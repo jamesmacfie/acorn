@@ -143,7 +143,15 @@ export const pullDetail = new Hono<AppEnv>().get('/:owner/:repo/pulls/:number', 
   const res = await ghGraphQL(user.token, COMPOSITE_QUERY, { owner, repo, number })
   if (res.status === 401) return c.json({ error: 'reauth' }, 401)
   if (!res.ok) return c.json({ error: 'github_unavailable' }, 502)
-  const json = (await res.json()) as { data?: { repository?: { pullRequest?: GqlPull | null } } }
+  const json = (await res.json()) as {
+    data?: { repository?: { pullRequest?: GqlPull | null } }
+    errors?: { message: string; type?: string }[]
+  }
+  // A GraphQL error (200 + errors, data null) must not masquerade as a 404 — surface it.
+  if (json.errors?.length) {
+    console.error('pullDetail GraphQL errors', JSON.stringify(json.errors))
+    return c.json({ error: 'graphql', detail: json.errors.map((e) => e.message) }, 502)
+  }
   const pr = json.data?.repository?.pullRequest
   if (!pr) return c.json({ error: 'pull_not_found' }, 404)
 
