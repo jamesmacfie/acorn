@@ -1,7 +1,10 @@
 /* @refresh reload */
 import { render } from 'solid-js/web'
-import { QueryClient, QueryClientProvider, QueryCache, MutationCache } from '@tanstack/solid-query'
+import { QueryClient, QueryCache, MutationCache } from '@tanstack/solid-query'
+import { PersistQueryClientProvider } from '@tanstack/solid-query-persist-client'
+import { createAsyncStoragePersister } from '@tanstack/query-async-storage-persister'
 import { Route, Router } from '@solidjs/router'
+import { clear, del, get, set } from 'idb-keyval'
 import App from './App'
 import './styles.css'
 
@@ -18,19 +21,30 @@ const onError = (err: unknown) => {
 const queryClient = new QueryClient({
   queryCache: new QueryCache({ onError }),
   mutationCache: new MutationCache({ onError }),
-  defaultOptions: { queries: { refetchOnWindowFocus: true } },
+  // gcTime must outlive a session so persisted entries survive reload (docs/caching.md 3-tier).
+  defaultOptions: { queries: { refetchOnWindowFocus: true, gcTime: 1000 * 60 * 60 * 24 } },
+})
+
+// Persist the cache to IndexedDB → instant render from last-known data + offline browsing of
+// recently-seen PRs. All user-scoped/private (private data never goes to a shared cache).
+const persister = createAsyncStoragePersister({
+  storage: { getItem: get, setItem: set, removeItem: del },
+  key: 'gurthurd-cache',
 })
 const noop = () => null
 
 render(
   () => (
-    <QueryClientProvider client={queryClient}>
+    <PersistQueryClientProvider client={queryClient} persistOptions={{ persister, maxAge: 1000 * 60 * 60 * 24 }}>
       <Router root={App}>
         <Route path="/" component={noop} />
         <Route path="/:owner/:repo" component={noop} />
         <Route path="/:owner/:repo/:number" component={noop} />
       </Router>
-    </QueryClientProvider>
+    </PersistQueryClientProvider>
   ),
   document.getElementById('root')!,
 )
+
+// Wipe the persisted cache on logout so the next user can't read it (logout posts then reloads).
+window.addEventListener('gurthurd:logout', () => void clear())
