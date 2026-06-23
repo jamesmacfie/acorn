@@ -1,6 +1,9 @@
 node_modules/
 .turbo/
 dist/
-.next/
 .env*.local
 *.log
+
+# Cloudflare / Wrangler
+.dev.vars
+.wrangler/
