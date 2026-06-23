@@ -43,6 +43,13 @@
       "when": 1782192415272,
       "tag": "0005_equal_shiva",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "6",
+      "when": 1782194554278,
+      "tag": "0006_marvelous_stephen_strange",
+      "breakpoints": true
     }
   ]
 }

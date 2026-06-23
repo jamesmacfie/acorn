@@ -98,6 +98,18 @@ export const comments = sqliteTable(
   (t) => [primaryKey({ columns: [t.userId, t.repoId, t.number, t.id] })],
 )
 
+export const prLabels = sqliteTable(
+  'pr_labels',
+  {
+    userId: text('user_id').notNull(),
+    repoId: integer('repo_id').notNull(),
+    number: integer('number').notNull(),
+    name: text('name').notNull(),
+    color: text('color'), // 6-hex, no leading #
+  },
+  (t) => [primaryKey({ columns: [t.userId, t.repoId, t.number, t.name] })],
+)
+
 export const checks = sqliteTable(
   'checks',
   {

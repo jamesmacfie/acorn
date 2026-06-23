@@ -124,3 +124,35 @@ export const prActions = new Hono<AppEnv>()
     await r.db.insert(schema.comments).values(row).onConflictDoNothing()
     return c.json({ id: row.id, author: row.author, body: row.body, createdAt: row.createdAt })
   })
+  // Add a label: POST /issues/{n}/labels. Remove a label: DELETE /issues/{n}/labels/{name}.
+  // Both return the PR's full label set → replace the pr_labels mirror so a within-TTL read is fresh.
+  .post('/:owner/:repo/pulls/:number/labels', (c) => mutateLabels(c, 'add'))
+  .delete('/:owner/:repo/pulls/:number/labels', (c) => mutateLabels(c, 'remove'))
+
+async function mutateLabels(c: Context<AppEnv>, op: 'add' | 'remove') {
+  const r = await resolvePr(c)
+  if ('error' in r) return c.json({ error: r.error }, r.status)
+  const { name } = (await c.req.json().catch(() => ({}))) as { name?: string }
+  if (!name?.trim()) return c.json({ error: 'empty_name' }, 400)
+  const res =
+    op === 'add'
+      ? await gh(r.user.token, `/repos/${r.owner}/${r.repo}/issues/${r.number}/labels`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ labels: [name] }),
+        })
+      : await gh(r.user.token, `/repos/${r.owner}/${r.repo}/issues/${r.number}/labels/${encodeURIComponent(name)}`, {
+          method: 'DELETE',
+        })
+  if (res.status === 401) return c.json({ error: 'reauth' }, 401)
+  if (!res.ok) return c.json({ error: 'github_unavailable' }, 502)
+  const labels = (await res.json()) as { name: string; color: string | null }[]
+  const rows = labels.map((l) => ({ userId: r.user.login, repoId: r.repoId, number: r.number, name: l.name, color: l.color }))
+  const where = and(
+    eq(schema.prLabels.userId, r.user.login),
+    eq(schema.prLabels.repoId, r.repoId),
+    eq(schema.prLabels.number, r.number),
+  )
+  await r.db.batch([r.db.delete(schema.prLabels).where(where), ...rows.map((row) => r.db.insert(schema.prLabels).values(row))])
+  return c.json(rows.map((row) => ({ name: row.name, color: row.color })))
+}

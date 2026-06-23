@@ -18,6 +18,7 @@ query PR($owner: String!, $repo: String!, $number: Int!) {
       id number title state isDraft bodyHTML
       author { login }
       baseRefName headRefName updatedAt
+      labels(first: 20) { nodes { name color } }
       reviews(first: 50) { nodes { id author { login } state bodyHTML submittedAt } }
       comments(first: 50) { nodes { id author { login } bodyHTML createdAt } }
       commits(last: 1) { nodes { commit { statusCheckRollup { contexts(first: 50) { nodes {
@@ -42,6 +43,7 @@ type GqlPull = {
   baseRefName: string | null
   headRefName: string | null
   updatedAt: string | null
+  labels: { nodes: { name: string; color: string | null }[] }
   reviews: { nodes: { id: string; author: { login: string } | null; state: string; bodyHTML: string | null; submittedAt: string | null }[] }
   comments: { nodes: { id: string; author: { login: string } | null; bodyHTML: string | null; createdAt: string | null }[] }
   commits: { nodes: { commit: { statusCheckRollup: { contexts: { nodes: GqlContext[] } } | null } }[] }
@@ -86,13 +88,15 @@ export const pullDetail = new Hono<AppEnv>().get('/:owner/:repo/pulls/:number', 
 
   const readComposite = async () => {
     const [pull] = await db.select().from(schema.pullRequests).where(prWhere)
-    const [reviews, comments, checks] = await Promise.all([
+    const [labels, reviews, comments, checks] = await Promise.all([
+      db.select().from(schema.prLabels).where(childWhere(schema.prLabels)),
       db.select().from(schema.reviews).where(childWhere(schema.reviews)),
       db.select().from(schema.comments).where(childWhere(schema.comments)),
       db.select().from(schema.checks).where(childWhere(schema.checks)),
     ])
     return {
       pull: pull ? toPublicPull(pull) : null,
+      labels: labels.map((l) => ({ name: l.name, color: l.color })),
       reviews: reviews.map((r) => ({ id: r.id, author: r.author, state: r.state, body: r.body, submittedAt: r.submittedAt })),
       comments: comments.map((m) => ({ id: m.id, author: m.author, body: m.body, createdAt: m.createdAt })),
       checks: checks.map((k) => ({ name: k.name, status: k.status, url: k.url })),
@@ -129,6 +133,7 @@ export const pullDetail = new Hono<AppEnv>().get('/:owner/:repo/pulls/:number', 
     staleAfter: STALE_AFTER_MS,
     etag: null,
   }
+  const labelRows = pr.labels.nodes.map((l) => ({ ...key, name: l.name, color: l.color }))
   const reviewRows = pr.reviews.nodes.map((r) => ({
     ...key,
     id: r.id,
@@ -164,9 +169,11 @@ export const pullDetail = new Hono<AppEnv>().get('/:owner/:repo/pulls/:number', 
         target: [schema.pullRequests.userId, schema.pullRequests.repoId, schema.pullRequests.number],
         set: pullRow,
       }),
+    db.delete(schema.prLabels).where(childWhere(schema.prLabels)),
     db.delete(schema.reviews).where(childWhere(schema.reviews)),
     db.delete(schema.comments).where(childWhere(schema.comments)),
     db.delete(schema.checks).where(childWhere(schema.checks)),
+    ...chunk(schema.prLabels, labelRows),
     ...chunk(schema.reviews, reviewRows),
     ...chunk(schema.comments, commentRows),
     ...chunk(schema.checks, checkRows),

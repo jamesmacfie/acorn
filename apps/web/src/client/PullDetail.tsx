@@ -2,7 +2,7 @@ import { createSignal, For, Show } from 'solid-js'
 import { createMutation, createQuery, useQueryClient } from '@tanstack/solid-query'
 import { useParams, useSearchParams } from '@solidjs/router'
 import { filesOptions, pullDetailOptions, reposOptions } from './queries'
-import { addComment, closePr, mergePr, reopenPr, setDraft } from './mutations'
+import { addComment, addLabel, closePr, mergePr, removeLabel, reopenPr, setDraft } from './mutations'
 
 // Mid (Navigator) pane: PR header + description + changed-files + checks + conversation.
 // Bodies are GitHub-sanitized bodyHTML, rendered via innerHTML (docs/ui-style.md §5).
@@ -27,6 +27,7 @@ export default function PullDetail() {
 
   const [mergeMethod, setMergeMethod] = createSignal('squash')
   const [draftText, setDraftText] = createSignal('')
+  const [labelText, setLabelText] = createSignal('')
   const [actionError, setActionError] = createSignal('')
   const run = (p: Promise<unknown>) => p.then(refresh).catch((e) => setActionError(String(e.message ?? e)))
 
@@ -40,6 +41,11 @@ export default function PullDetail() {
     const body = draftText().trim()
     if (!body) return
     run(comment.mutateAsync(body)).then(() => setDraftText(''))
+  }
+  const submitLabel = () => {
+    const name = labelText().trim()
+    if (!name) return
+    run(addLabel(o(), r(), n(), name)).then(() => setLabelText(''))
   }
 
   return (
@@ -94,6 +100,34 @@ export default function PullDetail() {
                 <div class="markdown" innerHTML={pull().body!} />
               </details>
             </Show>
+
+            <details class="nav-section" open>
+              <summary>Labels</summary>
+              <div class="labels">
+                <For each={detail.data?.labels} fallback={<span class="muted">None.</span>}>
+                  {(l) => (
+                    <button
+                      type="button"
+                      class="label-chip"
+                      title="Remove label"
+                      style={l.color ? { 'border-color': `#${l.color}` } : undefined}
+                      onClick={() => run(removeLabel(o(), r(), n(), l.name))}
+                    >
+                      {l.name} ✕
+                    </button>
+                  )}
+                </For>
+              </div>
+              <div class="composer">
+                <input
+                  class="pr-filter"
+                  placeholder="Add label…"
+                  value={labelText()}
+                  onInput={(e) => setLabelText(e.currentTarget.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && submitLabel()}
+                />
+              </div>
+            </details>
 
             <details class="nav-section" open>
               <summary>
