@@ -2,7 +2,10 @@ import { createSignal, For, Show } from 'solid-js'
 import { createMutation, createQuery, useQueryClient } from '@tanstack/solid-query'
 import { useParams, useSearchParams } from '@solidjs/router'
 import { filesOptions, pullDetailOptions, reposOptions } from './queries'
-import { addComment, addLabel, closePr, mergePr, removeLabel, reopenPr, setDraft, setViewed } from './mutations'
+import { addComment, addLabel, closePr, mergePr, removeLabel, reopenPr, rerunFailed, setDraft, setViewed } from './mutations'
+
+// Conclusions that count as a failed check → eligible for "Rerun failed jobs".
+const FAILED_STATUSES = new Set(['failure', 'error', 'cancelled', 'timed_out'])
 
 // Mid (Navigator) pane: PR header + description + changed-files + checks + conversation.
 // Bodies are GitHub-sanitized bodyHTML, rendered via innerHTML (docs/ui-style.md §5).
@@ -172,6 +175,11 @@ export default function PullDetail() {
                               {ck.status}
                             </a>
                           )}
+                        </Show>
+                        <Show when={FAILED_STATUSES.has((ck.status ?? '').toLowerCase()) && ck.runId != null}>
+                          <button type="button" class="check-rerun" onClick={() => run(rerunFailed(o(), r(), ck.runId!))}>
+                            Rerun
+                          </button>
                         </Show>
                       </li>
                     )}

@@ -142,6 +142,7 @@ export const checks = sqliteTable(
     name: text('name').notNull(), // CheckRun.name | StatusContext.context
     status: text('status'), // CheckRun.conclusion|status | StatusContext.state
     url: text('url'),
+    runId: integer('run_id'), // CheckRun.checkSuite.workflowRun.databaseId — null for StatusContext; enables rerun-failed-jobs
   },
   (t) => [primaryKey({ columns: [t.userId, t.repoId, t.number, t.name] })],
 )

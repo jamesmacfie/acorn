@@ -179,6 +179,18 @@ body {
 .check-success { background: var(--add-marker); }
 .check-failure, .check-error { background: var(--del-marker); }
 .check-pending, .check-in_progress, .check-queued { background: var(--warn); }
+.check-rerun {
+  flex: none;
+  font: inherit;
+  font-size: 11px;
+  color: var(--text);
+  background: var(--bg-subtle);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 1px 8px;
+  cursor: pointer;
+}
+.check-rerun:hover { border-color: var(--border-strong); }
 
 /* PR actions + comment composer. */
 .pr-actions { display: flex; align-items: center; gap: 6px; margin-top: 8px; flex-wrap: wrap; }

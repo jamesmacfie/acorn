@@ -27,7 +27,7 @@ query PR($owner: String!, $repo: String!, $number: Int!) {
       } }
       commits(last: 1) { nodes { commit { statusCheckRollup { contexts(first: 50) { nodes {
         __typename
-        ... on CheckRun { name status conclusion detailsUrl }
+        ... on CheckRun { name status conclusion detailsUrl checkSuite { workflowRun { databaseId } } }
         ... on StatusContext { context state targetUrl }
       } } } } } }
     }
@@ -67,7 +67,14 @@ type GqlThreadComment = {
 }
 type GqlThread = { id: string; isResolved: boolean; comments: { nodes: GqlThreadComment[] } }
 type GqlContext =
-  | { __typename: 'CheckRun'; name: string; status: string | null; conclusion: string | null; detailsUrl: string | null }
+  | {
+      __typename: 'CheckRun'
+      name: string
+      status: string | null
+      conclusion: string | null
+      detailsUrl: string | null
+      checkSuite: { workflowRun: { databaseId: number | null } | null } | null
+    }
   | { __typename: 'StatusContext'; context: string; state: string | null; targetUrl: string | null }
 
 const ms = (s: string | null) => (s ? Date.parse(s) : null)
@@ -125,7 +132,7 @@ export const pullDetail = new Hono<AppEnv>().get('/:owner/:repo/pulls/:number', 
       labels: labels.map((l) => ({ name: l.name, color: l.color })),
       reviews: reviews.map((r) => ({ id: r.id, author: r.author, state: r.state, body: r.body, submittedAt: r.submittedAt })),
       comments: comments.map((m) => ({ id: m.id, author: m.author, body: m.body, createdAt: m.createdAt })),
-      checks: checks.map((k) => ({ name: k.name, status: k.status, url: k.url })),
+      checks: checks.map((k) => ({ name: k.name, status: k.status, url: k.url, runId: k.runId })),
       threads: [...tmap.values()],
     }
   }
@@ -195,8 +202,8 @@ export const pullDetail = new Hono<AppEnv>().get('/:owner/:repo/pulls/:number', 
   const checkRows = dedupeByName(
     (pr.commits.nodes[0]?.commit.statusCheckRollup?.contexts.nodes ?? []).map((ctx) =>
       ctx.__typename === 'CheckRun'
-        ? { ...key, name: ctx.name, status: ctx.conclusion ?? ctx.status, url: ctx.detailsUrl }
-        : { ...key, name: ctx.context, status: ctx.state, url: ctx.targetUrl },
+        ? { ...key, name: ctx.name, status: ctx.conclusion ?? ctx.status, url: ctx.detailsUrl, runId: ctx.checkSuite?.workflowRun?.databaseId ?? null }
+        : { ...key, name: ctx.context, status: ctx.state, url: ctx.targetUrl, runId: null },
     ),
   )
 
