@@ -38,6 +38,7 @@ export const pullRequests = sqliteTable(
     draft: integer('draft', { mode: 'boolean' }).notNull().default(false),
     title: text('title').notNull(),
     body: text('body'), // sanitized bodyHTML from GraphQL (rendered via innerHTML)
+    headSha: text('head_sha'), // head commit oid — commit_id for creating line comments
     headRef: text('head_ref'),
     baseRef: text('base_ref'),
     author: text('author'),
@@ -91,6 +92,28 @@ export const comments = sqliteTable(
     repoId: integer('repo_id').notNull(),
     number: integer('number').notNull(),
     id: text('id').notNull(), // GraphQL node id
+    author: text('author'),
+    body: text('body'),
+    createdAt: integer('created_at'),
+  },
+  (t) => [primaryKey({ columns: [t.userId, t.repoId, t.number, t.id] })],
+)
+
+// Inline review-comment threads. One row per comment; thread-level fields (path/line/side/
+// resolved) are denormalized onto each row. databaseId is the numeric id REST needs for replies.
+export const reviewThreads = sqliteTable(
+  'review_threads',
+  {
+    userId: text('user_id').notNull(),
+    repoId: integer('repo_id').notNull(),
+    number: integer('number').notNull(),
+    threadId: text('thread_id').notNull(),
+    id: text('id').notNull(), // comment node id
+    databaseId: integer('database_id'),
+    path: text('path'),
+    line: integer('line'),
+    side: text('side'), // RIGHT | LEFT
+    resolved: integer('resolved', { mode: 'boolean' }).notNull().default(false),
     author: text('author'),
     body: text('body'),
     createdAt: integer('created_at'),

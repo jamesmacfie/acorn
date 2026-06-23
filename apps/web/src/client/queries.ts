@@ -64,12 +64,22 @@ export type Review = { id: string; author: string | null; state: string | null; 
 export type Comment = { id: string; author: string | null; body: string | null; createdAt: number | null }
 export type Check = { name: string; status: string | null; url: string | null }
 export type Label = { name: string; color: string | null }
+export type ThreadComment = { id: string; databaseId: number | null; author: string | null; body: string | null; createdAt: number | null }
+export type Thread = {
+  threadId: string
+  path: string | null
+  line: number | null
+  side: string | null
+  resolved: boolean
+  comments: ThreadComment[]
+}
 export type PullDetail = {
-  pull: (Pull & { number: number; body: string | null }) | null
+  pull: (Pull & { number: number; body: string | null; headSha: string | null }) | null
   labels: Label[]
   reviews: Review[]
   comments: Comment[]
   checks: Check[]
+  threads: Thread[]
 }
 
 export const pullDetailOptions = (owner: string, repo: string, number: string, enabled: boolean) => ({

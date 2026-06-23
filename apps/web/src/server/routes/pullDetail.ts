@@ -15,12 +15,16 @@ const COMPOSITE_QUERY = `
 query PR($owner: String!, $repo: String!, $number: Int!) {
   repository(owner: $owner, name: $repo) {
     pullRequest(number: $number) {
-      id number title state isDraft bodyHTML
+      id number title state isDraft bodyHTML headRefOid
       author { login }
       baseRefName headRefName updatedAt
       labels(first: 20) { nodes { name color } }
       reviews(first: 50) { nodes { id author { login } state bodyHTML submittedAt } }
       comments(first: 50) { nodes { id author { login } bodyHTML createdAt } }
+      reviewThreads(first: 50) { nodes {
+        id isResolved
+        comments(first: 50) { nodes { id databaseId path line originalLine diffSide author { login } bodyHTML createdAt } }
+      } }
       commits(last: 1) { nodes { commit { statusCheckRollup { contexts(first: 50) { nodes {
         __typename
         ... on CheckRun { name status conclusion detailsUrl }
@@ -39,6 +43,7 @@ type GqlPull = {
   state: string
   isDraft: boolean
   bodyHTML: string | null
+  headRefOid: string | null
   author: { login: string } | null
   baseRefName: string | null
   headRefName: string | null
@@ -46,8 +51,21 @@ type GqlPull = {
   labels: { nodes: { name: string; color: string | null }[] }
   reviews: { nodes: { id: string; author: { login: string } | null; state: string; bodyHTML: string | null; submittedAt: string | null }[] }
   comments: { nodes: { id: string; author: { login: string } | null; bodyHTML: string | null; createdAt: string | null }[] }
+  reviewThreads: { nodes: GqlThread[] }
   commits: { nodes: { commit: { statusCheckRollup: { contexts: { nodes: GqlContext[] } } | null } }[] }
 }
+type GqlThreadComment = {
+  id: string
+  databaseId: number | null
+  path: string | null
+  line: number | null
+  originalLine: number | null
+  diffSide: string | null
+  author: { login: string } | null
+  bodyHTML: string | null
+  createdAt: string | null
+}
+type GqlThread = { id: string; isResolved: boolean; comments: { nodes: GqlThreadComment[] } }
 type GqlContext =
   | { __typename: 'CheckRun'; name: string; status: string | null; conclusion: string | null; detailsUrl: string | null }
   | { __typename: 'StatusContext'; context: string; state: string | null; targetUrl: string | null }
@@ -88,18 +106,27 @@ export const pullDetail = new Hono<AppEnv>().get('/:owner/:repo/pulls/:number', 
 
   const readComposite = async () => {
     const [pull] = await db.select().from(schema.pullRequests).where(prWhere)
-    const [labels, reviews, comments, checks] = await Promise.all([
+    const [labels, reviews, comments, checks, threadRows] = await Promise.all([
       db.select().from(schema.prLabels).where(childWhere(schema.prLabels)),
       db.select().from(schema.reviews).where(childWhere(schema.reviews)),
       db.select().from(schema.comments).where(childWhere(schema.comments)),
       db.select().from(schema.checks).where(childWhere(schema.checks)),
+      db.select().from(schema.reviewThreads).where(childWhere(schema.reviewThreads)),
     ])
+    // Group thread-comment rows back into threads keyed by threadId.
+    const tmap = new Map<string, ReturnType<typeof toThread>>()
+    for (const row of threadRows) {
+      let t = tmap.get(row.threadId)
+      if (!t) tmap.set(row.threadId, (t = toThread(row)))
+      t.comments.push({ id: row.id, databaseId: row.databaseId, author: row.author, body: row.body, createdAt: row.createdAt })
+    }
     return {
       pull: pull ? toPublicPull(pull) : null,
       labels: labels.map((l) => ({ name: l.name, color: l.color })),
       reviews: reviews.map((r) => ({ id: r.id, author: r.author, state: r.state, body: r.body, submittedAt: r.submittedAt })),
       comments: comments.map((m) => ({ id: m.id, author: m.author, body: m.body, createdAt: m.createdAt })),
       checks: checks.map((k) => ({ name: k.name, status: k.status, url: k.url })),
+      threads: [...tmap.values()],
     }
   }
 
@@ -125,6 +152,7 @@ export const pullDetail = new Hono<AppEnv>().get('/:owner/:repo/pulls/:number', 
     draft: pr.isDraft,
     title: pr.title,
     body: pr.bodyHTML,
+    headSha: pr.headRefOid,
     headRef: pr.headRefName,
     baseRef: pr.baseRefName,
     author: pr.author?.login ?? null,
@@ -149,6 +177,21 @@ export const pullDetail = new Hono<AppEnv>().get('/:owner/:repo/pulls/:number', 
     body: m.bodyHTML,
     createdAt: ms(m.createdAt),
   }))
+  const threadRows = pr.reviewThreads.nodes.flatMap((t) =>
+    t.comments.nodes.map((cm) => ({
+      ...key,
+      threadId: t.id,
+      id: cm.id,
+      databaseId: cm.databaseId,
+      path: cm.path,
+      line: cm.line ?? cm.originalLine,
+      side: cm.diffSide,
+      resolved: t.isResolved,
+      author: cm.author?.login ?? null,
+      body: cm.bodyHTML,
+      createdAt: ms(cm.createdAt),
+    })),
+  )
   const checkRows = dedupeByName(
     (pr.commits.nodes[0]?.commit.statusCheckRollup?.contexts.nodes ?? []).map((ctx) =>
       ctx.__typename === 'CheckRun'
@@ -173,10 +216,12 @@ export const pullDetail = new Hono<AppEnv>().get('/:owner/:repo/pulls/:number', 
     db.delete(schema.reviews).where(childWhere(schema.reviews)),
     db.delete(schema.comments).where(childWhere(schema.comments)),
     db.delete(schema.checks).where(childWhere(schema.checks)),
+    db.delete(schema.reviewThreads).where(childWhere(schema.reviewThreads)),
     ...chunk(schema.prLabels, labelRows),
     ...chunk(schema.reviews, reviewRows),
     ...chunk(schema.comments, commentRows),
     ...chunk(schema.checks, checkRows),
+    ...chunk(schema.reviewThreads, threadRows),
     db
       .insert(schema.syncState)
       .values({ userId, resource, etag: null, fetchedAt: now })
@@ -189,6 +234,16 @@ export const pullDetail = new Hono<AppEnv>().get('/:owner/:repo/pulls/:number', 
 // A commit can carry duplicate context names across check runs; keep the last (PK is name).
 const dedupeByName = <T extends { name: string }>(rows: T[]) => [...new Map(rows.map((r) => [r.name, r])).values()]
 
+type ThreadComment = { id: string; databaseId: number | null; author: string | null; body: string | null; createdAt: number | null }
+const toThread = (row: typeof schema.reviewThreads.$inferSelect) => ({
+  threadId: row.threadId,
+  path: row.path,
+  line: row.line,
+  side: row.side,
+  resolved: row.resolved,
+  comments: [] as ThreadComment[],
+})
+
 const toPublicPull = (p: typeof schema.pullRequests.$inferSelect) => ({
   number: p.number,
   title: p.title,
@@ -196,6 +251,7 @@ const toPublicPull = (p: typeof schema.pullRequests.$inferSelect) => ({
   state: p.state,
   draft: p.draft,
   author: p.author,
+  headSha: p.headSha,
   headRef: p.headRef,
   baseRef: p.baseRef,
   updatedAt: p.updatedAt,

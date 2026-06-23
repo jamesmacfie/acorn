@@ -261,6 +261,7 @@ body {
   top: 0;
   left: 0;
   display: flex;
+  flex-wrap: wrap; /* lets an inline composer drop to its own line below the code */
   align-items: center;
   width: max-content;
   min-width: 100%;
@@ -274,6 +275,103 @@ body {
 .diff-del { background: var(--del-bg); }
 .diff-del .diff-marker { color: var(--del-marker); }
 .diff-hunk { background: var(--hunk-bg); color: var(--hunk-text); padding-left: 4px; }
+
+/* Inline review threads + new-line composer. Thread rows are full-width, variable-height blocks
+   (measured by the virtualizer); the add-comment "+" reveals on row hover. */
+.diff-add-btn {
+  flex: none;
+  width: 16px;
+  height: 16px;
+  margin-right: 4px;
+  padding: 0;
+  font: inherit;
+  font-size: 11px;
+  line-height: 14px;
+  color: var(--text-muted);
+  background: var(--bg-subtle);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  cursor: pointer;
+  visibility: hidden;
+}
+.diff-row:hover .diff-add-btn { visibility: visible; }
+.diff-add-btn:hover { color: var(--text); border-color: var(--border-strong); }
+
+/* Thread / composer rows opt out of the single-line flex layout used by code rows. */
+.diff-thread-row {
+  display: block;
+  align-items: stretch;
+  width: 100%;
+  min-width: 100%;
+  white-space: normal;
+}
+
+.diff-thread {
+  margin: 4px 0;
+  padding: 8px 10px;
+  background: var(--bg-subtle);
+  border: 1px solid var(--border);
+  border-left: 2px solid var(--accent);
+  border-radius: var(--radius);
+  line-height: var(--lh);
+}
+.diff-thread-resolved { opacity: 0.75; border-left-color: var(--add-marker); }
+.diff-thread-head { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+.diff-thread-status {
+  font-size: var(--fs-sm);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-muted);
+}
+.diff-thread-resolved .diff-thread-status { color: var(--add-marker); }
+.diff-thread-link {
+  margin-left: auto;
+  font: inherit;
+  font-size: var(--fs-sm);
+  color: var(--text-muted);
+  background: none;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+}
+.diff-thread-link + .diff-thread-link { margin-left: 0; }
+.diff-thread-link:hover:not(:disabled) { color: var(--text); }
+.diff-thread-link:disabled { opacity: 0.5; cursor: default; }
+.diff-thread-comment { padding: 4px 0; border-top: 1px solid var(--border); }
+.diff-thread-comment:first-of-type { border-top: 0; }
+
+/* Reply box (thread) + new-line composer share the textarea + action styling. */
+.diff-reply, .diff-composer { display: flex; flex-direction: column; gap: 6px; margin-top: 6px; }
+.diff-composer { flex-basis: 100%; padding: 6px 0 4px 52px; white-space: normal; }
+.diff-reply-input {
+  width: 100%;
+  min-height: 48px;
+  font: inherit;
+  font-family: var(--font-mono);
+  font-size: var(--fs-sm);
+  color: var(--text);
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 6px 8px;
+  resize: vertical;
+  white-space: normal;
+}
+.diff-reply-input:disabled { opacity: 0.5; }
+.diff-composer-actions { display: flex; gap: 6px; }
+.diff-composer-actions button {
+  font: inherit;
+  font-size: var(--fs-sm);
+  color: var(--text);
+  background: var(--bg-subtle);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 3px 10px;
+  cursor: pointer;
+}
+.diff-composer-actions button:hover:not(:disabled) { border-color: var(--border-strong); }
+.diff-composer-actions button:disabled { opacity: 0.5; cursor: default; }
+.diff-thread-err { font-size: var(--fs-sm); color: var(--del-marker); }
 
 /* Shiki dual-theme: light by default, dark when the app theme is dark (mirrors token theming). */
 .diff-code span { color: var(--l); }

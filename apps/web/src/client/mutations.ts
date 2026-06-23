@@ -33,6 +33,14 @@ export const removeLabel = async (o: string, r: string, n: string, name: string)
   return res.json()
 }
 
+// Inline review threads.
+export const addReviewComment = (o: string, r: string, n: string, body: string, path: string, line: number, side: string) =>
+  post(`${base(o, r, n)}/review-comments`, { body, path, line, side })
+export const replyReview = (o: string, r: string, n: string, commentDatabaseId: number, body: string) =>
+  post(`${base(o, r, n)}/review-comments/${commentDatabaseId}/replies`, { body })
+export const resolveThread = (o: string, r: string, n: string, threadId: string, resolved: boolean) =>
+  post(`${base(o, r, n)}/threads/${encodeURIComponent(threadId)}/resolve`, { resolved })
+
 export const setPref = async (key: string, value: string) => {
   const res = await fetch('/api/prefs', {
     method: 'PUT',
