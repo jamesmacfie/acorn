@@ -42,11 +42,11 @@ export const reposOptions = (enabled: boolean) => ({
   },
 })
 
-export const pullsOptions = (owner: string, repo: string, enabled: boolean) => ({
-  queryKey: ['pulls', owner, repo] as const,
+export const pullsOptions = (owner: string, repo: string, state: 'open' | 'closed', enabled: boolean) => ({
+  queryKey: ['pulls', owner, repo, state] as const,
   enabled,
   queryFn: async (): Promise<Pull[]> => {
-    const res = await fetch(`/api/repos/${owner}/${repo}/pulls`)
+    const res = await fetch(`/api/repos/${owner}/${repo}/pulls?state=${state}`)
     if (!res.ok) throw new Error(`/api/repos/${owner}/${repo}/pulls ${res.status}`)
     return res.json()
   },

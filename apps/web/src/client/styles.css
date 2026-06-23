@@ -100,6 +100,31 @@ body {
   border-bottom: 1px solid var(--border);
   font-size: var(--fs-sm);
 }
+/* PR list tabs + filter. */
+.pr-tabs { display: flex; align-items: center; gap: 6px; margin-bottom: 8px; }
+.pr-tabs button {
+  font: inherit;
+  font-size: var(--fs-sm);
+  color: var(--text-muted);
+  background: none;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  padding: 2px 2px 4px;
+  cursor: pointer;
+}
+.pr-tabs button.active { color: var(--text); border-bottom-color: var(--accent); }
+.pr-filter {
+  margin-left: auto;
+  width: 40%;
+  font: inherit;
+  font-size: var(--fs-sm);
+  color: var(--text);
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 2px 6px;
+}
+
 .pr-row { color: inherit; text-decoration: none; cursor: pointer; }
 .pr-row.active { background: var(--bg-selected); }
 .pr-row:hover { background: var(--bg-subtle); }

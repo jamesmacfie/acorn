@@ -1,4 +1,4 @@
-import { and, desc, eq } from 'drizzle-orm'
+import { and, desc, eq, ne } from 'drizzle-orm'
 import { Hono } from 'hono'
 import { getDb, schema } from '../db'
 import { gh } from '../github'
@@ -29,6 +29,8 @@ export const pulls = new Hono<AppEnv>().get('/:owner/:repo/pulls', async (c) => 
   const userId = user.login
   const owner = c.req.param('owner')
   const repo = c.req.param('repo')
+  // open | closed (closed covers merged — GitHub's list reports merged PRs as "closed").
+  const state = c.req.query('state') === 'closed' ? 'closed' : 'open'
 
   // Resolve the GitHub repo id from this user's repos mirror. The client only requests repos
   // already in its loaded list, so a miss means a cold/invalid URL.
@@ -39,18 +41,18 @@ export const pulls = new Hono<AppEnv>().get('/:owner/:repo/pulls', async (c) => 
   if (!repoRow) return c.json({ error: 'repo_not_found' }, 404)
   const repoId = repoRow.id
 
-  const resource = `pulls:${repoId}:open`
+  const resource = `pulls:${repoId}:${state}`
   const [sync] = await db
     .select()
     .from(schema.syncState)
     .where(and(eq(schema.syncState.userId, userId), eq(schema.syncState.resource, resource)))
 
+  // Partition open vs closed within the shared table so the two tabs don't clobber each other.
+  const stateFilter = state === 'open' ? eq(schema.pullRequests.state, 'open') : ne(schema.pullRequests.state, 'open')
+  const scope = and(eq(schema.pullRequests.userId, userId), eq(schema.pullRequests.repoId, repoId), stateFilter)
+
   const readRows = () =>
-    db
-      .select()
-      .from(schema.pullRequests)
-      .where(and(eq(schema.pullRequests.userId, userId), eq(schema.pullRequests.repoId, repoId)))
-      .orderBy(desc(schema.pullRequests.updatedAt))
+    db.select().from(schema.pullRequests).where(scope).orderBy(desc(schema.pullRequests.updatedAt))
 
   // Fresh → serve the mirror, no GitHub call.
   if (sync && sync.fetchedAt + STALE_AFTER_MS > Date.now()) {
@@ -58,7 +60,7 @@ export const pulls = new Hono<AppEnv>().get('/:owner/:repo/pulls', async (c) => 
   }
 
   // Stale/missing → revalidate conditionally.
-  const res = await gh(user.token, `/repos/${owner}/${repo}/pulls?state=open&sort=updated&direction=desc&per_page=100`, {
+  const res = await gh(user.token, `/repos/${owner}/${repo}/pulls?state=${state}&sort=updated&direction=desc&per_page=100`, {
     headers: sync?.etag ? { 'If-None-Match': sync.etag } : {},
   })
   if (res.status === 401) return c.json({ error: 'reauth' }, 401)
@@ -105,7 +107,7 @@ export const pulls = new Hono<AppEnv>().get('/:owner/:repo/pulls', async (c) => 
     db.insert(schema.pullRequests).values(rows.slice(i * 6, i * 6 + 6)),
   )
   await db.batch([
-    db.delete(schema.pullRequests).where(and(eq(schema.pullRequests.userId, userId), eq(schema.pullRequests.repoId, repoId))),
+    db.delete(schema.pullRequests).where(scope),
     db
       .insert(schema.syncState)
       .values({ userId, resource, etag, fetchedAt: now })
