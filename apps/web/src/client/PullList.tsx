@@ -1,7 +1,8 @@
-import { createMemo, createSignal, For, onCleanup, onMount, Show } from 'solid-js'
+import { createEffect, createMemo, createSignal, For, on, onCleanup, onMount, Show } from 'solid-js'
 import { createQuery } from '@tanstack/solid-query'
 import { A, useNavigate, useParams } from '@solidjs/router'
 import { createVirtualizer } from '@tanstack/solid-virtual'
+import { formatRelativeTime } from './displayMeta'
 import { pullsOptions, reposOptions } from './queries'
 
 // Left-pane PR list for the routed repo. Reads the shared repos cache to gate the request
@@ -15,6 +16,15 @@ export default function PullList() {
   const repos = createQuery(() => reposOptions(true))
   const repoKnown = () => !!repos.data?.some((r) => r.owner === params.owner && r.name === params.repo)
   const pulls = createQuery(() => pullsOptions(params.owner ?? '', params.repo ?? '', tab(), repoKnown()))
+
+  createEffect(on(
+    () => `${params.owner ?? ''}/${params.repo ?? ''}`,
+    () => {
+      setTab('open')
+      setFilter('')
+    },
+    { defer: true },
+  ))
 
   // Client-side text filter over the loaded tab (title / author / #number).
   const shown = createMemo(() => {
@@ -45,7 +55,7 @@ export default function PullList() {
       return shown().length
     },
     getScrollElement: () => scrollEl ?? null,
-    estimateSize: () => 34, // --row-h
+    estimateSize: () => 36, // --row-h
     overscan: 12,
   })
 
@@ -82,6 +92,7 @@ export default function PullList() {
                       <Show when={pr().author}>
                         <span class="pr-author muted">{pr().author}</span>
                       </Show>
+                      <span class="pr-time muted">{formatRelativeTime(pr().updatedAt)}</span>
                     </A>
                   )
                 }}

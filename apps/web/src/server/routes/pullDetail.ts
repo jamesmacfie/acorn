@@ -219,9 +219,12 @@ export const pullDetail = new Hono<AppEnv>().get('/:owner/:repo/pulls/:number', 
     ),
   )
 
-  // chunk(rows): D1 caps bound params at 100/statement; ≤8 cols × 8 rows = ≤64.
-  const chunk = <T,>(table: Parameters<typeof db.insert>[0], rows: T[]) =>
-    Array.from({ length: Math.ceil(rows.length / 8) }, (_, i) => db.insert(table).values(rows.slice(i * 8, i * 8 + 8) as never))
+  // chunk(rows): D1 caps bound params at 100/statement, so cap rows/statement by column count.
+  const chunk = <T,>(table: Parameters<typeof db.insert>[0], rows: T[]) => {
+    if (rows.length === 0) return []
+    const size = Math.max(1, Math.floor(100 / Object.keys(rows[0] as object).length))
+    return Array.from({ length: Math.ceil(rows.length / size) }, (_, i) => db.insert(table).values(rows.slice(i * size, i * size + size) as never))
+  }
 
   await db.batch([
     db

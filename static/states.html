@@ -1,0 +1,209 @@
+<!doctype html>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>aacorn — states & overlays (static mockup)</title>
+  <link rel="stylesheet" href="styles.css" />
+  <style>
+    /* static-mockup shim — NOT part of the app. Neutralises JS-virtualization positioning
+       and pins the normally-fixed overlays/popover into the page flow so a designer can see
+       every state at once. Delete when wiring to real data. */
+    .diff-rows { height: auto !important; }
+    .diff-row { position: static !important; transform: none !important; }
+    .overlay-backdrop { position: static; inset: auto; padding: 24px; background: var(--bg-subtle); }
+    .repo-picker-popover { position: static; }
+
+    /* gallery chrome (not app UI) */
+    .gallery { padding: 24px; max-width: 980px; margin: 0 auto; }
+    .gallery h1 { font-size: var(--fs-lg); margin: 0 0 4px; }
+    .gallery .lede { color: var(--text-muted); font-size: var(--fs-sm); margin: 0 0 24px; }
+    .case { margin: 0 0 32px; }
+    .case > h2 {
+      font-size: var(--fs-sm); text-transform: uppercase; letter-spacing: 0.05em;
+      color: var(--text-muted); margin: 0 0 8px; padding-bottom: 4px;
+      border-bottom: 1px solid var(--border);
+    }
+    .frame { border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }
+    .frame .topbar { border-bottom: 1px solid var(--border); }
+  </style>
+</head>
+<body>
+  <div class="gallery">
+    <h1>aacorn — states &amp; overlays</h1>
+    <p class="lede">Every secondary view in one page. Shares <code>styles.css</code> with the main view
+      (<code>index.html</code>) — restyle once, both update. Cards are pinned into flow by a clearly-marked
+      mockup shim; in the live app the overlays float fixed over the three panes.</p>
+
+    <!-- ── Split diff ──────────────────────────────────────────────────── -->
+    <div class="case">
+      <h2>Diff — split (side-by-side) view</h2>
+      <div class="frame">
+        <div class="diff-toolbar">
+          <div class="diff-viewmode" role="group" aria-label="Diff view mode">
+            <button type="button" class="diff-viewmode-btn" aria-pressed="false">Unified</button>
+            <button type="button" class="diff-viewmode-btn active" aria-pressed="true">Split</button>
+          </div>
+        </div>
+        <div class="diff diff-split">
+          <div class="diff-split-rows">
+            <div class="diff-split-full diff-hunk">
+              <span class="diff-hunk-text">@@ -38,9 +38,12 @@ export class UploadClient {</span>
+            </div>
+
+            <!-- context line: same on both sides -->
+            <div class="diff-split-pair">
+              <div class="diff-split-cell">
+                <span class="diff-gutter">38</span><span class="diff-marker"> </span>
+                <span class="diff-code"><span style="--l:#cf222e;--r:#ff7b72">async</span> <span style="--l:#8250df;--r:#d2a8ff">send</span>(blob) {</span>
+              </div>
+              <div class="diff-split-cell">
+                <span class="diff-gutter">38</span><span class="diff-marker"> </span>
+                <span class="diff-code"><span style="--l:#cf222e;--r:#ff7b72">async</span> <span style="--l:#8250df;--r:#d2a8ff">send</span>(blob) {</span>
+              </div>
+            </div>
+
+            <!-- paired change: delete on the left, insert on the right, word-diff highlighted -->
+            <div class="diff-split-pair">
+              <div class="diff-split-cell diff-del">
+                <span class="diff-gutter">39</span><span class="diff-marker">−</span>
+                <span class="diff-code">  <span style="--l:#cf222e;--r:#ff7b72">const</span> res = <span class="diff-word-del">fetch(this.url, opts)</span></span>
+              </div>
+              <div class="diff-split-cell diff-add">
+                <span class="diff-gutter">39</span><span class="diff-marker">+</span>
+                <span class="diff-code">  <span style="--l:#cf222e;--r:#ff7b72">const</span> res = <span class="diff-word-add">withBackoff(() =&gt; fetch(this.url, opts), n)</span></span>
+              </div>
+            </div>
+
+            <!-- pure insert: left cell empty (filler) -->
+            <div class="diff-split-pair">
+              <div class="diff-split-cell diff-split-empty"><span class="diff-gutter"></span></div>
+              <div class="diff-split-cell diff-add">
+                <span class="diff-gutter">40</span><span class="diff-marker">+</span>
+                <span class="diff-code">  <span style="--l:#6a737d;--r:#8b949e">// 0 disables retries</span></span>
+              </div>
+            </div>
+
+            <!-- full-width thread spanning both columns -->
+            <div class="diff-split-full diff-thread-row">
+              <div class="diff-thread">
+                <div class="diff-thread-head">
+                  <span class="diff-thread-status">Conversation</span>
+                  <button class="diff-thread-link">Resolve</button>
+                </div>
+                <div class="comment diff-thread-comment">
+                  <div class="comment-meta"><strong>monalisa</strong></div>
+                  <div class="markdown"><p>Nice — the wrapper keeps the call site readable.</p></div>
+                </div>
+                <div class="diff-reply">
+                  <textarea class="diff-reply-input" placeholder="Reply…"></textarea>
+                  <div class="diff-composer-actions"><button>Reply</button></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── Repo picker popover ─────────────────────────────────────────── -->
+    <div class="case">
+      <h2>Repo picker — open popover</h2>
+      <div class="repo-picker">
+        <div class="repo-picker-popover" role="listbox">
+          <input class="repo-picker-filter" placeholder="Filter repos…" />
+          <ul class="repo-picker-list">
+            <li class="repo-picker-row active">
+              <button type="button" class="repo-pin pinned" title="Unpin" aria-pressed="true">★</button>
+              <button type="button" class="repo-picker-name">acme/web-platform</button>
+            </li>
+            <li class="repo-picker-row">
+              <button type="button" class="repo-pin pinned" title="Unpin" aria-pressed="true">★</button>
+              <button type="button" class="repo-picker-name">acme/design-system</button>
+            </li>
+            <li class="repo-picker-row">
+              <button type="button" class="repo-pin" title="Pin" aria-pressed="false">☆</button>
+              <button type="button" class="repo-picker-name">acme/api-gateway</button>
+            </li>
+            <li class="repo-picker-row">
+              <button type="button" class="repo-pin" title="Pin" aria-pressed="false">☆</button>
+              <button type="button" class="repo-picker-name">acme/mobile-app</button>
+            </li>
+            <li class="repo-picker-row">
+              <button type="button" class="repo-pin" title="Pin" aria-pressed="false">☆</button>
+              <button type="button" class="repo-picker-name">octocat/dotfiles</button>
+            </li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── Help overlay ────────────────────────────────────────────────── -->
+    <div class="case">
+      <h2>Keyboard-shortcuts overlay (<kbd>?</kbd>)</h2>
+      <div class="overlay-backdrop">
+        <div class="overlay" role="dialog" aria-modal="true">
+          <div class="overlay-title">Keyboard shortcuts</div>
+          <dl class="help-list">
+            <dt class="help-key">j / k</dt><dd class="help-desc">Next / previous PR</dd>
+            <dt class="help-key">[ / ]</dt><dd class="help-desc">Previous / next file</dd>
+            <dt class="help-key">/</dt><dd class="help-desc">Find file in this PR</dd>
+            <dt class="help-key">?</dt><dd class="help-desc">Toggle this help</dd>
+            <dt class="help-key">Esc</dt><dd class="help-desc">Close overlay</dd>
+          </dl>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── File finder overlay ─────────────────────────────────────────── -->
+    <div class="case">
+      <h2>File finder overlay (<kbd>/</kbd>)</h2>
+      <div class="overlay-backdrop">
+        <div class="overlay" role="dialog" aria-modal="true">
+          <input class="finder-input" placeholder="Find file…" value="up/cl" />
+          <ul class="finder-list">
+            <li class="finder-row active">
+              <span class="finder-dir">src/upload/</span><span class="finder-name">client.ts</span>
+            </li>
+            <li class="finder-row">
+              <span class="finder-dir">src/upload/</span><span class="finder-name">backoff.ts</span>
+            </li>
+            <li class="finder-row">
+              <span class="finder-dir">src/upload/</span><span class="finder-name">client.test.ts</span>
+            </li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── Logged-out top bar ──────────────────────────────────────────── -->
+    <div class="case">
+      <h2>Top bar — logged out</h2>
+      <div class="frame">
+        <header class="topbar">
+          <div class="topbar-side">
+            <button type="button" class="collapse-toggle" title="Hide left pane">«</button>
+          </div>
+          <div class="breadcrumb"><span class="brand">aacorn</span></div>
+          <div class="topbar-side topbar-end">
+            <button type="button" class="theme-toggle" title="Toggle theme">◑</button>
+            <a class="auth-control" href="#">Login</a>
+          </div>
+        </header>
+      </div>
+    </div>
+
+    <!-- ── Empty / placeholder states ──────────────────────────────────── -->
+    <div class="case">
+      <h2>Empty &amp; loading states</h2>
+      <div class="frame" style="padding: var(--pane-pad); display: grid; gap: 12px;">
+        <p class="placeholder">Select a PR.</p>
+        <p class="placeholder">Select a file.</p>
+        <p class="placeholder">Loading…</p>
+        <p class="placeholder">No matching PRs.</p>
+        <p class="placeholder">No diff (binary or too large).</p>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

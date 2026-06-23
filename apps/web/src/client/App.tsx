@@ -8,6 +8,7 @@ import PullList from './PullList'
 import PullDetail from './PullDetail'
 import DiffView from './DiffView'
 import Shortcuts from './Shortcuts'
+import AccountMenu from './AccountMenu'
 
 // Layout root (Router root): top bar + three panes. Panes are params-driven — PullList (left)
 // and PullDetail (mid) read useParams() directly; routes exist only to populate params.
@@ -60,9 +61,14 @@ export default function App() {
 
   async function logout() {
     await fetch('/auth/logout', { method: 'POST' })
-    window.dispatchEvent(new Event('gurthurd:logout')) // wipe the persisted IndexedDB cache
+    window.dispatchEvent(new Event('aacorn:logout')) // wipe the persisted IndexedDB cache
     queryClient.clear()
     await queryClient.invalidateQueries({ queryKey: ['me'] })
+  }
+  async function permissions() {
+    await fetch('/api/repos/refresh', { method: 'POST' }).catch(() => {})
+    queryClient.invalidateQueries({ queryKey: ['repos'] })
+    window.location.href = '/auth/permissions'
   }
 
   return (
@@ -88,7 +94,7 @@ export default function App() {
           </Show>
         </div>
         <div class="breadcrumb">
-          <Show when={params.owner} fallback={<span class="brand">gurthurd</span>}>
+          <Show when={params.owner} fallback={<span class="brand">aacorn</span>}>
             <button type="button" class="crumb crumb-link" onClick={() => navigate(`/${params.owner}/${params.repo}`)}>
               {params.owner}
             </button>
@@ -115,12 +121,7 @@ export default function App() {
             }
           >
             {(user) => (
-              <span class="auth-control">
-                <img class="avatar" src={user().avatar} alt={user().login} width="20" height="20" />
-                <button class="auth-logout" type="button" onClick={logout}>
-                  Logout
-                </button>
-              </span>
+              <AccountMenu user={user()} onPermissions={permissions} onLogout={logout} />
             )}
           </Show>
         </div>

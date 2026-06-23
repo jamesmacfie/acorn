@@ -1,0 +1,334 @@
+<!doctype html>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>aacorn — main view (static mockup)</title>
+  <link rel="stylesheet" href="styles.css" />
+  <style>
+    /* static-mockup shim — NOT part of the app. The real app positions PR-list and
+       diff rows with JS virtualization (position:absolute + translateY transforms).
+       These pages have no JS, so flow the rows normally. Delete when wiring to real data. */
+    .pr-list, .diff-rows { height: auto !important; }
+    .pr-row, .diff-row { position: static !important; transform: none !important; }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <!-- ── Top bar ───────────────────────────────────────────────────────── -->
+    <header class="topbar">
+      <div class="topbar-side">
+        <button type="button" class="collapse-toggle" title="Hide left pane">«</button>
+        <div class="repo-picker">
+          <button type="button" class="repo-picker-button" aria-haspopup="listbox" aria-expanded="false">
+            <span class="repo-picker-label">acme/web-platform</span>
+            <span class="repo-picker-chevron" aria-hidden="true">▾</span>
+          </button>
+        </div>
+      </div>
+      <div class="breadcrumb">
+        <button type="button" class="crumb crumb-link">acme</button>
+        <span class="crumb-sep">/</span>
+        <button type="button" class="crumb crumb-link">web-platform</button>
+        <span class="crumb-sep">/</span>
+        <span class="crumb crumb-num">#482</span>
+      </div>
+      <div class="topbar-side topbar-end">
+        <button type="button" class="theme-toggle" title="Toggle theme">◑</button>
+        <span class="auth-control">
+          <img class="avatar" width="20" height="20" alt="octocat"
+            src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='20' height='20'%3E%3Ccircle cx='10' cy='10' r='10' fill='%23b0b0b0'/%3E%3C/svg%3E" />
+          <button class="auth-logout" type="button">Logout</button>
+        </span>
+      </div>
+    </header>
+
+    <main class="panes">
+      <!-- ── Left pane: PR list ──────────────────────────────────────────── -->
+      <section class="pane pane-left">
+        <div class="section-header">Reviews</div>
+        <div class="pr-tabs">
+          <button type="button" class="active">Open</button>
+          <button type="button">Closed</button>
+          <input class="pr-filter" placeholder="Filter…" />
+        </div>
+        <div class="pr-list-scroll">
+          <div class="pr-list">
+            <a class="pr-row active" href="#">
+              <span class="pr-num">#482</span>
+              <span class="pr-title">Add retry with backoff to the upload client</span>
+              <span class="pr-author muted">octocat</span>
+            </a>
+            <a class="pr-row" href="#">
+              <span class="pr-num">#481</span>
+              <span class="pr-title">Migrate session store to KV</span>
+              <span class="pr-badge">draft</span>
+              <span class="pr-author muted">hubot</span>
+            </a>
+            <a class="pr-row" href="#">
+              <span class="pr-num">#479</span>
+              <span class="pr-title">Fix flaky e2e test on the checkout flow</span>
+              <span class="pr-author muted">monalisa</span>
+            </a>
+            <a class="pr-row" href="#">
+              <span class="pr-num">#476</span>
+              <span class="pr-title">Bump vite to 6 and drop the legacy plugin</span>
+              <span class="pr-author muted">octocat</span>
+            </a>
+            <a class="pr-row" href="#">
+              <span class="pr-num">#475</span>
+              <span class="pr-title">Add dark-mode tokens to the design system</span>
+              <span class="pr-badge">draft</span>
+              <span class="pr-author muted">monalisa</span>
+            </a>
+            <a class="pr-row" href="#">
+              <span class="pr-num">#470</span>
+              <span class="pr-title">Cache the GraphQL schema between worker invocations</span>
+              <span class="pr-author muted">hubot</span>
+            </a>
+          </div>
+        </div>
+      </section>
+
+      <!-- ── Mid pane: PR detail / Navigator ─────────────────────────────── -->
+      <section class="pane pane-mid">
+        <div class="section-header">Navigator</div>
+
+        <div class="pr-detail-header">
+          <div class="pr-detail-title">
+            <span class="pr-num">#482</span> Add retry with backoff to the upload client
+          </div>
+          <div class="pr-detail-meta muted">
+            <span class="state-badge state-open">open</span>
+            <span>octocat</span>
+            <span>main ← feat/upload-retry</span>
+          </div>
+          <div class="pr-actions">
+            <select class="repo-select">
+              <option>squash</option>
+              <option>merge</option>
+              <option>rebase</option>
+            </select>
+            <button type="button">Merge</button>
+            <button type="button">Close</button>
+            <button type="button">Convert to draft</button>
+          </div>
+        </div>
+
+        <details class="nav-section" open>
+          <summary>Description</summary>
+          <div class="markdown">
+            <p>Uploads currently fail hard on a transient 5xx. This adds an exponential
+              backoff (capped at 5 attempts) around the fetch in <code>UploadClient.send</code>.</p>
+            <ul>
+              <li>Retries on 429 / 502 / 503 / 504 and network errors.</li>
+              <li>Honours <code>Retry-After</code> when present.</li>
+              <li>Surfaces the final error unchanged so callers still see the real failure.</li>
+            </ul>
+            <pre>await client.send(blob, { maxRetries: 5 })</pre>
+          </div>
+        </details>
+
+        <details class="nav-section" open>
+          <summary>Labels</summary>
+          <div class="labels">
+            <button type="button" class="label-chip" title="Remove label" style="border-color:#1a7f37">enhancement ✕</button>
+            <button type="button" class="label-chip" title="Remove label" style="border-color:#9a6700">needs-review ✕</button>
+          </div>
+          <div class="composer">
+            <input class="pr-filter" placeholder="Add label…" />
+          </div>
+        </details>
+
+        <details class="nav-section" open>
+          <summary>Files <span class="muted">(3)</span></summary>
+          <ul class="file-list">
+            <li class="file-row active">
+              <input type="checkbox" class="file-viewed" title="Mark viewed" />
+              <button type="button" class="file-open">
+                <span class="file-path">src/upload/client.ts</span>
+                <span class="file-stat add">+38</span>
+                <span class="file-stat del">−6</span>
+              </button>
+            </li>
+            <li class="file-row">
+              <input type="checkbox" class="file-viewed" title="Mark viewed" />
+              <button type="button" class="file-open">
+                <span class="file-path">src/upload/backoff.ts</span>
+                <span class="file-stat add">+24</span>
+                <span class="file-stat del">−0</span>
+              </button>
+            </li>
+            <li class="file-row viewed">
+              <input type="checkbox" class="file-viewed" title="Mark viewed" checked />
+              <button type="button" class="file-open">
+                <span class="file-path">README.md</span>
+                <span class="file-stat add">+5</span>
+                <span class="file-stat del">−1</span>
+              </button>
+            </li>
+          </ul>
+        </details>
+
+        <details class="nav-section">
+          <summary>Checks <span class="muted">(4)</span></summary>
+          <ul class="check-list">
+            <li class="check-row">
+              <span class="check-dot check-success"></span>
+              <span class="check-name">build</span>
+              <a class="muted" href="#">success</a>
+            </li>
+            <li class="check-row">
+              <span class="check-dot check-success"></span>
+              <span class="check-name">test</span>
+              <a class="muted" href="#">success</a>
+            </li>
+            <li class="check-row">
+              <span class="check-dot check-failure"></span>
+              <span class="check-name">lint</span>
+              <a class="muted" href="#">failure</a>
+              <button type="button" class="check-rerun">Rerun</button>
+            </li>
+            <li class="check-row">
+              <span class="check-dot check-pending"></span>
+              <span class="check-name">e2e</span>
+              <a class="muted" href="#">pending</a>
+            </li>
+          </ul>
+        </details>
+
+        <details class="nav-section" open>
+          <summary>Conversation <span class="muted">(3)</span></summary>
+          <div class="composer">
+            <textarea class="composer-input" placeholder="Leave a comment…"></textarea>
+            <button type="button">Comment</button>
+          </div>
+          <div class="comment">
+            <div class="comment-meta muted">
+              monalisa <span class="review-state review-approved">approved</span>
+            </div>
+            <div class="markdown"><p>Backoff logic reads cleanly. One nit inline about the jitter.</p></div>
+          </div>
+          <div class="comment">
+            <div class="comment-meta muted">
+              hubot <span class="review-state review-changes_requested">changes_requested</span>
+            </div>
+            <div class="markdown"><p>Please cap <code>maxRetries</code> so a misconfig can't loop forever.</p></div>
+          </div>
+          <div class="comment">
+            <div class="comment-meta muted">octocat</div>
+            <div class="markdown"><p>Good call — capped at 5 and added a test. PTAL.</p></div>
+          </div>
+        </details>
+      </section>
+
+      <!-- ── Right pane: diff (unified) ──────────────────────────────────── -->
+      <section class="pane pane-right">
+        <div class="section-header">Diff</div>
+        <div class="diff-toolbar">
+          <div class="diff-viewmode" role="group" aria-label="Diff view mode">
+            <button type="button" class="diff-viewmode-btn active" aria-pressed="true">Unified</button>
+            <button type="button" class="diff-viewmode-btn" aria-pressed="false">Split</button>
+          </div>
+        </div>
+        <div class="diff">
+          <div class="diff-rows">
+
+            <div class="diff-row diff-hunk">
+              <span class="diff-hunk-text">@@ -38,9 +38,12 @@ export class UploadClient {</span>
+            </div>
+
+            <div class="diff-row">
+              <span class="diff-gutter">38</span><span class="diff-gutter">38</span><span class="diff-marker"> </span>
+              <button class="diff-add-btn" title="Comment on this line">+</button>
+              <span class="diff-code"><span style="--l:#cf222e;--r:#ff7b72">async</span> <span style="--l:#8250df;--r:#d2a8ff">send</span>(blob<span style="--l:#cf222e;--r:#ff7b72">:</span> Blob) {</span>
+            </div>
+
+            <div class="diff-row diff-del">
+              <span class="diff-gutter">39</span><span class="diff-gutter"></span><span class="diff-marker">−</span>
+              <button class="diff-add-btn" title="Comment on this line">+</button>
+              <span class="diff-code">  <span style="--l:#cf222e;--r:#ff7b72">const</span> res = <span style="--l:#cf222e;--r:#ff7b72">await</span> <span class="diff-word-del">fetch(this.url, { method: 'POST', body: blob })</span></span>
+            </div>
+
+            <div class="diff-row diff-add">
+              <span class="diff-gutter"></span><span class="diff-gutter">39</span><span class="diff-marker">+</span>
+              <button class="diff-add-btn" title="Comment on this line">+</button>
+              <span class="diff-code">  <span style="--l:#cf222e;--r:#ff7b72">const</span> res = <span style="--l:#cf222e;--r:#ff7b72">await</span> <span class="diff-word-add">withBackoff(() =&gt; fetch(this.url, { method: 'POST', body: blob }), this.maxRetries)</span></span>
+            </div>
+
+            <div class="diff-row">
+              <span class="diff-gutter">40</span><span class="diff-gutter">40</span><span class="diff-marker"> </span>
+              <button class="diff-add-btn" title="Comment on this line">+</button>
+              <span class="diff-code">  <span style="--l:#cf222e;--r:#ff7b72">if</span> (!res.ok) <span style="--l:#cf222e;--r:#ff7b72">throw new</span> <span style="--l:#8250df;--r:#d2a8ff">UploadError</span>(res.status)</span>
+            </div>
+
+            <!-- Inline review thread (open) anchored to the line above -->
+            <div class="diff-row diff-thread-row">
+              <div class="diff-thread">
+                <div class="diff-thread-head">
+                  <span class="diff-thread-status">Conversation</span>
+                  <button class="diff-thread-link">Resolve</button>
+                </div>
+                <div class="comment diff-thread-comment">
+                  <div class="comment-meta"><strong>monalisa</strong></div>
+                  <div class="markdown"><p>Add a little jitter to the delay so retries from many clients don't synchronise.</p></div>
+                </div>
+                <div class="comment diff-thread-comment">
+                  <div class="comment-meta"><strong>octocat</strong></div>
+                  <div class="markdown"><p>Done in <code>backoff.ts</code> — full jitter on each attempt.</p></div>
+                </div>
+                <div class="diff-reply">
+                  <textarea class="diff-reply-input" placeholder="Reply…"></textarea>
+                  <div class="diff-composer-actions"><button>Reply</button></div>
+                </div>
+              </div>
+            </div>
+
+            <div class="diff-row">
+              <span class="diff-gutter">41</span><span class="diff-gutter">41</span><span class="diff-marker"> </span>
+              <button class="diff-add-btn" title="Comment on this line">+</button>
+              <span class="diff-code">  <span style="--l:#cf222e;--r:#ff7b72">return</span> res.json()</span>
+            </div>
+
+            <div class="diff-row diff-hunk">
+              <span class="diff-hunk-text">@@ -52,4 +55,7 @@ export class UploadClient {</span>
+            </div>
+
+            <div class="diff-row diff-add">
+              <span class="diff-gutter"></span><span class="diff-gutter">55</span><span class="diff-marker">+</span>
+              <button class="diff-add-btn" title="Comment on this line">+</button>
+              <span class="diff-code">  <span style="--l:#6a737d;--r:#8b949e">// retry budget; 0 disables retries entirely</span></span>
+            </div>
+
+            <!-- Code row with an OPEN new-line-comment composer dropped below it -->
+            <div class="diff-row diff-add">
+              <span class="diff-gutter"></span><span class="diff-gutter">56</span><span class="diff-marker">+</span>
+              <button class="diff-add-btn" title="Comment on this line">+</button>
+              <span class="diff-code">  maxRetries <span style="--l:#cf222e;--r:#ff7b72">=</span> <span style="--l:#0550ae;--r:#79c0ff">5</span></span>
+              <div class="diff-composer">
+                <textarea class="diff-reply-input" placeholder="Comment on this line…"></textarea>
+                <div class="diff-composer-actions">
+                  <button>Comment</button>
+                  <button>Cancel</button>
+                </div>
+              </div>
+            </div>
+
+            <!-- Resolved thread (collapsed-toggle + unresolve) -->
+            <div class="diff-row diff-thread-row">
+              <div class="diff-thread diff-thread-resolved">
+                <div class="diff-thread-head">
+                  <span class="diff-thread-status">Resolved</span>
+                  <button class="diff-thread-link">Show</button>
+                  <button class="diff-thread-link">Unresolve</button>
+                </div>
+              </div>
+            </div>
+
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
+</body>
+</html>

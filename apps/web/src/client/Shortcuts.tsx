@@ -28,11 +28,17 @@ export default function Shortcuts() {
   const [filter, setFilter] = createSignal('')
   const [active, setActive] = createSignal(0)
   let inputRef: HTMLInputElement | undefined
+  let lastRouteKey = ''
 
   // Current PR's changed files (same source/order PullDetail uses). Only fetched when a PR is open.
-  const files = createQuery(() =>
-    filesOptions(params.owner ?? '', params.repo ?? '', params.number ?? '', !!params.number),
-  )
+  const route = createMemo(() => {
+    if (!params.owner || !params.repo || !params.number) return null
+    return { owner: params.owner, repo: params.repo, number: params.number, key: `${params.owner}/${params.repo}#${params.number}` }
+  })
+  const files = createQuery(() => {
+    const r = route()
+    return filesOptions(r?.owner ?? '', r?.repo ?? '', r?.number ?? '', !!r)
+  })
   const allFiles = (): PullFile[] => files.data ?? []
   const currentFile = () => (typeof searchParams.file === 'string' ? searchParams.file : undefined)
 
@@ -48,7 +54,7 @@ export default function Shortcuts() {
   })
 
   function openFinder() {
-    if (!params.number) return
+    if (!route()) return
     setFilter('')
     setActive(0)
     setOverlay('finder')
@@ -116,6 +122,17 @@ export default function Shortcuts() {
 
   onMount(() => window.addEventListener('keydown', onKey))
   onCleanup(() => window.removeEventListener('keydown', onKey))
+
+  // Finder state is per PR. Route changes keep `?file=` intact for DiffView's scroll target,
+  // but the transient finder UI should not carry across pages.
+  createEffect(() => {
+    const key = route()?.key ?? ''
+    if (key === lastRouteKey) return
+    lastRouteKey = key
+    setFilter('')
+    setActive(0)
+    setOverlay((current) => (current === 'finder' ? null : current))
+  })
 
   // Focus the finder input when it opens; keep the active row in range as the filter narrows.
   createEffect(() => {

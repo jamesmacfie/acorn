@@ -1,6 +1,6 @@
 {
-  "name": "gurthurd",
-  "short_name": "gurthurd",
+  "name": "aacorn",
+  "short_name": "aacorn",
   "description": "GitHub PR review tool",
   "start_url": "/",
   "display": "standalone",

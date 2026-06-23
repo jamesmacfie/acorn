@@ -1,7 +1,7 @@
 // Minimal offline shell (docs/caching.md / architecture-overview.md). No build integration —
 // generic runtime caching, so it survives hashed asset names. Data (GET /api/*) is NOT cached
 // here; the client's IndexedDB query cache owns offline data. /api and /auth always hit network.
-const CACHE = 'gurthurd-shell-v1'
+const CACHE = 'aacorn-shell-v1'
 
 self.addEventListener('install', () => self.skipWaiting())
 self.addEventListener('activate', (e) =>

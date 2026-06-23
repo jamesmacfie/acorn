@@ -1,4 +1,4 @@
-# gurthurd
+# aacorn
 
 A GitHub pull-request review tool. A **SolidJS SPA** served by a **Hono Worker** on
 Cloudflare, with a **D1** mirror of GitHub data and a **KV** blob cache for diff/patch
@@ -15,7 +15,7 @@ pnpm workspace + Turborepo.
 ```
 .
 ├── apps/
-│   └── web/            # the app: SolidJS client + Hono Worker (@gurthurd/web)
+│   └── web/            # the app: SolidJS client + Hono Worker (@aacorn/web)
 ├── packages/           # (reserved)
 ├── package.json        # root scripts proxy to turbo
 ├── turbo.json
@@ -33,7 +33,7 @@ All app code lives in `apps/web`:
 - **Node** ≥ 20 (developed on 24).
 - **pnpm 11** — the repo pins `packageManager: pnpm@11.0.0`. Run `corepack enable` to get it.
 - A **GitHub OAuth App** (one for dev, one for production — see below).
-- **Wrangler** is installed as a dev dependency; invoke it with `pnpm --filter @gurthurd/web exec wrangler …` (or `pnpm wrangler …` from `apps/web`).
+- **Wrangler** is installed as a dev dependency; invoke it with `pnpm --filter @aacorn/web exec wrangler …` (or `pnpm wrangler …` from `apps/web`).
 
 ## Local setup
 
@@ -83,11 +83,11 @@ SESSION_ENC_KEY=<the 64-hex-char openssl output>
 pnpm install
 
 # Apply migrations to the local D1 database (Miniflare state under apps/web/.wrangler/state)
-pnpm --filter @gurthurd/web db:migrate
+pnpm --filter @aacorn/web db:migrate
 
 # Start the dev server (Vite + vite-plugin-solid for the SPA, @cloudflare/vite-plugin
 # runs the Hono Worker in Miniflare with local D1/KV)
-pnpm --filter @gurthurd/web dev
+pnpm --filter @aacorn/web dev
 ```
 
 Open `http://localhost:5173` and log in with GitHub.
@@ -98,16 +98,16 @@ Open `http://localhost:5173` and log in with GitHub.
 
 ## Common scripts
 
-Run from the repo root via Turborepo, or per-package with `--filter @gurthurd/web`.
+Run from the repo root via Turborepo, or per-package with `--filter @aacorn/web`.
 
 | Script | What it does |
 | --- | --- |
-| `pnpm dev` / `pnpm --filter @gurthurd/web dev` | Vite dev server + Worker in Miniflare |
-| `pnpm build` / `pnpm --filter @gurthurd/web build` | `vite build` (client + Worker bundle) |
-| `pnpm lint` / `pnpm --filter @gurthurd/web lint` | `tsc --noEmit` typecheck |
-| `pnpm --filter @gurthurd/web typegen` | `wrangler types` → regenerate `worker-configuration.d.ts` (`Env`) |
-| `pnpm --filter @gurthurd/web db:generate` | `drizzle-kit generate` — emit a migration from the schema |
-| `pnpm --filter @gurthurd/web db:migrate` | `wrangler d1 migrations apply gurthurd --local` |
+| `pnpm dev` / `pnpm --filter @aacorn/web dev` | Vite dev server + Worker in Miniflare |
+| `pnpm build` / `pnpm --filter @aacorn/web build` | `vite build` (client + Worker bundle) |
+| `pnpm lint` / `pnpm --filter @aacorn/web lint` | `tsc --noEmit` typecheck |
+| `pnpm --filter @aacorn/web typegen` | `wrangler types` → regenerate `worker-configuration.d.ts` (`Env`) |
+| `pnpm --filter @aacorn/web db:generate` | `drizzle-kit generate` — emit a migration from the schema |
+| `pnpm --filter @aacorn/web db:migrate` | `wrangler d1 migrations apply aacorn --local` |
 
 (`pnpm test` is wired through turbo but the package has no `test` script yet.)
 
@@ -118,10 +118,10 @@ The schema lives in `apps/web/src/server/db/schema.ts` (Drizzle, SQLite dialect)
 ```bash
 # 1. Edit src/server/db/schema.ts
 # 2. Generate the SQL migration into apps/web/migrations/
-pnpm --filter @gurthurd/web db:generate
+pnpm --filter @aacorn/web db:generate
 
 # 3. Apply it to the LOCAL D1 (note the --local flag, baked into db:migrate)
-pnpm --filter @gurthurd/web db:migrate
+pnpm --filter @aacorn/web db:migrate
 ```
 
 **Drizzle quirk — NOT NULL columns on populated tables.** When you add a `NOT NULL` column to
@@ -141,7 +141,7 @@ dependency).
 ### 1. Create the resources
 
 ```bash
-pnpm wrangler d1 create gurthurd                # prints a database_id
+pnpm wrangler d1 create aacorn                # prints a database_id
 pnpm wrangler kv namespace create OAUTH_STATE   # prints an id
 pnpm wrangler kv namespace create BLOBS         # prints an id
 ```
@@ -170,13 +170,13 @@ pnpm wrangler secret put SESSION_ENC_KEY      # a fresh `openssl rand -hex 32` (
 ### 4. Apply migrations to remote D1
 
 ```bash
-pnpm wrangler d1 migrations apply gurthurd --remote
+pnpm wrangler d1 migrations apply aacorn --remote
 ```
 
 ### 5. Build & deploy
 
 ```bash
-pnpm --filter @gurthurd/web build
+pnpm --filter @aacorn/web build
 pnpm wrangler deploy
 ```
 
