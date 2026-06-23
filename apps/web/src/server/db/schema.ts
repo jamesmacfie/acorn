@@ -29,6 +29,8 @@ export const repos = sqliteTable(
 export const pullRequests = sqliteTable(
   'pull_requests',
   {
+    // User-scoped like repos: a private repo's PR mirror must never serve across users.
+    userId: text('user_id').notNull(),
     repoId: integer('repo_id').notNull(),
     number: integer('number').notNull(),
     nodeId: text('node_id'), // GraphQL node id — needed for draft↔ready toggles
@@ -43,7 +45,20 @@ export const pullRequests = sqliteTable(
     staleAfter: integer('stale_after').notNull(),
     etag: text('etag'),
   },
-  (t) => [primaryKey({ columns: [t.repoId, t.number] })],
+  (t) => [primaryKey({ columns: [t.userId, t.repoId, t.number] })],
+)
+
+// Collection-level revalidation bookkeeping: a list endpoint's ETag has no per-row home
+// (docs/caching.md). Keyed by (userId, resource) e.g. `pulls:<repoId>:open`.
+export const syncState = sqliteTable(
+  'sync_state',
+  {
+    userId: text('user_id').notNull(),
+    resource: text('resource').notNull(),
+    etag: text('etag'),
+    fetchedAt: integer('fetched_at').notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.userId, t.resource] })],
 )
 
 // --- App-state table: data GitHub doesn't have, we are the source of truth ---

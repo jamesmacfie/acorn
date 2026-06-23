@@ -3,6 +3,7 @@ import { csrf } from 'hono/csrf'
 import { authMiddleware, type AppEnv } from './middleware/auth'
 import { auth } from './routes/auth'
 import { me } from './routes/me'
+import { pulls } from './routes/pulls'
 import { repos } from './routes/repos'
 
 // One Worker, both /auth and /api. Non-matching paths never reach here — run_worker_first
@@ -13,6 +14,7 @@ const app = new Hono<AppEnv>()
   .use('/api/*', authMiddleware) // stateless cookie → ctx.user (stub for now)
   .route('/api/me', me)
   .route('/api/repos', repos)
+  .route('/api/repos', pulls) // repo-scoped sub-resources, e.g. /:owner/:repo/pulls
 
 // The RPC contract consumed by the SPA's typed hono/client. See docs/api-structure.md.
 export type AppType = typeof app
