@@ -1,0 +1,30 @@
+{
+  "name": "@gurthurd/web",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "lint": "tsc --noEmit",
+    "typegen": "wrangler types",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "wrangler d1 migrations apply gurthurd --local"
+  },
+  "dependencies": {
+    "@solidjs/router": "^0.16.1",
+    "@tanstack/solid-query": "^5.101.0",
+    "drizzle-orm": "^0.45.2",
+    "hono": "^4.12.26",
+    "solid-js": "^1.9.13"
+  },
+  "devDependencies": {
+    "@cloudflare/vite-plugin": "^1.42.1",
+    "@types/node": "^26.0.0",
+    "drizzle-kit": "^0.31.10",
+    "typescript": "^6.0.3",
+    "vite": "^8.0.16",
+    "vite-plugin-solid": "^2.11.12",
+    "wrangler": "^4.103.0"
+  }
+}

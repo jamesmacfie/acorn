@@ -1,0 +1,6 @@
+# Copy to .dev.vars (gitignored) and fill in. See docs/local-development.md §4.
+# .dev.vars is what Wrangler reads for local dev secrets — NOT `wrangler secret put`.
+GITHUB_CLIENT_ID=Iv1.xxxxxxxx
+GITHUB_CLIENT_SECRET=xxxxxxxxxxxxxxxx
+# openssl rand -hex 32  — 32-byte key for the AES-GCM/JWE session cookie
+SESSION_ENC_KEY=0000000000000000000000000000000000000000000000000000000000000000
