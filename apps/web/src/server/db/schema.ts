@@ -48,8 +48,69 @@ export const pullRequests = sqliteTable(
   (t) => [primaryKey({ columns: [t.userId, t.repoId, t.number] })],
 )
 
+// --- PR-detail children: mirrored together from the GraphQL composite, replaced wholesale on
+// each sync. No per-row staleness — freshness is governed by sync_state(`pr:<repoId>:<number>`).
+// All user-scoped and keyed off the PR (userId, repoId, number) + a per-row discriminator.
+
+export const prFiles = sqliteTable(
+  'pr_files',
+  {
+    userId: text('user_id').notNull(),
+    repoId: integer('repo_id').notNull(),
+    number: integer('number').notNull(),
+    path: text('path').notNull(),
+    status: text('status'), // GraphQL changeType: ADDED | MODIFIED | DELETED | RENAMED | …
+    additions: integer('additions'),
+    deletions: integer('deletions'),
+    // ponytail: patch/diff text deferred to slice 3b — immutable-by-SHA, cached in KV/IndexedDB.
+  },
+  (t) => [primaryKey({ columns: [t.userId, t.repoId, t.number, t.path] })],
+)
+
+export const reviews = sqliteTable(
+  'reviews',
+  {
+    userId: text('user_id').notNull(),
+    repoId: integer('repo_id').notNull(),
+    number: integer('number').notNull(),
+    id: text('id').notNull(), // GraphQL node id
+    author: text('author'),
+    state: text('state'), // APPROVED | CHANGES_REQUESTED | COMMENTED | DISMISSED | PENDING
+    body: text('body'),
+    submittedAt: integer('submitted_at'),
+  },
+  (t) => [primaryKey({ columns: [t.userId, t.repoId, t.number, t.id] })],
+)
+
+export const comments = sqliteTable(
+  'comments',
+  {
+    userId: text('user_id').notNull(),
+    repoId: integer('repo_id').notNull(),
+    number: integer('number').notNull(),
+    id: text('id').notNull(), // GraphQL node id
+    author: text('author'),
+    body: text('body'),
+    createdAt: integer('created_at'),
+  },
+  (t) => [primaryKey({ columns: [t.userId, t.repoId, t.number, t.id] })],
+)
+
+export const checks = sqliteTable(
+  'checks',
+  {
+    userId: text('user_id').notNull(),
+    repoId: integer('repo_id').notNull(),
+    number: integer('number').notNull(),
+    name: text('name').notNull(), // CheckRun.name | StatusContext.context
+    status: text('status'), // CheckRun.conclusion|status | StatusContext.state
+    url: text('url'),
+  },
+  (t) => [primaryKey({ columns: [t.userId, t.repoId, t.number, t.name] })],
+)
+
 // Collection-level revalidation bookkeeping: a list endpoint's ETag has no per-row home
-// (docs/caching.md). Keyed by (userId, resource) e.g. `pulls:<repoId>:open`.
+// (docs/caching.md). Keyed by (userId, resource) e.g. `pulls:<repoId>:open`, `pr:<repoId>:<number>`.
 export const syncState = sqliteTable(
   'sync_state',
   {

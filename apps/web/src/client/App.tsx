@@ -1,11 +1,13 @@
 import { createEffect, For, Show } from 'solid-js'
 import { createQuery, useQueryClient } from '@tanstack/solid-query'
-import { useNavigate, useParams, type RouteSectionProps } from '@solidjs/router'
+import { useNavigate, useParams } from '@solidjs/router'
 import { meOptions, reposOptions } from './queries'
+import PullList from './PullList'
+import PullDetail from './PullDetail'
 
-// Layout root (Router root): top bar + three panes. The routed child renders into the left
-// pane (PR list for /:owner/:repo). docs/ui-style.md §5.
-export default function App(props: RouteSectionProps) {
+// Layout root (Router root): top bar + three panes. Panes are params-driven — PullList (left)
+// and PullDetail (mid) read useParams() directly; routes exist only to populate params.
+export default function App() {
   const queryClient = useQueryClient()
   const params = useParams()
   const navigate = useNavigate()
@@ -66,11 +68,11 @@ export default function App(props: RouteSectionProps) {
       <main class="panes">
         <section class="pane pane-left">
           <div class="section-header">Reviews</div>
-          {props.children}
+          <PullList />
         </section>
         <section class="pane pane-mid">
           <div class="section-header">Navigator</div>
-          <p class="placeholder">Select a PR.</p>
+          <PullDetail />
         </section>
         <section class="pane pane-right">
           <div class="section-header">Diff</div>

@@ -100,6 +100,9 @@ body {
   border-bottom: 1px solid var(--border);
   font-size: var(--fs-sm);
 }
+.pr-row { color: inherit; text-decoration: none; cursor: pointer; }
+.pr-row.active { background: var(--bg-selected); }
+.pr-row:hover { background: var(--bg-subtle); }
 .pr-num { color: var(--text-muted); flex-shrink: 0; }
 .pr-title { flex: 1; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
 .pr-author { flex-shrink: 0; }
@@ -111,6 +114,34 @@ body {
   border-radius: var(--radius);
   padding: 0 5px;
 }
+
+/* PR detail (mid / Navigator pane). */
+.pr-detail-header { margin-bottom: var(--pane-pad); }
+.pr-detail-title { font-size: var(--fs-lg); margin-bottom: 4px; }
+.pr-detail-meta { display: flex; align-items: center; gap: 8px; font-size: var(--fs-sm); }
+.state-badge {
+  text-transform: capitalize;
+  border: 1px solid var(--badge-border);
+  border-radius: var(--radius);
+  padding: 0 6px;
+}
+.state-open { color: var(--add-marker); }
+.state-merged { color: var(--accent); }
+.state-closed { color: var(--del-marker); }
+
+.file-list { list-style: none; margin: 0; padding: 0; }
+.file-row {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  height: var(--row-h);
+  border-bottom: 1px solid var(--border);
+  font-size: var(--fs-sm);
+}
+.file-path { flex: 1; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; direction: rtl; text-align: left; }
+.file-stat { flex-shrink: 0; font-variant-numeric: tabular-nums; }
+.file-stat.add { color: var(--add-marker); }
+.file-stat.del { color: var(--del-marker); }
 
 /* Top bar side clusters: dropdown (start) and auth (end). */
 .topbar-side { display: inline-flex; align-items: center; gap: var(--pane-pad); }

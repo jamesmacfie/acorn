@@ -1,0 +1,206 @@
+import { and, eq } from 'drizzle-orm'
+import type { SQLiteColumn } from 'drizzle-orm/sqlite-core'
+import { Hono } from 'hono'
+import { getDb, schema } from '../db'
+import { ghGraphQL } from '../github'
+import type { AppEnv } from '../middleware/auth'
+
+// PR detail — the composite GraphQL read (docs/github-api.md "primary read for the PR screen").
+// PR + files + reviews + comments + checks in one round-trip. GraphQL has no ETag, so freshness
+// is a TTL gate in sync_state (`pr:<repoId>:<number>`); the mirror tables are the cache. Rows are
+// user-scoped. 3a renders header + files; reviews/comments/checks are mirrored for later panes.
+const STALE_AFTER_MS = 45_000 // PR data is "fast-changing" (docs/caching.md)
+
+const COMPOSITE_QUERY = `
+query PR($owner: String!, $repo: String!, $number: Int!) {
+  repository(owner: $owner, name: $repo) {
+    pullRequest(number: $number) {
+      id number title state isDraft body
+      author { login }
+      baseRefName headRefName updatedAt
+      additions deletions changedFiles
+      files(first: 100) { nodes { path changeType additions deletions } }
+      reviews(first: 50) { nodes { id author { login } state body submittedAt } }
+      comments(first: 50) { nodes { id author { login } body createdAt } }
+      commits(last: 1) { nodes { commit { statusCheckRollup { contexts(first: 50) { nodes {
+        __typename
+        ... on CheckRun { name status conclusion detailsUrl }
+        ... on StatusContext { context state targetUrl }
+      } } } } } }
+    }
+  }
+}`
+// ponytail: first-page only (files 100 / reviews,comments 50) — cursor pagination deferred.
+
+type GqlPull = {
+  id: string
+  number: number
+  title: string
+  state: string
+  isDraft: boolean
+  body: string | null
+  author: { login: string } | null
+  baseRefName: string | null
+  headRefName: string | null
+  updatedAt: string | null
+  files: { nodes: { path: string; changeType: string; additions: number; deletions: number }[] }
+  reviews: { nodes: { id: string; author: { login: string } | null; state: string; body: string | null; submittedAt: string | null }[] }
+  comments: { nodes: { id: string; author: { login: string } | null; body: string | null; createdAt: string | null }[] }
+  commits: { nodes: { commit: { statusCheckRollup: { contexts: { nodes: GqlContext[] } } | null } }[] }
+}
+type GqlContext =
+  | { __typename: 'CheckRun'; name: string; status: string | null; conclusion: string | null; detailsUrl: string | null }
+  | { __typename: 'StatusContext'; context: string; state: string | null; targetUrl: string | null }
+
+const ms = (s: string | null) => (s ? Date.parse(s) : null)
+
+export const pullDetail = new Hono<AppEnv>().get('/:owner/:repo/pulls/:number', async (c) => {
+  const user = c.get('user')
+  if (!user) return c.json({ error: 'unauthenticated' }, 401)
+
+  const db = getDb(c.env)
+  const userId = user.login
+  const owner = c.req.param('owner')
+  const repo = c.req.param('repo')
+  const number = Number(c.req.param('number'))
+  if (!Number.isInteger(number)) return c.json({ error: 'bad_number' }, 400)
+
+  const [repoRow] = await db
+    .select({ id: schema.repos.id })
+    .from(schema.repos)
+    .where(and(eq(schema.repos.userId, userId), eq(schema.repos.owner, owner), eq(schema.repos.name, repo)))
+  if (!repoRow) return c.json({ error: 'repo_not_found' }, 404)
+  const repoId = repoRow.id
+
+  const resource = `pr:${repoId}:${number}`
+  const [sync] = await db
+    .select()
+    .from(schema.syncState)
+    .where(and(eq(schema.syncState.userId, userId), eq(schema.syncState.resource, resource)))
+
+  const prWhere = and(
+    eq(schema.pullRequests.userId, userId),
+    eq(schema.pullRequests.repoId, repoId),
+    eq(schema.pullRequests.number, number),
+  )
+  const childWhere = (t: { userId: SQLiteColumn; repoId: SQLiteColumn; number: SQLiteColumn }) =>
+    and(eq(t.userId, userId), eq(t.repoId, repoId), eq(t.number, number))
+
+  const readComposite = async () => {
+    const [pull] = await db.select().from(schema.pullRequests).where(prWhere)
+    const [files, reviews, comments, checks] = await Promise.all([
+      db.select().from(schema.prFiles).where(childWhere(schema.prFiles)),
+      db.select().from(schema.reviews).where(childWhere(schema.reviews)),
+      db.select().from(schema.comments).where(childWhere(schema.comments)),
+      db.select().from(schema.checks).where(childWhere(schema.checks)),
+    ])
+    return { pull: pull ? toPublicPull(pull) : null, files: files.map(toPublicFile), reviews, comments, checks }
+  }
+
+  // Fresh → serve the mirror, no GraphQL call.
+  if (sync && sync.fetchedAt + STALE_AFTER_MS > Date.now()) return c.json(await readComposite())
+
+  const res = await ghGraphQL(user.token, COMPOSITE_QUERY, { owner, repo, number })
+  if (res.status === 401) return c.json({ error: 'reauth' }, 401)
+  if (!res.ok) return c.json({ error: 'github_unavailable' }, 502)
+  const json = (await res.json()) as { data?: { repository?: { pullRequest?: GqlPull | null } } }
+  const pr = json.data?.repository?.pullRequest
+  if (!pr) return c.json({ error: 'pull_not_found' }, 404)
+
+  const now = Date.now()
+  const key = { userId, repoId, number }
+
+  const pullRow = {
+    userId,
+    repoId,
+    number,
+    nodeId: pr.id,
+    state: pr.state.toLowerCase(),
+    draft: pr.isDraft,
+    title: pr.title,
+    headRef: pr.headRefName,
+    baseRef: pr.baseRefName,
+    author: pr.author?.login ?? null,
+    updatedAt: ms(pr.updatedAt),
+    fetchedAt: now,
+    staleAfter: STALE_AFTER_MS,
+    etag: null,
+  }
+  const fileRows = pr.files.nodes.map((f) => ({
+    ...key,
+    path: f.path,
+    status: f.changeType,
+    additions: f.additions,
+    deletions: f.deletions,
+  }))
+  const reviewRows = pr.reviews.nodes.map((r) => ({
+    ...key,
+    id: r.id,
+    author: r.author?.login ?? null,
+    state: r.state,
+    body: r.body,
+    submittedAt: ms(r.submittedAt),
+  }))
+  const commentRows = pr.comments.nodes.map((m) => ({
+    ...key,
+    id: m.id,
+    author: m.author?.login ?? null,
+    body: m.body,
+    createdAt: ms(m.createdAt),
+  }))
+  const checkRows = dedupeByName(
+    (pr.commits.nodes[0]?.commit.statusCheckRollup?.contexts.nodes ?? []).map((ctx) =>
+      ctx.__typename === 'CheckRun'
+        ? { ...key, name: ctx.name, status: ctx.conclusion ?? ctx.status, url: ctx.detailsUrl }
+        : { ...key, name: ctx.context, status: ctx.state, url: ctx.targetUrl },
+    ),
+  )
+
+  // chunk(rows): D1 caps bound params at 100/statement; ≤8 cols × 8 rows = ≤64.
+  const chunk = <T,>(table: Parameters<typeof db.insert>[0], rows: T[]) =>
+    Array.from({ length: Math.ceil(rows.length / 8) }, (_, i) => db.insert(table).values(rows.slice(i * 8, i * 8 + 8) as never))
+
+  await db.batch([
+    db
+      .insert(schema.pullRequests)
+      .values(pullRow)
+      .onConflictDoUpdate({
+        target: [schema.pullRequests.userId, schema.pullRequests.repoId, schema.pullRequests.number],
+        set: pullRow,
+      }),
+    db.delete(schema.prFiles).where(childWhere(schema.prFiles)),
+    db.delete(schema.reviews).where(childWhere(schema.reviews)),
+    db.delete(schema.comments).where(childWhere(schema.comments)),
+    db.delete(schema.checks).where(childWhere(schema.checks)),
+    ...chunk(schema.prFiles, fileRows),
+    ...chunk(schema.reviews, reviewRows),
+    ...chunk(schema.comments, commentRows),
+    ...chunk(schema.checks, checkRows),
+    db
+      .insert(schema.syncState)
+      .values({ userId, resource, etag: null, fetchedAt: now })
+      .onConflictDoUpdate({ target: [schema.syncState.userId, schema.syncState.resource], set: { fetchedAt: now } }),
+  ])
+
+  return c.json(await readComposite())
+})
+
+// A commit can carry duplicate context names across check runs; keep the last (PK is name).
+const dedupeByName = <T extends { name: string }>(rows: T[]) => [...new Map(rows.map((r) => [r.name, r])).values()]
+
+const toPublicPull = (p: typeof schema.pullRequests.$inferSelect) => ({
+  number: p.number,
+  title: p.title,
+  state: p.state,
+  draft: p.draft,
+  author: p.author,
+  headRef: p.headRef,
+  baseRef: p.baseRef,
+  updatedAt: p.updatedAt,
+})
+const toPublicFile = (f: typeof schema.prFiles.$inferSelect) => ({
+  path: f.path,
+  status: f.status,
+  additions: f.additions,
+  deletions: f.deletions,
+})

@@ -51,3 +51,23 @@ export const pullsOptions = (owner: string, repo: string, enabled: boolean) => (
     return res.json()
   },
 })
+
+export type PullFile = { path: string; status: string | null; additions: number | null; deletions: number | null }
+// Reviews/comments/checks are mirrored server-side but not rendered in 3a — typed loosely for now.
+export type PullDetail = {
+  pull: (Pull & { number: number }) | null
+  files: PullFile[]
+  reviews: unknown[]
+  comments: unknown[]
+  checks: unknown[]
+}
+
+export const pullDetailOptions = (owner: string, repo: string, number: string, enabled: boolean) => ({
+  queryKey: ['pull', owner, repo, number] as const,
+  enabled,
+  queryFn: async (): Promise<PullDetail> => {
+    const res = await fetch(`/api/repos/${owner}/${repo}/pulls/${number}`)
+    if (!res.ok) throw new Error(`/api/repos/${owner}/${repo}/pulls/${number} ${res.status}`)
+    return res.json()
+  },
+})
