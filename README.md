@@ -189,24 +189,24 @@ in step 3.
 
 ## Status / roadmap
 
-**Built:**
+All features described in `docs/` are implemented:
 
 - GitHub OAuth login (encrypted-cookie session, token never sent to the browser).
-- Repo list.
-- PR list with open/closed tabs and filtering.
-- PR detail: description, checks, conversation, labels.
-- Diff rendering with Shiki syntax highlighting + virtualization.
-- Write actions: merge, close, reopen, mark draft, comment, edit labels.
-- Theme persistence and `j`/`k` keyboard navigation.
-- IndexedDB client cache (TanStack Query persistence).
+- Repo selector: searchable picker, pinned repos (★), breadcrumb, collapsible left pane.
+- PR list: open/closed tabs, text filter, virtualized, `j`/`k` navigation.
+- PR detail: description, labels (add/remove), checks (with "rerun failed jobs"), conversation,
+  changed-file tree with per-file "viewed" checkboxes.
+- Diff rendering: Shiki syntax highlighting, row virtualization, unified/split toggle,
+  word-level intra-line diff, inline review-comment threads (display, reply, resolve, new
+  line comment).
+- Write actions: merge, close, reopen, mark draft/ready, PR comment, labels, review comments,
+  rerun Actions.
+- App state: theme + diff-view + pane/pin/viewed preferences persisted; session-expiry redirect.
+- Caching: D1 mirror (ETag/TTL serve-then-revalidate), KV blob-by-SHA for public patches,
+  IndexedDB client cache, and a service-worker offline app shell.
+- Keyboard / overlays: `j`/`k` PR nav, `[`/`]` file nav, `/` fuzzy file finder, `?` help.
 
-**Deferred to v2:**
-
-- Inline diff comment threads.
-- Split / word-level diff views.
-- Service-worker offline shell.
-- Re-run failed GitHub Actions.
-- Pinned repos.
-- Viewed-file tracking.
-- Virtualized PR list.
-- Fuzzy file finder / command palette.
+**Known limitations / future polish:** first-page pagination only (100 repos/PRs/files,
+50 reviews/comments); the command palette (`.`) is marked future in the docs and not built;
+list/diff data verified against types + build, with live-GitHub paths exercised manually
+(see Local setup).
