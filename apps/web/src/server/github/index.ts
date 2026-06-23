@@ -1,7 +1,8 @@
 // Thin GitHub client (docs/api-structure.md "start lean"). Injects the standard headers and
 // returns the raw Response so callers handle status/parsing. Stays here in apps/web/src/server/
 // until a third consumer justifies promoting it to packages/.
-// ponytail: no ETag / rate-limit parsing yet — add when conditional fetch lands.
+// ponytail: no client-side ETag parsing yet (callers pass If-None-Match themselves); ghError
+// below normalizes auth / rate-limit / SSO statuses for every route.
 const ghHeaders = (token: string) => ({
   Authorization: `Bearer ${token}`,
   Accept: 'application/vnd.github+json',
@@ -23,3 +24,20 @@ export const ghGraphQL = (token: string, query: string, variables: Record<string
     headers: { ...ghHeaders(token), 'Content-Type': 'application/json' },
     body: JSON.stringify({ query, variables }),
   })
+
+// Normalize a non-OK GitHub REST/GraphQL Response to a client error code + HTTP status, or null
+// when the response is OK (2xx). Callers handle endpoint-specific statuses (e.g. merge 405/409,
+// GraphQL `errors`) themselves, then delegate everything else here so the taxonomy stays uniform
+// (docs/github-integration.md). GitHub signals rate limits as 403 *or* 429 with x-ratelimit-remaining: 0
+// (primary) or retry-after (secondary), and SAML enforcement as 403 with x-github-sso.
+export const ghError = (res: Response): { error: string; status: 401 | 403 | 429 | 502 } | null => {
+  if (res.ok) return null
+  if (res.status === 401) return { error: 'reauth', status: 401 }
+  if (res.status === 403 || res.status === 429) {
+    if (res.headers.get('x-ratelimit-remaining') === '0' || res.headers.has('retry-after'))
+      return { error: 'rate_limited', status: 429 }
+    if (res.headers.has('x-github-sso')) return { error: 'sso', status: 403 }
+    return { error: 'forbidden', status: 403 }
+  }
+  return { error: 'github_unavailable', status: 502 }
+}

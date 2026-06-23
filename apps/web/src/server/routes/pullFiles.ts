@@ -1,7 +1,7 @@
 import { and, eq } from 'drizzle-orm'
 import { Hono } from 'hono'
 import { getDb, schema } from '../db'
-import { gh } from '../github'
+import { gh, ghError } from '../github'
 import type { AppEnv } from '../middleware/auth'
 
 // PR changed-files + patches. REST /pulls/{n}/files is the single writer of pr_files (it carries
@@ -72,8 +72,8 @@ export const pullFiles = new Hono<AppEnv>().get('/:owner/:repo/pulls/:number/fil
   if (sync && sync.fetchedAt + STALE_AFTER_MS > Date.now()) return c.json(await readFiles())
 
   const res = await gh(user.token, `/repos/${owner}/${repo}/pulls/${number}/files?per_page=100`)
-  if (res.status === 401) return c.json({ error: 'reauth' }, 401)
-  if (!res.ok) return c.json({ error: 'github_unavailable' }, 502)
+  const err = ghError(res)
+  if (err) return c.json({ error: err.error }, err.status)
   // ponytail: first 100 files — Link-header pagination deferred.
   const body = (await res.json()) as GitHubFile[]
   const now = Date.now()

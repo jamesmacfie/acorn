@@ -1,7 +1,7 @@
 import { and, eq } from 'drizzle-orm'
 import { Hono, type Context } from 'hono'
 import { getDb, schema } from '../db'
-import { gh, ghGraphQL } from '../github'
+import { gh, ghError, ghGraphQL } from '../github'
 import type { AppEnv } from '../middleware/auth'
 
 // PR write actions (docs/github-api.md). Each calls GitHub, updates the D1 mirror so a read
@@ -59,9 +59,9 @@ export const prActions = new Hono<AppEnv>()
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ merge_method: method ?? 'merge' }),
     })
-    if (res.status === 401) return c.json({ error: 'reauth' }, 401)
     if (res.status === 405 || res.status === 409) return c.json({ error: 'merge_failed', status: res.status }, 409)
-    if (!res.ok) return c.json({ error: 'github_unavailable' }, 502)
+    const err = ghError(res)
+    if (err) return c.json({ error: err.error }, err.status)
     await setState(r.db, r.user.login, r.repoId, r.number, 'merged')
     return c.json({ state: 'merged' })
   })
@@ -75,8 +75,8 @@ export const prActions = new Hono<AppEnv>()
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ state }),
     })
-    if (res.status === 401) return c.json({ error: 'reauth' }, 401)
-    if (!res.ok) return c.json({ error: 'github_unavailable' }, 502)
+    const err = ghError(res)
+    if (err) return c.json({ error: err.error }, err.status)
     await setState(r.db, r.user.login, r.repoId, r.number, state)
     return c.json({ state })
   })
@@ -90,9 +90,10 @@ export const prActions = new Hono<AppEnv>()
       ? `mutation($id:ID!){ convertPullRequestToDraft(input:{pullRequestId:$id}){ clientMutationId } }`
       : `mutation($id:ID!){ markPullRequestReadyForReview(input:{pullRequestId:$id}){ clientMutationId } }`
     const res = await ghGraphQL(r.user.token, mutation, { id: r.nodeId })
-    if (res.status === 401) return c.json({ error: 'reauth' }, 401)
+    const err = ghError(res)
+    if (err) return c.json({ error: err.error }, err.status)
     const body = (await res.json().catch(() => ({}))) as { errors?: unknown }
-    if (!res.ok || body.errors) return c.json({ error: 'github_unavailable' }, 502)
+    if (body.errors) return c.json({ error: 'github_unavailable' }, 502)
     await r.db
       .update(schema.pullRequests)
       .set({ draft: !!draft })
@@ -116,8 +117,8 @@ export const prActions = new Hono<AppEnv>()
       headers: { 'Content-Type': 'application/json', Accept: 'application/vnd.github.full+json' },
       body: JSON.stringify({ body }),
     })
-    if (res.status === 401) return c.json({ error: 'reauth' }, 401)
-    if (!res.ok) return c.json({ error: 'github_unavailable' }, 502)
+    const err = ghError(res)
+    if (err) return c.json({ error: err.error }, err.status)
     const ct = (await res.json()) as { node_id: string; user: { login: string } | null; body_html?: string; created_at: string }
     const row = {
       userId: r.user.login,
@@ -169,8 +170,8 @@ export const prActions = new Hono<AppEnv>()
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ body, commit_id: r.headSha, path, line, side: side ?? 'RIGHT' }),
     })
-    if (res.status === 401) return c.json({ error: 'reauth' }, 401)
-    if (!res.ok) return c.json({ error: 'github_unavailable' }, 502)
+    const err = ghError(res)
+    if (err) return c.json({ error: err.error }, err.status)
     await bustPrSync(r.db, r.user.login, r.repoId, r.number)
     return c.json({ ok: true })
   })
@@ -186,8 +187,8 @@ export const prActions = new Hono<AppEnv>()
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ body }),
     })
-    if (res.status === 401) return c.json({ error: 'reauth' }, 401)
-    if (!res.ok) return c.json({ error: 'github_unavailable' }, 502)
+    const err = ghError(res)
+    if (err) return c.json({ error: err.error }, err.status)
     await bustPrSync(r.db, r.user.login, r.repoId, r.number)
     return c.json({ ok: true })
   })
@@ -201,9 +202,10 @@ export const prActions = new Hono<AppEnv>()
     const res = await ghGraphQL(r.user.token, `mutation($id:ID!){ ${field}(input:{threadId:$id}){ thread { id } } }`, {
       id: threadId,
     })
-    if (res.status === 401) return c.json({ error: 'reauth' }, 401)
+    const err = ghError(res)
+    if (err) return c.json({ error: err.error }, err.status)
     const out = (await res.json().catch(() => ({}))) as { errors?: unknown }
-    if (!res.ok || out.errors) return c.json({ error: 'github_unavailable' }, 502)
+    if (out.errors) return c.json({ error: 'github_unavailable' }, 502)
     await bustPrSync(r.db, r.user.login, r.repoId, r.number)
     return c.json({ resolved: !!resolved })
   })
@@ -217,9 +219,8 @@ export const prActions = new Hono<AppEnv>()
     const repo = c.req.param('repo')
     const runId = c.req.param('runId')
     const res = await gh(user.token, `/repos/${owner}/${repo}/actions/runs/${runId}/rerun-failed-jobs`, { method: 'POST' })
-    if (res.status === 401) return c.json({ error: 'reauth' }, 401)
-    if (res.status === 403) return c.json({ error: 'forbidden' }, 403)
-    if (!res.ok) return c.json({ error: 'github_unavailable' }, 502)
+    const err = ghError(res)
+    if (err) return c.json({ error: err.error }, err.status)
     return c.json({ ok: true })
   })
 
@@ -238,8 +239,8 @@ async function mutateLabels(c: Context<AppEnv>, op: 'add' | 'remove') {
       : await gh(r.user.token, `/repos/${r.owner}/${r.repo}/issues/${r.number}/labels/${encodeURIComponent(name)}`, {
           method: 'DELETE',
         })
-  if (res.status === 401) return c.json({ error: 'reauth' }, 401)
-  if (!res.ok) return c.json({ error: 'github_unavailable' }, 502)
+  const err = ghError(res)
+  if (err) return c.json({ error: err.error }, err.status)
   const labels = (await res.json()) as { name: string; color: string | null }[]
   const rows = labels.map((l) => ({ userId: r.user.login, repoId: r.repoId, number: r.number, name: l.name, color: l.color }))
   const where = and(

@@ -2,7 +2,7 @@ import { and, eq } from 'drizzle-orm'
 import type { SQLiteColumn } from 'drizzle-orm/sqlite-core'
 import { Hono } from 'hono'
 import { getDb, schema } from '../db'
-import { ghGraphQL } from '../github'
+import { ghError, ghGraphQL } from '../github'
 import type { AppEnv } from '../middleware/auth'
 
 // PR detail — the composite GraphQL read (docs/github-api.md "primary read for the PR screen").
@@ -145,8 +145,8 @@ export const pullDetail = new Hono<AppEnv>().get('/:owner/:repo/pulls/:number', 
   if (sync && sync.fetchedAt + STALE_AFTER_MS > Date.now()) return c.json(await readComposite())
 
   const res = await ghGraphQL(user.token, COMPOSITE_QUERY, { owner, repo, number })
-  if (res.status === 401) return c.json({ error: 'reauth' }, 401)
-  if (!res.ok) return c.json({ error: 'github_unavailable' }, 502)
+  const err = ghError(res)
+  if (err) return c.json({ error: err.error }, err.status)
   const json = (await res.json()) as {
     data?: { repository?: { pullRequest?: GqlPull | null } }
     errors?: { message: string; type?: string }[]

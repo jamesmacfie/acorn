@@ -1,7 +1,7 @@
 import { and, desc, eq, ne } from 'drizzle-orm'
 import { Hono } from 'hono'
 import { getDb, schema } from '../db'
-import { gh } from '../github'
+import { gh, ghError } from '../github'
 import type { AppEnv } from '../middleware/auth'
 
 // PR list for a repo (docs/caching.md serve-then-revalidate). PR data is "fast-changing":
@@ -79,8 +79,9 @@ export const pulls = new Hono<AppEnv>().get('/:owner/:repo/pulls', async (c) => 
     return c.json((await readRows()).map(toPublic))
   }
 
-  if (!res.ok) return c.json({ error: 'github_unavailable' }, 502)
-  // ponytail: full error table (SSO 403, rate-limit 429) lands with the diff slice.
+  // 401 + 304 already handled above; everything else (rate-limit, SSO, upstream failure) maps here.
+  const err = ghError(res)
+  if (err) return c.json({ error: err.error }, err.status)
 
   const etag = res.headers.get('etag')
   const body = (await res.json()) as GitHubPull[]

@@ -1,7 +1,7 @@
 import { desc, eq } from 'drizzle-orm'
 import { Hono } from 'hono'
 import { getDb, schema } from '../db'
-import { gh } from '../github'
+import { gh, ghError } from '../github'
 import type { AppEnv } from '../middleware/auth'
 
 // First read path through the D1 mirror (docs/caching.md serve-then-revalidate).
@@ -40,9 +40,8 @@ export const repos = new Hono<AppEnv>()
     // Stale or missing → re-sync from GitHub. One page of 100, most-recently-pushed first.
     // ponytail: Link-header pagination deferred; the selector wants recent repos anyway.
     const res = await gh(user.token, '/user/repos?sort=pushed&direction=desc&per_page=100')
-    if (res.status === 401) return c.json({ error: 'reauth' }, 401)
-    if (!res.ok) return c.json({ error: 'github_unavailable' }, 502)
-    // ponytail: full error table (SSO 403, rate-limit 429) lands with the PR slice.
+    const err = ghError(res)
+    if (err) return c.json({ error: err.error }, err.status)
 
     const etag = res.headers.get('etag')
     const fetchedAt = Date.now()

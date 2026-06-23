@@ -1,8 +1,8 @@
 import { integer, primaryKey, sqliteTable, text } from 'drizzle-orm/sqlite-core'
 
-// Representative slice of the read-model mirror + app-state (docs/data-layer.md).
-// Two mirror tables and one app-state table prove the Drizzle → migration → local-D1
-// path; the remaining tables (pr_files, comments, workflow_runs, …) land with their features.
+// The read-model mirror + app-state schema (docs/data-layer.md). Mirror tables are cached,
+// revalidated projections of GitHub data; app-state tables (prefs, pins, viewed files) are the
+// source of truth. Edit here, then `pnpm db:generate` → `pnpm db:migrate`.
 
 // --- Mirror tables: cached projections of GitHub data (revalidated, disposable) ---
 
