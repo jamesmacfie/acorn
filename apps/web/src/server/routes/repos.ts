@@ -1,6 +1,7 @@
 import { desc, eq } from 'drizzle-orm'
 import { Hono } from 'hono'
 import { getDb, schema } from '../db'
+import { chunkRowsByColumnBudget } from '../db/batch'
 import { gh, ghError } from '../github'
 import type { AppEnv } from '../middleware/auth'
 
@@ -61,12 +62,9 @@ export const repos = new Hono<AppEnv>()
 
     // Full-list refresh: delete-then-insert so repos the user lost access to disappear
     // (docs/data-layer.md batch pattern), atomically in one batch. D1 caps bound params at
-    // 100/statement, so chunk inserts: 10 cols × 9 rows = 90 params per insert.
+    // 100/statement, so inserts are chunked by row width.
     const del = db.delete(schema.repos).where(eq(schema.repos.userId, userId))
-    const inserts = []
-    for (let i = 0; i < rows.length; i += 9) {
-      inserts.push(db.insert(schema.repos).values(rows.slice(i, i + 9)))
-    }
+    const inserts = chunkRowsByColumnBudget(rows).map((part) => db.insert(schema.repos).values(part))
     await db.batch([del, ...inserts])
 
     return c.json(rows.map(toPublic))

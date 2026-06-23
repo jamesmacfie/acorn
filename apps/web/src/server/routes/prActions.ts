@@ -1,52 +1,13 @@
 import { and, eq } from 'drizzle-orm'
 import { Hono, type Context } from 'hono'
-import { getDb, schema } from '../db'
+import { schema } from '../db'
 import { gh, ghError, ghGraphQL } from '../github'
 import type { AppEnv } from '../middleware/auth'
+import { bustPrSync, resolvePr, setPrState } from './prContext'
 
 // PR write actions (docs/github-api.md). Each calls GitHub, updates the D1 mirror so a read
 // within the TTL window reflects the change, and returns the canonical bit. The client layers
 // optimistic updates / invalidation on top.
-
-// Resolve the mirror PR row (repoId + nodeId) for the routed PR; 404 if unknown to this user.
-async function resolvePr(c: Context<AppEnv>) {
-  const user = c.get('user')
-  if (!user) return { error: 'unauthenticated' as const, status: 401 as const }
-  const db = getDb(c.env)
-  const owner = c.req.param('owner')!
-  const repo = c.req.param('repo')!
-  const number = Number(c.req.param('number'))
-  if (!Number.isInteger(number)) return { error: 'bad_number' as const, status: 400 as const }
-  const [repoRow] = await db
-    .select({ id: schema.repos.id })
-    .from(schema.repos)
-    .where(and(eq(schema.repos.userId, user.login), eq(schema.repos.owner, owner), eq(schema.repos.name, repo)))
-  if (!repoRow) return { error: 'repo_not_found' as const, status: 404 as const }
-  const [pr] = await db
-    .select({ nodeId: schema.pullRequests.nodeId, headSha: schema.pullRequests.headSha })
-    .from(schema.pullRequests)
-    .where(
-      and(
-        eq(schema.pullRequests.userId, user.login),
-        eq(schema.pullRequests.repoId, repoRow.id),
-        eq(schema.pullRequests.number, number),
-      ),
-    )
-  return { user, db, owner, repo, number, repoId: repoRow.id, nodeId: pr?.nodeId ?? null, headSha: pr?.headSha ?? null }
-}
-
-// Drop the PR's composite freshness gate so the next detail GET refetches from GitHub (used after
-// thread mutations, whose effects we don't mirror surgically).
-const bustPrSync = (db: ReturnType<typeof getDb>, userId: string, repoId: number, number: number) =>
-  db
-    .delete(schema.syncState)
-    .where(and(eq(schema.syncState.userId, userId), eq(schema.syncState.resource, `pr:${repoId}:${number}`)))
-
-const setState = (db: ReturnType<typeof getDb>, userId: string, repoId: number, number: number, state: string) =>
-  db
-    .update(schema.pullRequests)
-    .set({ state })
-    .where(and(eq(schema.pullRequests.userId, userId), eq(schema.pullRequests.repoId, repoId), eq(schema.pullRequests.number, number)))
 
 export const prActions = new Hono<AppEnv>()
   // Merge: PUT /pulls/{n}/merge. 405 = not mergeable, 409 = head moved.
@@ -62,7 +23,7 @@ export const prActions = new Hono<AppEnv>()
     if (res.status === 405 || res.status === 409) return c.json({ error: 'merge_failed', status: res.status }, 409)
     const err = ghError(res)
     if (err) return c.json({ error: err.error }, err.status)
-    await setState(r.db, r.user.login, r.repoId, r.number, 'merged')
+    await setPrState(r.db, r.user.login, r.repoId, r.number, 'merged')
     return c.json({ state: 'merged' })
   })
   // Close / reopen: PATCH /pulls/{n} { state }.
@@ -77,7 +38,7 @@ export const prActions = new Hono<AppEnv>()
     })
     const err = ghError(res)
     if (err) return c.json({ error: err.error }, err.status)
-    await setState(r.db, r.user.login, r.repoId, r.number, state)
+    await setPrState(r.db, r.user.login, r.repoId, r.number, state)
     return c.json({ state })
   })
   // Draft ↔ ready: GraphQL only, needs the PR node id.

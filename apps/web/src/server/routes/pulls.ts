@@ -1,6 +1,8 @@
 import { and, desc, eq, ne } from 'drizzle-orm'
 import { Hono } from 'hono'
 import { getDb, schema } from '../db'
+import { chunkRowsByColumnBudget } from '../db/batch'
+import { pullsResource } from '../db/resourceKeys'
 import { gh, ghError } from '../github'
 import type { AppEnv } from '../middleware/auth'
 
@@ -41,7 +43,7 @@ export const pulls = new Hono<AppEnv>().get('/:owner/:repo/pulls', async (c) => 
   if (!repoRow) return c.json({ error: 'repo_not_found' }, 404)
   const repoId = repoRow.id
 
-  const resource = `pulls:${repoId}:${state}`
+  const resource = pullsResource(repoId, state)
   const [sync] = await db
     .select()
     .from(schema.syncState)
@@ -103,10 +105,8 @@ export const pulls = new Hono<AppEnv>().get('/:owner/:repo/pulls', async (c) => 
   }))
 
   // Full-list refresh: delete-then-insert so closed/merged PRs drop out, plus the sync_state
-  // upsert, atomically in one batch. D1 caps bound params at 100/statement → 14 cols × 6 rows = 84.
-  const ops = Array.from({ length: Math.ceil(rows.length / 6) }, (_, i) =>
-    db.insert(schema.pullRequests).values(rows.slice(i * 6, i * 6 + 6)),
-  )
+  // upsert, atomically in one batch. D1 caps bound params at 100/statement.
+  const ops = chunkRowsByColumnBudget(rows).map((part) => db.insert(schema.pullRequests).values(part))
   await db.batch([
     db.delete(schema.pullRequests).where(scope),
     db
