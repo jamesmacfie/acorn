@@ -21,3 +21,13 @@ export const reopenPr = (o: string, r: string, n: string) => post(`${base(o, r, 
 export const setDraft = (o: string, r: string, n: string, draft: boolean) => post(`${base(o, r, n)}/draft`, { draft })
 export const addComment = (o: string, r: string, n: string, body: string) =>
   post<{ id: string }>(`${base(o, r, n)}/comments`, { body })
+
+export const setPref = async (key: string, value: string) => {
+  const res = await fetch('/api/prefs', {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ key, value }),
+  })
+  if (!res.ok) throw new Error(`prefs ${res.status}`)
+  return res.json() as Promise<{ key: string; value: string }>
+}

@@ -4,6 +4,7 @@ import { authMiddleware, type AppEnv } from './middleware/auth'
 import { auth } from './routes/auth'
 import { me } from './routes/me'
 import { prActions } from './routes/prActions'
+import { prefs } from './routes/prefs'
 import { pullDetail } from './routes/pullDetail'
 import { pullFiles } from './routes/pullFiles'
 import { pulls } from './routes/pulls'
@@ -16,6 +17,7 @@ const app = new Hono<AppEnv>()
   .use('/api/*', csrf()) // Origin / Sec-Fetch-Site check on mutating calls
   .use('/api/*', authMiddleware) // stateless cookie → ctx.user (stub for now)
   .route('/api/me', me)
+  .route('/api/prefs', prefs)
   .route('/api/repos', repos)
   .route('/api/repos', pulls) // repo-scoped sub-resources, e.g. /:owner/:repo/pulls
   .route('/api/repos', pullDetail) // /:owner/:repo/pulls/:number

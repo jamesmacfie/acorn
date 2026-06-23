@@ -247,6 +247,16 @@ body {
 /* Top bar side clusters: dropdown (start) and auth (end). */
 .topbar-side { display: inline-flex; align-items: center; gap: var(--pane-pad); }
 .topbar-end { justify-content: flex-end; }
+.theme-toggle {
+  font: inherit;
+  color: var(--text-muted);
+  background: none;
+  border: 0;
+  cursor: pointer;
+  padding: 2px 6px;
+  line-height: 1;
+}
+.theme-toggle:hover { color: var(--text); }
 
 .repo-select {
   height: 36px;
