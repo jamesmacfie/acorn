@@ -22,6 +22,17 @@ export const setDraft = (o: string, r: string, n: string, draft: boolean) => pos
 export const addComment = (o: string, r: string, n: string, body: string) =>
   post<{ id: string }>(`${base(o, r, n)}/comments`, { body })
 
+export const addLabel = (o: string, r: string, n: string, name: string) => post(`${base(o, r, n)}/labels`, { name })
+export const removeLabel = async (o: string, r: string, n: string, name: string) => {
+  const res = await fetch(`${base(o, r, n)}/labels`, {
+    method: 'DELETE',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name }),
+  })
+  if (!res.ok) throw new Error(((await res.json().catch(() => ({}))) as { error?: string }).error ?? `${res.status}`)
+  return res.json()
+}
+
 export const setPref = async (key: string, value: string) => {
   const res = await fetch('/api/prefs', {
     method: 'PUT',

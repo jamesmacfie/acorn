@@ -63,8 +63,10 @@ export type PullFile = {
 export type Review = { id: string; author: string | null; state: string | null; body: string | null; submittedAt: number | null }
 export type Comment = { id: string; author: string | null; body: string | null; createdAt: number | null }
 export type Check = { name: string; status: string | null; url: string | null }
+export type Label = { name: string; color: string | null }
 export type PullDetail = {
   pull: (Pull & { number: number; body: string | null }) | null
+  labels: Label[]
   reviews: Review[]
   comments: Comment[]
   checks: Check[]
