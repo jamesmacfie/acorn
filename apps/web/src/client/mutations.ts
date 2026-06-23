@@ -44,6 +44,16 @@ export const resolveThread = (o: string, r: string, n: string, threadId: string,
 export const setViewed = (o: string, r: string, n: string, path: string, viewed: boolean) =>
   post(`${base(o, r, n)}/viewed`, { path, viewed })
 
+export const setPin = async (repoId: number, pinned: boolean) => {
+  const res = await fetch('/api/pins', {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ repoId, pinned }),
+  })
+  if (!res.ok) throw new Error(`pins ${res.status}`)
+  return res.json() as Promise<{ repoId: number; pinned: boolean }>
+}
+
 export const setPref = async (key: string, value: string) => {
   const res = await fetch('/api/prefs', {
     method: 'PUT',

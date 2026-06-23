@@ -75,6 +75,10 @@ body {
   min-height: 0;
 }
 
+/* Left-pane collapse: zero the left column and hide the pane entirely (no stray border). */
+.app.left-collapsed .panes { grid-template-columns: 0 360px 1fr; }
+.app.left-collapsed .pane-left { display: none; }
+
 .pane {
   border-right: 1px solid var(--border);
   padding: var(--pane-pad);
@@ -453,7 +457,52 @@ body {
 }
 .theme-toggle:hover { color: var(--text); }
 
-.repo-select {
+/* Left-pane collapse chevron: a quiet glyph toggle next to the picker. */
+.collapse-toggle {
+  font: inherit;
+  color: var(--text-muted);
+  background: none;
+  border: 0;
+  cursor: pointer;
+  padding: 2px 6px;
+  line-height: 1;
+}
+.collapse-toggle:hover { color: var(--text); }
+
+/* Breadcrumb (top-bar center): owner / repo / #number, each segment muted, the number bold. */
+.breadcrumb {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  justify-self: center;
+  max-width: 100%;
+  overflow: hidden;
+  font-size: var(--fs-sm);
+}
+.crumb {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.crumb-link {
+  font: inherit;
+  font-size: var(--fs-sm);
+  color: var(--text-muted);
+  background: none;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+}
+.crumb-link:hover { color: var(--text); }
+.crumb-sep { color: var(--text-faint); flex: none; }
+.crumb-num { color: var(--text); font-weight: 600; flex: none; }
+
+/* Searchable repo picker: a button that opens an absolute-positioned popover. */
+.repo-picker { position: relative; }
+.repo-picker-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
   height: 36px;
   max-width: 300px;
   box-sizing: border-box;
@@ -462,18 +511,76 @@ body {
   background: var(--bg-subtle);
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  padding: 0 28px 0 10px; /* room for the chevron on the right */
-  /* truncate long owner/name with an ellipsis (needs appearance:none) */
+  padding: 0 10px;
+  cursor: pointer;
+}
+.repo-picker-button:hover { border-color: var(--border-strong); }
+.repo-picker-label { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.repo-picker-chevron { flex: none; color: var(--text-muted); font-size: 10px; }
+
+.repo-picker-popover {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  z-index: 40;
+  width: 300px;
+  max-width: 90vw;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+  overflow: hidden;
+}
+.repo-picker-filter {
+  font: inherit;
+  font-size: var(--fs-sm);
+  color: var(--text);
+  background: var(--bg);
+  border: 0;
+  border-bottom: 1px solid var(--border);
+  padding: 8px 10px;
+  outline: none;
+}
+.repo-picker-empty { color: var(--text-muted); font-size: var(--fs-sm); padding: 10px; margin: 0; }
+.repo-picker-list { list-style: none; margin: 0; padding: 4px 0; max-height: 320px; overflow-y: auto; }
+.repo-picker-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 6px;
+}
+.repo-picker-row:hover { background: var(--bg-subtle); }
+.repo-picker-row.active { background: var(--bg-selected); }
+.repo-pin {
+  flex: none;
+  font: inherit;
+  font-size: var(--fs-sm);
+  color: var(--text-faint);
+  background: none;
+  border: 0;
+  padding: 2px 4px;
+  cursor: pointer;
+  line-height: 1;
+}
+.repo-pin:hover { color: var(--text-muted); }
+.repo-pin.pinned { color: var(--warn); }
+.repo-picker-name {
+  flex: 1;
+  min-width: 0;
+  font: inherit;
+  font-size: var(--fs-sm);
+  color: var(--text);
+  background: none;
+  border: 0;
+  padding: 6px 4px;
+  text-align: left;
   overflow: hidden;
   white-space: nowrap;
   text-overflow: ellipsis;
-  appearance: none;
-  /* ponytail: neutral-gray chevron data-URI reads fine on both themes; no JS/asset needed */
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%238a8a8a' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
-  background-repeat: no-repeat;
-  background-position: right 10px center;
+  cursor: pointer;
 }
-.repo-select:hover { border-color: var(--border-strong); }
 
 /* Auth control (top-right): Login link, or avatar + Logout when signed in. */
 .auth-control {

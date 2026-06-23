@@ -1,8 +1,9 @@
-import { createEffect, For, Show } from 'solid-js'
+import { createEffect, createSignal, Show } from 'solid-js'
 import { createQuery, useQueryClient } from '@tanstack/solid-query'
 import { useNavigate, useParams } from '@solidjs/router'
-import { meOptions, prefsOptions, reposOptions } from './queries'
+import { meOptions, pinsOptions, prefsOptions, reposOptions } from './queries'
 import { setPref } from './mutations'
+import RepoPicker from './RepoPicker'
 import PullList from './PullList'
 import PullDetail from './PullDetail'
 import DiffView from './DiffView'
@@ -18,6 +19,7 @@ export default function App() {
   const me = createQuery(() => meOptions())
   const repos = createQuery(() => reposOptions(!!me.data))
   const prefs = createQuery(() => prefsOptions(!!me.data))
+  const pins = createQuery(() => pinsOptions(!!me.data))
 
   // Apply the saved theme (falls back to prefers-color-scheme when unset).
   createEffect(() => {
@@ -38,6 +40,22 @@ export default function App() {
     if (list?.length && !params.owner) navigate(`/${list[0].owner}/${list[0].name}`, { replace: true })
   })
 
+  // Left-pane collapse, persisted via the `left_collapsed` pref. Seed the local signal from prefs
+  // once it loads (and the user hasn't toggled since), so reloads restore the saved state.
+  const [collapsed, setCollapsed] = createSignal(false)
+  const [touched, setTouched] = createSignal(false)
+  createEffect(() => {
+    const v = prefs.data?.left_collapsed
+    if (v !== undefined && !touched()) setCollapsed(v === '1')
+  })
+  const toggleCollapsed = async () => {
+    const next = !collapsed()
+    setTouched(true)
+    setCollapsed(next)
+    await setPref('left_collapsed', next ? '1' : '0')
+    queryClient.invalidateQueries({ queryKey: ['prefs'] })
+  }
+
   const selected = () => (params.owner && params.repo ? `${params.owner}/${params.repo}` : '')
 
   async function logout() {
@@ -48,22 +66,42 @@ export default function App() {
   }
 
   return (
-    <div class="app">
+    <div class="app" classList={{ 'left-collapsed': collapsed() }}>
       <header class="topbar">
         <div class="topbar-side">
+          <button
+            type="button"
+            class="collapse-toggle"
+            title={collapsed() ? 'Show left pane' : 'Hide left pane'}
+            aria-pressed={collapsed()}
+            onClick={toggleCollapsed}
+          >
+            {collapsed() ? '»' : '«'}
+          </button>
           <Show when={repos.data?.length}>
-            <select class="repo-select" value={selected()} onChange={(e) => navigate(`/${e.currentTarget.value}`)}>
-              <For each={repos.data}>
-                {(repo) => (
-                  <option value={`${repo.owner}/${repo.name}`}>
-                    {repo.owner}/{repo.name}
-                  </option>
-                )}
-              </For>
-            </select>
+            <RepoPicker
+              repos={repos.data ?? []}
+              pinned={pins.data ?? []}
+              selected={selected()}
+              onSelect={(value) => navigate(`/${value}`)}
+            />
           </Show>
         </div>
-        <span class="brand">gurthurd</span>
+        <div class="breadcrumb">
+          <Show when={params.owner} fallback={<span class="brand">gurthurd</span>}>
+            <button type="button" class="crumb crumb-link" onClick={() => navigate(`/${params.owner}/${params.repo}`)}>
+              {params.owner}
+            </button>
+            <span class="crumb-sep">/</span>
+            <button type="button" class="crumb crumb-link" onClick={() => navigate(`/${params.owner}/${params.repo}`)}>
+              {params.repo}
+            </button>
+            <Show when={params.number}>
+              <span class="crumb-sep">/</span>
+              <span class="crumb crumb-num">#{params.number}</span>
+            </Show>
+          </Show>
+        </div>
         <div class="topbar-side topbar-end">
           <button type="button" class="theme-toggle" title="Toggle theme" onClick={toggleTheme}>
             ◑
