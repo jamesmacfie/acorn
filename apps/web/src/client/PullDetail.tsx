@@ -1,18 +1,46 @@
-import { For, Show } from 'solid-js'
-import { createQuery } from '@tanstack/solid-query'
+import { createSignal, For, Show } from 'solid-js'
+import { createMutation, createQuery, useQueryClient } from '@tanstack/solid-query'
 import { useParams, useSearchParams } from '@solidjs/router'
 import { filesOptions, pullDetailOptions, reposOptions } from './queries'
+import { addComment, closePr, mergePr, reopenPr, setDraft } from './mutations'
 
 // Mid (Navigator) pane: PR header + description + changed-files + checks + conversation.
 // Bodies are GitHub-sanitized bodyHTML, rendered via innerHTML (docs/ui-style.md §5).
 export default function PullDetail() {
   const params = useParams()
   const [searchParams, setSearchParams] = useSearchParams()
+  const qc = useQueryClient()
   const repos = createQuery(() => reposOptions(true))
   const repoKnown = () => !!repos.data?.some((r) => r.owner === params.owner && r.name === params.repo)
   const enabled = () => !!params.number && repoKnown()
   const detail = createQuery(() => pullDetailOptions(params.owner ?? '', params.repo ?? '', params.number ?? '', enabled()))
   const files = createQuery(() => filesOptions(params.owner ?? '', params.repo ?? '', params.number ?? '', enabled()))
+
+  const o = () => params.owner ?? ''
+  const r = () => params.repo ?? ''
+  const n = () => params.number ?? ''
+  // Refetch detail (and the open-PR list, since state changes drop a PR from it) after a mutation.
+  const refresh = () => {
+    qc.invalidateQueries({ queryKey: ['pull', o(), r()] })
+    qc.invalidateQueries({ queryKey: ['pulls', o(), r()] })
+  }
+
+  const [mergeMethod, setMergeMethod] = createSignal('squash')
+  const [draftText, setDraftText] = createSignal('')
+  const [actionError, setActionError] = createSignal('')
+  const run = (p: Promise<unknown>) => p.then(refresh).catch((e) => setActionError(String(e.message ?? e)))
+
+  const merge = createMutation(() => ({ mutationFn: () => mergePr(o(), r(), n(), mergeMethod()) }))
+  const close = createMutation(() => ({ mutationFn: () => closePr(o(), r(), n()) }))
+  const reopen = createMutation(() => ({ mutationFn: () => reopenPr(o(), r(), n()) }))
+  const draft = createMutation(() => ({ mutationFn: (d: boolean) => setDraft(o(), r(), n(), d) }))
+  const comment = createMutation(() => ({ mutationFn: (body: string) => addComment(o(), r(), n(), body) }))
+
+  const submitComment = () => {
+    const body = draftText().trim()
+    if (!body) return
+    run(comment.mutateAsync(body)).then(() => setDraftText(''))
+  }
 
   return (
     <Show when={params.number} fallback={<p class="placeholder">Select a PR.</p>}>
@@ -30,6 +58,34 @@ export default function PullDetail() {
                   {pull().baseRef} ← {pull().headRef}
                 </span>
               </div>
+              <Show when={pull().state === 'open'}>
+                <div class="pr-actions">
+                  <select class="repo-select" value={mergeMethod()} onChange={(e) => setMergeMethod(e.currentTarget.value)}>
+                    <option value="squash">squash</option>
+                    <option value="merge">merge</option>
+                    <option value="rebase">rebase</option>
+                  </select>
+                  <button type="button" onClick={() => run(merge.mutateAsync())} disabled={merge.isPending}>
+                    Merge
+                  </button>
+                  <button type="button" onClick={() => run(close.mutateAsync())} disabled={close.isPending}>
+                    Close
+                  </button>
+                  <button type="button" onClick={() => run(draft.mutateAsync(!pull().draft))} disabled={draft.isPending}>
+                    {pull().draft ? 'Ready for review' : 'Convert to draft'}
+                  </button>
+                </div>
+              </Show>
+              <Show when={pull().state === 'closed'}>
+                <div class="pr-actions">
+                  <button type="button" onClick={() => run(reopen.mutateAsync())} disabled={reopen.isPending}>
+                    Reopen
+                  </button>
+                </div>
+              </Show>
+              <Show when={actionError()}>
+                <div class="action-error">{actionError()}</div>
+              </Show>
             </div>
 
             <Show when={pull().body}>
@@ -88,26 +144,39 @@ export default function PullDetail() {
               </details>
             </Show>
 
-            <Show when={detail.data && (detail.data.comments.length || detail.data.reviews.length)}>
-              <details class="nav-section">
-                <summary>
-                  Conversation <span class="muted">({detail.data!.comments.length + detail.data!.reviews.length})</span>
-                </summary>
-                <For each={detail.data!.reviews}>
-                  {(r) => (
-                    <Show when={r.body || r.state}>
+            <details class="nav-section" open>
+              <summary>
+                Conversation{' '}
+                <span class="muted">({(detail.data?.comments.length ?? 0) + (detail.data?.reviews.length ?? 0)})</span>
+              </summary>
+              <Show when={detail.data}>
+                <div class="composer">
+                  <textarea
+                    class="composer-input"
+                    placeholder="Leave a comment…"
+                    value={draftText()}
+                    onInput={(e) => setDraftText(e.currentTarget.value)}
+                  />
+                  <button type="button" onClick={submitComment} disabled={comment.isPending || !draftText().trim()}>
+                    Comment
+                  </button>
+                </div>
+              </Show>
+                <For each={detail.data?.reviews}>
+                  {(rv) => (
+                    <Show when={rv.body || rv.state}>
                       <div class="comment">
                         <div class="comment-meta muted">
-                          {r.author} <span class={`review-state review-${(r.state ?? '').toLowerCase()}`}>{r.state}</span>
+                          {rv.author} <span class={`review-state review-${(rv.state ?? '').toLowerCase()}`}>{rv.state}</span>
                         </div>
-                        <Show when={r.body}>
-                          <div class="markdown" innerHTML={r.body!} />
+                        <Show when={rv.body}>
+                          <div class="markdown" innerHTML={rv.body!} />
                         </Show>
                       </div>
                     </Show>
                   )}
                 </For>
-                <For each={detail.data!.comments}>
+                <For each={detail.data?.comments}>
                   {(m) => (
                     <div class="comment">
                       <div class="comment-meta muted">{m.author}</div>
@@ -116,7 +185,6 @@ export default function PullDetail() {
                   )}
                 </For>
               </details>
-            </Show>
           </>
         )}
       </Show>

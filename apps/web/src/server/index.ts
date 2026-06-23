@@ -3,6 +3,7 @@ import { csrf } from 'hono/csrf'
 import { authMiddleware, type AppEnv } from './middleware/auth'
 import { auth } from './routes/auth'
 import { me } from './routes/me'
+import { prActions } from './routes/prActions'
 import { pullDetail } from './routes/pullDetail'
 import { pullFiles } from './routes/pullFiles'
 import { pulls } from './routes/pulls'
@@ -19,6 +20,7 @@ const app = new Hono<AppEnv>()
   .route('/api/repos', pulls) // repo-scoped sub-resources, e.g. /:owner/:repo/pulls
   .route('/api/repos', pullDetail) // /:owner/:repo/pulls/:number
   .route('/api/repos', pullFiles) // /:owner/:repo/pulls/:number/files
+  .route('/api/repos', prActions) // PR write actions: merge / close / reopen / draft / comments
 
 // The RPC contract consumed by the SPA's typed hono/client. See docs/api-structure.md.
 export type AppType = typeof app

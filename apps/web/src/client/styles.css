@@ -148,6 +148,36 @@ body {
 .check-failure, .check-error { background: var(--del-marker); }
 .check-pending, .check-in_progress, .check-queued { background: var(--warn); }
 
+/* PR actions + comment composer. */
+.pr-actions { display: flex; align-items: center; gap: 6px; margin-top: 8px; flex-wrap: wrap; }
+.pr-actions button, .composer button {
+  font: inherit;
+  font-size: var(--fs-sm);
+  color: var(--text);
+  background: var(--bg-subtle);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 3px 10px;
+  cursor: pointer;
+}
+.pr-actions button:hover:not(:disabled), .composer button:hover:not(:disabled) { border-color: var(--border-strong); }
+.pr-actions button:disabled, .composer button:disabled { opacity: 0.5; cursor: default; }
+.action-error { margin-top: 6px; font-size: var(--fs-sm); color: var(--del-marker); }
+
+.composer { display: flex; flex-direction: column; gap: 6px; align-items: flex-start; }
+.composer-input {
+  width: 100%;
+  min-height: 64px;
+  font: inherit;
+  font-size: var(--fs-sm);
+  color: var(--text);
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 6px 8px;
+  resize: vertical;
+}
+
 .comment { font-size: var(--fs-sm); }
 .comment-meta { margin-bottom: 2px; }
 .review-state { text-transform: lowercase; }
