@@ -4,6 +4,7 @@ import { authMiddleware, type AppEnv } from './middleware/auth'
 import { auth } from './routes/auth'
 import { me } from './routes/me'
 import { pullDetail } from './routes/pullDetail'
+import { pullFiles } from './routes/pullFiles'
 import { pulls } from './routes/pulls'
 import { repos } from './routes/repos'
 
@@ -17,6 +18,7 @@ const app = new Hono<AppEnv>()
   .route('/api/repos', repos)
   .route('/api/repos', pulls) // repo-scoped sub-resources, e.g. /:owner/:repo/pulls
   .route('/api/repos', pullDetail) // /:owner/:repo/pulls/:number
+  .route('/api/repos', pullFiles) // /:owner/:repo/pulls/:number/files
 
 // The RPC contract consumed by the SPA's typed hono/client. See docs/api-structure.md.
 export type AppType = typeof app

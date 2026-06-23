@@ -4,6 +4,7 @@ import { useNavigate, useParams } from '@solidjs/router'
 import { meOptions, reposOptions } from './queries'
 import PullList from './PullList'
 import PullDetail from './PullDetail'
+import DiffView from './DiffView'
 
 // Layout root (Router root): top bar + three panes. Panes are params-driven — PullList (left)
 // and PullDetail (mid) read useParams() directly; routes exist only to populate params.
@@ -76,7 +77,7 @@ export default function App() {
         </section>
         <section class="pane pane-right">
           <div class="section-header">Diff</div>
-          <p class="placeholder">Nothing here.</p>
+          <DiffView />
         </section>
       </main>
     </div>

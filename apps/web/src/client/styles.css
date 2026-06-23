@@ -134,14 +134,62 @@ body {
   display: flex;
   align-items: baseline;
   gap: 8px;
+  width: 100%;
   height: var(--row-h);
+  border: 0;
   border-bottom: 1px solid var(--border);
+  background: none;
+  color: inherit;
+  font: inherit;
   font-size: var(--fs-sm);
+  text-align: left;
+  cursor: pointer;
 }
+.file-row:hover { background: var(--bg-subtle); }
+.file-row.active { background: var(--bg-selected); }
 .file-path { flex: 1; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; direction: rtl; text-align: left; }
 .file-stat { flex-shrink: 0; font-variant-numeric: tabular-nums; }
 .file-stat.add { color: var(--add-marker); }
 .file-stat.del { color: var(--del-marker); }
+
+/* Diff pane (right): flex column so the diff scroller owns the viewport (virtualized rows). */
+.pane-right { display: flex; flex-direction: column; padding: 0; overflow: hidden; }
+.pane-right .section-header { padding: var(--pane-pad) var(--pane-pad) 0; }
+.diff {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding: 0 var(--pane-pad) var(--pane-pad);
+  font-family: var(--font-mono);
+  font-size: var(--fs-sm);
+  line-height: 20px;
+}
+.diff-rows { position: relative; width: 100%; }
+.diff-row {
+  position: absolute;
+  top: 0;
+  left: 0;
+  display: flex;
+  align-items: center;
+  width: max-content;
+  min-width: 100%;
+  white-space: pre;
+}
+.diff-gutter { flex: none; width: 44px; padding-right: 8px; text-align: right; color: var(--text-faint); user-select: none; }
+.diff-marker { flex: none; width: 14px; text-align: center; color: var(--text-faint); user-select: none; }
+.diff-code { flex: 1; }
+.diff-add { background: var(--add-bg); }
+.diff-add .diff-marker { color: var(--add-marker); }
+.diff-del { background: var(--del-bg); }
+.diff-del .diff-marker { color: var(--del-marker); }
+.diff-hunk { background: var(--hunk-bg); color: var(--hunk-text); padding-left: 4px; }
+
+/* Shiki dual-theme: light by default, dark when the app theme is dark (mirrors token theming). */
+.diff-code span { color: var(--l); }
+:root[data-theme='dark'] .diff-code span { color: var(--r); }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) .diff-code span { color: var(--r); }
+}
 
 /* Top bar side clusters: dropdown (start) and auth (end). */
 .topbar-side { display: inline-flex; align-items: center; gap: var(--pane-pad); }

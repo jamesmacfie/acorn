@@ -52,11 +52,17 @@ export const pullsOptions = (owner: string, repo: string, enabled: boolean) => (
   },
 })
 
-export type PullFile = { path: string; status: string | null; additions: number | null; deletions: number | null }
-// Reviews/comments/checks are mirrored server-side but not rendered in 3a — typed loosely for now.
+export type PullFile = {
+  path: string
+  status: string | null
+  additions: number | null
+  deletions: number | null
+  sha: string | null
+  patch: string | null // null for binary / too-large files
+}
+// Reviews/comments/checks are mirrored server-side but not rendered yet — typed loosely for now.
 export type PullDetail = {
   pull: (Pull & { number: number }) | null
-  files: PullFile[]
   reviews: unknown[]
   comments: unknown[]
   checks: unknown[]
@@ -68,6 +74,16 @@ export const pullDetailOptions = (owner: string, repo: string, number: string, e
   queryFn: async (): Promise<PullDetail> => {
     const res = await fetch(`/api/repos/${owner}/${repo}/pulls/${number}`)
     if (!res.ok) throw new Error(`/api/repos/${owner}/${repo}/pulls/${number} ${res.status}`)
+    return res.json()
+  },
+})
+
+export const filesOptions = (owner: string, repo: string, number: string, enabled: boolean) => ({
+  queryKey: ['files', owner, repo, number] as const,
+  enabled,
+  queryFn: async (): Promise<PullFile[]> => {
+    const res = await fetch(`/api/repos/${owner}/${repo}/pulls/${number}/files`)
+    if (!res.ok) throw new Error(`/api/repos/${owner}/${repo}/pulls/${number}/files ${res.status}`)
     return res.json()
   },
 })
