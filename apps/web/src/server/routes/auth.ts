@@ -1,5 +1,6 @@
 import { Hono } from 'hono'
 import { deleteCookie, getCookie, setCookie } from 'hono/cookie'
+import { gh } from '../github'
 import { cookieAttrs, sealSession, SESSION_TTL_SECONDS } from '../session'
 
 // GitHub OAuth web flow (docs/auth.md). The Worker exchanges the code for a token and seals
@@ -68,14 +69,7 @@ export const auth = new Hono<{ Bindings: Env }>()
     const token = tokenJson.access_token
 
     // Fetch the profile for the UI header.
-    const userRes = await fetch('https://api.github.com/user', {
-      headers: {
-        Authorization: `Bearer ${token}`,
-        Accept: 'application/vnd.github+json',
-        'X-GitHub-Api-Version': '2022-11-28',
-        'User-Agent': 'gurthurd',
-      },
-    })
+    const userRes = await gh(token, '/user')
     if (!userRes.ok) return c.redirect('/auth/login')
     const user = (await userRes.json()) as { login: string; name: string | null; avatar_url: string }
 

@@ -6,18 +6,25 @@ import { integer, primaryKey, sqliteTable, text } from 'drizzle-orm/sqlite-core'
 
 // --- Mirror tables: cached projections of GitHub data (revalidated, disposable) ---
 
-export const repos = sqliteTable('repos', {
-  id: integer('id').primaryKey(), // GitHub repo id
-  owner: text('owner').notNull(),
-  name: text('name').notNull(),
-  private: integer('private', { mode: 'boolean' }).notNull().default(false),
-  defaultBranch: text('default_branch'),
-  pushedAt: integer('pushed_at'), // epoch ms — repo selector orders by this
-  // staleness: row is stale when now > fetchedAt + staleAfter; etag drives revalidation
-  fetchedAt: integer('fetched_at').notNull(),
-  staleAfter: integer('stale_after').notNull(),
-  etag: text('etag'),
-})
+export const repos = sqliteTable(
+  'repos',
+  {
+    // Private repos are user-scoped (docs/data-layer.md): two users may mirror the same
+    // private repo, so (userId, id) is the key — id alone (the GitHub repo id) isn't unique.
+    userId: text('user_id').notNull(),
+    id: integer('id').notNull(), // GitHub repo id
+    owner: text('owner').notNull(),
+    name: text('name').notNull(),
+    private: integer('private', { mode: 'boolean' }).notNull().default(false),
+    defaultBranch: text('default_branch'),
+    pushedAt: integer('pushed_at'), // epoch ms — repo selector orders by this
+    // staleness: row is stale when now > fetchedAt + staleAfter; etag drives revalidation
+    fetchedAt: integer('fetched_at').notNull(),
+    staleAfter: integer('stale_after').notNull(),
+    etag: text('etag'),
+  },
+  (t) => [primaryKey({ columns: [t.userId, t.id] })],
+)
 
 export const pullRequests = sqliteTable(
   'pull_requests',
