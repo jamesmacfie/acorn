@@ -207,6 +207,21 @@ export const prActions = new Hono<AppEnv>()
     await bustPrSync(r.db, r.user.login, r.repoId, r.number)
     return c.json({ resolved: !!resolved })
   })
+  // Rerun a workflow run's failed jobs: POST /actions/runs/{runId}/rerun-failed-jobs (GitHub → 201).
+  // Repo-scoped (no PR number): a check's runId is the Actions run, not the PR. No mirror to update —
+  // the new run states surface on the next composite refetch.
+  .post('/:owner/:repo/actions/:runId/rerun', async (c) => {
+    const user = c.get('user')
+    if (!user) return c.json({ error: 'unauthenticated' }, 401)
+    const owner = c.req.param('owner')
+    const repo = c.req.param('repo')
+    const runId = c.req.param('runId')
+    const res = await gh(user.token, `/repos/${owner}/${repo}/actions/runs/${runId}/rerun-failed-jobs`, { method: 'POST' })
+    if (res.status === 401) return c.json({ error: 'reauth' }, 401)
+    if (res.status === 403) return c.json({ error: 'forbidden' }, 403)
+    if (!res.ok) return c.json({ error: 'github_unavailable' }, 502)
+    return c.json({ ok: true })
+  })
 
 async function mutateLabels(c: Context<AppEnv>, op: 'add' | 'remove') {
   const r = await resolvePr(c)

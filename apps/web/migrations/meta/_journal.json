@@ -64,6 +64,13 @@
       "when": 1782197528497,
       "tag": "0008_fearless_mister_sinister",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "6",
+      "when": 1782198631506,
+      "tag": "0009_groovy_jamie_braddock",
+      "breakpoints": true
     }
   ]
 }

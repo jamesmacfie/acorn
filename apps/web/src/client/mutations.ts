@@ -44,6 +44,9 @@ export const resolveThread = (o: string, r: string, n: string, threadId: string,
 export const setViewed = (o: string, r: string, n: string, path: string, viewed: boolean) =>
   post(`${base(o, r, n)}/viewed`, { path, viewed })
 
+// Rerun a check's failed Actions jobs. Repo-scoped (keyed by the workflow run id, not the PR).
+export const rerunFailed = (o: string, r: string, runId: number) => post(`/api/repos/${o}/${r}/actions/${runId}/rerun`)
+
 export const setPin = async (repoId: number, pinned: boolean) => {
   const res = await fetch('/api/pins', {
     method: 'PUT',

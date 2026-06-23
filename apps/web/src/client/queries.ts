@@ -63,7 +63,7 @@ export type PullFile = {
 }
 export type Review = { id: string; author: string | null; state: string | null; body: string | null; submittedAt: number | null }
 export type Comment = { id: string; author: string | null; body: string | null; createdAt: number | null }
-export type Check = { name: string; status: string | null; url: string | null }
+export type Check = { name: string; status: string | null; url: string | null; runId: number | null }
 export type Label = { name: string; color: string | null }
 export type ThreadComment = { id: string; databaseId: number | null; author: string | null; body: string | null; createdAt: number | null }
 export type Thread = {
