@@ -86,6 +86,9 @@ body {
   contain: layout paint; /* isolate reflow per pane (docs/ui-style.md §4) */
 }
 .pane-right { border-right: 0; }
+/* Left pane is a flex column so the PR list scrolls (and virtualizes) independently of the tabs. */
+.pane-left { display: flex; flex-direction: column; overflow: hidden; }
+.pr-list-scroll { flex: 1; min-height: 0; overflow: auto; margin: 0 calc(-1 * var(--pane-pad)); padding: 0 var(--pane-pad); }
 
 .section-header {
   font-size: var(--fs-sm);
