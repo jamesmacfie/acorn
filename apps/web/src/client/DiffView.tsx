@@ -5,6 +5,7 @@ import { createVirtualizer } from '@tanstack/solid-virtual'
 import gitdiffParser from 'gitdiff-parser'
 import { filesOptions } from './queries'
 import { getHighlighter, langFor } from './shiki'
+import { synth } from './diff'
 
 // Right (Diff) pane: parse the selected file's unified-diff patch, syntax-highlight (Shiki, dual
 // theme via CSS vars), virtualize rows (docs/git-diff.md, docs/ui-style.md §6).
@@ -13,9 +14,6 @@ type Tok = { content: string; light: string; dark: string }
 type Row =
   | { kind: 'hunk'; text: string }
   | { kind: 'normal' | 'insert' | 'delete'; oldNo: number | null; newNo: number | null; toks: Tok[] }
-
-// GitHub's per-file `patch` is hunks-only; synthesize a header so gitdiff-parser keys on it.
-const synth = (path: string, patch: string) => `diff --git a/${path} b/${path}\n--- a/${path}\n+++ b/${path}\n${patch}`
 
 export default function DiffView() {
   const params = useParams()

@@ -7,6 +7,7 @@
     "build": "vite build",
     "preview": "vite preview",
     "lint": "tsc --noEmit",
+    "test": "vitest run",
     "typegen": "wrangler types",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "wrangler d1 migrations apply gurthurd --local"
@@ -32,6 +33,7 @@
     "typescript": "^6.0.3",
     "vite": "^8.0.16",
     "vite-plugin-solid": "^2.11.12",
+    "vitest": "^4.1.9",
     "wrangler": "^4.103.0"
   }
 }
