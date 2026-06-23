@@ -43,7 +43,8 @@ All app code lives in `apps/web`:
 apps/web/
 ├── src/
 │   ├── client/         # SolidJS SPA — router, TanStack Query, Shiki diff rendering,
-│   │                   #   PullList / PullDetail / DiffView / RepoPicker, shortcuts
+│   │                   #   feature-owned diff / PR-detail modules, RepoPicker, shortcuts
+│   ├── shared/         # typed API response contracts, route builders, query keys
 │   └── server/         # Hono Worker
 │       ├── index.ts    # Worker entry / route mounting
 │       ├── routes/     # auth, me, pins, prefs, repos, pulls, pullDetail,

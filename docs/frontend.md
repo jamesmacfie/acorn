@@ -62,13 +62,20 @@ The selected file within a PR is **not** in the path — it is the `?file=` sear
 | `Shortcuts` | Global keyboard handler + help / file-finder overlays. |
 | `UserAvatar` | GitHub avatar `<img>` (`sm` 18px / `md` 24px) with a dashed placeholder when login is absent. |
 
+Feature-owned helpers sit next to the views that use them:
+
+- `features/diff/model.ts` parses patches, attaches word diffs, builds renderable rows, and derives split-mode bands.
+- `features/diff/DiffRows.tsx` renders non-code rows, code lines, split cells, line composers, and review-thread rows.
+- `features/pullDetail/model.ts` merges reviews, issue comments, and review threads into conversation entries and extracts file-thread snippets.
+- `features/pullDetail/Conversation.tsx` renders the conversation cards used by `PullDetail`.
+
 ### PullList
 
 Reads the shared `repos` cache and gates the `pulls` query on `repoKnown()` — the repo must be in the server's list before requesting its PRs, avoiding a 404 race on a cold URL. `tab` (`'open' | 'closed'`) and `filter` are signals, reset on repo change. The visible list is a `createMemo` filtering by `#number`, title, and author. Rows are virtualized with `@tanstack/solid-virtual` (`estimateSize: 36`, `overscan: 12`) in `.pr-list-scroll`. Each row is an `<A>` link to `/:owner/:repo/:number`. `PullList` owns the `j` / `k` next/prev-PR shortcut via its own `window` keydown listener (ignored while a form field is focused).
 
 ### PullDetail
 
-Gates its `pull` + `files` queries on `repoKnown() && params.number`. Builds a single time-sorted `conversationEntries` memo merging reviews, issue comments, and review threads (`{ kind: 'review' | 'comment' | 'thread' }`). Renders:
+Gates its `pull` + `files` queries on `repoKnown() && params.number`. Builds a single time-sorted `conversationEntries` memo via `features/pullDetail/model.ts`, merging reviews, issue comments, and review threads (`{ kind: 'review' | 'comment' | 'thread' }`). Renders:
 
 - Header: `#number`, title, state badge, author chip, `base ← head` branch flow, file/±line summary, relative age.
 - Action bar (state-dependent): merge-method `<select>` + **Merge** / **Close** / **Convert to draft**, or **Reopen** when closed.
@@ -90,7 +97,7 @@ Mounted once in `App`; owns a single `window` keydown listener and the help + fi
 
 ## TanStack Query
 
-Query option factories live in `queries.ts` so the dropdown and list share one definition. All reads are same-origin cookie `fetch`; a 401 on `/api/me` is the valid logged-out state (returns `null`), elsewhere it throws.
+Query option factories live in `queries.ts` so the dropdown and list share one definition. Route builders, response types, and query-key factories live in `../shared/api.ts`; `queries.ts` imports them and keeps the runtime path as plain same-origin cookie `fetch`. A 401 on `/api/me` is the valid logged-out state (returns `null`), elsewhere it throws.
 
 | Factory | Query key | Endpoint |
 | --- | --- | --- |
@@ -102,11 +109,11 @@ Query option factories live in `queries.ts` so the dropdown and list share one d
 | `pinsOptions(enabled)` | `['pins']` | `GET /api/pins` |
 | `prefsOptions(enabled)` | `['prefs']` | `GET /api/prefs` |
 
-`enabled` gates dependent queries (most are gated on `repoKnown()` / a routed PR number). Query-key shapes match the invalidation calls below — keep them in sync. See [caching](./caching.md) for SWR and persistence behaviour.
+`enabled` gates dependent queries (most are gated on `repoKnown()` / a routed PR number). Query-key shapes match the invalidation calls below and are characterized in `apps/web/src/shared/api.test.ts`; keep them in sync. See [caching](./caching.md) for SWR and persistence behaviour.
 
 ### Mutations
 
-`mutations.ts` exposes write helpers. Reads are GET; writes are same-origin POST/PUT/DELETE (the Worker checks the `Origin` header for CSRF). A non-OK response throws the structured `error` code from the body so callers can branch (e.g. `merge_failed`, `reauth`).
+`mutations.ts` exposes write helpers and uses the same shared route builders as `queries.ts`. Reads are GET; writes are same-origin POST/PUT/DELETE (the Worker checks the `Origin` header for CSRF). A non-OK response throws the structured `error` code from the body so callers can branch (e.g. `merge_failed`, `reauth`).
 
 | Helper | Verb / endpoint |
 | --- | --- |

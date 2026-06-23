@@ -26,7 +26,4 @@ const app = new Hono<AppEnv>()
   .route('/api/repos', pullFiles) // /:owner/:repo/pulls/:number/files
   .route('/api/repos', prActions) // PR write actions: merge / close / reopen / draft / comments
 
-// The RPC contract consumed by the SPA's typed hono/client. See docs/api-structure.md.
-export type AppType = typeof app
-
 export default app

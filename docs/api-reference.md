@@ -18,20 +18,18 @@ A route that needs a session returns `401 { error: 'unauthenticated' }` when
 - Reads return public projections (no `userId`, no staleness columns, no token).
 - Mutating requests take a JSON body.
 
-## `AppType` — the typed RPC contract
+## Shared client contract
 
-The Hono app exports its own type:
+The SPA uses a small shared TypeScript contract rather than a runtime RPC
+client. `apps/web/src/shared/api.ts` owns response types, route builders, and
+query-key factories; `apps/web/src/client/queries.ts` and `mutations.ts` consume
+those helpers with plain same-origin `fetch`.
 
-```ts
-export type AppType = typeof app
-```
-
-This is the contract the SPA consumes via `hono/client`, giving the client a
-fully typed view of routes, params and response shapes with no hand-written
-client. The shared TanStack Query option factories live in
-`apps/web/src/client/queries.ts` (see [frontend](./frontend.md)). Response
-types there (`Me`, `Repo`, `Pull`, `PullDetail`, `PullFile`, …) mirror these
-endpoints.
+That keeps the client bundle thin and preserves the exact request shape of the
+HTTP API: no generated client, no additional network calls, and no extra
+runtime wrapper on the hot read paths. `apps/web/src/shared/api.test.ts`
+characterizes the route strings and query-key shapes so cache compatibility
+does not drift.
 
 ---
 

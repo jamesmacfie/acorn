@@ -1,6 +1,6 @@
 # Diff rendering
 
-The right ("Diff") pane renders **every** changed file's diff stacked in one scroller. It is the most involved part of the [frontend](./frontend.md): patch text from the [GitHub integration](./github-integration.md) is parsed, syntax-highlighted, virtualized, progressively built, optionally split into two columns, given word-level intra-line diffs, and interleaved with inline review threads. All of this lives in `apps/web/src/client/DiffView.tsx`, with helpers in `diff.ts`, `shiki.ts`, and `fileNavigation.ts`.
+The right ("Diff") pane renders **every** changed file's diff stacked in one scroller. It is the most involved part of the [frontend](./frontend.md): patch text from the [GitHub integration](./github-integration.md) is parsed, syntax-highlighted, virtualized, progressively built, optionally split into two columns, given word-level intra-line diffs, and interleaved with inline review threads. `DiffView.tsx` owns route/query/scroll orchestration; pure model work lives in `features/diff/model.ts`, row rendering in `features/diff/DiffRows.tsx`, and shared helpers in `diff.ts`, `shiki.ts`, and `fileNavigation.ts`.
 
 ## Data in
 
@@ -19,7 +19,7 @@ export const synth = (path: string, patch: string) =>
   `diff --git a/${path} b/${path}\n--- a/${path}\n+++ b/${path}\n${patch}`
 ```
 
-`buildDiffRows(file, tokenize)` feeds `synth(...)` to `gitdiff-parser`, then flattens the parsed hunks into a flat `DiffRow[]`:
+`features/diff/model.ts` owns the pure diff model. `buildDiffRows(file, tokenize)` feeds `synth(...)` to `gitdiff-parser`, then flattens the parsed hunks into a flat `DiffRow[]`:
 
 - `{ kind: 'hunk', text }` for each `@@` header (parser-provided, or reconstructed as `@@ -oldStart +newStart @@`).
 - `{ kind: 'normal' | 'insert' | 'delete', path, oldNo, newNo, toks, raw }` for each line. `oldNo`/`newNo` carry the real line numbers from the parser; `path` rides along so a new line comment knows its file; `raw` is the untouched line text.
@@ -50,13 +50,13 @@ A `parseRun` counter plus an `onCleanup` cancel flag guard against a stale run w
 
 ## Row model and interleaving
 
-A `rows` memo flattens `parsed()` into the final `Row[]` the views consume:
+`buildRenderableRows(parsed, threads)` flattens `parsed()` into the final `Row[]` the views consume:
 
 - A `{ kind: 'file' }` header opens each file's section (and is the scroll anchor).
-- Then the file's `DiffRow`s, with review **threads interleaved** immediately after their anchor line: a thread is matched to the file by `path`, and placed after the row whose line number equals `thread.line` on the thread's side (`RIGHT`/`null` → `newNo`, `LEFT` → `oldNo`).
+- Then the file's `DiffRow`s, with review **threads interleaved** immediately after their anchor line: threads are first grouped by `path`, then each file only checks its own bucket. A thread is placed after the row whose line number equals `thread.line` on the thread's side (`RIGHT`/`null` → `newNo`, `LEFT` → `oldNo`).
 - A `{ kind: 'nodiff' }` placeholder closes a file that had no patch.
 
-Recomputing `rows` is cheap and reactive: it re-runs when parsing advances *or* threads change, so a resolve/reply rerenders without reparsing.
+Recomputing `rows` is cheap and reactive: it re-runs when parsing advances *or* threads change, so a resolve/reply rerenders without reparsing. The path grouping keeps this at "files plus threads for that file" rather than repeatedly scanning every thread for every file.
 
 ## View modes
 
@@ -82,7 +82,7 @@ Split mode renders **non-virtualized** (every row mounts) — band pairing plus 
 
 ## Inline review threads
 
-Threads render as full-width `ThreadRow`s (shared by both view modes via `NonCodeRow`): each comment, a Resolve/Unresolve toggle, a Show/Hide collapse when resolved, and a reply box (replies target the thread's first comment `databaseId`). A hover **`+`** on any code line opens a `LineComposer` to start a new line comment — enabled only when `headSha` is known and the line has a number. Both `addReviewComment` and `replyReview`/`resolveThread` invalidate `['pull', …]` on success (see [frontend](./frontend.md) for the mutation pattern).
+Threads render as full-width `ThreadRow`s from `features/diff/DiffRows.tsx` (shared by both view modes via `NonCodeRow`): each comment, a Resolve/Unresolve toggle, a Show/Hide collapse when resolved, and a reply box (replies target the thread's first comment `databaseId`). A hover **`+`** on any code line opens a `LineComposer` to start a new line comment — enabled only when `headSha` is known and the line has a number. Both `addReviewComment` and `replyReview`/`resolveThread` invalidate `['pull', …]` on success (see [frontend](./frontend.md) for the mutation pattern).
 
 ## `?file=` scroll anchoring
 

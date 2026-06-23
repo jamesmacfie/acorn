@@ -2,7 +2,16 @@
 
 aacorn's visual language is deliberately minimal and information-dense: a flat, monospaced, three-pane shell where every pixel of chrome earns its place. There are no shadows except on floating popovers, no gradients, no rounded panes — just 1px dividers, square panes, and a small set of muted greys with two semantic accents (green for additions, red for deletions). The aim is a tool that disappears so the review can foreground.
 
-The stylesheet is `apps/web/src/client/styles.css`, imported by the SPA at boot, and holds the single source of truth for the design tokens documented below.
+The SPA imports `apps/web/src/client/styles.css` at boot. That file is now a manifest of feature-owned stylesheets under `apps/web/src/client/styles/`:
+
+- `tokens-layout.css` — design tokens, reset, shell grid, pane containment.
+- `pull-list.css` — PR tabs, filters, and virtualized list rows.
+- `pull-detail.css` — navigator pane, labels, files, checks, and conversation cards.
+- `diff.css` — diff toolbar, virtualized rows, split mode, composers, and thread rows.
+- `topbar.css` — collapse toggle, repo picker, account menu, and auth controls.
+- `overlays.css` — keyboard shortcuts and file finder overlays.
+
+Vite still emits one client CSS asset, so the split changes ownership and reviewability without adding render-blocking files.
 
 ## Principles
 

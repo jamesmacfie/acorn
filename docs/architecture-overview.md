@@ -34,15 +34,12 @@ Because the API and the app share an origin, the session is a plain
 same-origin cookie — no CORS, no bearer tokens in the browser, no token
 storage on the client at all. See [authentication](./authentication.md).
 
-The Hono app is also the contract: it exports its own type so the client gets
-a fully typed RPC surface.
-
-```ts
-export type AppType = typeof app
-```
-
-See [api-reference](./api-reference.md) for the full route map and the
-`AppType` export.
+The HTTP API contract is mirrored into shared TypeScript, not a runtime RPC
+client. `apps/web/src/shared/api.ts` owns response types, route builders, and
+query-key factories that the SPA consumes through plain same-origin `fetch`.
+That keeps the route and cache contracts typed without adding client bundle
+weight or extra per-request abstraction. See [api-reference](./api-reference.md)
+for the full route map.
 
 ## Lazy read-model mirror
 
@@ -149,7 +146,7 @@ mirror so a read inside the TTL window reflects the change. See
 - [github-integration](./github-integration.md) — the REST + GraphQL clients,
   the operation → endpoint map, ETag usage and rate limits.
 - [api-reference](./api-reference.md) — every Worker route: method, path,
-  params, response shape, error codes, and the `AppType` RPC export.
+  params, response shape, error codes, and shared client contract.
 - [frontend](./frontend.md) — the SolidJS app, routing, panes, and the shared
   TanStack Query definitions.
 - [diff-rendering](./diff-rendering.md) — how patches are parsed and rendered,
