@@ -80,6 +80,16 @@ export const pullDetailOptions = (owner: string, repo: string, number: string, e
   },
 })
 
+export const prefsOptions = (enabled: boolean) => ({
+  queryKey: ['prefs'] as const,
+  enabled,
+  queryFn: async (): Promise<Record<string, string>> => {
+    const res = await fetch('/api/prefs')
+    if (!res.ok) throw new Error(`/api/prefs ${res.status}`)
+    return res.json()
+  },
+})
+
 export const filesOptions = (owner: string, repo: string, number: string, enabled: boolean) => ({
   queryKey: ['files', owner, repo, number] as const,
   enabled,

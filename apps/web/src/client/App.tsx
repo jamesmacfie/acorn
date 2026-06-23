@@ -1,7 +1,8 @@
 import { createEffect, For, Show } from 'solid-js'
 import { createQuery, useQueryClient } from '@tanstack/solid-query'
 import { useNavigate, useParams } from '@solidjs/router'
-import { meOptions, reposOptions } from './queries'
+import { meOptions, prefsOptions, reposOptions } from './queries'
+import { setPref } from './mutations'
 import PullList from './PullList'
 import PullDetail from './PullDetail'
 import DiffView from './DiffView'
@@ -15,6 +16,20 @@ export default function App() {
 
   const me = createQuery(() => meOptions())
   const repos = createQuery(() => reposOptions(!!me.data))
+  const prefs = createQuery(() => prefsOptions(!!me.data))
+
+  // Apply the saved theme (falls back to prefers-color-scheme when unset).
+  createEffect(() => {
+    const theme = prefs.data?.theme
+    if (theme) document.documentElement.dataset.theme = theme
+  })
+  const toggleTheme = async () => {
+    const current = prefs.data?.theme ?? (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light')
+    const next = current === 'dark' ? 'light' : 'dark'
+    document.documentElement.dataset.theme = next
+    await setPref('theme', next)
+    queryClient.invalidateQueries({ queryKey: ['prefs'] })
+  }
 
   // Default to the first repo once the list loads and no repo is in the URL.
   createEffect(() => {
@@ -47,6 +62,9 @@ export default function App() {
         </div>
         <span class="brand">gurthurd</span>
         <div class="topbar-side topbar-end">
+          <button type="button" class="theme-toggle" title="Toggle theme" onClick={toggleTheme}>
+            ◑
+          </button>
           <Show
             when={me.data}
             fallback={
