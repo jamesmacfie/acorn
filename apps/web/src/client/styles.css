@@ -88,3 +88,30 @@ body {
 }
 
 .placeholder { color: var(--text-muted); font-size: var(--fs-sm); }
+
+/* Auth control (top-right): Login link, or avatar + Logout when signed in. */
+.auth-control {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--text);
+  text-decoration: none;
+  font-size: var(--fs-sm);
+}
+.auth-control:hover { color: var(--text-muted); }
+
+.avatar {
+  border-radius: 50%;
+  border: 1px solid var(--border);
+  display: block;
+}
+
+.auth-logout {
+  font: inherit;
+  color: var(--text-muted);
+  background: none;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+}
+.auth-logout:hover { color: var(--text); }

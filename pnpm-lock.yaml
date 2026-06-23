@@ -26,6 +26,9 @@ importers:
       hono:
         specifier: ^4.12.26
         version: 4.12.26
+      jose:
+        specifier: ^6.2.3
+        version: 6.2.3
       solid-js:
         specifier: ^1.9.13
         version: 1.9.13
@@ -1225,6 +1228,9 @@ packages:
     resolution: {integrity: sha512-ZhMwEosbFJkA0YhFnNDgTM4ZxDRsS6HqTo7qsZM08fehyRYIYa0yHu5R6mgo1n/8MgaPBXiPimPD77baVFYg+A==}
     engines: {node: '>=12.13'}
 
+  jose@6.2.3:
+    resolution: {integrity: sha512-YYVDInQKFJfR/xa3ojUTl8c2KoTwiL1R5Wg9YCydwH0x0B9grbzlg5HC7mMjCtUJjbQ/YnGEZIhI5tCgfTb4Hw==}
+
   js-tokens@4.0.0:
     resolution: {integrity: sha512-RdJUflcE3cUzKiMqQgsCu06FPu9UdIJO0beYbPhHN4k6apgJtifcoCtT9bcxOpYBtpD2kCM6Sbzg4CausW/PKQ==}
 
@@ -2373,6 +2379,8 @@ snapshots:
   html-entities@2.3.3: {}
 
   is-what@4.1.16: {}
+
+  jose@6.2.3: {}
 
   js-tokens@4.0.0: {}
 
