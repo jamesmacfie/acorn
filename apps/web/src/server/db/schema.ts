@@ -37,6 +37,7 @@ export const pullRequests = sqliteTable(
     state: text('state').notNull(), // open | closed | merged
     draft: integer('draft', { mode: 'boolean' }).notNull().default(false),
     title: text('title').notNull(),
+    body: text('body'), // sanitized bodyHTML from GraphQL (rendered via innerHTML)
     headRef: text('head_ref'),
     baseRef: text('base_ref'),
     author: text('author'),
