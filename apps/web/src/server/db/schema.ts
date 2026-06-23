@@ -59,10 +59,11 @@ export const prFiles = sqliteTable(
     repoId: integer('repo_id').notNull(),
     number: integer('number').notNull(),
     path: text('path').notNull(),
-    status: text('status'), // GraphQL changeType: ADDED | MODIFIED | DELETED | RENAMED | …
+    status: text('status'), // changeType / GitHub status: added | modified | removed | renamed | …
     additions: integer('additions'),
     deletions: integer('deletions'),
-    // ponytail: patch/diff text deferred to slice 3b — immutable-by-SHA, cached in KV/IndexedDB.
+    sha: text('sha'), // blob sha — immutability key for the patch (docs/caching.md)
+    patch: text('patch'), // private-repo patch body; public bodies live in KV by sha, this stays null
   },
   (t) => [primaryKey({ columns: [t.userId, t.repoId, t.number, t.path] })],
 )

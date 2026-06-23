@@ -19,7 +19,6 @@ query PR($owner: String!, $repo: String!, $number: Int!) {
       author { login }
       baseRefName headRefName updatedAt
       additions deletions changedFiles
-      files(first: 100) { nodes { path changeType additions deletions } }
       reviews(first: 50) { nodes { id author { login } state body submittedAt } }
       comments(first: 50) { nodes { id author { login } body createdAt } }
       commits(last: 1) { nodes { commit { statusCheckRollup { contexts(first: 50) { nodes {
@@ -30,7 +29,8 @@ query PR($owner: String!, $repo: String!, $number: Int!) {
     }
   }
 }`
-// ponytail: first-page only (files 100 / reviews,comments 50) — cursor pagination deferred.
+// Files live in pr_files, owned by the REST /files endpoint (it carries patch+sha); not here.
+// ponytail: first-page only (reviews,comments 50) — cursor pagination deferred.
 
 type GqlPull = {
   id: string
@@ -43,7 +43,6 @@ type GqlPull = {
   baseRefName: string | null
   headRefName: string | null
   updatedAt: string | null
-  files: { nodes: { path: string; changeType: string; additions: number; deletions: number }[] }
   reviews: { nodes: { id: string; author: { login: string } | null; state: string; body: string | null; submittedAt: string | null }[] }
   comments: { nodes: { id: string; author: { login: string } | null; body: string | null; createdAt: string | null }[] }
   commits: { nodes: { commit: { statusCheckRollup: { contexts: { nodes: GqlContext[] } } | null } }[] }
@@ -88,13 +87,12 @@ export const pullDetail = new Hono<AppEnv>().get('/:owner/:repo/pulls/:number', 
 
   const readComposite = async () => {
     const [pull] = await db.select().from(schema.pullRequests).where(prWhere)
-    const [files, reviews, comments, checks] = await Promise.all([
-      db.select().from(schema.prFiles).where(childWhere(schema.prFiles)),
+    const [reviews, comments, checks] = await Promise.all([
       db.select().from(schema.reviews).where(childWhere(schema.reviews)),
       db.select().from(schema.comments).where(childWhere(schema.comments)),
       db.select().from(schema.checks).where(childWhere(schema.checks)),
     ])
-    return { pull: pull ? toPublicPull(pull) : null, files: files.map(toPublicFile), reviews, comments, checks }
+    return { pull: pull ? toPublicPull(pull) : null, reviews, comments, checks }
   }
 
   // Fresh → serve the mirror, no GraphQL call.
@@ -126,13 +124,6 @@ export const pullDetail = new Hono<AppEnv>().get('/:owner/:repo/pulls/:number', 
     staleAfter: STALE_AFTER_MS,
     etag: null,
   }
-  const fileRows = pr.files.nodes.map((f) => ({
-    ...key,
-    path: f.path,
-    status: f.changeType,
-    additions: f.additions,
-    deletions: f.deletions,
-  }))
   const reviewRows = pr.reviews.nodes.map((r) => ({
     ...key,
     id: r.id,
@@ -168,11 +159,9 @@ export const pullDetail = new Hono<AppEnv>().get('/:owner/:repo/pulls/:number', 
         target: [schema.pullRequests.userId, schema.pullRequests.repoId, schema.pullRequests.number],
         set: pullRow,
       }),
-    db.delete(schema.prFiles).where(childWhere(schema.prFiles)),
     db.delete(schema.reviews).where(childWhere(schema.reviews)),
     db.delete(schema.comments).where(childWhere(schema.comments)),
     db.delete(schema.checks).where(childWhere(schema.checks)),
-    ...chunk(schema.prFiles, fileRows),
     ...chunk(schema.reviews, reviewRows),
     ...chunk(schema.comments, commentRows),
     ...chunk(schema.checks, checkRows),
@@ -197,10 +186,4 @@ const toPublicPull = (p: typeof schema.pullRequests.$inferSelect) => ({
   headRef: p.headRef,
   baseRef: p.baseRef,
   updatedAt: p.updatedAt,
-})
-const toPublicFile = (f: typeof schema.prFiles.$inferSelect) => ({
-  path: f.path,
-  status: f.status,
-  additions: f.additions,
-  deletions: f.deletions,
 })

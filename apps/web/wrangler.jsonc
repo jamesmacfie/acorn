@@ -21,5 +21,9 @@
       "migrations_dir": "migrations"
     }
   ],
-  "kv_namespaces": [{ "binding": "OAUTH_STATE", "id": "00000000000000000000000000000000" }]
+  "kv_namespaces": [
+    { "binding": "OAUTH_STATE", "id": "00000000000000000000000000000000" },
+    // BLOBS: shared, immutable public blob/patch bodies keyed by sha (docs/caching.md).
+    { "binding": "BLOBS", "id": "00000000000000000000000000000001" }
+  ]
 }
