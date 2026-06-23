@@ -22,8 +22,8 @@ query PR($owner: String!, $repo: String!, $number: Int!) {
       reviews(first: 50) { nodes { id author { login } state bodyHTML submittedAt } }
       comments(first: 50) { nodes { id author { login } bodyHTML createdAt } }
       reviewThreads(first: 50) { nodes {
-        id isResolved
-        comments(first: 50) { nodes { id databaseId path line originalLine diffSide author { login } bodyHTML createdAt } }
+        id isResolved path line originalLine diffSide
+        comments(first: 50) { nodes { id databaseId author { login } bodyHTML createdAt } }
       } }
       commits(last: 1) { nodes { commit { statusCheckRollup { contexts(first: 50) { nodes {
         __typename
@@ -57,15 +57,19 @@ type GqlPull = {
 type GqlThreadComment = {
   id: string
   databaseId: number | null
-  path: string | null
-  line: number | null
-  originalLine: number | null
-  diffSide: string | null
   author: { login: string } | null
   bodyHTML: string | null
   createdAt: string | null
 }
-type GqlThread = { id: string; isResolved: boolean; comments: { nodes: GqlThreadComment[] } }
+type GqlThread = {
+  id: string
+  isResolved: boolean
+  path: string | null
+  line: number | null
+  originalLine: number | null
+  diffSide: string | null
+  comments: { nodes: GqlThreadComment[] }
+}
 type GqlContext =
   | {
       __typename: 'CheckRun'
@@ -198,9 +202,9 @@ export const pullDetail = new Hono<AppEnv>().get('/:owner/:repo/pulls/:number', 
       threadId: t.id,
       id: cm.id,
       databaseId: cm.databaseId,
-      path: cm.path,
-      line: cm.line ?? cm.originalLine,
-      side: cm.diffSide,
+      path: t.path,
+      line: t.line ?? t.originalLine,
+      side: t.diffSide,
       resolved: t.isResolved,
       author: cm.author?.login ?? null,
       body: cm.bodyHTML,
