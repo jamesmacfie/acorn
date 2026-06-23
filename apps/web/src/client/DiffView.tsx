@@ -1,22 +1,29 @@
-import { createMemo, createResource, createSignal, For, Show } from 'solid-js'
+import { createEffect, createMemo, createSignal, For, Match, onCleanup, onMount, Show, Switch } from 'solid-js'
 import { createQuery, useQueryClient } from '@tanstack/solid-query'
 import { useParams, useSearchParams } from '@solidjs/router'
 import { createVirtualizer } from '@tanstack/solid-virtual'
 import gitdiffParser from 'gitdiff-parser'
 import { diffWordsWithSpace } from 'diff'
-import { filesOptions, prefsOptions, pullDetailOptions, type Thread } from './queries'
+import { fileStatusMeta } from './displayMeta'
+import { filesOptions, prefsOptions, pullDetailOptions, type PullFile, type Thread } from './queries'
 import { addReviewComment, replyReview, resolveThread, setPref } from './mutations'
 import { getHighlighter, langFor } from './shiki'
 import { synth } from './diff'
+import { FILE_SCROLL_EVENT, routeKey as makeRouteKey, type FileScrollDetail } from './fileNavigation'
+import { UserAvatar } from './UserAvatar'
 
-// Right (Diff) pane: parse the selected file's unified-diff patch, syntax-highlight (Shiki, dual
-// theme via CSS vars), virtualize rows (docs/git-diff.md, docs/ui-style.md §6). Review threads are
-// interleaved as variable-height rows anchored to their diff line; the virtualizer measures each
-// rendered row (measureElement + data-index) so thread height needn't be known ahead of time.
+// Right (Diff) pane: render EVERY changed file's diff stacked one after another in a single
+// virtualized list (docs/git-diff.md, docs/ui-style.md §6). Each file opens with a header row;
+// `?file=` no longer picks which file is shown — it's the scroll target (the file list, finder,
+// and [ / ] all set it), so selecting a file scrolls the combined diff to it.
 //
-// Two view modes (persisted via the `diff_view` pref): UNIFIED (default, virtualized — unchanged
-// from before) and SPLIT (side-by-side). Paired delete/insert lines additionally carry a word-level
-// intra-line diff (jsdiff) so the exact changed spans are highlighted in both modes.
+// Parsing + Shiki highlighting all files up front would block on large PRs, so files are parsed in
+// chunks of 10 and appended as each chunk lands — the list grows progressively and stays scrollable
+// while later files are still tokenizing. Review threads are interleaved at render time (matched by
+// path) so thread mutations rerender without re-tokenizing patches.
+//
+// Two view modes (persisted via the `diff_view` pref): UNIFIED (default, virtualized) and SPLIT
+// (side-by-side). Paired delete/insert lines additionally carry a word-level intra-line diff.
 
 type Tok = { content: string; light: string; dark: string }
 // A word-diff span layered over a paired changed line: `kind` marks whether this span was added on
@@ -24,6 +31,7 @@ type Tok = { content: string; light: string; dark: string }
 type WordTok = { content: string; kind: 'eq' | 'add' | 'del' }
 type CodeRow = {
   kind: 'normal' | 'insert' | 'delete'
+  path: string // owning file — used to anchor a new line-comment to the right file
   oldNo: number | null
   newNo: number | null
   toks: Tok[]
@@ -31,16 +39,42 @@ type CodeRow = {
   words?: WordTok[] // present only on paired changed lines
 }
 type HunkRow = { kind: 'hunk'; text: string }
-type Row = HunkRow | CodeRow | { kind: 'thread'; thread: Thread }
-type DiffRow = HunkRow | CodeRow // a parsed diff row (no interleaved threads)
+// Full-width boundary/placeholder rows. `file` opens each file's section (scroll anchor); `nodiff`
+// stands in for a file we got no patch for (binary / too large).
+type FileRow = { kind: 'file'; file: PullFile }
+type NoDiffRow = { kind: 'nodiff' }
+type ThreadRowT = { kind: 'thread'; thread: Thread }
+type Row = HunkRow | CodeRow | FileRow | NoDiffRow | ThreadRowT
+type DiffRow = HunkRow | CodeRow // a parsed diff row (no interleaved threads / file chrome)
 
 type ViewMode = 'unified' | 'split'
 
-// A split-mode band: either a full-width row (hunk header or thread) or a paired left/right line.
-// `left`/`right` may be null when one side has no counterpart (pure delete or pure insert).
+// A split-mode band: either a full-width row (hunk header, file header, no-diff, or thread) or a
+// paired left/right line. `left`/`right` may be null when one side has no counterpart.
 type SplitBand =
-  | { kind: 'full'; row: Extract<Row, { kind: 'hunk' | 'thread' }> }
+  | { kind: 'full'; row: HunkRow | FileRow | NoDiffRow | ThreadRowT }
   | { kind: 'pair'; left: CodeRow | null; right: CodeRow | null }
+
+const isCodeRow = (r: Row): r is CodeRow => r.kind === 'normal' || r.kind === 'insert' || r.kind === 'delete'
+// DOM id for a file's header, so split mode (non-virtualized) can scrollIntoView by path.
+const fileAnchor = (path: string) => `diff-file:${path}`
+const DIFF_LINE_HEIGHT = 20
+const DIFF_FILE_HEADER_HEIGHT = 36
+const estimateRowSize = (row: Row | undefined) => {
+  if (!row) return DIFF_LINE_HEIGHT
+  if (row.kind === 'file') return DIFF_FILE_HEADER_HEIGHT
+  if (row.kind === 'thread') return 140
+  if (row.kind === 'nodiff') return 28
+  return DIFF_LINE_HEIGHT
+}
+
+type PullRoute = {
+  owner: string
+  repo: string
+  number: string
+  key: string
+}
+type TokenizeLine = (path: string, content: string) => Tok[]
 
 // Compute a word-level intra-line diff between the old and new text of a paired changed line.
 // Returns the span list for each side; only changed spans get add/del kinds. Whitespace is kept
@@ -60,19 +94,93 @@ function wordDiff(oldText: string, newText: string): { del: WordTok[]; add: Word
   return { del, add }
 }
 
+// Parse + highlight a single file's patch into diff rows. Carries the file path onto each code row
+// so a line-comment knows which file it belongs to. No-patch files return [] (rendered as `nodiff`).
+const plainTokenize: TokenizeLine = (_path, content) => [{ content, light: '', dark: '' }]
+
+function highlighterTokenize(hl: Awaited<ReturnType<typeof getHighlighter>>): TokenizeLine {
+  return (path, content) => {
+    const lang = langFor(path)
+    if (lang === 'text') return plainTokenize(path, content)
+    const [line] = hl.codeToTokensWithThemes(content, { lang: lang as never, themes: { light: 'github-light', dark: 'github-dark' } })
+    return (line ?? []).map((t) => ({ content: t.content, light: t.variants.light.color ?? '', dark: t.variants.dark.color ?? '' }))
+  }
+}
+
+function rawPatchRows(file: PullFile, tokenize: TokenizeLine): DiffRow[] {
+  const rows: DiffRow[] = []
+  for (const line of (file.patch ?? '').split('\n')) {
+    if (line.startsWith('@@')) {
+      rows.push({ kind: 'hunk', text: line })
+    } else if (line.startsWith('+')) {
+      const raw = line.slice(1)
+      rows.push({ kind: 'insert', path: file.path, oldNo: null, newNo: null, toks: tokenize(file.path, raw), raw })
+    } else if (line.startsWith('-')) {
+      const raw = line.slice(1)
+      rows.push({ kind: 'delete', path: file.path, oldNo: null, newNo: null, toks: tokenize(file.path, raw), raw })
+    } else {
+      const raw = line.startsWith(' ') ? line.slice(1) : line
+      rows.push({ kind: 'normal', path: file.path, oldNo: null, newNo: null, toks: tokenize(file.path, raw), raw })
+    }
+  }
+  return rows
+}
+
+function buildDiffRows(file: PullFile, tokenize: TokenizeLine): DiffRow[] {
+  if (!file.patch) return []
+  let parsed: ReturnType<typeof gitdiffParser.parse>
+  try {
+    parsed = gitdiffParser.parse(synth(file.path, file.patch))
+  } catch {
+    return rawPatchRows(file, tokenize)
+  }
+  const hunks = parsed[0]?.hunks ?? []
+  const out: DiffRow[] = []
+  for (const h of hunks) {
+    out.push({ kind: 'hunk', text: h.content || `@@ -${h.oldStart} +${h.newStart} @@` })
+    for (const ch of h.changes) {
+      if (ch.type === 'normal') out.push({ kind: 'normal', path: file.path, oldNo: ch.oldLineNumber, newNo: ch.newLineNumber, toks: tokenize(file.path, ch.content), raw: ch.content })
+      else if (ch.type === 'insert') out.push({ kind: 'insert', path: file.path, oldNo: null, newNo: ch.lineNumber, toks: tokenize(file.path, ch.content), raw: ch.content })
+      else out.push({ kind: 'delete', path: file.path, oldNo: ch.lineNumber, newNo: null, toks: tokenize(file.path, ch.content), raw: ch.content })
+    }
+  }
+  if (out.length === 0) return rawPatchRows(file, tokenize)
+  // Word-diff: pair each maximal delete-run with the following insert-run, zipping by order.
+  attachWordDiffs(out)
+  return out
+}
+
 export default function DiffView() {
   const params = useParams()
+  const route = createMemo<PullRoute | null>(() => {
+    if (!params.owner || !params.repo || !params.number) return null
+    return {
+      owner: params.owner,
+      repo: params.repo,
+      number: params.number,
+      key: makeRouteKey(params.owner, params.repo, params.number),
+    }
+  })
+
+  return (
+    <Show when={route()} keyed fallback={<p class="placeholder">Select a PR.</p>}>
+      {(r) => <DiffForPull route={r} />}
+    </Show>
+  )
+}
+
+function DiffForPull(props: { route: PullRoute }) {
   const [searchParams] = useSearchParams()
   const queryClient = useQueryClient()
-  const owner = () => params.owner ?? ''
-  const repo = () => params.repo ?? ''
-  const number = () => params.number ?? ''
+  const owner = props.route.owner
+  const repo = props.route.repo
+  const number = props.route.number
 
-  const files = createQuery(() => filesOptions(owner(), repo(), number(), !!params.number))
-  const detail = createQuery(() => pullDetailOptions(owner(), repo(), number(), !!params.number))
+  const files = createQuery(() => filesOptions(owner, repo, number, true))
+  const detail = createQuery(() => pullDetailOptions(owner, repo, number, true))
   const prefs = createQuery(() => prefsOptions(true))
-  const selected = createMemo(() => files.data?.find((f) => f.path === searchParams.file) ?? null)
   const headSha = () => detail.data?.pull?.headSha ?? null
+  let lastTarget = ''
 
   const viewMode = (): ViewMode => (prefs.data?.diff_view === 'split' ? 'split' : 'unified')
   const setViewMode = async (mode: ViewMode) => {
@@ -80,74 +188,145 @@ export default function DiffView() {
     queryClient.invalidateQueries({ queryKey: ['prefs'] })
   }
 
-  const invalidate = () => queryClient.invalidateQueries({ queryKey: ['pull', owner(), repo(), number()] })
+  const invalidate = () => queryClient.invalidateQueries({ queryKey: ['pull', owner, repo, number] })
 
-  // Parse + highlight off the render path; re-runs when the selected file changes. Threads are
-  // applied separately at render time so they refetch/rerender without re-tokenizing the patch.
-  // Per-hunk we also pair adjacent delete/insert runs (zip by order) and compute a word-level diff
-  // for each pair — this is positional and thread-independent, so it lives here, not at render time.
-  const [base] = createResource(
-    () => selected(),
-    async (file): Promise<DiffRow[]> => {
-      if (!file?.patch) return []
-      const parsed = gitdiffParser.parse(synth(file.path, file.patch))
-      const hunks = parsed[0]?.hunks ?? []
-      const hl = await getHighlighter()
-      const lang = langFor(file.path)
-      const tok = (content: string): Tok[] => {
-        if (lang === 'text') return [{ content, light: '', dark: '' }] // no grammar → render plain
-        const [line] = hl.codeToTokensWithThemes(content, { lang: lang as never, themes: { light: 'github-light', dark: 'github-dark' } })
-        return (line ?? []).map((t) => ({ content: t.content, light: t.variants.light.color ?? '', dark: t.variants.dark.color ?? '' }))
+  // Parse + highlight every file off the render path, in chunks of 10, appending as each chunk
+  // lands so a large PR paints progressively instead of blocking on the full set. Re-runs only when
+  // the file set itself changes (thread edits don't touch files.data → no re-tokenize).
+  const [parsed, setParsed] = createSignal<{ file: PullFile; diff: DiffRow[] }[]>([])
+  let parseRun = 0
+  createEffect(() => {
+    const list = files.data ?? []
+    const run = ++parseRun
+    let cancelled = false
+    onCleanup(() => {
+      cancelled = true
+    })
+    lastTarget = ''
+    setParsed([])
+    resetScrollPosition()
+    if (!list.length) return
+    void (async () => {
+      const tokenize = await getHighlighter().then(highlighterTokenize).catch(() => plainTokenize)
+      if (cancelled || run !== parseRun) return
+      const acc: { file: PullFile; diff: DiffRow[] }[] = []
+      for (let i = 0; i < list.length; i += 10) {
+        if (cancelled || run !== parseRun) return
+        for (const file of list.slice(i, i + 10)) acc.push({ file, diff: buildDiffRows(file, tokenize) })
+        if (cancelled || run !== parseRun) return
+        setParsed([...acc])
+        await new Promise((r) => setTimeout(r, 0)) // yield so this chunk paints before the next 10
       }
-      const out: DiffRow[] = []
-      for (const h of hunks) {
-        out.push({ kind: 'hunk', text: h.content || `@@ -${h.oldStart} +${h.newStart} @@` })
-        for (const ch of h.changes) {
-          if (ch.type === 'normal') out.push({ kind: 'normal', oldNo: ch.oldLineNumber, newNo: ch.newLineNumber, toks: tok(ch.content), raw: ch.content })
-          else if (ch.type === 'insert') out.push({ kind: 'insert', oldNo: null, newNo: ch.lineNumber, toks: tok(ch.content), raw: ch.content })
-          else out.push({ kind: 'delete', oldNo: ch.lineNumber, newNo: null, toks: tok(ch.content), raw: ch.content })
+    })()
+  })
+
+  // Flatten parsed files into one row list: a `file` header per file, then its diff rows with review
+  // threads interleaved after their anchor line (RIGHT/null → new line, LEFT → old line), then a
+  // `nodiff` placeholder if the file had no patch. Recomputes when parsing advances or threads change.
+  const rows = createMemo<Row[]>(() => {
+    const all = detail.data?.threads ?? []
+    const out: Row[] = []
+    for (const { file, diff } of parsed()) {
+      out.push({ kind: 'file', file })
+      const threads = all.filter((t) => t.path === file.path)
+      for (const r of diff) {
+        out.push(r)
+        if (r.kind === 'hunk') continue
+        for (const t of threads) {
+          const onRight = t.side === 'RIGHT' || t.side == null
+          const anchor = onRight ? r.newNo : r.oldNo
+          if (anchor != null && anchor === t.line) out.push({ kind: 'thread', thread: t })
         }
       }
-      // Word-diff: pair each maximal delete-run with the following insert-run, zipping by order.
-      // The i-th delete pairs with the i-th insert; the shorter run leaves the rest unpaired.
-      attachWordDiffs(out)
-      return out
-    },
-  )
-
-  // Interleave thread rows after their anchor diff row. A thread anchors to a line in the SELECTED
-  // file: RIGHT/null → match new-line number; LEFT → match old-line number. Shared by both modes.
-  const rows = createMemo<Row[]>(() => {
-    const diff = base()
-    if (!diff) return []
-    const file = selected()
-    const threads = (file ? detail.data?.threads ?? [] : []).filter((t) => t.path === file?.path)
-    if (threads.length === 0) return diff
-    const out: Row[] = []
-    for (const r of diff) {
-      out.push(r)
-      if (r.kind === 'hunk') continue
-      for (const t of threads) {
-        const onRight = t.side === 'RIGHT' || t.side == null
-        const anchor = onRight ? r.newNo : r.oldNo
-        if (anchor != null && anchor === t.line) out.push({ kind: 'thread', thread: t })
-      }
+      if (diff.length === 0) out.push({ kind: 'nodiff' })
     }
     return out
   })
 
-  // Split bands: hunk headers and threads stay full-width; consecutive paired delete/insert lines
-  // share a band (same `words` pairing as the word-diff). Built from the same interleaved `rows()`.
+  // Split bands from the same interleaved rows (see toBands).
   const bands = createMemo<SplitBand[]>(() => toBands(rows()))
 
-  let scrollEl: HTMLDivElement | undefined
+  // Scroll element as a signal so the virtualizer re-attaches when it (re)mounts (it lives behind a
+  // `<Show>` — no PR / split mode — so it's absent at this component's onMount). The virtualizer
+  // reads the element's size only when getScrollElement first returns it; publishing the ref inside
+  // requestAnimationFrame guarantees that read happens AFTER layout (offsetHeight is real), not in
+  // the same tick a cached query fills rows() — otherwise it freezes a 0-height viewport and the
+  // range stays empty. measure() then drives that post-layout re-read.
+  const [scrollEl, setScrollEl] = createSignal<HTMLDivElement>()
   const virt = createVirtualizer({
     get count() {
       return rows().length
     },
-    getScrollElement: () => scrollEl ?? null,
-    estimateSize: () => 20,
+    getScrollElement: () => scrollEl() ?? null,
+    estimateSize: (index) => estimateRowSize(rows()[index]),
     overscan: 20,
+  })
+  createEffect(() => {
+    if (scrollEl()) virt.measure()
+  })
+  createEffect(() => {
+    rows().length
+    if (scrollEl()) queueMicrotask(() => virt.measure())
+  })
+  let scrollFrame = 0
+  onCleanup(() => cancelAnimationFrame(scrollFrame))
+  const resetScrollPosition = () => {
+    const el = scrollEl()
+    if (!el) return
+    el.scrollTop = 0
+    el.scrollLeft = 0
+  }
+  const publishScrollEl = (el: HTMLDivElement) => {
+    cancelAnimationFrame(scrollFrame)
+    scrollFrame = requestAnimationFrame(() => {
+      setScrollEl(el)
+      resetScrollPosition()
+      virt.measure()
+    })
+  }
+  const publishSplitScrollEl = (el: HTMLDivElement) => {
+    cancelAnimationFrame(scrollFrame)
+    scrollFrame = requestAnimationFrame(() => {
+      setScrollEl(el)
+      resetScrollPosition()
+    })
+  }
+
+  const scrollToFile = (path: string, force = false) => {
+    const all = rows()
+    const idx = all.findIndex((r) => r.kind === 'file' && r.file.path === path)
+    if (idx < 0) return false
+    if (!force && path === lastTarget) return true
+    lastTarget = path
+    if (viewMode() === 'split') {
+      queueMicrotask(() => document.getElementById(fileAnchor(path))?.scrollIntoView({ block: 'start' }))
+    } else {
+      virt.scrollToIndex(idx, { align: 'start' })
+    }
+    return true
+  }
+
+  onMount(() => {
+    const onFileScroll = (event: Event) => {
+      const detail = (event as CustomEvent<FileScrollDetail>).detail
+      if (!detail || detail.routeKey !== props.route.key) return
+      lastTarget = ''
+      scrollToFile(detail.path, true)
+    }
+    window.addEventListener(FILE_SCROLL_EVENT, onFileScroll)
+    onCleanup(() => window.removeEventListener(FILE_SCROLL_EVENT, onFileScroll))
+  })
+
+  // Scroll to the file named in `?file=` once it has been parsed. Tracks rows() so a file still in a
+  // not-yet-parsed chunk scrolls as soon as its chunk lands; `lastTarget` keeps later chunk appends
+  // (or thread edits) from yanking the scroll back after the initial jump.
+  createEffect(() => {
+    const path = typeof searchParams.file === 'string' ? searchParams.file : ''
+    if (!path) {
+      lastTarget = ''
+      return
+    }
+    scrollToFile(path)
   })
 
   const lineComment = (r: CodeRow) => {
@@ -157,133 +336,133 @@ export default function DiffView() {
   }
 
   return (
-    <Show when={searchParams.file} fallback={<p class="placeholder">Select a file.</p>}>
-      <Show when={selected()?.patch} fallback={<p class="placeholder">{base.loading ? 'Loading…' : 'No diff (binary or too large).'}</p>}>
-        <div class="diff-toolbar">
-          <div class="diff-viewmode" role="group" aria-label="Diff view mode">
-            <button
-              type="button"
-              class="diff-viewmode-btn"
-              classList={{ active: viewMode() === 'unified' }}
-              aria-pressed={viewMode() === 'unified'}
-              onClick={() => setViewMode('unified')}
-            >
-              Unified
-            </button>
-            <button
-              type="button"
-              class="diff-viewmode-btn"
-              classList={{ active: viewMode() === 'split' }}
-              aria-pressed={viewMode() === 'split'}
-              onClick={() => setViewMode('split')}
-            >
-              Split
-            </button>
-          </div>
+    <Show
+      when={files.data?.length}
+      fallback={<p class="placeholder">{files.isLoading ? 'Loading…' : 'No files.'}</p>}
+    >
+      <div class="diff-toolbar">
+        <div class="diff-viewmode" role="group" aria-label="Diff view mode">
+          <button
+            type="button"
+            class="diff-viewmode-btn"
+            classList={{ active: viewMode() === 'unified' }}
+            aria-pressed={viewMode() === 'unified'}
+            onClick={() => setViewMode('unified')}
+          >
+            Unified
+          </button>
+          <button
+            type="button"
+            class="diff-viewmode-btn"
+            classList={{ active: viewMode() === 'split' }}
+            aria-pressed={viewMode() === 'split'}
+            onClick={() => setViewMode('split')}
+          >
+            Split
+          </button>
         </div>
-        <Show
-          when={viewMode() === 'split'}
-          fallback={
-            <div class="diff" ref={scrollEl}>
-              <div class="diff-rows" style={{ height: `${virt.getTotalSize()}px` }}>
-                <For each={virt.getVirtualItems()}>
-                  {(vi) => {
-                    const row = () => rows()[vi.index]
-                    return (
-                      <div
-                        class="diff-row"
-                        classList={{
-                          'diff-hunk': row().kind === 'hunk',
-                          'diff-add': row().kind === 'insert',
-                          'diff-del': row().kind === 'delete',
-                          'diff-thread-row': row().kind === 'thread',
-                        }}
-                        data-index={vi.index}
-                        ref={(el) => queueMicrotask(() => virt.measureElement(el))}
-                        style={{ transform: `translateY(${vi.start}px)` }}
-                      >
-                        <Show when={row().kind === 'thread'}>
-                          <ThreadRow
-                            thread={(row() as Extract<Row, { kind: 'thread' }>).thread}
-                            onMutated={invalidate}
-                            resolveThread={(threadId, resolved) => resolveThread(owner(), repo(), number(), threadId, resolved)}
-                            reply={(databaseId, body) => replyReview(owner(), repo(), number(), databaseId, body)}
-                          />
-                        </Show>
-                        <Show when={row().kind === 'hunk'}>
-                          <span class="diff-hunk-text">{(row() as Extract<Row, { kind: 'hunk' }>).text}</span>
-                        </Show>
-                        <Show when={row().kind !== 'hunk' && row().kind !== 'thread'}>
-                          {(() => {
-                            const r = row() as CodeRow
-                            const lc = lineComment(r)
-                            return <DiffLine r={r} canAdd={lc.canAdd} side={lc.side} lineNo={lc.lineNo} addComment={(body) => addReviewComment(owner(), repo(), number(), body, selected()!.path, lc.lineNo, lc.side)} onMutated={invalidate} />
-                          })()}
-                        </Show>
-                      </div>
-                    )
-                  }}
-                </For>
-              </div>
-            </div>
-          }
-        >
-          {/* ponytail: split mode renders non-virtualized. Pairing two columns into bands plus the
-              full-width thread/composer interleave makes a measureElement virtualizer materially more
-              complex; diffs shown here are a single file and small enough that plain rendering is
-              fine. Unified mode stays virtualized and byte-identical to before. */}
-          <div class="diff diff-split">
-            <div class="diff-split-rows">
-              <For each={bands()}>
-                {(band) => (
-                  <Show
-                    when={band.kind === 'pair' ? (band as Extract<SplitBand, { kind: 'pair' }>) : null}
-                    fallback={
+      </div>
+      <Show
+        when={viewMode() === 'split'}
+        fallback={
+          <div class="diff" ref={publishScrollEl}>
+            <div class="diff-rows" style={{ height: `${virt.getTotalSize()}px` }}>
+              <For each={virt.getVirtualItems()}>
+                {(vi) => {
+                  const row = () => rows()[vi.index]
+                  return (
+                    <div
+                      class="diff-row"
+                      classList={{
+                        'diff-hunk': row().kind === 'hunk',
+                        'diff-add': row().kind === 'insert',
+                        'diff-del': row().kind === 'delete',
+                        'diff-file-row': row().kind === 'file',
+                        'diff-thread-row': row().kind === 'thread' || row().kind === 'nodiff',
+                      }}
+                      data-index={vi.index}
+                      ref={(el) => queueMicrotask(() => virt.measureElement(el))}
+                      style={{ transform: `translateY(${vi.start}px)` }}
+                    >
                       <Show
-                        when={(band as Extract<SplitBand, { kind: 'full' }>).row.kind === 'hunk'}
+                        when={isCodeRow(row()) ? (row() as CodeRow) : null}
                         fallback={
-                          <div class="diff-split-full diff-thread-row">
-                            <ThreadRow
-                              thread={((band as Extract<SplitBand, { kind: 'full' }>).row as Extract<Row, { kind: 'thread' }>).thread}
-                              onMutated={invalidate}
-                              resolveThread={(threadId, resolved) => resolveThread(owner(), repo(), number(), threadId, resolved)}
-                              reply={(databaseId, body) => replyReview(owner(), repo(), number(), databaseId, body)}
-                            />
-                          </div>
+                          <NonCodeRow
+                            row={row() as Exclude<Row, CodeRow>}
+                            onMutated={invalidate}
+                            resolveThread={(threadId, resolved) => resolveThread(owner, repo, number, threadId, resolved)}
+                            reply={(databaseId, body) => replyReview(owner, repo, number, databaseId, body)}
+                          />
                         }
                       >
-                        <div class="diff-split-full diff-hunk">
-                          <span class="diff-hunk-text">{((band as Extract<SplitBand, { kind: 'full' }>).row as Extract<Row, { kind: 'hunk' }>).text}</span>
-                        </div>
+                        {(r) => {
+                          const lc = lineComment(r())
+                          return <DiffLine r={r()} canAdd={lc.canAdd} side={lc.side} lineNo={lc.lineNo} addComment={(body) => addReviewComment(owner, repo, number, body, r().path, lc.lineNo, lc.side)} onMutated={invalidate} />
+                        }}
                       </Show>
-                    }
-                  >
-                    {(pair) => (
-                      <div class="diff-split-pair">
-                        <SplitCell
-                          r={pair().left}
-                          gutter={pair().left?.oldNo ?? null}
-                          side="LEFT"
-                          canAdd={!!headSha() && pair().left?.oldNo != null}
-                          addComment={(body) => addReviewComment(owner(), repo(), number(), body, selected()!.path, pair().left!.oldNo!, 'LEFT')}
-                          onMutated={invalidate}
-                        />
-                        <SplitCell
-                          r={pair().right}
-                          gutter={pair().right?.newNo ?? null}
-                          side="RIGHT"
-                          canAdd={!!headSha() && pair().right?.newNo != null}
-                          addComment={(body) => addReviewComment(owner(), repo(), number(), body, selected()!.path, pair().right!.newNo!, 'RIGHT')}
-                          onMutated={invalidate}
-                        />
-                      </div>
-                    )}
-                  </Show>
-                )}
+                    </div>
+                  )
+                }}
               </For>
             </div>
           </div>
-        </Show>
+        }
+      >
+        {/* Split mode renders non-virtualized — pairing two columns into bands plus the
+            full-width thread/composer interleave makes a measureElement virtualizer materially more
+            complex. Now that it spans every file, a very large PR in split mode mounts every row;
+            upgrade path is the same band-aware virtualizer if that bites. Unified stays virtualized. */}
+        <div class="diff diff-split" ref={publishSplitScrollEl}>
+          <div class="diff-split-rows">
+            <For each={bands()}>
+              {(band) => (
+                <Show
+                  when={band.kind === 'pair' ? (band as Extract<SplitBand, { kind: 'pair' }>) : null}
+                  fallback={
+                    <div
+                      class="diff-split-full"
+                      classList={{
+                        'diff-hunk': (band as Extract<SplitBand, { kind: 'full' }>).row.kind === 'hunk',
+                        'diff-file-row': (band as Extract<SplitBand, { kind: 'full' }>).row.kind === 'file',
+                        'diff-thread-row':
+                          (band as Extract<SplitBand, { kind: 'full' }>).row.kind === 'thread' ||
+                          (band as Extract<SplitBand, { kind: 'full' }>).row.kind === 'nodiff',
+                      }}
+                    >
+                      <NonCodeRow
+                        row={(band as Extract<SplitBand, { kind: 'full' }>).row}
+                        onMutated={invalidate}
+                        resolveThread={(threadId, resolved) => resolveThread(owner, repo, number, threadId, resolved)}
+                        reply={(databaseId, body) => replyReview(owner, repo, number, databaseId, body)}
+                      />
+                    </div>
+                  }
+                >
+                  {(pair) => (
+                    <div class="diff-split-pair">
+                      <SplitCell
+                        r={pair().left}
+                        gutter={pair().left?.oldNo ?? null}
+                        side="LEFT"
+                        canAdd={!!headSha() && pair().left?.oldNo != null}
+                        addComment={(body) => addReviewComment(owner, repo, number, body, pair().left!.path, pair().left!.oldNo!, 'LEFT')}
+                        onMutated={invalidate}
+                      />
+                      <SplitCell
+                        r={pair().right}
+                        gutter={pair().right?.newNo ?? null}
+                        side="RIGHT"
+                        canAdd={!!headSha() && pair().right?.newNo != null}
+                        addComment={(body) => addReviewComment(owner, repo, number, body, pair().right!.path, pair().right!.newNo!, 'RIGHT')}
+                        onMutated={invalidate}
+                      />
+                    </div>
+                  )}
+                </Show>
+              )}
+            </For>
+          </div>
+        </div>
       </Show>
     </Show>
   )
@@ -315,7 +494,7 @@ function attachWordDiffs(rows: DiffRow[]) {
   }
 }
 
-// Build the split-mode band list from the interleaved rows. Hunk headers and threads become
+// Build the split-mode band list from the interleaved rows. Hunk/file/no-diff/thread rows become
 // full-width bands; delete/insert runs are zipped into paired left/right bands (mirroring the
 // word-diff pairing); leftover unpaired lines occupy one side only; context lines pair with
 // themselves (same line on both sides).
@@ -324,7 +503,7 @@ function toBands(rows: Row[]): SplitBand[] {
   let i = 0
   while (i < rows.length) {
     const r = rows[i]!
-    if (r.kind === 'hunk' || r.kind === 'thread') {
+    if (r.kind === 'hunk' || r.kind === 'thread' || r.kind === 'file' || r.kind === 'nodiff') {
       out.push({ kind: 'full', row: r })
       i++
       continue
@@ -353,6 +532,44 @@ function toBands(rows: Row[]): SplitBand[] {
     i = n
   }
   return out
+}
+
+// Render a full-width non-code row: file header (scroll anchor), hunk header, no-diff placeholder,
+// or an inline review thread. Shared by unified and split rendering.
+function NonCodeRow(props: {
+  row: Exclude<Row, CodeRow>
+  onMutated: () => void
+  resolveThread: (threadId: string, resolved: boolean) => Promise<unknown>
+  reply: (commentDatabaseId: number, body: string) => Promise<unknown>
+}) {
+  return (
+    <Switch>
+      <Match when={props.row.kind === 'file' ? (props.row as FileRow) : null}>
+        {(f) => {
+          const status = () => fileStatusMeta(f().file.status)
+          return (
+            <div class="diff-file-head" id={fileAnchor(f().file.path)}>
+              <span class={`file-status file-status-${status().tone}`} title={status().label}>
+                {status().letter}
+              </span>
+              <span class="diff-file-path">{f().file.path}</span>
+              <span class="file-stat add">+{f().file.additions ?? 0}</span>
+              <span class="file-stat del">−{f().file.deletions ?? 0}</span>
+            </div>
+          )
+        }}
+      </Match>
+      <Match when={props.row.kind === 'hunk' ? (props.row as HunkRow) : null}>
+        {(h) => <span class="diff-hunk-text">{h().text}</span>}
+      </Match>
+      <Match when={props.row.kind === 'nodiff'}>
+        <span class="diff-nodiff muted">No diff (binary or too large).</span>
+      </Match>
+      <Match when={props.row.kind === 'thread' ? (props.row as ThreadRowT) : null}>
+        {(t) => <ThreadRow thread={t().thread} onMutated={props.onMutated} resolveThread={props.resolveThread} reply={props.reply} />}
+      </Match>
+    </Switch>
+  )
 }
 
 // Render a line's code: word-diff spans when paired (intra-line highlight, plain text + glyph/bg —
@@ -556,7 +773,8 @@ function ThreadRow(props: {
         <For each={props.thread.comments}>
           {(c) => (
             <div class="comment diff-thread-comment">
-              <div class="comment-meta">
+              <div class="comment-meta comment-meta-with-avatar">
+                <UserAvatar login={c.author} />
                 <strong>{c.author ?? 'unknown'}</strong>
               </div>
               <div class="markdown" innerHTML={c.body ?? ''} />

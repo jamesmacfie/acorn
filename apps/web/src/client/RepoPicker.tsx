@@ -15,6 +15,8 @@ export default function RepoPicker(props: {
   const queryClient = useQueryClient()
   const [open, setOpen] = createSignal(false)
   const [filter, setFilter] = createSignal('')
+  const [refreshing, setRefreshing] = createSignal(false)
+  const [refreshFailed, setRefreshFailed] = createSignal(false)
   let rootRef: HTMLDivElement | undefined
   let inputRef: HTMLInputElement | undefined
 
@@ -51,6 +53,23 @@ export default function RepoPicker(props: {
     await setPin(repo.id, !pinnedSet().has(repo.id))
     queryClient.invalidateQueries({ queryKey: ['pins'] })
   }
+  async function refreshRepos() {
+    setRefreshing(true)
+    setRefreshFailed(false)
+    try {
+      const res = await fetch('/api/repos/refresh', { method: 'POST' })
+      if (res.status === 401) {
+        window.location.href = '/auth/login'
+        return
+      }
+      if (!res.ok) throw new Error(`/api/repos/refresh ${res.status}`)
+      await queryClient.invalidateQueries({ queryKey: ['repos'] })
+    } catch {
+      setRefreshFailed(true)
+    } finally {
+      setRefreshing(false)
+    }
+  }
 
   const onDocPointer = (e: PointerEvent) => {
     if (open() && rootRef && !rootRef.contains(e.target as Node)) close()
@@ -80,13 +99,30 @@ export default function RepoPicker(props: {
       </button>
       <Show when={open()}>
         <div class="repo-picker-popover" role="listbox">
-          <input
-            ref={inputRef}
-            class="repo-picker-filter"
-            placeholder="Filter repos…"
-            value={filter()}
-            onInput={(e) => setFilter(e.currentTarget.value)}
-          />
+          <div class="repo-picker-tools">
+            <input
+              ref={inputRef}
+              class="repo-picker-filter"
+              placeholder="Filter repos…"
+              value={filter()}
+              onInput={(e) => setFilter(e.currentTarget.value)}
+            />
+            <button
+              type="button"
+              class="repo-picker-refresh"
+              title="Refresh repos"
+              aria-label="Refresh repos"
+              disabled={refreshing()}
+              onClick={refreshRepos}
+            >
+              {refreshing() ? '...' : '↻'}
+            </button>
+          </div>
+          <Show when={refreshFailed()}>
+            <p class="repo-picker-status" role="status">
+              Refresh failed.
+            </p>
+          </Show>
           <Show
             when={visible().length}
             fallback={<p class="repo-picker-empty">No matching repos.</p>}

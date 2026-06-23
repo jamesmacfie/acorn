@@ -9,6 +9,12 @@ import { cookieAttrs, sealSession, SESSION_TTL_SECONDS } from '../session'
 const GITHUB_SCOPES = 'repo read:org read:user'
 const STATE_COOKIE = 'oauth_state'
 const STATE_TTL_SECONDS = 300
+const GITHUB_OAUTH_SETTINGS_URL = 'https://github.com/settings/applications'
+
+export function oauthAppSettingsUrl(clientId: string): string {
+  const id = clientId.trim()
+  return id ? `https://github.com/settings/connections/applications/${encodeURIComponent(id)}` : GITHUB_OAUTH_SETTINGS_URL
+}
 
 // Constant-time string compare — avoids leaking the state via comparison timing.
 function timingSafeEqual(a: string, b: string): boolean {
@@ -40,6 +46,7 @@ export const auth = new Hono<{ Bindings: Env }>()
     })
     return c.redirect(`https://github.com/login/oauth/authorize?${params.toString()}`)
   })
+  .get('/permissions', (c) => c.redirect(oauthAppSettingsUrl(c.env.GITHUB_CLIENT_ID)))
   .get('/callback', async (c) => {
     const code = c.req.query('code')
     const state = c.req.query('state')

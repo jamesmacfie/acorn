@@ -1,5 +1,5 @@
 {
-  "name": "@gurthurd/web",
+  "name": "@aacorn/web",
   "private": true,
   "type": "module",
   "scripts": {
@@ -10,7 +10,7 @@
     "test": "vitest run",
     "typegen": "wrangler types",
     "db:generate": "drizzle-kit generate",
-    "db:migrate": "wrangler d1 migrations apply gurthurd --local"
+    "db:migrate": "wrangler d1 migrations apply aacorn --local"
   },
   "dependencies": {
     "@solidjs/router": "^0.16.1",
