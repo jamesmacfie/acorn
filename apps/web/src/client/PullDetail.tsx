@@ -3,7 +3,7 @@ import { createMutation, createQuery, useQueryClient } from '@tanstack/solid-que
 import { useParams, useSearchParams } from '@solidjs/router'
 import { fileStatusMeta, formatRelativeTime, summarizeFileStats } from './displayMeta'
 import { requestFileScroll, routeKey } from './fileNavigation'
-import { filesOptions, pullDetailOptions, queryKeys, reposOptions } from './queries'
+import { filesOptions, pullDetailOptions, pullPrefixKey, pullsPrefixKey, reposOptions } from './queries'
 import { addComment, addLabel, closePr, mergePr, removeLabel, reopenPr, rerunFailed, setDraft, setViewed } from './mutations'
 import { UserAvatar } from './UserAvatar'
 import { ConversationEntryItem } from './features/pullDetail/Conversation'
@@ -31,8 +31,8 @@ export default function PullDetail() {
   const n = () => params.number ?? ''
   // Refetch detail (and the open-PR list, since state changes drop a PR from it) after a mutation.
   const refresh = () => {
-    qc.invalidateQueries({ queryKey: queryKeys.pullPrefix(o(), r()) })
-    qc.invalidateQueries({ queryKey: queryKeys.pullsPrefix(o(), r()) })
+    qc.invalidateQueries({ queryKey: pullPrefixKey(o(), r()) })
+    qc.invalidateQueries({ queryKey: pullsPrefixKey(o(), r()) })
   }
 
   const [mergeMethod, setMergeMethod] = createSignal('squash')

@@ -32,7 +32,12 @@ export function byTime<T extends { createdAt: number | null }>(a: T, b: T): numb
 }
 
 export const threadComments = (thread: Thread) => [...thread.comments].sort(byTime)
-export const threadCreatedAt = (thread: Thread) => threadComments(thread)[0]?.createdAt ?? null
+export function firstThreadComment(thread: Thread): Thread['comments'][number] | undefined {
+  let first: Thread['comments'][number] | undefined
+  for (const comment of thread.comments) if (!first || byTime(comment, first) < 0) first = comment
+  return first
+}
+export const threadCreatedAt = (thread: Thread) => firstThreadComment(thread)?.createdAt ?? null
 
 export type ConversationEntry =
   | { kind: 'review'; id: string; createdAt: number | null; review: Review }

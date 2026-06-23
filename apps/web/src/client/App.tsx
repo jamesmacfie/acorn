@@ -1,7 +1,7 @@
 import { createEffect, createSignal, Show } from 'solid-js'
 import { createQuery, useQueryClient } from '@tanstack/solid-query'
 import { useNavigate, useParams } from '@solidjs/router'
-import { apiRoutes, meOptions, pinsOptions, prefsOptions, queryKeys, reposOptions } from './queries'
+import { meKey, meOptions, pinsOptions, prefsKey, prefsOptions, reposKey, reposOptions, reposRefreshRoute } from './queries'
 import { setPref } from './mutations'
 import RepoPicker from './RepoPicker'
 import PullList from './PullList'
@@ -32,7 +32,7 @@ export default function App() {
     const next = current === 'dark' ? 'light' : 'dark'
     document.documentElement.dataset.theme = next
     await setPref('theme', next)
-    queryClient.invalidateQueries({ queryKey: queryKeys.prefs })
+    queryClient.invalidateQueries({ queryKey: prefsKey })
   }
 
   // Default to the first repo once the list loads and no repo is in the URL.
@@ -54,7 +54,7 @@ export default function App() {
     setTouched(true)
     setCollapsed(next)
     await setPref('left_collapsed', next ? '1' : '0')
-    queryClient.invalidateQueries({ queryKey: queryKeys.prefs })
+    queryClient.invalidateQueries({ queryKey: prefsKey })
   }
 
   const selected = () => (params.owner && params.repo ? `${params.owner}/${params.repo}` : '')
@@ -63,11 +63,11 @@ export default function App() {
     await fetch('/auth/logout', { method: 'POST' })
     window.dispatchEvent(new Event('aacorn:logout')) // wipe the persisted IndexedDB cache
     queryClient.clear()
-    await queryClient.invalidateQueries({ queryKey: queryKeys.me })
+    await queryClient.invalidateQueries({ queryKey: meKey })
   }
   async function permissions() {
-    await fetch(apiRoutes.reposRefresh, { method: 'POST' }).catch(() => {})
-    queryClient.invalidateQueries({ queryKey: queryKeys.repos })
+    await fetch(reposRefreshRoute, { method: 'POST' }).catch(() => {})
+    queryClient.invalidateQueries({ queryKey: reposKey })
     window.location.href = '/auth/permissions'
   }
 

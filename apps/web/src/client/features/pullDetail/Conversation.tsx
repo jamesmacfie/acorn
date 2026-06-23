@@ -1,4 +1,4 @@
-import { For, Show } from 'solid-js'
+import { createMemo, For, Show } from 'solid-js'
 import { formatRelativeTime } from '../../displayMeta'
 import type { PullFile, Thread, ThreadComment } from '../../queries'
 import { UserAvatar } from '../../UserAvatar'
@@ -52,9 +52,9 @@ function ConversationItem(props: { author: string | null; action: string; body: 
 }
 
 function FileThreadItem(props: { thread: Thread; files: PullFile[] | undefined; onOpenFile: (path: string) => void }) {
-  const comments = () => threadComments(props.thread)
-  const first = () => comments()[0]
-  const snippet = () => threadSnippet(props.thread, props.files)
+  const comments = threadComments(props.thread)
+  const first = () => comments[0]
+  const snippet = createMemo(() => threadSnippet(props.thread, props.files))
   const path = () => props.thread.path ?? 'Unknown file'
 
   return (
@@ -93,7 +93,7 @@ function FileThreadItem(props: { thread: Thread; files: PullFile[] | undefined; 
         </div>
       </Show>
       <div class="file-thread-comments">
-        <For each={comments()}>
+        <For each={comments}>
           {(comment, index) => <FileThreadComment comment={comment} compact={index() === 0} />}
         </For>
       </div>

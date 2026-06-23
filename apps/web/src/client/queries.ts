@@ -2,48 +2,67 @@
 // so the options live here to avoid drift. All reads are same-origin cookie-auth; 401 on /me
 // is a valid logged-out state, elsewhere it's an error.
 import { readJson } from './apiClient'
-import { apiRoutes, queryKeys, type Me, type Pull, type PullDetail, type PullFile, type Repo } from '../shared/api'
+import {
+  filesKey,
+  meKey,
+  meRoute,
+  pinsKey,
+  pinsRoute,
+  prefsKey,
+  prefsRoute,
+  pullKey,
+  pullRoute,
+  pullsKey,
+  pullsRoute,
+  reposKey,
+  reposRoute,
+  type Me,
+  type Pull,
+  type PullDetail,
+  type PullFile,
+  type Repo,
+} from '../shared/api'
 
-export { apiRoutes, queryKeys }
+export { meKey, pinsKey, prefsKey, pullKey, pullPrefixKey, pullsPrefixKey, reposKey, reposRefreshRoute } from '../shared/api'
 export type { Check, Comment, Label, Me, Pull, PullDetail, PullFile, Repo, Review, Thread, ThreadComment } from '../shared/api'
 
 export const meOptions = () => ({
-  queryKey: queryKeys.me,
-  queryFn: async (): Promise<Me | null> => readJson<Me | null>(apiRoutes.me, { nullOn401: true }),
+  queryKey: meKey,
+  queryFn: async (): Promise<Me | null> => readJson<Me | null>(meRoute, { nullOn401: true }),
 })
 
 export const reposOptions = (enabled: boolean) => ({
-  queryKey: queryKeys.repos,
+  queryKey: reposKey,
   enabled,
-  queryFn: async (): Promise<Repo[]> => readJson<Repo[]>(apiRoutes.repos),
+  queryFn: async (): Promise<Repo[]> => readJson<Repo[]>(reposRoute),
 })
 
 export const pullsOptions = (owner: string, repo: string, state: 'open' | 'closed', enabled: boolean) => ({
-  queryKey: queryKeys.pulls(owner, repo, state),
+  queryKey: pullsKey(owner, repo, state),
   enabled,
-  queryFn: async (): Promise<Pull[]> => readJson<Pull[]>(apiRoutes.pulls(owner, repo, state)),
+  queryFn: async (): Promise<Pull[]> => readJson<Pull[]>(pullsRoute(owner, repo, state)),
 })
 
 export const pullDetailOptions = (owner: string, repo: string, number: string, enabled: boolean) => ({
-  queryKey: queryKeys.pull(owner, repo, number),
+  queryKey: pullKey(owner, repo, number),
   enabled,
-  queryFn: async (): Promise<PullDetail> => readJson<PullDetail>(apiRoutes.pull(owner, repo, number)),
+  queryFn: async (): Promise<PullDetail> => readJson<PullDetail>(pullRoute(owner, repo, number)),
 })
 
 export const pinsOptions = (enabled: boolean) => ({
-  queryKey: queryKeys.pins,
+  queryKey: pinsKey,
   enabled,
-  queryFn: async (): Promise<number[]> => readJson<number[]>(apiRoutes.pins),
+  queryFn: async (): Promise<number[]> => readJson<number[]>(pinsRoute),
 })
 
 export const prefsOptions = (enabled: boolean) => ({
-  queryKey: queryKeys.prefs,
+  queryKey: prefsKey,
   enabled,
-  queryFn: async (): Promise<Record<string, string>> => readJson<Record<string, string>>(apiRoutes.prefs),
+  queryFn: async (): Promise<Record<string, string>> => readJson<Record<string, string>>(prefsRoute),
 })
 
 export const filesOptions = (owner: string, repo: string, number: string, enabled: boolean) => ({
-  queryKey: queryKeys.files(owner, repo, number),
+  queryKey: filesKey(owner, repo, number),
   enabled,
-  queryFn: async (): Promise<PullFile[]> => readJson<PullFile[]>(apiRoutes.files(owner, repo, number)),
+  queryFn: async (): Promise<PullFile[]> => readJson<PullFile[]>(pullRoute(owner, repo, number, 'files')),
 })
