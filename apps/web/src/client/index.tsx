@@ -48,3 +48,8 @@ render(
 
 // Wipe the persisted cache on logout so the next user can't read it (logout posts then reloads).
 window.addEventListener('gurthurd:logout', () => void clear())
+
+// Offline app shell. The SW caches the shell + static assets; data stays in IndexedDB (above).
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => void navigator.serviceWorker.register('/sw.js').catch(() => {}))
+}
