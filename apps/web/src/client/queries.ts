@@ -60,12 +60,14 @@ export type PullFile = {
   sha: string | null
   patch: string | null // null for binary / too-large files
 }
-// Reviews/comments/checks are mirrored server-side but not rendered yet — typed loosely for now.
+export type Review = { id: string; author: string | null; state: string | null; body: string | null; submittedAt: number | null }
+export type Comment = { id: string; author: string | null; body: string | null; createdAt: number | null }
+export type Check = { name: string; status: string | null; url: string | null }
 export type PullDetail = {
-  pull: (Pull & { number: number }) | null
-  reviews: unknown[]
-  comments: unknown[]
-  checks: unknown[]
+  pull: (Pull & { number: number; body: string | null }) | null
+  reviews: Review[]
+  comments: Comment[]
+  checks: Check[]
 }
 
 export const pullDetailOptions = (owner: string, repo: string, number: string, enabled: boolean) => ({

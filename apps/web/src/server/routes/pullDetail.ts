@@ -15,12 +15,11 @@ const COMPOSITE_QUERY = `
 query PR($owner: String!, $repo: String!, $number: Int!) {
   repository(owner: $owner, name: $repo) {
     pullRequest(number: $number) {
-      id number title state isDraft body
+      id number title state isDraft bodyHTML
       author { login }
       baseRefName headRefName updatedAt
-      additions deletions changedFiles
-      reviews(first: 50) { nodes { id author { login } state body submittedAt } }
-      comments(first: 50) { nodes { id author { login } body createdAt } }
+      reviews(first: 50) { nodes { id author { login } state bodyHTML submittedAt } }
+      comments(first: 50) { nodes { id author { login } bodyHTML createdAt } }
       commits(last: 1) { nodes { commit { statusCheckRollup { contexts(first: 50) { nodes {
         __typename
         ... on CheckRun { name status conclusion detailsUrl }
@@ -38,13 +37,13 @@ type GqlPull = {
   title: string
   state: string
   isDraft: boolean
-  body: string | null
+  bodyHTML: string | null
   author: { login: string } | null
   baseRefName: string | null
   headRefName: string | null
   updatedAt: string | null
-  reviews: { nodes: { id: string; author: { login: string } | null; state: string; body: string | null; submittedAt: string | null }[] }
-  comments: { nodes: { id: string; author: { login: string } | null; body: string | null; createdAt: string | null }[] }
+  reviews: { nodes: { id: string; author: { login: string } | null; state: string; bodyHTML: string | null; submittedAt: string | null }[] }
+  comments: { nodes: { id: string; author: { login: string } | null; bodyHTML: string | null; createdAt: string | null }[] }
   commits: { nodes: { commit: { statusCheckRollup: { contexts: { nodes: GqlContext[] } } | null } }[] }
 }
 type GqlContext =
@@ -92,7 +91,12 @@ export const pullDetail = new Hono<AppEnv>().get('/:owner/:repo/pulls/:number', 
       db.select().from(schema.comments).where(childWhere(schema.comments)),
       db.select().from(schema.checks).where(childWhere(schema.checks)),
     ])
-    return { pull: pull ? toPublicPull(pull) : null, reviews, comments, checks }
+    return {
+      pull: pull ? toPublicPull(pull) : null,
+      reviews: reviews.map((r) => ({ id: r.id, author: r.author, state: r.state, body: r.body, submittedAt: r.submittedAt })),
+      comments: comments.map((m) => ({ id: m.id, author: m.author, body: m.body, createdAt: m.createdAt })),
+      checks: checks.map((k) => ({ name: k.name, status: k.status, url: k.url })),
+    }
   }
 
   // Fresh → serve the mirror, no GraphQL call.
@@ -116,6 +120,7 @@ export const pullDetail = new Hono<AppEnv>().get('/:owner/:repo/pulls/:number', 
     state: pr.state.toLowerCase(),
     draft: pr.isDraft,
     title: pr.title,
+    body: pr.bodyHTML,
     headRef: pr.headRefName,
     baseRef: pr.baseRefName,
     author: pr.author?.login ?? null,
@@ -129,14 +134,14 @@ export const pullDetail = new Hono<AppEnv>().get('/:owner/:repo/pulls/:number', 
     id: r.id,
     author: r.author?.login ?? null,
     state: r.state,
-    body: r.body,
+    body: r.bodyHTML,
     submittedAt: ms(r.submittedAt),
   }))
   const commentRows = pr.comments.nodes.map((m) => ({
     ...key,
     id: m.id,
     author: m.author?.login ?? null,
-    body: m.body,
+    body: m.bodyHTML,
     createdAt: ms(m.createdAt),
   }))
   const checkRows = dedupeByName(
@@ -180,6 +185,7 @@ const dedupeByName = <T extends { name: string }>(rows: T[]) => [...new Map(rows
 const toPublicPull = (p: typeof schema.pullRequests.$inferSelect) => ({
   number: p.number,
   title: p.title,
+  body: p.body,
   state: p.state,
   draft: p.draft,
   author: p.author,
