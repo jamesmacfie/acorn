@@ -135,6 +135,23 @@ export const prActions = new Hono<AppEnv>()
   // Both return the PR's full label set → replace the pr_labels mirror so a within-TTL read is fresh.
   .post('/:owner/:repo/pulls/:number/labels', (c) => mutateLabels(c, 'add'))
   .delete('/:owner/:repo/pulls/:number/labels', (c) => mutateLabels(c, 'remove'))
+  // Toggle a file's "viewed" checkbox (app-state, no GitHub call).
+  .post('/:owner/:repo/pulls/:number/viewed', async (c) => {
+    const r = await resolvePr(c)
+    if ('error' in r) return c.json({ error: r.error }, r.status)
+    const { path, viewed } = (await c.req.json().catch(() => ({}))) as { path?: string; viewed?: boolean }
+    if (!path) return c.json({ error: 'bad_request' }, 400)
+    const key = { userId: r.user.login, repoId: r.repoId, number: r.number, path }
+    const where = and(
+      eq(schema.viewedFiles.userId, r.user.login),
+      eq(schema.viewedFiles.repoId, r.repoId),
+      eq(schema.viewedFiles.number, r.number),
+      eq(schema.viewedFiles.path, path),
+    )
+    if (viewed) await r.db.insert(schema.viewedFiles).values({ ...key, viewedAt: Date.now() }).onConflictDoNothing()
+    else await r.db.delete(schema.viewedFiles).where(where)
+    return c.json({ path, viewed: !!viewed })
+  })
   // Start a new inline review comment on a line: POST /pulls/{n}/comments { commit_id, path, line, side }.
   .post('/:owner/:repo/pulls/:number/review-comments', async (c) => {
     const r = await resolvePr(c)

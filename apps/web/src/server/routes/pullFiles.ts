@@ -39,17 +39,30 @@ export const pullFiles = new Hono<AppEnv>().get('/:owner/:repo/pulls/:number/fil
   const { id: repoId, private: isPrivate } = repoRow
 
   const fileWhere = and(eq(schema.prFiles.userId, userId), eq(schema.prFiles.repoId, repoId), eq(schema.prFiles.number, number))
+  const viewedWhere = and(
+    eq(schema.viewedFiles.userId, userId),
+    eq(schema.viewedFiles.repoId, repoId),
+    eq(schema.viewedFiles.number, number),
+  )
 
-  // Resolve a row's patch: private bodies live in D1, public bodies in shared KV by sha.
-  const withPatch = async (f: typeof schema.prFiles.$inferSelect) => ({
+  // Resolve a row's patch: private bodies live in D1, public bodies in shared KV by sha. `viewed`
+  // is app-state (viewed_files), merged in fresh on every read — it survives mirror re-syncs.
+  const withPatch = (viewed: Set<string>) => async (f: typeof schema.prFiles.$inferSelect) => ({
     path: f.path,
     status: f.status,
     additions: f.additions,
     deletions: f.deletions,
     sha: f.sha,
+    viewed: viewed.has(f.path),
     patch: f.patch ?? (f.sha ? await c.env.BLOBS.get(blobKey(f.sha)) : null),
   })
-  const readFiles = async () => Promise.all((await db.select().from(schema.prFiles).where(fileWhere)).map(withPatch))
+  const readFiles = async () => {
+    const [files, viewed] = await Promise.all([
+      db.select().from(schema.prFiles).where(fileWhere),
+      db.select({ path: schema.viewedFiles.path }).from(schema.viewedFiles).where(viewedWhere),
+    ])
+    return Promise.all(files.map(withPatch(new Set(viewed.map((v) => v.path)))))
+  }
 
   const resource = `files:${repoId}:${number}`
   const [sync] = await db

@@ -159,7 +159,31 @@ export const syncState = sqliteTable(
   (t) => [primaryKey({ columns: [t.userId, t.resource] })],
 )
 
-// --- App-state table: data GitHub doesn't have, we are the source of truth ---
+// --- App-state tables: data GitHub doesn't have, we are the source of truth ---
+
+// Per-user "I've reviewed this file" checkboxes. Survives mirror re-syncs (not a GitHub concept).
+export const viewedFiles = sqliteTable(
+  'viewed_files',
+  {
+    userId: text('user_id').notNull(),
+    repoId: integer('repo_id').notNull(),
+    number: integer('number').notNull(),
+    path: text('path').notNull(),
+    viewedAt: integer('viewed_at').notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.userId, t.repoId, t.number, t.path] })],
+)
+
+// Per-user pinned repos for the selector (sort ascending).
+export const pinnedRepos = sqliteTable(
+  'pinned_repos',
+  {
+    userId: text('user_id').notNull(),
+    repoId: integer('repo_id').notNull(),
+    sort: integer('sort').notNull().default(0),
+  },
+  (t) => [primaryKey({ columns: [t.userId, t.repoId] })],
+)
 
 export const prefs = sqliteTable(
   'prefs',

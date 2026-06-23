@@ -41,6 +41,9 @@ export const replyReview = (o: string, r: string, n: string, commentDatabaseId: 
 export const resolveThread = (o: string, r: string, n: string, threadId: string, resolved: boolean) =>
   post(`${base(o, r, n)}/threads/${encodeURIComponent(threadId)}/resolve`, { resolved })
 
+export const setViewed = (o: string, r: string, n: string, path: string, viewed: boolean) =>
+  post(`${base(o, r, n)}/viewed`, { path, viewed })
+
 export const setPref = async (key: string, value: string) => {
   const res = await fetch('/api/prefs', {
     method: 'PUT',

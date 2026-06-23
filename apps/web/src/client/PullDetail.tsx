@@ -2,7 +2,7 @@ import { createSignal, For, Show } from 'solid-js'
 import { createMutation, createQuery, useQueryClient } from '@tanstack/solid-query'
 import { useParams, useSearchParams } from '@solidjs/router'
 import { filesOptions, pullDetailOptions, reposOptions } from './queries'
-import { addComment, addLabel, closePr, mergePr, removeLabel, reopenPr, setDraft } from './mutations'
+import { addComment, addLabel, closePr, mergePr, removeLabel, reopenPr, setDraft, setViewed } from './mutations'
 
 // Mid (Navigator) pane: PR header + description + changed-files + checks + conversation.
 // Bodies are GitHub-sanitized bodyHTML, rendered via innerHTML (docs/ui-style.md §5).
@@ -136,13 +136,15 @@ export default function PullDetail() {
               <ul class="file-list">
                 <For each={files.data} fallback={<li class="placeholder">{files.isLoading ? 'Loading…' : 'No files.'}</li>}>
                   {(f) => (
-                    <li>
-                      <button
-                        type="button"
-                        class="file-row"
-                        classList={{ active: searchParams.file === f.path }}
-                        onClick={() => setSearchParams({ file: f.path })}
-                      >
+                    <li class="file-row" classList={{ active: searchParams.file === f.path, viewed: f.viewed }}>
+                      <input
+                        type="checkbox"
+                        class="file-viewed"
+                        title="Mark viewed"
+                        checked={f.viewed}
+                        onChange={(e) => run(setViewed(o(), r(), n(), f.path, e.currentTarget.checked))}
+                      />
+                      <button type="button" class="file-open" onClick={() => setSearchParams({ file: f.path })}>
                         <span class="file-path">{f.path}</span>
                         <span class="file-stat add">+{f.additions ?? 0}</span>
                         <span class="file-stat del">−{f.deletions ?? 0}</span>

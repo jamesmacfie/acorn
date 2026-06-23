@@ -58,6 +58,7 @@ export type PullFile = {
   additions: number | null
   deletions: number | null
   sha: string | null
+  viewed: boolean
   patch: string | null // null for binary / too-large files
 }
 export type Review = { id: string; author: string | null; state: string | null; body: string | null; submittedAt: number | null }

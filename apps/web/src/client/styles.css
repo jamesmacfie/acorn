@@ -223,12 +223,23 @@ body {
 .review-changes_requested { color: var(--del-marker); }
 .file-row {
   display: flex;
+  align-items: center;
+  gap: 6px;
+  height: var(--row-h);
+  border-bottom: 1px solid var(--border);
+  font-size: var(--fs-sm);
+}
+.file-row:hover { background: var(--bg-subtle); }
+.file-row.active { background: var(--bg-selected); }
+.file-row.viewed .file-path { text-decoration: line-through; color: var(--text-muted); }
+.file-viewed { flex: none; cursor: pointer; accent-color: var(--accent); }
+.file-open {
+  flex: 1;
+  display: flex;
   align-items: baseline;
   gap: 8px;
-  width: 100%;
-  height: var(--row-h);
+  min-width: 0;
   border: 0;
-  border-bottom: 1px solid var(--border);
   background: none;
   color: inherit;
   font: inherit;
@@ -236,8 +247,6 @@ body {
   text-align: left;
   cursor: pointer;
 }
-.file-row:hover { background: var(--bg-subtle); }
-.file-row.active { background: var(--bg-selected); }
 .file-path { flex: 1; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; direction: rtl; text-align: left; }
 .file-stat { flex-shrink: 0; font-variant-numeric: tabular-nums; }
 .file-stat.add { color: var(--add-marker); }
