@@ -6,6 +6,7 @@ import { setPref } from './mutations'
 import PullList from './PullList'
 import PullDetail from './PullDetail'
 import DiffView from './DiffView'
+import Shortcuts from './Shortcuts'
 
 // Layout root (Router root): top bar + three panes. Panes are params-driven — PullList (left)
 // and PullDetail (mid) read useParams() directly; routes exist only to populate params.
@@ -100,6 +101,7 @@ export default function App() {
           <DiffView />
         </section>
       </main>
+      <Shortcuts />
     </div>
   )
 }

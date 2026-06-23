@@ -501,3 +501,83 @@ body {
   cursor: pointer;
 }
 .auth-logout:hover { color: var(--text); }
+
+/* Keyboard-shortcut overlays (Shortcuts.tsx): a translucent backdrop with a centered modal.
+   Help is a key→description list; the file finder is an input above a scrollable result list. */
+.overlay-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding-top: 12vh;
+  background: rgba(0, 0, 0, 0.4);
+}
+.overlay {
+  width: min(560px, 92vw);
+  max-height: 70vh;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+  overflow: hidden;
+}
+.overlay-title {
+  font-size: var(--fs-sm);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-muted);
+  padding: var(--pane-pad);
+  border-bottom: 1px solid var(--border);
+}
+
+/* Help: two-column key → description grid. */
+.help-list {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 8px 16px;
+  margin: 0;
+  padding: var(--pane-pad);
+  overflow-y: auto;
+}
+.help-key {
+  font-family: var(--font-mono);
+  font-size: var(--fs-sm);
+  color: var(--text);
+  background: var(--bg-subtle);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 1px 6px;
+  justify-self: start;
+}
+.help-desc { margin: 0; font-size: var(--fs-sm); color: var(--text-muted); align-self: center; }
+
+/* File finder: input header + scrollable result list. */
+.finder-input {
+  font: inherit;
+  font-size: var(--fs);
+  color: var(--text);
+  background: var(--bg);
+  border: 0;
+  border-bottom: 1px solid var(--border);
+  padding: 10px var(--pane-pad);
+  outline: none;
+}
+.finder-empty { color: var(--text-muted); font-size: var(--fs-sm); padding: var(--pane-pad); margin: 0; }
+.finder-list { list-style: none; margin: 0; padding: 4px 0; overflow-y: auto; }
+.finder-row {
+  display: flex;
+  align-items: baseline;
+  gap: 2px;
+  padding: 4px var(--pane-pad);
+  font-size: var(--fs-sm);
+  white-space: nowrap;
+  overflow: hidden;
+  cursor: pointer;
+}
+.finder-row.active { background: var(--bg-selected); }
+.finder-dir { color: var(--text-muted); overflow: hidden; text-overflow: ellipsis; }
+.finder-name { color: var(--text); flex-shrink: 0; }
