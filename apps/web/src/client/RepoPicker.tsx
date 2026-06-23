@@ -1,7 +1,7 @@
 import { createMemo, createSignal, For, onCleanup, onMount, Show } from 'solid-js'
 import { useQueryClient } from '@tanstack/solid-query'
 import { setPin } from './mutations'
-import { apiRoutes, queryKeys, type Repo } from './queries'
+import { pinsKey, reposKey, reposRefreshRoute, type Repo } from './queries'
 
 // Searchable repo picker replacing the native <select>. A button shows the current owner/name;
 // clicking opens a popover with a filter input + scrollable list. Pinned repos float to the top
@@ -51,19 +51,19 @@ export default function RepoPicker(props: {
   async function togglePin(e: MouseEvent, repo: Repo) {
     e.stopPropagation()
     await setPin(repo.id, !pinnedSet().has(repo.id))
-    queryClient.invalidateQueries({ queryKey: queryKeys.pins })
+    queryClient.invalidateQueries({ queryKey: pinsKey })
   }
   async function refreshRepos() {
     setRefreshing(true)
     setRefreshFailed(false)
     try {
-      const res = await fetch(apiRoutes.reposRefresh, { method: 'POST' })
+      const res = await fetch(reposRefreshRoute, { method: 'POST' })
       if (res.status === 401) {
         window.location.href = '/auth/login'
         return
       }
       if (!res.ok) throw new Error(`/api/repos/refresh ${res.status}`)
-      await queryClient.invalidateQueries({ queryKey: queryKeys.repos })
+      await queryClient.invalidateQueries({ queryKey: reposKey })
     } catch {
       setRefreshFailed(true)
     } finally {

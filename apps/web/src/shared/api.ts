@@ -49,41 +49,26 @@ export type PullDetail = {
   threads: Thread[]
 }
 
-const repoBase = (owner: string, repo: string) => `/api/repos/${owner}/${repo}`
-const pullBase = (owner: string, repo: string, number: string | number) => `${repoBase(owner, repo)}/pulls/${number}`
+export const repoRoute = (owner: string, repo: string, child = '') => `/api/repos/${owner}/${repo}${child ? `/${child}` : ''}`
+export const pullRoute = (owner: string, repo: string, number: string | number, child = '') =>
+  repoRoute(owner, repo, `pulls/${number}${child ? `/${child}` : ''}`)
 
-export const apiRoutes = {
-  me: '/api/me',
-  repos: '/api/repos',
-  reposRefresh: '/api/repos/refresh',
-  pulls: (owner: string, repo: string, state: 'open' | 'closed') => `${repoBase(owner, repo)}/pulls?state=${state}`,
-  pull: pullBase,
-  files: (owner: string, repo: string, number: string | number) => `${pullBase(owner, repo, number)}/files`,
-  merge: (owner: string, repo: string, number: string | number) => `${pullBase(owner, repo, number)}/merge`,
-  close: (owner: string, repo: string, number: string | number) => `${pullBase(owner, repo, number)}/close`,
-  reopen: (owner: string, repo: string, number: string | number) => `${pullBase(owner, repo, number)}/reopen`,
-  draft: (owner: string, repo: string, number: string | number) => `${pullBase(owner, repo, number)}/draft`,
-  comments: (owner: string, repo: string, number: string | number) => `${pullBase(owner, repo, number)}/comments`,
-  labels: (owner: string, repo: string, number: string | number) => `${pullBase(owner, repo, number)}/labels`,
-  viewed: (owner: string, repo: string, number: string | number) => `${pullBase(owner, repo, number)}/viewed`,
-  reviewComments: (owner: string, repo: string, number: string | number) => `${pullBase(owner, repo, number)}/review-comments`,
-  reviewReply: (owner: string, repo: string, number: string | number, commentDatabaseId: number) =>
-    `${pullBase(owner, repo, number)}/review-comments/${commentDatabaseId}/replies`,
-  resolveThread: (owner: string, repo: string, number: string | number, threadId: string) =>
-    `${pullBase(owner, repo, number)}/threads/${encodeURIComponent(threadId)}/resolve`,
-  rerunFailed: (owner: string, repo: string, runId: number) => `${repoBase(owner, repo)}/actions/${runId}/rerun`,
-  pins: '/api/pins',
-  prefs: '/api/prefs',
-} as const
+export const meRoute = '/api/me'
+export const reposRoute = '/api/repos'
+export const reposRefreshRoute = '/api/repos/refresh'
+export const pullsRoute = (owner: string, repo: string, state: 'open' | 'closed') => `${repoRoute(owner, repo)}/pulls?state=${state}`
+export const resolveThreadRoute = (owner: string, repo: string, number: string | number, threadId: string) =>
+  pullRoute(owner, repo, number, `threads/${encodeURIComponent(threadId)}/resolve`)
+export const rerunFailedRoute = (owner: string, repo: string, runId: number) => repoRoute(owner, repo, `actions/${runId}/rerun`)
+export const pinsRoute = '/api/pins'
+export const prefsRoute = '/api/prefs'
 
-export const queryKeys = {
-  me: ['me'] as const,
-  repos: ['repos'] as const,
-  pulls: (owner: string, repo: string, state: 'open' | 'closed') => ['pulls', owner, repo, state] as const,
-  pullsPrefix: (owner: string, repo: string) => ['pulls', owner, repo] as const,
-  pull: (owner: string, repo: string, number: string) => ['pull', owner, repo, number] as const,
-  pullPrefix: (owner: string, repo: string) => ['pull', owner, repo] as const,
-  files: (owner: string, repo: string, number: string) => ['files', owner, repo, number] as const,
-  pins: ['pins'] as const,
-  prefs: ['prefs'] as const,
-}
+export const meKey = ['me'] as const
+export const reposKey = ['repos'] as const
+export const pullsKey = (owner: string, repo: string, state: 'open' | 'closed') => ['pulls', owner, repo, state] as const
+export const pullsPrefixKey = (owner: string, repo: string) => ['pulls', owner, repo] as const
+export const pullKey = (owner: string, repo: string, number: string) => ['pull', owner, repo, number] as const
+export const pullPrefixKey = (owner: string, repo: string) => ['pull', owner, repo] as const
+export const filesKey = (owner: string, repo: string, number: string) => ['files', owner, repo, number] as const
+export const pinsKey = ['pins'] as const
+export const prefsKey = ['prefs'] as const

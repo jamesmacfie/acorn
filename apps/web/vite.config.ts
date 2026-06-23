@@ -8,4 +8,7 @@ import { defineConfig } from 'vite'
 export default defineConfig({
   plugins: [solid(), cloudflare()],
   server: { port: 5173 },
+  environments: {
+    aacorn: { build: { minify: 'esbuild' } },
+  },
 })

@@ -2,7 +2,7 @@ import { createEffect, createMemo, createSignal, For, onCleanup, onMount, Show }
 import { createQuery, useQueryClient } from '@tanstack/solid-query'
 import { useParams, useSearchParams } from '@solidjs/router'
 import { createVirtualizer } from '@tanstack/solid-virtual'
-import { filesOptions, prefsOptions, pullDetailOptions, queryKeys, type PullFile } from './queries'
+import { filesOptions, prefsKey, prefsOptions, pullDetailOptions, pullKey, type PullFile } from './queries'
 import { addReviewComment, replyReview, resolveThread, setPref } from './mutations'
 import { getHighlighter } from './shiki'
 import { FILE_SCROLL_EVENT, routeKey as makeRouteKey, type FileScrollDetail } from './fileNavigation'
@@ -76,10 +76,10 @@ function DiffForPull(props: { route: PullRoute }) {
   const viewMode = (): ViewMode => (prefs.data?.diff_view === 'split' ? 'split' : 'unified')
   const setViewMode = async (mode: ViewMode) => {
     await setPref('diff_view', mode)
-    queryClient.invalidateQueries({ queryKey: queryKeys.prefs })
+    queryClient.invalidateQueries({ queryKey: prefsKey })
   }
 
-  const invalidate = () => queryClient.invalidateQueries({ queryKey: queryKeys.pull(owner, repo, number) })
+  const invalidate = () => queryClient.invalidateQueries({ queryKey: pullKey(owner, repo, number) })
 
   // Parse + highlight every file off the render path, in chunks of 10, appending as each chunk
   // lands so a large PR paints progressively instead of blocking on the full set. Re-runs only when
