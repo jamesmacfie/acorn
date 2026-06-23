@@ -2,6 +2,8 @@ import { and, eq } from 'drizzle-orm'
 import type { SQLiteColumn } from 'drizzle-orm/sqlite-core'
 import { Hono } from 'hono'
 import { getDb, schema } from '../db'
+import { chunkRowsByColumnBudget } from '../db/batch'
+import { prResource } from '../db/resourceKeys'
 import { ghError, ghGraphQL } from '../github'
 import type { AppEnv } from '../middleware/auth'
 
@@ -101,7 +103,7 @@ export const pullDetail = new Hono<AppEnv>().get('/:owner/:repo/pulls/:number', 
   if (!repoRow) return c.json({ error: 'repo_not_found' }, 404)
   const repoId = repoRow.id
 
-  const resource = `pr:${repoId}:${number}`
+  const resource = prResource(repoId, number)
   const [sync] = await db
     .select()
     .from(schema.syncState)
@@ -219,11 +221,10 @@ export const pullDetail = new Hono<AppEnv>().get('/:owner/:repo/pulls/:number', 
     ),
   )
 
-  // chunk(rows): D1 caps bound params at 100/statement, so cap rows/statement by column count.
+  // D1 caps bound params at 100/statement, so cap rows/statement by column count.
   const chunk = <T,>(table: Parameters<typeof db.insert>[0], rows: T[]) => {
     if (rows.length === 0) return []
-    const size = Math.max(1, Math.floor(100 / Object.keys(rows[0] as object).length))
-    return Array.from({ length: Math.ceil(rows.length / size) }, (_, i) => db.insert(table).values(rows.slice(i * size, i * size + size) as never))
+    return chunkRowsByColumnBudget(rows as object[]).map((part) => db.insert(table).values(part as never))
   }
 
   await db.batch([

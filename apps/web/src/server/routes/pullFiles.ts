@@ -1,6 +1,7 @@
 import { and, eq } from 'drizzle-orm'
 import { Hono } from 'hono'
 import { getDb, schema } from '../db'
+import { filesResource } from '../db/resourceKeys'
 import { gh, ghError } from '../github'
 import type { AppEnv } from '../middleware/auth'
 
@@ -64,7 +65,7 @@ export const pullFiles = new Hono<AppEnv>().get('/:owner/:repo/pulls/:number/fil
     return Promise.all(files.map(withPatch(new Set(viewed.map((v) => v.path)))))
   }
 
-  const resource = `files:${repoId}:${number}`
+  const resource = filesResource(repoId, number)
   const [sync] = await db
     .select()
     .from(schema.syncState)
