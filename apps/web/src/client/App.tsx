@@ -41,6 +41,8 @@ export default function App() {
 
   async function logout() {
     await fetch('/auth/logout', { method: 'POST' })
+    window.dispatchEvent(new Event('gurthurd:logout')) // wipe the persisted IndexedDB cache
+    queryClient.clear()
     await queryClient.invalidateQueries({ queryKey: ['me'] })
   }
 
