@@ -93,6 +93,16 @@ export const pullDetailOptions = (owner: string, repo: string, number: string, e
   },
 })
 
+export const pinsOptions = (enabled: boolean) => ({
+  queryKey: ['pins'] as const,
+  enabled,
+  queryFn: async (): Promise<number[]> => {
+    const res = await fetch('/api/pins')
+    if (!res.ok) throw new Error(`/api/pins ${res.status}`)
+    return res.json()
+  },
+})
+
 export const prefsOptions = (enabled: boolean) => ({
   queryKey: ['prefs'] as const,
   enabled,
