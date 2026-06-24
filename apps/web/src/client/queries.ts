@@ -3,6 +3,8 @@
 // is a valid logged-out state, elsewhere it's an error.
 import { readJson } from './apiClient'
 import {
+  fileBlobKey,
+  fileBlobRoute,
   filesKey,
   meKey,
   meRoute,
@@ -19,6 +21,7 @@ import {
   reposKey,
   reposRoute,
   type ClosedPullsPage,
+  type FileBlob,
   type Me,
   type Pull,
   type PullDetail,
@@ -78,4 +81,12 @@ export const filesOptions = (owner: string, repo: string, number: string, enable
   queryKey: filesKey(owner, repo, number),
   enabled,
   queryFn: async (): Promise<PullFile[]> => readJson<PullFile[]>(pullRoute(owner, repo, number, 'files')),
+})
+
+// Full head-blob body, fetched on demand (queryClient.fetchQuery) when a gap is expanded. The sha
+// is immutable so the body never goes stale — fetch once per file, reuse for every gap.
+export const fileBlobOptions = (owner: string, repo: string, sha: string) => ({
+  queryKey: fileBlobKey(owner, repo, sha),
+  staleTime: Infinity,
+  queryFn: async (): Promise<FileBlob> => readJson<FileBlob>(fileBlobRoute(owner, repo, sha)),
 })

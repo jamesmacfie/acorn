@@ -1,7 +1,7 @@
 import { performance } from 'node:perf_hooks'
 import { describe, expect, it } from 'vitest'
 import type { PullFile, Thread } from '../../queries'
-import { buildDiffRows, buildRenderableRows, plainTokenize, toBands, wordDiff, type CodeRow, type ParsedFile } from './model'
+import { buildDiffRows, buildRenderableRows, expandGap, gapId, plainTokenize, toBands, wordDiff, type CodeRow, type GapRow, type ParsedFile } from './model'
 
 const pullFile = (path: string, patch: string | null): PullFile => ({
   path,
@@ -32,11 +32,58 @@ describe('diff model', () => {
       plainTokenize,
     )
 
-    expect(rows.map((row) => row.kind)).toEqual(['hunk', 'normal', 'delete', 'insert', 'normal'])
+    // Trailing 'gap' is the below-last-hunk expand affordance (size unknown until the body loads).
+    expect(rows.map((row) => row.kind)).toEqual(['hunk', 'normal', 'delete', 'insert', 'normal', 'gap'])
     const del = rows.find((row): row is CodeRow => row.kind === 'delete')
     const ins = rows.find((row): row is CodeRow => row.kind === 'insert')
     expect(del?.words?.some((w) => w.kind === 'del')).toBe(true)
     expect(ins?.words?.some((w) => w.kind === 'add')).toBe(true)
+  })
+
+  it('injects top/mid/bottom gaps and expands them from the head body', () => {
+    const rows = buildDiffRows(
+      pullFile(
+        'src/app.ts',
+        ['@@ -10,1 +10,1 @@', '-x', '+y', '@@ -20,1 +20,1 @@', '-p', '+q'].join('\n'),
+      ),
+      plainTokenize,
+    )
+    const gaps = rows.filter((r): r is GapRow => r.kind === 'gap')
+    expect(gaps.map((g) => g.side)).toEqual(['top', 'mid', 'bottom'])
+    expect(gaps[0]).toMatchObject({ newStart: 1, count: 9 }) // lines 1..9 above the first hunk
+    expect(gaps[1]).toMatchObject({ newStart: 11, count: 9 }) // lines 11..19 between hunks
+    expect(gaps[2]).toMatchObject({ side: 'bottom', newStart: 21, count: null })
+
+    const body = Array.from({ length: 25 }, (_, i) => `line ${i + 1}`).join('\n')
+    const top = expandGap(gaps[0]!, body, plainTokenize)
+    expect(top.map((r) => r.raw)).toEqual(Array.from({ length: 9 }, (_, i) => `line ${i + 1}`))
+    expect(top[0]).toMatchObject({ oldNo: 1, newNo: 1 })
+    const bottom = expandGap(gaps[2]!, body, plainTokenize) // count null → to EOF (lines 21..25)
+    expect(bottom.map((r) => r.raw)).toEqual(['line 21', 'line 22', 'line 23', 'line 24', 'line 25'])
+
+    const expanded = new Map([[gapId(gaps[0]!), top]])
+    const rendered = buildRenderableRows([{ file: pullFile('src/app.ts', 'patch'), diff: rows }], [], expanded)
+    expect(rendered.filter((r) => r.kind === 'normal' && r.raw === 'line 1')).toHaveLength(1)
+  })
+
+  it('interleaves review threads on expanded gap lines', () => {
+    const rows = buildDiffRows(
+      pullFile('src/app.ts', ['@@ -10,1 +10,1 @@', '-x', '+y'].join('\n')),
+      plainTokenize,
+    )
+    const gap = rows.find((r): r is GapRow => r.kind === 'gap' && r.side === 'top')!
+    const expanded = new Map([[gapId(gap), expandGap(gap, Array.from({ length: 12 }, (_, i) => `line ${i + 1}`).join('\n'), plainTokenize)]])
+
+    const rendered = buildRenderableRows(
+      [{ file: pullFile('src/app.ts', 'patch'), diff: rows }],
+      [thread('src/app.ts', 1, 'LEFT'), thread('src/app.ts', 2, 'RIGHT')],
+      expanded,
+    )
+    const lineOne = rendered.findIndex((r) => r.kind === 'normal' && r.raw === 'line 1')
+    const lineTwo = rendered.findIndex((r) => r.kind === 'normal' && r.raw === 'line 2')
+
+    expect(rendered[lineOne + 1]).toMatchObject({ kind: 'thread', thread: { line: 1, side: 'LEFT' } })
+    expect(rendered[lineTwo + 1]).toMatchObject({ kind: 'thread', thread: { line: 2, side: 'RIGHT' } })
   })
 
   it('interleaves threads by file and side without dropping no-diff files', () => {

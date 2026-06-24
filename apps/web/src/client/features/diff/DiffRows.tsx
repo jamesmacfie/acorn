@@ -2,13 +2,21 @@ import { createSignal, For, Match, Show, Switch } from 'solid-js'
 import { fileStatusMeta } from '../../displayMeta'
 import type { Thread } from '../../queries'
 import { UserAvatar } from '../../UserAvatar'
-import { fileAnchor, type CodeRow, type FileRow, type HunkRow, type Row, type ThreadRowT } from './model'
+import { fileAnchor, type CodeRow, type FileRow, type GapRow, type HunkRow, type Row, type ThreadRowT } from './model'
+
+export type LineComposerController = {
+  isOpen: () => boolean
+  body: () => string
+  setOpen: (open: boolean) => void
+  setBody: (body: string) => void
+}
 
 export function NonCodeRow(props: {
   row: Exclude<Row, CodeRow>
   onMutated: () => void
   resolveThread: (threadId: string, resolved: boolean) => Promise<unknown>
   reply: (commentDatabaseId: number, body: string) => Promise<unknown>
+  expandGap?: (gap: GapRow) => Promise<unknown>
 }) {
   return (
     <Switch>
@@ -30,6 +38,9 @@ export function NonCodeRow(props: {
       <Match when={props.row.kind === 'hunk' ? (props.row as HunkRow) : null}>
         {(h) => <span class="diff-hunk-text">{h().text}</span>}
       </Match>
+      <Match when={props.row.kind === 'gap' ? (props.row as GapRow) : null}>
+        {(g) => <GapRowView gap={g()} expandGap={props.expandGap} />}
+      </Match>
       <Match when={props.row.kind === 'nodiff'}>
         <span class="diff-nodiff muted">No diff (binary or too large).</span>
       </Match>
@@ -40,18 +51,38 @@ export function NonCodeRow(props: {
   )
 }
 
+function GapRowView(props: { gap: GapRow; expandGap?: (gap: GapRow) => Promise<unknown> }) {
+  const [busy, setBusy] = createSignal(false)
+  const label = () => (props.gap.side === 'bottom' ? 'Expand below' : `Expand ${props.gap.count ?? ''} lines`.replace('  ', ' '))
+  const run = async () => {
+    if (!props.expandGap || props.gap.sha == null) return
+    setBusy(true)
+    try {
+      await props.expandGap(props.gap)
+    } finally {
+      setBusy(false)
+    }
+  }
+  return (
+    <button class="diff-gap" disabled={busy() || props.gap.sha == null} onClick={run}>
+      {busy() ? 'Expanding…' : `⋯ ${label()} ⋯`}
+    </button>
+  )
+}
+
 export function DiffLine(props: {
   r: CodeRow
   canAdd: boolean
   addComment: (body: string) => Promise<unknown>
   onMutated: () => void
+  composer?: LineComposerController
 }) {
   return (
     <>
       <span class="diff-gutter">{props.r.oldNo ?? ''}</span>
       <span class="diff-gutter">{props.r.newNo ?? ''}</span>
       <span class="diff-marker">{props.r.kind === 'insert' ? '+' : props.r.kind === 'delete' ? '\u2212' : ' '}</span>
-      <LineComposer canAdd={props.canAdd} addComment={props.addComment} onMutated={props.onMutated}>
+      <LineComposer canAdd={props.canAdd} addComment={props.addComment} onMutated={props.onMutated} composer={props.composer}>
         <CodeContent r={props.r} />
       </LineComposer>
     </>
@@ -64,6 +95,7 @@ export function SplitCell(props: {
   canAdd: boolean
   addComment: (body: string) => Promise<unknown>
   onMutated: () => void
+  composer?: LineComposerController
 }) {
   return (
     <div
@@ -79,7 +111,7 @@ export function SplitCell(props: {
           <>
             <span class="diff-gutter">{props.gutter ?? ''}</span>
             <span class="diff-marker">{r().kind === 'insert' ? '+' : r().kind === 'delete' ? '\u2212' : ' '}</span>
-            <LineComposer canAdd={props.canAdd} addComment={props.addComment} onMutated={props.onMutated}>
+            <LineComposer canAdd={props.canAdd} addComment={props.addComment} onMutated={props.onMutated} composer={props.composer}>
               <CodeContent r={r()} />
             </LineComposer>
           </>
@@ -116,22 +148,21 @@ function LineComposer(props: {
   canAdd: boolean
   addComment: (body: string) => Promise<unknown>
   onMutated: () => void
+  composer?: LineComposerController
   children: unknown
 }) {
-  const [open, setOpen] = createSignal(false)
-  const [body, setBody] = createSignal('')
   const [busy, setBusy] = createSignal(false)
   const [err, setErr] = createSignal<string | null>(null)
 
   const submit = async () => {
-    const text = body().trim()
+    const text = props.composer?.body().trim() ?? ''
     if (!text) return
     setBusy(true)
     setErr(null)
     try {
       await props.addComment(text)
-      setBody('')
-      setOpen(false)
+      props.composer?.setBody('')
+      props.composer?.setOpen(false)
       props.onMutated()
     } catch (e) {
       setErr(e instanceof Error ? e.message : 'failed')
@@ -142,25 +173,25 @@ function LineComposer(props: {
 
   return (
     <>
-      <Show when={props.canAdd}>
-        <button class="diff-add-btn" title="Comment on this line" onClick={() => setOpen((v) => !v)}>
+      <Show when={props.canAdd && props.composer}>
+        <button class="diff-add-btn" title="Comment on this line" onClick={() => props.composer?.setOpen(!props.composer.isOpen())}>
           +
         </button>
       </Show>
       {props.children as never}
-      <Show when={open()}>
+      <Show when={props.composer?.isOpen()}>
         <div class="diff-composer" onClick={(e) => e.stopPropagation()}>
           <textarea
             class="diff-reply-input"
             placeholder={'Comment on this line\u2026'}
-            value={body()}
-            onInput={(e) => setBody(e.currentTarget.value)}
+            value={props.composer?.body() ?? ''}
+            onInput={(e) => props.composer?.setBody(e.currentTarget.value)}
           />
           <div class="diff-composer-actions">
-            <button disabled={busy() || !body().trim()} onClick={submit}>
+            <button disabled={busy() || !(props.composer?.body().trim() ?? '')} onClick={submit}>
               {busy() ? 'Adding\u2026' : 'Comment'}
             </button>
-            <button onClick={() => setOpen(false)}>Cancel</button>
+            <button onClick={() => props.composer?.setOpen(false)}>Cancel</button>
           </div>
           <Show when={err()}>
             <span class="diff-thread-err">{err()}</span>

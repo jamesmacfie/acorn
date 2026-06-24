@@ -2,25 +2,28 @@ import { createEffect, createMemo, createSignal, For, onCleanup, onMount, Show }
 import { createQuery, useQueryClient } from '@tanstack/solid-query'
 import { useParams, useSearchParams } from '@solidjs/router'
 import { createVirtualizer } from '@tanstack/solid-virtual'
-import { filesOptions, prefsKey, prefsOptions, pullDetailOptions, pullKey, type PullFile } from './queries'
+import { fileBlobOptions, filesOptions, prefsKey, prefsOptions, pullDetailOptions, pullKey, type PullFile } from './queries'
 import { addReviewComment, replyReview, resolveThread, setPref } from './mutations'
 import { getHighlighter } from './shiki'
 import { FILE_SCROLL_EVENT, routeKey as makeRouteKey, type FileScrollDetail } from './fileNavigation'
-import { DiffLine, NonCodeRow, SplitCell } from './features/diff/DiffRows'
+import { DiffLine, NonCodeRow, SplitCell, type LineComposerController } from './features/diff/DiffRows'
 import {
   buildDiffRows,
   buildRenderableRows,
   estimateRowSize,
+  expandGap,
   fileAnchor,
+  gapId,
   highlighterTokenize,
   isCodeRow,
   plainTokenize,
   toBands,
   type CodeRow,
-  type DiffRow,
+  type GapRow,
   type ParsedFile,
   type Row,
   type SplitBand,
+  type TokenizeLine,
   type ViewMode,
 } from './features/diff/model'
 
@@ -86,6 +89,11 @@ function DiffForPull(props: { route: PullRoute }) {
   // lands so a large PR paints progressively instead of blocking on the full set. Re-runs only when
   // the file set itself changes (thread edits don't touch files.data → no re-tokenize).
   const [parsed, setParsed] = createSignal<ParsedFile[]>([])
+  // Context lines revealed by clicking a gap, keyed by that gap's stable identity. Reset when the file
+  // set changes. tokenizeFn is the loaded Shiki tokenizer, lifted out so the gap handler can reuse it.
+  const [expanded, setExpanded] = createSignal<Map<string, CodeRow[]>>(new Map())
+  const [tokenizeFn, setTokenizeFn] = createSignal<TokenizeLine>(plainTokenize)
+  const [lineComposer, setLineComposer] = createSignal<{ key: string; body: string } | null>(null)
   let parseRun = 0
   createEffect(() => {
     const list = files.data ?? []
@@ -96,11 +104,14 @@ function DiffForPull(props: { route: PullRoute }) {
     })
     lastTarget = ''
     setParsed([])
+    setExpanded(new Map())
+    setLineComposer(null)
     resetScrollPosition()
     if (!list.length) return
     void (async () => {
       const tokenize = await getHighlighter().then(highlighterTokenize).catch(() => plainTokenize)
       if (cancelled || run !== parseRun) return
+      setTokenizeFn(() => tokenize)
       const acc: ParsedFile[] = []
       for (let i = 0; i < list.length; i += 10) {
         if (cancelled || run !== parseRun) return
@@ -112,7 +123,16 @@ function DiffForPull(props: { route: PullRoute }) {
     })()
   })
 
-  const rows = createMemo<Row[]>(() => buildRenderableRows(parsed(), detail.data?.threads))
+  const rows = createMemo<Row[]>(() => buildRenderableRows(parsed(), detail.data?.threads, expanded()))
+
+  // Fetch the file's head body once (cached by immutable sha), slice the gap's hidden lines, and
+  // splice them into the row stream by recording them in `expanded`.
+  const handleExpand = async (gap: GapRow) => {
+    if (gap.sha == null) return
+    const body = await queryClient.fetchQuery(fileBlobOptions(owner, repo, gap.sha))
+    const lines = expandGap(gap, body.text, tokenizeFn())
+    setExpanded((prev) => new Map(prev).set(gapId(gap), lines))
+  }
 
   // Split bands from the same interleaved rows (see toBands).
   const bands = createMemo<SplitBand[]>(() => toBands(rows()))
@@ -213,7 +233,33 @@ function DiffForPull(props: { route: PullRoute }) {
   const lineComment = (r: CodeRow) => {
     const side = r.oldNo != null && r.newNo == null ? 'LEFT' : 'RIGHT'
     const lineNo = side === 'LEFT' ? r.oldNo : r.newNo
-    return { side: side as 'LEFT' | 'RIGHT', lineNo: lineNo ?? 0, canAdd: !!headSha() && lineNo != null }
+    return {
+      side: side as 'LEFT' | 'RIGHT',
+      lineNo: lineNo ?? 0,
+      key: lineNo == null ? '' : commentTargetKey(r.path, side, lineNo),
+      canAdd: !!headSha() && lineNo != null,
+    }
+  }
+
+  const commentTargetKey = (path: string, side: 'LEFT' | 'RIGHT', lineNo: number) => JSON.stringify([path, side, lineNo])
+  const composerFor = (key: string): LineComposerController => ({
+    isOpen: () => lineComposer()?.key === key,
+    body: () => {
+      const current = lineComposer()
+      return current?.key === key ? current.body : ''
+    },
+    setOpen: (open) => {
+      setLineComposer((current) => {
+        if (open) return { key, body: current?.key === key ? current.body : '' }
+        return current?.key === key ? null : current
+      })
+    },
+    setBody: (body) => setLineComposer({ key, body }),
+  })
+
+  const splitComposer = (r: CodeRow | null, side: 'LEFT' | 'RIGHT') => {
+    const lineNo = side === 'LEFT' ? r?.oldNo : r?.newNo
+    return r && lineNo != null ? composerFor(commentTargetKey(r.path, side, lineNo)) : undefined
   }
 
   return (
@@ -272,12 +318,21 @@ function DiffForPull(props: { route: PullRoute }) {
                             onMutated={invalidate}
                             resolveThread={(threadId, resolved) => resolveThread(owner, repo, number, threadId, resolved)}
                             reply={(databaseId, body) => replyReview(owner, repo, number, databaseId, body)}
+                            expandGap={handleExpand}
                           />
                         }
                       >
                         {(r) => {
                           const lc = lineComment(r())
-                          return <DiffLine r={r()} canAdd={lc.canAdd} addComment={(body) => addReviewComment(owner, repo, number, body, r().path, lc.lineNo, lc.side)} onMutated={invalidate} />
+                          return (
+                            <DiffLine
+                              r={r()}
+                              canAdd={lc.canAdd}
+                              addComment={(body) => addReviewComment(owner, repo, number, body, r().path, lc.lineNo, lc.side)}
+                              onMutated={invalidate}
+                              composer={lc.canAdd ? composerFor(lc.key) : undefined}
+                            />
+                          )
                         }}
                       </Show>
                     </div>
@@ -314,6 +369,7 @@ function DiffForPull(props: { route: PullRoute }) {
                         onMutated={invalidate}
                         resolveThread={(threadId, resolved) => resolveThread(owner, repo, number, threadId, resolved)}
                         reply={(databaseId, body) => replyReview(owner, repo, number, databaseId, body)}
+                        expandGap={handleExpand}
                       />
                     </div>
                   }
@@ -326,6 +382,7 @@ function DiffForPull(props: { route: PullRoute }) {
                         canAdd={!!headSha() && pair().left?.oldNo != null}
                         addComment={(body) => addReviewComment(owner, repo, number, body, pair().left!.path, pair().left!.oldNo!, 'LEFT')}
                         onMutated={invalidate}
+                        composer={splitComposer(pair().left, 'LEFT')}
                       />
                       <SplitCell
                         r={pair().right}
@@ -333,6 +390,7 @@ function DiffForPull(props: { route: PullRoute }) {
                         canAdd={!!headSha() && pair().right?.newNo != null}
                         addComment={(body) => addReviewComment(owner, repo, number, body, pair().right!.path, pair().right!.newNo!, 'RIGHT')}
                         onMutated={invalidate}
+                        composer={splitComposer(pair().right, 'RIGHT')}
                       />
                     </div>
                   )}

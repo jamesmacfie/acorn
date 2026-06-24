@@ -54,6 +54,9 @@ export type PullDetail = {
 // One PR's full warmed payload, returned by the batch prefetch endpoint.
 export type PullBatchItem = { number: number; detail: PullDetail; files: PullFile[] }
 
+// Full head-blob body, fetched on demand to expand unchanged context around diff hunks.
+export type FileBlob = { text: string }
+
 export const repoRoute = (owner: string, repo: string, child = '') => `/api/repos/${owner}/${repo}${child ? `/${child}` : ''}`
 export const pullRoute = (owner: string, repo: string, number: string | number, child = '') =>
   repoRoute(owner, repo, `pulls/${number}${child ? `/${child}` : ''}`)
@@ -64,6 +67,7 @@ export const reposRefreshRoute = '/api/repos/refresh'
 export const pullsRoute = (owner: string, repo: string, state: 'open' | 'closed') => `${repoRoute(owner, repo)}/pulls?state=${state}`
 export const closedPullsRoute = (owner: string, repo: string, page: number) => `${pullsRoute(owner, repo, 'closed')}&page=${page}`
 export const pullsBatchRoute = (owner: string, repo: string) => `${repoRoute(owner, repo)}/pulls/batch`
+export const fileBlobRoute = (owner: string, repo: string, sha: string) => repoRoute(owner, repo, `blobs/${sha}`)
 export const resolveThreadRoute = (owner: string, repo: string, number: string | number, threadId: string) =>
   pullRoute(owner, repo, number, `threads/${encodeURIComponent(threadId)}/resolve`)
 export const rerunFailedRoute = (owner: string, repo: string, runId: number) => repoRoute(owner, repo, `actions/${runId}/rerun`)
@@ -80,5 +84,6 @@ export const pullsPrefixKey = (owner: string, repo: string) => ['pulls', owner, 
 export const pullKey = (owner: string, repo: string, number: string) => ['pull', owner, repo, number] as const
 export const pullPrefixKey = (owner: string, repo: string) => ['pull', owner, repo] as const
 export const filesKey = (owner: string, repo: string, number: string) => ['files', owner, repo, number] as const
+export const fileBlobKey = (owner: string, repo: string, sha: string) => ['blob', owner, repo, sha] as const
 export const pinsKey = ['pins'] as const
 export const prefsKey = ['prefs'] as const
