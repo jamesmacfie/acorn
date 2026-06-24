@@ -95,6 +95,32 @@ body {
   min-height: 0;
 }
 
+/* Empty state: no repo selected — single full-width column for the centered acorn. */
+.panes-empty { grid-template-columns: 1fr; }
+.pane-empty { display: flex; }
+
+.acorn-empty {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+  min-height: 0;
+}
+.acorn-art {
+  margin: 0;
+  font-family: var(--font-mono);
+  color: var(--text-muted);
+  line-height: 1.1;
+  white-space: pre;
+}
+.acorn-word {
+  font-family: var(--font-mono);
+  color: var(--text-muted);
+  letter-spacing: 0.2em;
+}
+
 /* Left-pane collapse: zero the left column and hide the pane entirely (no stray border). */
 .app.left-collapsed .panes { grid-template-columns: 0 clamp(360px, 23vw, 430px) minmax(0, 1fr); }
 .app.left-collapsed .pane-left { display: none; }

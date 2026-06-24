@@ -9,6 +9,7 @@ import PullDetail from './PullDetail'
 import DiffView from './DiffView'
 import Shortcuts from './Shortcuts'
 import AccountMenu from './AccountMenu'
+import Acorn from './Acorn'
 
 // Layout root (Router root): top bar + three panes. Panes are params-driven — PullList (left)
 // and PullDetail (mid) read useParams() directly; routes exist only to populate params.
@@ -126,20 +127,31 @@ export default function App() {
           </Show>
         </div>
       </header>
-      <main class="panes">
-        <section class="pane pane-left">
-          <div class="section-header">Reviews</div>
-          <PullList />
-        </section>
-        <section class="pane pane-mid">
-          <div class="section-header">Navigator</div>
-          <PullDetail />
-        </section>
-        <section class="pane pane-right">
-          <div class="section-header">Diff</div>
-          <DiffView />
-        </section>
-      </main>
+      <Show when={params.owner} fallback={<main class="panes panes-empty"><Acorn /></main>}>
+        <main class="panes">
+          <section class="pane pane-left">
+            <div class="section-header">Reviews</div>
+            <PullList />
+          </section>
+          <Show
+            when={params.number}
+            fallback={
+              <section class="pane pane-mid pane-empty" style={{ 'grid-column': '2 / -1' }}>
+                <Acorn />
+              </section>
+            }
+          >
+            <section class="pane pane-mid">
+              <div class="section-header">Navigator</div>
+              <PullDetail />
+            </section>
+            <section class="pane pane-right">
+              <div class="section-header">Diff</div>
+              <DiffView />
+            </section>
+          </Show>
+        </main>
+      </Show>
       <Shortcuts />
     </div>
   )

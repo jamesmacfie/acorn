@@ -17,13 +17,13 @@
     {
       "binding": "DB",
       "database_name": "acorn",
-      "database_id": "baf0810e-4d6c-42fc-98e7-6b35636037f9",
+      "database_id": "30a16f09-bc50-4da7-b3bd-3cf4569ef07a",
       "migrations_dir": "migrations"
     }
   ],
   "kv_namespaces": [
-    { "binding": "OAUTH_STATE", "id": "179b4deef08e45aeb081d1e910ba4d40" },
+    { "binding": "OAUTH_STATE", "id": "56d25c60db044d208f10e7d45ed82e0a" },
     // BLOBS: shared, immutable public blob/patch bodies keyed by sha (docs/caching.md).
-    { "binding": "BLOBS", "id": "57246d2f0a66454cbf6631a829ebc3e6" }
+    { "binding": "BLOBS", "id": "a328168716b74ff9bf211b190088adf2" }
   ]
 }
