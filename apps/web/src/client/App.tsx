@@ -1,5 +1,5 @@
 import { createEffect, createSignal, Show } from 'solid-js'
-import { createQuery, useQueryClient } from '@tanstack/solid-query'
+import { createQuery, useIsRestoring, useQueryClient } from '@tanstack/solid-query'
 import { useNavigate, useParams } from '@solidjs/router'
 import { meKey, meOptions, pinsOptions, prefsKey, prefsOptions, reposKey, reposOptions, reposRefreshRoute } from './queries'
 import { setPref } from './mutations'
@@ -17,6 +17,7 @@ export default function App() {
   const queryClient = useQueryClient()
   const params = useParams()
   const navigate = useNavigate()
+  const isRestoring = useIsRestoring()
 
   const me = createQuery(() => meOptions())
   const repos = createQuery(() => reposOptions(!!me.data))
@@ -36,8 +37,11 @@ export default function App() {
     queryClient.invalidateQueries({ queryKey: prefsKey })
   }
 
-  // Default to the first repo once the list loads and no repo is in the URL.
+  // Default to the first repo once the list loads and no repo is in the URL. Wait for the
+  // persisted cache to finish restoring — mounting PullList mid-restore drops its gated pulls
+  // fetch (the enabled flip races the isRestoring boundary), so the list never populates.
   createEffect(() => {
+    if (isRestoring()) return
     const list = repos.data
     if (list?.length && !params.owner) navigate(`/${list[0].owner}/${list[0].name}`, { replace: true })
   })
@@ -72,7 +76,11 @@ export default function App() {
     window.location.href = '/auth/permissions'
   }
 
+  // Logged out: no chrome, just the mark — bounce straight to GitHub OAuth. While auth is still
+  // unknown (initial load / cache restore) show the bare mark without redirecting, to avoid a flash.
+  const settledLoggedOut = () => !isRestoring() && !me.isPending && !me.data
   return (
+    <Show when={me.data} fallback={<LoginGate redirecting={settledLoggedOut()} />}>
     <div class="app" classList={{ 'left-collapsed': collapsed() }}>
       <header class="topbar">
         <div class="topbar-side">
@@ -154,5 +162,15 @@ export default function App() {
       </Show>
       <Shortcuts />
     </div>
+    </Show>
   )
+}
+
+// Full-screen mark shown when there's no session. Once auth resolves to logged-out, redirect to
+// the OAuth start; before that just hold the mark so we don't flash a redirect mid-restore.
+function LoginGate(props: { redirecting: boolean }) {
+  createEffect(() => {
+    if (props.redirecting) window.location.href = '/auth/login'
+  })
+  return <main class="panes panes-empty"><Acorn label={props.redirecting ? 'redirecting to github…' : 'acorn'} /></main>
 }
