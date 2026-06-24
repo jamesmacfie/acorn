@@ -1,9 +1,11 @@
 import { createEffect, createMemo, createSignal, For, on, onCleanup, onMount, Show } from 'solid-js'
-import { createQuery } from '@tanstack/solid-query'
+import { createQuery, useQueryClient } from '@tanstack/solid-query'
 import { A, useNavigate, useParams } from '@solidjs/router'
 import { createVirtualizer } from '@tanstack/solid-virtual'
 import { formatRelativeTime } from './displayMeta'
+import { prefetchOpenPulls } from './prefetch'
 import { pullsOptions, reposOptions } from './queries'
+import { filterPulls } from './features/pullList/model'
 
 // Left-pane PR list for the routed repo. Reads the shared repos cache to gate the request
 // until the repo is known to the server (avoids a 404 race on a cold URL). The list is
@@ -13,9 +15,22 @@ export default function PullList() {
   const navigate = useNavigate()
   const [tab, setTab] = createSignal<'open' | 'closed'>('open')
   const [filter, setFilter] = createSignal('')
+  const queryClient = useQueryClient()
   const repos = createQuery(() => reposOptions(true))
   const repoKnown = () => !!repos.data?.some((r) => r.owner === params.owner && r.name === params.repo)
   const pulls = createQuery(() => pullsOptions(params.owner ?? '', params.repo ?? '', tab(), repoKnown()))
+
+  // Once the repo is known, warm the per-PR caches in the background so navigating is instant.
+  // Re-runs per repo; the cleanup aborts an in-flight warm-up when the repo changes (or unmounts).
+  createEffect(on(
+    () => (repoKnown() ? `${params.owner}/${params.repo}` : ''),
+    (key) => {
+      if (!key) return
+      const ac = new AbortController()
+      void prefetchOpenPulls(queryClient, params.owner ?? '', params.repo ?? '', ac.signal).catch(() => {})
+      onCleanup(() => ac.abort())
+    },
+  ))
 
   createEffect(on(
     () => `${params.owner ?? ''}/${params.repo ?? ''}`,
@@ -27,12 +42,7 @@ export default function PullList() {
   ))
 
   // Client-side text filter over the loaded tab (title / author / #number).
-  const shown = createMemo(() => {
-    const q = filter().trim().toLowerCase()
-    const list = pulls.data ?? []
-    if (!q) return list
-    return list.filter((p) => `#${p.number} ${p.title} ${p.author ?? ''}`.toLowerCase().includes(q))
-  })
+  const shown = createMemo(() => filterPulls(pulls.data ?? [], filter()))
 
   // j/k move to the next/prev PR in the list (docs/ui-style.md keyboard nav). Ignore while typing.
   const onKey = (e: KeyboardEvent) => {
@@ -58,6 +68,22 @@ export default function PullList() {
     estimateSize: () => 36, // --row-h
     overscan: 12,
   })
+  const resetVirtualList = () => {
+    if (scrollEl) {
+      scrollEl.scrollTop = 0
+      scrollEl.scrollLeft = 0
+    }
+    queueMicrotask(() => virt.measure())
+  }
+  createEffect(on([tab, filter], resetVirtualList, { defer: true }))
+  createEffect(on(() => shown().length, () => queueMicrotask(() => virt.measure()), { defer: true }))
+  const virtualRows = createMemo(() => {
+    const list = shown()
+    return virt.getVirtualItems().flatMap((vi) => {
+      const pr = list[vi.index]
+      return pr ? [{ vi, pr }] : []
+    })
+  })
 
   return (
     <>
@@ -74,25 +100,24 @@ export default function PullList() {
         <Show when={shown().length} fallback={<p class="placeholder">No matching PRs.</p>}>
           <div class="pr-list-scroll" ref={scrollEl}>
             <div class="pr-list" style={{ height: `${virt.getTotalSize()}px`, position: 'relative' }}>
-              <For each={virt.getVirtualItems()}>
-                {(vi) => {
-                  const pr = () => shown()[vi.index]
+              <For each={virtualRows()}>
+                {({ vi, pr }) => {
                   return (
                     <A
                       class="pr-row"
-                      classList={{ active: params.number === String(pr().number) }}
-                      href={`/${params.owner}/${params.repo}/${pr().number}`}
+                      classList={{ active: params.number === String(pr.number) }}
+                      href={`/${params.owner}/${params.repo}/${pr.number}`}
                       style={{ position: 'absolute', top: 0, left: 0, width: '100%', transform: `translateY(${vi.start}px)`, height: `${vi.size}px` }}
                     >
-                      <span class="pr-num">#{pr().number}</span>
-                      <span class="pr-title">{pr().title}</span>
-                      <Show when={pr().draft}>
+                      <span class="pr-num">#{pr.number}</span>
+                      <span class="pr-title">{pr.title}</span>
+                      <Show when={pr.draft}>
                         <span class="pr-badge">draft</span>
                       </Show>
-                      <Show when={pr().author}>
-                        <span class="pr-author muted">{pr().author}</span>
+                      <Show when={pr.author}>
+                        <span class="pr-author muted">{pr.author}</span>
                       </Show>
-                      <span class="pr-time muted">{formatRelativeTime(pr().updatedAt)}</span>
+                      <span class="pr-time muted">{formatRelativeTime(pr.updatedAt)}</span>
                     </A>
                   )
                 }}

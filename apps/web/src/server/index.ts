@@ -9,6 +9,7 @@ import { prefs } from './routes/prefs'
 import { pullDetail } from './routes/pullDetail'
 import { pullFiles } from './routes/pullFiles'
 import { pulls } from './routes/pulls'
+import { pullsBatch } from './routes/pullsBatch'
 import { repos } from './routes/repos'
 
 // One Worker, both /auth and /api. Non-matching paths never reach here — run_worker_first
@@ -24,6 +25,7 @@ const app = new Hono<AppEnv>()
   .route('/api/repos', pulls) // repo-scoped sub-resources, e.g. /:owner/:repo/pulls
   .route('/api/repos', pullDetail) // /:owner/:repo/pulls/:number
   .route('/api/repos', pullFiles) // /:owner/:repo/pulls/:number/files
+  .route('/api/repos', pullsBatch) // POST /:owner/:repo/pulls/batch — prefetch warm-up
   .route('/api/repos', prActions) // PR write actions: merge / close / reopen / draft / comments
 
 export default app

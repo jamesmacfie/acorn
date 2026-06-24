@@ -40,6 +40,7 @@ type PullRoute = {
   number: string
   key: string
 }
+const FALLBACK_ROW_ESTIMATE = 36
 
 export default function DiffView() {
   const params = useParams()
@@ -128,8 +129,18 @@ function DiffForPull(props: { route: PullRoute }) {
       return rows().length
     },
     getScrollElement: () => scrollEl() ?? null,
-    estimateSize: (index) => estimateRowSize(rows()[index]),
+    estimateSize: (index) => {
+      const row = rows()[index]
+      return row ? estimateRowSize(row) : FALLBACK_ROW_ESTIMATE
+    },
     overscan: 20,
+  })
+  const virtualRows = createMemo(() => {
+    const list = rows()
+    return virt.getVirtualItems().flatMap((vi) => {
+      const row = list[vi.index]
+      return row ? [{ vi, row }] : []
+    })
   })
   createEffect(() => {
     if (scrollEl()) virt.measure()
@@ -237,28 +248,27 @@ function DiffForPull(props: { route: PullRoute }) {
         fallback={
           <div class="diff" ref={publishScrollEl}>
             <div class="diff-rows" style={{ height: `${virt.getTotalSize()}px` }}>
-              <For each={virt.getVirtualItems()}>
-                {(vi) => {
-                  const row = () => rows()[vi.index]
+              <For each={virtualRows()}>
+                {({ vi, row }) => {
                   return (
                     <div
                       class="diff-row"
                       classList={{
-                        'diff-hunk': row().kind === 'hunk',
-                        'diff-add': row().kind === 'insert',
-                        'diff-del': row().kind === 'delete',
-                        'diff-file-row': row().kind === 'file',
-                        'diff-thread-row': row().kind === 'thread' || row().kind === 'nodiff',
+                        'diff-hunk': row.kind === 'hunk',
+                        'diff-add': row.kind === 'insert',
+                        'diff-del': row.kind === 'delete',
+                        'diff-file-row': row.kind === 'file',
+                        'diff-thread-row': row.kind === 'thread' || row.kind === 'nodiff',
                       }}
                       data-index={vi.index}
                       ref={(el) => queueMicrotask(() => virt.measureElement(el))}
                       style={{ transform: `translateY(${vi.start}px)` }}
                     >
                       <Show
-                        when={isCodeRow(row()) ? (row() as CodeRow) : null}
+                        when={isCodeRow(row) ? row : null}
                         fallback={
                           <NonCodeRow
-                            row={row() as Exclude<Row, CodeRow>}
+                            row={row as Exclude<Row, CodeRow>}
                             onMutated={invalidate}
                             resolveThread={(threadId, resolved) => resolveThread(owner, repo, number, threadId, resolved)}
                             reply={(databaseId, body) => replyReview(owner, repo, number, databaseId, body)}

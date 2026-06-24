@@ -1,0 +1,308 @@
+import { and, eq } from 'drizzle-orm'
+import type { SQLiteColumn } from 'drizzle-orm/sqlite-core'
+import type { PullDetail, PullFile } from '../../shared/api'
+import { getDb, schema } from '../db'
+import { chunkRowsByColumnBudget } from '../db/batch'
+import { filesResource, prResource } from '../db/resourceKeys'
+import { gh } from '../github'
+
+// Shared PR mirror helpers: the GraphQL→D1 detail mirror and the REST→KV/D1 files mirror, plus
+// their read-backs. Both the single-PR routes (pullDetail / pullFiles) and the batch route
+// (pullsBatch) read+write the same mirror tables, so the logic lives here once to avoid drift.
+// PR data is "fast-changing" (docs/caching.md) — freshness is a 45s TTL gate in sync_state.
+export const STALE_AFTER_MS = 45_000
+
+type Db = ReturnType<typeof getDb>
+export type PrKey = { userId: string; repoId: number; number: number }
+
+// ─── Detail (GraphQL composite) ──────────────────────────────────────────────
+
+// The per-PR selection set, shared by the single-PR query and the batch multi-alias query.
+export const PR_FRAGMENT = `
+fragment PrFields on PullRequest {
+  id number title state isDraft bodyHTML headRefOid
+  author { login }
+  baseRefName headRefName updatedAt
+  labels(first: 20) { nodes { name color } }
+  reviews(first: 50) { nodes { id author { login } state bodyHTML submittedAt } }
+  comments(first: 50) { nodes { id author { login } bodyHTML createdAt } }
+  reviewThreads(first: 50) { nodes {
+    id isResolved path line originalLine diffSide
+    comments(first: 50) { nodes { id databaseId author { login } bodyHTML createdAt } }
+  } }
+  commits(last: 1) { nodes { commit { statusCheckRollup { contexts(first: 50) { nodes {
+    __typename
+    ... on CheckRun { name status conclusion detailsUrl checkSuite { workflowRun { databaseId } } }
+    ... on StatusContext { context state targetUrl }
+  } } } } } }
+}`
+// ponytail: first-page only (reviews,comments 50) — cursor pagination deferred.
+
+export type GqlPull = {
+  id: string
+  number: number
+  title: string
+  state: string
+  isDraft: boolean
+  bodyHTML: string | null
+  headRefOid: string | null
+  author: { login: string } | null
+  baseRefName: string | null
+  headRefName: string | null
+  updatedAt: string | null
+  labels: { nodes: { name: string; color: string | null }[] }
+  reviews: { nodes: { id: string; author: { login: string } | null; state: string; bodyHTML: string | null; submittedAt: string | null }[] }
+  comments: { nodes: { id: string; author: { login: string } | null; bodyHTML: string | null; createdAt: string | null }[] }
+  reviewThreads: { nodes: GqlThread[] }
+  commits: { nodes: { commit: { statusCheckRollup: { contexts: { nodes: GqlContext[] } } | null } }[] }
+}
+type GqlThreadComment = {
+  id: string
+  databaseId: number | null
+  author: { login: string } | null
+  bodyHTML: string | null
+  createdAt: string | null
+}
+type GqlThread = {
+  id: string
+  isResolved: boolean
+  path: string | null
+  line: number | null
+  originalLine: number | null
+  diffSide: string | null
+  comments: { nodes: GqlThreadComment[] }
+}
+type GqlContext =
+  | {
+      __typename: 'CheckRun'
+      name: string
+      status: string | null
+      conclusion: string | null
+      detailsUrl: string | null
+      checkSuite: { workflowRun: { databaseId: number | null } | null } | null
+    }
+  | { __typename: 'StatusContext'; context: string; state: string | null; targetUrl: string | null }
+
+const ms = (s: string | null) => (s ? Date.parse(s) : null)
+
+// A commit can carry duplicate context names across check runs; keep the last (PK is name).
+const dedupeByName = <T extends { name: string }>(rows: T[]) => [...new Map(rows.map((r) => [r.name, r])).values()]
+
+const childWhere = (t: { userId: SQLiteColumn; repoId: SQLiteColumn; number: SQLiteColumn }, key: PrKey) =>
+  and(eq(t.userId, key.userId), eq(t.repoId, key.repoId), eq(t.number, key.number))
+
+// Atomically re-mirror one PR's detail composite: upsert the pull row, replace all child rows,
+// bump sync_state. D1 caps bound params at 100/statement, so rows per insert are capped by column
+// count. Runs in one db.batch; callers can fan these out in parallel across PRs.
+export const mirrorPr = async (db: Db, key: PrKey, pr: GqlPull, now: number) => {
+  const pullRow = {
+    ...key,
+    nodeId: pr.id,
+    state: pr.state.toLowerCase(),
+    draft: pr.isDraft,
+    title: pr.title,
+    body: pr.bodyHTML,
+    headSha: pr.headRefOid,
+    headRef: pr.headRefName,
+    baseRef: pr.baseRefName,
+    author: pr.author?.login ?? null,
+    updatedAt: ms(pr.updatedAt),
+    fetchedAt: now,
+    staleAfter: STALE_AFTER_MS,
+    etag: null,
+  }
+  const labelRows = pr.labels.nodes.map((l) => ({ ...key, name: l.name, color: l.color }))
+  const reviewRows = pr.reviews.nodes.map((r) => ({
+    ...key,
+    id: r.id,
+    author: r.author?.login ?? null,
+    state: r.state,
+    body: r.bodyHTML,
+    submittedAt: ms(r.submittedAt),
+  }))
+  const commentRows = pr.comments.nodes.map((m) => ({
+    ...key,
+    id: m.id,
+    author: m.author?.login ?? null,
+    body: m.bodyHTML,
+    createdAt: ms(m.createdAt),
+  }))
+  const threadRows = pr.reviewThreads.nodes.flatMap((t) =>
+    t.comments.nodes.map((cm) => ({
+      ...key,
+      threadId: t.id,
+      id: cm.id,
+      databaseId: cm.databaseId,
+      path: t.path,
+      line: t.line ?? t.originalLine,
+      side: t.diffSide,
+      resolved: t.isResolved,
+      author: cm.author?.login ?? null,
+      body: cm.bodyHTML,
+      createdAt: ms(cm.createdAt),
+    })),
+  )
+  const checkRows = dedupeByName(
+    (pr.commits.nodes[0]?.commit.statusCheckRollup?.contexts.nodes ?? []).map((ctx) =>
+      ctx.__typename === 'CheckRun'
+        ? { ...key, name: ctx.name, status: ctx.conclusion ?? ctx.status, url: ctx.detailsUrl, runId: ctx.checkSuite?.workflowRun?.databaseId ?? null }
+        : { ...key, name: ctx.context, status: ctx.state, url: ctx.targetUrl, runId: null },
+    ),
+  )
+
+  const chunk = <T,>(table: Parameters<typeof db.insert>[0], rows: T[]) => {
+    if (rows.length === 0) return []
+    return chunkRowsByColumnBudget(rows as object[]).map((part) => db.insert(table).values(part as never))
+  }
+
+  const resource = prResource(key.repoId, key.number)
+  await db.batch([
+    db
+      .insert(schema.pullRequests)
+      .values(pullRow)
+      .onConflictDoUpdate({
+        target: [schema.pullRequests.userId, schema.pullRequests.repoId, schema.pullRequests.number],
+        set: pullRow,
+      }),
+    db.delete(schema.prLabels).where(childWhere(schema.prLabels, key)),
+    db.delete(schema.reviews).where(childWhere(schema.reviews, key)),
+    db.delete(schema.comments).where(childWhere(schema.comments, key)),
+    db.delete(schema.checks).where(childWhere(schema.checks, key)),
+    db.delete(schema.reviewThreads).where(childWhere(schema.reviewThreads, key)),
+    ...chunk(schema.prLabels, labelRows),
+    ...chunk(schema.reviews, reviewRows),
+    ...chunk(schema.comments, commentRows),
+    ...chunk(schema.checks, checkRows),
+    ...chunk(schema.reviewThreads, threadRows),
+    db
+      .insert(schema.syncState)
+      .values({ userId: key.userId, resource, etag: null, fetchedAt: now })
+      .onConflictDoUpdate({ target: [schema.syncState.userId, schema.syncState.resource], set: { fetchedAt: now } }),
+  ])
+}
+
+type ThreadComment = { id: string; databaseId: number | null; author: string | null; body: string | null; createdAt: number | null }
+const toThread = (row: typeof schema.reviewThreads.$inferSelect) => ({
+  threadId: row.threadId,
+  path: row.path,
+  line: row.line,
+  side: row.side,
+  resolved: row.resolved,
+  comments: [] as ThreadComment[],
+})
+
+const toPublicPull = (p: typeof schema.pullRequests.$inferSelect) => ({
+  number: p.number,
+  title: p.title,
+  body: p.body,
+  state: p.state,
+  draft: p.draft,
+  author: p.author,
+  headSha: p.headSha,
+  headRef: p.headRef,
+  baseRef: p.baseRef,
+  updatedAt: p.updatedAt,
+})
+
+// Read one PR's detail composite back out of the mirror tables.
+export const readComposite = async (db: Db, key: PrKey): Promise<PullDetail> => {
+  const prWhere = and(
+    eq(schema.pullRequests.userId, key.userId),
+    eq(schema.pullRequests.repoId, key.repoId),
+    eq(schema.pullRequests.number, key.number),
+  )
+  const [pull] = await db.select().from(schema.pullRequests).where(prWhere)
+  const [labels, reviews, comments, checks, threadRows] = await Promise.all([
+    db.select().from(schema.prLabels).where(childWhere(schema.prLabels, key)),
+    db.select().from(schema.reviews).where(childWhere(schema.reviews, key)),
+    db.select().from(schema.comments).where(childWhere(schema.comments, key)),
+    db.select().from(schema.checks).where(childWhere(schema.checks, key)),
+    db.select().from(schema.reviewThreads).where(childWhere(schema.reviewThreads, key)),
+  ])
+  const tmap = new Map<string, ReturnType<typeof toThread>>()
+  for (const row of threadRows) {
+    let t = tmap.get(row.threadId)
+    if (!t) tmap.set(row.threadId, (t = toThread(row)))
+    t.comments.push({ id: row.id, databaseId: row.databaseId, author: row.author, body: row.body, createdAt: row.createdAt })
+  }
+  return {
+    pull: pull ? toPublicPull(pull) : null,
+    labels: labels.map((l) => ({ name: l.name, color: l.color })),
+    reviews: reviews.map((r) => ({ id: r.id, author: r.author, state: r.state, body: r.body, submittedAt: r.submittedAt })),
+    comments: comments.map((m) => ({ id: m.id, author: m.author, body: m.body, createdAt: m.createdAt })),
+    checks: checks.map((k) => ({ name: k.name, status: k.status, url: k.url, runId: k.runId })),
+    threads: [...tmap.values()],
+  }
+}
+
+// ─── Files (REST /files → KV/D1) ─────────────────────────────────────────────
+
+type GitHubFile = {
+  filename: string
+  status: string
+  additions: number
+  deletions: number
+  sha: string
+  patch?: string // omitted for binary / too-large / pure-rename files
+}
+
+const blobKey = (sha: string) => `patch:${sha}`
+
+// Fetch one PR's changed files from the REST API. ponytail: first 100 files — Link-header
+// pagination deferred. Returns null on a non-OK response (caller decides how to surface).
+export const fetchFiles = async (token: string, owner: string, repo: string, number: number) => {
+  const res = await gh(token, `/repos/${owner}/${repo}/pulls/${number}/files?per_page=100`)
+  if (!res.ok) return { res, body: null as GitHubFile[] | null }
+  return { res, body: (await res.json()) as GitHubFile[] }
+}
+
+// Re-mirror one PR's files: public patch bodies → shared KV by sha (immutable, deduped); private
+// bodies → user-scoped D1 (never KV — docs/caching.md). One insert per file (patches are large).
+export const mirrorFiles = async (env: Env, db: Db, key: PrKey, isPrivate: boolean, body: GitHubFile[]) => {
+  const now = Date.now()
+  if (!isPrivate) {
+    await Promise.all(body.filter((f) => f.patch != null).map((f) => env.BLOBS.put(blobKey(f.sha), f.patch as string)))
+  }
+  const rows = body.map((f) => ({
+    ...key,
+    path: f.filename,
+    status: f.status,
+    additions: f.additions,
+    deletions: f.deletions,
+    sha: f.sha,
+    patch: isPrivate ? (f.patch ?? null) : null,
+  }))
+  const fileWhere = and(eq(schema.prFiles.userId, key.userId), eq(schema.prFiles.repoId, key.repoId), eq(schema.prFiles.number, key.number))
+  const resource = filesResource(key.repoId, key.number)
+  await db.batch([
+    db.delete(schema.prFiles).where(fileWhere),
+    ...rows.map((r) => db.insert(schema.prFiles).values(r)),
+    db
+      .insert(schema.syncState)
+      .values({ userId: key.userId, resource, etag: null, fetchedAt: now })
+      .onConflictDoUpdate({ target: [schema.syncState.userId, schema.syncState.resource], set: { fetchedAt: now } }),
+  ])
+}
+
+// Read one PR's files back out of the mirror. `viewed` is app-state (viewed_files), merged in
+// fresh on every read so it survives mirror re-syncs; public patch bodies resolve from KV by sha.
+export const readFiles = async (env: Env, db: Db, key: PrKey): Promise<PullFile[]> => {
+  const fileWhere = and(eq(schema.prFiles.userId, key.userId), eq(schema.prFiles.repoId, key.repoId), eq(schema.prFiles.number, key.number))
+  const viewedWhere = and(eq(schema.viewedFiles.userId, key.userId), eq(schema.viewedFiles.repoId, key.repoId), eq(schema.viewedFiles.number, key.number))
+  const [files, viewed] = await Promise.all([
+    db.select().from(schema.prFiles).where(fileWhere),
+    db.select({ path: schema.viewedFiles.path }).from(schema.viewedFiles).where(viewedWhere),
+  ])
+  const seen = new Set(viewed.map((v) => v.path))
+  return Promise.all(
+    files.map(async (f) => ({
+      path: f.path,
+      status: f.status,
+      additions: f.additions,
+      deletions: f.deletions,
+      sha: f.sha,
+      viewed: seen.has(f.path),
+      patch: f.patch ?? (f.sha ? await env.BLOBS.get(blobKey(f.sha)) : null),
+    })),
+  )
+}

@@ -2,25 +2,13 @@ import { and, eq } from 'drizzle-orm'
 import { Hono } from 'hono'
 import { getDb, schema } from '../db'
 import { filesResource } from '../db/resourceKeys'
-import { gh, ghError } from '../github'
+import { ghError } from '../github'
 import type { AppEnv } from '../middleware/auth'
+import { fetchFiles, mirrorFiles, readFiles, STALE_AFTER_MS } from './prMirror'
 
 // PR changed-files + patches. REST /pulls/{n}/files is the single writer of pr_files (it carries
 // path/status/+/−/sha/patch in one call — richer than the GraphQL composite, which dropped files).
-// Patch bodies are immutable by sha (docs/caching.md): public → shared KV by sha; private → D1.
-const STALE_AFTER_MS = 45_000
-
-type GitHubFile = {
-  filename: string
-  status: string
-  additions: number
-  deletions: number
-  sha: string
-  patch?: string // omitted for binary / too-large / pure-rename files
-}
-
-const blobKey = (sha: string) => `patch:${sha}`
-
+// Mirror logic is shared with the batch route — see prMirror.ts.
 export const pullFiles = new Hono<AppEnv>().get('/:owner/:repo/pulls/:number/files', async (c) => {
   const user = c.get('user')
   if (!user) return c.json({ error: 'unauthenticated' }, 401)
@@ -38,74 +26,17 @@ export const pullFiles = new Hono<AppEnv>().get('/:owner/:repo/pulls/:number/fil
     .where(and(eq(schema.repos.userId, userId), eq(schema.repos.owner, owner), eq(schema.repos.name, repo)))
   if (!repoRow) return c.json({ error: 'repo_not_found' }, 404)
   const { id: repoId, private: isPrivate } = repoRow
+  const key = { userId, repoId, number }
 
-  const fileWhere = and(eq(schema.prFiles.userId, userId), eq(schema.prFiles.repoId, repoId), eq(schema.prFiles.number, number))
-  const viewedWhere = and(
-    eq(schema.viewedFiles.userId, userId),
-    eq(schema.viewedFiles.repoId, repoId),
-    eq(schema.viewedFiles.number, number),
-  )
-
-  // Resolve a row's patch: private bodies live in D1, public bodies in shared KV by sha. `viewed`
-  // is app-state (viewed_files), merged in fresh on every read — it survives mirror re-syncs.
-  const withPatch = (viewed: Set<string>) => async (f: typeof schema.prFiles.$inferSelect) => ({
-    path: f.path,
-    status: f.status,
-    additions: f.additions,
-    deletions: f.deletions,
-    sha: f.sha,
-    viewed: viewed.has(f.path),
-    patch: f.patch ?? (f.sha ? await c.env.BLOBS.get(blobKey(f.sha)) : null),
-  })
-  const readFiles = async () => {
-    const [files, viewed] = await Promise.all([
-      db.select().from(schema.prFiles).where(fileWhere),
-      db.select({ path: schema.viewedFiles.path }).from(schema.viewedFiles).where(viewedWhere),
-    ])
-    return Promise.all(files.map(withPatch(new Set(viewed.map((v) => v.path)))))
-  }
-
-  const resource = filesResource(repoId, number)
   const [sync] = await db
     .select()
     .from(schema.syncState)
-    .where(and(eq(schema.syncState.userId, userId), eq(schema.syncState.resource, resource)))
-  if (sync && sync.fetchedAt + STALE_AFTER_MS > Date.now()) return c.json(await readFiles())
+    .where(and(eq(schema.syncState.userId, userId), eq(schema.syncState.resource, filesResource(repoId, number))))
+  if (sync && sync.fetchedAt + STALE_AFTER_MS > Date.now()) return c.json(await readFiles(c.env, db, key))
 
-  const res = await gh(user.token, `/repos/${owner}/${repo}/pulls/${number}/files?per_page=100`)
+  const { res, body } = await fetchFiles(user.token, owner, repo, number)
   const err = ghError(res)
   if (err) return c.json({ error: err.error }, err.status)
-  // ponytail: first 100 files — Link-header pagination deferred.
-  const body = (await res.json()) as GitHubFile[]
-  const now = Date.now()
-
-  // Public patches → KV (shared, immutable by sha); the D1 row keeps patch null for public.
-  if (!isPrivate) {
-    await Promise.all(body.filter((f) => f.patch != null).map((f) => c.env.BLOBS.put(blobKey(f.sha), f.patch as string)))
-  }
-
-  const rows = body.map((f) => ({
-    userId,
-    repoId,
-    number,
-    path: f.filename,
-    status: f.status,
-    additions: f.additions,
-    deletions: f.deletions,
-    sha: f.sha,
-    patch: isPrivate ? (f.patch ?? null) : null,
-  }))
-
-  // Full-list refresh. One insert per file — patches are large; a multi-row statement risks
-  // the D1 statement-size limit. ponytail: per-row insert, revisit only if file counts explode.
-  await db.batch([
-    db.delete(schema.prFiles).where(fileWhere),
-    ...rows.map((r) => db.insert(schema.prFiles).values(r)),
-    db
-      .insert(schema.syncState)
-      .values({ userId, resource, etag: null, fetchedAt: now })
-      .onConflictDoUpdate({ target: [schema.syncState.userId, schema.syncState.resource], set: { fetchedAt: now } }),
-  ])
-
-  return c.json(await readFiles())
+  await mirrorFiles(c.env, db, key, isPrivate, body ?? [])
+  return c.json(await readFiles(c.env, db, key))
 })

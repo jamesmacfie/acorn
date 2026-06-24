@@ -48,6 +48,8 @@ export type PullDetail = {
   checks: Check[]
   threads: Thread[]
 }
+// One PR's full warmed payload, returned by the batch prefetch endpoint.
+export type PullBatchItem = { number: number; detail: PullDetail; files: PullFile[] }
 
 export const repoRoute = (owner: string, repo: string, child = '') => `/api/repos/${owner}/${repo}${child ? `/${child}` : ''}`
 export const pullRoute = (owner: string, repo: string, number: string | number, child = '') =>
@@ -57,6 +59,7 @@ export const meRoute = '/api/me'
 export const reposRoute = '/api/repos'
 export const reposRefreshRoute = '/api/repos/refresh'
 export const pullsRoute = (owner: string, repo: string, state: 'open' | 'closed') => `${repoRoute(owner, repo)}/pulls?state=${state}`
+export const pullsBatchRoute = (owner: string, repo: string) => `${repoRoute(owner, repo)}/pulls/batch`
 export const resolveThreadRoute = (owner: string, repo: string, number: string | number, threadId: string) =>
   pullRoute(owner, repo, number, `threads/${encodeURIComponent(threadId)}/resolve`)
 export const rerunFailedRoute = (owner: string, repo: string, runId: number) => repoRoute(owner, repo, `actions/${runId}/rerun`)
