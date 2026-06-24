@@ -1,10 +1,10 @@
 import { createEffect, createMemo, createSignal, For, on, onCleanup, onMount, Show } from 'solid-js'
-import { createQuery, useQueryClient } from '@tanstack/solid-query'
+import { createInfiniteQuery, createQuery, useQueryClient } from '@tanstack/solid-query'
 import { A, useNavigate, useParams } from '@solidjs/router'
 import { createVirtualizer } from '@tanstack/solid-virtual'
 import { formatRelativeTime } from './displayMeta'
 import { prefetchOpenPulls } from './prefetch'
-import { pullsOptions, reposOptions } from './queries'
+import { closedPullsInfiniteOptions, pullsOptions, reposOptions } from './queries'
 import { filterPulls } from './features/pullList/model'
 
 // Left-pane PR list for the routed repo. Reads the shared repos cache to gate the request
@@ -18,7 +18,13 @@ export default function PullList() {
   const queryClient = useQueryClient()
   const repos = createQuery(() => reposOptions(true))
   const repoKnown = () => !!repos.data?.some((r) => r.owner === params.owner && r.name === params.repo)
-  const pulls = createQuery(() => pullsOptions(params.owner ?? '', params.repo ?? '', tab(), repoKnown()))
+  // Open: full mirror in one shot. Closed: paginated on demand (load-more), so only the active tab fetches.
+  const openPulls = createQuery(() => pullsOptions(params.owner ?? '', params.repo ?? '', 'open', repoKnown() && tab() === 'open'))
+  const closedPulls = createInfiniteQuery(() => closedPullsInfiniteOptions(params.owner ?? '', params.repo ?? '', repoKnown() && tab() === 'closed'))
+  const closedRows = createMemo(() => closedPulls.data?.pages?.flatMap((p) => p.pulls) ?? [])
+  const list = () => (tab() === 'open' ? (openPulls.data ?? []) : closedRows())
+  const ready = () => (tab() === 'open' ? openPulls.data !== undefined : closedPulls.data !== undefined)
+  const isError = () => (tab() === 'open' ? openPulls.isError : closedPulls.isError)
 
   // Once the repo is known, warm the per-PR caches in the background so navigating is instant.
   // Re-runs per repo; the cleanup aborts an in-flight warm-up when the repo changes (or unmounts).
@@ -42,7 +48,7 @@ export default function PullList() {
   ))
 
   // Client-side text filter over the loaded tab (title / author / #number).
-  const shown = createMemo(() => filterPulls(pulls.data ?? [], filter()))
+  const shown = createMemo(() => filterPulls(list(), filter()))
 
   // j/k move to the next/prev PR in the list (docs/ui-style.md keyboard nav). Ignore while typing.
   const onKey = (e: KeyboardEvent) => {
@@ -68,8 +74,19 @@ export default function PullList() {
     estimateSize: () => 36, // --row-h
     overscan: 12,
   })
+  let publishFrame = 0
   let measureFrame = 0
-  onCleanup(() => cancelAnimationFrame(measureFrame))
+  onCleanup(() => {
+    cancelAnimationFrame(publishFrame)
+    cancelAnimationFrame(measureFrame)
+  })
+  const publishScrollEl = (el: HTMLDivElement) => {
+    cancelAnimationFrame(publishFrame)
+    publishFrame = requestAnimationFrame(() => {
+      setScrollEl(el)
+      virt.measure()
+    })
+  }
   const measureSoon = () => {
     cancelAnimationFrame(measureFrame)
     measureFrame = requestAnimationFrame(() => virt.measure())
@@ -106,8 +123,10 @@ export default function PullList() {
         </button>
         <input class="pr-filter" placeholder="Filter…" value={filter()} onInput={(e) => setFilter(e.currentTarget.value)} />
       </div>
-      <Show when={pulls.data} fallback={<p class="placeholder">{pulls.isError ? 'Failed to load PRs.' : 'Loading…'}</p>}>
-        <div class="pr-list-scroll" ref={setScrollEl}>
+      {/* Scroll element stays mounted from first render so the virtualizer always observes it —
+          publish the ref after layout so the first observed rect has the flexed pane height. */}
+      <div class="pr-list-scroll" ref={publishScrollEl}>
+        <Show when={ready()} fallback={<p class="placeholder">{isError() ? 'Failed to load PRs.' : 'Loading…'}</p>}>
           <Show when={shown().length} fallback={<p class="placeholder">No matching PRs.</p>}>
             <div class="pr-list" style={{ height: `${virt.getTotalSize()}px`, position: 'relative' }}>
               <For each={virtualRows()}>
@@ -134,8 +153,19 @@ export default function PullList() {
               </For>
             </div>
           </Show>
-        </div>
-      </Show>
+          {/* Load-more only on closed; hidden while filtering since the filter only sees loaded pages. */}
+          <Show when={tab() === 'closed' && closedPulls.hasNextPage && !filter().trim()}>
+            <button
+              type="button"
+              class="pr-load-more"
+              disabled={closedPulls.isFetchingNextPage}
+              onClick={() => void closedPulls.fetchNextPage()}
+            >
+              {closedPulls.isFetchingNextPage ? 'Loading…' : 'Load more'}
+            </button>
+          </Show>
+        </Show>
+      </div>
     </>
   )
 }

@@ -10,6 +10,7 @@ import type { AppEnv } from '../middleware/auth'
 // short TTL + conditional If-None-Match. The list ETag lives in sync_state (no per-row home);
 // 304s are free against the rate limit. Rows are user-scoped (private PRs never cross users).
 const STALE_AFTER_MS = 45_000 // ~45s — "fast-changing" list data (docs/caching.md)
+const CLOSED_PAGE_SIZE = 50 // closed PRs load on demand, one page at a time (load-more)
 
 type GitHubPull = {
   number: number
@@ -33,6 +34,22 @@ export const pulls = new Hono<AppEnv>().get('/:owner/:repo/pulls', async (c) => 
   const repo = c.req.param('repo')
   // open | closed (closed covers merged — GitHub's list reports merged PRs as "closed").
   const state = c.req.query('state') === 'closed' ? 'closed' : 'open'
+
+  // Closed PRs are historical/effectively-immutable and unbounded — no point mirroring them in D1
+  // with a short TTL. Proxy GitHub one page at a time; the client load-mores via createInfiniteQuery.
+  if (state === 'closed') {
+    const page = Math.max(1, Math.trunc(Number(c.req.query('page'))) || 1)
+    const res = await gh(
+      user.token,
+      `/repos/${owner}/${repo}/pulls?state=closed&sort=updated&direction=desc&per_page=${CLOSED_PAGE_SIZE}&page=${page}`,
+    )
+    if (res.status === 401) return c.json({ error: 'reauth' }, 401)
+    const err = ghError(res)
+    if (err) return c.json({ error: err.error }, err.status)
+    const body = (await res.json()) as GitHubPull[]
+    const hasNext = /\brel="next"/.test(res.headers.get('link') ?? '')
+    return c.json({ pulls: body.map(ghToPublic), nextPage: hasNext ? page + 1 : null })
+  }
 
   // Resolve the GitHub repo id from this user's repos mirror. The client only requests repos
   // already in its loaded list, so a miss means a cold/invalid URL.
@@ -120,6 +137,18 @@ export const pulls = new Hono<AppEnv>().get('/:owner/:repo/pulls', async (c) => 
   ])
 
   return c.json(rows.map(toPublic))
+})
+
+// Same public shape as toPublic, but mapped straight from a GitHub payload (closed path, no mirror row).
+const ghToPublic = (p: GitHubPull) => ({
+  number: p.number,
+  title: p.title,
+  state: p.state,
+  draft: p.draft,
+  author: p.user?.login ?? null,
+  headRef: p.head?.ref ?? null,
+  baseRef: p.base?.ref ?? null,
+  updatedAt: p.updated_at ? Date.parse(p.updated_at) : null,
 })
 
 // Public projection — the fields the SPA PR list needs; no staleness bookkeeping.

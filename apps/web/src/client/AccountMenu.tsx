@@ -4,6 +4,7 @@ import type { Me } from './queries'
 type AccountMenuProps = {
   user: Me
   onPermissions: () => void | Promise<void>
+  onClearCache: () => void | Promise<void>
   onLogout: () => void | Promise<void>
 }
 
@@ -41,6 +42,10 @@ export default function AccountMenu(props: AccountMenuProps) {
     close()
     await props.onPermissions()
   }
+  const clearCache = async () => {
+    close()
+    await props.onClearCache()
+  }
 
   return (
     <div class="account-menu" ref={rootRef}>
@@ -64,6 +69,9 @@ export default function AccountMenu(props: AccountMenuProps) {
           </div>
           <button class="account-menu-item" role="menuitem" type="button" onClick={permissions}>
             Permissions
+          </button>
+          <button class="account-menu-item" role="menuitem" type="button" onClick={clearCache}>
+            Clear cache
           </button>
           <button class="account-menu-item" role="menuitem" type="button" onClick={logout}>
             Logout

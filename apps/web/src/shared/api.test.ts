@@ -6,6 +6,7 @@ import {
   pullKey,
   pullPrefixKey,
   pullRoute,
+  closedPullsRoute,
   pullsKey,
   pullsPrefixKey,
   pullsRoute,
@@ -26,6 +27,7 @@ describe('shared API contract helpers', () => {
     expect(reposRefreshRoute).toBe('/api/repos/refresh')
     expect(repoRoute('octo', 'repo', 'actions/123/rerun')).toBe('/api/repos/octo/repo/actions/123/rerun')
     expect(pullsRoute('octo', 'repo', 'open')).toBe('/api/repos/octo/repo/pulls?state=open')
+    expect(closedPullsRoute('octo', 'repo', 2)).toBe('/api/repos/octo/repo/pulls?state=closed&page=2')
     expect(pullRoute('octo', 'repo', '12')).toBe('/api/repos/octo/repo/pulls/12')
     expect(pullRoute('octo', 'repo', '12', 'files')).toBe('/api/repos/octo/repo/pulls/12/files')
     expect(pullRoute('octo', 'repo', '12', 'review-comments/99/replies')).toBe('/api/repos/octo/repo/pulls/12/review-comments/99/replies')

@@ -40,8 +40,11 @@ When stale, endpoints that have an ETag revalidate conditionally rather than
 blindly refetching:
 
 - **Repos** capture the response `etag` (per-row column).
-- **PR lists** store the collection ETag in `sync_state` and send
-  `If-None-Match` on the next fetch. A **`304 Not Modified` is free** against
+- **Open PR list** stores the collection ETag in `sync_state` and sends
+  `If-None-Match` on the next fetch. (The **closed** PR list does *not* go
+  through the mirror at all — it is proxied straight from GitHub one 50-item
+  page per request and load-mored client-side; closed PRs are historical, so
+  there is nothing worth caching in D1 with a 45 s TTL.) A **`304 Not Modified` is free** against
   the GitHub rate limit — the route just bumps `sync_state.fetchedAt` and
   re-serves the existing mirror rows:
 

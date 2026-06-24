@@ -64,6 +64,21 @@
   text-align: right;
   font-variant-numeric: tabular-nums;
 }
+.pr-load-more {
+  display: block;
+  width: 100%;
+  font: inherit;
+  font-size: var(--fs-sm);
+  color: var(--text-muted);
+  background: var(--bg);
+  border: none;
+  border-top: 1px solid var(--border);
+  padding: 10px var(--pane-pad);
+  text-align: center;
+  cursor: pointer;
+}
+.pr-load-more:hover:not(:disabled) { color: var(--text); background: var(--bg-hover); }
+.pr-load-more:disabled { cursor: default; }
 .pr-badge {
   flex-shrink: 0;
   font-size: 11px;

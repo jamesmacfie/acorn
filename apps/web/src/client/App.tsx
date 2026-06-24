@@ -1,6 +1,7 @@
 import { createEffect, createSignal, Show } from 'solid-js'
 import { createQuery, useIsRestoring, useQueryClient } from '@tanstack/solid-query'
 import { useNavigate, useParams } from '@solidjs/router'
+import { clear } from 'idb-keyval'
 import { meKey, meOptions, pinsOptions, prefsKey, prefsOptions, reposKey, reposOptions, reposRefreshRoute } from './queries'
 import { setPref } from './mutations'
 import RepoPicker from './RepoPicker'
@@ -70,6 +71,11 @@ export default function App() {
     queryClient.clear()
     await queryClient.invalidateQueries({ queryKey: meKey })
   }
+  async function clearCache() {
+    queryClient.clear()
+    await clear() // wipe the persisted IndexedDB cache before reload so it can't rehydrate
+    window.location.reload()
+  }
   async function permissions() {
     await fetch(reposRefreshRoute, { method: 'POST' }).catch(() => {})
     queryClient.invalidateQueries({ queryKey: reposKey })
@@ -130,7 +136,7 @@ export default function App() {
             }
           >
             {(user) => (
-              <AccountMenu user={user()} onPermissions={permissions} onLogout={logout} />
+              <AccountMenu user={user()} onPermissions={permissions} onClearCache={clearCache} onLogout={logout} />
             )}
           </Show>
         </div>
