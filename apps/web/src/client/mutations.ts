@@ -2,6 +2,7 @@
 // structured error code on failure so callers can branch (e.g. merge_failed, reauth).
 import { apiError, writeJson } from './apiClient'
 import {
+  createPullRoute,
   pinsRoute,
   prefsRoute,
   pullRoute,
@@ -16,6 +17,9 @@ const post = async <T>(url: string, body?: unknown): Promise<T> => {
     body: body === undefined ? undefined : JSON.stringify(body),
   })
 }
+
+export const createPr = (o: string, r: string, input: { title: string; body: string; base: string; head: string; draft: boolean }) =>
+  post<{ number: number }>(createPullRoute(o, r), input)
 
 export const mergePr = (o: string, r: string, n: string, method: string) => post(pullRoute(o, r, n, 'merge'), { method })
 export const closePr = (o: string, r: string, n: string) => post(pullRoute(o, r, n, 'close'))

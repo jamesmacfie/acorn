@@ -54,6 +54,11 @@ export type PullDetail = {
 // One PR's full warmed payload, returned by the batch prefetch endpoint.
 export type PullBatchItem = { number: number; detail: PullDetail; files: PullFile[] }
 
+// Create-PR support: branch picker list + base..head compare (diff preview + commits for prefill).
+export type Branch = { name: string }
+export type CompareCommit = { sha: string; message: string }
+export type Compare = { aheadBy: number; files: PullFile[]; commits: CompareCommit[] }
+
 // Full head-blob body, fetched on demand to expand unchanged context around diff hunks.
 export type FileBlob = { text: string }
 
@@ -67,6 +72,10 @@ export const reposRefreshRoute = '/api/repos/refresh'
 export const pullsRoute = (owner: string, repo: string, state: 'open' | 'closed') => `${repoRoute(owner, repo)}/pulls?state=${state}`
 export const closedPullsRoute = (owner: string, repo: string, page: number) => `${pullsRoute(owner, repo, 'closed')}&page=${page}`
 export const pullsBatchRoute = (owner: string, repo: string) => `${repoRoute(owner, repo)}/pulls/batch`
+export const createPullRoute = (owner: string, repo: string) => `${repoRoute(owner, repo)}/pulls`
+export const branchesRoute = (owner: string, repo: string) => repoRoute(owner, repo, 'branches')
+export const compareRoute = (owner: string, repo: string, base: string, head: string) =>
+  `${repoRoute(owner, repo, 'compare')}?base=${encodeURIComponent(base)}&head=${encodeURIComponent(head)}`
 export const fileBlobRoute = (owner: string, repo: string, sha: string) => repoRoute(owner, repo, `blobs/${sha}`)
 export const resolveThreadRoute = (owner: string, repo: string, number: string | number, threadId: string) =>
   pullRoute(owner, repo, number, `threads/${encodeURIComponent(threadId)}/resolve`)
@@ -85,5 +94,7 @@ export const pullKey = (owner: string, repo: string, number: string) => ['pull',
 export const pullPrefixKey = (owner: string, repo: string) => ['pull', owner, repo] as const
 export const filesKey = (owner: string, repo: string, number: string) => ['files', owner, repo, number] as const
 export const fileBlobKey = (owner: string, repo: string, sha: string) => ['blob', owner, repo, sha] as const
+export const branchesKey = (owner: string, repo: string) => ['branches', owner, repo] as const
+export const compareKey = (owner: string, repo: string, base: string, head: string) => ['compare', owner, repo, base, head] as const
 export const pinsKey = ['pins'] as const
 export const prefsKey = ['prefs'] as const

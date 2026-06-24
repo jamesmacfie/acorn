@@ -11,6 +11,10 @@
   line-height: 20px;
 }
 .diff-rows { position: relative; width: 100%; }
+/* Read-only compare preview (create mode): same rows rendered in normal document flow instead of
+   the virtualizer's absolute positioning. */
+.compare-diff .diff-rows { position: static; }
+.compare-diff .diff-row { position: static; transform: none; }
 .diff-row {
   position: absolute;
   top: 0;

@@ -39,6 +39,7 @@ render(
       <Router root={App}>
         <Route path="/" component={noop} />
         <Route path="/:owner/:repo" component={noop} />
+        <Route path="/:owner/:repo/new" component={noop} />
         <Route path="/:owner/:repo/:number" component={noop} />
       </Router>
     </PersistQueryClientProvider>

@@ -88,6 +88,9 @@
   box-shadow: 0 12px 28px var(--shadow-popover);
   overflow: hidden;
 }
+/* Portalled to body and pinned to the button's rect (inline top/left/width) so it overlays
+   adjacent panes instead of being clipped by their overflow. */
+.repo-picker-popover-fixed { position: fixed; top: auto; left: auto; z-index: 60; }
 .repo-picker-tools {
   display: flex;
   align-items: stretch;
@@ -126,7 +129,10 @@
   font-size: var(--fs-sm);
 }
 .repo-picker-empty { color: var(--text-muted); font-size: var(--fs-sm); padding: 10px; margin: 0; }
-.repo-picker-list { list-style: none; margin: 0; padding: 4px 0; max-height: 320px; overflow-y: auto; }
+/* overflow-x: hidden is load-bearing: without it `overflow-y: auto` computes overflow-x to `auto`
+   too, so long branch names get a horizontal scrollbar instead of ellipsizing (.repo-picker-name
+   already clips). max-height tracks the viewport so the list runs near-full-height before scrolling. */
+.repo-picker-list { list-style: none; margin: 0; padding: 4px 0; max-height: min(70vh, 560px); overflow-y: auto; overflow-x: hidden; }
 .repo-picker-row {
   display: flex;
   align-items: center;

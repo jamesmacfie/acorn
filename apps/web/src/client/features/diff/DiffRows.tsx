@@ -64,7 +64,7 @@ function GapRowView(props: { gap: GapRow; expandGap?: (gap: GapRow) => Promise<u
     }
   }
   return (
-    <button class="diff-gap" disabled={busy() || props.gap.sha == null} onClick={run}>
+    <button class="diff-gap" disabled={busy() || props.gap.sha == null || !props.expandGap} onClick={run}>
       {busy() ? 'Expanding…' : `⋯ ${label()} ⋯`}
     </button>
   )
