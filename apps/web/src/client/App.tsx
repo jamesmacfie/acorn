@@ -172,5 +172,5 @@ function LoginGate(props: { redirecting: boolean }) {
   createEffect(() => {
     if (props.redirecting) window.location.href = '/auth/login'
   })
-  return <main class="panes panes-empty"><Acorn label={props.redirecting ? 'redirecting to github…' : 'acorn'} /></main>
+  return <main class="login-gate"><Acorn label={props.redirecting ? 'redirecting to github…' : 'acorn'} /></main>
 }

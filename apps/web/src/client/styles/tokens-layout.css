@@ -99,6 +99,9 @@ body {
 .panes-empty { grid-template-columns: 1fr; }
 .pane-empty { display: flex; }
 
+/* Logged-out gate: no app chrome, so center the mark in the full viewport. */
+.login-gate { min-height: 100vh; display: grid; place-items: center; }
+
 .acorn-empty {
   flex: 1;
   display: flex;
