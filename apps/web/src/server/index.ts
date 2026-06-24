@@ -6,6 +6,7 @@ import { me } from './routes/me'
 import { pins } from './routes/pins'
 import { prActions } from './routes/prActions'
 import { prefs } from './routes/prefs'
+import { pullBlob } from './routes/pullBlob'
 import { pullDetail } from './routes/pullDetail'
 import { pullFiles } from './routes/pullFiles'
 import { pulls } from './routes/pulls'
@@ -25,6 +26,7 @@ const app = new Hono<AppEnv>()
   .route('/api/repos', pulls) // repo-scoped sub-resources, e.g. /:owner/:repo/pulls
   .route('/api/repos', pullDetail) // /:owner/:repo/pulls/:number
   .route('/api/repos', pullFiles) // /:owner/:repo/pulls/:number/files
+  .route('/api/repos', pullBlob) // /:owner/:repo/blobs/:sha — full body for context expansion
   .route('/api/repos', pullsBatch) // POST /:owner/:repo/pulls/batch — prefetch warm-up
   .route('/api/repos', prActions) // PR write actions: merge / close / reopen / draft / comments
 

@@ -32,6 +32,24 @@
 .diff-del .diff-marker { color: var(--del-marker); }
 .diff-hunk { background: var(--hunk-bg); color: var(--hunk-text); padding-left: var(--pane-pad); font-weight: 500; }
 
+/* Clickable band that reveals hidden unchanged context (GitHub-style expand). Full-width in both
+   the flex unified row and the .diff-split-full wrapper. */
+.diff-gap {
+  flex: 1 0 100%;
+  display: block;
+  width: 100%;
+  padding: 3px var(--pane-pad);
+  border: none;
+  background: var(--hunk-bg);
+  color: var(--hunk-text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  user-select: none;
+}
+.diff-gap:hover:not(:disabled) { background: var(--bg-hover); color: var(--text); }
+.diff-gap:disabled { cursor: default; opacity: 0.6; }
+
 /* Per-file header that opens each file's section in the stacked all-files diff. Kept in-flow so
    virtual row measurement cannot overlap it with the following hunk. */
 .diff-file-row {
