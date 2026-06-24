@@ -1,7 +1,7 @@
 import { defineConfig } from 'drizzle-kit'
 
 // generate-only: emits SQL migrations from the schema. Applied to local D1 via
-// `wrangler d1 migrations apply aacorn --local` (no DB connection needed here).
+// `wrangler d1 migrations apply acorn --local` (no DB connection needed here).
 export default defineConfig({
   dialect: 'sqlite',
   schema: './src/server/db/schema.ts',

@@ -1,6 +1,6 @@
 {
   "$schema": "./node_modules/wrangler/config-schema.json",
-  "name": "aacorn",
+  "name": "acorn",
   "main": "src/server/index.ts",
   "compatibility_date": "2026-06-17",
   "compatibility_flags": ["nodejs_compat"],
@@ -16,14 +16,14 @@
   "d1_databases": [
     {
       "binding": "DB",
-      "database_name": "aacorn",
-      "database_id": "00000000-0000-0000-0000-000000000000",
+      "database_name": "acorn",
+      "database_id": "baf0810e-4d6c-42fc-98e7-6b35636037f9",
       "migrations_dir": "migrations"
     }
   ],
   "kv_namespaces": [
-    { "binding": "OAUTH_STATE", "id": "00000000000000000000000000000000" },
+    { "binding": "OAUTH_STATE", "id": "179b4deef08e45aeb081d1e910ba4d40" },
     // BLOBS: shared, immutable public blob/patch bodies keyed by sha (docs/caching.md).
-    { "binding": "BLOBS", "id": "00000000000000000000000000000001" }
+    { "binding": "BLOBS", "id": "57246d2f0a66454cbf6631a829ebc3e6" }
   ]
 }

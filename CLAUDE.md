@@ -1,4 +1,4 @@
-# CLAUDE.md — aacorn
+# CLAUDE.md — acorn
 
 A GitHub pull-request review tool: a SolidJS SPA served by a single Hono Worker on Cloudflare,
 backed by a D1 read-model mirror of GitHub data, a KV blob cache, and IndexedDB client
@@ -41,9 +41,9 @@ pnpm workspace + Turborepo; all app code is in `apps/web`.
 | `pnpm build` | `vite build` (client + Worker bundle) |
 | `pnpm lint` | `tsc --noEmit` typecheck |
 | `pnpm test` | `vitest run` |
-| `pnpm --filter @aacorn/web db:generate` | `drizzle-kit generate` — emit a migration from the schema |
-| `pnpm --filter @aacorn/web db:migrate` | apply migrations to local D1 (`--local`) |
-| `pnpm --filter @aacorn/web typegen` | `wrangler types` → regenerate `worker-configuration.d.ts` (`Env`) |
+| `pnpm --filter @acorn/web db:generate` | `drizzle-kit generate` — emit a migration from the schema |
+| `pnpm --filter @acorn/web db:migrate` | apply migrations to local D1 (`--local`) |
+| `pnpm --filter @acorn/web typegen` | `wrangler types` → regenerate `worker-configuration.d.ts` (`Env`) |
 
 ## Conventions & gotchas
 

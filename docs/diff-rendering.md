@@ -89,6 +89,6 @@ Threads render as full-width `ThreadRow`s from `features/diff/DiffRows.tsx` (sha
 `?file=` is **not** which file is shown (all files are always rendered) — it is the **scroll target**. It is set by the file list, the fuzzy finder, and the `[` / `]` shortcuts. Two mechanisms move the diff to it:
 
 - **Search param effect** — a `createEffect` on `searchParams.file` calls `scrollToFile(path)`. Tracking `rows()` means a file still in a not-yet-parsed chunk scrolls as soon as its chunk lands; `lastTarget` stops later chunk appends or thread edits from yanking the scroll back after the initial jump.
-- **Custom event** — `fileNavigation.ts` defines the `aacorn:file-scroll` event and `routeKey(owner, repo, number)`. `PullDetail.selectFile` both sets `?file=` and dispatches the event (`requestFileScroll`); `DiffView` listens and force-scrolls when the `routeKey` matches the current PR, so re-selecting the already-active file still scrolls.
+- **Custom event** — `fileNavigation.ts` defines the `acorn:file-scroll` event and `routeKey(owner, repo, number)`. `PullDetail.selectFile` both sets `?file=` and dispatches the event (`requestFileScroll`); `DiffView` listens and force-scrolls when the `routeKey` matches the current PR, so re-selecting the already-active file still scrolls.
 
 `scrollToFile` finds the file header's row index. In unified mode it calls `virt.scrollToIndex(idx, { align: 'start' })`; in split mode (non-virtualized) it `scrollIntoView`s the element whose id is `diff-file:<path>`.

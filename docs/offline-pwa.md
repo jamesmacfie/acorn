@@ -1,6 +1,6 @@
 # Offline & PWA
 
-aacorn is an installable PWA that can browse recently-seen PRs while offline. Offline support is a read-only view of already-cached data — there is **no** real-time sync or offline mutation queue. It rests on three pieces: a service worker (`apps/web/public/sw.js`), a web manifest (`apps/web/public/manifest.webmanifest`), and the IndexedDB-persisted TanStack Query cache wired up in `apps/web/src/client/index.tsx`.
+acorn is an installable PWA that can browse recently-seen PRs while offline. Offline support is a read-only view of already-cached data — there is **no** real-time sync or offline mutation queue. It rests on three pieces: a service worker (`apps/web/public/sw.js`), a web manifest (`apps/web/public/manifest.webmanifest`), and the IndexedDB-persisted TanStack Query cache wired up in `apps/web/src/client/index.tsx`.
 
 ## Service worker
 
@@ -15,7 +15,7 @@ if ('serviceWorker' in navigator) {
 ### Lifecycle
 
 - `install` → `skipWaiting()` so a new worker activates immediately.
-- `activate` → deletes every cache except the current `aacorn-shell-v1`, then `clients.claim()`. Bumping the cache name is how a shell version is rotated.
+- `activate` → deletes every cache except the current `acorn-shell-v1`, then `clients.claim()`. Bumping the cache name is how a shell version is rotated.
 
 ### Fetch strategy
 
@@ -39,8 +39,8 @@ This means the app **shell** (HTML, JS, CSS, fonts) comes back offline, but a na
 
 ```json
 {
-  "name": "aacorn",
-  "short_name": "aacorn",
+  "name": "acorn",
+  "short_name": "acorn",
   "description": "GitHub PR review tool",
   "start_url": "/",
   "display": "standalone",
@@ -56,13 +56,13 @@ This means the app **shell** (HTML, JS, CSS, fonts) comes back offline, but a na
 The service worker deliberately does **not** cache API responses. Offline *data* is owned entirely by the TanStack Query cache, persisted to IndexedDB. In `index.tsx`:
 
 - The `QueryClient` sets `gcTime: 24h` so entries outlive a session and survive reload.
-- `PersistQueryClientProvider` persists the cache with `createAsyncStoragePersister` backed by `idb-keyval` (`get`/`set`/`del`), under key `aacorn-cache`, with `maxAge: 24h`.
+- `PersistQueryClientProvider` persists the cache with `createAsyncStoragePersister` backed by `idb-keyval` (`get`/`set`/`del`), under key `acorn-cache`, with `maxAge: 24h`.
 
 On load the persisted cache rehydrates, so the app renders last-known data instantly and, offline, can show any PR list / PR detail / file diff that was fetched while online. New `/api/*` requests simply fail offline; the cached query data is what's displayed. See [caching](./caching.md) for how this layers with the server-side D1/KV mirror.
 
 ### Privacy
 
-The persisted cache holds private repo data, so it is treated as user-scoped and wiped on logout: `logout()` in `App.tsx` dispatches the `aacorn:logout` window event, and `index.tsx` listens for it to call `clear()` on the IndexedDB store. This prevents the next user on a shared device from reading the previous user's cached PRs.
+The persisted cache holds private repo data, so it is treated as user-scoped and wiped on logout: `logout()` in `App.tsx` dispatches the `acorn:logout` window event, and `index.tsx` listens for it to call `clear()` on the IndexedDB store. This prevents the next user on a shared device from reading the previous user's cached PRs.
 
 ## Limits
 

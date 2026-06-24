@@ -1,6 +1,6 @@
 # Architecture Overview
 
-aacorn is a GitHub pull-request review tool. It is a SolidJS single-page app
+acorn is a GitHub pull-request review tool. It is a SolidJS single-page app
 served by one Hono Worker on Cloudflare Workers, backed by a D1 SQLite
 read-model mirror, a KV blob cache, and IndexedDB client persistence.
 
@@ -43,7 +43,7 @@ for the full route map.
 
 ## Lazy read-model mirror
 
-The defining idea: **D1 is a cache of GitHub, not a source of truth.** aacorn
+The defining idea: **D1 is a cache of GitHub, not a source of truth.** acorn
 never owns PR/repo data — GitHub does. The mirror exists only to make reads
 fast and to support offline browsing.
 
@@ -60,7 +60,7 @@ Consequences of treating the mirror as a cache:
   list endpoints delete-then-insert on every refresh so resources the user lost
   access to drop out.
 
-A small set of tables are *not* mirror data — they are app-state aacorn owns
+A small set of tables are *not* mirror data — they are app-state acorn owns
 (per-user prefs, pinned repos, "viewed file" checkboxes). Those are the source
 of truth and survive mirror re-syncs. See [data-layer](./data-layer.md) for the
 table-by-table split.
@@ -123,7 +123,7 @@ mirror so a read inside the TTL window reflects the change. See
 [github-integration](./github-integration.md) and
 [api-reference](./api-reference.md).
 
-## What aacorn deliberately does not have
+## What acorn deliberately does not have
 
 - No webhooks or background jobs — everything is read-driven.
 - No server-side session store — the session lives entirely in an encrypted
