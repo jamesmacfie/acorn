@@ -1,6 +1,6 @@
 import { createEffect, createMemo, createSignal, For, onCleanup, onMount, Show } from 'solid-js'
 import { createQuery } from '@tanstack/solid-query'
-import { useParams, useSearchParams } from '@solidjs/router'
+import { useNavigate, useParams, useSearchParams } from '@solidjs/router'
 import { filesOptions, type PullFile } from './queries'
 
 // Global keyboard shortcuts + their overlays. Mounted once in App. Owns a single window
@@ -23,6 +23,7 @@ function isTypingTarget(t: EventTarget | null): boolean {
 
 export default function Shortcuts() {
   const params = useParams()
+  const navigate = useNavigate()
   const [searchParams, setSearchParams] = useSearchParams()
   const [overlay, setOverlay] = createSignal<Overlay>(null)
   const [filter, setFilter] = createSignal('')
@@ -117,6 +118,9 @@ export default function Shortcuts() {
     } else if (e.key === '[') {
       e.preventDefault()
       cycleFile(-1)
+    } else if (e.key === 'c' && params.owner && params.repo) {
+      e.preventDefault()
+      navigate(`/${params.owner}/${params.repo}/new`)
     }
   }
 
@@ -147,6 +151,7 @@ export default function Shortcuts() {
     ['j / k', 'Next / previous PR'],
     ['[ / ]', 'Previous / next file'],
     ['/', 'Find file in this PR'],
+    ['c', 'Create pull request'],
     ['?', 'Toggle this help'],
     ['Esc', 'Close overlay'],
   ]

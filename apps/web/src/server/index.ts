@@ -5,6 +5,7 @@ import { auth } from './routes/auth'
 import { me } from './routes/me'
 import { pins } from './routes/pins'
 import { prActions } from './routes/prActions'
+import { prCreate } from './routes/prCreate'
 import { prefs } from './routes/prefs'
 import { pullBlob } from './routes/pullBlob'
 import { pullDetail } from './routes/pullDetail'
@@ -29,5 +30,6 @@ const app = new Hono<AppEnv>()
   .route('/api/repos', pullBlob) // /:owner/:repo/blobs/:sha — full body for context expansion
   .route('/api/repos', pullsBatch) // POST /:owner/:repo/pulls/batch — prefetch warm-up
   .route('/api/repos', prActions) // PR write actions: merge / close / reopen / draft / comments
+  .route('/api/repos', prCreate) // create PR + branches/compare reads for the create view
 
 export default app

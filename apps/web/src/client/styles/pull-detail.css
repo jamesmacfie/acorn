@@ -105,6 +105,43 @@
 .diff-composer-actions button:disabled { opacity: 0.5; cursor: default; }
 .action-error { margin-top: 6px; font-size: var(--fs-sm); color: var(--del-marker); }
 
+/* Create-PR form (mid pane in create mode). Reuses .repo-select / .pr-filter / .composer-input /
+   .pr-actions; this just lays them out and stretches the title + body full width. */
+/* Fill the pane below its sticky header (the pane is the scroll container; this is the rest of the
+   row height). overflow: hidden auto — never a horizontal scrollbar (the absolute branch popover can
+   sit wider than the column); vertical scroll only when the form itself overflows. */
+.create-pr {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  height: calc(100% - var(--pane-head-h));
+  box-sizing: border-box;
+  padding: 14px var(--pane-pad);
+  overflow: hidden auto;
+}
+.create-pr-branches { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.create-pr-title { width: 100%; font-size: var(--fs); }
+.create-pr-body { min-height: 160px; }
+.create-pr-draft { display: inline-flex; align-items: center; gap: 6px; font-size: var(--fs-sm); color: var(--text-muted); cursor: pointer; }
+.create-pr-draft input { accent-color: var(--accent); cursor: pointer; }
+.create-pr-status { font-size: var(--fs-sm); color: var(--text-muted); }
+
+/* "+ New PR" entry button in the left-pane Reviews header. */
+.new-pr-btn {
+  margin-left: auto;
+  font: inherit;
+  font-size: var(--fs-sm);
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--text);
+  background: var(--bg);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+  padding: 2px 8px;
+  cursor: pointer;
+}
+.new-pr-btn:hover { background: var(--bg-hover); border-color: var(--accent); }
+
 .composer { display: flex; flex-direction: column; gap: 6px; align-items: flex-start; }
 .composer-input {
   width: 100%;

@@ -1,12 +1,14 @@
 import { createEffect, createSignal, Show } from 'solid-js'
 import { createQuery, useIsRestoring, useQueryClient } from '@tanstack/solid-query'
-import { useNavigate, useParams } from '@solidjs/router'
+import { useMatch, useNavigate, useParams } from '@solidjs/router'
 import { clear } from 'idb-keyval'
 import { meKey, meOptions, pinsOptions, prefsKey, prefsOptions, reposKey, reposOptions, reposRefreshRoute } from './queries'
 import { setPref } from './mutations'
 import RepoPicker from './RepoPicker'
 import PullList from './PullList'
 import PullDetail from './PullDetail'
+import CreatePullForm from './CreatePullForm'
+import ComparePreview from './ComparePreview'
 import DiffView from './DiffView'
 import Shortcuts from './Shortcuts'
 import AccountMenu from './AccountMenu'
@@ -64,6 +66,9 @@ export default function App() {
   }
 
   const selected = () => (params.owner && params.repo ? `${params.owner}/${params.repo}` : '')
+  // Create-PR mode: the static /:owner/:repo/new route (outranks the :number param route).
+  const newMatch = useMatch(() => '/:owner/:repo/new')
+  const isNew = () => !!newMatch()
 
   async function logout() {
     await fetch('/auth/logout', { method: 'POST' })
@@ -121,6 +126,10 @@ export default function App() {
               <span class="crumb-sep">/</span>
               <span class="crumb crumb-num">#{params.number}</span>
             </Show>
+            <Show when={isNew()}>
+              <span class="crumb-sep">/</span>
+              <span class="crumb crumb-num">new</span>
+            </Show>
           </Show>
         </div>
         <div class="topbar-side topbar-end">
@@ -144,24 +153,43 @@ export default function App() {
       <Show when={params.owner} fallback={<main class="panes panes-empty"><Acorn /></main>}>
         <main class="panes">
           <section class="pane pane-left">
-            <div class="section-header">Reviews</div>
+            <div class="section-header">
+              Reviews
+              <button type="button" class="new-pr-btn" title="New pull request" onClick={() => navigate(`/${params.owner}/${params.repo}/new`)}>
+                + New PR
+              </button>
+            </div>
             <PullList />
           </section>
           <Show
-            when={params.number}
+            when={isNew()}
             fallback={
-              <section class="pane pane-mid pane-empty" style={{ 'grid-column': '2 / -1' }}>
-                <Acorn />
-              </section>
+              <Show
+                when={params.number}
+                fallback={
+                  <section class="pane pane-mid pane-empty" style={{ 'grid-column': '2 / -1' }}>
+                    <Acorn />
+                  </section>
+                }
+              >
+                <section class="pane pane-mid">
+                  <div class="section-header">Navigator</div>
+                  <PullDetail />
+                </section>
+                <section class="pane pane-right">
+                  <div class="section-header">Diff</div>
+                  <DiffView />
+                </section>
+              </Show>
             }
           >
             <section class="pane pane-mid">
-              <div class="section-header">Navigator</div>
-              <PullDetail />
+              <div class="section-header">New pull request</div>
+              <CreatePullForm />
             </section>
             <section class="pane pane-right">
-              <div class="section-header">Diff</div>
-              <DiffView />
+              <div class="section-header">Compare</div>
+              <ComparePreview />
             </section>
           </Show>
         </main>

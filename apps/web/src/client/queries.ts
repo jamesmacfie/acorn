@@ -3,6 +3,10 @@
 // is a valid logged-out state, elsewhere it's an error.
 import { readJson } from './apiClient'
 import {
+  branchesKey,
+  branchesRoute,
+  compareKey,
+  compareRoute,
   fileBlobKey,
   fileBlobRoute,
   filesKey,
@@ -20,7 +24,9 @@ import {
   pullsRoute,
   reposKey,
   reposRoute,
+  type Branch,
   type ClosedPullsPage,
+  type Compare,
   type FileBlob,
   type Me,
   type Pull,
@@ -29,8 +35,8 @@ import {
   type Repo,
 } from '../shared/api'
 
-export { meKey, pinsKey, prefsKey, pullKey, pullPrefixKey, pullsPrefixKey, reposKey, reposRefreshRoute } from '../shared/api'
-export type { Check, Comment, Label, Me, Pull, PullDetail, PullFile, Repo, Review, Thread, ThreadComment } from '../shared/api'
+export { meKey, pinsKey, prefsKey, pullKey, pullPrefixKey, pullsKey, pullsPrefixKey, reposKey, reposRefreshRoute } from '../shared/api'
+export type { Branch, Check, Comment, Compare, CompareCommit, Label, Me, Pull, PullDetail, PullFile, Repo, Review, Thread, ThreadComment } from '../shared/api'
 
 export const meOptions = () => ({
   queryKey: meKey,
@@ -81,6 +87,20 @@ export const filesOptions = (owner: string, repo: string, number: string, enable
   queryKey: filesKey(owner, repo, number),
   enabled,
   queryFn: async (): Promise<PullFile[]> => readJson<PullFile[]>(pullRoute(owner, repo, number, 'files')),
+})
+
+// Branch names for the create-PR pickers; enabled once the repo is known.
+export const branchesOptions = (owner: string, repo: string, enabled: boolean) => ({
+  queryKey: branchesKey(owner, repo),
+  enabled,
+  queryFn: async (): Promise<Branch[]> => readJson<Branch[]>(branchesRoute(owner, repo)),
+})
+
+// base..head compare for the create view (diff preview + commits for title prefill).
+export const compareOptions = (owner: string, repo: string, base: string, head: string, enabled: boolean) => ({
+  queryKey: compareKey(owner, repo, base, head),
+  enabled,
+  queryFn: async (): Promise<Compare> => readJson<Compare>(compareRoute(owner, repo, base, head)),
 })
 
 // Full head-blob body, fetched on demand (queryClient.fetchQuery) when a gap is expanded. The sha
