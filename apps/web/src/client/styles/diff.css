@@ -210,10 +210,17 @@
 .diff-word-del { background: var(--del-word-bg); border-radius: 2px; }
 .diff-word-add { background: var(--add-word-bg); border-radius: 2px; }
 
-/* Split (side-by-side) mode. ponytail: non-virtualized (see DiffView.tsx) — bands render in flow.
-   Each pair band is a two-column grid; hunk headers + threads span both columns full-width. */
+/* Split (side-by-side) mode. Bands are virtualized; each mounted pair band is a two-column grid,
+   while hunk headers + threads span both columns full-width. */
 .diff-split { padding-top: 0; }
-.diff-split-rows { width: 100%; }
+.diff-split-rows { position: relative; width: 100%; }
+.diff-split-band {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  min-height: 20px;
+}
 .diff-split-pair { display: grid; grid-template-columns: 1fr 1fr; align-items: stretch; }
 .diff-split-cell {
   display: flex;
@@ -229,3 +236,4 @@
 .diff-split-full { width: 100%; white-space: normal; }
 .diff-split-full.diff-hunk { display: block; white-space: pre; }
 .diff-split-full.diff-file-row { padding: 0; }
+.diff-split-pair:hover .diff-add-btn { visibility: visible; }

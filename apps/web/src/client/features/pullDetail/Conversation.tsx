@@ -1,12 +1,12 @@
 import { createMemo, For, Show } from 'solid-js'
 import { formatRelativeTime } from '../../displayMeta'
-import type { PullFile, Thread, ThreadComment } from '../../queries'
+import type { Thread, ThreadComment } from '../../queries'
 import { UserAvatar } from '../../UserAvatar'
-import { hasRenderableBody, reviewAction, threadComments, threadSnippet, type ConversationEntry } from './model'
+import { hasRenderableBody, reviewAction, threadComments, threadSnippetFromIndex, type ConversationEntry, type ThreadSnippetIndex } from './model'
 
 export function ConversationEntryItem(props: {
   entry: ConversationEntry
-  files: PullFile[] | undefined
+  snippetIndex: ThreadSnippetIndex
   onOpenFile: (path: string) => void
 }) {
   return (
@@ -25,7 +25,7 @@ export function ConversationEntryItem(props: {
         </Show>
       }
     >
-      {(entry) => <FileThreadItem thread={entry().thread} files={props.files} onOpenFile={props.onOpenFile} />}
+      {(entry) => <FileThreadItem thread={entry().thread} snippetIndex={props.snippetIndex} onOpenFile={props.onOpenFile} />}
     </Show>
   )
 }
@@ -51,10 +51,10 @@ function ConversationItem(props: { author: string | null; action: string; body: 
   )
 }
 
-function FileThreadItem(props: { thread: Thread; files: PullFile[] | undefined; onOpenFile: (path: string) => void }) {
+function FileThreadItem(props: { thread: Thread; snippetIndex: ThreadSnippetIndex; onOpenFile: (path: string) => void }) {
   const comments = threadComments(props.thread)
   const first = () => comments[0]
-  const snippet = createMemo(() => threadSnippet(props.thread, props.files))
+  const snippet = createMemo(() => threadSnippetFromIndex(props.thread, props.snippetIndex))
   const path = () => props.thread.path ?? 'Unknown file'
 
   return (

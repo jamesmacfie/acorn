@@ -1,7 +1,7 @@
 import { performance } from 'node:perf_hooks'
 import { describe, expect, it } from 'vitest'
 import type { PullFile, Thread } from '../../queries'
-import { buildDiffRows, buildRenderableRows, expandGap, gapId, plainTokenize, toBands, wordDiff, type CodeRow, type GapRow, type ParsedFile } from './model'
+import { buildDiffRows, buildRenderableRows, estimateSplitBandSize, expandGap, gapId, plainTokenize, toBands, wordDiff, type CodeRow, type GapRow, type ParsedFile } from './model'
 
 const pullFile = (path: string, patch: string | null): PullFile => ({
   path,
@@ -120,6 +120,26 @@ describe('diff model', () => {
     )
 
     expect(toBands(rows).map((band) => band.kind)).toEqual(['full', 'full', 'pair', 'full'])
+  })
+
+  it('estimates split band sizes from full rows and paired cells', () => {
+    const rows = buildRenderableRows(
+      [
+        {
+          file: pullFile('src/app.ts', 'patch'),
+          diff: [
+            { kind: 'delete', path: 'src/app.ts', oldNo: 1, newNo: null, toks: [], raw: 'old' },
+            { kind: 'insert', path: 'src/app.ts', oldNo: null, newNo: 1, toks: [], raw: 'new' },
+          ],
+        },
+      ],
+      [thread('src/app.ts', 1)],
+    )
+    const bands = toBands(rows)
+
+    expect(estimateSplitBandSize(bands[0])).toBe(36)
+    expect(estimateSplitBandSize(bands[1])).toBe(20)
+    expect(estimateSplitBandSize(bands[2])).toBe(140)
   })
 
   it('keeps large row interleaving comfortably within the speed budget', () => {

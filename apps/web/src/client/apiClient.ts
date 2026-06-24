@@ -1,7 +1,7 @@
-type ReadOptions = { nullOn401?: boolean }
+type ReadOptions = { nullOn401?: boolean; signal?: AbortSignal }
 
 export async function readJson<T>(url: string, options: ReadOptions = {}): Promise<T> {
-  const res = await fetch(url)
+  const res = await fetch(url, { signal: options.signal })
   if (options.nullOn401 && res.status === 401) return null as T
   if (!res.ok) throw new Error(`${url} ${res.status}`)
   return res.json()

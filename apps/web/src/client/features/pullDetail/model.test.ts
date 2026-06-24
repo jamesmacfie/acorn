@@ -1,7 +1,7 @@
 import { performance } from 'node:perf_hooks'
 import { describe, expect, it } from 'vitest'
 import type { PullDetail, PullFile, Thread } from '../../queries'
-import { buildConversationEntries, hasRenderableBody, reviewAction, threadSnippet } from './model'
+import { buildConversationEntries, buildThreadSnippetIndex, hasRenderableBody, reviewAction, threadSnippet, threadSnippetFromIndex } from './model'
 
 const baseDetail = (overrides: Partial<PullDetail> = {}): PullDetail => ({
   pull: null,
@@ -68,6 +68,15 @@ describe('pull detail model', () => {
 
     expect(threadSnippet(thread('left', 'src/app.ts', 2, 'LEFT'), [file(patch)]).map((row) => row.kind)).toContain('delete')
     expect(threadSnippet(thread('right', 'src/app.ts', 2, 'RIGHT'), [file(patch)]).map((row) => row.kind)).toContain('insert')
+  })
+
+  it('serves multiple thread snippets from one parsed file index', () => {
+    const patch = ['@@ -1,6 +1,6 @@', ' const a = 1', '-const oldName = a', '+const newName = a', ' export { a }', '-oldTail()', '+newTail()'].join('\n')
+    const index = buildThreadSnippetIndex([file(patch)])
+
+    expect(index.get('src/app.ts')).toHaveLength(6)
+    expect(threadSnippetFromIndex(thread('right-name', 'src/app.ts', 2, 'RIGHT'), index).map((row) => row.kind)).toContain('insert')
+    expect(threadSnippetFromIndex(thread('right-tail', 'src/app.ts', 4, 'RIGHT'), index).map((row) => row.text)).toContain('newTail()')
   })
 
   it('keeps large conversation merging within the speed budget', () => {

@@ -7,7 +7,7 @@ import { filesOptions, pullDetailOptions, pullPrefixKey, pullsPrefixKey, reposOp
 import { addComment, addLabel, closePr, mergePr, removeLabel, reopenPr, rerunFailed, setDraft, setViewed } from './mutations'
 import { UserAvatar } from './UserAvatar'
 import { ConversationEntryItem } from './features/pullDetail/Conversation'
-import { buildConversationEntries } from './features/pullDetail/model'
+import { buildConversationEntries, buildThreadSnippetIndex } from './features/pullDetail/model'
 
 // Conclusions that count as a failed check → eligible for "Rerun failed jobs".
 const FAILED_STATUSES = new Set(['failure', 'error', 'cancelled', 'timed_out'])
@@ -25,6 +25,7 @@ export default function PullDetail() {
   const files = createQuery(() => filesOptions(params.owner ?? '', params.repo ?? '', params.number ?? '', enabled()))
   const fileSummary = createMemo(() => summarizeFileStats(files.data))
   const conversationEntries = createMemo(() => buildConversationEntries(detail.data))
+  const threadSnippetIndex = createMemo(() => buildThreadSnippetIndex(files.data))
 
   const o = () => params.owner ?? ''
   const r = () => params.repo ?? ''
@@ -242,7 +243,7 @@ export default function PullDetail() {
               <div class="conversation-items">
                 <For each={conversationEntries()} fallback={<span class="muted conversation-empty">No comments.</span>}>
                   {(entry) => (
-                    <ConversationEntryItem entry={entry} files={files.data} onOpenFile={selectFile} />
+                    <ConversationEntryItem entry={entry} snippetIndex={threadSnippetIndex()} onOpenFile={selectFile} />
                   )}
                 </For>
               </div>

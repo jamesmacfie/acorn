@@ -50,6 +50,7 @@ export type SnippetLine = {
   newNo: number | null
   text: string
 }
+export type ThreadSnippetIndex = Map<string, SnippetLine[]>
 
 export function buildConversationEntries(data: PullDetail | undefined): ConversationEntry[] {
   if (!data) return []
@@ -60,14 +61,18 @@ export function buildConversationEntries(data: PullDetail | undefined): Conversa
   ].sort((a, b) => (a.createdAt ?? Number.MAX_SAFE_INTEGER) - (b.createdAt ?? Number.MAX_SAFE_INTEGER))
 }
 
-export function threadSnippet(thread: Thread, files: PullFile[] | undefined): SnippetLine[] {
-  if (!thread.path || thread.line == null) return []
-  const file = files?.find((f) => f.path === thread.path)
-  if (!file?.patch) return []
+export function buildThreadSnippetIndex(files: PullFile[] | undefined): ThreadSnippetIndex {
+  const index: ThreadSnippetIndex = new Map()
+  for (const file of files ?? []) {
+    if (!file.patch) continue
+    index.set(file.path, parseSnippetRows(file, file.patch))
+  }
+  return index
+}
 
-  const targetSide = thread.side === 'LEFT' ? 'LEFT' : 'RIGHT'
+function parseSnippetRows(file: PullFile, patch: string): SnippetLine[] {
   try {
-    const [parsed] = gitdiffParser.parse(synth(file.path, file.patch))
+    const [parsed] = gitdiffParser.parse(synth(file.path, patch))
     const rows: SnippetLine[] = []
     for (const hunk of parsed?.hunks ?? []) {
       for (const change of hunk.changes) {
@@ -80,10 +85,23 @@ export function threadSnippet(thread: Thread, files: PullFile[] | undefined): Sn
         }
       }
     }
-    const index = rows.findIndex((row) => (targetSide === 'LEFT' ? row.oldNo : row.newNo) === thread.line)
-    if (index < 0) return []
-    return rows.slice(Math.max(index - 2, 0), index + 3)
+    return rows
   } catch {
     return []
   }
+}
+
+export function threadSnippetFromIndex(thread: Thread, index: ThreadSnippetIndex): SnippetLine[] {
+  if (!thread.path || thread.line == null) return []
+  const rows = index.get(thread.path)
+  if (!rows?.length) return []
+
+  const targetSide = thread.side === 'LEFT' ? 'LEFT' : 'RIGHT'
+  const lineIndex = rows.findIndex((row) => (targetSide === 'LEFT' ? row.oldNo : row.newNo) === thread.line)
+  if (lineIndex < 0) return []
+  return rows.slice(Math.max(lineIndex - 2, 0), lineIndex + 3)
+}
+
+export function threadSnippet(thread: Thread, files: PullFile[] | undefined): SnippetLine[] {
+  return threadSnippetFromIndex(thread, buildThreadSnippetIndex(files))
 }

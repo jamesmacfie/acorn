@@ -60,6 +60,12 @@ export const estimateRowSize = (row: Row | undefined) => {
   return DIFF_LINE_HEIGHT
 }
 
+export const estimateSplitBandSize = (band: SplitBand | undefined) => {
+  if (!band) return DIFF_LINE_HEIGHT
+  if (band.kind === 'full') return estimateRowSize(band.row)
+  return Math.max(estimateRowSize(band.left ?? undefined), estimateRowSize(band.right ?? undefined))
+}
+
 export const plainTokenize: TokenizeLine = (_path, content) => [{ content, light: '', dark: '' }]
 
 export function highlighterTokenize(hl: Awaited<ReturnType<typeof getHighlighter>>): TokenizeLine {

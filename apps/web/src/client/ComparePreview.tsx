@@ -4,8 +4,8 @@ import { useParams, useSearchParams } from '@solidjs/router'
 import { compareOptions, reposOptions } from './queries'
 import { getHighlighter } from './shiki'
 import { DiffLine, NonCodeRow } from './features/diff/DiffRows'
+import { parseFilesInChunks } from './features/diff/chunkedParse'
 import {
-  buildDiffRows,
   buildRenderableRows,
   highlighterTokenize,
   isCodeRow,
@@ -17,11 +17,9 @@ import {
 } from './features/diff/model'
 
 // Right (Diff) pane in create mode: read-only base..head preview. Reuses the diff engine
-// (buildDiffRows / buildRenderableRows + Shiki) and the row components, but with no review
-// threads, line composers, or gap expansion — none of those exist before the PR does. Rendered
-// in normal flow (.compare-diff un-absolutes the rows) rather than virtualized.
-// ponytail: not chunked/virtualized like DiffView — a preview is usually small; upgrade to the
-// chunked virtualizer if large compares lag.
+// (chunked parsing / buildRenderableRows + Shiki) and the row components, but with no review
+// threads, line composers, or gap expansion — none of those exist before the PR does. Rows still
+// render in normal flow; parsing is chunked so branch changes do not pin the main thread.
 const noop = async () => {}
 
 export default function ComparePreview() {
@@ -38,8 +36,10 @@ export default function ComparePreview() {
 
   // Parse + highlight all files once the tokenizer loads. Cancels if the file set changes mid-flight.
   const [parsed, setParsed] = createSignal<ParsedFile[]>([])
+  let parseRun = 0
   createEffect(() => {
     const list = compare.data?.files ?? []
+    const run = ++parseRun
     let cancelled = false
     onCleanup(() => {
       cancelled = true
@@ -50,8 +50,11 @@ export default function ComparePreview() {
       const tokenize: TokenizeLine = await getHighlighter()
         .then(highlighterTokenize)
         .catch(() => plainTokenize)
-      if (cancelled) return
-      setParsed(list.map((file) => ({ file, diff: buildDiffRows(file, tokenize) })))
+      if (cancelled || run !== parseRun) return
+      await parseFilesInChunks(list, tokenize, {
+        isCancelled: () => cancelled || run !== parseRun,
+        onChunk: setParsed,
+      })
     })()
   })
   const rows = createMemo<Row[]>(() => buildRenderableRows(parsed(), undefined))

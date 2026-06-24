@@ -7,12 +7,12 @@ import { addReviewComment, replyReview, resolveThread, setPref } from './mutatio
 import { getHighlighter } from './shiki'
 import { FILE_SCROLL_EVENT, routeKey as makeRouteKey, type FileScrollDetail } from './fileNavigation'
 import { DiffLine, NonCodeRow, SplitCell, type LineComposerController } from './features/diff/DiffRows'
+import { parseFilesInChunks } from './features/diff/chunkedParse'
 import {
-  buildDiffRows,
   buildRenderableRows,
   estimateRowSize,
+  estimateSplitBandSize,
   expandGap,
-  fileAnchor,
   gapId,
   highlighterTokenize,
   isCodeRow,
@@ -112,14 +112,10 @@ function DiffForPull(props: { route: PullRoute }) {
       const tokenize = await getHighlighter().then(highlighterTokenize).catch(() => plainTokenize)
       if (cancelled || run !== parseRun) return
       setTokenizeFn(() => tokenize)
-      const acc: ParsedFile[] = []
-      for (let i = 0; i < list.length; i += 10) {
-        if (cancelled || run !== parseRun) return
-        for (const file of list.slice(i, i + 10)) acc.push({ file, diff: buildDiffRows(file, tokenize) })
-        if (cancelled || run !== parseRun) return
-        setParsed([...acc])
-        await new Promise((r) => setTimeout(r, 0)) // yield so this chunk paints before the next 10
-      }
+      await parseFilesInChunks(list, tokenize, {
+        isCancelled: () => cancelled || run !== parseRun,
+        onChunk: setParsed,
+      })
     })()
   })
 
@@ -155,6 +151,14 @@ function DiffForPull(props: { route: PullRoute }) {
     },
     overscan: 20,
   })
+  const splitVirt = createVirtualizer({
+    get count() {
+      return bands().length
+    },
+    getScrollElement: () => scrollEl() ?? null,
+    estimateSize: (index) => estimateSplitBandSize(bands()[index]),
+    overscan: 20,
+  })
   const virtualRows = createMemo(() => {
     const list = rows()
     return virt.getVirtualItems().flatMap((vi) => {
@@ -162,12 +166,26 @@ function DiffForPull(props: { route: PullRoute }) {
       return row ? [{ vi, row }] : []
     })
   })
+  const virtualBands = createMemo(() => {
+    const list = bands()
+    return splitVirt.getVirtualItems().flatMap((vi) => {
+      const band = list[vi.index]
+      return band ? [{ vi, band }] : []
+    })
+  })
   createEffect(() => {
-    if (scrollEl()) virt.measure()
+    if (scrollEl()) {
+      virt.measure()
+      splitVirt.measure()
+    }
   })
   createEffect(() => {
     rows().length
     if (scrollEl()) queueMicrotask(() => virt.measure())
+  })
+  createEffect(() => {
+    bands().length
+    if (scrollEl()) queueMicrotask(() => splitVirt.measure())
   })
   let scrollFrame = 0
   onCleanup(() => cancelAnimationFrame(scrollFrame))
@@ -200,7 +218,9 @@ function DiffForPull(props: { route: PullRoute }) {
     if (!force && path === lastTarget) return true
     lastTarget = path
     if (viewMode() === 'split') {
-      queueMicrotask(() => document.getElementById(fileAnchor(path))?.scrollIntoView({ block: 'start' }))
+      const bandIdx = bands().findIndex((band) => band.kind === 'full' && band.row.kind === 'file' && band.row.file.path === path)
+      if (bandIdx < 0) return false
+      splitVirt.scrollToIndex(bandIdx, { align: 'start' })
     } else {
       virt.scrollToIndex(idx, { align: 'start' })
     }
@@ -343,58 +363,61 @@ function DiffForPull(props: { route: PullRoute }) {
           </div>
         }
       >
-        {/* Split mode renders non-virtualized — pairing two columns into bands plus the
-            full-width thread/composer interleave makes a measureElement virtualizer materially more
-            complex. Now that it spans every file, a very large PR in split mode mounts every row;
-            upgrade path is the same band-aware virtualizer if that bites. Unified stays virtualized. */}
         <div class="diff diff-split" ref={publishSplitScrollEl}>
-          <div class="diff-split-rows">
-            <For each={bands()}>
-              {(band) => (
-                <Show
-                  when={band.kind === 'pair' ? (band as Extract<SplitBand, { kind: 'pair' }>) : null}
-                  fallback={
-                    <div
-                      class="diff-split-full"
-                      classList={{
-                        'diff-hunk': (band as Extract<SplitBand, { kind: 'full' }>).row.kind === 'hunk',
-                        'diff-file-row': (band as Extract<SplitBand, { kind: 'full' }>).row.kind === 'file',
-                        'diff-thread-row':
-                          (band as Extract<SplitBand, { kind: 'full' }>).row.kind === 'thread' ||
-                          (band as Extract<SplitBand, { kind: 'full' }>).row.kind === 'nodiff',
-                      }}
-                    >
-                      <NonCodeRow
-                        row={(band as Extract<SplitBand, { kind: 'full' }>).row}
-                        onMutated={invalidate}
-                        resolveThread={(threadId, resolved) => resolveThread(owner, repo, number, threadId, resolved)}
-                        reply={(databaseId, body) => replyReview(owner, repo, number, databaseId, body)}
-                        expandGap={handleExpand}
-                      />
-                    </div>
-                  }
+          <div class="diff-split-rows" style={{ height: `${splitVirt.getTotalSize()}px` }}>
+            <For each={virtualBands()}>
+              {({ vi, band }) => (
+                <div
+                  class="diff-split-band"
+                  data-index={vi.index}
+                  ref={(el) => queueMicrotask(() => splitVirt.measureElement(el))}
+                  style={{ transform: `translateY(${vi.start}px)` }}
                 >
-                  {(pair) => (
-                    <div class="diff-split-pair">
-                      <SplitCell
-                        r={pair().left}
-                        gutter={pair().left?.oldNo ?? null}
-                        canAdd={!!headSha() && pair().left?.oldNo != null}
-                        addComment={(body) => addReviewComment(owner, repo, number, body, pair().left!.path, pair().left!.oldNo!, 'LEFT')}
-                        onMutated={invalidate}
-                        composer={splitComposer(pair().left, 'LEFT')}
-                      />
-                      <SplitCell
-                        r={pair().right}
-                        gutter={pair().right?.newNo ?? null}
-                        canAdd={!!headSha() && pair().right?.newNo != null}
-                        addComment={(body) => addReviewComment(owner, repo, number, body, pair().right!.path, pair().right!.newNo!, 'RIGHT')}
-                        onMutated={invalidate}
-                        composer={splitComposer(pair().right, 'RIGHT')}
-                      />
-                    </div>
-                  )}
-                </Show>
+                  <Show
+                    when={band.kind === 'pair' ? (band as Extract<SplitBand, { kind: 'pair' }>) : null}
+                    fallback={
+                      <div
+                        class="diff-split-full"
+                        classList={{
+                          'diff-hunk': (band as Extract<SplitBand, { kind: 'full' }>).row.kind === 'hunk',
+                          'diff-file-row': (band as Extract<SplitBand, { kind: 'full' }>).row.kind === 'file',
+                          'diff-thread-row':
+                            (band as Extract<SplitBand, { kind: 'full' }>).row.kind === 'thread' ||
+                            (band as Extract<SplitBand, { kind: 'full' }>).row.kind === 'nodiff',
+                        }}
+                      >
+                        <NonCodeRow
+                          row={(band as Extract<SplitBand, { kind: 'full' }>).row}
+                          onMutated={invalidate}
+                          resolveThread={(threadId, resolved) => resolveThread(owner, repo, number, threadId, resolved)}
+                          reply={(databaseId, body) => replyReview(owner, repo, number, databaseId, body)}
+                          expandGap={handleExpand}
+                        />
+                      </div>
+                    }
+                  >
+                    {(pair) => (
+                      <div class="diff-split-pair">
+                        <SplitCell
+                          r={pair().left}
+                          gutter={pair().left?.oldNo ?? null}
+                          canAdd={!!headSha() && pair().left?.oldNo != null}
+                          addComment={(body) => addReviewComment(owner, repo, number, body, pair().left!.path, pair().left!.oldNo!, 'LEFT')}
+                          onMutated={invalidate}
+                          composer={splitComposer(pair().left, 'LEFT')}
+                        />
+                        <SplitCell
+                          r={pair().right}
+                          gutter={pair().right?.newNo ?? null}
+                          canAdd={!!headSha() && pair().right?.newNo != null}
+                          addComment={(body) => addReviewComment(owner, repo, number, body, pair().right!.path, pair().right!.newNo!, 'RIGHT')}
+                          onMutated={invalidate}
+                          composer={splitComposer(pair().right, 'RIGHT')}
+                        />
+                      </div>
+                    )}
+                  </Show>
+                </div>
               )}
             </For>
           </div>
