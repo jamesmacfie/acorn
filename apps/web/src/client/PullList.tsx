@@ -59,24 +59,34 @@ export default function PullList() {
   onMount(() => window.addEventListener('keydown', onKey))
   onCleanup(() => window.removeEventListener('keydown', onKey))
 
-  let scrollEl: HTMLDivElement | undefined
+  const [scrollEl, setScrollEl] = createSignal<HTMLDivElement>()
   const virt = createVirtualizer({
     get count() {
       return shown().length
     },
-    getScrollElement: () => scrollEl ?? null,
+    getScrollElement: () => scrollEl() ?? null,
     estimateSize: () => 36, // --row-h
     overscan: 12,
   })
-  const resetVirtualList = () => {
-    if (scrollEl) {
-      scrollEl.scrollTop = 0
-      scrollEl.scrollLeft = 0
-    }
-    queueMicrotask(() => virt.measure())
+  let measureFrame = 0
+  onCleanup(() => cancelAnimationFrame(measureFrame))
+  const measureSoon = () => {
+    cancelAnimationFrame(measureFrame)
+    measureFrame = requestAnimationFrame(() => virt.measure())
   }
+  const resetVirtualList = () => {
+    const el = scrollEl()
+    if (el) {
+      el.scrollTop = 0
+      el.scrollLeft = 0
+    }
+    measureSoon()
+  }
+  createEffect(() => {
+    if (scrollEl()) measureSoon()
+  })
   createEffect(on([tab, filter], resetVirtualList, { defer: true }))
-  createEffect(on(() => shown().length, () => queueMicrotask(() => virt.measure()), { defer: true }))
+  createEffect(on(() => shown().length, measureSoon, { defer: true }))
   const virtualRows = createMemo(() => {
     const list = shown()
     return virt.getVirtualItems().flatMap((vi) => {
@@ -97,8 +107,8 @@ export default function PullList() {
         <input class="pr-filter" placeholder="Filter…" value={filter()} onInput={(e) => setFilter(e.currentTarget.value)} />
       </div>
       <Show when={pulls.data} fallback={<p class="placeholder">{pulls.isError ? 'Failed to load PRs.' : 'Loading…'}</p>}>
-        <Show when={shown().length} fallback={<p class="placeholder">No matching PRs.</p>}>
-          <div class="pr-list-scroll" ref={scrollEl}>
+        <div class="pr-list-scroll" ref={setScrollEl}>
+          <Show when={shown().length} fallback={<p class="placeholder">No matching PRs.</p>}>
             <div class="pr-list" style={{ height: `${virt.getTotalSize()}px`, position: 'relative' }}>
               <For each={virtualRows()}>
                 {({ vi, pr }) => {
@@ -123,8 +133,8 @@ export default function PullList() {
                 }}
               </For>
             </div>
-          </div>
-        </Show>
+          </Show>
+        </div>
       </Show>
     </>
   )
