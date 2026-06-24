@@ -1,6 +1,6 @@
 # Local development
 
-Clone → running → logged-in runbook for aacorn. For the system design behind it, see
+Clone → running → logged-in runbook for acorn. For the system design behind it, see
 [architecture-overview.md](./architecture-overview.md).
 
 ## Prerequisites
@@ -9,8 +9,8 @@ Clone → running → logged-in runbook for aacorn. For the system design behind
 - **pnpm 11** — the repo pins `packageManager: pnpm@11.0.0`. Run `corepack enable` to get
   the pinned version automatically.
 - A **GitHub OAuth App** for dev (separate from production — see below).
-- **Wrangler** ships as a dev dependency of `@aacorn/web`; invoke it via
-  `pnpm --filter @aacorn/web exec wrangler …`, or `pnpm wrangler …` from inside `apps/web`.
+- **Wrangler** ships as a dev dependency of `@acorn/web`; invoke it via
+  `pnpm --filter @acorn/web exec wrangler …`, or `pnpm wrangler …` from inside `apps/web`.
 
 ## 1. Create a dev GitHub OAuth App
 
@@ -60,7 +60,7 @@ pnpm install
 
 # Apply migrations to the local D1 database
 # (Miniflare state lives under apps/web/.wrangler/state)
-pnpm --filter @aacorn/web db:migrate
+pnpm --filter @acorn/web db:migrate
 
 # Start the dev server: Vite + vite-plugin-solid for the SPA, and
 # @cloudflare/vite-plugin running the Hono Worker in Miniflare with local D1/KV
@@ -75,7 +75,7 @@ Open `http://localhost:5173` and log in with GitHub.
 
 ## Common scripts
 
-Run from the repo root via Turborepo, or per-package with `--filter @aacorn/web`.
+Run from the repo root via Turborepo, or per-package with `--filter @acorn/web`.
 
 | Script | What it does |
 | --- | --- |
@@ -83,9 +83,9 @@ Run from the repo root via Turborepo, or per-package with `--filter @aacorn/web`
 | `pnpm build` | `vite build` (client bundle + Worker) |
 | `pnpm lint` | `tsc --noEmit` typecheck |
 | `pnpm test` | `vitest run` |
-| `pnpm --filter @aacorn/web typegen` | `wrangler types` → regenerate `worker-configuration.d.ts` (`Env`) |
-| `pnpm --filter @aacorn/web db:generate` | `drizzle-kit generate` — emit a migration from the schema |
-| `pnpm --filter @aacorn/web db:migrate` | `wrangler d1 migrations apply aacorn --local` |
+| `pnpm --filter @acorn/web typegen` | `wrangler types` → regenerate `worker-configuration.d.ts` (`Env`) |
+| `pnpm --filter @acorn/web db:generate` | `drizzle-kit generate` — emit a migration from the schema |
+| `pnpm --filter @acorn/web db:migrate` | `wrangler d1 migrations apply acorn --local` |
 
 `pnpm dev`, `pnpm build`, `pnpm lint`, and `pnpm test` all proxy through Turborepo at the root.
 
@@ -97,10 +97,10 @@ The schema lives in `apps/web/src/server/db/schema.ts` (Drizzle, SQLite dialect)
 # 1. Edit src/server/db/schema.ts
 
 # 2. Generate the SQL migration into apps/web/migrations/
-pnpm --filter @aacorn/web db:generate
+pnpm --filter @acorn/web db:generate
 
 # 3. Apply it to the LOCAL D1 (the --local flag is baked into db:migrate)
-pnpm --filter @aacorn/web db:migrate
+pnpm --filter @acorn/web db:migrate
 ```
 
 > **Drizzle quirk — NOT NULL columns on populated tables.** When you add a `NOT NULL` column

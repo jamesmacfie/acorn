@@ -1,6 +1,6 @@
 # Authentication
 
-aacorn authenticates users with GitHub via the OAuth 2.0 web flow. The Worker
+acorn authenticates users with GitHub via the OAuth 2.0 web flow. The Worker
 exchanges the OAuth code for an access token and seals it into an encrypted
 cookie. **The token never reaches the browser** — only public profile fields
 do.

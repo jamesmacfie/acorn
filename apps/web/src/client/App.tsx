@@ -61,7 +61,7 @@ export default function App() {
 
   async function logout() {
     await fetch('/auth/logout', { method: 'POST' })
-    window.dispatchEvent(new Event('aacorn:logout')) // wipe the persisted IndexedDB cache
+    window.dispatchEvent(new Event('acorn:logout')) // wipe the persisted IndexedDB cache
     queryClient.clear()
     await queryClient.invalidateQueries({ queryKey: meKey })
   }
@@ -94,7 +94,7 @@ export default function App() {
           </Show>
         </div>
         <div class="breadcrumb">
-          <Show when={params.owner} fallback={<span class="brand">aacorn</span>}>
+          <Show when={params.owner} fallback={<span class="brand">acorn</span>}>
             <button type="button" class="crumb crumb-link" onClick={() => navigate(`/${params.owner}/${params.repo}`)}>
               {params.owner}
             </button>

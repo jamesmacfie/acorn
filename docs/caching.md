@@ -1,6 +1,6 @@
 # Caching
 
-aacorn layers three caches between the browser and GitHub. Each has a different
+acorn layers three caches between the browser and GitHub. Each has a different
 scope, lifetime, and privacy rule. The whole design follows one principle:
 **serve the last-known data immediately, revalidate behind it.**
 
@@ -124,11 +124,11 @@ defaultOptions: { queries: { refetchOnWindowFocus: true, gcTime: 1000 * 60 * 60 
 - **`refetchOnWindowFocus: true`** — refocusing the tab revalidates, keeping the
   serve-then-revalidate feel on the client.
 
-The persister stores under key `aacorn-cache` with `maxAge` 24h. On render the
+The persister stores under key `acorn-cache` with `maxAge` 24h. On render the
 app shows the last persisted data instantly, then refetches.
 
 This cache is **per-user and private**. On logout the app wipes it
-(`window.addEventListener('aacorn:logout', () => void clear())`) so the next
+(`window.addEventListener('acorn:logout', () => void clear())`) so the next
 user can't read it. See [offline-pwa](./offline-pwa.md) for the service-worker
 app shell that complements this.
 

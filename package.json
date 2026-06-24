@@ -1,5 +1,5 @@
 {
-  "name": "aacorn",
+  "name": "acorn",
   "private": true,
   "packageManager": "pnpm@11.0.0",
   "scripts": {

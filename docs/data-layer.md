@@ -6,7 +6,7 @@ Cloudflare D1 (SQLite). The schema is two kinds of table:
 - **Mirror tables** — cached projections of GitHub data. Disposable,
   revalidated, populated on read. D1 is a *cache of GitHub, not a source of
   truth* (see [architecture-overview](./architecture-overview.md)).
-- **App-state tables** — data GitHub does not have. aacorn is the source of
+- **App-state tables** — data GitHub does not have. acorn is the source of
   truth: prefs, pinned repos, viewed-file checkboxes.
 
 Source: `apps/web/src/server/db/schema.ts`,
@@ -115,7 +115,7 @@ Exact TTL values and the ETag/304 flow are in [caching](./caching.md).
 
 ## App-state tables
 
-aacorn owns these. No mirror, no TTL — they survive mirror re-syncs.
+acorn owns these. No mirror, no TTL — they survive mirror re-syncs.
 
 ### `viewed_files`
 
@@ -151,7 +151,7 @@ Workflow:
 
 ```bash
 pnpm db:generate   # drizzle-kit generate → new SQL file in apps/web/migrations/
-pnpm db:migrate    # wrangler d1 migrations apply aacorn --local
+pnpm db:migrate    # wrangler d1 migrations apply acorn --local
 ```
 
 Migrations live in `apps/web/migrations/` (`0000_*.sql` … `0009_*.sql` at time

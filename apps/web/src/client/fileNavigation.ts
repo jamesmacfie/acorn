@@ -1,4 +1,4 @@
-export const FILE_SCROLL_EVENT = 'aacorn:file-scroll'
+export const FILE_SCROLL_EVENT = 'acorn:file-scroll'
 
 export type FileScrollDetail = {
   routeKey: string

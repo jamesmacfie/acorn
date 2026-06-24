@@ -1,14 +1,14 @@
 # Frontend
 
-The aacorn client is a SolidJS single-page app under `apps/web/src/client/`. It is served as static assets by the Hono Worker and talks to the same origin over cookie-authenticated `fetch`. State lives in [TanStack Query](./caching.md) (server data) and SolidJS signals (transient UI). There is no client-side store beyond those two.
+The acorn client is a SolidJS single-page app under `apps/web/src/client/`. It is served as static assets by the Hono Worker and talks to the same origin over cookie-authenticated `fetch`. State lives in [TanStack Query](./caching.md) (server data) and SolidJS signals (transient UI). There is no client-side store beyond those two.
 
 ## Entry point
 
 `index.tsx` mounts the app:
 
-- Constructs a single `QueryClient` (`refetchOnWindowFocus: true`, `gcTime: 24h`) wrapped in `PersistQueryClientProvider`, persisting the cache to IndexedDB via `idb-keyval` under key `aacorn-cache` (see [caching](./caching.md) and [offline/PWA](./offline-pwa.md)).
+- Constructs a single `QueryClient` (`refetchOnWindowFocus: true`, `gcTime: 24h`) wrapped in `PersistQueryClientProvider`, persisting the cache to IndexedDB via `idb-keyval` under key `acorn-cache` (see [caching](./caching.md) and [offline/PWA](./offline-pwa.md)).
 - A global `QueryCache`/`MutationCache` `onError` bounces to `/auth/login` when an error message matches `/\b401\b|reauth|unauthenticated/`.
-- Registers `/sw.js` on `load`, and wipes the persisted cache on the `aacorn:logout` window event.
+- Registers `/sw.js` on `load`, and wipes the persisted cache on the `acorn:logout` window event.
 - Mounts `<Router root={App}>` with three routes whose components are all `noop` — routes exist only to populate `useParams()`; `App` renders the actual UI.
 
 ## Layout
@@ -28,7 +28,7 @@ The aacorn client is a SolidJS single-page app under `apps/web/src/client/`. It 
 Top bar (`.topbar`, a `1fr auto 1fr` grid):
 
 - **Left cluster** — a collapse toggle (`«` / `»`) and the `RepoPicker`. Collapse state is local signal `collapsed`, seeded from and persisted to the `left_collapsed` pref; collapsing zeroes the left grid column and hides `.pane-left`.
-- **Center** — a breadcrumb (`owner / repo / #number`) or the `aacorn` brand when no repo is routed.
+- **Center** — a breadcrumb (`owner / repo / #number`) or the `acorn` brand when no repo is routed.
 - **Right cluster** — a theme toggle (`◑`) and either a `Login` link or the `AccountMenu`.
 
 The three panes each carry a sticky `.section-header` ("Reviews", "Navigator", "Diff") and render `PullList`, `PullDetail`, and `DiffView` respectively. `Shortcuts` is mounted once at the end (no visible markup until an overlay opens).

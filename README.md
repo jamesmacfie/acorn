@@ -1,6 +1,6 @@
-# aacorn
+# acorn
 
-A GitHub pull-request review tool. aacorn is a **SolidJS SPA** served by a single **Hono
+A GitHub pull-request review tool. acorn is a **SolidJS SPA** served by a single **Hono
 Worker** on Cloudflare, backed by a **D1** read-model mirror of GitHub data, a **KV** blob
 cache for diff/patch bodies, and **IndexedDB** client persistence. Log in with GitHub and you
 get a fast, keyboard-driven review surface: searchable repo picker with pins, virtualized PR
@@ -30,7 +30,7 @@ pnpm workspace + Turborepo.
 ```
 .
 ├── apps/
-│   └── web/            # the app: SolidJS client + Hono Worker (@aacorn/web)
+│   └── web/            # the app: SolidJS client + Hono Worker (@acorn/web)
 ├── packages/           # (reserved)
 ├── package.json        # root scripts proxy to turbo
 ├── turbo.json
@@ -76,7 +76,7 @@ openssl rand -hex 32
 pnpm install
 
 # 3. Apply local D1 migrations
-pnpm --filter @aacorn/web db:migrate
+pnpm --filter @acorn/web db:migrate
 
 # 4. Run (port 5173)
 pnpm dev
@@ -92,9 +92,9 @@ Open `http://localhost:5173` and log in with GitHub.
 | `pnpm build` | `vite build` (client + Worker bundle) |
 | `pnpm lint` | `tsc --noEmit` typecheck |
 | `pnpm test` | `vitest run` |
-| `pnpm --filter @aacorn/web typegen` | `wrangler types` → regenerate `worker-configuration.d.ts` |
-| `pnpm --filter @aacorn/web db:generate` | `drizzle-kit generate` — emit a migration |
-| `pnpm --filter @aacorn/web db:migrate` | `wrangler d1 migrations apply aacorn --local` |
+| `pnpm --filter @acorn/web typegen` | `wrangler types` → regenerate `worker-configuration.d.ts` |
+| `pnpm --filter @acorn/web db:generate` | `drizzle-kit generate` — emit a migration |
+| `pnpm --filter @acorn/web db:migrate` | `wrangler d1 migrations apply acorn --local` |
 
 ## Production deploy
 
@@ -105,7 +105,7 @@ dependency).
 ### 1. Create the resources
 
 ```bash
-pnpm wrangler d1 create aacorn                  # prints a database_id
+pnpm wrangler d1 create acorn                  # prints a database_id
 pnpm wrangler kv namespace create OAUTH_STATE   # prints an id
 pnpm wrangler kv namespace create BLOBS         # prints an id
 ```
@@ -117,7 +117,7 @@ Replace the local placeholder ids with the values printed above:
 - `d1_databases[0].database_id` ← the D1 `database_id`
 - the `OAUTH_STATE` and `BLOBS` `kv_namespaces` ids ← their respective ids
 
-The binding **names** (`DB`, `OAUTH_STATE`, `BLOBS`), `database_name: "aacorn"`, and
+The binding **names** (`DB`, `OAUTH_STATE`, `BLOBS`), `database_name: "acorn"`, and
 `migrations_dir: "migrations"` are contractual — the code and migration tooling reference them,
 so don't rename them.
 
@@ -135,13 +135,13 @@ pnpm wrangler secret put SESSION_ENC_KEY        # a fresh `openssl rand -hex 32`
 ### 4. Apply migrations to remote D1
 
 ```bash
-pnpm wrangler d1 migrations apply aacorn --remote
+pnpm wrangler d1 migrations apply acorn --remote
 ```
 
 ### 5. Build & deploy
 
 ```bash
-pnpm --filter @aacorn/web build
+pnpm --filter @acorn/web build
 pnpm wrangler deploy
 ```
 

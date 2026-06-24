@@ -16,7 +16,7 @@ const ghHeaders = (token: string) => ({
   Authorization: `Bearer ${token}`,
   Accept: 'application/vnd.github+json',
   'X-GitHub-Api-Version': '2022-11-28',
-  'User-Agent': 'aacorn',
+  'User-Agent': 'acorn',
 })
 
 // REST
@@ -49,7 +49,7 @@ a shared package until a third consumer justifies it.
 
 ### Reads
 
-| aacorn operation | API | GitHub endpoint |
+| acorn operation | API | GitHub endpoint |
 | --- | --- | --- |
 | Repos list | REST | `GET /user/repos?sort=pushed&direction=desc&per_page=100` |
 | PR list | REST | `GET /repos/{owner}/{repo}/pulls?state={state}&sort=updated&direction=desc&per_page=100` (conditional `If-None-Match`) |
@@ -67,7 +67,7 @@ in the composite — the richer REST `/files` endpoint owns `pr_files`.
 
 ### Write actions
 
-| aacorn operation | API | GitHub endpoint |
+| acorn operation | API | GitHub endpoint |
 | --- | --- | --- |
 | Merge | REST | `PUT /repos/{owner}/{repo}/pulls/{n}/merge` (`merge_method`) |
 | Close / reopen | REST | `PATCH /repos/{owner}/{repo}/pulls/{n}` (`{ state }`) |
@@ -103,7 +103,7 @@ The client layers optimistic updates / invalidation on top. See
 
 ## ETags and rate limits
 
-- **ETags** are aacorn's main rate-limit defense. The PR-list route sends
+- **ETags** are acorn's main rate-limit defense. The PR-list route sends
   `If-None-Match` with the stored `sync_state.etag`; a `304` costs nothing
   against the limit and re-serves the mirror. The repos route captures the ETag
   per row. GraphQL reads (PR detail) have no ETag and rely on the TTL gate.
