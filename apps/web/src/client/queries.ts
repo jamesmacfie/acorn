@@ -10,12 +10,15 @@ import {
   pinsRoute,
   prefsKey,
   prefsRoute,
+  closedPullsKey,
+  closedPullsRoute,
   pullKey,
   pullRoute,
   pullsKey,
   pullsRoute,
   reposKey,
   reposRoute,
+  type ClosedPullsPage,
   type Me,
   type Pull,
   type PullDetail,
@@ -41,6 +44,16 @@ export const pullsOptions = (owner: string, repo: string, state: 'open' | 'close
   queryKey: pullsKey(owner, repo, state),
   enabled,
   queryFn: async (): Promise<Pull[]> => readJson<Pull[]>(pullsRoute(owner, repo, state)),
+})
+
+// Closed PRs paginate on demand: one GitHub page per fetch, load-more advances pageParam.
+export const closedPullsInfiniteOptions = (owner: string, repo: string, enabled: boolean) => ({
+  queryKey: closedPullsKey(owner, repo),
+  enabled,
+  initialPageParam: 1,
+  queryFn: async ({ pageParam }: { pageParam: number }): Promise<ClosedPullsPage> =>
+    readJson<ClosedPullsPage>(closedPullsRoute(owner, repo, pageParam)),
+  getNextPageParam: (last: ClosedPullsPage) => last.nextPage ?? undefined,
 })
 
 export const pullDetailOptions = (owner: string, repo: string, number: string, enabled: boolean) => ({

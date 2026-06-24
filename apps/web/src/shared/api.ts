@@ -18,6 +18,9 @@ export type Pull = {
   updatedAt: number | null
 }
 
+// Closed PRs are paginated on demand (one GitHub page per fetch); nextPage is null at the end.
+export type ClosedPullsPage = { pulls: Pull[]; nextPage: number | null }
+
 export type PullFile = {
   path: string
   status: string | null
@@ -59,6 +62,7 @@ export const meRoute = '/api/me'
 export const reposRoute = '/api/repos'
 export const reposRefreshRoute = '/api/repos/refresh'
 export const pullsRoute = (owner: string, repo: string, state: 'open' | 'closed') => `${repoRoute(owner, repo)}/pulls?state=${state}`
+export const closedPullsRoute = (owner: string, repo: string, page: number) => `${pullsRoute(owner, repo, 'closed')}&page=${page}`
 export const pullsBatchRoute = (owner: string, repo: string) => `${repoRoute(owner, repo)}/pulls/batch`
 export const resolveThreadRoute = (owner: string, repo: string, number: string | number, threadId: string) =>
   pullRoute(owner, repo, number, `threads/${encodeURIComponent(threadId)}/resolve`)
@@ -69,6 +73,9 @@ export const prefsRoute = '/api/prefs'
 export const meKey = ['me'] as const
 export const reposKey = ['repos'] as const
 export const pullsKey = (owner: string, repo: string, state: 'open' | 'closed') => ['pulls', owner, repo, state] as const
+// Distinct from pullsKey(_, 'closed'): the closed list is now an infinite query ({pages}), so it must
+// not share a key with the old finite-array cache entry (a persisted array would poison .data.pages).
+export const closedPullsKey = (owner: string, repo: string) => ['pulls', owner, repo, 'closed', 'pages'] as const
 export const pullsPrefixKey = (owner: string, repo: string) => ['pulls', owner, repo] as const
 export const pullKey = (owner: string, repo: string, number: string) => ['pull', owner, repo, number] as const
 export const pullPrefixKey = (owner: string, repo: string) => ['pull', owner, repo] as const
