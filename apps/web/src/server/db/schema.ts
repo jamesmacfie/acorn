@@ -43,6 +43,9 @@ export const pullRequests = sqliteTable(
     baseRef: text('base_ref'),
     author: text('author'),
     updatedAt: integer('updated_at'),
+    mergeable: text('mergeable'), // MERGEABLE | CONFLICTING | UNKNOWN
+    mergeStateStatus: text('merge_state_status'), // CLEAN | BLOCKED | BEHIND | DIRTY | DRAFT | UNSTABLE | UNKNOWN
+    autoMergeEnabled: integer('auto_merge_enabled', { mode: 'boolean' }).notNull().default(false),
     fetchedAt: integer('fetched_at').notNull(),
     staleAfter: integer('stale_after').notNull(),
     etag: text('etag'),

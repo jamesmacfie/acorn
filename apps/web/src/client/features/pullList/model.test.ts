@@ -11,6 +11,9 @@ const pull = (overrides: Partial<Pull>): Pull => ({
   headRef: 'feature',
   baseRef: 'main',
   updatedAt: null,
+  mergeable: null,
+  mergeStateStatus: null,
+  autoMergeEnabled: false,
   ...overrides,
 })
 

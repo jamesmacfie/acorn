@@ -16,6 +16,9 @@ export type Pull = {
   headRef: string | null
   baseRef: string | null
   updatedAt: number | null
+  mergeable: string | null
+  mergeStateStatus: string | null
+  autoMergeEnabled: boolean
 }
 
 // Closed PRs are paginated on demand (one GitHub page per fetch); nextPage is null at the end.
@@ -89,6 +92,7 @@ export const compareRoute = (owner: string, repo: string, base: string, head: st
 export const fileBlobRoute = (owner: string, repo: string, sha: string) => repoRoute(owner, repo, `blobs/${sha}`)
 export const resolveThreadRoute = (owner: string, repo: string, number: string | number, threadId: string) =>
   pullRoute(owner, repo, number, `threads/${encodeURIComponent(threadId)}/resolve`)
+export const autoMergeRoute = (owner: string, repo: string, number: string | number) => pullRoute(owner, repo, number, 'auto-merge')
 export const rerunFailedRoute = (owner: string, repo: string, runId: number) => repoRoute(owner, repo, `actions/${runId}/rerun`)
 export const mentionsRoute = (owner: string, repo: string) => repoRoute(owner, repo, 'mentions')
 export const pinsRoute = '/api/pins'

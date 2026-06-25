@@ -78,6 +78,13 @@
       "when": 1782377137657,
       "tag": "0010_wide_blazing_skull",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "6",
+      "when": 1782423265701,
+      "tag": "0011_pale_white_queen",
+      "breakpoints": true
     }
   ]
 }

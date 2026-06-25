@@ -36,6 +36,9 @@ fragment PrFields on PullRequest {
     ... on CheckRun { name status conclusion detailsUrl checkSuite { workflowRun { databaseId } } }
     ... on StatusContext { context state targetUrl }
   } } } } } }
+  mergeable
+  mergeStateStatus
+  autoMergeRequest { mergeMethod }
 }`
 // ponytail: first-page only (reviews,comments 50) — cursor pagination deferred.
 
@@ -66,6 +69,9 @@ export type GqlPull = {
   }
   reviewThreads: { nodes: GqlThread[] }
   latestCommit: { nodes: { commit: { statusCheckRollup: { contexts: { nodes: GqlContext[] } } | null } }[] }
+  mergeable: string | null
+  mergeStateStatus: string | null
+  autoMergeRequest: { mergeMethod: string } | null
 }
 type GqlThreadComment = {
   id: string
@@ -118,6 +124,9 @@ export const mirrorPr = async (db: Db, key: PrKey, pr: GqlPull, now: number) => 
     baseRef: pr.baseRefName,
     author: pr.author?.login ?? null,
     updatedAt: ms(pr.updatedAt),
+    mergeable: pr.mergeable ?? null,
+    mergeStateStatus: pr.mergeStateStatus ?? null,
+    autoMergeEnabled: pr.autoMergeRequest != null,
     fetchedAt: now,
     staleAfter: STALE_AFTER_MS,
     etag: null,
@@ -223,6 +232,9 @@ const toPublicPull = (p: typeof schema.pullRequests.$inferSelect) => ({
   headRef: p.headRef,
   baseRef: p.baseRef,
   updatedAt: p.updatedAt,
+  mergeable: p.mergeable,
+  mergeStateStatus: p.mergeStateStatus,
+  autoMergeEnabled: p.autoMergeEnabled,
 })
 
 // Read one PR's detail composite back out of the mirror tables.
