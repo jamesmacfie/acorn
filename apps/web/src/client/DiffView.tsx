@@ -2,11 +2,11 @@ import { createEffect, createMemo, createSignal, For, on, onCleanup, onMount, Sh
 import { createQuery, useQueryClient } from '@tanstack/solid-query'
 import { useParams, useSearchParams } from '@solidjs/router'
 import { createVirtualizer } from '@tanstack/solid-virtual'
-import { fileBlobOptions, filesOptions, mentionsOptions, prefsKey, prefsOptions, pullDetailOptions, pullKey, type PullFile } from './queries'
+import { fileBlobOptions, filesOptions, mentionsOptions, prefsKey, prefsOptions, pullDetailOptions, pullKey, type PullFile, type Thread } from './queries'
 import { addReviewComment, replyReview, resolveThread, setPref } from './mutations'
 import { getHighlighter } from './shiki'
 import { FILE_SCROLL_EVENT, routeKey as makeRouteKey, type FileScrollDetail } from './fileNavigation'
-import { DiffLine, NonCodeRow, SplitCell, type LineComposerController } from './features/diff/DiffRows'
+import { DiffLine, NonCodeRow, SplitCell, type LineComposerController, type ThreadCollapseController } from './features/diff/DiffRows'
 import { createDiffHydrator } from './features/diff/hydration'
 import {
   buildDiffRows,
@@ -99,6 +99,7 @@ function DiffForPull(props: { route: PullRoute }) {
   // set changes.
   const [expanded, setExpanded] = createSignal<Map<string, CodeRow[]>>(new Map())
   const [lineComposer, setLineComposer] = createSignal<{ key: string; body: string } | null>(null)
+  const [threadCollapsed, setThreadCollapsed] = createSignal<Map<string, boolean>>(new Map())
   let tokenizerPromise: Promise<TokenizeLine> | null = null
   const loadTokenizer = async () => {
     return (tokenizerPromise ??= getHighlighter().then(highlighterTokenize).catch(() => plainTokenize))
@@ -256,6 +257,42 @@ function DiffForPull(props: { route: PullRoute }) {
     })
   })
   const threadLayoutSignature = createMemo(() => (detail.data?.threads ?? []).map((thread) => `${thread.threadId}:${thread.resolved}`).join('\0'))
+  const threadCollapseFor = (thread: Thread): ThreadCollapseController => ({
+    collapsed: () => threadCollapsed().get(thread.threadId) ?? thread.resolved,
+    setCollapsed: (collapsed) =>
+      setThreadCollapsed((prev) => {
+        const next = new Map(prev)
+        next.set(thread.threadId, collapsed)
+        return next
+      }),
+  })
+  let serverThreadResolved = new Map<string, boolean>()
+  createEffect(() => {
+    const threads = detail.data?.threads ?? []
+    const ids = new Set(threads.map((thread) => thread.threadId))
+    const resolvedChanges = new Map<string, boolean>()
+    for (const thread of threads) {
+      const previous = serverThreadResolved.get(thread.threadId)
+      if (previous != null && previous !== thread.resolved) resolvedChanges.set(thread.threadId, thread.resolved)
+    }
+    serverThreadResolved = new Map(threads.map((thread) => [thread.threadId, thread.resolved]))
+    setThreadCollapsed((prev) => {
+      if (prev.size === 0 && resolvedChanges.size === 0) return prev
+      let changed = false
+      const next = new Map(prev)
+      for (const id of next.keys()) {
+        if (!ids.has(id)) {
+          next.delete(id)
+          changed = true
+        }
+      }
+      for (const [id, resolved] of resolvedChanges) {
+        next.set(id, resolved)
+        changed = true
+      }
+      return changed ? next : prev
+    })
+  })
   createEffect(() => {
     const paths = new Set<string>()
     if (viewMode() === 'split') {
@@ -470,6 +507,7 @@ function DiffForPull(props: { route: PullRoute }) {
                             expandGap={handleExpand}
                             retryDiff={(file) => hydrator.retry(file.path)}
                             mentions={mentionsList()}
+                            threadCollapse={threadCollapseFor}
                             onLayoutChange={measureRow}
                           />
                         }
@@ -536,6 +574,7 @@ function DiffForPull(props: { route: PullRoute }) {
                             expandGap={handleExpand}
                             retryDiff={(file) => hydrator.retry(file.path)}
                             mentions={mentionsList()}
+                            threadCollapse={threadCollapseFor}
                             onLayoutChange={measureBand}
                           />
                         </div>
