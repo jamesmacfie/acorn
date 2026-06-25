@@ -1,7 +1,21 @@
 import { performance } from 'node:perf_hooks'
 import { describe, expect, it } from 'vitest'
 import type { PullFile, Thread } from '../../queries'
-import { buildDiffRows, buildRenderableRows, estimateSplitBandSize, expandGap, gapId, plainTokenize, toBands, wordDiff, type CodeRow, type GapRow, type ParsedFile } from './model'
+import {
+  buildDiffRows,
+  buildRenderableRows,
+  estimateSplitBandSize,
+  expandGap,
+  gapId,
+  plainTokenize,
+  rowIdentityKeys,
+  splitBandIdentityKeys,
+  toBands,
+  wordDiff,
+  type CodeRow,
+  type GapRow,
+  type ParsedFile,
+} from './model'
 
 const pullFile = (path: string, patch: string | null): PullFile => ({
   path,
@@ -120,6 +134,63 @@ describe('diff model', () => {
     )
 
     expect(toBands(rows).map((band) => band.kind)).toEqual(['full', 'full', 'pair', 'full'])
+  })
+
+  it('gives progressively hydrated rows distinct stable identities', () => {
+    const summary = buildRenderableRows(
+      [{ file: pullFile('src/app.ts', null), diff: [{ kind: 'load', file: pullFile('src/app.ts', null), status: 'loading' }] }],
+      [],
+    )
+    const hydrated = buildRenderableRows(
+      [
+        {
+          file: pullFile('src/app.ts', 'patch'),
+          diff: buildDiffRows(
+            pullFile(
+              'src/app.ts',
+              [
+                '@@ -1,2 +1,2 @@',
+                '-const a = 1',
+                '+const a = 2',
+                '@@ -10,2 +10,2 @@',
+                '-const b = 1',
+                '+const b = 2',
+              ].join('\n'),
+            ),
+            plainTokenize,
+          ),
+        },
+      ],
+      [],
+    )
+
+    const summaryKeys = rowIdentityKeys(summary)
+    const hydratedKeys = rowIdentityKeys(hydrated)
+
+    expect(summaryKeys[1]).toBe('load:src/app.ts:loading')
+    expect(hydratedKeys[1]).toBe('hunk:src/app.ts:@@ -1,2 +1,2 @@')
+    expect(hydratedKeys).not.toContain(summaryKeys[1])
+    expect(new Set(hydratedKeys).size).toBe(hydratedKeys.length)
+  })
+
+  it('gives split bands unique identities for repeated one-sided fallback rows', () => {
+    const rows = buildRenderableRows(
+      [
+        {
+          file: pullFile('src/fallback.txt', 'patch'),
+          diff: [
+            { kind: 'insert', path: 'src/fallback.txt', oldNo: null, newNo: null, toks: [], raw: 'same' },
+            { kind: 'insert', path: 'src/fallback.txt', oldNo: null, newNo: null, toks: [], raw: 'same' },
+          ],
+        },
+      ],
+      [],
+    )
+    const keys = splitBandIdentityKeys(toBands(rows))
+
+    expect(new Set(keys).size).toBe(keys.length)
+    expect(keys).toContain('pair:empty:code:src/fallback.txt:insert::')
+    expect(keys).toContain('pair:empty:code:src/fallback.txt:insert:::1')
   })
 
   it('estimates split band sizes from full rows and paired cells', () => {

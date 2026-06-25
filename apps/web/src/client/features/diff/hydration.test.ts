@@ -84,4 +84,39 @@ describe('diff hydrator', () => {
       disposeRoot()
     }
   })
+
+  it('parses already-loaded patch-bearing files without fetching patch batches', async () => {
+    const fetchMock = vi.fn()
+    vi.stubGlobal('fetch', fetchMock)
+
+    const queryClient = new QueryClient()
+    const parsed: ParsedFile[] = []
+    let disposeRoot!: () => void
+    const hydrator = createRoot((dispose) => {
+      disposeRoot = dispose
+      return createDiffHydrator({
+        owner: 'acorn',
+        repo: 'web',
+        number: '42',
+        queryClient,
+        tokenizerForFile: async () => plain,
+        parseFile: (file) => ({ file, diff: [] }),
+        onParsed: (file) => parsed.push(file),
+      })
+    })
+
+    try {
+      hydrator.reset([pullFile('src/a.ts', '@@ a'), pullFile('src/b.ts', '@@ b')], 'src/b.ts')
+
+      await waitFor(() => {
+        expect(parsed.map((file) => file.file.path)).toEqual(['src/b.ts', 'src/a.ts'])
+      })
+      expect(fetchMock).not.toHaveBeenCalled()
+      expect(hydrator.status('src/a.ts')).toBe('loaded')
+      expect(hydrator.status('src/b.ts')).toBe('loaded')
+    } finally {
+      hydrator.dispose()
+      disposeRoot()
+    }
+  })
 })

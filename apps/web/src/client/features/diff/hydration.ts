@@ -52,6 +52,8 @@ export function createDiffHydrator(options: HydratorOptions) {
   }
 
   const cachedFile = (path: string) => {
+    const current = fileByPath.get(path)
+    if (current?.patch != null) return current
     const direct = options.queryClient.getQueryData<PullFile>(filePatchKey(options.owner, options.repo, options.number, path))
     if (direct) return direct
     const warmed = options.queryClient.getQueryData<PullFile[]>(filesKey(options.owner, options.repo, options.number))

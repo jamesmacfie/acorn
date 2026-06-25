@@ -2,7 +2,7 @@ import { createEffect, createMemo, createSignal, For, on, onCleanup, onMount, Sh
 import { createQuery, useQueryClient } from '@tanstack/solid-query'
 import { useParams, useSearchParams } from '@solidjs/router'
 import { createVirtualizer } from '@tanstack/solid-virtual'
-import { fileBlobOptions, fileSummariesOptions, mentionsOptions, prefsKey, prefsOptions, pullDetailOptions, pullKey, type PullFile } from './queries'
+import { fileBlobOptions, filesOptions, mentionsOptions, prefsKey, prefsOptions, pullDetailOptions, pullKey, type PullFile } from './queries'
 import { addReviewComment, replyReview, resolveThread, setPref } from './mutations'
 import { getHighlighter } from './shiki'
 import { FILE_SCROLL_EVENT, routeKey as makeRouteKey, type FileScrollDetail } from './fileNavigation'
@@ -18,6 +18,8 @@ import {
   highlighterTokenize,
   isCodeRow,
   plainTokenize,
+  rowIdentityKeys,
+  splitBandIdentityKeys,
   toBands,
   type CodeRow,
   type GapRow,
@@ -33,10 +35,10 @@ import {
 // `?file=` no longer picks which file is shown — it's the scroll target (the file list, finder,
 // and [ / ] all set it), so selecting a file scrolls the combined diff to it.
 //
-// The first request fetches file summaries only. Patch bodies, parsing, and Shiki highlighting are
-// demand-driven per file so large PRs can paint their navigation + file list without spending seconds
-// tokenizing unseen diffs. Review threads are interleaved at render time (matched by path) so thread
-// mutations rerender without re-tokenizing patches.
+// The PR load fetches the full changed-file payload so every patch body is present for that PR.
+// Parsing and Shiki highlighting still hydrate in priority order so large PRs do not turn one
+// network gap into one giant main-thread block. Review threads are interleaved at render time
+// (matched by path) so thread mutations rerender without re-tokenizing patches.
 //
 type PullRoute = {
   owner: string
@@ -74,7 +76,7 @@ function DiffForPull(props: { route: PullRoute }) {
   const repo = props.route.repo
   const number = props.route.number
 
-  const files = createQuery(() => fileSummariesOptions(owner, repo, number, true))
+  const files = createQuery(() => filesOptions(owner, repo, number, true))
   const detail = createQuery(() => pullDetailOptions(owner, repo, number, true))
   const prefs = createQuery(() => prefsOptions(true))
   const mentionsQuery = createQuery(() => mentionsOptions(owner, repo, true))
@@ -90,8 +92,8 @@ function DiffForPull(props: { route: PullRoute }) {
 
   const invalidate = () => queryClient.invalidateQueries({ queryKey: pullKey(owner, repo, number) })
 
-  // First paint uses cheap file summaries. Patch bodies are then hydrated automatically in priority
-  // order: selected/visible file first, the rest in small idle batches.
+  // Patch bodies arrive with the PR's files query. Hydration then parses/tokenizes automatically in
+  // priority order: selected/visible file first, the rest in small idle batches.
   const [parsedByPath, setParsedByPath] = createSignal<Map<string, ParsedFile>>(new Map())
   // Context lines revealed by clicking a gap, keyed by that gap's stable identity. Reset when the file
   // set changes.
@@ -154,6 +156,7 @@ function DiffForPull(props: { route: PullRoute }) {
   ))
 
   const rows = createMemo<Row[]>(() => buildRenderableRows(parsed(), detail.data?.threads, expanded()))
+  const rowKeys = createMemo(() => rowIdentityKeys(rows()))
 
   // Fetch the file's head body once (cached by immutable sha), slice the gap's hidden lines, and
   // splice them into the row stream by recording them in `expanded`.
@@ -164,8 +167,10 @@ function DiffForPull(props: { route: PullRoute }) {
     setExpanded((prev) => new Map(prev).set(gapId(gap), lines))
   }
 
-  // Split bands from the same interleaved rows (see toBands).
-  const bands = createMemo<SplitBand[]>(() => toBands(rows()))
+  // Split bands from the same interleaved rows (see toBands). Keep this cold in unified mode:
+  // building and keying split bands is pure overhead while the main diff list is active.
+  const bands = createMemo<SplitBand[]>(() => (viewMode() === 'split' ? toBands(rows()) : []))
+  const bandKeys = createMemo(() => splitBandIdentityKeys(bands()))
 
   // Scroll element as a signal so the virtualizer re-attaches when it (re)mounts (it lives behind a
   // `<Show>` — no PR / split mode — so it's absent at this component's onMount). The virtualizer
@@ -179,6 +184,7 @@ function DiffForPull(props: { route: PullRoute }) {
       return rows().length
     },
     getScrollElement: () => scrollEl() ?? null,
+    getItemKey: (index) => rowKeys()[index] ?? `row:${index}`,
     estimateSize: (index) => {
       const row = rows()[index]
       return row ? estimateRowSize(row) : FALLBACK_ROW_ESTIMATE
@@ -190,9 +196,51 @@ function DiffForPull(props: { route: PullRoute }) {
       return bands().length
     },
     getScrollElement: () => scrollEl() ?? null,
+    getItemKey: (index) => bandKeys()[index] ?? `band:${index}`,
     estimateSize: (index) => estimateSplitBandSize(bands()[index]),
     overscan: 20,
   })
+
+  let virtualMeasureFrame = 0
+  let needsUnifiedMeasure = false
+  let needsSplitMeasure = false
+  const scheduleVirtualMeasure = (target: 'unified' | 'split') => {
+    if (target === 'unified') needsUnifiedMeasure = true
+    else needsSplitMeasure = true
+    if (virtualMeasureFrame) return
+    virtualMeasureFrame = requestAnimationFrame(() => {
+      virtualMeasureFrame = 0
+      if (!scrollEl()) return
+      if (needsUnifiedMeasure) virt.measure()
+      if (needsSplitMeasure) splitVirt.measure()
+      needsUnifiedMeasure = false
+      needsSplitMeasure = false
+    })
+  }
+
+  const pendingUnifiedMeasures = new Set<HTMLElement>()
+  const pendingSplitMeasures = new Set<HTMLElement>()
+  let elementMeasureFrame = 0
+  const scheduleElementMeasure = (target: 'unified' | 'split', el: HTMLElement) => {
+    if (target === 'unified') pendingUnifiedMeasures.add(el)
+    else pendingSplitMeasures.add(el)
+    if (elementMeasureFrame) return
+    elementMeasureFrame = requestAnimationFrame(() => {
+      elementMeasureFrame = 0
+      for (const item of pendingUnifiedMeasures) {
+        if (item.isConnected) virt.measureElement(item)
+      }
+      for (const item of pendingSplitMeasures) {
+        if (item.isConnected) splitVirt.measureElement(item)
+      }
+      pendingUnifiedMeasures.clear()
+      pendingSplitMeasures.clear()
+    })
+  }
+
+  const shouldMeasureRow = (row: Row) => row.kind === 'thread'
+  const shouldMeasureBand = (band: SplitBand) => band.kind === 'full' && band.row.kind === 'thread'
+
   const virtualRows = createMemo(() => {
     const list = rows()
     return virt.getVirtualItems().flatMap((vi) => {
@@ -231,19 +279,30 @@ function DiffForPull(props: { route: PullRoute }) {
   createEffect(() => {
     if (scrollEl()) {
       virt.measure()
-      splitVirt.measure()
+      if (viewMode() === 'split') splitVirt.measure()
     }
   })
   createEffect(() => {
     rows().length
-    if (scrollEl()) queueMicrotask(() => virt.measure())
+    if (scrollEl()) scheduleVirtualMeasure('unified')
   })
   createEffect(() => {
+    if (viewMode() !== 'split') return
     bands().length
-    if (scrollEl()) queueMicrotask(() => splitVirt.measure())
+    if (scrollEl()) scheduleVirtualMeasure('split')
+  })
+  createEffect(() => {
+    lineComposer()?.key
+    if (!scrollEl()) return
+    scheduleVirtualMeasure('unified')
+    if (viewMode() === 'split') scheduleVirtualMeasure('split')
   })
   let scrollFrame = 0
-  onCleanup(() => cancelAnimationFrame(scrollFrame))
+  onCleanup(() => {
+    cancelAnimationFrame(scrollFrame)
+    cancelAnimationFrame(virtualMeasureFrame)
+    cancelAnimationFrame(elementMeasureFrame)
+  })
   const resetScrollPosition = () => {
     const el = scrollEl()
     if (!el) return
@@ -263,6 +322,7 @@ function DiffForPull(props: { route: PullRoute }) {
     scrollFrame = requestAnimationFrame(() => {
       setScrollEl(el)
       resetScrollPosition()
+      splitVirt.measure()
     })
   }
 
@@ -382,7 +442,9 @@ function DiffForPull(props: { route: PullRoute }) {
                         'diff-thread-row': row.kind === 'thread' || row.kind === 'nodiff' || row.kind === 'load',
                       }}
                       data-index={vi.index}
-                      ref={(el) => queueMicrotask(() => virt.measureElement(el))}
+                      ref={(el) => {
+                        if (shouldMeasureRow(row)) scheduleElementMeasure('unified', el)
+                      }}
                       style={{ transform: `translateY(${vi.start}px)` }}
                     >
                       <Show
@@ -428,7 +490,9 @@ function DiffForPull(props: { route: PullRoute }) {
                 <div
                   class="diff-split-band"
                   data-index={vi.index}
-                  ref={(el) => queueMicrotask(() => splitVirt.measureElement(el))}
+                  ref={(el) => {
+                    if (shouldMeasureBand(band)) scheduleElementMeasure('split', el)
+                  }}
                   style={{ transform: `translateY(${vi.start}px)` }}
                 >
                   <Show

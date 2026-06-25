@@ -69,6 +69,50 @@ export const estimateSplitBandSize = (band: SplitBand | undefined) => {
   return Math.max(estimateRowSize(band.left ?? undefined), estimateRowSize(band.right ?? undefined))
 }
 
+const UNKNOWN_FILE_KEY = '<unknown>'
+
+const countedKey = (base: string, counts: Map<string, number>) => {
+  const count = counts.get(base) ?? 0
+  counts.set(base, count + 1)
+  return count === 0 ? base : `${base}:${count}`
+}
+
+const codeRowIdentity = (row: CodeRow) => `code:${row.path}:${row.kind}:${row.oldNo ?? ''}:${row.newNo ?? ''}`
+
+const rowIdentityBase = (row: Row, currentFilePath: string) => {
+  if (row.kind === 'file') return `file:${row.file.path}`
+  if (row.kind === 'hunk') return `hunk:${currentFilePath}:${row.text}`
+  if (row.kind === 'gap') return `gap:${gapId(row)}`
+  if (row.kind === 'load') return `load:${row.file.path}:${row.status}`
+  if (row.kind === 'nodiff') return `nodiff:${currentFilePath}`
+  if (row.kind === 'thread') return `thread:${row.thread.threadId}`
+  return codeRowIdentity(row)
+}
+
+export function rowIdentityKeys(rows: readonly Row[]): string[] {
+  const counts = new Map<string, number>()
+  let currentFilePath = UNKNOWN_FILE_KEY
+  return rows.map((row) => {
+    if (row.kind === 'file') currentFilePath = row.file.path
+    return countedKey(rowIdentityBase(row, currentFilePath), counts)
+  })
+}
+
+export function splitBandIdentityKeys(bands: readonly SplitBand[]): string[] {
+  const counts = new Map<string, number>()
+  let currentFilePath = UNKNOWN_FILE_KEY
+  return bands.map((band) => {
+    let base: string
+    if (band.kind === 'full') {
+      if (band.row.kind === 'file') currentFilePath = band.row.file.path
+      base = `full:${rowIdentityBase(band.row, currentFilePath)}`
+    } else {
+      base = `pair:${band.left ? codeRowIdentity(band.left) : 'empty'}:${band.right ? codeRowIdentity(band.right) : 'empty'}`
+    }
+    return countedKey(base, counts)
+  })
+}
+
 export const plainTokenize: TokenizeLine = (_path, content) => [{ content, light: '', dark: '' }]
 
 export function highlighterTokenize(hl: Awaited<ReturnType<typeof getHighlighter>>): TokenizeLine {
