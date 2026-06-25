@@ -256,7 +256,10 @@ function DiffForPull(props: { route: PullRoute }) {
       return band ? [{ vi, band }] : []
     })
   })
-  const threadLayoutSignature = createMemo(() => (detail.data?.threads ?? []).map((thread) => `${thread.threadId}:${thread.resolved}`).join('\0'))
+  const threadLayoutSignature = createMemo(() => {
+    const collapsed = threadCollapsed()
+    return (detail.data?.threads ?? []).map((thread) => `${thread.threadId}:${thread.resolved}:${collapsed.get(thread.threadId) ?? thread.resolved}`).join('\0')
+  })
   const threadCollapseFor = (thread: Thread): ThreadCollapseController => ({
     collapsed: () => threadCollapsed().get(thread.threadId) ?? thread.resolved,
     setCollapsed: (collapsed) =>
@@ -287,8 +290,12 @@ function DiffForPull(props: { route: PullRoute }) {
         }
       }
       for (const [id, resolved] of resolvedChanges) {
-        next.set(id, resolved)
-        changed = true
+        if (!resolved) {
+          if (next.delete(id)) changed = true
+        } else if (!next.has(id)) {
+          next.set(id, true)
+          changed = true
+        }
       }
       return changed ? next : prev
     })

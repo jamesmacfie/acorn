@@ -254,7 +254,7 @@ function ThreadRow(props: {
   const [err, setErr] = createSignal<string | null>(null)
   const replyId = () => props.thread.comments[0]?.databaseId ?? null
   const resolved = () => optimisticResolved() ?? props.thread.resolved
-  const collapsed = () => props.collapse?.collapsed() ?? localCollapsed()
+  const collapsed = () => resolved() && (props.collapse?.collapsed() ?? localCollapsed())
   const setCollapsed = (value: boolean) => {
     if (props.collapse) props.collapse.setCollapsed(value)
     else setLocalCollapsed(value)
