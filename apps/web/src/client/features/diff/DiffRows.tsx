@@ -12,6 +12,11 @@ export type LineComposerController = {
   setBody: (body: string) => void
 }
 
+export type ThreadCollapseController = {
+  collapsed: () => boolean
+  setCollapsed: (collapsed: boolean) => void
+}
+
 export function NonCodeRow(props: {
   row: Exclude<Row, CodeRow>
   onMutated: () => void
@@ -20,6 +25,7 @@ export function NonCodeRow(props: {
   expandGap?: (gap: GapRow) => Promise<unknown>
   retryDiff?: (file: LoadDiffRow['file']) => void
   mentions?: string[]
+  threadCollapse?: (thread: Thread) => ThreadCollapseController
   onLayoutChange?: () => void
 }) {
   return (
@@ -68,6 +74,7 @@ export function NonCodeRow(props: {
             resolveThread={props.resolveThread}
             reply={props.reply}
             mentions={props.mentions ?? []}
+            collapse={props.threadCollapse?.(t().thread)}
             onLayoutChange={props.onLayoutChange}
           />
         )}
@@ -237,21 +244,31 @@ function ThreadRow(props: {
   resolveThread: (threadId: string, resolved: boolean) => Promise<unknown>
   reply: (commentDatabaseId: number, body: string) => Promise<unknown>
   mentions: string[]
+  collapse?: ThreadCollapseController
   onLayoutChange?: () => void
 }) {
   const [optimisticResolved, setOptimisticResolved] = createSignal<boolean | null>(null)
-  const [collapsed, setCollapsed] = createSignal(props.thread.resolved)
+  const [localCollapsed, setLocalCollapsed] = createSignal(props.thread.resolved)
   const [body, setBody] = createSignal('')
   const [busy, setBusy] = createSignal(false)
   const [err, setErr] = createSignal<string | null>(null)
   const replyId = () => props.thread.comments[0]?.databaseId ?? null
   const resolved = () => optimisticResolved() ?? props.thread.resolved
+  const collapsed = () => props.collapse?.collapsed() ?? localCollapsed()
+  const setCollapsed = (value: boolean) => {
+    if (props.collapse) props.collapse.setCollapsed(value)
+    else setLocalCollapsed(value)
+  }
 
   const publishLayoutChange = () => props.onLayoutChange?.()
 
   createEffect(on(
     () => [props.thread.threadId, props.thread.resolved] as const,
     ([threadId, serverResolved], previous) => {
+      if (!previous) {
+        publishLayoutChange()
+        return
+      }
       if (previous && previous[0] === threadId && previous[1] === serverResolved) return
       setOptimisticResolved(null)
       setCollapsed(serverResolved)
@@ -277,7 +294,7 @@ function ThreadRow(props: {
   }
 
   const toggleCollapsed = () => {
-    setCollapsed((v) => !v)
+    setCollapsed(!collapsed())
     publishLayoutChange()
   }
 
