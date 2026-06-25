@@ -54,6 +54,17 @@ export default function PullDetail() {
   const [actionError, setActionError] = createSignal('')
   const run = (p: Promise<unknown>) => p.then(refresh).catch((e) => setActionError(String(e.message ?? e)))
 
+  const [rerunned, setRerunned] = createSignal(new Set<number>())
+  const triggerRerun = (runId: number) => {
+    setRerunned((s) => new Set([...s, runId]))
+    rerunFailed(o(), r(), runId)
+      .then(refresh)
+      .catch((e) => {
+        setRerunned((s) => { const n = new Set(s); n.delete(runId); return n })
+        setActionError(String((e as Error).message ?? e))
+      })
+  }
+
   const merge = createMutation(() => ({ mutationFn: () => mergePr(o(), r(), n(), mergeMethod()) }))
   const close = createMutation(() => ({ mutationFn: () => closePr(o(), r(), n()) }))
   const reopen = createMutation(() => ({ mutationFn: () => reopenPr(o(), r(), n()) }))
@@ -237,8 +248,8 @@ export default function PullDetail() {
                           )}
                         </Show>
                         <Show when={FAILED_STATUSES.has((ck.status ?? '').toLowerCase()) && ck.runId != null}>
-                          <button type="button" class="check-rerun" onClick={() => run(rerunFailed(o(), r(), ck.runId!))}>
-                            Rerun
+                          <button type="button" class="check-rerun" disabled={rerunned().has(ck.runId!)} onClick={() => triggerRerun(ck.runId!)}>
+                            {rerunned().has(ck.runId!) ? 'Queued' : 'Rerun'}
                           </button>
                         </Show>
                       </li>
