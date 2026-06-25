@@ -204,7 +204,7 @@ export default function App() {
 // the OAuth start; before that just hold the mark so we don't flash a redirect mid-restore.
 function LoginGate(props: { redirecting: boolean }) {
   createEffect(() => {
-    if (props.redirecting) window.location.href = '/auth/login'
+    if (props.redirecting) window.location.href = '/auth/login?return_to=' + encodeURIComponent(window.location.pathname + window.location.search)
   })
   return <main class="login-gate"><Acorn label={props.redirecting ? 'redirecting to github…' : 'acorn'} /></main>
 }

@@ -3,13 +3,13 @@ import { createInfiniteQuery, createQuery, useQueryClient } from '@tanstack/soli
 import { A, useNavigate, useParams } from '@solidjs/router'
 import { createVirtualizer } from '@tanstack/solid-virtual'
 import { formatRelativeTime } from './displayMeta'
-import { prefetchOpenPulls } from './prefetch'
+import { prefetchOpenPulls, schedulePullSummaryPrefetch } from './prefetch'
 import { closedPullsInfiniteOptions, pullsOptions, reposOptions } from './queries'
 import { filterPulls } from './features/pullList/model'
 
-// Left-pane PR list for the routed repo. Reads the shared repos cache to gate the request
-// until the repo is known to the server (avoids a 404 race on a cold URL). The list is
-// virtualized in its own scroll container (rows are uniform var(--row-h)).
+// Left-pane PR list for the routed repo. Access checks live on the server; this pane only needs
+// route params before it can ask for the repo's PRs. The list is virtualized in its own scroll
+// container (rows are uniform var(--row-h)).
 export default function PullList() {
   const params = useParams()
   const navigate = useNavigate()
@@ -18,18 +18,19 @@ export default function PullList() {
   const queryClient = useQueryClient()
   const repos = createQuery(() => reposOptions(true))
   const repoKnown = () => !!repos.data?.some((r) => r.owner === params.owner && r.name === params.repo)
+  const hasRepoParams = () => !!params.owner && !!params.repo
   // Open: full mirror in one shot. Closed: paginated on demand (load-more), so only the active tab fetches.
-  const openPulls = createQuery(() => pullsOptions(params.owner ?? '', params.repo ?? '', 'open', repoKnown() && tab() === 'open'))
-  const closedPulls = createInfiniteQuery(() => closedPullsInfiniteOptions(params.owner ?? '', params.repo ?? '', repoKnown() && tab() === 'closed'))
+  const openPulls = createQuery(() => pullsOptions(params.owner ?? '', params.repo ?? '', 'open', hasRepoParams() && tab() === 'open'))
+  const closedPulls = createInfiniteQuery(() => closedPullsInfiniteOptions(params.owner ?? '', params.repo ?? '', hasRepoParams() && tab() === 'closed'))
   const closedRows = createMemo(() => closedPulls.data?.pages?.flatMap((p) => p.pulls) ?? [])
   const list = () => (tab() === 'open' ? (openPulls.data ?? []) : closedRows())
   const ready = () => (tab() === 'open' ? openPulls.data !== undefined : closedPulls.data !== undefined)
   const isError = () => (tab() === 'open' ? openPulls.isError : closedPulls.isError)
 
-  // Once the repo is known, warm the per-PR caches in the background so navigating is instant.
-  // Re-runs per repo; the cleanup aborts an in-flight warm-up when the repo changes (or unmounts).
+  // Once the repo is known on the repo overview, warm per-PR caches so navigating is instant.
+  // Direct PR routes skip first-load warm-up so detail/files own the critical path.
   createEffect(on(
-    () => (repoKnown() ? `${params.owner}/${params.repo}` : ''),
+    () => (repoKnown() && !params.number ? `${params.owner}/${params.repo}` : ''),
     (key) => {
       if (!key) return
       const ac = new AbortController()
@@ -64,6 +65,18 @@ export default function PullList() {
   }
   onMount(() => window.addEventListener('keydown', onKey))
   onCleanup(() => window.removeEventListener('keydown', onKey))
+
+  let rowPrefetch: { cancel: () => void } | null = null
+  const cancelRowPrefetch = () => {
+    rowPrefetch?.cancel()
+    rowPrefetch = null
+  }
+  const queueRowPrefetch = (number: number) => {
+    if (!params.owner || !params.repo) return
+    cancelRowPrefetch()
+    rowPrefetch = schedulePullSummaryPrefetch(queryClient, params.owner, params.repo, number)
+  }
+  onCleanup(cancelRowPrefetch)
 
   const [scrollEl, setScrollEl] = createSignal<HTMLDivElement>()
   const virt = createVirtualizer({
@@ -136,6 +149,10 @@ export default function PullList() {
                       class="pr-row"
                       classList={{ active: params.number === String(pr.number) }}
                       href={`/${params.owner}/${params.repo}/${pr.number}`}
+                      onFocus={() => queueRowPrefetch(pr.number)}
+                      onBlur={cancelRowPrefetch}
+                      onMouseEnter={() => queueRowPrefetch(pr.number)}
+                      onMouseLeave={cancelRowPrefetch}
                       style={{ position: 'absolute', top: 0, left: 0, width: '100%', transform: `translateY(${vi.start}px)`, height: `${vi.size}px` }}
                     >
                       <span class="pr-num">#{pr.number}</span>

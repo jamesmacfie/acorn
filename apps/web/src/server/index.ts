@@ -12,6 +12,7 @@ import { pullDetail } from './routes/pullDetail'
 import { pullFiles } from './routes/pullFiles'
 import { pulls } from './routes/pulls'
 import { pullsBatch } from './routes/pullsBatch'
+import { mentions } from './routes/mentions'
 import { repos } from './routes/repos'
 
 // One Worker, both /auth and /api. Non-matching paths never reach here — run_worker_first
@@ -31,5 +32,6 @@ const app = new Hono<AppEnv>()
   .route('/api/repos', pullsBatch) // POST /:owner/:repo/pulls/batch — prefetch warm-up
   .route('/api/repos', prActions) // PR write actions: merge / close / reopen / draft / comments
   .route('/api/repos', prCreate) // create PR + branches/compare reads for the create view
+  .route('/api/repos', mentions) // /:owner/:repo/mentions — participant logins for @autocomplete
 
 export default app

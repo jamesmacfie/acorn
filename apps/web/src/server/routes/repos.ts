@@ -1,23 +1,8 @@
-import { desc, eq } from 'drizzle-orm'
+import { eq } from 'drizzle-orm'
 import { Hono } from 'hono'
 import { getDb, schema } from '../db'
-import { chunkRowsByColumnBudget } from '../db/batch'
-import { gh, ghError } from '../github'
 import type { AppEnv } from '../middleware/auth'
-
-// First read path through the D1 mirror (docs/caching.md serve-then-revalidate).
-// TTL-only for this slice: freshness is the staleness window; conditional If-None-Match
-// revalidation lands with the PR slice. Rows are user-scoped (private repos never cross users).
-const STALE_AFTER_MS = 300_000 // ~5 min — repo metadata is "slow-changing" (docs/caching.md)
-
-type GitHubRepo = {
-  id: number
-  name: string
-  private: boolean
-  default_branch: string
-  pushed_at: string | null
-  owner: { login: string }
-}
+import { readCachedRepos, refreshRepos, REPOS_STALE_AFTER_MS, toPublicRepo, waitUntilLogged } from './repoMirror'
 
 export const repos = new Hono<AppEnv>()
   .get('/', async (c) => {
@@ -27,47 +12,23 @@ export const repos = new Hono<AppEnv>()
     const db = getDb(c.env)
     const userId = user.login // ponytail: login as the scope key — stable enough; revisit if logins churn.
 
-    const cached = await db
-      .select()
-      .from(schema.repos)
-      .where(eq(schema.repos.userId, userId))
-      .orderBy(desc(schema.repos.pushedAt))
+    const cached = await readCachedRepos(db, userId)
 
     // Fresh if we have rows and the most recent sync is within the staleness window.
     const newest = cached.reduce((max, r) => Math.max(max, r.fetchedAt), 0)
-    const fresh = cached.length > 0 && newest + STALE_AFTER_MS > Date.now()
-    if (fresh) return c.json(cached.map(toPublic))
+    const fresh = cached.length > 0 && newest + REPOS_STALE_AFTER_MS > Date.now()
+    if (fresh) return c.json(cached.map(toPublicRepo))
 
-    // Stale or missing → re-sync from GitHub. One page of 100, most-recently-pushed first.
-    // ponytail: Link-header pagination deferred; the selector wants recent repos anyway.
-    const res = await gh(user.token, '/user/repos?sort=pushed&direction=desc&per_page=100')
-    const err = ghError(res)
-    if (err) return c.json({ error: err.error }, err.status)
+    // Stale-but-present is enough for first paint; revalidate outside the response.
+    if (cached.length > 0) {
+      waitUntilLogged(c.executionCtx, 'repos', refreshRepos(user.token, db, userId))
+      return c.json(cached.map(toPublicRepo))
+    }
 
-    const etag = res.headers.get('etag')
-    const fetchedAt = Date.now()
-    const body = (await res.json()) as GitHubRepo[]
-    const rows = body.map((r) => ({
-      userId,
-      id: r.id,
-      owner: r.owner.login,
-      name: r.name,
-      private: r.private,
-      defaultBranch: r.default_branch ?? null,
-      pushedAt: r.pushed_at ? Date.parse(r.pushed_at) : null,
-      fetchedAt,
-      staleAfter: STALE_AFTER_MS,
-      etag,
-    }))
-
-    // Full-list refresh: delete-then-insert so repos the user lost access to disappear
-    // (docs/data-layer.md batch pattern), atomically in one batch. D1 caps bound params at
-    // 100/statement, so inserts are chunked by row width.
-    const del = db.delete(schema.repos).where(eq(schema.repos.userId, userId))
-    const inserts = chunkRowsByColumnBudget(rows).map((part) => db.insert(schema.repos).values(part))
-    await db.batch([del, ...inserts])
-
-    return c.json(rows.map(toPublic))
+    // Cold mirror: no rows exist yet, so the selector has nothing useful to render.
+    const refreshed = await refreshRepos(user.token, db, userId)
+    if (!refreshed.ok) return c.json({ error: refreshed.failure.error }, refreshed.failure.status)
+    return c.json(refreshed.value.map(toPublicRepo))
   })
   .post('/refresh', async (c) => {
     const user = c.get('user')
@@ -76,20 +37,3 @@ export const repos = new Hono<AppEnv>()
     await getDb(c.env).update(schema.repos).set({ fetchedAt: 0 }).where(eq(schema.repos.userId, user.login))
     return c.body(null, 204)
   })
-
-// Public projection — the fields the SPA selector needs; no staleness bookkeeping.
-const toPublic = (r: {
-  id: number
-  owner: string
-  name: string
-  private: boolean
-  defaultBranch: string | null
-  pushedAt: number | null
-}) => ({
-  id: r.id,
-  owner: r.owner,
-  name: r.name,
-  private: r.private,
-  defaultBranch: r.defaultBranch,
-  pushedAt: r.pushedAt,
-})

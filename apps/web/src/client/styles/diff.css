@@ -54,6 +54,31 @@
 .diff-gap:hover:not(:disabled) { background: var(--bg-hover); color: var(--text); }
 .diff-gap:disabled { cursor: default; opacity: 0.6; }
 
+.diff-load {
+  flex: 1 0 100%;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 3px var(--pane-pad);
+  background: var(--bg);
+  color: var(--text-muted);
+  font: inherit;
+  user-select: none;
+  white-space: normal;
+}
+.diff-load-error { color: var(--del-marker); }
+.diff-load-retry {
+  font: inherit;
+  font-size: var(--fs-sm);
+  color: var(--text-muted);
+  background: none;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+}
+.diff-load-retry:hover { color: var(--text); }
+
 /* Per-file header that opens each file's section in the stacked all-files diff. Kept in-flow so
    virtual row measurement cannot overlap it with the following hunk. */
 .diff-file-row {

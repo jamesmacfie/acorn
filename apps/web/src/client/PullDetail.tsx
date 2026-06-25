@@ -3,7 +3,8 @@ import { createMutation, createQuery, useQueryClient } from '@tanstack/solid-que
 import { useParams, useSearchParams } from '@solidjs/router'
 import { fileStatusMeta, formatRelativeTime, summarizeFileStats } from './displayMeta'
 import { requestFileScroll, routeKey } from './fileNavigation'
-import { filesOptions, pullDetailOptions, pullPrefixKey, pullsPrefixKey, reposOptions } from './queries'
+import { fileSummariesOptions, mentionsOptions, pullDetailOptions, pullPrefixKey, pullsPrefixKey, reposOptions } from './queries'
+import MentionTextarea from './MentionTextarea'
 import { addComment, addLabel, closePr, mergePr, removeLabel, reopenPr, rerunFailed, setDraft, setViewed, submitReview } from './mutations'
 import { UserAvatar } from './UserAvatar'
 import { ConversationEntryItem } from './features/pullDetail/Conversation'
@@ -20,16 +21,19 @@ export default function PullDetail() {
   const qc = useQueryClient()
   const repos = createQuery(() => reposOptions(true))
   const repoKnown = () => !!repos.data?.some((r) => r.owner === params.owner && r.name === params.repo)
-  const enabled = () => !!params.number && repoKnown()
-  const detail = createQuery(() => pullDetailOptions(params.owner ?? '', params.repo ?? '', params.number ?? '', enabled()))
-  const files = createQuery(() => filesOptions(params.owner ?? '', params.repo ?? '', params.number ?? '', enabled()))
+  const o = () => params.owner ?? ''
+  const r = () => params.repo ?? ''
+  const n = () => params.number ?? ''
+  const hasRepoParams = () => !!params.owner && !!params.repo
+  const hasPullParams = () => hasRepoParams() && !!params.number
+  const detail = createQuery(() => pullDetailOptions(o(), r(), n(), hasPullParams()))
+  const files = createQuery(() => fileSummariesOptions(o(), r(), n(), hasPullParams()))
+  const mentionsQuery = createQuery(() => mentionsOptions(o(), r(), hasRepoParams()))
+  const mentionsList = () => mentionsQuery.data ?? []
   const fileSummary = createMemo(() => summarizeFileStats(files.data))
   const conversationEntries = createMemo(() => buildConversationEntries(detail.data))
   const threadSnippetIndex = createMemo(() => buildThreadSnippetIndex(files.data))
 
-  const o = () => params.owner ?? ''
-  const r = () => params.repo ?? ''
-  const n = () => params.number ?? ''
   // Refetch detail (and the open-PR list, since state changes drop a PR from it) after a mutation.
   const refresh = () => {
     qc.invalidateQueries({ queryKey: pullPrefixKey(o(), r()) })
@@ -93,9 +97,15 @@ export default function PullDetail() {
                   )}
                 </Show>
                 <span class="branch-flow">
-                  <span class="branch-chip">{pull().baseRef ?? 'base'}</span>
+                  <button class="branch-chip" title={pull().baseRef ?? 'base'} onClick={() => navigator.clipboard.writeText(pull().baseRef ?? '')}>
+                    <span class="branch-chip-label">{pull().baseRef ?? 'base'}</span>
+                    <svg class="branch-chip-copy" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+                  </button>
                   <span class="branch-arrow">←</span>
-                  <span class="branch-chip">{pull().headRef ?? 'head'}</span>
+                  <button class="branch-chip" title={pull().headRef ?? 'head'} onClick={() => navigator.clipboard.writeText(pull().headRef ?? '')}>
+                    <span class="branch-chip-label">{pull().headRef ?? 'head'}</span>
+                    <svg class="branch-chip-copy" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+                  </button>
                 </span>
                 <span>
                   {fileSummary().count} files · <span class="file-stat add">+{fileSummary().additions}</span> /{' '}
@@ -239,11 +249,12 @@ export default function PullDetail() {
               </summary>
               <Show when={detail.data}>
                 <div class="composer">
-                  <textarea
+                  <MentionTextarea
                     class="composer-input"
                     placeholder="Leave a comment…"
                     value={draftText()}
-                    onInput={(e) => setDraftText(e.currentTarget.value)}
+                    onInput={setDraftText}
+                    mentions={mentionsList()}
                   />
                   <button type="button" onClick={submitComment} disabled={comment.isPending || !draftText().trim()}>
                     Comment
@@ -262,12 +273,13 @@ export default function PullDetail() {
             <details class="nav-section" open>
               <summary>Review</summary>
               <div class="composer">
-                <textarea
+                <MentionTextarea
                   class="composer-input"
                   placeholder="Leave a review comment…"
                   value={reviewBody()}
-                  onInput={(e) => setReviewBody(e.currentTarget.value)}
+                  onInput={setReviewBody}
                   disabled={review.isPending}
+                  mentions={mentionsList()}
                 />
                 <div class="pr-actions">
                   <button type="button" onClick={() => submitReviewWith('APPROVE')} disabled={review.isPending}>

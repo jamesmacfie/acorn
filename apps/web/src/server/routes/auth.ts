@@ -8,8 +8,16 @@ import { cookieAttrs, sealSession, SESSION_TTL_SECONDS } from '../session'
 
 const GITHUB_SCOPES = 'repo read:org read:user'
 const STATE_COOKIE = 'oauth_state'
+const RETURN_TO_COOKIE = 'oauth_return_to'
 const STATE_TTL_SECONDS = 300
 const GITHUB_OAUTH_SETTINGS_URL = 'https://github.com/settings/applications'
+
+// Only allow relative paths (not protocol-relative or external) to prevent open redirect.
+function safeReturnTo(value: string | undefined): string {
+  if (!value) return '/'
+  if (!value.startsWith('/') || value.startsWith('//')) return '/'
+  return value
+}
 
 export function oauthAppSettingsUrl(clientId: string): string {
   const id = clientId.trim()
@@ -32,6 +40,15 @@ export const auth = new Hono<{ Bindings: Env }>()
     // completed in another (login-CSRF). Both must match on callback.
     await c.env.OAUTH_STATE.put(state, '1', { expirationTtl: STATE_TTL_SECONDS })
     setCookie(c, STATE_COOKIE, state, {
+      httpOnly: true,
+      secure: cookieAttrs(c.req.url).secure,
+      sameSite: 'Lax',
+      path: '/auth',
+      maxAge: STATE_TTL_SECONDS,
+    })
+    // Preserve the deep-link URL so the callback can send the user back there after login.
+    const returnTo = safeReturnTo(c.req.query('return_to'))
+    setCookie(c, RETURN_TO_COOKIE, returnTo, {
       httpOnly: true,
       secure: cookieAttrs(c.req.url).secure,
       sameSite: 'Lax',
@@ -99,7 +116,9 @@ export const auth = new Hono<{ Bindings: Env }>()
       path: '/',
       maxAge: SESSION_TTL_SECONDS,
     })
-    return c.redirect('/')
+    const returnTo = safeReturnTo(getCookie(c, RETURN_TO_COOKIE))
+    deleteCookie(c, RETURN_TO_COOKIE, { path: '/auth', secure: cookieAttrs(c.req.url).secure })
+    return c.redirect(returnTo)
   })
   .post('/logout', (c) => {
     // Clear whichever cookie is in play (prod __Host-session and the dev fallback).

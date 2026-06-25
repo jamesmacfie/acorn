@@ -15,16 +15,32 @@
 }
 .branch-flow { gap: 5px; }
 .branch-chip {
-  max-width: 150px;
-  overflow: hidden;
-  white-space: nowrap;
-  text-overflow: ellipsis;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  cursor: pointer;
   color: var(--text);
   background: var(--bg-selected);
   border: 1px solid var(--border);
   border-radius: var(--radius);
   padding: 1px 6px;
+  font: inherit;
+  font-size: var(--fs-sm);
 }
+.branch-chip:hover { border-color: var(--text-muted); }
+.branch-chip-label {
+  max-width: 140px;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.branch-chip-copy {
+  flex-shrink: 0;
+  opacity: 0;
+  color: var(--text-muted);
+  transition: opacity 0.1s;
+}
+.branch-chip:hover .branch-chip-copy { opacity: 1; }
 .branch-arrow { color: var(--text-muted); }
 .state-badge {
   text-transform: capitalize;

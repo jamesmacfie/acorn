@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { closedPullsInfiniteOptions, compareOptions, filesOptions, meOptions, reposOptions } from './queries'
+import { closedPullsInfiniteOptions, compareOptions, fetchFilePatches, filePatchOptions, fileSummariesOptions, filesOptions, meOptions, reposOptions } from './queries'
 
 const jsonResponse = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), {
@@ -51,5 +51,31 @@ describe('client query options', () => {
 
     expect(fetchMock).toHaveBeenNthCalledWith(1, '/api/repos/acorn/web/compare?base=main&head=feature', { signal })
     expect(fetchMock).toHaveBeenNthCalledWith(2, '/api/repos/acorn/web/pulls/42/files', { signal })
+  })
+
+  it('fetches file summaries and a single patch through distinct cache entries', async () => {
+    const patchFile = { path: 'src/app file.ts', status: 'modified', additions: 1, deletions: 0, sha: 'abc', viewed: false, patch: '@@' }
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(jsonResponse([{ ...patchFile, patch: null }]))
+      .mockResolvedValueOnce(jsonResponse([patchFile]))
+      .mockResolvedValueOnce(jsonResponse([patchFile]))
+    vi.stubGlobal('fetch', fetchMock)
+    const signal = new AbortController().signal
+
+    await fileSummariesOptions('acorn', 'web', '42', true).queryFn({ signal })
+    await expect(filePatchOptions('acorn', 'web', '42', 'src/app file.ts').queryFn({ signal })).resolves.toEqual(patchFile)
+    await expect(fetchFilePatches('acorn', 'web', '42', ['src/app file.ts'], signal)).resolves.toEqual([patchFile])
+
+    expect(fileSummariesOptions('acorn', 'web', '42', true).queryKey).toEqual(['files', 'acorn', 'web', '42', 'summary'])
+    expect(filePatchOptions('acorn', 'web', '42', 'src/app file.ts').queryKey).toEqual(['files', 'acorn', 'web', '42', 'patch', 'src/app file.ts'])
+    expect(fetchMock).toHaveBeenNthCalledWith(1, '/api/repos/acorn/web/pulls/42/files?summary=1', { signal })
+    expect(fetchMock).toHaveBeenNthCalledWith(2, '/api/repos/acorn/web/pulls/42/files?path=src%2Fapp%20file.ts', { signal })
+    expect(fetchMock).toHaveBeenNthCalledWith(3, '/api/repos/acorn/web/pulls/42/files/patches', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ paths: ['src/app file.ts'] }),
+      signal,
+    })
   })
 })
