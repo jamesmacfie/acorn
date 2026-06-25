@@ -131,17 +131,21 @@ export const pulls = new Hono<AppEnv>().get('/:owner/:repo/pulls', async (c) => 
     return { ok: true, value: rows.map(toPublic) }
   }
 
+  const force = c.req.query('force') === 'true'
+
   // Fresh → serve the mirror, no GitHub call.
-  if (sync && sync.fetchedAt + STALE_AFTER_MS > Date.now()) {
+  if (!force && sync && sync.fetchedAt + STALE_AFTER_MS > Date.now()) {
     return c.json(await readPublicRows())
   }
 
-  if (sync) {
+  // Stale but cached → serve immediately and revalidate in the background, unless forced.
+  if (!force && sync) {
     const cached = await readPublicRows()
     waitUntilLogged(c.executionCtx, `pulls:${owner}/${repo}`, revalidate())
     return c.json(cached)
   }
 
+  // force=true or no prior sync → block on a real GitHub fetch.
   const refreshed = await revalidate()
   if (!refreshed.ok) return c.json({ error: refreshed.failure.error }, refreshed.failure.status)
   return c.json(refreshed.value)

@@ -26,7 +26,8 @@ self.addEventListener('fetch', (e) => {
     e.respondWith(
       fetch(req)
         .then((res) => {
-          caches.open(CACHE).then((c) => c.put('/', res.clone()))
+          const clone = res.clone() // must clone synchronously before body is consumed
+          caches.open(CACHE).then((c) => c.put('/', clone))
           return res
         })
         .catch(async () => (await caches.match('/')) ?? Response.error()),

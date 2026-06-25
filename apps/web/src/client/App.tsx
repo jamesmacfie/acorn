@@ -2,7 +2,8 @@ import { createEffect, createSignal, Show } from 'solid-js'
 import { createQuery, useIsRestoring, useQueryClient } from '@tanstack/solid-query'
 import { useMatch, useNavigate, useParams } from '@solidjs/router'
 import { clear } from 'idb-keyval'
-import { meKey, meOptions, pinsOptions, prefsKey, prefsOptions, reposKey, reposOptions, reposRefreshRoute } from './queries'
+import { readJson } from './apiClient'
+import { meKey, meOptions, pinsOptions, prefsKey, prefsOptions, pullPrefixKey, pullsKey, pullsRoute, pullsPrefixKey, reposKey, reposOptions, reposRefreshRoute, type Pull } from './queries'
 import { setPref } from './mutations'
 import RepoPicker from './RepoPicker'
 import PullList from './PullList'
@@ -87,6 +88,29 @@ export default function App() {
     window.location.href = '/auth/permissions'
   }
 
+  const [refreshingPulls, setRefreshingPulls] = createSignal(false)
+  const [refreshingPull, setRefreshingPull] = createSignal(false)
+  async function refreshAllPulls() {
+    if (!params.owner || !params.repo) return
+    setRefreshingPulls(true)
+    try {
+      const data = await readJson<Pull[]>(`${pullsRoute(params.owner, params.repo, 'open')}&force=true`)
+      queryClient.setQueryData(pullsKey(params.owner, params.repo, 'open'), data)
+    } finally {
+      setRefreshingPulls(false)
+    }
+  }
+  async function refreshCurrentPull() {
+    if (!params.owner || !params.repo || !params.number) return
+    setRefreshingPull(true)
+    await Promise.all([
+      queryClient.invalidateQueries({ queryKey: pullPrefixKey(params.owner, params.repo) }),
+      queryClient.invalidateQueries({ queryKey: pullsPrefixKey(params.owner, params.repo) }),
+      queryClient.invalidateQueries({ queryKey: ['files', params.owner, params.repo, params.number] }),
+    ])
+    setRefreshingPull(false)
+  }
+
   // Logged out: no chrome, just the mark — bounce straight to GitHub OAuth. While auth is still
   // unknown (initial load / cache restore) show the bare mark without redirecting, to avoid a flash.
   const settledLoggedOut = () => !isRestoring() && !me.isPending && !me.data
@@ -158,6 +182,9 @@ export default function App() {
               <button type="button" class="new-pr-btn" title="New pull request" onClick={() => navigate(`/${params.owner}/${params.repo}/new`)}>
                 + New PR
               </button>
+              <button type="button" class="section-refresh" title="Refresh reviews" aria-label="Refresh reviews" disabled={refreshingPulls()} onClick={refreshAllPulls}>
+                {refreshingPulls() ? '...' : '↻'}
+              </button>
             </div>
             <PullList />
           </section>
@@ -177,7 +204,12 @@ export default function App() {
                   <PullDetail />
                 </section>
                 <section class="pane pane-right">
-                  <div class="section-header">Diff</div>
+                  <div class="section-header">
+                    Diff
+                    <button type="button" class="section-refresh" style={{ 'margin-left': 'auto' }} title="Refresh diff" aria-label="Refresh diff" disabled={refreshingPull()} onClick={refreshCurrentPull}>
+                      {refreshingPull() ? '...' : '↻'}
+                    </button>
+                  </div>
                   <DiffView />
                 </section>
               </Show>

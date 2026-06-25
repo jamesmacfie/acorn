@@ -30,6 +30,7 @@ export async function prefetchOpenPulls(qc: QueryClient, owner: string, repo: st
 
 async function prefetchOpenPullsOnce(qc: QueryClient, owner: string, repo: string, signal: AbortSignal) {
   const list = await qc.ensureQueryData(pullsOptions(owner, repo, 'open', true))
+  if (!list) return
   const chunks: number[][] = []
   for (let i = 0; i < list.length; i += CHUNK) chunks.push(list.slice(i, i + CHUNK).map((p) => p.number))
 

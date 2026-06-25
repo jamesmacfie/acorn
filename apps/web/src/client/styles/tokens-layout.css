@@ -157,5 +157,21 @@ body {
   font-weight: 600;
 }
 
+.section-refresh {
+  flex: none;
+  margin-left: 4px;
+  width: 22px;
+  font: inherit;
+  font-size: var(--fs);
+  color: var(--text-muted);
+  background: transparent;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+  line-height: 1;
+}
+.section-refresh:hover:not(:disabled) { color: var(--text); }
+.section-refresh:disabled { color: var(--text-faint); cursor: wait; }
+
 .placeholder { color: var(--text-muted); font-size: var(--fs-sm); margin: var(--pane-pad); }
 .muted { color: var(--text-muted); }

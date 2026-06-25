@@ -56,6 +56,7 @@ export {
   pullPrefixKey,
   repoLabelsKey,
   pullsKey,
+  pullsRoute,
   pullsPrefixKey,
   reposKey,
   reposRefreshRoute,
@@ -79,6 +80,7 @@ export const reposOptions = (enabled: boolean) => ({
 export const pullsOptions = (owner: string, repo: string, state: 'open' | 'closed', enabled: boolean) => ({
   queryKey: pullsKey(owner, repo, state),
   enabled,
+  refetchInterval: 60_000,
   queryFn: async ({ signal }: QueryContext): Promise<Pull[]> => readJson<Pull[]>(pullsRoute(owner, repo, state), { signal }),
 })
 
