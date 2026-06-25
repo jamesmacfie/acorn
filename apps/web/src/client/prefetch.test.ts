@@ -25,6 +25,7 @@ const detail = {
   labels: [],
   reviews: [],
   comments: [],
+  commits: [],
   checks: [],
   threads: [],
 }

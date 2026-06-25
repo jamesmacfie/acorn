@@ -8,6 +8,7 @@ const baseDetail = (overrides: Partial<PullDetail> = {}): PullDetail => ({
   labels: [],
   reviews: [],
   comments: [],
+  commits: [],
   checks: [],
   threads: [],
   ...overrides,
@@ -51,16 +52,17 @@ describe('pull detail model', () => {
     expect(entries.map((entry) => entry.id)).toEqual(['r2'])
   })
 
-  it('sorts reviews, comments, and non-empty threads by first visible time', () => {
+  it('sorts reviews, comments, commits, and non-empty threads by first visible time', () => {
     const entries = buildConversationEntries(
       baseDetail({
         reviews: [{ id: 'r1', author: 'a', state: 'APPROVED', body: null, submittedAt: 20 }],
         comments: [{ id: 'c1', author: 'c', body: '<p>comment</p>', createdAt: 10 }],
+        commits: [{ sha: 'abc1234', message: 'ship it', author: 'Ada', authorLogin: 'ada', committedAt: 25 }],
         threads: [thread('t1')],
       }),
     )
 
-    expect(entries.map((entry) => entry.kind)).toEqual(['comment', 'review', 'thread'])
+    expect(entries.map((entry) => entry.kind)).toEqual(['comment', 'review', 'commit', 'thread'])
   })
 
   it('extracts thread snippets on the requested diff side', () => {
@@ -83,9 +85,10 @@ describe('pull detail model', () => {
     const detail = baseDetail({
       comments: Array.from({ length: 1000 }, (_, i) => ({ id: `c${i}`, author: 'octo', body: '<p>x</p>', createdAt: i })),
       reviews: Array.from({ length: 1000 }, (_, i) => ({ id: `r${i}`, author: 'octo', state: 'APPROVED', body: null, submittedAt: i + 1000 })),
+      commits: Array.from({ length: 1000 }, (_, i) => ({ sha: `sha${i}`, message: 'commit', author: 'octo', authorLogin: 'octo', committedAt: i + 2000 })),
       threads: Array.from({ length: 1000 }, (_, i) => ({
         ...thread(`t${i}`),
-        comments: [{ id: `tc${i}`, databaseId: i, author: 'octo', body: '<p>x</p>', createdAt: i + 2000 }],
+        comments: [{ id: `tc${i}`, databaseId: i, author: 'octo', body: '<p>x</p>', createdAt: i + 3000 }],
       })),
     })
 
@@ -93,7 +96,7 @@ describe('pull detail model', () => {
     const entries = buildConversationEntries(detail)
     const elapsed = performance.now() - start
 
-    expect(entries).toHaveLength(3000)
+    expect(entries).toHaveLength(4000)
     expect(elapsed).toBeLessThan(250)
   })
 })

@@ -1,6 +1,6 @@
 import gitdiffParser from 'gitdiff-parser'
 import { synth } from '../../diff'
-import type { Comment, PullDetail, PullFile, Review, Thread } from '../../queries'
+import type { Comment, PullCommit, PullDetail, PullFile, Review, Thread } from '../../queries'
 
 export function hasRenderableBody(body: string | null | undefined): boolean {
   if (!body) return false
@@ -42,6 +42,7 @@ export const threadCreatedAt = (thread: Thread) => firstThreadComment(thread)?.c
 export type ConversationEntry =
   | { kind: 'review'; id: string; createdAt: number | null; review: Review }
   | { kind: 'comment'; id: string; createdAt: number | null; comment: Comment }
+  | { kind: 'commit'; id: string; createdAt: number | null; commit: PullCommit }
   | { kind: 'thread'; id: string; createdAt: number | null; thread: Thread }
 
 export type SnippetLine = {
@@ -57,6 +58,7 @@ export function buildConversationEntries(data: PullDetail | undefined): Conversa
   return [
     ...data.reviews.filter(shouldShowReviewSummary).map((review) => ({ kind: 'review' as const, id: review.id, createdAt: review.submittedAt, review })),
     ...data.comments.map((comment) => ({ kind: 'comment' as const, id: comment.id, createdAt: comment.createdAt, comment })),
+    ...data.commits.map((commit) => ({ kind: 'commit' as const, id: commit.sha, createdAt: commit.committedAt, commit })),
     ...data.threads.filter((thread) => thread.comments.length > 0).map((thread) => ({ kind: 'thread' as const, id: thread.threadId, createdAt: threadCreatedAt(thread), thread })),
   ].sort((a, b) => (a.createdAt ?? Number.MAX_SAFE_INTEGER) - (b.createdAt ?? Number.MAX_SAFE_INTEGER))
 }

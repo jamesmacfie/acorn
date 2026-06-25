@@ -238,8 +238,8 @@ function DiffForPull(props: { route: PullRoute }) {
     })
   }
 
-  const shouldMeasureRow = (row: Row) => row.kind === 'thread'
-  const shouldMeasureBand = (band: SplitBand) => band.kind === 'full' && band.row.kind === 'thread'
+  const shouldMeasureRow = (row: Row) => row.kind === 'thread' || isCodeRow(row)
+  const shouldMeasureBand = (band: SplitBand) => band.kind === 'pair' || (band.kind === 'full' && band.row.kind === 'thread')
 
   const virtualRows = createMemo(() => {
     const list = rows()

@@ -14,6 +14,7 @@ import { pulls } from './routes/pulls'
 import { pullsBatch } from './routes/pullsBatch'
 import { mentions } from './routes/mentions'
 import { repos } from './routes/repos'
+import { repoLabels } from './routes/repoLabels'
 
 // One Worker, both /auth and /api. Non-matching paths never reach here — run_worker_first
 // in wrangler.jsonc routes only /api/* and /auth/* to the Worker; the SPA serves the rest.
@@ -25,6 +26,7 @@ const app = new Hono<AppEnv>()
   .route('/api/pins', pins)
   .route('/api/prefs', prefs)
   .route('/api/repos', repos)
+  .route('/api/repos', repoLabels) // /:owner/:repo/labels — repo label choices for the PR picker
   .route('/api/repos', pulls) // repo-scoped sub-resources, e.g. /:owner/:repo/pulls
   .route('/api/repos', pullDetail) // /:owner/:repo/pulls/:number
   .route('/api/repos', pullFiles) // /:owner/:repo/pulls/:number/files

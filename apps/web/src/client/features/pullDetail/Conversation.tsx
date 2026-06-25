@@ -1,6 +1,6 @@
 import { createMemo, For, Show } from 'solid-js'
 import { formatRelativeTime } from '../../displayMeta'
-import type { Thread, ThreadComment } from '../../queries'
+import type { PullCommit, Thread, ThreadComment } from '../../queries'
 import { UserAvatar } from '../../UserAvatar'
 import { hasRenderableBody, reviewAction, threadComments, threadSnippetFromIndex, type ConversationEntry, type ThreadSnippetIndex } from './model'
 
@@ -9,24 +9,38 @@ export function ConversationEntryItem(props: {
   snippetIndex: ThreadSnippetIndex
   onOpenFile: (path: string) => void
 }) {
+  switch (props.entry.kind) {
+    case 'comment':
+      return <ConversationItem author={props.entry.comment.author} action="commented" body={props.entry.comment.body} createdAt={props.entry.createdAt} />
+    case 'review':
+      return <ConversationItem author={props.entry.review.author} action={reviewAction(props.entry.review.state)} body={props.entry.review.body} state={props.entry.review.state} createdAt={props.entry.createdAt} />
+    case 'commit':
+      return <CommitItem commit={props.entry.commit} />
+    case 'thread':
+      return <FileThreadItem thread={props.entry.thread} snippetIndex={props.snippetIndex} onOpenFile={props.onOpenFile} />
+  }
+}
+
+function CommitItem(props: { commit: PullCommit }) {
+  const shortSha = () => props.commit.sha.slice(0, 7)
+  const author = () => props.commit.author ?? props.commit.authorLogin ?? 'unknown'
+
   return (
-    <Show
-      when={props.entry.kind === 'thread' ? props.entry : null}
-      fallback={
-        <Show
-          when={props.entry.kind === 'review' ? props.entry : null}
-          fallback={
-            <Show when={props.entry.kind === 'comment' ? props.entry : null}>
-              {(entry) => <ConversationItem author={entry().comment.author} action="commented" body={entry().comment.body} createdAt={entry().createdAt} />}
-            </Show>
-          }
-        >
-          {(entry) => <ConversationItem author={entry().review.author} action={reviewAction(entry().review.state)} body={entry().review.body} state={entry().review.state} createdAt={entry().createdAt} />}
-        </Show>
-      }
-    >
-      {(entry) => <FileThreadItem thread={entry().thread} snippetIndex={props.snippetIndex} onOpenFile={props.onOpenFile} />}
-    </Show>
+    <div class="commit-row">
+      <UserAvatar login={props.commit.authorLogin} />
+      <div class="commit-main">
+        <div class="commit-primary">
+          <span class="commit-sha">{shortSha()}</span>
+          <span class="commit-message">{props.commit.message || 'No commit message.'}</span>
+        </div>
+        <div class="commit-secondary">
+          <span class="commit-author">{author()}</span>
+          <Show when={formatRelativeTime(props.commit.committedAt)}>
+            {(age) => <span class="comment-time">{age()}</span>}
+          </Show>
+        </div>
+      </div>
+    </div>
   )
 }
 

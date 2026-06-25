@@ -99,6 +99,21 @@ export const comments = sqliteTable(
   (t) => [primaryKey({ columns: [t.userId, t.repoId, t.number, t.id] })],
 )
 
+export const prCommits = sqliteTable(
+  'pr_commits',
+  {
+    userId: text('user_id').notNull(),
+    repoId: integer('repo_id').notNull(),
+    number: integer('number').notNull(),
+    sha: text('sha').notNull(),
+    message: text('message').notNull(),
+    author: text('author'),
+    authorLogin: text('author_login'),
+    committedAt: integer('committed_at'),
+  },
+  (t) => [primaryKey({ columns: [t.userId, t.repoId, t.number, t.sha] })],
+)
+
 // Inline review-comment threads. One row per comment; thread-level fields (path/line/side/
 // resolved) are denormalized onto each row. databaseId is the numeric id REST needs for replies.
 export const reviewThreads = sqliteTable(

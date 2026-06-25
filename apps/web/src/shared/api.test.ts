@@ -11,6 +11,8 @@ import {
   pullKey,
   pullPrefixKey,
   pullRoute,
+  repoLabelsKey,
+  repoLabelsRoute,
   closedPullsRoute,
   pullsKey,
   pullsPrefixKey,
@@ -33,6 +35,7 @@ describe('shared API contract helpers', () => {
     expect(repoRoute('octo', 'repo', 'actions/123/rerun')).toBe('/api/repos/octo/repo/actions/123/rerun')
     expect(pullsRoute('octo', 'repo', 'open')).toBe('/api/repos/octo/repo/pulls?state=open')
     expect(closedPullsRoute('octo', 'repo', 2)).toBe('/api/repos/octo/repo/pulls?state=closed&page=2')
+    expect(repoLabelsRoute('octo', 'repo')).toBe('/api/repos/octo/repo/labels')
     expect(pullRoute('octo', 'repo', '12')).toBe('/api/repos/octo/repo/pulls/12')
     expect(pullRoute('octo', 'repo', '12', 'files')).toBe('/api/repos/octo/repo/pulls/12/files')
     expect(fileSummariesRoute('octo', 'repo', '12')).toBe('/api/repos/octo/repo/pulls/12/files?summary=1')
@@ -50,6 +53,7 @@ describe('shared API contract helpers', () => {
     expect(pullsPrefixKey('octo', 'repo')).toEqual(['pulls', 'octo', 'repo'])
     expect(pullKey('octo', 'repo', '12')).toEqual(['pull', 'octo', 'repo', '12'])
     expect(pullPrefixKey('octo', 'repo')).toEqual(['pull', 'octo', 'repo'])
+    expect(repoLabelsKey('octo', 'repo')).toEqual(['labels', 'octo', 'repo'])
     expect(filesKey('octo', 'repo', '12')).toEqual(['files', 'octo', 'repo', '12'])
     expect(fileSummariesKey('octo', 'repo', '12')).toEqual(['files', 'octo', 'repo', '12', 'summary'])
     expect(filePatchKey('octo', 'repo', '12', 'src/app.ts')).toEqual(['files', 'octo', 'repo', '12', 'patch', 'src/app.ts'])

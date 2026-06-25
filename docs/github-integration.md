@@ -52,15 +52,17 @@ a shared package until a third consumer justifies it.
 | acorn operation | API | GitHub endpoint |
 | --- | --- | --- |
 | Repos list | REST | `GET /user/repos?sort=pushed&direction=desc&per_page=100` |
+| Repo labels | REST | `GET /repos/{owner}/{repo}/labels?per_page=100` |
 | PR list | REST | `GET /repos/{owner}/{repo}/pulls?state={state}&sort=updated&direction=desc&per_page=100` (conditional `If-None-Match`) |
 | PR files + patches | REST | `GET /repos/{owner}/{repo}/pulls/{n}/files?per_page=100` |
-| PR detail (composite) | GraphQL | `repository.pullRequest { … reviews comments reviewThreads commits.statusCheckRollup }` |
+| PR detail (composite) | GraphQL | `repository.pullRequest { … reviews comments commitTimeline reviewThreads latestCommit.statusCheckRollup }` |
 
 The composite GraphQL query pulls `id number title state isDraft bodyHTML
 headRefOid author baseRefName headRefName updatedAt`, plus `labels` (first 20),
-`reviews` / `comments` / `reviewThreads` (first 50), and the latest commit's
-`statusCheckRollup` contexts (`CheckRun` and `StatusContext`). Files are *not*
-in the composite — the richer REST `/files` endpoint owns `pr_files`.
+`reviews` / `comments` / `reviewThreads` (first 50), timeline commits (first
+100), and the latest commit's `statusCheckRollup` contexts (`CheckRun` and
+`StatusContext`). Files are *not* in the composite — the richer REST `/files`
+endpoint owns `pr_files`.
 
 > `ponytail:` first-page only — cursor pagination for reviews/comments/threads,
 > and Link-header pagination for repos/PRs/files, are deferred.

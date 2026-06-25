@@ -33,6 +33,7 @@ export type PullFile = {
 export type PullFilesPatchRequest = { paths: string[] }
 export type Review = { id: string; author: string | null; state: string | null; body: string | null; submittedAt: number | null }
 export type Comment = { id: string; author: string | null; body: string | null; createdAt: number | null }
+export type PullCommit = { sha: string; message: string; author: string | null; authorLogin: string | null; committedAt: number | null }
 export type Check = { name: string; status: string | null; url: string | null; runId: number | null }
 export type Label = { name: string; color: string | null }
 export type ThreadComment = { id: string; databaseId: number | null; author: string | null; body: string | null; createdAt: number | null }
@@ -49,6 +50,7 @@ export type PullDetail = {
   labels: Label[]
   reviews: Review[]
   comments: Comment[]
+  commits: PullCommit[]
   checks: Check[]
   threads: Thread[]
 }
@@ -76,6 +78,7 @@ export const pullsRoute = (owner: string, repo: string, state: 'open' | 'closed'
 export const closedPullsRoute = (owner: string, repo: string, page: number) => `${pullsRoute(owner, repo, 'closed')}&page=${page}`
 export const pullsBatchRoute = (owner: string, repo: string) => `${repoRoute(owner, repo)}/pulls/batch`
 export const createPullRoute = (owner: string, repo: string) => `${repoRoute(owner, repo)}/pulls`
+export const repoLabelsRoute = (owner: string, repo: string) => repoRoute(owner, repo, 'labels')
 export const fileSummariesRoute = (owner: string, repo: string, number: string | number) => `${pullRoute(owner, repo, number, 'files')}?summary=1`
 export const filePatchRoute = (owner: string, repo: string, number: string | number, path: string) =>
   `${pullRoute(owner, repo, number, 'files')}?path=${encodeURIComponent(path)}`
@@ -100,6 +103,7 @@ export const closedPullsKey = (owner: string, repo: string) => ['pulls', owner, 
 export const pullsPrefixKey = (owner: string, repo: string) => ['pulls', owner, repo] as const
 export const pullKey = (owner: string, repo: string, number: string) => ['pull', owner, repo, number] as const
 export const pullPrefixKey = (owner: string, repo: string) => ['pull', owner, repo] as const
+export const repoLabelsKey = (owner: string, repo: string) => ['labels', owner, repo] as const
 export const filesKey = (owner: string, repo: string, number: string) => ['files', owner, repo, number] as const
 export const fileSummariesKey = (owner: string, repo: string, number: string) => ['files', owner, repo, number, 'summary'] as const
 export const filePatchKey = (owner: string, repo: string, number: string, path: string) => ['files', owner, repo, number, 'patch', path] as const

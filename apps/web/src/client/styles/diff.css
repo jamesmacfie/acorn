@@ -21,15 +21,21 @@
   left: 0;
   display: flex;
   flex-wrap: wrap; /* lets an inline composer drop to its own line below the code */
-  align-items: center;
-  width: max-content;
+  align-items: flex-start;
+  width: 100%;
   min-width: 100%;
   min-height: 20px;
-  white-space: pre;
+  white-space: normal;
 }
 .diff-gutter { flex: none; width: 44px; padding-right: 8px; text-align: right; color: var(--text-faint); user-select: none; }
 .diff-marker { flex: none; width: 14px; text-align: center; color: var(--text-faint); user-select: none; }
-.diff-code { flex: 1; padding-right: var(--pane-pad); }
+.diff-code {
+  flex: 1 1 0;
+  min-width: 0;
+  padding-right: var(--pane-pad);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
 .diff-add { background: var(--add-bg); }
 .diff-add .diff-marker { color: var(--add-marker); }
 .diff-del { background: var(--del-bg); }
@@ -251,13 +257,13 @@
 .diff-split-cell {
   display: flex;
   flex-wrap: wrap;
-  align-items: center;
+  align-items: flex-start;
   min-width: 0;
-  white-space: pre;
+  white-space: normal;
   border-left: 1px solid var(--border);
 }
 .diff-split-cell:first-child { border-left: 0; }
-.diff-split-cell .diff-code { min-width: 0; overflow-x: auto; }
+.diff-split-cell .diff-code { min-width: 0; }
 .diff-split-empty { background: var(--bg-subtle); }
 .diff-split-full { width: 100%; white-space: normal; }
 .diff-split-full.diff-hunk { display: block; white-space: pre; }

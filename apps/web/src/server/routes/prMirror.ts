@@ -26,11 +26,12 @@ fragment PrFields on PullRequest {
   labels(first: 20) { nodes { name color } }
   reviews(first: 50) { nodes { id author { login } state bodyHTML submittedAt } }
   comments(first: 50) { nodes { id author { login } bodyHTML createdAt } }
+  commitTimeline: commits(first: 100) { nodes { commit { oid messageHeadline committedDate author { name user { login } } } } }
   reviewThreads(first: 50) { nodes {
     id isResolved path line originalLine diffSide
     comments(first: 50) { nodes { id databaseId author { login } bodyHTML createdAt } }
   } }
-  commits(last: 1) { nodes { commit { statusCheckRollup { contexts(first: 50) { nodes {
+  latestCommit: commits(last: 1) { nodes { commit { statusCheckRollup { contexts(first: 50) { nodes {
     __typename
     ... on CheckRun { name status conclusion detailsUrl checkSuite { workflowRun { databaseId } } }
     ... on StatusContext { context state targetUrl }
@@ -53,8 +54,18 @@ export type GqlPull = {
   labels: { nodes: { name: string; color: string | null }[] }
   reviews: { nodes: { id: string; author: { login: string } | null; state: string; bodyHTML: string | null; submittedAt: string | null }[] }
   comments: { nodes: { id: string; author: { login: string } | null; bodyHTML: string | null; createdAt: string | null }[] }
+  commitTimeline: {
+    nodes: {
+      commit: {
+        oid: string
+        messageHeadline: string
+        committedDate: string | null
+        author: { name: string | null; user: { login: string } | null } | null
+      }
+    }[]
+  }
   reviewThreads: { nodes: GqlThread[] }
-  commits: { nodes: { commit: { statusCheckRollup: { contexts: { nodes: GqlContext[] } } | null } }[] }
+  latestCommit: { nodes: { commit: { statusCheckRollup: { contexts: { nodes: GqlContext[] } } | null } }[] }
 }
 type GqlThreadComment = {
   id: string
@@ -127,6 +138,14 @@ export const mirrorPr = async (db: Db, key: PrKey, pr: GqlPull, now: number) => 
     body: m.bodyHTML,
     createdAt: ms(m.createdAt),
   }))
+  const commitRows = pr.commitTimeline.nodes.map(({ commit }) => ({
+    ...key,
+    sha: commit.oid,
+    message: commit.messageHeadline,
+    author: commit.author?.name ?? commit.author?.user?.login ?? null,
+    authorLogin: commit.author?.user?.login ?? null,
+    committedAt: ms(commit.committedDate),
+  }))
   const threadRows = pr.reviewThreads.nodes.flatMap((t) =>
     t.comments.nodes.map((cm) => ({
       ...key,
@@ -143,7 +162,7 @@ export const mirrorPr = async (db: Db, key: PrKey, pr: GqlPull, now: number) => 
     })),
   )
   const checkRows = dedupeByName(
-    (pr.commits.nodes[0]?.commit.statusCheckRollup?.contexts.nodes ?? []).map((ctx) =>
+    (pr.latestCommit.nodes[0]?.commit.statusCheckRollup?.contexts.nodes ?? []).map((ctx) =>
       ctx.__typename === 'CheckRun'
         ? { ...key, name: ctx.name, status: ctx.conclusion ?? ctx.status, url: ctx.detailsUrl, runId: ctx.checkSuite?.workflowRun?.databaseId ?? null }
         : { ...key, name: ctx.context, status: ctx.state, url: ctx.targetUrl, runId: null },
@@ -167,11 +186,13 @@ export const mirrorPr = async (db: Db, key: PrKey, pr: GqlPull, now: number) => 
     db.delete(schema.prLabels).where(childWhere(schema.prLabels, key)),
     db.delete(schema.reviews).where(childWhere(schema.reviews, key)),
     db.delete(schema.comments).where(childWhere(schema.comments, key)),
+    db.delete(schema.prCommits).where(childWhere(schema.prCommits, key)),
     db.delete(schema.checks).where(childWhere(schema.checks, key)),
     db.delete(schema.reviewThreads).where(childWhere(schema.reviewThreads, key)),
     ...chunk(schema.prLabels, labelRows),
     ...chunk(schema.reviews, reviewRows),
     ...chunk(schema.comments, commentRows),
+    ...chunk(schema.prCommits, commitRows),
     ...chunk(schema.checks, checkRows),
     ...chunk(schema.reviewThreads, threadRows),
     db
@@ -212,10 +233,11 @@ export const readComposite = async (db: Db, key: PrKey): Promise<PullDetail> => 
     eq(schema.pullRequests.number, key.number),
   )
   const [pull] = await db.select().from(schema.pullRequests).where(prWhere)
-  const [labels, reviews, comments, checks, threadRows] = await Promise.all([
+  const [labels, reviews, comments, commits, checks, threadRows] = await Promise.all([
     db.select().from(schema.prLabels).where(childWhere(schema.prLabels, key)),
     db.select().from(schema.reviews).where(childWhere(schema.reviews, key)),
     db.select().from(schema.comments).where(childWhere(schema.comments, key)),
+    db.select().from(schema.prCommits).where(childWhere(schema.prCommits, key)),
     db.select().from(schema.checks).where(childWhere(schema.checks, key)),
     db.select().from(schema.reviewThreads).where(childWhere(schema.reviewThreads, key)),
   ])
@@ -230,6 +252,7 @@ export const readComposite = async (db: Db, key: PrKey): Promise<PullDetail> => 
     labels: labels.map((l) => ({ name: l.name, color: l.color })),
     reviews: reviews.map((r) => ({ id: r.id, author: r.author, state: r.state, body: r.body, submittedAt: r.submittedAt })),
     comments: comments.map((m) => ({ id: m.id, author: m.author, body: m.body, createdAt: m.createdAt })),
+    commits: commits.map((m) => ({ sha: m.sha, message: m.message, author: m.author, authorLogin: m.authorLogin, committedAt: m.committedAt })),
     checks: checks.map((k) => ({ name: k.name, status: k.status, url: k.url, runId: k.runId })),
     threads: [...tmap.values()],
   }

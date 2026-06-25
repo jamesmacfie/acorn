@@ -81,6 +81,7 @@ staleness** — freshness is governed centrally by `sync_state`
 | `pr_files` | `path` | `status`, `additions`, `deletions`, `sha` (blob sha), `patch` (private-repo body only; public bodies live in KV) |
 | `reviews` | `id` (node id) | `author`, `state`, `body`, `submittedAt` |
 | `comments` | `id` (node id) | `author`, `body`, `createdAt` |
+| `pr_commits` | `sha` | `message`, `author`, `authorLogin`, `committedAt` |
 | `review_threads` | `id` (comment node id) | inline review-comment threads. Thread-level fields (`threadId`, `path`, `line`, `side`, `resolved`) are denormalized onto each comment row. `databaseId` is the numeric id REST needs for replies |
 | `pr_labels` | `name` | `color` (6-hex, no leading `#`) |
 | `checks` | `name` | `status`, `url`, `runId` (the Actions `workflowRun.databaseId`; null for status contexts — enables rerun-failed-jobs) |

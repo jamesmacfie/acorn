@@ -71,6 +71,13 @@
       "when": 1782198631506,
       "tag": "0009_groovy_jamie_braddock",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "6",
+      "when": 1782377137657,
+      "tag": "0010_wide_blazing_skull",
+      "breakpoints": true
     }
   ]
 }

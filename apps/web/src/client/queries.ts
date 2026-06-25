@@ -29,6 +29,8 @@ import {
   pullRoute,
   pullsKey,
   pullsRoute,
+  repoLabelsKey,
+  repoLabelsRoute,
   reposKey,
   reposRoute,
   type Branch,
@@ -37,6 +39,7 @@ import {
   type FileBlob,
   type Me,
   type Pull,
+  type Label,
   type PullDetail,
   type PullFile,
   type PullFilesPatchRequest,
@@ -51,12 +54,13 @@ export {
   prefsKey,
   pullKey,
   pullPrefixKey,
+  repoLabelsKey,
   pullsKey,
   pullsPrefixKey,
   reposKey,
   reposRefreshRoute,
 } from '../shared/api'
-export type { Branch, Check, Comment, Compare, CompareCommit, Label, Me, Pull, PullDetail, PullFile, Repo, Review, Thread, ThreadComment } from '../shared/api'
+export type { Branch, Check, Comment, Compare, CompareCommit, Label, Me, Pull, PullCommit, PullDetail, PullFile, Repo, Review, Thread, ThreadComment } from '../shared/api'
 
 type QueryContext = { signal?: AbortSignal }
 type PageQueryContext = QueryContext & { pageParam: number }
@@ -92,6 +96,13 @@ export const pullDetailOptions = (owner: string, repo: string, number: string, e
   queryKey: pullKey(owner, repo, number),
   enabled,
   queryFn: async ({ signal }: QueryContext): Promise<PullDetail> => readJson<PullDetail>(pullRoute(owner, repo, number), { signal }),
+})
+
+export const repoLabelsOptions = (owner: string, repo: string, enabled: boolean) => ({
+  queryKey: repoLabelsKey(owner, repo),
+  enabled,
+  staleTime: 5 * 60 * 1000,
+  queryFn: async ({ signal }: QueryContext): Promise<Label[]> => readJson<Label[]>(repoLabelsRoute(owner, repo), { signal }),
 })
 
 export const pinsOptions = (enabled: boolean) => ({

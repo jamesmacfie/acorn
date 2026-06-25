@@ -3,7 +3,8 @@ import { createMutation, createQuery, useQueryClient } from '@tanstack/solid-que
 import { useParams, useSearchParams } from '@solidjs/router'
 import { fileStatusMeta, formatRelativeTime, summarizeFileStats } from './displayMeta'
 import { requestFileScroll, routeKey } from './fileNavigation'
-import { fileSummariesOptions, mentionsOptions, pullDetailOptions, pullPrefixKey, pullsPrefixKey, reposOptions } from './queries'
+import Picker from './Picker'
+import { fileSummariesOptions, mentionsOptions, pullDetailOptions, pullPrefixKey, pullsPrefixKey, repoLabelsOptions, reposOptions, type Label } from './queries'
 import MentionTextarea from './MentionTextarea'
 import { addComment, addLabel, closePr, mergePr, removeLabel, reopenPr, rerunFailed, setDraft, setViewed, submitReview } from './mutations'
 import { UserAvatar } from './UserAvatar'
@@ -12,6 +13,7 @@ import { buildConversationEntries, buildThreadSnippetIndex } from './features/pu
 
 // Conclusions that count as a failed check → eligible for "Rerun failed jobs".
 const FAILED_STATUSES = new Set(['failure', 'error', 'cancelled', 'timed_out'])
+const labelColor = (color: string | null | undefined) => (color ? `#${color}` : 'var(--text-faint)')
 
 // Mid (Navigator) pane: PR header + description + changed-files + checks + conversation.
 // Bodies are GitHub-sanitized bodyHTML, rendered via innerHTML (docs/ui-style.md §5).
@@ -29,10 +31,16 @@ export default function PullDetail() {
   const detail = createQuery(() => pullDetailOptions(o(), r(), n(), hasPullParams()))
   const files = createQuery(() => fileSummariesOptions(o(), r(), n(), hasPullParams()))
   const mentionsQuery = createQuery(() => mentionsOptions(o(), r(), hasRepoParams()))
+  const repoLabels = createQuery(() => repoLabelsOptions(o(), r(), hasRepoParams()))
   const mentionsList = () => mentionsQuery.data ?? []
   const fileSummary = createMemo(() => summarizeFileStats(files.data))
   const conversationEntries = createMemo(() => buildConversationEntries(detail.data))
   const threadSnippetIndex = createMemo(() => buildThreadSnippetIndex(files.data))
+  const assignedLabelNames = createMemo(() => new Set((detail.data?.labels ?? []).map((label) => label.name.toLowerCase())))
+  const labelResults = (query: string): Label[] => {
+    const q = query.trim().toLowerCase()
+    return (repoLabels.data ?? []).filter((label) => !assignedLabelNames().has(label.name.toLowerCase()) && (!q || label.name.toLowerCase().includes(q)))
+  }
 
   // Refetch detail (and the open-PR list, since state changes drop a PR from it) after a mutation.
   const refresh = () => {
@@ -42,7 +50,6 @@ export default function PullDetail() {
 
   const [mergeMethod, setMergeMethod] = createSignal('squash')
   const [draftText, setDraftText] = createSignal('')
-  const [labelText, setLabelText] = createSignal('')
   const [reviewBody, setReviewBody] = createSignal('')
   const [actionError, setActionError] = createSignal('')
   const run = (p: Promise<unknown>) => p.then(refresh).catch((e) => setActionError(String(e.message ?? e)))
@@ -66,11 +73,7 @@ export default function PullDetail() {
     if (!body) return
     run(comment.mutateAsync(body)).then(() => setDraftText(''))
   }
-  const submitLabel = () => {
-    const name = labelText().trim()
-    if (!name) return
-    run(addLabel(o(), r(), n(), name)).then(() => setLabelText(''))
-  }
+  const chooseLabel = (label: Label) => run(addLabel(o(), r(), n(), label.name))
   const selectFile = (path: string) => {
     setSearchParams({ file: path })
     requestFileScroll({ routeKey: routeKey(o(), r(), n()), path })
@@ -154,28 +157,31 @@ export default function PullDetail() {
 
             <details class="nav-section" open>
               <summary>Labels</summary>
-              <div class="labels">
-                <For each={detail.data?.labels} fallback={<span class="muted">None.</span>}>
+              <ul class="label-list">
+                <For each={detail.data?.labels} fallback={<li class="label-empty muted">None.</li>}>
                   {(l) => (
-                    <button
-                      type="button"
-                      class="label-chip"
-                      title="Remove label"
-                      style={l.color ? { 'border-color': `#${l.color}` } : undefined}
-                      onClick={() => run(removeLabel(o(), r(), n(), l.name))}
-                    >
-                      {l.name} ✕
-                    </button>
+                    <li class="label-row" style={{ 'border-left-color': labelColor(l.color) }}>
+                      <span class="label-row-name">{l.name}</span>
+                      <button type="button" class="label-row-remove" title="Remove label" onClick={() => run(removeLabel(o(), r(), n(), l.name))}>
+                        ×
+                      </button>
+                    </li>
                   )}
                 </For>
-              </div>
-              <div class="composer">
-                <input
-                  class="pr-filter"
-                  placeholder="Add label…"
-                  value={labelText()}
-                  onInput={(e) => setLabelText(e.currentTarget.value)}
-                  onKeyDown={(e) => e.key === 'Enter' && submitLabel()}
+              </ul>
+              <div class="label-picker">
+                <Picker<Label>
+                  label="Add label…"
+                  placeholder="Filter labels…"
+                  emptyText={repoLabels.isLoading ? 'Loading labels…' : 'No labels available.'}
+                  results={labelResults}
+                  rowLabel={(label) => label.name}
+                  isActive={() => false}
+                  onSelect={chooseLabel}
+                  buttonClass="label-picker-button"
+                  leading={(label) => (
+                    <span class="label-picker-swatch" style={{ background: labelColor(label.color) }} aria-hidden="true" />
+                  )}
                 />
               </div>
             </details>
@@ -244,7 +250,7 @@ export default function PullDetail() {
 
             <details class="nav-section" open>
               <summary>
-                Conversation{' '}
+                Comments/Commits{' '}
                 <span class="muted">({conversationEntries().length})</span>
               </summary>
               <Show when={detail.data}>
@@ -262,7 +268,7 @@ export default function PullDetail() {
                 </div>
               </Show>
               <div class="conversation-items">
-                <For each={conversationEntries()} fallback={<span class="muted conversation-empty">No comments.</span>}>
+                <For each={conversationEntries()} fallback={<span class="muted conversation-empty">No comments or commits.</span>}>
                   {(entry) => (
                     <ConversationEntryItem entry={entry} snippetIndex={threadSnippetIndex()} onOpenFile={selectFile} />
                   )}

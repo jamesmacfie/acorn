@@ -119,6 +119,7 @@ The composite read (GraphQL; mirror, ~45 s TTL, **TTL-only** — no ETag).
     labels:   { name, color }[],
     reviews:  { id, author, state, body, submittedAt }[],
     comments: { id, author, body, createdAt }[],
+    commits:  { sha, message, author, authorLogin, committedAt }[],
     checks:   { name, status, url, runId }[],
     threads:  { threadId, path, line, side, resolved, comments: ThreadComment[] }[],
   }
@@ -197,6 +198,17 @@ Add a discussion comment. Body `{ body: string }`.
 ```ts
 200 → { id, author, body, createdAt }
 400 → { error: 'empty_body' }
+502 → { error: 'github_unavailable' }
+```
+
+### `GET /api/repos/:owner/:repo/labels`
+
+Repo label choices for the PR label picker. Returns the first 100 GitHub labels sorted by name.
+
+```ts
+200 → { name, color }[]
+401 → { error: 'unauthenticated' } | { error: 'reauth' }
+404 → { error: 'repo_not_found' }
 502 → { error: 'github_unavailable' }
 ```
 

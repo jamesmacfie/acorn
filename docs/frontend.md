@@ -66,7 +66,7 @@ Feature-owned helpers sit next to the views that use them:
 
 - `features/diff/model.ts` parses patches, attaches word diffs, builds renderable rows, and derives split-mode bands.
 - `features/diff/DiffRows.tsx` renders non-code rows, code lines, split cells, line composers, and review-thread rows.
-- `features/pullDetail/model.ts` merges reviews, issue comments, and review threads into conversation entries and extracts file-thread snippets.
+- `features/pullDetail/model.ts` merges reviews, issue comments, commits, and review threads into conversation entries and extracts file-thread snippets.
 - `features/pullDetail/Conversation.tsx` renders the conversation cards used by `PullDetail`.
 
 ### PullList
@@ -75,11 +75,11 @@ Reads the shared `repos` cache and gates the `pulls` query on `repoKnown()` — 
 
 ### PullDetail
 
-Gates its `pull` + `files` queries on `repoKnown() && params.number`. Builds a single time-sorted `conversationEntries` memo via `features/pullDetail/model.ts`, merging reviews, issue comments, and review threads (`{ kind: 'review' | 'comment' | 'thread' }`). Renders:
+Gates its `pull` + `files` queries on the routed PR number. Builds a single time-sorted `conversationEntries` memo via `features/pullDetail/model.ts`, merging reviews, issue comments, commits, and review threads (`{ kind: 'review' | 'comment' | 'commit' | 'thread' }`). Renders:
 
 - Header: `#number`, title, state badge, author chip, `base ← head` branch flow, file/±line summary, relative age.
 - Action bar (state-dependent): merge-method `<select>` + **Merge** / **Close** / **Convert to draft**, or **Reopen** when closed.
-- Collapsible `<details>` sections: **Description** (sanitized `bodyHTML` via `innerHTML`), **Labels** (add/remove chips), **Files** (per-file viewed checkbox, status letter, ± stats; clicking sets `?file=` and dispatches a scroll request), **Checks** (status dots + **Rerun** on failed runs), **Conversation** (comment composer + entries; file threads render a context snippet parsed from the file patch).
+- Collapsible `<details>` sections: **Description** (sanitized `bodyHTML` via `innerHTML`), **Labels** (full-row assigned labels + repo-label picker), **Files** (per-file viewed checkbox, status letter, ± stats; clicking sets `?file=` and dispatches a scroll request), **Checks** (status dots + **Rerun** on failed runs), **Comments/Commits** (comment composer + mixed timeline; file threads render a context snippet parsed from the file patch).
 
 `refresh()` invalidates `['pull', owner, repo]` and `['pulls', owner, repo]` after any mutation, since state changes drop a PR from the open list.
 
@@ -144,7 +144,7 @@ Transient state that must not survive reload lives in `createSignal`, never in t
 
 - `App`: `collapsed`, `touched` (left-pane collapse).
 - `PullList`: `tab`, `filter`.
-- `PullDetail`: `mergeMethod`, `draftText`, `labelText`, `actionError`.
+- `PullDetail`: `mergeMethod`, `draftText`, `reviewBody`, `actionError`.
 - `RepoPicker`: `open`, `filter`, `refreshing`, `refreshFailed`.
 - `Shortcuts`: `overlay`, `filter`, `active`.
 - `DiffView`: `parsed`, `scrollEl`, plus per-composer `open`/`body`/`busy`/`err`.
