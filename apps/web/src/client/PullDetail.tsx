@@ -6,7 +6,7 @@ import { requestFileScroll, routeKey } from './fileNavigation'
 import Picker from './Picker'
 import { fileSummariesOptions, mentionsOptions, pullDetailOptions, pullPrefixKey, pullsPrefixKey, repoLabelsOptions, reposOptions, type Label } from './queries'
 import MentionTextarea from './MentionTextarea'
-import { addComment, addLabel, closePr, mergePr, removeLabel, reopenPr, rerunFailed, setDraft, setViewed, submitReview } from './mutations'
+import { addComment, addLabel, closePr, disableAutoMerge, enableAutoMerge, mergePr, removeLabel, reopenPr, rerunFailed, setDraft, setViewed, submitReview } from './mutations'
 import { UserAvatar } from './UserAvatar'
 import { ConversationEntryItem } from './features/pullDetail/Conversation'
 import { buildConversationEntries, buildThreadSnippetIndex } from './features/pullDetail/model'
@@ -66,6 +66,8 @@ export default function PullDetail() {
   }
 
   const merge = createMutation(() => ({ mutationFn: () => mergePr(o(), r(), n(), mergeMethod()) }))
+  const autoMergeEnable = createMutation(() => ({ mutationFn: () => enableAutoMerge(o(), r(), n(), mergeMethod()) }))
+  const autoMergeDisable = createMutation(() => ({ mutationFn: () => disableAutoMerge(o(), r(), n()) }))
   const close = createMutation(() => ({ mutationFn: () => closePr(o(), r(), n()) }))
   const reopen = createMutation(() => ({ mutationFn: () => reopenPr(o(), r(), n()) }))
   const draft = createMutation(() => ({ mutationFn: (d: boolean) => setDraft(o(), r(), n(), d) }))
@@ -131,14 +133,33 @@ export default function PullDetail() {
               </div>
               <Show when={pull().state === 'open'}>
                 <div class="pr-actions">
-                  <select class="repo-select" value={mergeMethod()} onChange={(e) => setMergeMethod(e.currentTarget.value)}>
-                    <option value="squash">squash</option>
-                    <option value="merge">merge</option>
-                    <option value="rebase">rebase</option>
-                  </select>
-                  <button type="button" onClick={() => run(merge.mutateAsync())} disabled={merge.isPending}>
-                    Merge
-                  </button>
+                  <Show when={!pull().autoMergeEnabled}>
+                    <select class="repo-select" value={mergeMethod()} onChange={(e) => setMergeMethod(e.currentTarget.value)}>
+                      <option value="squash">squash</option>
+                      <option value="merge">merge</option>
+                      <option value="rebase">rebase</option>
+                    </select>
+                  </Show>
+                  <Show when={pull().autoMergeEnabled}>
+                    <button type="button" onClick={() => run(autoMergeDisable.mutateAsync())} disabled={autoMergeDisable.isPending}>
+                      Disable auto-merge
+                    </button>
+                  </Show>
+                  <Show when={!pull().autoMergeEnabled && pull().mergeStateStatus === 'BLOCKED'}>
+                    <button type="button" onClick={() => run(autoMergeEnable.mutateAsync())} disabled={autoMergeEnable.isPending}>
+                      Enable auto-merge ({mergeMethod()})
+                    </button>
+                  </Show>
+                  <Show when={!pull().autoMergeEnabled && pull().mergeStateStatus !== 'BLOCKED'}>
+                    <button
+                      type="button"
+                      onClick={() => run(merge.mutateAsync())}
+                      disabled={merge.isPending || pull().mergeable === 'CONFLICTING'}
+                      title={pull().mergeable === 'CONFLICTING' ? 'Resolve merge conflicts before merging' : undefined}
+                    >
+                      Merge
+                    </button>
+                  </Show>
                   <button type="button" onClick={() => run(close.mutateAsync())} disabled={close.isPending}>
                     Close
                   </button>

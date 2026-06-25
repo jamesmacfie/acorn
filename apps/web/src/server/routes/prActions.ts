@@ -26,6 +26,37 @@ export const prActions = new Hono<AppEnv>()
     await setPrState(r.db, r.user.login, r.repoId, r.number, 'merged')
     return c.json({ state: 'merged' })
   })
+  // Enable auto-merge: PUT /pulls/{n}/auto-merge { merge_method }.
+  .post('/:owner/:repo/pulls/:number/auto-merge', async (c) => {
+    const r = await resolvePr(c)
+    if ('error' in r) return c.json({ error: r.error }, r.status)
+    const { method } = (await c.req.json().catch(() => ({}))) as { method?: string }
+    const res = await gh(r.user.token, `/repos/${r.owner}/${r.repo}/pulls/${r.number}/auto-merge`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ merge_method: method ?? 'merge' }),
+    })
+    const err = ghError(res)
+    if (err) return c.json({ error: err.error }, err.status)
+    await r.db
+      .update(schema.pullRequests)
+      .set({ autoMergeEnabled: true })
+      .where(and(eq(schema.pullRequests.userId, r.user.login), eq(schema.pullRequests.repoId, r.repoId), eq(schema.pullRequests.number, r.number)))
+    return c.json({ autoMergeEnabled: true })
+  })
+  // Disable auto-merge: DELETE /pulls/{n}/auto-merge.
+  .delete('/:owner/:repo/pulls/:number/auto-merge', async (c) => {
+    const r = await resolvePr(c)
+    if ('error' in r) return c.json({ error: r.error }, r.status)
+    const res = await gh(r.user.token, `/repos/${r.owner}/${r.repo}/pulls/${r.number}/auto-merge`, { method: 'DELETE' })
+    const err = ghError(res)
+    if (err) return c.json({ error: err.error }, err.status)
+    await r.db
+      .update(schema.pullRequests)
+      .set({ autoMergeEnabled: false })
+      .where(and(eq(schema.pullRequests.userId, r.user.login), eq(schema.pullRequests.repoId, r.repoId), eq(schema.pullRequests.number, r.number)))
+    return c.json({ autoMergeEnabled: false })
+  })
   // Close / reopen: PATCH /pulls/{n} { state }.
   .post('/:owner/:repo/pulls/:number/:action{close|reopen}', async (c) => {
     const r = await resolvePr(c)
