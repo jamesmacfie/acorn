@@ -4,7 +4,7 @@ import { useParams, useSearchParams } from '@solidjs/router'
 import { fileStatusMeta, formatRelativeTime, summarizeFileStats } from './displayMeta'
 import { requestFileScroll, routeKey } from './fileNavigation'
 import { filesOptions, pullDetailOptions, pullPrefixKey, pullsPrefixKey, reposOptions } from './queries'
-import { addComment, addLabel, closePr, mergePr, removeLabel, reopenPr, rerunFailed, setDraft, setViewed } from './mutations'
+import { addComment, addLabel, closePr, mergePr, removeLabel, reopenPr, rerunFailed, setDraft, setViewed, submitReview } from './mutations'
 import { UserAvatar } from './UserAvatar'
 import { ConversationEntryItem } from './features/pullDetail/Conversation'
 import { buildConversationEntries, buildThreadSnippetIndex } from './features/pullDetail/model'
@@ -39,6 +39,7 @@ export default function PullDetail() {
   const [mergeMethod, setMergeMethod] = createSignal('squash')
   const [draftText, setDraftText] = createSignal('')
   const [labelText, setLabelText] = createSignal('')
+  const [reviewBody, setReviewBody] = createSignal('')
   const [actionError, setActionError] = createSignal('')
   const run = (p: Promise<unknown>) => p.then(refresh).catch((e) => setActionError(String(e.message ?? e)))
 
@@ -47,6 +48,14 @@ export default function PullDetail() {
   const reopen = createMutation(() => ({ mutationFn: () => reopenPr(o(), r(), n()) }))
   const draft = createMutation(() => ({ mutationFn: (d: boolean) => setDraft(o(), r(), n(), d) }))
   const comment = createMutation(() => ({ mutationFn: (body: string) => addComment(o(), r(), n(), body) }))
+  const review = createMutation(() => ({
+    mutationFn: ({ event, body }: { event: string; body: string }) => submitReview(o(), r(), n(), event, body),
+  }))
+  const submitReviewWith = (event: string) => {
+    const body = reviewBody().trim()
+    if ((event === 'REQUEST_CHANGES' || event === 'COMMENT') && !body) return
+    run(review.mutateAsync({ event, body })).then(() => setReviewBody(''))
+  }
 
   const submitComment = () => {
     const body = draftText().trim()
@@ -65,7 +74,8 @@ export default function PullDetail() {
 
   return (
     <Show when={params.number} fallback={<p class="placeholder">Select a PR.</p>}>
-      <Show when={detail.data?.pull} fallback={<p class="placeholder">{detail.isError ? 'Failed to load PR.' : 'Loading…'}</p>}>
+      <Show when={repoKnown() || !repos.data} fallback={<p class="placeholder">Not found.</p>}>
+      <Show when={detail.data?.pull} fallback={<p class="placeholder">{detail.isError ? 'Not found.' : 'Loading…'}</p>}>
         {(pull) => (
           <>
             <div class="pr-detail-header">
@@ -248,8 +258,33 @@ export default function PullDetail() {
                 </For>
               </div>
             </details>
+
+            <details class="nav-section" open>
+              <summary>Review</summary>
+              <div class="composer">
+                <textarea
+                  class="composer-input"
+                  placeholder="Leave a review comment…"
+                  value={reviewBody()}
+                  onInput={(e) => setReviewBody(e.currentTarget.value)}
+                  disabled={review.isPending}
+                />
+                <div class="pr-actions">
+                  <button type="button" onClick={() => submitReviewWith('APPROVE')} disabled={review.isPending}>
+                    {review.isPending ? 'Submitting…' : 'Approve'}
+                  </button>
+                  <button type="button" onClick={() => submitReviewWith('REQUEST_CHANGES')} disabled={review.isPending || !reviewBody().trim()}>
+                    Request changes
+                  </button>
+                  <button type="button" onClick={() => submitReviewWith('COMMENT')} disabled={review.isPending || !reviewBody().trim()}>
+                    Comment
+                  </button>
+                </div>
+              </div>
+            </details>
           </>
         )}
+      </Show>
       </Show>
     </Show>
   )

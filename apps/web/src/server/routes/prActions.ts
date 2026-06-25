@@ -170,6 +170,25 @@ export const prActions = new Hono<AppEnv>()
     await bustPrSync(r.db, r.user.login, r.repoId, r.number)
     return c.json({ resolved: !!resolved })
   })
+  // Submit a PR review: POST /pulls/{n}/reviews { event, body }.
+  .post('/:owner/:repo/pulls/:number/reviews', async (c) => {
+    const r = await resolvePr(c)
+    if ('error' in r) return c.json({ error: r.error }, r.status)
+    const { body, event } = (await c.req.json().catch(() => ({}))) as { body?: string; event?: string }
+    if (!event || !['APPROVE', 'REQUEST_CHANGES', 'COMMENT'].includes(event))
+      return c.json({ error: 'bad_request' }, 400)
+    if ((event === 'REQUEST_CHANGES' || event === 'COMMENT') && !body?.trim())
+      return c.json({ error: 'body_required' }, 400)
+    const res = await gh(r.user.token, `/repos/${r.owner}/${r.repo}/pulls/${r.number}/reviews`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ body: body?.trim() ?? '', event }),
+    })
+    const err = ghError(res)
+    if (err) return c.json({ error: err.error }, err.status)
+    await bustPrSync(r.db, r.user.login, r.repoId, r.number)
+    return c.json({ ok: true })
+  })
   // Rerun a workflow run's failed jobs: POST /actions/runs/{runId}/rerun-failed-jobs (GitHub → 201).
   // Repo-scoped (no PR number): a check's runId is the Actions run, not the PR. No mirror to update —
   // the new run states surface on the next composite refetch.
