@@ -1,4 +1,4 @@
-import { createSignal, For, Match, Show, Switch } from 'solid-js'
+import { createEffect, createSignal, For, Match, on, Show, Switch } from 'solid-js'
 import { fileStatusMeta } from '../../displayMeta'
 import MentionTextarea from '../../MentionTextarea'
 import type { Thread } from '../../queries'
@@ -20,6 +20,7 @@ export function NonCodeRow(props: {
   expandGap?: (gap: GapRow) => Promise<unknown>
   retryDiff?: (file: LoadDiffRow['file']) => void
   mentions?: string[]
+  onLayoutChange?: () => void
 }) {
   return (
     <Switch>
@@ -60,7 +61,16 @@ export function NonCodeRow(props: {
         )}
       </Match>
       <Match when={props.row.kind === 'thread' ? (props.row as ThreadRowT) : null}>
-        {(t) => <ThreadRow thread={t().thread} onMutated={props.onMutated} resolveThread={props.resolveThread} reply={props.reply} mentions={props.mentions ?? []} />}
+        {(t) => (
+          <ThreadRow
+            thread={t().thread}
+            onMutated={props.onMutated}
+            resolveThread={props.resolveThread}
+            reply={props.reply}
+            mentions={props.mentions ?? []}
+            onLayoutChange={props.onLayoutChange}
+          />
+        )}
       </Match>
     </Switch>
   )
@@ -227,24 +237,48 @@ function ThreadRow(props: {
   resolveThread: (threadId: string, resolved: boolean) => Promise<unknown>
   reply: (commentDatabaseId: number, body: string) => Promise<unknown>
   mentions: string[]
+  onLayoutChange?: () => void
 }) {
+  const [optimisticResolved, setOptimisticResolved] = createSignal<boolean | null>(null)
   const [collapsed, setCollapsed] = createSignal(props.thread.resolved)
   const [body, setBody] = createSignal('')
   const [busy, setBusy] = createSignal(false)
   const [err, setErr] = createSignal<string | null>(null)
   const replyId = () => props.thread.comments[0]?.databaseId ?? null
+  const resolved = () => optimisticResolved() ?? props.thread.resolved
+
+  const publishLayoutChange = () => props.onLayoutChange?.()
+
+  createEffect(on(
+    () => [props.thread.threadId, props.thread.resolved] as const,
+    ([threadId, serverResolved], previous) => {
+      if (previous && previous[0] === threadId && previous[1] === serverResolved) return
+      setOptimisticResolved(null)
+      setCollapsed(serverResolved)
+      publishLayoutChange()
+    },
+  ))
 
   const toggleResolve = async () => {
+    const nextResolved = !resolved()
     setBusy(true)
     setErr(null)
     try {
-      await props.resolveThread(props.thread.threadId, !props.thread.resolved)
+      await props.resolveThread(props.thread.threadId, nextResolved)
+      setOptimisticResolved(nextResolved)
+      setCollapsed(nextResolved)
+      publishLayoutChange()
       props.onMutated()
     } catch (e) {
       setErr(e instanceof Error ? e.message : 'failed')
     } finally {
       setBusy(false)
     }
+  }
+
+  const toggleCollapsed = () => {
+    setCollapsed((v) => !v)
+    publishLayoutChange()
   }
 
   const submitReply = async () => {
@@ -265,16 +299,22 @@ function ThreadRow(props: {
   }
 
   return (
-    <div class="diff-thread" classList={{ 'diff-thread-resolved': props.thread.resolved }}>
+    <div
+      class="diff-thread"
+      classList={{
+        'diff-thread-resolved': resolved(),
+        'diff-thread-collapsed': collapsed(),
+      }}
+    >
       <div class="diff-thread-head">
-        <span class="diff-thread-status">{props.thread.resolved ? 'Resolved' : 'Conversation'}</span>
-        <Show when={props.thread.resolved}>
-          <button class="diff-thread-link" onClick={() => setCollapsed((v) => !v)}>
+        <span class="diff-thread-status">{resolved() ? 'Resolved' : 'Conversation'}</span>
+        <Show when={resolved()}>
+          <button class="diff-thread-link" onClick={toggleCollapsed}>
             {collapsed() ? 'Show' : 'Hide'}
           </button>
         </Show>
         <button class="diff-thread-link" disabled={busy()} onClick={toggleResolve}>
-          {props.thread.resolved ? 'Unresolve' : 'Resolve'}
+          {resolved() ? 'Unresolve' : 'Resolve'}
         </button>
       </div>
       <Show when={!collapsed()}>

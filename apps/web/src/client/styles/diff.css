@@ -152,6 +152,7 @@
 }
 .diff-thread-resolved { background: var(--bg-subtle); border-left-color: var(--add-marker); }
 .diff-thread-head { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+.diff-thread-collapsed .diff-thread-head { margin-bottom: 0; }
 .diff-thread-status {
   font-size: var(--fs-sm);
   text-transform: uppercase;

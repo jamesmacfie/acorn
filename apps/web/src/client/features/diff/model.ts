@@ -52,11 +52,13 @@ export const fileAnchor = (path: string) => `diff-file:${path}`
 
 const DIFF_LINE_HEIGHT = 20
 const DIFF_FILE_HEADER_HEIGHT = 36
+const DIFF_THREAD_HEIGHT = 140
+const DIFF_RESOLVED_THREAD_HEIGHT = 50
 
 export const estimateRowSize = (row: Row | undefined) => {
   if (!row) return DIFF_LINE_HEIGHT
   if (row.kind === 'file') return DIFF_FILE_HEADER_HEIGHT
-  if (row.kind === 'thread') return 140
+  if (row.kind === 'thread') return row.thread.resolved ? DIFF_RESOLVED_THREAD_HEIGHT : DIFF_THREAD_HEIGHT
   if (row.kind === 'nodiff') return 28
   if (row.kind === 'load') return 36
   if (row.kind === 'gap') return 28

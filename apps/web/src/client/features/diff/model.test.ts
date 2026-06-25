@@ -4,6 +4,7 @@ import type { PullFile, Thread } from '../../queries'
 import {
   buildDiffRows,
   buildRenderableRows,
+  estimateRowSize,
   estimateSplitBandSize,
   expandGap,
   gapId,
@@ -27,12 +28,12 @@ const pullFile = (path: string, patch: string | null): PullFile => ({
   patch,
 })
 
-const thread = (path: string, line: number, side: 'LEFT' | 'RIGHT' | null = 'RIGHT'): Thread => ({
+const thread = (path: string, line: number, side: 'LEFT' | 'RIGHT' | null = 'RIGHT', resolved = false): Thread => ({
   threadId: `${path}:${line}:${side ?? 'RIGHT'}`,
   path,
   line,
   side,
-  resolved: false,
+  resolved,
   comments: [{ id: `${path}:${line}:c1`, databaseId: line, author: 'octo', body: 'note', createdAt: line }],
 })
 
@@ -211,6 +212,15 @@ describe('diff model', () => {
     expect(estimateSplitBandSize(bands[0])).toBe(36)
     expect(estimateSplitBandSize(bands[1])).toBe(20)
     expect(estimateSplitBandSize(bands[2])).toBe(140)
+  })
+
+  it('estimates resolved thread rows at their collapsed height', () => {
+    const openRow = { kind: 'thread' as const, thread: thread('src/app.ts', 1) }
+    const resolvedRow = { kind: 'thread' as const, thread: thread('src/app.ts', 1, 'RIGHT', true) }
+
+    expect(estimateRowSize(openRow)).toBe(140)
+    expect(estimateRowSize(resolvedRow)).toBe(50)
+    expect(estimateSplitBandSize({ kind: 'full', row: resolvedRow })).toBe(50)
   })
 
   it('keeps large row interleaving comfortably within the speed budget', () => {

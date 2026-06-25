@@ -255,6 +255,7 @@ function DiffForPull(props: { route: PullRoute }) {
       return band ? [{ vi, band }] : []
     })
   })
+  const threadLayoutSignature = createMemo(() => (detail.data?.threads ?? []).map((thread) => `${thread.threadId}:${thread.resolved}`).join('\0'))
   createEffect(() => {
     const paths = new Set<string>()
     if (viewMode() === 'split') {
@@ -293,6 +294,12 @@ function DiffForPull(props: { route: PullRoute }) {
   })
   createEffect(() => {
     lineComposer()?.key
+    if (!scrollEl()) return
+    scheduleVirtualMeasure('unified')
+    if (viewMode() === 'split') scheduleVirtualMeasure('split')
+  })
+  createEffect(() => {
+    threadLayoutSignature()
     if (!scrollEl()) return
     scheduleVirtualMeasure('unified')
     if (viewMode() === 'split') scheduleVirtualMeasure('split')
@@ -431,6 +438,10 @@ function DiffForPull(props: { route: PullRoute }) {
             <div class="diff-rows" style={{ height: `${virt.getTotalSize()}px` }}>
               <For each={virtualRows()}>
                 {({ vi, row }) => {
+                  let rowEl: HTMLDivElement | undefined
+                  const measureRow = () => {
+                    if (rowEl) scheduleElementMeasure('unified', rowEl)
+                  }
                   return (
                     <div
                       class="diff-row"
@@ -443,6 +454,7 @@ function DiffForPull(props: { route: PullRoute }) {
                       }}
                       data-index={vi.index}
                       ref={(el) => {
+                        rowEl = el
                         if (shouldMeasureRow(row)) scheduleElementMeasure('unified', el)
                       }}
                       style={{ transform: `translateY(${vi.start}px)` }}
@@ -458,6 +470,7 @@ function DiffForPull(props: { route: PullRoute }) {
                             expandGap={handleExpand}
                             retryDiff={(file) => hydrator.retry(file.path)}
                             mentions={mentionsList()}
+                            onLayoutChange={measureRow}
                           />
                         }
                       >
@@ -486,66 +499,74 @@ function DiffForPull(props: { route: PullRoute }) {
         <div class="diff diff-split" ref={publishSplitScrollEl}>
           <div class="diff-split-rows" style={{ height: `${splitVirt.getTotalSize()}px` }}>
             <For each={virtualBands()}>
-              {({ vi, band }) => (
-                <div
-                  class="diff-split-band"
-                  data-index={vi.index}
-                  ref={(el) => {
-                    if (shouldMeasureBand(band)) scheduleElementMeasure('split', el)
-                  }}
-                  style={{ transform: `translateY(${vi.start}px)` }}
-                >
-                  <Show
-                    when={band.kind === 'pair' ? (band as Extract<SplitBand, { kind: 'pair' }>) : null}
-                    fallback={
-                      <div
-                        class="diff-split-full"
-                        classList={{
-                          'diff-hunk': (band as Extract<SplitBand, { kind: 'full' }>).row.kind === 'hunk',
-                          'diff-file-row': (band as Extract<SplitBand, { kind: 'full' }>).row.kind === 'file',
-                          'diff-thread-row':
-                            (band as Extract<SplitBand, { kind: 'full' }>).row.kind === 'thread' ||
-                            (band as Extract<SplitBand, { kind: 'full' }>).row.kind === 'nodiff' ||
-                            (band as Extract<SplitBand, { kind: 'full' }>).row.kind === 'load',
-                        }}
-                      >
-                        <NonCodeRow
-                          row={(band as Extract<SplitBand, { kind: 'full' }>).row}
-                          onMutated={invalidate}
-                          resolveThread={(threadId, resolved) => resolveThread(owner, repo, number, threadId, resolved)}
-                          reply={(databaseId, body) => replyReview(owner, repo, number, databaseId, body)}
-                          expandGap={handleExpand}
-                          retryDiff={(file) => hydrator.retry(file.path)}
-                          mentions={mentionsList()}
-                        />
-                      </div>
-                    }
+              {({ vi, band }) => {
+                let bandEl: HTMLDivElement | undefined
+                const measureBand = () => {
+                  if (bandEl) scheduleElementMeasure('split', bandEl)
+                }
+                return (
+                  <div
+                    class="diff-split-band"
+                    data-index={vi.index}
+                    ref={(el) => {
+                      bandEl = el
+                      if (shouldMeasureBand(band)) scheduleElementMeasure('split', el)
+                    }}
+                    style={{ transform: `translateY(${vi.start}px)` }}
                   >
-                    {(pair) => (
-                      <div class="diff-split-pair">
-                        <SplitCell
-                          r={pair().left}
-                          gutter={pair().left?.oldNo ?? null}
-                          canAdd={!!headSha() && pair().left?.oldNo != null}
-                          addComment={(body) => addReviewComment(owner, repo, number, body, pair().left!.path, pair().left!.oldNo!, 'LEFT')}
-                          onMutated={invalidate}
-                          composer={splitComposer(pair().left, 'LEFT')}
-                          mentions={mentionsList()}
-                        />
-                        <SplitCell
-                          r={pair().right}
-                          gutter={pair().right?.newNo ?? null}
-                          canAdd={!!headSha() && pair().right?.newNo != null}
-                          addComment={(body) => addReviewComment(owner, repo, number, body, pair().right!.path, pair().right!.newNo!, 'RIGHT')}
-                          onMutated={invalidate}
-                          composer={splitComposer(pair().right, 'RIGHT')}
-                          mentions={mentionsList()}
-                        />
-                      </div>
-                    )}
-                  </Show>
-                </div>
-              )}
+                    <Show
+                      when={band.kind === 'pair' ? (band as Extract<SplitBand, { kind: 'pair' }>) : null}
+                      fallback={
+                        <div
+                          class="diff-split-full"
+                          classList={{
+                            'diff-hunk': (band as Extract<SplitBand, { kind: 'full' }>).row.kind === 'hunk',
+                            'diff-file-row': (band as Extract<SplitBand, { kind: 'full' }>).row.kind === 'file',
+                            'diff-thread-row':
+                              (band as Extract<SplitBand, { kind: 'full' }>).row.kind === 'thread' ||
+                              (band as Extract<SplitBand, { kind: 'full' }>).row.kind === 'nodiff' ||
+                              (band as Extract<SplitBand, { kind: 'full' }>).row.kind === 'load',
+                          }}
+                        >
+                          <NonCodeRow
+                            row={(band as Extract<SplitBand, { kind: 'full' }>).row}
+                            onMutated={invalidate}
+                            resolveThread={(threadId, resolved) => resolveThread(owner, repo, number, threadId, resolved)}
+                            reply={(databaseId, body) => replyReview(owner, repo, number, databaseId, body)}
+                            expandGap={handleExpand}
+                            retryDiff={(file) => hydrator.retry(file.path)}
+                            mentions={mentionsList()}
+                            onLayoutChange={measureBand}
+                          />
+                        </div>
+                      }
+                    >
+                      {(pair) => (
+                        <div class="diff-split-pair">
+                          <SplitCell
+                            r={pair().left}
+                            gutter={pair().left?.oldNo ?? null}
+                            canAdd={!!headSha() && pair().left?.oldNo != null}
+                            addComment={(body) => addReviewComment(owner, repo, number, body, pair().left!.path, pair().left!.oldNo!, 'LEFT')}
+                            onMutated={invalidate}
+                            composer={splitComposer(pair().left, 'LEFT')}
+                            mentions={mentionsList()}
+                          />
+                          <SplitCell
+                            r={pair().right}
+                            gutter={pair().right?.newNo ?? null}
+                            canAdd={!!headSha() && pair().right?.newNo != null}
+                            addComment={(body) => addReviewComment(owner, repo, number, body, pair().right!.path, pair().right!.newNo!, 'RIGHT')}
+                            onMutated={invalidate}
+                            composer={splitComposer(pair().right, 'RIGHT')}
+                            mentions={mentionsList()}
+                          />
+                        </div>
+                      )}
+                    </Show>
+                  </div>
+                )
+              }}
             </For>
           </div>
         </div>
