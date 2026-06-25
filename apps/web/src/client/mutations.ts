@@ -26,6 +26,8 @@ export const closePr = (o: string, r: string, n: string) => post(pullRoute(o, r,
 export const reopenPr = (o: string, r: string, n: string) => post(pullRoute(o, r, n, 'reopen'))
 export const setDraft = (o: string, r: string, n: string, draft: boolean) => post(pullRoute(o, r, n, 'draft'), { draft })
 export const addComment = (o: string, r: string, n: string, body: string) => post<{ id: string }>(pullRoute(o, r, n, 'comments'), { body })
+export const submitReview = (o: string, r: string, n: string, event: string, body: string) =>
+  post(pullRoute(o, r, n, 'reviews'), { event, body })
 
 export const addLabel = (o: string, r: string, n: string, name: string) => post(pullRoute(o, r, n, 'labels'), { name })
 export const removeLabel = async (o: string, r: string, n: string, name: string) => {
