@@ -30,6 +30,7 @@ export type PullFile = {
   viewed: boolean
   patch: string | null
 }
+export type PullFilesPatchRequest = { paths: string[] }
 export type Review = { id: string; author: string | null; state: string | null; body: string | null; submittedAt: number | null }
 export type Comment = { id: string; author: string | null; body: string | null; createdAt: number | null }
 export type Check = { name: string; status: string | null; url: string | null; runId: number | null }
@@ -53,6 +54,8 @@ export type PullDetail = {
 }
 // One PR's full warmed payload, returned by the batch prefetch endpoint.
 export type PullBatchItem = { number: number; detail: PullDetail; files: PullFile[] }
+export type PullBatchFilesMode = 'full' | 'summary' | 'none'
+export type PullBatchRequest = { numbers: number[]; files?: PullBatchFilesMode }
 
 // Create-PR support: branch picker list + base..head compare (diff preview + commits for prefill).
 export type Branch = { name: string }
@@ -73,6 +76,10 @@ export const pullsRoute = (owner: string, repo: string, state: 'open' | 'closed'
 export const closedPullsRoute = (owner: string, repo: string, page: number) => `${pullsRoute(owner, repo, 'closed')}&page=${page}`
 export const pullsBatchRoute = (owner: string, repo: string) => `${repoRoute(owner, repo)}/pulls/batch`
 export const createPullRoute = (owner: string, repo: string) => `${repoRoute(owner, repo)}/pulls`
+export const fileSummariesRoute = (owner: string, repo: string, number: string | number) => `${pullRoute(owner, repo, number, 'files')}?summary=1`
+export const filePatchRoute = (owner: string, repo: string, number: string | number, path: string) =>
+  `${pullRoute(owner, repo, number, 'files')}?path=${encodeURIComponent(path)}`
+export const filePatchesRoute = (owner: string, repo: string, number: string | number) => pullRoute(owner, repo, number, 'files/patches')
 export const branchesRoute = (owner: string, repo: string) => repoRoute(owner, repo, 'branches')
 export const compareRoute = (owner: string, repo: string, base: string, head: string) =>
   `${repoRoute(owner, repo, 'compare')}?base=${encodeURIComponent(base)}&head=${encodeURIComponent(head)}`
@@ -80,6 +87,7 @@ export const fileBlobRoute = (owner: string, repo: string, sha: string) => repoR
 export const resolveThreadRoute = (owner: string, repo: string, number: string | number, threadId: string) =>
   pullRoute(owner, repo, number, `threads/${encodeURIComponent(threadId)}/resolve`)
 export const rerunFailedRoute = (owner: string, repo: string, runId: number) => repoRoute(owner, repo, `actions/${runId}/rerun`)
+export const mentionsRoute = (owner: string, repo: string) => repoRoute(owner, repo, 'mentions')
 export const pinsRoute = '/api/pins'
 export const prefsRoute = '/api/prefs'
 
@@ -93,8 +101,11 @@ export const pullsPrefixKey = (owner: string, repo: string) => ['pulls', owner, 
 export const pullKey = (owner: string, repo: string, number: string) => ['pull', owner, repo, number] as const
 export const pullPrefixKey = (owner: string, repo: string) => ['pull', owner, repo] as const
 export const filesKey = (owner: string, repo: string, number: string) => ['files', owner, repo, number] as const
+export const fileSummariesKey = (owner: string, repo: string, number: string) => ['files', owner, repo, number, 'summary'] as const
+export const filePatchKey = (owner: string, repo: string, number: string, path: string) => ['files', owner, repo, number, 'patch', path] as const
 export const fileBlobKey = (owner: string, repo: string, sha: string) => ['blob', owner, repo, sha] as const
 export const branchesKey = (owner: string, repo: string) => ['branches', owner, repo] as const
 export const compareKey = (owner: string, repo: string, base: string, head: string) => ['compare', owner, repo, base, head] as const
 export const pinsKey = ['pins'] as const
 export const prefsKey = ['prefs'] as const
+export const mentionsKey = (owner: string, repo: string) => ['mentions', owner, repo] as const

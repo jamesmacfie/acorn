@@ -1,8 +1,9 @@
 import { createSignal, For, Match, Show, Switch } from 'solid-js'
 import { fileStatusMeta } from '../../displayMeta'
+import MentionTextarea from '../../MentionTextarea'
 import type { Thread } from '../../queries'
 import { UserAvatar } from '../../UserAvatar'
-import { fileAnchor, type CodeRow, type FileRow, type GapRow, type HunkRow, type Row, type ThreadRowT } from './model'
+import { fileAnchor, type CodeRow, type FileRow, type GapRow, type HunkRow, type LoadDiffRow, type Row, type ThreadRowT } from './model'
 
 export type LineComposerController = {
   isOpen: () => boolean
@@ -17,6 +18,8 @@ export function NonCodeRow(props: {
   resolveThread: (threadId: string, resolved: boolean) => Promise<unknown>
   reply: (commentDatabaseId: number, body: string) => Promise<unknown>
   expandGap?: (gap: GapRow) => Promise<unknown>
+  retryDiff?: (file: LoadDiffRow['file']) => void
+  mentions?: string[]
 }) {
   return (
     <Switch>
@@ -44,8 +47,20 @@ export function NonCodeRow(props: {
       <Match when={props.row.kind === 'nodiff'}>
         <span class="diff-nodiff muted">No diff (binary or too large).</span>
       </Match>
+      <Match when={props.row.kind === 'load' ? (props.row as LoadDiffRow) : null}>
+        {(row) => (
+          <span class="diff-load" classList={{ 'diff-load-error': row().status === 'error' }}>
+            <span>{row().status === 'error' ? 'Could not load diff.' : 'Loading diff…'}</span>
+            <Show when={row().status === 'error'}>
+              <button class="diff-load-retry" onClick={() => props.retryDiff?.(row().file)}>
+                Retry
+              </button>
+            </Show>
+          </span>
+        )}
+      </Match>
       <Match when={props.row.kind === 'thread' ? (props.row as ThreadRowT) : null}>
-        {(t) => <ThreadRow thread={t().thread} onMutated={props.onMutated} resolveThread={props.resolveThread} reply={props.reply} />}
+        {(t) => <ThreadRow thread={t().thread} onMutated={props.onMutated} resolveThread={props.resolveThread} reply={props.reply} mentions={props.mentions ?? []} />}
       </Match>
     </Switch>
   )
@@ -76,13 +91,14 @@ export function DiffLine(props: {
   addComment: (body: string) => Promise<unknown>
   onMutated: () => void
   composer?: LineComposerController
+  mentions?: string[]
 }) {
   return (
     <>
       <span class="diff-gutter">{props.r.oldNo ?? ''}</span>
       <span class="diff-gutter">{props.r.newNo ?? ''}</span>
       <span class="diff-marker">{props.r.kind === 'insert' ? '+' : props.r.kind === 'delete' ? '\u2212' : ' '}</span>
-      <LineComposer canAdd={props.canAdd} addComment={props.addComment} onMutated={props.onMutated} composer={props.composer}>
+      <LineComposer canAdd={props.canAdd} addComment={props.addComment} onMutated={props.onMutated} composer={props.composer} mentions={props.mentions ?? []}>
         <CodeContent r={props.r} />
       </LineComposer>
     </>
@@ -96,6 +112,7 @@ export function SplitCell(props: {
   addComment: (body: string) => Promise<unknown>
   onMutated: () => void
   composer?: LineComposerController
+  mentions?: string[]
 }) {
   return (
     <div
@@ -111,7 +128,7 @@ export function SplitCell(props: {
           <>
             <span class="diff-gutter">{props.gutter ?? ''}</span>
             <span class="diff-marker">{r().kind === 'insert' ? '+' : r().kind === 'delete' ? '\u2212' : ' '}</span>
-            <LineComposer canAdd={props.canAdd} addComment={props.addComment} onMutated={props.onMutated} composer={props.composer}>
+            <LineComposer canAdd={props.canAdd} addComment={props.addComment} onMutated={props.onMutated} composer={props.composer} mentions={props.mentions ?? []}>
               <CodeContent r={r()} />
             </LineComposer>
           </>
@@ -149,6 +166,7 @@ function LineComposer(props: {
   addComment: (body: string) => Promise<unknown>
   onMutated: () => void
   composer?: LineComposerController
+  mentions: string[]
   children: unknown
 }) {
   const [busy, setBusy] = createSignal(false)
@@ -181,11 +199,12 @@ function LineComposer(props: {
       {props.children as never}
       <Show when={props.composer?.isOpen()}>
         <div class="diff-composer" onClick={(e) => e.stopPropagation()}>
-          <textarea
+          <MentionTextarea
             class="diff-reply-input"
             placeholder={'Comment on this line\u2026'}
             value={props.composer?.body() ?? ''}
-            onInput={(e) => props.composer?.setBody(e.currentTarget.value)}
+            onInput={(v) => props.composer?.setBody(v)}
+            mentions={props.mentions}
           />
           <div class="diff-composer-actions">
             <button disabled={busy() || !(props.composer?.body().trim() ?? '')} onClick={submit}>
@@ -207,6 +226,7 @@ function ThreadRow(props: {
   onMutated: () => void
   resolveThread: (threadId: string, resolved: boolean) => Promise<unknown>
   reply: (commentDatabaseId: number, body: string) => Promise<unknown>
+  mentions: string[]
 }) {
   const [collapsed, setCollapsed] = createSignal(props.thread.resolved)
   const [body, setBody] = createSignal('')
@@ -270,12 +290,13 @@ function ThreadRow(props: {
           )}
         </For>
         <div class="diff-reply">
-          <textarea
+          <MentionTextarea
             class="diff-reply-input"
             placeholder={replyId() == null ? 'Reply unavailable' : 'Reply\u2026'}
             disabled={replyId() == null}
             value={body()}
-            onInput={(e) => setBody(e.currentTarget.value)}
+            onInput={setBody}
+            mentions={props.mentions}
           />
           <div class="diff-composer-actions">
             <button disabled={busy() || replyId() == null || !body().trim()} onClick={submitReply}>

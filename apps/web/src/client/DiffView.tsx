@@ -1,14 +1,15 @@
-import { createEffect, createMemo, createSignal, For, onCleanup, onMount, Show } from 'solid-js'
+import { createEffect, createMemo, createSignal, For, on, onCleanup, onMount, Show } from 'solid-js'
 import { createQuery, useQueryClient } from '@tanstack/solid-query'
 import { useParams, useSearchParams } from '@solidjs/router'
 import { createVirtualizer } from '@tanstack/solid-virtual'
-import { fileBlobOptions, filesOptions, prefsKey, prefsOptions, pullDetailOptions, pullKey, type PullFile } from './queries'
+import { fileBlobOptions, fileSummariesOptions, mentionsOptions, prefsKey, prefsOptions, pullDetailOptions, pullKey, type PullFile } from './queries'
 import { addReviewComment, replyReview, resolveThread, setPref } from './mutations'
 import { getHighlighter } from './shiki'
 import { FILE_SCROLL_EVENT, routeKey as makeRouteKey, type FileScrollDetail } from './fileNavigation'
 import { DiffLine, NonCodeRow, SplitCell, type LineComposerController } from './features/diff/DiffRows'
-import { parseFilesInChunks } from './features/diff/chunkedParse'
+import { createDiffHydrator } from './features/diff/hydration'
 import {
+  buildDiffRows,
   buildRenderableRows,
   estimateRowSize,
   estimateSplitBandSize,
@@ -32,10 +33,10 @@ import {
 // `?file=` no longer picks which file is shown — it's the scroll target (the file list, finder,
 // and [ / ] all set it), so selecting a file scrolls the combined diff to it.
 //
-// Parsing + Shiki highlighting all files up front would block on large PRs, so files are parsed in
-// chunks of 10 and appended as each chunk lands — the list grows progressively and stays scrollable
-// while later files are still tokenizing. Review threads are interleaved at render time (matched by
-// path) so thread mutations rerender without re-tokenizing patches.
+// The first request fetches file summaries only. Patch bodies, parsing, and Shiki highlighting are
+// demand-driven per file so large PRs can paint their navigation + file list without spending seconds
+// tokenizing unseen diffs. Review threads are interleaved at render time (matched by path) so thread
+// mutations rerender without re-tokenizing patches.
 //
 type PullRoute = {
   owner: string
@@ -44,6 +45,8 @@ type PullRoute = {
   key: string
 }
 const FALLBACK_ROW_ESTIMATE = 36
+const HIGHLIGHT_MAX_PATCH_CHARS = 120_000
+const HIGHLIGHT_MAX_PATCH_LINES = 2_000
 
 export default function DiffView() {
   const params = useParams()
@@ -71,9 +74,11 @@ function DiffForPull(props: { route: PullRoute }) {
   const repo = props.route.repo
   const number = props.route.number
 
-  const files = createQuery(() => filesOptions(owner, repo, number, true))
+  const files = createQuery(() => fileSummariesOptions(owner, repo, number, true))
   const detail = createQuery(() => pullDetailOptions(owner, repo, number, true))
   const prefs = createQuery(() => prefsOptions(true))
+  const mentionsQuery = createQuery(() => mentionsOptions(owner, repo, true))
+  const mentionsList = () => mentionsQuery.data ?? []
   const headSha = () => detail.data?.pull?.headSha ?? null
   let lastTarget = ''
 
@@ -85,39 +90,68 @@ function DiffForPull(props: { route: PullRoute }) {
 
   const invalidate = () => queryClient.invalidateQueries({ queryKey: pullKey(owner, repo, number) })
 
-  // Parse + highlight every file off the render path, in chunks of 10, appending as each chunk
-  // lands so a large PR paints progressively instead of blocking on the full set. Re-runs only when
-  // the file set itself changes (thread edits don't touch files.data → no re-tokenize).
-  const [parsed, setParsed] = createSignal<ParsedFile[]>([])
+  // First paint uses cheap file summaries. Patch bodies are then hydrated automatically in priority
+  // order: selected/visible file first, the rest in small idle batches.
+  const [parsedByPath, setParsedByPath] = createSignal<Map<string, ParsedFile>>(new Map())
   // Context lines revealed by clicking a gap, keyed by that gap's stable identity. Reset when the file
-  // set changes. tokenizeFn is the loaded Shiki tokenizer, lifted out so the gap handler can reuse it.
+  // set changes.
   const [expanded, setExpanded] = createSignal<Map<string, CodeRow[]>>(new Map())
-  const [tokenizeFn, setTokenizeFn] = createSignal<TokenizeLine>(plainTokenize)
   const [lineComposer, setLineComposer] = createSignal<{ key: string; body: string } | null>(null)
-  let parseRun = 0
-  createEffect(() => {
-    const list = files.data ?? []
-    const run = ++parseRun
-    let cancelled = false
-    onCleanup(() => {
-      cancelled = true
+  let tokenizerPromise: Promise<TokenizeLine> | null = null
+  const loadTokenizer = async () => {
+    return (tokenizerPromise ??= getHighlighter().then(highlighterTokenize).catch(() => plainTokenize))
+  }
+
+  const shouldUsePlainTokenizer = (file: PullFile) => {
+    const patch = file.patch ?? ''
+    if (patch.length > HIGHLIGHT_MAX_PATCH_CHARS) return true
+    let lines = 1
+    for (let i = 0; i < patch.length; i++) {
+      if (patch.charCodeAt(i) === 10 && ++lines > HIGHLIGHT_MAX_PATCH_LINES) return true
+    }
+    return false
+  }
+
+  const hydrator = createDiffHydrator({
+    owner,
+    repo,
+    number,
+    queryClient,
+    tokenizerForFile: (file) => (shouldUsePlainTokenizer(file) ? Promise.resolve(plainTokenize) : loadTokenizer()),
+    parseFile: (file, tokenize) => ({ file, diff: buildDiffRows(file, tokenize) }),
+    onParsed: (parsedFile) => setParsedByPath((prev) => new Map(prev).set(parsedFile.file.path, parsedFile)),
+  })
+  onCleanup(hydrator.dispose)
+
+  const parsed = createMemo<ParsedFile[]>(() => {
+    const parsedFiles = parsedByPath()
+    return (files.data ?? []).map((file) => {
+      const parsedFile = parsedFiles.get(file.path)
+      if (parsedFile) return parsedFile
+      return { file, diff: [{ kind: 'load', file, status: hydrator.status(file.path) === 'error' ? 'error' : 'loading' }] }
     })
+  })
+
+  const filesSignature = createMemo(() => (files.data ?? []).map((file) => `${file.path}:${file.sha}:${file.additions}:${file.deletions}`).join('\0'))
+  createEffect(on(filesSignature, () => {
     lastTarget = ''
-    setParsed([])
+    setParsedByPath(new Map())
     setExpanded(new Map())
     setLineComposer(null)
     resetScrollPosition()
-    if (!list.length) return
-    void (async () => {
-      const tokenize = await getHighlighter().then(highlighterTokenize).catch(() => plainTokenize)
-      if (cancelled || run !== parseRun) return
-      setTokenizeFn(() => tokenize)
-      await parseFilesInChunks(list, tokenize, {
-        isCancelled: () => cancelled || run !== parseRun,
-        onChunk: setParsed,
-      })
-    })()
-  })
+    hydrator.reset(files.data ?? [], typeof searchParams.file === 'string' ? searchParams.file : undefined)
+  }))
+
+  createEffect(on(
+    () => [filesSignature(), typeof searchParams.file === 'string' ? searchParams.file : ''] as const,
+    ([, selectedPath]) => {
+      const list = files.data ?? []
+      if (!list.length) return
+      const selected = selectedPath ? list.find((file) => file.path === selectedPath) : undefined
+      const target = selected ?? list[0]
+      if (target) hydrator.prioritize(target.path)
+    },
+  ))
 
   const rows = createMemo<Row[]>(() => buildRenderableRows(parsed(), detail.data?.threads, expanded()))
 
@@ -126,7 +160,7 @@ function DiffForPull(props: { route: PullRoute }) {
   const handleExpand = async (gap: GapRow) => {
     if (gap.sha == null) return
     const body = await queryClient.fetchQuery(fileBlobOptions(owner, repo, gap.sha))
-    const lines = expandGap(gap, body.text, tokenizeFn())
+    const lines = expandGap(gap, body.text, await loadTokenizer())
     setExpanded((prev) => new Map(prev).set(gapId(gap), lines))
   }
 
@@ -174,6 +208,27 @@ function DiffForPull(props: { route: PullRoute }) {
     })
   })
   createEffect(() => {
+    const paths = new Set<string>()
+    if (viewMode() === 'split') {
+      for (const { band } of virtualBands()) {
+        if (band.kind === 'pair') {
+          if (band.left) paths.add(band.left.path)
+          if (band.right) paths.add(band.right.path)
+        } else if (band.row.kind === 'file' || band.row.kind === 'load') {
+          paths.add(band.row.file.path)
+        } else if (band.row.kind === 'gap') {
+          paths.add(band.row.path)
+        }
+      }
+    } else {
+      for (const { row } of virtualRows()) {
+        if (row.kind === 'file' || row.kind === 'load') paths.add(row.file.path)
+        else if (isCodeRow(row) || row.kind === 'gap') paths.add(row.path)
+      }
+    }
+    if (paths.size) hydrator.prioritize([...paths])
+  })
+  createEffect(() => {
     if (scrollEl()) {
       virt.measure()
       splitVirt.measure()
@@ -215,6 +270,7 @@ function DiffForPull(props: { route: PullRoute }) {
     const all = rows()
     const idx = all.findIndex((r) => r.kind === 'file' && r.file.path === path)
     if (idx < 0) return false
+    hydrator.prioritize(path)
     if (!force && path === lastTarget) return true
     lastTarget = path
     if (viewMode() === 'split') {
@@ -238,9 +294,8 @@ function DiffForPull(props: { route: PullRoute }) {
     onCleanup(() => window.removeEventListener(FILE_SCROLL_EVENT, onFileScroll))
   })
 
-  // Scroll to the file named in `?file=` once it has been parsed. Tracks rows() so a file still in a
-  // not-yet-parsed chunk scrolls as soon as its chunk lands; `lastTarget` keeps later chunk appends
-  // (or thread edits) from yanking the scroll back after the initial jump.
+  // Scroll to the file named in `?file=` once summaries have created the file headers. Loading that
+  // file's patch is prioritized separately so navigation doesn't wait for tokenization.
   createEffect(() => {
     const path = typeof searchParams.file === 'string' ? searchParams.file : ''
     if (!path) {
@@ -324,7 +379,7 @@ function DiffForPull(props: { route: PullRoute }) {
                         'diff-add': row.kind === 'insert',
                         'diff-del': row.kind === 'delete',
                         'diff-file-row': row.kind === 'file',
-                        'diff-thread-row': row.kind === 'thread' || row.kind === 'nodiff',
+                        'diff-thread-row': row.kind === 'thread' || row.kind === 'nodiff' || row.kind === 'load',
                       }}
                       data-index={vi.index}
                       ref={(el) => queueMicrotask(() => virt.measureElement(el))}
@@ -339,6 +394,8 @@ function DiffForPull(props: { route: PullRoute }) {
                             resolveThread={(threadId, resolved) => resolveThread(owner, repo, number, threadId, resolved)}
                             reply={(databaseId, body) => replyReview(owner, repo, number, databaseId, body)}
                             expandGap={handleExpand}
+                            retryDiff={(file) => hydrator.retry(file.path)}
+                            mentions={mentionsList()}
                           />
                         }
                       >
@@ -351,6 +408,7 @@ function DiffForPull(props: { route: PullRoute }) {
                               addComment={(body) => addReviewComment(owner, repo, number, body, r().path, lc.lineNo, lc.side)}
                               onMutated={invalidate}
                               composer={lc.canAdd ? composerFor(lc.key) : undefined}
+                              mentions={mentionsList()}
                             />
                           )
                         }}
@@ -383,7 +441,8 @@ function DiffForPull(props: { route: PullRoute }) {
                           'diff-file-row': (band as Extract<SplitBand, { kind: 'full' }>).row.kind === 'file',
                           'diff-thread-row':
                             (band as Extract<SplitBand, { kind: 'full' }>).row.kind === 'thread' ||
-                            (band as Extract<SplitBand, { kind: 'full' }>).row.kind === 'nodiff',
+                            (band as Extract<SplitBand, { kind: 'full' }>).row.kind === 'nodiff' ||
+                            (band as Extract<SplitBand, { kind: 'full' }>).row.kind === 'load',
                         }}
                       >
                         <NonCodeRow
@@ -392,6 +451,8 @@ function DiffForPull(props: { route: PullRoute }) {
                           resolveThread={(threadId, resolved) => resolveThread(owner, repo, number, threadId, resolved)}
                           reply={(databaseId, body) => replyReview(owner, repo, number, databaseId, body)}
                           expandGap={handleExpand}
+                          retryDiff={(file) => hydrator.retry(file.path)}
+                          mentions={mentionsList()}
                         />
                       </div>
                     }
@@ -405,6 +466,7 @@ function DiffForPull(props: { route: PullRoute }) {
                           addComment={(body) => addReviewComment(owner, repo, number, body, pair().left!.path, pair().left!.oldNo!, 'LEFT')}
                           onMutated={invalidate}
                           composer={splitComposer(pair().left, 'LEFT')}
+                          mentions={mentionsList()}
                         />
                         <SplitCell
                           r={pair().right}
@@ -413,6 +475,7 @@ function DiffForPull(props: { route: PullRoute }) {
                           addComment={(body) => addReviewComment(owner, repo, number, body, pair().right!.path, pair().right!.newNo!, 'RIGHT')}
                           onMutated={invalidate}
                           composer={splitComposer(pair().right, 'RIGHT')}
+                          mentions={mentionsList()}
                         />
                       </div>
                     )}

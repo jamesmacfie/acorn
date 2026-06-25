@@ -1,7 +1,7 @@
 // Shared TanStack Query definitions. Two consumers each (dropdown + PR list both read repos),
 // so the options live here to avoid drift. All reads are same-origin cookie-auth; 401 on /me
 // is a valid logged-out state, elsewhere it's an error.
-import { readJson } from './apiClient'
+import { readJson, writeJson } from './apiClient'
 import {
   branchesKey,
   branchesRoute,
@@ -9,9 +9,16 @@ import {
   compareRoute,
   fileBlobKey,
   fileBlobRoute,
+  filePatchKey,
+  filePatchRoute,
+  filePatchesRoute,
+  fileSummariesKey,
+  fileSummariesRoute,
   filesKey,
   meKey,
   meRoute,
+  mentionsKey,
+  mentionsRoute,
   pinsKey,
   pinsRoute,
   prefsKey,
@@ -32,10 +39,23 @@ import {
   type Pull,
   type PullDetail,
   type PullFile,
+  type PullFilesPatchRequest,
   type Repo,
 } from '../shared/api'
 
-export { meKey, pinsKey, prefsKey, pullKey, pullPrefixKey, pullsKey, pullsPrefixKey, reposKey, reposRefreshRoute } from '../shared/api'
+export {
+  filePatchKey,
+  fileSummariesKey,
+  meKey,
+  pinsKey,
+  prefsKey,
+  pullKey,
+  pullPrefixKey,
+  pullsKey,
+  pullsPrefixKey,
+  reposKey,
+  reposRefreshRoute,
+} from '../shared/api'
 export type { Branch, Check, Comment, Compare, CompareCommit, Label, Me, Pull, PullDetail, PullFile, Repo, Review, Thread, ThreadComment } from '../shared/api'
 
 type QueryContext = { signal?: AbortSignal }
@@ -92,6 +112,33 @@ export const filesOptions = (owner: string, repo: string, number: string, enable
   queryFn: async ({ signal }: QueryContext): Promise<PullFile[]> => readJson<PullFile[]>(pullRoute(owner, repo, number, 'files'), { signal }),
 })
 
+export const fileSummariesOptions = (owner: string, repo: string, number: string, enabled: boolean) => ({
+  queryKey: fileSummariesKey(owner, repo, number),
+  enabled,
+  queryFn: async ({ signal }: QueryContext): Promise<PullFile[]> => readJson<PullFile[]>(fileSummariesRoute(owner, repo, number), { signal }),
+})
+
+export const filePatchOptions = (owner: string, repo: string, number: string, path: string) => ({
+  queryKey: filePatchKey(owner, repo, number, path),
+  queryFn: async ({ signal }: QueryContext): Promise<PullFile> => {
+    const [file] = await readJson<PullFile[]>(filePatchRoute(owner, repo, number, path), { signal })
+    if (!file) throw new Error('file_not_found')
+    return file
+  },
+})
+
+export const fetchFilePatches = (owner: string, repo: string, number: string, paths: string[], signal?: AbortSignal): Promise<PullFile[]> =>
+  writeJson<PullFile[]>(
+    filePatchesRoute(owner, repo, number),
+    {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ paths } satisfies PullFilesPatchRequest),
+      signal,
+    },
+    'files_patch_failed',
+  )
+
 // Branch names for the create-PR pickers; enabled once the repo is known.
 export const branchesOptions = (owner: string, repo: string, enabled: boolean) => ({
   queryKey: branchesKey(owner, repo),
@@ -112,4 +159,12 @@ export const fileBlobOptions = (owner: string, repo: string, sha: string) => ({
   queryKey: fileBlobKey(owner, repo, sha),
   staleTime: Infinity,
   queryFn: async ({ signal }: QueryContext): Promise<FileBlob> => readJson<FileBlob>(fileBlobRoute(owner, repo, sha), { signal }),
+})
+
+// Distinct participant logins for the repo — used to populate @mention autocomplete.
+export const mentionsOptions = (owner: string, repo: string, enabled: boolean) => ({
+  queryKey: mentionsKey(owner, repo),
+  enabled,
+  staleTime: 5 * 60 * 1000,
+  queryFn: async ({ signal }: QueryContext): Promise<string[]> => readJson<string[]>(mentionsRoute(owner, repo), { signal }),
 })

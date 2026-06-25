@@ -13,7 +13,7 @@ import './styles.css'
 // null on 401 (logged-out) so it never trips this.
 const onError = (err: unknown) => {
   const msg = err instanceof Error ? err.message : ''
-  if (/\b401\b|reauth|unauthenticated/.test(msg)) window.location.href = '/auth/login'
+  if (/\b401\b|reauth|unauthenticated/.test(msg)) window.location.href = '/auth/login?return_to=' + encodeURIComponent(window.location.pathname + window.location.search)
 }
 
 // TanStack Query is the client cache (SWR). App is the layout root and renders the panes from

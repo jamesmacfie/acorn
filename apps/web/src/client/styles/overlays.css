@@ -78,3 +78,33 @@
 .finder-row.active { background: var(--bg-selected); border-left-color: var(--accent); }
 .finder-dir { color: var(--text-muted); overflow: hidden; text-overflow: ellipsis; }
 .finder-name { color: var(--text); flex-shrink: 0; }
+
+/* @mention autocomplete popup (MentionTextarea.tsx): fixed below the textarea. */
+.mention-popup {
+  position: fixed;
+  z-index: 70;
+  list-style: none;
+  margin: 0;
+  padding: 4px 0;
+  background: var(--bg);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+  box-shadow: 0 8px 20px var(--shadow-popover);
+  max-width: 220px;
+  overflow: hidden;
+}
+.mention-item {
+  display: flex;
+  align-items: center;
+  padding: 5px 10px;
+  font-size: var(--fs-sm);
+  color: var(--text);
+  cursor: pointer;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  gap: 1px;
+}
+.mention-item:hover,
+.mention-item-sel { background: var(--bg-subtle); }
+.mention-at { color: var(--accent); font-weight: 600; }

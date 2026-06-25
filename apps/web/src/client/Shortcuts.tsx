@@ -1,7 +1,7 @@
 import { createEffect, createMemo, createSignal, For, onCleanup, onMount, Show } from 'solid-js'
 import { createQuery } from '@tanstack/solid-query'
 import { useNavigate, useParams, useSearchParams } from '@solidjs/router'
-import { filesOptions, type PullFile } from './queries'
+import { fileSummariesOptions, type PullFile } from './queries'
 
 // Global keyboard shortcuts + their overlays. Mounted once in App. Owns a single window
 // keydown listener. PullList owns j/k (next/prev PR) — those keys are deliberately untouched
@@ -38,7 +38,7 @@ export default function Shortcuts() {
   })
   const files = createQuery(() => {
     const r = route()
-    return filesOptions(r?.owner ?? '', r?.repo ?? '', r?.number ?? '', !!r)
+    return fileSummariesOptions(r?.owner ?? '', r?.repo ?? '', r?.number ?? '', !!r)
   })
   const allFiles = (): PullFile[] => files.data ?? []
   const currentFile = () => (typeof searchParams.file === 'string' ? searchParams.file : undefined)

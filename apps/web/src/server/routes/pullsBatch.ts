@@ -1,17 +1,20 @@
 import { and, eq, inArray } from 'drizzle-orm'
 import { Hono } from 'hono'
-import type { PullBatchItem } from '../../shared/api'
+import type { PullBatchFilesMode, PullBatchItem, PullBatchRequest } from '../../shared/api'
 import { getDb, schema } from '../db'
 import { filesResource, prResource } from '../db/resourceKeys'
 import { ghError, ghGraphQL } from '../github'
 import type { AppEnv } from '../middleware/auth'
 import { fetchFiles, mirrorFiles, mirrorPr, PR_FRAGMENT, readComposite, readFiles, STALE_AFTER_MS, type GqlPull } from './prMirror'
+import { resolveRepoForUser } from './repoMirror'
 
 // Batch prefetch — warm the mirror for several open PRs at once so client navigation is instant.
 // Detail is one multi-alias GraphQL call for all stale PRs (one GitHub round-trip); files stay N
 // parallel REST calls (REST can't be aliased). Per-PR TTL skip means already-fresh PRs cost no
 // GitHub calls. Reuses the same mirror tables/logic as the single-PR routes (prMirror.ts).
 const MAX_BATCH = 10 // bounds the GraphQL query size; the client sends ~5
+const isFilesMode = (value: unknown): value is PullBatchFilesMode =>
+  value === 'full' || value === 'summary' || value === 'none'
 
 export const pullsBatch = new Hono<AppEnv>().post('/:owner/:repo/pulls/batch', async (c) => {
   const user = c.get('user')
@@ -19,20 +22,19 @@ export const pullsBatch = new Hono<AppEnv>().post('/:owner/:repo/pulls/batch', a
 
   const owner = c.req.param('owner')
   const repo = c.req.param('repo')
-  const body = await c.req.json<{ numbers?: unknown }>().catch(() => null)
+  const body = await c.req.json<Partial<PullBatchRequest> & { numbers?: unknown; files?: unknown }>().catch(() => null)
   const raw = body?.numbers
   if (!Array.isArray(raw) || raw.some((n) => !Number.isInteger(n))) return c.json({ error: 'bad_numbers' }, 400)
   const numbers = [...new Set(raw as number[])]
   if (numbers.length === 0 || numbers.length > MAX_BATCH) return c.json({ error: 'bad_numbers' }, 400)
+  const filesMode = body?.files ?? 'full'
+  if (!isFilesMode(filesMode)) return c.json({ error: 'bad_files_mode' }, 400)
 
   const db = getDb(c.env)
   const userId = user.login
-  const [repoRow] = await db
-    .select({ id: schema.repos.id, private: schema.repos.private })
-    .from(schema.repos)
-    .where(and(eq(schema.repos.userId, userId), eq(schema.repos.owner, owner), eq(schema.repos.name, repo)))
-  if (!repoRow) return c.json({ error: 'repo_not_found' }, 404)
-  const { id: repoId, private: isPrivate } = repoRow
+  const resolved = await resolveRepoForUser(db, user.token, userId, owner, repo)
+  if (!resolved.ok) return c.json({ error: resolved.failure.error }, resolved.failure.status)
+  const { repoId, private: isPrivate } = resolved.value
 
   // Per-PR TTL: only stale resources go to GitHub; fresh ones serve straight from the mirror.
   const resources = numbers.flatMap((n) => [prResource(repoId, n), filesResource(repoId, n)])
@@ -47,7 +49,7 @@ export const pullsBatch = new Hono<AppEnv>().post('/:owner/:repo/pulls/batch', a
     return f != null && f + STALE_AFTER_MS > now
   }
   const staleDetail = numbers.filter((n) => !isFresh(prResource(repoId, n)))
-  const staleFiles = numbers.filter((n) => !isFresh(filesResource(repoId, n)))
+  const staleFiles = filesMode === 'none' ? [] : numbers.filter((n) => !isFresh(filesResource(repoId, n)))
 
   // Detail: one multi-alias GraphQL query for all stale PRs. A whole-response error (auth/rate
   // limit) fails the batch — the client treats prefetch as best-effort and falls back to on-demand.
@@ -98,7 +100,10 @@ query Batch($owner: String!, $repo: String!, ${varDecls}) {
   const items = await Promise.all(
     numbers.map(async (number): Promise<PullBatchItem> => {
       const key = { userId, repoId, number }
-      const [detail, files] = await Promise.all([readComposite(db, key), readFiles(c.env, db, key)])
+      const [detail, files] = await Promise.all([
+        readComposite(db, key),
+        filesMode === 'none' ? [] : readFiles(c.env, db, key, { includePatches: filesMode === 'full' }),
+      ])
       return { number, detail, files }
     }),
   )

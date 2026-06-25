@@ -19,6 +19,8 @@ export type CodeRow = {
 export type HunkRow = { kind: 'hunk'; text: string }
 export type FileRow = { kind: 'file'; file: PullFile }
 export type NoDiffRow = { kind: 'nodiff' }
+export type LoadDiffStatus = 'loading' | 'error'
+export type LoadDiffRow = { kind: 'load'; file: PullFile; status: LoadDiffStatus }
 export type ThreadRowT = { kind: 'thread'; thread: Thread }
 // A run of unchanged lines hidden between/above/below hunks. oldNo/newNo advance in lockstep
 // (unchanged context), so expansion just slices the head blob from newStart. count is null for the
@@ -32,15 +34,15 @@ export type GapRow = {
   newStart: number
   count: number | null
 }
-export type Row = HunkRow | CodeRow | FileRow | NoDiffRow | ThreadRowT | GapRow
-export type DiffRow = HunkRow | CodeRow | GapRow
+export type Row = HunkRow | CodeRow | FileRow | NoDiffRow | LoadDiffRow | ThreadRowT | GapRow
+export type DiffRow = HunkRow | CodeRow | GapRow | LoadDiffRow
 export type ParsedFile = { file: PullFile; diff: DiffRow[] }
 
 export const gapId = (gap: Pick<GapRow, 'path' | 'side' | 'oldStart' | 'newStart'>) => `${gap.path}:${gap.side}:${gap.oldStart}:${gap.newStart}`
 
 export type ViewMode = 'unified' | 'split'
 export type SplitBand =
-  | { kind: 'full'; row: HunkRow | FileRow | NoDiffRow | ThreadRowT | GapRow }
+  | { kind: 'full'; row: HunkRow | FileRow | NoDiffRow | LoadDiffRow | ThreadRowT | GapRow }
   | { kind: 'pair'; left: CodeRow | null; right: CodeRow | null }
 
 export type TokenizeLine = (path: string, content: string) => Tok[]
@@ -56,6 +58,7 @@ export const estimateRowSize = (row: Row | undefined) => {
   if (row.kind === 'file') return DIFF_FILE_HEADER_HEIGHT
   if (row.kind === 'thread') return 140
   if (row.kind === 'nodiff') return 28
+  if (row.kind === 'load') return 36
   if (row.kind === 'gap') return 28
   return DIFF_LINE_HEIGHT
 }
@@ -199,7 +202,7 @@ export function buildRenderableRows(parsed: ParsedFile[], threads: Thread[] | un
         }
         continue
       }
-      if (row.kind === 'hunk') out.push(row)
+      if (row.kind === 'hunk' || row.kind === 'load') out.push(row)
       else pushCodeRow(out, row, fileThreads)
     }
     if (diff.length === 0) out.push({ kind: 'nodiff' })
@@ -244,7 +247,7 @@ export function toBands(rows: Row[]): SplitBand[] {
   let i = 0
   while (i < rows.length) {
     const row = rows[i]!
-    if (row.kind === 'hunk' || row.kind === 'thread' || row.kind === 'file' || row.kind === 'nodiff' || row.kind === 'gap') {
+    if (row.kind === 'hunk' || row.kind === 'thread' || row.kind === 'file' || row.kind === 'nodiff' || row.kind === 'load' || row.kind === 'gap') {
       out.push({ kind: 'full', row })
       i++
       continue

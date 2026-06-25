@@ -1,7 +1,8 @@
 import { createEffect, createSignal, Show } from 'solid-js'
 import { createMutation, createQuery, useQueryClient } from '@tanstack/solid-query'
 import { useNavigate, useParams, useSearchParams } from '@solidjs/router'
-import { branchesOptions, compareOptions, pullsKey, reposOptions, type Branch } from './queries'
+import { branchesOptions, compareOptions, mentionsOptions, pullsKey, reposOptions, type Branch } from './queries'
+import MentionTextarea from './MentionTextarea'
 import { createPr } from './mutations'
 import { prefillFromCompare } from './features/createPull/model'
 import Picker from './Picker'
@@ -20,6 +21,8 @@ export default function CreatePullForm() {
   const repo = () => repos.data?.find((x) => x.owner === o() && x.name === r())
   const repoKnown = () => !!repo()
   const branches = createQuery(() => branchesOptions(o(), r(), repoKnown()))
+  const mentionsQuery = createQuery(() => mentionsOptions(o(), r(), repoKnown()))
+  const mentionsList = () => mentionsQuery.data ?? []
 
   const base = () => (typeof searchParams.base === 'string' && searchParams.base) || repo()?.defaultBranch || ''
   const head = () => (typeof searchParams.head === 'string' ? searchParams.head : '')
@@ -106,15 +109,13 @@ export default function CreatePullForm() {
             setTitle(e.currentTarget.value)
           }}
         />
-        <textarea
+        <MentionTextarea
           class="composer-input create-pr-body"
           placeholder="Describe this pull request… (⌘↵ to create)"
           value={body()}
-          onInput={(e) => {
-            setTouched(true)
-            setBody(e.currentTarget.value)
-          }}
+          onInput={(v) => { setTouched(true); setBody(v) }}
           onKeyDown={onBodyKey}
+          mentions={mentionsList()}
         />
 
         <label class="create-pr-draft">

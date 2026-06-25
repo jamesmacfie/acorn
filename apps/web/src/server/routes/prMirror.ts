@@ -1,4 +1,4 @@
-import { and, eq } from 'drizzle-orm'
+import { and, eq, inArray } from 'drizzle-orm'
 import type { SQLiteColumn } from 'drizzle-orm/sqlite-core'
 import type { PullDetail, PullFile } from '../../shared/api'
 import { getDb, schema } from '../db'
@@ -284,10 +284,20 @@ export const mirrorFiles = async (env: Env, db: Db, key: PrKey, isPrivate: boole
   ])
 }
 
+type ReadFilesOptions = { includePatches?: boolean; paths?: string[] }
+
 // Read one PR's files back out of the mirror. `viewed` is app-state (viewed_files), merged in
-// fresh on every read so it survives mirror re-syncs; public patch bodies resolve from KV by sha.
-export const readFiles = async (env: Env, db: Db, key: PrKey): Promise<PullFile[]> => {
-  const fileWhere = and(eq(schema.prFiles.userId, key.userId), eq(schema.prFiles.repoId, key.repoId), eq(schema.prFiles.number, key.number))
+// fresh on every read so it survives mirror re-syncs. Callers can skip patch bodies for cheap
+// summary reads; public patch bodies resolve from KV by sha only when explicitly requested.
+export const readFiles = async (env: Env, db: Db, key: PrKey, options: ReadFilesOptions = {}): Promise<PullFile[]> => {
+  const includePatches = options.includePatches ?? true
+  const paths = options.paths?.length ? Array.from(new Set(options.paths)) : undefined
+  const fileWhere = and(
+    eq(schema.prFiles.userId, key.userId),
+    eq(schema.prFiles.repoId, key.repoId),
+    eq(schema.prFiles.number, key.number),
+    ...(paths ? [inArray(schema.prFiles.path, paths)] : []),
+  )
   const viewedWhere = and(eq(schema.viewedFiles.userId, key.userId), eq(schema.viewedFiles.repoId, key.repoId), eq(schema.viewedFiles.number, key.number))
   const [files, viewed] = await Promise.all([
     db.select().from(schema.prFiles).where(fileWhere),
@@ -302,7 +312,7 @@ export const readFiles = async (env: Env, db: Db, key: PrKey): Promise<PullFile[
       deletions: f.deletions,
       sha: f.sha,
       viewed: seen.has(f.path),
-      patch: f.patch ?? (f.sha ? await env.BLOBS.get(blobKey(f.sha)) : null),
+      patch: includePatches ? (f.patch ?? (f.sha ? await env.BLOBS.get(blobKey(f.sha)) : null)) : null,
     })),
   )
 }
