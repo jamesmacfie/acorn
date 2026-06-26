@@ -104,17 +104,24 @@ export const pulls = new Hono<AppEnv>().get('/:owner/:repo/pulls', async (c) => 
       state: p.state,
       draft: p.draft,
       title: p.title,
+      // Detail fields absent from the list API — set explicitly so Drizzle's bound-param count
+      // matches Object.keys() and chunkRowsByColumnBudget stays accurate.
+      body: null,
+      headSha: null,
       headRef: p.head?.ref ?? null,
       baseRef: p.base?.ref ?? null,
       author: p.user?.login ?? null,
       updatedAt: p.updated_at ? Date.parse(p.updated_at) : null,
+      mergeable: null,
+      mergeStateStatus: null,
+      autoMergeEnabled: false,
       fetchedAt: now,
       staleAfter: STALE_AFTER_MS,
-      etag: null, // collection freshness lives in sync_state; per-row etag earns its keep at single-PR revalidation.
+      etag: null,
     }))
 
     // Full-list refresh: delete → insert chunks → upsert sync_state. Split across three steps so
-    // total batch params never blow D1's cumulative limit (100 open PRs × 14 cols = 1400 params).
+    // total batch params never blow D1's cumulative limit (100 open PRs × 19 cols = 1900 params).
     // Ordering: sync_state is written last so a mid-insert failure leaves it stale and the next
     // request retries rather than serving an empty list.
     await db.delete(schema.pullRequests).where(scope)
