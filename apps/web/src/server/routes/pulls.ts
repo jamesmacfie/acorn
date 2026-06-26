@@ -113,20 +113,21 @@ export const pulls = new Hono<AppEnv>().get('/:owner/:repo/pulls', async (c) => 
       etag: null, // collection freshness lives in sync_state; per-row etag earns its keep at single-PR revalidation.
     }))
 
-    // Full-list refresh: delete-then-insert so closed/merged PRs drop out, plus the sync_state
-    // upsert, atomically in one batch. D1 caps bound params at 100/statement.
-    const ops = chunkRowsByColumnBudget(rows).map((part) => db.insert(schema.pullRequests).values(part))
-    await db.batch([
-      db.delete(schema.pullRequests).where(scope),
-      db
-        .insert(schema.syncState)
-        .values({ userId, resource, etag, fetchedAt: now })
-        .onConflictDoUpdate({
-          target: [schema.syncState.userId, schema.syncState.resource],
-          set: { etag, fetchedAt: now },
-        }),
-      ...ops,
-    ])
+    // Full-list refresh: delete → insert chunks → upsert sync_state. Split across three steps so
+    // total batch params never blow D1's cumulative limit (100 open PRs × 14 cols = 1400 params).
+    // Ordering: sync_state is written last so a mid-insert failure leaves it stale and the next
+    // request retries rather than serving an empty list.
+    await db.delete(schema.pullRequests).where(scope)
+    for (const part of chunkRowsByColumnBudget(rows)) {
+      await db.insert(schema.pullRequests).values(part)
+    }
+    await db
+      .insert(schema.syncState)
+      .values({ userId, resource, etag, fetchedAt: now })
+      .onConflictDoUpdate({
+        target: [schema.syncState.userId, schema.syncState.resource],
+        set: { etag, fetchedAt: now },
+      })
 
     return { ok: true, value: rows.map(toPublic) }
   }

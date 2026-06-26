@@ -25,5 +25,20 @@
     { "binding": "OAUTH_STATE", "id": "56d25c60db044d208f10e7d45ed82e0a" },
     // BLOBS: shared, immutable public blob/patch bodies keyed by sha (docs/caching.md).
     { "binding": "BLOBS", "id": "a328168716b74ff9bf211b190088adf2" }
-  ]
+  ],
+  "observability": {
+    "enabled": false,
+    "head_sampling_rate": 1,
+    "logs": {
+      "enabled": true,
+      "head_sampling_rate": 1,
+      "persist": true,
+      "invocation_logs": true
+    },
+    "traces": {
+      "enabled": false,
+      "persist": true,
+      "head_sampling_rate": 1
+    }
+  }
 }
