@@ -2,9 +2,9 @@ import { createEffect, createMemo, createSignal, For, on, onCleanup, onMount, Sh
 import { createInfiniteQuery, createQuery, useQueryClient } from '@tanstack/solid-query'
 import { A, useNavigate, useParams } from '@solidjs/router'
 import { createVirtualizer } from '@tanstack/solid-virtual'
-import { formatRelativeTime } from './displayMeta'
+import { checksState, formatRelativeTime } from './displayMeta'
 import { prefetchOpenPulls, schedulePullSummaryPrefetch } from './prefetch'
-import { closedPullsInfiniteOptions, pullsOptions, reposOptions } from './queries'
+import { closedPullsInfiniteOptions, pullDetailOptions, pullsOptions, reposOptions } from './queries'
 import { filterPulls } from './features/pullList/model'
 
 // Left-pane PR list for the routed repo. Access checks live on the server; this pane only needs
@@ -144,6 +144,10 @@ export default function PullList() {
             <div class="pr-list" style={{ height: `${virt.getTotalSize()}px`, position: 'relative' }}>
               <For each={virtualRows()}>
                 {({ vi, pr }) => {
+                  // Reactively read the warmed detail cache (enabled:false → no fetch) so the rolled-up
+                  // checks dot appears as prefetchOpenPulls seeds each PR. No checks → no dot.
+                  const detail = createQuery(() => pullDetailOptions(params.owner ?? '', params.repo ?? '', String(pr.number), false))
+                  const checks = () => detail.data?.checks ?? []
                   return (
                     <A
                       class="pr-row"
@@ -156,6 +160,9 @@ export default function PullList() {
                       style={{ position: 'absolute', top: 0, left: 0, width: '100%', transform: `translateY(${vi.start}px)`, height: `${vi.size}px` }}
                     >
                       <span class="pr-num">#{pr.number}</span>
+                      <Show when={checks().length}>
+                        <span class={`checks-dot checks-dot-${checksState(checks())}`} />
+                      </Show>
                       <span class="pr-title">{pr.title}</span>
                       <Show when={pr.draft}>
                         <span class="pr-badge">draft</span>

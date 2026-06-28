@@ -1,7 +1,7 @@
 import { createMemo, createSignal, For, Show } from 'solid-js'
 import { createMutation, createQuery, useQueryClient } from '@tanstack/solid-query'
 import { useParams, useSearchParams } from '@solidjs/router'
-import { fileStatusMeta, formatRelativeTime, summarizeFileStats } from './displayMeta'
+import { checksState, FAILED_STATUSES, fileStatusMeta, formatRelativeTime, summarizeFileStats } from './displayMeta'
 import { requestFileScroll, routeKey } from './fileNavigation'
 import Picker from './Picker'
 import { fileSummariesOptions, mentionsOptions, pullDetailOptions, pullPrefixKey, pullsPrefixKey, repoLabelsOptions, reposOptions, type Label } from './queries'
@@ -11,25 +11,6 @@ import { UserAvatar } from './UserAvatar'
 import { ConversationEntryItem } from './features/pullDetail/Conversation'
 import { buildConversationEntries, buildThreadSnippetIndex } from './features/pullDetail/model'
 
-// Conclusions that count as a failed check → eligible for "Rerun failed jobs".
-const FAILED_STATUSES = new Set(['failure', 'error', 'cancelled', 'timed_out'])
-const IN_PROGRESS_STATUSES = new Set(['pending', 'in_progress', 'queued'])
-
-// Roll the individual check statuses up to one dot: red if any failed, green if all
-// passed, in-progress if any still running, and split red/in-progress if both.
-function checksState(checks: { status: string | null }[]): 'success' | 'failure' | 'pending' | 'mixed' {
-  let failed = false
-  let pending = false
-  for (const c of checks) {
-    const s = (c.status ?? '').toLowerCase()
-    if (FAILED_STATUSES.has(s)) failed = true
-    else if (IN_PROGRESS_STATUSES.has(s)) pending = true
-  }
-  if (failed && pending) return 'mixed'
-  if (failed) return 'failure'
-  if (pending) return 'pending'
-  return 'success'
-}
 const labelColor = (color: string | null | undefined) => (color ? `#${color}` : 'var(--text-faint)')
 
 // Mid (Navigator) pane: PR header + description + changed-files + checks + conversation.
