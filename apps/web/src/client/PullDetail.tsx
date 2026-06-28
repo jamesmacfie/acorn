@@ -6,7 +6,7 @@ import { requestFileScroll, routeKey } from './fileNavigation'
 import Picker from './Picker'
 import { fileSummariesOptions, mentionsOptions, pullDetailOptions, pullPrefixKey, pullsPrefixKey, repoLabelsOptions, reposOptions, type Label } from './queries'
 import MentionTextarea from './MentionTextarea'
-import { addComment, addLabel, closePr, disableAutoMerge, enableAutoMerge, mergePr, removeLabel, reopenPr, rerunFailed, setDraft, setViewed, submitReview } from './mutations'
+import { addComment, addLabel, closePr, disableAutoMerge, enableAutoMerge, mergePr, removeLabel, removeReviewer, reopenPr, rerunFailed, requestReviewer, setDraft, setViewed, submitReview } from './mutations'
 import { UserAvatar } from './UserAvatar'
 import { ConversationEntryItem } from './features/pullDetail/Conversation'
 import { buildConversationEntries, buildThreadSnippetIndex } from './features/pullDetail/model'
@@ -57,6 +57,11 @@ export default function PullDetail() {
   const labelResults = (query: string): Label[] => {
     const q = query.trim().toLowerCase()
     return (repoLabels.data ?? []).filter((label) => !assignedLabelNames().has(label.name.toLowerCase()) && (!q || label.name.toLowerCase().includes(q)))
+  }
+  const requestedReviewers = createMemo(() => new Set(detail.data?.requestedReviewers ?? []))
+  const reviewerResults = (query: string): string[] => {
+    const q = query.trim().toLowerCase()
+    return mentionsList().filter((login) => !requestedReviewers().has(login) && (!q || login.toLowerCase().includes(q)))
   }
 
   // Refetch detail (and the open-PR list, since state changes drop a PR from it) after a mutation.
@@ -328,6 +333,34 @@ export default function PullDetail() {
 
             <details class="nav-section" open>
               <summary>Review</summary>
+              <ul class="label-list">
+                <For each={detail.data?.requestedReviewers} fallback={<li class="label-empty muted">No reviewers requested.</li>}>
+                  {(login) => (
+                    <li class="label-row">
+                      <span class="identity-chip">
+                        <UserAvatar login={login} />
+                        <span class="label-row-name">{login}</span>
+                      </span>
+                      <button type="button" class="label-row-remove" title="Remove review request" onClick={() => run(removeReviewer(o(), r(), n(), login))}>
+                        ×
+                      </button>
+                    </li>
+                  )}
+                </For>
+              </ul>
+              <div class="label-picker">
+                <Picker<string>
+                  label="Request review…"
+                  placeholder="Filter people…"
+                  emptyText={mentionsQuery.isLoading ? 'Loading people…' : 'No one to request.'}
+                  results={reviewerResults}
+                  rowLabel={(login) => login}
+                  isActive={() => false}
+                  onSelect={(login) => run(requestReviewer(o(), r(), n(), login))}
+                  buttonClass="label-picker-button"
+                  leading={(login) => <UserAvatar login={login} />}
+                />
+              </div>
               <div class="composer">
                 <MentionTextarea
                   class="composer-input"

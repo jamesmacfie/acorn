@@ -8,6 +8,7 @@ import {
   prefsRoute,
   pullRoute,
   rerunFailedRoute,
+  requestedReviewersRoute,
   resolveThreadRoute,
 } from '../shared/api'
 
@@ -42,6 +43,18 @@ export const removeLabel = async (o: string, r: string, n: string, name: string)
     method: 'DELETE',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ name }),
+  })
+  if (!res.ok) throw new Error(await apiError(res, `${res.status}`))
+  return res.json()
+}
+
+export const requestReviewer = (o: string, r: string, n: string, login: string) =>
+  post(requestedReviewersRoute(o, r, n), { login })
+export const removeReviewer = async (o: string, r: string, n: string, login: string) => {
+  const res = await fetch(requestedReviewersRoute(o, r, n), {
+    method: 'DELETE',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ login }),
   })
   if (!res.ok) throw new Error(await apiError(res, `${res.status}`))
   return res.json()

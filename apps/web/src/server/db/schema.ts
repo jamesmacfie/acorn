@@ -151,6 +151,18 @@ export const prLabels = sqliteTable(
   (t) => [primaryKey({ columns: [t.userId, t.repoId, t.number, t.name] })],
 )
 
+// Pending review requests (logins). ponytail: users only — team review requests not mirrored.
+export const reviewRequests = sqliteTable(
+  'review_requests',
+  {
+    userId: text('user_id').notNull(),
+    repoId: integer('repo_id').notNull(),
+    number: integer('number').notNull(),
+    login: text('login').notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.userId, t.repoId, t.number, t.login] })],
+)
+
 export const checks = sqliteTable(
   'checks',
   {
