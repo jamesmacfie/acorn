@@ -1,4 +1,4 @@
-import { and, desc, eq, ne } from 'drizzle-orm'
+import { and, desc, eq, lt, ne, sql } from 'drizzle-orm'
 import { Hono } from 'hono'
 import { getDb, schema } from '../db'
 import { chunkRowsByColumnBudget } from '../db/batch'
@@ -104,30 +104,37 @@ export const pulls = new Hono<AppEnv>().get('/:owner/:repo/pulls', async (c) => 
       state: p.state,
       draft: p.draft,
       title: p.title,
-      // Detail fields absent from the list API — set explicitly so Drizzle's bound-param count
-      // matches Object.keys() and chunkRowsByColumnBudget stays accurate.
-      body: null,
-      headSha: null,
       headRef: p.head?.ref ?? null,
       baseRef: p.base?.ref ?? null,
       author: p.user?.login ?? null,
       updatedAt: p.updated_at ? Date.parse(p.updated_at) : null,
-      mergeable: null,
-      mergeStateStatus: null,
-      autoMergeEnabled: false,
       fetchedAt: now,
       staleAfter: STALE_AFTER_MS,
       etag: null,
     }))
 
-    // Full-list refresh: delete → insert chunks → upsert sync_state. Split across three steps so
-    // total batch params never blow D1's cumulative limit (100 open PRs × 19 cols = 1900 params).
-    // Ordering: sync_state is written last so a mid-insert failure leaves it stale and the next
-    // request retries rather than serving an empty list.
-    await db.delete(schema.pullRequests).where(scope)
+    // Full-list refresh: upsert list-level fields (preserving detail fields like body fetched by
+    // the GraphQL detail route), then prune rows no longer in the list. sync_state last so a
+    // mid-upsert failure leaves it stale and the next request retries.
     for (const part of chunkRowsByColumnBudget(rows)) {
-      await db.insert(schema.pullRequests).values(part)
+      await db.insert(schema.pullRequests).values(part).onConflictDoUpdate({
+        target: [schema.pullRequests.userId, schema.pullRequests.repoId, schema.pullRequests.number],
+        set: {
+          nodeId: sql`excluded.node_id`,
+          state: sql`excluded.state`,
+          draft: sql`excluded.draft`,
+          title: sql`excluded.title`,
+          headRef: sql`excluded.head_ref`,
+          baseRef: sql`excluded.base_ref`,
+          author: sql`excluded.author`,
+          updatedAt: sql`excluded.updated_at`,
+          fetchedAt: sql`excluded.fetched_at`,
+          staleAfter: sql`excluded.stale_after`,
+          etag: sql`excluded.etag`,
+        },
+      })
     }
+    await db.delete(schema.pullRequests).where(and(scope, lt(schema.pullRequests.fetchedAt, now)))
     await db
       .insert(schema.syncState)
       .values({ userId, resource, etag, fetchedAt: now })
