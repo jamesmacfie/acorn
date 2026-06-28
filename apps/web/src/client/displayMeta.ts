@@ -63,3 +63,23 @@ export function summarizeFileStats(files: readonly Pick<PullFile, 'additions' | 
 export function githubAvatarUrl(login: string, size = 40): string {
   return `https://github.com/${encodeURIComponent(login)}.png?size=${size}`
 }
+
+// Conclusions that count as a failed check → eligible for "Rerun failed jobs".
+export const FAILED_STATUSES = new Set(['failure', 'error', 'cancelled', 'timed_out'])
+const IN_PROGRESS_STATUSES = new Set(['pending', 'in_progress', 'queued'])
+
+// Roll the individual check statuses up to one dot: red if any failed, green if all
+// passed, in-progress if any still running, and split red/in-progress if both.
+export function checksState(checks: { status: string | null }[]): 'success' | 'failure' | 'pending' | 'mixed' {
+  let failed = false
+  let pending = false
+  for (const c of checks) {
+    const s = (c.status ?? '').toLowerCase()
+    if (FAILED_STATUSES.has(s)) failed = true
+    else if (IN_PROGRESS_STATUSES.has(s)) pending = true
+  }
+  if (failed && pending) return 'mixed'
+  if (failed) return 'failure'
+  if (pending) return 'pending'
+  return 'success'
+}
