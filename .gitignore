@@ -7,3 +7,5 @@ dist/
 # Cloudflare / Wrangler
 .dev.vars
 .wrangler/
+
+.playwright-mcp/*

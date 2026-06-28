@@ -36,6 +36,7 @@ export const prActions = new Hono<AppEnv>()
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ merge_method: method ?? 'merge' }),
     })
+    if (res.status === 422) return c.json({ error: 'auto_merge_not_allowed' }, 422)
     const err = ghError(res)
     if (err) return c.json({ error: err.error }, err.status)
     await r.db
