@@ -24,6 +24,7 @@ const detail = {
   },
   labels: [],
   reviews: [],
+  requestedReviewers: [],
   comments: [],
   commits: [],
   checks: [],

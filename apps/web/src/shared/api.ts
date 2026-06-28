@@ -52,6 +52,7 @@ export type PullDetail = {
   pull: (Pull & { number: number; body: string | null; headSha: string | null }) | null
   labels: Label[]
   reviews: Review[]
+  requestedReviewers: string[]
   comments: Comment[]
   commits: PullCommit[]
   checks: Check[]
@@ -95,6 +96,8 @@ export const resolveThreadRoute = (owner: string, repo: string, number: string |
 export const autoMergeRoute = (owner: string, repo: string, number: string | number) => pullRoute(owner, repo, number, 'auto-merge')
 export const rerunFailedRoute = (owner: string, repo: string, runId: number) => repoRoute(owner, repo, `actions/${runId}/rerun`)
 export const mentionsRoute = (owner: string, repo: string) => repoRoute(owner, repo, 'mentions')
+export const requestedReviewersRoute = (owner: string, repo: string, number: string | number) =>
+  pullRoute(owner, repo, number, 'requested-reviewers')
 export const pinsRoute = '/api/pins'
 export const prefsRoute = '/api/prefs'
 

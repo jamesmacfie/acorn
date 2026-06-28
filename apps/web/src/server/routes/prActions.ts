@@ -221,6 +221,10 @@ export const prActions = new Hono<AppEnv>()
     await bustPrSync(r.db, r.user.login, r.repoId, r.number)
     return c.json({ ok: true })
   })
+  // Request a reviewer: POST /pulls/{n}/requested_reviewers { reviewers }. Remove: DELETE same.
+  // bustPrSync so the next composite refetch picks up the changed request set.
+  .post('/:owner/:repo/pulls/:number/requested-reviewers', (c) => mutateReviewers(c, 'add'))
+  .delete('/:owner/:repo/pulls/:number/requested-reviewers', (c) => mutateReviewers(c, 'remove'))
   // Rerun a workflow run's failed jobs: POST /actions/runs/{runId}/rerun-failed-jobs (GitHub → 201).
   // Repo-scoped (no PR number): a check's runId is the Actions run, not the PR. No mirror to update —
   // the new run states surface on the next composite refetch.
@@ -235,6 +239,31 @@ export const prActions = new Hono<AppEnv>()
     if (err) return c.json({ error: err.error }, err.status)
     return c.json({ ok: true })
   })
+
+async function mutateReviewers(c: Context<AppEnv>, op: 'add' | 'remove') {
+  const r = await resolvePr(c)
+  if ('error' in r) return c.json({ error: r.error }, r.status)
+  const { login } = (await c.req.json().catch(() => ({}))) as { login?: string }
+  if (!login?.trim()) return c.json({ error: 'empty_login' }, 400)
+  const res = await gh(r.user.token, `/repos/${r.owner}/${r.repo}/pulls/${r.number}/requested_reviewers`, {
+    method: op === 'add' ? 'POST' : 'DELETE',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ reviewers: [login] }),
+  })
+  const err = ghError(res)
+  if (err) return c.json({ error: err.error }, err.status)
+  // GitHub returns the PR with its full requested_reviewers set → replace the mirror so a
+  // within-TTL read (the client's refetch) reflects the change immediately. ponytail: users only.
+  const pr = (await res.json()) as { requested_reviewers?: { login: string }[] }
+  const rows = (pr.requested_reviewers ?? []).map((u) => ({ userId: r.user.login, repoId: r.repoId, number: r.number, login: u.login }))
+  const where = and(
+    eq(schema.reviewRequests.userId, r.user.login),
+    eq(schema.reviewRequests.repoId, r.repoId),
+    eq(schema.reviewRequests.number, r.number),
+  )
+  await r.db.batch([r.db.delete(schema.reviewRequests).where(where), ...rows.map((row) => r.db.insert(schema.reviewRequests).values(row))])
+  return c.json(rows.map((row) => row.login))
+}
 
 async function mutateLabels(c: Context<AppEnv>, op: 'add' | 'remove') {
   const r = await resolvePr(c)

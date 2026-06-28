@@ -85,6 +85,13 @@
       "when": 1782423265701,
       "tag": "0011_pale_white_queen",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "6",
+      "when": 1782686238028,
+      "tag": "0012_public_nemesis",
+      "breakpoints": true
     }
   ]
 }

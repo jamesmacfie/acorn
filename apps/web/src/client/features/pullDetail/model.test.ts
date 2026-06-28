@@ -7,6 +7,7 @@ const baseDetail = (overrides: Partial<PullDetail> = {}): PullDetail => ({
   pull: null,
   labels: [],
   reviews: [],
+  requestedReviewers: [],
   comments: [],
   commits: [],
   checks: [],

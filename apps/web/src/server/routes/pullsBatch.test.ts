@@ -67,6 +67,7 @@ describe('pulls batch route', () => {
       pull: null,
       labels: [],
       reviews: [],
+      requestedReviewers: [],
       comments: [],
       commits: [],
       checks: [],
@@ -92,7 +93,7 @@ describe('pulls batch route', () => {
     expect(await res.json()).toEqual([
       {
         number: 42,
-        detail: { pull: null, labels: [], reviews: [], comments: [], commits: [], checks: [], threads: [] },
+        detail: { pull: null, labels: [], reviews: [], requestedReviewers: [], comments: [], commits: [], checks: [], threads: [] },
         files: [
           {
             path: 'src/app.ts',

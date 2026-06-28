@@ -25,6 +25,7 @@ fragment PrFields on PullRequest {
   baseRefName headRefName updatedAt
   labels(first: 20) { nodes { name color } }
   reviews(first: 50) { nodes { id author { login } state bodyHTML submittedAt } }
+  reviewRequests(first: 50) { nodes { requestedReviewer { ... on User { login } } } }
   comments(first: 50) { nodes { id author { login } bodyHTML createdAt } }
   commitTimeline: commits(first: 100) { nodes { commit { oid messageHeadline committedDate author { name user { login } } } } }
   reviewThreads(first: 50) { nodes {
@@ -56,6 +57,7 @@ export type GqlPull = {
   updatedAt: string | null
   labels: { nodes: { name: string; color: string | null }[] }
   reviews: { nodes: { id: string; author: { login: string } | null; state: string; bodyHTML: string | null; submittedAt: string | null }[] }
+  reviewRequests: { nodes: { requestedReviewer: { login?: string } | null }[] }
   comments: { nodes: { id: string; author: { login: string } | null; bodyHTML: string | null; createdAt: string | null }[] }
   commitTimeline: {
     nodes: {
@@ -140,6 +142,10 @@ export const mirrorPr = async (db: Db, key: PrKey, pr: GqlPull, now: number) => 
     body: r.bodyHTML,
     submittedAt: ms(r.submittedAt),
   }))
+  const reviewRequestRows = pr.reviewRequests.nodes
+    .map((rr) => rr.requestedReviewer?.login)
+    .filter((login): login is string => !!login)
+    .map((login) => ({ ...key, login }))
   const commentRows = pr.comments.nodes.map((m) => ({
     ...key,
     id: m.id,
@@ -194,12 +200,14 @@ export const mirrorPr = async (db: Db, key: PrKey, pr: GqlPull, now: number) => 
       }),
     db.delete(schema.prLabels).where(childWhere(schema.prLabels, key)),
     db.delete(schema.reviews).where(childWhere(schema.reviews, key)),
+    db.delete(schema.reviewRequests).where(childWhere(schema.reviewRequests, key)),
     db.delete(schema.comments).where(childWhere(schema.comments, key)),
     db.delete(schema.prCommits).where(childWhere(schema.prCommits, key)),
     db.delete(schema.checks).where(childWhere(schema.checks, key)),
     db.delete(schema.reviewThreads).where(childWhere(schema.reviewThreads, key)),
     ...chunk(schema.prLabels, labelRows),
     ...chunk(schema.reviews, reviewRows),
+    ...chunk(schema.reviewRequests, reviewRequestRows),
     ...chunk(schema.comments, commentRows),
     ...chunk(schema.prCommits, commitRows),
     ...chunk(schema.checks, checkRows),
@@ -245,9 +253,10 @@ export const readComposite = async (db: Db, key: PrKey): Promise<PullDetail> => 
     eq(schema.pullRequests.number, key.number),
   )
   const [pull] = await db.select().from(schema.pullRequests).where(prWhere)
-  const [labels, reviews, comments, commits, checks, threadRows] = await Promise.all([
+  const [labels, reviews, reviewRequests, comments, commits, checks, threadRows] = await Promise.all([
     db.select().from(schema.prLabels).where(childWhere(schema.prLabels, key)),
     db.select().from(schema.reviews).where(childWhere(schema.reviews, key)),
+    db.select().from(schema.reviewRequests).where(childWhere(schema.reviewRequests, key)),
     db.select().from(schema.comments).where(childWhere(schema.comments, key)),
     db.select().from(schema.prCommits).where(childWhere(schema.prCommits, key)),
     db.select().from(schema.checks).where(childWhere(schema.checks, key)),
@@ -263,6 +272,7 @@ export const readComposite = async (db: Db, key: PrKey): Promise<PullDetail> => 
     pull: pull ? toPublicPull(pull) : null,
     labels: labels.map((l) => ({ name: l.name, color: l.color })),
     reviews: reviews.map((r) => ({ id: r.id, author: r.author, state: r.state, body: r.body, submittedAt: r.submittedAt })),
+    requestedReviewers: reviewRequests.map((r) => r.login),
     comments: comments.map((m) => ({ id: m.id, author: m.author, body: m.body, createdAt: m.createdAt })),
     commits: commits.map((m) => ({ sha: m.sha, message: m.message, author: m.author, authorLogin: m.authorLogin, committedAt: m.committedAt })),
     checks: checks.map((k) => ({ name: k.name, status: k.status, url: k.url, runId: k.runId })),
