@@ -26,32 +26,41 @@ export const prActions = new Hono<AppEnv>()
     await setPrState(r.db, r.user.login, r.repoId, r.number, 'merged')
     return c.json({ state: 'merged' })
   })
-  // Enable auto-merge: PUT /pulls/{n}/auto-merge { merge_method }.
+  // Enable auto-merge: GraphQL enablePullRequestAutoMerge (no REST endpoint exists). Needs the PR
+  // node id; mergeMethod is the PullRequestMergeMethod enum (MERGE|SQUASH|REBASE).
   .post('/:owner/:repo/pulls/:number/auto-merge', async (c) => {
     const r = await resolvePr(c)
     if ('error' in r) return c.json({ error: r.error }, r.status)
+    if (!r.nodeId) return c.json({ error: 'node_id_unknown' }, 409) // open the PR first to mirror its node id
     const { method } = (await c.req.json().catch(() => ({}))) as { method?: string }
-    const res = await gh(r.user.token, `/repos/${r.owner}/${r.repo}/pulls/${r.number}/auto-merge`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ merge_method: method ?? 'merge' }),
-    })
-    if (res.status === 422) return c.json({ error: 'auto_merge_not_allowed' }, 422)
+    const res = await ghGraphQL(
+      r.user.token,
+      `mutation($id:ID!,$m:PullRequestMergeMethod!){ enablePullRequestAutoMerge(input:{pullRequestId:$id, mergeMethod:$m}){ clientMutationId } }`,
+      { id: r.nodeId, m: (method ?? 'merge').toUpperCase() },
+    )
     const err = ghError(res)
     if (err) return c.json({ error: err.error }, err.status)
+    // GraphQL surfaces "auto-merge not allowed / PR already mergeable" as errors, not a status code.
+    const body = (await res.json().catch(() => ({}))) as { errors?: unknown }
+    if (body.errors) return c.json({ error: 'auto_merge_not_allowed' }, 422)
     await r.db
       .update(schema.pullRequests)
       .set({ autoMergeEnabled: true })
       .where(and(eq(schema.pullRequests.userId, r.user.login), eq(schema.pullRequests.repoId, r.repoId), eq(schema.pullRequests.number, r.number)))
     return c.json({ autoMergeEnabled: true })
   })
-  // Disable auto-merge: DELETE /pulls/{n}/auto-merge.
+  // Disable auto-merge: GraphQL disablePullRequestAutoMerge (no REST endpoint exists).
   .delete('/:owner/:repo/pulls/:number/auto-merge', async (c) => {
     const r = await resolvePr(c)
     if ('error' in r) return c.json({ error: r.error }, r.status)
-    const res = await gh(r.user.token, `/repos/${r.owner}/${r.repo}/pulls/${r.number}/auto-merge`, { method: 'DELETE' })
+    if (!r.nodeId) return c.json({ error: 'node_id_unknown' }, 409)
+    const res = await ghGraphQL(r.user.token, `mutation($id:ID!){ disablePullRequestAutoMerge(input:{pullRequestId:$id}){ clientMutationId } }`, {
+      id: r.nodeId,
+    })
     const err = ghError(res)
     if (err) return c.json({ error: err.error }, err.status)
+    const body = (await res.json().catch(() => ({}))) as { errors?: unknown }
+    if (body.errors) return c.json({ error: 'github_unavailable' }, 502)
     await r.db
       .update(schema.pullRequests)
       .set({ autoMergeEnabled: false })
