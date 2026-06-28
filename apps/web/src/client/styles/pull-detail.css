@@ -96,6 +96,11 @@
 .check-success { background: var(--add-marker); }
 .check-failure, .check-error { background: var(--del-marker); }
 .check-pending, .check-in_progress, .check-queued { background: var(--warn); }
+.checks-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-left: 6px; vertical-align: middle; }
+.checks-dot-success { background: var(--add-marker); }
+.checks-dot-failure { background: var(--del-marker); }
+.checks-dot-pending { background: var(--warn); }
+.checks-dot-mixed { background: linear-gradient(90deg, var(--del-marker) 0 50%, var(--warn) 50% 100%); }
 .check-rerun,
 .pr-actions button,
 .composer button,
