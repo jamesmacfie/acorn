@@ -148,7 +148,7 @@ export default function App() {
             </button>
             <Show when={params.number}>
               <span class="crumb-sep">/</span>
-              <span class="crumb crumb-num">#{params.number}</span>
+              <a class="crumb crumb-num crumb-link" href={`https://github.com/${params.owner}/${params.repo}/pull/${params.number}`} target="_blank" rel="noopener noreferrer">#{params.number}</a>
             </Show>
             <Show when={isNew()}>
               <span class="crumb-sep">/</span>
