@@ -108,6 +108,10 @@ export const pulls = new Hono<AppEnv>().get('/:owner/:repo/pulls', async (c) => 
       baseRef: p.base?.ref ?? null,
       author: p.user?.login ?? null,
       updatedAt: p.updated_at ? Date.parse(p.updated_at) : null,
+      // Not in the conflict `set` (detail route owns it), but must be a row key: Drizzle binds a
+      // param for an omitted NOT NULL-default column, which would desync chunkRowsByColumnBudget's
+      // per-row param count and overflow D1's 100-param cap.
+      autoMergeEnabled: false,
       fetchedAt: now,
       staleAfter: STALE_AFTER_MS,
       etag: null,
