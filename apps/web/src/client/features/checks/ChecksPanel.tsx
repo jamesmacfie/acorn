@@ -14,19 +14,27 @@ function StepLog(props: { text: string }) {
     async (text) => (text.length > 300_000 ? null : tokenizeAnsiLines(await getHighlighter(), text)),
   )
   return (
-    <pre class="step-log">
-      <Show when={lines()} fallback={props.text}>
-        {(ls) => (
-          <For each={ls()}>
-            {(line) => (
-              <div class="log-line">
-                <For each={line}>{(t) => <span style={{ '--l': t.light, '--r': t.dark }}>{t.content}</span>}</For>
-              </div>
-            )}
-          </For>
-        )}
-      </Show>
-    </pre>
+    <div class="step-log-wrap">
+      <button type="button" class="step-log-copy" title="Copy log" aria-label="Copy log" onClick={() => navigator.clipboard?.writeText(props.text)}>
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
+          <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+        </svg>
+      </button>
+      <pre class="step-log">
+        <Show when={lines()} fallback={props.text}>
+          {(ls) => (
+            <For each={ls()}>
+              {(line) => (
+                <div class="log-line">
+                  <For each={line}>{(t) => <span style={{ '--l': t.light, '--r': t.dark }}>{t.content}</span>}</For>
+                </div>
+              )}
+            </For>
+          )}
+        </Show>
+      </pre>
+    </div>
   )
 }
 

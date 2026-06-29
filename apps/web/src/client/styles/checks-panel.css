@@ -88,6 +88,26 @@
   border: 1px solid var(--border);
   border-radius: var(--radius);
 }
+/* Copy button: absolute top-right of the log block, revealed on hover. */
+.step-log-wrap {
+  position: relative;
+}
+.step-log-copy {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  display: flex;
+  padding: 4px;
+  color: var(--text-muted);
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.1s;
+}
+.step-log-wrap:hover .step-log-copy { opacity: 1; }
+.step-log-copy:hover { color: var(--text); }
 .log-line {
   min-height: 1.45em;
 }
