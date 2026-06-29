@@ -4,7 +4,8 @@
   "type": "module",
   "main": "out/main/index.js",
   "scripts": {
-    "dev": "vite",
+    "dev": "electron-vite build && electron-vite preview",
+    "dev:web": "vite",
     "dev:node": "node --import tsx --watch --env-file=.dev.vars src/main/server.ts",
     "build": "vite build",
     "preview": "vite preview",

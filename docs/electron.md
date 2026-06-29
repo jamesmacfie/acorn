@@ -19,8 +19,11 @@
 > **Phase 1 artifacts:** `apps/web/src/main/electron.ts` (main process: starts the server, hardened
 > BrowserWindow, navigation guard, dedicated OAuth window), `src/main/preload.ts` (minimal sandboxed
 > bridge), `electron.vite.config.ts` (main/preload/renderer→dist/client), SW gate in
-> `src/client/index.tsx`, loopback Host-header guard in `server.ts`. Scripts: `electron:dev`,
-> `electron:build`, `electron:rebuild`/`node:rebuild` (better-sqlite3 ABI switch — see caveat in §4i).
+> `src/client/index.tsx`, loopback Host-header guard in `server.ts`. **`pnpm dev` now launches the
+> Electron app** (`electron-vite build && electron-vite preview`; old Cloudflare dev server → `dev:web`),
+> plus `electron:dev`, `electron:build`, `electron:rebuild`/`node:rebuild` (better-sqlite3 ABI switch —
+> see caveat in §4i). The window loads the node-server origin (`:4317`), never electron-vite's renderer
+> dev server, so the SPA and `/api` stay same-origin and the session cookie/OAuth keep working.
 > Verified headlessly: app boots, server binds, better-sqlite3 loads under Electron's ABI, SPA serves,
 > and the 401→/auth/login→OAuth-window→GitHub chain fires. **Not yet verified (needs your machine):**
 > the visible window, a full GitHub login round-trip, and a packaged `.dmg` (electron-builder config
