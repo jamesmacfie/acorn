@@ -34,7 +34,7 @@ export const pullsBatch = new Hono<AppEnv>().post('/:owner/:repo/pulls/batch', a
   const userId = user.login
   const resolved = await resolveRepoForUser(db, user.token, userId, owner, repo)
   if (!resolved.ok) return c.json({ error: resolved.failure.error }, resolved.failure.status)
-  const { repoId, private: isPrivate } = resolved.value
+  const { repoId } = resolved.value
 
   // Per-PR TTL: only stale resources go to GitHub; fresh ones serve straight from the mirror.
   const resources = numbers.flatMap((n) => [prResource(repoId, n), filesResource(repoId, n)])
@@ -91,7 +91,7 @@ query Batch($owner: String!, $repo: String!, ${varDecls}) {
     await Promise.all(
       fetched.map((r, i) => {
         if (r.status !== 'fulfilled' || !r.value.res.ok || !r.value.body) return undefined
-        return mirrorFiles(c.env, db, { userId, repoId, number: staleFiles[i]! }, isPrivate, r.value.body)
+        return mirrorFiles(c.env, db, { userId, repoId, number: staleFiles[i]! }, r.value.body)
       }),
     )
   }

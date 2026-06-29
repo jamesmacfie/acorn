@@ -291,6 +291,9 @@ type GitHubFile = {
   patch?: string // omitted for binary / too-large / pure-rename files
 }
 
+// Patch bodies key off an immutable sha and live in the local on-disk BLOBS cache (the D1 `patch`
+// column is always null now). The public/private split is gone — it only mattered for Workers'
+// shared KV; on a single-user machine the cache is yours (docs/electron.md §5).
 const blobKey = (sha: string) => `patch:${sha}`
 
 // Fetch one PR's changed files from the REST API. ponytail: first 100 files — Link-header
@@ -301,13 +304,11 @@ export const fetchFiles = async (token: string, owner: string, repo: string, num
   return { res, body: (await res.json()) as GitHubFile[] }
 }
 
-// Re-mirror one PR's files: public patch bodies → shared KV by sha (immutable, deduped); private
-// bodies → user-scoped D1 (never KV — docs/caching.md). One insert per file (patches are large).
-export const mirrorFiles = async (env: Env, db: Db, key: PrKey, isPrivate: boolean, body: GitHubFile[]) => {
+// Re-mirror one PR's files: patch bodies → on-disk BLOBS by sha (immutable, deduped). The file
+// metadata rows go to the DB; the large patch bodies do not (resolved from BLOBS on read).
+export const mirrorFiles = async (env: Env, db: Db, key: PrKey, body: GitHubFile[]) => {
   const now = Date.now()
-  if (!isPrivate) {
-    await Promise.all(body.filter((f) => f.patch != null).map((f) => env.BLOBS.put(blobKey(f.sha), f.patch as string)))
-  }
+  await Promise.all(body.filter((f) => f.patch != null).map((f) => env.BLOBS.put(blobKey(f.sha), f.patch as string)))
   const rows = body.map((f) => ({
     ...key,
     path: f.filename,
@@ -315,7 +316,7 @@ export const mirrorFiles = async (env: Env, db: Db, key: PrKey, isPrivate: boole
     additions: f.additions,
     deletions: f.deletions,
     sha: f.sha,
-    patch: isPrivate ? (f.patch ?? null) : null,
+    patch: null,
   }))
   const fileWhere = and(eq(schema.prFiles.userId, key.userId), eq(schema.prFiles.repoId, key.repoId), eq(schema.prFiles.number, key.number))
   const resource = filesResource(key.repoId, key.number)
@@ -333,7 +334,7 @@ type ReadFilesOptions = { includePatches?: boolean; paths?: string[] }
 
 // Read one PR's files back out of the mirror. `viewed` is app-state (viewed_files), merged in
 // fresh on every read so it survives mirror re-syncs. Callers can skip patch bodies for cheap
-// summary reads; public patch bodies resolve from KV by sha only when explicitly requested.
+// summary reads; patch bodies resolve from the on-disk BLOBS cache by sha when requested.
 export const readFiles = async (env: Env, db: Db, key: PrKey, options: ReadFilesOptions = {}): Promise<PullFile[]> => {
   const includePatches = options.includePatches ?? true
   const paths = options.paths?.length ? Array.from(new Set(options.paths)) : undefined

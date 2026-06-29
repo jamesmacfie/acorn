@@ -47,7 +47,7 @@ const handleFilesRead = async (c: Context<AppEnv>, options: { summaryOnly?: bool
 
   const resolved = await resolveRepoForUser(db, user.token, userId, owner, repo)
   if (!resolved.ok) return c.json({ error: resolved.failure.error }, resolved.failure.status)
-  const { repoId, private: isPrivate } = resolved.value
+  const { repoId } = resolved.value
   const key = { userId, repoId, number }
   const paths = options.paths?.length ? options.paths : undefined
   const includePatches = !options.summaryOnly || !!paths
@@ -63,7 +63,7 @@ const handleFilesRead = async (c: Context<AppEnv>, options: { summaryOnly?: bool
     const { res, body } = await fetchFiles(user.token, owner, repo, number)
     const err = ghError(res)
     if (err) return { ok: false, failure: err }
-    await mirrorFiles(c.env, db, key, isPrivate, body ?? [])
+    await mirrorFiles(c.env, db, key, body ?? [])
     return { ok: true, value: await readCached() }
   }
 
