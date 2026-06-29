@@ -3,11 +3,14 @@ packages:
   - "packages/*"
 allowBuilds:
   better-sqlite3: true
+  electron: true
+  electron-winstaller: false # Windows-only; this build is macOS-only
   esbuild: true
   sharp: true
   workerd: true
 onlyBuiltDependencies:
   - better-sqlite3
+  - electron
   - esbuild
   - sharp
   - workerd

@@ -1,8 +1,9 @@
 # acorn → Electron desktop app — migration plan
 
-> Status: **Phase 0 complete** (Node-server spike). The existing Hono app now runs under
-> `@hono/node-server` on `http://127.0.0.1:4317` with a better-sqlite3 + KV-shim Bindings object;
-> Cloudflare config is untouched and still builds (reversible). Phases 1–3 remain planned. This is
+> Status: **Phases 0 & 1 done** (Node-server spike + Electron shell). The Hono app runs under
+> `@hono/node-server` on `http://127.0.0.1:4317` with a better-sqlite3 + KV-shim Bindings object,
+> wrapped in an Electron app whose main process starts that server and loads the loopback origin.
+> Cloudflare config is untouched and still builds (reversible). Phases 2–3 remain planned. This is
 > the full change inventory and a clean, phased transition off Cloudflare Workers to a local
 > Electron app.
 >
@@ -14,6 +15,16 @@
 > + static + SPA fallback), `createApp()` factory in `src/server/index.ts`, DB driver swap in
 > `src/server/db/index.ts`. Run with `pnpm --filter @acorn/web dev:node`. Local data lives under
 > `apps/web/.acorn/` (gitignored).
+>
+> **Phase 1 artifacts:** `apps/web/src/main/electron.ts` (main process: starts the server, hardened
+> BrowserWindow, navigation guard, dedicated OAuth window), `src/main/preload.ts` (minimal sandboxed
+> bridge), `electron.vite.config.ts` (main/preload/renderer→dist/client), SW gate in
+> `src/client/index.tsx`, loopback Host-header guard in `server.ts`. Scripts: `electron:dev`,
+> `electron:build`, `electron:rebuild`/`node:rebuild` (better-sqlite3 ABI switch — see caveat in §4i).
+> Verified headlessly: app boots, server binds, better-sqlite3 loads under Electron's ABI, SPA serves,
+> and the 401→/auth/login→OAuth-window→GitHub chain fires. **Not yet verified (needs your machine):**
+> the visible window, a full GitHub login round-trip, and a packaged `.dmg` (electron-builder config
+> is not written yet — see §4i).
 
 ## 1. Why Electron (decision recap)
 
@@ -426,9 +437,19 @@ and the `.batch` shim is atomic. The riskiest step (DB driver, waitUntil, bindin
 Remaining one-time setup for OAuth login: register `http://127.0.0.1:4317/auth/callback` as a
 loopback callback on the GitHub OAuth app (the only Phase 0 step that can't be verified headlessly).
 
-**Phase 1 — Electron shell.** Wrap Phase 0 in Electron (`electron-vite` + main/preload). Window
-loads the local server. Verify OAuth loopback login via the hardened auth window, session cookie,
-all data flows, native rebuild of `better-sqlite3`, and service-worker gating.
+**Phase 1 — Electron shell. ✅ DONE (pending GUI/OAuth verification on a real machine).** Wrapped
+Phase 0 in Electron (`electron-vite` + `src/main/electron.ts` + `src/main/preload.ts`). The main
+process starts the server then loads `http://127.0.0.1:4317`; navigation is locked to the loopback
+origin, external links open in the system browser, and `/auth/login` is rerouted into a dedicated
+sandboxed OAuth window. SW registration is gated out of the Electron renderer. `better-sqlite3` is
+rebuilt against Electron's ABI via `pnpm electron:rebuild`. Verified headlessly that the app boots,
+the server binds, the native module loads, the SPA serves, and the login redirect chain fires.
+
+> **better-sqlite3 ABI caveat:** the native module can be built for the Node ABI *or* the Electron
+> ABI, not both. `electron:rebuild` switches it to Electron (needed to run the app); `node:rebuild`
+> switches it back for `dev:node`. This is why the rebuild is **not** a `postinstall` yet — that
+> would silently break the parallel `dev:node` path we keep until Phase 2. Make it a postinstall
+> once Cloudflare/Node-only-dev is gone.
 
 **Phase 2 — Cut Cloudflare.** Delete wrangler/cloudflare config, deps, `worker-configuration.d.ts`,
 `.dev.vars`. Switch build to `electron-builder`. Update docs. Now there is one runtime.
