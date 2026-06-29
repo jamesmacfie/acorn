@@ -1,18 +1,40 @@
-import { createMemo, createSignal, For, Show } from 'solid-js'
+import { createEffect, createMemo, createSignal, For, Show } from 'solid-js'
 import { createMutation, createQuery, useQueryClient } from '@tanstack/solid-query'
-import { useParams, useSearchParams } from '@solidjs/router'
+import { useNavigate, useParams, useSearchParams } from '@solidjs/router'
 import { checksState, FAILED_STATUSES, fileStatusMeta, formatRelativeTime, summarizeFileStats } from './displayMeta'
 import { requestFileScroll, routeKey } from './fileNavigation'
 import Picker from './Picker'
-import { fileSummariesOptions, mentionsOptions, pullDetailOptions, pullPrefixKey, pullsPrefixKey, repoLabelsOptions, reposOptions, type Label } from './queries'
+import { fileSummariesOptions, integrationsOptions, linearIssuesOptions, mentionsOptions, pullDetailOptions, pullPrefixKey, pullsPrefixKey, repoLabelsOptions, reposOptions, type Label } from './queries'
 import MentionTextarea from './MentionTextarea'
 import { addComment, addLabel, closePr, disableAutoMerge, enableAutoMerge, mergePr, removeLabel, removeReviewer, reopenPr, rerunFailed, requestReviewer, setDraft, setViewed, submitReview } from './mutations'
 import { UserAvatar } from './UserAvatar'
 import { ConversationEntryItem } from './features/pullDetail/Conversation'
 import ChecksPanel from './features/checks/ChecksPanel'
+import LinearIssuePanel from './features/integrations/LinearIssuePanel'
+import { scanLinearRefs } from './features/integrations/scanLinearRefs'
+import { linkifyLinearIds, makeContentLinkHandler, splitLinearIds } from './contentLinks'
 import { buildConversationEntries, buildThreadSnippetIndex } from './features/pullDetail/model'
 
 const labelColor = (color: string | null | undefined) => (color ? `#${color}` : 'var(--text-faint)')
+
+// Render plain text with bare Linear identifiers (CRA-404) turned into clickable links — used for
+// the PR title, where the id is plain text. Prefixes gate which ids are real (see splitLinearIds).
+function LinearText(props: { text: string; prefixes: string[]; onOpen: (id: string) => void }) {
+  const parts = createMemo(() => splitLinearIds(props.text, props.prefixes))
+  return (
+    <For each={parts()}>
+      {(p) =>
+        p.id ? (
+          <a class="linear-inline-link" onClick={() => props.onOpen(p.id!)}>
+            {p.text}
+          </a>
+        ) : (
+          <>{p.text}</>
+        )
+      }
+    </For>
+  )
+}
 
 // Persist a <details> open/closed state in localStorage, keyed by section name, so it survives
 // navigation and reloads. Seeds from storage on mount (falling back to the JSX `open` default),
@@ -45,6 +67,41 @@ export default function PullDetail() {
   const fileSummary = createMemo(() => summarizeFileStats(files.data))
   const conversationEntries = createMemo(() => buildConversationEntries(detail.data))
   const threadSnippetIndex = createMemo(() => buildThreadSnippetIndex(files.data))
+
+  // Integrations: Linear tickets linked from the PR body / comments / reviews / threads.
+  const linearRefs = createMemo(() => {
+    const d = detail.data
+    if (!d) return []
+    const texts: (string | null | undefined)[] = [d.pull?.body]
+    for (const cm of d.comments) texts.push(cm.body)
+    for (const rv of d.reviews) texts.push(rv.body)
+    for (const th of d.threads) for (const cm of th.comments) texts.push(cm.body)
+    return scanLinearRefs(texts)
+  })
+  const integrations = createQuery(() => integrationsOptions(linearRefs().length > 0))
+  const linearConnected = () => !!integrations.data?.linear.connected
+  const linearIssues = createQuery(() => linearIssuesOptions(linearRefs().map((rf) => rf.identifier), linearRefs().length > 0 && linearConnected()))
+  const linearSummary = createMemo(() => new Map((linearIssues.data?.issues ?? []).map((i) => [i.identifier, i])))
+  const [openIssue, setOpenIssue] = createSignal<string | null>(null)
+  // Open in-app links found inside rendered bodies (Linear issues → panel; GitHub PRs/repos → SPA).
+  const navigate = useNavigate()
+  const onContentClick = makeContentLinkHandler(navigate, setOpenIssue)
+  // Team prefixes seen via linear.app URLs in this PR — used to safely linkify bare ids (CRA-404)
+  // in GitHub text/title without false-positives on things like UTF-8.
+  const linearPrefixes = createMemo(() => [...new Set(linearRefs().map((rf) => rf.identifier.split('-')[0]))])
+
+  // After GitHub bodies render (innerHTML, opaque to Solid), wrap bare Linear ids in clickable
+  // anchors. Only touch .markdown nodes (never Solid-managed text). Re-runs when data/prefixes change.
+  let descRef: HTMLDivElement | undefined
+  let convRef: HTMLDivElement | undefined
+  createEffect(() => {
+    detail.data
+    const prefixes = linearPrefixes()
+    queueMicrotask(() => {
+      if (descRef) linkifyLinearIds(descRef, prefixes)
+      convRef?.querySelectorAll<HTMLElement>('.markdown').forEach((el) => linkifyLinearIds(el, prefixes))
+    })
+  })
   const assignedLabelNames = createMemo(() => new Set((detail.data?.labels ?? []).map((label) => label.name.toLowerCase())))
   const labelResults = (query: string): Label[] => {
     const q = query.trim().toLowerCase()
@@ -115,7 +172,7 @@ export default function PullDetail() {
           <>
             <div class="pr-detail-header">
               <div class="pr-detail-title">
-                <span class="pr-num">#{pull().number}</span> {pull().title}
+                <span class="pr-num">#{pull().number}</span> <LinearText text={pull().title} prefixes={linearPrefixes()} onOpen={setOpenIssue} />
               </div>
               <div class="pr-detail-meta muted">
                 <span class={`state-badge state-${pull().state}`}>{pull().draft ? 'draft' : pull().state}</span>
@@ -198,7 +255,65 @@ export default function PullDetail() {
             <Show when={pull().body}>
               <details class="nav-section" open ref={rememberOpen('description')}>
                 <summary>Description</summary>
-                <div class="markdown" innerHTML={pull().body!} />
+                <div class="markdown" ref={descRef} onClick={onContentClick} innerHTML={pull().body!} />
+              </details>
+            </Show>
+
+            <Show when={linearRefs().length > 0}>
+              <details class="nav-section" open ref={rememberOpen('integrations')}>
+                <summary>
+                  Integrations <span class="muted">({linearRefs().length})</span>
+                </summary>
+                <Show
+                  when={linearConnected()}
+                  fallback={
+                    <>
+                      <ul class="check-list">
+                        <For each={linearRefs()}>
+                          {(rf) => (
+                            <li class="check-row">
+                              <a class="integration-row" href={rf.url} target="_blank" rel="noreferrer">
+                                <span class="integration-row-id">{rf.identifier}</span>
+                              </a>
+                            </li>
+                          )}
+                        </For>
+                      </ul>
+                      <p class="muted" style={{ padding: '4px 0' }}>
+                        Connect Linear in your account menu to see titles and details.
+                      </p>
+                    </>
+                  }
+                >
+                  <ul class="check-list">
+                    <For each={linearRefs()}>
+                      {(rf) => {
+                        const summary = () => linearSummary().get(rf.identifier)
+                        return (
+                          <li class="check-row">
+                            <button type="button" class="integration-row" onClick={() => setOpenIssue(rf.identifier)}>
+                              <span class="integration-row-id">{rf.identifier}</span>
+                              <Show when={summary()} fallback={<span class="integration-row-title muted">{linearIssues.isLoading ? 'Loading…' : ''}</span>}>
+                                {(s) => (
+                                  <>
+                                    <span class="integration-row-title">{s().title}</span>
+                                    <Show when={s().state}>
+                                      {(st) => (
+                                        <span class="integration-row-state" style={{ '--state-color': st().color }}>
+                                          {st().name}
+                                        </span>
+                                      )}
+                                    </Show>
+                                  </>
+                                )}
+                              </Show>
+                            </button>
+                          </li>
+                        )
+                      }}
+                    </For>
+                  </ul>
+                </Show>
               </details>
             </Show>
 
@@ -319,7 +434,7 @@ export default function PullDetail() {
                   </button>
                 </div>
               </Show>
-              <div class="conversation-items">
+              <div class="conversation-items" ref={convRef} onClick={onContentClick}>
                 <For each={conversationEntries()} fallback={<span class="muted conversation-empty">No comments or commits.</span>}>
                   {(entry) => (
                     <ConversationEntryItem entry={entry} snippetIndex={threadSnippetIndex()} onOpenFile={selectFile} />
@@ -382,6 +497,9 @@ export default function PullDetail() {
             </details>
             <Show when={openCheck()}>
               {(c) => <ChecksPanel owner={o()} repo={r()} runId={c().runId} jobName={c().name} onClose={() => setOpenCheck(null)} />}
+            </Show>
+            <Show when={openIssue()}>
+              {(id) => <LinearIssuePanel identifier={id()} onClose={() => setOpenIssue(null)} onContentClick={onContentClick} />}
             </Show>
           </>
         )}

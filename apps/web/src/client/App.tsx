@@ -13,6 +13,7 @@ import ComparePreview from './ComparePreview'
 import DiffView from './DiffView'
 import Shortcuts from './Shortcuts'
 import AccountMenu from './AccountMenu'
+import IntegrationsModal from './features/integrations/IntegrationsModal'
 import Acorn from './Acorn'
 
 // Layout root (Router root): top bar + three panes. Panes are params-driven — PullList (left)
@@ -23,6 +24,7 @@ export default function App() {
   const navigate = useNavigate()
   const isRestoring = useIsRestoring()
   const [helpOpen, setHelpOpen] = createSignal(false)
+  const [integrationsOpen, setIntegrationsOpen] = createSignal(false)
 
   const me = createQuery(() => meOptions())
   const repos = createQuery(() => reposOptions(!!me.data))
@@ -108,6 +110,9 @@ export default function App() {
       queryClient.invalidateQueries({ queryKey: pullPrefixKey(params.owner, params.repo) }),
       queryClient.invalidateQueries({ queryKey: pullsPrefixKey(params.owner, params.repo) }),
       queryClient.invalidateQueries({ queryKey: ['files', params.owner, params.repo, params.number] }),
+      // Linked Linear tickets (list enrichment + any open detail) — refetch their status too.
+      queryClient.invalidateQueries({ queryKey: ['linear-issues'] }),
+      queryClient.invalidateQueries({ queryKey: ['linear-issue'] }),
     ])
     setRefreshingPull(false)
   }
@@ -170,7 +175,7 @@ export default function App() {
             }
           >
             {(user) => (
-              <AccountMenu user={user()} onShortcuts={() => setHelpOpen(true)} onPermissions={permissions} onClearCache={clearCache} onLogout={logout} />
+              <AccountMenu user={user()} onShortcuts={() => setHelpOpen(true)} onIntegrations={() => setIntegrationsOpen(true)} onPermissions={permissions} onClearCache={clearCache} onLogout={logout} />
             )}
           </Show>
         </div>
@@ -228,6 +233,7 @@ export default function App() {
         </main>
       </Show>
       <Shortcuts helpOpen={helpOpen()} onHelpOpenChange={setHelpOpen} />
+      <IntegrationsModal open={integrationsOpen()} onClose={() => setIntegrationsOpen(false)} />
     </div>
     </Show>
   )

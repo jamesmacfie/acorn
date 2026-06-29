@@ -76,6 +76,19 @@ export type Compare = { aheadBy: number; files: PullFile[]; commits: CompareComm
 // Full head-blob body, fetched on demand to expand unchanged context around diff hunks.
 export type FileBlob = { text: string }
 
+// --- Integrations (Linear is provider #1) ---
+export type IntegrationsStatus = { linear: { connected: boolean; workspace?: string } }
+export type LinearIssueState = { name: string; type: string; color: string } | null
+export type LinearIssueSummary = { identifier: string; title: string; url: string; state: LinearIssueState; assignee: string | null }
+export type LinearComment = { id: string; author: string | null; body: string; createdAt: number | null; parentId: string | null }
+// One activity-feed entry. `icon` is a kind key (created|state|assignee|label|title) the client
+// maps to a glyph; `color` tints state changes.
+export type LinearActivity = { id: string; actor: string | null; text: string; createdAt: number | null; icon: string; color?: string }
+export type LinearIssueDetail = LinearIssueSummary & { id: string; description: string | null; comments: LinearComment[]; activity: LinearActivity[] }
+export type LinearCommentRequest = { body: string; parentId?: string }
+export type LinearIssuesRequest = { identifiers: string[] }
+export type LinearIssuesResponse = { issues: LinearIssueSummary[] }
+
 export const repoRoute = (owner: string, repo: string, child = '') => `/api/repos/${owner}/${repo}${child ? `/${child}` : ''}`
 export const pullRoute = (owner: string, repo: string, number: string | number, child = '') =>
   repoRoute(owner, repo, `pulls/${number}${child ? `/${child}` : ''}`)
@@ -107,6 +120,11 @@ export const requestedReviewersRoute = (owner: string, repo: string, number: str
   pullRoute(owner, repo, number, 'requested-reviewers')
 export const pinsRoute = '/api/pins'
 export const prefsRoute = '/api/prefs'
+export const integrationsRoute = '/api/integrations'
+export const linearIntegrationRoute = '/api/integrations/linear'
+export const linearIssuesRoute = '/api/linear/issues'
+export const linearIssueRoute = (identifier: string) => `/api/linear/issues/${encodeURIComponent(identifier)}?refresh=1`
+export const linearCommentsRoute = (identifier: string) => `/api/linear/issues/${encodeURIComponent(identifier)}/comments`
 
 export const meKey = ['me'] as const
 export const reposKey = ['repos'] as const
@@ -129,3 +147,6 @@ export const prefsKey = ['prefs'] as const
 export const mentionsKey = (owner: string, repo: string) => ['mentions', owner, repo] as const
 export const runJobsKey = (owner: string, repo: string, runId: number) => ['run-jobs', owner, repo, runId] as const
 export const jobLogKey = (owner: string, repo: string, jobId: number) => ['job-log', owner, repo, jobId] as const
+export const integrationsKey = ['integrations'] as const
+export const linearIssuesKey = (identifiers: string[]) => ['linear-issues', ...[...identifiers].sort()] as const
+export const linearIssueKey = (identifier: string) => ['linear-issue', identifier] as const

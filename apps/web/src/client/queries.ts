@@ -15,6 +15,12 @@ import {
   fileSummariesKey,
   fileSummariesRoute,
   filesKey,
+  integrationsKey,
+  integrationsRoute,
+  linearIssueKey,
+  linearIssueRoute,
+  linearIssuesKey,
+  linearIssuesRoute,
   meKey,
   meRoute,
   mentionsKey,
@@ -41,7 +47,11 @@ import {
   type ClosedPullsPage,
   type Compare,
   type FileBlob,
+  type IntegrationsStatus,
   type JobLog,
+  type LinearIssueDetail,
+  type LinearIssuesRequest,
+  type LinearIssuesResponse,
   type Me,
   type Pull,
   type RunJobs,
@@ -55,6 +65,8 @@ import {
 export {
   filePatchKey,
   fileSummariesKey,
+  integrationsKey,
+  linearIssueKey,
   meKey,
   pinsKey,
   prefsKey,
@@ -67,7 +79,7 @@ export {
   reposKey,
   reposRefreshRoute,
 } from '../shared/api'
-export type { Branch, Check, Comment, Compare, CompareCommit, Label, Me, Pull, PullCommit, PullDetail, PullFile, Repo, Review, Thread, ThreadComment } from '../shared/api'
+export type { Branch, Check, Comment, Compare, CompareCommit, IntegrationsStatus, Label, LinearActivity, LinearComment, LinearIssueDetail, LinearIssueState, LinearIssueSummary, Me, Pull, PullCommit, PullDetail, PullFile, Repo, Review, Thread, ThreadComment } from '../shared/api'
 
 type QueryContext = { signal?: AbortSignal }
 type PageQueryContext = QueryContext & { pageParam: number }
@@ -203,4 +215,40 @@ export const jobLogOptions = (owner: string, repo: string, jobId: number, enable
   enabled,
   staleTime: Infinity,
   queryFn: async ({ signal }: QueryContext): Promise<JobLog> => readJson<JobLog>(jobLogRoute(owner, repo, jobId), { signal }),
+})
+
+// Integration connection status (gates the Integrations section + settings). 401 → logged out.
+export const integrationsOptions = (enabled: boolean) => ({
+  queryKey: integrationsKey,
+  enabled,
+  staleTime: 5 * 60 * 1000,
+  queryFn: async ({ signal }: QueryContext): Promise<IntegrationsStatus | null> =>
+    readJson<IntegrationsStatus | null>(integrationsRoute, { nullOn401: true, signal }),
+})
+
+// Batch enrichment for the Integrations list (title + status per referenced ticket). Server
+// serves-then-revalidates from D1; client caches 5 min. Returns only the issues Linear resolved.
+export const linearIssuesOptions = (identifiers: string[], enabled: boolean) => ({
+  queryKey: linearIssuesKey(identifiers),
+  enabled,
+  staleTime: 5 * 60 * 1000,
+  // Always re-check on mount so the list self-heals from a stale/empty persisted cache; the
+  // server's 10-min D1 cache keeps this cheap (serves cached title/status without hitting Linear).
+  refetchOnMount: 'always' as const,
+  queryFn: async ({ signal }: QueryContext): Promise<LinearIssuesResponse> =>
+    writeJson<LinearIssuesResponse>(
+      linearIssuesRoute,
+      { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ identifiers } satisfies LinearIssuesRequest), signal },
+      'linear_issues_failed',
+    ),
+})
+
+// Full ticket detail for the side panel. refetchOnMount:'always' + staleTime 0 → opening the panel
+// re-fetches (the route's ?refresh=1 forces a fresh Linear read and updates the cache).
+export const linearIssueOptions = (identifier: string, enabled: boolean) => ({
+  queryKey: linearIssueKey(identifier),
+  enabled,
+  staleTime: 0,
+  refetchOnMount: 'always' as const,
+  queryFn: async ({ signal }: QueryContext): Promise<LinearIssueDetail> => readJson<LinearIssueDetail>(linearIssueRoute(identifier), { signal }),
 })

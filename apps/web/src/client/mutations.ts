@@ -4,6 +4,10 @@ import { apiError, writeJson } from './apiClient'
 import {
   autoMergeRoute,
   createPullRoute,
+  type IntegrationsStatus,
+  type LinearCommentRequest,
+  linearCommentsRoute,
+  linearIntegrationRoute,
   pinsRoute,
   prefsRoute,
   pullRoute,
@@ -38,6 +42,16 @@ export const submitReview = (o: string, r: string, n: string, event: string, bod
   post(pullRoute(o, r, n, 'reviews'), { event, body })
 
 export const addLabel = (o: string, r: string, n: string, name: string) => post(pullRoute(o, r, n, 'labels'), { name })
+
+// Save a Linear API key (server validates it against Linear before storing). Throws 'invalid_key'.
+export const connectLinear = (apiKey: string) => post<IntegrationsStatus>(linearIntegrationRoute, { apiKey })
+export const disconnectLinear = async () => {
+  const res = await fetch(linearIntegrationRoute, { method: 'DELETE' })
+  if (!res.ok) throw new Error(await apiError(res, `${res.status}`))
+}
+// Add a comment / threaded reply to a Linear ticket; caller refetches the issue after.
+export const postLinearComment = (identifier: string, body: string, parentId?: string) =>
+  post<{ ok: true }>(linearCommentsRoute(identifier), { body, parentId } satisfies LinearCommentRequest)
 export const removeLabel = async (o: string, r: string, n: string, name: string) => {
   const res = await fetch(pullRoute(o, r, n, 'labels'), {
     method: 'DELETE',

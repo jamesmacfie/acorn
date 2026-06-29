@@ -105,6 +105,7 @@
 .pr-actions button,
 .composer button,
 .diff-composer-actions button,
+.linear-reply-btn,
 .repo-select {
   flex: none;
   font: inherit;
@@ -120,6 +121,7 @@
 .pr-actions button:hover:not(:disabled),
 .composer button:hover:not(:disabled),
 .diff-composer-actions button:hover:not(:disabled),
+.linear-reply-btn:hover,
 .repo-select:hover { background: var(--bg-hover); border-color: var(--accent); }
 
 /* PR actions + comment composer. */

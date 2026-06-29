@@ -3,6 +3,7 @@ import { csrf } from 'hono/csrf'
 import { authMiddleware, type AppEnv } from './middleware/auth'
 import { actions } from './routes/actions'
 import { auth } from './routes/auth'
+import { integrations, linear } from './routes/integrations'
 import { me } from './routes/me'
 import { pins } from './routes/pins'
 import { prActions } from './routes/prActions'
@@ -26,6 +27,8 @@ const app = new Hono<AppEnv>()
   .route('/api/me', me)
   .route('/api/pins', pins)
   .route('/api/prefs', prefs)
+  .route('/api/integrations', integrations) // connect/disconnect/status for third-party providers
+  .route('/api/linear', linear) // Linear issues referenced from a PR (read, cached per-user)
   .route('/api/repos', repos)
   .route('/api/repos', repoLabels) // /:owner/:repo/labels — repo label choices for the PR picker
   .route('/api/repos', pulls) // repo-scoped sub-resources, e.g. /:owner/:repo/pulls

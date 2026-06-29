@@ -4,6 +4,7 @@ import type { Me } from './queries'
 type AccountMenuProps = {
   user: Me
   onShortcuts: () => void
+  onIntegrations: () => void
   onPermissions: () => void | Promise<void>
   onClearCache: () => void | Promise<void>
   onLogout: () => void | Promise<void>
@@ -51,6 +52,10 @@ export default function AccountMenu(props: AccountMenuProps) {
     close()
     props.onShortcuts()
   }
+  const integrations = () => {
+    close()
+    props.onIntegrations()
+  }
 
   return (
     <div class="account-menu" ref={rootRef}>
@@ -74,6 +79,9 @@ export default function AccountMenu(props: AccountMenuProps) {
           </div>
           <button class="account-menu-item" role="menuitem" type="button" onClick={shortcuts}>
             Shortcuts
+          </button>
+          <button class="account-menu-item" role="menuitem" type="button" onClick={integrations}>
+            Integrations
           </button>
           <button class="account-menu-item" role="menuitem" type="button" onClick={permissions}>
             Permissions

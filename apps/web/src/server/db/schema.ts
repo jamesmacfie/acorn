@@ -225,3 +225,33 @@ export const prefs = sqliteTable(
   },
   (t) => [primaryKey({ columns: [t.userId, t.key] })],
 )
+
+// Per-user third-party credentials (Linear is provider #1). App-state: source of truth is us.
+// accessToken is ENCRYPTED at rest (JWE via SESSION_ENC_KEY, see session.ts encryptSecret) and
+// never leaves the Worker — same posture as the GitHub token.
+export const integrations = sqliteTable(
+  'integrations',
+  {
+    userId: text('user_id').notNull(),
+    provider: text('provider').notNull(), // 'linear'
+    accessToken: text('access_token').notNull(),
+    meta: text('meta'), // optional JSON (e.g. { workspace })
+    createdAt: integer('created_at').notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.userId, t.provider] })],
+)
+
+// Per-user cache of fetched external issues (generic across providers, parallels integrations).
+// Mirror table: serve-then-revalidate by TTL. Private/per-user → D1 only, never shared KV. Single
+// JSON `data` column so a provider's issue shape can evolve without migrations.
+export const issues = sqliteTable(
+  'issues',
+  {
+    userId: text('user_id').notNull(),
+    provider: text('provider').notNull(), // 'linear'
+    identifier: text('identifier').notNull(), // 'ENG-123'
+    data: text('data').notNull(), // JSON issue detail
+    fetchedAt: integer('fetched_at').notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.userId, t.provider, t.identifier] })],
+)

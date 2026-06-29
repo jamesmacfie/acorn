@@ -43,6 +43,20 @@ export async function openSession(jwt: string, hexKey: string): Promise<SessionD
   }
 }
 
+// Encrypt/decrypt a single secret string at rest (integration tokens) — JWE A256GCM, same key as
+// the session. No expiry: an integration credential lives until the user disconnects it.
+export async function encryptSecret(plaintext: string, hexKey: string): Promise<string> {
+  return new EncryptJWT({ s: plaintext }).setProtectedHeader({ alg: 'dir', enc: 'A256GCM' }).encrypt(keyBytes(hexKey))
+}
+export async function decryptSecret(jwt: string, hexKey: string): Promise<string | null> {
+  try {
+    const { s } = (await jwtDecrypt(jwt, keyBytes(hexKey))).payload as { s?: string }
+    return s ?? null
+  } catch {
+    return null
+  }
+}
+
 // __Host- requires a Secure (https) connection. Over http://localhost (dev), browsers reject
 // it, so drop the prefix + Secure there. docs/local-development.md "Local gotchas".
 export function cookieAttrs(reqUrl: string): { name: '__Host-session' | 'session'; secure: boolean } {
