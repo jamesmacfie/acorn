@@ -5,12 +5,12 @@ import { ACORN_PORT, startServer } from './server'
 const ORIGIN = `http://127.0.0.1:${ACORN_PORT}`
 const PRELOAD = join(import.meta.dirname, '../preload/index.cjs')
 
-// Dev: load secrets from .dev.vars (same file wrangler/dev:node use). Packaged builds have no
-// .dev.vars (this no-ops) and will read from the OS keychain — see docs/electron.md §4b/Phase 3.
+// Dev: load secrets from .env. Packaged builds have no .env (this no-ops) and will read from the
+// OS keychain — see docs/electron.md §4b/Phase 3.
 try {
-  process.loadEnvFile(join(import.meta.dirname, '../../.dev.vars'))
+  process.loadEnvFile(join(import.meta.dirname, '../../.env'))
 } catch {
-  // no .dev.vars present — secrets must already be in the environment / keychain
+  // no .env present — secrets must already be in the environment / keychain
 }
 
 // Single-instance: a second launch focuses the existing window. A pinned port means only one

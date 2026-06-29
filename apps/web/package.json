@@ -5,19 +5,16 @@
   "main": "out/main/index.js",
   "scripts": {
     "dev": "electron-vite build && electron-vite preview",
-    "dev:web": "vite",
-    "dev:node": "node --import tsx --watch --env-file=.dev.vars src/main/server.ts",
-    "build": "vite build",
-    "preview": "vite preview",
+    "dev:node": "node --import tsx --watch --env-file=.env src/main/server.ts",
+    "build": "electron-vite build",
+    "dist": "electron-vite build && electron-builder --mac",
     "electron:dev": "electron-vite dev",
-    "electron:build": "electron-vite build",
     "electron:rebuild": "electron-rebuild -f -w better-sqlite3",
     "node:rebuild": "pnpm rebuild better-sqlite3",
     "lint": "tsc --noEmit",
     "test": "vitest run",
-    "typegen": "wrangler types",
     "db:generate": "drizzle-kit generate",
-    "db:migrate": "wrangler d1 migrations apply acorn --local"
+    "db:migrate": "tsx scripts/migrate.ts"
   },
   "dependencies": {
     "@hono/node-server": "^2.0.6",
@@ -37,7 +34,6 @@
     "solid-js": "^1.9.13"
   },
   "devDependencies": {
-    "@cloudflare/vite-plugin": "^1.42.1",
     "@electron/rebuild": "^4.0.6",
     "@types/better-sqlite3": "^7.6.13",
     "@types/diff": "^8.0.0",
@@ -50,7 +46,6 @@
     "typescript": "^6.0.3",
     "vite": "^8.0.16",
     "vite-plugin-solid": "^2.11.12",
-    "vitest": "^4.1.9",
-    "wrangler": "^4.103.0"
+    "vitest": "^4.1.9"
   }
 }

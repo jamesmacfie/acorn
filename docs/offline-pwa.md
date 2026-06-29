@@ -1,5 +1,10 @@
 # Offline & PWA
 
+> **Runtime note:** acorn migrated from Cloudflare Workers to a local Electron app (see
+> [electron.md](./electron.md)). In the Electron build the **service worker is disabled** (it would
+> mask app upgrades) — `src/client/index.tsx` skips registration under Electron and unregisters any
+> leftover. The IndexedDB query cache still applies. PWA install metadata is unused on desktop.
+
 acorn is an installable PWA that can browse recently-seen PRs while offline. Offline support is a read-only view of already-cached data — there is **no** real-time sync or offline mutation queue. It rests on three pieces: a service worker (`apps/web/public/sw.js`), a web manifest (`apps/web/public/manifest.webmanifest`), and the IndexedDB-persisted TanStack Query cache wired up in `apps/web/src/client/index.tsx`.
 
 ## Service worker

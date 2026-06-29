@@ -1,5 +1,10 @@
 # Caching
 
+> **Runtime note:** acorn migrated from Cloudflare Workers to a local Electron app (see
+> [electron.md](./electron.md)). The shared-KV `BLOBS` cache is now a per-user **on-disk dir** keyed
+> by SHA; the public/private split is vestigial on a single-user machine (Phase 3 removes it). The
+> three-tier model and TTLs are otherwise unchanged.
+
 acorn layers three caches between the browser and GitHub. Each has a different
 scope, lifetime, and privacy rule. The whole design follows one principle:
 **serve the last-known data immediately, revalidate behind it.**

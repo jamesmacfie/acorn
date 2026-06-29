@@ -1,0 +1,27 @@
+# macOS-only packaging (docs/electron.md §4i). Run via `pnpm dist`.
+appId: io.acorn.app
+productName: acorn
+directories:
+  output: release
+  buildResources: build
+# Ship the built main/preload, the renderer, and package.json (electron needs "main").
+files:
+  - out/**
+  - dist/client/**
+  - package.json
+# Native modules can't live inside the asar — unpack them so the .node loads at runtime.
+asarUnpack:
+  - "**/*.node"
+  - node_modules/better-sqlite3/**
+# Drizzle migrations are read at runtime; ship them as resources so process.resourcesPath/migrations
+# resolves (see migrationsFolder in src/main/bindings.ts).
+extraResources:
+  - from: migrations
+    to: migrations
+mac:
+  category: public.app-category.developer-tools
+  target:
+    - dmg
+    - zip
+  # Personal use: ad-hoc signing. Add a Developer ID identity + notarization only to distribute.
+  identity: null

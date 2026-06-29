@@ -18,10 +18,9 @@ import { mentions } from './routes/mentions'
 import { repos } from './routes/repos'
 import { repoLabels } from './routes/repoLabels'
 
-// One server, both /auth and /api. On Workers, run_worker_first in wrangler.jsonc routes only
-// /api/* and /auth/* here and the SPA serves the rest; the Node bootstrap (main/server.ts) adds
-// static + SPA fallback itself. createApp() is a factory so the Node side can build a fresh
-// instance without mutating the default export that tests/Workers use.
+// One server, both /auth and /api. The Node/Electron bootstrap (main/server.ts) wraps this with
+// static asset serving + SPA fallback. createApp() is a factory so the bootstrap can build a fresh
+// instance without mutating the default export that tests use.
 export function createApp() {
   return new Hono<AppEnv>()
     .route('/auth', auth)

@@ -6,7 +6,7 @@
     "jsx": "preserve",
     "jsxImportSource": "solid-js",
     "lib": ["ESNext", "DOM", "DOM.Iterable"],
-    "types": ["vite/client"],
+    "types": ["vite/client", "node"],
     "strict": true,
     "noEmit": true,
     "skipLibCheck": true,
@@ -14,5 +14,5 @@
     "verbatimModuleSyntax": true,
     "allowImportingTsExtensions": true
   },
-  "include": ["src", "worker-configuration.d.ts", "vite.config.ts", "drizzle.config.ts"]
+  "include": ["src", "electron.vite.config.ts", "drizzle.config.ts"]
 }
