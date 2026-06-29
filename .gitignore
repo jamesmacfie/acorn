@@ -8,4 +8,7 @@ dist/
 .dev.vars
 .wrangler/
 
+# Electron migration (Phase 0): local SQLite + on-disk blob cache
+.acorn/
+
 .playwright-mcp/*

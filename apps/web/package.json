@@ -4,6 +4,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "dev:node": "node --import tsx --watch --env-file=.dev.vars src/main/server.ts",
     "build": "vite build",
     "preview": "vite preview",
     "lint": "tsc --noEmit",
@@ -13,11 +14,13 @@
     "db:migrate": "wrangler d1 migrations apply acorn --local"
   },
   "dependencies": {
+    "@hono/node-server": "^2.0.6",
     "@solidjs/router": "^0.16.1",
     "@tanstack/query-async-storage-persister": "^5.101.0",
     "@tanstack/solid-query": "^5.101.0",
     "@tanstack/solid-query-persist-client": "^5.101.0",
     "@tanstack/solid-virtual": "^3.13.29",
+    "better-sqlite3": "^12.11.1",
     "diff": "^9.0.0",
     "drizzle-orm": "^0.45.2",
     "gitdiff-parser": "^0.3.1",
@@ -29,9 +32,11 @@
   },
   "devDependencies": {
     "@cloudflare/vite-plugin": "^1.42.1",
+    "@types/better-sqlite3": "^7.6.13",
     "@types/diff": "^8.0.0",
     "@types/node": "^26.0.0",
     "drizzle-kit": "^0.31.10",
+    "tsx": "^4.22.4",
     "typescript": "^6.0.3",
     "vite": "^8.0.16",
     "vite-plugin-solid": "^2.11.12",
