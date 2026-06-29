@@ -38,6 +38,11 @@ export type Review = { id: string; author: string | null; state: string | null; 
 export type Comment = { id: string; author: string | null; body: string | null; createdAt: number | null }
 export type PullCommit = { sha: string; message: string; author: string | null; authorLogin: string | null; committedAt: number | null }
 export type Check = { name: string; status: string | null; url: string | null; runId: number | null }
+// A workflow run's jobs and their steps, for the checks side panel. Logs are a separate fetch.
+export type WorkflowStep = { number: number; name: string; status: string | null; conclusion: string | null }
+export type WorkflowJob = { id: number; name: string; status: string | null; conclusion: string | null; steps: WorkflowStep[] }
+export type RunJobs = { jobs: WorkflowJob[] }
+export type JobLog = { text: string }
 export type Label = { name: string; color: string | null }
 export type ThreadComment = { id: string; databaseId: number | null; author: string | null; body: string | null; createdAt: number | null }
 export type Thread = {
@@ -95,6 +100,8 @@ export const resolveThreadRoute = (owner: string, repo: string, number: string |
   pullRoute(owner, repo, number, `threads/${encodeURIComponent(threadId)}/resolve`)
 export const autoMergeRoute = (owner: string, repo: string, number: string | number) => pullRoute(owner, repo, number, 'auto-merge')
 export const rerunFailedRoute = (owner: string, repo: string, runId: number) => repoRoute(owner, repo, `actions/${runId}/rerun`)
+export const runJobsRoute = (owner: string, repo: string, runId: number) => repoRoute(owner, repo, `actions/runs/${runId}/jobs`)
+export const jobLogRoute = (owner: string, repo: string, jobId: number) => repoRoute(owner, repo, `actions/jobs/${jobId}/logs`)
 export const mentionsRoute = (owner: string, repo: string) => repoRoute(owner, repo, 'mentions')
 export const requestedReviewersRoute = (owner: string, repo: string, number: string | number) =>
   pullRoute(owner, repo, number, 'requested-reviewers')
@@ -120,3 +127,5 @@ export const compareKey = (owner: string, repo: string, base: string, head: stri
 export const pinsKey = ['pins'] as const
 export const prefsKey = ['prefs'] as const
 export const mentionsKey = (owner: string, repo: string) => ['mentions', owner, repo] as const
+export const runJobsKey = (owner: string, repo: string, runId: number) => ['run-jobs', owner, repo, runId] as const
+export const jobLogKey = (owner: string, repo: string, jobId: number) => ['job-log', owner, repo, jobId] as const

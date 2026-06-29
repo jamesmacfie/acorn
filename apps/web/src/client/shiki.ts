@@ -1,4 +1,4 @@
-import { createHighlighterCore, type HighlighterCore, type LanguageInput } from 'shiki/core'
+import { createHighlighterCore, tokenizeAnsiWithTheme, type HighlighterCore, type LanguageInput } from 'shiki/core'
 import { createOnigurumaEngine } from 'shiki/engine/oniguruma'
 
 // Fine-grained Shiki: only the langs/themes below get bundled (the bundled `shiki` entry pulls a
@@ -41,3 +41,14 @@ export const getHighlighter = () =>
     langs: Object.values(LANGS).map((load) => load()) as LanguageInput[],
     engine: createOnigurumaEngine(import('shiki/wasm')),
   }))
+
+// ANSI-colour log lines (CI output), tokenized the same dual-theme way as diff code: {content,
+// light, dark} per token, rendered with --l/--r CSS vars. ANSI token boundaries are theme-
+// independent, so the two passes zip 1:1. `ansi` isn't a TextMate grammar — core won't route to it
+// via codeToTokens, so we call tokenizeAnsiWithTheme directly.
+export type AnsiTok = { content: string; light: string; dark: string }
+export function tokenizeAnsiLines(hl: HighlighterCore, text: string): AnsiTok[][] {
+  const light = tokenizeAnsiWithTheme(hl.getTheme('github-light'), text)
+  const dark = tokenizeAnsiWithTheme(hl.getTheme('github-dark'), text)
+  return light.map((line, i) => line.map((t, j) => ({ content: t.content, light: t.color ?? '', dark: dark[i]?.[j]?.color ?? '' })))
+}

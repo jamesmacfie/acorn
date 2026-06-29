@@ -1,6 +1,7 @@
 import { Hono } from 'hono'
 import { csrf } from 'hono/csrf'
 import { authMiddleware, type AppEnv } from './middleware/auth'
+import { actions } from './routes/actions'
 import { auth } from './routes/auth'
 import { me } from './routes/me'
 import { pins } from './routes/pins'
@@ -33,6 +34,7 @@ const app = new Hono<AppEnv>()
   .route('/api/repos', pullBlob) // /:owner/:repo/blobs/:sha — full body for context expansion
   .route('/api/repos', pullsBatch) // POST /:owner/:repo/pulls/batch — prefetch warm-up
   .route('/api/repos', prActions) // PR write actions: merge / close / reopen / draft / comments
+  .route('/api/repos', actions) // Actions reads: /:owner/:repo/actions/runs/:runId/jobs + jobs/:jobId/logs
   .route('/api/repos', prCreate) // create PR + branches/compare reads for the create view
   .route('/api/repos', mentions) // /:owner/:repo/mentions — participant logins for @autocomplete
 

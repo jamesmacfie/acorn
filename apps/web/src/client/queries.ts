@@ -19,6 +19,10 @@ import {
   meRoute,
   mentionsKey,
   mentionsRoute,
+  jobLogKey,
+  jobLogRoute,
+  runJobsKey,
+  runJobsRoute,
   pinsKey,
   pinsRoute,
   prefsKey,
@@ -37,8 +41,10 @@ import {
   type ClosedPullsPage,
   type Compare,
   type FileBlob,
+  type JobLog,
   type Me,
   type Pull,
+  type RunJobs,
   type Label,
   type PullDetail,
   type PullFile,
@@ -180,4 +186,21 @@ export const mentionsOptions = (owner: string, repo: string, enabled: boolean) =
   enabled,
   staleTime: 5 * 60 * 1000,
   queryFn: async ({ signal }: QueryContext): Promise<string[]> => readJson<string[]>(mentionsRoute(owner, repo), { signal }),
+})
+
+// Workflow run's jobs + steps for the checks panel. Short staleTime since running jobs change.
+export const runJobsOptions = (owner: string, repo: string, runId: number, enabled: boolean) => ({
+  queryKey: runJobsKey(owner, repo, runId),
+  enabled,
+  staleTime: 15_000,
+  queryFn: async ({ signal }: QueryContext): Promise<RunJobs> => readJson<RunJobs>(runJobsRoute(owner, repo, runId), { signal }),
+})
+
+// One job's full log. staleTime Infinity: a completed job's log is immutable. ponytail: a still-
+// running job's log going stale is the accepted ceiling (manual refresh is a later add).
+export const jobLogOptions = (owner: string, repo: string, jobId: number, enabled: boolean) => ({
+  queryKey: jobLogKey(owner, repo, jobId),
+  enabled,
+  staleTime: Infinity,
+  queryFn: async ({ signal }: QueryContext): Promise<JobLog> => readJson<JobLog>(jobLogRoute(owner, repo, jobId), { signal }),
 })

@@ -9,6 +9,7 @@ import MentionTextarea from './MentionTextarea'
 import { addComment, addLabel, closePr, disableAutoMerge, enableAutoMerge, mergePr, removeLabel, removeReviewer, reopenPr, rerunFailed, requestReviewer, setDraft, setViewed, submitReview } from './mutations'
 import { UserAvatar } from './UserAvatar'
 import { ConversationEntryItem } from './features/pullDetail/Conversation'
+import ChecksPanel from './features/checks/ChecksPanel'
 import { buildConversationEntries, buildThreadSnippetIndex } from './features/pullDetail/model'
 
 const labelColor = (color: string | null | undefined) => (color ? `#${color}` : 'var(--text-faint)')
@@ -57,6 +58,7 @@ export default function PullDetail() {
   const [actionError, setActionError] = createSignal('')
   const run = (p: Promise<unknown>) => p.then(refresh).catch((e) => setActionError(String(e.message ?? e)))
 
+  const [openCheck, setOpenCheck] = createSignal<{ runId: number; name: string } | null>(null)
   const [rerunned, setRerunned] = createSignal(new Set<number>())
   const triggerRerun = (runId: number) => {
     setRerunned((s) => new Set([...s, runId]))
@@ -264,7 +266,11 @@ export default function PullDetail() {
                     {(ck) => (
                       <li class="check-row">
                         <span class={`check-dot check-${(ck.status ?? '').toLowerCase()}`} />
-                        <span class="check-name">{ck.name}</span>
+                        <Show when={ck.runId != null} fallback={<span class="check-name">{ck.name}</span>}>
+                          <button type="button" class="check-name check-name-link" onClick={() => setOpenCheck({ runId: ck.runId!, name: ck.name })}>
+                            {ck.name}
+                          </button>
+                        </Show>
                         <Show when={ck.url}>
                           {(u) => (
                             <a class="muted" href={u()} target="_blank" rel="noreferrer">
@@ -364,6 +370,9 @@ export default function PullDetail() {
                 </div>
               </div>
             </details>
+            <Show when={openCheck()}>
+              {(c) => <ChecksPanel owner={o()} repo={r()} runId={c().runId} jobName={c().name} onClose={() => setOpenCheck(null)} />}
+            </Show>
           </>
         )}
       </Show>

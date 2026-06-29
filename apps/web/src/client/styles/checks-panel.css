@@ -1,0 +1,113 @@
+/* Workflow steps side panel (ChecksPanel.tsx): a right-anchored drawer over a dimmed backdrop,
+   listing the clicked job's steps with lazily-loaded per-step logs. */
+.checks-panel-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  background: rgba(0, 0, 0, 0.4);
+}
+.checks-panel {
+  position: fixed;
+  inset: 0 0 0 auto;
+  z-index: 61;
+  width: min(620px, 92vw);
+  display: flex;
+  flex-direction: column;
+  background: var(--bg);
+  border-left: 1px solid var(--border-strong);
+  box-shadow: -12px 0 28px var(--shadow-popover);
+}
+.checks-panel-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: var(--pane-pad);
+  border-bottom: 1px solid var(--border);
+}
+.checks-panel-title {
+  flex: 1;
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.checks-panel-close {
+  font: inherit;
+  color: var(--text-muted);
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+  padding: 2px 6px;
+}
+.checks-panel-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: var(--pane-pad);
+}
+.step-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.step-row {
+  border-bottom: 1px solid var(--border);
+}
+.step-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  font: inherit;
+  font-size: var(--fs-sm);
+  color: var(--text);
+  text-align: left;
+  background: transparent;
+  border: 0;
+  padding: 7px 0;
+  cursor: pointer;
+}
+.step-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.step-log {
+  margin: 0 0 8px;
+  padding: 8px 10px;
+  max-height: 50vh;
+  overflow: auto;
+  font-family: var(--font-mono);
+  font-size: var(--fs-sm);
+  line-height: 1.45;
+  white-space: pre-wrap;
+  word-break: break-word;
+  color: var(--text);
+  background: var(--bg-subtle);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+.log-line {
+  min-height: 1.45em;
+}
+/* ANSI dual-theme: light token colour by default, dark when the app theme is dark (mirrors diff). */
+.step-log span { color: var(--l); }
+:root[data-theme='dark'] .step-log span { color: var(--r); }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) .step-log span { color: var(--r); }
+}
+/* Clickable check name in the PR detail checks list. */
+.check-name-link {
+  font: inherit;
+  color: var(--text);
+  background: transparent;
+  border: 0;
+  padding: 0;
+  text-align: left;
+  cursor: pointer;
+}
+.check-name-link:hover {
+  color: var(--accent);
+  text-decoration: underline;
+}
