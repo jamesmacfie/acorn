@@ -6,8 +6,7 @@
     "build": "turbo run build",
     "dev": "turbo run dev",
     "lint": "turbo run lint",
-    "test": "turbo run test",
-    "build-deploy": "pnpm build && pnpm --filter @acorn/web exec wrangler deploy"
+    "test": "turbo run test"
   },
   "devDependencies": {
     "turbo": "^2"

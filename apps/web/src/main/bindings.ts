@@ -1,5 +1,5 @@
 import Database from 'better-sqlite3'
-import { mkdirSync } from 'node:fs'
+import { existsSync, mkdirSync } from 'node:fs'
 import { readFile, rm, writeFile } from 'node:fs/promises'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -70,10 +70,15 @@ function diskKV(dir: string): KVish {
   }
 }
 
-// drizzle-generated migrations live at apps/web/migrations; resolve from this module, not cwd.
-const migrationsFolder = resolve(dirname(fileURLToPath(import.meta.url)), '../../migrations')
+// drizzle-generated migrations: packaged as extraResources (process.resourcesPath/migrations) in a
+// built app, else resolved from this module at apps/web/migrations. Never from process.cwd().
+const migrationsFolder = (() => {
+  const packaged = process.resourcesPath ? join(process.resourcesPath, 'migrations') : null
+  if (packaged && existsSync(packaged)) return packaged
+  return resolve(dirname(fileURLToPath(import.meta.url)), '../../migrations')
+})()
 
-function openDb(dbPath: string): AppDatabase {
+export function openDb(dbPath: string): AppDatabase {
   mkdirSync(dirname(dbPath), { recursive: true }) // better-sqlite3 won't create parent dirs
   const sqlite = new Database(dbPath)
   // D1 hides these; better-sqlite3 does not. FK enforcement, WAL, and a short busy timeout.
@@ -100,7 +105,7 @@ export type BindingsOptions = { dbPath: string; blobsDir: string }
 export function makeBindings({ dbPath, blobsDir }: BindingsOptions): RuntimeBindings {
   const secret = (name: string): string => {
     const value = process.env[name]
-    if (!value) throw new Error(`Missing required env var ${name} (load it via --env-file=.dev.vars)`)
+    if (!value) throw new Error(`Missing required env var ${name} (set it in .env or the environment)`)
     return value
   }
   return {

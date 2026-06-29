@@ -1,4 +1,5 @@
 import { Hono } from 'hono'
+import type { ExecutionContext } from 'hono'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { getDb } from '../db'
 import { gh } from '../github'

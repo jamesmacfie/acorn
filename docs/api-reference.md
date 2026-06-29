@@ -1,5 +1,10 @@
 # API Reference
 
+> **Runtime note:** acorn migrated from Cloudflare Workers to a local Electron app (see
+> [electron.md](./electron.md)). The HTTP surface below is unchanged — it is now served by an
+> in-process Node server (`@hono/node-server`) on `http://127.0.0.1:4317`. Read "the Worker" as
+> "the local server".
+
 The Worker's complete HTTP surface. One Hono app
 (`apps/web/src/server/index.ts`) serves `/auth/*` and `/api/*`; see
 [architecture-overview](./architecture-overview.md).

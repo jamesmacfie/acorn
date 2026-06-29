@@ -1,5 +1,10 @@
 # Local development
 
+> **Runtime note:** acorn migrated from Cloudflare Workers to a local Electron app (see
+> [electron.md](./electron.md)). `pnpm dev` now builds + launches the Electron app; secrets live in
+> `apps/web/.env`; migrations apply on startup or via `pnpm db:migrate`. The wrangler/Miniflare/D1
+> steps below are historical.
+
 Clone → running → logged-in runbook for acorn. For the system design behind it, see
 [architecture-overview.md](./architecture-overview.md).
 

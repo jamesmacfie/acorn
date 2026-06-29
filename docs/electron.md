@@ -1,11 +1,11 @@
 # acorn → Electron desktop app — migration plan
 
-> Status: **Phases 0 & 1 done** (Node-server spike + Electron shell). The Hono app runs under
-> `@hono/node-server` on `http://127.0.0.1:4317` with a better-sqlite3 + KV-shim Bindings object,
-> wrapped in an Electron app whose main process starts that server and loads the loopback origin.
-> Cloudflare config is untouched and still builds (reversible). Phases 2–3 remain planned. This is
-> the full change inventory and a clean, phased transition off Cloudflare Workers to a local
-> Electron app.
+> Status: **Phases 0–2 done** (Node-server spike + Electron shell + Cloudflare cut). The Hono app
+> runs under `@hono/node-server` on `http://127.0.0.1:4317` with a better-sqlite3 + KV-shim Bindings
+> object, wrapped in an Electron app whose main process starts that server and loads the loopback
+> origin. **Cloudflare/wrangler is fully removed** — Electron is now the only runtime. Phase 3
+> (desktop-native cleanups + v2 terminal) remains planned. This is the full change inventory and the
+> record of a clean, phased transition off Cloudflare Workers to a local Electron app.
 >
 > Companion doc: [v2.md](./v2.md) (terminal/agent sessions) — that feature collapses into the
 > Electron main process once this lands (see §8).
@@ -454,8 +454,14 @@ the server binds, the native module loads, the SPA serves, and the login redirec
 > would silently break the parallel `dev:node` path we keep until Phase 2. Make it a postinstall
 > once Cloudflare/Node-only-dev is gone.
 
-**Phase 2 — Cut Cloudflare.** Delete wrangler/cloudflare config, deps, `worker-configuration.d.ts`,
-`.dev.vars`. Switch build to `electron-builder`. Update docs. Now there is one runtime.
+**Phase 2 — Cut Cloudflare. ✅ DONE.** Deleted `wrangler.jsonc`, `worker-configuration.d.ts`,
+`vite.config.ts`, `.wrangler/`; removed `wrangler` + `@cloudflare/vite-plugin`; `.dev.vars`→`.env`.
+Hand-wrote the global `Env` (`src/env.d.ts` → `RuntimeBindings`), simplified `getDb` to Node-only,
+added `electron-builder.yml` (mac dmg/zip, `asarUnpack` the native `.node`, migrations as
+`extraResources` resolved via `process.resourcesPath`), reworked scripts (`build`→electron-vite,
+`dist`→electron-builder, `db:migrate`→`tsx scripts/migrate.ts`, dropped `typegen`/`dev:web`), and
+updated `CLAUDE.md`. Verified: `pnpm lint`, 88/88 tests, `pnpm build`, and `pnpm dev` boots clean.
+**Not verified headlessly:** a packaged `.dmg` from `pnpm dist` (run it on your machine).
 
 **Phase 3 — Desktop-native cleanups + features.** Caching simplification (§5), optional keychain
 auth, GitHub device flow (drop `client_secret`), and the **v2 terminal** (§8).

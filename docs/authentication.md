@@ -1,5 +1,11 @@
 # Authentication
 
+> **Runtime note:** acorn migrated from Cloudflare Workers to a local Electron app (see
+> [electron.md](./electron.md)). The OAuth web flow and sealed-cookie session are unchanged — they
+> run in an in-process Node server on `http://127.0.0.1:4317`, and login happens in a dedicated
+> Electron OAuth window. Register `http://127.0.0.1:4317/auth/callback` on the GitHub OAuth app.
+> Where this doc says "the Worker", read "the local server".
+
 acorn authenticates users with GitHub via the OAuth 2.0 web flow. The Worker
 exchanges the OAuth code for an access token and seals it into an encrypted
 cookie. **The token never reaches the browser** — only public profile fields

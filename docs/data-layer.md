@@ -1,5 +1,10 @@
 # Data Layer
 
+> **Runtime note:** acorn migrated from Cloudflare Workers to a local Electron app (see
+> [electron.md](./electron.md)). The read-model mirror is unchanged but now lives in local SQLite
+> (better-sqlite3 + Drizzle) under `apps/web/.acorn/`, not D1. `db.batch()` is emulated via a
+> transaction (electron.md §4c). Read "D1" as "the local SQLite DB".
+
 The Worker's data layer is [Drizzle ORM](https://orm.drizzle.team/) over
 Cloudflare D1 (SQLite). The schema is two kinds of table:
 

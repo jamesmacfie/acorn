@@ -1,5 +1,11 @@
 # Architecture Overview
 
+> **Runtime note:** acorn migrated from Cloudflare Workers to a local Electron app (see
+> [electron.md](./electron.md)). The same Hono app + Drizzle schema + SolidJS UI now run in an
+> Electron main process (server via `@hono/node-server`, DB via better-sqlite3) instead of a Worker.
+> References below to the Worker / D1 / KV / wrangler describe the prior host; the app design is
+> unchanged.
+
 acorn is a GitHub pull-request review tool. It is a SolidJS single-page app
 served by one Hono Worker on Cloudflare Workers, backed by a D1 SQLite
 read-model mirror, a KV blob cache, and IndexedDB client persistence.

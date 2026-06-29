@@ -2,14 +2,12 @@ node_modules/
 .turbo/
 dist/
 out/
+release/
+.env
 .env*.local
 *.log
 
-# Cloudflare / Wrangler
-.dev.vars
-.wrangler/
-
-# Electron migration (Phase 0): local SQLite + on-disk blob cache
+# Electron: local SQLite + on-disk blob cache
 .acorn/
 
 .playwright-mcp/*
