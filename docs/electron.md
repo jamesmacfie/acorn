@@ -1,11 +1,13 @@
 # acorn → Electron desktop app — migration plan
 
-> Status: **Phases 0–2 done** (Node-server spike + Electron shell + Cloudflare cut). The Hono app
-> runs under `@hono/node-server` on `http://127.0.0.1:4317` with a better-sqlite3 + KV-shim Bindings
-> object, wrapped in an Electron app whose main process starts that server and loads the loopback
-> origin. **Cloudflare/wrangler is fully removed** — Electron is now the only runtime. Phase 3
-> (desktop-native cleanups + v2 terminal) remains planned. This is the full change inventory and the
-> record of a clean, phased transition off Cloudflare Workers to a local Electron app.
+> Status: **Migration complete.** Phases 0–2 done (Node-server spike + Electron shell + Cloudflare
+> cut) plus the Phase 3 caching cleanup. The Hono app runs under `@hono/node-server` on
+> `http://127.0.0.1:4317` with a better-sqlite3 + KV-shim Bindings object, wrapped in an Electron app
+> whose main process starts that server and loads the loopback origin. **Cloudflare/wrangler is fully
+> removed** — Electron is the only runtime. The remaining Phase 3 items are **optional enhancements,
+> not migration work**: OS-keychain secrets, GitHub device flow (drop `client_secret`), and the
+> separate **v2 terminal** feature (§8). This doc is the full change inventory and the record of a
+> clean, phased transition off Cloudflare Workers to a local Electron app.
 >
 > Companion doc: [v2.md](./v2.md) (terminal/agent sessions) — that feature collapses into the
 > Electron main process once this lands (see §8).
