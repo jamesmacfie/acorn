@@ -22,6 +22,7 @@ export default function App() {
   const params = useParams()
   const navigate = useNavigate()
   const isRestoring = useIsRestoring()
+  const [helpOpen, setHelpOpen] = createSignal(false)
 
   const me = createQuery(() => meOptions())
   const repos = createQuery(() => reposOptions(!!me.data))
@@ -169,7 +170,7 @@ export default function App() {
             }
           >
             {(user) => (
-              <AccountMenu user={user()} onPermissions={permissions} onClearCache={clearCache} onLogout={logout} />
+              <AccountMenu user={user()} onShortcuts={() => setHelpOpen(true)} onPermissions={permissions} onClearCache={clearCache} onLogout={logout} />
             )}
           </Show>
         </div>
@@ -226,7 +227,7 @@ export default function App() {
           </Show>
         </main>
       </Show>
-      <Shortcuts />
+      <Shortcuts helpOpen={helpOpen()} onHelpOpenChange={setHelpOpen} />
     </div>
     </Show>
   )

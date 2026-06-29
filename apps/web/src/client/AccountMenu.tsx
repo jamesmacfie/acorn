@@ -3,6 +3,7 @@ import type { Me } from './queries'
 
 type AccountMenuProps = {
   user: Me
+  onShortcuts: () => void
   onPermissions: () => void | Promise<void>
   onClearCache: () => void | Promise<void>
   onLogout: () => void | Promise<void>
@@ -46,6 +47,10 @@ export default function AccountMenu(props: AccountMenuProps) {
     close()
     await props.onClearCache()
   }
+  const shortcuts = () => {
+    close()
+    props.onShortcuts()
+  }
 
   return (
     <div class="account-menu" ref={rootRef}>
@@ -67,6 +72,9 @@ export default function AccountMenu(props: AccountMenuProps) {
           <div class="account-menu-user" title={props.user.login}>
             {props.user.login}
           </div>
+          <button class="account-menu-item" role="menuitem" type="button" onClick={shortcuts}>
+            Shortcuts
+          </button>
           <button class="account-menu-item" role="menuitem" type="button" onClick={permissions}>
             Permissions
           </button>

@@ -6,7 +6,8 @@ import { fileSummariesOptions, type PullFile } from './queries'
 // Global keyboard shortcuts + their overlays. Mounted once in App. Owns a single window
 // keydown listener. PullList owns j/k (next/prev PR) — those keys are deliberately untouched
 // here. All shortcuts except Escape are ignored while focus is in a form field.
-type Overlay = 'help' | 'finder' | null
+// Finder is local; the help overlay is lifted to App so the account menu can open it too.
+type Overlay = 'finder' | null
 
 // Subsequence match (fuzzy): every char of the query appears in order within the path.
 function subsequence(query: string, target: string): boolean {
@@ -21,7 +22,7 @@ function isTypingTarget(t: EventTarget | null): boolean {
   return t instanceof HTMLInputElement || t instanceof HTMLTextAreaElement || t instanceof HTMLSelectElement
 }
 
-export default function Shortcuts() {
+export default function Shortcuts(props: { helpOpen: boolean; onHelpOpenChange: (open: boolean) => void }) {
   const params = useParams()
   const navigate = useNavigate()
   const [searchParams, setSearchParams] = useSearchParams()
@@ -79,9 +80,10 @@ export default function Shortcuts() {
   const onKey = (e: KeyboardEvent) => {
     // Escape always closes, even from within a field (e.g. the finder input).
     if (e.key === 'Escape') {
-      if (overlay()) {
+      if (overlay() || props.helpOpen) {
         e.preventDefault()
         setOverlay(null)
+        props.onHelpOpenChange(false)
       }
       return
     }
@@ -106,9 +108,12 @@ export default function Shortcuts() {
     // All remaining shortcuts ignore form fields.
     if (isTypingTarget(e.target)) return
 
+    // …and modifier chords (Cmd+C to copy, Ctrl+/, etc.) belong to the OS/browser, not us.
+    if (e.metaKey || e.ctrlKey || e.altKey) return
+
     if (e.key === '?') {
       e.preventDefault()
-      setOverlay((o) => (o === 'help' ? null : 'help'))
+      props.onHelpOpenChange(!props.helpOpen)
     } else if (e.key === '/') {
       e.preventDefault()
       openFinder()
@@ -163,10 +168,10 @@ export default function Shortcuts() {
   }
 
   return (
-    <Show when={overlay()}>
-      <div class="overlay-backdrop" onClick={() => setOverlay(null)}>
+    <Show when={overlay() || props.helpOpen}>
+      <div class="overlay-backdrop" onClick={() => { setOverlay(null); props.onHelpOpenChange(false) }}>
         <div class="overlay" role="dialog" aria-modal="true" onClick={(e) => e.stopPropagation()}>
-          <Show when={overlay() === 'help'}>
+          <Show when={props.helpOpen}>
             <div class="overlay-title">Keyboard shortcuts</div>
             <dl class="help-list">
               <For each={shortcuts}>
