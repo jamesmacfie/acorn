@@ -14,6 +14,16 @@ import { buildConversationEntries, buildThreadSnippetIndex } from './features/pu
 
 const labelColor = (color: string | null | undefined) => (color ? `#${color}` : 'var(--text-faint)')
 
+// Persist a <details> open/closed state in localStorage, keyed by section name, so it survives
+// navigation and reloads. Seeds from storage on mount (falling back to the JSX `open` default),
+// then writes back on every toggle. ponytail: localStorage, not server prefs — these are
+// per-device UI preferences and avoid the async seed-flash the left pane has.
+const rememberOpen = (key: string) => (el: HTMLDetailsElement) => {
+  const stored = localStorage.getItem(`section-open:${key}`)
+  if (stored !== null) el.open = stored === '1'
+  el.addEventListener('toggle', () => localStorage.setItem(`section-open:${key}`, el.open ? '1' : '0'))
+}
+
 // Mid (Navigator) pane: PR header + description + changed-files + checks + conversation.
 // Bodies are GitHub-sanitized bodyHTML, rendered via innerHTML (docs/ui-style.md §5).
 export default function PullDetail() {
@@ -186,13 +196,13 @@ export default function PullDetail() {
             </div>
 
             <Show when={pull().body}>
-              <details class="nav-section" open>
+              <details class="nav-section" open ref={rememberOpen('description')}>
                 <summary>Description</summary>
                 <div class="markdown" innerHTML={pull().body!} />
               </details>
             </Show>
 
-            <details class="nav-section" open>
+            <details class="nav-section" open ref={rememberOpen('labels')}>
               <summary>Labels</summary>
               <ul class="label-list">
                 <For each={detail.data?.labels} fallback={<li class="label-empty muted">None.</li>}>
@@ -223,7 +233,7 @@ export default function PullDetail() {
               </div>
             </details>
 
-            <details class="nav-section" open>
+            <details class="nav-section" open ref={rememberOpen('files')}>
               <summary>
                 Files <span class="muted">({files.data?.length ?? 0})</span>
               </summary>
@@ -256,7 +266,7 @@ export default function PullDetail() {
             </details>
 
             <Show when={detail.data?.checks.length}>
-              <details class="nav-section">
+              <details class="nav-section" ref={rememberOpen('checks')}>
                 <summary>
                   Checks <span class="muted">({detail.data!.checks.length})</span>
                   <span class={`checks-dot checks-dot-${checksState(detail.data!.checks)}`} />
@@ -290,7 +300,7 @@ export default function PullDetail() {
               </details>
             </Show>
 
-            <details class="nav-section" open>
+            <details class="nav-section" open ref={rememberOpen('conversation')}>
               <summary>
                 Comments/Commits{' '}
                 <span class="muted">({conversationEntries().length})</span>
@@ -318,7 +328,7 @@ export default function PullDetail() {
               </div>
             </details>
 
-            <details class="nav-section" open>
+            <details class="nav-section" open ref={rememberOpen('review')}>
               <summary>Review</summary>
               <ul class="label-list">
                 <For each={detail.data?.requestedReviewers} fallback={<li class="label-empty muted">No reviewers requested.</li>}>
