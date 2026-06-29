@@ -395,11 +395,11 @@ in-between (see §7). Then delete decisively:
   (+ `@electron/rebuild`), `@types/better-sqlite3`, `dotenv` or equivalent `.env` loading
 
 **Code simplifications (the satisfying part):**
-- **Caching public/private split goes away.** `pullBlob.ts` / `prMirror.ts` carefully *don't* cache
-  private-repo bodies because Workers KV is **shared/global** (see `docs/caching.md`). On a local
-  single-user machine the cache is yours — the `if (!repoRow.private)` guard around BLOBS becomes
-  unnecessary. Cache everything by sha; drop the private-repo special-casing. Removes a class of
-  subtle bugs.
+- **Caching public/private split goes away. ✅ DONE (Phase 3 cleanup).** `pullBlob.ts` /
+  `prMirror.ts` no longer special-case private repos: the `if (!repoRow.private)` guards are gone,
+  all blob/patch bodies cache by sha in the local on-disk BLOBS dir, and `mirrorFiles` dropped its
+  `isPrivate` param (patches live only in BLOBS now, never the DB `patch` column). Removed a class
+  of subtle bugs. (Verified: lint + 88 tests + boot.)
 - **Session cookie (optional, Phase 3).** The sealed-JWE-cookie + "token never reaches the browser"
   design exists to defend a shared-origin web app. In a single-user desktop app it's
   over-engineered — the token could live in the OS keychain and be injected server-side.
@@ -463,8 +463,9 @@ added `electron-builder.yml` (mac dmg/zip, `asarUnpack` the native `.node`, migr
 updated `CLAUDE.md`. Verified: `pnpm lint`, 88/88 tests, `pnpm build`, and `pnpm dev` boots clean.
 **Not verified headlessly:** a packaged `.dmg` from `pnpm dist` (run it on your machine).
 
-**Phase 3 — Desktop-native cleanups + features.** Caching simplification (§5), optional keychain
-auth, GitHub device flow (drop `client_secret`), and the **v2 terminal** (§8).
+**Phase 3 — Desktop-native cleanups + features.** Caching simplification (§5) **✅ done**. Still
+planned: optional keychain auth, GitHub device flow (drop `client_secret`), and the **v2 terminal**
+(§8).
 
 Each phase is independently shippable and Phase 0–1 are reversible (Cloudflare config still there
 until Phase 2). That's the clean transition.
