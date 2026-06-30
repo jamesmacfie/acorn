@@ -4,6 +4,7 @@ import { useNavigate, useParams, useSearchParams } from '@solidjs/router'
 import { checksState, FAILED_STATUSES, fileStatusMeta, formatRelativeTime, summarizeFileStats } from './displayMeta'
 import { requestFileScroll, routeKey } from './fileNavigation'
 import Picker from './Picker'
+import CopyButton from './CopyButton'
 import { fileSummariesOptions, integrationsOptions, linearIssuesOptions, mentionsOptions, pullDetailOptions, pullPrefixKey, pullsPrefixKey, repoLabelsOptions, reposOptions, type Label } from './queries'
 import MentionTextarea from './MentionTextarea'
 import { addComment, addLabel, closePr, disableAutoMerge, enableAutoMerge, mergePr, removeLabel, removeReviewer, reopenPr, rerunFailed, requestReviewer, setDraft, setViewed, submitReview } from './mutations'
@@ -172,7 +173,7 @@ export default function PullDetail() {
           <>
             <div class="pr-detail-header">
               <div class="pr-detail-title">
-                <span class="pr-num">#{pull().number}</span> <LinearText text={pull().title} prefixes={linearPrefixes()} onOpen={setOpenIssue} />
+                <span class="pr-num copyable">#{pull().number}<CopyButton text={() => String(pull().number)} title="Copy PR number" /></span> <LinearText text={pull().title} prefixes={linearPrefixes()} onOpen={setOpenIssue} />
               </div>
               <div class="pr-detail-meta muted">
                 <span class={`state-badge state-${pull().state}`}>{pull().draft ? 'draft' : pull().state}</span>
@@ -254,7 +255,7 @@ export default function PullDetail() {
 
             <Show when={pull().body}>
               <details class="nav-section" open ref={rememberOpen('description')}>
-                <summary>Description</summary>
+                <summary class="copyable">Description<CopyButton class="copy-right" text={() => descRef?.textContent ?? ''} title="Copy description" /></summary>
                 <div class="markdown" ref={descRef} onClick={onContentClick} innerHTML={pull().body!} />
               </details>
             </Show>
