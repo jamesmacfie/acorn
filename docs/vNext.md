@@ -1,10 +1,10 @@
 # vNext — Terminal & agent sessions (Electron)
 
-> Status: **design / RFC. Not yet implemented.** This supersedes and unifies [v2.md](./v2.md)
-> (remote-agent terminal sessions) and [v3.md](./v3.md) (local agent terminal sessions), rewritten
-> for the runtime acorn actually ships on now: a **local macOS Electron app** (see
-> [electron.md](./electron.md)). The product vision from v2/v3 is unchanged; the architecture is
-> much smaller because Electron already gives us a local process model.
+> Status: **design / RFC. Not yet implemented.** This supersedes and unifies two earlier terminal
+> RFCs (the former `v2.md` "remote-agent terminal sessions" and `v3.md` "local agent terminal
+> sessions", now removed), rewritten for the runtime acorn actually ships on now: a **local macOS
+> Electron app** (see [electron.md](./electron.md)). The product vision is unchanged; the
+> architecture is much smaller because Electron already gives us a local process model.
 
 acorn is a GitHub PR review tool that now runs as an Electron app: a SolidJS renderer talking to an
 in-process Hono server (`@hono/node-server`) on `http://127.0.0.1:4317`, backed by local SQLite. This

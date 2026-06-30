@@ -9,7 +9,7 @@
 > separate **v2 terminal** feature (§8). This doc is the full change inventory and the record of a
 > clean, phased transition off Cloudflare Workers to a local Electron app.
 >
-> Companion doc: [v2.md](./v2.md) (terminal/agent sessions) — that feature collapses into the
+> Companion doc: [vNext.md](./vNext.md) (terminal/agent sessions) — that feature collapses into the
 > Electron main process once this lands (see §8).
 >
 > **Phase 0 artifacts:** `apps/web/src/main/bindings.ts` (DB + `.batch` shim, in-mem `OAUTH_STATE`,
@@ -472,20 +472,20 @@ planned: optional keychain auth, GitHub device flow (drop `client_secret`), and 
 Each phase is independently shippable and Phase 0–1 are reversible (Cloudflare config still there
 until Phase 2). That's the clean transition.
 
-## 8. What this does to the v2 terminal feature
+## 8. What this does to the terminal feature
 
-[v2.md](./v2.md) designed the terminal around a Worker's *lack* of a process model — a separate
+The original terminal RFCs designed around a Worker's *lack* of a process model — a separate
 local daemon + a Vite WebSocket proxy. **Electron removes that entire workaround:**
 
 - node-pty runs **in the Electron main process**. No separate daemon, no `ws` server, no Vite proxy.
 - Renderer (xterm.js) ↔ main over **Electron IPC** (or a localhost WS on the same node-server),
   instead of `ws://localhost:5173/term`.
-- tmux-backed persistence (v2 §4) still applies for surviving an app restart; surviving a
-  *window* reload is automatic since the PTY lives in main.
+- tmux-backed persistence still applies for surviving an app restart; surviving a *window* reload
+  is automatic since the PTY lives in main.
 - The `@electron/rebuild` step from §4c already covers node-pty's native build.
 
-Net: v2 gets simpler and more native. Build it in Phase 3, after the migration settles. Update
-v2.md's transport section once this lands.
+Net: the terminal gets simpler and more native. The full Electron-reframed design lives in
+[vNext.md](./vNext.md); build it after the migration settles.
 
 ## 9. Risks & open questions
 
