@@ -15,7 +15,21 @@ export async function getRepoPath(db: AppDatabase, owner: string, repo: string):
     .from(schema.repoPaths)
     .where(and(eq(schema.repoPaths.owner, owner), eq(schema.repoPaths.repo, repo)))
   const row = rows[0]
-  return row ? { owner: row.owner, repo: row.repo, path: row.path } : null
+  return row ? { owner: row.owner, repo: row.repo, path: row.path, runCommand: row.runCommand, devPort: row.devPort } : null
+}
+
+// Save the per-repo dev-server config (docs/workspaces P5). The repo must already be mapped (its
+// path is required); returns the updated mapping or an error for the UI.
+export async function setRunConfig(db: AppDatabase, owner: string, repo: string, runCommand: string, devPort: number): Promise<RepoPathResult> {
+  if (!runCommand.trim()) return { ok: false, reason: 'Run command is required.' }
+  if (!Number.isInteger(devPort) || devPort < 1 || devPort > 65535) return { ok: false, reason: 'Port must be 1–65535.' }
+  const existing = await getRepoPath(db, owner, repo)
+  if (!existing) return { ok: false, reason: 'Map a local checkout for this repo first.' }
+  await db
+    .update(schema.repoPaths)
+    .set({ runCommand: runCommand.trim(), devPort, updatedAt: Date.now() })
+    .where(and(eq(schema.repoPaths.owner, owner), eq(schema.repoPaths.repo, repo)))
+  return { ok: true, repoPath: { ...existing, runCommand: runCommand.trim(), devPort } }
 }
 
 // Does a remote URL point at github.com/<owner>/<repo>? Accept https + ssh forms and an optional
@@ -50,7 +64,7 @@ export async function setRepoPath(db: AppDatabase, owner: string, repo: string, 
     .insert(schema.repoPaths)
     .values({ owner, repo, path, createdAt: now, updatedAt: now })
     .onConflictDoUpdate({ target: [schema.repoPaths.owner, schema.repoPaths.repo], set: { path, updatedAt: now } })
-  return { ok: true, repoPath: { owner, repo, path } }
+  return { ok: true, repoPath: (await getRepoPath(db, owner, repo))! }
 }
 
 const isDir = (p: string): boolean => {

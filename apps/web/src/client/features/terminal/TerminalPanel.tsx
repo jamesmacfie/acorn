@@ -1,8 +1,7 @@
 import { createEffect, createMemo, createSignal, For, onMount, Show } from 'solid-js'
 import { Portal } from 'solid-js/web'
-import { useParams } from '@solidjs/router'
 import { createQuery } from '@tanstack/solid-query'
-import { prefsOptions } from '../../queries'
+import { prefsOptions, type Workspace } from '../../queries'
 import { setPref } from '../../mutations'
 import { terminalApi } from './terminalClient'
 import { refreshSessions, sessions } from './sessions'
@@ -11,19 +10,19 @@ import type { TerminalProfile, TerminalSession } from '../../../shared/terminal'
 import './terminal.css'
 
 // vNext Phase 2: a bottom drawer of persistent local sessions. The "+" opens a profile menu
-// (Shell / Claude Code / Codex / Aider, disabled when not on PATH); agents start in the current
-// PR's mapped checkout (prompting for the path if unmapped — §9) on a durable tmux backend. tmux
-// sessions survive an app restart and are rediscovered by the main process.
-export default function TerminalPanel(props: { onClose: () => void }) {
+// (Shell / Claude Code / Codex / Aider, disabled when not on PATH); agents start in the active
+// workspace's mapped checkout (prompting for the path if unmapped — §9) on a durable tmux backend.
+// docs/workspaces P2: sessions are scoped to the active workspace, not the URL — switching
+// workspaces swaps the visible terminals.
+export default function TerminalPanel(props: { onClose: () => void; workspace: Workspace | null }) {
   const api = terminalApi()
-  const params = useParams()
+  const ws = () => props.workspace
   const prefs = createQuery(() => prefsOptions(true))
 
   const [profiles, setProfiles] = createSignal<TerminalProfile[]>([])
   const [activeId, setActiveId] = createSignal<string | null>(null)
   const [busy, setBusy] = createSignal(false)
   const [menuOpen, setMenuOpen] = createSignal(false)
-  const [useWorktree, setUseWorktree] = createSignal(false)
   const [error, setError] = createSignal<string | null>(null)
   // Repo-path prompt: set when a launch needs a checkout we don't have mapped yet.
   const [prompt, setPrompt] = createSignal<{ owner: string; repo: string; number?: string } | null>(null)
@@ -31,13 +30,14 @@ export default function TerminalPanel(props: { onClose: () => void }) {
   const [pathInput, setPathInput] = createSignal('')
   const [pathError, setPathError] = createSignal<string | null>(null)
 
-  // Scope the strip to the active tab's repo. ponytail: repo-less shells always show — they aren't
-  // bound to a workspace.
-  const visibleSessions = createMemo(() =>
-    sessions().filter((s) => !s.repo || (s.repo.owner === params.owner && s.repo.name === params.repo)),
-  )
+  // Scope the strip to the active workspace (docs/workspaces P2). A session opened in workspace A
+  // never shows under B, regardless of the URL.
+  const visibleSessions = createMemo(() => {
+    const id = ws()?.id
+    return id ? sessions().filter((s) => s.workspaceId === id) : []
+  })
 
-  // Keep the active session in sync with what's visible (e.g. after switching tabs).
+  // Keep the active session in sync with what's visible (e.g. after switching workspaces).
   createEffect(() => {
     const vis = visibleSessions()
     if (!vis.some((s) => s.id === activeId())) setActiveId(vis[0]?.id ?? null)
@@ -84,17 +84,18 @@ export default function TerminalPanel(props: { onClose: () => void }) {
     return ctx ? `${label} · ${ctx}` : label
   }
 
-  async function spawn(profileId: string, cwd: string | undefined, owner?: string, repo?: string, number?: string, isWorktree = false) {
-    if (!api) return
+  // Spawn into the active workspace. `checkout` is the base repo path; the main process derives the
+  // workspace's lazy worktree from it and cwds the session there (docs/workspaces Flow C).
+  async function spawn(profileId: string, checkout: string | undefined, owner?: string, repo?: string, number?: string) {
+    const workspaceId = ws()?.id
+    if (!api || !workspaceId) return
     setBusy(true)
     try {
       const s = await api.create({
+        workspaceId,
         profileId,
-        cwd,
-        isWorktree,
+        cwd: checkout,
         title: titleFor(profileId, owner, repo, number),
-        repo: owner && repo ? { owner, name: repo } : undefined,
-        pull: number ? { number: Number(number) } : undefined,
       })
       await refreshSessions()
       setActiveId(s.id)
@@ -103,26 +104,19 @@ export default function TerminalPanel(props: { onClose: () => void }) {
     }
   }
 
-  // Given a resolved checkout, optionally create/reuse a PR worktree (§9) then spawn there.
-  async function launch(profileId: string, checkout: string, owner: string, repo: string, number?: string) {
-    if (useWorktree() && number) {
-      const wt = await api!.worktree.ensure(owner, repo, Number(number))
-      if (!wt.ok) return setError(wt.reason)
-      return spawn(profileId, wt.path, owner, repo, number, true)
-    }
-    return spawn(profileId, checkout, owner, repo, number)
-  }
-
-  // Launch a profile: shell with no repo → $HOME; otherwise the current PR's checkout, prompting
-  // for the local path the first time we see this repo (validated in main before we spawn).
+  // Launch a profile in the active workspace's repo checkout, prompting for the local path the
+  // first time we see this repo (validated in main before we spawn). docs/workspaces P2: context
+  // comes from the workspace, not the URL; the worktree is created lazily in main (Flow C).
   async function startProfile(profileId: string) {
     setMenuOpen(false)
     setError(null)
-    if (!api) return
-    const { owner, repo, number } = params
-    if (!owner || !repo) return spawn(profileId, undefined)
+    const w = ws()
+    if (!api || !w) return
+    const owner = w.repoOwner
+    const repo = w.repoName
+    const number = w.pullNumber != null ? String(w.pullNumber) : undefined
     const mapped = await api.repoPath.get(owner, repo)
-    if (mapped) return launch(profileId, mapped.path, owner, repo, number)
+    if (mapped) return spawn(profileId, mapped.path, owner, repo, number)
     setPendingProfile(profileId)
     setPathError(null)
     setPathInput('')
@@ -139,19 +133,7 @@ export default function TerminalPanel(props: { onClose: () => void }) {
       return
     }
     setPrompt(null)
-    await launch(pendingProfile(), res.repoPath.path, ctx.owner, ctx.repo, ctx.number)
-  }
-
-  // Clean up the active session's PR worktree. Refuses a dirty tree unless the user confirms discard.
-  async function removeActiveWorktree() {
-    const s = activeSession()
-    if (!s || !s.isWorktree || !s.repo) return
-    let res = await api!.worktree.remove(s.repo.owner, s.repo.name, s.cwd, false)
-    if (!res.ok && /uncommitted/i.test(res.reason)) {
-      if (!window.confirm(`${res.reason}`)) return
-      res = await api!.worktree.remove(s.repo.owner, s.repo.name, s.cwd, true)
-    }
-    if (!res.ok) setError(res.reason)
+    await spawn(pendingProfile(), res.repoPath.path, ctx.owner, ctx.repo, ctx.number)
   }
 
   // Single contextual control: kill a running session (it stays as an exited tab), dismiss an
@@ -197,17 +179,13 @@ export default function TerminalPanel(props: { onClose: () => void }) {
             </div>
             <div class="terminal-actions">
               <div class="terminal-new-wrap">
-                <button type="button" class="terminal-new" disabled={busy()} title="New session" onClick={() => setMenuOpen((v) => !v)}>
+                <button type="button" class="terminal-new" disabled={busy() || !ws()} title={ws() ? 'New session' : 'Select a workspace first'} onClick={() => setMenuOpen((v) => !v)}>
                   +
                 </button>
                 <Show when={menuOpen()}>
+                  {/* Click-away: a full-screen transparent layer behind the menu closes it. */}
+                  <div class="terminal-menu-backdrop" onClick={() => setMenuOpen(false)} />
                   <div class="terminal-menu">
-                    <Show when={params.number}>
-                      <label class="terminal-menu-wt">
-                        <input type="checkbox" checked={useWorktree()} onChange={(e) => setUseWorktree(e.currentTarget.checked)} />
-                        PR worktree (isolated)
-                      </label>
-                    </Show>
                     <For each={profiles()}>
                       {(p) => (
                         <button
@@ -230,11 +208,6 @@ export default function TerminalPanel(props: { onClose: () => void }) {
               <Show when={activeRunning()}>
                 <button type="button" class="terminal-interrupt" title="Interrupt (Ctrl-C)" onClick={() => void api!.interrupt(activeId()!)}>
                   ^C
-                </button>
-              </Show>
-              <Show when={activeSession()?.isWorktree}>
-                <button type="button" class="terminal-interrupt" title="Remove this PR worktree" onClick={() => void removeActiveWorktree()}>
-                  rm wt
                 </button>
               </Show>
             </div>

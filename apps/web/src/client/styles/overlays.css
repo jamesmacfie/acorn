@@ -3,7 +3,8 @@
 .overlay-backdrop {
   position: fixed;
   inset: 0;
-  z-index: 50;
+  /* Above the terminal drawer (z 50) and its menu (z 60) — modals always sit on top. */
+  z-index: 100;
   display: flex;
   align-items: flex-start;
   justify-content: center;
@@ -29,6 +30,30 @@
   padding: var(--pane-pad);
   border-bottom: 1px solid var(--border);
 }
+
+/* Padded body for simple form modals (matches the Integrations settings spacing). */
+.overlay-body {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: var(--pane-pad);
+}
+.overlay-body .muted { margin: 0; }
+
+/* Standard modal button — same look as the app's action buttons (.pr-actions button etc.). */
+.overlay-btn {
+  flex: none;
+  font: inherit;
+  font-size: var(--fs-sm);
+  color: var(--text);
+  background: var(--bg);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+  padding: 6px 12px;
+  cursor: pointer;
+}
+.overlay-btn:hover:not(:disabled) { background: var(--bg-hover); border-color: var(--accent); }
+.overlay-btn:disabled { opacity: 0.5; cursor: default; }
 
 /* Help: two-column key → description grid. */
 .help-list {

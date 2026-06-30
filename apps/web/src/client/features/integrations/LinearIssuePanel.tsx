@@ -13,7 +13,15 @@ const ACTIVITY_GLYPH: Record<string, string> = { created: '✦', state: '◐', a
 // via linearIssueOptions, which forces a fresh server read so the panel is always current. Bodies
 // are raw markdown (renderMarkdown → sanitized HTML). Activity Log replays the issue history;
 // comments are threaded with an inline reply box (GitHub-style), plus a composer at the bottom.
-export default function LinearIssuePanel(props: { identifier: string; onClose: () => void; onContentClick: (e: MouseEvent) => void }) {
+export default function LinearIssuePanel(props: {
+  identifier: string
+  onClose: () => void
+  onContentClick: (e: MouseEvent) => void
+  // When a workspace links several Linear tickets, the panel shows a chip strip to switch between
+  // them (docs/workspaces). Omitted by the single-ticket PR-detail caller.
+  identifiers?: string[]
+  onSelectIdentifier?: (id: string) => void
+}) {
   const qc = useQueryClient()
   const issue = createQuery(() => linearIssueOptions(props.identifier, true))
 
@@ -117,6 +125,22 @@ export default function LinearIssuePanel(props: { identifier: string; onClose: (
             ✕
           </button>
         </header>
+        <Show when={(props.identifiers?.length ?? 0) > 1}>
+          <div class="integrations-panel-tabs">
+            <For each={props.identifiers}>
+              {(id) => (
+                <button
+                  type="button"
+                  class="integrations-panel-tab"
+                  classList={{ active: id === props.identifier }}
+                  onClick={() => props.onSelectIdentifier?.(id)}
+                >
+                  {id}
+                </button>
+              )}
+            </For>
+          </div>
+        </Show>
         <div class="integrations-panel-body" onClick={props.onContentClick}>
           <Show when={!issue.isLoading} fallback={<p class="muted">Loading ticket…</p>}>
             <Show when={issue.data} fallback={<p class="muted">{issue.isError ? 'Failed to load ticket.' : 'Not found.'}</p>}>

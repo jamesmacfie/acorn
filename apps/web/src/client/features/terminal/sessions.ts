@@ -23,14 +23,12 @@ export function initSessions(): () => void {
   return api.onStatus(() => void refreshSessions())
 }
 
-// Agents actively working for a tab's repo. Mirrors TerminalPanel's visibleSessions repo predicate
-// (repo-less sessions match every tab). "Working" = a running agent that isn't idle.
-export function workingCountFor(owner?: string, repo?: string): number {
+// Agents actively working in a workspace (docs/workspaces P2). "Working" = a running agent that
+// isn't idle. Keys off workspaceId, not the URL — the rail's per-workspace spinner and the topbar
+// badge both read this.
+export function workingCountFor(workspaceId: string | null): number {
+  if (!workspaceId) return 0
   return sessions().filter(
-    (s) =>
-      s.kind === 'agent' &&
-      s.status === 'running' &&
-      !s.idle &&
-      (!s.repo || (s.repo.owner === owner && s.repo.name === repo)),
+    (s) => s.kind === 'agent' && s.status === 'running' && !s.idle && s.workspaceId === workspaceId,
   ).length
 }

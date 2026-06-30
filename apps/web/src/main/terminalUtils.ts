@@ -46,6 +46,12 @@ export const resolveBackend = (preference: 'node-pty' | 'tmux', tmuxAvailable: b
 // PR worktree directory name (vNext §9): `<owner>-<repo>-pr-<number>` under the worktrees root.
 export const worktreeDirName = (owner: string, repo: string, number: number | string) => `${owner}-${repo}-pr-${number}`
 
+// Workspace worktree directory name (docs/workspaces 05): keyed by branch, since a workspace is
+// branch-first (local-first workspaces have no PR number). The branch slug replaces any char that
+// isn't filesystem-safe (`feat/login` → `feat-login`); isContainedPath still guards the result.
+export const worktreeBranchDirName = (owner: string, repo: string, branch: string) =>
+  `${owner}-${repo}-${branch.replace(/[^A-Za-z0-9._-]/g, '-')}`
+
 // Guard repo identifiers before they reach a filesystem path (vNext §5/§11: validate every IPC
 // payload at the boundary). Allow only GitHub-legal chars and forbid a leading dot, so `..`, `/`,
 // and absolute/relative traversal can't escape the worktrees root.

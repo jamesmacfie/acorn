@@ -1,9 +1,9 @@
-import { createEffect, createSignal, onCleanup, onMount, Show } from 'solid-js'
+import { createEffect, createSignal, Match, onCleanup, onMount, Show, Switch } from 'solid-js'
 import { createQuery, useIsRestoring, useQueryClient } from '@tanstack/solid-query'
-import { useLocation, useMatch, useNavigate, useParams } from '@solidjs/router'
+import { useMatch, useNavigate, useParams } from '@solidjs/router'
 import { clear } from 'idb-keyval'
 import { readJson } from './apiClient'
-import { meKey, meOptions, pinsOptions, prefsKey, prefsOptions, pullPrefixKey, pullsKey, pullsRoute, pullsPrefixKey, reposKey, reposOptions, reposRefreshRoute, type Pull } from './queries'
+import { meKey, meOptions, pinsOptions, prefsKey, prefsOptions, pullPrefixKey, pullsKey, pullsRoute, pullsPrefixKey, reposKey, reposOptions, reposRefreshRoute, workspacesOptions, type Pull } from './queries'
 import { setPref } from './mutations'
 import RepoPicker from './RepoPicker'
 import PullList from './PullList'
@@ -15,9 +15,12 @@ import Shortcuts from './Shortcuts'
 import AccountMenu from './AccountMenu'
 import IntegrationsModal from './features/integrations/IntegrationsModal'
 import TerminalPanel from './features/terminal/TerminalPanel'
-import { initSessions, workingCountFor } from './features/terminal/sessions'
+import { initSessions } from './features/terminal/sessions'
 import TabRail from './features/tabs/TabRail'
-import { PREFS_KEY as tabsPrefsKey, recordLocation, seedFromPrefs } from './features/tabs/tabs'
+import { activeWorkspaceId, selectedSource, setActiveWorkspaceId, setSelectedSource } from './features/workspaces/workspaces'
+import { initWorkspaceStatuses } from './features/workspaces/workspaceStatus'
+import WorkspaceView from './features/workspaces/WorkspaceView'
+import LinearBrowse from './features/workspaces/LinearBrowse'
 import Acorn from './Acorn'
 
 // vNext Phase 0 flag: terminal only exists on desktop (Electron IPC) and stays behind a flag —
@@ -30,7 +33,6 @@ export default function App() {
   const queryClient = useQueryClient()
   const params = useParams()
   const navigate = useNavigate()
-  const location = useLocation()
   const isRestoring = useIsRestoring()
   const [helpOpen, setHelpOpen] = createSignal(false)
   const [integrationsOpen, setIntegrationsOpen] = createSignal(false)
@@ -55,19 +57,22 @@ export default function App() {
   onMount(() => {
     if (!terminalEnabled) return
     onCleanup(initSessions())
+    onCleanup(initWorkspaceStatuses())
   })
 
   const me = createQuery(() => meOptions())
   const repos = createQuery(() => reposOptions(!!me.data))
   const prefs = createQuery(() => prefsOptions(!!me.data))
   const pins = createQuery(() => pinsOptions(!!me.data))
+  const workspaces = createQuery(() => workspacesOptions(!!me.data))
 
-  // Workspace tabs: seed the store once from the persisted blob (or the current path), then track
-  // every navigation into the active tab so switching tabs restores where you were.
+  // Default the active workspace to the first row once the list loads (no navigation — selecting a
+  // row in the rail is what navigates). The terminal drawer + topbar badge key off this.
   createEffect(() => {
-    if (prefs.data) seedFromPrefs(prefs.data[tabsPrefsKey], location.pathname)
+    const list = workspaces.data
+    if (list?.length && !activeWorkspaceId()) setActiveWorkspaceId(list[0].id)
   })
-  createEffect(() => recordLocation(location.pathname))
+  const activeWorkspace = () => workspaces.data?.find((w) => w.id === activeWorkspaceId()) ?? null
 
   // Apply the saved theme (falls back to prefers-color-scheme when unset).
   createEffect(() => {
@@ -184,7 +189,12 @@ export default function App() {
               repos={repos.data ?? []}
               pinned={pins.data ?? []}
               selected={selected()}
-              onSelect={(value) => navigate(`/${value}`)}
+              onSelect={(value) => {
+                // From a workspace view, picking a repo returns to the GitHub browse; from a Source
+                // (GitHub/Linear) it just re-scopes that source to the chosen repo.
+                if (!selectedSource()) setSelectedSource('github')
+                navigate(`/${value}`)
+              }}
             />
           </Show>
         </div>
@@ -212,11 +222,6 @@ export default function App() {
             <button type="button" class="theme-toggle" title="Terminal" aria-pressed={termOpen()} onClick={toggleTerm}>
               ▣
             </button>
-            <Show when={workingCountFor(params.owner, params.repo) > 0}>
-              <span class="term-working" title="Agents working">
-                <span class="spin">✻</span> ({workingCountFor(params.owner, params.repo)})
-              </span>
-            </Show>
           </Show>
           <button type="button" class="theme-toggle" title="Toggle theme" onClick={toggleTheme}>
             ◑
@@ -235,7 +240,9 @@ export default function App() {
           </Show>
         </div>
       </header>
-      <Show when={params.owner} fallback={<main class="panes panes-empty"><Acorn /></main>}>
+      <Switch
+        fallback={
+          <Show when={params.owner} fallback={<main class="panes panes-empty"><Acorn /></main>}>
         <main class="panes">
           <section class="pane pane-left">
             <div class="section-header">
@@ -286,11 +293,27 @@ export default function App() {
             </section>
           </Show>
         </main>
-      </Show>
+          </Show>
+        }
+      >
+        <Match when={selectedSource() === 'linear'}>
+          <LinearBrowse />
+        </Match>
+        <Match when={!selectedSource() && activeWorkspace()}>
+          {(ws) => (
+            <WorkspaceView
+              workspace={ws()}
+              terminalOpen={termOpen()}
+              onToggleTerminal={() => void toggleTerm()}
+              onOpenTerminal={() => { if (!termOpen()) void toggleTerm() }}
+            />
+          )}
+        </Match>
+      </Switch>
       <Shortcuts helpOpen={helpOpen()} onHelpOpenChange={setHelpOpen} />
       <IntegrationsModal open={integrationsOpen()} onClose={() => setIntegrationsOpen(false)} />
       <Show when={termOpen()}>
-        <TerminalPanel onClose={() => setTermOpen(false)} />
+        <TerminalPanel onClose={() => setTermOpen(false)} workspace={activeWorkspace()} />
       </Show>
     </div>
     </div>

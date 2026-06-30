@@ -3,41 +3,73 @@ import { existsSync, mkdirSync } from 'node:fs'
 import { join } from 'node:path'
 import { promisify } from 'node:util'
 import type { WorktreeResult } from '../shared/terminal'
-import { isContainedPath, isDirty, worktreeDirName } from './terminalUtils'
+import { isContainedPath, isDirty, worktreeBranchDirName } from './terminalUtils'
 
 const exec = promisify(execFile)
 
-// PR worktrees (vNext §9): an agent edits a PR in an isolated git worktree instead of dirtying the
-// main checkout, and we get a clean cleanup affordance. Worktrees live under the app data dir, not
-// the user's source tree. All git runs in the *main checkout* (it owns the .git the worktree links
-// to). execFile with arg arrays — no shell; owner/repo/number are validated upstream.
+// Workspace worktrees (docs/workspaces 05): a workspace edits its branch in an isolated git
+// worktree instead of dirtying the main checkout, and we get a clean cleanup affordance. Worktrees
+// live under the app data dir, keyed by branch. All git runs in the *main checkout* (it owns the
+// .git the worktree links to). execFile with arg arrays — no shell; owner/repo are validated
+// upstream, the branch is slugged for the dir name and isContainedPath guards the result.
+
+async function branchExists(checkout: string, branch: string): Promise<boolean> {
+  try {
+    await exec('git', ['-C', checkout, 'rev-parse', '--verify', '--quiet', `refs/heads/${branch}`], { timeout: 10_000 })
+    return true
+  } catch {
+    return false
+  }
+}
+
+// Lazy on first terminal (Flow C). For a PR workspace, check out the PR head detached (robust for
+// forks). For a local-first workspace, reuse the branch if it exists else create it from HEAD.
+// A branch name safe to pass to git as a positional: no leading dash (so it can't be read as a
+// flag) and only git-legal ref chars. The dir name is slugged separately; this guards the *git arg*.
+const isValidBranch = (branch: string): boolean => !branch.startsWith('-') && /^[A-Za-z0-9._/-]+$/.test(branch)
 
 export async function ensureWorktree(
   worktreesRoot: string,
   checkout: string,
   owner: string,
   repo: string,
-  number: number,
+  branch: string,
+  pullNumber: number | null,
 ): Promise<WorktreeResult> {
-  const path = join(worktreesRoot, worktreeDirName(owner, repo, number))
+  if (!isValidBranch(branch)) return { ok: false, reason: 'Invalid branch name.' }
+  const path = join(worktreesRoot, worktreeBranchDirName(owner, repo, branch))
   // Defense in depth: never operate on a path that escaped the worktrees root (handler validates
   // identifiers too, vNext §11).
   if (!isContainedPath(worktreesRoot, path)) return { ok: false, reason: 'Invalid worktree path.' }
   if (existsSync(path)) return { ok: true, path } // reuse
 
-  // Fetch the PR head (uses the user's existing git credentials for this checkout).
-  try {
-    await exec('git', ['-C', checkout, 'fetch', 'origin', `pull/${number}/head`], { timeout: 60_000 })
-  } catch {
-    return { ok: false, reason: `Could not fetch pull/${number}/head.` }
+  mkdirSync(worktreesRoot, { recursive: true })
+
+  if (pullNumber != null) {
+    // PR workspace: fetch the head (uses the checkout's git credentials) and check it out detached —
+    // no branch name to collide with the main checkout. `--` ends option parsing before positionals.
+    try {
+      await exec('git', ['-C', checkout, 'fetch', 'origin', `pull/${pullNumber}/head`], { timeout: 60_000 })
+    } catch {
+      return { ok: false, reason: `Could not fetch pull/${pullNumber}/head.` }
+    }
+    try {
+      await exec('git', ['-C', checkout, 'worktree', 'add', '--detach', '--', path, 'FETCH_HEAD'], { timeout: 60_000 })
+    } catch {
+      return { ok: false, reason: 'Could not create the worktree.' }
+    }
+    return { ok: true, path }
   }
 
-  mkdirSync(worktreesRoot, { recursive: true })
-  // Detached checkout of the fetched head — no branch name to collide with the main checkout.
+  // Local-first workspace: add a worktree on the branch, creating it from HEAD if it's new. `--`
+  // ends option parsing so a branch/path can never be mistaken for a flag (argv-injection guard).
+  const args = (await branchExists(checkout, branch))
+    ? ['-C', checkout, 'worktree', 'add', '--', path, branch]
+    : ['-C', checkout, 'worktree', 'add', '-b', branch, '--', path]
   try {
-    await exec('git', ['-C', checkout, 'worktree', 'add', '--detach', path, 'FETCH_HEAD'], { timeout: 60_000 })
+    await exec('git', args, { timeout: 60_000 })
   } catch {
-    return { ok: false, reason: 'Could not create the worktree.' }
+    return { ok: false, reason: `Could not create a worktree for ${branch}.` }
   }
   return { ok: true, path }
 }
@@ -48,6 +80,17 @@ export async function worktreeDirty(path: string): Promise<boolean> {
     return isDirty(stdout)
   } catch {
     return false
+  }
+}
+
+// Dirty flag + changed-file count for the live rail/footer markers (docs/workspaces 02/05).
+export async function worktreePorcelain(path: string): Promise<{ dirty: boolean; count: number }> {
+  try {
+    const { stdout } = await exec('git', ['-C', path, 'status', '--porcelain'], { timeout: 10_000 })
+    const count = stdout.split('\n').filter((l) => l.trim().length > 0).length
+    return { dirty: count > 0, count }
+  } catch {
+    return { dirty: false, count: 0 }
   }
 }
 

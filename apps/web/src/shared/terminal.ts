@@ -10,11 +10,12 @@ export type TerminalSession = {
   status: 'running' | 'exited'
   idle: boolean // agent has produced no output for a while (vNext §3); always false for shells
   isWorktree: boolean // cwd is an isolated PR worktree (vNext §9); in-memory only, not persisted
+  workspaceId: string // → workspaces.id (docs/workspaces P2); a session always belongs to a workspace
   cwd: string
   command: string
   tmuxSession?: string
-  repo?: { owner: string; name: string }
-  pull?: { number: number }
+  repo?: { owner: string; name: string } // derived from the workspace join (main process)
+  pull?: { number: number } // derived from the workspace join (main process)
   cols: number
   rows: number
   createdAt: number
@@ -22,18 +23,36 @@ export type TerminalSession = {
 }
 
 export type CreateOpts = {
+  workspaceId: string // → workspaces.id (docs/workspaces P2); repo / branch / PR derive from it
   profileId?: string // defaults to the built-in 'shell'
   cwd?: string
   cols?: number
   rows?: number
   title?: string
   isWorktree?: boolean
-  repo?: { owner: string; name: string }
-  pull?: { number: number }
+  // Dev-server pane (docs/workspaces P5): run this command line via the user's shell instead of a
+  // profile binary, with `env` merged in (e.g. PORT). The command is user-configured per repo.
+  command?: string
+  env?: Record<string, string>
 }
 
-// Result of creating/removing a PR worktree (vNext §9). `reason` explains a failure for the UI.
+// Result of creating/removing a worktree (vNext §9). `reason` explains a failure for the UI.
 export type WorktreeResult = { ok: true; path: string } | { ok: false; reason: string }
+
+// Result of archiving a workspace (docs/workspaces 05). `reason` carries the guard refusal
+// (running sessions / dirty worktree) for the UI to surface.
+export type ArchiveResult = { ok: true } | { ok: false; reason: string }
+
+// Live worktree status for a workspace (docs/workspaces 02/05). `missing` = the workspace has a
+// worktreePath but the directory is gone (removed outside acorn) → needs repair. Computed in main
+// (git status --porcelain + an existence check) and polled by the rail / workspace footer.
+export type WorkspaceStatus = {
+  workspaceId: string
+  worktreePath: string | null
+  dirty: boolean
+  dirtyCount: number
+  missing: boolean
+}
 
 // A launchable profile as the renderer sees it (vNext §8). `available` is false when the command
 // isn't on PATH — the UI disables it. command/backend stay in main.
@@ -44,8 +63,9 @@ export type TerminalProfile = {
   available: boolean
 }
 
-// Local checkout mapping for a repo (vNext §9). Returned by repoPath.get / set.
-export type RepoPath = { owner: string; repo: string; path: string }
+// Local checkout mapping for a repo (vNext §9). Returned by repoPath.get / set. runCommand / devPort
+// are the per-repo dev-server config (docs/workspaces P5), null until configured.
+export type RepoPath = { owner: string; repo: string; path: string; runCommand: string | null; devPort: number | null }
 
 // Result of validating/saving a checkout path. `reason` explains a rejection for the UI.
 export type RepoPathResult = { ok: true; repoPath: RepoPath } | { ok: false; reason: string }

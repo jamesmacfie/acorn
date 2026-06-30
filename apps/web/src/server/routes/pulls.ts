@@ -1,4 +1,4 @@
-import { and, desc, eq, lt, ne, sql } from 'drizzle-orm'
+import { and, desc, eq, isNull, lt, ne, sql } from 'drizzle-orm'
 import { Hono } from 'hono'
 import { getDb, schema } from '../db'
 import { chunkRowsByColumnBudget } from '../db/batch'
@@ -139,6 +139,29 @@ export const pulls = new Hono<AppEnv>().get('/:owner/:repo/pulls', async (c) => 
       })
     }
     await db.delete(schema.pullRequests).where(and(scope, lt(schema.pullRequests.fetchedAt, now)))
+    // Flow B (docs/workspaces 02): a local-first workspace inherits a PR once one is opened for its
+    // branch. Match no-pullNumber active workspaces for this repo against the just-mirrored headRefs.
+    // Machine-scoped table (no userId); keyed by owner/repo name. Cheap: few workspaces, runs only
+    // on a real list refresh (not 304s).
+    const branchToPull = new Map<string, number>()
+    for (const p of body) if (p.head?.ref) branchToPull.set(p.head.ref, p.number)
+    if (branchToPull.size) {
+      const wsRows = await db
+        .select()
+        .from(schema.workspaces)
+        .where(
+          and(
+            eq(schema.workspaces.repoOwner, owner),
+            eq(schema.workspaces.repoName, repo),
+            eq(schema.workspaces.status, 'active'),
+            isNull(schema.workspaces.pullNumber),
+          ),
+        )
+      for (const w of wsRows) {
+        const num = branchToPull.get(w.branch)
+        if (num != null) await db.update(schema.workspaces).set({ pullNumber: num, updatedAt: now }).where(eq(schema.workspaces.id, w.id))
+      }
+    }
     await db
       .insert(schema.syncState)
       .values({ userId, resource, etag, fetchedAt: now })

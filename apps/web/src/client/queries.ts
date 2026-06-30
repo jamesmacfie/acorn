@@ -21,6 +21,10 @@ import {
   linearIssueRoute,
   linearIssuesKey,
   linearIssuesRoute,
+  linearProjectsKey,
+  linearProjectsRoute,
+  linearProjectIssuesKey,
+  linearProjectIssuesRoute,
   meKey,
   meRoute,
   mentionsKey,
@@ -43,6 +47,9 @@ import {
   repoLabelsRoute,
   reposKey,
   reposRoute,
+  workspacesKey,
+  workspacesRoute,
+  type Workspace,
   type Branch,
   type ClosedPullsPage,
   type Compare,
@@ -52,6 +59,8 @@ import {
   type LinearIssueDetail,
   type LinearIssuesRequest,
   type LinearIssuesResponse,
+  type LinearProjectsResponse,
+  type LinearProjectIssuesResponse,
   type Me,
   type Pull,
   type RunJobs,
@@ -78,8 +87,9 @@ export {
   pullsPrefixKey,
   reposKey,
   reposRefreshRoute,
+  workspacesKey,
 } from '../shared/api'
-export type { Branch, Check, Comment, Compare, CompareCommit, IntegrationsStatus, Label, LinearActivity, LinearComment, LinearIssueDetail, LinearIssueState, LinearIssueSummary, Me, Pull, PullCommit, PullDetail, PullFile, Repo, Review, Thread, ThreadComment } from '../shared/api'
+export type { Branch, Check, Comment, Compare, CompareCommit, IntegrationsStatus, Label, LinearActivity, LinearComment, LinearIssueDetail, LinearIssueState, LinearIssueSummary, Me, Pull, PullCommit, PullDetail, PullFile, Repo, Review, Thread, ThreadComment, Workspace, WorkspaceLink, WorkspaceSeed } from '../shared/api'
 
 type QueryContext = { signal?: AbortSignal }
 type PageQueryContext = QueryContext & { pageParam: number }
@@ -129,6 +139,14 @@ export const pinsOptions = (enabled: boolean) => ({
   queryKey: pinsKey,
   enabled,
   queryFn: async ({ signal }: QueryContext): Promise<number[]> => readJson<number[]>(pinsRoute, { signal }),
+})
+
+// Active workspaces for the rail (docs/workspaces P1). Source of truth is us; refetch on focus
+// keeps the dirty/PR-inherited markers fresh as the mirror syncs.
+export const workspacesOptions = (enabled: boolean) => ({
+  queryKey: workspacesKey,
+  enabled,
+  queryFn: async ({ signal }: QueryContext): Promise<Workspace[]> => readJson<Workspace[]>(workspacesRoute, { signal }),
 })
 
 export const prefsOptions = (enabled: boolean) => ({
@@ -241,6 +259,24 @@ export const linearIssuesOptions = (identifiers: string[], enabled: boolean) => 
       { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ identifiers } satisfies LinearIssuesRequest), signal },
       'linear_issues_failed',
     ),
+})
+
+// Linear projects for the per-repo picker (Linear source). Cached 5 min — projects change rarely.
+export const linearProjectsOptions = (enabled: boolean) => ({
+  queryKey: linearProjectsKey,
+  enabled,
+  staleTime: 5 * 60 * 1000,
+  queryFn: async ({ signal }: QueryContext): Promise<LinearProjectsResponse> => readJson<LinearProjectsResponse>(linearProjectsRoute, { signal }),
+})
+
+// Active issues for a repo's selected Linear projects (the Linear source browse). Refetch on mount
+// so it self-heals; the server reads live from Linear.
+export const linearProjectIssuesOptions = (projectIds: string[], enabled: boolean) => ({
+  queryKey: linearProjectIssuesKey(projectIds),
+  enabled,
+  refetchOnMount: 'always' as const,
+  queryFn: async ({ signal }: QueryContext): Promise<LinearProjectIssuesResponse> =>
+    readJson<LinearProjectIssuesResponse>(linearProjectIssuesRoute(projectIds), { signal }),
 })
 
 // Full ticket detail for the side panel. refetchOnMount:'always' + staleTime 0 → opening the panel

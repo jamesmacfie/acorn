@@ -7,6 +7,10 @@ import {
   ISSUE_ID_QUERY,
   ISSUES_QUERY,
   type LinearNode,
+  type LinearProjectNode,
+  PROJECTS_QUERY,
+  PROJECT_ISSUES_QUERY,
+  projectIssuesFilter,
   type Viewer,
   VIEWER_QUERY,
   issuesFilter,
@@ -16,7 +20,7 @@ import {
 } from '../linear'
 import type { AppEnv } from '../middleware/auth'
 import { decryptSecret, encryptSecret } from '../session'
-import type { LinearActivity, IntegrationsStatus, LinearIssueDetail, LinearIssuesRequest, LinearIssuesResponse } from '../../shared/api'
+import type { LinearActivity, IntegrationsStatus, LinearIssueDetail, LinearIssuesRequest, LinearIssuesResponse, LinearProjectIssue, LinearProjectIssuesResponse, LinearProjectsResponse } from '../../shared/api'
 
 const PROVIDER = 'linear'
 const ISSUES_STALE_AFTER_MS = 600_000 // 10 min — tickets change slower than PRs; panel forces fresh
@@ -123,6 +127,33 @@ export const integrations = new Hono<AppEnv>()
 
 // /api/linear — read Linear issues referenced from a PR. Per-user, cached in D1 (never shared KV).
 export const linear = new Hono<AppEnv>()
+  // Workspace projects for the per-repo picker (docs/workspaces — Linear source). Live read.
+  .get('/projects', async (c) => {
+    const user = c.get('user')
+    if (!user) return c.json({ error: 'unauthenticated' }, 401)
+    const key = await linearKey(c, user.login)
+    if (!key) return c.json({ error: 'linear_not_connected' }, 403)
+    const res = await linearFetch(key, PROJECTS_QUERY, {})
+    const err = linearError(res)
+    if (err) return c.json({ error: err.error }, err.status)
+    const { projects } = await linearData<{ projects: { nodes: LinearProjectNode[] } }>(res)
+    return c.json({ projects: projects.nodes.map((p) => ({ id: p.id, name: p.name })) } satisfies LinearProjectsResponse)
+  })
+  // Active issues for the given project ids (the Linear source browse). Live read, client caches.
+  .get('/project-issues', async (c) => {
+    const user = c.get('user')
+    if (!user) return c.json({ error: 'unauthenticated' }, 401)
+    const key = await linearKey(c, user.login)
+    if (!key) return c.json({ error: 'linear_not_connected' }, 403)
+    const ids = [...new Set((c.req.query('ids') ?? '').split(',').map((s) => s.trim()).filter(Boolean))]
+    if (!ids.length) return c.json({ issues: [] } satisfies LinearProjectIssuesResponse)
+    const res = await linearFetch(key, PROJECT_ISSUES_QUERY, { filter: projectIssuesFilter(ids) })
+    const err = linearError(res)
+    if (err) return c.json({ error: err.error }, err.status)
+    const { issues } = await linearData<{ issues: { nodes: LinearNode[] } }>(res)
+    const out: LinearProjectIssue[] = issues.nodes.map((n) => ({ ...toSummary(nodeToDetail(n)), branchName: n.branchName ?? null }))
+    return c.json({ issues: out } satisfies LinearProjectIssuesResponse)
+  })
   // Batch enrichment for the Integrations list: summaries, serve-then-revalidate (10-min TTL).
   .post('/issues', async (c) => {
     const user = c.get('user')

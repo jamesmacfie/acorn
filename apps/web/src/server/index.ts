@@ -17,6 +17,7 @@ import { pullsBatch } from './routes/pullsBatch'
 import { mentions } from './routes/mentions'
 import { repos } from './routes/repos'
 import { repoLabels } from './routes/repoLabels'
+import { workspaces } from './routes/workspaces'
 
 // One server, both /auth and /api. The Node/Electron bootstrap (main/server.ts) wraps this with
 // static asset serving + SPA fallback. createApp() is a factory so the bootstrap can build a fresh
@@ -29,6 +30,7 @@ export function createApp() {
     .route('/api/me', me)
     .route('/api/pins', pins)
     .route('/api/prefs', prefs)
+    .route('/api/workspaces', workspaces)
     .route('/api/integrations', integrations) // connect/disconnect/status for third-party providers
     .route('/api/linear', linear) // Linear issues referenced from a PR (read, cached per-user)
     .route('/api/repos', repos)

@@ -8,13 +8,11 @@ import { homedir } from 'node:os'
 import { eq } from 'drizzle-orm'
 import type { AppDatabase } from '../server/db'
 import { schema } from '../server/db'
-import type { CreateOpts, ServerMsg, TerminalSession } from '../shared/terminal'
+import type { ArchiveResult, CreateOpts, ServerMsg, TerminalSession, WorkspaceStatus } from '../shared/terminal'
 import {
   childEnv,
   clampDim,
   computeIdle,
-  isContainedPath,
-  isValidRepoIdent,
   parseTmuxSessions,
   resolveBackend,
   tmuxAttachArgs,
@@ -23,8 +21,8 @@ import {
   trimRing,
 } from './terminalUtils'
 import { getProfile, listProfiles, resolveCommand, tmuxAvailable } from './profiles'
-import { getRepoPath, setRepoPath } from './repoPaths'
-import { ensureWorktree, removeWorktree } from './worktrees'
+import { getRepoPath, setRepoPath, setRunConfig } from './repoPaths'
+import { ensureWorktree, removeWorktree, worktreePorcelain } from './worktrees'
 
 // vNext Phase 2: PTYs live in the main process. Sessions run on one of two backends —
 //  - node-pty: spawn the command directly. Survives a window reload (PTY is in main), not an app
@@ -43,6 +41,9 @@ type Session = {
 }
 
 const sessions = new Map<string, Session>()
+
+// Set once by registerTerminalIpc — where workspace worktrees are created (docs/workspaces 05).
+let worktreesRoot = ''
 
 const channel = (id: string) => `term:out:${id}`
 
@@ -79,8 +80,10 @@ const isDir = (p: string): boolean => {
 // --- tmux process plumbing (execFileSync with arg arrays — no shell, command is a fixed profile
 // binary, cwd is validated, name is acorn-<uuid>) ---
 
-function ensureTmuxSession(name: string, cwd: string, command: string) {
-  execFileSync('tmux', tmuxNewSessionArgs(name, cwd, command), { env: childEnv(), stdio: 'ignore' })
+function ensureTmuxSession(name: string, cwd: string, command: string, env: Record<string, string>) {
+  // tmux runs the command argument through the user's shell, so a full "pnpm dev" line works; env
+  // (e.g. PORT) is inherited by that shell (docs/workspaces P5).
+  execFileSync('tmux', tmuxNewSessionArgs(name, cwd, command), { env, stdio: 'ignore' })
 }
 
 function attachTmuxPty(name: string, cols: number, rows: number): IPty {
@@ -115,9 +118,7 @@ async function persistSession(db: AppDatabase, m: TerminalSession) {
     backend: m.backend,
     status: m.status,
     cwd: m.cwd,
-    repoOwner: m.repo?.owner ?? null,
-    repoName: m.repo?.name ?? null,
-    pullNumber: m.pull?.number ?? null,
+    workspaceId: m.workspaceId,
     command: m.command,
     argvJson: '[]',
     tmuxSession: m.tmuxSession ?? null,
@@ -129,6 +130,65 @@ async function persistSession(db: AppDatabase, m: TerminalSession) {
   })
 }
 
+const loadWorkspace = async (db: AppDatabase, id: string): Promise<typeof schema.workspaces.$inferSelect | undefined> => {
+  const [ws] = await db.select().from(schema.workspaces).where(eq(schema.workspaces.id, id))
+  return ws
+}
+
+// Live worktree status for every active workspace that has a worktree (docs/workspaces 02/05):
+// dirty + changed-file count via git, and `missing` when the dir vanished (removed outside acorn).
+async function computeWorkspaceStatuses(db: AppDatabase): Promise<WorkspaceStatus[]> {
+  const rows = (await db.select().from(schema.workspaces).where(eq(schema.workspaces.status, 'active'))).filter((w) => w.worktreePath)
+  return Promise.all(
+    rows.map(async (w) => {
+      const path = w.worktreePath!
+      if (!isDir(path)) return { workspaceId: w.id, worktreePath: path, dirty: false, dirtyCount: 0, missing: true }
+      const { dirty, count } = await worktreePorcelain(path)
+      return { workspaceId: w.id, worktreePath: path, dirty, dirtyCount: count, missing: false }
+    }),
+  )
+}
+
+// Startup reconciliation (docs/workspaces 05): flag any persisted worktree whose directory is gone
+// (manual rm) as needing repair. The rail/footer surface `missing` live; this just logs at boot.
+async function reconcileWorktrees(db: AppDatabase) {
+  try {
+    const missing = (await computeWorkspaceStatuses(db)).filter((s) => s.missing)
+    if (missing.length) console.warn(`[worktrees] ${missing.length} workspace worktree(s) missing on disk (needs repair): ${missing.map((m) => m.worktreePath).join(', ')}`)
+  } catch {
+    // best-effort — never block startup on status
+  }
+}
+
+// Repo / branch / PR context for a session, derived through the workspaceId → workspaces join
+// (docs/workspaces 03). The session row no longer denormalizes repo/pull; this is the single read.
+function workspaceContext(ws: typeof schema.workspaces.$inferSelect | undefined): Pick<TerminalSession, 'repo' | 'pull'> {
+  if (!ws) return {}
+  return {
+    repo: { owner: ws.repoOwner, name: ws.repoName },
+    pull: ws.pullNumber != null ? { number: ws.pullNumber } : undefined,
+  }
+}
+
+// Lazy worktree on first terminal (Flow C, docs/workspaces 05). Reuse the workspace's worktree if
+// it's set and still on disk; otherwise create one from the base checkout, keyed by branch, and
+// persist worktreePath on the workspace. Returns the cwd + whether it's an isolated worktree. On
+// any failure (no checkout mapped, git error) it degrades to the base checkout so the terminal
+// still opens — the workspace just doesn't gain isolation until the next try.
+// ponytail: graceful fallback over a hard error; the dirty/teardown guards still key off worktreePath.
+async function resolveWorkspaceCwd(
+  db: AppDatabase,
+  ws: typeof schema.workspaces.$inferSelect | undefined,
+  baseCheckout: string | undefined,
+): Promise<{ cwd: string; isWorktree: boolean }> {
+  if (ws?.worktreePath && isDir(ws.worktreePath)) return { cwd: ws.worktreePath, isWorktree: true }
+  if (!ws || !baseCheckout || !isDir(baseCheckout)) return { cwd: baseCheckout && isDir(baseCheckout) ? baseCheckout : homedir(), isWorktree: false }
+  const wt = await ensureWorktree(worktreesRoot, baseCheckout, ws.repoOwner, ws.repoName, ws.branch, ws.pullNumber)
+  if (!wt.ok) return { cwd: baseCheckout, isWorktree: false }
+  await db.update(schema.workspaces).set({ worktreePath: wt.path, updatedAt: Date.now() }).where(eq(schema.workspaces.id, ws.id))
+  return { cwd: wt.path, isWorktree: true }
+}
+
 async function markExited(db: AppDatabase, id: string, exitCode: number | null) {
   await db
     .update(schema.terminalSessions)
@@ -138,7 +198,7 @@ async function markExited(db: AppDatabase, id: string, exitCode: number | null) 
 
 const deleteRow = (db: AppDatabase, id: string) => db.delete(schema.terminalSessions).where(eq(schema.terminalSessions.id, id))
 
-function rowToMeta(row: typeof schema.terminalSessions.$inferSelect): TerminalSession {
+function rowToMeta(row: typeof schema.terminalSessions.$inferSelect, ctx: Pick<TerminalSession, 'repo' | 'pull'>): TerminalSession {
   return {
     id: row.id,
     title: row.title,
@@ -148,11 +208,12 @@ function rowToMeta(row: typeof schema.terminalSessions.$inferSelect): TerminalSe
     status: 'running', // only called for sessions whose tmux is alive
     idle: false,
     isWorktree: false, // not persisted; a reconciled session loses its worktree-cleanup affordance
+    workspaceId: row.workspaceId,
     cwd: row.cwd,
     command: row.command,
     tmuxSession: row.tmuxSession ?? undefined,
-    repo: row.repoOwner && row.repoName ? { owner: row.repoOwner, name: row.repoName } : undefined,
-    pull: row.pullNumber != null ? { number: row.pullNumber } : undefined,
+    repo: ctx.repo,
+    pull: ctx.pull,
     cols: row.cols,
     rows: row.rows,
     createdAt: row.createdAt,
@@ -202,10 +263,17 @@ function startIdleWatch() {
 
 async function create(db: AppDatabase, opts: CreateOpts): Promise<TerminalSession> {
   const profile = getProfile(opts.profileId)
-  const command = resolveCommand(profile)
+  // Dev-server pane (docs/workspaces P5): a command override runs via the user's shell with env
+  // (PORT) merged in; otherwise the profile's binary. resolveCommand stays the path for shells/agents.
+  const command = opts.command?.trim() || resolveCommand(profile)
+  const env = opts.env ? { ...childEnv(), ...opts.env } : childEnv()
   const backend = resolveBackend(profile.backendPreference, tmuxAvailable())
-  // Validate at the boundary: cwd must be an existing absolute dir, else fall back to $HOME.
-  const cwd = opts.cwd && isAbsolute(opts.cwd) && isDir(opts.cwd) ? opts.cwd : homedir()
+  // The renderer passes the base checkout as opts.cwd (validated at the boundary); the worktree is
+  // derived from it. Lazy worktree on first terminal, reused after (docs/workspaces Flow C).
+  const baseCheckout = opts.cwd && isAbsolute(opts.cwd) && isDir(opts.cwd) ? opts.cwd : undefined
+  const ws = await loadWorkspace(db, opts.workspaceId)
+  const ctx = workspaceContext(ws)
+  const { cwd, isWorktree } = await resolveWorkspaceCwd(db, ws, baseCheckout)
   const cols = clampDim(opts.cols, 80)
   const rows = clampDim(opts.rows, 24)
   const id = randomUUID()
@@ -218,12 +286,13 @@ async function create(db: AppDatabase, opts: CreateOpts): Promise<TerminalSessio
     backend,
     status: 'running',
     idle: false,
-    isWorktree: !!opts.isWorktree,
+    isWorktree,
+    workspaceId: opts.workspaceId,
     cwd,
     command,
     tmuxSession: backend === 'tmux' ? tmuxName(id) : undefined,
-    repo: opts.repo,
-    pull: opts.pull,
+    repo: ctx.repo,
+    pull: ctx.pull,
     cols,
     rows,
     createdAt: Date.now(),
@@ -232,11 +301,14 @@ async function create(db: AppDatabase, opts: CreateOpts): Promise<TerminalSessio
 
   let pty: IPty
   if (backend === 'tmux') {
-    ensureTmuxSession(meta.tmuxSession!, cwd, command)
+    ensureTmuxSession(meta.tmuxSession!, cwd, command, env)
     pty = attachTmuxPty(meta.tmuxSession!, cols, rows)
     await persistSession(db, meta)
+  } else if (opts.command) {
+    // No tmux: run the command line through a login shell so PATH/nvm resolve "pnpm" etc.
+    pty = spawn(env.SHELL || '/bin/sh', ['-lc', command], { name: 'xterm-256color', cols, rows, cwd, env })
   } else {
-    pty = spawn(command, [], { name: 'xterm-256color', cols, rows, cwd, env: childEnv() })
+    pty = spawn(command, [], { name: 'xterm-256color', cols, rows, cwd, env })
   }
   wireSession(db, meta, pty)
   return meta
@@ -262,7 +334,7 @@ async function reconcileTmux(db: AppDatabase) {
   const alive = tmuxAvailable() ? listTmuxSessions() : new Set<string>()
   for (const row of rows) {
     if (row.backend === 'tmux' && row.tmuxSession && alive.has(row.tmuxSession)) {
-      const meta = rowToMeta(row)
+      const meta = rowToMeta(row, workspaceContext(await loadWorkspace(db, row.workspaceId)))
       wireSession(db, meta, attachTmuxPty(row.tmuxSession, row.cols, row.rows))
     } else {
       await deleteRow(db, row.id)
@@ -273,6 +345,7 @@ async function reconcileTmux(db: AppDatabase) {
 // Registered once at app start. Every payload is validated here — the renderer is the less-trusted
 // side (vNext §5, §11). Exited sessions linger until explicitly removed (term:remove).
 export async function registerTerminalIpc(db: AppDatabase, worktreesDir: string) {
+  worktreesRoot = worktreesDir
   ipcMain.handle('term:list', () => [...sessions.values()].map((s) => s.meta))
 
   ipcMain.handle('term:profiles', () => listProfiles())
@@ -310,26 +383,43 @@ export async function registerTerminalIpc(db: AppDatabase, worktreesDir: string)
     setRepoPath(db, p.owner, p.repo, p.path),
   )
 
-  // Worktrees resolve the checkout from repo_paths in main — the renderer only names the PR.
-  // Validate identifiers before they touch the filesystem (path-traversal guard, vNext §11).
-  ipcMain.handle('term:worktree:ensure', async (_e: IpcMainInvokeEvent, p: { owner: string; repo: string; number: number }) => {
-    if (!isValidRepoIdent(p?.owner) || !isValidRepoIdent(p?.repo) || !Number.isInteger(p?.number) || p.number <= 0) {
-      return { ok: false, reason: 'Invalid repo identifiers.' }
-    }
-    const mapped = await getRepoPath(db, p.owner, p.repo)
-    if (!mapped) return { ok: false, reason: 'No local checkout mapped for this repo.' }
-    return ensureWorktree(worktreesDir, mapped.path, p.owner, p.repo, p.number)
-  })
+  ipcMain.handle('term:repoPath:runConfig', (_e: IpcMainInvokeEvent, p: { owner: string; repo: string; runCommand: string; devPort: number }) =>
+    setRunConfig(db, p.owner, p.repo, p.runCommand, p.devPort),
+  )
 
-  ipcMain.handle('term:worktree:remove', async (_e: IpcMainInvokeEvent, p: { owner: string; repo: string; path: string; force?: boolean }) => {
-    if (!isValidRepoIdent(p?.owner) || !isValidRepoIdent(p?.repo)) return { ok: false, reason: 'Invalid repo identifiers.' }
-    // The path is renderer-supplied: only ever remove something inside our worktrees dir.
-    if (typeof p.path !== 'string' || !isContainedPath(worktreesDir, p.path)) {
-      return { ok: false, reason: 'Refusing to remove a path outside the worktrees directory.' }
+  // Archive a workspace with the lifecycle guard (docs/workspaces 05): the ONLY path allowed to
+  // tear a worktree down, and never automatic. Refuse while sessions run or the worktree is dirty;
+  // otherwise remove the worktree and mark the row archived (kept for history). Worktree removal +
+  // the running-session check both need main (git + the in-memory session map), so this is IPC, not
+  // an HTTP route.
+  ipcMain.handle('term:workspace:statuses', () => computeWorkspaceStatuses(db))
+
+  ipcMain.handle('term:workspace:archive', async (_e: IpcMainInvokeEvent, id: string): Promise<ArchiveResult> => {
+    if (typeof id !== 'string' || !id) return { ok: false, reason: 'Invalid workspace.' }
+    const running = [...sessions.values()].filter((s) => s.meta.workspaceId === id && s.meta.status === 'running')
+    if (running.length) return { ok: false, reason: `Stop ${running.length} running session${running.length > 1 ? 's' : ''} first.` }
+    const ws = await loadWorkspace(db, id)
+    if (!ws) return { ok: false, reason: 'Workspace not found.' }
+    if (ws.worktreePath) {
+      const mapped = await getRepoPath(db, ws.repoOwner, ws.repoName)
+      if (mapped) {
+        const res = await removeWorktree(mapped.path, ws.worktreePath, false) // refuses a dirty tree
+        if (!res.ok) return res
+      }
+      // No mapped checkout → can't git-remove; we still archive and drop the (now-orphaned) reference.
     }
-    const mapped = await getRepoPath(db, p.owner, p.repo)
-    if (!mapped) return { ok: false, reason: 'No local checkout mapped for this repo.' }
-    return removeWorktree(mapped.path, p.path, !!p.force)
+    // Drop any lingering exited sessions for this workspace so their rows don't outlive it.
+    for (const [sid, s] of sessions) {
+      if (s.meta.workspaceId === id) {
+        sessions.delete(sid)
+        if (s.meta.backend === 'tmux') await deleteRow(db, sid)
+      }
+    }
+    await db
+      .update(schema.workspaces)
+      .set({ status: 'archived', archivedAt: Date.now(), worktreePath: null, updatedAt: Date.now() })
+      .where(eq(schema.workspaces.id, id))
+    return { ok: true }
   })
 
   ipcMain.handle('term:resize', (_e: IpcMainInvokeEvent, p: { id: string; cols: number; rows: number }) => {
@@ -364,5 +454,6 @@ export async function registerTerminalIpc(db: AppDatabase, worktreesDir: string)
   })
 
   await reconcileTmux(db)
+  await reconcileWorktrees(db)
   startIdleWatch()
 }
