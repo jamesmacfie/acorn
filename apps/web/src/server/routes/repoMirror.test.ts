@@ -1,5 +1,4 @@
 import { Hono } from 'hono'
-import type { ExecutionContext } from 'hono'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { getDb } from '../db'
 import { gh } from '../github'
@@ -7,7 +6,7 @@ import type { AppEnv } from '../middleware/auth'
 import { STALE_AFTER_MS as FILES_STALE_AFTER_MS } from './prMirror'
 import { pullFiles } from './pullFiles'
 import { repos } from './repos'
-import { REPOS_STALE_AFTER_MS, resolveRepoForUser } from './repoMirror'
+import { REPOS_STALE_AFTER_MS, resolveRepoForUser, settleBackground } from './repoMirror'
 
 vi.mock('../db', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../db')>()
@@ -159,12 +158,8 @@ describe('repos stale-while-revalidate', () => {
     })
     app.route('/api/repos', repos)
 
-    const scheduled: Promise<unknown>[] = []
-    const waitUntil = vi.fn((promise: Promise<unknown>) => {
-      scheduled.push(promise)
-    })
     const response = await Promise.race([
-      app.fetch(new Request('http://acorn.test/api/repos'), {} as Env, { waitUntil } as unknown as ExecutionContext),
+      app.fetch(new Request('http://acorn.test/api/repos'), {} as Env),
       new Promise<null>((resolve) => setTimeout(() => resolve(null), 20)),
     ])
 
@@ -179,11 +174,10 @@ describe('repos stale-while-revalidate', () => {
         pushedAt: Date.parse('2026-06-25T01:00:00Z'),
       },
     ])
-    expect(waitUntil).toHaveBeenCalledTimes(1)
     expect(gh).toHaveBeenCalledWith('token', '/user/repos?sort=pushed&direction=desc&per_page=100')
 
     resolveGh(responseJson([]))
-    await scheduled[0]
+    await settleBackground()
   })
 })
 
@@ -228,16 +222,11 @@ describe('pull files stale-while-revalidate', () => {
     app.route('/api/repos', pullFiles)
 
     const blobGet = vi.fn()
-    const scheduled: Promise<unknown>[] = []
-    const waitUntil = vi.fn((promise: Promise<unknown>) => {
-      scheduled.push(promise)
-    })
 
     const response = await Promise.race([
       app.fetch(
         new Request('http://acorn.test/api/repos/Runn-Fast/runn/pulls/12/files?summary=1'),
         { BLOBS: { get: blobGet, put: vi.fn() } } as unknown as Env,
-        { waitUntil } as unknown as ExecutionContext,
       ),
       new Promise<null>((resolve) => setTimeout(() => resolve(null), 20)),
     ])
@@ -255,11 +244,10 @@ describe('pull files stale-while-revalidate', () => {
       },
     ])
     expect(blobGet).not.toHaveBeenCalled()
-    expect(waitUntil).toHaveBeenCalledTimes(1)
     expect(gh).toHaveBeenCalledWith('token', '/repos/Runn-Fast/runn/pulls/12/files?per_page=100')
 
     resolveGh(responseJson([{ filename: 'src/app.ts', status: 'modified', additions: 3, deletions: 1, sha: 'abc123', patch: '@@' }]))
-    await scheduled[0]
+    await settleBackground()
   })
 
   it('returns stale requested patches in request order and refreshes in waitUntil', async () => {
@@ -309,10 +297,6 @@ describe('pull files stale-while-revalidate', () => {
     app.route('/api/repos', pullFiles)
 
     const blobGet = vi.fn(async (key: string) => (key === 'patch:sha-a' ? '@@ a' : '@@ b'))
-    const scheduled: Promise<unknown>[] = []
-    const waitUntil = vi.fn((promise: Promise<unknown>) => {
-      scheduled.push(promise)
-    })
 
     const response = await Promise.race([
       app.fetch(
@@ -322,7 +306,6 @@ describe('pull files stale-while-revalidate', () => {
           body: JSON.stringify({ paths: ['src/a.ts', 'src/b.ts'] }),
         }),
         { BLOBS: { get: blobGet, put: vi.fn() } } as unknown as Env,
-        { waitUntil } as unknown as ExecutionContext,
       ),
       new Promise<null>((resolve) => setTimeout(() => resolve(null), 20)),
     ])
@@ -349,7 +332,6 @@ describe('pull files stale-while-revalidate', () => {
       },
     ])
     expect(blobGet).toHaveBeenCalledTimes(2)
-    expect(waitUntil).toHaveBeenCalledTimes(1)
     expect(gh).toHaveBeenCalledWith('token', '/repos/Runn-Fast/runn/pulls/12/files?per_page=100')
 
     resolveGh(
@@ -358,6 +340,6 @@ describe('pull files stale-while-revalidate', () => {
         { filename: 'src/b.ts', status: 'modified', additions: 1, deletions: 1, sha: 'sha-b', patch: '@@ b' },
       ]),
     )
-    await scheduled[0]
+    await settleBackground()
   })
 })

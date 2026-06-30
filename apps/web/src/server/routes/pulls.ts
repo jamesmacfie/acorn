@@ -160,7 +160,7 @@ export const pulls = new Hono<AppEnv>().get('/:owner/:repo/pulls', async (c) => 
   // Stale but cached → serve immediately and revalidate in the background, unless forced.
   if (!force && sync) {
     const cached = await readPublicRows()
-    waitUntilLogged(c.executionCtx, `pulls:${owner}/${repo}`, revalidate())
+    waitUntilLogged(`pulls:${owner}/${repo}`, revalidate())
     return c.json(cached)
   }
 

@@ -69,7 +69,7 @@ const handleFilesRead = async (c: Context<AppEnv>, options: { summaryOnly?: bool
 
   if (sync) {
     const cached = await readCached()
-    waitUntilLogged(c.executionCtx, `files:${owner}/${repo}#${number}`, refresh())
+    waitUntilLogged(`files:${owner}/${repo}#${number}`, refresh())
     return c.json(cached)
   }
 

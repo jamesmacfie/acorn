@@ -65,7 +65,7 @@ export const pullDetail = new Hono<AppEnv>().get('/:owner/:repo/pulls/:number', 
   if (sync) {
     const cached = await readComposite(db, key)
     if (cached.pull) {
-      waitUntilLogged(c.executionCtx, `pull:${owner}/${repo}#${number}`, refresh())
+      waitUntilLogged(`pull:${owner}/${repo}#${number}`, refresh())
       return c.json(cached)
     }
   }
