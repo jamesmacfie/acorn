@@ -1,38 +1,50 @@
 import { createSignal, For, Show } from 'solid-js'
 import { useNavigate, useParams } from '@solidjs/router'
 import { createQuery, useQueryClient } from '@tanstack/solid-query'
-import { integrationsOptions, pullDetailOptions, workspacesKey, workspacesOptions, type Workspace } from '../../queries'
-import { archiveWorkspace, createWorkspace, renameWorkspace } from '../../mutations'
+import { integrationsOptions, pullDetailOptions, tasksKey, tasksOptions, workspacesOptions, type Task } from '../../queries'
+import { archiveTask, createTask, renameTask } from '../../mutations'
 import { checksState } from '../../displayMeta'
-import { activeWorkspaceId, selectedSource, setActivePane, setActiveWorkspaceId, setSelectedSource, type SourceId } from '../workspaces/workspaces'
-import { workspaceStatus } from '../workspaces/workspaceStatus'
+import { activeTaskId, selectedSource, setActivePane, setActiveTaskId, setSelectedSource, type SourceId } from '../tasks/tasks'
+import { taskStatus } from '../tasks/taskStatus'
+import { workspaceForRepo } from '../workspaces/activeWorkspace'
 import { terminalApi } from '../terminal/terminalClient'
 import './tabrail.css'
 
-// The Workspaces zone of the left rail (docs/workspaces P1/P2). Rows are real Workspace entities
-// (not path bookmarks). Clicking a row makes it active and navigates to its repo/PR; clicking the
-// active row opens a popover to rename or archive it. ponytail: create/rename use a small modal
-// reusing the shared .overlay shell — the richer promotion flows (PR rows → workspace, local-first
-// new branch) land in P3/P4. (Electron's BrowserWindow has no window.prompt, so we can't shortcut.)
+// The Tasks zone of the left rail (docs/workspaces). Rows are real Task entities (not path
+// bookmarks). Clicking a row makes it active and navigates to its repo/PR; clicking the active row
+// opens a popover to rename or archive it. ponytail: create/rename use a small modal reusing the
+// shared .overlay shell. (Electron's BrowserWindow has no window.prompt, so we can't shortcut.)
 
 // Origin → glyph; cosmetic, replaces the old cycled icon.
-const ORIGIN_GLYPH: Record<Workspace['origin'], string> = { 'github-pr': '⌥', linear: '◷', rollbar: '◍', local: '●' }
+const ORIGIN_GLYPH: Record<Task['origin'], string> = { 'github-pr': '⌥', linear: '◷', rollbar: '◍', local: '●' }
 
-type Draft = { mode: 'new' } | { mode: 'rename'; w: Workspace }
+type Draft = { mode: 'new' } | { mode: 'rename'; w: Task }
 
 export default function TabRail() {
   const navigate = useNavigate()
   const params = useParams()
   const queryClient = useQueryClient()
-  const query = createQuery(() => workspacesOptions(true))
+  const query = createQuery(() => tasksOptions(true))
+  const workspaces = createQuery(() => workspacesOptions(true))
   const integrations = createQuery(() => integrationsOptions(true))
   const [menuId, setMenuId] = createSignal<string | null>(null)
   const [draft, setDraft] = createSignal<Draft | null>(null)
   const [text, setText] = createSignal('')
+  const [newRepo, setNewRepo] = createSignal('') // "owner/name" for the new-task repo selector
 
-  const invalidate = () => queryClient.invalidateQueries({ queryKey: workspacesKey })
+  const invalidate = () => queryClient.invalidateQueries({ queryKey: tasksKey })
 
-  function pathFor(w: Workspace): string {
+  // Scope the rail to the active workspace (partition: derived from the current repo). Tasks whose
+  // repo isn't in the active workspace are hidden so switching workspaces swaps the roster.
+  const activeWorkspace = () => workspaceForRepo(workspaces.data, params.owner, params.repo)
+  const visibleTasks = () => {
+    const ws = activeWorkspace()
+    if (!ws) return query.data ?? []
+    const set = new Set((ws.repos ?? []).map((r) => `${r.owner}/${r.name}`))
+    return (query.data ?? []).filter((t) => set.has(`${t.repoOwner}/${t.repoName}`))
+  }
+
+  function pathFor(w: Task): string {
     return `/${w.repoOwner}/${w.repoName}${w.pullNumber != null ? `/${w.pullNumber}` : ''}`
   }
 
@@ -47,29 +59,33 @@ export default function TabRail() {
     setSelectedSource(id)
   }
 
-  function onRowClick(w: Workspace) {
-    if (w.id === activeWorkspaceId() && !selectedSource()) {
+  function onRowClick(w: Task) {
+    if (w.id === activeTaskId() && !selectedSource()) {
       setMenuId((v) => (v === w.id ? null : w.id))
       return
     }
     setMenuId(null)
     setSelectedSource(null)
-    setActiveWorkspaceId(w.id)
+    setActiveTaskId(w.id)
     setActivePane(w.pullNumber != null ? 'pr' : w.links.some((l) => l.provider === 'linear') ? 'linear' : 'pr')
     navigate(pathFor(w))
   }
 
   function openNew() {
     setMenuId(null)
-    if (!params.owner || !params.repo) {
-      window.alert('Open a repo first, then create a workspace for it.')
+    const repos = activeWorkspace()?.repos ?? []
+    if (!repos.length) {
+      window.alert('This workspace has no repos yet. Add one in the workspace setup first.')
       return
     }
+    // Default the repo to the current one if it's in this workspace, else the first.
+    const cur = `${params.owner}/${params.repo}`
+    setNewRepo(repos.some((r) => `${r.owner}/${r.name}` === cur) ? cur : `${repos[0].owner}/${repos[0].name}`)
     setText('')
     setDraft({ mode: 'new' })
   }
 
-  function openRename(w: Workspace) {
+  function openRename(w: Task) {
     setMenuId(null)
     setText(w.title)
     setDraft({ mode: 'rename', w })
@@ -81,16 +97,16 @@ export default function TabRail() {
     const value = text().trim()
     if (!d || !value) return setDraft(null)
     if (d.mode === 'new') {
-      const { owner, repo } = params
+      const [owner, repo] = newRepo().split('/')
       if (!owner || !repo) return setDraft(null)
-      const w = await createWorkspace({ origin: 'local', repoOwner: owner, repoName: repo, branch: value })
+      const w = await createTask({ origin: 'local', repoOwner: owner, repoName: repo, branch: value })
       await invalidate()
       setSelectedSource(null)
-      setActiveWorkspaceId(w.id)
+      setActiveTaskId(w.id)
       setActivePane('pr')
       navigate(pathFor(w))
     } else if (value !== d.w.title) {
-      await renameWorkspace(d.w.id, value)
+      await renameTask(d.w.id, value)
       await invalidate()
     }
     setDraft(null)
@@ -98,19 +114,19 @@ export default function TabRail() {
 
   // Archive runs through the guarded main-process teardown when on desktop (refuses while sessions
   // run or the worktree is dirty, removes the worktree); falls back to the plain HTTP flip otherwise.
-  async function onArchive(w: Workspace) {
+  async function onArchive(w: Task) {
     setMenuId(null)
     if (!window.confirm(`Archive "${w.title}"?`)) return
     const api = terminalApi()
     if (api) {
-      const res = await api.workspace.archive(w.id)
+      const res = await api.task.archive(w.id)
       if (!res.ok) return window.alert(res.reason)
     } else {
-      await archiveWorkspace(w.id)
+      await archiveTask(w.id)
     }
-    if (activeWorkspaceId() === w.id) {
-      setActiveWorkspaceId(null)
-      setSelectedSource('github') // archived the active workspace → fall back to the GitHub browse
+    if (activeTaskId() === w.id) {
+      setActiveTaskId(null)
+      setSelectedSource('github') // archived the active task → fall back to the GitHub browse
     }
     await invalidate()
   }
@@ -134,18 +150,18 @@ export default function TabRail() {
       </div>
       <div class="tabrail-sep" />
       <div class="tabrail-list">
-        <For each={query.data ?? []}>
+        <For each={visibleTasks()}>
           {(w) => {
             // PR checks dot (warmed/fetched detail) and live worktree status (dirty / vanished).
             const detail = createQuery(() => pullDetailOptions(w.repoOwner, w.repoName, w.pullNumber != null ? String(w.pullNumber) : '', w.pullNumber != null))
             const checks = () => detail.data?.checks ?? []
-            const st = () => workspaceStatus(w.id)
+            const st = () => taskStatus(w.id)
             return (
             <div class="tabrail-item">
               <button
                 type="button"
                 class="tabrail-tab"
-                classList={{ active: !selectedSource() && w.id === activeWorkspaceId() }}
+                classList={{ active: !selectedSource() && w.id === activeTaskId() }}
                 title={w.title}
                 onClick={() => onRowClick(w)}
               >
@@ -177,24 +193,29 @@ export default function TabRail() {
           }}
         </For>
       </div>
-      <button type="button" class="tabrail-add" title="New workspace" onClick={openNew}>
+      <button type="button" class="tabrail-add" title="New task" onClick={openNew}>
         +
       </button>
       <Show when={draft()}>
         {(d) => (
           <div class="overlay-backdrop" onClick={() => setDraft(null)}>
             <div class="overlay" role="dialog" aria-modal="true" onClick={(e) => e.stopPropagation()}>
-              <div class="overlay-title">{d().mode === 'new' ? 'New workspace' : 'Rename workspace'}</div>
+              <div class="overlay-title">{d().mode === 'new' ? 'New task' : 'Rename task'}</div>
               <div class="overlay-body">
                 <Show when={d().mode === 'new'}>
-                  <p class="muted">A local-first workspace on a new branch in {params.owner}/{params.repo}.</p>
+                  <p class="muted">A local-first task on a new branch.</p>
+                  <select class="integration-key-input" value={newRepo()} onChange={(e) => setNewRepo(e.currentTarget.value)}>
+                    <For each={activeWorkspace()?.repos ?? []}>
+                      {(r) => <option value={`${r.owner}/${r.name}`}>{r.owner}/{r.name}</option>}
+                    </For>
+                  </select>
                 </Show>
                 <form class="integration-key-row" onSubmit={submitDraft}>
                   <input
                     class="integration-key-input"
                     type="text"
                     autofocus
-                    placeholder={d().mode === 'new' ? 'feat/my-branch' : 'Workspace name'}
+                    placeholder={d().mode === 'new' ? 'feat/my-branch' : 'Task name'}
                     value={text()}
                     onInput={(e) => setText(e.currentTarget.value)}
                     onKeyDown={(e) => e.key === 'Escape' && setDraft(null)}

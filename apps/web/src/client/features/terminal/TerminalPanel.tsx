@@ -1,7 +1,7 @@
 import { createEffect, createMemo, createSignal, For, onMount, Show } from 'solid-js'
 import { Portal } from 'solid-js/web'
 import { createQuery } from '@tanstack/solid-query'
-import { prefsOptions, type Workspace } from '../../queries'
+import { prefsOptions, type Task } from '../../queries'
 import { setPref } from '../../mutations'
 import { terminalApi } from './terminalClient'
 import { refreshSessions, sessions } from './sessions'
@@ -11,12 +11,12 @@ import './terminal.css'
 
 // vNext Phase 2: a bottom drawer of persistent local sessions. The "+" opens a profile menu
 // (Shell / Claude Code / Codex / Aider, disabled when not on PATH); agents start in the active
-// workspace's mapped checkout (prompting for the path if unmapped — §9) on a durable tmux backend.
-// docs/workspaces P2: sessions are scoped to the active workspace, not the URL — switching
-// workspaces swaps the visible terminals.
-export default function TerminalPanel(props: { onClose: () => void; workspace: Workspace | null }) {
+// task's mapped checkout (prompting for the path if unmapped — §9) on a durable tmux backend.
+// docs/workspaces: sessions are scoped to the active task, not the URL — switching tasks swaps the
+// visible terminals.
+export default function TerminalPanel(props: { onClose: () => void; task: Task | null }) {
   const api = terminalApi()
-  const ws = () => props.workspace
+  const ws = () => props.task
   const prefs = createQuery(() => prefsOptions(true))
 
   const [profiles, setProfiles] = createSignal<TerminalProfile[]>([])
@@ -30,14 +30,14 @@ export default function TerminalPanel(props: { onClose: () => void; workspace: W
   const [pathInput, setPathInput] = createSignal('')
   const [pathError, setPathError] = createSignal<string | null>(null)
 
-  // Scope the strip to the active workspace (docs/workspaces P2). A session opened in workspace A
+  // Scope the strip to the active task (docs/workspaces). A session opened in task A
   // never shows under B, regardless of the URL.
   const visibleSessions = createMemo(() => {
     const id = ws()?.id
-    return id ? sessions().filter((s) => s.workspaceId === id) : []
+    return id ? sessions().filter((s) => s.taskId === id) : []
   })
 
-  // Keep the active session in sync with what's visible (e.g. after switching workspaces).
+  // Keep the active session in sync with what's visible (e.g. after switching tasks).
   createEffect(() => {
     const vis = visibleSessions()
     if (!vis.some((s) => s.id === activeId())) setActiveId(vis[0]?.id ?? null)
@@ -84,15 +84,15 @@ export default function TerminalPanel(props: { onClose: () => void; workspace: W
     return ctx ? `${label} · ${ctx}` : label
   }
 
-  // Spawn into the active workspace. `checkout` is the base repo path; the main process derives the
-  // workspace's lazy worktree from it and cwds the session there (docs/workspaces Flow C).
+  // Spawn into the active task. `checkout` is the base repo path; the main process derives the
+  // task's lazy worktree from it and cwds the session there (docs/workspaces Flow C).
   async function spawn(profileId: string, checkout: string | undefined, owner?: string, repo?: string, number?: string) {
-    const workspaceId = ws()?.id
-    if (!api || !workspaceId) return
+    const taskId = ws()?.id
+    if (!api || !taskId) return
     setBusy(true)
     try {
       const s = await api.create({
-        workspaceId,
+        taskId,
         profileId,
         cwd: checkout,
         title: titleFor(profileId, owner, repo, number),
@@ -104,9 +104,9 @@ export default function TerminalPanel(props: { onClose: () => void; workspace: W
     }
   }
 
-  // Launch a profile in the active workspace's repo checkout, prompting for the local path the
-  // first time we see this repo (validated in main before we spawn). docs/workspaces P2: context
-  // comes from the workspace, not the URL; the worktree is created lazily in main (Flow C).
+  // Launch a profile in the active task's repo checkout, prompting for the local path the
+  // first time we see this repo (validated in main before we spawn). docs/workspaces: context
+  // comes from the task, not the URL; the worktree is created lazily in main (Flow C).
   async function startProfile(profileId: string) {
     setMenuOpen(false)
     setError(null)
@@ -179,7 +179,7 @@ export default function TerminalPanel(props: { onClose: () => void; workspace: W
             </div>
             <div class="terminal-actions">
               <div class="terminal-new-wrap">
-                <button type="button" class="terminal-new" disabled={busy() || !ws()} title={ws() ? 'New session' : 'Select a workspace first'} onClick={() => setMenuOpen((v) => !v)}>
+                <button type="button" class="terminal-new" disabled={busy() || !ws()} title={ws() ? 'New session' : 'Select a task first'} onClick={() => setMenuOpen((v) => !v)}>
                   +
                 </button>
                 <Show when={menuOpen()}>

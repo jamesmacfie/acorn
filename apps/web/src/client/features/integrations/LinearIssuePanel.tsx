@@ -17,7 +17,7 @@ export default function LinearIssuePanel(props: {
   identifier: string
   onClose: () => void
   onContentClick: (e: MouseEvent) => void
-  // When a workspace links several Linear tickets, the panel shows a chip strip to switch between
+  // When a task links several Linear tickets, the panel shows a chip strip to switch between
   // them (docs/workspaces). Omitted by the single-ticket PR-detail caller.
   identifiers?: string[]
   onSelectIdentifier?: (id: string) => void

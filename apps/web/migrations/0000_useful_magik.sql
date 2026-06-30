@@ -114,6 +114,8 @@ CREATE TABLE `repo_paths` (
 	`repo` text NOT NULL,
 	`github_repo_id` integer,
 	`path` text NOT NULL,
+	`run_command` text,
+	`dev_port` integer,
 	`created_at` integer NOT NULL,
 	`updated_at` integer NOT NULL,
 	PRIMARY KEY(`owner`, `repo`)
@@ -178,6 +180,30 @@ CREATE TABLE `sync_state` (
 	PRIMARY KEY(`user_id`, `resource`)
 );
 --> statement-breakpoint
+CREATE TABLE `task_links` (
+	`task_id` text NOT NULL,
+	`provider` text NOT NULL,
+	`identifier` text NOT NULL,
+	`created_at` integer NOT NULL,
+	PRIMARY KEY(`task_id`, `provider`, `identifier`)
+);
+--> statement-breakpoint
+CREATE TABLE `tasks` (
+	`id` text PRIMARY KEY NOT NULL,
+	`title` text NOT NULL,
+	`origin` text NOT NULL,
+	`repo_owner` text NOT NULL,
+	`repo_name` text NOT NULL,
+	`branch` text NOT NULL,
+	`worktree_path` text,
+	`pull_number` integer,
+	`status` text NOT NULL,
+	`sort` integer DEFAULT 0 NOT NULL,
+	`created_at` integer NOT NULL,
+	`updated_at` integer NOT NULL,
+	`archived_at` integer
+);
+--> statement-breakpoint
 CREATE TABLE `terminal_sessions` (
 	`id` text PRIMARY KEY NOT NULL,
 	`title` text NOT NULL,
@@ -186,7 +212,7 @@ CREATE TABLE `terminal_sessions` (
 	`backend` text NOT NULL,
 	`status` text NOT NULL,
 	`cwd` text NOT NULL,
-	`workspace_id` text NOT NULL,
+	`task_id` text NOT NULL,
 	`command` text NOT NULL,
 	`argv_json` text DEFAULT '[]' NOT NULL,
 	`tmux_session` text,
@@ -206,26 +232,27 @@ CREATE TABLE `viewed_files` (
 	PRIMARY KEY(`user_id`, `repo_id`, `number`, `path`)
 );
 --> statement-breakpoint
-CREATE TABLE `workspace_links` (
+CREATE TABLE `workspace_linear_projects` (
 	`workspace_id` text NOT NULL,
-	`provider` text NOT NULL,
-	`identifier` text NOT NULL,
+	`linear_project_id` text NOT NULL,
 	`created_at` integer NOT NULL,
-	PRIMARY KEY(`workspace_id`, `provider`, `identifier`)
+	PRIMARY KEY(`workspace_id`, `linear_project_id`)
+);
+--> statement-breakpoint
+CREATE TABLE `workspace_repos` (
+	`workspace_id` text NOT NULL,
+	`repo_owner` text NOT NULL,
+	`repo_name` text NOT NULL,
+	`sort` integer DEFAULT 0 NOT NULL,
+	`created_at` integer NOT NULL,
+	PRIMARY KEY(`repo_owner`, `repo_name`)
 );
 --> statement-breakpoint
 CREATE TABLE `workspaces` (
 	`id` text PRIMARY KEY NOT NULL,
-	`title` text NOT NULL,
-	`origin` text NOT NULL,
-	`repo_owner` text NOT NULL,
-	`repo_name` text NOT NULL,
-	`branch` text NOT NULL,
-	`worktree_path` text,
-	`pull_number` integer,
-	`status` text NOT NULL,
+	`name` text NOT NULL,
+	`is_default` integer DEFAULT false NOT NULL,
 	`sort` integer DEFAULT 0 NOT NULL,
 	`created_at` integer NOT NULL,
-	`updated_at` integer NOT NULL,
-	`archived_at` integer
+	`updated_at` integer NOT NULL
 );

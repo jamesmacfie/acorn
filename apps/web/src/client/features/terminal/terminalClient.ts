@@ -1,6 +1,6 @@
 // Typed accessor for the preload's `window.acorn.terminal` bridge (vNext §5). The global is declared
 // here so anything importing it (App's flag check, TerminalPanel) sees the same shape.
-import type { ArchiveResult, CreateOpts, RepoPath, RepoPathResult, ServerMsg, TerminalProfile, TerminalSession, WorkspaceStatus } from '../../../shared/terminal'
+import type { ArchiveResult, CreateOpts, RepoPath, RepoPathResult, ServerMsg, TerminalProfile, TerminalSession, TaskStatus } from '../../../shared/terminal'
 
 export type TerminalApi = {
   list(): Promise<TerminalSession[]>
@@ -16,11 +16,12 @@ export type TerminalApi = {
   repoPath: {
     get(owner: string, repo: string): Promise<RepoPath | null>
     set(owner: string, repo: string, path: string): Promise<RepoPathResult>
+    pick(): Promise<string | null>
     runConfig(owner: string, repo: string, runCommand: string, devPort: number): Promise<RepoPathResult>
   }
-  workspace: {
+  task: {
     archive(id: string): Promise<ArchiveResult>
-    statuses(): Promise<WorkspaceStatus[]>
+    statuses(): Promise<TaskStatus[]>
   }
 }
 

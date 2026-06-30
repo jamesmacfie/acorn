@@ -1,11 +1,38 @@
 # Workspaces — unifying PRs, terminals, worktrees & integrations
 
-> Status: **design / proposal**. No code has been written for this yet. These docs survey the
+> ## ⚠️ Two-tier update (current model)
+> These docs were written when **"Workspace" meant a single unit of work** (one repo + branch + PR +
+> worktree + terminals). That entity has since been **renamed `Task`**, and **"Workspace" now means a
+> named *group of many repos*** — the top-level thing you pick in the top bar.
+>
+> | Concept | These docs call it | Current name |
+> | --- | --- | --- |
+> | One repo + branch + PR + worktree + terminals (a rail row) | "Workspace" | **Task** |
+> | A named group of repos (top selector) | — (didn't exist) | **Workspace** |
+>
+> Rules of the current model:
+> - A repo belongs to **exactly one** Workspace (partition). The active Workspace is *derived* from
+>   the current repo — no URL/routing dimension.
+> - On first login a **Default** Workspace is auto-created and every repo is assigned to it (an
+>   idempotent `bootstrap` endpoint); a first-run onboarding modal lets you re-group repos, create
+>   workspaces inline, (on desktop) point each repo at its on-disk folder via a native picker, and
+>   **hide repos** with a per-row eye toggle (plus a master toggle to hide/show all). On-disk paths
+>   live in `repo_paths` (unchanged); hidden repos keep their membership but sit in `ignored_repos`.
+> - The active Workspace shows in the top selector; the repo sub-selector is **disabled inside a
+>   task view** (the worktree's repo is fixed) but live while browsing a Source.
+> - Linear projects link at the **Workspace** level, so one project spans many repos.
+> - Tables: `workspaces` (group), `workspace_repos` (partition, PK `(owner,repo)`),
+>   `workspace_linear_projects`; the old `workspaces`/`workspace_links` became `tasks`/`task_links`;
+>   `terminal_sessions.workspace_id` → `task_id`.
+>
+> Below this line, **read "Workspace" as "Task"** unless it clearly refers to the new group.
+
+> Status: **design / proposal**. These docs survey the
 > options, commit to a direction, and specify the UI, data model, and a phased build. The build
 > starts from a **clean schema baseline** (Phase 0): there's no production data worth keeping, so we
 > wipe the local SQLite DB and collapse the migrations into one fresh baseline rather than threading
 > incremental migrations through live data. The **existing UI is reused as-is** — only the
-> path-bookmark *tab* concept is dropped in favour of real Workspace entities.
+> path-bookmark *tab* concept is dropped in favour of real entities.
 
 ## The problem
 

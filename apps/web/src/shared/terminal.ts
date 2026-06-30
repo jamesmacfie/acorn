@@ -10,12 +10,12 @@ export type TerminalSession = {
   status: 'running' | 'exited'
   idle: boolean // agent has produced no output for a while (vNext §3); always false for shells
   isWorktree: boolean // cwd is an isolated PR worktree (vNext §9); in-memory only, not persisted
-  workspaceId: string // → workspaces.id (docs/workspaces P2); a session always belongs to a workspace
+  taskId: string // → tasks.id (docs/workspaces); a session always belongs to a task
   cwd: string
   command: string
   tmuxSession?: string
-  repo?: { owner: string; name: string } // derived from the workspace join (main process)
-  pull?: { number: number } // derived from the workspace join (main process)
+  repo?: { owner: string; name: string } // derived from the task join (main process)
+  pull?: { number: number } // derived from the task join (main process)
   cols: number
   rows: number
   createdAt: number
@@ -23,7 +23,7 @@ export type TerminalSession = {
 }
 
 export type CreateOpts = {
-  workspaceId: string // → workspaces.id (docs/workspaces P2); repo / branch / PR derive from it
+  taskId: string // → tasks.id (docs/workspaces); repo / branch / PR derive from it
   profileId?: string // defaults to the built-in 'shell'
   cwd?: string
   cols?: number
@@ -39,15 +39,15 @@ export type CreateOpts = {
 // Result of creating/removing a worktree (vNext §9). `reason` explains a failure for the UI.
 export type WorktreeResult = { ok: true; path: string } | { ok: false; reason: string }
 
-// Result of archiving a workspace (docs/workspaces 05). `reason` carries the guard refusal
+// Result of archiving a task (docs/workspaces 05). `reason` carries the guard refusal
 // (running sessions / dirty worktree) for the UI to surface.
 export type ArchiveResult = { ok: true } | { ok: false; reason: string }
 
-// Live worktree status for a workspace (docs/workspaces 02/05). `missing` = the workspace has a
+// Live worktree status for a task (docs/workspaces 02/05). `missing` = the task has a
 // worktreePath but the directory is gone (removed outside acorn) → needs repair. Computed in main
-// (git status --porcelain + an existence check) and polled by the rail / workspace footer.
-export type WorkspaceStatus = {
-  workspaceId: string
+// (git status --porcelain + an existence check) and polled by the rail / task footer.
+export type TaskStatus = {
+  taskId: string
   worktreePath: string | null
   dirty: boolean
   dirtyCount: number

@@ -17,15 +17,17 @@ contextBridge.exposeInMainWorld('acorn', {
     repoPath: {
       get: (owner: string, repo: string) => ipcRenderer.invoke('term:repoPath:get', { owner, repo }),
       set: (owner: string, repo: string, path: string) => ipcRenderer.invoke('term:repoPath:set', { owner, repo, path }),
+      // Native folder picker (onboarding / repo mapping). Returns the chosen absolute path or null.
+      pick: () => ipcRenderer.invoke('term:repoPath:pick'),
       runConfig: (owner: string, repo: string, runCommand: string, devPort: number) =>
         ipcRenderer.invoke('term:repoPath:runConfig', { owner, repo, runCommand, devPort }),
     },
-    workspace: {
+    task: {
       // Guarded archive + worktree teardown (docs/workspaces 05). Lives on the terminal bridge
       // because teardown needs the main-process git + live session map.
-      archive: (id: string) => ipcRenderer.invoke('term:workspace:archive', id),
+      archive: (id: string) => ipcRenderer.invoke('term:task:archive', id),
       // Live worktree statuses (dirty / missing) for the rail + footer markers.
-      statuses: () => ipcRenderer.invoke('term:workspace:statuses'),
+      statuses: () => ipcRenderer.invoke('term:task:statuses'),
     },
     write: (id: string, data: string) => ipcRenderer.send('term:input', { id, data }),
     // Subscribe to session-status pings (idle/exit changes for any session); returns unsubscribe.

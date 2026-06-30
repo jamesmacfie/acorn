@@ -11,10 +11,19 @@ import {
   pinsRoute,
   prefsRoute,
   pullRoute,
+  taskRoute,
+  tasksRoute,
+  type Task,
+  type TaskSeed,
+  type Workspace,
   workspaceRoute,
   workspacesRoute,
-  type Workspace,
-  type WorkspaceSeed,
+  workspaceBootstrapRoute,
+  workspaceReposRoute,
+  workspaceIgnoreRepoRoute,
+  workspaceUnignoreRepoRoute,
+  workspaceIgnoreAllRoute,
+  workspaceLinearProjectsRoute,
   rerunFailedRoute,
   requestedReviewersRoute,
   resolveThreadRoute,
@@ -100,17 +109,35 @@ export const setPin = async (repoId: number, pinned: boolean) => {
   }, (res) => `pins ${res.status}`)
 }
 
-// Workspaces (docs/workspaces). Create from a seed; rename/archive via PATCH. Callers invalidate
-// workspacesKey after.
-export const createWorkspace = (seed: WorkspaceSeed) => post<Workspace>(workspacesRoute, seed)
-export const renameWorkspace = async (id: string, title: string) => patchWorkspace(id, { title })
-export const archiveWorkspace = async (id: string) => patchWorkspace(id, { status: 'archived' })
-async function patchWorkspace(id: string, body: { title?: string; status?: 'active' | 'archived' }) {
-  return writeJson<unknown>(workspaceRoute(id), {
+// Workspaces (named groups of repos). Callers invalidate workspacesKey after.
+export const bootstrapWorkspaces = () => post<Workspace[]>(workspaceBootstrapRoute)
+export const createWorkspace = (name: string) => post<Workspace>(workspacesRoute, { name })
+export const renameWorkspace = async (id: string, name: string) =>
+  writeJson<{ ok: true }>(workspaceRoute(id), { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name }) }, (res) => `workspace ${res.status}`)
+export const deleteWorkspace = async (id: string) =>
+  writeJson<{ ok: true }>(workspaceRoute(id), { method: 'DELETE' }, (res) => `workspace ${res.status}`)
+// Move a repo into a workspace (partition; upsert on owner/repo). Also un-ignores it.
+export const setRepoWorkspace = (workspaceId: string, owner: string, name: string) =>
+  post<{ ok: true }>(workspaceReposRoute(workspaceId), { owner, name })
+// Hide a repo (keeps its workspace membership; excluded from selector/rail/scoping). Reversible.
+export const ignoreRepo = (owner: string, name: string) => post<{ ok: true }>(workspaceIgnoreRepoRoute, { owner, name })
+export const unignoreRepo = (owner: string, name: string) => post<{ ok: true }>(workspaceUnignoreRepoRoute, { owner, name })
+// Hide or show every repo at once (onboarding master toggle).
+export const setAllReposIgnored = (ignored: boolean) => post<{ ok: true }>(workspaceIgnoreAllRoute, { ignored })
+export const setWorkspaceLinearProjects = async (workspaceId: string, projectIds: string[]) =>
+  writeJson<{ ok: true }>(workspaceLinearProjectsRoute(workspaceId), { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ projectIds }) }, (res) => `linear-projects ${res.status}`)
+
+// Tasks (docs/workspaces). Create from a seed; rename/archive via PATCH. Callers invalidate
+// tasksKey after.
+export const createTask = (seed: TaskSeed) => post<Task>(tasksRoute, seed)
+export const renameTask = async (id: string, title: string) => patchTask(id, { title })
+export const archiveTask = async (id: string) => patchTask(id, { status: 'archived' })
+async function patchTask(id: string, body: { title?: string; status?: 'active' | 'archived' }) {
+  return writeJson<unknown>(taskRoute(id), {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
-  }, (res) => `workspace ${res.status}`)
+  }, (res) => `task ${res.status}`)
 }
 
 export const setPref = async (key: string, value: string) => {

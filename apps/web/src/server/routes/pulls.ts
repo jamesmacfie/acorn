@@ -139,27 +139,27 @@ export const pulls = new Hono<AppEnv>().get('/:owner/:repo/pulls', async (c) => 
       })
     }
     await db.delete(schema.pullRequests).where(and(scope, lt(schema.pullRequests.fetchedAt, now)))
-    // Flow B (docs/workspaces 02): a local-first workspace inherits a PR once one is opened for its
-    // branch. Match no-pullNumber active workspaces for this repo against the just-mirrored headRefs.
-    // Machine-scoped table (no userId); keyed by owner/repo name. Cheap: few workspaces, runs only
+    // Flow B (docs/workspaces 02): a local-first task inherits a PR once one is opened for its
+    // branch. Match no-pullNumber active tasks for this repo against the just-mirrored headRefs.
+    // Machine-scoped table (no userId); keyed by owner/repo name. Cheap: few tasks, runs only
     // on a real list refresh (not 304s).
     const branchToPull = new Map<string, number>()
     for (const p of body) if (p.head?.ref) branchToPull.set(p.head.ref, p.number)
     if (branchToPull.size) {
-      const wsRows = await db
+      const taskRows = await db
         .select()
-        .from(schema.workspaces)
+        .from(schema.tasks)
         .where(
           and(
-            eq(schema.workspaces.repoOwner, owner),
-            eq(schema.workspaces.repoName, repo),
-            eq(schema.workspaces.status, 'active'),
-            isNull(schema.workspaces.pullNumber),
+            eq(schema.tasks.repoOwner, owner),
+            eq(schema.tasks.repoName, repo),
+            eq(schema.tasks.status, 'active'),
+            isNull(schema.tasks.pullNumber),
           ),
         )
-      for (const w of wsRows) {
+      for (const w of taskRows) {
         const num = branchToPull.get(w.branch)
-        if (num != null) await db.update(schema.workspaces).set({ pullNumber: num, updatedAt: now }).where(eq(schema.workspaces.id, w.id))
+        if (num != null) await db.update(schema.tasks).set({ pullNumber: num, updatedAt: now }).where(eq(schema.tasks.id, w.id))
       }
     }
     await db
