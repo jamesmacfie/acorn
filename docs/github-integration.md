@@ -2,8 +2,8 @@
 
 All GitHub access goes through two thin clients in
 `apps/web/src/server/github/index.ts`. The route handlers
-(`apps/web/src/server/routes/`) call these, mirror the result into D1, and
-return a public projection. The browser never talks to GitHub directly and
+(`apps/web/src/server/routes/`) call these, mirror the result into the local
+SQLite read-model, and return a public projection. The browser never talks to GitHub directly and
 never holds the token (see [authentication](./authentication.md)).
 
 ## The clients
@@ -84,7 +84,7 @@ endpoint owns `pr_files`.
 
 ### Write actions and the mirror {#write-actions}
 
-Each write calls GitHub, then keeps the D1 mirror consistent so a read inside
+Each write calls GitHub, then keeps the local mirror consistent so a read inside
 the TTL window reflects the change:
 
 - **Merge / close / reopen** update `pull_requests.state` directly.

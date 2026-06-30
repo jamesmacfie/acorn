@@ -13,30 +13,31 @@ Clone → running → logged-in runbook for acorn. For the system design behind 
 - **Node** ≥ 20 (developed on 24).
 - **pnpm 11** — the repo pins `packageManager: pnpm@11.0.0`. Run `corepack enable` to get
   the pinned version automatically.
-- A **GitHub OAuth App** for dev (separate from production — see below).
-- **Wrangler** ships as a dev dependency of `@acorn/web`; invoke it via
-  `pnpm --filter @acorn/web exec wrangler …`, or `pnpm wrangler …` from inside `apps/web`.
+- A **GitHub OAuth App** dedicated to the desktop app (an OAuth App allows one callback URL).
+- **macOS** to produce a packaged build (`pnpm dist`); `pnpm dev` runs anywhere Electron does.
 
-## 1. Create a dev GitHub OAuth App
+## 1. Create a GitHub OAuth App
 
-A GitHub OAuth App allows exactly **one** callback URL, so dev needs its own app, separate
-from production.
+A GitHub OAuth App allows exactly **one** callback URL, so the desktop app wants its own.
 
 - GitHub → Settings → Developer settings → **OAuth Apps** → **New OAuth App**.
-- **Homepage URL:** `http://localhost:5173`
-- **Authorization callback URL:** `http://localhost:5173/auth/callback`
+- **Homepage URL:** `http://127.0.0.1:4317`
+- **Authorization callback URL:** `http://127.0.0.1:4317/auth/callback` — use the `127.0.0.1`
+  form (GitHub treats it as distinct from `localhost`).
 - Copy the **Client ID** and generate a **Client Secret**.
 
-The dev server port is pinned to `5173` (`apps/web/vite.config.ts`). The OAuth flow requests
-the scopes `repo read:org read:user`.
+The app origin is pinned to port `4317` (`ACORN_PORT` in `apps/web/src/main/server.ts`) so the
+browser storage and OAuth callback stay stable. The OAuth flow requests the scopes
+`repo read:org read:user`.
 
-## 2. Configure local secrets — `apps/web/.dev.vars`
+## 2. Configure local secrets — `apps/web/.env`
 
-Wrangler reads local dev secrets from `apps/web/.dev.vars`. This is **not** `wrangler secret
-put` — that command is for production only.
+Dev secrets live in `apps/web/.env`, loaded by the Electron main process (`process.loadEnvFile`)
+and by `dev:node`. Packaged builds will read them from the OS keychain (planned — see
+[electron.md](./electron.md) §4b).
 
 ```bash
-cp apps/web/.dev.vars.example apps/web/.dev.vars
+cp apps/web/.env.example apps/web/.env
 ```
 
 Generate the session encryption key. `SESSION_ENC_KEY` must be **exactly 64 hex characters**
@@ -47,35 +48,35 @@ Generate the session encryption key. `SESSION_ENC_KEY` must be **exactly 64 hex 
 openssl rand -hex 32
 ```
 
-Then fill `apps/web/.dev.vars`:
+Then fill `apps/web/.env`:
 
 ```
-GITHUB_CLIENT_ID=<from your dev OAuth App>
-GITHUB_CLIENT_SECRET=<from your dev OAuth App>
+GITHUB_CLIENT_ID=<from your OAuth App>
+GITHUB_CLIENT_SECRET=<from your OAuth App>
 SESSION_ENC_KEY=<the 64-hex-char openssl output>
 ```
 
-`.dev.vars` and `.wrangler/` are gitignored — **never commit them**.
+`.env` is gitignored — **never commit it**.
 
-## 3. Install, migrate, run
+## 3. Install and run
 
 ```bash
 # From the repo root
 pnpm install
 
-# Apply migrations to the local D1 database
-# (Miniflare state lives under apps/web/.wrangler/state)
-pnpm --filter @acorn/web db:migrate
+# better-sqlite3 is native: build it against Electron's ABI before `pnpm dev`
+# (and back to the Node ABI with `node:rebuild` if you use dev:node / db:migrate).
+pnpm --filter @acorn/web electron:rebuild
 
-# Start the dev server: Vite + vite-plugin-solid for the SPA, and
-# @cloudflare/vite-plugin running the Hono Worker in Miniflare with local D1/KV
+# Build + launch the Electron app. Migrations apply automatically on startup
+# (openDb); the SQLite DB and blob cache live under apps/web/.acorn/.
 pnpm dev
 ```
 
-Open `http://localhost:5173` and log in with GitHub.
+The Electron window opens on `http://127.0.0.1:4317`; log in with GitHub.
 
-> **Local gotcha — cookie prefix.** Over `http://localhost` the session cookie drops the
-> `__Host-` prefix and the `Secure` flag (browsers reject `__Host-` on plain http). The Worker
+> **Local gotcha — cookie prefix.** Over `http://127.0.0.1` the session cookie drops the
+> `__Host-` prefix and the `Secure` flag (browsers reject `__Host-` on plain http). The server
 > handles this automatically (`cookieAttrs` in `session.ts`); no action needed.
 
 ## Common scripts
@@ -84,13 +85,15 @@ Run from the repo root via Turborepo, or per-package with `--filter @acorn/web`.
 
 | Script | What it does |
 | --- | --- |
-| `pnpm dev` | Vite dev server + Hono Worker in Miniflare |
-| `pnpm build` | `vite build` (client bundle + Worker) |
+| `pnpm dev` | `electron-vite build && electron-vite preview` — build + launch the Electron app |
+| `pnpm --filter @acorn/web dev:node` | Run just the Node server (no Electron) on `:4317` |
+| `pnpm --filter @acorn/web build` | `electron-vite build` (main + preload + renderer) |
+| `pnpm --filter @acorn/web dist` | `electron-vite build && electron-builder --mac` — package the `.dmg`/`.zip` |
+| `pnpm --filter @acorn/web electron:rebuild` / `node:rebuild` | switch better-sqlite3's native ABI (Electron ↔ Node) |
 | `pnpm lint` | `tsc --noEmit` typecheck |
 | `pnpm test` | `vitest run` |
-| `pnpm --filter @acorn/web typegen` | `wrangler types` → regenerate `worker-configuration.d.ts` (`Env`) |
 | `pnpm --filter @acorn/web db:generate` | `drizzle-kit generate` — emit a migration from the schema |
-| `pnpm --filter @acorn/web db:migrate` | `wrangler d1 migrations apply acorn --local` |
+| `pnpm --filter @acorn/web db:migrate` | `tsx scripts/migrate.ts` — apply migrations to local SQLite |
 
 `pnpm dev`, `pnpm build`, `pnpm lint`, and `pnpm test` all proxy through Turborepo at the root.
 
@@ -104,7 +107,7 @@ The schema lives in `apps/web/src/server/db/schema.ts` (Drizzle, SQLite dialect)
 # 2. Generate the SQL migration into apps/web/migrations/
 pnpm --filter @acorn/web db:generate
 
-# 3. Apply it to the LOCAL D1 (the --local flag is baked into db:migrate)
+# 3. Apply it to the local SQLite DB (also applied automatically on app startup)
 pnpm --filter @acorn/web db:migrate
 ```
 
@@ -116,5 +119,5 @@ pnpm --filter @acorn/web db:migrate
 > data hadn't been populated yet). A plain **nullable** `ADD COLUMN` generates a clean one-line
 > statement and needs no editing.
 
-For production (remote) migrations and the full deploy flow, see the root
-[README](../README.md#production-deploy).
+For packaging the app into a `.dmg`/`.zip`, see [Packaging](../README.md#packaging-macos) in the
+root README and [electron.md](./electron.md) §4i.

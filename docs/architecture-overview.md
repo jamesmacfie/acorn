@@ -7,34 +7,28 @@
 > unchanged.
 
 acorn is a GitHub pull-request review tool. It is a SolidJS single-page app
-served by one Hono Worker on Cloudflare Workers, backed by a D1 SQLite
-read-model mirror, a KV blob cache, and IndexedDB client persistence.
+served by one Hono server running in an Electron main process (via
+`@hono/node-server`), backed by a local SQLite read-model mirror, an on-disk
+blob cache, and IndexedDB client persistence.
 
 This is the keystone doc. See the [index](#documentation-index) at the bottom
 for everything else.
 
-## One Worker, one origin
+## One local server, one origin
 
-There is a single Worker (`apps/web/src/server/index.ts`). It serves three
-things from the same origin:
+The Electron main process (`apps/web/src/main/electron.ts`) starts a single Hono
+app (`apps/web/src/server/index.ts`) under `@hono/node-server` on
+`http://127.0.0.1:4317`, and the app window loads that origin. The server serves
+three things from the same origin:
 
-- the SPA shell and static assets,
+- the SPA shell and static assets (`dist/client`),
 - the `/api/*` JSON API, and
 - the `/auth/*` OAuth flow.
 
-Routing is done by Cloudflare's asset handling, configured in
-`apps/web/wrangler.jsonc`:
-
-```jsonc
-"assets": {
-  "not_found_handling": "single-page-application",
-  "run_worker_first": ["/api/*", "/auth/*"]
-}
-```
-
-`run_worker_first` sends only `/api/*` and `/auth/*` to the Worker. Everything
-else is served from the built assets; unknown paths fall back to `index.html`
-so the client router can handle deep links (`/:owner/:repo/:number`).
+Routing lives in `apps/web/src/main/server.ts`: a static-file middleware serves
+the built assets, and a `notFound` handler returns 404s for unmatched `/api/*`
+and `/auth/*` but falls back to `index.html` for other paths so the client router
+can handle deep links (`/:owner/:repo/:number`).
 
 Because the API and the app share an origin, the session is a plain
 same-origin cookie — no CORS, no bearer tokens in the browser, no token
@@ -49,15 +43,15 @@ for the full route map.
 
 ## Lazy read-model mirror
 
-The defining idea: **D1 is a cache of GitHub, not a source of truth.** acorn
-never owns PR/repo data — GitHub does. The mirror exists only to make reads
-fast and to support offline browsing.
+The defining idea: **the SQLite mirror is a cache of GitHub, not a source of
+truth.** acorn never owns PR/repo data — GitHub does. The mirror exists only to
+make reads fast and to support offline browsing.
 
 Consequences of treating the mirror as a cache:
 
 - **Populated on read.** A table row only exists because someone fetched that
   resource. There are no webhooks and no background sync jobs — nothing fills
-  D1 ahead of demand.
+  the mirror ahead of demand.
 - **Revalidated, never trusted blindly.** Each read checks freshness. Repos use
   a TTL window; PR lists, PR detail and files gate on a TTL recorded in
   `sync_state`, and repos/PR-lists revalidate against GitHub with an ETag where
@@ -71,9 +65,9 @@ A small set of tables are *not* mirror data — they are app-state acorn owns
 of truth and survive mirror re-syncs. See [data-layer](./data-layer.md) for the
 table-by-table split.
 
-A hard rule rides on top of this: **only public, identical-for-all-users data
-may live in shared storage.** Private repo data is user-scoped in D1; only
-public patch bodies go to the shared KV namespace. See
+Everything is local to one machine and one user now, so there is no shared
+storage to protect: mirror rows stay user-scoped (inherited from the multi-tenant
+design) and all blob/patch bodies cache on-disk by sha. See
 [caching](./caching.md#public-private-rule).
 
 ## Three cache layers
@@ -83,8 +77,8 @@ lifetime:
 
 | Layer | Where | Scope | Holds | Lifetime |
 | --- | --- | --- | --- | --- |
-| D1 mirror | Worker / D1 | Per user | Repos, PRs, files, reviews, comments, checks, labels, threads | TTL + ETag (see [caching](./caching.md)) |
-| KV `BLOBS` | Worker / KV | Shared, public repos only | Immutable patch/diff bodies keyed by blob SHA | Immutable |
+| SQLite mirror | Local server / SQLite | Per user | Repos, PRs, files, reviews, comments, checks, labels, threads | TTL + ETag (see [caching](./caching.md)) |
+| `BLOBS` cache | Local server / on-disk | Per device | Immutable patch/diff bodies keyed by blob SHA | Immutable |
 | IndexedDB | Browser | Per user/device | TanStack Query cache (last-known API responses) | `gcTime` 24h, persisted |
 
 The client cache is a stale-while-revalidate layer: it renders instantly from
@@ -102,10 +96,10 @@ Browser (SolidJS SPA)
   ▼
 GET /api/repos/:owner/:repo/pulls           (same-origin cookie)
   │
-Worker (Hono)
+Hono server (Electron main process)
   │  csrf() + authMiddleware: decrypt session cookie in-CPU → ctx.user
   ▼
-D1 mirror
+SQLite mirror
   │  sync_state fresh within TTL? ──► yes ──► serve mirror rows  ─┐
   │                                                               │
   └─ no/stale                                                     │
@@ -115,7 +109,7 @@ D1 mirror
         │  304 ► bump freshness, serve mirror ────────────────────┤
         │  200 ► delete-then-insert rows + update sync_state ─────┤
         ▼                                                         │
-     (patch bodies for public repos → KV BLOBS by SHA)            │
+     (patch bodies → on-disk BLOBS cache by SHA)                  │
                                                                   ▼
                                                        JSON response
   ▲                                                               │
@@ -124,7 +118,7 @@ D1 mirror
 ```
 
 Writes (merge/close/draft/comment/label/…) follow the same spine in reverse:
-the Worker calls GitHub, then updates (or busts the freshness of) the D1
+the server calls GitHub, then updates (or busts the freshness of) the SQLite
 mirror so a read inside the TTL window reflects the change. See
 [github-integration](./github-integration.md) and
 [api-reference](./api-reference.md).
@@ -135,24 +129,26 @@ mirror so a read inside the TTL window reflects the change. See
 - No server-side session store — the session lives entirely in an encrypted
   cookie, decrypted per request.
 - No GitHub token in the browser — only public profile fields cross the wire.
-- No second backend — one Worker is the whole server.
+- No second backend — one in-process Hono server is the whole backend.
 
 ## Documentation index
 
-- [architecture-overview](./architecture-overview.md) — this doc: the one-Worker
+- [electron.md](./electron.md) — the Cloudflare Workers → Electron migration: the
+  runtime, bindings, packaging, and what changed (and didn't).
+- [architecture-overview](./architecture-overview.md) — this doc: the one-server
   design, the lazy mirror, the three cache layers, the data flow.
-- [local-development](./local-development.md) — running the Vite + Miniflare dev
-  server, OAuth callback setup, local D1/KV state.
+- [local-development](./local-development.md) — building + launching the Electron
+  app, OAuth callback setup, local SQLite/blob state.
 - [authentication](./authentication.md) — GitHub OAuth web flow, the encrypted
   stateless session cookie, CSRF protections, the 401 → reauth bounce.
-- [data-layer](./data-layer.md) — Drizzle + D1 schema table-by-table, mirror vs
-  app-state, user-scoping, staleness bookkeeping, migrations.
+- [data-layer](./data-layer.md) — Drizzle + SQLite schema table-by-table, mirror
+  vs app-state, user-scoping, staleness bookkeeping, migrations.
 - [caching](./caching.md) — the three cache layers and their exact policies
-  (TTLs, ETag revalidation, KV blobs, IndexedDB persistence).
+  (TTLs, ETag revalidation, on-disk blobs, IndexedDB persistence).
 - [github-integration](./github-integration.md) — the REST + GraphQL clients,
   the operation → endpoint map, ETag usage and rate limits.
-- [api-reference](./api-reference.md) — every Worker route: method, path,
-  params, response shape, error codes, and shared client contract.
+- [api-reference](./api-reference.md) — every route: method, path, params,
+  response shape, error codes, and shared client contract.
 - [frontend](./frontend.md) — the SolidJS app, routing, panes, and the shared
   TanStack Query definitions.
 - [diff-rendering](./diff-rendering.md) — how patches are parsed and rendered,

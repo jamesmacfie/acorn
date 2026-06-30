@@ -6,21 +6,21 @@
 > three-tier model and TTLs are otherwise unchanged.
 
 acorn layers three caches between the browser and GitHub. Each has a different
-scope, lifetime, and privacy rule. The whole design follows one principle:
+scope and lifetime. The whole design follows one principle:
 **serve the last-known data immediately, revalidate behind it.**
 
 | Layer | Where | Scope | Holds |
 | --- | --- | --- | --- |
-| D1 mirror | Worker / D1 | Per user | All GitHub projections (repos, PRs, files, reviews, comments, checks, labels, threads) |
-| KV `BLOBS` | Worker / KV | Shared, public repos only | Immutable patch/diff bodies keyed by blob SHA |
+| SQLite mirror | Local server / SQLite | Per user | All GitHub projections (repos, PRs, files, reviews, comments, checks, labels, threads) |
+| `BLOBS` cache | Local server / on-disk | Per device | Immutable patch/diff bodies keyed by blob SHA |
 | IndexedDB | Browser | Per user / device | TanStack Query cache (last API responses) |
 
 See [data-layer](./data-layer.md) for the schema behind layer 1 and
 [offline-pwa](./offline-pwa.md) for how layer 3 powers offline browsing.
 
-## Layer 1 — D1 mirror
+## Layer 1 — SQLite mirror
 
-The mirror is the Worker's read cache of GitHub. Every read goes through it
+The mirror is the local server's read cache of GitHub. Every read goes through it
 (see the serve-then-revalidate pattern below). Freshness is governed by a TTL
 and, where available, an ETag.
 
@@ -49,7 +49,7 @@ blindly refetching:
   `If-None-Match` on the next fetch. (The **closed** PR list does *not* go
   through the mirror at all — it is proxied straight from GitHub one 50-item
   page per request and load-mored client-side; closed PRs are historical, so
-  there is nothing worth caching in D1 with a 45 s TTL.) A **`304 Not Modified` is free** against
+  there is nothing worth caching in the mirror with a 45 s TTL.) A **`304 Not Modified` is free** against
   the GitHub rate limit — the route just bumps `sync_state.fetchedAt` and
   re-serves the existing mirror rows:
 
@@ -85,37 +85,34 @@ Every mirror read follows the same shape:
      - 200 → delete-then-insert rows + upsert sync_state, then serve.
 ```
 
-List refreshes are **delete-then-insert in one `db.batch([...])`** so resources
-the user lost access to (closed PRs, lost repos) drop out atomically. Because D1
-caps bound parameters at 100 per statement, inserts are chunked by column count
-(e.g. repos: 9 rows × 10 cols = 90 params; PRs: 6 rows × 14 cols = 84). `pr_files`
-inserts one row per statement because patch bodies are large.
+List refreshes are **delete-then-insert in one `db.batch([...])`** (emulated via a
+better-sqlite3 transaction — see [electron.md](./electron.md) §4c) so resources the
+user lost access to (closed PRs, lost repos) drop out atomically. Inserts are
+chunked by column count to keep each statement under a ~100 bound-parameter budget
+(e.g. repos: 9 rows × 10 cols = 90; PRs: 6 rows × 14 cols = 84). `pr_files` inserts
+one row per statement because patch bodies are large.
 
-## Layer 2 — KV `BLOBS` (immutable patches)
+## Layer 2 — on-disk `BLOBS` cache (immutable patches)
 
-The `BLOBS` KV namespace holds **patch/diff bodies**, keyed by the file's blob
-`sha`:
+The `BLOBS` cache holds **patch/diff bodies** (and full file bodies for context
+expansion), keyed by the file's blob `sha`. It's a local directory under
+`apps/web/.acorn/blobs/`, one file per key:
 
 ```ts
 const blobKey = (sha: string) => `patch:${sha}`
 ```
 
-A patch body is immutable for a given blob sha — the content can't change
-without the sha changing — so it is safe to cache indefinitely and to share.
-
-**Public repos only.** In `routes/pullFiles.ts`:
-
-- **Public repo:** patch bodies are written to KV (`BLOBS.put(blobKey(sha), …)`)
-  and the D1 `pr_files.patch` column is left `null`. On read, the patch is
-  resolved from KV by sha.
-- **Private repo:** the patch body stays in the user-scoped D1 `pr_files.patch`
-  column and never touches KV.
+A patch body is immutable for a given blob sha — the content can't change without
+the sha changing — so it is cached indefinitely. Every body is cached this way
+regardless of repo visibility: `mirrorFiles` writes patches to `BLOBS` and leaves
+the `pr_files.patch` column `null`, and reads resolve from `BLOBS` by sha:
 
 ```ts
 patch: f.patch ?? (f.sha ? await c.env.BLOBS.get(blobKey(f.sha)) : null)
 ```
 
-This keeps the shared cache strictly public — see the rule below.
+(The old public-only rule existed because Workers KV was *shared* across users;
+a local single-user cache has no such constraint — see [electron.md](./electron.md) §5.)
 
 ## Layer 3 — Client IndexedDB (TanStack Query persistence)
 
@@ -140,14 +137,13 @@ This cache is **per-user and private**. On logout the app wipes it
 user can't read it. See [offline-pwa](./offline-pwa.md) for the service-worker
 app shell that complements this.
 
-## Public/private cache rule {#public-private-rule}
+## Locality {#public-private-rule}
 
-The invariant that ties all three layers together:
+All three layers are now local to one machine and one user, so the old
+"only-public-data-in-shared-storage" invariant (a Workers-KV concern) is retired:
 
-> **Only public, identical-for-all-users data may live in shared storage.**
-
-- D1 mirror rows are **user-scoped** (`userId` in every PK) — a private repo's
-  mirror never serves across users. See [data-layer](./data-layer.md#user-scoping-rule).
-- KV `BLOBS` is shared, so it holds **only** public patch bodies. Private
-  patches stay in user-scoped D1.
+- SQLite mirror rows are **user-scoped** (`userId` in every PK), inherited from the
+  multi-tenant design. See [data-layer](./data-layer.md#user-scoping-rule).
+- The `BLOBS` cache is an on-disk dir private to your machine — it caches all
+  bodies by sha, public or private.
 - IndexedDB is per-device and per-user, and is cleared on logout.

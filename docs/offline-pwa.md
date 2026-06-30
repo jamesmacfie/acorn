@@ -63,7 +63,7 @@ The service worker deliberately does **not** cache API responses. Offline *data*
 - The `QueryClient` sets `gcTime: 24h` so entries outlive a session and survive reload.
 - `PersistQueryClientProvider` persists the cache with `createAsyncStoragePersister` backed by `idb-keyval` (`get`/`set`/`del`), under key `acorn-cache`, with `maxAge: 24h`.
 
-On load the persisted cache rehydrates, so the app renders last-known data instantly and, offline, can show any PR list / PR detail / file diff that was fetched while online. New `/api/*` requests simply fail offline; the cached query data is what's displayed. See [caching](./caching.md) for how this layers with the server-side D1/KV mirror.
+On load the persisted cache rehydrates, so the app renders last-known data instantly and, offline, can show any PR list / PR detail / file diff that was fetched while online. New `/api/*` requests simply fail offline; the cached query data is what's displayed. See [caching](./caching.md) for how this layers with the server-side SQLite + on-disk blob mirror.
 
 ### Privacy
 

@@ -5,7 +5,7 @@
 > in-process Node server (`@hono/node-server`) on `http://127.0.0.1:4317`. Read "the Worker" as
 > "the local server".
 
-The Worker's complete HTTP surface. One Hono app
+The server's complete HTTP surface. One Hono app
 (`apps/web/src/server/index.ts`) serves `/auth/*` and `/api/*`; see
 [architecture-overview](./architecture-overview.md).
 
@@ -42,13 +42,13 @@ does not drift.
 
 | Method | Path | Description |
 | --- | --- | --- |
-| `GET` | `/auth/login` | Mint OAuth state (KV + cookie), redirect to GitHub authorize |
+| `GET` | `/auth/login` | Mint OAuth state (in-memory map + cookie), redirect to GitHub authorize |
 | `GET` | `/auth/callback` | Validate state, exchange code, seal session, redirect `/` |
 | `GET` | `/auth/permissions` | Redirect to the GitHub OAuth app settings page |
 | `POST` | `/auth/logout` | Clear session cookies → `204` |
 
 `/auth/callback` errors: `400` (missing `code`/`state`), `403 invalid state`
-(cookie mismatch or consumed/expired KV state). Token-exchange failure
+(cookie mismatch or consumed/expired state). Token-exchange failure
 redirects back to `/auth/login`. Full flow in
 [authentication](./authentication.md).
 
@@ -145,9 +145,9 @@ Note: a GraphQL-level error (HTTP 200 with an `errors` array) is surfaced as
 
 ### `GET /api/repos/:owner/:repo/pulls/:number/files`
 
-Changed files + patches (REST; mirror, ~45 s TTL). Patch bodies come from KV
-for public repos, from D1 for private (see [caching](./caching.md)). Merges in
-per-user `viewed` state.
+Changed files + patches (REST; mirror, ~45 s TTL). Patch bodies are cached
+on-disk by blob SHA (see [caching](./caching.md)). Merges in per-user `viewed`
+state.
 
 ```ts
 200 → PullFile[]
@@ -165,7 +165,7 @@ per-user `viewed` state.
 
 All resolve the mirror PR row first; unknown owner/repo → `404 repo_not_found`,
 non-integer number → `400 bad_number`, GitHub `401` → `401 reauth`. After
-success each updates or busts the D1 mirror (see
+success each updates or busts the SQLite mirror (see
 [github-integration](./github-integration.md#write-actions)).
 
 ### `POST .../merge`

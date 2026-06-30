@@ -5,12 +5,12 @@
 > (better-sqlite3 + Drizzle) under `apps/web/.acorn/`, not D1. `db.batch()` is emulated via a
 > transaction (electron.md §4c). Read "D1" as "the local SQLite DB".
 
-The Worker's data layer is [Drizzle ORM](https://orm.drizzle.team/) over
-Cloudflare D1 (SQLite). The schema is two kinds of table:
+The data layer is [Drizzle ORM](https://orm.drizzle.team/) over local SQLite
+(better-sqlite3). The schema is two kinds of table:
 
 - **Mirror tables** — cached projections of GitHub data. Disposable,
-  revalidated, populated on read. D1 is a *cache of GitHub, not a source of
-  truth* (see [architecture-overview](./architecture-overview.md)).
+  revalidated, populated on read. The SQLite mirror is a *cache of GitHub, not a
+  source of truth* (see [architecture-overview](./architecture-overview.md)).
 - **App-state tables** — data GitHub does not have. acorn is the source of
   truth: prefs, pinned repos, viewed-file checkboxes.
 
@@ -20,11 +20,13 @@ Source: `apps/web/src/server/db/schema.ts`,
 ## Drizzle client
 
 ```ts
-export const getDb = (env: Env) => drizzle(env.DB, { schema })
+export const getDb = (env: Env): AppDatabase => env.DB
 ```
 
-`env.DB` is the D1 binding (`binding: "DB"` in `wrangler.jsonc`). `getDb(env)`
-returns a typed Drizzle client; routes import it directly.
+`env.DB` is the better-sqlite3 Drizzle client, built once at startup in
+`src/main/bindings.ts` (with an emulated `.batch()`, since better-sqlite3 has no
+native batch — see [electron.md](./electron.md) §4c). `getDb(env)` just hands it
+back; routes import it directly.
 
 ## User-scoping rule
 
@@ -37,9 +39,10 @@ the GitHub repo `id` alone is *not* unique — the primary key includes
 > `userId = user.login`. A `ponytail:` note in the source flags login-as-scope
 > as "stable enough; revisit if logins churn."
 
-The one exception is the shared KV `BLOBS` namespace, which holds **only**
-public, identical-for-all-users patch bodies — never private data. See
-[caching](./caching.md#public-private-rule).
+Patch/blob bodies are the one thing kept outside the per-user tables: the on-disk
+`BLOBS` cache (under `apps/web/.acorn/blobs/`) holds immutable bodies keyed by sha.
+On a single-user machine the cache is private to you, so there is no public/private
+split. See [caching](./caching.md).
 
 ## Mirror tables
 
@@ -54,7 +57,7 @@ PK `(userId, id)` — `id` is the GitHub repo id.
 | --- | --- |
 | `userId`, `id` | scope + GitHub repo id |
 | `owner`, `name` | |
-| `private` | boolean; drives whether patches go to KV or stay in D1 |
+| `private` | boolean; repo visibility (no longer affects caching — all bodies cache locally) |
 | `defaultBranch` | |
 | `pushedAt` | epoch ms; the repo selector orders by this |
 | `fetchedAt`, `staleAfter`, `etag` | staleness columns (below) |
@@ -83,7 +86,7 @@ staleness** — freshness is governed centrally by `sync_state`
 
 | Table | PK discriminator | Holds |
 | --- | --- | --- |
-| `pr_files` | `path` | `status`, `additions`, `deletions`, `sha` (blob sha), `patch` (private-repo body only; public bodies live in KV) |
+| `pr_files` | `path` | `status`, `additions`, `deletions`, `sha` (blob sha); `patch` is always null — bodies resolve from the on-disk BLOBS cache by sha |
 | `reviews` | `id` (node id) | `author`, `state`, `body`, `submittedAt` |
 | `comments` | `id` (node id) | `author`, `body`, `createdAt` |
 | `pr_commits` | `sha` | `message`, `author`, `authorLogin`, `committedAt` |
@@ -157,11 +160,12 @@ Workflow:
 
 ```bash
 pnpm db:generate   # drizzle-kit generate → new SQL file in apps/web/migrations/
-pnpm db:migrate    # wrangler d1 migrations apply acorn --local
+pnpm db:migrate    # tsx scripts/migrate.ts → apply to local SQLite (also runs on app startup)
 ```
 
-Migrations live in `apps/web/migrations/` (`0000_*.sql` … `0009_*.sql` at time
-of writing, plus a `meta/` snapshot directory) and are applied to local D1 via
-Wrangler's D1 migration runner. `migrations_dir` is declared in `wrangler.jsonc`.
-Local D1/KV state is kept under `.wrangler/state/` by Miniflare — see
+Migrations live in `apps/web/migrations/` (`0000_*.sql` … `0013_*.sql` at time
+of writing, plus a `meta/` snapshot directory) and are applied to the local
+SQLite DB by `drizzle-orm/better-sqlite3/migrator` — automatically on app
+startup (`openDb` in `src/main/bindings.ts`) and via `pnpm db:migrate`. The DB
+and on-disk blob cache live under `apps/web/.acorn/` — see
 [local-development](./local-development.md).

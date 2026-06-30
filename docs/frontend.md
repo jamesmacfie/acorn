@@ -1,6 +1,6 @@
 # Frontend
 
-The acorn client is a SolidJS single-page app under `apps/web/src/client/`. It is served as static assets by the Hono Worker and talks to the same origin over cookie-authenticated `fetch`. State lives in [TanStack Query](./caching.md) (server data) and SolidJS signals (transient UI). There is no client-side store beyond those two.
+The acorn client is a SolidJS single-page app under `apps/web/src/client/`. It is served as static assets by the local Hono server (in the Electron main process) and talks to the same origin over cookie-authenticated `fetch`. State lives in [TanStack Query](./caching.md) (server data) and SolidJS signals (transient UI). There is no client-side store beyond those two.
 
 ## Entry point
 
@@ -113,7 +113,7 @@ Query option factories live in `queries.ts` so the dropdown and list share one d
 
 ### Mutations
 
-`mutations.ts` exposes write helpers and uses the same shared route builders as `queries.ts`. Reads are GET; writes are same-origin POST/PUT/DELETE (the Worker checks the `Origin` header for CSRF). A non-OK response throws the structured `error` code from the body so callers can branch (e.g. `merge_failed`, `reauth`).
+`mutations.ts` exposes write helpers and uses the same shared route builders as `queries.ts`. Reads are GET; writes are same-origin POST/PUT/DELETE (the server checks the `Origin` header for CSRF). A non-OK response throws the structured `error` code from the body so callers can branch (e.g. `merge_failed`, `reauth`).
 
 | Helper | Verb / endpoint |
 | --- | --- |

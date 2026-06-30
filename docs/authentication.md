@@ -6,9 +6,9 @@
 > Electron OAuth window. Register `http://127.0.0.1:4317/auth/callback` on the GitHub OAuth app.
 > Where this doc says "the Worker", read "the local server".
 
-acorn authenticates users with GitHub via the OAuth 2.0 web flow. The Worker
-exchanges the OAuth code for an access token and seals it into an encrypted
-cookie. **The token never reaches the browser** — only public profile fields
+acorn authenticates users with GitHub via the OAuth 2.0 web flow. The local
+server exchanges the OAuth code for an access token and seals it into an
+encrypted cookie. **The token never reaches the browser** — only public profile fields
 do.
 
 Source: `apps/web/src/server/routes/auth.ts`,
@@ -30,7 +30,7 @@ repo read:org read:user
 ### `GET /auth/login`
 
 1. Mint a one-time state: `crypto.randomUUID()`.
-2. Store it in the `OAUTH_STATE` KV namespace with a 300s TTL
+2. Store it in the `OAUTH_STATE` in-memory TTL map with a 300s TTL
    (`expirationTtl: STATE_TTL_SECONDS`), value `'1'`.
 3. Set a short-lived `oauth_state` cookie (httpOnly, `SameSite=Lax`,
    `path=/auth`, `maxAge` 300s) bound to this browser.
@@ -38,8 +38,8 @@ repo read:org read:user
    `redirect_uri` (`/auth/callback`), `scope` and `state`.
 
 This is **login-CSRF protection**: the state must be both a live, one-time
-server-issued token (KV) *and* match the cookie set in this browser. A state
-minted in one browser cannot be completed in another.
+server-issued token (in the TTL map) *and* match the cookie set in this browser.
+A state minted in one browser cannot be completed in another.
 
 ### `GET /auth/callback`
 
@@ -47,7 +47,7 @@ minted in one browser cannot be completed in another.
 2. Compare `state` against the `oauth_state` cookie using a constant-time
    compare (`timingSafeEqual`); mismatch → `403 invalid state`. The cookie is
    deleted regardless.
-3. Confirm the state is still live in KV; consume it (`OAUTH_STATE.delete`).
+3. Confirm the state is still live in the TTL map; consume it (`OAUTH_STATE.delete`).
    Missing → `403 invalid state`.
 4. POST `code` + `client_secret` to
    `https://github.com/login/oauth/access_token`. No `access_token` →
@@ -70,8 +70,8 @@ cache on logout — see [offline-pwa](./offline-pwa.md).
 ## The stateless encrypted session
 
 The session is `{ token, login, name, avatar, scopes }` sealed into a **JWE**
-encrypted cookie. There is **no server-side session store** — Cloudflare keeps
-nothing; the cookie *is* the session.
+encrypted cookie. There is **no server-side session store** — the cookie *is*
+the session.
 
 - **Algorithm:** JWE direct encryption — `alg: 'dir'`, `enc: 'A256GCM'`
   (AES-256-GCM), via the `jose` library.
@@ -110,7 +110,7 @@ Both are set `httpOnly`, `SameSite=Lax`, `path=/`.
 
 `authMiddleware` runs on every `/api/*` request:
 
-1. Read the session cookie, decrypt it **in-CPU** (0 KV reads, 0 DB reads).
+1. Read the session cookie, decrypt it **in-CPU** (0 DB reads, no session store).
 2. Attach `ctx.user` (the `SessionData`, or `null`).
 3. On success, re-seal and re-set the cookie with a fresh 7-day expiry (the
    sliding TTL).
@@ -125,7 +125,7 @@ Returns **public fields only**:
 { login, name, avatar, scopes }
 ```
 
-The GitHub `token` is excluded — it never leaves the Worker. When logged out,
+The GitHub `token` is excluded — it never leaves the local server. When logged out,
 `/api/me` returns `401 { error: 'unauthenticated' }`; the client treats that as
 a valid logged-out state (the `me` query returns `null`), not an error.
 
@@ -133,7 +133,7 @@ a valid logged-out state (the `me` query returns `null`), not an error.
 
 Two distinct CSRF concerns, two distinct mitigations:
 
-- **Login CSRF** — handled by the one-time KV state token bound to the
+- **Login CSRF** — handled by the one-time in-memory state token bound to the
   `oauth_state` cookie (above).
 - **Mutation CSRF** — Hono's `csrf()` middleware runs ahead of
   `authMiddleware` on `/api/*`, applying Origin / `Sec-Fetch-Site` checks to
