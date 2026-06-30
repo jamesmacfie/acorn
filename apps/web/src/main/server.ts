@@ -3,7 +3,6 @@ import { serveStatic } from '@hono/node-server/serve-static'
 import { readFileSync } from 'node:fs'
 import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import type { ExecutionContext } from 'hono'
 import { createApp } from '../server/index'
 import { makeBindings } from './bindings'
 
@@ -22,8 +21,8 @@ export function startServer(): Promise<ServerType> {
   })
   const app = createApp()
 
-  // Replaces wrangler.jsonc's declarative `assets` block: serve built SPA, fall back to the
-  // shell only for non-API/auth navigations (preserving run_worker_first 404 semantics).
+  // Serve the built SPA, and fall back to the shell only for non-API/auth navigations — so
+  // unmatched /api/* and /auth/* still return JSON/text 404s rather than the HTML shell.
   app.use('/*', serveStatic({ root: clientDir }))
   app.notFound((c) => {
     const path = new URL(c.req.url).pathname
@@ -31,22 +30,13 @@ export function startServer(): Promise<ServerType> {
     return c.html(indexHtml)
   })
 
-  // node-server provides no ExecutionContext, but routes read c.executionCtx (Hono's getter
-  // throws if unset) to pass to waitUntilLogged. A no-op stub satisfies it; the background
-  // promise self-runs in the long-lived Node process.
-  const executionCtx = {
-    waitUntil: () => {},
-    passThroughOnException: () => {},
-    props: {},
-  } as unknown as ExecutionContext
-
   // Loopback Host guard (docs/electron.md §4g): we bind 127.0.0.1, but reject unexpected Host
   // headers too so a DNS-rebinding page can't reach the local API as some other origin.
   const allowedHosts = new Set([`127.0.0.1:${ACORN_PORT}`, `localhost:${ACORN_PORT}`])
   const fetch = (request: Request, nodeEnv: HttpBindings | Http2Bindings) => {
     const host = request.headers.get('host')
     if (!host || !allowedHosts.has(host)) return new Response('Forbidden host', { status: 403 })
-    return app.fetch(request, { ...nodeEnv, ...runtime } as unknown as Env, executionCtx)
+    return app.fetch(request, { ...nodeEnv, ...runtime } as unknown as Env)
   }
 
   // serve() binds asynchronously — resolve only once listening so callers (Electron) can safely

@@ -9,7 +9,6 @@ export const REPOS_STALE_AFTER_MS = 300_000
 
 type Db = ReturnType<typeof getDb>
 type GitHubFetcher = (token: string, path: string, init?: RequestInit) => Promise<Response>
-type WaitUntilContext = { waitUntil(promise: Promise<unknown>): void }
 export type RouteFailure = { error: string; status: 401 | 403 | 404 | 429 | 502; detail?: string[] }
 export type RouteResult<T> = { ok: true; value: T } | { ok: false; failure: RouteFailure }
 
@@ -24,9 +23,17 @@ type GitHubRepo = {
 
 export type ResolvedRepo = { repoId: number; private: boolean }
 
-export const waitUntilLogged = (ctx: WaitUntilContext, label: string, promise: Promise<unknown>) => {
-  ctx.waitUntil(promise.catch((error) => console.error(`${label} background refresh failed`, error)))
+// Serve-then-revalidate kicks off a background refresh. In the long-lived Node process it just
+// runs fire-and-forget (no Worker ExecutionContext to keep alive). Tracked so tests can await
+// completion via settleBackground(); production never awaits.
+const background = new Set<Promise<unknown>>()
+export const waitUntilLogged = (label: string, promise: Promise<unknown>) => {
+  const p = promise
+    .catch((error) => console.error(`${label} background refresh failed`, error))
+    .finally(() => background.delete(p))
+  background.add(p)
 }
+export const settleBackground = () => Promise.all([...background])
 
 export const readCachedRepos = (db: Db, userId: string) =>
   db.select().from(schema.repos).where(eq(schema.repos.userId, userId)).orderBy(desc(schema.repos.pushedAt))

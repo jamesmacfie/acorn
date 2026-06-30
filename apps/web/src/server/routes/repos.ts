@@ -21,7 +21,7 @@ export const repos = new Hono<AppEnv>()
 
     // Stale-but-present is enough for first paint; revalidate outside the response.
     if (cached.length > 0) {
-      waitUntilLogged(c.executionCtx, 'repos', refreshRepos(user.token, db, userId))
+      waitUntilLogged('repos', refreshRepos(user.token, db, userId))
       return c.json(cached.map(toPublicRepo))
     }
 
