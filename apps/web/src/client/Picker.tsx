@@ -22,6 +22,7 @@ export default function Picker<T>(props: {
   tools?: JSX.Element // optional extra toolbar control beside the filter (e.g. refresh)
   status?: JSX.Element // optional status line under the toolbar (e.g. refresh failed)
   buttonClass?: string
+  disabled?: boolean // greys the button and blocks opening (e.g. repo is fixed in a task view)
 }) {
   const [open, setOpen] = createSignal(false)
   const [filter, setFilter] = createSignal('')
@@ -44,6 +45,7 @@ export default function Picker<T>(props: {
     setFilter('')
   }
   const toggle = () => {
+    if (props.disabled) return
     if (open()) close()
     else {
       reposition()
@@ -91,6 +93,7 @@ export default function Picker<T>(props: {
         class={props.buttonClass ?? 'repo-picker-button'}
         aria-haspopup="listbox"
         aria-expanded={open()}
+        disabled={props.disabled}
         onClick={toggle}
       >
         <span class="repo-picker-label">{props.label}</span>

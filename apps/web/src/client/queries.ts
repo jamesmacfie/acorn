@@ -25,6 +25,10 @@ import {
   linearProjectsRoute,
   linearProjectIssuesKey,
   linearProjectIssuesRoute,
+  workspaceLinearProjectsRoute,
+  workspaceAssignmentsRoute,
+  workspaceAssignmentsKey,
+  type RepoAssignment,
   meKey,
   meRoute,
   mentionsKey,
@@ -47,6 +51,9 @@ import {
   repoLabelsRoute,
   reposKey,
   reposRoute,
+  tasksKey,
+  tasksRoute,
+  type Task,
   workspacesKey,
   workspacesRoute,
   type Workspace,
@@ -87,9 +94,10 @@ export {
   pullsPrefixKey,
   reposKey,
   reposRefreshRoute,
+  tasksKey,
   workspacesKey,
 } from '../shared/api'
-export type { Branch, Check, Comment, Compare, CompareCommit, IntegrationsStatus, Label, LinearActivity, LinearComment, LinearIssueDetail, LinearIssueState, LinearIssueSummary, Me, Pull, PullCommit, PullDetail, PullFile, Repo, Review, Thread, ThreadComment, Workspace, WorkspaceLink, WorkspaceSeed } from '../shared/api'
+export type { Branch, Check, Comment, Compare, CompareCommit, IntegrationsStatus, Label, LinearActivity, LinearComment, LinearIssueDetail, LinearIssueState, LinearIssueSummary, Me, Pull, PullCommit, PullDetail, PullFile, Repo, Review, Thread, ThreadComment, Task, TaskLink, TaskSeed, Workspace, WorkspaceRepo } from '../shared/api'
 
 type QueryContext = { signal?: AbortSignal }
 type PageQueryContext = QueryContext & { pageParam: number }
@@ -141,12 +149,38 @@ export const pinsOptions = (enabled: boolean) => ({
   queryFn: async ({ signal }: QueryContext): Promise<number[]> => readJson<number[]>(pinsRoute, { signal }),
 })
 
-// Active workspaces for the rail (docs/workspaces P1). Source of truth is us; refetch on focus
+// Active tasks for the rail (docs/workspaces). Source of truth is us; refetch on focus
 // keeps the dirty/PR-inherited markers fresh as the mirror syncs.
+export const tasksOptions = (enabled: boolean) => ({
+  queryKey: tasksKey,
+  enabled,
+  queryFn: async ({ signal }: QueryContext): Promise<Task[]> => readJson<Task[]>(tasksRoute, { signal }),
+})
+
+// Workspaces (named groups of repos) for the top selector. Each carries its repo membership.
 export const workspacesOptions = (enabled: boolean) => ({
   queryKey: workspacesKey,
   enabled,
   queryFn: async ({ signal }: QueryContext): Promise<Workspace[]> => readJson<Workspace[]>(workspacesRoute, { signal }),
+})
+
+// Per-repo workspace assignment + hidden flag, for the onboarding modal (docs/workspaces).
+export { workspaceAssignmentsKey } from '../shared/api'
+export type { RepoAssignment } from '../shared/api'
+export const assignmentsOptions = (enabled: boolean) => ({
+  queryKey: workspaceAssignmentsKey,
+  enabled,
+  queryFn: async ({ signal }: QueryContext): Promise<RepoAssignment[]> => readJson<RepoAssignment[]>(workspaceAssignmentsRoute, { signal }),
+})
+
+// Linear project IDs linked to a workspace (docs/workspaces P5). One project → many repos via the
+// workspace grouping; replaces the old per-repo prefs key.
+export const workspaceLinearProjectsKey = (id: string) => ['workspace-linear-projects', id] as const
+export const workspaceLinearProjectsOptions = (workspaceId: string | null, enabled: boolean) => ({
+  queryKey: workspaceLinearProjectsKey(workspaceId ?? ''),
+  enabled: enabled && !!workspaceId,
+  queryFn: async ({ signal }: QueryContext): Promise<{ projectIds: string[] }> =>
+    readJson<{ projectIds: string[] }>(workspaceLinearProjectsRoute(workspaceId as string), { signal }),
 })
 
 export const prefsOptions = (enabled: boolean) => ({

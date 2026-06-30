@@ -1,34 +1,27 @@
-import { createMemo, createSignal, For, Show } from 'solid-js'
+import { createSignal, For, Show } from 'solid-js'
 import { useNavigate, useParams } from '@solidjs/router'
 import { createQuery, useQueryClient } from '@tanstack/solid-query'
-import { linearProjectIssuesOptions, linearProjectsOptions, prefsKey, prefsOptions, workspacesKey } from '../../queries'
-import { createWorkspace, setPref } from '../../mutations'
-import { linearProjectsPrefKey, type LinearProject, type LinearProjectIssue } from '../../../shared/api'
-import { setActivePane, setActiveWorkspaceId, setSelectedSource } from './workspaces'
+import { linearProjectIssuesOptions, linearProjectsOptions, tasksKey, workspaceLinearProjectsKey, workspaceLinearProjectsOptions, workspacesOptions } from '../../queries'
+import { createTask, setWorkspaceLinearProjects } from '../../mutations'
+import type { LinearProjectIssue } from '../../../shared/api'
+import { workspaceForRepo } from '../workspaces/activeWorkspace'
+import { setActivePane, setActiveTaskId, setSelectedSource } from './tasks'
 
-// The Linear Source browse (docs/workspaces 04). Linear has projects; pulling *all* issues is noise,
-// so issues are scoped to the project(s) the user links to the current repo. The selection is stored
-// per repo in prefs; a picker over the workspace's projects edits it. Clicking an issue promotes it
-// to a workspace (origin linear) on the issue's Linear branch name. EUX: repo follows the topbar
-// RepoPicker, so "Linear" always shows the issues relevant to the repo you're working in.
+// The Linear Source browse (docs/workspaces 04/P5). Linear projects are linked at the WORKSPACE
+// level — one project can back many repos in the workspace. Issues are scoped to the workspace's
+// linked projects; a picker edits the link set. Clicking an issue promotes it to a task on the
+// current repo (the topbar repo sub-selector chooses which) on the issue's Linear branch name.
 export default function LinearBrowse() {
   const navigate = useNavigate()
   const params = useParams()
   const qc = useQueryClient()
-  const prefs = createQuery(() => prefsOptions(true))
+  const workspaces = createQuery(() => workspacesOptions(true))
+  const ws = () => workspaceForRepo(workspaces.data, params.owner, params.repo)
+  const wsId = () => ws()?.id ?? null
 
-  const prefKey = () => linearProjectsPrefKey(params.owner ?? '', params.repo ?? '')
-  const selected = createMemo<LinearProject[]>(() => {
-    const raw = prefs.data?.[prefKey()]
-    if (!raw) return []
-    try {
-      return JSON.parse(raw) as LinearProject[]
-    } catch {
-      return []
-    }
-  })
-  const selectedIds = () => selected().map((p) => p.id)
-  const issues = createQuery(() => linearProjectIssuesOptions(selectedIds(), !!params.owner && selectedIds().length > 0))
+  const linked = createQuery(() => workspaceLinearProjectsOptions(wsId(), true))
+  const selectedIds = () => linked.data?.projectIds ?? []
+  const issues = createQuery(() => linearProjectIssuesOptions(selectedIds(), selectedIds().length > 0))
 
   // Project picker.
   const [pickerOpen, setPickerOpen] = createSignal(false)
@@ -44,9 +37,10 @@ export default function LinearBrowse() {
     setChecked(s)
   }
   async function savePicker() {
-    const sel = (projects.data?.projects ?? []).filter((p) => checked().has(p.id))
-    await setPref(prefKey(), JSON.stringify(sel))
-    await qc.invalidateQueries({ queryKey: prefsKey })
+    const id = wsId()
+    if (!id) return setPickerOpen(false)
+    await setWorkspaceLinearProjects(id, [...checked()])
+    await qc.invalidateQueries({ queryKey: workspaceLinearProjectsKey(id) })
     setPickerOpen(false)
   }
 
@@ -54,7 +48,7 @@ export default function LinearBrowse() {
     const { owner, repo } = params
     if (!owner || !repo) return
     const branch = it.branchName || it.identifier.toLowerCase()
-    const w = await createWorkspace({
+    const w = await createTask({
       origin: 'linear',
       repoOwner: owner,
       repoName: repo,
@@ -62,9 +56,9 @@ export default function LinearBrowse() {
       title: `${it.identifier} ${it.title}`,
       links: [{ provider: 'linear', identifier: it.identifier }],
     })
-    await qc.invalidateQueries({ queryKey: workspacesKey })
+    await qc.invalidateQueries({ queryKey: tasksKey })
     setSelectedSource(null)
-    setActiveWorkspaceId(w.id)
+    setActiveTaskId(w.id)
     setActivePane('linear')
     navigate(`/${owner}/${repo}`)
   }
@@ -73,20 +67,20 @@ export default function LinearBrowse() {
     <main class="panes panes-empty">
       <section class="pane linear-browse">
         <div class="section-header">
-          Linear{params.owner ? ` · ${params.owner}/${params.repo}` : ''}
-          <Show when={params.owner}>
-            <button type="button" class="new-pr-btn" title="Choose Linear projects for this repo" onClick={openPicker}>
-              Projects{selected().length ? ` (${selected().length})` : ''}
+          Linear{ws() ? ` · ${ws()!.name}` : ''}
+          <Show when={wsId()}>
+            <button type="button" class="new-pr-btn" title="Choose Linear projects for this workspace" onClick={openPicker}>
+              Projects{selectedIds().length ? ` (${selectedIds().length})` : ''}
             </button>
           </Show>
         </div>
 
-        <Show when={params.owner} fallback={<p class="placeholder">Select a repo to browse its Linear issues.</p>}>
+        <Show when={wsId()} fallback={<p class="placeholder">Select a workspace to browse its Linear issues.</p>}>
           <Show
             when={selectedIds().length}
             fallback={
               <div class="workspace-empty-inner">
-                <p class="muted">No Linear projects linked to {params.repo}.</p>
+                <p class="muted">No Linear projects linked to {ws()?.name}.</p>
                 <button type="button" class="overlay-btn" onClick={openPicker}>Choose projects</button>
               </div>
             }
@@ -97,7 +91,7 @@ export default function LinearBrowse() {
                   <For each={issues.data?.issues ?? []}>
                     {(it) => (
                       <li>
-                        <button type="button" class="linear-browse-row" title="Open as workspace" onClick={() => void promote(it)}>
+                        <button type="button" class="linear-browse-row" title="Open as task" onClick={() => void promote(it)}>
                           <span class="linear-browse-id">{it.identifier}</span>
                           <span class="linear-browse-title">{it.title}</span>
                           <Show when={it.state}>{(s) => <span class="linear-browse-state" style={{ '--state-color': s().color }}>{s().name}</span>}</Show>
@@ -115,7 +109,7 @@ export default function LinearBrowse() {
       <Show when={pickerOpen()}>
         <div class="overlay-backdrop" onClick={() => setPickerOpen(false)}>
           <div class="overlay" role="dialog" aria-modal="true" onClick={(e) => e.stopPropagation()}>
-            <div class="overlay-title">Linear projects — {params.owner}/{params.repo}</div>
+            <div class="overlay-title">Linear projects — {ws()?.name}</div>
             <div class="overlay-body">
               <Show when={!projects.isPending} fallback={<p class="muted">Loading projects…</p>}>
                 <Show when={(projects.data?.projects ?? []).length} fallback={<p class="muted">No projects found in this Linear workspace.</p>}>

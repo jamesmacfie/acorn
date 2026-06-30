@@ -1,4 +1,4 @@
-import { BrowserWindow, ipcMain, Notification, type IpcMainInvokeEvent, type WebContents } from 'electron'
+import { BrowserWindow, dialog, ipcMain, Notification, type IpcMainInvokeEvent, type WebContents } from 'electron'
 import { spawn, type IPty } from 'node-pty'
 import { execFileSync } from 'node:child_process'
 import { randomUUID } from 'node:crypto'
@@ -8,7 +8,7 @@ import { homedir } from 'node:os'
 import { eq } from 'drizzle-orm'
 import type { AppDatabase } from '../server/db'
 import { schema } from '../server/db'
-import type { ArchiveResult, CreateOpts, ServerMsg, TerminalSession, WorkspaceStatus } from '../shared/terminal'
+import type { ArchiveResult, CreateOpts, ServerMsg, TerminalSession, TaskStatus } from '../shared/terminal'
 import {
   childEnv,
   clampDim,
@@ -118,7 +118,7 @@ async function persistSession(db: AppDatabase, m: TerminalSession) {
     backend: m.backend,
     status: m.status,
     cwd: m.cwd,
-    workspaceId: m.workspaceId,
+    taskId: m.taskId,
     command: m.command,
     argvJson: '[]',
     tmuxSession: m.tmuxSession ?? null,
@@ -130,21 +130,21 @@ async function persistSession(db: AppDatabase, m: TerminalSession) {
   })
 }
 
-const loadWorkspace = async (db: AppDatabase, id: string): Promise<typeof schema.workspaces.$inferSelect | undefined> => {
-  const [ws] = await db.select().from(schema.workspaces).where(eq(schema.workspaces.id, id))
-  return ws
+const loadTask = async (db: AppDatabase, id: string): Promise<typeof schema.tasks.$inferSelect | undefined> => {
+  const [t] = await db.select().from(schema.tasks).where(eq(schema.tasks.id, id))
+  return t
 }
 
-// Live worktree status for every active workspace that has a worktree (docs/workspaces 02/05):
+// Live worktree status for every active task that has a worktree (docs/workspaces 02/05):
 // dirty + changed-file count via git, and `missing` when the dir vanished (removed outside acorn).
-async function computeWorkspaceStatuses(db: AppDatabase): Promise<WorkspaceStatus[]> {
-  const rows = (await db.select().from(schema.workspaces).where(eq(schema.workspaces.status, 'active'))).filter((w) => w.worktreePath)
+async function computeTaskStatuses(db: AppDatabase): Promise<TaskStatus[]> {
+  const rows = (await db.select().from(schema.tasks).where(eq(schema.tasks.status, 'active'))).filter((w) => w.worktreePath)
   return Promise.all(
     rows.map(async (w) => {
       const path = w.worktreePath!
-      if (!isDir(path)) return { workspaceId: w.id, worktreePath: path, dirty: false, dirtyCount: 0, missing: true }
+      if (!isDir(path)) return { taskId: w.id, worktreePath: path, dirty: false, dirtyCount: 0, missing: true }
       const { dirty, count } = await worktreePorcelain(path)
-      return { workspaceId: w.id, worktreePath: path, dirty, dirtyCount: count, missing: false }
+      return { taskId: w.id, worktreePath: path, dirty, dirtyCount: count, missing: false }
     }),
   )
 }
@@ -153,39 +153,39 @@ async function computeWorkspaceStatuses(db: AppDatabase): Promise<WorkspaceStatu
 // (manual rm) as needing repair. The rail/footer surface `missing` live; this just logs at boot.
 async function reconcileWorktrees(db: AppDatabase) {
   try {
-    const missing = (await computeWorkspaceStatuses(db)).filter((s) => s.missing)
-    if (missing.length) console.warn(`[worktrees] ${missing.length} workspace worktree(s) missing on disk (needs repair): ${missing.map((m) => m.worktreePath).join(', ')}`)
+    const missing = (await computeTaskStatuses(db)).filter((s) => s.missing)
+    if (missing.length) console.warn(`[worktrees] ${missing.length} task worktree(s) missing on disk (needs repair): ${missing.map((m) => m.worktreePath).join(', ')}`)
   } catch {
     // best-effort — never block startup on status
   }
 }
 
-// Repo / branch / PR context for a session, derived through the workspaceId → workspaces join
+// Repo / branch / PR context for a session, derived through the taskId → tasks join
 // (docs/workspaces 03). The session row no longer denormalizes repo/pull; this is the single read.
-function workspaceContext(ws: typeof schema.workspaces.$inferSelect | undefined): Pick<TerminalSession, 'repo' | 'pull'> {
-  if (!ws) return {}
+function taskContext(t: typeof schema.tasks.$inferSelect | undefined): Pick<TerminalSession, 'repo' | 'pull'> {
+  if (!t) return {}
   return {
-    repo: { owner: ws.repoOwner, name: ws.repoName },
-    pull: ws.pullNumber != null ? { number: ws.pullNumber } : undefined,
+    repo: { owner: t.repoOwner, name: t.repoName },
+    pull: t.pullNumber != null ? { number: t.pullNumber } : undefined,
   }
 }
 
-// Lazy worktree on first terminal (Flow C, docs/workspaces 05). Reuse the workspace's worktree if
+// Lazy worktree on first terminal (Flow C, docs/workspaces 05). Reuse the task's worktree if
 // it's set and still on disk; otherwise create one from the base checkout, keyed by branch, and
-// persist worktreePath on the workspace. Returns the cwd + whether it's an isolated worktree. On
+// persist worktreePath on the task. Returns the cwd + whether it's an isolated worktree. On
 // any failure (no checkout mapped, git error) it degrades to the base checkout so the terminal
-// still opens — the workspace just doesn't gain isolation until the next try.
+// still opens — the task just doesn't gain isolation until the next try.
 // ponytail: graceful fallback over a hard error; the dirty/teardown guards still key off worktreePath.
-async function resolveWorkspaceCwd(
+async function resolveTaskCwd(
   db: AppDatabase,
-  ws: typeof schema.workspaces.$inferSelect | undefined,
+  t: typeof schema.tasks.$inferSelect | undefined,
   baseCheckout: string | undefined,
 ): Promise<{ cwd: string; isWorktree: boolean }> {
-  if (ws?.worktreePath && isDir(ws.worktreePath)) return { cwd: ws.worktreePath, isWorktree: true }
-  if (!ws || !baseCheckout || !isDir(baseCheckout)) return { cwd: baseCheckout && isDir(baseCheckout) ? baseCheckout : homedir(), isWorktree: false }
-  const wt = await ensureWorktree(worktreesRoot, baseCheckout, ws.repoOwner, ws.repoName, ws.branch, ws.pullNumber)
+  if (t?.worktreePath && isDir(t.worktreePath)) return { cwd: t.worktreePath, isWorktree: true }
+  if (!t || !baseCheckout || !isDir(baseCheckout)) return { cwd: baseCheckout && isDir(baseCheckout) ? baseCheckout : homedir(), isWorktree: false }
+  const wt = await ensureWorktree(worktreesRoot, baseCheckout, t.repoOwner, t.repoName, t.branch, t.pullNumber)
   if (!wt.ok) return { cwd: baseCheckout, isWorktree: false }
-  await db.update(schema.workspaces).set({ worktreePath: wt.path, updatedAt: Date.now() }).where(eq(schema.workspaces.id, ws.id))
+  await db.update(schema.tasks).set({ worktreePath: wt.path, updatedAt: Date.now() }).where(eq(schema.tasks.id, t.id))
   return { cwd: wt.path, isWorktree: true }
 }
 
@@ -208,7 +208,7 @@ function rowToMeta(row: typeof schema.terminalSessions.$inferSelect, ctx: Pick<T
     status: 'running', // only called for sessions whose tmux is alive
     idle: false,
     isWorktree: false, // not persisted; a reconciled session loses its worktree-cleanup affordance
-    workspaceId: row.workspaceId,
+    taskId: row.taskId,
     cwd: row.cwd,
     command: row.command,
     tmuxSession: row.tmuxSession ?? undefined,
@@ -271,9 +271,9 @@ async function create(db: AppDatabase, opts: CreateOpts): Promise<TerminalSessio
   // The renderer passes the base checkout as opts.cwd (validated at the boundary); the worktree is
   // derived from it. Lazy worktree on first terminal, reused after (docs/workspaces Flow C).
   const baseCheckout = opts.cwd && isAbsolute(opts.cwd) && isDir(opts.cwd) ? opts.cwd : undefined
-  const ws = await loadWorkspace(db, opts.workspaceId)
-  const ctx = workspaceContext(ws)
-  const { cwd, isWorktree } = await resolveWorkspaceCwd(db, ws, baseCheckout)
+  const t = await loadTask(db, opts.taskId)
+  const ctx = taskContext(t)
+  const { cwd, isWorktree } = await resolveTaskCwd(db, t, baseCheckout)
   const cols = clampDim(opts.cols, 80)
   const rows = clampDim(opts.rows, 24)
   const id = randomUUID()
@@ -287,7 +287,7 @@ async function create(db: AppDatabase, opts: CreateOpts): Promise<TerminalSessio
     status: 'running',
     idle: false,
     isWorktree,
-    workspaceId: opts.workspaceId,
+    taskId: opts.taskId,
     cwd,
     command,
     tmuxSession: backend === 'tmux' ? tmuxName(id) : undefined,
@@ -334,7 +334,7 @@ async function reconcileTmux(db: AppDatabase) {
   const alive = tmuxAvailable() ? listTmuxSessions() : new Set<string>()
   for (const row of rows) {
     if (row.backend === 'tmux' && row.tmuxSession && alive.has(row.tmuxSession)) {
-      const meta = rowToMeta(row, workspaceContext(await loadWorkspace(db, row.workspaceId)))
+      const meta = rowToMeta(row, taskContext(await loadTask(db, row.taskId)))
       wireSession(db, meta, attachTmuxPty(row.tmuxSession, row.cols, row.rows))
     } else {
       await deleteRow(db, row.id)
@@ -387,38 +387,44 @@ export async function registerTerminalIpc(db: AppDatabase, worktreesDir: string)
     setRunConfig(db, p.owner, p.repo, p.runCommand, p.devPort),
   )
 
-  // Archive a workspace with the lifecycle guard (docs/workspaces 05): the ONLY path allowed to
+  // Native folder picker for the onboarding repo-mapping flow. Returns the chosen path or null.
+  ipcMain.handle('term:repoPath:pick', async (): Promise<string | null> => {
+    const res = await dialog.showOpenDialog({ properties: ['openDirectory'] })
+    return res.canceled || !res.filePaths[0] ? null : res.filePaths[0]
+  })
+
+  // Archive a task with the lifecycle guard (docs/workspaces 05): the ONLY path allowed to
   // tear a worktree down, and never automatic. Refuse while sessions run or the worktree is dirty;
   // otherwise remove the worktree and mark the row archived (kept for history). Worktree removal +
   // the running-session check both need main (git + the in-memory session map), so this is IPC, not
   // an HTTP route.
-  ipcMain.handle('term:workspace:statuses', () => computeWorkspaceStatuses(db))
+  ipcMain.handle('term:task:statuses', () => computeTaskStatuses(db))
 
-  ipcMain.handle('term:workspace:archive', async (_e: IpcMainInvokeEvent, id: string): Promise<ArchiveResult> => {
-    if (typeof id !== 'string' || !id) return { ok: false, reason: 'Invalid workspace.' }
-    const running = [...sessions.values()].filter((s) => s.meta.workspaceId === id && s.meta.status === 'running')
+  ipcMain.handle('term:task:archive', async (_e: IpcMainInvokeEvent, id: string): Promise<ArchiveResult> => {
+    if (typeof id !== 'string' || !id) return { ok: false, reason: 'Invalid task.' }
+    const running = [...sessions.values()].filter((s) => s.meta.taskId === id && s.meta.status === 'running')
     if (running.length) return { ok: false, reason: `Stop ${running.length} running session${running.length > 1 ? 's' : ''} first.` }
-    const ws = await loadWorkspace(db, id)
-    if (!ws) return { ok: false, reason: 'Workspace not found.' }
-    if (ws.worktreePath) {
-      const mapped = await getRepoPath(db, ws.repoOwner, ws.repoName)
+    const t = await loadTask(db, id)
+    if (!t) return { ok: false, reason: 'Task not found.' }
+    if (t.worktreePath) {
+      const mapped = await getRepoPath(db, t.repoOwner, t.repoName)
       if (mapped) {
-        const res = await removeWorktree(mapped.path, ws.worktreePath, false) // refuses a dirty tree
+        const res = await removeWorktree(mapped.path, t.worktreePath, false) // refuses a dirty tree
         if (!res.ok) return res
       }
       // No mapped checkout → can't git-remove; we still archive and drop the (now-orphaned) reference.
     }
-    // Drop any lingering exited sessions for this workspace so their rows don't outlive it.
+    // Drop any lingering exited sessions for this task so their rows don't outlive it.
     for (const [sid, s] of sessions) {
-      if (s.meta.workspaceId === id) {
+      if (s.meta.taskId === id) {
         sessions.delete(sid)
         if (s.meta.backend === 'tmux') await deleteRow(db, sid)
       }
     }
     await db
-      .update(schema.workspaces)
+      .update(schema.tasks)
       .set({ status: 'archived', archivedAt: Date.now(), worktreePath: null, updatedAt: Date.now() })
-      .where(eq(schema.workspaces.id, id))
+      .where(eq(schema.tasks.id, id))
     return { ok: true }
   })
 

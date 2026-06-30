@@ -12,6 +12,7 @@ export default function RepoPicker(props: {
   pinned: number[]
   selected: string // "owner/name" or ""
   onSelect: (value: string) => void
+  disabled?: boolean
 }) {
   const queryClient = useQueryClient()
   const [refreshing, setRefreshing] = createSignal(false)
@@ -53,6 +54,7 @@ export default function RepoPicker(props: {
   return (
     <Picker<Repo>
       label={props.selected || 'Select a repo'}
+      disabled={props.disabled}
       placeholder="Filter repos…"
       emptyText="No matching repos."
       results={results}

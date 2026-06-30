@@ -23,12 +23,12 @@ export function initSessions(): () => void {
   return api.onStatus(() => void refreshSessions())
 }
 
-// Agents actively working in a workspace (docs/workspaces P2). "Working" = a running agent that
-// isn't idle. Keys off workspaceId, not the URL — the rail's per-workspace spinner and the topbar
+// Agents actively working in a task (docs/workspaces). "Working" = a running agent that
+// isn't idle. Keys off taskId, not the URL — the rail's per-task spinner and the topbar
 // badge both read this.
-export function workingCountFor(workspaceId: string | null): number {
-  if (!workspaceId) return 0
+export function workingCountFor(taskId: string | null): number {
+  if (!taskId) return 0
   return sessions().filter(
-    (s) => s.kind === 'agent' && s.status === 'running' && !s.idle && s.workspaceId === workspaceId,
+    (s) => s.kind === 'agent' && s.status === 'running' && !s.idle && s.taskId === taskId,
   ).length
 }

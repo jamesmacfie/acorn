@@ -1,5 +1,30 @@
 # 03 — Data model: entities & schema
 
+> **⚠️ Superseded terminology** — see the two-tier note in [`README.md`](./README.md). The
+> `workspaces` table described below is now the **`tasks`** table; `workspace_links` is **`task_links`**;
+> `terminal_sessions.workspace_id` is **`task_id`**. The name **`workspaces`** now belongs to a new
+> top-level group table. The current shape is:
+>
+> ```ts
+> // Named group of repos — the top-level unit (machine-scoped).
+> workspaces            { id, name, isDefault, sort, createdAt, updatedAt }
+> // Repo → Workspace membership. PK (repoOwner, repoName) = one workspace per repo (partition).
+> workspace_repos       { workspaceId, repoOwner, repoName, sort, createdAt }
+> // Linear projects linked to a workspace → one project spans the workspace's repos.
+> workspace_linear_projects { workspaceId, linearProjectId, createdAt }
+> // Repos hidden from the UI (onboarding eye-toggle). Keeps its workspace_repos membership; this
+> // flag just excludes it from the selector / rail / scoping, and bootstrap skips it.
+> ignored_repos         { owner, repo, createdAt }
+> // The single-repo unit of work (formerly `workspaces`). Parent workspace is derived via
+> // workspace_repos on (repoOwner, repoName).
+> tasks                 { id, title, origin, repoOwner, repoName, branch, worktreePath,
+>                         pullNumber, status, sort, createdAt, updatedAt, archivedAt }
+> task_links            { taskId, provider, identifier, createdAt }
+> terminal_sessions     { …, taskId, … }   // was workspaceId
+> ```
+>
+> The rest of this doc reflects the original single-tier design — read "workspace" as "task".
+
 This proposes the minimum schema to make a Workspace a first-class entity. It follows the existing
 conventions in `apps/web/src/server/db/schema.ts` exactly. These tables are added to `schema.ts`
 up front and ship in the single fresh baseline migration (P0,

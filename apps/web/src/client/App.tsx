@@ -3,9 +3,12 @@ import { createQuery, useIsRestoring, useQueryClient } from '@tanstack/solid-que
 import { useMatch, useNavigate, useParams } from '@solidjs/router'
 import { clear } from 'idb-keyval'
 import { readJson } from './apiClient'
-import { meKey, meOptions, pinsOptions, prefsKey, prefsOptions, pullPrefixKey, pullsKey, pullsRoute, pullsPrefixKey, reposKey, reposOptions, reposRefreshRoute, workspacesOptions, type Pull } from './queries'
-import { setPref } from './mutations'
+import { meKey, meOptions, pinsOptions, prefsKey, prefsOptions, pullPrefixKey, pullsKey, pullsRoute, pullsPrefixKey, reposKey, reposOptions, reposRefreshRoute, tasksOptions, workspacesKey, workspacesOptions, type Pull } from './queries'
+import { bootstrapWorkspaces, setPref } from './mutations'
 import RepoPicker from './RepoPicker'
+import WorkspacePicker from './WorkspacePicker'
+import OnboardingModal from './features/workspaces/OnboardingModal'
+import { workspaceForRepo } from './features/workspaces/activeWorkspace'
 import PullList from './PullList'
 import PullDetail from './PullDetail'
 import CreatePullForm from './CreatePullForm'
@@ -17,10 +20,10 @@ import IntegrationsModal from './features/integrations/IntegrationsModal'
 import TerminalPanel from './features/terminal/TerminalPanel'
 import { initSessions } from './features/terminal/sessions'
 import TabRail from './features/tabs/TabRail'
-import { activeWorkspaceId, selectedSource, setActiveWorkspaceId, setSelectedSource } from './features/workspaces/workspaces'
-import { initWorkspaceStatuses } from './features/workspaces/workspaceStatus'
-import WorkspaceView from './features/workspaces/WorkspaceView'
-import LinearBrowse from './features/workspaces/LinearBrowse'
+import { activeTaskId, selectedSource, setActiveTaskId, setSelectedSource } from './features/tasks/tasks'
+import { initTaskStatuses } from './features/tasks/taskStatus'
+import TaskView from './features/tasks/TaskView'
+import LinearBrowse from './features/tasks/LinearBrowse'
 import Acorn from './Acorn'
 
 // vNext Phase 0 flag: terminal only exists on desktop (Electron IPC) and stays behind a flag —
@@ -36,6 +39,7 @@ export default function App() {
   const isRestoring = useIsRestoring()
   const [helpOpen, setHelpOpen] = createSignal(false)
   const [integrationsOpen, setIntegrationsOpen] = createSignal(false)
+  const [onboardingDismissed, setOnboardingDismissed] = createSignal(false)
   // Terminal drawer open/closed, persisted via the `term_open` pref so a reload restores it (vNext
   // §10). Seed once from prefs (mirrors the left-collapse pattern), then user toggles win.
   const [termOpen, setTermOpen] = createSignal(false)
@@ -57,22 +61,45 @@ export default function App() {
   onMount(() => {
     if (!terminalEnabled) return
     onCleanup(initSessions())
-    onCleanup(initWorkspaceStatuses())
+    onCleanup(initTaskStatuses())
   })
 
   const me = createQuery(() => meOptions())
   const repos = createQuery(() => reposOptions(!!me.data))
   const prefs = createQuery(() => prefsOptions(!!me.data))
   const pins = createQuery(() => pinsOptions(!!me.data))
+  const tasks = createQuery(() => tasksOptions(!!me.data))
   const workspaces = createQuery(() => workspacesOptions(!!me.data))
 
-  // Default the active workspace to the first row once the list loads (no navigation — selecting a
+  // First-run bootstrap (idempotent): ensure a Default workspace exists and every mirrored repo is
+  // assigned to a workspace, so the top selector + repo scoping always have data. Runs once the
+  // repos mirror has loaded (so newly-fetched repos get assigned). The onboarding modal (P4) lets
+  // the user re-group afterwards.
+  let bootstrapped = false
+  createEffect(() => {
+    if (bootstrapped || !me.data || !repos.data) return
+    bootstrapped = true
+    void bootstrapWorkspaces().then(() => queryClient.invalidateQueries({ queryKey: workspacesKey }))
+  })
+
+  // Active workspace is derived from the current repo (partition — a repo is in exactly one).
+  const activeWorkspace = () => workspaceForRepo(workspaces.data, params.owner, params.repo)
+  // Repos scoped to the active workspace for the topbar sub-selector. Falls back to all repos before
+  // the workspace mapping has loaded so the picker is never empty.
+  const scopedRepos = () => {
+    const ws = activeWorkspace()
+    if (!ws) return repos.data ?? []
+    const set = new Set((ws.repos ?? []).map((r) => `${r.owner}/${r.name}`))
+    return (repos.data ?? []).filter((r) => set.has(`${r.owner}/${r.name}`))
+  }
+
+  // Default the active task to the first row once the list loads (no navigation — selecting a
   // row in the rail is what navigates). The terminal drawer + topbar badge key off this.
   createEffect(() => {
-    const list = workspaces.data
-    if (list?.length && !activeWorkspaceId()) setActiveWorkspaceId(list[0].id)
+    const list = tasks.data
+    if (list?.length && !activeTaskId()) setActiveTaskId(list[0].id)
   })
-  const activeWorkspace = () => workspaces.data?.find((w) => w.id === activeWorkspaceId()) ?? null
+  const activeTask = () => tasks.data?.find((w) => w.id === activeTaskId()) ?? null
 
   // Apply the saved theme (falls back to prefers-color-scheme when unset).
   createEffect(() => {
@@ -184,13 +211,30 @@ export default function App() {
           >
             {collapsed() ? '»' : '«'}
           </button>
-          <Show when={repos.data?.length}>
+          <Show when={workspaces.data?.length}>
+            <WorkspacePicker
+              workspaces={workspaces.data ?? []}
+              active={activeWorkspace()}
+              onSelect={(w) => {
+                // Selecting a workspace navigates to its first repo; the active workspace is derived
+                // from the repo, so no extra state. Empty workspaces stay put.
+                const first = w.repos[0]
+                if (!first) return
+                if (!selectedSource()) setSelectedSource('github')
+                navigate(`/${first.owner}/${first.name}`)
+              }}
+            />
+          </Show>
+          <Show when={scopedRepos().length}>
             <RepoPicker
-              repos={repos.data ?? []}
+              repos={scopedRepos()}
               pinned={pins.data ?? []}
               selected={selected()}
+              /* In a task view the repo is fixed to that worktree — switching repos is meaningless,
+                 so disable it. The workspace selector stays live (it swaps the whole UI). */
+              disabled={!selectedSource() && !!activeTask()}
               onSelect={(value) => {
-                // From a workspace view, picking a repo returns to the GitHub browse; from a Source
+                // From a task view, picking a repo returns to the GitHub browse; from a Source
                 // (GitHub/Linear) it just re-scopes that source to the chosen repo.
                 if (!selectedSource()) setSelectedSource('github')
                 navigate(`/${value}`)
@@ -299,10 +343,10 @@ export default function App() {
         <Match when={selectedSource() === 'linear'}>
           <LinearBrowse />
         </Match>
-        <Match when={!selectedSource() && activeWorkspace()}>
-          {(ws) => (
-            <WorkspaceView
-              workspace={ws()}
+        <Match when={!selectedSource() && activeTask()}>
+          {(task) => (
+            <TaskView
+              task={task()}
               terminalOpen={termOpen()}
               onToggleTerminal={() => void toggleTerm()}
               onOpenTerminal={() => { if (!termOpen()) void toggleTerm() }}
@@ -312,8 +356,11 @@ export default function App() {
       </Switch>
       <Shortcuts helpOpen={helpOpen()} onHelpOpenChange={setHelpOpen} />
       <IntegrationsModal open={integrationsOpen()} onClose={() => setIntegrationsOpen(false)} />
+      <Show when={!onboardingDismissed() && !!me.data && prefs.data !== undefined && prefs.data?.onboarded !== '1' && (workspaces.data?.length ?? 0) > 0}>
+        <OnboardingModal onClose={() => setOnboardingDismissed(true)} />
+      </Show>
       <Show when={termOpen()}>
-        <TerminalPanel onClose={() => setTermOpen(false)} workspace={activeWorkspace()} />
+        <TerminalPanel onClose={() => setTermOpen(false)} task={activeTask()} />
       </Show>
     </div>
     </div>

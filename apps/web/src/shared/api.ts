@@ -94,9 +94,22 @@ export type LinearProjectsResponse = { projects: LinearProject[] }
 export type LinearProjectIssue = LinearIssueSummary & { branchName: string | null }
 export type LinearProjectIssuesResponse = { issues: LinearProjectIssue[] }
 
-// --- Workspaces (docs/workspaces) ---
-export type WorkspaceLink = { provider: string; identifier: string }
+// --- Workspaces: named groups of repos (docs/workspaces). The top-level unit. ---
+export type WorkspaceRepo = { owner: string; name: string; sort: number }
 export type Workspace = {
+  id: string
+  name: string
+  isDefault: boolean
+  sort: number
+  repos: WorkspaceRepo[]
+}
+export type WorkspaceSeed = { name: string }
+// Per-repo assignment for the onboarding modal: which workspace a repo is in + whether it's hidden.
+export type RepoAssignment = { owner: string; name: string; workspaceId: string; ignored: boolean }
+
+// --- Tasks: the single-repo unit of work (docs/workspaces/03). Rail rows. ---
+export type TaskLink = { provider: string; identifier: string }
+export type Task = {
   id: string
   title: string
   origin: 'github-pr' | 'linear' | 'rollbar' | 'local'
@@ -107,18 +120,18 @@ export type Workspace = {
   pullNumber: number | null
   status: 'active' | 'archived'
   sort: number
-  links: WorkspaceLink[]
+  links: TaskLink[]
 }
-// The non-derived columns a new workspace needs, plus initial links. One create path for every
+// The non-derived columns a new task needs, plus initial links. One create path for every
 // Source (docs/workspaces/04). title is optional — the server seeds one from origin if absent.
-export type WorkspaceSeed = {
+export type TaskSeed = {
   title?: string
-  origin: Workspace['origin']
+  origin: Task['origin']
   repoOwner: string
   repoName: string
   branch: string
   pullNumber?: number
-  links?: WorkspaceLink[]
+  links?: TaskLink[]
 }
 
 export const repoRoute = (owner: string, repo: string, child = '') => `/api/repos/${owner}/${repo}${child ? `/${child}` : ''}`
@@ -152,15 +165,24 @@ export const requestedReviewersRoute = (owner: string, repo: string, number: str
   pullRoute(owner, repo, number, 'requested-reviewers')
 export const pinsRoute = '/api/pins'
 export const prefsRoute = '/api/prefs'
+// Workspaces (named groups of repos) — the top-level unit.
 export const workspacesRoute = '/api/workspaces'
 export const workspaceRoute = (id: string) => `/api/workspaces/${id}`
+export const workspaceBootstrapRoute = '/api/workspaces/bootstrap'
+export const workspaceReposRoute = (id: string) => `/api/workspaces/${id}/repos`
+export const workspaceIgnoreRepoRoute = '/api/workspaces/ignore-repo'
+export const workspaceUnignoreRepoRoute = '/api/workspaces/unignore-repo'
+export const workspaceIgnoreAllRoute = '/api/workspaces/ignore-all'
+export const workspaceAssignmentsRoute = '/api/workspaces/assignments'
+export const workspaceLinearProjectsRoute = (id: string) => `/api/workspaces/${id}/linear-projects`
+// Tasks (single-repo units of work) — rail rows.
+export const tasksRoute = '/api/tasks'
+export const taskRoute = (id: string) => `/api/tasks/${id}`
 export const integrationsRoute = '/api/integrations'
 export const linearIntegrationRoute = '/api/integrations/linear'
 export const linearIssuesRoute = '/api/linear/issues'
 export const linearProjectsRoute = '/api/linear/projects'
 export const linearProjectIssuesRoute = (projectIds: string[]) => `/api/linear/project-issues?ids=${encodeURIComponent(projectIds.join(','))}`
-// Per-repo Linear project selection lives in prefs under this key (docs/workspaces — Linear source).
-export const linearProjectsPrefKey = (owner: string, repo: string) => `linear:projects:${owner}/${repo}`
 export const linearIssueRoute = (identifier: string) => `/api/linear/issues/${encodeURIComponent(identifier)}?refresh=1`
 export const linearCommentsRoute = (identifier: string) => `/api/linear/issues/${encodeURIComponent(identifier)}/comments`
 
@@ -182,7 +204,12 @@ export const branchesKey = (owner: string, repo: string) => ['branches', owner, 
 export const compareKey = (owner: string, repo: string, base: string, head: string) => ['compare', owner, repo, base, head] as const
 export const pinsKey = ['pins'] as const
 export const prefsKey = ['prefs'] as const
-export const workspacesKey = ['workspaces'] as const
+// 'groups' suffix: the bare ['workspaces'] key held the old single-tier task array, which may still
+// be in a user's persisted IndexedDB cache — restoring it under a new shape (repos[]) would poison
+// reads. A distinct key sidesteps the stale entry (same fix as closedPullsKey).
+export const workspacesKey = ['workspaces', 'groups'] as const
+export const workspaceAssignmentsKey = ['workspace-assignments'] as const
+export const tasksKey = ['tasks'] as const
 export const mentionsKey = (owner: string, repo: string) => ['mentions', owner, repo] as const
 export const runJobsKey = (owner: string, repo: string, runId: number) => ['run-jobs', owner, repo, runId] as const
 export const jobLogKey = (owner: string, repo: string, jobId: number) => ['job-log', owner, repo, jobId] as const
