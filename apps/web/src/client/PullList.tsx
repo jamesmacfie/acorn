@@ -4,8 +4,11 @@ import { A, useNavigate, useParams } from '@solidjs/router'
 import { createVirtualizer } from '@tanstack/solid-virtual'
 import { checksState, formatRelativeTime } from './displayMeta'
 import { prefetchOpenPulls, schedulePullSummaryPrefetch } from './prefetch'
-import { closedPullsInfiniteOptions, pullDetailOptions, pullsOptions, reposOptions } from './queries'
+import { closedPullsInfiniteOptions, pullDetailOptions, pullsOptions, reposOptions, workspacesKey, type Pull } from './queries'
 import { filterPulls } from './features/pullList/model'
+import { createWorkspace } from './mutations'
+import { scanLinearRefs } from './features/integrations/scanLinearRefs'
+import { setActivePane, setActiveWorkspaceId, setSelectedSource } from './features/workspaces/workspaces'
 
 // Left-pane PR list for the routed repo. Access checks live on the server; this pane only needs
 // route params before it can ask for the repo's PRs. The list is virtualized in its own scroll
@@ -65,6 +68,26 @@ export default function PullList() {
   }
   onMount(() => window.addEventListener('keydown', onKey))
   onCleanup(() => window.removeEventListener('keydown', onKey))
+
+  // Flow A (docs/workspaces 02): promote a PR into a workspace. origin github-pr, branch = headRef,
+  // pullNumber. Linear ids are seeded from a warmed detail body if we have one (best-effort — the
+  // Linear pane that consumes them is P4); otherwise none. Then activate + navigate to the PR.
+  async function openAsWorkspace(e: Event, pr: Pull) {
+    e.preventDefault()
+    e.stopPropagation()
+    const { owner, repo } = params
+    if (!owner || !repo || !pr.headRef) return
+    // Fetch the detail (cached if warm) so the body is present, then seed a workspace_link for EVERY
+    // Linear ticket the PR references — a PR can resolve several, and the workspace links them all.
+    const detail = await queryClient.ensureQueryData(pullDetailOptions(owner, repo, String(pr.number), true)).catch(() => undefined)
+    const links = scanLinearRefs([detail?.pull?.body]).map((r) => ({ provider: 'linear', identifier: r.identifier }))
+    const w = await createWorkspace({ origin: 'github-pr', repoOwner: owner, repoName: repo, branch: pr.headRef, pullNumber: pr.number, links })
+    await queryClient.invalidateQueries({ queryKey: workspacesKey })
+    setSelectedSource(null)
+    setActiveWorkspaceId(w.id)
+    setActivePane('pr')
+    navigate(`/${owner}/${repo}/${pr.number}`)
+  }
 
   let rowPrefetch: { cancel: () => void } | null = null
   const cancelRowPrefetch = () => {
@@ -171,6 +194,11 @@ export default function PullList() {
                         <span class="pr-author muted">{pr.author}</span>
                       </Show>
                       <span class="pr-time muted">{formatRelativeTime(pr.updatedAt)}</span>
+                      <Show when={pr.headRef}>
+                        <button type="button" class="pr-ws-btn" title="Open as workspace" onClick={(e) => void openAsWorkspace(e, pr)}>
+                          + ws
+                        </button>
+                      </Show>
                     </A>
                   )
                 }}

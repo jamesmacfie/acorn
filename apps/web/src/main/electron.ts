@@ -61,6 +61,14 @@ function hardenNavigation(win: BrowserWindow) {
     void shell.openExternal(url)
     return { action: 'deny' }
   })
+  // Browser-preview pane (docs/workspaces P5): only let a <webview> attach when it points at the
+  // local dev server, and never give the guest a preload or node integration (hardened posture).
+  win.webContents.on('will-attach-webview', (e, webPreferences, params) => {
+    delete webPreferences.preload
+    webPreferences.nodeIntegration = false
+    webPreferences.contextIsolation = true
+    if (!/^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?(\/|$)/.test(params.src ?? '')) e.preventDefault()
+  })
 }
 
 async function createMainWindow() {
@@ -74,6 +82,9 @@ async function createMainWindow() {
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: true,
+      // Browser-preview pane (docs/workspaces P5): a <webview> onto the workspace's local dev server.
+      // The guest gets no node integration; will-attach-webview below pins it to localhost.
+      webviewTag: true,
     },
   })
   hardenNavigation(win)

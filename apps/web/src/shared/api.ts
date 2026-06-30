@@ -88,6 +88,38 @@ export type LinearIssueDetail = LinearIssueSummary & { id: string; description: 
 export type LinearCommentRequest = { body: string; parentId?: string }
 export type LinearIssuesRequest = { identifiers: string[] }
 export type LinearIssuesResponse = { issues: LinearIssueSummary[] }
+// Linear projects + project-scoped issue browse (docs/workspaces — Linear source per repo).
+export type LinearProject = { id: string; name: string }
+export type LinearProjectsResponse = { projects: LinearProject[] }
+export type LinearProjectIssue = LinearIssueSummary & { branchName: string | null }
+export type LinearProjectIssuesResponse = { issues: LinearProjectIssue[] }
+
+// --- Workspaces (docs/workspaces) ---
+export type WorkspaceLink = { provider: string; identifier: string }
+export type Workspace = {
+  id: string
+  title: string
+  origin: 'github-pr' | 'linear' | 'rollbar' | 'local'
+  repoOwner: string
+  repoName: string
+  branch: string
+  worktreePath: string | null
+  pullNumber: number | null
+  status: 'active' | 'archived'
+  sort: number
+  links: WorkspaceLink[]
+}
+// The non-derived columns a new workspace needs, plus initial links. One create path for every
+// Source (docs/workspaces/04). title is optional — the server seeds one from origin if absent.
+export type WorkspaceSeed = {
+  title?: string
+  origin: Workspace['origin']
+  repoOwner: string
+  repoName: string
+  branch: string
+  pullNumber?: number
+  links?: WorkspaceLink[]
+}
 
 export const repoRoute = (owner: string, repo: string, child = '') => `/api/repos/${owner}/${repo}${child ? `/${child}` : ''}`
 export const pullRoute = (owner: string, repo: string, number: string | number, child = '') =>
@@ -120,9 +152,15 @@ export const requestedReviewersRoute = (owner: string, repo: string, number: str
   pullRoute(owner, repo, number, 'requested-reviewers')
 export const pinsRoute = '/api/pins'
 export const prefsRoute = '/api/prefs'
+export const workspacesRoute = '/api/workspaces'
+export const workspaceRoute = (id: string) => `/api/workspaces/${id}`
 export const integrationsRoute = '/api/integrations'
 export const linearIntegrationRoute = '/api/integrations/linear'
 export const linearIssuesRoute = '/api/linear/issues'
+export const linearProjectsRoute = '/api/linear/projects'
+export const linearProjectIssuesRoute = (projectIds: string[]) => `/api/linear/project-issues?ids=${encodeURIComponent(projectIds.join(','))}`
+// Per-repo Linear project selection lives in prefs under this key (docs/workspaces — Linear source).
+export const linearProjectsPrefKey = (owner: string, repo: string) => `linear:projects:${owner}/${repo}`
 export const linearIssueRoute = (identifier: string) => `/api/linear/issues/${encodeURIComponent(identifier)}?refresh=1`
 export const linearCommentsRoute = (identifier: string) => `/api/linear/issues/${encodeURIComponent(identifier)}/comments`
 
@@ -144,9 +182,12 @@ export const branchesKey = (owner: string, repo: string) => ['branches', owner, 
 export const compareKey = (owner: string, repo: string, base: string, head: string) => ['compare', owner, repo, base, head] as const
 export const pinsKey = ['pins'] as const
 export const prefsKey = ['prefs'] as const
+export const workspacesKey = ['workspaces'] as const
 export const mentionsKey = (owner: string, repo: string) => ['mentions', owner, repo] as const
 export const runJobsKey = (owner: string, repo: string, runId: number) => ['run-jobs', owner, repo, runId] as const
 export const jobLogKey = (owner: string, repo: string, jobId: number) => ['job-log', owner, repo, jobId] as const
 export const integrationsKey = ['integrations'] as const
 export const linearIssuesKey = (identifiers: string[]) => ['linear-issues', ...[...identifiers].sort()] as const
+export const linearProjectsKey = ['linear-projects'] as const
+export const linearProjectIssuesKey = (projectIds: string[]) => ['linear-project-issues', ...[...projectIds].sort()] as const
 export const linearIssueKey = (identifier: string) => ['linear-issue', identifier] as const

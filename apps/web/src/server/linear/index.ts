@@ -29,6 +29,22 @@ export async function linearData<T>(res: Response): Promise<T> {
 export const VIEWER_QUERY = `query { viewer { name organization { name } } }`
 export type Viewer = { viewer: { name: string; organization: { name: string } } }
 
+// Projects in the workspace, for the per-repo project picker (docs/workspaces — Linear source).
+export const PROJECTS_QUERY = `query { projects(first: 250) { nodes { id name } } }`
+export type LinearProjectNode = { id: string; name: string }
+
+// Active issues for a set of projects (the Linear source browse). Excludes completed/canceled so the
+// list is signal, not history. branchName is Linear's suggested git branch — the promote default.
+export const PROJECT_ISSUES_QUERY = `query($filter: IssueFilter) {
+  issues(filter: $filter, first: 100) {
+    nodes { id identifier title url branchName state { name type color } assignee { name } }
+  }
+}`
+export const projectIssuesFilter = (projectIds: string[]): Record<string, unknown> => ({
+  project: { id: { in: projectIds } },
+  state: { type: { nin: ['completed', 'canceled'] } },
+})
+
 // A single issue-history event. Linear records each change with from/to fields; one event may
 // carry several changes (state + assignee at once). Labels arrive as IDs — resolved to names via
 // the issue's current label set where possible. actor is the user; botActor covers integrations.
@@ -54,6 +70,7 @@ export type LinearNode = {
   title: string
   url: string
   description?: string | null
+  branchName?: string | null
   createdAt?: string
   state: { name: string; type: string; color: string } | null
   assignee: { name: string } | null

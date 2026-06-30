@@ -251,10 +251,47 @@ export const repoPaths = sqliteTable(
     repo: text('repo').notNull(),
     githubRepoId: integer('github_repo_id'),
     path: text('path').notNull(),
+    // Per-repo dev-server config (docs/workspaces 05 / P5). runCommand is run in a workspace's
+    // worktree with PORT = devPort + the workspace's rail offset, so two workspaces don't collide.
+    runCommand: text('run_command'),
+    devPort: integer('dev_port'),
     createdAt: integer('created_at').notNull(),
     updatedAt: integer('updated_at').notNull(),
   },
   (t) => [primaryKey({ columns: [t.owner, t.repo] })],
+)
+
+// The owning entity (docs/workspaces/03-data-model.md). One row per "thing you're working on":
+// a repo + branch + optional worktree + optional linked PR + its panes/terminals. Machine-scoped
+// like repo_paths / terminal_sessions — it owns a local worktree, so no user_id.
+export const workspaces = sqliteTable('workspaces', {
+  id: text('id').primaryKey(), // opaque uuid
+  title: text('title').notNull(), // editable label; seeded from origin (PR title, ticket, …)
+  origin: text('origin').notNull(), // 'github-pr' | 'linear' | 'rollbar' | 'local'
+  repoOwner: text('repo_owner').notNull(), // a workspace always belongs to a repo
+  repoName: text('repo_name').notNull(),
+  branch: text('branch').notNull(), // the branch this workspace works on
+  worktreePath: text('worktree_path'), // null until a terminal is first opened (Flow C)
+  pullNumber: integer('pull_number'), // null for local-first until a PR is inherited (Flow B)
+  status: text('status').notNull(), // 'active' | 'archived'
+  sort: integer('sort').notNull().default(0), // rail ordering, like pinned_repos.sort
+  createdAt: integer('created_at').notNull(),
+  updatedAt: integer('updated_at').notNull(),
+  archivedAt: integer('archived_at'), // set on archive; row kept for history/teardown audit
+})
+
+// Zero-or-more external items a workspace references (Linear tickets, Rollbar errors). The join
+// the schema lacks today — Linear ids are only parsed out of PR bodies at render time.
+// (provider, identifier) matches the PK tail of `issues`, so a link resolves straight to cached detail.
+export const workspaceLinks = sqliteTable(
+  'workspace_links',
+  {
+    workspaceId: text('workspace_id').notNull(), // → workspaces.id
+    provider: text('provider').notNull(), // 'linear' | 'rollbar'
+    identifier: text('identifier').notNull(), // 'ENG-42' | rollbar item id
+    createdAt: integer('created_at').notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.workspaceId, t.provider, t.identifier] })],
 )
 
 // Durable terminal sessions (vNext §7). Machine-scoped like repo_paths. We persist ONLY tmux-backed
@@ -262,6 +299,8 @@ export const repoPaths = sqliteTable(
 // `tmux list-sessions` and re-attaches the survivors. node-pty sessions die with the process and
 // live only in the in-memory map. No terminal output is ever stored (vNext §8). ponytail: a §7
 // subset — no pid / last_attached_at (we re-derive liveness from tmux, not a stored pid).
+// Bound to a workspace (docs/workspaces/03): repo / branch / PR are derived through the
+// workspaceId → workspaces join, so the loose repo_owner / repo_name / pull_number columns are gone.
 export const terminalSessions = sqliteTable('terminal_sessions', {
   id: text('id').primaryKey(),
   title: text('title').notNull(),
@@ -270,9 +309,7 @@ export const terminalSessions = sqliteTable('terminal_sessions', {
   backend: text('backend').notNull(), // node-pty | tmux (only tmux rows are persisted)
   status: text('status').notNull(), // running | exited
   cwd: text('cwd').notNull(),
-  repoOwner: text('repo_owner'),
-  repoName: text('repo_name'),
-  pullNumber: integer('pull_number'),
+  workspaceId: text('workspace_id').notNull(), // → workspaces.id
   command: text('command').notNull(),
   argvJson: text('argv_json').notNull().default('[]'),
   tmuxSession: text('tmux_session'),

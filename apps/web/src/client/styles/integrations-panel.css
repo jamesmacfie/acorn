@@ -29,6 +29,26 @@
   font-weight: 600;
   color: var(--text);
 }
+/* Ticket switcher when a workspace links several Linear tickets (docs/workspaces). */
+.integrations-panel-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  padding: 6px var(--pane-pad);
+  border-bottom: 1px solid var(--border);
+}
+.integrations-panel-tab {
+  font: inherit;
+  font-size: var(--fs-sm);
+  color: var(--text-muted);
+  background: var(--bg-subtle);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 2px 8px;
+  cursor: pointer;
+}
+.integrations-panel-tab:hover { color: var(--text); border-color: var(--border-strong); }
+.integrations-panel-tab.active { color: var(--text); background: var(--bg-selected); border-color: var(--accent); }
 .integrations-panel-link {
   flex: 1;
   font-size: var(--fs-sm);

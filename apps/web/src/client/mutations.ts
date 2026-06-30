@@ -11,6 +11,10 @@ import {
   pinsRoute,
   prefsRoute,
   pullRoute,
+  workspaceRoute,
+  workspacesRoute,
+  type Workspace,
+  type WorkspaceSeed,
   rerunFailedRoute,
   requestedReviewersRoute,
   resolveThreadRoute,
@@ -94,6 +98,19 @@ export const setPin = async (repoId: number, pinned: boolean) => {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ repoId, pinned }),
   }, (res) => `pins ${res.status}`)
+}
+
+// Workspaces (docs/workspaces). Create from a seed; rename/archive via PATCH. Callers invalidate
+// workspacesKey after.
+export const createWorkspace = (seed: WorkspaceSeed) => post<Workspace>(workspacesRoute, seed)
+export const renameWorkspace = async (id: string, title: string) => patchWorkspace(id, { title })
+export const archiveWorkspace = async (id: string) => patchWorkspace(id, { status: 'archived' })
+async function patchWorkspace(id: string, body: { title?: string; status?: 'active' | 'archived' }) {
+  return writeJson<unknown>(workspaceRoute(id), {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  }, (res) => `workspace ${res.status}`)
 }
 
 export const setPref = async (key: string, value: string) => {

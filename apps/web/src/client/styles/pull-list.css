@@ -64,6 +64,22 @@
   text-align: right;
   font-variant-numeric: tabular-nums;
 }
+/* "Open as workspace" affordance — hidden until the row is hovered/focused (docs/workspaces P3). */
+.pr-ws-btn {
+  flex: none;
+  opacity: 0;
+  font: inherit;
+  font-size: var(--fs-sm);
+  color: var(--text-muted);
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 0 6px;
+  cursor: pointer;
+}
+.pr-row:hover .pr-ws-btn,
+.pr-row:focus-within .pr-ws-btn { opacity: 1; }
+.pr-ws-btn:hover { background: var(--bg); color: var(--text); border-color: var(--border-strong); }
 .pr-load-more {
   display: block;
   width: 100%;
