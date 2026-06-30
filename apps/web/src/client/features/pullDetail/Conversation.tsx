@@ -2,6 +2,7 @@ import { createMemo, For, Show } from 'solid-js'
 import { formatRelativeTime } from '../../displayMeta'
 import type { PullCommit, Thread, ThreadComment } from '../../queries'
 import { UserAvatar } from '../../UserAvatar'
+import CopyButton from '../../CopyButton'
 import { hasRenderableBody, reviewAction, threadComments, threadSnippetFromIndex, type ConversationEntry, type ThreadSnippetIndex } from './model'
 
 export function ConversationEntryItem(props: {
@@ -47,9 +48,13 @@ function CommitItem(props: { commit: PullCommit }) {
 function ConversationItem(props: { author: string | null; action: string; body: string | null; state?: string | null; createdAt?: number | null }) {
   const hasBody = () => hasRenderableBody(props.body)
   const stateClass = () => (props.state ? `review-state review-${props.state.toLowerCase()}` : '')
+  let bodyRef: HTMLDivElement | undefined
 
   return (
-    <div class="comment comment-card" classList={{ 'comment-card-empty': !hasBody() }}>
+    <div class="comment comment-card copyable" classList={{ 'comment-card-empty': !hasBody() }}>
+      <Show when={hasBody()}>
+        <CopyButton class="copy-abs" text={() => bodyRef?.textContent ?? props.body ?? ''} title="Copy comment" />
+      </Show>
       <div class="comment-meta comment-meta-with-avatar">
         <UserAvatar login={props.author} />
         <span class="comment-author">{props.author ?? 'unknown'}</span>
@@ -59,7 +64,7 @@ function ConversationItem(props: { author: string | null; action: string; body: 
         </Show>
       </div>
       <Show when={hasBody()} fallback={<div class="comment-empty muted">No written summary.</div>}>
-        <div class="markdown" innerHTML={props.body!} />
+        <div class="markdown" ref={bodyRef} innerHTML={props.body!} />
       </Show>
     </div>
   )
