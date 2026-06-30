@@ -4,17 +4,21 @@ import { readFileSync } from 'node:fs'
 import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { createApp } from '../server/index'
-import { makeBindings } from './bindings'
+import { makeBindings, type RuntimeBindings } from './bindings'
 
 const here = dirname(fileURLToPath(import.meta.url))
 // Resolve packaged paths from this module, never process.cwd() — Phase 1 launches from Finder.
 const clientDir = resolve(here, '../../dist/client')
-const dataDir = resolve(here, '../../.acorn')
+// Local app data root (gitignored). Exported so the terminal service can place PR worktrees under
+// it (vNext §9) rather than polluting the user's source tree.
+export const dataDir = resolve(here, '../../.acorn')
 const indexHtml = readFileSync(resolve(clientDir, 'index.html'), 'utf8')
 
 export const ACORN_PORT = Number(process.env.ACORN_PORT) || 4317
 
-export function startServer(): Promise<ServerType> {
+// Resolves with the live server and the runtime bindings — Electron passes runtime.DB to the
+// terminal service so it shares this one SQLite connection (vNext §7) rather than opening a second.
+export function startServer(): Promise<{ server: ServerType; runtime: RuntimeBindings }> {
   const runtime = makeBindings({
     dbPath: resolve(dataDir, 'acorn.sqlite'),
     blobsDir: resolve(dataDir, 'blobs'),
@@ -44,7 +48,7 @@ export function startServer(): Promise<ServerType> {
   return new Promise((resolveServer) => {
     const server = serve({ fetch, hostname: '127.0.0.1', port: ACORN_PORT }, (info) => {
       console.log(`acorn server on http://127.0.0.1:${info.port}`)
-      resolveServer(server)
+      resolveServer({ server, runtime })
     })
   })
 }

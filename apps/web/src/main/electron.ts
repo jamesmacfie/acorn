@@ -1,6 +1,7 @@
 import { app, BrowserWindow, shell } from 'electron'
 import { join } from 'node:path'
-import { ACORN_PORT, startServer } from './server'
+import { ACORN_PORT, dataDir, startServer } from './server'
+import { registerTerminalIpc } from './terminal'
 
 const ORIGIN = `http://127.0.0.1:${ACORN_PORT}`
 const PRELOAD = join(import.meta.dirname, '../preload/index.cjs')
@@ -82,7 +83,8 @@ async function createMainWindow() {
 }
 
 app.whenReady().then(async () => {
-  await startServer() // resolves once listening on the pinned loopback port
+  const { runtime } = await startServer() // resolves once listening on the pinned loopback port
+  await registerTerminalIpc(runtime.DB, join(dataDir, 'worktrees')) // PTYs + tmux + repo paths + worktrees
   mainWindow = await createMainWindow()
 })
 

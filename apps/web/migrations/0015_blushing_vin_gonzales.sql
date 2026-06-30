@@ -1,0 +1,20 @@
+CREATE TABLE `terminal_sessions` (
+	`id` text PRIMARY KEY NOT NULL,
+	`title` text NOT NULL,
+	`kind` text NOT NULL,
+	`profile_id` text NOT NULL,
+	`backend` text NOT NULL,
+	`status` text NOT NULL,
+	`cwd` text NOT NULL,
+	`repo_owner` text,
+	`repo_name` text,
+	`pull_number` integer,
+	`command` text NOT NULL,
+	`argv_json` text DEFAULT '[]' NOT NULL,
+	`tmux_session` text,
+	`cols` integer NOT NULL,
+	`rows` integer NOT NULL,
+	`created_at` integer NOT NULL,
+	`exited_at` integer,
+	`exit_code` integer
+);

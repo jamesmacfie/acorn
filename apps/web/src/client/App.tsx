@@ -14,7 +14,12 @@ import DiffView from './DiffView'
 import Shortcuts from './Shortcuts'
 import AccountMenu from './AccountMenu'
 import IntegrationsModal from './features/integrations/IntegrationsModal'
+import TerminalPanel from './features/terminal/TerminalPanel'
 import Acorn from './Acorn'
+
+// vNext Phase 0 flag: terminal only exists on desktop (Electron IPC) and stays behind a flag —
+// enable in devtools with `localStorage.setItem('acorn:term','1')` then reload. ponytail.
+const terminalEnabled = !!window.acorn?.desktop && localStorage.getItem('acorn:term') === '1'
 
 // Layout root (Router root): top bar + three panes. Panes are params-driven — PullList (left)
 // and PullDetail (mid) read useParams() directly; routes exist only to populate params.
@@ -25,6 +30,21 @@ export default function App() {
   const isRestoring = useIsRestoring()
   const [helpOpen, setHelpOpen] = createSignal(false)
   const [integrationsOpen, setIntegrationsOpen] = createSignal(false)
+  // Terminal drawer open/closed, persisted via the `term_open` pref so a reload restores it (vNext
+  // §10). Seed once from prefs (mirrors the left-collapse pattern), then user toggles win.
+  const [termOpen, setTermOpen] = createSignal(false)
+  const [termTouched, setTermTouched] = createSignal(false)
+  createEffect(() => {
+    const v = prefs.data?.term_open
+    if (terminalEnabled && v !== undefined && !termTouched()) setTermOpen(v === '1')
+  })
+  const toggleTerm = async () => {
+    const next = !termOpen()
+    setTermTouched(true)
+    setTermOpen(next)
+    await setPref('term_open', next ? '1' : '0')
+    queryClient.invalidateQueries({ queryKey: prefsKey })
+  }
 
   const me = createQuery(() => meOptions())
   const repos = createQuery(() => reposOptions(!!me.data))
@@ -163,6 +183,11 @@ export default function App() {
           </Show>
         </div>
         <div class="topbar-side topbar-end">
+          <Show when={terminalEnabled}>
+            <button type="button" class="theme-toggle" title="Terminal" aria-pressed={termOpen()} onClick={toggleTerm}>
+              ▣
+            </button>
+          </Show>
           <button type="button" class="theme-toggle" title="Toggle theme" onClick={toggleTheme}>
             ◑
           </button>
@@ -234,6 +259,9 @@ export default function App() {
       </Show>
       <Shortcuts helpOpen={helpOpen()} onHelpOpenChange={setHelpOpen} />
       <IntegrationsModal open={integrationsOpen()} onClose={() => setIntegrationsOpen(false)} />
+      <Show when={termOpen()}>
+        <TerminalPanel onClose={() => setTermOpen(false)} />
+      </Show>
     </div>
     </Show>
   )

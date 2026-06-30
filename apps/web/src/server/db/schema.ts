@@ -241,6 +241,48 @@ export const integrations = sqliteTable(
   (t) => [primaryKey({ columns: [t.userId, t.provider] })],
 )
 
+// Local checkout for a GitHub repo (vNext §7, §9). Machine-scoped, NOT user-scoped: it describes
+// *this machine's* filesystem, so there's no userId — the terminal service in the Electron main
+// process reads it outside any GitHub user context. PK is (owner, repo).
+export const repoPaths = sqliteTable(
+  'repo_paths',
+  {
+    owner: text('owner').notNull(),
+    repo: text('repo').notNull(),
+    githubRepoId: integer('github_repo_id'),
+    path: text('path').notNull(),
+    createdAt: integer('created_at').notNull(),
+    updatedAt: integer('updated_at').notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.owner, t.repo] })],
+)
+
+// Durable terminal sessions (vNext §7). Machine-scoped like repo_paths. We persist ONLY tmux-backed
+// sessions: tmux outlives an app restart, so on startup the service reconciles these rows against
+// `tmux list-sessions` and re-attaches the survivors. node-pty sessions die with the process and
+// live only in the in-memory map. No terminal output is ever stored (vNext §8). ponytail: a §7
+// subset — no pid / last_attached_at (we re-derive liveness from tmux, not a stored pid).
+export const terminalSessions = sqliteTable('terminal_sessions', {
+  id: text('id').primaryKey(),
+  title: text('title').notNull(),
+  kind: text('kind').notNull(), // shell | agent
+  profileId: text('profile_id').notNull(),
+  backend: text('backend').notNull(), // node-pty | tmux (only tmux rows are persisted)
+  status: text('status').notNull(), // running | exited
+  cwd: text('cwd').notNull(),
+  repoOwner: text('repo_owner'),
+  repoName: text('repo_name'),
+  pullNumber: integer('pull_number'),
+  command: text('command').notNull(),
+  argvJson: text('argv_json').notNull().default('[]'),
+  tmuxSession: text('tmux_session'),
+  cols: integer('cols').notNull(),
+  rows: integer('rows').notNull(),
+  createdAt: integer('created_at').notNull(),
+  exitedAt: integer('exited_at'),
+  exitCode: integer('exit_code'),
+})
+
 // Per-user cache of fetched external issues (generic across providers, parallels integrations).
 // Mirror table: serve-then-revalidate by TTL. Private/per-user → D1 only, never shared KV. Single
 // JSON `data` column so a provider's issue shape can evolve without migrations.

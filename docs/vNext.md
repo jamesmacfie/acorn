@@ -1,6 +1,11 @@
 # vNext — Terminal & agent sessions (Electron)
 
-> Status: **design / RFC. Not yet implemented.** This supersedes and unifies two earlier terminal
+> Status: **implemented (Phases 0–4) + Phase 5 seam.** The terminal drawer ships behind a flag
+> (`localStorage['acorn:term']='1'`). Built per the phasing below; deliberate ponytail deferrals are
+> noted inline (no user-editable profile CRUD, no prompt-injection, no "open diff from worktree", no
+> structured-transport runtime). Code lives in `apps/web/src/main/{terminal,profiles,repoPaths,
+> worktrees,terminalUtils}.ts`, `src/shared/terminal.ts`, and `src/client/features/terminal/`. This
+> supersedes and unifies two earlier terminal
 > RFCs (the former `v2.md` "remote-agent terminal sessions" and `v3.md` "local agent terminal
 > sessions", now removed), rewritten for the runtime acorn actually ships on now: a **local macOS
 > Electron app** (see [electron.md](./electron.md)). The product vision is unchanged; the
@@ -381,30 +386,36 @@ local service to a LAN/public interface.
 
 Stop at the rung that holds; don't scaffold later phases into earlier ones.
 
-**Phase 0 — spike.** TerminalService in main with node-pty (no tmux), a single shell, IPC channels,
-an xterm `TerminalPanel` behind a flag. Acceptance: start `$SHELL`; window reload reattaches while
-main stays alive; resize works; kill updates UI; **node-pty is imported only by main**.
+**Phase 0 — spike. ✅ done.** TerminalService in main with node-pty (no tmux), a single shell, IPC
+channels, an xterm `TerminalPanel` behind a flag. Acceptance: start `$SHELL`; window reload reattaches
+while main stays alive; resize works; kill updates UI; **node-pty is imported only by main**.
 
-**Phase 1 — product-shaped local sessions.** SQLite metadata tables; `list` / `kill`; repo-path
-mapping UI + validation; drawer tabs + session switcher; `prefs` for drawer open/size. Acceptance: map
-`owner/repo` → checkout; open a shell from a PR and return to it later; session list survives reload;
-exited sessions stay visible until dismissed.
+**Phase 1 — product-shaped local sessions. ✅ done.** `repo_paths` table; `list` / `kill` / `remove`;
+repo-path mapping UI + validation; drawer tabs + session switcher; `prefs` for drawer open/size.
+_Deferred: `terminal_sessions` table moved to Phase 2 (in-memory map covers reload; restart survival
+is tmux's job)._ Acceptance: map `owner/repo` → checkout; open a shell from a PR and return to it
+later; session list survives reload; exited sessions stay visible until dismissed.
 
-**Phase 2 — tmux durability + agent profiles.** tmux backend (create/attach/detach/capture-pane/
-interrupt/terminate); profiles for shell/Claude/Codex/aider with PATH detection; titles from PR
-context; optional "start with PR context". Acceptance: start an agent in a mapped repo; closing the
-**app** doesn't kill a tmux agent; restarting the app rediscovers tmux sessions; user can attach from
-an external terminal.
+**Phase 2 — tmux durability + agent profiles. ✅ done.** tmux backend (create/attach/detach/interrupt/
+terminate) + `terminal_sessions` persistence + startup reconciliation; built-in profiles for
+shell/Claude/Codex/aider with PATH detection; titles from PR context. _Deferred: user-editable
+`agent_profiles` CRUD, prompt-injection ("start with PR context")._ Acceptance: start an agent in a
+mapped repo; closing the **app** doesn't kill a tmux agent; restarting the app rediscovers tmux
+sessions; user can attach from an external terminal.
 
-**Phase 3 — agent-aware niceties.** Read `~/.claude` transcripts for idle/"waiting for input"
-indicators (à la claudecodeui); optional desktop notification when an agent goes idle (Electron
-`Notification` — native now).
+**Phase 3 — agent-aware niceties. ✅ done (divergent).** Idle/"waiting for input" indicator + desktop
+`Notification`. _Implemented via PTY output-silence detection, NOT `~/.claude` transcript scraping —
+backend-agnostic (works for codex/aider) and free of coupling to an undocumented JSONL format._
 
-**Phase 4 — worktrees.** PR worktree create/reuse, fetch PR refs, dirty-state detection, cleanup UI,
-optional "open diff from worktree" into acorn's diff UI.
+**Phase 4 — worktrees. ✅ done (core).** PR worktree create/reuse, fetch PR refs, dirty-state
+detection, cleanup control. _Deferred: "open diff from worktree" into acorn's DiffView (optional, deep
+integration)._
 
-**Phase 5 — structured agent protocols.** Add `transport: 'pty' | 'structured'` to profiles; support
-JSON-RPC / ACP-like / MCP-like / SDK-native agent backends; keep PTY as the universal fallback.
+**Phase 5 — structured agent protocols. ◻︎ seam only.** `transport: 'pty'` field added to the profile
+model as the documented extension point; PTY is the universal transport. _Structured backends
+(JSON-RPC / ACP-like / MCP-like / SDK-native) intentionally not built — no concrete agent targets one
+yet, so a runtime now would be speculative dead code. Branch on `transport` in `terminal.ts` when a
+real one appears._
 
 > Note vs v3: there is **no separate "local supervisor" phase**. v3 needed `acorn local` to start the
 > web app + daemon together and inject a pairing token. Electron already *is* that supervisor — one

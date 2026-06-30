@@ -6,11 +6,13 @@ allowBuilds:
   electron: true
   electron-winstaller: false # Windows-only; this build is macOS-only
   esbuild: true
+  node-pty: true
   sharp: true
   workerd: true
 onlyBuiltDependencies:
   - better-sqlite3
   - electron
   - esbuild
+  - node-pty
   - sharp
   - workerd

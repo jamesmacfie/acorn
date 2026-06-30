@@ -1,0 +1,121 @@
+import { describe, expect, it } from 'vitest'
+import {
+  childEnv,
+  clampDim,
+  computeIdle,
+  isContainedPath,
+  isDirty,
+  isValidRepoIdent,
+  parseTmuxSessions,
+  resolveBackend,
+  RING_CAP,
+  tmuxAttachArgs,
+  tmuxName,
+  tmuxNewSessionArgs,
+  trimRing,
+  worktreeDirName,
+} from './terminalUtils'
+
+describe('clampDim', () => {
+  it('keeps sane integers and rejects junk to the fallback', () => {
+    expect(clampDim(120, 80)).toBe(120)
+    expect(clampDim(0, 80)).toBe(80)
+    expect(clampDim(99999, 24)).toBe(24)
+    expect(clampDim(40.5, 24)).toBe(24)
+    expect(clampDim('80', 24)).toBe(24)
+    expect(clampDim(undefined, 24)).toBe(24)
+  })
+})
+
+describe('trimRing', () => {
+  it('caps the buffer at RING_CAP, keeping the most recent bytes', () => {
+    const big = 'a'.repeat(RING_CAP) + 'TAIL'
+    const out = trimRing(big)
+    expect(out.length).toBe(RING_CAP)
+    expect(out.endsWith('TAIL')).toBe(true)
+    expect(trimRing('short')).toBe('short')
+  })
+})
+
+describe('resolveBackend', () => {
+  it('uses tmux only when preferred and available, else degrades to node-pty', () => {
+    expect(resolveBackend('tmux', true)).toBe('tmux')
+    expect(resolveBackend('tmux', false)).toBe('node-pty')
+    expect(resolveBackend('node-pty', true)).toBe('node-pty')
+  })
+})
+
+describe('parseTmuxSessions', () => {
+  it('keeps only acorn-prefixed session names', () => {
+    const out = 'acorn-abc\nmy-other-session\nacorn-def\n\n'
+    expect(parseTmuxSessions(out)).toEqual(new Set(['acorn-abc', 'acorn-def']))
+  })
+})
+
+describe('tmux arg builders', () => {
+  it('build create-or-noop + attach argv', () => {
+    expect(tmuxName('abc')).toBe('acorn-abc')
+    expect(tmuxNewSessionArgs('acorn-abc', '/repo', 'claude')).toEqual(['new-session', '-A', '-d', '-s', 'acorn-abc', '-c', '/repo', 'claude'])
+    expect(tmuxAttachArgs('acorn-abc')).toEqual(['attach', '-t', 'acorn-abc'])
+  })
+})
+
+describe('computeIdle', () => {
+  const now = 1_000_000
+  it('flags only running agents past the silence threshold', () => {
+    expect(computeIdle('agent', 'running', now - 20_000, now, 10_000)).toBe(true)
+    expect(computeIdle('agent', 'running', now - 5_000, now, 10_000)).toBe(false)
+  })
+  it('never flags shells or exited sessions', () => {
+    expect(computeIdle('shell', 'running', now - 20_000, now, 10_000)).toBe(false)
+    expect(computeIdle('agent', 'exited', now - 20_000, now, 10_000)).toBe(false)
+  })
+})
+
+describe('worktrees', () => {
+  it('builds the per-PR dir name', () => {
+    expect(worktreeDirName('acme', 'widget', 42)).toBe('acme-widget-pr-42')
+  })
+  it('treats any porcelain output as dirty', () => {
+    expect(isDirty('')).toBe(false)
+    expect(isDirty('\n  \n')).toBe(false)
+    expect(isDirty(' M src/a.ts\n?? b.ts')).toBe(true)
+  })
+})
+
+describe('path-traversal guards', () => {
+  it('isValidRepoIdent rejects traversal and separators', () => {
+    expect(isValidRepoIdent('acme')).toBe(true)
+    expect(isValidRepoIdent('my.repo_2-x')).toBe(true)
+    expect(isValidRepoIdent('..')).toBe(false)
+    expect(isValidRepoIdent('.hidden')).toBe(false)
+    expect(isValidRepoIdent('a/b')).toBe(false)
+    expect(isValidRepoIdent('../../etc')).toBe(false)
+    expect(isValidRepoIdent('')).toBe(false)
+  })
+  it('isContainedPath rejects escapes from the root', () => {
+    expect(isContainedPath('/data/worktrees', '/data/worktrees/acme-w-pr-1')).toBe(true)
+    expect(isContainedPath('/data/worktrees', '/data/worktrees')).toBe(true)
+    expect(isContainedPath('/data/worktrees', '/data/worktrees/../../etc/passwd')).toBe(false)
+    expect(isContainedPath('/data/worktrees', '/data/worktrees-evil')).toBe(false)
+    expect(isContainedPath('/data/worktrees', '/etc/passwd')).toBe(false)
+  })
+})
+
+describe('childEnv', () => {
+  it('never leaks secrets and always sets TERM', () => {
+    const env = childEnv({
+      HOME: '/Users/x',
+      PATH: '/usr/bin',
+      SESSION_ENC_KEY: 'super-secret',
+      GITHUB_CLIENT_SECRET: 'also-secret',
+      RANDOM_OTHER: 'nope',
+    })
+    expect(env.HOME).toBe('/Users/x')
+    expect(env.PATH).toBe('/usr/bin')
+    expect(env.TERM).toBe('xterm-256color')
+    expect(env.SESSION_ENC_KEY).toBeUndefined()
+    expect(env.GITHUB_CLIENT_SECRET).toBeUndefined()
+    expect(env.RANDOM_OTHER).toBeUndefined()
+  })
+})
