@@ -1,6 +1,6 @@
-import { createEffect, createSignal, Show } from 'solid-js'
+import { createEffect, createSignal, onCleanup, onMount, Show } from 'solid-js'
 import { createQuery, useIsRestoring, useQueryClient } from '@tanstack/solid-query'
-import { useMatch, useNavigate, useParams } from '@solidjs/router'
+import { useLocation, useMatch, useNavigate, useParams } from '@solidjs/router'
 import { clear } from 'idb-keyval'
 import { readJson } from './apiClient'
 import { meKey, meOptions, pinsOptions, prefsKey, prefsOptions, pullPrefixKey, pullsKey, pullsRoute, pullsPrefixKey, reposKey, reposOptions, reposRefreshRoute, type Pull } from './queries'
@@ -15,6 +15,9 @@ import Shortcuts from './Shortcuts'
 import AccountMenu from './AccountMenu'
 import IntegrationsModal from './features/integrations/IntegrationsModal'
 import TerminalPanel from './features/terminal/TerminalPanel'
+import { initSessions, workingCountFor } from './features/terminal/sessions'
+import TabRail from './features/tabs/TabRail'
+import { PREFS_KEY as tabsPrefsKey, recordLocation, seedFromPrefs } from './features/tabs/tabs'
 import Acorn from './Acorn'
 
 // vNext Phase 0 flag: terminal only exists on desktop (Electron IPC) and stays behind a flag —
@@ -27,6 +30,7 @@ export default function App() {
   const queryClient = useQueryClient()
   const params = useParams()
   const navigate = useNavigate()
+  const location = useLocation()
   const isRestoring = useIsRestoring()
   const [helpOpen, setHelpOpen] = createSignal(false)
   const [integrationsOpen, setIntegrationsOpen] = createSignal(false)
@@ -46,10 +50,24 @@ export default function App() {
     queryClient.invalidateQueries({ queryKey: prefsKey })
   }
 
+  // Track terminal sessions globally (independent of the drawer) so the tab rail and the topbar
+  // badge can show agent-working activity. No-op when the terminal bridge is absent.
+  onMount(() => {
+    if (!terminalEnabled) return
+    onCleanup(initSessions())
+  })
+
   const me = createQuery(() => meOptions())
   const repos = createQuery(() => reposOptions(!!me.data))
   const prefs = createQuery(() => prefsOptions(!!me.data))
   const pins = createQuery(() => pinsOptions(!!me.data))
+
+  // Workspace tabs: seed the store once from the persisted blob (or the current path), then track
+  // every navigation into the active tab so switching tabs restores where you were.
+  createEffect(() => {
+    if (prefs.data) seedFromPrefs(prefs.data[tabsPrefsKey], location.pathname)
+  })
+  createEffect(() => recordLocation(location.pathname))
 
   // Apply the saved theme (falls back to prefers-color-scheme when unset).
   createEffect(() => {
@@ -97,6 +115,7 @@ export default function App() {
   async function logout() {
     await fetch('/auth/logout', { method: 'POST' })
     window.dispatchEvent(new Event('acorn:logout')) // wipe the persisted IndexedDB cache
+    sessionStorage.setItem('acorn:loggedout', '1') // else LoginGate bounces to GitHub and silently re-auths
     queryClient.clear()
     await queryClient.invalidateQueries({ queryKey: meKey })
   }
@@ -139,9 +158,15 @@ export default function App() {
 
   // Logged out: no chrome, just the mark — bounce straight to GitHub OAuth. While auth is still
   // unknown (initial load / cache restore) show the bare mark without redirecting, to avoid a flash.
-  const settledLoggedOut = () => !isRestoring() && !me.isPending && !me.data
+  const settled = () => !isRestoring() && !me.isPending && !me.data
+  // Settled-logged-out: bounce to GitHub UNLESS the user explicitly logged out (else GitHub silently
+  // re-auths and logout is a no-op). In that case hold the gate and offer a manual Login.
+  const settledLoggedOut = () => settled() && sessionStorage.getItem('acorn:loggedout') !== '1'
+  const didLogout = () => settled() && sessionStorage.getItem('acorn:loggedout') === '1'
   return (
-    <Show when={me.data} fallback={<LoginGate redirecting={settledLoggedOut()} />}>
+    <Show when={me.data} fallback={<LoginGate redirecting={settledLoggedOut()} loggedOut={didLogout()} />}>
+    <div class="shell">
+    <TabRail />
     <div class="app" classList={{ 'left-collapsed': collapsed() }}>
       <header class="topbar">
         <div class="topbar-side">
@@ -187,6 +212,11 @@ export default function App() {
             <button type="button" class="theme-toggle" title="Terminal" aria-pressed={termOpen()} onClick={toggleTerm}>
               ▣
             </button>
+            <Show when={workingCountFor(params.owner, params.repo) > 0}>
+              <span class="term-working" title="Agents working">
+                <span class="spin">✻</span> ({workingCountFor(params.owner, params.repo)})
+              </span>
+            </Show>
           </Show>
           <button type="button" class="theme-toggle" title="Toggle theme" onClick={toggleTheme}>
             ◑
@@ -263,15 +293,27 @@ export default function App() {
         <TerminalPanel onClose={() => setTermOpen(false)} />
       </Show>
     </div>
+    </div>
     </Show>
   )
 }
 
 // Full-screen mark shown when there's no session. Once auth resolves to logged-out, redirect to
 // the OAuth start; before that just hold the mark so we don't flash a redirect mid-restore.
-function LoginGate(props: { redirecting: boolean }) {
+function LoginGate(props: { redirecting: boolean; loggedOut: boolean }) {
   createEffect(() => {
     if (props.redirecting) window.location.href = '/auth/login?return_to=' + encodeURIComponent(window.location.pathname + window.location.search)
   })
-  return <main class="login-gate"><Acorn label={props.redirecting ? 'redirecting to github…' : 'acorn'} /></main>
+  const login = () => {
+    sessionStorage.removeItem('acorn:loggedout')
+    window.location.href = '/auth/login'
+  }
+  return (
+    <main class="login-gate">
+      <Acorn label={props.redirecting ? 'redirecting to github…' : props.loggedOut ? 'logged out' : 'acorn'} />
+      <Show when={props.loggedOut}>
+        <button class="auth-control" type="button" onClick={login}>Login</button>
+      </Show>
+    </main>
+  )
 }

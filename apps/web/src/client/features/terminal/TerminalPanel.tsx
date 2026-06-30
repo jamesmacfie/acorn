@@ -1,10 +1,11 @@
-import { createEffect, createMemo, createSignal, For, onCleanup, onMount, Show } from 'solid-js'
+import { createEffect, createMemo, createSignal, For, onMount, Show } from 'solid-js'
 import { Portal } from 'solid-js/web'
 import { useParams } from '@solidjs/router'
 import { createQuery } from '@tanstack/solid-query'
 import { prefsOptions } from '../../queries'
 import { setPref } from '../../mutations'
 import { terminalApi } from './terminalClient'
+import { refreshSessions, sessions } from './sessions'
 import TerminalSurface from './TerminalSurface'
 import type { TerminalProfile, TerminalSession } from '../../../shared/terminal'
 import './terminal.css'
@@ -18,7 +19,6 @@ export default function TerminalPanel(props: { onClose: () => void }) {
   const params = useParams()
   const prefs = createQuery(() => prefsOptions(true))
 
-  const [sessions, setSessions] = createSignal<TerminalSession[]>([])
   const [profiles, setProfiles] = createSignal<TerminalProfile[]>([])
   const [activeId, setActiveId] = createSignal<string | null>(null)
   const [busy, setBusy] = createSignal(false)
@@ -31,20 +31,23 @@ export default function TerminalPanel(props: { onClose: () => void }) {
   const [pathInput, setPathInput] = createSignal('')
   const [pathError, setPathError] = createSignal<string | null>(null)
 
-  const refresh = async () => {
-    if (!api) return
-    const list = await api.list()
-    setSessions(list)
-    if (!list.some((s) => s.id === activeId())) setActiveId(list[0]?.id ?? null)
-  }
+  // Scope the strip to the active tab's repo. ponytail: repo-less shells always show — they aren't
+  // bound to a workspace.
+  const visibleSessions = createMemo(() =>
+    sessions().filter((s) => !s.repo || (s.repo.owner === params.owner && s.repo.name === params.repo)),
+  )
+
+  // Keep the active session in sync with what's visible (e.g. after switching tabs).
+  createEffect(() => {
+    const vis = visibleSessions()
+    if (!vis.some((s) => s.id === activeId())) setActiveId(vis[0]?.id ?? null)
+  })
 
   onMount(async () => {
     if (!api) return
     setProfiles(await api.profiles())
-    await refresh()
-    // Background idle/exit changes for any session → re-pull the list to refresh tab state.
-    const off = api.onStatus(() => void refresh())
-    onCleanup(off)
+    // The shared store (init'd in App) owns the onStatus subscription; just ensure we're populated.
+    await refreshSessions()
   })
 
   const activeSession = createMemo(() => sessions().find((s) => s.id === activeId()) ?? null)
@@ -93,7 +96,7 @@ export default function TerminalPanel(props: { onClose: () => void }) {
         repo: owner && repo ? { owner, name: repo } : undefined,
         pull: number ? { number: Number(number) } : undefined,
       })
-      await refresh()
+      await refreshSessions()
       setActiveId(s.id)
     } finally {
       setBusy(false)
@@ -157,7 +160,7 @@ export default function TerminalPanel(props: { onClose: () => void }) {
     if (!api) return
     if (s.status === 'running') await api.kill(s.id)
     else await api.remove(s.id)
-    await refresh()
+    await refreshSessions()
   }
 
   return (
@@ -167,7 +170,7 @@ export default function TerminalPanel(props: { onClose: () => void }) {
         <header class="terminal-tabs">
           <Show when={api} fallback={<span class="terminal-unavailable">Terminal service unavailable</span>}>
             <div class="terminal-tabstrip">
-              <For each={sessions()}>
+              <For each={visibleSessions()}>
                 {(s) => (
                   <div class="terminal-tab" classList={{ active: s.id === activeId() }} onClick={() => setActiveId(s.id)}>
                     <span class="terminal-tab-dot" classList={{ exited: s.status === 'exited', idle: s.idle }} />
@@ -270,7 +273,7 @@ export default function TerminalPanel(props: { onClose: () => void }) {
 
         <div class="terminal-body">
           <Show when={activeId()} fallback={<div class="terminal-empty">No sessions. Press + to open one.</div>} keyed>
-            {(id) => <TerminalSurface sessionId={id} onExit={() => void refresh()} />}
+            {(id) => <TerminalSurface sessionId={id} onExit={() => void refreshSessions()} />}
           </Show>
         </div>
       </aside>

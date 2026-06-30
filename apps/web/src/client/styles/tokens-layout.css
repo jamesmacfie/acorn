@@ -20,6 +20,7 @@
   --row-h: 36px;
   --topbar-h: 48px;
   --pane-head-h: 48px;
+  --tabrail-w: 52px;
   --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
   --dur-short: 150ms;
 }
@@ -75,8 +76,11 @@ body {
     color var(--dur-short) var(--ease-out);
 }
 
+/* Shell: workspace tab rail on the far left, the app to its right. */
+.shell { display: flex; height: 100%; }
+
 /* Three-pane layout: top bar + independently-scrolling panes, 1px dividers, flat. */
-.app { display: grid; grid-template-rows: var(--topbar-h) 1fr; height: 100%; }
+.app { flex: 1; min-width: 0; display: grid; grid-template-rows: var(--topbar-h) 1fr; height: 100%; }
 
 .topbar {
   display: grid;
@@ -175,3 +179,8 @@ body {
 
 .placeholder { color: var(--text-muted); font-size: var(--fs-sm); margin: var(--pane-pad); }
 .muted { color: var(--text-muted); }
+
+/* Spinning glyph utility (agent-working indicators). */
+@keyframes spin { to { transform: rotate(360deg); } }
+.spin { display: inline-block; animation: spin 1s linear infinite; }
+@media (prefers-reduced-motion: reduce) { .spin { animation: none; } }

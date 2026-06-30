@@ -12,6 +12,17 @@
 }
 .theme-toggle:hover { color: var(--text); }
 
+/* Agent-working badge beside the terminal toggle: spinning glyph + active count. */
+.term-working {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: var(--fs-sm);
+  color: var(--accent);
+  line-height: 1;
+  margin-left: -2px;
+}
+
 /* Left-pane collapse chevron: a quiet glyph toggle next to the picker. */
 .collapse-toggle {
   font: inherit;

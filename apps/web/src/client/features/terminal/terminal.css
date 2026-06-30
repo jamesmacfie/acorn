@@ -1,6 +1,6 @@
 .terminal-drawer {
   position: fixed;
-  left: 0;
+  left: var(--tabrail-w); /* sit beside the workspace rail, not over it */
   right: 0;
   bottom: 0;
   min-height: 160px;
