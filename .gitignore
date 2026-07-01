@@ -11,3 +11,5 @@ release/
 .acorn/
 
 .playwright-mcp/*
+
+references/
