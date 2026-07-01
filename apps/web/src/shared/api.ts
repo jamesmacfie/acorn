@@ -99,6 +99,9 @@ export type WorkspaceRepo = { owner: string; name: string; sort: number }
 // When the worktree setup script runs: 'off' never, 'created' eagerly when the task is created,
 // 'terminal' lazily when its terminal first opens (the default). null is treated as 'terminal'.
 export type SetupTrigger = 'off' | 'created' | 'terminal'
+// How the browser-preview pane resolves its URL: a fixed URL, http://localhost:<port>, or the
+// stdout of a shell command run in the repo's worktree. null falls back to the dev-server port.
+export type PreviewMode = 'url' | 'port' | 'script'
 export type Workspace = {
   id: string
   name: string
@@ -106,6 +109,8 @@ export type Workspace = {
   sort: number
   setupScript: string | null // shell command run once when a task worktree is created; null/blank = none
   setupScriptTrigger: SetupTrigger | null
+  previewMode: PreviewMode | null // how the browser-preview URL is resolved; null → dev-server port
+  previewValue: string | null // the URL, port, or command per previewMode; null/blank = unset
   repos: WorkspaceRepo[]
 }
 export type WorkspaceSeed = { name: string }

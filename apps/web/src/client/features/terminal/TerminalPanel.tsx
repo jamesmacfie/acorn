@@ -1,4 +1,4 @@
-import { createEffect, createMemo, createSignal, For, onMount, Show } from 'solid-js'
+import { createEffect, createMemo, createSignal, For, onCleanup, onMount, Show } from 'solid-js'
 import { Portal } from 'solid-js/web'
 import { createQuery } from '@tanstack/solid-query'
 import { prefsOptions, type Task } from '../../queries'
@@ -63,6 +63,12 @@ export default function TerminalPanel(props: { onClose: () => void; task: Task |
       seeded = true
     }
   })
+  // Publish the live drawer height so the task view (`.workspace-wrap`) can reserve that much space
+  // at the bottom — the panes shrink to sit above the drawer (keeping their scrollbars) instead of
+  // being covered by this fixed overlay. Cleared when the drawer unmounts (terminal closed).
+  createEffect(() => document.documentElement.style.setProperty('--term-drawer-h', `${height()}px`))
+  onCleanup(() => document.documentElement.style.removeProperty('--term-drawer-h'))
+
   const onHandleDown = (e: PointerEvent) => {
     e.preventDefault()
     const startY = e.clientY

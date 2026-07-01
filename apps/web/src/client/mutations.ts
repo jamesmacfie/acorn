@@ -14,6 +14,7 @@ import {
   pullRoute,
   taskRoute,
   tasksRoute,
+  type PreviewMode,
   type SetupTrigger,
   type Task,
   type TaskSeed,
@@ -122,6 +123,9 @@ export const setWorkspaceSetupScript = async (id: string, setupScript: string) =
 // When the setup script runs: off / on task creation / on first terminal open.
 export const setWorkspaceSetupTrigger = async (id: string, setupScriptTrigger: SetupTrigger) =>
   writeJson<{ ok: true }>(workspaceRoute(id), { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ setupScriptTrigger }) }, (res) => `workspace ${res.status}`)
+// How the browser-preview pane resolves its URL: '' (dev-server port), 'url', 'port', or 'script'.
+export const setWorkspacePreview = async (id: string, previewMode: PreviewMode | '', previewValue: string) =>
+  writeJson<{ ok: true }>(workspaceRoute(id), { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ previewMode, previewValue }) }, (res) => `workspace ${res.status}`)
 export const deleteWorkspace = async (id: string) =>
   writeJson<{ ok: true }>(workspaceRoute(id), { method: 'DELETE' }, (res) => `workspace ${res.status}`)
 // Move a repo into a workspace (partition; upsert on owner/repo). Also un-ignores it.

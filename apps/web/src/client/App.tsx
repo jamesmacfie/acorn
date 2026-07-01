@@ -20,7 +20,7 @@ import SettingsModal from './features/settings/SettingsModal'
 import TerminalPanel from './features/terminal/TerminalPanel'
 import { initSessions } from './features/terminal/sessions'
 import TabRail from './features/tabs/TabRail'
-import { activeTaskId, isTerminalOpen, selectedSource, setActiveTaskId, setSelectedSource, setTerminalOpen } from './features/tasks/tasks'
+import { activeTaskId, hydrateTaskPanes, isTerminalOpen, selectedSource, setActiveTaskId, setSelectedSource, setTerminalOpen, taskPanes } from './features/tasks/tasks'
 import { initTaskStatuses } from './features/tasks/taskStatus'
 import TaskView from './features/tasks/TaskView'
 import LinearBrowse from './features/tasks/LinearBrowse'
@@ -93,11 +93,15 @@ export default function App() {
     return (repos.data ?? []).filter((r) => set.has(`${r.owner}/${r.name}`))
   }
 
-  // Default the active task to the first row once the list loads (no navigation — selecting a
-  // row in the rail is what navigates). The terminal drawer + topbar badge key off this.
+  // Focus a task once the list loads (no navigation — selecting a row in the rail is what
+  // navigates). The terminal drawer + topbar badge key off this. Prefer the task focused last
+  // session (persisted below), falling back to the first row; wait for prefs so we don't flash the
+  // wrong one first.
   createEffect(() => {
     const list = tasks.data
-    if (list?.length && !activeTaskId()) setActiveTaskId(list[0].id)
+    if (!list?.length || activeTaskId() || prefs.data === undefined) return
+    const saved = prefs.data.last_task
+    setActiveTaskId(saved && list.some((t) => t.id === saved) ? saved : list[0].id)
   })
   const activeTask = () => tasks.data?.find((w) => w.id === activeTaskId()) ?? null
 
@@ -114,13 +118,59 @@ export default function App() {
     queryClient.invalidateQueries({ queryKey: prefsKey })
   }
 
-  // Default to the first repo once the list loads and no repo is in the URL. Wait for the
-  // persisted cache to finish restoring — mounting PullList mid-restore drops its gated pulls
-  // fetch (the enabled flip races the isRestoring boundary), so the list never populates.
+  // Open the repo used last session once the list loads and no repo is in the URL (falling back to
+  // the first repo). Electron always boots at the origin root, so this is what restores the
+  // workspace/repo — the active workspace is derived from the repo. Wait for the persisted cache to
+  // finish restoring — mounting PullList mid-restore drops its gated pulls fetch (the enabled flip
+  // races the isRestoring boundary), so the list never populates — and for prefs, so we don't flash
+  // the first repo before the saved one.
   createEffect(() => {
-    if (isRestoring()) return
+    if (isRestoring() || prefs.data === undefined) return
     const list = repos.data
-    if (list?.length && !params.owner) navigate(`/${list[0].owner}/${list[0].name}`, { replace: true })
+    if (!list?.length || params.owner) return
+    // The saved path carries the PR number too (e.g. /owner/repo/123), so a PR task/detail reopens
+    // on the right pull. Validate its repo still exists before honouring it.
+    const saved = prefs.data.last_path
+    const [, sOwner, sRepo] = saved?.split('/') ?? []
+    const ok = saved && list.some((r) => r.owner === sOwner && r.name === sRepo)
+    navigate(ok ? saved : `/${list[0].owner}/${list[0].name}`, { replace: true })
+  })
+
+  // Restore the rest of last session's view once, after prefs load: which Source was selected (a
+  // task view was saved as '') and each task's last-used pane. `restored` then gates the persist
+  // effects below so they don't clobber the saved values with startup defaults.
+  const [restored, setRestored] = createSignal(false)
+  createEffect(() => {
+    if (prefs.data === undefined || restored()) return
+    setRestored(true)
+    const src = prefs.data.last_source
+    if (src === '') setSelectedSource(null)
+    else if (src === 'github' || src === 'linear') setSelectedSource(src)
+    try {
+      hydrateTaskPanes(JSON.parse(prefs.data.task_panes ?? '{}'))
+    } catch {
+      /* ignore malformed pane map */
+    }
+  })
+
+  // Persist the current view so a relaunch reopens it. Separate effects so each writes only when its
+  // own slice changes. No prefsKey invalidation — these keys are read once at startup, and skipping
+  // it avoids a write→refetch loop.
+  createEffect(() => {
+    if (restored() && params.owner && params.repo) {
+      void setPref('last_path', `/${params.owner}/${params.repo}${params.number ? `/${params.number}` : ''}`)
+    }
+  })
+  createEffect(() => {
+    if (restored()) void setPref('last_source', selectedSource() ?? '')
+  })
+  createEffect(() => {
+    const id = activeTaskId()
+    if (restored() && id) void setPref('last_task', id)
+  })
+  createEffect(() => {
+    const panes = taskPanes()
+    if (restored()) void setPref('task_panes', JSON.stringify(panes))
   })
 
   // Left-pane collapse, persisted via the `left_collapsed` pref. Seed the local signal from prefs
