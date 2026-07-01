@@ -40,6 +40,9 @@ export default function App() {
   const [helpOpen, setHelpOpen] = createSignal(false)
   const [integrationsOpen, setIntegrationsOpen] = createSignal(false)
   const [onboardingDismissed, setOnboardingDismissed] = createSignal(false)
+  // Reopen the workspace/repo modal on demand (account menu) — same UI as first-run onboarding:
+  // assign repos to workspaces, hide/show (disable) repos, add new ones, map local checkouts.
+  const [manageWorkspacesOpen, setManageWorkspacesOpen] = createSignal(false)
   // Terminal drawer open/closed, persisted via the `term_open` pref so a reload restores it (vNext
   // §10). Seed once from prefs (mirrors the left-collapse pattern), then user toggles win.
   const [termOpen, setTermOpen] = createSignal(false)
@@ -279,7 +282,7 @@ export default function App() {
             }
           >
             {(user) => (
-              <AccountMenu user={user()} onShortcuts={() => setHelpOpen(true)} onIntegrations={() => setIntegrationsOpen(true)} onPermissions={permissions} onClearCache={clearCache} onLogout={logout} />
+              <AccountMenu user={user()} onManageWorkspaces={() => setManageWorkspacesOpen(true)} onShortcuts={() => setHelpOpen(true)} onIntegrations={() => setIntegrationsOpen(true)} onPermissions={permissions} onClearCache={clearCache} onLogout={logout} />
             )}
           </Show>
         </div>
@@ -356,8 +359,8 @@ export default function App() {
       </Switch>
       <Shortcuts helpOpen={helpOpen()} onHelpOpenChange={setHelpOpen} />
       <IntegrationsModal open={integrationsOpen()} onClose={() => setIntegrationsOpen(false)} />
-      <Show when={!onboardingDismissed() && !!me.data && prefs.data !== undefined && prefs.data?.onboarded !== '1' && (workspaces.data?.length ?? 0) > 0}>
-        <OnboardingModal onClose={() => setOnboardingDismissed(true)} />
+      <Show when={manageWorkspacesOpen() || (!onboardingDismissed() && !!me.data && prefs.data !== undefined && prefs.data?.onboarded !== '1' && (workspaces.data?.length ?? 0) > 0)}>
+        <OnboardingModal onClose={() => { setOnboardingDismissed(true); setManageWorkspacesOpen(false) }} />
       </Show>
       <Show when={termOpen()}>
         <TerminalPanel onClose={() => setTermOpen(false)} task={activeTask()} />
