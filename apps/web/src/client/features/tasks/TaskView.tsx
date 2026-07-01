@@ -6,6 +6,7 @@ import { archiveTask } from '../../mutations'
 import PullDetail from '../../PullDetail'
 import DiffView from '../../DiffView'
 import LinearIssuePanel from '../integrations/LinearIssuePanel'
+import EditorPane from '../editor/EditorPane'
 import { workspaceForRepo } from '../workspaces/activeWorkspace'
 import { refreshSessions, sessions } from '../terminal/sessions'
 import { terminalApi } from '../terminal/terminalClient'
@@ -145,6 +146,7 @@ export default function TaskView(props: {
   return (
     <div class="workspace-wrap">
     <main class="panes panes-workspace">
+      <Show when={activePane() === 'editor'} fallback={
       <Show when={activePane() === 'preview'} fallback={
         <Show
           when={activePane() === 'pr' && hasPr()}
@@ -174,6 +176,9 @@ export default function TaskView(props: {
       }>
         <PreviewPane url={port() != null ? `http://localhost:${port()}` : null} onConfigure={startDev} running={!!devSession()} />
       </Show>
+      }>
+        <EditorPane task={props.task} />
+      </Show>
 
       <nav class="pane-switcher">
         <Show when={hasPr()}>
@@ -184,6 +189,7 @@ export default function TaskView(props: {
         </Show>
         <button type="button" class="pane-switch-btn" classList={{ active: !!devSession() }} title="Run dev server" onClick={() => void startDev()}>▶</button>
         <button type="button" class="pane-switch-btn" classList={{ active: activePane() === 'preview' }} title="Browser preview" onClick={() => setActivePane('preview')}>◍</button>
+        <button type="button" class="pane-switch-btn" classList={{ active: activePane() === 'editor' }} title="Editor" onClick={() => setActivePane('editor')}>✎</button>
         <button type="button" class="pane-switch-btn" classList={{ active: props.terminalOpen }} title="Terminal" onClick={props.onToggleTerminal}>{'>_'}</button>
         <button type="button" class="pane-switch-btn pane-switch-close" title="Close task" onClick={openClose}>✕</button>
       </nav>

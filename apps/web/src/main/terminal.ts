@@ -3,7 +3,8 @@ import { spawn, type IPty } from 'node-pty'
 import { execFileSync } from 'node:child_process'
 import { randomUUID } from 'node:crypto'
 import { statSync } from 'node:fs'
-import { isAbsolute } from 'node:path'
+import { readdir, readFile, writeFile } from 'node:fs/promises'
+import { isAbsolute, resolve, sep } from 'node:path'
 import { homedir } from 'node:os'
 import { and, eq } from 'drizzle-orm'
 import type { AppDatabase } from '../server/db'
@@ -187,6 +188,25 @@ async function resolveTaskCwd(
   if (!wt.ok) return { cwd: baseCheckout, isWorktree: false, created: false }
   await db.update(schema.tasks).set({ worktreePath: wt.path, updatedAt: Date.now() }).where(eq(schema.tasks.id, t.id))
   return { cwd: wt.path, isWorktree: true, created: wt.created }
+}
+
+// The on-disk root the editor pane operates on: the task's worktree (created lazily, like the
+// terminal), or null if the repo has no mapped checkout yet. Re-derived per IPC call so the taskId
+// — not a renderer-supplied absolute path — is the capability.
+async function taskRoot(db: AppDatabase, taskId: string): Promise<string | null> {
+  const t = await loadTask(db, taskId)
+  if (!t) return null
+  const mapped = await getRepoPath(db, t.repoOwner, t.repoName)
+  const baseCheckout = mapped?.path && isDir(mapped.path) ? mapped.path : undefined
+  if (!baseCheckout) return null
+  const { cwd } = await resolveTaskCwd(db, t, baseCheckout)
+  return resolve(cwd)
+}
+
+// Confine a renderer-supplied relative path to within `root`; null on any escape (`..`, absolute).
+function resolveInRoot(root: string, relPath: string): string | null {
+  const abs = resolve(root, relPath)
+  return abs === root || abs.startsWith(root + sep) ? abs : null
 }
 
 // The setup script + when-to-run configured on the workspace that owns this repo (docs/workspaces
@@ -427,6 +447,41 @@ export async function registerTerminalIpc(db: AppDatabase, worktreesDir: string)
   ipcMain.handle('term:repoPath:pick', async (): Promise<string | null> => {
     const res = await dialog.showOpenDialog({ properties: ['openDirectory'] })
     return res.canceled || !res.filePaths[0] ? null : res.filePaths[0]
+  })
+
+  // Monaco editor pane (docs/workspaces): read/write files on the task's worktree. Local-only, so
+  // IPC not HTTP. All calls are keyed by taskId + a relative path confined to the worktree root by
+  // resolveInRoot — the renderer never hands us an absolute path.
+  ipcMain.handle('editor:root', (_e: IpcMainInvokeEvent, taskId: string): Promise<string | null> => taskRoot(db, taskId))
+
+  ipcMain.handle('editor:list', async (_e: IpcMainInvokeEvent, p: { taskId: string; relPath: string }): Promise<{ name: string; dir: boolean }[]> => {
+    const root = await taskRoot(db, p.taskId)
+    const abs = root && resolveInRoot(root, p.relPath)
+    if (!abs) return []
+    const ents = await readdir(abs, { withFileTypes: true })
+    return ents
+      .filter((e) => e.name !== '.git' && e.name !== 'node_modules')
+      .map((e) => ({ name: e.name, dir: e.isDirectory() }))
+      .sort((a, b) => (a.dir === b.dir ? a.name.localeCompare(b.name) : a.dir ? -1 : 1))
+  })
+
+  ipcMain.handle('editor:read', async (_e: IpcMainInvokeEvent, p: { taskId: string; relPath: string }): Promise<string> => {
+    const root = await taskRoot(db, p.taskId)
+    const abs = root && resolveInRoot(root, p.relPath)
+    if (!abs) throw new Error('Path outside worktree.')
+    return readFile(abs, 'utf8')
+  })
+
+  ipcMain.handle('editor:write', async (_e: IpcMainInvokeEvent, p: { taskId: string; relPath: string; content: string }): Promise<{ ok: boolean; reason?: string }> => {
+    const root = await taskRoot(db, p.taskId)
+    const abs = root && resolveInRoot(root, p.relPath)
+    if (!abs) return { ok: false, reason: 'Path outside worktree.' }
+    try {
+      await writeFile(abs, p.content, 'utf8')
+      return { ok: true }
+    } catch (e) {
+      return { ok: false, reason: e instanceof Error ? e.message : String(e) }
+    }
   })
 
   // Archive a task with the lifecycle guard (docs/workspaces 05): the ONLY path allowed to

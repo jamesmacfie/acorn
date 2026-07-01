@@ -13,7 +13,7 @@ const [activeTaskId, setActiveTaskId] = createSignal<string | null>(null)
 
 // Which pane the active task shows (docs/workspaces 02). Terminal is the bottom drawer, toggled
 // separately; this is the main-area pane.
-export type PaneId = 'pr' | 'linear' | 'preview'
+export type PaneId = 'pr' | 'linear' | 'preview' | 'editor'
 const [activePane, setActivePane] = createSignal<PaneId>('pr')
 
 // The terminal drawer is per-task (session state, like activeTaskId): each task remembers whether

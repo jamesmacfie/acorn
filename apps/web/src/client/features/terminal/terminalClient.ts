@@ -28,7 +28,7 @@ export type TerminalApi = {
 
 declare global {
   interface Window {
-    acorn?: { desktop?: boolean; platform?: string; terminal?: TerminalApi }
+    acorn?: { desktop?: boolean; platform?: string; terminal?: TerminalApi; editor?: import('../editor/editorClient').EditorApi }
   }
 }
 
