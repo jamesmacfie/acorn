@@ -43,7 +43,7 @@
   position: absolute;
   bottom: 4px;
   right: 5px;
-  font-size: 10px;
+  font-size: 15px;
   line-height: 1;
   color: var(--warn);
   pointer-events: none;
