@@ -1,10 +1,11 @@
 import { BrowserWindow, dialog, ipcMain, Notification, type IpcMainInvokeEvent, type WebContents } from 'electron'
 import { spawn, type IPty } from 'node-pty'
-import { execFileSync } from 'node:child_process'
+import { execFile, execFileSync } from 'node:child_process'
 import { randomUUID } from 'node:crypto'
-import { statSync } from 'node:fs'
+import { promisify } from 'node:util'
+import { existsSync, realpathSync, statSync } from 'node:fs'
 import { readdir, readFile, writeFile } from 'node:fs/promises'
-import { isAbsolute, resolve, sep } from 'node:path'
+import { dirname, isAbsolute, resolve, sep } from 'node:path'
 import { homedir } from 'node:os'
 import { and, eq } from 'drizzle-orm'
 import type { AppDatabase } from '../server/db'
@@ -203,10 +204,23 @@ async function taskRoot(db: AppDatabase, taskId: string): Promise<string | null>
   return resolve(cwd)
 }
 
-// Confine a renderer-supplied relative path to within `root`; null on any escape (`..`, absolute).
+// Confine a renderer-supplied relative path to within `root`; null on any escape. Two gates: a
+// lexical one (rejects `..`/absolute paths) and a symlink one — resolve the real path of the nearest
+// existing ancestor (the target itself may not exist yet on a new-file write) and require it to stay
+// within root's real path, so a symlink inside the worktree can't point the read/write outside it
+// (worktrees can hold arbitrary checked-out content, including hostile symlinks).
 function resolveInRoot(root: string, relPath: string): string | null {
   const abs = resolve(root, relPath)
-  return abs === root || abs.startsWith(root + sep) ? abs : null
+  if (abs !== root && !abs.startsWith(root + sep)) return null
+  try {
+    const realRoot = realpathSync(root)
+    let probe = abs
+    while (probe !== root && !existsSync(probe)) probe = dirname(probe)
+    const real = realpathSync(probe)
+    return real === realRoot || real.startsWith(realRoot + sep) ? abs : null
+  } catch {
+    return null
+  }
 }
 
 // The setup script + when-to-run configured on the workspace that owns this repo (docs/workspaces
@@ -442,6 +456,23 @@ export async function registerTerminalIpc(db: AppDatabase, worktreesDir: string)
   ipcMain.handle('term:repoPath:runConfig', (_e: IpcMainInvokeEvent, p: { owner: string; repo: string; runCommand: string; devPort: number }) =>
     setRunConfig(db, p.owner, p.repo, p.runCommand, p.devPort),
   )
+
+  // Browser-preview 'script' mode (WorkspaceSettings): run the configured shell command in the
+  // task's worktree and use its stdout (last non-empty line, trimmed) as the preview URL. Keyed by
+  // taskId so the renderer never supplies a path; a short timeout guards a hung script.
+  ipcMain.handle('term:previewUrl', async (_e: IpcMainInvokeEvent, p: { taskId: string; script: string }): Promise<{ ok: boolean; url?: string; reason?: string }> => {
+    const script = p.script?.trim()
+    if (!script) return { ok: false, reason: 'no script configured' }
+    const cwd = await taskRoot(db, p.taskId)
+    if (!cwd) return { ok: false, reason: 'no worktree yet — open a terminal first' }
+    try {
+      const { stdout } = await promisify(execFile)('/bin/sh', ['-c', script], { cwd, timeout: 10_000 })
+      const url = stdout.split('\n').map((l) => l.trim()).filter(Boolean).pop()
+      return url ? { ok: true, url } : { ok: false, reason: 'script produced no output' }
+    } catch (err) {
+      return { ok: false, reason: err instanceof Error ? err.message : 'script failed' }
+    }
+  })
 
   // Native folder picker for the onboarding repo-mapping flow. Returns the chosen path or null.
   ipcMain.handle('term:repoPath:pick', async (): Promise<string | null> => {

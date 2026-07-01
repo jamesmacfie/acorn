@@ -3,7 +3,7 @@ import { and, eq, inArray, max, notInArray } from 'drizzle-orm'
 import { Hono } from 'hono'
 import { getDb, schema } from '../db'
 import type { AppEnv } from '../middleware/auth'
-import type { SetupTrigger, Workspace, WorkspaceRepo, WorkspaceSeed } from '../../shared/api'
+import type { PreviewMode, SetupTrigger, Workspace, WorkspaceRepo, WorkspaceSeed } from '../../shared/api'
 
 // Workspaces (docs/workspaces): named GROUPS of repos — the top-level unit. Machine-scoped (no
 // user_id) like tasks / repo_paths, but auth-gated. A repo belongs to exactly one workspace
@@ -30,6 +30,8 @@ async function listWorkspaces(db: ReturnType<typeof getDb>): Promise<Workspace[]
     sort: r.sort,
     setupScript: r.setupScript,
     setupScriptTrigger: r.setupScriptTrigger as Workspace['setupScriptTrigger'],
+    previewMode: r.previewMode as PreviewMode | null,
+    previewValue: r.previewValue,
     repos: (byWs.get(r.id) ?? []).sort((a, b) => a.sort - b.sort),
   }))
 }
@@ -74,13 +76,13 @@ export const workspaces = new Hono<AppEnv>()
     const now = Date.now()
     const id = randomUUID()
     await db.insert(schema.workspaces).values({ id, name: body.name.trim(), isDefault: false, sort: (value ?? -1) + 1, createdAt: now, updatedAt: now })
-    return c.json({ id, name: body.name.trim(), isDefault: false, sort: (value ?? -1) + 1, setupScript: null, setupScriptTrigger: null, repos: [] } satisfies Workspace)
+    return c.json({ id, name: body.name.trim(), isDefault: false, sort: (value ?? -1) + 1, setupScript: null, setupScriptTrigger: null, previewMode: null, previewValue: null, repos: [] } satisfies Workspace)
   })
   // Update a workspace's name, worktree setup script, and/or when it runs. Blank script ⇒ null.
   .patch('/:id', async (c) => {
     if (!c.get('user')) return c.json({ error: 'unauthenticated' }, 401)
-    const body = (await c.req.json().catch(() => ({}))) as { name?: string; setupScript?: string; setupScriptTrigger?: SetupTrigger }
-    const set: { name?: string; setupScript?: string | null; setupScriptTrigger?: string; updatedAt: number } = { updatedAt: Date.now() }
+    const body = (await c.req.json().catch(() => ({}))) as { name?: string; setupScript?: string; setupScriptTrigger?: SetupTrigger; previewMode?: string; previewValue?: string }
+    const set: { name?: string; setupScript?: string | null; setupScriptTrigger?: string; previewMode?: string | null; previewValue?: string | null; updatedAt: number } = { updatedAt: Date.now() }
     if (body.name !== undefined) {
       if (!body.name.trim()) return c.json({ error: 'bad_request' }, 400)
       set.name = body.name.trim()
@@ -90,7 +92,19 @@ export const workspaces = new Hono<AppEnv>()
       if (!['off', 'created', 'terminal'].includes(body.setupScriptTrigger)) return c.json({ error: 'bad_request' }, 400)
       set.setupScriptTrigger = body.setupScriptTrigger
     }
-    if (set.name === undefined && set.setupScript === undefined && set.setupScriptTrigger === undefined) return c.json({ error: 'bad_request' }, 400)
+    // Browser-preview config: mode (blank ⇒ null, falls back to dev-server port) + its value.
+    if (body.previewMode !== undefined) {
+      if (body.previewMode && !['url', 'port', 'script'].includes(body.previewMode)) return c.json({ error: 'bad_request' }, 400)
+      set.previewMode = body.previewMode || null
+    }
+    if (body.previewValue !== undefined) set.previewValue = body.previewValue.trim() || null
+    // 'port' mode is interpolated into http://localhost:<value>; require a bare port so a crafted
+    // value (e.g. "@evil.com") can't redirect the preview webview to another host.
+    if (set.previewMode === 'port' && set.previewValue != null) {
+      const p = Number(set.previewValue)
+      if (!/^\d{1,5}$/.test(set.previewValue) || p < 1 || p > 65535) return c.json({ error: 'bad_request' }, 400)
+    }
+    if (set.name === undefined && set.setupScript === undefined && set.setupScriptTrigger === undefined && set.previewMode === undefined && set.previewValue === undefined) return c.json({ error: 'bad_request' }, 400)
     await getDb(c.env).update(schema.workspaces).set(set).where(eq(schema.workspaces.id, c.req.param('id')))
     return c.json({ ok: true })
   })

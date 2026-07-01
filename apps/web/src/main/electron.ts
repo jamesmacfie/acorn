@@ -61,13 +61,16 @@ function hardenNavigation(win: BrowserWindow) {
     void shell.openExternal(url)
     return { action: 'deny' }
   })
-  // Browser-preview pane (docs/workspaces P5): only let a <webview> attach when it points at the
-  // local dev server, and never give the guest a preload or node integration (hardened posture).
+  // Browser-preview pane (docs/workspaces P5): the URL is user-configured per workspace (a dev-server
+  // port, a fixed URL, or a script's output), so allow any http(s) origin — but never give the guest
+  // a preload or node integration (hardened posture kept for the guest itself).
   win.webContents.on('will-attach-webview', (e, webPreferences, params) => {
     delete webPreferences.preload
     webPreferences.nodeIntegration = false
     webPreferences.contextIsolation = true
-    if (!/^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?(\/|$)/.test(params.src ?? '')) e.preventDefault()
+    // http(s) only, and no userinfo in the authority (`http://localhost@evil.com`) so a preview URL
+    // can't disguise a foreign host as localhost.
+    if (!/^https?:\/\/[^@/?#]+(?::\d+)?(\/|$)/.test(params.src ?? '')) e.preventDefault()
   })
 }
 

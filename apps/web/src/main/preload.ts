@@ -22,6 +22,9 @@ contextBridge.exposeInMainWorld('acorn', {
       runConfig: (owner: string, repo: string, runCommand: string, devPort: number) =>
         ipcRenderer.invoke('term:repoPath:runConfig', { owner, repo, runCommand, devPort }),
     },
+    // Resolve a workspace's browser-preview URL by running its configured script in the task's
+    // worktree (script mode only — url/port are computed client-side). Returns the trimmed stdout.
+    previewUrl: (taskId: string, script: string) => ipcRenderer.invoke('term:previewUrl', { taskId, script }),
     task: {
       // Guarded archive + worktree teardown (docs/workspaces 05). Lives on the terminal bridge
       // because teardown needs the main-process git + live session map.

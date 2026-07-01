@@ -1,4 +1,4 @@
-import { createMemo, createResource, createSignal, onCleanup, onMount, Show } from 'solid-js'
+import { createEffect, createMemo, createResource, createSignal, Show } from 'solid-js'
 import { useNavigate } from '@solidjs/router'
 import { createQuery, useQueryClient } from '@tanstack/solid-query'
 import { tasksKey, tasksOptions, workspacesOptions, type Task } from '../../queries'
@@ -10,7 +10,7 @@ import EditorPane from '../editor/EditorPane'
 import { workspaceForRepo } from '../workspaces/activeWorkspace'
 import { refreshSessions, sessions } from '../terminal/sessions'
 import { terminalApi } from '../terminal/terminalClient'
-import { activePane, setActivePane, setActiveTaskId, setSelectedSource } from './tasks'
+import { activePane, paneForTask, setActivePane, setActiveTaskId, setSelectedSource } from './tasks'
 import { taskStatus } from './taskStatus'
 import './task-view.css'
 
@@ -96,6 +96,32 @@ export default function TaskView(props: {
   const queryClient = useQueryClient()
   const tasksQuery = createQuery(() => tasksOptions(true))
   const workspacesQuery = createQuery(() => workspacesOptions(true))
+
+  // Browser-preview URL is configured per workspace (Settings → workspace). Falls back to the
+  // dev-server port when unset. 'script' mode runs a command in the worktree (via IPC) for its URL.
+  const previewWs = () => workspaceForRepo(workspacesQuery.data, props.task.repoOwner, props.task.repoName)
+  const [scriptUrl] = createResource(
+    () => {
+      const ws = previewWs()
+      return ws?.previewMode === 'script' && ws.previewValue ? { taskId: props.task.id, script: ws.previewValue } : null
+    },
+    async (src) => {
+      if (!api) return null
+      const res = await api.previewUrl(src.taskId, src.script)
+      return res.ok ? (res.url ?? null) : null
+    },
+  )
+  const previewUrl = () => {
+    const ws = previewWs()
+    const val = ws?.previewValue?.trim() || null
+    if (ws?.previewMode === 'url') return val
+    if (ws?.previewMode === 'port') {
+      const p = Number(val)
+      return val && Number.isInteger(p) && p >= 1 && p <= 65535 ? `http://localhost:${p}` : null
+    }
+    if (ws?.previewMode === 'script') return scriptUrl() ?? null
+    return port() != null ? `http://localhost:${port()}` : null
+  }
   const [closeOpen, setCloseOpen] = createSignal(false)
   const [deleteWt, setDeleteWt] = createSignal(true)
   const [closeErr, setCloseErr] = createSignal('')
@@ -133,7 +159,7 @@ export default function TaskView(props: {
     if (next) {
       setSelectedSource(null)
       setActiveTaskId(next.id)
-      setActivePane('pr')
+      if (paneForTask(next.id) == null) setActivePane('pr')
       navigate(pathFor(next))
     } else {
       setActiveTaskId(null)
@@ -146,39 +172,40 @@ export default function TaskView(props: {
   return (
     <div class="workspace-wrap">
     <main class="panes panes-workspace">
-      <Show when={activePane() === 'editor'} fallback={
-      <Show when={activePane() === 'preview'} fallback={
-        <Show
-          when={activePane() === 'pr' && hasPr()}
-          fallback={
-            <section class="pane pane-mid pane-empty workspace-empty">
-              <div class="workspace-empty-inner">
-                <Show when={!hasPr()} fallback={<p class="muted">Select a pane.</p>}>
-                  <p class="muted">No PR linked yet.</p>
-                  <p class="muted">Open a terminal to start working on <code>{props.task.branch}</code>; a PR is inherited automatically once you open one.</p>
-                  <button type="button" class="workspace-empty-term" onClick={props.onOpenTerminal}>
-                    {props.terminalOpen ? 'Hide terminal' : 'Open terminal'}
-                  </button>
-                </Show>
-              </div>
+      {/* Preview stays mounted (just hidden) so its <webview> and browse state survive pane switches;
+          the other panes render only when preview isn't active. */}
+      <Show when={activePane() !== 'preview'}>
+        <Show when={activePane() === 'editor'} fallback={
+          <Show
+            when={activePane() === 'pr' && hasPr()}
+            fallback={
+              <section class="pane pane-mid pane-empty workspace-empty">
+                <div class="workspace-empty-inner">
+                  <Show when={!hasPr()} fallback={<p class="muted">Select a pane.</p>}>
+                    <p class="muted">No PR linked yet.</p>
+                    <p class="muted">Open a terminal to start working on <code>{props.task.branch}</code>; a PR is inherited automatically once you open one.</p>
+                    <button type="button" class="workspace-empty-term" onClick={props.onOpenTerminal}>
+                      {props.terminalOpen ? 'Hide terminal' : 'Open terminal'}
+                    </button>
+                  </Show>
+                </div>
+              </section>
+            }
+          >
+            <section class="pane pane-mid">
+              <div class="section-header">Navigator</div>
+              <PullDetail />
             </section>
-          }
-        >
-          <section class="pane pane-mid">
-            <div class="section-header">Navigator</div>
-            <PullDetail />
-          </section>
-          <section class="pane pane-right">
-            <div class="section-header">Diff</div>
-            <DiffView />
-          </section>
+            <section class="pane pane-right">
+              <div class="section-header">Diff</div>
+              <DiffView />
+            </section>
+          </Show>
+        }>
+          <EditorPane task={props.task} />
         </Show>
-      }>
-        <PreviewPane url={port() != null ? `http://localhost:${port()}` : null} onConfigure={startDev} running={!!devSession()} />
       </Show>
-      }>
-        <EditorPane task={props.task} />
-      </Show>
+      <PreviewPane taskId={props.task.id} url={previewUrl()} hidden={activePane() !== 'preview'} onConfigure={startDev} />
 
       <nav class="pane-switcher">
         <Show when={hasPr()}>
@@ -270,29 +297,106 @@ export default function TaskView(props: {
   )
 }
 
-// The preview <webview> is created imperatively (it isn't a typed JSX element) and pinned to the
-// localhost dev-server URL. The main process's will-attach-webview guard enforces localhost-only.
-function PreviewPane(props: { url: string | null; running: boolean; onConfigure: () => void }) {
+// Electron's <webview> isn't a typed JSX element; this is the slice of its API the chrome drives.
+type WebviewEl = HTMLElement & {
+  src: string
+  loadURL(url: string): void
+  reload(): void
+  stop(): void
+  goBack(): void
+  goForward(): void
+  canGoBack(): boolean
+  canGoForward(): boolean
+  getURL(): string
+}
+const withScheme = (v: string) => (/^[a-z]+:\/\//i.test(v) ? v : `https://${v}`)
+
+// One live <webview> per task, kept for the whole app session so browse state (page, scroll, form
+// input) survives pane and task switches — only a page reload (app restart) starts fresh. Not GC'd
+// on task close.
+// ponytail: session-lifetime leak; add cleanup on task archive if it ever bites.
+const previewWebviews = new Map<string, WebviewEl>()
+
+// The browser-preview pane: browser chrome (back/forward/stop-reload/home + editable URL bar +
+// loading spinner) over the per-task <webview>. props.url is the workspace-configured "home"; the
+// main process's will-attach-webview guard keeps it to http(s).
+function PreviewPane(props: { taskId: string; url: string | null; hidden: boolean; onConfigure: () => void }) {
   let host!: HTMLDivElement
-  onMount(() => {
-    if (!props.url) return
-    const wv = document.createElement('webview')
-    wv.setAttribute('src', props.url)
-    wv.style.width = '100%'
-    wv.style.height = '100%'
-    host.appendChild(wv)
-    onCleanup(() => wv.remove())
+  const [loading, setLoading] = createSignal(false)
+  const [addr, setAddr] = createSignal('')
+  const [canBack, setCanBack] = createSignal(false)
+  const [canFwd, setCanFwd] = createSignal(false)
+  const active = () => previewWebviews.get(props.taskId) ?? null
+  const isActive = (el: WebviewEl) => previewWebviews.get(props.taskId) === el
+  const syncFrom = (el: WebviewEl) => {
+    try {
+      setAddr(el.getURL() || props.url || '')
+      setCanBack(el.canGoBack())
+      setCanFwd(el.canGoForward())
+    } catch {
+      setAddr(props.url ?? '')
+      setCanBack(false)
+      setCanFwd(false)
+    }
+  }
+
+  // Show the current task's webview (creating it on first open), hide the others. Re-appends after a
+  // TaskView remount (leaving/returning the task view), which reloads that one webview.
+  createEffect(() => {
+    const taskId = props.taskId
+    const url = props.url
+    if (!host || !url) return
+    let el = previewWebviews.get(taskId)
+    if (!el) {
+      el = document.createElement('webview') as WebviewEl
+      el.setAttribute('src', url)
+      el.style.width = '100%'
+      el.style.height = '100%'
+      const captured = el
+      el.addEventListener('did-start-loading', () => isActive(captured) && setLoading(true))
+      el.addEventListener('did-stop-loading', () => isActive(captured) && (setLoading(false), syncFrom(captured)))
+      const onNav = (e: Event) => isActive(captured) && (setAddr((e as Event & { url?: string }).url ?? captured.getURL()), syncFrom(captured))
+      el.addEventListener('did-navigate', onNav)
+      el.addEventListener('did-navigate-in-page', onNav)
+      previewWebviews.set(taskId, el)
+    }
+    if (el.parentElement !== host) host.appendChild(el) // fresh host after a remount → reload
+    for (const [id, w] of previewWebviews) w.style.display = id === taskId ? 'flex' : 'none'
+    setLoading(false)
+    syncFrom(el)
   })
+
+  const go = () => {
+    const el = active()
+    const v = addr().trim()
+    if (el && v) el.loadURL(withScheme(v))
+  }
+
   return (
-    <section class="pane workspace-preview" style={{ 'grid-column': '1 / 3' }}>
+    <section class="pane workspace-preview" classList={{ 'is-hidden': props.hidden }} style={{ 'grid-column': '1 / 3' }}>
       <Show when={props.url} fallback={
         <div class="workspace-empty-inner">
           <p class="muted">No dev server port configured.</p>
           <button type="button" class="workspace-empty-term" onClick={props.onConfigure}>Configure & run</button>
         </div>
       }>
-        <div class="workspace-preview-host" ref={host} />
+        <div class="preview-chrome">
+          <button type="button" class="preview-nav-btn" title="Back" disabled={!canBack()} onClick={() => active()?.goBack()}>‹</button>
+          <button type="button" class="preview-nav-btn" title="Forward" disabled={!canFwd()} onClick={() => active()?.goForward()}>›</button>
+          <button type="button" class="preview-nav-btn" title={loading() ? 'Stop' : 'Reload'} onClick={() => (loading() ? active()?.stop() : active()?.reload())}>{loading() ? '✕' : '↻'}</button>
+          <button type="button" class="preview-nav-btn" title="Home" onClick={() => props.url && active()?.loadURL(props.url)}>⌂</button>
+          <input
+            class="preview-url"
+            type="text"
+            spellcheck={false}
+            value={addr()}
+            onInput={(e) => setAddr(e.currentTarget.value)}
+            onKeyDown={(e) => e.key === 'Enter' && go()}
+          />
+          <Show when={loading()}><span class="preview-spinner spin">◐</span></Show>
+        </div>
       </Show>
+      <div class="workspace-preview-host" ref={host} />
     </section>
   )
 }

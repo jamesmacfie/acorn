@@ -19,6 +19,9 @@ export type TerminalApi = {
     pick(): Promise<string | null>
     runConfig(owner: string, repo: string, runCommand: string, devPort: number): Promise<RepoPathResult>
   }
+  // Run a workspace's browser-preview script in the task's worktree; stdout (trimmed) is the URL.
+  previewUrl(taskId: string, script: string): Promise<{ ok: boolean; url?: string; reason?: string }>
+
   task: {
     archive(id: string, opts?: { deleteWorktree?: boolean; force?: boolean }): Promise<ArchiveResult>
     onCreated(id: string): Promise<void>

@@ -4,7 +4,7 @@ import { createQuery, useQueryClient } from '@tanstack/solid-query'
 import { integrationsOptions, pullDetailOptions, tasksKey, tasksOptions, workspacesOptions, type Task } from '../../queries'
 import { archiveTask, createTask, renameTask } from '../../mutations'
 import { checksState } from '../../displayMeta'
-import { activeTaskId, selectedSource, setActivePane, setActiveTaskId, setSelectedSource, type SourceId } from '../tasks/tasks'
+import { activeTaskId, paneForTask, selectedSource, setActivePane, setActiveTaskId, setSelectedSource, type SourceId } from '../tasks/tasks'
 import { taskStatus } from '../tasks/taskStatus'
 import { workspaceForRepo } from '../workspaces/activeWorkspace'
 import { terminalApi } from '../terminal/terminalClient'
@@ -67,7 +67,8 @@ export default function TabRail() {
     setMenuId(null)
     setSelectedSource(null)
     setActiveTaskId(w.id)
-    setActivePane(w.pullNumber != null ? 'pr' : w.links.some((l) => l.provider === 'linear') ? 'linear' : 'pr')
+    // Restore the pane last used for this task; only pick a default the first time it's opened.
+    if (paneForTask(w.id) == null) setActivePane(w.pullNumber != null ? 'pr' : w.links.some((l) => l.provider === 'linear') ? 'linear' : 'pr')
     navigate(pathFor(w))
   }
 
