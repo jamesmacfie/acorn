@@ -1,11 +1,15 @@
 import { createMemo, createResource, createSignal, onCleanup, onMount, Show } from 'solid-js'
-import type { Task } from '../../queries'
+import { useNavigate } from '@solidjs/router'
+import { createQuery, useQueryClient } from '@tanstack/solid-query'
+import { tasksKey, tasksOptions, workspacesOptions, type Task } from '../../queries'
+import { archiveTask } from '../../mutations'
 import PullDetail from '../../PullDetail'
 import DiffView from '../../DiffView'
 import LinearIssuePanel from '../integrations/LinearIssuePanel'
+import { workspaceForRepo } from '../workspaces/activeWorkspace'
 import { refreshSessions, sessions } from '../terminal/sessions'
 import { terminalApi } from '../terminal/terminalClient'
-import { activePane, setActivePane } from './tasks'
+import { activePane, setActivePane, setActiveTaskId, setSelectedSource } from './tasks'
 import { taskStatus } from './taskStatus'
 import './task-view.css'
 
@@ -84,6 +88,60 @@ export default function TaskView(props: {
     await startDev()
   }
 
+  // Close-task flow (the ✕ at the bottom of the switcher): confirm, tear the task down (killing any
+  // running sessions and — if the user opts in — deleting the worktree, discarding a dirty tree),
+  // then drop the tab and select the next one down.
+  const navigate = useNavigate()
+  const queryClient = useQueryClient()
+  const tasksQuery = createQuery(() => tasksOptions(true))
+  const workspacesQuery = createQuery(() => workspacesOptions(true))
+  const [closeOpen, setCloseOpen] = createSignal(false)
+  const [deleteWt, setDeleteWt] = createSignal(true)
+  const [closeErr, setCloseErr] = createSignal('')
+  const hasWorktree = () => !!props.task.worktreePath
+  const dirtyCount = () => (st()?.missing ? 0 : st()?.dirty ? (st()?.dirtyCount ?? 0) : 0)
+
+  const pathFor = (t: Task) => `/${t.repoOwner}/${t.repoName}${t.pullNumber != null ? `/${t.pullNumber}` : ''}`
+  // The workspace-scoped, sort-ordered rail list (mirrors TabRail's visibleTasks) — the task's repo
+  // is the current repo, so scope by it. Pick the task just below the one being closed, else above.
+  function nextTask(): Task | null {
+    const ws = workspaceForRepo(workspacesQuery.data, props.task.repoOwner, props.task.repoName)
+    const all = tasksQuery.data ?? []
+    const set = ws ? new Set((ws.repos ?? []).map((r) => `${r.owner}/${r.name}`)) : null
+    const list = set ? all.filter((t) => set.has(`${t.repoOwner}/${t.repoName}`)) : all
+    const i = list.findIndex((t) => t.id === props.task.id)
+    if (i < 0) return list[0] ?? null
+    return list[i + 1] ?? list[i - 1] ?? null
+  }
+
+  function openClose() {
+    setCloseErr('')
+    setDeleteWt(true)
+    setCloseOpen(true)
+  }
+
+  async function confirmClose() {
+    const next = nextTask() // resolve before archiving — the list still holds this task
+    if (api) {
+      const res = await api.task.archive(props.task.id, { deleteWorktree: deleteWt(), force: true })
+      if (!res.ok) return setCloseErr(res.reason)
+    } else {
+      await archiveTask(props.task.id)
+    }
+    setCloseOpen(false)
+    if (next) {
+      setSelectedSource(null)
+      setActiveTaskId(next.id)
+      setActivePane('pr')
+      navigate(pathFor(next))
+    } else {
+      setActiveTaskId(null)
+      setSelectedSource('github') // no tasks left → fall back to the GitHub browse
+      navigate('/')
+    }
+    await queryClient.invalidateQueries({ queryKey: tasksKey })
+  }
+
   return (
     <div class="workspace-wrap">
     <main class="panes panes-workspace">
@@ -127,6 +185,7 @@ export default function TaskView(props: {
         <button type="button" class="pane-switch-btn" classList={{ active: !!devSession() }} title="Run dev server" onClick={() => void startDev()}>▶</button>
         <button type="button" class="pane-switch-btn" classList={{ active: activePane() === 'preview' }} title="Browser preview" onClick={() => setActivePane('preview')}>◍</button>
         <button type="button" class="pane-switch-btn" classList={{ active: props.terminalOpen }} title="Terminal" onClick={props.onToggleTerminal}>{'>_'}</button>
+        <button type="button" class="pane-switch-btn pane-switch-close" title="Close task" onClick={openClose}>✕</button>
       </nav>
 
       {/* Linear pane reuses the existing ticket panel (a right-anchored overlay). With several linked
@@ -153,6 +212,31 @@ export default function TaskView(props: {
                 <button type="submit" class="overlay-btn" disabled={!cmd().trim() || !portInput().trim()}>Run</button>
               </form>
               <Show when={cfgErr()}><div class="action-error">{cfgErr()}</div></Show>
+            </div>
+          </div>
+        </div>
+      </Show>
+
+      <Show when={closeOpen()}>
+        <div class="overlay-backdrop" onClick={() => setCloseOpen(false)}>
+          <div class="overlay" role="dialog" aria-modal="true" onClick={(e) => e.stopPropagation()}>
+            <div class="overlay-title">Close task</div>
+            <div class="overlay-body">
+              <p class="muted">Close “{props.task.title}” and remove it from the rail?</p>
+              <Show when={hasWorktree()}>
+                <label class="close-check">
+                  <input type="checkbox" checked={deleteWt()} onChange={(e) => setDeleteWt(e.currentTarget.checked)} />
+                  <span>Also delete this worktree</span>
+                </label>
+                <Show when={deleteWt() && dirtyCount() > 0}>
+                  <div class="action-error">⚠ {dirtyCount()} uncommitted change{dirtyCount() === 1 ? '' : 's'} — deleting the worktree discards them.</div>
+                </Show>
+              </Show>
+              <Show when={closeErr()}><div class="action-error">{closeErr()}</div></Show>
+              <div class="close-actions">
+                <button type="button" class="overlay-btn" onClick={() => setCloseOpen(false)}>Cancel</button>
+                <button type="button" class="overlay-btn close-confirm" onClick={() => void confirmClose()}>Close task</button>
+              </div>
             </div>
           </div>
         </div>

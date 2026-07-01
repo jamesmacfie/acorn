@@ -96,11 +96,16 @@ export type LinearProjectIssuesResponse = { issues: LinearProjectIssue[] }
 
 // --- Workspaces: named groups of repos (docs/workspaces). The top-level unit. ---
 export type WorkspaceRepo = { owner: string; name: string; sort: number }
+// When the worktree setup script runs: 'off' never, 'created' eagerly when the task is created,
+// 'terminal' lazily when its terminal first opens (the default). null is treated as 'terminal'.
+export type SetupTrigger = 'off' | 'created' | 'terminal'
 export type Workspace = {
   id: string
   name: string
   isDefault: boolean
   sort: number
+  setupScript: string | null // shell command run once when a task worktree is created; null/blank = none
+  setupScriptTrigger: SetupTrigger | null
   repos: WorkspaceRepo[]
 }
 export type WorkspaceSeed = { name: string }

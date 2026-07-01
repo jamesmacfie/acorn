@@ -28,6 +28,10 @@ async function branchExists(checkout: string, branch: string): Promise<boolean> 
 // flag) and only git-legal ref chars. The dir name is slugged separately; this guards the *git arg*.
 const isValidBranch = (branch: string): boolean => !branch.startsWith('-') && /^[A-Za-z0-9._/-]+$/.test(branch)
 
+// `created` distinguishes a fresh `git worktree add` from reuse of an existing dir — the caller
+// runs the workspace setup script only on the fresh path (docs/workspaces P5).
+type EnsureWorktreeResult = { ok: true; path: string; created: boolean } | { ok: false; reason: string }
+
 export async function ensureWorktree(
   worktreesRoot: string,
   checkout: string,
@@ -35,13 +39,13 @@ export async function ensureWorktree(
   repo: string,
   branch: string,
   pullNumber: number | null,
-): Promise<WorktreeResult> {
+): Promise<EnsureWorktreeResult> {
   if (!isValidBranch(branch)) return { ok: false, reason: 'Invalid branch name.' }
   const path = join(worktreesRoot, worktreeBranchDirName(owner, repo, branch))
   // Defense in depth: never operate on a path that escaped the worktrees root (handler validates
   // identifiers too, vNext §11).
   if (!isContainedPath(worktreesRoot, path)) return { ok: false, reason: 'Invalid worktree path.' }
-  if (existsSync(path)) return { ok: true, path } // reuse
+  if (existsSync(path)) return { ok: true, path, created: false } // reuse
 
   mkdirSync(worktreesRoot, { recursive: true })
 
@@ -58,7 +62,7 @@ export async function ensureWorktree(
     } catch {
       return { ok: false, reason: 'Could not create the worktree.' }
     }
-    return { ok: true, path }
+    return { ok: true, path, created: true }
   }
 
   // Local-first workspace: add a worktree on the branch, creating it from HEAD if it's new. `--`
@@ -71,7 +75,7 @@ export async function ensureWorktree(
   } catch {
     return { ok: false, reason: `Could not create a worktree for ${branch}.` }
   }
-  return { ok: true, path }
+  return { ok: true, path, created: true }
 }
 
 export async function worktreeDirty(path: string): Promise<boolean> {

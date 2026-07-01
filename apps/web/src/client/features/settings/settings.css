@@ -1,0 +1,89 @@
+/* Settings page (SettingsModal.tsx): a wide two-column modal — left tab rail, right scrolling pane.
+   Reuses .overlay-backdrop / .overlay from overlays.css; this widens it and lays out the columns. */
+.overlay.settings {
+  flex-direction: row;
+  width: min(820px, 94vw);
+  height: 72vh;
+  max-height: 72vh;
+}
+
+.settings-nav {
+  flex: none;
+  width: 200px;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  padding: 8px;
+  overflow-y: auto;
+  border-right: 1px solid var(--border);
+  background: var(--bg-subtle);
+}
+.settings-nav-group {
+  font-size: var(--fs-sm);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-muted);
+  padding: 10px 8px 4px;
+}
+.settings-nav-item {
+  font: inherit;
+  font-size: var(--fs-sm);
+  text-align: left;
+  color: var(--text);
+  background: transparent;
+  border: 0;
+  border-radius: var(--radius);
+  padding: 6px 8px;
+  cursor: pointer;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.settings-nav-item:hover { background: var(--bg-hover); }
+.settings-nav-item.active { background: var(--bg-selected); color: var(--text); }
+.settings-nav-sub { padding-left: 16px; }
+
+.settings-pane {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: var(--pane-pad);
+  overflow-y: auto;
+}
+.settings-pane .overlay-title { padding: 0 0 8px; margin: 0 32px 0 0; }
+.settings-close {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  font: inherit;
+  color: var(--text-muted);
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+  line-height: 1;
+  padding: 4px;
+}
+.settings-close:hover { color: var(--text); }
+
+.settings-section { display: flex; flex-direction: column; gap: 18px; }
+.settings-field { display: flex; flex-direction: column; gap: 6px; }
+.settings-label { font-size: var(--fs-sm); color: var(--text); }
+.settings-hint { font-size: var(--fs-sm); }
+.settings-script {
+  font-family: var(--font-mono);
+  font-size: var(--fs-sm);
+  color: var(--text);
+  background: var(--bg);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+  padding: 8px;
+  resize: vertical;
+  outline: none;
+}
+.settings-script:focus { border-color: var(--accent); }
+.settings-actions { display: flex; align-items: center; gap: 10px; }
+.settings-danger { margin-top: 8px; padding-top: 14px; border-top: 1px solid var(--border); }
+.settings-delete { color: var(--danger, #c0392b); border-color: var(--danger, #c0392b); }

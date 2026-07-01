@@ -3,7 +3,7 @@ import { and, eq, inArray, max, notInArray } from 'drizzle-orm'
 import { Hono } from 'hono'
 import { getDb, schema } from '../db'
 import type { AppEnv } from '../middleware/auth'
-import type { Workspace, WorkspaceRepo, WorkspaceSeed } from '../../shared/api'
+import type { SetupTrigger, Workspace, WorkspaceRepo, WorkspaceSeed } from '../../shared/api'
 
 // Workspaces (docs/workspaces): named GROUPS of repos — the top-level unit. Machine-scoped (no
 // user_id) like tasks / repo_paths, but auth-gated. A repo belongs to exactly one workspace
@@ -28,6 +28,8 @@ async function listWorkspaces(db: ReturnType<typeof getDb>): Promise<Workspace[]
     name: r.name,
     isDefault: r.isDefault,
     sort: r.sort,
+    setupScript: r.setupScript,
+    setupScriptTrigger: r.setupScriptTrigger as Workspace['setupScriptTrigger'],
     repos: (byWs.get(r.id) ?? []).sort((a, b) => a.sort - b.sort),
   }))
 }
@@ -72,14 +74,24 @@ export const workspaces = new Hono<AppEnv>()
     const now = Date.now()
     const id = randomUUID()
     await db.insert(schema.workspaces).values({ id, name: body.name.trim(), isDefault: false, sort: (value ?? -1) + 1, createdAt: now, updatedAt: now })
-    return c.json({ id, name: body.name.trim(), isDefault: false, sort: (value ?? -1) + 1, repos: [] } satisfies Workspace)
+    return c.json({ id, name: body.name.trim(), isDefault: false, sort: (value ?? -1) + 1, setupScript: null, setupScriptTrigger: null, repos: [] } satisfies Workspace)
   })
+  // Update a workspace's name, worktree setup script, and/or when it runs. Blank script ⇒ null.
   .patch('/:id', async (c) => {
     if (!c.get('user')) return c.json({ error: 'unauthenticated' }, 401)
-    const body = (await c.req.json().catch(() => ({}))) as { name?: string }
-    if (!body.name?.trim()) return c.json({ error: 'bad_request' }, 400)
-    const db = getDb(c.env)
-    await db.update(schema.workspaces).set({ name: body.name.trim(), updatedAt: Date.now() }).where(eq(schema.workspaces.id, c.req.param('id')))
+    const body = (await c.req.json().catch(() => ({}))) as { name?: string; setupScript?: string; setupScriptTrigger?: SetupTrigger }
+    const set: { name?: string; setupScript?: string | null; setupScriptTrigger?: string; updatedAt: number } = { updatedAt: Date.now() }
+    if (body.name !== undefined) {
+      if (!body.name.trim()) return c.json({ error: 'bad_request' }, 400)
+      set.name = body.name.trim()
+    }
+    if (body.setupScript !== undefined) set.setupScript = body.setupScript.trim() || null
+    if (body.setupScriptTrigger !== undefined) {
+      if (!['off', 'created', 'terminal'].includes(body.setupScriptTrigger)) return c.json({ error: 'bad_request' }, 400)
+      set.setupScriptTrigger = body.setupScriptTrigger
+    }
+    if (set.name === undefined && set.setupScript === undefined && set.setupScriptTrigger === undefined) return c.json({ error: 'bad_request' }, 400)
+    await getDb(c.env).update(schema.workspaces).set(set).where(eq(schema.workspaces.id, c.req.param('id')))
     return c.json({ ok: true })
   })
   .delete('/:id', async (c) => {
