@@ -50,11 +50,6 @@ render(
 // Wipe the persisted cache on logout so the next user can't read it (logout posts then reloads).
 window.addEventListener('acorn:logout', () => void clear())
 
-// Offline app shell. The SW caches the shell + static assets; data stays in IndexedDB (above).
-// In the Electron desktop build a cached shell would mask app upgrades (docs/electron.md §4h), so
-// skip registration there and unregister any leftover from a prior web visit to this origin.
-if (navigator.userAgent.includes('Electron')) {
-  void navigator.serviceWorker?.getRegistrations().then((rs) => rs.forEach((r) => void r.unregister()))
-} else if ('serviceWorker' in navigator) {
-  window.addEventListener('load', () => void navigator.serviceWorker.register('/sw.js').catch(() => {}))
-}
+// Unregister any service worker left over from a prior web (Cloudflare Workers) visit to this
+// origin — a stale cached shell would mask app upgrades in the Electron build.
+void navigator.serviceWorker?.getRegistrations().then((rs) => rs.forEach((r) => void r.unregister()))

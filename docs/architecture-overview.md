@@ -84,7 +84,7 @@ lifetime:
 The client cache is a stale-while-revalidate layer: it renders instantly from
 the last persisted response, then refetches. `gcTime` is set to 24h so
 persisted entries survive a reload, which is what enables offline browsing of
-recently-seen PRs. See [offline-pwa](./offline-pwa.md).
+recently-seen PRs. See [caching](./caching.md).
 
 ## End-to-end data flow
 
@@ -153,6 +153,4 @@ mirror so a read inside the TTL window reflects the change. See
   TanStack Query definitions.
 - [diff-rendering](./diff-rendering.md) — how patches are parsed and rendered,
   including inline review comments and viewed-file state.
-- [offline-pwa](./offline-pwa.md) — the service worker app shell, web manifest,
-  and IndexedDB-backed offline browsing.
 - [ui-design](./ui-design.md) — layout, panes, theming, and design conventions.

@@ -15,8 +15,9 @@ scope and lifetime. The whole design follows one principle:
 | `BLOBS` cache | Local server / on-disk | Per device | Immutable patch/diff bodies keyed by blob SHA |
 | IndexedDB | Browser | Per user / device | TanStack Query cache (last API responses) |
 
-See [data-layer](./data-layer.md) for the schema behind layer 1 and
-[offline-pwa](./offline-pwa.md) for how layer 3 powers offline browsing.
+See [data-layer](./data-layer.md) for the schema behind layer 1. Layer 3
+(the IndexedDB-persisted TanStack Query cache, below) powers offline browsing
+of recently-seen data.
 
 ## Layer 1 — SQLite mirror
 
@@ -134,8 +135,7 @@ app shows the last persisted data instantly, then refetches.
 
 This cache is **per-user and private**. On logout the app wipes it
 (`window.addEventListener('acorn:logout', () => void clear())`) so the next
-user can't read it. See [offline-pwa](./offline-pwa.md) for the service-worker
-app shell that complements this.
+user can't read it.
 
 ## Locality {#public-private-rule}
 

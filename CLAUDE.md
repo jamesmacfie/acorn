@@ -31,8 +31,7 @@ pnpm workspace + Turborepo; all app code is in `apps/web`.
 
 - `apps/web/src/client/` — SolidJS SPA (router, TanStack Query, Shiki diffs, PullList /
   PullDetail / DiffView / RepoPicker, shortcuts). Detail: [docs/frontend.md](./docs/frontend.md),
-  [docs/diff-rendering.md](./docs/diff-rendering.md), [docs/ui-design.md](./docs/ui-design.md),
-  [docs/offline-pwa.md](./docs/offline-pwa.md).
+  [docs/diff-rendering.md](./docs/diff-rendering.md), [docs/ui-design.md](./docs/ui-design.md).
 - `apps/web/src/main/` — Electron main process + Node bootstrap: `electron.ts` (window, guards,
   OAuth window), `server.ts` (`@hono/node-server` + static/SPA), `bindings.ts` (DB/KV/secrets),
   `preload.ts`. Detail: [docs/electron.md](./docs/electron.md).
