@@ -72,7 +72,7 @@ cookie, CSRF, and OAuth-callback flow all keep working unchanged. We do **not** 
 already exists).
 
 Prefer a **stable loopback origin** (`127.0.0.1` + one pinned port) even though GitHub loopback
-OAuth can technically use a dynamic port. The app's IndexedDB query cache, service-worker state,
+OAuth can technically use a dynamic port. The app's IndexedDB query cache,
 Chromium permissions, and renderer storage are origin-scoped; a new port every launch gives the
 user a fresh browser profile for those features. Pick a high, uncommon port, enforce single-instance
 startup, and fail with a clear error if another process owns it.
@@ -91,7 +91,7 @@ Exhaustive — this is everything that isn't portable as-is:
 | Secrets / vars | `SESSION_ENC_KEY`, `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET` via `c.env` + `.dev.vars` | `.env` / OS keychain → injected into Bindings |
 | Worker entry | `src/server/index.ts:44` (`export default app`) | `@hono/node-server` `serve(app)` |
 | Static + SPA fallback | `wrangler.jsonc` `assets` block | `serveStatic` + index.html fallback in the Hono app |
-| PWA shell | `src/client/index.tsx`, `public/sw.js`, `manifest.webmanifest` | disable or explicitly version for desktop so a stale service worker cannot mask app updates |
+| PWA shell | `src/client/index.tsx`, `public/sw.js`, `manifest.webmanifest` | removed — the service worker and web manifest are gone; the renderer only unregisters any leftover web-origin service worker (§4h) |
 | Build plugin | `vite.config.ts` `@cloudflare/vite-plugin` | `electron-vite` (main/preload/renderer) |
 | Env types | `worker-configuration.d.ts` (`Env`), `typegen` script | hand-written `Bindings` type |
 
@@ -102,7 +102,7 @@ fetch, no R2. Globals already in Node: `fetch`, `crypto.randomUUID`, `atob`, `Te
 
 That's the entire list. Everything else — all 16 route modules' business logic, the Drizzle schema,
 the migration SQL, the GitHub client, and the SolidJS product UI — is untouched. The only renderer
-change called out below is the service-worker registration gate (§4h).
+change called out below is removing the service worker (§4h).
 
 ## 4. The changes
 
@@ -177,7 +177,7 @@ electron.whenReady().then(async () => {
 
 Port policy: use a pinned port for a stable app origin. GitHub's loopback redirect handling does
 not require the runtime port to match the registered callback port, so OAuth is not the reason to
-pin it; IndexedDB and service-worker continuity are.
+pin it; IndexedDB continuity is.
 
 ### 4b. The Bindings shim (replaces `Env`)
 
@@ -344,14 +344,15 @@ renderer ↔ preload ↔ main. Treat that as a narrow capability API, not a gene
 
 ### 4h. PWA / service worker decision
 
-The current SPA registers `public/sw.js` unconditionally. In Electron, that service worker is no
+The old web SPA registered `public/sw.js` unconditionally. In Electron the service worker is no
 longer needed to make the app installable, and it can create confusing update bugs by serving an
 old cached app shell after an app upgrade.
 
-Recommended v1: gate service-worker registration out of the Electron renderer build and unregister
-any existing registrations for the app origin on first desktop launch. Keep the IndexedDB TanStack
-Query cache; it still gives fast warm reads. If offline shell support is deliberately kept, version
-the cache from the packaged app version so updates cannot be masked.
+Resolved: the service worker (`public/sw.js`) and web manifest (`public/manifest.webmanifest`) have
+been removed entirely, along with the `<link rel="manifest">`/`theme-color` tags in `index.html`.
+The renderer boot in `src/client/index.tsx` now only unregisters any service worker left over from a
+prior web (Cloudflare Workers) visit to this origin. The IndexedDB TanStack Query cache is kept — it
+gives fast warm reads and offline browsing without a service worker (see [caching](./caching.md)).
 
 ### 4i. Build & packaging
 
@@ -388,8 +389,7 @@ in-between (see §7). Then delete decisively:
 - `.wrangler/` state dir
 - `observability` config (Workers-only) — use Electron logging instead
 - root `build-deploy` script and README production-deploy instructions
-- PWA install metadata if not used by desktop (`manifest.webmanifest`; keep `sw.js` only if §4h
-  chooses explicit desktop offline-shell support)
+- PWA install metadata and the service worker (`manifest.webmanifest`, `sw.js`) — removed (§4h)
 
 **Dependencies:**
 - remove `wrangler`, `@cloudflare/vite-plugin`
@@ -420,7 +420,7 @@ To keep the transition calm, note how much does **not** move:
 
 - The SolidJS product UI (`src/client/**`) — router, TanStack Query, IndexedDB persistence, Shiki,
   all panels. It just loads from `http://127.0.0.1:<port>` instead of the Worker. The exception is
-  the boot-time service-worker gate in `src/client/index.tsx` (§4h).
+  the boot-time service-worker unregister in `src/client/index.tsx` (§4h).
 - All 16 route modules' business logic and the Hono routing in `index.ts` (now a `createApp()` factory).
 - The Drizzle **schema** and all migration SQL.
 - The GitHub client (`github/index.ts`) — plain `fetch`.
@@ -491,10 +491,9 @@ Net: the terminal gets simpler and more native. The full Electron-reframed desig
 
 1. **Pinned app port** must be free. If taken, the stable origin cannot start. Mitigation: enforce
    single-instance startup, pick an uncommon port, and surface a clear error. A dynamic fallback is
-   possible, but it creates a new IndexedDB/service-worker origin.
+   possible, but it creates a new IndexedDB origin.
 2. **`client_secret` in the binary** if we ever distribute (§4f) — device flow is the answer.
-3. **Service worker masking app updates** if it remains enabled (§4h). Either disable it in desktop
-   builds or version the cache from the packaged app version.
+3. ~~**Service worker masking app updates**~~ — resolved: the service worker was removed (§4h).
 4. **Packaged migrations/native modules** can work in dev and fail in a signed app if paths are
    resolved from `process.cwd()` or native `.node` files stay inside `asar`. Resolve paths from app
    resources and unpack native modules.

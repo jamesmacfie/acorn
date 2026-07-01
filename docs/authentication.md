@@ -65,7 +65,7 @@ can review/revoke the grant.
 
 Deletes both possible session cookies (`__Host-session` and the dev `session`
 fallback) and returns `204`. The client also wipes its persisted IndexedDB
-cache on logout — see [offline-pwa](./offline-pwa.md).
+cache on logout — see [caching](./caching.md).
 
 ## The stateless encrypted session
 

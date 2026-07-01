@@ -6,9 +6,9 @@ The acorn client is a SolidJS single-page app under `apps/web/src/client/`. It i
 
 `index.tsx` mounts the app:
 
-- Constructs a single `QueryClient` (`refetchOnWindowFocus: true`, `gcTime: 24h`) wrapped in `PersistQueryClientProvider`, persisting the cache to IndexedDB via `idb-keyval` under key `acorn-cache` (see [caching](./caching.md) and [offline/PWA](./offline-pwa.md)).
+- Constructs a single `QueryClient` (`refetchOnWindowFocus: true`, `gcTime: 24h`) wrapped in `PersistQueryClientProvider`, persisting the cache to IndexedDB via `idb-keyval` under key `acorn-cache` (see [caching](./caching.md)).
 - A global `QueryCache`/`MutationCache` `onError` bounces to `/auth/login` when an error message matches `/\b401\b|reauth|unauthenticated/`.
-- Registers `/sw.js` on `load`, and wipes the persisted cache on the `acorn:logout` window event.
+- Wipes the persisted cache on the `acorn:logout` window event, and unregisters any service worker left over from a prior web (Cloudflare Workers) visit to this origin.
 - Mounts `<Router root={App}>` with three routes whose components are all `noop` — routes exist only to populate `useParams()`; `App` renders the actual UI.
 
 ## Layout

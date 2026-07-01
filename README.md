@@ -140,5 +140,4 @@ Detailed docs live in [`docs/`](./docs):
 - [api-reference.md](./docs/api-reference.md) — the server's `/api/*` and `/auth/*` routes.
 - [frontend.md](./docs/frontend.md) — SolidJS SPA structure, routing, state, queries.
 - [diff-rendering.md](./docs/diff-rendering.md) — Shiki highlighting, virtualization, threads.
-- [offline-pwa.md](./docs/offline-pwa.md) — service-worker offline app shell + web manifest.
 - [ui-design.md](./docs/ui-design.md) — UI conventions, theming, keyboard model.
