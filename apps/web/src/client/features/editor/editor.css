@@ -1,0 +1,111 @@
+.editor-pane {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.editor-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  padding: var(--pane-pad);
+  text-align: center;
+}
+.editor-layout {
+  flex: 1;
+  display: flex;
+  min-height: 0;
+}
+.editor-tree {
+  flex: none;
+  width: 240px;
+  overflow: auto;
+  border-right: 1px solid var(--border);
+  background: var(--bg-subtle);
+  padding: 6px 0;
+  font-family: var(--font-mono);
+  font-size: var(--fs-sm);
+}
+.editor-main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.editor-bar {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: var(--pane-pad);
+  height: var(--topbar-h);
+  padding: 0 var(--pane-pad);
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-subtle);
+  font-size: var(--fs-sm);
+}
+.editor-file {
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.editor-save {
+  margin-left: auto;
+  flex: none;
+  font: inherit;
+  font-size: var(--fs-sm);
+  color: var(--text);
+  background: var(--bg);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+  padding: 4px 10px;
+  cursor: pointer;
+}
+.editor-save:hover { background: var(--bg-hover); border-color: var(--accent); }
+.editor-host {
+  flex: 1;
+  min-height: 0;
+}
+
+/* File tree — flat rows, no button chrome; hover/active are the app's row states. */
+.tree {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.tree .tree {
+  padding-left: 12px;
+}
+.tree-file,
+.tree-dir {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  width: 100%;
+  text-align: left;
+  font: inherit;
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  padding: 3px 10px;
+  cursor: pointer;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.tree-file:hover,
+.tree-dir:hover {
+  background: var(--bg-hover);
+  color: var(--text);
+}
+.tree-file.active {
+  background: var(--bg-selected);
+  color: var(--text);
+}
+.tree-twist {
+  flex: none;
+  width: 10px;
+  color: var(--text-faint);
+  font-size: 9px;
+}
