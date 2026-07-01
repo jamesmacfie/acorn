@@ -123,6 +123,14 @@ export default function TerminalPanel(props: { onClose: () => void; task: Task |
     setPrompt({ owner, repo, number })
   }
 
+  // Native folder picker — same bridge the onboarding modal uses (api.repoPath.pick). Fills the
+  // input so the user can eyeball it before hitting Open; submitPath still validates in main.
+  async function pickPath() {
+    if (!api) return
+    const picked = await api.repoPath.pick()
+    if (picked) setPathInput(picked)
+  }
+
   async function submitPath(e: Event) {
     e.preventDefault()
     const ctx = prompt()
@@ -231,6 +239,9 @@ export default function TerminalPanel(props: { onClose: () => void; task: Task |
                 value={pathInput()}
                 onInput={(e) => setPathInput(e.currentTarget.value)}
               />
+              <button type="button" class="terminal-drawer-btn" title="Choose folder…" aria-label="Choose folder" onClick={() => void pickPath()}>
+                📁
+              </button>
               <button type="submit" class="terminal-drawer-btn">
                 Open
               </button>
