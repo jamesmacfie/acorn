@@ -269,6 +269,8 @@ export const workspaces = sqliteTable('workspaces', {
   name: text('name').notNull(), // editable label
   isDefault: integer('is_default', { mode: 'boolean' }).notNull().default(false), // the catch-all group
   sort: integer('sort').notNull().default(0), // selector ordering
+  setupScript: text('setup_script'), // shell command run once when a task worktree is created; null/blank = none
+  setupScriptTrigger: text('setup_script_trigger'), // 'off' | 'created' | 'terminal' — when to run it; null → 'terminal'
   createdAt: integer('created_at').notNull(),
   updatedAt: integer('updated_at').notNull(),
 })

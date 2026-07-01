@@ -16,11 +16,11 @@ import ComparePreview from './ComparePreview'
 import DiffView from './DiffView'
 import Shortcuts from './Shortcuts'
 import AccountMenu from './AccountMenu'
-import IntegrationsModal from './features/integrations/IntegrationsModal'
+import SettingsModal from './features/settings/SettingsModal'
 import TerminalPanel from './features/terminal/TerminalPanel'
 import { initSessions } from './features/terminal/sessions'
 import TabRail from './features/tabs/TabRail'
-import { activeTaskId, selectedSource, setActiveTaskId, setSelectedSource } from './features/tasks/tasks'
+import { activeTaskId, isTerminalOpen, selectedSource, setActiveTaskId, setSelectedSource, setTerminalOpen } from './features/tasks/tasks'
 import { initTaskStatuses } from './features/tasks/taskStatus'
 import TaskView from './features/tasks/TaskView'
 import LinearBrowse from './features/tasks/LinearBrowse'
@@ -37,26 +37,23 @@ export default function App() {
   const params = useParams()
   const navigate = useNavigate()
   const isRestoring = useIsRestoring()
-  const [helpOpen, setHelpOpen] = createSignal(false)
-  const [integrationsOpen, setIntegrationsOpen] = createSignal(false)
   const [onboardingDismissed, setOnboardingDismissed] = createSignal(false)
-  // Reopen the workspace/repo modal on demand (account menu) — same UI as first-run onboarding:
-  // assign repos to workspaces, hide/show (disable) repos, add new ones, map local checkouts.
-  const [manageWorkspacesOpen, setManageWorkspacesOpen] = createSignal(false)
-  // Terminal drawer open/closed, persisted via the `term_open` pref so a reload restores it (vNext
-  // §10). Seed once from prefs (mirrors the left-collapse pattern), then user toggles win.
-  const [termOpen, setTermOpen] = createSignal(false)
-  const [termTouched, setTermTouched] = createSignal(false)
-  createEffect(() => {
-    const v = prefs.data?.term_open
-    if (terminalEnabled && v !== undefined && !termTouched()) setTermOpen(v === '1')
-  })
-  const toggleTerm = async () => {
-    const next = !termOpen()
-    setTermTouched(true)
-    setTermOpen(next)
-    await setPref('term_open', next ? '1' : '0')
-    queryClient.invalidateQueries({ queryKey: prefsKey })
+  // The Settings page (account menu → Settings): workspace mapping, per-workspace pages,
+  // integrations, shortcuts, permissions. `settingsTab` seeds which tab opens.
+  const [settingsOpen, setSettingsOpen] = createSignal(false)
+  const [settingsTab, setSettingsTab] = createSignal('workspaces')
+  const openSettings = (tab = 'workspaces') => {
+    setSettingsTab(tab)
+    setSettingsOpen(true)
+  }
+  // The terminal drawer belongs to a task, not the app: it's shown only in the Task view (a Source
+  // browse like Pull requests has no terminal) and its open/closed state is tracked per task, so
+  // switching tabs swaps it. `termOpen` reflects the active task's state within the Task view.
+  const inTaskView = () => !selectedSource() && !!activeTask()
+  const termOpen = () => inTaskView() && isTerminalOpen(activeTaskId())
+  const toggleTerm = () => {
+    const id = activeTaskId()
+    if (id) setTerminalOpen(id, !isTerminalOpen(id))
   }
 
   // Track terminal sessions globally (independent of the drawer) so the tab rail and the topbar
@@ -265,7 +262,7 @@ export default function App() {
           </Show>
         </div>
         <div class="topbar-side topbar-end">
-          <Show when={terminalEnabled}>
+          <Show when={terminalEnabled && inTaskView()}>
             <button type="button" class="theme-toggle" title="Terminal" aria-pressed={termOpen()} onClick={toggleTerm}>
               ▣
             </button>
@@ -282,7 +279,7 @@ export default function App() {
             }
           >
             {(user) => (
-              <AccountMenu user={user()} onManageWorkspaces={() => setManageWorkspacesOpen(true)} onShortcuts={() => setHelpOpen(true)} onIntegrations={() => setIntegrationsOpen(true)} onPermissions={permissions} onClearCache={clearCache} onLogout={logout} />
+              <AccountMenu user={user()} onSettings={() => openSettings()} onClearCache={clearCache} onLogout={logout} />
             )}
           </Show>
         </div>
@@ -357,13 +354,15 @@ export default function App() {
           )}
         </Match>
       </Switch>
-      <Shortcuts helpOpen={helpOpen()} onHelpOpenChange={setHelpOpen} />
-      <IntegrationsModal open={integrationsOpen()} onClose={() => setIntegrationsOpen(false)} />
-      <Show when={manageWorkspacesOpen() || (!onboardingDismissed() && !!me.data && prefs.data !== undefined && prefs.data?.onboarded !== '1' && (workspaces.data?.length ?? 0) > 0)}>
-        <OnboardingModal onClose={() => { setOnboardingDismissed(true); setManageWorkspacesOpen(false) }} />
+      <Shortcuts onOpenShortcuts={() => openSettings('shortcuts')} />
+      <Show when={settingsOpen()}>
+        <SettingsModal initialTab={settingsTab()} onPermissions={permissions} onClose={() => setSettingsOpen(false)} />
+      </Show>
+      <Show when={!onboardingDismissed() && !!me.data && prefs.data !== undefined && prefs.data?.onboarded !== '1' && (workspaces.data?.length ?? 0) > 0}>
+        <OnboardingModal onClose={() => setOnboardingDismissed(true)} />
       </Show>
       <Show when={termOpen()}>
-        <TerminalPanel onClose={() => setTermOpen(false)} task={activeTask()} />
+        <TerminalPanel onClose={() => { const id = activeTaskId(); if (id) setTerminalOpen(id, false) }} task={activeTask()} />
       </Show>
     </div>
     </div>

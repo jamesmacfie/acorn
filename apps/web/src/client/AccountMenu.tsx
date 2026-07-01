@@ -3,10 +3,7 @@ import type { Me } from './queries'
 
 type AccountMenuProps = {
   user: Me
-  onManageWorkspaces: () => void
-  onShortcuts: () => void
-  onIntegrations: () => void
-  onPermissions: () => void | Promise<void>
+  onSettings: () => void
   onClearCache: () => void | Promise<void>
   onLogout: () => void | Promise<void>
 }
@@ -41,25 +38,13 @@ export default function AccountMenu(props: AccountMenuProps) {
     close()
     await props.onLogout()
   }
-  const permissions = async () => {
-    close()
-    await props.onPermissions()
-  }
   const clearCache = async () => {
     close()
     await props.onClearCache()
   }
-  const shortcuts = () => {
+  const settings = () => {
     close()
-    props.onShortcuts()
-  }
-  const integrations = () => {
-    close()
-    props.onIntegrations()
-  }
-  const manageWorkspaces = () => {
-    close()
-    props.onManageWorkspaces()
+    props.onSettings()
   }
 
   return (
@@ -82,17 +67,8 @@ export default function AccountMenu(props: AccountMenuProps) {
           <div class="account-menu-user" title={props.user.login}>
             {props.user.login}
           </div>
-          <button class="account-menu-item" role="menuitem" type="button" onClick={manageWorkspaces}>
-            Manage workspaces
-          </button>
-          <button class="account-menu-item" role="menuitem" type="button" onClick={shortcuts}>
-            Shortcuts
-          </button>
-          <button class="account-menu-item" role="menuitem" type="button" onClick={integrations}>
-            Integrations
-          </button>
-          <button class="account-menu-item" role="menuitem" type="button" onClick={permissions}>
-            Permissions
+          <button class="account-menu-item" role="menuitem" type="button" onClick={settings}>
+            Settings
           </button>
           <button class="account-menu-item" role="menuitem" type="button" onClick={clearCache}>
             Clear cache

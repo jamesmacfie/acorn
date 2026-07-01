@@ -3,11 +3,22 @@ import { createQuery } from '@tanstack/solid-query'
 import { useNavigate, useParams, useSearchParams } from '@solidjs/router'
 import { fileSummariesOptions, type PullFile } from './queries'
 
-// Global keyboard shortcuts + their overlays. Mounted once in App. Owns a single window
+// Global keyboard shortcuts + the file finder. Mounted once in App. Owns a single window
 // keydown listener. PullList owns j/k (next/prev PR) — those keys are deliberately untouched
 // here. All shortcuts except Escape are ignored while focus is in a form field.
-// Finder is local; the help overlay is lifted to App so the account menu can open it too.
+// The finder is local; the shortcut *reference* now lives in Settings → Shortcuts, so `?` opens
+// that tab (via onOpenShortcuts) rather than a local help overlay.
 type Overlay = 'finder' | null
+
+// Keyboard shortcut reference, rendered by the Settings → Shortcuts tab.
+export const SHORTCUTS: Array<[string, string]> = [
+  ['j / k', 'Next / previous PR'],
+  ['[ / ]', 'Previous / next file'],
+  ['/', 'Find file in this PR'],
+  ['c', 'Create pull request'],
+  ['?', 'Open keyboard shortcuts'],
+  ['Esc', 'Close overlay'],
+]
 
 // Subsequence match (fuzzy): every char of the query appears in order within the path.
 function subsequence(query: string, target: string): boolean {
@@ -22,7 +33,7 @@ function isTypingTarget(t: EventTarget | null): boolean {
   return t instanceof HTMLInputElement || t instanceof HTMLTextAreaElement || t instanceof HTMLSelectElement
 }
 
-export default function Shortcuts(props: { helpOpen: boolean; onHelpOpenChange: (open: boolean) => void }) {
+export default function Shortcuts(props: { onOpenShortcuts: () => void }) {
   const params = useParams()
   const navigate = useNavigate()
   const [searchParams, setSearchParams] = useSearchParams()
@@ -78,12 +89,11 @@ export default function Shortcuts(props: { helpOpen: boolean; onHelpOpenChange: 
   }
 
   const onKey = (e: KeyboardEvent) => {
-    // Escape always closes, even from within a field (e.g. the finder input).
+    // Escape always closes the finder, even from within its input.
     if (e.key === 'Escape') {
-      if (overlay() || props.helpOpen) {
+      if (overlay()) {
         e.preventDefault()
         setOverlay(null)
-        props.onHelpOpenChange(false)
       }
       return
     }
@@ -113,7 +123,7 @@ export default function Shortcuts(props: { helpOpen: boolean; onHelpOpenChange: 
 
     if (e.key === '?') {
       e.preventDefault()
-      props.onHelpOpenChange(!props.helpOpen)
+      props.onOpenShortcuts()
     } else if (e.key === '/') {
       e.preventDefault()
       openFinder()
@@ -152,15 +162,6 @@ export default function Shortcuts(props: { helpOpen: boolean; onHelpOpenChange: 
     if (active() >= len) setActive(len ? len - 1 : 0)
   })
 
-  const shortcuts: Array<[string, string]> = [
-    ['j / k', 'Next / previous PR'],
-    ['[ / ]', 'Previous / next file'],
-    ['/', 'Find file in this PR'],
-    ['c', 'Create pull request'],
-    ['?', 'Toggle this help'],
-    ['Esc', 'Close overlay'],
-  ]
-
   // Split a path into directory + basename so the finder can emphasize the filename.
   function splitPath(path: string) {
     const i = path.lastIndexOf('/')
@@ -168,23 +169,9 @@ export default function Shortcuts(props: { helpOpen: boolean; onHelpOpenChange: 
   }
 
   return (
-    <Show when={overlay() || props.helpOpen}>
-      <div class="overlay-backdrop" onClick={() => { setOverlay(null); props.onHelpOpenChange(false) }}>
+    <Show when={overlay() === 'finder'}>
+      <div class="overlay-backdrop" onClick={() => setOverlay(null)}>
         <div class="overlay" role="dialog" aria-modal="true" onClick={(e) => e.stopPropagation()}>
-          <Show when={props.helpOpen}>
-            <div class="overlay-title">Keyboard shortcuts</div>
-            <dl class="help-list">
-              <For each={shortcuts}>
-                {([key, desc]) => (
-                  <>
-                    <dt class="help-key">{key}</dt>
-                    <dd class="help-desc">{desc}</dd>
-                  </>
-                )}
-              </For>
-            </dl>
-          </Show>
-
           <Show when={overlay() === 'finder'}>
             <input
               ref={inputRef}

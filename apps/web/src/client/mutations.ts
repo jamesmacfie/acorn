@@ -1,6 +1,7 @@
 // PR write actions. Same-origin POST (cookie auth; the Worker's csrf() checks Origin). Throws the
 // structured error code on failure so callers can branch (e.g. merge_failed, reauth).
 import { apiError, writeJson } from './apiClient'
+import { terminalApi } from './features/terminal/terminalClient'
 import {
   autoMergeRoute,
   createPullRoute,
@@ -13,6 +14,7 @@ import {
   pullRoute,
   taskRoute,
   tasksRoute,
+  type SetupTrigger,
   type Task,
   type TaskSeed,
   type Workspace,
@@ -114,6 +116,12 @@ export const bootstrapWorkspaces = () => post<Workspace[]>(workspaceBootstrapRou
 export const createWorkspace = (name: string) => post<Workspace>(workspacesRoute, { name })
 export const renameWorkspace = async (id: string, name: string) =>
   writeJson<{ ok: true }>(workspaceRoute(id), { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name }) }, (res) => `workspace ${res.status}`)
+// Per-workspace worktree setup script (blank ⇒ cleared server-side).
+export const setWorkspaceSetupScript = async (id: string, setupScript: string) =>
+  writeJson<{ ok: true }>(workspaceRoute(id), { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ setupScript }) }, (res) => `workspace ${res.status}`)
+// When the setup script runs: off / on task creation / on first terminal open.
+export const setWorkspaceSetupTrigger = async (id: string, setupScriptTrigger: SetupTrigger) =>
+  writeJson<{ ok: true }>(workspaceRoute(id), { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ setupScriptTrigger }) }, (res) => `workspace ${res.status}`)
 export const deleteWorkspace = async (id: string) =>
   writeJson<{ ok: true }>(workspaceRoute(id), { method: 'DELETE' }, (res) => `workspace ${res.status}`)
 // Move a repo into a workspace (partition; upsert on owner/repo). Also un-ignores it.
@@ -129,7 +137,13 @@ export const setWorkspaceLinearProjects = async (workspaceId: string, projectIds
 
 // Tasks (docs/workspaces). Create from a seed; rename/archive via PATCH. Callers invalidate
 // tasksKey after.
-export const createTask = (seed: TaskSeed) => post<Task>(tasksRoute, seed)
+export const createTask = async (seed: TaskSeed) => {
+  const task = await post<Task>(tasksRoute, seed)
+  // Desktop: let main run the workspace's setup script now if it's configured to run on task
+  // creation (no-op otherwise). Fire-and-forget so task creation isn't blocked on git/worktree.
+  void terminalApi()?.task.onCreated(task.id)
+  return task
+}
 export const renameTask = async (id: string, title: string) => patchTask(id, { title })
 export const archiveTask = async (id: string) => patchTask(id, { status: 'archived' })
 async function patchTask(id: string, body: { title?: string; status?: 'active' | 'archived' }) {

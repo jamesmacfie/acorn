@@ -20,7 +20,8 @@ export type TerminalApi = {
     runConfig(owner: string, repo: string, runCommand: string, devPort: number): Promise<RepoPathResult>
   }
   task: {
-    archive(id: string): Promise<ArchiveResult>
+    archive(id: string, opts?: { deleteWorktree?: boolean; force?: boolean }): Promise<ArchiveResult>
+    onCreated(id: string): Promise<void>
     statuses(): Promise<TaskStatus[]>
   }
 }

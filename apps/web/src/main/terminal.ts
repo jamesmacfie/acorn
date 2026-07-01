@@ -5,7 +5,7 @@ import { randomUUID } from 'node:crypto'
 import { statSync } from 'node:fs'
 import { isAbsolute } from 'node:path'
 import { homedir } from 'node:os'
-import { eq } from 'drizzle-orm'
+import { and, eq } from 'drizzle-orm'
 import type { AppDatabase } from '../server/db'
 import { schema } from '../server/db'
 import type { ArchiveResult, CreateOpts, ServerMsg, TerminalSession, TaskStatus } from '../shared/terminal'
@@ -180,13 +180,40 @@ async function resolveTaskCwd(
   db: AppDatabase,
   t: typeof schema.tasks.$inferSelect | undefined,
   baseCheckout: string | undefined,
-): Promise<{ cwd: string; isWorktree: boolean }> {
-  if (t?.worktreePath && isDir(t.worktreePath)) return { cwd: t.worktreePath, isWorktree: true }
-  if (!t || !baseCheckout || !isDir(baseCheckout)) return { cwd: baseCheckout && isDir(baseCheckout) ? baseCheckout : homedir(), isWorktree: false }
+): Promise<{ cwd: string; isWorktree: boolean; created: boolean }> {
+  if (t?.worktreePath && isDir(t.worktreePath)) return { cwd: t.worktreePath, isWorktree: true, created: false }
+  if (!t || !baseCheckout || !isDir(baseCheckout)) return { cwd: baseCheckout && isDir(baseCheckout) ? baseCheckout : homedir(), isWorktree: false, created: false }
   const wt = await ensureWorktree(worktreesRoot, baseCheckout, t.repoOwner, t.repoName, t.branch, t.pullNumber)
-  if (!wt.ok) return { cwd: baseCheckout, isWorktree: false }
+  if (!wt.ok) return { cwd: baseCheckout, isWorktree: false, created: false }
   await db.update(schema.tasks).set({ worktreePath: wt.path, updatedAt: Date.now() }).where(eq(schema.tasks.id, t.id))
-  return { cwd: wt.path, isWorktree: true }
+  return { cwd: wt.path, isWorktree: true, created: wt.created }
+}
+
+// The setup script + when-to-run configured on the workspace that owns this repo (docs/workspaces
+// P5). trigger: 'off' never runs, 'created' pre-creates the worktree at task creation, 'terminal'
+// (the default; null coalesces to it) runs lazily on first terminal. The script itself runs once,
+// whenever the worktree is first created — see maybeRunSetup.
+type SetupTrigger = 'off' | 'created' | 'terminal'
+async function workspaceSetup(db: AppDatabase, owner: string, repo: string): Promise<{ script: string | null; trigger: SetupTrigger }> {
+  const [wr] = await db
+    .select({ workspaceId: schema.workspaceRepos.workspaceId })
+    .from(schema.workspaceRepos)
+    .where(and(eq(schema.workspaceRepos.repoOwner, owner), eq(schema.workspaceRepos.repoName, repo)))
+  if (!wr) return { script: null, trigger: 'terminal' }
+  const [ws] = await db
+    .select({ setupScript: schema.workspaces.setupScript, trigger: schema.workspaces.setupScriptTrigger })
+    .from(schema.workspaces)
+    .where(eq(schema.workspaces.id, wr.workspaceId))
+  return { script: ws?.setupScript ?? null, trigger: (ws?.trigger as SetupTrigger) || 'terminal' }
+}
+
+// Run the workspace setup script as a "Setup" session in the freshly-created worktree, unless it's
+// blank or disabled ('off'). Called whenever a worktree is first created (create() on first
+// terminal, or onCreated at task creation). Ordered before the requested session so it's tab #1.
+async function maybeRunSetup(db: AppDatabase, t: typeof schema.tasks.$inferSelect, cwd: string, ctx: Pick<TerminalSession, 'repo' | 'pull'>): Promise<void> {
+  const { script, trigger } = await workspaceSetup(db, t.repoOwner, t.repoName)
+  if (trigger === 'off' || !script?.trim()) return
+  await spawnOne(db, { taskId: t.id, command: script, title: 'Setup' }, cwd, true, ctx)
 }
 
 async function markExited(db: AppDatabase, id: string, exitCode: number | null) {
@@ -262,18 +289,27 @@ function startIdleWatch() {
 }
 
 async function create(db: AppDatabase, opts: CreateOpts): Promise<TerminalSession> {
+  // The renderer passes the base checkout as opts.cwd (validated at the boundary); the worktree is
+  // derived from it. Lazy worktree on first terminal, reused after (docs/workspaces Flow C).
+  const baseCheckout = opts.cwd && isAbsolute(opts.cwd) && isDir(opts.cwd) ? opts.cwd : undefined
+  const t = await loadTask(db, opts.taskId)
+  const ctx = taskContext(t)
+  const { cwd, isWorktree, created } = await resolveTaskCwd(db, t, baseCheckout)
+  // First-ever worktree for this task → run the setup script (unless 'off') as tab #1 before the
+  // requested session (which stays focused). Runs once because `created` is only true on the single
+  // worktree add; if it already ran at task creation ('created' trigger), created is false here.
+  if (created && t) await maybeRunSetup(db, t, cwd, ctx)
+  return spawnOne(db, opts, cwd, isWorktree, ctx)
+}
+
+// Build the session meta, spawn the PTY (tmux or node-pty) in the already-resolved cwd, and wire it.
+async function spawnOne(db: AppDatabase, opts: CreateOpts, cwd: string, isWorktree: boolean, ctx: Pick<TerminalSession, 'repo' | 'pull'>): Promise<TerminalSession> {
   const profile = getProfile(opts.profileId)
   // Dev-server pane (docs/workspaces P5): a command override runs via the user's shell with env
   // (PORT) merged in; otherwise the profile's binary. resolveCommand stays the path for shells/agents.
   const command = opts.command?.trim() || resolveCommand(profile)
   const env = opts.env ? { ...childEnv(), ...opts.env } : childEnv()
   const backend = resolveBackend(profile.backendPreference, tmuxAvailable())
-  // The renderer passes the base checkout as opts.cwd (validated at the boundary); the worktree is
-  // derived from it. Lazy worktree on first terminal, reused after (docs/workspaces Flow C).
-  const baseCheckout = opts.cwd && isAbsolute(opts.cwd) && isDir(opts.cwd) ? opts.cwd : undefined
-  const t = await loadTask(db, opts.taskId)
-  const ctx = taskContext(t)
-  const { cwd, isWorktree } = await resolveTaskCwd(db, t, baseCheckout)
   const cols = clampDim(opts.cols, 80)
   const rows = clampDim(opts.rows, 24)
   const id = randomUUID()
@@ -400,16 +436,43 @@ export async function registerTerminalIpc(db: AppDatabase, worktreesDir: string)
   // an HTTP route.
   ipcMain.handle('term:task:statuses', () => computeTaskStatuses(db))
 
-  ipcMain.handle('term:task:archive', async (_e: IpcMainInvokeEvent, id: string): Promise<ArchiveResult> => {
+  // Notified by the client right after a task is created. If its workspace runs the setup script on
+  // task creation (trigger 'created') and the repo checkout is mapped, eagerly create the worktree
+  // and run the script now (as a background "Setup" tab). Other triggers ('terminal'/'off') no-op
+  // here and are handled lazily by create(). Best-effort: a missing checkout defers to first terminal.
+  ipcMain.handle('term:task:onCreated', async (_e: IpcMainInvokeEvent, id: string): Promise<void> => {
+    if (typeof id !== 'string' || !id) return
+    const t = await loadTask(db, id)
+    if (!t || (t.worktreePath && isDir(t.worktreePath))) return
+    const { script, trigger } = await workspaceSetup(db, t.repoOwner, t.repoName)
+    if (trigger !== 'created' || !script?.trim()) return
+    const mapped = await getRepoPath(db, t.repoOwner, t.repoName)
+    if (!mapped || !isDir(mapped.path)) return
+    const wt = await ensureWorktree(worktreesRoot, mapped.path, t.repoOwner, t.repoName, t.branch, t.pullNumber)
+    if (!wt.ok || !wt.created) return
+    await db.update(schema.tasks).set({ worktreePath: wt.path, updatedAt: Date.now() }).where(eq(schema.tasks.id, t.id))
+    await maybeRunSetup(db, t, wt.path, taskContext(t))
+    broadcastStatus() // rail/footer pick up the new worktree; panel re-lists to show the Setup tab
+  })
+
+  ipcMain.handle('term:task:archive', async (_e: IpcMainInvokeEvent, id: string, opts?: { deleteWorktree?: boolean; force?: boolean }): Promise<ArchiveResult> => {
     if (typeof id !== 'string' || !id) return { ok: false, reason: 'Invalid task.' }
+    // Defaults preserve the safe menu-archive behavior: remove the worktree, refuse dirty / running.
+    // The task-close X passes force (kill running sessions + discard a dirty worktree) and lets the
+    // user opt out of deleting the worktree folder entirely (deleteWorktree: false).
+    const deleteWorktree = opts?.deleteWorktree ?? true
+    const force = opts?.force ?? false
     const running = [...sessions.values()].filter((s) => s.meta.taskId === id && s.meta.status === 'running')
-    if (running.length) return { ok: false, reason: `Stop ${running.length} running session${running.length > 1 ? 's' : ''} first.` }
+    if (running.length) {
+      if (!force) return { ok: false, reason: `Stop ${running.length} running session${running.length > 1 ? 's' : ''} first.` }
+      for (const s of running) killSession(s)
+    }
     const t = await loadTask(db, id)
     if (!t) return { ok: false, reason: 'Task not found.' }
-    if (t.worktreePath) {
+    if (deleteWorktree && t.worktreePath) {
       const mapped = await getRepoPath(db, t.repoOwner, t.repoName)
       if (mapped) {
-        const res = await removeWorktree(mapped.path, t.worktreePath, false) // refuses a dirty tree
+        const res = await removeWorktree(mapped.path, t.worktreePath, force) // force discards a dirty tree
         if (!res.ok) return res
       }
       // No mapped checkout → can't git-remove; we still archive and drop the (now-orphaned) reference.

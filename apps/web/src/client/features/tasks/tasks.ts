@@ -16,4 +16,18 @@ const [activeTaskId, setActiveTaskId] = createSignal<string | null>(null)
 export type PaneId = 'pr' | 'linear' | 'preview'
 const [activePane, setActivePane] = createSignal<PaneId>('pr')
 
+// The terminal drawer is per-task (session state, like activeTaskId): each task remembers whether
+// its drawer is open, so switching tasks swaps it and a Source browse (no task) shows no terminal.
+const [terminalOpenTasks, setTerminalOpenTasks] = createSignal<Set<string>>(new Set())
+export const isTerminalOpen = (taskId: string | null | undefined): boolean => !!taskId && terminalOpenTasks().has(taskId)
+export function setTerminalOpen(taskId: string, open: boolean): void {
+  setTerminalOpenTasks((prev) => {
+    if (open === prev.has(taskId)) return prev
+    const next = new Set(prev)
+    if (open) next.add(taskId)
+    else next.delete(taskId)
+    return next
+  })
+}
+
 export { activeTaskId, setActiveTaskId, selectedSource, setSelectedSource, activePane, setActivePane }

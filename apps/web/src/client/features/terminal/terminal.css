@@ -1,7 +1,9 @@
 .terminal-drawer {
   position: fixed;
-  left: var(--tabrail-w); /* sit beside the workspace rail, not over it */
-  right: 0;
+  /* Sit between the two icon rails (left TabRail, right pane-switcher — both --tabrail-w wide),
+     not over either. The terminal only shows in the Task view, where the right rail is present. */
+  left: var(--tabrail-w);
+  right: var(--tabrail-w);
   bottom: 0;
   min-height: 160px;
   display: flex;

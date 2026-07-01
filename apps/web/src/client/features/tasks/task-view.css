@@ -9,6 +9,13 @@
   min-height: 0;
   grid-template-columns: clamp(360px, 23vw, 430px) minmax(0, 1fr) auto;
 }
+/* `.app.left-collapsed .panes` (0,3,0) otherwise beats the rule above (0,2,0) and forces the PR
+   view's `0 | mid | 1fr` grid onto the workspace's [Navigator | Diff | switcher] children —
+   collapsing the Navigator and dropping the switcher into the 1fr track (huge right gap). The
+   workspace has no left pane to collapse, so keep its own 3-track grid when the left is collapsed. */
+.app.left-collapsed .panes.panes-workspace {
+  grid-template-columns: clamp(360px, 23vw, 430px) minmax(0, 1fr) auto;
+}
 
 /* Worktree status line under the panes: path + dirty/clean/needs-repair. */
 .workspace-footer {
@@ -92,6 +99,15 @@
 }
 .pane-switch-btn:hover { background: var(--bg-hover); color: var(--text); }
 .pane-switch-btn.active { background: var(--bg-selected); color: var(--text); border-right-color: var(--accent); }
+/* Close-task ✕ sits at the bottom of the rail, set off from the pane switches above it. */
+.pane-switch-close { margin-top: auto; border-bottom: 0; border-top: 1px solid var(--border); }
+.pane-switch-close:hover { color: var(--del-marker); }
+
+/* Close-task confirmation modal bits (reuses the shared .overlay shell). */
+.close-check { display: flex; align-items: center; gap: 8px; font-size: var(--fs-sm); color: var(--text); cursor: pointer; }
+.close-check input { accent-color: var(--accent); cursor: pointer; }
+.close-actions { display: flex; justify-content: flex-end; gap: 10px; }
+.close-confirm { color: var(--del-marker); border-color: var(--del-marker); }
 
 /* Linear Source browse (LinearBrowse.tsx): a thin list of linked tickets. */
 .linear-browse { display: flex; flex-direction: column; overflow: hidden; }
