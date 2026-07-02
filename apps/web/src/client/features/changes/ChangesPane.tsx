@@ -4,6 +4,7 @@ import { fileStatusMeta } from '../../displayMeta'
 import { getHighlighter } from '../../shiki'
 import { DiffLine, NonCodeRow } from '../diff/DiffRows'
 import { buildDiffRows, highlighterTokenize, isCodeRow, plainTokenize, type CodeRow, type Row } from '../diff/model'
+import { formatFileReference, sendReferenceToAgent } from '../agent/reference'
 import { taskStatus } from '../tasks/taskStatus'
 import { terminalApi } from '../terminal/terminalClient'
 import { changeKey, groupChanges, pickSelected, toPullFile } from './model'
@@ -57,6 +58,12 @@ export default function ChangesPane(props: { task: Task }) {
 
   const noop = async () => {}
 
+  // "Add file/line to agent" (docs/next 04 §E): drop a path[:line] draft into the agent composer.
+  async function sendRef(ref: string) {
+    const res = await sendReferenceToAgent(props.task.id, ref)
+    if (!res.ok && res.reason) window.alert(res.reason)
+  }
+
   return (
     <section class="pane changes-pane">
       <div class="section-header">Changes (uncommitted)</div>
@@ -70,20 +77,28 @@ export default function ChangesPane(props: { task: Task }) {
                   {(c) => {
                     const status = () => fileStatusMeta(c.status === 'untracked' ? 'added' : c.status)
                     return (
-                      <button
-                        type="button"
-                        class="changes-row"
-                        classList={{ active: selected() != null && changeKey(selected()!) === changeKey(c) }}
-                        title={c.oldPath ? `${c.oldPath} → ${c.path}` : c.path}
-                        onClick={() => setSelectedKey(changeKey(c))}
-                      >
-                        <span class={`file-status file-status-${status().tone}`}>{status().letter}</span>
-                        <span class="changes-row-path">{c.path}</span>
-                        <Show when={c.additions != null}>
-                          <span class="file-stat add">+{c.additions}</span>
-                          <span class="file-stat del">&#8722;{c.deletions ?? 0}</span>
-                        </Show>
-                      </button>
+                      <div class="changes-row-wrap">
+                        <button
+                          type="button"
+                          class="changes-row"
+                          classList={{ active: selected() != null && changeKey(selected()!) === changeKey(c) }}
+                          title={c.oldPath ? `${c.oldPath} → ${c.path}` : c.path}
+                          onClick={() => setSelectedKey(changeKey(c))}
+                        >
+                          <span class={`file-status file-status-${status().tone}`}>{status().letter}</span>
+                          <span class="changes-row-path">{c.path}</span>
+                          <Show when={c.additions != null}>
+                            <span class="file-stat add">+{c.additions}</span>
+                            <span class="file-stat del">&#8722;{c.deletions ?? 0}</span>
+                          </Show>
+                        </button>
+                        <button
+                          type="button"
+                          class="changes-to-agent"
+                          title="Add file reference to the agent composer"
+                          onClick={() => void sendRef(formatFileReference(c.path))}
+                        >→</button>
+                      </div>
                     )
                   }}
                 </For>
@@ -106,6 +121,12 @@ export default function ChangesPane(props: { task: Task }) {
                     'diff-del': row.kind === 'delete',
                     'diff-file-row': row.kind === 'file',
                     'diff-thread-row': row.kind === 'nodiff' || row.kind === 'load',
+                  }}
+                  title={isCodeRow(row) ? '⌥-click: add line reference to the agent composer' : undefined}
+                  onClick={(e) => {
+                    if (!e.altKey || !isCodeRow(row)) return
+                    const line = row.newNo ?? row.oldNo
+                    if (line != null) void sendRef(formatFileReference(row.path, line))
                   }}
                 >
                   <Show

@@ -3,6 +3,7 @@ import * as monaco from 'monaco-editor'
 import './monacoSetup'
 import type { Task } from '../../queries'
 import { editorApi, type EditorEntry } from './editorClient'
+import { formatFileReference, sendReferenceToAgent } from '../agent/reference'
 import { isAppDark, watchTheme } from '../terminal/theme'
 import './editor.css'
 
@@ -87,6 +88,20 @@ export default function EditorPane(props: { task: Task }) {
                 <span class="editor-file">{openPath() ?? 'Select a file'}{dirty() ? ' ●' : ''}</span>
                 <Show when={openPath()}>
                   <button type="button" class="editor-save" onClick={() => void save()}>Save ⌘S</button>
+                  <button
+                    type="button"
+                    class="editor-save"
+                    title="Add file/selection reference to the agent composer"
+                    onClick={() => {
+                      const p = openPath()
+                      if (!p) return
+                      const sel = editor?.getSelection()
+                      const ref = sel && !sel.isEmpty() ? formatFileReference(p, sel.startLineNumber, sel.endLineNumber) : formatFileReference(p)
+                      void sendReferenceToAgent(props.task.id, ref).then((r) => {
+                        if (!r.ok && r.reason) window.alert(r.reason)
+                      })
+                    }}
+                  >→ agent</button>
                 </Show>
                 <Show when={saveErr()}><span class="action-error">{saveErr()}</span></Show>
               </div>
