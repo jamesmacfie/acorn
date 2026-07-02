@@ -161,6 +161,26 @@ export async function commitStaged(worktree: string, message: string): Promise<G
   return run(worktree, ['commit', '-m', msg])
 }
 
+// Recent commits on the branch (the MCP git_log tool, docs/next 06 catalog).
+export type GitLogEntry = { sha: string; subject: string; author: string; committedAt: number }
+
+export function parseGitLog(stdout: string): GitLogEntry[] {
+  return stdout
+    .split('\n')
+    .filter(Boolean)
+    .map((line) => {
+      const [sha, subject, author, ts] = line.split('\x1f')
+      return { sha: sha ?? '', subject: subject ?? '', author: author ?? '', committedAt: Number(ts) * 1000 || 0 }
+    })
+    .filter((e) => e.sha)
+}
+
+export async function gitLog(worktree: string, n = 10): Promise<GitLogEntry[]> {
+  const count = Number.isInteger(n) && n > 0 && n <= 100 ? n : 10
+  const { stdout } = await exec('git', ['-C', worktree, 'log', `-n${count}`, '--pretty=format:%h\x1f%s\x1f%an\x1f%ct'], { timeout: 15_000 })
+  return parseGitLog(stdout)
+}
+
 // Read a file's content at a ref (context expansion / before-side). ref is a commit-ish; guard the
 // argv like resolveBaseRef does.
 export async function localFileBlob(worktree: string, path: string, ref = 'HEAD'): Promise<{ text: string }> {

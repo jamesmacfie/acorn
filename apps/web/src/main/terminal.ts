@@ -32,7 +32,9 @@ import { getProfile, listProfiles, resolveCommand, tmuxAvailable } from './profi
 import { loadRepoConfig } from './repoConfig'
 import { getRepoPath, setEditorCommand, setRepoPath, setRunConfig, setRunTargets } from './repoPaths'
 import { RuntimeService } from './runtime'
+import { setHarnessBridge } from '../server/routes/harness'
 import { setContextNotesSource } from '../server/routes/taskContext'
+import { MemoryProposalStore } from './memoryProposals'
 import { fileURLToPath } from 'node:url'
 import { inspectMcpConfig, MCP_CANDIDATES, STARTER_MCP_JSON, type McpServerSummary } from '../shared/mcp'
 import { AGENT_FLAVOURS, launcherSpec, registerAcornMcp, removeAcornMcp, resolveMcpEntry, serverName, type AgentFlavour } from './mcpRegister'
@@ -449,17 +451,18 @@ async function spawnOne(
   // Dev-server pane (docs/workspaces P5): a command override runs via the user's shell with env
   // merged in; otherwise the profile's binary. resolveCommand stays the path for shells/agents.
   const command = opts.command?.trim() || resolveCommand(profile)
-  // Every task-scoped session carries the ACORN_* identity vars (docs/next 02/11).
+  const id = randomUUID()
+  // Every task-scoped session carries the ACORN_* identity vars (docs/next 02/11) plus its own
+  // session id — MCP notes/memory writes use it for `author: agent` provenance (docs/next 09).
   const env = buildSessionEnv({
     taskId: opts.taskId,
     cwd,
     task: task ? { repoOwner: task.repoOwner, repoName: task.repoName, branch: task.branch, title: task.title } : null,
-    env: { ...internalApiEnv, ...(opts.env ?? {}) },
+    env: { ...internalApiEnv, ACORN_SESSION_ID: id, ...(opts.env ?? {}) },
   })
   const backend = resolveBackend(profile.backendPreference, tmuxAvailable())
   const cols = clampDim(opts.cols, 80)
   const rows = clampDim(opts.rows, 24)
-  const id = randomUUID()
 
   const meta: TerminalSession = {
     id,
@@ -735,6 +738,59 @@ export async function registerTerminalIpc(db: AppDatabase, worktreesDir: string,
       if (s) killSession(s)
     },
     runScript,
+  })
+
+  // The MCP feature-tool surface (docs/next 06): notes/memory/run backings injected into the Hono
+  // harness routes. Agent writes stamp author: agent + the session id (provenance).
+  const workspaceIdFor = async (taskId: string): Promise<string> => {
+    const t = await loadTask(db, taskId)
+    if (!t) throw new Error('Task not found.')
+    const ws = await workspaceConfigRow(db, t.repoOwner, t.repoName)
+    if (!ws) throw new Error('Task has no workspace.')
+    return ws.id
+  }
+  const repoFor = async (taskId: string): Promise<string> => {
+    const t = await loadTask(db, taskId)
+    if (!t) throw new Error('Task not found.')
+    return `${t.repoOwner}/${t.repoName}`
+  }
+  const proposals = new MemoryProposalStore(join(dirname(worktreesDir), 'memory-proposals'))
+  setHarnessBridge({
+    notesList: async (taskId) => notesStore.list(await workspaceIdFor(taskId)),
+    notesRead: async (taskId, slug) => notesStore.read(await workspaceIdFor(taskId), slug),
+    notesWrite: async (taskId, slug, body, sessionId) => {
+      const ws = await workspaceIdFor(taskId)
+      const exists = await notesStore.read(ws, slug).catch(() => null)
+      if (exists) await notesStore.write(ws, slug, body)
+      else await notesStore.append(ws, slug, body, { author: 'agent', originSessionId: sessionId })
+    },
+    notesAppend: async (taskId, slug, text, sessionId) => notesStore.append(await workspaceIdFor(taskId), slug, text, { author: 'agent', originSessionId: sessionId }),
+    memorySearch: async (taskId, query, type) => {
+      await reconciled()
+      return searchMemories(db, query, { repo: await repoFor(taskId), type: MEMORY_TYPES.includes(type as MemoryType) ? (type as MemoryType) : undefined })
+    },
+    memoryList: async (taskId, type) => {
+      await reconciled()
+      return listMemories(db, { repo: await repoFor(taskId), type: MEMORY_TYPES.includes(type as MemoryType) ? (type as MemoryType) : undefined })
+    },
+    memoryGet: async (taskId, name) => {
+      await reconciled()
+      return (await listMemories(db, { repo: await repoFor(taskId) })).find((m) => m.name === name) ?? null
+    },
+    memoryPropose: async (taskId, p) =>
+      proposals.propose({
+        taskId,
+        repo: await repoFor(taskId).catch(() => null),
+        name: p.name,
+        type: p.type as MemoryType,
+        description: p.description,
+        body: p.body,
+        originSessionId: p.originSessionId ?? null,
+      }),
+    runTargets: (taskId) => runtime.targets(taskId),
+    runStart: (taskId, targetId) => runtime.start(taskId, targetId),
+    runStop: (taskId, targetId) => runtime.stop(taskId, targetId),
+    runStatus: (taskId, targetId) => runtime.status(taskId, targetId),
   })
 
   ipcMain.handle('run:targets', (_e: IpcMainInvokeEvent, taskId: string) => runtime.targets(String(taskId)))
