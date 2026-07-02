@@ -24,6 +24,17 @@ contextBridge.exposeInMainWorld('acorn', {
       // Per-repo external editor command (docs/next 01 P2). Blank clears to the global default.
       editorCommand: (owner: string, repo: string, editorCommand: string) =>
         ipcRenderer.invoke('term:repoPath:editorCommand', { owner, repo, editorCommand }),
+      // Per-repo run targets as a JSON RunTarget[] string (docs/next 13 §A DB fallback).
+      runTargets: (owner: string, repo: string, runTargets: string) =>
+        ipcRenderer.invoke('term:repoPath:runTargets', { owner, repo, runTargets }),
+    },
+    // Run targets (docs/next 13 §A): named commands per repo, run in the task's worktree.
+    run: {
+      targets: (taskId: string) => ipcRenderer.invoke('run:targets', taskId),
+      start: (taskId: string, targetId: string) => ipcRenderer.invoke('run:start', { taskId, targetId }),
+      stop: (taskId: string, targetId: string) => ipcRenderer.invoke('run:stop', { taskId, targetId }),
+      status: (taskId: string, targetId: string) => ipcRenderer.invoke('run:status', { taskId, targetId }),
+      defaultUrl: (taskId: string) => ipcRenderer.invoke('run:defaultUrl', taskId),
     },
     // Open the task's worktree in the user's external editor (code/zed/…, docs/next 01 P2).
     openInEditor: (taskId: string) => ipcRenderer.invoke('term:openInEditor', taskId),

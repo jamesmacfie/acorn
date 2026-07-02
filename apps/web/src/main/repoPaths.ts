@@ -15,7 +15,37 @@ export async function getRepoPath(db: AppDatabase, owner: string, repo: string):
     .from(schema.repoPaths)
     .where(and(eq(schema.repoPaths.owner, owner), eq(schema.repoPaths.repo, repo)))
   const row = rows[0]
-  return row ? { owner: row.owner, repo: row.repo, path: row.path, runCommand: row.runCommand, devPort: row.devPort, editorCommand: row.editorCommand } : null
+  return row
+    ? { owner: row.owner, repo: row.repo, path: row.path, runCommand: row.runCommand, devPort: row.devPort, editorCommand: row.editorCommand, runTargets: row.runTargets }
+    : null
+}
+
+// Persist the per-repo run-target list (docs/next 13 §A — the DB fallback below a committed
+// .acorn/config.toml). Accepts a JSON RunTarget[] string; blank clears. Shape-validated here so a
+// bad save is rejected with a reason instead of surfacing later as a config error row.
+export async function setRunTargets(db: AppDatabase, owner: string, repo: string, json: string): Promise<RepoPathResult> {
+  const existing = await getRepoPath(db, owner, repo)
+  if (!existing) return { ok: false, reason: 'Map a local checkout for this repo first.' }
+  const value = json.trim() || null
+  if (value) {
+    try {
+      const arr = JSON.parse(value) as unknown
+      if (!Array.isArray(arr)) return { ok: false, reason: 'Run targets must be a JSON array.' }
+      for (const t of arr) {
+        const o = t as Record<string, unknown>
+        if (!o || typeof o !== 'object' || typeof o.id !== 'string' || !o.id.trim() || typeof o.command !== 'string' || !o.command.trim())
+          return { ok: false, reason: 'Each run target needs an "id" and a "command".' }
+        if (o.url && o.urlCommand) return { ok: false, reason: `Target "${o.id}": pick one of "url" / "urlCommand".` }
+      }
+    } catch {
+      return { ok: false, reason: 'Invalid JSON.' }
+    }
+  }
+  await db
+    .update(schema.repoPaths)
+    .set({ runTargets: value, updatedAt: Date.now() })
+    .where(and(eq(schema.repoPaths.owner, owner), eq(schema.repoPaths.repo, repo)))
+  return { ok: true, repoPath: { ...existing, runTargets: value } }
 }
 
 // Save the per-repo external-editor command (docs/next 01 P2). Blank clears back to the global

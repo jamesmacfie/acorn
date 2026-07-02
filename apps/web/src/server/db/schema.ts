@@ -256,6 +256,10 @@ export const repoPaths = sqliteTable(
     // worktree with PORT = devPort + the workspace's rail offset, so two workspaces don't collide.
     runCommand: text('run_command'),
     devPort: integer('dev_port'),
+    // Named run targets (docs/next 13 §A): JSON RunTarget[] — the DB fallback below a committed
+    // .acorn/config.toml. runCommand/devPort stay and map into a default 'dev' target when this
+    // is null (loadRepoConfig.legacyRunTargets) — no data migration.
+    runTargets: text('run_targets'),
     // External editor command for this repo's worktrees (docs/next 01 P2): 'code' | 'zed' |
     // 'cursor -n' | an absolute path. null → the prefs 'editor_command_default' → 'code'.
     editorCommand: text('editor_command'),
