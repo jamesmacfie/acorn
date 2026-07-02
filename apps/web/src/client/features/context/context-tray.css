@@ -1,0 +1,37 @@
+/* Context tray (docs/next 11 §E): collapsible strip above the task footer. Flat, 1px borders. */
+.context-tray { flex: none; border-top: 1px solid var(--border); background: var(--bg-subtle); }
+.context-tray-head {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 3px var(--pane-pad);
+  font: inherit;
+  font-size: var(--fs-sm);
+  text-align: left;
+  color: var(--text);
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+}
+.context-tray-head:hover { background: var(--bg-hover); }
+.context-tray-twist { color: var(--text-faint); }
+.context-tray-msg { margin-left: auto; }
+.context-tray-body { padding: 2px var(--pane-pad) 6px; display: flex; flex-direction: column; gap: 2px; }
+.context-tray-row {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  font-size: var(--fs-sm);
+  color: var(--text);
+  cursor: pointer;
+}
+.context-tray-row input { accent-color: var(--accent); cursor: pointer; }
+.context-tray-kind {
+  flex: none;
+  min-width: 52px;
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+}
+.context-tray-label { flex: 1; min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.context-tray-actions { display: flex; gap: 8px; margin-top: 4px; }

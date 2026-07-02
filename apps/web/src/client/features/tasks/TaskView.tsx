@@ -8,6 +8,7 @@ import DiffView from '../../DiffView'
 import LinearIssuePanel from '../integrations/LinearIssuePanel'
 import EditorPane from '../editor/EditorPane'
 import ChangesPane from '../changes/ChangesPane'
+import ContextTray from '../context/ContextTray'
 import { workspaceForRepo } from '../workspaces/activeWorkspace'
 import { refreshSessions } from '../terminal/sessions'
 import { terminalApi } from '../terminal/terminalClient'
@@ -445,6 +446,7 @@ export default function TaskView(props: {
       </Show>
     </main>
     <Show when={!layout().maximised}>
+    <ContextTray task={props.task} />
     <footer class="workspace-footer">
       <Show when={props.task.worktreePath} fallback={<span class="muted">No worktree yet — created on first terminal.</span>}>
         {(p) => (
