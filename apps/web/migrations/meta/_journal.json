@@ -50,6 +50,13 @@
       "when": 1782985250377,
       "tag": "0006_slippery_redwing",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "6",
+      "when": 1782985627337,
+      "tag": "0007_wandering_jocasta",
+      "breakpoints": true
     }
   ]
 }

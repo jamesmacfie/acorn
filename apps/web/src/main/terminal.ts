@@ -1,6 +1,6 @@
 import { BrowserWindow, dialog, ipcMain, Notification, type IpcMainInvokeEvent, type WebContents } from 'electron'
 import { spawn, type IPty } from 'node-pty'
-import { execFile, execFileSync } from 'node:child_process'
+import { execFile, execFileSync, spawn as spawnProcess } from 'node:child_process'
 import { randomUUID } from 'node:crypto'
 import { promisify } from 'node:util'
 import { existsSync, realpathSync, statSync } from 'node:fs'
@@ -23,8 +23,9 @@ import {
   tmuxNewSessionArgs,
   trimRing,
 } from './terminalUtils'
+import { buildEditorArgv } from './editorLaunch'
 import { getProfile, listProfiles, resolveCommand, tmuxAvailable } from './profiles'
-import { getRepoPath, setRepoPath, setRunConfig } from './repoPaths'
+import { getRepoPath, setEditorCommand, setRepoPath, setRunConfig } from './repoPaths'
 import { ensureWorktree, removeWorktree, worktreePorcelain } from './worktrees'
 
 // vNext Phase 2: PTYs live in the main process. Sessions run on one of two backends —
@@ -470,6 +471,33 @@ export async function registerTerminalIpc(db: AppDatabase, worktreesDir: string)
   ipcMain.handle('term:repoPath:runConfig', (_e: IpcMainInvokeEvent, p: { owner: string; repo: string; runCommand: string; devPort: number }) =>
     setRunConfig(db, p.owner, p.repo, p.runCommand, p.devPort),
   )
+
+  ipcMain.handle('term:repoPath:editorCommand', (_e: IpcMainInvokeEvent, p: { owner: string; repo: string; editorCommand: string }) =>
+    setEditorCommand(db, p.owner, p.repo, typeof p.editorCommand === 'string' ? p.editorCommand : ''),
+  )
+
+  // Open the task's worktree (or the base checkout while no worktree exists) in the user's real
+  // editor (docs/next 01 P2). Command precedence: repo_paths.editorCommand → prefs
+  // 'editor_command_default' → 'code'; resolution failures come back as { ok:false, reason }.
+  ipcMain.handle('term:openInEditor', async (_e: IpcMainInvokeEvent, taskId: string): Promise<{ ok: boolean; reason?: string }> => {
+    if (typeof taskId !== 'string' || !taskId) return { ok: false, reason: 'Invalid task.' }
+    const t = await loadTask(db, taskId)
+    if (!t) return { ok: false, reason: 'Task not found.' }
+    const mapped = await getRepoPath(db, t.repoOwner, t.repoName)
+    const target = t.worktreePath && isDir(t.worktreePath) ? t.worktreePath : mapped?.path && isDir(mapped.path) ? mapped.path : null
+    if (!target) return { ok: false, reason: 'No checkout mapped for this repo yet.' }
+    // Machine-local single-user app: the prefs row is read by key alone (same reasoning as the
+    // machine-scoped app-state tables having no user_id).
+    const [pref] = await db.select().from(schema.prefs).where(eq(schema.prefs.key, 'editor_command_default')).limit(1)
+    const launch = buildEditorArgv(mapped?.editorCommand ?? null, pref?.value ?? null, target, { pathVar: process.env.PATH ?? '', exists: existsSync })
+    if (!launch.ok) return launch
+    try {
+      spawnProcess(launch.file, launch.args, { detached: true, stdio: 'ignore' }).unref()
+      return { ok: true }
+    } catch (e) {
+      return { ok: false, reason: e instanceof Error ? e.message : String(e) }
+    }
+  })
 
   // Browser-preview 'script' mode (WorkspaceSettings): run the configured shell command in the
   // task's worktree and use its stdout (last non-empty line, trimmed) as the preview URL. Keyed by

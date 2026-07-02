@@ -21,7 +21,12 @@ contextBridge.exposeInMainWorld('acorn', {
       pick: () => ipcRenderer.invoke('term:repoPath:pick'),
       runConfig: (owner: string, repo: string, runCommand: string, devPort: number) =>
         ipcRenderer.invoke('term:repoPath:runConfig', { owner, repo, runCommand, devPort }),
+      // Per-repo external editor command (docs/next 01 P2). Blank clears to the global default.
+      editorCommand: (owner: string, repo: string, editorCommand: string) =>
+        ipcRenderer.invoke('term:repoPath:editorCommand', { owner, repo, editorCommand }),
     },
+    // Open the task's worktree in the user's external editor (code/zed/…, docs/next 01 P2).
+    openInEditor: (taskId: string) => ipcRenderer.invoke('term:openInEditor', taskId),
     // Resolve a workspace's browser-preview URL by running its configured script in the task's
     // worktree (script mode only — url/port are computed client-side). Returns the trimmed stdout.
     previewUrl: (taskId: string, script: string) => ipcRenderer.invoke('term:previewUrl', { taskId, script }),

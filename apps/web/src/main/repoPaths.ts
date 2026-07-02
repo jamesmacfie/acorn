@@ -15,7 +15,20 @@ export async function getRepoPath(db: AppDatabase, owner: string, repo: string):
     .from(schema.repoPaths)
     .where(and(eq(schema.repoPaths.owner, owner), eq(schema.repoPaths.repo, repo)))
   const row = rows[0]
-  return row ? { owner: row.owner, repo: row.repo, path: row.path, runCommand: row.runCommand, devPort: row.devPort } : null
+  return row ? { owner: row.owner, repo: row.repo, path: row.path, runCommand: row.runCommand, devPort: row.devPort, editorCommand: row.editorCommand } : null
+}
+
+// Save the per-repo external-editor command (docs/next 01 P2). Blank clears back to the global
+// default. Not validated here — resolution (PATH probe) happens at launch, where failure surfaces.
+export async function setEditorCommand(db: AppDatabase, owner: string, repo: string, editorCommand: string): Promise<RepoPathResult> {
+  const existing = await getRepoPath(db, owner, repo)
+  if (!existing) return { ok: false, reason: 'Map a local checkout for this repo first.' }
+  const value = editorCommand.trim() || null
+  await db
+    .update(schema.repoPaths)
+    .set({ editorCommand: value, updatedAt: Date.now() })
+    .where(and(eq(schema.repoPaths.owner, owner), eq(schema.repoPaths.repo, repo)))
+  return { ok: true, repoPath: { ...existing, editorCommand: value } }
 }
 
 // Save the per-repo dev-server config (docs/workspaces P5). The repo must already be mapped (its
