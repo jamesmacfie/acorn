@@ -126,6 +126,9 @@ describe('acorn MCP server over stdio JSON-RPC (docs/next 06 B)', () => {
       if (url.startsWith('/api/tasks/t1/memory')) return json([{ name: 'auth-conventions', description: 'how auth works' }])
       if (url.startsWith('/api/tasks/t1/run/dev/status')) return json({ running: true, url: 'http://localhost:5173' })
       if (url.startsWith('/api/tasks/t1/run')) return json({ targets: [{ id: 'dev', running: false }], errors: [], layouts: [] })
+      if (url.startsWith('/api/tasks/t1/browser/snapshot'))
+        return json({ url: 'http://localhost:5173/login', text: '- textbox "Email" [e2]\n- button "Sign in" [e5]', tree: [] })
+      if (url.startsWith('/api/tasks/t1/browser/console')) return json({ lines: ['[error] Uncaught TypeError: token is null'] })
       res.statusCode = 404
       res.end('{}')
     })
@@ -164,6 +167,12 @@ describe('acorn MCP server over stdio JSON-RPC (docs/next 06 B)', () => {
       const list = await client.send('tools/list')
       const names = ((list.result as { tools: { name: string }[] }).tools ?? []).map((t) => t.name).sort()
       expect(names).toEqual([
+        'browser_click',
+        'browser_console',
+        'browser_fill',
+        'browser_navigate',
+        'browser_screenshot',
+        'browser_snapshot',
         'git_log',
         'linked_issues',
         'local_changes',
@@ -226,6 +235,18 @@ describe('acorn MCP server over stdio JSON-RPC (docs/next 06 B)', () => {
       expect(proposal).toMatchObject({ proposal: { status: 'pending' } })
       const proposePost = posts.find((p) => p.url.includes('/memory/propose'))
       expect(proposePost?.body).toMatchObject({ name: 'null-token-guard', type: 'fix', sessionId: 'sess-42' })
+
+      // The 08 example loop shape over the (stubbed) driver: navigate → snapshot → fill/click → console.
+      await client.send('tools/call', { name: 'browser_navigate', arguments: { url: 'http://localhost:5173/login' } })
+      expect(posts.some((p) => p.url.includes('/browser/navigate'))).toBe(true)
+      const snap = toolText(await client.send('tools/call', { name: 'browser_snapshot', arguments: {} })) as { text: string }
+      expect(snap.text).toContain('[e5]')
+      await client.send('tools/call', { name: 'browser_fill', arguments: { ref: 'e2', text: 'a@b.com' } })
+      await client.send('tools/call', { name: 'browser_click', arguments: { ref: 'e5' } })
+      expect(posts.find((p) => p.url.includes('/browser/fill'))?.body).toEqual({ ref: 'e2', text: 'a@b.com' })
+      expect(posts.find((p) => p.url.includes('/browser/click'))?.body).toEqual({ ref: 'e5' })
+      const consoleOut = toolText(await client.send('tools/call', { name: 'browser_console', arguments: {} })) as { lines: string[] }
+      expect(consoleOut.lines[0]).toContain('token is null')
 
       expect(toolText(await client.send('tools/call', { name: 'run_targets', arguments: {} }))).toMatchObject({ targets: [{ id: 'dev' }] })
       await client.send('tools/call', { name: 'run_start', arguments: { id: 'dev' } })

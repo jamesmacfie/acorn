@@ -484,6 +484,7 @@ type WebviewEl = HTMLElement & {
   canGoBack(): boolean
   canGoForward(): boolean
   getURL(): string
+  getWebContentsId(): number
 }
 const withScheme = (v: string) => (/^[a-z]+:\/\//i.test(v) ? v : `https://${v}`)
 
@@ -535,6 +536,14 @@ function PreviewPane(props: { taskId: string; url: string | null; hidden: boolea
       const onNav = (e: Event) => isActive(captured) && (setAddr((e as Event & { url?: string }).url ?? captured.getURL()), syncFrom(captured))
       el.addEventListener('did-navigate', onNav)
       el.addEventListener('did-navigate-in-page', onNav)
+      // Bind for agent driving (docs/next 08): main resolves the webContents id → CDP driver.
+      el.addEventListener('dom-ready', () => {
+        try {
+          void window.acorn?.browser?.bind(taskId, captured.getWebContentsId())
+        } catch {
+          /* driving is optional; the preview still works */
+        }
+      }, { once: true })
       previewWebviews.set(taskId, el)
     }
     if (el.parentElement !== host) host.appendChild(el) // fresh host after a remount → reload

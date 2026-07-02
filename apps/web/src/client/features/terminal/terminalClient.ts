@@ -70,6 +70,9 @@ declare global {
       editor?: import('../editor/editorClient').EditorApi
       notes?: import('../notes/notesClient').NotesApi
       memory?: import('../memory/memoryClient').MemoryApi
+      browser?: {
+        bind(taskId: string, webContentsId: number): Promise<boolean>
+      }
       mcp?: {
         inspect(taskId: string): Promise<{ file: string; servers: import('../../../shared/mcp').McpServerSummary[] }[]>
         createStarter(taskId: string): Promise<{ ok: boolean; reason?: string }>

@@ -82,6 +82,10 @@ contextBridge.exposeInMainWorld('acorn', {
       }
     },
   },
+  // Drivable browser (docs/next 08): bind the task's preview webview so main can drive it via CDP.
+  browser: {
+    bind: (taskId: string, webContentsId: number) => ipcRenderer.invoke('browser:bind', { taskId, webContentsId }),
+  },
   // MCP config inspector (docs/next 06 A): known candidate files only, secrets masked in main.
   mcp: {
     inspect: (taskId: string) => ipcRenderer.invoke('mcp:inspect', taskId),

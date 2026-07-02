@@ -196,6 +196,36 @@ export function buildServer(): McpServer {
       taskTool((id) => apiSend('POST', `/api/tasks/${id}/memory/propose`, { name, type, description, body, sessionId: SESSION_ID })),
   )
 
+  // --- Browser (docs/next 08 P2): drive the task's preview webview — navigate (URL from
+  // run_status, never a guessed port), snapshot (accessibility tree with refs), click/fill by ref,
+  // read the console. The 08 §example loop.
+  server.registerTool(
+    'browser_navigate',
+    { description: "Navigate the task's preview browser to a URL (get it from run_status; http(s) only).", inputSchema: { url: z.string() } },
+    ({ url }) => taskTool((id) => apiSend('POST', `/api/tasks/${id}/browser/navigate`, { url })),
+  )
+  server.registerTool(
+    'browser_snapshot',
+    { description: 'Accessibility snapshot of the current page: a compact tree with element refs (e1, e2, …) for browser_click/browser_fill.' },
+    () => taskTool((id) => apiGet(`/api/tasks/${id}/browser/snapshot`)),
+  )
+  server.registerTool(
+    'browser_click',
+    { description: 'Click an element by its snapshot ref.', inputSchema: { ref: z.string() } },
+    ({ ref }) => taskTool((id) => apiSend('POST', `/api/tasks/${id}/browser/click`, { ref })),
+  )
+  server.registerTool(
+    'browser_fill',
+    { description: 'Fill a textbox by its snapshot ref (replaces the current value).', inputSchema: { ref: z.string(), text: z.string() } },
+    ({ ref, text: t }) => taskTool((id) => apiSend('POST', `/api/tasks/${id}/browser/fill`, { ref, text: t })),
+  )
+  server.registerTool('browser_screenshot', { description: 'Screenshot the current page (png data URI).' }, () =>
+    taskTool((id) => apiGet(`/api/tasks/${id}/browser/screenshot`)),
+  )
+  server.registerTool('browser_console', { description: "The page's recent console output." }, () =>
+    taskTool((id) => apiGet(`/api/tasks/${id}/browser/console`)),
+  )
+
   // --- Run targets (docs/next 13 §A): bring the stack up, learn where it listens, tear it down —
   // without knowing whether it's compose or pnpm.
   server.registerTool('run_targets', { description: "The repo's declared run targets with live status." }, () =>
