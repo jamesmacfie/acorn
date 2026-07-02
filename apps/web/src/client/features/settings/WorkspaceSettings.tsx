@@ -1,7 +1,7 @@
 import { createSignal, For, Show } from 'solid-js'
 import { useQueryClient } from '@tanstack/solid-query'
 import { workspacesKey } from '../../queries'
-import { deleteWorkspace, renameWorkspace, setWorkspaceColor, setWorkspaceIcon, setWorkspacePreview, setWorkspaceSetupScript, setWorkspaceSetupTrigger } from '../../mutations'
+import { deleteWorkspace, renameWorkspace, setWorkspaceColor, setWorkspaceIcon, setWorkspacePreview, setWorkspaceSetupScript, setWorkspaceSetupTrigger, setWorkspaceTeardownScript } from '../../mutations'
 import type { PreviewMode, SetupTrigger, Workspace } from '../../../shared/api'
 import { resolveWorkspaceColor, WORKSPACE_COLORS } from '../../../shared/workspaceIdentity'
 
@@ -12,6 +12,8 @@ export default function WorkspaceSettings(props: { workspace: Workspace; onDelet
   const qc = useQueryClient()
   const [name, setName] = createSignal(props.workspace.name)
   const [script, setScript] = createSignal(props.workspace.setupScript ?? '')
+  const [teardown, setTeardown] = createSignal(props.workspace.teardownScript ?? '')
+  const [teardownSaved, setTeardownSaved] = createSignal(false)
   const [trigger, setTrigger] = createSignal<SetupTrigger>(props.workspace.setupScriptTrigger ?? 'terminal')
   const [previewMode, setPreviewMode] = createSignal<PreviewMode | ''>(props.workspace.previewMode ?? '')
   const [previewValue, setPreviewValue] = createSignal(props.workspace.previewValue ?? '')
@@ -87,6 +89,17 @@ export default function WorkspaceSettings(props: { workspace: Workspace; onDelet
       await setWorkspaceSetupScript(props.workspace.id, script())
       await refresh()
       setSaved(true)
+    } finally {
+      setBusy(false)
+    }
+  }
+  const saveTeardown = async () => {
+    setBusy(true)
+    setTeardownSaved(false)
+    try {
+      await setWorkspaceTeardownScript(props.workspace.id, teardown())
+      await refresh()
+      setTeardownSaved(true)
     } finally {
       setBusy(false)
     }
@@ -193,6 +206,32 @@ export default function WorkspaceSettings(props: { workspace: Workspace; onDelet
             {busy() ? 'Saving…' : 'Save script'}
           </button>
           <Show when={saved()}>
+            <span class="muted">Saved.</span>
+          </Show>
+        </div>
+      </label>
+
+      <label class="settings-field">
+        <span class="settings-label">Worktree teardown script</span>
+        <span class="muted settings-hint">
+          Runs in the worktree just before it's removed on task close (e.g. <code>docker compose down</code>). Non-zero exit pauses the close.
+        </span>
+        <textarea
+          class="settings-script"
+          rows="4"
+          spellcheck={false}
+          placeholder="docker compose -f dev.yml down"
+          value={teardown()}
+          onInput={(e) => {
+            setTeardown(e.currentTarget.value)
+            setTeardownSaved(false)
+          }}
+        />
+        <div class="settings-actions">
+          <button type="button" class="overlay-btn" disabled={busy()} onClick={() => void saveTeardown()}>
+            {busy() ? 'Saving…' : 'Save teardown'}
+          </button>
+          <Show when={teardownSaved()}>
             <span class="muted">Saved.</span>
           </Show>
         </div>

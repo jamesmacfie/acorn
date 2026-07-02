@@ -33,7 +33,7 @@ contextBridge.exposeInMainWorld('acorn', {
     task: {
       // Guarded archive + worktree teardown (docs/workspaces 05). Lives on the terminal bridge
       // because teardown needs the main-process git + live session map.
-      archive: (id: string, opts?: { deleteWorktree?: boolean; force?: boolean }) => ipcRenderer.invoke('term:task:archive', id, opts),
+      archive: (id: string, opts?: { deleteWorktree?: boolean; force?: boolean; skipTeardown?: boolean }) => ipcRenderer.invoke('term:task:archive', id, opts),
       // Notify main a task was created, so it can run the setup script now if configured to.
       onCreated: (id: string) => ipcRenderer.invoke('term:task:onCreated', id),
       // Live worktree statuses (dirty / missing) for the rail + footer markers.

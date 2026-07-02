@@ -57,6 +57,13 @@
       "when": 1782985627337,
       "tag": "0007_wandering_jocasta",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "6",
+      "when": 1782985860645,
+      "tag": "0008_kind_shockwave",
+      "breakpoints": true
     }
   ]
 }
