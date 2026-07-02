@@ -29,7 +29,7 @@ import { getProfile, listProfiles, resolveCommand, tmuxAvailable } from './profi
 import { loadRepoConfig } from './repoConfig'
 import { getRepoPath, setEditorCommand, setRepoPath, setRunConfig, setRunTargets } from './repoPaths'
 import { RuntimeService } from './runtime'
-import { ensureWorktree, worktreePorcelain } from './worktrees'
+import { copyWorktreeFiles, ensureWorktree, worktreePorcelain } from './worktrees'
 
 // vNext Phase 2: PTYs live in the main process. Sessions run on one of two backends —
 //  - node-pty: spawn the command directly. Survives a window reload (PTY is in main), not an app
@@ -200,6 +200,7 @@ async function resolveTaskCwd(
   const wt = await ensureWorktree(worktreesRoot, baseCheckout, t.repoOwner, t.repoName, t.branch, t.pullNumber, await baseRefPref(db, t.repoOwner, t.repoName))
   if (!wt.ok) return { cwd: baseCheckout, isWorktree: false, created: false }
   await db.update(schema.tasks).set({ worktreePath: wt.path, updatedAt: Date.now() }).where(eq(schema.tasks.id, t.id))
+  if (wt.created) await copyConfiguredFiles(db, t, baseCheckout, wt.path)
   return { cwd: wt.path, isWorktree: true, created: wt.created }
 }
 
@@ -260,6 +261,21 @@ async function maybeRunSetup(db: AppDatabase, t: typeof schema.tasks.$inferSelec
   const { script, trigger } = await workspaceSetup(db, t.repoOwner, t.repoName)
   if (trigger === 'off' || !script?.trim()) return
   await spawnOne(db, { taskId: t.id, command: script, title: 'Setup' }, cwd, true, ctx, t)
+}
+
+// Files-to-copy on a fresh worktree (docs/next 13 §A `copy`): read the config from the SOURCE
+// checkout (the entries are usually gitignored, so only it has them) and copy each into the new
+// worktree. Best-effort — warnings are logged, never thrown.
+async function copyConfiguredFiles(db: AppDatabase, t: typeof schema.tasks.$inferSelect, checkout: string, worktreePath: string): Promise<void> {
+  try {
+    const ws = await workspaceConfigRow(db, t.repoOwner, t.repoName)
+    const cfg = loadRepoConfig(checkout, homedir(), { setupScript: ws?.setupScript, teardownScript: ws?.teardownScript })
+    if (!cfg.copy.length) return
+    const res = copyWorktreeFiles(checkout, worktreePath, cfg.copy)
+    for (const w of res.warnings) console.warn(`[worktrees] ${w}`)
+  } catch (e) {
+    console.warn('[worktrees] copy failed:', e)
+  }
 }
 
 // Workspace-level config columns for a repo (preview + scripts) — the DB fallback layer that
@@ -666,6 +682,7 @@ export async function registerTerminalIpc(db: AppDatabase, worktreesDir: string)
     const wt = await ensureWorktree(worktreesRoot, mapped.path, t.repoOwner, t.repoName, t.branch, t.pullNumber, await baseRefPref(db, t.repoOwner, t.repoName))
     if (!wt.ok || !wt.created) return
     await db.update(schema.tasks).set({ worktreePath: wt.path, updatedAt: Date.now() }).where(eq(schema.tasks.id, t.id))
+    await copyConfiguredFiles(db, t, mapped.path, wt.path)
     await maybeRunSetup(db, t, wt.path, taskContext(t))
     broadcastStatus() // rail/footer pick up the new worktree; panel re-lists to show the Setup tab
   })

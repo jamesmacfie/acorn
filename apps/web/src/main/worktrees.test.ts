@@ -1,9 +1,9 @@
 import { execFileSync } from 'node:child_process'
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import { ensureWorktree, resolveBaseRef } from './worktrees'
+import { copyWorktreeFiles, ensureWorktree, resolveBaseRef } from './worktrees'
 
 const git = (cwd: string, ...args: string[]) => execFileSync('git', ['-C', cwd, ...args], { stdio: 'pipe' }).toString()
 
@@ -72,5 +72,34 @@ describe('worktree base-ref precedence (docs/next 02 P2)', () => {
     const res = await ensureWorktree(root, checkout, 'acme', 'widget', 'feat/existing', null, 'origin/develop')
     expect(res.ok).toBe(true)
     if (res.ok) expect(git(res.path, 'rev-parse', 'HEAD').trim()).toBe(mainSha)
+  })
+
+  describe('copyWorktreeFiles (docs/next 13 §A copy)', () => {
+    it('copies a gitignored file into the worktree, creating parents', async () => {
+      writeFileSync(join(checkout, '.env.local'), 'SECRET=1')
+      mkdirSync(join(checkout, 'config'), { recursive: true })
+      writeFileSync(join(checkout, 'config', 'dev.json'), '{}')
+      const res = await ensureWorktree(root, checkout, 'acme', 'widget', 'feat/copy', null)
+      expect(res.ok).toBe(true)
+      if (!res.ok) return
+      const out = copyWorktreeFiles(checkout, res.path, ['.env.local', 'config/dev.json'])
+      expect(out.copied).toEqual(['.env.local', 'config/dev.json'])
+      expect(out.warnings).toEqual([])
+      expect(readFileSync(join(res.path, '.env.local'), 'utf8')).toBe('SECRET=1')
+    })
+
+    it('warns on missing entries, rejects traversal/absolute, never overwrites', async () => {
+      writeFileSync(join(checkout, '.env.local'), 'FROM_CHECKOUT')
+      const res = await ensureWorktree(root, checkout, 'acme', 'widget', 'feat/copy2', null)
+      expect(res.ok).toBe(true)
+      if (!res.ok) return
+      writeFileSync(join(res.path, '.env.local'), 'ALREADY_HERE')
+      const out = copyWorktreeFiles(checkout, res.path, ['.env.local', 'missing.txt', '../evil', '/etc/passwd'])
+      expect(out.copied).toEqual([])
+      expect(out.warnings).toHaveLength(3)
+      expect(out.warnings.join(' ')).toMatch(/missing\.txt.*skipped/)
+      expect(out.warnings.join(' ')).toMatch(/\.\.\/evil.*rejected/)
+      expect(readFileSync(join(res.path, '.env.local'), 'utf8')).toBe('ALREADY_HERE')
+    })
   })
 })

@@ -1,6 +1,6 @@
 import { execFile } from 'node:child_process'
-import { existsSync, mkdirSync } from 'node:fs'
-import { join } from 'node:path'
+import { copyFileSync, existsSync, mkdirSync } from 'node:fs'
+import { dirname, isAbsolute, join, resolve } from 'node:path'
 import { promisify } from 'node:util'
 import type { WorktreeResult } from '../shared/terminal'
 import { isContainedPath, isDirty, worktreeBranchDirName } from './terminalUtils'
@@ -101,6 +101,43 @@ export async function ensureWorktree(
     return { ok: false, reason: `Could not create a worktree for ${branch}.` }
   }
   return { ok: true, path, created: true }
+}
+
+// Files-to-copy (docs/next 13 §A `copy`): carry gitignored files (.env.local, …) from the source
+// checkout into a freshly-created worktree without a setup script. Repo-relative paths only
+// (absolute / traversal entries are rejected), missing sources warn, existing targets are never
+// overwritten. Best-effort: a bad entry never fails worktree creation.
+export type CopyFilesResult = { copied: string[]; warnings: string[] }
+
+export function copyWorktreeFiles(checkout: string, worktree: string, entries: string[]): CopyFilesResult {
+  const copied: string[] = []
+  const warnings: string[] = []
+  for (const entry of entries) {
+    if (isAbsolute(entry) || entry.split(/[\\/]/).includes('..')) {
+      warnings.push(`copy: '${entry}' rejected — repo-relative paths only`)
+      continue
+    }
+    const src = resolve(checkout, entry)
+    const dst = resolve(worktree, entry)
+    // Defense in depth after the lexical check above.
+    if (!isContainedPath(checkout, src) || !isContainedPath(worktree, dst)) {
+      warnings.push(`copy: '${entry}' rejected — escapes the repo`)
+      continue
+    }
+    if (!existsSync(src)) {
+      warnings.push(`copy: '${entry}' missing in the checkout — skipped`)
+      continue
+    }
+    if (existsSync(dst)) continue // never overwrite what's already there
+    try {
+      mkdirSync(dirname(dst), { recursive: true })
+      copyFileSync(src, dst)
+      copied.push(entry)
+    } catch (e) {
+      warnings.push(`copy: '${entry}' failed — ${e instanceof Error ? e.message : String(e)}`)
+    }
+  }
+  return { copied, warnings }
 }
 
 export async function worktreeDirty(path: string): Promise<boolean> {
