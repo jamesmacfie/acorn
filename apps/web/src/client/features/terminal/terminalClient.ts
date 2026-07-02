@@ -1,6 +1,6 @@
 // Typed accessor for the preload's `window.acorn.terminal` bridge (vNext §5). The global is declared
 // here so anything importing it (App's flag check, TerminalPanel) sees the same shape.
-import type { ArchiveOpts, ArchiveResult, CreateOpts, RepoPath, RepoPathResult, RunStatus, RunTargetInfo, ServerMsg, TerminalProfile, TerminalSession, TaskStatus } from '../../../shared/terminal'
+import type { ArchiveOpts, ArchiveResult, CreateOpts, LocalChange, RepoPath, RepoPathResult, RunStatus, RunTargetInfo, ServerMsg, TerminalProfile, TerminalSession, TaskStatus } from '../../../shared/terminal'
 
 export type TerminalApi = {
   list(): Promise<TerminalSession[]>
@@ -41,6 +41,12 @@ export type TerminalApi = {
   previewUrl(taskId: string, script: string): Promise<{ ok: boolean; url?: string; reason?: string }>
   // Open the task's worktree (or base checkout) in the external editor (docs/next 01 P2).
   openInEditor(taskId: string): Promise<{ ok: boolean; reason?: string }>
+  // Local-changes review (docs/next 04): working-tree status/diffs/blobs for the ChangesPane.
+  local: {
+    changes(taskId: string): Promise<LocalChange[]>
+    diff(taskId: string, path: string, scope: 'unstaged' | 'staged'): Promise<{ patch: string } | { error: string }>
+    blob(taskId: string, path: string, ref?: string): Promise<{ text: string } | { error: string }>
+  }
 
   task: {
     archive(id: string, opts?: ArchiveOpts): Promise<ArchiveResult>

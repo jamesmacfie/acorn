@@ -38,6 +38,12 @@ contextBridge.exposeInMainWorld('acorn', {
     },
     // Open the task's worktree in the user's external editor (code/zed/…, docs/next 01 P2).
     openInEditor: (taskId: string) => ipcRenderer.invoke('term:openInEditor', taskId),
+    // Local-changes review (docs/next 04): working-tree status/diffs/blobs for the ChangesPane.
+    local: {
+      changes: (taskId: string) => ipcRenderer.invoke('local:changes', taskId),
+      diff: (taskId: string, path: string, scope: 'unstaged' | 'staged') => ipcRenderer.invoke('local:diff', { taskId, path, scope }),
+      blob: (taskId: string, path: string, ref?: string) => ipcRenderer.invoke('local:blob', { taskId, path, ref }),
+    },
     // Resolve a workspace's browser-preview URL by running its configured script in the task's
     // worktree (script mode only — url/port are computed client-side). Returns the trimmed stdout.
     previewUrl: (taskId: string, script: string) => ipcRenderer.invoke('term:previewUrl', { taskId, script }),

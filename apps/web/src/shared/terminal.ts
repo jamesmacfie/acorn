@@ -96,6 +96,17 @@ export type RunStatus = { running: boolean; url?: string; exitCode?: number | nu
 // Result of validating/saving a checkout path. `reason` explains a rejection for the UI.
 export type RepoPathResult = { ok: true; repoPath: RepoPath } | { ok: false; reason: string }
 
+// Local-changes review (docs/next 04 §A): one working-tree change as the ChangesPane sees it.
+// A file changed in both the index and the worktree appears once per scope (staged flag).
+export type LocalChange = {
+  path: string
+  status: 'modified' | 'added' | 'deleted' | 'renamed' | 'untracked'
+  oldPath?: string // for renames
+  staged: boolean
+  additions: number | null
+  deletions: number | null
+}
+
 // Pushed from main to a subscribed renderer over `term:out:<id>` (see preload `attach`).
 export type ServerMsg =
   | { type: 'ready'; session: TerminalSession; replayed: boolean }
