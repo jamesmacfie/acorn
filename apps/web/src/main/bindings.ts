@@ -1,4 +1,5 @@
 import Database from 'better-sqlite3'
+import { randomUUID } from 'node:crypto'
 import { existsSync, mkdirSync } from 'node:fs'
 import { readFile, rm, writeFile } from 'node:fs/promises'
 import { dirname, join, resolve } from 'node:path'
@@ -16,6 +17,10 @@ export type RuntimeBindings = {
   SESSION_ENC_KEY: string
   GITHUB_CLIENT_ID: string
   GITHUB_CLIENT_SECRET: string
+  // Per-app-run bearer for loopback callers that hold no session cookie — the acorn MCP server
+  // (docs/next 06 B). Injected into task session env (ACORN_API_TOKEN) so agent-spawned servers
+  // inherit it; auth middleware maps it to the machine's single user.
+  INTERNAL_TOKEN: string
 }
 
 // Only the KV methods the routes actually call — not the full Workers KV surface.
@@ -115,5 +120,6 @@ export function makeBindings({ dbPath, blobsDir }: BindingsOptions): RuntimeBind
     SESSION_ENC_KEY: secret('SESSION_ENC_KEY'),
     GITHUB_CLIENT_ID: secret('GITHUB_CLIENT_ID'),
     GITHUB_CLIENT_SECRET: secret('GITHUB_CLIENT_SECRET'),
+    INTERNAL_TOKEN: randomUUID(),
   }
 }

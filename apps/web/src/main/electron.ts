@@ -98,7 +98,7 @@ async function createMainWindow() {
 
 app.whenReady().then(async () => {
   const { runtime } = await startServer() // resolves once listening on the pinned loopback port
-  await registerTerminalIpc(runtime.DB, join(dataDir, 'worktrees')) // PTYs + tmux + repo paths + worktrees
+  await registerTerminalIpc(runtime.DB, join(dataDir, 'worktrees'), { apiUrl: ORIGIN, token: runtime.INTERNAL_TOKEN }) // PTYs + tmux + repo paths + worktrees
   mainWindow = await createMainWindow()
 })
 
