@@ -7,6 +7,7 @@ import { checksState } from '../../displayMeta'
 import { activeTaskId, paneForTask, selectedSource, setActivePane, setActiveTaskId, setSelectedSource, type SourceId } from '../tasks/tasks'
 import { taskStatus } from '../tasks/taskStatus'
 import { workspaceForRepo } from '../workspaces/activeWorkspace'
+import { resolveWorkspaceColor } from '../../../shared/workspaceIdentity'
 import { terminalApi } from '../terminal/terminalClient'
 import './tabrail.css'
 
@@ -157,16 +158,28 @@ export default function TabRail() {
             const detail = createQuery(() => pullDetailOptions(w.repoOwner, w.repoName, w.pullNumber != null ? String(w.pullNumber) : '', w.pullNumber != null))
             const checks = () => detail.data?.checks ?? []
             const st = () => taskStatus(w.id)
+            // Workspace identity derived onto the row (docs/next 01): 3px accent in the
+            // workspace's colour, matching the active-row accent convention in docs/ui-design.md.
+            const ws = () => workspaceForRepo(workspaces.data, w.repoOwner, w.repoName)
+            const accent = () => {
+              const g = ws()
+              return g ? resolveWorkspaceColor(g.color, g.name) : undefined
+            }
+            const wsGlyph = () => {
+              const icon = ws()?.icon
+              return icon?.kind === 'emoji' ? icon.value : null
+            }
             return (
             <div class="tabrail-item">
               <button
                 type="button"
-                class="tabrail-tab"
+                class="tabrail-tab tabrail-task"
                 classList={{ active: !selectedSource() && w.id === activeTaskId() }}
+                style={accent() ? { 'border-left-color': accent() } : undefined}
                 title={w.title}
                 onClick={() => onRowClick(w)}
               >
-                {ORIGIN_GLYPH[w.origin] ?? '●'}
+                {wsGlyph() ?? ORIGIN_GLYPH[w.origin] ?? '●'}
               </button>
               <Show when={w.pullNumber != null && checks().length}>
                 <span class={`tabrail-checks checks-dot checks-dot-${checksState(checks())}`} title="PR checks" />

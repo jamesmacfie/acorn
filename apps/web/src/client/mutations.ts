@@ -23,6 +23,7 @@ import {
   type Task,
   type TaskSeed,
   type Workspace,
+  type WorkspaceIcon,
   workspaceRoute,
   workspacesRoute,
   workspaceBootstrapRoute,
@@ -133,6 +134,11 @@ export const setWorkspaceSetupTrigger = async (id: string, setupScriptTrigger: S
 // How the browser-preview pane resolves its URL: '' (dev-server port), 'url', 'port', or 'script'.
 export const setWorkspacePreview = async (id: string, previewMode: PreviewMode | '', previewValue: string) =>
   writeJson<{ ok: true }>(workspaceRoute(id), { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ previewMode, previewValue }) }, (res) => `workspace ${res.status}`)
+// Workspace identity (docs/next 01): icon (null clears) + colour (preset token or hex; null clears).
+export const setWorkspaceIcon = async (id: string, icon: WorkspaceIcon | null) =>
+  writeJson<{ ok: true }>(workspaceRoute(id), { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ icon }) }, (res) => `workspace ${res.status}`)
+export const setWorkspaceColor = async (id: string, color: string | null) =>
+  writeJson<{ ok: true }>(workspaceRoute(id), { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ color }) }, (res) => `workspace ${res.status}`)
 export const deleteWorkspace = async (id: string) =>
   writeJson<{ ok: true }>(workspaceRoute(id), { method: 'DELETE' }, (res) => `workspace ${res.status}`)
 // Move a repo into a workspace (partition; upsert on owner/repo). Also un-ignores it.

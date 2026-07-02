@@ -43,6 +43,13 @@
       "when": 1782944342901,
       "tag": "0005_sturdy_golden_guardian",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "6",
+      "when": 1782985250377,
+      "tag": "0006_slippery_redwing",
+      "breakpoints": true
     }
   ]
 }

@@ -115,6 +115,12 @@ export type SetupTrigger = 'off' | 'created' | 'terminal'
 // How the browser-preview pane resolves its URL: a fixed URL, http://localhost:<port>, or the
 // stdout of a shell command run in the repo's worktree. null falls back to the dev-server port.
 export type PreviewMode = 'url' | 'port' | 'script'
+// Workspace identity (docs/next 01): a small JSON-stored icon union (grows without migrations) and
+// a colour (preset token key or 6-hex). null → derived defaults (name-hash colour, initial glyph).
+export type WorkspaceIcon =
+  | { kind: 'emoji'; value: string }
+  | { kind: 'lucide'; value: string }
+  | { kind: 'github' }
 export type Workspace = {
   id: string
   name: string
@@ -124,6 +130,8 @@ export type Workspace = {
   setupScriptTrigger: SetupTrigger | null
   previewMode: PreviewMode | null // how the browser-preview URL is resolved; null → dev-server port
   previewValue: string | null // the URL, port, or command per previewMode; null/blank = unset
+  icon: WorkspaceIcon | null
+  color: string | null
   repos: WorkspaceRepo[]
 }
 export type WorkspaceSeed = { name: string }
