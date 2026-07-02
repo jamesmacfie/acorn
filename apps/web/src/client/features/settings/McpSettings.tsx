@@ -7,7 +7,16 @@ import { activeTaskId } from '../tasks/tasks'
 export default function McpSettings() {
   const api = () => window.acorn?.mcp ?? null
   const [msg, setMsg] = createSignal('')
+  const [regMsg, setRegMsg] = createSignal('')
   const taskId = () => activeTaskId()
+
+  async function doRegister(flavour: 'claude' | 'codex', add: boolean) {
+    const a = api()
+    if (!a) return
+    setRegMsg('…')
+    const res = add ? await a.register(flavour) : await a.unregister(flavour)
+    setRegMsg(res.ok ? (add ? `Registered with ${flavour}.` : `Removed from ${flavour}.`) : (res.reason ?? 'Failed.'))
+  }
 
   const [configs, { refetch }] = createResource(
     () => taskId() ?? 'no-task',
@@ -64,6 +73,24 @@ export default function McpSettings() {
         <button type="button" class="overlay-btn" onClick={() => void createStarter()}>Create .mcp.json</button>
         <button type="button" class="overlay-btn" onClick={() => void refetch()}>Rescan</button>
         <Show when={msg()}><span class="muted">{msg()}</span></Show>
+      </div>
+
+      <div class="settings-field">
+        <span class="settings-label">acorn MCP server</span>
+        <span class="muted settings-hint">
+          Exposes the current task (PR, linked issues, context) as tools to your agents. Registers via each agent's own CLI (`claude mcp add` / `codex mcp add`) — only when you click, idempotent, removable.
+        </span>
+        <div class="settings-actions">
+          <For each={['claude', 'codex'] as const}>
+            {(flavour) => (
+              <>
+                <button type="button" class="overlay-btn" onClick={() => void doRegister(flavour, true)}>Register with {flavour}</button>
+                <button type="button" class="overlay-btn" onClick={() => void doRegister(flavour, false)}>Remove from {flavour}</button>
+              </>
+            )}
+          </For>
+          <Show when={regMsg()}><span class="muted">{regMsg()}</span></Show>
+        </div>
       </div>
     </div>
   )

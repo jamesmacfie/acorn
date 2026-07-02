@@ -86,6 +86,9 @@ contextBridge.exposeInMainWorld('acorn', {
   mcp: {
     inspect: (taskId: string) => ipcRenderer.invoke('mcp:inspect', taskId),
     createStarter: (taskId: string) => ipcRenderer.invoke('mcp:createStarter', taskId),
+    // Register/remove acorn's own MCP server via the agent's CLI (explicit user action only).
+    register: (flavour: 'claude' | 'codex') => ipcRenderer.invoke('mcp:register', flavour),
+    unregister: (flavour: 'claude' | 'codex') => ipcRenderer.invoke('mcp:unregister', flavour),
   },
   // Memory (docs/next 12): committed .acorn/memory files + the derived FTS index.
   memory: {
