@@ -22,6 +22,7 @@ export type LayoutAction =
   | { type: 'toggleMaximise'; pane: PaneId }
   | { type: 'restore' } // Esc — clear maximise
   | { type: 'setRatio'; ratio: number }
+  | { type: 'replace'; layout: TaskLayout } // recipe seeding (docs/next 13 §C) — validated wholesale
 
 export const DEFAULT_PANE: PaneId = 'pr'
 export const defaultLayout = (pane: PaneId = DEFAULT_PANE): TaskLayout => ({ panes: [pane], pinned: null, maximised: null })
@@ -80,6 +81,8 @@ export function applyLayoutAction(layout: TaskLayout, action: LayoutAction): Tas
     case 'setRatio':
       if (layout.panes.length !== 2) return layout
       return { ...layout, ratio: clampRatio(action.ratio) }
+    case 'replace':
+      return normalizeLayout(action.layout) ?? layout
   }
 }
 

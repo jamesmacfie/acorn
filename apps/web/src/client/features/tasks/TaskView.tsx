@@ -10,7 +10,7 @@ import EditorPane from '../editor/EditorPane'
 import { workspaceForRepo } from '../workspaces/activeWorkspace'
 import { refreshSessions } from '../terminal/sessions'
 import { terminalApi } from '../terminal/terminalClient'
-import { dispatchLayout, layoutForTask, paneForTask, setActivePane, setActiveTaskId, setSelectedSource } from './tasks'
+import { dispatchLayout, layoutForTask, paneForTask, recipeBrowserUrl, setActivePane, setActiveTaskId, setSelectedSource } from './tasks'
 import { defaultLayout, type LayoutAction, type PaneId } from './layout'
 import { taskStatus } from './taskStatus'
 import './task-view.css'
@@ -190,6 +190,9 @@ export default function TaskView(props: {
     async (src) => (api ? ((await api.run.defaultUrl(src.id)) ?? null) : null),
   )
   const previewUrl = () => {
+    // A layout recipe's browser=run:<id> resolution wins for this session (docs/next 13 §C).
+    const fromRecipe = recipeBrowserUrl(props.task.id)
+    if (fromRecipe) return fromRecipe
     const fromTarget = runUrl()
     if (fromTarget) return fromTarget
     // Legacy workspace preview config, kept as the fallback when no run target resolves.
@@ -515,6 +518,7 @@ function PreviewPane(props: { taskId: string; url: string | null; hidden: boolea
     if (!el) {
       el = document.createElement('webview') as WebviewEl
       el.setAttribute('src', url)
+      el.setAttribute('data-acorn-home', url)
       el.style.width = '100%'
       el.style.height = '100%'
       const captured = el
@@ -526,6 +530,15 @@ function PreviewPane(props: { taskId: string; url: string | null; hidden: boolea
       previewWebviews.set(taskId, el)
     }
     if (el.parentElement !== host) host.appendChild(el) // fresh host after a remount → reload
+    // A changed home URL (a layout recipe resolved a run target, docs/next 13 §C) navigates there.
+    if (el.getAttribute('data-acorn-home') !== url) {
+      el.setAttribute('data-acorn-home', url)
+      try {
+        el.loadURL(url)
+      } catch {
+        /* webview not ready yet — the src attribute already points home */
+      }
+    }
     for (const [id, w] of previewWebviews) w.style.display = id === taskId ? 'flex' : 'none'
     setLoading(false)
     syncFrom(el)

@@ -294,7 +294,10 @@ async function workspaceConfigRow(db: AppDatabase, owner: string, repo: string) 
 async function taskRunConfig(
   db: AppDatabase,
   taskId: string,
-): Promise<{ targets: import('./repoConfig').RunTarget[]; cwd: string; errors: { source: string; message: string }[] } | { error: string }> {
+): Promise<
+  | { targets: import('./repoConfig').RunTarget[]; cwd: string; errors: { source: string; message: string }[]; layouts: import('./repoConfig').LayoutRecipe[] }
+  | { error: string }
+> {
   const t = await loadTask(db, taskId)
   if (!t) return { error: 'Task not found.' }
   const mapped = await getRepoPath(db, t.repoOwner, t.repoName)
@@ -311,7 +314,7 @@ async function taskRunConfig(
     devPort: mapped?.devPort,
     runTargetsJson: mapped?.runTargets,
   })
-  return { targets: cfg.runTargets, cwd, errors: cfg.errors }
+  return { targets: cfg.runTargets, cwd, errors: cfg.errors, layouts: cfg.layouts }
 }
 
 async function markExited(db: AppDatabase, id: string, exitCode: number | null) {

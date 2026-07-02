@@ -3,7 +3,8 @@ import { useQueryClient } from '@tanstack/solid-query'
 import { tasksKey } from '../../queries'
 import { refreshSessions } from '../terminal/sessions'
 import { terminalApi } from '../terminal/terminalClient'
-import { activeLayout, activeTaskId, dispatchActiveLayout, isTerminalOpen, setTerminalOpen } from '../tasks/tasks'
+import { activeLayout, activeTaskId, dispatchActiveLayout, dispatchLayout, isTerminalOpen, setRecipeBrowserUrl, setTerminalOpen } from '../tasks/tasks'
+import { invokeLayoutRecipe } from '../tasks/recipes'
 import { composeItems, fuzzyFilter, type PaletteItem } from './model'
 import './palette.css'
 
@@ -45,7 +46,8 @@ export default function CommandPalette() {
     const data = runData()
     const targets = data && 'targets' in data ? data.targets : []
     const errors = data && 'targets' in data ? data.errors : []
-    return fuzzyFilter(composeItems({ targets, errors, actions: actions() }), query())
+    const layouts = data && 'targets' in data ? data.layouts : []
+    return fuzzyFilter(composeItems({ targets, errors, layouts, actions: actions() }), query())
   })
 
   const close = () => {
@@ -69,7 +71,23 @@ export default function CommandPalette() {
       await refreshSessions()
       return
     }
-    if (item.kind === 'layout') return // recipes invoke via TaskView (docs/next 13 §C)
+    if (item.kind === 'layout') {
+      // Layout recipe (docs/next 13 §C): seed panes, auto-start the named target, resolve the
+      // browser URL — all through the pure executor.
+      const data = runData()
+      const recipe = data && 'targets' in data ? data.layouts.find((r) => `layout:${r.id}` === item.id) : undefined
+      if (!recipe) return
+      const res = await invokeLayoutRecipe(taskId, recipe, {
+        setLayout: (tid, layout) => dispatchLayout(tid, { type: 'replace', layout }),
+        startTarget: (tid, targetId) => api.run.start(tid, targetId),
+        targetUrl: async (tid, targetId) => (await api.run.status(tid, targetId)).url,
+        setBrowserUrl: setRecipeBrowserUrl,
+        openTerminal: (tid) => setTerminalOpen(tid, true),
+      })
+      if (!res.ok && res.reason) window.alert(res.reason)
+      await refreshSessions()
+      return
+    }
     switch (item.id) {
       case 'action:new-terminal':
         await api.create({ taskId, profileId: 'shell' })

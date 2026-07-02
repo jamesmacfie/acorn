@@ -63,6 +63,15 @@ describe('applyLayoutAction — pin / maximise / ratio', () => {
   })
 })
 
+describe('applyLayoutAction — replace (recipe seeding)', () => {
+  it('replaces wholesale after validation; junk keeps the current layout', () => {
+    const next = l({ panes: ['pr', 'changes'], ratio: 0.5 })
+    expect(applyLayoutAction(l({}), { type: 'replace', layout: next })).toEqual(next)
+    const junk = { panes: ['nope'] } as unknown as TaskLayout
+    expect(applyLayoutAction(l({}), { type: 'replace', layout: junk })).toEqual(l({}))
+  })
+})
+
 describe('persistence + migration', () => {
   it('migrates the old task_panes map', () => {
     expect(migrateTaskPanes({ t1: 'editor', t2: 'pr', t3: 'bogus' })).toEqual({

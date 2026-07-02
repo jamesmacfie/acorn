@@ -58,6 +58,14 @@ export function hydrateTaskLayouts(map: Record<string, TaskLayout>): void {
   setTaskLayouts((p) => ({ ...map, ...p }))
 }
 
+// Recipe-resolved browser home URLs (docs/next 13 §C): a layout recipe points the browser pane at
+// a run target's resolved URL. Session-only view state, per task.
+const [recipeBrowserUrls, setRecipeBrowserUrls] = createSignal<Record<string, string>>({})
+export const recipeBrowserUrl = (taskId: string): string | undefined => recipeBrowserUrls()[taskId]
+export function setRecipeBrowserUrl(taskId: string, url: string): void {
+  setRecipeBrowserUrls((p) => (p[taskId] === url ? p : { ...p, [taskId]: url }))
+}
+
 // The terminal drawer is per-task (session state, like activeTaskId): each task remembers whether
 // its drawer is open, so switching tasks swaps it and a Source browse (no task) shows no terminal.
 const [terminalOpenTasks, setTerminalOpenTasks] = createSignal<Set<string>>(new Set())
