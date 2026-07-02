@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto'
-import { eq, inArray, max } from 'drizzle-orm'
+import { and, eq, inArray, max } from 'drizzle-orm'
 import { getDb, schema } from '../db'
 import type { AppEnv } from '../middleware/auth'
 import { Hono } from 'hono'
@@ -96,4 +96,38 @@ export const tasks = new Hono<AppEnv>()
     }
     await db.update(schema.tasks).set(patch).where(eq(schema.tasks.id, id))
     return c.json({ id, ...patch })
+  })
+  // Links grow/shrink after creation (docs/next 11 §A): the write path that turns "a task frozen
+  // with its birth links" into "a task that accumulates context as work unfolds". Mirrors the
+  // create-time insert above — same onConflictDoNothing, so a duplicate add is a no-op.
+  .post('/:id/links', async (c) => {
+    if (!c.get('user')) return c.json({ error: 'unauthenticated' }, 401)
+    const id = c.req.param('id')
+    const body = (await c.req.json().catch(() => ({}))) as Partial<TaskLink>
+    if (!body.integrationId || !body.provider || !body.identifier) return c.json({ error: 'bad_request' }, 400)
+    const db = getDb(c.env)
+    const [t] = await db.select().from(schema.tasks).where(eq(schema.tasks.id, id))
+    if (!t) return c.json({ error: 'not_found' }, 404)
+    await db
+      .insert(schema.taskLinks)
+      .values({ taskId: id, integrationId: body.integrationId, provider: body.provider, identifier: body.identifier, createdAt: Date.now() })
+      .onConflictDoNothing()
+    return c.json({ ok: true })
+  })
+  .delete('/:id/links', async (c) => {
+    if (!c.get('user')) return c.json({ error: 'unauthenticated' }, 401)
+    const id = c.req.param('id')
+    const body = (await c.req.json().catch(() => ({}))) as Partial<Pick<TaskLink, 'integrationId' | 'identifier'>>
+    if (!body.integrationId || !body.identifier) return c.json({ error: 'bad_request' }, 400)
+    const db = getDb(c.env)
+    await db
+      .delete(schema.taskLinks)
+      .where(
+        and(
+          eq(schema.taskLinks.taskId, id),
+          eq(schema.taskLinks.integrationId, body.integrationId),
+          eq(schema.taskLinks.identifier, body.identifier),
+        ),
+      )
+    return c.json({ ok: true })
   })

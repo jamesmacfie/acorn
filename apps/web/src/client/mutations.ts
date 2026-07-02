@@ -14,8 +14,10 @@ import {
   pinsRoute,
   prefsRoute,
   pullRoute,
+  taskLinksRoute,
   taskRoute,
   tasksRoute,
+  type TaskLink,
   type PreviewMode,
   type SetupTrigger,
   type Task,
@@ -155,6 +157,14 @@ export const createTask = async (seed: TaskSeed) => {
   void terminalApi()?.task.onCreated(task.id)
   return task
 }
+// Grow/shrink a task's links after creation (docs/next 11 §A). Callers invalidate tasksKey after.
+export const addTaskLink = (id: string, link: TaskLink) => post<{ ok: boolean }>(taskLinksRoute(id), link)
+export const removeTaskLink = (id: string, ref: Pick<TaskLink, 'integrationId' | 'identifier'>) =>
+  writeJson<{ ok: boolean }>(taskLinksRoute(id), {
+    method: 'DELETE',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(ref),
+  })
 export const renameTask = async (id: string, title: string) => patchTask(id, { title })
 export const archiveTask = async (id: string) => patchTask(id, { status: 'archived' })
 async function patchTask(id: string, body: { title?: string; status?: 'active' | 'archived' }) {
