@@ -40,8 +40,12 @@ export type CreateOpts = {
 export type WorktreeResult = { ok: true; path: string } | { ok: false; reason: string }
 
 // Result of archiving a task (docs/workspaces 05). `reason` carries the guard refusal
-// (running sessions / dirty worktree) for the UI to surface.
-export type ArchiveResult = { ok: true } | { ok: false; reason: string }
+// (running sessions / dirty worktree) for the UI to surface. A failed teardown script
+// (docs/next 02) sets teardownFailed so the UI can offer continue (re-archive with
+// skipTeardown) or abort; `output` is the script's tail for display.
+export type ArchiveResult = { ok: true } | { ok: false; reason: string; teardownFailed?: boolean; output?: string }
+
+export type ArchiveOpts = { deleteWorktree?: boolean; force?: boolean; skipTeardown?: boolean }
 
 // Live worktree status for a task (docs/workspaces 02/05). `missing` = the task has a
 // worktreePath but the directory is gone (removed outside acorn) → needs repair. Computed in main

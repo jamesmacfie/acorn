@@ -10,7 +10,8 @@ import { homedir } from 'node:os'
 import { and, eq } from 'drizzle-orm'
 import type { AppDatabase } from '../server/db'
 import { schema } from '../server/db'
-import type { ArchiveResult, CreateOpts, ServerMsg, TerminalSession, TaskStatus } from '../shared/terminal'
+import type { ArchiveOpts, ArchiveResult, CreateOpts, ServerMsg, TerminalSession, TaskStatus } from '../shared/terminal'
+import { archiveTask, TEARDOWN_TIMEOUT_MS } from './archive'
 import {
   buildSessionEnv,
   childEnv,
@@ -26,7 +27,7 @@ import {
 import { buildEditorArgv } from './editorLaunch'
 import { getProfile, listProfiles, resolveCommand, tmuxAvailable } from './profiles'
 import { getRepoPath, setEditorCommand, setRepoPath, setRunConfig } from './repoPaths'
-import { ensureWorktree, removeWorktree, worktreePorcelain } from './worktrees'
+import { ensureWorktree, worktreePorcelain } from './worktrees'
 
 // vNext Phase 2: PTYs live in the main process. Sessions run on one of two backends —
 //  - node-pty: spawn the command directly. Survives a window reload (PTY is in main), not an app
@@ -583,40 +584,42 @@ export async function registerTerminalIpc(db: AppDatabase, worktreesDir: string)
     broadcastStatus() // rail/footer pick up the new worktree; panel re-lists to show the Setup tab
   })
 
-  ipcMain.handle('term:task:archive', async (_e: IpcMainInvokeEvent, id: string, opts?: { deleteWorktree?: boolean; force?: boolean }): Promise<ArchiveResult> => {
+  // Archive orchestration lives in archive.ts (guard → teardown → stop sessions → remove worktree →
+  // mark archived, docs/next 02); this handler just injects the live-session + drawer glue.
+  ipcMain.handle('term:task:archive', async (_e: IpcMainInvokeEvent, id: string, opts?: ArchiveOpts): Promise<ArchiveResult> => {
     if (typeof id !== 'string' || !id) return { ok: false, reason: 'Invalid task.' }
-    // Defaults preserve the safe menu-archive behavior: remove the worktree, refuse dirty / running.
-    // The task-close X passes force (kill running sessions + discard a dirty worktree) and lets the
-    // user opt out of deleting the worktree folder entirely (deleteWorktree: false).
-    const deleteWorktree = opts?.deleteWorktree ?? true
-    const force = opts?.force ?? false
-    const running = [...sessions.values()].filter((s) => s.meta.taskId === id && s.meta.status === 'running')
-    if (running.length) {
-      if (!force) return { ok: false, reason: `Stop ${running.length} running session${running.length > 1 ? 's' : ''} first.` }
-      for (const s of running) killSession(s)
-    }
-    const t = await loadTask(db, id)
-    if (!t) return { ok: false, reason: 'Task not found.' }
-    if (deleteWorktree && t.worktreePath) {
-      const mapped = await getRepoPath(db, t.repoOwner, t.repoName)
-      if (mapped) {
-        const res = await removeWorktree(mapped.path, t.worktreePath, force) // force discards a dirty tree
-        if (!res.ok) return res
-      }
-      // No mapped checkout → can't git-remove; we still archive and drop the (now-orphaned) reference.
-    }
-    // Drop any lingering exited sessions for this task so their rows don't outlive it.
-    for (const [sid, s] of sessions) {
-      if (s.meta.taskId === id) {
-        sessions.delete(sid)
-        if (s.meta.backend === 'tmux') await deleteRow(db, sid)
-      }
-    }
-    await db
-      .update(schema.tasks)
-      .set({ status: 'archived', archivedAt: Date.now(), worktreePath: null, updatedAt: Date.now() })
-      .where(eq(schema.tasks.id, id))
-    return { ok: true }
+    return archiveTask(db, id, opts ?? {}, {
+      isDir,
+      runningCount: (taskId) => [...sessions.values()].filter((s) => s.meta.taskId === taskId && s.meta.status === 'running').length,
+      killRunning: (taskId) => {
+        for (const s of sessions.values()) if (s.meta.taskId === taskId && s.meta.status === 'running') killSession(s)
+      },
+      // Drop any lingering exited sessions for this task so their rows don't outlive it.
+      dropTaskSessions: async (taskId) => {
+        for (const [sid, s] of sessions) {
+          if (s.meta.taskId === taskId) {
+            sessions.delete(sid)
+            if (s.meta.backend === 'tmux') await deleteRow(db, sid)
+          }
+        }
+      },
+      // Teardown streams to the task drawer as a "Teardown" tab; its exit code + ring buffer are
+      // the result. A ~2 min timeout kills it (exitCode null → surfaced as timeout).
+      runTeardown: async (script, cwd, env, taskId) => {
+        const t = await loadTask(db, taskId)
+        const meta = await spawnOne(db, { taskId, command: script, title: 'Teardown', env }, cwd, true, taskContext(t), t)
+        const s = sessions.get(meta.id)
+        if (!s) return { exitCode: 1, output: 'Could not start the teardown session.' }
+        broadcastStatus()
+        return new Promise((resolveTeardown) => {
+          const timer = setTimeout(() => killSession(s), TEARDOWN_TIMEOUT_MS)
+          s.pty.onExit(({ exitCode }) => {
+            clearTimeout(timer)
+            resolveTeardown({ exitCode, output: s.ring })
+          })
+        })
+      },
+    })
   })
 
   ipcMain.handle('term:resize', (_e: IpcMainInvokeEvent, p: { id: string; cols: number; rows: number }) => {

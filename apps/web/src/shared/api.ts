@@ -128,6 +128,7 @@ export type Workspace = {
   sort: number
   setupScript: string | null // shell command run once when a task worktree is created; null/blank = none
   setupScriptTrigger: SetupTrigger | null
+  teardownScript: string | null // shell command run in the worktree just before removal (docs/next 02); null/blank = none
   previewMode: PreviewMode | null // how the browser-preview URL is resolved; null → dev-server port
   previewValue: string | null // the URL, port, or command per previewMode; null/blank = unset
   icon: WorkspaceIcon | null

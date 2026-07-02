@@ -148,6 +148,9 @@ export default function TaskView(props: {
   const [closeOpen, setCloseOpen] = createSignal(false)
   const [deleteWt, setDeleteWt] = createSignal(true)
   const [closeErr, setCloseErr] = createSignal('')
+  // A failed teardown pauses the close (docs/next 02): offer "close anyway" (skip teardown) or abort.
+  const [teardownFailed, setTeardownFailed] = createSignal(false)
+  const hasTeardown = () => !!previewWs()?.teardownScript?.trim()
   const hasWorktree = () => !!props.task.worktreePath
   const dirtyCount = () => (st()?.missing ? 0 : st()?.dirty ? (st()?.dirtyCount ?? 0) : 0)
 
@@ -166,15 +169,19 @@ export default function TaskView(props: {
 
   function openClose() {
     setCloseErr('')
+    setTeardownFailed(false)
     setDeleteWt(true)
     setCloseOpen(true)
   }
 
-  async function confirmClose() {
+  async function confirmClose(skipTeardown = false) {
     const next = nextTask() // resolve before archiving — the list still holds this task
     if (api) {
-      const res = await api.task.archive(props.task.id, { deleteWorktree: deleteWt(), force: true })
-      if (!res.ok) return setCloseErr(res.reason)
+      const res = await api.task.archive(props.task.id, { deleteWorktree: deleteWt(), force: true, skipTeardown })
+      if (!res.ok) {
+        setTeardownFailed(!!res.teardownFailed)
+        return setCloseErr(res.output ? `${res.reason}\n${res.output}` : res.reason)
+      }
     } else {
       await archiveTask(props.task.id)
     }
@@ -285,6 +292,9 @@ export default function TaskView(props: {
             <div class="overlay-title">Close task</div>
             <div class="overlay-body">
               <p class="muted">Close “{props.task.title}” and remove it from the rail?</p>
+              <Show when={hasWorktree() && deleteWt() && hasTeardown()}>
+                <p class="muted">Will run the teardown script before removing the worktree.</p>
+              </Show>
               <Show when={hasWorktree()}>
                 <label class="close-check">
                   <input type="checkbox" checked={deleteWt()} onChange={(e) => setDeleteWt(e.currentTarget.checked)} />
@@ -294,9 +304,12 @@ export default function TaskView(props: {
                   <div class="action-error">⚠ {dirtyCount()} uncommitted change{dirtyCount() === 1 ? '' : 's'} — deleting the worktree discards them.</div>
                 </Show>
               </Show>
-              <Show when={closeErr()}><div class="action-error">{closeErr()}</div></Show>
+              <Show when={closeErr()}><div class="action-error" style={{ 'white-space': 'pre-wrap' }}>{closeErr()}</div></Show>
               <div class="close-actions">
                 <button type="button" class="overlay-btn" onClick={() => setCloseOpen(false)}>Cancel</button>
+                <Show when={teardownFailed()}>
+                  <button type="button" class="overlay-btn close-confirm" onClick={() => void confirmClose(true)}>Close anyway (skip teardown)</button>
+                </Show>
                 <button type="button" class="overlay-btn close-confirm" onClick={() => void confirmClose()}>Close task</button>
               </div>
             </div>

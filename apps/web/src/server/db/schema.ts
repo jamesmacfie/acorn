@@ -275,6 +275,7 @@ export const workspaces = sqliteTable('workspaces', {
   sort: integer('sort').notNull().default(0), // selector ordering
   setupScript: text('setup_script'), // shell command run once when a task worktree is created; null/blank = none
   setupScriptTrigger: text('setup_script_trigger'), // 'off' | 'created' | 'terminal' — when to run it; null → 'terminal'
+  teardownScript: text('teardown_script'), // shell command run in the worktree just before removal (docs/next 02); null/blank = none
   previewMode: text('preview_mode'), // 'url' | 'port' | 'script' — how the browser-preview URL is resolved; null → dev-server port
   previewValue: text('preview_value'), // the URL, port, or shell command per previewMode; null/blank = unset
   icon: text('icon'), // JSON WorkspaceIcon ({"kind":"emoji","value":"🌰"} | {"kind":"lucide",…} | {"kind":"github"}); null → derived default
