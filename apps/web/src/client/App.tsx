@@ -19,6 +19,8 @@ import AccountMenu from './AccountMenu'
 import SettingsModal from './features/settings/SettingsModal'
 import TerminalPanel from './features/terminal/TerminalPanel'
 import CommandPalette from './features/palette/CommandPalette'
+import NotificationBell from './features/notifications/NotificationBell'
+import { hydrateNotices, markTaskRead, notices, serializeNotices } from './features/notifications/notifications'
 import { initSessions } from './features/terminal/sessions'
 import TabRail from './features/tabs/TabRail'
 import { activeTaskId, hydrateTaskLayouts, isTerminalOpen, selectedSource, setActiveTaskId, setSelectedSource, setTerminalOpen, taskLayouts } from './features/tasks/tasks'
@@ -153,6 +155,7 @@ export default function App() {
     } catch {
       /* ignore malformed pane map */
     }
+    hydrateNotices(prefs.data.notices)
   })
 
   // Persist the current view so a relaunch reopens it. Separate effects so each writes only when its
@@ -173,6 +176,10 @@ export default function App() {
   createEffect(() => {
     const layouts = taskLayouts()
     if (restored()) void setPref('task_layouts', JSON.stringify(layouts))
+  })
+  createEffect(() => {
+    void notices()
+    if (restored()) void setPref('notices', serializeNotices())
   })
 
   // Left-pane collapse, persisted via the `left_collapsed` pref. Seed the local signal from prefs
@@ -314,6 +321,16 @@ export default function App() {
           </Show>
         </div>
         <div class="topbar-side topbar-end">
+          <NotificationBell
+            onSelectTask={(taskId) => {
+              const t = tasks.data?.find((x) => x.id === taskId)
+              if (!t) return
+              setSelectedSource(null)
+              setActiveTaskId(taskId)
+              markTaskRead(taskId)
+              navigate(`/${t.repoOwner}/${t.repoName}${t.pullNumber != null ? `/${t.pullNumber}` : ''}`)
+            }}
+          />
           <Show when={terminalEnabled && inTaskView()}>
             <button type="button" class="theme-toggle" title="Terminal" aria-pressed={termOpen()} onClick={toggleTerm}>
               ▣

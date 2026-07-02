@@ -1,0 +1,81 @@
+/* Notification bell + popover (docs/next 05). Popovers are the only elevated surface. */
+.notify-bell { position: relative; }
+.notify-count {
+  position: absolute;
+  top: 0;
+  right: -2px;
+  min-width: 14px;
+  height: 14px;
+  padding: 0 3px;
+  font-size: 10px;
+  line-height: 14px;
+  text-align: center;
+  color: var(--bg);
+  background: var(--del-marker);
+  border-radius: 7px;
+  pointer-events: none;
+}
+.notify-popover {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  z-index: 40;
+  width: 340px;
+  background: var(--bg);
+  border: 1px solid var(--border-strong);
+  box-shadow: 0 4px 16px var(--shadow-popover);
+}
+.notify-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 10px;
+  font-size: var(--fs-sm);
+  color: var(--text-muted);
+  border-bottom: 1px solid var(--border);
+}
+.notify-mark-all {
+  font: inherit;
+  font-size: var(--fs-sm);
+  color: var(--text-muted);
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+}
+.notify-mark-all:hover { color: var(--text); }
+.notify-list { list-style: none; margin: 0; padding: 0; max-height: 50vh; overflow-y: auto; }
+.notify-empty { padding: 12px; font-size: var(--fs-sm); }
+.notify-row {
+  width: 100%;
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 6px 10px;
+  font: inherit;
+  font-size: var(--fs-sm);
+  text-align: left;
+  color: var(--text-muted);
+  background: transparent;
+  border: 0;
+  border-bottom: 1px solid var(--border);
+  cursor: pointer;
+}
+.notify-row:hover { background: var(--bg-hover); }
+.notify-row.unread { color: var(--text); }
+.notify-glyph { flex: none; }
+.notify-warn { color: var(--warn); }
+.notify-title { flex: none; }
+.notify-detail { flex: 1; min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.notify-time { flex: none; margin-left: auto; }
+
+/* Rail needs-input marker (docs/next 05): unread notice on a task row. */
+.tabrail-needs {
+  position: absolute;
+  top: 4px;
+  right: 5px;
+  font-size: 11px;
+  line-height: 1;
+  color: var(--warn);
+  pointer-events: none;
+  z-index: 1;
+}
