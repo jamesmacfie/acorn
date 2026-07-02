@@ -1,0 +1,45 @@
+/* ChangesPane (docs/next 04 §B): file list + local diff, flat/1px-bordered per docs/ui-design.md. */
+.changes-pane { display: flex; flex-direction: column; overflow: hidden; padding: 0; }
+.changes-body { flex: 1; min-height: 0; display: flex; }
+.changes-list {
+  flex: 0 0 clamp(200px, 18vw, 300px);
+  min-width: 0;
+  overflow-y: auto;
+  border-right: 1px solid var(--border);
+  background: var(--bg-subtle);
+}
+.changes-group-title {
+  padding: 6px 10px 2px;
+  font-size: var(--fs-sm);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.changes-row {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  font: inherit;
+  font-size: var(--fs-sm);
+  text-align: left;
+  color: var(--text);
+  background: transparent;
+  border: 0;
+  border-left: 2px solid transparent;
+  cursor: pointer;
+}
+.changes-row:hover { background: var(--bg-hover); }
+.changes-row.active { background: var(--bg-selected); border-left-color: var(--accent); }
+.changes-row-path {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  direction: rtl; /* keep the filename end visible */
+  text-align: left;
+  font-family: var(--font-mono);
+}
+.changes-empty { padding: 10px; font-size: var(--fs-sm); }
+.changes-diff { flex: 1; min-width: 0; overflow: auto; }
