@@ -48,6 +48,10 @@ export type TerminalApi = {
     changes(taskId: string): Promise<LocalChange[]>
     diff(taskId: string, path: string, scope: 'unstaged' | 'staged'): Promise<{ patch: string } | { error: string }>
     blob(taskId: string, path: string, ref?: string): Promise<{ text: string } | { error: string }>
+    stage(taskId: string, path: string): Promise<{ ok: boolean; reason?: string }>
+    unstage(taskId: string, path: string): Promise<{ ok: boolean; reason?: string }>
+    discard(taskId: string, path: string, untracked?: boolean): Promise<{ ok: boolean; reason?: string }>
+    commit(taskId: string, message: string): Promise<{ ok: boolean; reason?: string }>
   }
 
   task: {

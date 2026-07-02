@@ -5,7 +5,19 @@ import { join } from 'node:path'
 import gitdiffParser from 'gitdiff-parser'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { synth } from '../client/diff'
-import { isValidRelPath, localChanges, localDiff, localFileBlob, mergeNumstat, parsePorcelainV2, stripToHunks } from './localDiff'
+import {
+  commitStaged,
+  discardFile,
+  isValidRelPath,
+  localChanges,
+  localDiff,
+  localFileBlob,
+  mergeNumstat,
+  parsePorcelainV2,
+  stageFile,
+  stripToHunks,
+  unstageFile,
+} from './localDiff'
 
 describe('parsePorcelainV2 (pure)', () => {
   it('parses modified/added/deleted/untracked with staged split', () => {
@@ -113,6 +125,38 @@ describe('local diff over a real worktree', () => {
     expect((await localFileBlob(dir, 'src/a.ts')).text).toBe('line1\nline2\nline3\n')
     await expect(localFileBlob(dir, '../etc')).rejects.toThrow('Invalid path')
     await expect(localFileBlob(dir, 'src/a.ts', '--evil')).rejects.toThrow('Invalid ref')
+  })
+
+  it('stage/unstage/discard/commit land the reviewed work (docs/next 04 P4)', async () => {
+    // stage → commit
+    writeFileSync(join(dir, 'src', 'a.ts'), 'line1\nCOMMIT ME\nline3\n')
+    expect(await stageFile(dir, 'src/a.ts')).toEqual({ ok: true })
+    expect((await localChanges(dir))[0]).toMatchObject({ staged: true })
+    expect(await commitStaged(dir, 'feat: change a')).toEqual({ ok: true })
+    expect(await localChanges(dir)).toEqual([])
+    expect(git('log', '-1', '--pretty=%s').trim()).toBe('feat: change a')
+    expect(git('show', 'HEAD:src/a.ts')).toContain('COMMIT ME')
+
+    // unstage
+    writeFileSync(join(dir, 'src', 'a.ts'), 'line1\nUNSTAGE\nline3\n')
+    await stageFile(dir, 'src/a.ts')
+    expect(await unstageFile(dir, 'src/a.ts')).toEqual({ ok: true })
+    expect((await localChanges(dir))[0]).toMatchObject({ staged: false })
+
+    // discard tracked (post-confirm path)
+    expect(await discardFile(dir, 'src/a.ts', false)).toEqual({ ok: true })
+    expect(await localChanges(dir)).toEqual([])
+    expect(git('show', 'HEAD:src/a.ts')).not.toContain('UNSTAGE')
+
+    // discard untracked = clean
+    writeFileSync(join(dir, 'junk.txt'), 'x')
+    expect(await discardFile(dir, 'junk.txt', true)).toEqual({ ok: true })
+    expect(await localChanges(dir)).toEqual([])
+
+    // guards
+    expect((await stageFile(dir, '../evil')).ok).toBe(false)
+    expect((await commitStaged(dir, '  ')).ok).toBe(false)
+    expect((await commitStaged(dir, 'nothing staged')).ok).toBe(false) // git refuses an empty commit
   })
 
   it('stripToHunks drops the git header only', () => {
