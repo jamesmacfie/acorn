@@ -24,7 +24,7 @@ export type TerminalApi = {
   // Run targets (docs/next 13 §A): list with live status, start/stop/status, and the default
   // target's URL for the browser/preview home.
   run: {
-    targets(taskId: string): Promise<{ targets: RunTargetInfo[] } | { error: string }>
+    targets(taskId: string): Promise<{ targets: RunTargetInfo[]; errors: { source: string; message: string }[] } | { error: string }>
     start(taskId: string, targetId: string): Promise<{ ok: boolean; reason?: string; sessionId?: string }>
     stop(taskId: string, targetId: string): Promise<{ ok: boolean; reason?: string }>
     status(taskId: string, targetId: string): Promise<RunStatus>

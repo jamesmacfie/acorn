@@ -1,0 +1,46 @@
+/* Command palette (docs/next 13 §D): flat, square, 1px borders per docs/ui-design.md. */
+.overlay.palette { width: min(560px, 90vw); padding: 0; }
+.palette-input {
+  width: 100%;
+  padding: 10px 12px;
+  font: inherit;
+  font-size: var(--fs);
+  color: var(--text);
+  background: var(--bg);
+  border: 0;
+  border-bottom: 1px solid var(--border);
+  outline: none;
+}
+.palette-list {
+  list-style: none;
+  margin: 0;
+  padding: 4px 0;
+  max-height: 50vh;
+  overflow-y: auto;
+}
+.palette-row {
+  width: 100%;
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  padding: 6px 12px;
+  font: inherit;
+  font-size: var(--fs-sm);
+  text-align: left;
+  color: var(--text);
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+}
+.palette-row.selected { background: var(--bg-selected); }
+.palette-row.palette-error { color: var(--del-marker); cursor: default; }
+.palette-label { flex: none; }
+.palette-hint {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  font-family: var(--font-mono);
+}
+.palette-empty { padding: 10px 12px; font-size: var(--fs-sm); }
