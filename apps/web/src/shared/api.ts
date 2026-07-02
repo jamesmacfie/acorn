@@ -205,6 +205,7 @@ export const workspaceProjectsRoute = (id: string) => `/api/workspaces/${id}/pro
 // Tasks (single-repo units of work) — rail rows.
 export const tasksRoute = '/api/tasks'
 export const taskRoute = (id: string) => `/api/tasks/${id}`
+export const taskLinksRoute = (id: string) => `/api/tasks/${id}/links`
 export const integrationsRoute = '/api/integrations'
 export const integrationRoute = (id: string) => `/api/integrations/${id}`
 export const linearIssuesRoute = '/api/linear/issues'
