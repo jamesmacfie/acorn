@@ -170,6 +170,19 @@ export type TaskSeed = {
   links?: TaskLink[]
 }
 
+// Assembled task context (docs/next 11 §C): everything attached to a task, composed once and
+// consumed by both push (formatContextBlock → sendToAgent) and pull (MCP task_context).
+export type TaskContextInclude = 'pr' | 'issues' | 'notes' | 'memory'
+export type TaskContext = {
+  task: { id: string; title: string; repo: string; branch: string; worktreePath: string | null; pullNumber: number | null }
+  pr?: { number: number; title: string; body: string | null; changedFiles: string[] }
+  issues: { provider: string; identifier: string; title: string; detail: string }[]
+  notes: { title: string; body: string }[]
+  memory: { name: string; description: string }[]
+}
+export const taskContextRoute = (id: string, include?: TaskContextInclude[]) =>
+  `/api/tasks/${id}/context${include?.length ? `?include=${include.join(',')}` : ''}`
+
 // Local review notes (docs/next 04 §C): inline annotations on uncommitted changes, acorn-owned.
 export type ReviewNote = {
   id: string

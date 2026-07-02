@@ -18,6 +18,7 @@ import { mentions } from './routes/mentions'
 import { repos } from './routes/repos'
 import { repoLabels } from './routes/repoLabels'
 import { reviewNotes } from './routes/reviewNotes'
+import { taskContext } from './routes/taskContext'
 import { workspaces } from './routes/workspaces'
 import { tasks } from './routes/tasks'
 
@@ -35,6 +36,7 @@ export function createApp() {
     .route('/api/workspaces', workspaces)
     .route('/api/tasks', tasks)
     .route('/api/tasks', reviewNotes) // /:id/review-notes — local inline notes (docs/next 04 §C)
+    .route('/api/tasks', taskContext) // /:id/context — the assembled task context (docs/next 11 §C)
     .route('/api/integrations', integrations) // connect/disconnect/status for third-party providers
     .route('/api/linear', linear) // Linear issues referenced from a PR (read, cached per-user)
     .route('/api/repos', repos)
