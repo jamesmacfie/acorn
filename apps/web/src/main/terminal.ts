@@ -5,7 +5,7 @@ import { randomUUID } from 'node:crypto'
 import { promisify } from 'node:util'
 import { existsSync, realpathSync, statSync } from 'node:fs'
 import { readdir, readFile, writeFile } from 'node:fs/promises'
-import { dirname, isAbsolute, resolve, sep } from 'node:path'
+import { dirname, isAbsolute, join, resolve, sep } from 'node:path'
 import { homedir } from 'node:os'
 import { and, eq } from 'drizzle-orm'
 import type { AppDatabase } from '../server/db'
@@ -32,6 +32,7 @@ import { getProfile, listProfiles, resolveCommand, tmuxAvailable } from './profi
 import { loadRepoConfig } from './repoConfig'
 import { getRepoPath, setEditorCommand, setRepoPath, setRunConfig, setRunTargets } from './repoPaths'
 import { RuntimeService } from './runtime'
+import { NotesStore, type NoteKind } from './notes'
 import { copyWorktreeFiles, ensureWorktree, worktreePorcelain } from './worktrees'
 
 // vNext Phase 2: PTYs live in the main process. Sessions run on one of two backends —
@@ -515,6 +516,34 @@ async function reconcileTmux(db: AppDatabase) {
 // side (vNext §5, §11). Exited sessions linger until explicitly removed (term:remove).
 export async function registerTerminalIpc(db: AppDatabase, worktreesDir: string) {
   worktreesRoot = worktreesDir
+
+  // Workspace notes (docs/next 09 P1): files under <dataDir>/notes/<workspaceId>/, beside the
+  // worktrees dir. ONE store — the UI reads it here; the MCP notes_* tools reuse it.
+  const notesStore = new NotesStore(join(dirname(worktreesDir), 'notes'))
+  const guard = async <T>(fn: () => Promise<T>): Promise<T | { error: string }> => {
+    try {
+      return await fn()
+    } catch (e) {
+      return { error: e instanceof Error ? e.message : 'notes failed' }
+    }
+  }
+  ipcMain.handle('notes:list', (_e: IpcMainInvokeEvent, workspaceId: string) => guard(() => notesStore.list(String(workspaceId))))
+  ipcMain.handle('notes:read', (_e: IpcMainInvokeEvent, p: { workspaceId: string; slug: string }) => guard(() => notesStore.read(p.workspaceId, p.slug)))
+  ipcMain.handle('notes:create', (_e: IpcMainInvokeEvent, p: { workspaceId: string; title: string; kind?: NoteKind }) =>
+    guard(() => notesStore.create(p.workspaceId, String(p.title ?? ''), { kind: p.kind })),
+  )
+  ipcMain.handle('notes:write', (_e: IpcMainInvokeEvent, p: { workspaceId: string; slug: string; body: string }) =>
+    guard(async () => {
+      await notesStore.write(p.workspaceId, p.slug, String(p.body ?? ''))
+      return { ok: true }
+    }),
+  )
+  ipcMain.handle('notes:remove', (_e: IpcMainInvokeEvent, p: { workspaceId: string; slug: string }) =>
+    guard(async () => {
+      await notesStore.remove(p.workspaceId, p.slug)
+      return { ok: true }
+    }),
+  )
 
   // Runtime service (docs/next 13 §A): run targets as terminal sessions in the task worktree.
   // Short-lived scripts (stop / url_command) run out-of-band with the same ACORN_* env.

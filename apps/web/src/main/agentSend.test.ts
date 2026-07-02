@@ -82,12 +82,12 @@ describe('live PTY delivery (cat)', () => {
     pty.onData((d) => {
       ring += d
     })
-    await new Promise((r) => setTimeout(r, 300)) // let stty apply before writing
+    await new Promise((r) => setTimeout(r, 700)) // let the shell + stty settle before writing
     const sender = new AgentSender(() => ({ write: (d) => pty.write(d), running: () => true, idle: () => true }))
     const res = sender.send('cat', 'line one\nline two', 'draft')
     expect(res.ok).toBe(true)
-    const deadline = Date.now() + 3000
-    while (!ring.includes('line two') && Date.now() < deadline) await new Promise((r) => setTimeout(r, 25))
+    const deadline = Date.now() + 8000
+    while (!ring.includes(PASTE_END) && Date.now() < deadline) await new Promise((r) => setTimeout(r, 25))
     pty.kill()
     // The ring shows exactly one bracketed block (echo + cat's own output interleave, so assert
     // marker counts + content, not byte positions).

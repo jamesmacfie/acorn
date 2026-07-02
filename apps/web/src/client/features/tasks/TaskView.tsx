@@ -9,6 +9,7 @@ import LinearIssuePanel from '../integrations/LinearIssuePanel'
 import EditorPane from '../editor/EditorPane'
 import ChangesPane from '../changes/ChangesPane'
 import ContextTray from '../context/ContextTray'
+import NotesPane from '../notes/NotesPane'
 import { workspaceForRepo } from '../workspaces/activeWorkspace'
 import { refreshSessions } from '../terminal/sessions'
 import { terminalApi } from '../terminal/terminalClient'
@@ -281,6 +282,7 @@ export default function TaskView(props: {
     }
     if (pane === 'editor') return <EditorPane task={props.task} />
     if (pane === 'changes') return <ChangesPane task={props.task} />
+    if (pane === 'notes') return <NotesPane task={props.task} workspace={previewWs()} />
     if (pane === 'linear') {
       return (
         <section class="pane pane-empty">
@@ -357,6 +359,7 @@ export default function TaskView(props: {
           </For>
         </Show>
         <button type="button" class="pane-switch-btn" classList={{ active: showsPane('changes'), pinned: layout().pinned === 'changes' }} title="Changes (uncommitted)" onClick={() => onSwitch('changes')}>⎇</button>
+        <button type="button" class="pane-switch-btn" classList={{ active: showsPane('notes'), pinned: layout().pinned === 'notes' }} title="Notes (workspace)" onClick={() => onSwitch('notes')}>📝</button>
         <button type="button" class="pane-switch-btn" classList={{ active: showsPane('preview'), pinned: layout().pinned === 'preview' }} title="Browser preview" onClick={() => onSwitch('preview')}>◍</button>
         <button type="button" class="pane-switch-btn" classList={{ active: showsPane('editor'), pinned: layout().pinned === 'editor' }} title="Editor" onClick={() => onSwitch('editor')}>✎</button>
         <button type="button" class="pane-switch-btn" title="Open in external editor" onClick={() => void openExternally()}>↗</button>

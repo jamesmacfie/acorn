@@ -82,6 +82,15 @@ contextBridge.exposeInMainWorld('acorn', {
       }
     },
   },
+  // Workspace notes (docs/next 09): .md files with frontmatter under the app data dir; the pane
+  // and (later) the MCP notes_* tools share the one main-process store.
+  notes: {
+    list: (workspaceId: string) => ipcRenderer.invoke('notes:list', workspaceId),
+    read: (workspaceId: string, slug: string) => ipcRenderer.invoke('notes:read', { workspaceId, slug }),
+    create: (workspaceId: string, title: string, kind?: string) => ipcRenderer.invoke('notes:create', { workspaceId, title, kind }),
+    write: (workspaceId: string, slug: string, body: string) => ipcRenderer.invoke('notes:write', { workspaceId, slug, body }),
+    remove: (workspaceId: string, slug: string) => ipcRenderer.invoke('notes:remove', { workspaceId, slug }),
+  },
   // Monaco editor pane: read/write files on the task's worktree. Separate bridge from `terminal`
   // (own IPC channels), though the handlers share the main-process git/worktree resolution.
   editor: {
