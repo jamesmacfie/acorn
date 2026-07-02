@@ -84,6 +84,20 @@ export function childEnv(env: NodeJS.ProcessEnv = process.env): Record<string, s
   return out
 }
 
+// Bracketed paste (docs/next 04 §D): agent TUIs treat the wrapped payload as ONE pasted block, so
+// multi-line prompts don't submit per-line. Sanitize: strip any stray paste markers from the
+// payload (a payload containing ESC[201~ would end the paste early — the injection risk) and trim
+// trailing whitespace so a submit '\r' is the only terminator.
+export const PASTE_BEGIN = '\x1b[200~'
+export const PASTE_END = '\x1b[201~'
+// eslint-disable-next-line no-control-regex
+const PASTE_MARKERS = /\x1b\[20[01]~/g
+
+export function wrapBracketedPaste(text: string): string {
+  const sanitized = text.replace(PASTE_MARKERS, '').replace(/[\s\r\n]+$/, '')
+  return `${PASTE_BEGIN}${sanitized}${PASTE_END}`
+}
+
 // Task identity fields a session env needs — a projection of the tasks row, so this stays free of
 // drizzle types and testable under plain Node.
 export type SessionTaskInfo = { repoOwner: string; repoName: string; branch: string; title: string }
