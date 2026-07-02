@@ -96,3 +96,6 @@
   cursor: pointer;
 }
 .review-note-delete:hover { color: var(--del-marker); }
+
+/* Commit box (docs/next 04 P4) at the bottom of the file list. */
+.changes-commit { display: flex; flex-direction: column; gap: 6px; padding: 8px 10px; border-top: 1px solid var(--border); }

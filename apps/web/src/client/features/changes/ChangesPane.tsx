@@ -102,6 +102,26 @@ export default function ChangesPane(props: { task: Task }) {
     await refetchNotes()
   }
 
+  // Stage/commit actions (docs/next 04 P4). Discard is destructive → explicit confirm.
+  const [commitMsg, setCommitMsg] = createSignal('')
+  async function gitAction(fn: () => Promise<{ ok: boolean; reason?: string }>) {
+    const res = await fn()
+    if (!res.ok && res.reason) window.alert(res.reason)
+    await refetch()
+  }
+  async function discard(path: string, untracked: boolean) {
+    if (!api) return
+    if (!window.confirm(`Discard changes to ${path}? This cannot be undone.`)) return
+    await gitAction(() => api.local.discard(props.task.id, path, untracked))
+  }
+  async function commit() {
+    if (!api || !commitMsg().trim()) return
+    const res = await api.local.commit(props.task.id, commitMsg())
+    if (!res.ok) return window.alert(res.reason ?? 'Commit failed.')
+    setCommitMsg('')
+    await refetch()
+  }
+
   const notesForRow = (r: CodeRow): ReviewNote[] => {
     const a = anchorOf(r)
     if (!a) return []
@@ -158,6 +178,17 @@ export default function ChangesPane(props: { task: Task }) {
                             <span class="file-stat del">&#8722;{c.deletions ?? 0}</span>
                           </Show>
                         </button>
+                        <Show
+                          when={c.staged}
+                          fallback={
+                            <>
+                              <button type="button" class="changes-to-agent" title="Stage file" onClick={() => api && void gitAction(() => api.local.stage(props.task.id, c.path))}>+</button>
+                              <button type="button" class="changes-to-agent" title="Discard changes (confirm)" onClick={() => void discard(c.path, c.status === 'untracked')}>↺</button>
+                            </>
+                          }
+                        >
+                          <button type="button" class="changes-to-agent" title="Unstage file" onClick={() => api && void gitAction(() => api.local.unstage(props.task.id, c.path))}>−</button>
+                        </Show>
                         <button
                           type="button"
                           class="changes-to-agent"
@@ -173,6 +204,21 @@ export default function ChangesPane(props: { task: Task }) {
           </For>
           <Show when={!groups().staged.length && !groups().unstaged.length}>
             <p class="muted changes-empty">Working tree clean.</p>
+          </Show>
+          <Show when={groups().staged.length}>
+            <div class="changes-commit">
+              <input
+                class="integration-key-input"
+                type="text"
+                placeholder="Commit message"
+                value={commitMsg()}
+                onInput={(e) => setCommitMsg(e.currentTarget.value)}
+                onKeyDown={(e) => e.key === 'Enter' && void commit()}
+              />
+              <button type="button" class="overlay-btn" disabled={!commitMsg().trim()} onClick={() => void commit()}>
+                Commit staged
+              </button>
+            </div>
           </Show>
         </div>
         <div class="diff compare-diff changes-diff">

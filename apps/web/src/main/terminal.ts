@@ -26,7 +26,7 @@ import {
   trimRing,
 } from './terminalUtils'
 import { buildEditorArgv } from './editorLaunch'
-import { localChanges, localDiff, localFileBlob, type LocalScope } from './localDiff'
+import { commitStaged, discardFile, localChanges, localDiff, localFileBlob, stageFile, unstageFile, type LocalScope } from './localDiff'
 import { getProfile, listProfiles, resolveCommand, tmuxAvailable } from './profiles'
 import { loadRepoConfig } from './repoConfig'
 import { getRepoPath, setEditorCommand, setRepoPath, setRunConfig, setRunTargets } from './repoPaths'
@@ -682,6 +682,24 @@ export async function registerTerminalIpc(db: AppDatabase, worktreesDir: string)
       return { error: e instanceof Error ? e.message : 'read failed' }
     }
   })
+
+  // Stage/commit actions (docs/next 04 P4). Discard is destructive — the renderer confirms before
+  // calling; main still keeps the path validation.
+  const withRoot = async (taskId: string, fn: (root: string) => Promise<{ ok: boolean; reason?: string }>) => {
+    const root = await taskRoot(db, taskId)
+    if (!root) return { ok: false, reason: 'No worktree yet.' }
+    const res = await fn(root)
+    broadcastStatus() // dirty markers move immediately
+    return res
+  }
+  ipcMain.handle('local:stage', (_e: IpcMainInvokeEvent, p: { taskId: string; path: string }) => withRoot(p?.taskId, (root) => stageFile(root, p.path)))
+  ipcMain.handle('local:unstage', (_e: IpcMainInvokeEvent, p: { taskId: string; path: string }) => withRoot(p?.taskId, (root) => unstageFile(root, p.path)))
+  ipcMain.handle('local:discard', (_e: IpcMainInvokeEvent, p: { taskId: string; path: string; untracked?: boolean }) =>
+    withRoot(p?.taskId, (root) => discardFile(root, p.path, !!p.untracked)),
+  )
+  ipcMain.handle('local:commit', (_e: IpcMainInvokeEvent, p: { taskId: string; message: string }) =>
+    withRoot(p?.taskId, (root) => commitStaged(root, typeof p.message === 'string' ? p.message : '')),
+  )
 
   // Monaco editor pane (docs/workspaces): read/write files on the task's worktree. Local-only, so
   // IPC not HTTP. All calls are keyed by taskId + a relative path confined to the worktree root by

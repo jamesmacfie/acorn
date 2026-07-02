@@ -122,6 +122,45 @@ export async function localDiff(worktree: string, path: string, scope: LocalScop
   return { patch: stripToHunks(stdout) }
 }
 
+// --- Stage/commit actions (docs/next 04 P4): one-line git calls; the pane can land the work it
+// reviewed. Stops here per the doc — no hunk staging, no rebase UI. ---
+
+export type GitActionResult = { ok: true } | { ok: false; reason: string }
+
+const run = async (worktree: string, args: string[]): Promise<GitActionResult> => {
+  try {
+    await exec('git', ['-C', worktree, ...args], { timeout: 30_000 })
+    return { ok: true }
+  } catch (err) {
+    const e = err as { stderr?: string; message?: string }
+    return { ok: false, reason: (e.stderr || e.message || 'git failed').trim().slice(0, 400) }
+  }
+}
+
+export async function stageFile(worktree: string, path: string): Promise<GitActionResult> {
+  if (!isValidRelPath(path)) return { ok: false, reason: 'Invalid path.' }
+  return run(worktree, ['add', '--', path])
+}
+
+export async function unstageFile(worktree: string, path: string): Promise<GitActionResult> {
+  if (!isValidRelPath(path)) return { ok: false, reason: 'Invalid path.' }
+  return run(worktree, ['restore', '--staged', '--', path])
+}
+
+// Discard = restore the worktree copy (destructive — the caller MUST confirm first). Untracked
+// files aren't restorable; delete them via git clean, scoped to the one path.
+export async function discardFile(worktree: string, path: string, untracked: boolean): Promise<GitActionResult> {
+  if (!isValidRelPath(path)) return { ok: false, reason: 'Invalid path.' }
+  return untracked ? run(worktree, ['clean', '-f', '--', path]) : run(worktree, ['restore', '--', path])
+}
+
+// Commit whatever is staged. `--` never applies: -m is fixed and message is a value argv.
+export async function commitStaged(worktree: string, message: string): Promise<GitActionResult> {
+  const msg = message.trim()
+  if (!msg) return { ok: false, reason: 'Commit message required.' }
+  return run(worktree, ['commit', '-m', msg])
+}
+
 // Read a file's content at a ref (context expansion / before-side). ref is a commit-ish; guard the
 // argv like resolveBaseRef does.
 export async function localFileBlob(worktree: string, path: string, ref = 'HEAD'): Promise<{ text: string }> {

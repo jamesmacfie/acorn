@@ -43,6 +43,11 @@ contextBridge.exposeInMainWorld('acorn', {
       changes: (taskId: string) => ipcRenderer.invoke('local:changes', taskId),
       diff: (taskId: string, path: string, scope: 'unstaged' | 'staged') => ipcRenderer.invoke('local:diff', { taskId, path, scope }),
       blob: (taskId: string, path: string, ref?: string) => ipcRenderer.invoke('local:blob', { taskId, path, ref }),
+      // Stage/commit actions (docs/next 04 P4). Discard is confirmed in the renderer first.
+      stage: (taskId: string, path: string) => ipcRenderer.invoke('local:stage', { taskId, path }),
+      unstage: (taskId: string, path: string) => ipcRenderer.invoke('local:unstage', { taskId, path }),
+      discard: (taskId: string, path: string, untracked?: boolean) => ipcRenderer.invoke('local:discard', { taskId, path, untracked }),
+      commit: (taskId: string, message: string) => ipcRenderer.invoke('local:commit', { taskId, message }),
     },
     // Resolve a workspace's browser-preview URL by running its configured script in the task's
     // worktree (script mode only — url/port are computed client-side). Returns the trimmed stdout.
