@@ -4,7 +4,7 @@
 // separate calls). The TaskLayout type is the seam for a future recursive tree.
 // ponytail: 2 slots, not a LayoutNode tree — side-by-side is the real ergonomics here.
 
-export type PaneId = 'pr' | 'linear' | 'preview' | 'editor' | 'changes' | 'notes' | 'browser'
+export type PaneId = 'pr' | 'linear' | 'rollbar' | 'preview' | 'editor' | 'changes' | 'notes' | 'browser'
 
 export type TaskLayout = {
   panes: [PaneId] | [PaneId, PaneId] // left→right
@@ -27,7 +27,7 @@ export type LayoutAction =
 export const DEFAULT_PANE: PaneId = 'pr'
 export const defaultLayout = (pane: PaneId = DEFAULT_PANE): TaskLayout => ({ panes: [pane], pinned: null, maximised: null })
 
-const PANE_IDS: readonly PaneId[] = ['pr', 'linear', 'preview', 'editor', 'changes', 'notes', 'browser']
+const PANE_IDS: readonly PaneId[] = ['pr', 'linear', 'rollbar', 'preview', 'editor', 'changes', 'notes', 'browser']
 export const isPaneId = (v: unknown): v is PaneId => typeof v === 'string' && (PANE_IDS as readonly string[]).includes(v)
 
 const clampRatio = (r: number): number => Math.min(0.8, Math.max(0.2, r))

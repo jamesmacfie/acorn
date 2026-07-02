@@ -29,6 +29,7 @@ import { parseTaskLayouts } from './features/tasks/layout'
 import { initTaskStatuses } from './features/tasks/taskStatus'
 import TaskView from './features/tasks/TaskView'
 import LinearBrowse from './features/tasks/LinearBrowse'
+import RollbarBrowse from './features/tasks/RollbarBrowse'
 import Acorn from './Acorn'
 
 // vNext Phase 0 flag: terminal only exists on desktop (Electron IPC) and stays behind a flag —
@@ -417,6 +418,9 @@ export default function App() {
       >
         <Match when={selectedSource() === 'linear'}>
           <LinearBrowse />
+        </Match>
+        <Match when={selectedSource() === 'rollbar'}>
+          <RollbarBrowse />
         </Match>
         <Match when={!selectedSource() && activeTask()}>
           {(task) => (

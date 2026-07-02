@@ -8,7 +8,7 @@ import { applyLayoutAction, defaultLayout, type LayoutAction, type PaneId, type 
 export type { PaneId, TaskLayout } from './layout'
 
 // Which browse Source is selected, or null when a task is the active view (docs/workspaces 04).
-export type SourceId = 'github' | 'linear'
+export type SourceId = 'github' | 'linear' | 'rollbar'
 const [selectedSource, setSelectedSource] = createSignal<SourceId | null>('github')
 
 // The active task (its terminals scope to this; its view shows when no Source is selected).

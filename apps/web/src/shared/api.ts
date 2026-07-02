@@ -107,6 +107,25 @@ export type LinearProjectsResponse = { projects: LinearProject[] }
 export type LinearProjectIssue = LinearIssueSummary & { integrationId: string; branchName: string | null }
 export type LinearProjectIssuesResponse = { issues: LinearProjectIssue[] }
 
+// --- Rollbar (docs/next 10): deduped error items, cached into `issues` — zero new schema. ---
+export type RollbarItem = {
+  integrationId: string
+  identifier: string // the visible item counter ('142')
+  title: string
+  level: string
+  environment: string
+  status: string
+  totalOccurrences: number
+  firstOccurrenceAt: number | null
+  lastOccurrenceAt: number | null
+}
+export type RollbarItemsResponse = { items: RollbarItem[] }
+export const rollbarItemsRoute = '/api/rollbar/items'
+export const rollbarItemRoute = (integrationId: string, identifier: string) =>
+  `/api/rollbar/items/${encodeURIComponent(identifier)}?integration=${encodeURIComponent(integrationId)}`
+export const rollbarItemsKey = ['rollbar-items'] as const
+export const rollbarItemKey = (integrationId: string, identifier: string) => ['rollbar-item', integrationId, identifier] as const
+
 // --- Workspaces: named groups of repos (docs/workspaces). The top-level unit. ---
 export type WorkspaceRepo = { owner: string; name: string; sort: number }
 // When the worktree setup script runs: 'off' never, 'created' eagerly when the task is created,

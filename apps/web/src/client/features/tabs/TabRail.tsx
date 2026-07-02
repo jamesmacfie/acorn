@@ -6,6 +6,7 @@ import { archiveTask, createTask, renameTask, setPref } from '../../mutations'
 import { applyRailOrder, isPinned, moveTask, parseRailOrder, pinTask, serializeRailOrder, unpinTask, type RailOrder } from './railOrder'
 import { checksState } from '../../displayMeta'
 import { activeTaskId, paneForTask, selectedSource, setActivePane, setActiveTaskId, setSelectedSource, type SourceId } from '../tasks/tasks'
+import { availableSources } from './sources'
 import { taskStatus } from '../tasks/taskStatus'
 import { workingCountFor } from '../terminal/sessions'
 import { markTaskRead, unreadForTask } from '../notifications/notifications'
@@ -81,12 +82,9 @@ export default function TabRail() {
     return `/${w.repoOwner}/${w.repoName}${w.pullNumber != null ? `/${w.pullNumber}` : ''}`
   }
 
-  // Sources: GitHub always, Linear when connected (docs/workspaces 04). Selecting one fills the
-  // main area with that source's browse view.
-  const sources = (): { id: SourceId; glyph: string; label: string }[] => [
-    { id: 'github', glyph: '◇', label: 'GitHub' },
-    ...((integrations.data?.integrations ?? []).some((i) => i.provider === 'linear' && i.connected) ? [{ id: 'linear' as const, glyph: '◷', label: 'Linear' }] : []),
-  ]
+  // Sources: GitHub always; Linear/Rollbar when connected (docs/workspaces 04, docs/next 10).
+  // Selecting one fills the main area with that source's browse view.
+  const sources = () => availableSources(integrations.data?.integrations)
   function selectSource(id: SourceId) {
     setMenuId(null)
     setSelectedSource(id)

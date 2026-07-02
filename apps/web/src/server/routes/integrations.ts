@@ -20,6 +20,7 @@ import {
   linearFetch,
 } from '../linear'
 import type { AppEnv } from '../middleware/auth'
+import { projectPath, rollbarData, rollbarFetch, type RollbarProject } from '../rollbar'
 import { decryptSecret, encryptSecret } from '../session'
 import type { ConnectIntegrationRequest, Integration, IntegrationsResponse, LinearActivity, LinearIssueDetail, LinearIssuesRequest, LinearIssuesResponse, LinearProject, LinearProjectIssue, LinearProjectIssuesResponse, LinearProjectsResponse } from '../../shared/api'
 
@@ -132,8 +133,28 @@ export const integrations = new Hono<AppEnv>()
     if (!user) return c.json({ error: 'unauthenticated' }, 401)
     const { provider, token } = (await c.req.json().catch(() => ({}))) as Partial<ConnectIntegrationRequest>
     if (!token || typeof token !== 'string') return c.json({ error: 'bad_request' }, 400)
-    // ponytail: only Linear validates today; Rollbar's client is deferred (docs/workspaces 04).
-    if (provider !== 'linear') return c.json({ error: 'unsupported_provider' }, 400)
+    if (provider !== 'linear' && provider !== 'rollbar') return c.json({ error: 'unsupported_provider' }, 400)
+
+    // Rollbar (docs/next 10): a project-read token, validated with one cheap /project call.
+    if (provider === 'rollbar') {
+      let project: RollbarProject
+      try {
+        project = await rollbarData<RollbarProject>(await rollbarFetch(token.trim(), projectPath))
+      } catch {
+        return c.json({ error: 'invalid_key' }, 400)
+      }
+      const row = {
+        id: randomUUID(),
+        userId: user.login,
+        provider: 'rollbar',
+        label: `Rollbar · ${project.name}`,
+        accessToken: await encryptSecret(token.trim(), c.env.SESSION_ENC_KEY),
+        meta: JSON.stringify({ project: project.name, projectId: project.id }),
+        createdAt: Date.now(),
+      }
+      await getDb(c.env).insert(schema.integrations).values(row)
+      return c.json({ integration: rowToIntegration(row) })
+    }
 
     // Validate the key by reading the viewer; reject anything that doesn't authenticate.
     const res = await linearFetch(token.trim(), VIEWER_QUERY, {})

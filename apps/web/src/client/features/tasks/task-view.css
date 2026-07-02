@@ -213,3 +213,39 @@
 .task-divider:hover { background: var(--accent); }
 /* Pinned pane's switcher glyph gets the warn accent (filled-pin stand-in; flat, square). */
 .pane-switch-btn.pinned { border-right-color: var(--warn); color: var(--warn); }
+
+/* Rollbar pane + browse (docs/next 10). */
+.rollbar-pane { display: flex; flex-direction: column; overflow-y: auto; }
+.rollbar-detail { padding: 4px var(--pane-pad); }
+.rollbar-title { font-size: var(--fs-lg); font-weight: 600; margin: 8px 0; }
+.rollbar-level { color: var(--del-marker); font-family: var(--font-mono); font-size: var(--fs-sm); }
+.rollbar-level[data-level='warning'] { color: var(--warn); }
+.rollbar-facts { display: grid; grid-template-columns: auto 1fr; gap: 4px 14px; font-size: var(--fs-sm); margin: 10px 0; }
+.rollbar-facts dt { color: var(--text-muted); }
+.rollbar-facts dd { margin: 0; font-family: var(--font-mono); }
+.rollbar-chips { display: flex; gap: 6px; padding: 6px var(--pane-pad) 0; flex-wrap: wrap; }
+.rollbar-chip {
+  font: inherit;
+  font-size: var(--fs-sm);
+  font-family: var(--font-mono);
+  padding: 2px 8px;
+  color: var(--text-muted);
+  background: var(--bg);
+  border: 1px solid var(--border-strong);
+  cursor: pointer;
+}
+.rollbar-chip.active { color: var(--text); background: var(--bg-selected); }
+.rollbar-row-wrap { display: flex; align-items: stretch; }
+.rollbar-row-wrap .linear-browse-row { flex: 1; min-width: 0; }
+.rollbar-attach {
+  flex: none;
+  font: inherit;
+  font-size: var(--fs-sm);
+  padding: 0 10px;
+  color: var(--text-faint);
+  background: transparent;
+  border: 0;
+  border-bottom: 1px solid var(--border);
+  cursor: pointer;
+}
+.rollbar-attach:hover { color: var(--text); background: var(--bg-hover); }

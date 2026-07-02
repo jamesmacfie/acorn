@@ -39,6 +39,7 @@ export default function IntegrationsSettings() {
   const [key, setKey] = createSignal('')
   const [busy, setBusy] = createSignal(false)
   const [error, setError] = createSignal('')
+  const [provider, setProvider] = createSignal<'linear' | 'rollbar'>('linear')
 
   const refresh = () => qc.invalidateQueries({ queryKey: integrationsKey })
 
@@ -48,12 +49,12 @@ export default function IntegrationsSettings() {
     setBusy(true)
     setError('')
     try {
-      await connectIntegration('linear', k)
+      await connectIntegration(provider(), k)
       setKey('')
       setAdding(false)
       await refresh()
     } catch (e) {
-      setError((e as Error).message === 'invalid_key' ? 'That key was rejected by Linear.' : 'Could not connect.')
+      setError((e as Error).message === 'invalid_key' ? `That key was rejected by ${PROVIDER_LABEL[provider()]}.` : 'Could not connect.')
     } finally {
       setBusy(false)
     }
@@ -101,20 +102,22 @@ export default function IntegrationsSettings() {
       <div class="integration-add-panel" classList={{ open: adding() }}>
         <div class="integration-add-inner">
           <div class="integration-provider-chips">
-            <button type="button" class="integration-chip active">
+            <button type="button" class="integration-chip" classList={{ active: provider() === 'linear' }} onClick={() => setProvider('linear')}>
               <span class="integration-logo-mono" style={{ color: '#5e6ad2' }}>L</span> Linear
             </button>
-            <button type="button" class="integration-chip" disabled>
-              Rollbar <span class="soon">soon</span>
+            <button type="button" class="integration-chip" classList={{ active: provider() === 'rollbar' }} onClick={() => setProvider('rollbar')}>
+              <span class="integration-logo-mono" style={{ color: '#3a6cd4' }}>R</span> Rollbar
             </button>
           </div>
-          <label class="integration-add-label" for="integration-key">Personal API key</label>
+          <label class="integration-add-label" for="integration-key">
+            {provider() === 'rollbar' ? 'Project access token (read)' : 'Personal API key'}
+          </label>
           <div class="integration-key-row">
             <input
               id="integration-key"
               class="integration-key-input"
               type="password"
-              placeholder="lin_api_…"
+              placeholder={provider() === 'rollbar' ? 'read token…' : 'lin_api_…'}
               value={key()}
               onInput={(e) => setKey(e.currentTarget.value)}
               onKeyDown={(e) => e.key === 'Enter' && add()}
@@ -123,7 +126,11 @@ export default function IntegrationsSettings() {
               {busy() ? 'Connecting…' : 'Connect'}
             </button>
           </div>
-          <p class="integration-add-hint muted">Linear → Settings → Security &amp; access → Personal API keys. You can connect more than one workspace.</p>
+          <p class="integration-add-hint muted">
+            {provider() === 'rollbar'
+              ? 'Rollbar → project → Settings → Project Access Tokens (read scope). One connection per project.'
+              : 'Linear → Settings → Security & access → Personal API keys. You can connect more than one workspace.'}
+          </p>
           <Show when={error()}>
             <div class="action-error">{error()}</div>
           </Show>
