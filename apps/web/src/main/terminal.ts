@@ -18,6 +18,7 @@ import {
   childEnv,
   clampDim,
   computeIdle,
+  matchBlockedPrompt,
   parseTmuxSessions,
   resolveBackend,
   tmuxAttachArgs,
@@ -396,7 +397,8 @@ function startIdleWatch() {
     for (const s of sessions.values()) {
       if (computeIdle(s.meta.kind, s.meta.status, s.lastActivityAt, now) && !s.meta.idle) {
         s.meta.idle = true
-        s.meta.agentState = 'idle'
+        // An idle session showing an input prompt in its tail is BLOCKED, not done (05 P3).
+        s.meta.agentState = matchBlockedPrompt(s.ring.slice(-4000)) ? 'blocked' : 'idle'
         agentSender.onIdle(s.meta.id) // flush 'after-ready' sends on the busy→idle edge (04 §D)
         // The OS toast moved to the renderer (docs/next 05): focus-gated + cooldown/dedup there.
         broadcastStatus()
