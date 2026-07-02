@@ -1,4 +1,5 @@
-import { BrowserWindow, dialog, ipcMain, type IpcMainInvokeEvent, type WebContents } from 'electron'
+import { BrowserWindow, dialog, ipcMain, webContents, type IpcMainInvokeEvent, type WebContents } from 'electron'
+import { bindBrowserContents, driverFor } from './browserService'
 import { spawn, type IPty } from 'node-pty'
 import { execFile, execFileSync, spawn as spawnProcess } from 'node:child_process'
 import { randomUUID } from 'node:crypto'
@@ -791,6 +792,29 @@ export async function registerTerminalIpc(db: AppDatabase, worktreesDir: string,
     runStart: (taskId, targetId) => runtime.start(taskId, targetId),
     runStop: (taskId, targetId) => runtime.stop(taskId, targetId),
     runStatus: (taskId, targetId) => runtime.status(taskId, targetId),
+    // Drivable browser (docs/next 08): CDP over the bound preview webview; a missing binding is a
+    // clean structured result (the agent is told to open the preview), never a throw.
+    browserNavigate: async (taskId, url) => driverFor(taskId)?.navigate(url) ?? { ok: false, reason: 'No preview webview for this task — open the browser pane first.' },
+    browserSnapshot: async (taskId) => {
+      const d = driverFor(taskId)
+      return d ? d.takeSnapshot() : { error: 'No preview webview for this task — open the browser pane first.' }
+    },
+    browserClick: async (taskId, ref) => driverFor(taskId)?.click(ref) ?? { ok: false, reason: 'No preview webview for this task.' },
+    browserFill: async (taskId, ref, text) => driverFor(taskId)?.fill(ref, text) ?? { ok: false, reason: 'No preview webview for this task.' },
+    browserScreenshot: async (taskId) => {
+      const d = driverFor(taskId)
+      return d ? d.screenshot() : { error: 'No preview webview for this task.' }
+    },
+    browserConsole: async (taskId) => driverFor(taskId)?.console() ?? { lines: [] },
+  })
+
+  // The renderer binds each task's preview webview after creation (dom-ready) so main can drive it.
+  ipcMain.handle('browser:bind', (_e: IpcMainInvokeEvent, p: { taskId: string; webContentsId: number }) => {
+    if (typeof p?.taskId !== 'string' || typeof p?.webContentsId !== 'number') return false
+    const contents = webContents.fromId(p.webContentsId)
+    if (!contents) return false
+    bindBrowserContents(p.taskId, contents)
+    return true
   })
 
   ipcMain.handle('run:targets', (_e: IpcMainInvokeEvent, taskId: string) => runtime.targets(String(taskId)))

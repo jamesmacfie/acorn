@@ -20,6 +20,13 @@ export type HarnessBridge = {
   runStart(taskId: string, targetId: string): Promise<unknown>
   runStop(taskId: string, targetId: string): Promise<unknown>
   runStatus(taskId: string, targetId: string): Promise<unknown>
+  // Drivable browser (docs/next 08 P2): CDP over the task's preview webview.
+  browserNavigate(taskId: string, url: string): Promise<unknown>
+  browserSnapshot(taskId: string): Promise<unknown>
+  browserClick(taskId: string, ref: string): Promise<unknown>
+  browserFill(taskId: string, ref: string, text: string): Promise<unknown>
+  browserScreenshot(taskId: string): Promise<unknown>
+  browserConsole(taskId: string): Promise<unknown>
 }
 
 let bridge: HarnessBridge | null = null
@@ -102,5 +109,35 @@ export const harness = new Hono<AppEnv>()
   })
   .get('/:id/run/:target/status', async (c) => {
     const res = await withBridge((b) => b.runStatus(c.req.param('id'), c.req.param('target')))
+    return res.ok ? c.json(res.data) : c.json({ error: res.error }, 503)
+  })
+  .post('/:id/browser/navigate', async (c) => {
+    const body = (await c.req.json().catch(() => ({}))) as { url?: string }
+    if (!body.url || typeof body.url !== 'string') return c.json({ error: 'bad_request' }, 400)
+    const res = await withBridge((b) => b.browserNavigate(c.req.param('id'), body.url!))
+    return res.ok ? c.json(res.data) : c.json({ error: res.error }, 503)
+  })
+  .get('/:id/browser/snapshot', async (c) => {
+    const res = await withBridge((b) => b.browserSnapshot(c.req.param('id')))
+    return res.ok ? c.json(res.data) : c.json({ error: res.error }, 503)
+  })
+  .post('/:id/browser/click', async (c) => {
+    const body = (await c.req.json().catch(() => ({}))) as { ref?: string }
+    if (!body.ref) return c.json({ error: 'bad_request' }, 400)
+    const res = await withBridge((b) => b.browserClick(c.req.param('id'), body.ref!))
+    return res.ok ? c.json(res.data) : c.json({ error: res.error }, 503)
+  })
+  .post('/:id/browser/fill', async (c) => {
+    const body = (await c.req.json().catch(() => ({}))) as { ref?: string; text?: string }
+    if (!body.ref || typeof body.text !== 'string') return c.json({ error: 'bad_request' }, 400)
+    const res = await withBridge((b) => b.browserFill(c.req.param('id'), body.ref!, body.text!))
+    return res.ok ? c.json(res.data) : c.json({ error: res.error }, 503)
+  })
+  .get('/:id/browser/screenshot', async (c) => {
+    const res = await withBridge((b) => b.browserScreenshot(c.req.param('id')))
+    return res.ok ? c.json(res.data) : c.json({ error: res.error }, 503)
+  })
+  .get('/:id/browser/console', async (c) => {
+    const res = await withBridge((b) => b.browserConsole(c.req.param('id')))
     return res.ok ? c.json(res.data) : c.json({ error: res.error }, 503)
   })
