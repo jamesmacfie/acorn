@@ -71,6 +71,13 @@
       "when": 1782986514009,
       "tag": "0009_ordinary_banshee",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "6",
+      "when": 1782988853956,
+      "tag": "0010_classy_ultimates",
+      "breakpoints": true
     }
   ]
 }

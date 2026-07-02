@@ -14,6 +14,11 @@ import {
   pinsRoute,
   prefsRoute,
   pullRoute,
+  reviewNoteRoute,
+  reviewNotesRoute,
+  reviewNotesSentRoute,
+  type ReviewNote,
+  type ReviewNoteSeed,
   taskLinksRoute,
   taskRoute,
   tasksRoute,
@@ -166,6 +171,14 @@ export const createTask = async (seed: TaskSeed) => {
   void terminalApi()?.task.onCreated(task.id)
   return task
 }
+// Local review notes (docs/next 04 §C). Callers invalidate reviewNotesKey(taskId) after.
+export const addReviewNote = (taskId: string, seed: ReviewNoteSeed) => post<ReviewNote>(reviewNotesRoute(taskId), seed)
+export const editReviewNote = (taskId: string, noteId: string, body: string) =>
+  writeJson<{ ok: true }>(reviewNoteRoute(taskId, noteId), { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ body }) })
+export const deleteReviewNote = (taskId: string, noteId: string) =>
+  writeJson<{ ok: true }>(reviewNoteRoute(taskId, noteId), { method: 'DELETE' })
+export const markReviewNotesSent = (taskId: string, ids: string[]) => post<{ ok: true }>(reviewNotesSentRoute(taskId), { ids })
+
 // Grow/shrink a task's links after creation (docs/next 11 §A). Callers invalidate tasksKey after.
 export const addTaskLink = (id: string, link: TaskLink) => post<{ ok: boolean }>(taskLinksRoute(id), link)
 export const removeTaskLink = (id: string, ref: Pick<TaskLink, 'integrationId' | 'identifier'>) =>

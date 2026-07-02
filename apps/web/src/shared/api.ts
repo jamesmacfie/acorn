@@ -170,6 +170,21 @@ export type TaskSeed = {
   links?: TaskLink[]
 }
 
+// Local review notes (docs/next 04 §C): inline annotations on uncommitted changes, acorn-owned.
+export type ReviewNote = {
+  id: string
+  taskId: string
+  path: string
+  side: 'additions' | 'deletions'
+  startLine: number
+  endLine: number
+  snippet: string | null
+  body: string
+  sentAt: number | null // stamped on delivery; cleared on edit
+  createdAt: number
+}
+export type ReviewNoteSeed = Pick<ReviewNote, 'path' | 'side' | 'startLine' | 'endLine' | 'body'> & { snippet?: string | null }
+
 export const repoRoute = (owner: string, repo: string, child = '') => `/api/repos/${owner}/${repo}${child ? `/${child}` : ''}`
 export const pullRoute = (owner: string, repo: string, number: string | number, child = '') =>
   repoRoute(owner, repo, `pulls/${number}${child ? `/${child}` : ''}`)
@@ -215,6 +230,10 @@ export const workspaceProjectsRoute = (id: string) => `/api/workspaces/${id}/pro
 export const tasksRoute = '/api/tasks'
 export const taskRoute = (id: string) => `/api/tasks/${id}`
 export const taskLinksRoute = (id: string) => `/api/tasks/${id}/links`
+export const reviewNotesRoute = (taskId: string) => `/api/tasks/${taskId}/review-notes`
+export const reviewNoteRoute = (taskId: string, noteId: string) => `/api/tasks/${taskId}/review-notes/${noteId}`
+export const reviewNotesSentRoute = (taskId: string) => `/api/tasks/${taskId}/review-notes/sent`
+export const reviewNotesKey = (taskId: string) => ['review-notes', taskId] as const
 export const integrationsRoute = '/api/integrations'
 export const integrationRoute = (id: string) => `/api/integrations/${id}`
 export const linearIssuesRoute = '/api/linear/issues'
