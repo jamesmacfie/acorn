@@ -5,6 +5,7 @@ import { SHORTCUTS } from '../../Shortcuts'
 import WorkspaceRepoAssignments from '../workspaces/WorkspaceRepoAssignments'
 import IntegrationsSettings from '../integrations/IntegrationsSettings'
 import WorkspaceSettings from './WorkspaceSettings'
+import McpSettings from './McpSettings'
 import './settings.css'
 
 // The Settings page (profile dropdown → Settings). Left tab rail + right pane. Tabs: the
@@ -34,6 +35,9 @@ export default function SettingsModal(props: { onClose: () => void; initialTab?:
           <button type="button" class="settings-nav-item" classList={{ active: tab() === 'integrations' }} onClick={() => setTab('integrations')}>
             Integrations
           </button>
+          <button type="button" class="settings-nav-item" classList={{ active: tab() === 'mcp' }} onClick={() => setTab('mcp')}>
+            MCP
+          </button>
           <button type="button" class="settings-nav-item" classList={{ active: tab() === 'shortcuts' }} onClick={() => setTab('shortcuts')}>
             Shortcuts
           </button>
@@ -62,6 +66,10 @@ export default function SettingsModal(props: { onClose: () => void; initialTab?:
             <Match when={tab() === 'integrations'}>
               <div class="overlay-title">Integrations</div>
               <IntegrationsSettings />
+            </Match>
+            <Match when={tab() === 'mcp'}>
+              <div class="overlay-title">MCP</div>
+              <McpSettings />
             </Match>
             <Match when={tab() === 'shortcuts'}>
               <div class="overlay-title">Keyboard shortcuts</div>

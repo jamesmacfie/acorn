@@ -82,6 +82,11 @@ contextBridge.exposeInMainWorld('acorn', {
       }
     },
   },
+  // MCP config inspector (docs/next 06 A): known candidate files only, secrets masked in main.
+  mcp: {
+    inspect: (taskId: string) => ipcRenderer.invoke('mcp:inspect', taskId),
+    createStarter: (taskId: string) => ipcRenderer.invoke('mcp:createStarter', taskId),
+  },
   // Memory (docs/next 12): committed .acorn/memory files + the derived FTS index.
   memory: {
     list: (repo?: string) => ipcRenderer.invoke('memory:list', { repo }),

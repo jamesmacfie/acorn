@@ -112,3 +112,13 @@
 }
 .ws-swatch.active { outline: 2px solid var(--accent); outline-offset: 1px; }
 .ws-hex-input { width: 90px; font-family: var(--font-mono); }
+
+/* MCP inspector (docs/next 06 A). */
+.mcp-file { font-family: var(--font-mono); font-size: var(--fs-sm); }
+.mcp-server { display: flex; align-items: baseline; gap: 10px; padding: 3px 0 3px 12px; font-size: var(--fs-sm); flex-wrap: wrap; }
+.mcp-server-name { font-family: var(--font-mono); color: var(--text); }
+.mcp-server-status { color: var(--add-marker); }
+.mcp-server-status.mcp-disabled { color: var(--text-faint); }
+.mcp-server-status.mcp-invalid { color: var(--del-marker); }
+.mcp-server-cmd { max-width: 40ch; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; font-family: var(--font-mono); }
+.mcp-server-env { font-family: var(--font-mono); }
