@@ -39,7 +39,7 @@ export const tasks = new Hono<AppEnv>()
     const byTask = new Map<string, TaskLink[]>()
     for (const l of linkRows) {
       const list = byTask.get(l.taskId) ?? []
-      list.push({ provider: l.provider, identifier: l.identifier })
+      list.push({ integrationId: l.integrationId, provider: l.provider, identifier: l.identifier })
       byTask.set(l.taskId, list)
     }
     return c.json(rows.map((r) => rowToTask(r, byTask.get(r.id) ?? [])))
@@ -69,11 +69,11 @@ export const tasks = new Hono<AppEnv>()
       updatedAt: now,
       archivedAt: null,
     })
-    const links = (seed.links ?? []).filter((l) => l.provider && l.identifier)
+    const links = (seed.links ?? []).filter((l) => l.integrationId && l.provider && l.identifier)
     if (links.length) {
       await db
         .insert(schema.taskLinks)
-        .values(links.map((l) => ({ taskId: id, provider: l.provider, identifier: l.identifier, createdAt: now })))
+        .values(links.map((l) => ({ taskId: id, integrationId: l.integrationId, provider: l.provider, identifier: l.identifier, createdAt: now })))
         .onConflictDoNothing()
     }
     return c.json(

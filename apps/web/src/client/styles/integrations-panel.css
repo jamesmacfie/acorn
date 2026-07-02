@@ -212,6 +212,98 @@
   color: var(--text);
 }
 
+/* --- Integrations settings: card list + slide-down add panel --- */
+.integrations { display: flex; flex-direction: column; gap: 14px; padding: var(--pane-pad); }
+.integrations-list { display: flex; flex-direction: column; gap: 8px; }
+
+.integration-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  background: var(--bg-subtle);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+
+/* Logo slot — branded square; carries a real mark (SVG) or a monogram fallback. Adding a provider
+   later = drop in its mark + a data-provider colour rule. */
+.integration-logo {
+  flex: none;
+  width: 30px;
+  height: 30px;
+  display: grid;
+  place-items: center;
+  border-radius: 7px;
+  background: var(--bg-hover);
+  color: var(--text);
+}
+.integration-logo svg { width: 18px; height: 18px; display: block; }
+.integration-logo-mono { font-weight: 700; font-size: 14px; line-height: 1; }
+.integration-logo[data-provider='github'] { background: #24292f; color: #fff; }
+.integration-logo[data-provider='linear'] { background: #5e6ad2; color: #fff; }
+.integration-logo[data-provider='rollbar'] { background: #f24f4f; color: #fff; }
+
+.integration-meta { display: flex; flex-direction: column; gap: 2px; min-width: 0; flex: 1; }
+.integration-title { font-weight: 600; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.integration-sub { font-size: var(--fs-sm); color: var(--text-faint); }
+.integration-actions { flex: none; display: flex; align-items: center; gap: 8px; }
+.integration-badge {
+  font-size: var(--fs-sm);
+  color: var(--text-faint);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 2px 9px;
+}
+.integration-remove { color: var(--danger, #c0392b); border-color: transparent; background: transparent; }
+.integration-remove:hover:not(:disabled) { border-color: var(--danger, #c0392b); }
+
+/* "Add integration" — the trigger. */
+.integration-add-btn {
+  align-self: flex-start;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  color: var(--text);
+}
+.integration-add-btn.open { background: var(--bg-selected); }
+.integration-add-icon { font-size: 15px; line-height: 1; transition: transform 0.18s ease; }
+.integration-add-btn.open .integration-add-icon { transform: rotate(45deg); }
+
+/* The panel that "comes down" from the Add button. Animated via max-height so it slides. */
+.integration-add-panel {
+  max-height: 0;
+  opacity: 0;
+  overflow: hidden;
+  transition: max-height 0.2s ease, opacity 0.2s ease;
+}
+.integration-add-panel.open { max-height: 320px; opacity: 1; }
+.integration-add-inner {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px;
+  background: var(--bg-subtle);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+.integration-provider-chips { display: flex; gap: 8px; flex-wrap: wrap; }
+.integration-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 10px;
+  border: 1px solid var(--border-strong);
+  border-radius: 999px;
+  color: var(--text);
+  background: transparent;
+}
+.integration-chip.active { border-color: var(--accent); color: var(--text); background: var(--bg-selected); }
+.integration-chip:disabled { opacity: 0.5; cursor: default; }
+.integration-chip .soon { font-size: 10px; text-transform: uppercase; letter-spacing: 0.04em; color: var(--text-faint); }
+.integration-add-label { font-size: var(--fs-sm); color: var(--text); }
+.integration-add-hint { font-size: var(--fs-sm); margin: 0; }
+
 /* Clickable ticket row in the PR detail Integrations list. */
 .integration-row {
   display: flex;

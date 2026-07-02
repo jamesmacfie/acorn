@@ -4,7 +4,7 @@ import { A, useNavigate, useParams } from '@solidjs/router'
 import { createVirtualizer } from '@tanstack/solid-virtual'
 import { checksState, formatRelativeTime } from './displayMeta'
 import { prefetchOpenPulls, schedulePullSummaryPrefetch } from './prefetch'
-import { closedPullsInfiniteOptions, pullDetailOptions, pullsOptions, reposOptions, tasksKey, type Pull } from './queries'
+import { closedPullsInfiniteOptions, integrationsOptions, pullDetailOptions, pullsOptions, reposOptions, tasksKey, type Pull } from './queries'
 import { filterPulls } from './features/pullList/model'
 import { createTask } from './mutations'
 import { scanLinearRefs } from './features/integrations/scanLinearRefs'
@@ -80,7 +80,13 @@ export default function PullList() {
     // Fetch the detail (cached if warm) so the body is present, then seed a task_link for EVERY
     // Linear ticket the PR references — a PR can resolve several, and the task links them all.
     const detail = await queryClient.ensureQueryData(pullDetailOptions(owner, repo, String(pr.number), true)).catch(() => undefined)
-    const links = scanLinearRefs([detail?.pull?.body]).map((r) => ({ provider: 'linear', identifier: r.identifier }))
+    // A bare Linear id in a PR body doesn't say WHICH connection owns it. ponytail: attribute to the
+    // sole Linear connection when there's exactly one; with 0 or 2+ we can't disambiguate cheaply, so
+    // skip seeding (the Linear pane still resolves bare ids server-side across connections).
+    const integrations = await queryClient.ensureQueryData(integrationsOptions(true)).catch(() => null)
+    const linears = (integrations?.integrations ?? []).filter((i) => i.provider === 'linear' && i.connected)
+    const soleLinear = linears.length === 1 ? linears[0].id : null
+    const links = soleLinear ? scanLinearRefs([detail?.pull?.body]).map((r) => ({ integrationId: soleLinear, provider: 'linear', identifier: r.identifier })) : []
     const w = await createTask({ origin: 'github-pr', repoOwner: owner, repoName: repo, branch: pr.headRef, pullNumber: pr.number, links })
     await queryClient.invalidateQueries({ queryKey: tasksKey })
     setSelectedSource(null)

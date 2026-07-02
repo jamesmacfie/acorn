@@ -1,9 +1,9 @@
 import { randomUUID } from 'node:crypto'
-import { and, eq, inArray, max, notInArray } from 'drizzle-orm'
+import { and, eq, inArray, max } from 'drizzle-orm'
 import { Hono } from 'hono'
 import { getDb, schema } from '../db'
 import type { AppEnv } from '../middleware/auth'
-import type { PreviewMode, SetupTrigger, Workspace, WorkspaceRepo, WorkspaceSeed } from '../../shared/api'
+import type { PreviewMode, SetupTrigger, Workspace, WorkspaceProject, WorkspaceProjectsResponse, WorkspaceRepo, WorkspaceSeed } from '../../shared/api'
 
 // Workspaces (docs/workspaces): named GROUPS of repos — the top-level unit. Machine-scoped (no
 // user_id) like tasks / repo_paths, but auth-gated. A repo belongs to exactly one workspace
@@ -118,7 +118,7 @@ export const workspaces = new Hono<AppEnv>()
     const defaultId = await ensureDefault(db)
     // Reassign this workspace's repos back to Default rather than orphaning them.
     await db.update(schema.workspaceRepos).set({ workspaceId: defaultId }).where(eq(schema.workspaceRepos.workspaceId, id))
-    await db.delete(schema.workspaceLinearProjects).where(eq(schema.workspaceLinearProjects.workspaceId, id))
+    await db.delete(schema.workspaceProjects).where(eq(schema.workspaceProjects.workspaceId, id))
     await db.delete(schema.workspaces).where(eq(schema.workspaces.id, id))
     return c.json({ ok: true })
   })
@@ -181,28 +181,27 @@ export const workspaces = new Hono<AppEnv>()
     }
     return c.json({ ok: true })
   })
-  .get('/:id/linear-projects', async (c) => {
+  // External projects (Linear/…) linked to this workspace — (integrationId, externalId) pairs.
+  .get('/:id/projects', async (c) => {
     if (!c.get('user')) return c.json({ error: 'unauthenticated' }, 401)
     const db = getDb(c.env)
-    const rows = await db.select().from(schema.workspaceLinearProjects).where(eq(schema.workspaceLinearProjects.workspaceId, c.req.param('id')))
-    return c.json({ projectIds: rows.map((r) => r.linearProjectId) })
+    const rows = await db.select().from(schema.workspaceProjects).where(eq(schema.workspaceProjects.workspaceId, c.req.param('id')))
+    return c.json({ projects: rows.map((r) => ({ integrationId: r.integrationId, externalId: r.externalId })) } satisfies WorkspaceProjectsResponse)
   })
-  .put('/:id/linear-projects', async (c) => {
+  .put('/:id/projects', async (c) => {
     if (!c.get('user')) return c.json({ error: 'unauthenticated' }, 401)
     const id = c.req.param('id')
-    const body = (await c.req.json().catch(() => ({}))) as { projectIds?: string[] }
-    const projectIds = (body.projectIds ?? []).filter((p) => typeof p === 'string' && p)
+    const body = (await c.req.json().catch(() => ({}))) as { projects?: WorkspaceProject[] }
+    const projects = (body.projects ?? []).filter((p) => p && typeof p.integrationId === 'string' && typeof p.externalId === 'string' && p.integrationId && p.externalId)
     const db = getDb(c.env)
     const now = Date.now()
-    // Replace the set: drop removed, insert added.
-    if (projectIds.length) {
-      await db.delete(schema.workspaceLinearProjects).where(and(eq(schema.workspaceLinearProjects.workspaceId, id), notInArray(schema.workspaceLinearProjects.linearProjectId, projectIds)))
+    // Replace the whole set (composite key ⇒ simplest correct: clear then insert). ponytail.
+    await db.delete(schema.workspaceProjects).where(eq(schema.workspaceProjects.workspaceId, id))
+    if (projects.length) {
       await db
-        .insert(schema.workspaceLinearProjects)
-        .values(projectIds.map((p) => ({ workspaceId: id, linearProjectId: p, createdAt: now })))
+        .insert(schema.workspaceProjects)
+        .values(projects.map((p) => ({ workspaceId: id, integrationId: p.integrationId, externalId: p.externalId, createdAt: now })))
         .onConflictDoNothing()
-    } else {
-      await db.delete(schema.workspaceLinearProjects).where(eq(schema.workspaceLinearProjects.workspaceId, id))
     }
     return c.json({ ok: true })
   })

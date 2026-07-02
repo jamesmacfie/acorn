@@ -76,8 +76,20 @@ export type Compare = { aheadBy: number; files: PullFile[]; commits: CompareComm
 // Full head-blob body, fetched on demand to expand unchanged context around diff hunks.
 export type FileBlob = { text: string }
 
-// --- Integrations (Linear is provider #1) ---
-export type IntegrationsStatus = { linear: { connected: boolean; workspace?: string } }
+// --- Integrations: multi-row per provider (docs/workspaces 04). GitHub appears as a synthesized
+// entry (id 'github') so it reads as "just another integration", but it's the identity root — its
+// token is the session cookie, not a stored row. ---
+export type IntegrationProvider = 'github' | 'linear' | 'rollbar'
+export type Integration = {
+  id: string // 'github' for the synthesized entry; opaque uuid otherwise
+  provider: IntegrationProvider
+  label: string
+  connected: boolean
+  workspace?: string // provider-specific display hint (e.g. Linear org name), from meta
+}
+export type IntegrationsResponse = { integrations: Integration[] }
+// Connect a provider by pasting a token; server validates + encrypts it, returns the new row.
+export type ConnectIntegrationRequest = { provider: Exclude<IntegrationProvider, 'github'>; token: string }
 export type LinearIssueState = { name: string; type: string; color: string } | null
 export type LinearIssueSummary = { identifier: string; title: string; url: string; state: LinearIssueState; assignee: string | null }
 export type LinearComment = { id: string; author: string | null; body: string; createdAt: number | null; parentId: string | null }
@@ -88,10 +100,11 @@ export type LinearIssueDetail = LinearIssueSummary & { id: string; description: 
 export type LinearCommentRequest = { body: string; parentId?: string }
 export type LinearIssuesRequest = { identifiers: string[] }
 export type LinearIssuesResponse = { issues: LinearIssueSummary[] }
-// Linear projects + project-scoped issue browse (docs/workspaces — Linear source per repo).
-export type LinearProject = { id: string; name: string }
+// Linear projects + project-scoped issue browse (docs/workspaces — Linear source per repo). Each
+// project carries which connection it came from, so the picker can span multiple Linear integrations.
+export type LinearProject = { integrationId: string; integrationLabel: string; id: string; name: string }
 export type LinearProjectsResponse = { projects: LinearProject[] }
-export type LinearProjectIssue = LinearIssueSummary & { branchName: string | null }
+export type LinearProjectIssue = LinearIssueSummary & { integrationId: string; branchName: string | null }
 export type LinearProjectIssuesResponse = { issues: LinearProjectIssue[] }
 
 // --- Workspaces: named groups of repos (docs/workspaces). The top-level unit. ---
@@ -118,7 +131,11 @@ export type WorkspaceSeed = { name: string }
 export type RepoAssignment = { owner: string; name: string; workspaceId: string; ignored: boolean }
 
 // --- Tasks: the single-repo unit of work (docs/workspaces/03). Rail rows. ---
-export type TaskLink = { provider: string; identifier: string }
+// integrationId pins the link to a specific connection; provider is denormalized for filtering.
+export type TaskLink = { integrationId: string; provider: string; identifier: string }
+// A workspace's linked external projects (docs/workspaces 04) — (integrationId, externalId) pairs.
+export type WorkspaceProject = { integrationId: string; externalId: string }
+export type WorkspaceProjectsResponse = { projects: WorkspaceProject[] }
 export type Task = {
   id: string
   title: string
@@ -184,15 +201,16 @@ export const workspaceIgnoreRepoRoute = '/api/workspaces/ignore-repo'
 export const workspaceUnignoreRepoRoute = '/api/workspaces/unignore-repo'
 export const workspaceIgnoreAllRoute = '/api/workspaces/ignore-all'
 export const workspaceAssignmentsRoute = '/api/workspaces/assignments'
-export const workspaceLinearProjectsRoute = (id: string) => `/api/workspaces/${id}/linear-projects`
+export const workspaceProjectsRoute = (id: string) => `/api/workspaces/${id}/projects`
 // Tasks (single-repo units of work) — rail rows.
 export const tasksRoute = '/api/tasks'
 export const taskRoute = (id: string) => `/api/tasks/${id}`
 export const integrationsRoute = '/api/integrations'
-export const linearIntegrationRoute = '/api/integrations/linear'
+export const integrationRoute = (id: string) => `/api/integrations/${id}`
 export const linearIssuesRoute = '/api/linear/issues'
 export const linearProjectsRoute = '/api/linear/projects'
-export const linearProjectIssuesRoute = (projectIds: string[]) => `/api/linear/project-issues?ids=${encodeURIComponent(projectIds.join(','))}`
+export const linearProjectIssuesRoute = (integrationId: string, projectIds: string[]) =>
+  `/api/linear/project-issues?integration=${encodeURIComponent(integrationId)}&ids=${encodeURIComponent(projectIds.join(','))}`
 export const linearIssueRoute = (identifier: string) => `/api/linear/issues/${encodeURIComponent(identifier)}?refresh=1`
 export const linearCommentsRoute = (identifier: string) => `/api/linear/issues/${encodeURIComponent(identifier)}/comments`
 
@@ -223,8 +241,13 @@ export const tasksKey = ['tasks'] as const
 export const mentionsKey = (owner: string, repo: string) => ['mentions', owner, repo] as const
 export const runJobsKey = (owner: string, repo: string, runId: number) => ['run-jobs', owner, repo, runId] as const
 export const jobLogKey = (owner: string, repo: string, jobId: number) => ['job-log', owner, repo, jobId] as const
-export const integrationsKey = ['integrations'] as const
+// 'v2' suffix: the bare ['integrations'] key held the old IntegrationsStatus shape ({ linear }),
+// which may still be in a user's persisted IndexedDB cache — restoring it under the new shape
+// ({ integrations: [] }) would poison reads (.integrations is undefined). Distinct key sidesteps the
+// stale entry (same fix as workspacesKey/closedPullsKey).
+export const integrationsKey = ['integrations', 'v2'] as const
 export const linearIssuesKey = (identifiers: string[]) => ['linear-issues', ...[...identifiers].sort()] as const
 export const linearProjectsKey = ['linear-projects'] as const
-export const linearProjectIssuesKey = (projectIds: string[]) => ['linear-project-issues', ...[...projectIds].sort()] as const
+export const linearProjectIssuesKey = (integrationId: string, projectIds: string[]) =>
+  ['linear-project-issues', integrationId, ...[...projectIds].sort()] as const
 export const linearIssueKey = (identifier: string) => ['linear-issue', identifier] as const

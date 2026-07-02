@@ -23,9 +23,8 @@ import {
   linearIssuesRoute,
   linearProjectsKey,
   linearProjectsRoute,
-  linearProjectIssuesKey,
   linearProjectIssuesRoute,
-  workspaceLinearProjectsRoute,
+  workspaceProjectsRoute,
   workspaceAssignmentsRoute,
   workspaceAssignmentsKey,
   type RepoAssignment,
@@ -61,7 +60,9 @@ import {
   type ClosedPullsPage,
   type Compare,
   type FileBlob,
-  type IntegrationsStatus,
+  type IntegrationsResponse,
+  type WorkspaceProject,
+  type WorkspaceProjectsResponse,
   type JobLog,
   type LinearIssueDetail,
   type LinearIssuesRequest,
@@ -97,7 +98,7 @@ export {
   tasksKey,
   workspacesKey,
 } from '../shared/api'
-export type { Branch, Check, Comment, Compare, CompareCommit, IntegrationsStatus, Label, LinearActivity, LinearComment, LinearIssueDetail, LinearIssueState, LinearIssueSummary, Me, Pull, PullCommit, PullDetail, PullFile, Repo, Review, Thread, ThreadComment, Task, TaskLink, TaskSeed, Workspace, WorkspaceRepo } from '../shared/api'
+export type { Branch, Check, Comment, Compare, CompareCommit, Integration, IntegrationsResponse, Label, LinearActivity, LinearComment, LinearIssueDetail, LinearIssueState, LinearIssueSummary, Me, Pull, PullCommit, PullDetail, PullFile, Repo, Review, Thread, ThreadComment, Task, TaskLink, TaskSeed, Workspace, WorkspaceProject, WorkspaceRepo } from '../shared/api'
 
 type QueryContext = { signal?: AbortSignal }
 type PageQueryContext = QueryContext & { pageParam: number }
@@ -173,14 +174,14 @@ export const assignmentsOptions = (enabled: boolean) => ({
   queryFn: async ({ signal }: QueryContext): Promise<RepoAssignment[]> => readJson<RepoAssignment[]>(workspaceAssignmentsRoute, { signal }),
 })
 
-// Linear project IDs linked to a workspace (docs/workspaces P5). One project → many repos via the
-// workspace grouping; replaces the old per-repo prefs key.
-export const workspaceLinearProjectsKey = (id: string) => ['workspace-linear-projects', id] as const
-export const workspaceLinearProjectsOptions = (workspaceId: string | null, enabled: boolean) => ({
-  queryKey: workspaceLinearProjectsKey(workspaceId ?? ''),
+// External projects linked to a workspace (docs/workspaces 04): (integrationId, externalId) pairs
+// spanning any number of integrations. One project → many repos via the workspace grouping.
+export const workspaceProjectsKey = (id: string) => ['workspace-projects', id] as const
+export const workspaceProjectsOptions = (workspaceId: string | null, enabled: boolean) => ({
+  queryKey: workspaceProjectsKey(workspaceId ?? ''),
   enabled: enabled && !!workspaceId,
-  queryFn: async ({ signal }: QueryContext): Promise<{ projectIds: string[] }> =>
-    readJson<{ projectIds: string[] }>(workspaceLinearProjectsRoute(workspaceId as string), { signal }),
+  queryFn: async ({ signal }: QueryContext): Promise<WorkspaceProjectsResponse> =>
+    readJson<WorkspaceProjectsResponse>(workspaceProjectsRoute(workspaceId as string), { signal }),
 })
 
 export const prefsOptions = (enabled: boolean) => ({
@@ -269,13 +270,14 @@ export const jobLogOptions = (owner: string, repo: string, jobId: number, enable
   queryFn: async ({ signal }: QueryContext): Promise<JobLog> => readJson<JobLog>(jobLogRoute(owner, repo, jobId), { signal }),
 })
 
-// Integration connection status (gates the Integrations section + settings). 401 → logged out.
+// Connected integrations (gates the Sources rail + settings list). Includes the synthesized GitHub
+// entry. 401 → logged out.
 export const integrationsOptions = (enabled: boolean) => ({
   queryKey: integrationsKey,
   enabled,
   staleTime: 5 * 60 * 1000,
-  queryFn: async ({ signal }: QueryContext): Promise<IntegrationsStatus | null> =>
-    readJson<IntegrationsStatus | null>(integrationsRoute, { nullOn401: true, signal }),
+  queryFn: async ({ signal }: QueryContext): Promise<IntegrationsResponse | null> =>
+    readJson<IntegrationsResponse | null>(integrationsRoute, { nullOn401: true, signal }),
 })
 
 // Batch enrichment for the Integrations list (title + status per referenced ticket). Server
@@ -303,14 +305,23 @@ export const linearProjectsOptions = (enabled: boolean) => ({
   queryFn: async ({ signal }: QueryContext): Promise<LinearProjectsResponse> => readJson<LinearProjectsResponse>(linearProjectsRoute, { signal }),
 })
 
-// Active issues for a repo's selected Linear projects (the Linear source browse). Refetch on mount
-// so it self-heals; the server reads live from Linear.
-export const linearProjectIssuesOptions = (projectIds: string[], enabled: boolean) => ({
-  queryKey: linearProjectIssuesKey(projectIds),
+// All active issues for a workspace's linked Linear projects, which may span several connections.
+// Groups the (integrationId, externalId) selection by integration and fans out one request each,
+// merging the results. Each issue carries its integrationId (stamped server-side) for promotion.
+export const workspaceLinearIssuesKey = (selection: WorkspaceProject[]) =>
+  ['workspace-linear-issues', ...selection.map((p) => `${p.integrationId}:${p.externalId}`).sort()] as const
+export const workspaceLinearIssuesOptions = (selection: WorkspaceProject[], enabled: boolean) => ({
+  queryKey: workspaceLinearIssuesKey(selection),
   enabled,
   refetchOnMount: 'always' as const,
-  queryFn: async ({ signal }: QueryContext): Promise<LinearProjectIssuesResponse> =>
-    readJson<LinearProjectIssuesResponse>(linearProjectIssuesRoute(projectIds), { signal }),
+  queryFn: async ({ signal }: QueryContext): Promise<LinearProjectIssuesResponse> => {
+    const byIntegration = new Map<string, string[]>()
+    for (const p of selection) byIntegration.set(p.integrationId, [...(byIntegration.get(p.integrationId) ?? []), p.externalId])
+    const results = await Promise.all(
+      [...byIntegration].map(([integrationId, ids]) => readJson<LinearProjectIssuesResponse>(linearProjectIssuesRoute(integrationId, ids), { signal })),
+    )
+    return { issues: results.flatMap((r) => r.issues) }
+  },
 })
 
 // Full ticket detail for the side panel. refetchOnMount:'always' + staleTime 0 → opening the panel

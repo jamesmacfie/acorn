@@ -52,7 +52,7 @@ export default function TabRail() {
   // main area with that source's browse view.
   const sources = (): { id: SourceId; glyph: string; label: string }[] => [
     { id: 'github', glyph: '◇', label: 'GitHub' },
-    ...(integrations.data?.linear.connected ? [{ id: 'linear' as const, glyph: '◷', label: 'Linear' }] : []),
+    ...((integrations.data?.integrations ?? []).some((i) => i.provider === 'linear' && i.connected) ? [{ id: 'linear' as const, glyph: '◷', label: 'Linear' }] : []),
   ]
   function selectSource(id: SourceId) {
     setMenuId(null)
