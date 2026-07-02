@@ -1,11 +1,16 @@
 import { createEffect, createMemo, createResource, createSignal, For, Show } from 'solid-js'
 import type { Task } from '../../queries'
+import { readJson } from '../../apiClient'
+import { addReviewNote, deleteReviewNote, markReviewNotesSent } from '../../mutations'
 import { fileStatusMeta } from '../../displayMeta'
 import { getHighlighter } from '../../shiki'
-import { DiffLine, NonCodeRow } from '../diff/DiffRows'
+import { reviewNotesRoute, type ReviewNote } from '../../../shared/api'
+import { formatReviewPrompt } from '../../../shared/reviewPrompt'
+import { DiffLine, NonCodeRow, type LineComposerController } from '../diff/DiffRows'
 import { buildDiffRows, highlighterTokenize, isCodeRow, plainTokenize, type CodeRow, type Row } from '../diff/model'
 import { formatFileReference, sendReferenceToAgent } from '../agent/reference'
 import { taskStatus } from '../tasks/taskStatus'
+import { agentSessionsFor } from '../terminal/sessions'
 import { terminalApi } from '../terminal/terminalClient'
 import { changeKey, groupChanges, pickSelected, toPullFile } from './model'
 import './changes.css'
@@ -64,9 +69,70 @@ export default function ChangesPane(props: { task: Task }) {
     if (!res.ok && res.reason) window.alert(res.reason)
   }
 
+  // Review notes (docs/next 04 §C): inline annotations on the local diff. Created via the shared
+  // line composer, rendered under their anchor line, sent as one prompt via sendToAgent
+  // ('after-ready' — queued until the agent idles) and stamped sentAt on delivery.
+  const [notes, { refetch: refetchNotes }] = createResource(
+    () => props.task.id,
+    (id) => readJson<ReviewNote[]>(reviewNotesRoute(id)),
+    { initialValue: [] },
+  )
+  const unsent = () => (notes() ?? []).filter((n) => n.sentAt == null)
+  const [sendMsg, setSendMsg] = createSignal('')
+
+  const composers = new Map<string, LineComposerController>()
+  function composerFor(key: string): LineComposerController {
+    let c = composers.get(key)
+    if (!c) {
+      const [isOpen, setOpen] = createSignal(false)
+      const [body, setBody] = createSignal('')
+      c = { isOpen, body, setOpen, setBody }
+      composers.set(key, c)
+    }
+    return c
+  }
+
+  const anchorOf = (r: CodeRow): { side: ReviewNote['side']; line: number } | null =>
+    r.newNo != null ? { side: 'additions', line: r.newNo } : r.oldNo != null ? { side: 'deletions', line: r.oldNo } : null
+
+  async function createNote(r: CodeRow, body: string) {
+    const a = anchorOf(r)
+    if (!a) return
+    await addReviewNote(props.task.id, { path: r.path, side: a.side, startLine: a.line, endLine: a.line, snippet: r.raw, body })
+    await refetchNotes()
+  }
+
+  const notesForRow = (r: CodeRow): ReviewNote[] => {
+    const a = anchorOf(r)
+    if (!a) return []
+    return (notes() ?? []).filter((n) => n.path === r.path && n.side === a.side && n.endLine === a.line)
+  }
+
+  async function sendNotes() {
+    const list = unsent()
+    if (!list.length) return
+    const target = agentSessionsFor(props.task.id)[0]
+    if (!target || !api) return setSendMsg('No running agent session.')
+    const res = await api.sendToAgent(target.id, formatReviewPrompt(list), 'after-ready')
+    if (!res.ok) return setSendMsg(res.reason ?? 'Send failed.')
+    await markReviewNotesSent(props.task.id, list.map((n) => n.id))
+    await refetchNotes()
+    setSendMsg(res.queued ? 'Queued — delivers when the agent is idle.' : 'Sent.')
+  }
+
   return (
     <section class="pane changes-pane">
-      <div class="section-header">Changes (uncommitted)</div>
+      <div class="section-header changes-header">
+        <span>Changes (uncommitted)</span>
+        <Show when={unsent().length}>
+          <button type="button" class="changes-send" title="Bracketed-paste the unsent notes into the task's agent (queued until idle)" onClick={() => void sendNotes()}>
+            Send {unsent().length} note{unsent().length === 1 ? '' : 's'} → agent{agentSessionsFor(props.task.id)[0]?.idle ? ' ●' : ''}
+          </button>
+        </Show>
+        <Show when={sendMsg()}>
+          <span class="muted">{sendMsg()}</span>
+        </Show>
+      </div>
       <div class="changes-body">
         <div class="changes-list">
           <For each={[{ title: 'Staged', list: groups().staged }, { title: 'Changes', list: groups().unstaged }]}>
@@ -135,7 +201,33 @@ export default function ChangesPane(props: { task: Task }) {
                       <NonCodeRow row={row as Exclude<Row, CodeRow>} onMutated={() => void refetch()} resolveThread={noop} reply={noop} />
                     }
                   >
-                    {(r) => <DiffLine r={r()} canAdd={false} addComment={noop} onMutated={() => void refetch()} />}
+                    {(r) => (
+                      <>
+                        <DiffLine
+                          r={r()}
+                          canAdd={anchorOf(r()) != null}
+                          addComment={(body) => createNote(r(), body)}
+                          onMutated={() => void refetchNotes()}
+                          composer={composerFor(`${r().path}:${r().kind}:${r().oldNo ?? ''}:${r().newNo ?? ''}`)}
+                        />
+                        <For each={notesForRow(r())}>
+                          {(note) => (
+                            <div class="review-note" classList={{ 'review-note-sent': note.sentAt != null }}>
+                              <span class="review-note-status" title={note.sentAt ? 'Sent to agent' : 'Not sent yet'}>
+                                {note.sentAt ? '✓ sent' : '● unsent'}
+                              </span>
+                              <span class="review-note-body">{note.body}</span>
+                              <button
+                                type="button"
+                                class="review-note-delete"
+                                title="Delete note"
+                                onClick={() => void deleteReviewNote(props.task.id, note.id).then(() => refetchNotes())}
+                              >✕</button>
+                            </div>
+                          )}
+                        </For>
+                      </>
+                    )}
                   </Show>
                 </div>
               )}

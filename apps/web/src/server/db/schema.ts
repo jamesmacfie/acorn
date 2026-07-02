@@ -368,6 +368,24 @@ export const taskLinks = sqliteTable(
   (t) => [primaryKey({ columns: [t.taskId, t.integrationId, t.identifier] })],
 )
 
+// Local review notes (docs/next 04 §C): inline annotations on UNCOMMITTED changes, sent to the
+// agent as a prompt — acorn-owned app state (PR comments stay GitHub-owned). Machine-scoped like
+// tasks/terminal_sessions (no user_id). THE single home for anchored annotations (README decision
+// 16): when editor/browser annotations arrive, generalize the anchor (nullable anchorJson) rather
+// than adding a second store. sentAt is stamped on delivery and cleared on edit (orca's pattern).
+export const reviewNotes = sqliteTable('review_notes', {
+  id: text('id').primaryKey(),
+  taskId: text('task_id').notNull(), // → tasks.id
+  path: text('path').notNull(), // repo-relative file
+  side: text('side').notNull(), // 'additions' | 'deletions'
+  startLine: integer('start_line').notNull(),
+  endLine: integer('end_line').notNull(),
+  snippet: text('snippet'), // the lines the note anchors to (for the prompt + re-anchoring)
+  body: text('body').notNull(),
+  sentAt: integer('sent_at'), // stamped on delivery; cleared on edit
+  createdAt: integer('created_at').notNull(),
+})
+
 // Durable terminal sessions (vNext §7). Machine-scoped like repo_paths. We persist ONLY tmux-backed
 // sessions: tmux outlives an app restart, so on startup the service reconciles these rows against
 // `tmux list-sessions` and re-attaches the survivors. node-pty sessions die with the process and
