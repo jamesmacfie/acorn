@@ -226,20 +226,21 @@ export const prefs = sqliteTable(
   (t) => [primaryKey({ columns: [t.userId, t.key] })],
 )
 
-// Per-user third-party credentials (Linear is provider #1). App-state: source of truth is us.
-// accessToken is ENCRYPTED at rest (JWE via SESSION_ENC_KEY, see session.ts encryptSecret) and
-// never leaves the Worker — same posture as the GitHub token.
-export const integrations = sqliteTable(
-  'integrations',
-  {
-    userId: text('user_id').notNull(),
-    provider: text('provider').notNull(), // 'linear'
-    accessToken: text('access_token').notNull(),
-    meta: text('meta'), // optional JSON (e.g. { workspace })
-    createdAt: integer('created_at').notNull(),
-  },
-  (t) => [primaryKey({ columns: [t.userId, t.provider] })],
-)
+// Per-user third-party credentials. First-class, MULTI-ROW per provider (docs/workspaces 04): a
+// user can connect several Linears / Rollbars, so the key is an opaque `id`, not (userId, provider).
+// `label` disambiguates them in the UI ("Linear – work"). accessToken is ENCRYPTED at rest (JWE via
+// SESSION_ENC_KEY, see session.ts encryptSecret) and never leaves the server — same posture as the
+// GitHub token. GitHub itself is NOT stored here: it's the identity root (its token is the session
+// cookie, userId is derived from it); it only *appears* as a synthesized entry in the list endpoint.
+export const integrations = sqliteTable('integrations', {
+  id: text('id').primaryKey(), // opaque uuid
+  userId: text('user_id').notNull(),
+  provider: text('provider').notNull(), // 'linear' | 'rollbar'
+  label: text('label').notNull(), // user-facing name, seeded from the provider (e.g. workspace/org)
+  accessToken: text('access_token').notNull(),
+  meta: text('meta'), // optional JSON (e.g. { workspace }, base url, org id)
+  createdAt: integer('created_at').notNull(),
+})
 
 // Local checkout for a GitHub repo (vNext §7, §9). Machine-scoped, NOT user-scoped: it describes
 // *this machine's* filesystem, so there's no userId — the terminal service in the Electron main
@@ -305,17 +306,20 @@ export const ignoredRepos = sqliteTable(
   (t) => [primaryKey({ columns: [t.owner, t.repo] })],
 )
 
-// Linear projects associated with a workspace. One project → many repos falls out of the workspace
-// grouping (the project backs every repo in the workspace). Replaces the per-repo prefs key
-// `linear:projects:{owner}/{repo}`.
-export const workspaceLinearProjects = sqliteTable(
-  'workspace_linear_projects',
+// External projects (Linear/Rollbar/…) linked to a workspace. One project → many repos falls out of
+// the workspace grouping (the project backs every repo in the workspace). `integrationId` records
+// WHICH connection the project belongs to, so a workspace can link projects across several
+// integrations (docs/workspaces 04). Provider-agnostic — generalizes the old
+// `workspace_linear_projects` / per-repo prefs key `linear:projects:{owner}/{repo}`.
+export const workspaceProjects = sqliteTable(
+  'workspace_projects',
   {
     workspaceId: text('workspace_id').notNull(), // → workspaces.id
-    linearProjectId: text('linear_project_id').notNull(),
+    integrationId: text('integration_id').notNull(), // → integrations.id
+    externalId: text('external_id').notNull(), // the provider's project id within that connection
     createdAt: integer('created_at').notNull(),
   },
-  (t) => [primaryKey({ columns: [t.workspaceId, t.linearProjectId] })],
+  (t) => [primaryKey({ columns: [t.workspaceId, t.integrationId, t.externalId] })],
 )
 
 // A Task is the single-repo unit of work (docs/workspaces/03-data-model.md): a repo + branch +
@@ -338,18 +342,20 @@ export const tasks = sqliteTable('tasks', {
   archivedAt: integer('archived_at'), // set on archive; row kept for history/teardown audit
 })
 
-// Zero-or-more external items a task references (Linear tickets, Rollbar errors). The join
-// the schema lacks today — Linear ids are only parsed out of PR bodies at render time.
-// (provider, identifier) matches the PK tail of `issues`, so a link resolves straight to cached detail.
+// Zero-or-more external items a task references (Linear tickets, Rollbar errors). `integrationId`
+// pins the item to a specific connection (two Linears could each have an `ENG-42`); `provider` is
+// kept denormalized for cheap filtering. (integrationId, identifier) matches the PK tail of `issues`,
+// so a link resolves straight to cached detail.
 export const taskLinks = sqliteTable(
   'task_links',
   {
     taskId: text('task_id').notNull(), // → tasks.id
-    provider: text('provider').notNull(), // 'linear' | 'rollbar'
+    integrationId: text('integration_id').notNull(), // → integrations.id
+    provider: text('provider').notNull(), // 'linear' | 'rollbar' (denormalized from the integration)
     identifier: text('identifier').notNull(), // 'ENG-42' | rollbar item id
     createdAt: integer('created_at').notNull(),
   },
-  (t) => [primaryKey({ columns: [t.taskId, t.provider, t.identifier] })],
+  (t) => [primaryKey({ columns: [t.taskId, t.integrationId, t.identifier] })],
 )
 
 // Durable terminal sessions (vNext §7). Machine-scoped like repo_paths. We persist ONLY tmux-backed
@@ -379,16 +385,18 @@ export const terminalSessions = sqliteTable('terminal_sessions', {
 })
 
 // Per-user cache of fetched external issues (generic across providers, parallels integrations).
-// Mirror table: serve-then-revalidate by TTL. Private/per-user → D1 only, never shared KV. Single
-// JSON `data` column so a provider's issue shape can evolve without migrations.
+// Keyed by `integrationId` so the same identifier fetched via two different connections doesn't
+// collide. Mirror table: serve-then-revalidate by TTL. Single JSON `data` column so a provider's
+// issue shape can evolve without migrations.
 export const issues = sqliteTable(
   'issues',
   {
     userId: text('user_id').notNull(),
-    provider: text('provider').notNull(), // 'linear'
+    integrationId: text('integration_id').notNull(), // → integrations.id
+    provider: text('provider').notNull(), // 'linear' | 'rollbar' (denormalized from the integration)
     identifier: text('identifier').notNull(), // 'ENG-123'
     data: text('data').notNull(), // JSON issue detail
     fetchedAt: integer('fetched_at').notNull(),
   },
-  (t) => [primaryKey({ columns: [t.userId, t.provider, t.identifier] })],
+  (t) => [primaryKey({ columns: [t.userId, t.integrationId, t.identifier] })],
 )

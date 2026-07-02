@@ -5,10 +5,12 @@ import { terminalApi } from './features/terminal/terminalClient'
 import {
   autoMergeRoute,
   createPullRoute,
-  type IntegrationsStatus,
+  type ConnectIntegrationRequest,
+  type Integration,
   type LinearCommentRequest,
   linearCommentsRoute,
-  linearIntegrationRoute,
+  integrationsRoute,
+  integrationRoute,
   pinsRoute,
   prefsRoute,
   pullRoute,
@@ -26,7 +28,8 @@ import {
   workspaceIgnoreRepoRoute,
   workspaceUnignoreRepoRoute,
   workspaceIgnoreAllRoute,
-  workspaceLinearProjectsRoute,
+  workspaceProjectsRoute,
+  type WorkspaceProject,
   rerunFailedRoute,
   requestedReviewersRoute,
   resolveThreadRoute,
@@ -59,10 +62,12 @@ export const submitReview = (o: string, r: string, n: string, event: string, bod
 
 export const addLabel = (o: string, r: string, n: string, name: string) => post(pullRoute(o, r, n, 'labels'), { name })
 
-// Save a Linear API key (server validates it against Linear before storing). Throws 'invalid_key'.
-export const connectLinear = (apiKey: string) => post<IntegrationsStatus>(linearIntegrationRoute, { apiKey })
-export const disconnectLinear = async () => {
-  const res = await fetch(linearIntegrationRoute, { method: 'DELETE' })
+// Connect an integration by pasting a token (server validates + encrypts it, returns the new row).
+// Throws 'invalid_key' on rejection. Multiple connections per provider are allowed.
+export const connectIntegration = (provider: ConnectIntegrationRequest['provider'], token: string) =>
+  post<{ integration: Integration }>(integrationsRoute, { provider, token } satisfies ConnectIntegrationRequest)
+export const deleteIntegration = async (id: string) => {
+  const res = await fetch(integrationRoute(id), { method: 'DELETE' })
   if (!res.ok) throw new Error(await apiError(res, `${res.status}`))
 }
 // Add a comment / threaded reply to a Linear ticket; caller refetches the issue after.
@@ -136,8 +141,10 @@ export const ignoreRepo = (owner: string, name: string) => post<{ ok: true }>(wo
 export const unignoreRepo = (owner: string, name: string) => post<{ ok: true }>(workspaceUnignoreRepoRoute, { owner, name })
 // Hide or show every repo at once (onboarding master toggle).
 export const setAllReposIgnored = (ignored: boolean) => post<{ ok: true }>(workspaceIgnoreAllRoute, { ignored })
-export const setWorkspaceLinearProjects = async (workspaceId: string, projectIds: string[]) =>
-  writeJson<{ ok: true }>(workspaceLinearProjectsRoute(workspaceId), { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ projectIds }) }, (res) => `linear-projects ${res.status}`)
+// Replace a workspace's linked external projects — (integrationId, externalId) pairs across any
+// number of integrations (docs/workspaces 04).
+export const setWorkspaceProjects = async (workspaceId: string, projects: WorkspaceProject[]) =>
+  writeJson<{ ok: true }>(workspaceProjectsRoute(workspaceId), { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ projects }) }, (res) => `workspace-projects ${res.status}`)
 
 // Tasks (docs/workspaces). Create from a seed; rename/archive via PATCH. Callers invalidate
 // tasksKey after.

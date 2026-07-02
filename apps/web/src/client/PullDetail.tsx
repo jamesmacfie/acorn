@@ -80,7 +80,7 @@ export default function PullDetail() {
     return scanLinearRefs(texts)
   })
   const integrations = createQuery(() => integrationsOptions(linearRefs().length > 0))
-  const linearConnected = () => !!integrations.data?.linear.connected
+  const linearConnected = () => (integrations.data?.integrations ?? []).some((i) => i.provider === 'linear' && i.connected)
   const linearIssues = createQuery(() => linearIssuesOptions(linearRefs().map((rf) => rf.identifier), linearRefs().length > 0 && linearConnected()))
   const linearSummary = createMemo(() => new Map((linearIssues.data?.issues ?? []).map((i) => [i.identifier, i])))
   const [openIssue, setOpenIssue] = createSignal<string | null>(null)

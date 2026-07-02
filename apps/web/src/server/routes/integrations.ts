@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto'
 import { and, eq, inArray } from 'drizzle-orm'
 import { Hono } from 'hono'
 import { getDb, schema } from '../db'
@@ -20,18 +21,47 @@ import {
 } from '../linear'
 import type { AppEnv } from '../middleware/auth'
 import { decryptSecret, encryptSecret } from '../session'
-import type { LinearActivity, IntegrationsStatus, LinearIssueDetail, LinearIssuesRequest, LinearIssuesResponse, LinearProjectIssue, LinearProjectIssuesResponse, LinearProjectsResponse } from '../../shared/api'
+import type { ConnectIntegrationRequest, Integration, IntegrationsResponse, LinearActivity, LinearIssueDetail, LinearIssuesRequest, LinearIssuesResponse, LinearProject, LinearProjectIssue, LinearProjectIssuesResponse, LinearProjectsResponse } from '../../shared/api'
 
 const PROVIDER = 'linear'
 const ISSUES_STALE_AFTER_MS = 600_000 // 10 min — tickets change slower than PRs; panel forces fresh
 
-// Decrypt the caller's stored Linear key, or null if they haven't connected.
-async function linearKey(c: { env: Env }, userId: string): Promise<string | null> {
-  const rows = await getDb(c.env)
+type IntegrationRow = typeof schema.integrations.$inferSelect
+
+// Every connected Linear integration for the user (0..n). A bare identifier is resolved by trying
+// these in turn (see resolveIssues). ponytail: first-hit-wins — if two Linears both own an
+// identifier, the first row queried shadows the other. Accepted ceiling until colliding prefixes
+// across connected workspaces is a real case (then route by team prefix).
+async function linearRows(c: { env: Env }, userId: string): Promise<IntegrationRow[]> {
+  return getDb(c.env)
     .select()
     .from(schema.integrations)
     .where(and(eq(schema.integrations.userId, userId), eq(schema.integrations.provider, PROVIDER)))
-  return rows[0] ? decryptSecret(rows[0].accessToken, c.env.SESSION_ENC_KEY) : null
+}
+
+const rowKey = (c: { env: Env }, row: IntegrationRow) => decryptSecret(row.accessToken, c.env.SESSION_ENC_KEY)
+
+// Run an issues-shaped query (ISSUES/DETAIL/ID) against each connection until one returns nodes.
+// Returns the resolving connection so results can be cached/commented under the right integrationId.
+async function resolveIssues(
+  c: { env: Env },
+  rows: IntegrationRow[],
+  query: string,
+  variables: Record<string, unknown>,
+): Promise<{ integrationId: string; key: string; nodes: LinearNode[] } | null> {
+  for (const row of rows) {
+    const key = await rowKey(c, row)
+    if (!key) continue
+    const res = await linearFetch(key, query, variables)
+    if (linearError(res)) continue
+    try {
+      const { issues } = await linearData<{ issues: { nodes: LinearNode[] } }>(res)
+      if (issues.nodes.length) return { integrationId: row.id, key, nodes: issues.nodes }
+    } catch {
+      // try the next connection
+    }
+  }
+  return null
 }
 
 // Flatten an issue's history into a chronological activity feed (oldest first). One history event
@@ -79,26 +109,34 @@ function nodeToDetail(n: LinearNode): LinearIssueDetail {
 
 const toSummary = (d: LinearIssueDetail) => ({ identifier: d.identifier, title: d.title, url: d.url, state: d.state, assignee: d.assignee })
 
-// /api/integrations — connect/disconnect/status for third-party providers (Linear first).
+const metaWorkspace = (meta: string | null): string | undefined => (meta ? (JSON.parse(meta) as { workspace?: string }).workspace : undefined)
+const rowToIntegration = (r: IntegrationRow): Integration => ({ id: r.id, provider: r.provider as Integration['provider'], label: r.label, connected: true, workspace: metaWorkspace(r.meta) })
+
+// /api/integrations — list/connect/disconnect third-party providers. Multi-row per provider; GitHub
+// is synthesized (identity root, token lives in the session cookie), not a stored row.
 export const integrations = new Hono<AppEnv>()
   .get('/', async (c) => {
     const user = c.get('user')
     if (!user) return c.json({ error: 'unauthenticated' }, 401)
-    const rows = await getDb(c.env)
-      .select()
-      .from(schema.integrations)
-      .where(and(eq(schema.integrations.userId, user.login), eq(schema.integrations.provider, PROVIDER)))
-    const workspace = rows[0]?.meta ? (JSON.parse(rows[0].meta) as { workspace?: string }).workspace : undefined
-    return c.json({ linear: { connected: !!rows[0], workspace } } satisfies IntegrationsStatus)
+    const rows = await getDb(c.env).select().from(schema.integrations).where(eq(schema.integrations.userId, user.login))
+    const list: Integration[] = [
+      { id: 'github', provider: 'github', label: user.login, connected: true },
+      ...rows.map(rowToIntegration),
+    ]
+    return c.json({ integrations: list } satisfies IntegrationsResponse)
   })
-  .post('/linear', async (c) => {
+  // Connect a provider by pasting a token (validated + encrypted). Returns the new row. Multiple
+  // rows of the same provider are allowed — each is a distinct connection.
+  .post('/', async (c) => {
     const user = c.get('user')
     if (!user) return c.json({ error: 'unauthenticated' }, 401)
-    const { apiKey } = (await c.req.json().catch(() => ({}))) as { apiKey?: string }
-    if (!apiKey || typeof apiKey !== 'string') return c.json({ error: 'bad_request' }, 400)
+    const { provider, token } = (await c.req.json().catch(() => ({}))) as Partial<ConnectIntegrationRequest>
+    if (!token || typeof token !== 'string') return c.json({ error: 'bad_request' }, 400)
+    // ponytail: only Linear validates today; Rollbar's client is deferred (docs/workspaces 04).
+    if (provider !== 'linear') return c.json({ error: 'unsupported_provider' }, 400)
 
     // Validate the key by reading the viewer; reject anything that doesn't authenticate.
-    const res = await linearFetch(apiKey.trim(), VIEWER_QUERY, {})
+    const res = await linearFetch(token.trim(), VIEWER_QUERY, {})
     if (linearError(res)) return c.json({ error: 'invalid_key' }, 400)
     let workspace: string
     try {
@@ -107,43 +145,58 @@ export const integrations = new Hono<AppEnv>()
       return c.json({ error: 'invalid_key' }, 400)
     }
 
-    await getDb(c.env)
-      .insert(schema.integrations)
-      .values({ userId: user.login, provider: PROVIDER, accessToken: await encryptSecret(apiKey.trim(), c.env.SESSION_ENC_KEY), meta: JSON.stringify({ workspace }), createdAt: Date.now() })
-      .onConflictDoUpdate({
-        target: [schema.integrations.userId, schema.integrations.provider],
-        set: { accessToken: await encryptSecret(apiKey.trim(), c.env.SESSION_ENC_KEY), meta: JSON.stringify({ workspace }) },
-      })
-    return c.json({ linear: { connected: true, workspace } } satisfies IntegrationsStatus)
+    const row = { id: randomUUID(), userId: user.login, provider: PROVIDER, label: `Linear · ${workspace}`, accessToken: await encryptSecret(token.trim(), c.env.SESSION_ENC_KEY), meta: JSON.stringify({ workspace }), createdAt: Date.now() }
+    await getDb(c.env).insert(schema.integrations).values(row)
+    return c.json({ integration: rowToIntegration(row) })
   })
-  .delete('/linear', async (c) => {
+  // Disconnect one connection by id; cascade its workspace links, cached issues, and task links.
+  .delete('/:id', async (c) => {
     const user = c.get('user')
     if (!user) return c.json({ error: 'unauthenticated' }, 401)
-    await getDb(c.env)
-      .delete(schema.integrations)
-      .where(and(eq(schema.integrations.userId, user.login), eq(schema.integrations.provider, PROVIDER)))
+    const id = c.req.param('id')
+    if (id === 'github') return c.json({ error: 'cannot_disconnect_github' }, 400)
+    const db = getDb(c.env)
+    await db.delete(schema.workspaceProjects).where(eq(schema.workspaceProjects.integrationId, id))
+    await db.delete(schema.issues).where(and(eq(schema.issues.userId, user.login), eq(schema.issues.integrationId, id)))
+    await db.delete(schema.taskLinks).where(eq(schema.taskLinks.integrationId, id))
+    await db.delete(schema.integrations).where(and(eq(schema.integrations.id, id), eq(schema.integrations.userId, user.login)))
     return c.body(null, 204)
   })
 
-// /api/linear — read Linear issues referenced from a PR. Per-user, cached in D1 (never shared KV).
+// /api/linear — read Linear issues referenced from a PR. Per-user, cached locally (never shared).
+// A bare identifier is resolved across all connected Linear integrations (resolveIssues);
+// project/browse routes take an explicit ?integration=<id> since the client already knows it.
 export const linear = new Hono<AppEnv>()
-  // Workspace projects for the per-repo picker (docs/workspaces — Linear source). Live read.
+  // Projects across every connected Linear integration, each tagged with its connection so the
+  // picker can span multiple Linears (docs/workspaces 04). A failing connection is skipped.
   .get('/projects', async (c) => {
     const user = c.get('user')
     if (!user) return c.json({ error: 'unauthenticated' }, 401)
-    const key = await linearKey(c, user.login)
-    if (!key) return c.json({ error: 'linear_not_connected' }, 403)
-    const res = await linearFetch(key, PROJECTS_QUERY, {})
-    const err = linearError(res)
-    if (err) return c.json({ error: err.error }, err.status)
-    const { projects } = await linearData<{ projects: { nodes: LinearProjectNode[] } }>(res)
-    return c.json({ projects: projects.nodes.map((p) => ({ id: p.id, name: p.name })) } satisfies LinearProjectsResponse)
+    const rows = await linearRows(c, user.login)
+    if (!rows.length) return c.json({ error: 'linear_not_connected' }, 403)
+    const out: LinearProject[] = []
+    for (const row of rows) {
+      const key = await rowKey(c, row)
+      if (!key) continue
+      const res = await linearFetch(key, PROJECTS_QUERY, {})
+      if (linearError(res)) continue
+      try {
+        const { projects } = await linearData<{ projects: { nodes: LinearProjectNode[] } }>(res)
+        out.push(...projects.nodes.map((p) => ({ integrationId: row.id, integrationLabel: row.label, id: p.id, name: p.name })))
+      } catch {
+        // skip this connection
+      }
+    }
+    return c.json({ projects: out } satisfies LinearProjectsResponse)
   })
-  // Active issues for the given project ids (the Linear source browse). Live read, client caches.
+  // Active issues for the given project ids within ONE connection (?integration=<id>&ids=).
   .get('/project-issues', async (c) => {
     const user = c.get('user')
     if (!user) return c.json({ error: 'unauthenticated' }, 401)
-    const key = await linearKey(c, user.login)
+    const rows = await linearRows(c, user.login)
+    const row = rows.find((r) => r.id === c.req.query('integration'))
+    if (!row) return c.json({ error: 'linear_not_connected' }, 403)
+    const key = await rowKey(c, row)
     if (!key) return c.json({ error: 'linear_not_connected' }, 403)
     const ids = [...new Set((c.req.query('ids') ?? '').split(',').map((s) => s.trim()).filter(Boolean))]
     if (!ids.length) return c.json({ issues: [] } satisfies LinearProjectIssuesResponse)
@@ -151,15 +204,16 @@ export const linear = new Hono<AppEnv>()
     const err = linearError(res)
     if (err) return c.json({ error: err.error }, err.status)
     const { issues } = await linearData<{ issues: { nodes: LinearNode[] } }>(res)
-    const out: LinearProjectIssue[] = issues.nodes.map((n) => ({ ...toSummary(nodeToDetail(n)), branchName: n.branchName ?? null }))
+    const out: LinearProjectIssue[] = issues.nodes.map((n) => ({ ...toSummary(nodeToDetail(n)), integrationId: row.id, branchName: n.branchName ?? null }))
     return c.json({ issues: out } satisfies LinearProjectIssuesResponse)
   })
-  // Batch enrichment for the Integrations list: summaries, serve-then-revalidate (10-min TTL).
+  // Batch enrichment for referenced tickets: summaries, serve-then-revalidate (10-min TTL). Stale
+  // identifiers are resolved across all connections; each result is cached under its connection.
   .post('/issues', async (c) => {
     const user = c.get('user')
     if (!user) return c.json({ error: 'unauthenticated' }, 401)
-    const key = await linearKey(c, user.login)
-    if (!key) return c.json({ error: 'linear_not_connected' }, 403)
+    const rows = await linearRows(c, user.login)
+    if (!rows.length) return c.json({ error: 'linear_not_connected' }, 403)
 
     const body = (await c.req.json().catch(() => ({}))) as Partial<LinearIssuesRequest>
     const identifiers = [...new Set((body.identifiers ?? []).filter((s) => typeof s === 'string'))]
@@ -178,29 +232,32 @@ export const linear = new Hono<AppEnv>()
       if (row.fetchedAt + ISSUES_STALE_AFTER_MS > now) fresh.add(row.identifier)
     }
 
-    const stale = identifiers.filter((id) => !fresh.has(id))
-    const filter = issuesFilter(stale)
-    if (filter) {
+    let stale = identifiers.filter((id) => !fresh.has(id))
+    // Try each connection for whatever's still unresolved; found ids drop out of the next pass.
+    for (const row of rows) {
+      if (!stale.length) break
+      const key = await rowKey(c, row)
+      if (!key) continue
+      const filter = issuesFilter(stale)
+      if (!filter) break
       try {
         const res = await linearFetch(key, ISSUES_QUERY, { filter })
-        const err = linearError(res)
-        if (err) return c.json({ error: err.error }, err.status)
+        if (linearError(res)) continue
         const { issues } = await linearData<{ issues: { nodes: LinearNode[] } }>(res)
+        const found = new Set<string>()
         for (const node of issues.nodes) {
           const prev = byId.get(node.identifier)
-          // Preserve any already-fetched description/comments/activity from a prior detail fetch.
           const detail: LinearIssueDetail = { ...nodeToDetail(node), description: prev?.description ?? null, comments: prev?.comments ?? [], activity: prev?.activity ?? [] }
           byId.set(node.identifier, detail)
+          found.add(node.identifier)
           await db
             .insert(schema.issues)
-            .values({ userId: user.login, provider: PROVIDER, identifier: node.identifier, data: JSON.stringify(detail), fetchedAt: now })
-            .onConflictDoUpdate({
-              target: [schema.issues.userId, schema.issues.provider, schema.issues.identifier],
-              set: { data: JSON.stringify(detail), fetchedAt: now },
-            })
+            .values({ userId: user.login, integrationId: row.id, provider: PROVIDER, identifier: node.identifier, data: JSON.stringify(detail), fetchedAt: now })
+            .onConflictDoUpdate({ target: [schema.issues.userId, schema.issues.integrationId, schema.issues.identifier], set: { data: JSON.stringify(detail), fetchedAt: now } })
         }
+        stale = stale.filter((id) => !found.has(id))
       } catch {
-        // Network/GraphQL failure: fall back to whatever we had cached.
+        // try the next connection
       }
     }
 
@@ -211,8 +268,8 @@ export const linear = new Hono<AppEnv>()
   .get('/issues/:identifier', async (c) => {
     const user = c.get('user')
     if (!user) return c.json({ error: 'unauthenticated' }, 401)
-    const key = await linearKey(c, user.login)
-    if (!key) return c.json({ error: 'linear_not_connected' }, 403)
+    const rows = await linearRows(c, user.login)
+    if (!rows.length) return c.json({ error: 'linear_not_connected' }, 403)
 
     const identifier = c.req.param('identifier')
     const refresh = c.req.query('refresh') === '1'
@@ -220,71 +277,46 @@ export const linear = new Hono<AppEnv>()
     const now = Date.now()
 
     if (!refresh) {
-      const rows = await db
+      const cached = await db
         .select()
         .from(schema.issues)
         .where(and(eq(schema.issues.userId, user.login), eq(schema.issues.provider, PROVIDER), eq(schema.issues.identifier, identifier)))
-      const row = rows[0]
+      const row = cached[0]
       if (row && row.fetchedAt + ISSUES_STALE_AFTER_MS > now) return c.json(JSON.parse(row.data) as LinearIssueDetail)
     }
 
     const filter = issuesFilter([identifier])
     if (!filter) return c.json({ error: 'not_found' }, 404)
-    const res = await linearFetch(key, ISSUE_DETAIL_QUERY, { filter })
-    const err = linearError(res)
-    if (err) return c.json({ error: err.error }, err.status)
-    let node: LinearNode | undefined
-    try {
-      node = (await linearData<{ issues: { nodes: LinearNode[] } }>(res)).issues.nodes[0]
-    } catch {
-      return c.json({ error: 'linear_unavailable' }, 502)
-    }
-    if (!node) return c.json({ error: 'not_found' }, 404)
-    const detail = nodeToDetail(node)
+    const resolved = await resolveIssues(c, rows, ISSUE_DETAIL_QUERY, { filter })
+    if (!resolved) return c.json({ error: 'not_found' }, 404)
+    const detail = nodeToDetail(resolved.nodes[0])
     await db
       .insert(schema.issues)
-      .values({ userId: user.login, provider: PROVIDER, identifier: detail.identifier, data: JSON.stringify(detail), fetchedAt: now })
-      .onConflictDoUpdate({
-        target: [schema.issues.userId, schema.issues.provider, schema.issues.identifier],
-        set: { data: JSON.stringify(detail), fetchedAt: now },
-      })
+      .values({ userId: user.login, integrationId: resolved.integrationId, provider: PROVIDER, identifier: detail.identifier, data: JSON.stringify(detail), fetchedAt: now })
+      .onConflictDoUpdate({ target: [schema.issues.userId, schema.issues.integrationId, schema.issues.identifier], set: { data: JSON.stringify(detail), fetchedAt: now } })
     return c.json(detail)
   })
   // Add a comment (or threaded reply via parentId) to a ticket. Client refetches detail after.
   .post('/issues/:identifier/comments', async (c) => {
     const user = c.get('user')
     if (!user) return c.json({ error: 'unauthenticated' }, 401)
-    const key = await linearKey(c, user.login)
-    if (!key) return c.json({ error: 'linear_not_connected' }, 403)
+    const rows = await linearRows(c, user.login)
+    if (!rows.length) return c.json({ error: 'linear_not_connected' }, 403)
 
     const identifier = c.req.param('identifier')
     const { body, parentId } = (await c.req.json().catch(() => ({}))) as { body?: string; parentId?: string }
     if (!body || !body.trim()) return c.json({ error: 'bad_request' }, 400)
 
-    // commentCreate keys off the internal issue UUID — reuse the cached detail's id, else resolve it.
-    const db = getDb(c.env)
-    const rows = await db
-      .select()
-      .from(schema.issues)
-      .where(and(eq(schema.issues.userId, user.login), eq(schema.issues.provider, PROVIDER), eq(schema.issues.identifier, identifier)))
-    let issueId = rows[0] ? (JSON.parse(rows[0].data) as LinearIssueDetail).id || undefined : undefined
-    if (!issueId) {
-      const filter = issuesFilter([identifier])
-      if (!filter) return c.json({ error: 'not_found' }, 404)
-      const idRes = await linearFetch(key, ISSUE_ID_QUERY, { filter })
-      const idErr = linearError(idRes)
-      if (idErr) return c.json({ error: idErr.error }, idErr.status)
-      try {
-        issueId = (await linearData<{ issues: { nodes: { id: string }[] } }>(idRes)).issues.nodes[0]?.id
-      } catch {
-        return c.json({ error: 'linear_unavailable' }, 502)
-      }
-    }
-    if (!issueId) return c.json({ error: 'not_found' }, 404)
+    // commentCreate keys off the internal issue UUID; resolve it (and the owning connection's key).
+    const filter = issuesFilter([identifier])
+    if (!filter) return c.json({ error: 'not_found' }, 404)
+    const resolved = await resolveIssues(c, rows, ISSUE_ID_QUERY, { filter })
+    const issueId = resolved?.nodes[0]?.id
+    if (!resolved || !issueId) return c.json({ error: 'not_found' }, 404)
 
     const input: Record<string, unknown> = { issueId, body: body.trim() }
     if (parentId) input.parentId = parentId
-    const res = await linearFetch(key, COMMENT_CREATE, { input })
+    const res = await linearFetch(resolved.key, COMMENT_CREATE, { input })
     const err = linearError(res)
     if (err) return c.json({ error: err.error }, err.status)
     try {
