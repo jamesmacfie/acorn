@@ -43,3 +43,20 @@
 }
 .changes-empty { padding: 10px; font-size: var(--fs-sm); }
 .changes-diff { flex: 1; min-width: 0; overflow: auto; }
+
+/* File-row "add to agent" affordance (docs/next 04 §E). */
+.changes-row-wrap { display: flex; align-items: stretch; }
+.changes-row-wrap .changes-row { flex: 1; min-width: 0; }
+.changes-to-agent {
+  flex: none;
+  width: 22px;
+  font: inherit;
+  font-size: var(--fs-sm);
+  color: var(--text-faint);
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+  visibility: hidden;
+}
+.changes-row-wrap:hover .changes-to-agent { visibility: visible; }
+.changes-to-agent:hover { color: var(--text); }
