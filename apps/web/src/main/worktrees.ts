@@ -22,6 +22,27 @@ async function branchExists(checkout: string, branch: string): Promise<boolean> 
   }
 }
 
+// Any commit-ish (branch, remote ref, sha) that resolves in the checkout.
+async function refExists(checkout: string, ref: string): Promise<boolean> {
+  if (ref.startsWith('-')) return false // never let a ref be read as a flag
+  try {
+    await exec('git', ['-C', checkout, 'rev-parse', '--verify', '--quiet', `${ref}^{commit}`], { timeout: 10_000 })
+    return true
+  } catch {
+    return false
+  }
+}
+
+// Base-ref precedence for a NEW branch (docs/next 02 P2, verne's order): per-repo preferred ref
+// (prefs key `base_ref:<owner>/<repo>`, resolved by the caller) → origin/main → origin/master →
+// null (= HEAD, today's behaviour).
+export async function resolveBaseRef(checkout: string, preferred?: string | null): Promise<string | null> {
+  for (const candidate of [...(preferred?.trim() ? [preferred.trim()] : []), 'origin/main', 'origin/master']) {
+    if (await refExists(checkout, candidate)) return candidate
+  }
+  return null
+}
+
 // Lazy on first terminal (Flow C). For a PR workspace, check out the PR head detached (robust for
 // forks). For a local-first workspace, reuse the branch if it exists else create it from HEAD.
 // A branch name safe to pass to git as a positional: no leading dash (so it can't be read as a
@@ -39,6 +60,7 @@ export async function ensureWorktree(
   repo: string,
   branch: string,
   pullNumber: number | null,
+  preferredBaseRef?: string | null,
 ): Promise<EnsureWorktreeResult> {
   if (!isValidBranch(branch)) return { ok: false, reason: 'Invalid branch name.' }
   const path = join(worktreesRoot, worktreeBranchDirName(owner, repo, branch))
@@ -65,11 +87,14 @@ export async function ensureWorktree(
     return { ok: true, path, created: true }
   }
 
-  // Local-first workspace: add a worktree on the branch, creating it from HEAD if it's new. `--`
+  // Local-first workspace: add a worktree on the branch. A NEW branch starts from the resolved
+  // base ref (per-repo preference → origin/main → origin/master → HEAD, docs/next 02 P2). `--`
   // ends option parsing so a branch/path can never be mistaken for a flag (argv-injection guard).
-  const args = (await branchExists(checkout, branch))
+  const exists = await branchExists(checkout, branch)
+  const baseRef = exists ? null : await resolveBaseRef(checkout, preferredBaseRef)
+  const args = exists
     ? ['-C', checkout, 'worktree', 'add', '--', path, branch]
-    : ['-C', checkout, 'worktree', 'add', '-b', branch, '--', path]
+    : ['-C', checkout, 'worktree', 'add', '-b', branch, '--', path, ...(baseRef ? [baseRef] : [])]
   try {
     await exec('git', args, { timeout: 60_000 })
   } catch {

@@ -140,6 +140,13 @@ const loadTask = async (db: AppDatabase, id: string): Promise<typeof schema.task
   return t
 }
 
+// Per-repo preferred base ref for NEW branches (docs/next 02 P2): the prefs key
+// `base_ref:<owner>/<repo>`. Read by key alone — machine-local single-user app.
+const baseRefPref = async (db: AppDatabase, owner: string, repo: string): Promise<string | null> => {
+  const [row] = await db.select().from(schema.prefs).where(eq(schema.prefs.key, `base_ref:${owner}/${repo}`)).limit(1)
+  return row?.value ?? null
+}
+
 // Live worktree status for every active task that has a worktree (docs/workspaces 02/05):
 // dirty + changed-file count via git, and `missing` when the dir vanished (removed outside acorn).
 async function computeTaskStatuses(db: AppDatabase): Promise<TaskStatus[]> {
@@ -188,7 +195,7 @@ async function resolveTaskCwd(
 ): Promise<{ cwd: string; isWorktree: boolean; created: boolean }> {
   if (t?.worktreePath && isDir(t.worktreePath)) return { cwd: t.worktreePath, isWorktree: true, created: false }
   if (!t || !baseCheckout || !isDir(baseCheckout)) return { cwd: baseCheckout && isDir(baseCheckout) ? baseCheckout : homedir(), isWorktree: false, created: false }
-  const wt = await ensureWorktree(worktreesRoot, baseCheckout, t.repoOwner, t.repoName, t.branch, t.pullNumber)
+  const wt = await ensureWorktree(worktreesRoot, baseCheckout, t.repoOwner, t.repoName, t.branch, t.pullNumber, await baseRefPref(db, t.repoOwner, t.repoName))
   if (!wt.ok) return { cwd: baseCheckout, isWorktree: false, created: false }
   await db.update(schema.tasks).set({ worktreePath: wt.path, updatedAt: Date.now() }).where(eq(schema.tasks.id, t.id))
   return { cwd: wt.path, isWorktree: true, created: wt.created }
@@ -577,7 +584,7 @@ export async function registerTerminalIpc(db: AppDatabase, worktreesDir: string)
     if (trigger !== 'created' || !script?.trim()) return
     const mapped = await getRepoPath(db, t.repoOwner, t.repoName)
     if (!mapped || !isDir(mapped.path)) return
-    const wt = await ensureWorktree(worktreesRoot, mapped.path, t.repoOwner, t.repoName, t.branch, t.pullNumber)
+    const wt = await ensureWorktree(worktreesRoot, mapped.path, t.repoOwner, t.repoName, t.branch, t.pullNumber, await baseRefPref(db, t.repoOwner, t.repoName))
     if (!wt.ok || !wt.created) return
     await db.update(schema.tasks).set({ worktreePath: wt.path, updatedAt: Date.now() }).where(eq(schema.tasks.id, t.id))
     await maybeRunSetup(db, t, wt.path, taskContext(t))

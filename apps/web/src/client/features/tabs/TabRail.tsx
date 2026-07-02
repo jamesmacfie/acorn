@@ -8,6 +8,7 @@ import { activeTaskId, paneForTask, selectedSource, setActivePane, setActiveTask
 import { taskStatus } from '../tasks/taskStatus'
 import { workspaceForRepo } from '../workspaces/activeWorkspace'
 import { resolveWorkspaceColor } from '../../../shared/workspaceIdentity'
+import { dedupeBranch, slugifyBranch } from '../../../shared/branch'
 import { terminalApi } from '../terminal/terminalClient'
 import './tabrail.css'
 
@@ -32,6 +33,18 @@ export default function TabRail() {
   const [draft, setDraft] = createSignal<Draft | null>(null)
   const [text, setText] = createSignal('')
   const [newRepo, setNewRepo] = createSignal('') // "owner/name" for the new-task repo selector
+  // Custom branch name (docs/next 02 P2): defaults to a de-duped slug of the title until the user
+  // edits the branch field directly, then their value wins.
+  const [branchText, setBranchText] = createSignal('')
+  const [branchTouched, setBranchTouched] = createSignal(false)
+
+  const branchesInRepo = (repoKey: string) =>
+    (query.data ?? []).filter((t) => `${t.repoOwner}/${t.repoName}` === repoKey).map((t) => t.branch)
+  const defaultBranch = (title: string) => {
+    const slug = slugifyBranch(title)
+    return slug ? dedupeBranch(slug, branchesInRepo(newRepo())) : ''
+  }
+  const effectiveBranch = () => (branchTouched() ? slugifyBranch(branchText()) : defaultBranch(text()))
 
   const invalidate = () => queryClient.invalidateQueries({ queryKey: tasksKey })
 
@@ -84,6 +97,8 @@ export default function TabRail() {
     const cur = `${params.owner}/${params.repo}`
     setNewRepo(repos.some((r) => `${r.owner}/${r.name}` === cur) ? cur : `${repos[0].owner}/${repos[0].name}`)
     setText('')
+    setBranchText('')
+    setBranchTouched(false)
     setDraft({ mode: 'new' })
   }
 
@@ -101,7 +116,9 @@ export default function TabRail() {
     if (d.mode === 'new') {
       const [owner, repo] = newRepo().split('/')
       if (!owner || !repo) return setDraft(null)
-      const w = await createTask({ origin: 'local', repoOwner: owner, repoName: repo, branch: value })
+      const branch = effectiveBranch()
+      if (!branch) return
+      const w = await createTask({ origin: 'local', repoOwner: owner, repoName: repo, branch, title: value })
       await invalidate()
       setSelectedSource(null)
       setActiveTaskId(w.id)
@@ -224,17 +241,31 @@ export default function TabRail() {
                     </For>
                   </select>
                 </Show>
-                <form class="integration-key-row" onSubmit={submitDraft}>
+                <form class="integration-key-row" style={{ 'flex-direction': 'column', 'align-items': 'stretch', gap: '6px' }} onSubmit={submitDraft}>
                   <input
                     class="integration-key-input"
                     type="text"
                     autofocus
-                    placeholder={d().mode === 'new' ? 'feat/my-branch' : 'Task name'}
+                    placeholder={d().mode === 'new' ? 'Task title' : 'Task name'}
                     value={text()}
                     onInput={(e) => setText(e.currentTarget.value)}
                     onKeyDown={(e) => e.key === 'Escape' && setDraft(null)}
                   />
-                  <button type="submit" class="overlay-btn" disabled={!text().trim()}>
+                  <Show when={d().mode === 'new'}>
+                    <input
+                      class="integration-key-input"
+                      type="text"
+                      placeholder="branch (from title)"
+                      title="Branch name — defaults to a slug of the title"
+                      value={branchTouched() ? branchText() : effectiveBranch()}
+                      onInput={(e) => {
+                        setBranchTouched(true)
+                        setBranchText(e.currentTarget.value)
+                      }}
+                      onKeyDown={(e) => e.key === 'Escape' && setDraft(null)}
+                    />
+                  </Show>
+                  <button type="submit" class="overlay-btn" disabled={!text().trim() || (d().mode === 'new' && !effectiveBranch())}>
                     {d().mode === 'new' ? 'Create' : 'Save'}
                   </button>
                 </form>
