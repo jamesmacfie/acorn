@@ -1,6 +1,8 @@
-import { spawn, type ChildProcess } from 'node:child_process'
+import { execFileSync, spawn, type ChildProcess } from 'node:child_process'
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { createServer, type Server } from 'node:http'
-import { dirname, resolve } from 'node:path'
+import { tmpdir } from 'node:os'
+import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
@@ -93,40 +95,97 @@ describe('acorn MCP server over stdio JSON-RPC (docs/next 06 B)', () => {
   let port: number
   const seenHeaders: string[] = []
 
+  const posts: { url: string; body: unknown }[] = []
+  let worktree: string
+
   beforeAll(async () => {
     stub = createServer((req, res) => {
       seenHeaders.push(String(req.headers['x-acorn-internal'] ?? ''))
-      if (req.url?.startsWith('/api/tasks/t1/repo-info')) {
+      const json = (v: unknown) => {
         res.setHeader('content-type', 'application/json')
-        res.end(JSON.stringify({ owner: 'acme', name: 'api', defaultBranch: 'main', branch: 'fix/null-token', worktreePath: '/wt' }))
+        res.end(JSON.stringify(v))
+      }
+      const url = req.url ?? ''
+      if (req.method === 'POST' || req.method === 'PUT') {
+        let raw = ''
+        req.on('data', (c) => (raw += c))
+        req.on('end', () => {
+          posts.push({ url, body: raw ? JSON.parse(raw) : null })
+          if (url.includes('/memory/propose'))
+            json({ ok: true, proposal: { id: 'p1', status: 'pending', name: 'null-token-guard' } })
+          else if (url.includes('/run/')) json({ ok: true })
+          else json({ ok: true })
+        })
         return
       }
-      if (req.url?.startsWith('/api/tasks/t1/context')) {
-        res.setHeader('content-type', 'application/json')
-        res.end(JSON.stringify(CTX))
-        return
-      }
+      if (url.startsWith('/api/tasks/t1/repo-info')) return json({ owner: 'acme', name: 'api', defaultBranch: 'main', branch: 'fix/null-token', worktreePath: '/wt' })
+      if (url.startsWith('/api/tasks/t1/context')) return json(CTX)
+      if (url.startsWith('/api/tasks/t1/notes/plan')) return json({ slug: 'plan', title: 'plan', body: 'do the thing' })
+      if (url.startsWith('/api/tasks/t1/notes')) return json([{ slug: 'plan', title: 'plan', kind: 'plan', author: 'user' }])
+      if (url.startsWith('/api/tasks/t1/memory/auth-conventions')) return json({ name: 'auth-conventions', body: 'Tokens rotate.', path: '/x.md' })
+      if (url.startsWith('/api/tasks/t1/memory')) return json([{ name: 'auth-conventions', description: 'how auth works' }])
+      if (url.startsWith('/api/tasks/t1/run/dev/status')) return json({ running: true, url: 'http://localhost:5173' })
+      if (url.startsWith('/api/tasks/t1/run')) return json({ targets: [{ id: 'dev', running: false }], errors: [], layouts: [] })
       res.statusCode = 404
       res.end('{}')
     })
     await new Promise<void>((r) => stub.listen(0, '127.0.0.1', r))
     port = (stub.address() as { port: number }).port
+
+    // Fixture worktree for the local_* tools (never the acorn repo).
+    worktree = mkdtempSync(join(tmpdir(), 'acorn-mcp-wt-'))
+    const git = (...args: string[]) => execFileSync('git', ['-C', worktree, ...args], { stdio: 'pipe' })
+    execFileSync('git', ['init', '-q', '-b', 'main', worktree])
+    git('config', 'user.email', 't@t.test')
+    git('config', 'user.name', 'T')
+    writeFileSync(join(worktree, 'a.ts'), 'one\ntwo\n')
+    git('add', '.')
+    git('commit', '-q', '-m', 'feat: initial')
+    writeFileSync(join(worktree, 'a.ts'), 'one\nCHANGED\n')
   })
 
-  afterAll(() => stub.close())
+  afterAll(() => {
+    stub.close()
+    rmSync(worktree, { recursive: true, force: true })
+  })
 
   it('initialize → tools/list → tools/call with the task env set', async () => {
     const client = new McpClient({
       ACORN_TASK_ID: 't1',
       ACORN_API_URL: `http://127.0.0.1:${port}`,
       ACORN_API_TOKEN: 'internal-token',
+      ACORN_WORKTREE_PATH: worktree,
+      ACORN_SESSION_ID: 'sess-42',
     })
     try {
       await client.init()
 
+      // tools/list reflects the 06 catalog through P3 (orchestration-inversion P4 stays unbuilt).
       const list = await client.send('tools/list')
       const names = ((list.result as { tools: { name: string }[] }).tools ?? []).map((t) => t.name).sort()
-      expect(names).toEqual(['linked_issues', 'pr_changed_files', 'pr_current', 'repo_info', 'task_context', 'task_current'])
+      expect(names).toEqual([
+        'git_log',
+        'linked_issues',
+        'local_changes',
+        'local_diff',
+        'memory_get',
+        'memory_list',
+        'memory_search',
+        'memory_write',
+        'notes_append',
+        'notes_list',
+        'notes_read',
+        'notes_write',
+        'pr_changed_files',
+        'pr_current',
+        'repo_info',
+        'run_start',
+        'run_status',
+        'run_stop',
+        'run_targets',
+        'task_context',
+        'task_current',
+      ])
 
       const current = toolText(await client.send('tools/call', { name: 'task_current', arguments: {} }))
       expect(current).toMatchObject({ repo: 'acme/api', branch: 'fix/null-token', pullNumber: 813 })
@@ -140,6 +199,38 @@ describe('acorn MCP server over stdio JSON-RPC (docs/next 06 B)', () => {
 
       const info = toolText(await client.send('tools/call', { name: 'repo_info', arguments: {} }))
       expect(info).toMatchObject({ owner: 'acme', defaultBranch: 'main' })
+
+      // local_* over the fixture worktree (real git, one shared implementation with the pane).
+      const changes = toolText(await client.send('tools/call', { name: 'local_changes', arguments: {} })) as { path: string }[]
+      expect(changes).toEqual([expect.objectContaining({ path: 'a.ts', status: 'modified', staged: false })])
+      const diffRes = await client.send('tools/call', { name: 'local_diff', arguments: { path: 'a.ts' } })
+      expect((diffRes.result as { content: { text: string }[] }).content[0].text).toContain('+CHANGED')
+      const log = toolText(await client.send('tools/call', { name: 'git_log', arguments: { n: 5 } })) as { subject: string }[]
+      expect(log[0].subject).toBe('feat: initial')
+
+      // notes/memory/run ride the harness loopback; agent writes carry the session id.
+      expect(toolText(await client.send('tools/call', { name: 'notes_read', arguments: { slug: 'plan' } }))).toMatchObject({ slug: 'plan' })
+      await client.send('tools/call', { name: 'notes_append', arguments: { slug: 'plan', text: 'Done: guarded token.' } })
+      const appendPost = posts.find((p) => p.url.includes('/notes/plan/append'))
+      expect(appendPost?.body).toEqual({ text: 'Done: guarded token.', sessionId: 'sess-42' })
+
+      expect(toolText(await client.send('tools/call', { name: 'memory_search', arguments: { query: 'auth' } }))).toEqual([
+        { name: 'auth-conventions', description: 'how auth works' },
+      ])
+      expect(toolText(await client.send('tools/call', { name: 'memory_get', arguments: { name: 'auth-conventions' } }))).toMatchObject({ body: 'Tokens rotate.' })
+
+      // memory_write PROPOSES — the response carries a pending proposal, no direct write path.
+      const proposal = toolText(
+        await client.send('tools/call', { name: 'memory_write', arguments: { name: 'null-token-guard', type: 'fix', description: 'd', body: 'Why: order.' } }),
+      )
+      expect(proposal).toMatchObject({ proposal: { status: 'pending' } })
+      const proposePost = posts.find((p) => p.url.includes('/memory/propose'))
+      expect(proposePost?.body).toMatchObject({ name: 'null-token-guard', type: 'fix', sessionId: 'sess-42' })
+
+      expect(toolText(await client.send('tools/call', { name: 'run_targets', arguments: {} }))).toMatchObject({ targets: [{ id: 'dev' }] })
+      await client.send('tools/call', { name: 'run_start', arguments: { id: 'dev' } })
+      expect(posts.some((p) => p.url.includes('/run/dev/start'))).toBe(true)
+      expect(toolText(await client.send('tools/call', { name: 'run_status', arguments: { id: 'dev' } }))).toEqual({ running: true, url: 'http://localhost:5173' })
 
       // Loopback calls carried the internal bearer (never a cookie).
       expect(seenHeaders.every((h) => h === 'internal-token')).toBe(true)
