@@ -46,11 +46,15 @@ export const resolveBackend = (preference: 'node-pty' | 'tmux', tmuxAvailable: b
 // PR worktree directory name (vNext §9): `<owner>-<repo>-pr-<number>` under the worktrees root.
 export const worktreeDirName = (owner: string, repo: string, number: number | string) => `${owner}-${repo}-pr-${number}`
 
+// The filesystem/DNS-safe branch slug (docs/next 02): shared by the worktree dir name and the
+// ACORN_TASK_SLUG env var — the isolation handle for parallel tasks (compose -p, derived names).
+export const branchSlug = (branch: string) => branch.replace(/[^A-Za-z0-9._-]/g, '-')
+
 // Workspace worktree directory name (docs/workspaces 05): keyed by branch, since a workspace is
 // branch-first (local-first workspaces have no PR number). The branch slug replaces any char that
 // isn't filesystem-safe (`feat/login` → `feat-login`); isContainedPath still guards the result.
 export const worktreeBranchDirName = (owner: string, repo: string, branch: string) =>
-  `${owner}-${repo}-${branch.replace(/[^A-Za-z0-9._-]/g, '-')}`
+  `${owner}-${repo}-${branchSlug(branch)}`
 
 // Guard repo identifiers before they reach a filesystem path (vNext §5/§11: validate every IPC
 // payload at the boundary). Allow only GitHub-legal chars and forbid a leading dot, so `..`, `/`,
@@ -78,4 +82,32 @@ export function childEnv(env: NodeJS.ProcessEnv = process.env): Record<string, s
   }
   out.TERM = 'xterm-256color'
   return out
+}
+
+// Task identity fields a session env needs — a projection of the tasks row, so this stays free of
+// drizzle types and testable under plain Node.
+export type SessionTaskInfo = { repoOwner: string; repoName: string; branch: string; title: string }
+
+// Environment for every task-scoped session and lifecycle script (docs/next 02/11): the childEnv
+// whitelist (never secrets), plus the ACORN_* identity vars agents / MCP / setup / teardown scripts
+// key off. Caller-supplied opts.env still wins — it's spread last.
+export function buildSessionEnv(opts: {
+  taskId: string
+  cwd: string
+  task?: SessionTaskInfo | null
+  env?: Record<string, string>
+  baseEnv?: NodeJS.ProcessEnv
+}): Record<string, string> {
+  const out: Record<string, string> = {
+    ...childEnv(opts.baseEnv ?? process.env),
+    ACORN_TASK_ID: opts.taskId,
+    ACORN_WORKTREE_PATH: opts.cwd,
+  }
+  if (opts.task) {
+    out.ACORN_REPO = `${opts.task.repoOwner}/${opts.task.repoName}`
+    out.ACORN_BRANCH = opts.task.branch
+    out.ACORN_TASK_SLUG = branchSlug(opts.task.branch)
+    out.ACORN_TASK_TITLE = opts.task.title
+  }
+  return { ...out, ...(opts.env ?? {}) }
 }
