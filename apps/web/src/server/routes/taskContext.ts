@@ -30,7 +30,21 @@ const parseInclude = (raw: string | undefined): Set<TaskContextInclude> => {
   return new Set(ALL_INCLUDES.filter((k) => tokens.includes(k)))
 }
 
-export const taskContext = new Hono<AppEnv>().get('/:id/context', async (c) => {
+export const taskContext = new Hono<AppEnv>()
+  // Repo facts for the MCP repo_info tool (docs/next 06): owner/name/defaultBranch off the mirror.
+  .get('/:id/repo-info', async (c) => {
+    const user = c.get('user')
+    if (!user) return c.json({ error: 'unauthenticated' }, 401)
+    const db = getDb(c.env)
+    const [t] = await db.select().from(schema.tasks).where(eq(schema.tasks.id, c.req.param('id')))
+    if (!t) return c.json({ error: 'not_found' }, 404)
+    const [repoRow] = await db
+      .select()
+      .from(schema.repos)
+      .where(and(eq(schema.repos.userId, user.login), eq(schema.repos.owner, t.repoOwner), eq(schema.repos.name, t.repoName)))
+    return c.json({ owner: t.repoOwner, name: t.repoName, defaultBranch: repoRow?.defaultBranch ?? null, branch: t.branch, worktreePath: t.worktreePath })
+  })
+  .get('/:id/context', async (c) => {
   const user = c.get('user')
   if (!user) return c.json({ error: 'unauthenticated' }, 401)
   const db = getDb(c.env)

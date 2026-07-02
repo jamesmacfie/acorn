@@ -72,6 +72,10 @@ let worktreesRoot = ''
 // agent session (docs/next 12 P2). Best-effort — a session must never fail to launch over memory.
 let memoryInjector: ((taskId: string, sessionId: string) => Promise<void>) | null = null
 
+// Loopback API access for agent-spawned processes (docs/next 06 B): the MCP server reads
+// ACORN_API_URL + ACORN_API_TOKEN from its (inherited) session env. Set by registerTerminalIpc.
+let internalApiEnv: Record<string, string> = {}
+
 const channel = (id: string) => `term:out:${id}`
 
 // Per-tab status (idle/exited) is shown for sessions the renderer isn't attached to, so changes
@@ -448,7 +452,7 @@ async function spawnOne(
     taskId: opts.taskId,
     cwd,
     task: task ? { repoOwner: task.repoOwner, repoName: task.repoName, branch: task.branch, title: task.title } : null,
-    env: opts.env,
+    env: { ...internalApiEnv, ...(opts.env ?? {}) },
   })
   const backend = resolveBackend(profile.backendPreference, tmuxAvailable())
   const cols = clampDim(opts.cols, 80)
@@ -524,8 +528,9 @@ async function reconcileTmux(db: AppDatabase) {
 
 // Registered once at app start. Every payload is validated here — the renderer is the less-trusted
 // side (vNext §5, §11). Exited sessions linger until explicitly removed (term:remove).
-export async function registerTerminalIpc(db: AppDatabase, worktreesDir: string) {
+export async function registerTerminalIpc(db: AppDatabase, worktreesDir: string, internal?: { apiUrl: string; token: string }) {
   worktreesRoot = worktreesDir
+  if (internal) internalApiEnv = { ACORN_API_URL: internal.apiUrl, ACORN_API_TOKEN: internal.token }
 
   // Workspace notes (docs/next 09 P1): files under <dataDir>/notes/<workspaceId>/, beside the
   // worktrees dir. ONE store — the UI reads it here; the MCP notes_* tools reuse it.
