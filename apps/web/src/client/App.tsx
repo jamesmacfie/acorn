@@ -20,7 +20,8 @@ import SettingsModal from './features/settings/SettingsModal'
 import TerminalPanel from './features/terminal/TerminalPanel'
 import { initSessions } from './features/terminal/sessions'
 import TabRail from './features/tabs/TabRail'
-import { activeTaskId, hydrateTaskPanes, isTerminalOpen, selectedSource, setActiveTaskId, setSelectedSource, setTerminalOpen, taskPanes } from './features/tasks/tasks'
+import { activeTaskId, hydrateTaskLayouts, isTerminalOpen, selectedSource, setActiveTaskId, setSelectedSource, setTerminalOpen, taskLayouts } from './features/tasks/tasks'
+import { parseTaskLayouts } from './features/tasks/layout'
 import { initTaskStatuses } from './features/tasks/taskStatus'
 import TaskView from './features/tasks/TaskView'
 import LinearBrowse from './features/tasks/LinearBrowse'
@@ -147,7 +148,7 @@ export default function App() {
     if (src === '') setSelectedSource(null)
     else if (src === 'github' || src === 'linear') setSelectedSource(src)
     try {
-      hydrateTaskPanes(JSON.parse(prefs.data.task_panes ?? '{}'))
+      hydrateTaskLayouts(parseTaskLayouts(prefs.data.task_layouts, prefs.data.task_panes))
     } catch {
       /* ignore malformed pane map */
     }
@@ -169,8 +170,8 @@ export default function App() {
     if (restored() && id) void setPref('last_task', id)
   })
   createEffect(() => {
-    const panes = taskPanes()
-    if (restored()) void setPref('task_panes', JSON.stringify(panes))
+    const layouts = taskLayouts()
+    if (restored()) void setPref('task_layouts', JSON.stringify(layouts))
   })
 
   // Left-pane collapse, persisted via the `left_collapsed` pref. Seed the local signal from prefs

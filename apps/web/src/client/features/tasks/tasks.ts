@@ -1,8 +1,11 @@
 // Rail selection state (docs/workspaces). The task *list* is a TanStack query (tasksOptions); this
-// module tracks what the rail has selected — a Source browse view or an active task — plus which
-// pane that task is showing. Signals-only, like ../terminal/sessions.ts. The terminal drawer +
-// topbar key off activeTaskId.
+// module tracks what the rail has selected — a Source browse view or an active task — plus each
+// task's pane layout. Signals-only, like ../terminal/sessions.ts. The terminal drawer + topbar key
+// off activeTaskId.
 import { createSignal } from 'solid-js'
+import { applyLayoutAction, defaultLayout, type LayoutAction, type PaneId, type TaskLayout } from './layout'
+
+export type { PaneId, TaskLayout } from './layout'
 
 // Which browse Source is selected, or null when a task is the active view (docs/workspaces 04).
 export type SourceId = 'github' | 'linear'
@@ -11,24 +14,48 @@ const [selectedSource, setSelectedSource] = createSignal<SourceId | null>('githu
 // The active task (its terminals scope to this; its view shows when no Source is selected).
 const [activeTaskId, setActiveTaskId] = createSignal<string | null>(null)
 
-// Which pane each task shows (docs/workspaces 02). Terminal is the bottom drawer, toggled
-// separately; this is the main-area pane. Per-task (like terminalOpenTasks) so switching tasks
-// restores the pane you left on; persisted to prefs (App.tsx) so it also survives a relaunch.
-export type PaneId = 'pr' | 'linear' | 'preview' | 'editor'
-const [taskPanes, setTaskPanes] = createSignal<Record<string, PaneId>>({})
-const activePane = (): PaneId => taskPanes()[activeTaskId() ?? ''] ?? 'pr'
-export const paneForTask = (taskId: string): PaneId | undefined => taskPanes()[taskId]
+// Per-task pane layout (docs/next 03): 1–2 panes + ratio + pin + maximise. ALL transitions go
+// through the pure reducer (applyLayoutAction) via dispatchLayout — the single-writer rule that
+// keeps panes/pinned/maximised atomic. Persisted to the `task_layouts` pref (App.tsx), replacing
+// the old single-pane `task_panes` value (migrated on hydrate).
+const [taskLayouts, setTaskLayouts] = createSignal<Record<string, TaskLayout>>({})
+
+export const layoutForTask = (taskId: string): TaskLayout | undefined => taskLayouts()[taskId]
+export const activeLayout = (): TaskLayout => taskLayouts()[activeTaskId() ?? ''] ?? defaultLayout()
+
+export function dispatchLayout(taskId: string, action: LayoutAction): void {
+  setTaskLayouts((prev) => {
+    const cur = prev[taskId] ?? defaultLayout()
+    const next = applyLayoutAction(cur, action)
+    return next === cur ? prev : { ...prev, [taskId]: next }
+  })
+}
+export const dispatchActiveLayout = (action: LayoutAction): void => {
+  const id = activeTaskId()
+  if (id) dispatchLayout(id, action)
+}
+
+// --- Single-pane compatibility surface (ported call sites; docs/next 03 P1 = no visible change) ---
+// The "active" pane is the maximised pane, else the right-most slot (the one `show` targets).
+const activePane = (): PaneId => {
+  const layout = activeLayout()
+  return layout.maximised ?? layout.panes[layout.panes.length - 1]
+}
+export const paneForTask = (taskId: string): PaneId | undefined => {
+  const layout = taskLayouts()[taskId]
+  return layout ? layout.panes[layout.panes.length - 1] : undefined
+}
 export function setPaneForTask(taskId: string, pane: PaneId): void {
-  setTaskPanes((p) => (p[taskId] === pane ? p : { ...p, [taskId]: pane }))
+  dispatchLayout(taskId, { type: 'show', pane })
 }
 // setActivePane targets the active task (call sites set activeTaskId first).
 const setActivePane = (pane: PaneId): void => {
   const id = activeTaskId()
-  if (id) setPaneForTask(id, pane)
+  if (id) dispatchLayout(id, { type: 'show', pane })
 }
-// Seed from persisted prefs at startup without clobbering any pane the user changed pre-hydration.
-export function hydrateTaskPanes(map: Record<string, PaneId>): void {
-  setTaskPanes((p) => ({ ...map, ...p }))
+// Seed from persisted prefs at startup without clobbering any layout the user changed pre-hydration.
+export function hydrateTaskLayouts(map: Record<string, TaskLayout>): void {
+  setTaskLayouts((p) => ({ ...map, ...p }))
 }
 
 // The terminal drawer is per-task (session state, like activeTaskId): each task remembers whether
@@ -45,4 +72,4 @@ export function setTerminalOpen(taskId: string, open: boolean): void {
   })
 }
 
-export { activeTaskId, setActiveTaskId, selectedSource, setSelectedSource, activePane, setActivePane, taskPanes }
+export { activeTaskId, setActiveTaskId, selectedSource, setSelectedSource, activePane, setActivePane, taskLayouts }
