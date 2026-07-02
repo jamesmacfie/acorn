@@ -25,6 +25,7 @@ import {
   trimRing,
 } from './terminalUtils'
 import { buildEditorArgv } from './editorLaunch'
+import { localChanges, localDiff, localFileBlob, type LocalScope } from './localDiff'
 import { getProfile, listProfiles, resolveCommand, tmuxAvailable } from './profiles'
 import { loadRepoConfig } from './repoConfig'
 import { getRepoPath, setEditorCommand, setRepoPath, setRunConfig, setRunTargets } from './repoPaths'
@@ -629,6 +630,39 @@ export async function registerTerminalIpc(db: AppDatabase, worktreesDir: string)
   ipcMain.handle('term:repoPath:pick', async (): Promise<string | null> => {
     const res = await dialog.showOpenDialog({ properties: ['openDirectory'] })
     return res.canceled || !res.filePaths[0] ? null : res.filePaths[0]
+  })
+
+  // Local-changes review (docs/next 04 §A): parsed status / per-file unified patch / blob read
+  // against the task's worktree. Same boundary discipline as the editor IPC — taskId is the
+  // capability, paths are validated repo-relative inside localDiff.ts.
+  ipcMain.handle('local:changes', async (_e: IpcMainInvokeEvent, taskId: string) => {
+    const root = await taskRoot(db, taskId)
+    if (!root) return []
+    try {
+      return await localChanges(root)
+    } catch {
+      return []
+    }
+  })
+
+  ipcMain.handle('local:diff', async (_e: IpcMainInvokeEvent, p: { taskId: string; path: string; scope: LocalScope }): Promise<{ patch: string } | { error: string }> => {
+    const root = await taskRoot(db, p?.taskId)
+    if (!root) return { error: 'No worktree yet.' }
+    try {
+      return await localDiff(root, p.path, p.scope === 'staged' ? 'staged' : 'unstaged')
+    } catch (e) {
+      return { error: e instanceof Error ? e.message : 'diff failed' }
+    }
+  })
+
+  ipcMain.handle('local:blob', async (_e: IpcMainInvokeEvent, p: { taskId: string; path: string; ref?: string }): Promise<{ text: string } | { error: string }> => {
+    const root = await taskRoot(db, p?.taskId)
+    if (!root) return { error: 'No worktree yet.' }
+    try {
+      return await localFileBlob(root, p.path, p.ref ?? 'HEAD')
+    } catch (e) {
+      return { error: e instanceof Error ? e.message : 'read failed' }
+    }
   })
 
   // Monaco editor pane (docs/workspaces): read/write files on the task's worktree. Local-only, so
