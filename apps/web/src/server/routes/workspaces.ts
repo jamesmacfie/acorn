@@ -4,6 +4,7 @@ import { Hono } from 'hono'
 import { getDb, schema } from '../db'
 import type { AppEnv } from '../middleware/auth'
 import type { PreviewMode, SetupTrigger, Workspace, WorkspaceProject, WorkspaceProjectsResponse, WorkspaceRepo, WorkspaceSeed } from '../../shared/api'
+import { isValidWorkspaceColor, isValidWorkspaceIcon, parseWorkspaceIcon, serializeWorkspaceIcon } from '../../shared/workspaceIdentity'
 
 // Workspaces (docs/workspaces): named GROUPS of repos — the top-level unit. Machine-scoped (no
 // user_id) like tasks / repo_paths, but auth-gated. A repo belongs to exactly one workspace
@@ -32,6 +33,8 @@ async function listWorkspaces(db: ReturnType<typeof getDb>): Promise<Workspace[]
     setupScriptTrigger: r.setupScriptTrigger as Workspace['setupScriptTrigger'],
     previewMode: r.previewMode as PreviewMode | null,
     previewValue: r.previewValue,
+    icon: parseWorkspaceIcon(r.icon),
+    color: r.color,
     repos: (byWs.get(r.id) ?? []).sort((a, b) => a.sort - b.sort),
   }))
 }
@@ -76,13 +79,13 @@ export const workspaces = new Hono<AppEnv>()
     const now = Date.now()
     const id = randomUUID()
     await db.insert(schema.workspaces).values({ id, name: body.name.trim(), isDefault: false, sort: (value ?? -1) + 1, createdAt: now, updatedAt: now })
-    return c.json({ id, name: body.name.trim(), isDefault: false, sort: (value ?? -1) + 1, setupScript: null, setupScriptTrigger: null, previewMode: null, previewValue: null, repos: [] } satisfies Workspace)
+    return c.json({ id, name: body.name.trim(), isDefault: false, sort: (value ?? -1) + 1, setupScript: null, setupScriptTrigger: null, previewMode: null, previewValue: null, icon: null, color: null, repos: [] } satisfies Workspace)
   })
   // Update a workspace's name, worktree setup script, and/or when it runs. Blank script ⇒ null.
   .patch('/:id', async (c) => {
     if (!c.get('user')) return c.json({ error: 'unauthenticated' }, 401)
-    const body = (await c.req.json().catch(() => ({}))) as { name?: string; setupScript?: string; setupScriptTrigger?: SetupTrigger; previewMode?: string; previewValue?: string }
-    const set: { name?: string; setupScript?: string | null; setupScriptTrigger?: string; previewMode?: string | null; previewValue?: string | null; updatedAt: number } = { updatedAt: Date.now() }
+    const body = (await c.req.json().catch(() => ({}))) as { name?: string; setupScript?: string; setupScriptTrigger?: SetupTrigger; previewMode?: string; previewValue?: string; icon?: unknown; color?: string | null }
+    const set: { name?: string; setupScript?: string | null; setupScriptTrigger?: string; previewMode?: string | null; previewValue?: string | null; icon?: string | null; color?: string | null; updatedAt: number } = { updatedAt: Date.now() }
     if (body.name !== undefined) {
       if (!body.name.trim()) return c.json({ error: 'bad_request' }, 400)
       set.name = body.name.trim()
@@ -104,7 +107,19 @@ export const workspaces = new Hono<AppEnv>()
       const p = Number(set.previewValue)
       if (!/^\d{1,5}$/.test(set.previewValue) || p < 1 || p > 65535) return c.json({ error: 'bad_request' }, 400)
     }
-    if (set.name === undefined && set.setupScript === undefined && set.setupScriptTrigger === undefined && set.previewMode === undefined && set.previewValue === undefined) return c.json({ error: 'bad_request' }, 400)
+    // Identity (docs/next 01): icon is a validated JSON union stored as text; colour a preset token
+    // or 6-hex. Explicit null clears either back to the derived default.
+    if (body.icon !== undefined) {
+      if (body.icon === null) set.icon = null
+      else if (isValidWorkspaceIcon(body.icon)) set.icon = serializeWorkspaceIcon(body.icon)
+      else return c.json({ error: 'bad_request' }, 400)
+    }
+    if (body.color !== undefined) {
+      if (body.color === null || body.color === '') set.color = null
+      else if (typeof body.color === 'string' && isValidWorkspaceColor(body.color)) set.color = body.color
+      else return c.json({ error: 'bad_request' }, 400)
+    }
+    if (set.name === undefined && set.setupScript === undefined && set.setupScriptTrigger === undefined && set.previewMode === undefined && set.previewValue === undefined && set.icon === undefined && set.color === undefined) return c.json({ error: 'bad_request' }, 400)
     await getDb(c.env).update(schema.workspaces).set(set).where(eq(schema.workspaces.id, c.req.param('id')))
     return c.json({ ok: true })
   })

@@ -274,6 +274,8 @@ export const workspaces = sqliteTable('workspaces', {
   setupScriptTrigger: text('setup_script_trigger'), // 'off' | 'created' | 'terminal' — when to run it; null → 'terminal'
   previewMode: text('preview_mode'), // 'url' | 'port' | 'script' — how the browser-preview URL is resolved; null → dev-server port
   previewValue: text('preview_value'), // the URL, port, or shell command per previewMode; null/blank = unset
+  icon: text('icon'), // JSON WorkspaceIcon ({"kind":"emoji","value":"🌰"} | {"kind":"lucide",…} | {"kind":"github"}); null → derived default
+  color: text('color'), // preset token key ('green'|'blue'|…) or 6-hex; null → derived from name hash
   createdAt: integer('created_at').notNull(),
   updatedAt: integer('updated_at').notNull(),
 })

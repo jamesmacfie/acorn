@@ -136,3 +136,7 @@
   white-space: nowrap;
 }
 .tabrail-close:hover { background: var(--bg-hover); }
+
+/* Workspace identity accent (docs/next 01): task rows carry their workspace's colour as the 3px
+   left accent (the docs/ui-design.md active-accent convention, tinted per workspace). */
+.tabrail-task { border-left-width: 3px; }
