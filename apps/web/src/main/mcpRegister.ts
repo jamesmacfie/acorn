@@ -1,0 +1,80 @@
+// acorn MCP registration (docs/next 06 P3 — REUSE-FIRST): register via each agent's OWN mechanism
+// (`claude mcp add --scope user`, `codex mcp add`), only ever on explicit user action. acorn never
+// writes through into agent config files. Names are build-flavored (acorn / acorn-dev) so dev and
+// prod don't clobber each other; register is remove-then-add (idempotent) and removable.
+// Pure argv construction (unit tested, execs stubbed) + a thin exec wrapper.
+import { execFile } from 'node:child_process'
+import { join } from 'node:path'
+import { promisify } from 'node:util'
+
+export type AgentFlavour = 'claude' | 'codex'
+export const AGENT_FLAVOURS: readonly AgentFlavour[] = ['claude', 'codex']
+
+export const serverName = (isPackaged: boolean): string => (isPackaged ? 'acorn' : 'acorn-dev')
+
+// The Electron-as-node launcher (verne's trick — the user needs no system node): run the bundled
+// server entry under the app's own binary with ELECTRON_RUN_AS_NODE=1.
+export type Launcher = { command: string; args: string[]; env: Record<string, string> }
+
+export const resolveMcpEntry = (mainOutDir: string): string => join(mainOutDir, 'mcp.js')
+
+export const launcherSpec = (electronPath: string, mcpEntry: string): Launcher => ({
+  command: electronPath,
+  args: [mcpEntry],
+  env: { ELECTRON_RUN_AS_NODE: '1' },
+})
+
+export type Argv = { file: string; args: string[] }
+
+export function registerArgv(flavour: AgentFlavour, name: string, launcher: Launcher): Argv {
+  const envFlags = Object.entries(launcher.env).flatMap(([k, v]) => ['--env', `${k}=${v}`])
+  if (flavour === 'claude') {
+    // claude mcp add [options] <name> <command> [args...]
+    return { file: 'claude', args: ['mcp', 'add', '--scope', 'user', ...envFlags, name, '--', launcher.command, ...launcher.args] }
+  }
+  // codex mcp add <name> [--env KEY=VAL] -- <command> [args...]
+  return { file: 'codex', args: ['mcp', 'add', name, ...envFlags, '--', launcher.command, ...launcher.args] }
+}
+
+export function removeArgv(flavour: AgentFlavour, name: string): Argv {
+  if (flavour === 'claude') return { file: 'claude', args: ['mcp', 'remove', '--scope', 'user', name] }
+  return { file: 'codex', args: ['mcp', 'remove', name] }
+}
+
+export type ExecLike = (file: string, args: string[]) => Promise<{ stdout: string }>
+
+const realExec: ExecLike = async (file, args) => {
+  const { stdout } = await promisify(execFile)(file, args, { timeout: 20_000 })
+  return { stdout }
+}
+
+// Remove-then-add so re-registering never fails on "already exists"; the remove's own failure
+// (not registered yet / CLI missing) is ignored — the add's result is the verdict.
+export async function registerAcornMcp(
+  flavour: AgentFlavour,
+  name: string,
+  launcher: Launcher,
+  exec: ExecLike = realExec,
+): Promise<{ ok: boolean; reason?: string }> {
+  const remove = removeArgv(flavour, name)
+  await exec(remove.file, remove.args).catch(() => undefined)
+  const add = registerArgv(flavour, name, launcher)
+  try {
+    await exec(add.file, add.args)
+    return { ok: true }
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e)
+    return { ok: false, reason: msg.includes('ENOENT') ? `'${flavour}' CLI not found on PATH.` : msg.slice(0, 300) }
+  }
+}
+
+export async function removeAcornMcp(flavour: AgentFlavour, name: string, exec: ExecLike = realExec): Promise<{ ok: boolean; reason?: string }> {
+  const argv = removeArgv(flavour, name)
+  try {
+    await exec(argv.file, argv.args)
+    return { ok: true }
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e)
+    return { ok: false, reason: msg.includes('ENOENT') ? `'${flavour}' CLI not found on PATH.` : msg.slice(0, 300) }
+  }
+}

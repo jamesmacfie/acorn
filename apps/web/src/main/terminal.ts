@@ -33,7 +33,9 @@ import { loadRepoConfig } from './repoConfig'
 import { getRepoPath, setEditorCommand, setRepoPath, setRunConfig, setRunTargets } from './repoPaths'
 import { RuntimeService } from './runtime'
 import { setContextNotesSource } from '../server/routes/taskContext'
+import { fileURLToPath } from 'node:url'
 import { inspectMcpConfig, MCP_CANDIDATES, STARTER_MCP_JSON, type McpServerSummary } from '../shared/mcp'
+import { AGENT_FLAVOURS, launcherSpec, registerAcornMcp, removeAcornMcp, resolveMcpEntry, serverName, type AgentFlavour } from './mcpRegister'
 import { setContextMemorySource } from '../server/routes/taskContext'
 import { formatMemoryInjection, listMemories, memoryIndexSlice, memorySources, reconcileMemories, searchMemories, writeMemoryFile, MEMORY_TYPES, type MemoryType } from './memory'
 import { NotesStore, type NoteKind } from './notes'
@@ -577,6 +579,17 @@ export async function registerTerminalIpc(db: AppDatabase, worktreesDir: string,
     }
     return out
   })
+
+  // Register/remove the acorn MCP server with an agent's OWN config mechanism (docs/next 06 P3,
+  // reuse-first) — explicit user action only, never at startup.
+  const mcpLauncher = () => launcherSpec(process.execPath, resolveMcpEntry(dirname(fileURLToPath(import.meta.url))))
+  const mcpName = () => serverName(!process.defaultApp && !process.env.ELECTRON_IS_DEV)
+  ipcMain.handle('mcp:register', (_e: IpcMainInvokeEvent, flavour: AgentFlavour) =>
+    AGENT_FLAVOURS.includes(flavour) ? registerAcornMcp(flavour, mcpName(), mcpLauncher()) : { ok: false, reason: 'Unknown agent.' },
+  )
+  ipcMain.handle('mcp:unregister', (_e: IpcMainInvokeEvent, flavour: AgentFlavour) =>
+    AGENT_FLAVOURS.includes(flavour) ? removeAcornMcp(flavour, mcpName()) : { ok: false, reason: 'Unknown agent.' },
+  )
 
   ipcMain.handle('mcp:createStarter', async (_e: IpcMainInvokeEvent, taskId: string): Promise<{ ok: boolean; reason?: string }> => {
     const root = await taskRoot(db, taskId)

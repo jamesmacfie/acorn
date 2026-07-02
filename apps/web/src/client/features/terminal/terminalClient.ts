@@ -73,6 +73,8 @@ declare global {
       mcp?: {
         inspect(taskId: string): Promise<{ file: string; servers: import('../../../shared/mcp').McpServerSummary[] }[]>
         createStarter(taskId: string): Promise<{ ok: boolean; reason?: string }>
+        register(flavour: 'claude' | 'codex'): Promise<{ ok: boolean; reason?: string }>
+        unregister(flavour: 'claude' | 'codex'): Promise<{ ok: boolean; reason?: string }>
       }
     }
   }
