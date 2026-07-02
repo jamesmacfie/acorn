@@ -3,6 +3,7 @@
 // in the codebase's signals-only style (cf. ../tabs/tabs.ts).
 import { createSignal } from 'solid-js'
 import { terminalApi } from './terminalClient'
+import { trackSessionEdges } from '../notifications/notifications'
 import type { TerminalSession } from '../../../shared/terminal'
 
 const [sessions, setSessions] = createSignal<TerminalSession[]>([])
@@ -11,7 +12,10 @@ export { sessions }
 export async function refreshSessions(): Promise<void> {
   const api = terminalApi()
   if (!api) return
-  setSessions(await api.list())
+  const next = await api.list()
+  // Notification centre (docs/next 05): edge-detect against the previous snapshot on every refresh.
+  trackSessionEdges(sessions(), next)
+  setSessions(next)
 }
 
 // Pull once then track main-process idle/exit broadcasts. Returns an unsubscribe; a noop when the

@@ -7,6 +7,8 @@ import { applyRailOrder, isPinned, moveTask, parseRailOrder, pinTask, serializeR
 import { checksState } from '../../displayMeta'
 import { activeTaskId, paneForTask, selectedSource, setActivePane, setActiveTaskId, setSelectedSource, type SourceId } from '../tasks/tasks'
 import { taskStatus } from '../tasks/taskStatus'
+import { workingCountFor } from '../terminal/sessions'
+import { markTaskRead, unreadForTask } from '../notifications/notifications'
 import { workspaceForRepo } from '../workspaces/activeWorkspace'
 import { resolveWorkspaceColor } from '../../../shared/workspaceIdentity'
 import { dedupeBranch, slugifyBranch } from '../../../shared/branch'
@@ -98,6 +100,7 @@ export default function TabRail() {
     setMenuId(null)
     setSelectedSource(null)
     setActiveTaskId(w.id)
+    markTaskRead(w.id) // viewing acknowledges its notices (docs/next 05)
     // Restore the pane last used for this task; only pick a default the first time it's opened.
     if (paneForTask(w.id) == null) setActivePane(w.pullNumber != null ? 'pr' : w.links.some((l) => l.provider === 'linear') ? 'linear' : 'pr')
     navigate(pathFor(w))
@@ -232,6 +235,14 @@ export default function TabRail() {
               </button>
               <Show when={w.pullNumber != null && checks().length}>
                 <span class={`tabrail-checks checks-dot checks-dot-${checksState(checks())}`} title="PR checks" />
+              </Show>
+              {/* Agent-working spinner (docs/next 05 — workingCountFor, finally wired) and the
+                  needs-you marker for unread notices, cleared when the task is viewed. */}
+              <Show when={workingCountFor(w.id)}>
+                <span class="tabrail-spinner spin" title={`${workingCountFor(w.id)} agent(s) working`}>⠿</span>
+              </Show>
+              <Show when={unreadForTask(w.id)}>
+                <span class="tabrail-needs" title="An agent needs you — unread notifications">‼</span>
               </Show>
               <Show when={st()?.missing} fallback={
                 <Show when={st()?.dirty}>

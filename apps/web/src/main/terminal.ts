@@ -1,4 +1,4 @@
-import { BrowserWindow, dialog, ipcMain, Notification, type IpcMainInvokeEvent, type WebContents } from 'electron'
+import { BrowserWindow, dialog, ipcMain, type IpcMainInvokeEvent, type WebContents } from 'electron'
 import { spawn, type IPty } from 'node-pty'
 import { execFile, execFileSync, spawn as spawnProcess } from 'node:child_process'
 import { randomUUID } from 'node:crypto'
@@ -70,10 +70,10 @@ function broadcastStatus() {
   for (const w of BrowserWindow.getAllWindows()) if (!w.isDestroyed()) w.webContents.send('term:status')
 }
 
-function notifyIdle(m: TerminalSession) {
-  if (!Notification.isSupported()) return
-  new Notification({ title: `${m.title} is waiting`, body: 'The agent has been idle — it may need input.' }).show()
-}
+// PTY-tier AgentState (docs/next 05): shells stay 'unknown'; agents flip working/idle with the
+// silence detector ('blocked' lands with the prompt-pattern scan).
+const ptyState = (kind: 'shell' | 'agent', status: 'running' | 'exited', idle: boolean): TerminalSession['agentState'] =>
+  kind !== 'agent' ? 'unknown' : status !== 'running' ? 'done' : idle ? 'idle' : 'working'
 
 function emit(s: Session, msg: ServerMsg) {
   for (const wc of s.subscribers) {
@@ -345,6 +345,7 @@ function rowToMeta(row: typeof schema.terminalSessions.$inferSelect, ctx: Pick<T
     backend: row.backend as TerminalSession['backend'],
     status: 'running', // only called for sessions whose tmux is alive
     idle: false,
+    agentState: ptyState(row.kind as TerminalSession['kind'], 'running', false),
     isWorktree: false, // not persisted; a reconciled session loses its worktree-cleanup affordance
     taskId: row.taskId,
     cwd: row.cwd,
@@ -368,6 +369,7 @@ function wireSession(db: AppDatabase, meta: TerminalSession, pty: IPty): Session
     s.lastActivityAt = Date.now()
     if (s.meta.idle) {
       s.meta.idle = false // output resumed → no longer waiting
+      s.meta.agentState = ptyState(s.meta.kind, s.meta.status, false)
       broadcastStatus()
     }
     appendRing(s, data)
@@ -376,6 +378,7 @@ function wireSession(db: AppDatabase, meta: TerminalSession, pty: IPty): Session
   pty.onExit(({ exitCode, signal }) => {
     s.meta.status = 'exited'
     s.meta.idle = false
+    s.meta.agentState = ptyState(s.meta.kind, 'exited', false)
     s.meta.exitCode = exitCode
     agentSender.clear(s.meta.id) // queued sends can never fire now
     emit(s, { type: 'exit', exitCode, signal: signal != null ? String(signal) : null })
@@ -393,8 +396,9 @@ function startIdleWatch() {
     for (const s of sessions.values()) {
       if (computeIdle(s.meta.kind, s.meta.status, s.lastActivityAt, now) && !s.meta.idle) {
         s.meta.idle = true
+        s.meta.agentState = 'idle'
         agentSender.onIdle(s.meta.id) // flush 'after-ready' sends on the busy→idle edge (04 §D)
-        notifyIdle(s.meta)
+        // The OS toast moved to the renderer (docs/next 05): focus-gated + cooldown/dedup there.
         broadcastStatus()
       }
     }
@@ -448,6 +452,7 @@ async function spawnOne(
     backend,
     status: 'running',
     idle: false,
+    agentState: ptyState(profile.kind, 'running', false),
     isWorktree,
     taskId: opts.taskId,
     cwd,

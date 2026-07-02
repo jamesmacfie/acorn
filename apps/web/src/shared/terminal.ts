@@ -1,6 +1,11 @@
 // Shared terminal protocol (vNext §5). Imported by main, preload, and renderer — so it holds the
 // wire contract only, never node-pty types: main owns the PTY, this just describes what crosses IPC.
 
+// The ONE AgentState vocabulary (docs/next 05, README decision 15) — defined here, reused verbatim
+// by the agent surfaces (15); no other module redeclares it. Each transport emits only the subset
+// it can detect: PTY sessions 'working|idle|blocked|unknown'; managed/headless agents the full set.
+export type AgentState = 'starting' | 'working' | 'waiting' | 'idle' | 'blocked' | 'permission' | 'done' | 'unknown'
+
 export type TerminalSession = {
   id: string
   title: string
@@ -9,6 +14,7 @@ export type TerminalSession = {
   backend: 'node-pty' | 'tmux'
   status: 'running' | 'exited'
   idle: boolean // agent has produced no output for a while (vNext §3); always false for shells
+  agentState: AgentState // docs/next 05 — PTY tier emits working|idle|blocked|unknown
   isWorktree: boolean // cwd is an isolated PR worktree (vNext §9); in-memory only, not persisted
   taskId: string // → tasks.id (docs/workspaces); a session always belongs to a task
   cwd: string
