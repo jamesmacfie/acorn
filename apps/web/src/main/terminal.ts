@@ -33,7 +33,8 @@ import { loadRepoConfig } from './repoConfig'
 import { getRepoPath, setEditorCommand, setRepoPath, setRunConfig, setRunTargets } from './repoPaths'
 import { RuntimeService } from './runtime'
 import { setContextNotesSource } from '../server/routes/taskContext'
-import { listMemories, memorySources, reconcileMemories, searchMemories, writeMemoryFile, MEMORY_TYPES, type MemoryType } from './memory'
+import { setContextMemorySource } from '../server/routes/taskContext'
+import { formatMemoryInjection, listMemories, memoryIndexSlice, memorySources, reconcileMemories, searchMemories, writeMemoryFile, MEMORY_TYPES, type MemoryType } from './memory'
 import { NotesStore, type NoteKind } from './notes'
 import { copyWorktreeFiles, ensureWorktree, worktreePorcelain } from './worktrees'
 
@@ -65,6 +66,10 @@ const agentSender = new AgentSender((id) => {
 
 // Set once by registerTerminalIpc — where workspace worktrees are created (docs/workspaces 05).
 let worktreesRoot = ''
+
+// Set by registerTerminalIpc (needs the db + memory index): pushes the memory block into a fresh
+// agent session (docs/next 12 P2). Best-effort — a session must never fail to launch over memory.
+let memoryInjector: ((taskId: string, sessionId: string) => Promise<void>) | null = null
 
 const channel = (id: string) => `term:out:${id}`
 
@@ -483,6 +488,8 @@ async function spawnOne(
     pty = spawn(command, [], { name: 'xterm-256color', cols, rows, cwd, env })
   }
   wireSession(db, meta, pty)
+  // A fresh AGENT session gets the repo-memory block queued for its idle edge (docs/next 12 P2).
+  if (profile.kind === 'agent') void memoryInjector?.(opts.taskId, id)
   return meta
 }
 
@@ -555,6 +562,30 @@ export async function registerTerminalIpc(db: AppDatabase, worktreesDir: string)
     return memorySources(active, checkouts, homedir())
   }
   const reconciled = async () => reconcileMemories(db, await buildMemorySources())
+  memoryInjector = async (taskId: string, sessionId: string) => {
+    // Launch injection (docs/next 12 P2): MEMORY.md index slice + repo feedback/convention bodies,
+    // queued 'after-ready' so it lands as the agent's first prompt once it settles.
+    try {
+      const t = await loadTask(db, taskId)
+      if (!t) return
+      const repo = `${t.repoOwner}/${t.repoName}`
+      await reconciled()
+      const slice = await memoryIndexSlice(db, repo)
+      const key = (await listMemories(db, { repo })).filter((m) => m.type === 'feedback' || m.type === 'convention')
+      const block = formatMemoryInjection(slice, key)
+      if (block) agentSender.send(sessionId, block, 'after-ready')
+    } catch {
+      // memory injection is best-effort — never blocks a session launch
+    }
+  }
+
+  // Fill the assembler's memory seam (docs/next 12 P2 / 11 §C): the repo-scoped index slice.
+  setContextMemorySource(async (taskId) => {
+    const t = await loadTask(db, taskId)
+    if (!t) return []
+    await reconciled()
+    return memoryIndexSlice(db, `${t.repoOwner}/${t.repoName}`)
+  })
 
   ipcMain.handle('memory:list', (_e: IpcMainInvokeEvent, p: { repo?: string }) =>
     guard(async () => {

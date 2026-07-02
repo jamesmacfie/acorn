@@ -140,6 +140,20 @@ describe('memory store + index over temp checkouts', () => {
     expect((await searchMemories(t.db, 'auth', { repo: 'acme/api', type: 'user' })).map((h) => h.name)).toEqual(['my-shortcuts'])
   })
 
+  it('formatMemoryInjection caps the slice + bodies and returns null when empty', async () => {
+    const { formatMemoryInjection } = await import('./memory')
+    expect(formatMemoryInjection([], [])).toBeNull()
+    const slice = Array.from({ length: 40 }, (_, i) => ({ name: `m${i}`, description: `d${i}` }))
+    const keys = Array.from({ length: 8 }, (_, i) => ({ name: `k${i}`, type: 'convention', body: 'x'.repeat(3000) }))
+    const out = formatMemoryInjection(slice, keys, { index: 30, bodies: 5, bodyChars: 100 })
+    expect(out).toContain('- m0 — d0')
+    expect(out).toContain('…and 10 more')
+    expect(out).not.toContain('m35 —')
+    expect((out?.match(/^### /gm) ?? []).length).toBe(5) // bodies capped
+    expect(out).toContain('x'.repeat(100) + '…')
+    expect(out!.length).toBeLessThan(3500)
+  })
+
   it('memoryIndexSlice returns the injection index; renderMemoryIndex is stable-sorted', async () => {
     await writeMemoryFile(join(checkoutA, '.acorn', 'memory'), mem({}))
     await reconcileMemories(t.db, sources())
