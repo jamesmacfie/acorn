@@ -217,6 +217,36 @@ export async function memoryIndexSlice(db: AppDatabase, repo: string, cap = 30):
   return rows.slice(0, cap).map((r) => ({ name: r.name, description: r.description }))
 }
 
+// Launch injection block (docs/next 12 P2, the push half): the MEMORY.md index slice (cheap,
+// always-safe) plus the repo-scoped feedback/convention BODIES (the rules an agent must never
+// miss). Caps keep it compact — injection is recall for the high-value slice; MCP search is
+// recall for the long tail.
+export function formatMemoryInjection(
+  slice: { name: string; description: string }[],
+  keyMemories: { name: string; type: string; body: string }[],
+  caps: { index?: number; bodies?: number; bodyChars?: number } = {},
+): string | null {
+  const indexCap = caps.index ?? 30
+  const bodiesCap = caps.bodies ?? 5
+  const bodyChars = caps.bodyChars ?? 1500
+  if (!slice.length && !keyMemories.length) return null
+  const lines: string[] = ['# Repo memory (acorn) — ask for full bodies via memory_get / read .acorn/memory/']
+  if (slice.length) {
+    lines.push('', '## Index')
+    for (const m of slice.slice(0, indexCap)) lines.push(`- ${m.name} — ${m.description}`)
+    if (slice.length > indexCap) lines.push(`- …and ${slice.length - indexCap} more`)
+  }
+  const keys = keyMemories.slice(0, bodiesCap)
+  if (keys.length) {
+    lines.push('', '## Conventions & feedback (follow these)')
+    for (const m of keys) {
+      const body = m.body.trim()
+      lines.push(`### ${m.name} (${m.type})`, body.length > bodyChars ? `${body.slice(0, bodyChars)}…` : body)
+    }
+  }
+  return lines.join('\n')
+}
+
 // Standard source set: every active worktree + each primary checkout + the private home dir.
 export function memorySources(
   activeWorktrees: { dir: string; repo: string }[],
