@@ -35,3 +35,6 @@
 }
 .context-tray-label { flex: 1; min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
 .context-tray-actions { display: flex; gap: 8px; margin-top: 4px; }
+
+/* Inline add-memory form (docs/next 12 P1). */
+.context-tray-memform { display: flex; flex-direction: column; gap: 6px; margin-top: 6px; padding-top: 6px; border-top: 1px solid var(--border); }

@@ -33,6 +33,7 @@ import { loadRepoConfig } from './repoConfig'
 import { getRepoPath, setEditorCommand, setRepoPath, setRunConfig, setRunTargets } from './repoPaths'
 import { RuntimeService } from './runtime'
 import { setContextNotesSource } from '../server/routes/taskContext'
+import { listMemories, memorySources, reconcileMemories, searchMemories, writeMemoryFile, MEMORY_TYPES, type MemoryType } from './memory'
 import { NotesStore, type NoteKind } from './notes'
 import { copyWorktreeFiles, ensureWorktree, worktreePorcelain } from './worktrees'
 
@@ -544,6 +545,68 @@ export async function registerTerminalIpc(db: AppDatabase, worktreesDir: string)
       return { error: e instanceof Error ? e.message : 'notes failed' }
     }
   }
+  // Memory (docs/next 12 P1): files are truth; the SQLite index reconciles from every active
+  // worktree + primary checkout + the private home dir before each read (cheap at this scale).
+  const buildMemorySources = async () => {
+    const active = (await db.select().from(schema.tasks).where(eq(schema.tasks.status, 'active')))
+      .filter((t) => t.worktreePath && isDir(t.worktreePath))
+      .map((t) => ({ dir: t.worktreePath!, repo: `${t.repoOwner}/${t.repoName}` }))
+    const checkouts = (await db.select().from(schema.repoPaths)).filter((p) => isDir(p.path)).map((p) => ({ dir: p.path, repo: `${p.owner}/${p.repo}` }))
+    return memorySources(active, checkouts, homedir())
+  }
+  const reconciled = async () => reconcileMemories(db, await buildMemorySources())
+
+  ipcMain.handle('memory:list', (_e: IpcMainInvokeEvent, p: { repo?: string }) =>
+    guard(async () => {
+      await reconciled()
+      return listMemories(db, { repo: p?.repo ?? null })
+    }),
+  )
+  ipcMain.handle('memory:search', (_e: IpcMainInvokeEvent, p: { query: string; repo?: string; type?: MemoryType }) =>
+    guard(async () => {
+      await reconciled()
+      return searchMemories(db, String(p?.query ?? ''), { repo: p?.repo ?? null, type: p?.type })
+    }),
+  )
+  // Manual add (12 P1): repo scope writes into the TASK'S WORKTREE (reviewed via its PR — never the
+  // user's primary checkout); private scope into ~/.acorn/memory.
+  ipcMain.handle(
+    'memory:add',
+    (_e: IpcMainInvokeEvent, p: { taskId: string; scope: 'repo' | 'private'; name: string; description: string; type: MemoryType; body: string }) =>
+      guard(async () => {
+        const type: MemoryType = MEMORY_TYPES.includes(p?.type) ? p.type : 'reference'
+        let dir: string
+        if (p.scope === 'private') dir = join(homedir(), '.acorn', 'memory')
+        else {
+          const t = await loadTask(db, p.taskId)
+          if (!t?.worktreePath || !isDir(t.worktreePath)) throw new Error('Repo-scoped memory needs the task worktree (open a terminal first).')
+          dir = join(t.worktreePath, '.acorn', 'memory')
+        }
+        const t = await loadTask(db, p.taskId)
+        let commitSha: string | null = null
+        if (t?.worktreePath && isDir(t.worktreePath)) {
+          try {
+            const { stdout } = await promisify(execFile)('git', ['-C', t.worktreePath, 'rev-parse', 'HEAD'], { timeout: 5000 })
+            commitSha = stdout.trim()
+          } catch {
+            // no commit yet — fine
+          }
+        }
+        const res = await writeMemoryFile(dir, {
+          name: String(p.name ?? '').trim(),
+          description: String(p.description ?? '').trim(),
+          type,
+          originSessionId: null,
+          commitSha,
+          supersededBy: null,
+          createdAt: Date.now(),
+          body: String(p.body ?? ''),
+        })
+        await reconciled()
+        return res
+      }),
+  )
+
   ipcMain.handle('notes:list', (_e: IpcMainInvokeEvent, workspaceId: string) => guard(() => notesStore.list(String(workspaceId))))
   ipcMain.handle('notes:read', (_e: IpcMainInvokeEvent, p: { workspaceId: string; slug: string }) => guard(() => notesStore.read(p.workspaceId, p.slug)))
   ipcMain.handle('notes:create', (_e: IpcMainInvokeEvent, p: { workspaceId: string; title: string; kind?: NoteKind }) =>

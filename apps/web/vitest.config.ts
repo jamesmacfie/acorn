@@ -6,5 +6,11 @@ export default defineConfig({
   test: {
     environment: 'node',
     include: ['src/**/*.test.ts'],
+    // Temp-git-repo tests must not inherit the user's global git config (hooks, fsmonitor,
+    // templates) — it makes them slow and flaky under parallel workers.
+    env: {
+      GIT_CONFIG_GLOBAL: '/dev/null',
+      GIT_CONFIG_SYSTEM: '/dev/null',
+    },
   },
 })

@@ -69,6 +69,7 @@ declare global {
       terminal?: TerminalApi
       editor?: import('../editor/editorClient').EditorApi
       notes?: import('../notes/notesClient').NotesApi
+      memory?: import('../memory/memoryClient').MemoryApi
     }
   }
 }
