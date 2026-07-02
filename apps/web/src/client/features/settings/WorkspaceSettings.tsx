@@ -1,5 +1,6 @@
-import { createSignal, For, Show } from 'solid-js'
+import { createResource, createSignal, For, Show } from 'solid-js'
 import { useQueryClient } from '@tanstack/solid-query'
+import { terminalApi } from '../terminal/terminalClient'
 import { workspacesKey } from '../../queries'
 import { deleteWorkspace, renameWorkspace, setWorkspaceColor, setWorkspaceIcon, setWorkspacePreview, setWorkspaceSetupScript, setWorkspaceSetupTrigger, setWorkspaceTeardownScript } from '../../mutations'
 import type { PreviewMode, SetupTrigger, Workspace } from '../../../shared/api'
@@ -301,11 +302,72 @@ export default function WorkspaceSettings(props: { workspace: Workspace; onDelet
         </div>
       </label>
 
+      <Show when={terminalApi() && (props.workspace.repos ?? []).length}>
+        <div class="settings-field">
+          <span class="settings-label">Run targets (per repo)</span>
+          <span class="muted settings-hint">
+            Named commands run in a task's worktree (docs/next 13): JSON array of {'{'}"id", "command", "stop"?, "url"?, "urlCommand"?, "default"?{'}'}. A committed <code>.acorn/config.toml</code> overrides these.
+          </span>
+          <For each={props.workspace.repos ?? []}>
+            {(r) => <RepoRunTargets owner={r.owner} name={r.name} />}
+          </For>
+        </div>
+      </Show>
+
       <Show when={!props.workspace.isDefault}>
         <div class="settings-danger">
           <button type="button" class="overlay-btn settings-delete" disabled={busy()} onClick={() => void remove()}>
             Delete workspace
           </button>
+        </div>
+      </Show>
+    </div>
+  )
+}
+
+// Per-repo run-target JSON editor (docs/next 13 §A) — the DB fallback surface, edited at the
+// workspace level like the worktree scripts. Desktop-only (rides the terminal IPC bridge).
+function RepoRunTargets(props: { owner: string; name: string }) {
+  const api = terminalApi()
+  const [row, { refetch }] = createResource(
+    () => `${props.owner}/${props.name}`,
+    () => api?.repoPath.get(props.owner, props.name) ?? null,
+  )
+  const [text, setText] = createSignal<string | null>(null)
+  const [err, setErr] = createSignal('')
+  const [ok, setOk] = createSignal(false)
+  const value = () => text() ?? row()?.runTargets ?? ''
+
+  const save = async () => {
+    if (!api) return
+    setErr('')
+    setOk(false)
+    const res = await api.repoPath.runTargets(props.owner, props.name, value())
+    if (!res.ok) return setErr(res.reason)
+    setOk(true)
+    setText(null)
+    await refetch()
+  }
+
+  return (
+    <div class="settings-field">
+      <span class="muted">{props.owner}/{props.name}</span>
+      <Show when={row()} fallback={<span class="muted settings-hint">No local checkout mapped yet.</span>}>
+        <textarea
+          class="settings-script"
+          rows="3"
+          spellcheck={false}
+          placeholder='[{"id":"dev","command":"./scripts/dev.sh","urlCommand":"./scripts/dev-url.sh","default":true}]'
+          value={value()}
+          onInput={(e) => {
+            setText(e.currentTarget.value)
+            setOk(false)
+          }}
+        />
+        <div class="settings-actions">
+          <button type="button" class="overlay-btn" onClick={() => void save()}>Save targets</button>
+          <Show when={ok()}><span class="muted">Saved.</span></Show>
+          <Show when={err()}><span class="action-error">{err()}</span></Show>
         </div>
       </Show>
     </div>

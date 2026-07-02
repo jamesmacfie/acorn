@@ -64,6 +64,13 @@
       "when": 1782985860645,
       "tag": "0008_kind_shockwave",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "6",
+      "when": 1782986514009,
+      "tag": "0009_ordinary_banshee",
+      "breakpoints": true
     }
   ]
 }

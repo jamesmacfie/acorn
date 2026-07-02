@@ -26,7 +26,9 @@ import {
 } from './terminalUtils'
 import { buildEditorArgv } from './editorLaunch'
 import { getProfile, listProfiles, resolveCommand, tmuxAvailable } from './profiles'
-import { getRepoPath, setEditorCommand, setRepoPath, setRunConfig } from './repoPaths'
+import { loadRepoConfig } from './repoConfig'
+import { getRepoPath, setEditorCommand, setRepoPath, setRunConfig, setRunTargets } from './repoPaths'
+import { RuntimeService } from './runtime'
 import { ensureWorktree, worktreePorcelain } from './worktrees'
 
 // vNext Phase 2: PTYs live in the main process. Sessions run on one of two backends —
@@ -260,6 +262,39 @@ async function maybeRunSetup(db: AppDatabase, t: typeof schema.tasks.$inferSelec
   await spawnOne(db, { taskId: t.id, command: script, title: 'Setup' }, cwd, true, ctx, t)
 }
 
+// Workspace-level config columns for a repo (preview + scripts) — the DB fallback layer that
+// loadRepoConfig merges below any committed .acorn/config.toml (docs/next 13 §B).
+async function workspaceConfigRow(db: AppDatabase, owner: string, repo: string) {
+  const [wr] = await db
+    .select({ workspaceId: schema.workspaceRepos.workspaceId })
+    .from(schema.workspaceRepos)
+    .where(and(eq(schema.workspaceRepos.repoOwner, owner), eq(schema.workspaceRepos.repoName, repo)))
+  if (!wr) return null
+  const [ws] = await db.select().from(schema.workspaces).where(eq(schema.workspaces.id, wr.workspaceId))
+  return ws ?? null
+}
+
+// Merged run-target config + the cwd to run in (the task worktree, created lazily like a terminal).
+async function taskRunConfig(db: AppDatabase, taskId: string): Promise<{ targets: import('./repoConfig').RunTarget[]; cwd: string } | { error: string }> {
+  const t = await loadTask(db, taskId)
+  if (!t) return { error: 'Task not found.' }
+  const mapped = await getRepoPath(db, t.repoOwner, t.repoName)
+  const baseCheckout = mapped?.path && isDir(mapped.path) ? mapped.path : undefined
+  if (!baseCheckout) return { error: 'No checkout mapped for this repo yet.' }
+  const { cwd } = await resolveTaskCwd(db, t, baseCheckout)
+  const ws = await workspaceConfigRow(db, t.repoOwner, t.repoName)
+  const cfg = loadRepoConfig(cwd, homedir(), {
+    setupScript: ws?.setupScript,
+    teardownScript: ws?.teardownScript,
+    previewMode: ws?.previewMode,
+    previewValue: ws?.previewValue,
+    runCommand: mapped?.runCommand,
+    devPort: mapped?.devPort,
+    runTargetsJson: mapped?.runTargets,
+  })
+  return { targets: cfg.runTargets, cwd }
+}
+
 async function markExited(db: AppDatabase, id: string, exitCode: number | null) {
   await db
     .update(schema.terminalSessions)
@@ -439,6 +474,50 @@ async function reconcileTmux(db: AppDatabase) {
 // side (vNext §5, §11). Exited sessions linger until explicitly removed (term:remove).
 export async function registerTerminalIpc(db: AppDatabase, worktreesDir: string) {
   worktreesRoot = worktreesDir
+
+  // Runtime service (docs/next 13 §A): run targets as terminal sessions in the task worktree.
+  // Short-lived scripts (stop / url_command) run out-of-band with the same ACORN_* env.
+  const runScript = async (taskId: string, script: string, cwd: string): Promise<{ ok: boolean; output?: string; reason?: string }> => {
+    const t = await loadTask(db, taskId)
+    const env = buildSessionEnv({
+      taskId,
+      cwd,
+      task: t ? { repoOwner: t.repoOwner, repoName: t.repoName, branch: t.branch, title: t.title } : null,
+    })
+    try {
+      const { stdout } = await promisify(execFile)('/bin/sh', ['-c', script], { cwd, env, timeout: 15_000 })
+      return { ok: true, output: stdout }
+    } catch (err) {
+      return { ok: false, reason: err instanceof Error ? err.message : 'script failed' }
+    }
+  }
+  const runtime = new RuntimeService({
+    loadTargets: (taskId) => taskRunConfig(db, taskId),
+    startSession: async (taskId, target, cwd) => {
+      const t = await loadTask(db, taskId)
+      const meta = await spawnOne(db, { taskId, command: target.command, title: `▶ ${target.id}` }, cwd, true, taskContext(t), t)
+      broadcastStatus()
+      return meta.id
+    },
+    isRunning: (sessionId) => sessions.get(sessionId)?.meta.status === 'running',
+    exitCode: (sessionId) => sessions.get(sessionId)?.meta.exitCode,
+    killSession: (sessionId) => {
+      const s = sessions.get(sessionId)
+      if (s) killSession(s)
+    },
+    runScript,
+  })
+
+  ipcMain.handle('run:targets', (_e: IpcMainInvokeEvent, taskId: string) => runtime.targets(String(taskId)))
+  ipcMain.handle('run:start', (_e: IpcMainInvokeEvent, p: { taskId: string; targetId: string }) => runtime.start(String(p?.taskId), String(p?.targetId)))
+  ipcMain.handle('run:stop', (_e: IpcMainInvokeEvent, p: { taskId: string; targetId: string }) => runtime.stop(String(p?.taskId), String(p?.targetId)))
+  ipcMain.handle('run:status', (_e: IpcMainInvokeEvent, p: { taskId: string; targetId: string }) => runtime.status(String(p?.taskId), String(p?.targetId)))
+  ipcMain.handle('run:defaultUrl', (_e: IpcMainInvokeEvent, taskId: string) => runtime.defaultUrl(String(taskId)))
+
+  ipcMain.handle('term:repoPath:runTargets', (_e: IpcMainInvokeEvent, p: { owner: string; repo: string; runTargets: string }) =>
+    setRunTargets(db, p.owner, p.repo, typeof p.runTargets === 'string' ? p.runTargets : ''),
+  )
+
   ipcMain.handle('term:list', () => [...sessions.values()].map((s) => s.meta))
 
   ipcMain.handle('term:profiles', () => listProfiles())

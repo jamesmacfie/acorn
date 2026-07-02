@@ -1,4 +1,4 @@
-import { createEffect, createMemo, createResource, createSignal, Show } from 'solid-js'
+import { createEffect, createMemo, createResource, createSignal, For, Show } from 'solid-js'
 import { useNavigate } from '@solidjs/router'
 import { createQuery, useQueryClient } from '@tanstack/solid-query'
 import { tasksKey, tasksOptions, workspacesOptions, type Task } from '../../queries'
@@ -8,7 +8,7 @@ import DiffView from '../../DiffView'
 import LinearIssuePanel from '../integrations/LinearIssuePanel'
 import EditorPane from '../editor/EditorPane'
 import { workspaceForRepo } from '../workspaces/activeWorkspace'
-import { refreshSessions, sessions } from '../terminal/sessions'
+import { refreshSessions } from '../terminal/sessions'
 import { terminalApi } from '../terminal/terminalClient'
 import { activePane, paneForTask, setActivePane, setActiveTaskId, setSelectedSource } from './tasks'
 import { taskStatus } from './taskStatus'
@@ -16,9 +16,10 @@ import './task-view.css'
 
 // The single-window Task view (docs/workspaces 02/P4/P5): one active pane plus a switcher of
 // the panes that apply. PR review reuses PullDetail + DiffView (scoped to the task's PR via the
-// URL the rail navigated to); Linear reuses LinearIssuePanel; the dev server runs as a terminal in
-// the bottom drawer (▶, with a per-task PORT); the preview is a <webview> onto that port.
-// ponytail: terminal + dev server stay drawer terminals rather than rebuilt inline panes.
+// URL the rail navigated to); Linear reuses LinearIssuePanel; run targets (docs/next 13 §A) run as
+// terminal sessions in the bottom drawer (one ▶ per target — acorn allocates no ports); the
+// preview is a <webview> onto the default target's resolved URL.
+// ponytail: terminal + run targets stay drawer terminals rather than rebuilt inline panes.
 export default function TaskView(props: {
   task: Task
   terminalOpen: boolean
@@ -35,16 +36,22 @@ export default function TaskView(props: {
   const linearId = () => (picked() && linearIds().includes(picked()!) ? picked()! : linearIds()[0])
   const st = () => taskStatus(props.task.id)
 
-  // Per-repo dev config (run command + base port). Re-loaded when the task's repo changes.
+  // Per-repo dev config (legacy run command/port — maps into the default 'dev' run target).
   const [repoCfg, { refetch }] = createResource(
     () => `${props.task.repoOwner}/${props.task.repoName}`,
     () => api?.repoPath.get(props.task.repoOwner, props.task.repoName) ?? null,
   )
-  // Per-task port: base + the task's rail offset, so two tasks don't fight over a port.
-  const port = () => {
-    const base = repoCfg()?.devPort
-    return base != null ? base + props.task.sort : null
-  }
+
+  // Run targets (docs/next 13 §A): the merged config list with live status. One ▶ button per
+  // target; acorn allocates no ports — isolation is the script's job via ACORN_TASK_SLUG.
+  const [runTargets, { refetch: refetchTargets }] = createResource(
+    () => props.task.id,
+    async (id) => {
+      if (!api) return []
+      const res = await api.run.targets(id)
+      return 'targets' in res ? res.targets : []
+    },
+  )
 
   const [cfgOpen, setCfgOpen] = createSignal(false)
   const [cmd, setCmd] = createSignal('')
@@ -73,33 +80,26 @@ export default function TaskView(props: {
     await refetch()
   }
 
-  const devSession = () => sessions().find((s) => s.taskId === props.task.id && s.title.startsWith('▶ '))
-
-  // Start (or focus) the dev server. Needs a mapped checkout + a configured run command + port.
-  async function startDev() {
-    if (!api) return
+  // Open the per-repo config overlay (legacy runCommand/devPort — they map to a 'dev' target).
+  function configureRun() {
     const cfg = repoCfg()
     if (!cfg?.path) return window.alert('Open a shell terminal in this task first to map the repo checkout.')
-    if (!cfg.runCommand || cfg.devPort == null) {
-      setCmd(cfg.runCommand ?? 'pnpm dev')
-      setPortInput(String(cfg.devPort ?? 3000))
-      setEditorCmd(cfg.editorCommand ?? '')
-      setCfgErr('')
-      setCfgOpen(true)
-      return
-    }
-    if (!devSession()) {
-      await api.create({
-        taskId: props.task.id,
-        profileId: 'shell',
-        cwd: cfg.path,
-        command: cfg.runCommand,
-        env: { PORT: String(cfg.devPort + props.task.sort) },
-        title: `▶ ${cfg.runCommand}`,
-      })
-      await refreshSessions()
-    }
-    props.onOpenTerminal()
+    setCmd(cfg.runCommand ?? 'pnpm dev')
+    setPortInput(String(cfg.devPort ?? 3000))
+    setEditorCmd(cfg.editorCommand ?? '')
+    setCfgErr('')
+    setCfgOpen(true)
+  }
+
+  // Start / stop a run target through the runtime service (docs/next 13 §A). The instance is a
+  // terminal session in the worktree, so the drawer shows its output.
+  async function toggleTarget(id: string, running: boolean) {
+    if (!api) return
+    const res = running ? await api.run.stop(props.task.id, id) : await api.run.start(props.task.id, id)
+    if (!res.ok && res.reason) window.alert(res.reason)
+    await refreshSessions()
+    await refetchTargets()
+    if (!running && res.ok) props.onOpenTerminal()
   }
 
   async function saveCfg(e: Event) {
@@ -109,7 +109,7 @@ export default function TaskView(props: {
     if (!res.ok) return setCfgErr(res.reason)
     setCfgOpen(false)
     await refetch()
-    await startDev()
+    await refetchTargets()
   }
 
   // Close-task flow (the ✕ at the bottom of the switcher): confirm, tear the task down (killing any
@@ -134,7 +134,16 @@ export default function TaskView(props: {
       return res.ok ? (res.url ?? null) : null
     },
   )
+  // The default run target's resolved URL is the primary browser/preview home (docs/next 13 §A);
+  // re-resolved when target status changes (a url_command needs the instance up).
+  const [runUrl] = createResource(
+    () => ({ id: props.task.id, running: (runTargets() ?? []).map((t) => `${t.id}:${t.running}`).join(',') }),
+    async (src) => (api ? ((await api.run.defaultUrl(src.id)) ?? null) : null),
+  )
   const previewUrl = () => {
+    const fromTarget = runUrl()
+    if (fromTarget) return fromTarget
+    // Legacy workspace preview config, kept as the fallback when no run target resolves.
     const ws = previewWs()
     const val = ws?.previewValue?.trim() || null
     if (ws?.previewMode === 'url') return val
@@ -143,7 +152,7 @@ export default function TaskView(props: {
       return val && Number.isInteger(p) && p >= 1 && p <= 65535 ? `http://localhost:${p}` : null
     }
     if (ws?.previewMode === 'script') return scriptUrl() ?? null
-    return port() != null ? `http://localhost:${port()}` : null
+    return repoCfg()?.devPort != null ? `http://localhost:${repoCfg()?.devPort}` : null
   }
   const [closeOpen, setCloseOpen] = createSignal(false)
   const [deleteWt, setDeleteWt] = createSignal(true)
@@ -235,7 +244,7 @@ export default function TaskView(props: {
           <EditorPane task={props.task} />
         </Show>
       </Show>
-      <PreviewPane taskId={props.task.id} url={previewUrl()} hidden={activePane() !== 'preview'} onConfigure={startDev} />
+      <PreviewPane taskId={props.task.id} url={previewUrl()} hidden={activePane() !== 'preview'} onConfigure={configureRun} />
 
       <nav class="pane-switcher">
         <Show when={hasPr()}>
@@ -244,7 +253,23 @@ export default function TaskView(props: {
         <Show when={linearLinks().length}>
           <button type="button" class="pane-switch-btn" classList={{ active: activePane() === 'linear' }} title={`Linear (${linearIds().join(', ')})`} onClick={() => setActivePane('linear')}>◷</button>
         </Show>
-        <button type="button" class="pane-switch-btn" classList={{ active: !!devSession() }} title="Run dev server" onClick={() => void startDev()}>▶</button>
+        <Show when={(runTargets() ?? []).length} fallback={
+          <button type="button" class="pane-switch-btn" title="Configure run targets" onClick={configureRun}>▶</button>
+        }>
+          <For each={runTargets() ?? []}>
+            {(t) => (
+              <button
+                type="button"
+                class="pane-switch-btn pane-switch-run"
+                classList={{ active: t.running }}
+                title={`${t.running ? 'Stop' : 'Run'} ${t.id} — ${t.command}`}
+                onClick={() => void toggleTarget(t.id, t.running)}
+              >
+                {t.running ? '■' : '▶'}<span class="pane-switch-run-id">{t.id}</span>
+              </button>
+            )}
+          </For>
+        </Show>
         <button type="button" class="pane-switch-btn" classList={{ active: activePane() === 'preview' }} title="Browser preview" onClick={() => setActivePane('preview')}>◍</button>
         <button type="button" class="pane-switch-btn" classList={{ active: activePane() === 'editor' }} title="Editor" onClick={() => setActivePane('editor')}>✎</button>
         <button type="button" class="pane-switch-btn" title="Open in external editor" onClick={() => void openExternally()}>↗</button>
@@ -269,7 +294,7 @@ export default function TaskView(props: {
           <div class="overlay" role="dialog" aria-modal="true" onClick={(e) => e.stopPropagation()}>
             <div class="overlay-title">Dev server — {props.task.repoOwner}/{props.task.repoName}</div>
             <div class="overlay-body">
-              <p class="muted">Run command (in the worktree) and base port. PORT becomes base + this task's offset.</p>
+              <p class="muted">Legacy run command + port — becomes the default “dev” run target (URL: localhost:port). For named targets, set them in workspace settings or commit .acorn/config.toml.</p>
               <form class="integration-key-row" onSubmit={saveCfg}>
                 <input class="integration-key-input" type="text" placeholder="pnpm dev" value={cmd()} onInput={(e) => setCmd(e.currentTarget.value)} />
                 <input class="integration-key-input" type="number" style={{ 'max-width': '90px' }} placeholder="3000" value={portInput()} onInput={(e) => setPortInput(e.currentTarget.value)} />
