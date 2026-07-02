@@ -1,0 +1,72 @@
+/* Notes pane (docs/next 09): list + textarea/preview, flat + 1px borders. */
+.notes-pane { display: flex; flex-direction: column; overflow: hidden; padding: 0; }
+.notes-body { flex: 1; min-height: 0; display: flex; }
+.notes-list {
+  flex: 0 0 clamp(180px, 16vw, 260px);
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+  border-right: 1px solid var(--border);
+  background: var(--bg-subtle);
+}
+.notes-row-wrap { display: flex; align-items: stretch; }
+.notes-row {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  padding: 5px 10px;
+  font: inherit;
+  font-size: var(--fs-sm);
+  text-align: left;
+  color: var(--text);
+  background: transparent;
+  border: 0;
+  border-left: 2px solid transparent;
+  cursor: pointer;
+}
+.notes-row:hover { background: var(--bg-hover); }
+.notes-row.active { background: var(--bg-selected); border-left-color: var(--accent); }
+.notes-row-kind { flex: none; font-family: var(--font-mono); font-size: 10px; color: var(--text-faint); }
+.notes-row-title { flex: 1; min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.notes-row-author { flex: none; font-size: 10px; }
+.notes-row-delete {
+  flex: none;
+  width: 22px;
+  font-size: 10px;
+  color: var(--text-faint);
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+  visibility: hidden;
+}
+.notes-row-wrap:hover .notes-row-delete { visibility: visible; }
+.notes-row-delete:hover { color: var(--del-marker); }
+.notes-new { display: flex; flex-direction: column; gap: 6px; margin-top: auto; padding: 8px; border-top: 1px solid var(--border); }
+.notes-main { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.notes-toolbar {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 8px;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-subtle);
+}
+.notes-file { flex: 1; min-width: 0; font-family: var(--font-mono); font-size: var(--fs-sm); color: var(--text-muted); }
+.notes-editor {
+  flex: 1;
+  min-height: 0;
+  padding: 10px;
+  font-family: var(--font-mono);
+  font-size: var(--fs-sm);
+  line-height: 1.5;
+  color: var(--text);
+  background: var(--bg);
+  border: 0;
+  outline: none;
+  resize: none;
+}
+.notes-preview { flex: 1; min-height: 0; overflow-y: auto; padding: 10px 14px; }
