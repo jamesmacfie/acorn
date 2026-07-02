@@ -21,6 +21,7 @@ import TerminalPanel from './features/terminal/TerminalPanel'
 import CommandPalette from './features/palette/CommandPalette'
 import NotificationBell from './features/notifications/NotificationBell'
 import { hydrateNotices, markTaskRead, notices, serializeNotices } from './features/notifications/notifications'
+import { editorStateByTask, hydrateEditorState, serializeEditorState } from './features/editor/editorState'
 import { initSessions } from './features/terminal/sessions'
 import TabRail from './features/tabs/TabRail'
 import { activeTaskId, hydrateTaskLayouts, isTerminalOpen, selectedSource, setActiveTaskId, setSelectedSource, setTerminalOpen, taskLayouts } from './features/tasks/tasks'
@@ -156,6 +157,7 @@ export default function App() {
       /* ignore malformed pane map */
     }
     hydrateNotices(prefs.data.notices)
+    hydrateEditorState(prefs.data.editor_open_files)
   })
 
   // Persist the current view so a relaunch reopens it. Separate effects so each writes only when its
@@ -180,6 +182,10 @@ export default function App() {
   createEffect(() => {
     void notices()
     if (restored()) void setPref('notices', serializeNotices())
+  })
+  createEffect(() => {
+    void editorStateByTask()
+    if (restored()) void setPref('editor_open_files', serializeEditorState())
   })
 
   // Left-pane collapse, persisted via the `left_collapsed` pref. Seed the local signal from prefs
