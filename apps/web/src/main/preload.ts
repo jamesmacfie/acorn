@@ -57,6 +57,9 @@ contextBridge.exposeInMainWorld('acorn', {
       statuses: () => ipcRenderer.invoke('term:task:statuses'),
     },
     write: (id: string, data: string) => ipcRenderer.send('term:input', { id, data }),
+    // Bracketed-paste delivery into an agent PTY (docs/next 04 §D).
+    sendToAgent: (sessionId: string, text: string, submit: 'now' | 'after-ready' | 'draft') =>
+      ipcRenderer.invoke('term:sendToAgent', { sessionId, text, submit }),
     // Subscribe to session-status pings (idle/exit changes for any session); returns unsubscribe.
     onStatus: (cb: () => void) => {
       const listener = () => cb()

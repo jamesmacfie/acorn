@@ -11,6 +11,7 @@ import { and, eq } from 'drizzle-orm'
 import type { AppDatabase } from '../server/db'
 import { schema } from '../server/db'
 import type { ArchiveOpts, ArchiveResult, CreateOpts, ServerMsg, TerminalSession, TaskStatus } from '../shared/terminal'
+import { AgentSender, type SendSubmit } from './agentSend'
 import { archiveTask, TEARDOWN_TIMEOUT_MS } from './archive'
 import {
   buildSessionEnv,
@@ -49,6 +50,14 @@ type Session = {
 }
 
 const sessions = new Map<string, Session>()
+
+// sendToAgent (docs/next 04 §D): bracketed-paste delivery into agent PTYs, with 'after-ready'
+// queued on the idle edge below. One instance over the live session map.
+const agentSender = new AgentSender((id) => {
+  const s = sessions.get(id)
+  if (!s) return null
+  return { write: (data: string) => s.pty.write(data), running: () => s.meta.status === 'running', idle: () => s.meta.idle }
+})
 
 // Set once by registerTerminalIpc — where workspace worktrees are created (docs/workspaces 05).
 let worktreesRoot = ''
@@ -368,6 +377,7 @@ function wireSession(db: AppDatabase, meta: TerminalSession, pty: IPty): Session
     s.meta.status = 'exited'
     s.meta.idle = false
     s.meta.exitCode = exitCode
+    agentSender.clear(s.meta.id) // queued sends can never fire now
     emit(s, { type: 'exit', exitCode, signal: signal != null ? String(signal) : null })
     if (s.meta.backend === 'tmux') void markExited(db, s.meta.id, exitCode)
     broadcastStatus()
@@ -383,6 +393,7 @@ function startIdleWatch() {
     for (const s of sessions.values()) {
       if (computeIdle(s.meta.kind, s.meta.status, s.lastActivityAt, now) && !s.meta.idle) {
         s.meta.idle = true
+        agentSender.onIdle(s.meta.id) // flush 'after-ready' sends on the busy→idle edge (04 §D)
         notifyIdle(s.meta)
         broadcastStatus()
       }
@@ -546,6 +557,13 @@ export async function registerTerminalIpc(db: AppDatabase, worktreesDir: string)
   ipcMain.handle('term:profiles', () => listProfiles())
 
   ipcMain.handle('term:create', (_e: IpcMainInvokeEvent, opts: CreateOpts) => create(db, opts ?? {}))
+
+  // sendToAgent (docs/next 04 §D): bracketed paste into an agent session's PTY with a submit mode.
+  ipcMain.handle('term:sendToAgent', (_e: IpcMainInvokeEvent, p: { sessionId: string; text: string; submit: SendSubmit }) => {
+    if (typeof p?.sessionId !== 'string' || typeof p?.text !== 'string' || !p.text) return { ok: false, reason: 'Invalid payload.' }
+    const submit: SendSubmit = p.submit === 'now' || p.submit === 'after-ready' || p.submit === 'draft' ? p.submit : 'draft'
+    return agentSender.send(p.sessionId, p.text, submit)
+  })
 
   ipcMain.handle('term:kill', (_e: IpcMainInvokeEvent, id: string) => {
     const s = sessions.get(id)

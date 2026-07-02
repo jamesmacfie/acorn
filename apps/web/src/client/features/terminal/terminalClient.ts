@@ -11,6 +11,8 @@ export type TerminalApi = {
   remove(id: string): Promise<boolean>
   resize(id: string, cols: number, rows: number): Promise<boolean>
   write(id: string, data: string): void
+  // Bracketed-paste delivery into an agent PTY (docs/next 04 §D): one block, three submit modes.
+  sendToAgent(sessionId: string, text: string, submit: 'now' | 'after-ready' | 'draft'): Promise<{ ok: boolean; queued?: boolean; reason?: string }>
   onStatus(cb: () => void): () => void
   attach(id: string, on: (m: ServerMsg) => void): () => void
   repoPath: {
