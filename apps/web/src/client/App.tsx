@@ -18,6 +18,7 @@ import Shortcuts from './Shortcuts'
 import AccountMenu from './AccountMenu'
 import SettingsModal from './features/settings/SettingsModal'
 import TerminalPanel from './features/terminal/TerminalPanel'
+import CommandPalette from './features/palette/CommandPalette'
 import { initSessions } from './features/terminal/sessions'
 import TabRail from './features/tabs/TabRail'
 import { activeTaskId, hydrateTaskLayouts, isTerminalOpen, selectedSource, setActiveTaskId, setSelectedSource, setTerminalOpen, taskLayouts } from './features/tasks/tasks'
@@ -415,6 +416,7 @@ export default function App() {
       <Show when={termOpen()}>
         <TerminalPanel onClose={() => { const id = activeTaskId(); if (id) setTerminalOpen(id, false) }} task={activeTask()} />
       </Show>
+      <CommandPalette />
     </div>
     </div>
     </Show>

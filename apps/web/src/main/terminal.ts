@@ -291,7 +291,10 @@ async function workspaceConfigRow(db: AppDatabase, owner: string, repo: string) 
 }
 
 // Merged run-target config + the cwd to run in (the task worktree, created lazily like a terminal).
-async function taskRunConfig(db: AppDatabase, taskId: string): Promise<{ targets: import('./repoConfig').RunTarget[]; cwd: string } | { error: string }> {
+async function taskRunConfig(
+  db: AppDatabase,
+  taskId: string,
+): Promise<{ targets: import('./repoConfig').RunTarget[]; cwd: string; errors: { source: string; message: string }[] } | { error: string }> {
   const t = await loadTask(db, taskId)
   if (!t) return { error: 'Task not found.' }
   const mapped = await getRepoPath(db, t.repoOwner, t.repoName)
@@ -308,7 +311,7 @@ async function taskRunConfig(db: AppDatabase, taskId: string): Promise<{ targets
     devPort: mapped?.devPort,
     runTargetsJson: mapped?.runTargets,
   })
-  return { targets: cfg.runTargets, cwd }
+  return { targets: cfg.runTargets, cwd, errors: cfg.errors }
 }
 
 async function markExited(db: AppDatabase, id: string, exitCode: number | null) {
