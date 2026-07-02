@@ -12,6 +12,7 @@ import type { AppDatabase } from '../server/db'
 import { schema } from '../server/db'
 import type { ArchiveResult, CreateOpts, ServerMsg, TerminalSession, TaskStatus } from '../shared/terminal'
 import {
+  buildSessionEnv,
   childEnv,
   clampDim,
   computeIdle,
@@ -247,7 +248,7 @@ async function workspaceSetup(db: AppDatabase, owner: string, repo: string): Pro
 async function maybeRunSetup(db: AppDatabase, t: typeof schema.tasks.$inferSelect, cwd: string, ctx: Pick<TerminalSession, 'repo' | 'pull'>): Promise<void> {
   const { script, trigger } = await workspaceSetup(db, t.repoOwner, t.repoName)
   if (trigger === 'off' || !script?.trim()) return
-  await spawnOne(db, { taskId: t.id, command: script, title: 'Setup' }, cwd, true, ctx)
+  await spawnOne(db, { taskId: t.id, command: script, title: 'Setup' }, cwd, true, ctx, t)
 }
 
 async function markExited(db: AppDatabase, id: string, exitCode: number | null) {
@@ -333,16 +334,29 @@ async function create(db: AppDatabase, opts: CreateOpts): Promise<TerminalSessio
   // requested session (which stays focused). Runs once because `created` is only true on the single
   // worktree add; if it already ran at task creation ('created' trigger), created is false here.
   if (created && t) await maybeRunSetup(db, t, cwd, ctx)
-  return spawnOne(db, opts, cwd, isWorktree, ctx)
+  return spawnOne(db, opts, cwd, isWorktree, ctx, t)
 }
 
 // Build the session meta, spawn the PTY (tmux or node-pty) in the already-resolved cwd, and wire it.
-async function spawnOne(db: AppDatabase, opts: CreateOpts, cwd: string, isWorktree: boolean, ctx: Pick<TerminalSession, 'repo' | 'pull'>): Promise<TerminalSession> {
+async function spawnOne(
+  db: AppDatabase,
+  opts: CreateOpts,
+  cwd: string,
+  isWorktree: boolean,
+  ctx: Pick<TerminalSession, 'repo' | 'pull'>,
+  task?: typeof schema.tasks.$inferSelect,
+): Promise<TerminalSession> {
   const profile = getProfile(opts.profileId)
   // Dev-server pane (docs/workspaces P5): a command override runs via the user's shell with env
-  // (PORT) merged in; otherwise the profile's binary. resolveCommand stays the path for shells/agents.
+  // merged in; otherwise the profile's binary. resolveCommand stays the path for shells/agents.
   const command = opts.command?.trim() || resolveCommand(profile)
-  const env = opts.env ? { ...childEnv(), ...opts.env } : childEnv()
+  // Every task-scoped session carries the ACORN_* identity vars (docs/next 02/11).
+  const env = buildSessionEnv({
+    taskId: opts.taskId,
+    cwd,
+    task: task ? { repoOwner: task.repoOwner, repoName: task.repoName, branch: task.branch, title: task.title } : null,
+    env: opts.env,
+  })
   const backend = resolveBackend(profile.backendPreference, tmuxAvailable())
   const cols = clampDim(opts.cols, 80)
   const rows = clampDim(opts.rows, 24)
