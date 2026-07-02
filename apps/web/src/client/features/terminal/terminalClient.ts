@@ -18,9 +18,12 @@ export type TerminalApi = {
     set(owner: string, repo: string, path: string): Promise<RepoPathResult>
     pick(): Promise<string | null>
     runConfig(owner: string, repo: string, runCommand: string, devPort: number): Promise<RepoPathResult>
+    editorCommand(owner: string, repo: string, editorCommand: string): Promise<RepoPathResult>
   }
   // Run a workspace's browser-preview script in the task's worktree; stdout (trimmed) is the URL.
   previewUrl(taskId: string, script: string): Promise<{ ok: boolean; url?: string; reason?: string }>
+  // Open the task's worktree (or base checkout) in the external editor (docs/next 01 P2).
+  openInEditor(taskId: string): Promise<{ ok: boolean; reason?: string }>
 
   task: {
     archive(id: string, opts?: { deleteWorktree?: boolean; force?: boolean }): Promise<ArchiveResult>

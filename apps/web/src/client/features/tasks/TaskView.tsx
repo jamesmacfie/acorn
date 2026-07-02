@@ -50,6 +50,28 @@ export default function TaskView(props: {
   const [cmd, setCmd] = createSignal('')
   const [portInput, setPortInput] = createSignal('')
   const [cfgErr, setCfgErr] = createSignal('')
+  const [editorCmd, setEditorCmd] = createSignal('')
+
+  // Open the worktree in the user's external editor (docs/next 01 P2). A resolution failure opens
+  // the per-repo config overlay so the command can be fixed in place.
+  async function openExternally() {
+    if (!api) return
+    const res = await api.openInEditor(props.task.id)
+    if (res.ok) return
+    setEditorCmd(repoCfg()?.editorCommand ?? '')
+    setCfgErr(res.reason ?? 'Could not open the editor.')
+    setCmd(repoCfg()?.runCommand ?? '')
+    setPortInput(repoCfg()?.devPort != null ? String(repoCfg()?.devPort) : '')
+    setCfgOpen(true)
+  }
+
+  async function saveEditorCmd() {
+    if (!api) return
+    const res = await api.repoPath.editorCommand(props.task.repoOwner, props.task.repoName, editorCmd())
+    if (!res.ok) return setCfgErr(res.reason)
+    setCfgErr('')
+    await refetch()
+  }
 
   const devSession = () => sessions().find((s) => s.taskId === props.task.id && s.title.startsWith('▶ '))
 
@@ -61,6 +83,7 @@ export default function TaskView(props: {
     if (!cfg.runCommand || cfg.devPort == null) {
       setCmd(cfg.runCommand ?? 'pnpm dev')
       setPortInput(String(cfg.devPort ?? 3000))
+      setEditorCmd(cfg.editorCommand ?? '')
       setCfgErr('')
       setCfgOpen(true)
       return
@@ -217,6 +240,7 @@ export default function TaskView(props: {
         <button type="button" class="pane-switch-btn" classList={{ active: !!devSession() }} title="Run dev server" onClick={() => void startDev()}>▶</button>
         <button type="button" class="pane-switch-btn" classList={{ active: activePane() === 'preview' }} title="Browser preview" onClick={() => setActivePane('preview')}>◍</button>
         <button type="button" class="pane-switch-btn" classList={{ active: activePane() === 'editor' }} title="Editor" onClick={() => setActivePane('editor')}>✎</button>
+        <button type="button" class="pane-switch-btn" title="Open in external editor" onClick={() => void openExternally()}>↗</button>
         <button type="button" class="pane-switch-btn" classList={{ active: props.terminalOpen }} title="Terminal" onClick={props.onToggleTerminal}>{'>_'}</button>
         <button type="button" class="pane-switch-btn pane-switch-close" title="Close task" onClick={openClose}>✕</button>
       </nav>
@@ -244,6 +268,11 @@ export default function TaskView(props: {
                 <input class="integration-key-input" type="number" style={{ 'max-width': '90px' }} placeholder="3000" value={portInput()} onInput={(e) => setPortInput(e.currentTarget.value)} />
                 <button type="submit" class="overlay-btn" disabled={!cmd().trim() || !portInput().trim()}>Run</button>
               </form>
+              <p class="muted">Open in editor — the command for “open externally” (blank = default “code”).</p>
+              <div class="integration-key-row">
+                <input class="integration-key-input" type="text" placeholder="code" value={editorCmd()} onInput={(e) => setEditorCmd(e.currentTarget.value)} />
+                <button type="button" class="overlay-btn" onClick={() => void saveEditorCmd()}>Save editor</button>
+              </div>
               <Show when={cfgErr()}><div class="action-error">{cfgErr()}</div></Show>
             </div>
           </div>

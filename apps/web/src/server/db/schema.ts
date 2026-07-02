@@ -256,6 +256,9 @@ export const repoPaths = sqliteTable(
     // worktree with PORT = devPort + the workspace's rail offset, so two workspaces don't collide.
     runCommand: text('run_command'),
     devPort: integer('dev_port'),
+    // External editor command for this repo's worktrees (docs/next 01 P2): 'code' | 'zed' |
+    // 'cursor -n' | an absolute path. null → the prefs 'editor_command_default' → 'code'.
+    editorCommand: text('editor_command'),
     createdAt: integer('created_at').notNull(),
     updatedAt: integer('updated_at').notNull(),
   },
