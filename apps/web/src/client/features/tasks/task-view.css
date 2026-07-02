@@ -197,3 +197,19 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+
+/* Layout slots (docs/next 03): flex row of 1–2 slots + 1px-ish divider + switcher rail, ordered
+   by slot index (the preview slot stays mounted and takes its place via `order`). */
+.panes.panes-workspace.task-layout,
+.app.left-collapsed .panes.panes-workspace.task-layout {
+  display: flex;
+}
+.task-slot { display: flex; min-width: 0; min-height: 0; flex-basis: 0; overflow: hidden; }
+.task-slot > .pane { flex: 1; min-width: 0; }
+.task-slot-pr > .pane-mid { flex: 0 0 clamp(280px, 20vw, 430px); }
+.task-slot-pr > .pane-right { flex: 1; }
+.task-slot-preview.is-hidden { display: none; }
+.task-divider { flex: none; width: 3px; cursor: col-resize; background: var(--border); }
+.task-divider:hover { background: var(--accent); }
+/* Pinned pane's switcher glyph gets the warn accent (filled-pin stand-in; flat, square). */
+.pane-switch-btn.pinned { border-right-color: var(--warn); color: var(--warn); }
