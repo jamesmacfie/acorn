@@ -5,8 +5,11 @@ import { taskContextRoute, type TaskContext, type TaskContextInclude } from '../
 import { formatContextBlock } from '../../../shared/contextBlock'
 import { agentSessionsFor } from '../terminal/sessions'
 import { terminalApi } from '../terminal/terminalClient'
+import { memoryApi, type MemoryType } from '../memory/memoryClient'
 import { DEFAULT_SELECTION, selectionToInclude, traySummary, type TraySelection } from './model'
 import './context-tray.css'
+
+const MEMORY_TYPE_OPTIONS: MemoryType[] = ['convention', 'architecture', 'decision', 'fix', 'reference', 'feedback', 'task', 'user']
 
 // The context tray (docs/next 11 §E): collapsible chrome above the task footer listing everything
 // attached to the task — PR, linked tickets/errors, notes, top memories — each with an include
@@ -26,6 +29,36 @@ export default function ContextTray(props: { task: Task }) {
   )
 
   const toggle = (k: TaskContextInclude) => setSel((s) => ({ ...s, [k]: !s[k] }))
+
+  // Manual "add memory" (docs/next 12 P1): repo scope → the task worktree (lands via its PR);
+  // private scope → ~/.acorn/memory.
+  const [memFormOpen, setMemFormOpen] = createSignal(false)
+  const [memName, setMemName] = createSignal('')
+  const [memDesc, setMemDesc] = createSignal('')
+  const [memType, setMemType] = createSignal<MemoryType>('convention')
+  const [memScope, setMemScope] = createSignal<'repo' | 'private'>('repo')
+  const [memBody, setMemBody] = createSignal('')
+  const [memMsg, setMemMsg] = createSignal('')
+
+  async function addMemory() {
+    const m = memoryApi()
+    if (!m) return
+    setMemMsg('')
+    const res = await m.add({
+      taskId: props.task.id,
+      scope: memScope(),
+      name: memName().trim().toLowerCase().replace(/[^a-z0-9._-]+/g, '-'),
+      description: memDesc().trim(),
+      type: memType(),
+      body: memBody(),
+    })
+    if ('error' in res) return setMemMsg(res.error)
+    setMemMsg(`Saved → ${res.path}`)
+    setMemName('')
+    setMemDesc('')
+    setMemBody('')
+    await refetch()
+  }
 
   async function assembleAndSend() {
     setMsg('')
@@ -88,7 +121,36 @@ export default function ContextTray(props: { task: Task }) {
               <button type="button" class="overlay-btn" onClick={() => void assembleAndSend()}>
                 Assemble &amp; send → agent{agentSessionsFor(props.task.id)[0]?.idle ? ' ●' : ''}
               </button>
+              <Show when={memoryApi()}>
+                <button type="button" class="overlay-btn" onClick={() => setMemFormOpen(!memFormOpen())}>+ memory</button>
+              </Show>
             </div>
+            <Show when={memFormOpen()}>
+              <form
+                class="context-tray-memform"
+                onSubmit={(e) => {
+                  e.preventDefault()
+                  void addMemory()
+                }}
+              >
+                <div class="integration-key-row">
+                  <input class="integration-key-input" type="text" placeholder="name (kebab-case)" value={memName()} onInput={(e) => setMemName(e.currentTarget.value)} />
+                  <select class="integration-key-input" value={memType()} onChange={(e) => setMemType(e.currentTarget.value as MemoryType)}>
+                    <For each={MEMORY_TYPE_OPTIONS}>{(k) => <option value={k}>{k}</option>}</For>
+                  </select>
+                  <select class="integration-key-input" value={memScope()} onChange={(e) => setMemScope(e.currentTarget.value as 'repo' | 'private')}>
+                    <option value="repo">repo (worktree, committed)</option>
+                    <option value="private">private (~/.acorn)</option>
+                  </select>
+                </div>
+                <input class="integration-key-input" type="text" placeholder="one-line description" value={memDesc()} onInput={(e) => setMemDesc(e.currentTarget.value)} />
+                <textarea class="settings-script" rows="3" placeholder={'Body — include a **Why:** line.'} value={memBody()} onInput={(e) => setMemBody(e.currentTarget.value)} />
+                <div class="context-tray-actions">
+                  <button type="submit" class="overlay-btn" disabled={!memName().trim() || !memDesc().trim()}>Save memory</button>
+                  <Show when={memMsg()}><span class="muted">{memMsg()}</span></Show>
+                </div>
+              </form>
+            </Show>
           </div>
         )}
       </Show>

@@ -386,6 +386,30 @@ export const reviewNotes = sqliteTable('review_notes', {
   createdAt: integer('created_at').notNull(),
 })
 
+// Memory index (docs/next 12): markdown files are the TRUTH (<worktree>/.acorn/memory committed,
+// ~/.acorn/memory private); this table is a derived index reconciled on change from all active
+// worktrees + primary checkouts. id = content hash (idempotent across N checkouts); conflicts on
+// (scope, repo, name) resolve newest-updatedAt. Machine-scoped. The companion FTS5 virtual table
+// (memories_fts, porter stemming over name/description/body) is created by hand in the migration —
+// drizzle doesn't model virtual tables.
+export const memories = sqliteTable('memories', {
+  id: text('id').primaryKey(), // sha256(content) prefix
+  scope: text('scope').notNull(), // 'repo' | 'private'
+  repo: text('repo'), // 'owner/name' for repo scope; null for private
+  name: text('name').notNull(),
+  type: text('type').notNull(), // convention|architecture|decision|fix|reference|feedback|task|user
+  description: text('description').notNull(),
+  body: text('body').notNull(),
+  path: text('path').notNull(), // the winning file on disk
+  originSessionId: text('origin_session_id'),
+  commitSha: text('commit_sha'),
+  supersededBy: text('superseded_by'),
+  createdAt: integer('created_at').notNull(),
+  updatedAt: integer('updated_at').notNull(),
+  lastAccessedAt: integer('last_accessed_at'),
+  accessCount: integer('access_count').notNull().default(0),
+})
+
 // Durable terminal sessions (vNext §7). Machine-scoped like repo_paths. We persist ONLY tmux-backed
 // sessions: tmux outlives an app restart, so on startup the service reconciles these rows against
 // `tmux list-sessions` and re-attaches the survivors. node-pty sessions die with the process and

@@ -82,6 +82,13 @@ contextBridge.exposeInMainWorld('acorn', {
       }
     },
   },
+  // Memory (docs/next 12): committed .acorn/memory files + the derived FTS index.
+  memory: {
+    list: (repo?: string) => ipcRenderer.invoke('memory:list', { repo }),
+    search: (query: string, repo?: string, type?: string) => ipcRenderer.invoke('memory:search', { query, repo, type }),
+    add: (p: { taskId: string; scope: 'repo' | 'private'; name: string; description: string; type: string; body: string }) =>
+      ipcRenderer.invoke('memory:add', p),
+  },
   // Workspace notes (docs/next 09): .md files with frontmatter under the app data dir; the pane
   // and (later) the MCP notes_* tools share the one main-process store.
   notes: {
