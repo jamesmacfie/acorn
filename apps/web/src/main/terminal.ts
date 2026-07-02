@@ -33,6 +33,7 @@ import { loadRepoConfig } from './repoConfig'
 import { getRepoPath, setEditorCommand, setRepoPath, setRunConfig, setRunTargets } from './repoPaths'
 import { RuntimeService } from './runtime'
 import { setContextNotesSource } from '../server/routes/taskContext'
+import { inspectMcpConfig, MCP_CANDIDATES, STARTER_MCP_JSON, type McpServerSummary } from '../shared/mcp'
 import { setContextMemorySource } from '../server/routes/taskContext'
 import { formatMemoryInjection, listMemories, memoryIndexSlice, memorySources, reconcileMemories, searchMemories, writeMemoryFile, MEMORY_TYPES, type MemoryType } from './memory'
 import { NotesStore, type NoteKind } from './notes'
@@ -552,6 +553,35 @@ export async function registerTerminalIpc(db: AppDatabase, worktreesDir: string)
       return { error: e instanceof Error ? e.message : 'notes failed' }
     }
   }
+  // MCP config inspector (docs/next 06 A): read ONLY the known candidate files (worktree
+  // .mcp.json / .cursor/mcp.json, ~/.claude.json), parse + MASK IN MAIN — raw secrets never cross
+  // to the renderer. Read-only; acorn never launches these servers.
+  ipcMain.handle('mcp:inspect', async (_e: IpcMainInvokeEvent, taskId: string): Promise<{ file: string; servers: McpServerSummary[] }[]> => {
+    const root = typeof taskId === 'string' && taskId ? await taskRoot(db, taskId) : null
+    const out: { file: string; servers: McpServerSummary[] }[] = []
+    for (const candidate of MCP_CANDIDATES) {
+      const base = candidate.root === 'home' ? homedir() : root
+      if (!base) continue
+      const file = resolve(base, candidate.rel)
+      try {
+        const text = await readFile(file, 'utf8')
+        out.push({ file, servers: inspectMcpConfig(text) })
+      } catch {
+        // absent file → not listed
+      }
+    }
+    return out
+  })
+
+  ipcMain.handle('mcp:createStarter', async (_e: IpcMainInvokeEvent, taskId: string): Promise<{ ok: boolean; reason?: string }> => {
+    const root = await taskRoot(db, taskId)
+    if (!root) return { ok: false, reason: 'No worktree yet — open a terminal first.' }
+    const file = resolve(root, '.mcp.json')
+    if (existsSync(file)) return { ok: false, reason: '.mcp.json already exists.' }
+    await writeFile(file, STARTER_MCP_JSON, 'utf8')
+    return { ok: true }
+  })
+
   // Memory (docs/next 12 P1): files are truth; the SQLite index reconciles from every active
   // worktree + primary checkout + the private home dir before each read (cheap at this scale).
   const buildMemorySources = async () => {
