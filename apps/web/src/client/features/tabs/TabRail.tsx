@@ -1,8 +1,9 @@
 import { createSignal, For, Show } from 'solid-js'
 import { useNavigate, useParams } from '@solidjs/router'
 import { createQuery, useQueryClient } from '@tanstack/solid-query'
-import { integrationsOptions, pullDetailOptions, tasksKey, tasksOptions, workspacesOptions, type Task } from '../../queries'
-import { archiveTask, createTask, renameTask } from '../../mutations'
+import { integrationsOptions, prefsKey, prefsOptions, pullDetailOptions, tasksKey, tasksOptions, workspacesOptions, type Task } from '../../queries'
+import { archiveTask, createTask, renameTask, setPref } from '../../mutations'
+import { applyRailOrder, isPinned, moveTask, parseRailOrder, pinTask, serializeRailOrder, unpinTask, type RailOrder } from './railOrder'
 import { checksState } from '../../displayMeta'
 import { activeTaskId, paneForTask, selectedSource, setActivePane, setActiveTaskId, setSelectedSource, type SourceId } from '../tasks/tasks'
 import { taskStatus } from '../tasks/taskStatus'
@@ -29,7 +30,23 @@ export default function TabRail() {
   const query = createQuery(() => tasksOptions(true))
   const workspaces = createQuery(() => workspacesOptions(true))
   const integrations = createQuery(() => integrationsOptions(true))
+  const prefs = createQuery(() => prefsOptions(true))
   const [menuId, setMenuId] = createSignal<string | null>(null)
+  const [dragId, setDragId] = createSignal<string | null>(null)
+
+  // Rail order (docs/next 03 §rail): pin-to-top + drag-reorder in a dedicated pref — never
+  // tasks.sort. The pure model lives in railOrder.ts.
+  const railOrder = () => parseRailOrder(prefs.data?.rail_order)
+  const saveOrder = async (o: RailOrder) => {
+    await setPref('rail_order', serializeRailOrder(o))
+    await queryClient.invalidateQueries({ queryKey: prefsKey })
+  }
+  async function onDrop(targetId: string | null) {
+    const id = dragId()
+    setDragId(null)
+    if (!id || id === targetId) return
+    await saveOrder(moveTask(railOrder(), visibleTasks().map((t) => t.id), id, targetId))
+  }
   const [draft, setDraft] = createSignal<Draft | null>(null)
   const [text, setText] = createSignal('')
   const [newRepo, setNewRepo] = createSignal('') // "owner/name" for the new-task repo selector
@@ -53,9 +70,9 @@ export default function TabRail() {
   const activeWorkspace = () => workspaceForRepo(workspaces.data, params.owner, params.repo)
   const visibleTasks = () => {
     const ws = activeWorkspace()
-    if (!ws) return query.data ?? []
-    const set = new Set((ws.repos ?? []).map((r) => `${r.owner}/${r.name}`))
-    return (query.data ?? []).filter((t) => set.has(`${t.repoOwner}/${t.repoName}`))
+    const all = query.data ?? []
+    const scoped = ws ? all.filter((t) => new Set((ws.repos ?? []).map((r) => `${r.owner}/${r.name}`)).has(`${t.repoOwner}/${t.repoName}`)) : all
+    return applyRailOrder(scoped, railOrder())
   }
 
   function pathFor(w: Task): string {
@@ -187,13 +204,28 @@ export default function TabRail() {
               return icon?.kind === 'emoji' ? icon.value : null
             }
             return (
-            <div class="tabrail-item">
+            <div
+              class="tabrail-item"
+              draggable={true}
+              onDragStart={(e) => {
+                setDragId(w.id)
+                e.dataTransfer?.setData('text/plain', w.id)
+              }}
+              onDragOver={(e) => e.preventDefault()}
+              onDrop={(e) => {
+                e.preventDefault()
+                void onDrop(w.id)
+              }}
+            >
+              <Show when={isPinned(railOrder(), w.id)}>
+                <span class="tabrail-pin" title="Pinned to top">⌖</span>
+              </Show>
               <button
                 type="button"
                 class="tabrail-tab tabrail-task"
                 classList={{ active: !selectedSource() && w.id === activeTaskId() }}
                 style={accent() ? { 'border-left-color': accent() } : undefined}
-                title={w.title}
+                title={`${w.title}\n${w.branch}${st()?.dirty ? ` · ${st()?.dirtyCount} uncommitted` : ''}`}
                 onClick={() => onRowClick(w)}
               >
                 {wsGlyph() ?? ORIGIN_GLYPH[w.origin] ?? '●'}
@@ -211,6 +243,17 @@ export default function TabRail() {
               <Show when={menuId() === w.id}>
                 <div class="tabrail-menu">
                   <div class="tabrail-menu-title">{w.title}</div>
+                  <div class="tabrail-menu-title">{w.branch}</div>
+                  <button
+                    type="button"
+                    class="tabrail-close"
+                    onClick={() => {
+                      setMenuId(null)
+                      void saveOrder(isPinned(railOrder(), w.id) ? unpinTask(railOrder(), w.id) : pinTask(railOrder(), w.id))
+                    }}
+                  >
+                    {isPinned(railOrder(), w.id) ? 'Unpin' : 'Pin to top'}
+                  </button>
                   <button type="button" class="tabrail-close" onClick={() => openRename(w)}>
                     Rename
                   </button>
