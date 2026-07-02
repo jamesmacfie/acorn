@@ -18,6 +18,7 @@ import { mentions } from './routes/mentions'
 import { repos } from './routes/repos'
 import { repoLabels } from './routes/repoLabels'
 import { reviewNotes } from './routes/reviewNotes'
+import { rollbar } from './routes/rollbar'
 import { harness } from './routes/harness'
 import { taskContext } from './routes/taskContext'
 import { workspaces } from './routes/workspaces'
@@ -41,6 +42,7 @@ export function createApp() {
     .route('/api/tasks', harness) // /:id/notes|memory|run — the MCP feature-tool surface (docs/next 06)
     .route('/api/integrations', integrations) // connect/disconnect/status for third-party providers
     .route('/api/linear', linear) // Linear issues referenced from a PR (read, cached per-user)
+    .route('/api/rollbar', rollbar) // Rollbar items browse + detail, cached into `issues` (docs/next 10)
     .route('/api/repos', repos)
     .route('/api/repos', repoLabels) // /:owner/:repo/labels — repo label choices for the PR picker
     .route('/api/repos', pulls) // repo-scoped sub-resources, e.g. /:owner/:repo/pulls

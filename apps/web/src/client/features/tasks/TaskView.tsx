@@ -6,6 +6,7 @@ import { archiveTask } from '../../mutations'
 import PullDetail from '../../PullDetail'
 import DiffView from '../../DiffView'
 import LinearIssuePanel from '../integrations/LinearIssuePanel'
+import RollbarPane from '../integrations/RollbarPane'
 import EditorPane from '../editor/EditorPane'
 import ChangesPane from '../changes/ChangesPane'
 import ContextTray from '../context/ContextTray'
@@ -83,6 +84,7 @@ export default function TaskView(props: {
   // A task can link several Linear tickets (e.g. a PR that resolves multiple). The ◷ icon
   // shows only when there's at least one; the pane lets you switch between them.
   const linearLinks = createMemo(() => props.task.links.filter((l) => l.provider === 'linear'))
+  const rollbarLinks = createMemo(() => props.task.links.filter((l) => l.provider === 'rollbar'))
   const linearIds = () => linearLinks().map((l) => l.identifier)
   const [picked, setPicked] = createSignal<string | null>(null)
   const linearId = () => (picked() && linearIds().includes(picked()!) ? picked()! : linearIds()[0])
@@ -283,6 +285,7 @@ export default function TaskView(props: {
     if (pane === 'editor') return <EditorPane task={props.task} />
     if (pane === 'changes') return <ChangesPane task={props.task} />
     if (pane === 'notes') return <NotesPane task={props.task} workspace={previewWs()} />
+    if (pane === 'rollbar') return <RollbarPane task={props.task} />
     if (pane === 'linear') {
       return (
         <section class="pane pane-empty">
@@ -340,6 +343,9 @@ export default function TaskView(props: {
         </Show>
         <Show when={linearLinks().length}>
           <button type="button" class="pane-switch-btn" classList={{ active: showsPane('linear'), pinned: layout().pinned === 'linear' }} title={`Linear (${linearIds().join(', ')})`} onClick={() => onSwitch('linear')}>◷</button>
+        </Show>
+        <Show when={rollbarLinks().length}>
+          <button type="button" class="pane-switch-btn" classList={{ active: showsPane('rollbar'), pinned: layout().pinned === 'rollbar' }} title={`Rollbar (#${rollbarLinks().map((l) => l.identifier).join(', #')})`} onClick={() => onSwitch('rollbar')}>◍</button>
         </Show>
         <Show when={(runTargets() ?? []).length} fallback={
           <button type="button" class="pane-switch-btn" title="Configure run targets" onClick={configureRun}>▶</button>
