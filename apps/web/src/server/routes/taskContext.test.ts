@@ -146,6 +146,36 @@ describe('GET /api/tasks/:id/context (docs/next 11 §C)', () => {
     expect(ctx.memory).toEqual([{ name: 'auth-conventions', description: 'how auth flows work' }])
   })
 
+  it('workspace notes ride the assembler once the 09 P2 source is wired (real NotesStore)', async () => {
+    const { mkdtempSync, rmSync } = await import('node:fs')
+    const { tmpdir } = await import('node:os')
+    const { join } = await import('node:path')
+    const { NotesStore } = await import('../../main/notes')
+    const dir = mkdtempSync(join(tmpdir(), 'acorn-ctx-notes-'))
+    try {
+      const store = new NotesStore(dir)
+      await store.create('ws1', 'eng-42 plan', { kind: 'plan', body: 'Guard the null token first.\n' })
+      await store.create('ws1', 'handoff', { kind: 'handoff', author: 'agent', body: 'Left the redirect for next session.\n' })
+      // The same wiring shape terminal.ts registers: task → workspace → notes list + bodies.
+      setContextNotesSource(async () => {
+        const list = await store.list('ws1')
+        const out: { title: string; body: string }[] = []
+        for (const s of list) {
+          const n = await store.read('ws1', s.slug)
+          out.push({ title: `${n.title} (${n.kind})`, body: n.body })
+        }
+        return out
+      })
+      const ctx = await fetchCtx()
+      expect(ctx.notes.map((n) => n.title).sort()).toEqual(['eng-42 plan (plan)', 'handoff (handoff)'])
+      expect(ctx.notes.find((n) => n.title.startsWith('eng-42'))?.body).toContain('Guard the null token')
+      // include filter still respected: pr-only leaves notes out.
+      expect((await fetchCtx('?include=pr')).notes).toEqual([])
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
+  })
+
   it('404s an unknown task', async () => {
     const res = await app.fetch(new Request('http://acorn.test/api/tasks/nope/context'), {} as Env)
     expect(res.status).toBe(404)

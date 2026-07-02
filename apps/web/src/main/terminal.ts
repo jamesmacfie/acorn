@@ -32,6 +32,7 @@ import { getProfile, listProfiles, resolveCommand, tmuxAvailable } from './profi
 import { loadRepoConfig } from './repoConfig'
 import { getRepoPath, setEditorCommand, setRepoPath, setRunConfig, setRunTargets } from './repoPaths'
 import { RuntimeService } from './runtime'
+import { setContextNotesSource } from '../server/routes/taskContext'
 import { NotesStore, type NoteKind } from './notes'
 import { copyWorktreeFiles, ensureWorktree, worktreePorcelain } from './worktrees'
 
@@ -520,6 +521,22 @@ export async function registerTerminalIpc(db: AppDatabase, worktreesDir: string)
   // Workspace notes (docs/next 09 P1): files under <dataDir>/notes/<workspaceId>/, beside the
   // worktrees dir. ONE store — the UI reads it here; the MCP notes_* tools reuse it.
   const notesStore = new NotesStore(join(dirname(worktreesDir), 'notes'))
+
+  // Fill the context assembler's notes seam (docs/next 09 P2 / 11 §C): the task's workspace notes
+  // ride TaskContext.notes. Newest first, capped — the push block stays compact.
+  setContextNotesSource(async (taskId) => {
+    const t = await loadTask(db, taskId)
+    if (!t) return []
+    const ws = await workspaceConfigRow(db, t.repoOwner, t.repoName)
+    if (!ws) return []
+    const list = await notesStore.list(ws.id)
+    const out: { title: string; body: string }[] = []
+    for (const summary of list.slice(0, 10)) {
+      const note = await notesStore.read(ws.id, summary.slug).catch(() => null)
+      if (note) out.push({ title: `${note.title} (${note.kind})`, body: note.body.slice(0, 2000) })
+    }
+    return out
+  })
   const guard = async <T>(fn: () => Promise<T>): Promise<T | { error: string }> => {
     try {
       return await fn()
