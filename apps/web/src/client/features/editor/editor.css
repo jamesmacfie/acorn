@@ -109,3 +109,39 @@
   color: var(--text-faint);
   font-size: 9px;
 }
+
+/* File tab bar (docs/next 07): flat/square, 1px borders; italic = ephemeral preview tab. */
+.editor-tabs {
+  flex: none;
+  display: flex;
+  align-items: stretch;
+  overflow-x: auto;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-subtle);
+  min-height: 30px;
+}
+.editor-tab { display: flex; align-items: center; border-right: 1px solid var(--border); }
+.editor-tab.active { background: var(--bg); }
+.editor-tab.ephemeral .editor-tab-name { font-style: italic; }
+.editor-tab-name {
+  padding: 4px 4px 4px 10px;
+  font: inherit;
+  font-size: var(--fs-sm);
+  font-family: var(--font-mono);
+  color: var(--text-muted);
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.editor-tab.active .editor-tab-name { color: var(--text); }
+.editor-tab-close {
+  padding: 4px 8px 4px 4px;
+  font-size: 10px;
+  color: var(--text-faint);
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+}
+.editor-tab-close:hover { color: var(--del-marker); }
+.editor-tab-actions { display: flex; align-items: center; gap: 6px; margin-left: auto; padding: 0 8px; }
