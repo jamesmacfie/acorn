@@ -84,6 +84,36 @@ export function childEnv(env: NodeJS.ProcessEnv = process.env): Record<string, s
   return out
 }
 
+// Blocked-prompt detection (docs/next 05 P3): when an agent session is otherwise idle, scan the
+// tail of its PTY ring for a tiny const rule list of input prompts. ponytail: a heuristic with a
+// known ceiling — the upgrade path is config-injected agent hooks (deferred, invasive).
+// eslint-disable-next-line no-control-regex
+const ANSI_RE = /\x1b(?:\[[0-9;?]*[a-zA-Z~]|\][^\x07\x1b]*(?:\x07|\x1b\\)|[()][A-Z0-9])/g
+const SPINNER_RE = /[⠁⠂⠄⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏◐◓◑◒]/g
+
+const BLOCKED_PATTERNS: RegExp[] = [
+  /\(y\/n\)/i,
+  /\[y\/n\]/i,
+  /do you want to proceed/i,
+  /press enter/i,
+]
+
+export const TAIL_SCAN_LINES = 12
+
+export function matchBlockedPrompt(ringTail: string): boolean {
+  const cleaned = ringTail.replace(ANSI_RE, '').replace(SPINNER_RE, '').replace(/\r/g, '\n')
+  const lines = cleaned
+    .split('\n')
+    .map((l) => l.trim())
+    .filter(Boolean)
+    .slice(-TAIL_SCAN_LINES)
+  if (!lines.length) return false
+  const tail = lines.join('\n')
+  if (BLOCKED_PATTERNS.some((re) => re.test(tail))) return true
+  // A trailing `?` counts only on the LAST line (a mid-stream question in scrollback doesn't).
+  return /\?\s*$/.test(lines[lines.length - 1])
+}
+
 // Bracketed paste (docs/next 04 §D): agent TUIs treat the wrapped payload as ONE pasted block, so
 // multi-line prompts don't submit per-line. Sanitize: strip any stray paste markers from the
 // payload (a payload containing ESC[201~ would end the paste early — the injection risk) and trim

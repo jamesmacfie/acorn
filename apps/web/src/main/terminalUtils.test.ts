@@ -7,6 +7,7 @@ import {
   isContainedPath,
   isDirty,
   isValidRepoIdent,
+  matchBlockedPrompt,
   parseTmuxSessions,
   resolveBackend,
   RING_CAP,
@@ -100,6 +101,34 @@ describe('path-traversal guards', () => {
     expect(isContainedPath('/data/worktrees', '/data/worktrees/../../etc/passwd')).toBe(false)
     expect(isContainedPath('/data/worktrees', '/data/worktrees-evil')).toBe(false)
     expect(isContainedPath('/data/worktrees', '/etc/passwd')).toBe(false)
+  })
+})
+
+describe('matchBlockedPrompt (docs/next 05 P3)', () => {
+  it.each([
+    ['Do you want to proceed? (y/n)', true],
+    ['Overwrite existing file? [Y/n]', true],
+    ['Press enter to continue', true],
+    ['Which file should I edit?', true], // trailing ? on the last line
+    ['done.\nAll tests passed.', false],
+    ['building…\ncompiling module 4 of 7', false],
+  ])('%j → %s', (tail, expected) => {
+    expect(matchBlockedPrompt(tail)).toBe(expected)
+  })
+
+  it('ignores a mid-stream question that is not the last line', () => {
+    expect(matchBlockedPrompt('What changed?\nApplying edits now\nDone.')).toBe(false)
+  })
+
+  it('is not fooled by spinner frames or ANSI colour', () => {
+    expect(matchBlockedPrompt('⠋ working…\n⠙ still working…')).toBe(false)
+    expect(matchBlockedPrompt('\x1b[32m✓ built\x1b[0m\n\x1b[90mwaiting for changes\x1b[0m')).toBe(false)
+    expect(matchBlockedPrompt('\x1b[1mProceed?\x1b[0m (y/n)\x1b[?25l')).toBe(true)
+  })
+
+  it('handles carriage-return-only spinners (last visual line wins)', () => {
+    expect(matchBlockedPrompt('step 1\rstep 2\rstep 3 running')).toBe(false)
+    expect(matchBlockedPrompt('')).toBe(false)
   })
 })
 
