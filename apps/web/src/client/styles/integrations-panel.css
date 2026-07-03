@@ -261,10 +261,7 @@
 /* "Add integration" — the trigger. */
 .integration-add-btn {
   align-self: flex-start;
-  display: inline-flex;
-  align-items: center;
   gap: 7px;
-  color: var(--text);
 }
 .integration-add-btn.open { background: var(--bg-selected); }
 .integration-add-icon { font-size: 15px; line-height: 1; transition: transform 0.18s ease; }
