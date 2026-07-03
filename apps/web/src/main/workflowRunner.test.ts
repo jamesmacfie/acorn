@@ -109,6 +109,109 @@ describe('WorkflowRunner (docs/next 14 P2)', () => {
     expect(steps[1].status).toBe('pending') // never started
   })
 
+  it('human gate pauses the run (no further transitions) until the approve IPC; reject fails cleanly', async () => {
+    const d = deps()
+    const runner = new WorkflowRunner(t.db, d)
+    const def: WorkflowDef = {
+      name: 'gated-ship',
+      steps: [
+        { name: 'build', prompt: 'Build.' },
+        { name: 'ship?', kind: 'gate-human' },
+        { name: 'ship', prompt: 'Ship it.' },
+      ],
+    }
+    const runId = await runner.start('task1', def)
+    const gated = await waitDone(runner, runId, ['gated'])
+    expect(gated.status).toBe('gated')
+    let steps = await runner.steps(runId)
+    expect(steps.map((s) => s.status)).toEqual(['done', 'waiting-gate', 'pending'])
+    expect(d.notify).toHaveBeenCalledWith('task1', 'gate', expect.stringContaining('needs you'))
+
+    // NO further transitions while gated — the final step must not start.
+    await new Promise((r) => setTimeout(r, 300))
+    steps = await runner.steps(runId)
+    expect(steps[2].status).toBe('pending')
+
+    await runner.resolveGate(runId, steps[1].id, true)
+    const run = await waitDone(runner, runId)
+    expect(run.status).toBe('done')
+    expect((await runner.steps(runId)).map((s) => s.status)).toEqual(['done', 'done', 'done'])
+
+    // Reject path on a fresh run.
+    const runId2 = await runner.start('task1', def)
+    await waitDone(runner, runId2, ['gated'])
+    const steps2 = await runner.steps(runId2)
+    await runner.resolveGate(runId2, steps2[1].id, false)
+    const run2 = await runner.run(runId2)
+    expect(run2?.status).toBe('failed')
+    expect((await runner.steps(runId2))[2].status).toBe('pending') // never ran
+  })
+
+  it('autonomous posture skips human gates but policy gates still bind', async () => {
+    const d = deps()
+    d.evaluatePolicy = vi.fn(async () => ({ pass: false, detail: 'CI red' }))
+    const runner = new WorkflowRunner(t.db, d)
+    const runId = await runner.start('task1', {
+      name: 'auto',
+      posture: 'autonomous',
+      steps: [
+        { name: 'gate', kind: 'gate-human' },
+        { name: 'policy', kind: 'gate-policy', policy: 'checks-green' },
+      ],
+    })
+    const run = await waitDone(runner, runId)
+    expect(run.status).toBe('failed') // human gate auto-passed, policy refused
+    const steps = await runner.steps(runId)
+    expect(steps[0].status).toBe('done')
+    expect(steps[1].status).toBe('failed')
+  })
+
+  it('policy gate ignores a lying step result — the verdict is re-derived in the runtime', async () => {
+    // The agent step CLAIMS success in its structured output; the policy dep says red. Red wins.
+    structuredByStep = { build: '{"ci":"green","trust_me":true}' }
+    const d = deps()
+    d.evaluatePolicy = vi.fn(async () => ({ pass: false, detail: 'checks mirror says failing' }))
+    const runner = new WorkflowRunner(t.db, d)
+    const runId = await runner.start('task1', {
+      name: 'no-trust',
+      steps: [
+        { name: 'build', prompt: 'Build.', schema: { type: 'object' } },
+        { name: 'verify', kind: 'gate-policy', policy: 'checks-green' },
+      ],
+    })
+    const run = await waitDone(runner, runId)
+    expect(run.status).toBe('failed')
+    const steps = await runner.steps(runId)
+    expect(JSON.parse(steps[0].structuredJson!)).toMatchObject({ ci: 'green' }) // the lie was recorded…
+    expect(steps[1].status).toBe('failed') // …and ignored
+    expect(d.evaluatePolicy).toHaveBeenCalledWith('task1', 'checks-green')
+  })
+
+  it('CI loop: seeded failures flip green → done; exhaustion → safety-rail, NOT failed', async () => {
+    // Green after two fix iterations.
+    let polls = 0
+    const d = deps()
+    d.failingChecks = vi.fn(async () => (++polls <= 2 ? '- test: failure' : ''))
+    const runner = new WorkflowRunner(t.db, d)
+    const runId = await runner.start('task1', { name: 'ci', steps: [{ name: 'ci-fix', kind: 'ci-loop', maxIterations: 3 }] })
+    const run = await waitDone(runner, runId)
+    expect(run.status).toBe('done')
+    const [step] = await runner.steps(runId)
+    expect(step.iteration).toBe(2)
+
+    // Never green → the bound is a first-class terminal state.
+    const d2 = deps()
+    d2.failingChecks = vi.fn(async () => '- test: failure')
+    const runner2 = new WorkflowRunner(t.db, d2)
+    const runId2 = await runner2.start('task1', { name: 'ci2', steps: [{ name: 'ci-fix', kind: 'ci-loop', maxIterations: 2 }] })
+    const run2 = await waitDone(runner2, runId2)
+    expect(run2.status).toBe('safety-rail')
+    expect(run2.status).not.toBe('failed')
+    const [step2] = await runner2.steps(runId2)
+    expect(step2.iteration).toBe(2)
+    expect(step2.error).toContain('Safety rail')
+  })
+
   it('kill-and-reconstruct over the same DB mid-run → resumes from the persisted step', async () => {
     const runner = new WorkflowRunner(t.db, deps())
     const runId = await runner.start('task1', DEF)
