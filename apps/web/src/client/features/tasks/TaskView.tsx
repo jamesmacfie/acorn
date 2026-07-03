@@ -7,6 +7,7 @@ import PullDetail from '../../PullDetail'
 import DiffView from '../../DiffView'
 import LinearIssuePanel from '../integrations/LinearIssuePanel'
 import RollbarPane from '../integrations/RollbarPane'
+import AgentsPanel from '../agents/AgentsPanel'
 import EditorPane from '../editor/EditorPane'
 import ChangesPane from '../changes/ChangesPane'
 import ContextTray from '../context/ContextTray'
@@ -211,6 +212,7 @@ export default function TaskView(props: {
     if (ws?.previewMode === 'script') return scriptUrl() ?? null
     return repoCfg()?.devPort != null ? `http://localhost:${repoCfg()?.devPort}` : null
   }
+  const [agentsOpen, setAgentsOpen] = createSignal(false)
   const [closeOpen, setCloseOpen] = createSignal(false)
   const [deleteWt, setDeleteWt] = createSignal(true)
   const [closeErr, setCloseErr] = createSignal('')
@@ -385,12 +387,17 @@ export default function TaskView(props: {
           title={layout().maximised ? 'Restore (Esc)' : `Maximise ${currentPane()} pane`}
           onClick={() => dispatch({ type: 'toggleMaximise', pane: currentPane() })}
         >⤢</button>
+        <button type="button" class="pane-switch-btn" classList={{ active: agentsOpen() }} title="Agents (roster · launcher · feed)" onClick={() => setAgentsOpen(!agentsOpen())}>⠿</button>
         <button type="button" class="pane-switch-btn" classList={{ active: props.terminalOpen }} title="Terminal" onClick={props.onToggleTerminal}>{'>_'}</button>
         <button type="button" class="pane-switch-btn pane-switch-close" title="Close task" onClick={openClose}>✕</button>
       </nav>
 
       {/* Linear pane reuses the existing ticket panel (a right-anchored overlay). With several linked
           tickets it shows a chip strip to switch between them. */}
+      <Show when={agentsOpen()}>
+        <AgentsPanel task={props.task} onClose={() => setAgentsOpen(false)} />
+      </Show>
+
       <Show when={showsPane('linear') && linearIds().length}>
         <LinearIssuePanel
           identifier={linearId()}
