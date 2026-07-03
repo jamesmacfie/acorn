@@ -130,6 +130,8 @@ function ensureTmuxSession(name: string, cwd: string, command: string, env: Reco
   // tmux runs the command argument through the user's shell, so a full "pnpm dev" line works; env
   // (e.g. PORT) is inherited by that shell (docs/workspaces P5).
   execFileSync('tmux', tmuxNewSessionArgs(name, cwd, command), { env, stdio: 'ignore' })
+  // ponytail: hide tmux's own status bar — we render our own tab strip, so it's just noise
+  execFileSync('tmux', ['set-option', '-t', name, 'status', 'off'], { env, stdio: 'ignore' })
 }
 
 function attachTmuxPty(name: string, cols: number, rows: number): IPty {
@@ -347,10 +349,7 @@ async function taskRunConfig(
   const cfg = loadRepoConfig(cwd, homedir(), {
     setupScript: ws?.setupScript,
     teardownScript: ws?.teardownScript,
-    previewMode: ws?.previewMode,
-    previewValue: ws?.previewValue,
-    runCommand: mapped?.runCommand,
-    devPort: mapped?.devPort,
+    devScript: ws?.devScript,
     runTargetsJson: mapped?.runTargets,
   })
   return { targets: cfg.runTargets, cwd, errors: cfg.errors, layouts: cfg.layouts }
@@ -499,6 +498,12 @@ async function spawnOne(
     exitCode: null,
   }
 
+  // Auto-register the acorn MCP server with this agent's CLI before it launches, so the current
+  // task's tools are always available — no manual "Register" click. Idempotent (remove-then-add),
+  // failures (CLI missing) are swallowed. Awaited so the agent sees it at startup.
+  const mcpFlavour = PROFILE_MCP_FLAVOUR[profile.id]
+  if (mcpFlavour) await registerAcornMcp(mcpFlavour, mcpName(), mcpLauncher()).catch(() => undefined)
+
   let pty: IPty
   if (backend === 'tmux') {
     ensureTmuxSession(meta.tmuxSession!, cwd, command, env)
@@ -515,6 +520,13 @@ async function spawnOne(
   if (profile.kind === 'agent') void memoryInjector?.(opts.taskId, id)
   return meta
 }
+
+// acorn MCP server: the launcher + build-flavored name (dev vs prod), and which agent profiles get
+// it auto-registered when their terminal spawns (docs/next 06 P3). Module-level so both spawnOne and
+// the ipc handlers share them.
+const mcpLauncher = () => launcherSpec(process.execPath, resolveMcpEntry(dirname(fileURLToPath(import.meta.url))))
+const mcpName = () => serverName(!process.defaultApp && !process.env.ELECTRON_IS_DEV)
+const PROFILE_MCP_FLAVOUR: Record<string, AgentFlavour> = { 'claude-code': 'claude', codex: 'codex' }
 
 // Killing a tmux session's attach PTY only *detaches* it — the session keeps running. To actually
 // stop a tmux agent we must kill the tmux session itself (which then EOFs the PTY → onExit).
@@ -562,10 +574,10 @@ export async function registerTerminalIpc(db: AppDatabase, worktreesDir: string,
     const ws = await workspaceConfigRow(db, t.repoOwner, t.repoName)
     if (!ws) return []
     const list = await notesStore.list(ws.id)
-    const out: { title: string; body: string }[] = []
+    const out: { slug: string; title: string; body: string }[] = []
     for (const summary of list.slice(0, 10)) {
       const note = await notesStore.read(ws.id, summary.slug).catch(() => null)
-      if (note) out.push({ title: `${note.title} (${note.kind})`, body: note.body.slice(0, 2000) })
+      if (note) out.push({ slug: summary.slug, title: `${note.title} (${note.kind})`, body: note.body.slice(0, 2000) })
     }
     return out
   })
@@ -597,9 +609,8 @@ export async function registerTerminalIpc(db: AppDatabase, worktreesDir: string,
   })
 
   // Register/remove the acorn MCP server with an agent's OWN config mechanism (docs/next 06 P3,
-  // reuse-first) — explicit user action only, never at startup.
-  const mcpLauncher = () => launcherSpec(process.execPath, resolveMcpEntry(dirname(fileURLToPath(import.meta.url))))
-  const mcpName = () => serverName(!process.defaultApp && !process.env.ELECTRON_IS_DEV)
+  // reuse-first). Also fired automatically on agent spawn (see spawnOne); these handlers back the
+  // manual Settings → MCP buttons.
   ipcMain.handle('mcp:register', (_e: IpcMainInvokeEvent, flavour: AgentFlavour) =>
     AGENT_FLAVOURS.includes(flavour) ? registerAcornMcp(flavour, mcpName(), mcpLauncher()) : { ok: false, reason: 'Unknown agent.' },
   )
@@ -1051,10 +1062,11 @@ export async function registerTerminalIpc(db: AppDatabase, worktreesDir: string,
     return true
   })
 
-  // Dismiss an exited session. Refuse a running one — kill it first.
+  // Close a session in one shot: kill it if still running, then drop it.
   ipcMain.handle('term:remove', async (_e: IpcMainInvokeEvent, id: string) => {
     const s = sessions.get(id)
-    if (!s || s.meta.status === 'running') return false
+    if (!s) return false
+    if (s.meta.status === 'running') killSession(s)
     sessions.delete(id)
     if (s.meta.backend === 'tmux') await deleteRow(db, id)
     return true
