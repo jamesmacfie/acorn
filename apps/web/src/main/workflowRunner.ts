@@ -231,7 +231,8 @@ export class WorkflowRunner {
     await this.setStep(step.id, { inputsJson: JSON.stringify({ prompt: inputs }) })
     const result = await this.deps.runStep(run.taskId, def, { prompt: inputs, model: def.model, schema: def.schema })
     const patch: Partial<StepRow> = {
-      resultJson: JSON.stringify({ status: result.status, exitCode: result.exitCode, result: result.capture.result, stderrTail: result.stderrTail }),
+      // events (capped) feed the Agents-panel activity view (15 P1).
+      resultJson: JSON.stringify({ status: result.status, exitCode: result.exitCode, result: result.capture.result, stderrTail: result.stderrTail, events: result.capture.events.slice(-100) }),
       structuredJson: result.capture.structuredOutput != null ? JSON.stringify(result.capture.structuredOutput) : null,
       sessionId: result.capture.sessionId,
       costUsd: result.capture.costUsd,
@@ -302,7 +303,7 @@ export class WorkflowRunner {
         const ok = result.status === 'ok'
         await this.setStep(rowId, {
           status: ok ? 'done' : 'failed',
-          resultJson: JSON.stringify({ status: result.status, result: result.capture.result }),
+          resultJson: JSON.stringify({ status: result.status, result: result.capture.result, events: result.capture.events.slice(-100) }),
           structuredJson: result.capture.structuredOutput != null ? JSON.stringify(result.capture.structuredOutput) : null,
           sessionId: result.capture.sessionId,
           costUsd: result.capture.costUsd,
