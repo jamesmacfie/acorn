@@ -95,7 +95,7 @@ export default function IntegrationsSettings() {
         </For>
       </div>
 
-      <button type="button" class="integration-add-btn" classList={{ open: adding() }} onClick={() => setAdding((v) => !v)}>
+      <button type="button" class="overlay-btn integration-add-btn" classList={{ open: adding() }} onClick={() => setAdding((v) => !v)}>
         <span class="integration-add-icon">+</span> Add integration
       </button>
 
