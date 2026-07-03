@@ -177,7 +177,9 @@ export default function TabRail() {
               type="button"
               class="tabrail-tab tabrail-source"
               classList={{ active: selectedSource() === s.id }}
-              title={s.label}
+              data-tip={s.label}
+              data-tip-sub="Browse"
+              aria-label={s.label}
               onClick={() => selectSource(s.id)}
             >
               {s.glyph}
@@ -226,7 +228,9 @@ export default function TabRail() {
                 class="tabrail-tab tabrail-task"
                 classList={{ active: !selectedSource() && w.id === activeTaskId() }}
                 style={accent() ? { 'border-left-color': accent() } : undefined}
-                title={`${w.title}\n${w.branch}${st()?.dirty ? ` · ${st()?.dirtyCount} uncommitted` : ''}`}
+                data-tip={w.title}
+                data-tip-sub={`${w.branch}${st()?.dirty ? ` · ${st()?.dirtyCount} uncommitted` : ''}`}
+                aria-label={w.title}
                 onClick={() => onRowClick(w)}
               >
                 {wsGlyph() ?? ORIGIN_GLYPH[w.origin] ?? '●'}
@@ -276,7 +280,7 @@ export default function TabRail() {
           }}
         </For>
       </div>
-      <button type="button" class="tabrail-add" title="New task" onClick={openNew}>
+      <button type="button" class="tabrail-add" data-tip="New task" data-tip-sub="Start a task on a new branch" aria-label="New task" onClick={openNew}>
         +
       </button>
       <Show when={draft()}>

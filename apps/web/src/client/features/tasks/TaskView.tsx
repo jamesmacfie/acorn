@@ -341,16 +341,16 @@ export default function TaskView(props: {
 
       <nav class="pane-switcher" style={{ order: 99 }}>
         <Show when={hasPr()}>
-          <button type="button" class="pane-switch-btn" classList={{ active: showsPane('pr'), pinned: layout().pinned === 'pr' }} title="PR review" onClick={() => onSwitch('pr')}>⌥</button>
+          <button type="button" class="pane-switch-btn" classList={{ active: showsPane('pr'), pinned: layout().pinned === 'pr' }} data-tip="PR review" data-tip-sub="Diff, files & review comments" aria-label="PR review" onClick={() => onSwitch('pr')}>⌥</button>
         </Show>
         <Show when={linearLinks().length}>
-          <button type="button" class="pane-switch-btn" classList={{ active: showsPane('linear'), pinned: layout().pinned === 'linear' }} title={`Linear (${linearIds().join(', ')})`} onClick={() => onSwitch('linear')}>◷</button>
+          <button type="button" class="pane-switch-btn" classList={{ active: showsPane('linear'), pinned: layout().pinned === 'linear' }} data-tip="Linear" data-tip-sub={linearIds().join(', ')} aria-label="Linear" onClick={() => onSwitch('linear')}>◷</button>
         </Show>
         <Show when={rollbarLinks().length}>
-          <button type="button" class="pane-switch-btn" classList={{ active: showsPane('rollbar'), pinned: layout().pinned === 'rollbar' }} title={`Rollbar (#${rollbarLinks().map((l) => l.identifier).join(', #')})`} onClick={() => onSwitch('rollbar')}>◍</button>
+          <button type="button" class="pane-switch-btn" classList={{ active: showsPane('rollbar'), pinned: layout().pinned === 'rollbar' }} data-tip="Rollbar" data-tip-sub={`#${rollbarLinks().map((l) => l.identifier).join(', #')}`} aria-label="Rollbar" onClick={() => onSwitch('rollbar')}>◍</button>
         </Show>
         <Show when={(runTargets() ?? []).length} fallback={
-          <button type="button" class="pane-switch-btn" title="Configure run targets" onClick={configureRun}>▶</button>
+          <button type="button" class="pane-switch-btn" data-tip="Run targets" data-tip-sub="Configure commands to run" aria-label="Configure run targets" onClick={configureRun}>▶</button>
         }>
           <For each={runTargets() ?? []}>
             {(t) => (
@@ -358,7 +358,9 @@ export default function TaskView(props: {
                 type="button"
                 class="pane-switch-btn pane-switch-run"
                 classList={{ active: t.running }}
-                title={`${t.running ? 'Stop' : 'Run'} ${t.id} — ${t.command}`}
+                data-tip={`${t.running ? 'Stop' : 'Run'} ${t.id}`}
+                data-tip-sub={t.command}
+                aria-label={`${t.running ? 'Stop' : 'Run'} ${t.id}`}
                 onClick={() => void toggleTarget(t.id, t.running)}
               >
                 {t.running ? '■' : '▶'}<span class="pane-switch-run-id">{t.id}</span>
@@ -366,30 +368,34 @@ export default function TaskView(props: {
             )}
           </For>
         </Show>
-        <button type="button" class="pane-switch-btn" classList={{ active: showsPane('changes'), pinned: layout().pinned === 'changes' }} title="Changes (uncommitted)" onClick={() => onSwitch('changes')}>⎇</button>
-        <button type="button" class="pane-switch-btn" classList={{ active: showsPane('notes'), pinned: layout().pinned === 'notes' }} title="Notes (workspace)" onClick={() => onSwitch('notes')}>📝</button>
-        <button type="button" class="pane-switch-btn" classList={{ active: showsPane('preview'), pinned: layout().pinned === 'preview' }} title="Browser preview" onClick={() => onSwitch('preview')}>◍</button>
-        <button type="button" class="pane-switch-btn" classList={{ active: showsPane('editor'), pinned: layout().pinned === 'editor' }} title="Editor" onClick={() => onSwitch('editor')}>✎</button>
-        <button type="button" class="pane-switch-btn" title="Open in external editor" onClick={() => void openExternally()}>↗</button>
+        <button type="button" class="pane-switch-btn" classList={{ active: showsPane('changes'), pinned: layout().pinned === 'changes' }} data-tip="Changes" data-tip-sub="Uncommitted working tree" aria-label="Changes" onClick={() => onSwitch('changes')}>⎇</button>
+        <button type="button" class="pane-switch-btn" classList={{ active: showsPane('notes'), pinned: layout().pinned === 'notes' }} data-tip="Notes" data-tip-sub="Workspace scratchpad" aria-label="Notes" onClick={() => onSwitch('notes')}>📝</button>
+        <button type="button" class="pane-switch-btn" classList={{ active: showsPane('preview'), pinned: layout().pinned === 'preview' }} data-tip="Browser preview" data-tip-sub="Live preview of the app" aria-label="Browser preview" onClick={() => onSwitch('preview')}>◍</button>
+        <button type="button" class="pane-switch-btn" classList={{ active: showsPane('editor'), pinned: layout().pinned === 'editor' }} data-tip="Editor" data-tip-sub="In-app code editor" aria-label="Editor" onClick={() => onSwitch('editor')}>✎</button>
+        <button type="button" class="pane-switch-btn" data-tip="Open in external editor" aria-label="Open in external editor" onClick={() => void openExternally()}>↗</button>
         {/* Pin (docs/next 03 P3): fixes the current pane's slot — switcher clicks then open in the
             other slot. Maximise (P2): the current pane fills the view; Esc or a second click restores. */}
         <button
           type="button"
           class="pane-switch-btn"
           classList={{ active: layout().pinned != null }}
-          title={layout().pinned ? `Unpin ${layout().pinned}` : `Pin ${currentPane()} pane`}
+          data-tip={layout().pinned ? `Unpin ${layout().pinned}` : `Pin ${currentPane()} pane`}
+          data-tip-sub="Keep this pane fixed in its slot"
+          aria-label="Pin pane"
           onClick={() => (layout().pinned ? dispatch({ type: 'unpin' }) : dispatch({ type: 'pin', pane: currentPane() }))}
         >⌖</button>
         <button
           type="button"
           class="pane-switch-btn"
           classList={{ active: layout().maximised != null }}
-          title={layout().maximised ? 'Restore (Esc)' : `Maximise ${currentPane()} pane`}
+          data-tip={layout().maximised ? 'Restore' : `Maximise ${currentPane()} pane`}
+          data-tip-sub="Fill the view · Esc restores"
+          aria-label="Maximise pane"
           onClick={() => dispatch({ type: 'toggleMaximise', pane: currentPane() })}
         >⤢</button>
-        <button type="button" class="pane-switch-btn" classList={{ active: agentsOpen() }} title="Agents (roster · launcher · feed)" onClick={() => setAgentsOpen(!agentsOpen())}>⠿</button>
-        <button type="button" class="pane-switch-btn" classList={{ active: props.terminalOpen }} title="Terminal" onClick={props.onToggleTerminal}>{'>_'}</button>
-        <button type="button" class="pane-switch-btn pane-switch-close" title="Close task" onClick={openClose}>✕</button>
+        <button type="button" class="pane-switch-btn" classList={{ active: agentsOpen() }} data-tip="Agents" data-tip-sub="Roster · launcher · feed" aria-label="Agents" onClick={() => setAgentsOpen(!agentsOpen())}>⠿</button>
+        <button type="button" class="pane-switch-btn" classList={{ active: props.terminalOpen }} data-tip="Terminal" data-tip-sub="Shell in the worktree" aria-label="Terminal" onClick={props.onToggleTerminal}>{'>_'}</button>
+        <button type="button" class="pane-switch-btn pane-switch-close" data-tip="Close task" aria-label="Close task" onClick={openClose}>✕</button>
       </nav>
 
       {/* Linear pane reuses the existing ticket panel (a right-anchored overlay). With several linked
