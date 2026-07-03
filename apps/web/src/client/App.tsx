@@ -25,6 +25,7 @@ import { hydrateNotices, initWorkflowNotices, markTaskRead, notices, serializeNo
 import { editorStateByTask, hydrateEditorState, serializeEditorState } from './features/editor/editorState'
 import { initSessions } from './features/terminal/sessions'
 import TabRail from './features/tabs/TabRail'
+import RailTips from './features/tooltip/RailTips'
 import { activeTaskId, hydrateTaskLayouts, isTerminalOpen, selectedSource, setActiveTaskId, setSelectedSource, setTerminalOpen, taskLayouts } from './features/tasks/tasks'
 import { parseTaskLayouts } from './features/tasks/layout'
 import { initTaskStatuses } from './features/tasks/taskStatus'
@@ -448,6 +449,7 @@ export default function App() {
       <CommandPalette />
       <FilePalette />
     </div>
+    <RailTips />
     </div>
     </Show>
   )
