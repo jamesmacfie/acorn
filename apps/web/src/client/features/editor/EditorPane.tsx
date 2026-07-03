@@ -94,8 +94,7 @@ export default function EditorPane(props: { task: Task }) {
   }
 
   function openPath(relPath: string, ephemeral: boolean) {
-    editorOpen(props.task.id, relPath, ephemeral)
-    void show(relPath)
+    editorOpen(props.task.id, relPath, ephemeral) // the active() effect swaps the surface
   }
 
   async function save() {
@@ -111,16 +110,10 @@ export default function EditorPane(props: { task: Task }) {
   function close(relPath: string) {
     const file = files().find((x) => x.path === relPath)
     if (file?.dirty && !window.confirm(`${relPath} has unsaved changes — close anyway?`)) return
-    editorClose(props.task.id, relPath)
+    editorClose(props.task.id, relPath) // active() moves to the neighbour; the effect swaps the surface
     models.get(relPath)?.dispose()
     models.delete(relPath)
     savedVersion.delete(relPath)
-    if (currentPath === relPath) {
-      currentPath = null
-      const next = activeFile(props.task.id)
-      if (next) void show(next)
-      else editor?.setModel(null)
-    }
   }
 
   // External-change reload on window focus (docs/next 07 P2): the agent edits the same worktree.
@@ -139,22 +132,18 @@ export default function EditorPane(props: { task: Task }) {
     }
   }
 
-  // Task switch within a mounted pane: re-sync the surface to that task's active tab.
+  // Single driver for the reused Monaco surface: whenever the active file changes — task switch,
+  // tree click, tab close, or the ⌘P quick-open palette (a separate component writing editorState) —
+  // swap the model here. Deferred so onMount owns the first paint.
   createEffect(
-    on(
-      () => props.task.id,
-      () => {
-        const next = activeFile(props.task.id)
-        if (editor) {
-          if (next) void show(next)
-          else {
-            currentPath = null
-            editor.setModel(null)
-          }
-        }
-      },
-      { defer: true },
-    ),
+    on(active, (next) => {
+      if (!editor) return
+      if (next && next !== currentPath) void show(next)
+      else if (!next) {
+        currentPath = null
+        editor.setModel(null)
+      }
+    }, { defer: true }),
   )
 
   return (

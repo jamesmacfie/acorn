@@ -132,6 +132,7 @@ contextBridge.exposeInMainWorld('acorn', {
   editor: {
     root: (taskId: string) => ipcRenderer.invoke('editor:root', taskId),
     list: (taskId: string, relPath: string) => ipcRenderer.invoke('editor:list', { taskId, relPath }),
+    files: (taskId: string) => ipcRenderer.invoke('editor:files', taskId),
     read: (taskId: string, relPath: string) => ipcRenderer.invoke('editor:read', { taskId, relPath }),
     write: (taskId: string, relPath: string, content: string) =>
       ipcRenderer.invoke('editor:write', { taskId, relPath, content }),
