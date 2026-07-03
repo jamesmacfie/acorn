@@ -18,10 +18,24 @@ export type MemoryRow = {
   updatedAt: number
 }
 
+export type MemoryProposalRow = {
+  id: string
+  taskId: string
+  repo: string | null
+  name: string
+  type: MemoryType
+  description: string
+  body: string
+  status: 'pending' | 'accepted' | 'rejected'
+  createdAt: number
+}
+
 export type MemoryApi = {
   list(repo?: string): Promise<MemoryRow[] | { error: string }>
   search(query: string, repo?: string, type?: MemoryType): Promise<(MemoryRow & { rank: number })[] | { error: string }>
   add(p: { taskId: string; scope: 'repo' | 'private'; name: string; description: string; type: MemoryType; body: string }): Promise<{ path: string } | { error: string }>
+  proposals(taskId?: string): Promise<MemoryProposalRow[]>
+  resolveProposal(id: string, approved: boolean, edited?: { name: string; type: MemoryType; description: string; body: string }): Promise<{ ok: boolean; reason?: string }>
 }
 
 export const memoryApi = (): MemoryApi | null => window.acorn?.memory ?? null
