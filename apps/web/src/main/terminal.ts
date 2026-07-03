@@ -30,7 +30,7 @@ import {
 } from './terminalUtils'
 import { buildEditorArgv } from './editorLaunch'
 import { commitStaged, discardFile, localChanges, localDiff, localFileBlob, stageFile, unstageFile, type LocalScope } from './localDiff'
-import { getProfile, listProfiles, resolveCommand, tmuxAvailable } from './profiles'
+import { getProfile, listProfiles, profileAvailable, resolveCommand, tmuxAvailable } from './profiles'
 import { loadRepoConfig } from './repoConfig'
 import { getRepoPath, setEditorCommand, setRepoPath, setRunConfig, setRunTargets } from './repoPaths'
 import { RuntimeService } from './runtime'
@@ -45,6 +45,7 @@ import { formatMemoryInjection, listMemories, memoryIndexSlice, memorySources, r
 import { NotesStore, type NoteKind } from './notes'
 import { formatContextBlock } from '../shared/contextBlock'
 import { buildHeadlessArgv, runHeadless } from './headless'
+import { acceptProposal, generateMemoryProposals, rejectProposal } from './memoryGen'
 import { loadWorkflowFiles } from './workflowFiles'
 import { WorkflowRunner, type WorkflowDef } from './workflowRunner'
 import { copyWorktreeFiles, ensureWorktree, worktreePorcelain } from './worktrees'
@@ -85,6 +86,10 @@ let memoryInjector: ((taskId: string, sessionId: string) => Promise<void>) | nul
 // Loopback API access for agent-spawned processes (docs/next 06 B): the MCP server reads
 // ACORN_API_URL + ACORN_API_TOKEN from its (inherited) session env. Set by registerTerminalIpc.
 let internalApiEnv: Record<string, string> = {}
+
+// Memory auto-generation trigger (docs/next 12 P3), set by registerTerminalIpc: fired when an
+// agent session for a task exits, with that session's ring tail as the transcript input.
+let memoryReviewTrigger: ((taskId: string, transcriptTail: string) => Promise<void>) | null = null
 
 const channel = (id: string) => `term:out:${id}`
 
@@ -407,6 +412,8 @@ function wireSession(db: AppDatabase, meta: TerminalSession, pty: IPty): Session
     agentSender.clear(s.meta.id) // queued sends can never fire now
     emit(s, { type: 'exit', exitCode, signal: signal != null ? String(signal) : null })
     if (s.meta.backend === 'tmux') void markExited(db, s.meta.id, exitCode)
+    // Task-completion trigger (docs/next 12 P3): an agent session ending is the extraction moment.
+    if (s.meta.kind === 'agent' && s.meta.title !== 'Teardown') void memoryReviewTrigger?.(s.meta.taskId, s.ring.slice(-10_000))
     broadcastStatus()
   })
   return s
@@ -812,6 +819,68 @@ export async function registerTerminalIpc(db: AppDatabase, worktreesDir: string,
     },
     browserConsole: async (taskId) => driverFor(taskId)?.console() ?? { lines: [] },
   })
+
+  // Memory auto-generation (docs/next 12 P3): the task-completion trigger. Fired on agent session
+  // end (and best-effort at archive) while the worktree is still alive; proposals flow through the
+  // human gate — nothing lands without an accept.
+  memoryReviewTrigger = async (taskId, transcriptTail) => {
+    try {
+      const t = await loadTask(db, taskId)
+      if (!t?.worktreePath || !isDir(t.worktreePath)) return
+      const profile = getProfile('claude-code')
+      if (!profileAvailable(profile)) return // no agent CLI → no auto-generation
+      const worktree = t.worktreePath
+      const repo = `${t.repoOwner}/${t.repoName}`
+      const out = await generateMemoryProposals({
+        runReview: (prompt, schema) => {
+          const argv = buildHeadlessArgv(profile.id, resolveCommand(profile), { prompt, schema })!
+          return runHeadless(argv, { cwd: worktree, env: buildSessionEnv({ taskId, cwd: worktree, task: t }) })
+        },
+        taskDiff: async () => {
+          try {
+            const { stdout } = await promisify(execFile)('git', ['-C', worktree, 'diff', 'HEAD'], { timeout: 15_000, maxBuffer: 10 * 1024 * 1024 })
+            return stdout
+          } catch {
+            return ''
+          }
+        },
+        transcriptTail: async () => transcriptTail,
+        existingIndex: async () => {
+          await reconciled()
+          return (await listMemories(db, { repo })).map((m) => ({ id: m.id, name: m.name, description: m.description, body: m.body }))
+        },
+        fileExists: (p) => existsSync(join(worktree, p)),
+        propose: async (c, flags) =>
+          void (await proposals.propose({
+            taskId,
+            repo,
+            name: c.name,
+            type: c.type,
+            description: flags.length ? `${c.description} [${flags.join('; ')}]` : c.description,
+            body: c.body,
+            originSessionId: null,
+          })),
+      })
+      if (out.proposed > 0) broadcastWorkflowNotice(taskId, 'gate', `${out.proposed} memory proposal${out.proposed === 1 ? '' : 's'} await review`)
+    } catch {
+      // auto-generation is best-effort — never disturbs the task lifecycle
+    }
+  }
+
+  ipcMain.handle('memory:proposals', async (_e: IpcMainInvokeEvent, taskId?: string) => {
+    const pending = await proposals.list('pending')
+    return taskId ? pending.filter((p) => p.taskId === taskId) : pending
+  })
+  ipcMain.handle(
+    'memory:proposal:resolve',
+    async (_e: IpcMainInvokeEvent, p: { id: string; approved: boolean; edited?: { name: string; type: MemoryType; description: string; body: string } }) => {
+      if (!p?.approved) return rejectProposal(proposals, String(p?.id))
+      const proposal = await proposals.get(String(p.id))
+      if (!proposal) return { ok: false, reason: 'Proposal not found.' }
+      const t = await loadTask(db, proposal.taskId)
+      return acceptProposal(proposals, proposal.id, t?.worktreePath ?? null, reconciled, p.edited)
+    },
+  )
 
   // The renderer binds each task's preview webview after creation (dom-ready) so main can drive it.
   ipcMain.handle('browser:bind', (_e: IpcMainInvokeEvent, p: { taskId: string; webContentsId: number }) => {

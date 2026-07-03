@@ -113,6 +113,10 @@ contextBridge.exposeInMainWorld('acorn', {
     search: (query: string, repo?: string, type?: string) => ipcRenderer.invoke('memory:search', { query, repo, type }),
     add: (p: { taskId: string; scope: 'repo' | 'private'; name: string; description: string; type: string; body: string }) =>
       ipcRenderer.invoke('memory:add', p),
+    // The human gate over auto-generated proposals (docs/next 12 P3).
+    proposals: (taskId?: string) => ipcRenderer.invoke('memory:proposals', taskId),
+    resolveProposal: (id: string, approved: boolean, edited?: { name: string; type: string; description: string; body: string }) =>
+      ipcRenderer.invoke('memory:proposal:resolve', { id, approved, edited }),
   },
   // Workspace notes (docs/next 09): .md files with frontmatter under the app data dir; the pane
   // and (later) the MCP notes_* tools share the one main-process store.

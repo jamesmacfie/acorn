@@ -38,3 +38,8 @@
 
 /* Inline add-memory form (docs/next 12 P1). */
 .context-tray-memform { display: flex; flex-direction: column; gap: 6px; margin-top: 6px; padding-top: 6px; border-top: 1px solid var(--border); }
+
+/* Auto-generated memory proposals (docs/next 12 P3 — the human gate). */
+.context-tray-proposals { display: flex; flex-direction: column; gap: 4px; margin-top: 6px; padding-top: 6px; border-top: 1px solid var(--border); font-size: var(--fs-sm); }
+.context-tray-proposal { display: flex; align-items: center; gap: 8px; }
+.context-tray-proposal-desc { flex: 1; min-width: 0; }

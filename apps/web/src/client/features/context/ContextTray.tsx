@@ -30,6 +30,30 @@ export default function ContextTray(props: { task: Task }) {
 
   const toggle = (k: TaskContextInclude) => setSel((s) => ({ ...s, [k]: !s[k] }))
 
+  // The human gate over auto-generated memory proposals (docs/next 12 P3): accept (with an
+  // optional description edit) writes to the task worktree + index; reject leaves no trace.
+  const [proposals, { refetch: refetchProposals }] = createResource(
+    () => props.task.id,
+    async (id) => (memoryApi() ? await memoryApi()!.proposals(id) : []),
+    { initialValue: [] },
+  )
+  const [propEdits, setPropEdits] = createSignal<Record<string, string>>({})
+
+  async function resolveProposal(id: string, approved: boolean) {
+    const m = memoryApi()
+    if (!m) return
+    const p = (proposals() ?? []).find((x) => x.id === id)
+    const editedDesc = propEdits()[id]
+    const res = await m.resolveProposal(
+      id,
+      approved,
+      approved && p && editedDesc && editedDesc !== p.description ? { name: p.name, type: p.type, description: editedDesc, body: p.body } : undefined,
+    )
+    if (!res.ok && res.reason) window.alert(res.reason)
+    await refetchProposals()
+    await refetch()
+  }
+
   // Manual "add memory" (docs/next 12 P1): repo scope → the task worktree (lands via its PR);
   // private scope → ~/.acorn/memory.
   const [memFormOpen, setMemFormOpen] = createSignal(false)
@@ -115,6 +139,27 @@ export default function ContextTray(props: { task: Task }) {
                 <span class="context-tray-kind">memory</span>
                 <span class="context-tray-label">{c().memory.length} repo memories ({c().memory.slice(0, 3).map((m) => m.name).join(', ')}{c().memory.length > 3 ? ', …' : ''})</span>
               </label>
+            </Show>
+            <Show when={(proposals() ?? []).length}>
+              <div class="context-tray-proposals">
+                <span class="muted">Memory proposals (auto-generated — review before they land):</span>
+                <For each={proposals() ?? []}>
+                  {(p) => (
+                    <div class="context-tray-proposal">
+                      <span class="context-tray-kind">{p.type}</span>
+                      <span class="context-tray-label" title={p.body}>{p.name}</span>
+                      <input
+                        class="integration-key-input context-tray-proposal-desc"
+                        type="text"
+                        value={propEdits()[p.id] ?? p.description}
+                        onInput={(e) => setPropEdits((prev) => ({ ...prev, [p.id]: e.currentTarget.value }))}
+                      />
+                      <button type="button" class="overlay-btn" onClick={() => void resolveProposal(p.id, true)}>Accept</button>
+                      <button type="button" class="overlay-btn" onClick={() => void resolveProposal(p.id, false)}>Reject</button>
+                    </div>
+                  )}
+                </For>
+              </div>
             </Show>
             <div class="context-tray-actions">
               <button type="button" class="overlay-btn" onClick={() => void refetch()}>Refresh</button>
