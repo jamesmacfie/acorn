@@ -8,6 +8,8 @@ export type EditorApi = {
   root(taskId: string): Promise<string | null>
   // Directory entries under root+relPath (relPath '' = root). `.git`/`node_modules` filtered out.
   list(taskId: string, relPath: string): Promise<EditorEntry[]>
+  // Flat, gitignore-aware file list for ⌘P quick-open (git ls-files).
+  files(taskId: string): Promise<string[]>
   read(taskId: string, relPath: string): Promise<string>
   write(taskId: string, relPath: string, content: string): Promise<{ ok: boolean; reason?: string }>
 }

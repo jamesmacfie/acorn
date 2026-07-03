@@ -1189,6 +1189,18 @@ export async function registerTerminalIpc(db: AppDatabase, worktreesDir: string,
       .sort((a, b) => (a.dir === b.dir ? a.name.localeCompare(b.name) : a.dir ? -1 : 1))
   })
 
+  // Flat file list for the ⌘P quick-open palette. `git ls-files` gives the tracked + untracked
+  // (non-ignored) set — the same files VS Code's Cmd+P offers — without walking node_modules.
+  ipcMain.handle('editor:files', async (_e: IpcMainInvokeEvent, taskId: string): Promise<string[]> => {
+    const root = await taskRoot(db, taskId)
+    if (!root) return []
+    const { stdout } = await promisify(execFile)('git', ['-C', root, 'ls-files', '--cached', '--others', '--exclude-standard'], {
+      timeout: 10_000,
+      maxBuffer: 32 * 1024 * 1024,
+    }).catch(() => ({ stdout: '' }))
+    return stdout.split('\n').filter(Boolean)
+  })
+
   ipcMain.handle('editor:read', async (_e: IpcMainInvokeEvent, p: { taskId: string; relPath: string }): Promise<string> => {
     const root = await taskRoot(db, p.taskId)
     const abs = root && resolveInRoot(root, p.relPath)

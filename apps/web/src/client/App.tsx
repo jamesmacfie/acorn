@@ -19,6 +19,7 @@ import AccountMenu from './AccountMenu'
 import SettingsModal from './features/settings/SettingsModal'
 import TerminalPanel from './features/terminal/TerminalPanel'
 import CommandPalette from './features/palette/CommandPalette'
+import FilePalette from './features/palette/FilePalette'
 import NotificationBell from './features/notifications/NotificationBell'
 import { hydrateNotices, initWorkflowNotices, markTaskRead, notices, serializeNotices } from './features/notifications/notifications'
 import { editorStateByTask, hydrateEditorState, serializeEditorState } from './features/editor/editorState'
@@ -445,6 +446,7 @@ export default function App() {
         <TerminalPanel onClose={() => { const id = activeTaskId(); if (id) setTerminalOpen(id, false) }} task={activeTask()} />
       </Show>
       <CommandPalette />
+      <FilePalette />
     </div>
     </div>
     </Show>
