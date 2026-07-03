@@ -61,6 +61,7 @@ export type TerminalApi = {
   }
   // Workflows (docs/next 14): the runner's IPC surface + gate/run-done notices for the bell.
   workflow: {
+    defs(taskId: string): Promise<{ workflows: { id: string; name: string; steps: unknown[] }[]; errors: { source: string; message: string }[] }>
     start(taskId: string, def: unknown): Promise<{ runId?: string; error?: string }>
     runs(taskId: string): Promise<WorkflowRunRow[]>
     steps(runId: string): Promise<WorkflowStepRow[]>

@@ -23,6 +23,11 @@ export default function CommandPalette() {
     () => (open() ? activeTaskId() : null),
     async (id) => (id && api ? await api.run.targets(id) : null),
   )
+  // Committed workflows for the task (docs/next 14 P5); their parse/cycle errors join the rows.
+  const [wfData, { refetch: refetchWf }] = createResource(
+    () => (open() ? activeTaskId() : null),
+    async (id) => (id && api ? await api.workflow.defs(id) : null),
+  )
 
   const actions = () => {
     const id = activeTaskId()
@@ -47,7 +52,11 @@ export default function CommandPalette() {
     const targets = data && 'targets' in data ? data.targets : []
     const errors = data && 'targets' in data ? data.errors : []
     const layouts = data && 'targets' in data ? data.layouts : []
-    return fuzzyFilter(composeItems({ targets, errors, layouts, actions: actions() }), query())
+    const wf = wfData()
+    return fuzzyFilter(
+      composeItems({ targets, errors: [...errors, ...(wf?.errors ?? [])], layouts, workflows: wf?.workflows ?? [], actions: actions() }),
+      query(),
+    )
   })
 
   const close = () => {
@@ -69,6 +78,13 @@ export default function CommandPalette() {
         setTerminalOpen(taskId, true)
       }
       await refreshSessions()
+      return
+    }
+    if (item.kind === 'workflow') {
+      const wf = wfData()?.workflows.find((w) => `workflow:${w.id}` === item.id)
+      if (!wf) return
+      const res = await api.workflow.start(taskId, wf)
+      if (res.error) window.alert(res.error)
       return
     }
     if (item.kind === 'layout') {

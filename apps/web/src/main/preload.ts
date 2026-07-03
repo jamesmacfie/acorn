@@ -67,6 +67,7 @@ contextBridge.exposeInMainWorld('acorn', {
       ipcRenderer.invoke('term:sendToAgent', { sessionId, text, submit }),
     // Workflows (docs/next 14): start/list/inspect runs + the human-gate verdict; notices feed the bell.
     workflow: {
+      defs: (taskId: string) => ipcRenderer.invoke('workflow:defs', taskId),
       start: (taskId: string, def: unknown) => ipcRenderer.invoke('workflow:start', { taskId, def }),
       runs: (taskId: string) => ipcRenderer.invoke('workflow:runs', taskId),
       steps: (runId: string) => ipcRenderer.invoke('workflow:steps', runId),

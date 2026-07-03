@@ -45,6 +45,7 @@ import { formatMemoryInjection, listMemories, memoryIndexSlice, memorySources, r
 import { NotesStore, type NoteKind } from './notes'
 import { formatContextBlock } from '../shared/contextBlock'
 import { buildHeadlessArgv, runHeadless } from './headless'
+import { loadWorkflowFiles } from './workflowFiles'
 import { WorkflowRunner, type WorkflowDef } from './workflowRunner'
 import { copyWorktreeFiles, ensureWorktree, worktreePorcelain } from './worktrees'
 
@@ -917,6 +918,16 @@ export async function registerTerminalIpc(db: AppDatabase, worktreesDir: string,
       broadcastStatus()
       return id
     },
+  })
+
+  // Declared workflows for a task (docs/next 14 P5): `.acorn/workflows/*.toml` from the
+  // worktree/checkout + ~/.acorn, parse/cycle errors surfaced as palette rows (13 §B).
+  ipcMain.handle('workflow:defs', async (_e: IpcMainInvokeEvent, taskId: string) => {
+    const t = await loadTask(db, String(taskId))
+    if (!t) return { workflows: [], errors: [] }
+    const mapped = await getRepoPath(db, t.repoOwner, t.repoName)
+    const repoDir = t.worktreePath && isDir(t.worktreePath) ? t.worktreePath : mapped?.path && isDir(mapped.path) ? mapped.path : null
+    return loadWorkflowFiles(repoDir, homedir())
   })
 
   ipcMain.handle('workflow:start', async (_e: IpcMainInvokeEvent, p: { taskId: string; def: WorkflowDef }) => {
