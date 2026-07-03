@@ -110,6 +110,24 @@ export function shouldToast(
   return true
 }
 
+// Workflow notices (docs/next 14/05): main broadcasts gate/run-done events; they land in the same
+// bell + toast gate. Returns unsubscribe; noop off-desktop.
+export function initWorkflowNotices(): () => void {
+  const wf = window.acorn?.terminal?.workflow
+  if (!wf) return () => {}
+  return wf.onNotice((n) => {
+    const at = Date.now()
+    pushNotice({ taskId: n.taskId, kind: n.kind, title: n.title, at })
+    if (typeof Notification !== 'undefined' && shouldToast({ taskId: n.taskId, kind: n.kind, at }, { focused: document.hasFocus(), lastToastAt })) {
+      try {
+        new Notification(n.title)
+      } catch {
+        // never break the bell
+      }
+    }
+  })
+}
+
 // --- Wiring: called by sessions.ts on every refresh with the previous + new snapshot.
 const lastToastAt = new Map<string, number>()
 

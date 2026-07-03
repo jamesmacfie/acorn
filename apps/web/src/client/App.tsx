@@ -20,7 +20,7 @@ import SettingsModal from './features/settings/SettingsModal'
 import TerminalPanel from './features/terminal/TerminalPanel'
 import CommandPalette from './features/palette/CommandPalette'
 import NotificationBell from './features/notifications/NotificationBell'
-import { hydrateNotices, markTaskRead, notices, serializeNotices } from './features/notifications/notifications'
+import { hydrateNotices, initWorkflowNotices, markTaskRead, notices, serializeNotices } from './features/notifications/notifications'
 import { editorStateByTask, hydrateEditorState, serializeEditorState } from './features/editor/editorState'
 import { initSessions } from './features/terminal/sessions'
 import TabRail from './features/tabs/TabRail'
@@ -68,6 +68,7 @@ export default function App() {
     if (!terminalEnabled) return
     onCleanup(initSessions())
     onCleanup(initTaskStatuses())
+    onCleanup(initWorkflowNotices())
   })
 
   const me = createQuery(() => meOptions())

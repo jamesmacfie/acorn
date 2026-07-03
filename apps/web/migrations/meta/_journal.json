@@ -85,6 +85,13 @@
       "when": 1783018292133,
       "tag": "0011_whole_silvermane",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "6",
+      "when": 1783026891510,
+      "tag": "0012_left_war_machine",
+      "breakpoints": true
     }
   ]
 }
