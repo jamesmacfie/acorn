@@ -74,15 +74,13 @@ export type TerminalProfile = {
 }
 
 // Local checkout mapping for a repo (vNext §9). Returned by repoPath.get / set. runCommand / devPort
-// are the per-repo dev-server config (docs/workspaces P5), null until configured. editorCommand is
-// the external editor for this repo's worktrees (docs/next 01 P2); null → global default → 'code'.
+// are the per-repo dev-server config (docs/workspaces P5), null until configured.
 export type RepoPath = {
   owner: string
   repo: string
   path: string
   runCommand: string | null
   devPort: number | null
-  editorCommand: string | null
   runTargets: string | null // JSON RunTarget[] (docs/next 13 §A) — the DB fallback config surface
 }
 

@@ -21,9 +21,6 @@ contextBridge.exposeInMainWorld('acorn', {
       pick: () => ipcRenderer.invoke('term:repoPath:pick'),
       runConfig: (owner: string, repo: string, runCommand: string, devPort: number) =>
         ipcRenderer.invoke('term:repoPath:runConfig', { owner, repo, runCommand, devPort }),
-      // Per-repo external editor command (docs/next 01 P2). Blank clears to the global default.
-      editorCommand: (owner: string, repo: string, editorCommand: string) =>
-        ipcRenderer.invoke('term:repoPath:editorCommand', { owner, repo, editorCommand }),
       // Per-repo run targets as a JSON RunTarget[] string (docs/next 13 §A DB fallback).
       runTargets: (owner: string, repo: string, runTargets: string) =>
         ipcRenderer.invoke('term:repoPath:runTargets', { owner, repo, runTargets }),
@@ -36,8 +33,6 @@ contextBridge.exposeInMainWorld('acorn', {
       status: (taskId: string, targetId: string) => ipcRenderer.invoke('run:status', { taskId, targetId }),
       defaultUrl: (taskId: string) => ipcRenderer.invoke('run:defaultUrl', taskId),
     },
-    // Open the task's worktree in the user's external editor (code/zed/…, docs/next 01 P2).
-    openInEditor: (taskId: string) => ipcRenderer.invoke('term:openInEditor', taskId),
     // Local-changes review (docs/next 04): working-tree status/diffs/blobs for the ChangesPane.
     local: {
       changes: (taskId: string) => ipcRenderer.invoke('local:changes', taskId),
