@@ -174,6 +174,7 @@ export type Task = {
   worktreePath: string | null
   pullNumber: number | null
   status: 'active' | 'archived'
+  parentId: string | null // task tree (docs/next 14 P4): fan-out children point at their root
   sort: number
   links: TaskLink[]
 }

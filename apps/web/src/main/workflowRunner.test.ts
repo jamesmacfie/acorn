@@ -212,6 +212,114 @@ describe('WorkflowRunner (docs/next 14 P2)', () => {
     expect(step2.error).toContain('Safety rail')
   })
 
+  it('fan-out → 3 child tasks with real worktrees → join aggregates all 3; partial failure marks the join', async () => {
+    const { execFileSync } = await import('node:child_process')
+    const { existsSync } = await import('node:fs')
+    const { ensureWorktree } = await import('./worktrees')
+    const { schema } = await import('../server/db')
+
+    // Real repo + worktrees per child (never the acorn repo).
+    const checkout = join(dir, 'checkout')
+    execFileSync('git', ['init', '-q', '-b', 'main', checkout])
+    execFileSync('git', ['-C', checkout, 'config', 'user.email', 't@t.test'])
+    execFileSync('git', ['-C', checkout, 'config', 'user.name', 'T'])
+    execFileSync('sh', ['-c', `echo a > ${checkout}/a.txt`])
+    execFileSync('git', ['-C', checkout, 'add', '.'])
+    execFileSync('git', ['-C', checkout, 'commit', '-q', '-m', 'init'])
+    const wtRoot = join(dir, 'worktrees')
+
+    const childTaskIds: string[] = []
+    const cwdByTask = new Map<string, string>()
+    let childCounter = 0
+    let failSecondChild = false
+
+    const d = deps()
+    d.createChildTask = async (parentTaskId, seed) => {
+      const id = `child-${++childCounter}`
+      const wt = await ensureWorktree(wtRoot, checkout, 'acme', 'api', seed.branch, null)
+      if (!wt.ok) throw new Error(wt.reason)
+      await t.db.insert(schema.tasks).values({
+        id,
+        title: seed.title,
+        origin: 'local',
+        repoOwner: 'acme',
+        repoName: 'api',
+        branch: seed.branch,
+        worktreePath: wt.path,
+        pullNumber: null,
+        status: 'active',
+        parentId: parentTaskId,
+        sort: childTaskIds.length,
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+        archivedAt: null,
+      })
+      childTaskIds.push(id)
+      cwdByTask.set(id, wt.path)
+      return id
+    }
+    const baseRunStep = d.runStep
+    d.runStep = async (taskId, def, opts) => {
+      if (def.kind === 'fan-out') {
+        structuredByStep[def.name] = JSON.stringify({
+          tasks: [
+            { title: 'Fix login', branch: 'fix-login' },
+            { title: 'Fix logout', branch: 'fix-logout' },
+            { title: 'Fix session', branch: 'fix-session' },
+          ],
+        })
+      } else if (failSecondChild && opts.prompt.includes('Fix logout')) {
+        return baseRunStep(taskId, { ...def, name: 'FAILCHILD' }, opts)
+      }
+      return baseRunStep(taskId, def, opts)
+    }
+    structuredByStep.FAILCHILD = 'FAIL'
+
+    const DEF_FAN: WorkflowDef = {
+      name: 'parallel-review',
+      steps: [
+        { name: 'plan', kind: 'fan-out', prompt: 'Split the work.', schema: { type: 'object' }, childStep: { name: 'review', prompt: 'Review this slice.', schema: { type: 'object' } } },
+        { name: 'aggregate', kind: 'join' },
+      ],
+    }
+
+    // Happy path: all three children succeed.
+    const runner = new WorkflowRunner(t.db, d)
+    const runId = await runner.start('task1', DEF_FAN)
+    const run = await waitDone(runner, runId)
+    expect(run.status).toBe('done')
+
+    // 3 child task rows with parentId + real worktrees on their branches.
+    const taskRows = await t.db.select().from(schema.tasks)
+    expect(taskRows.filter((r) => r.parentId === 'task1')).toHaveLength(3)
+    for (const id of childTaskIds) expect(existsSync(cwdByTask.get(id)!)).toBe(true)
+
+    const seq = await runner.steps(runId)
+    const fanOut = seq.find((s) => s.kind === 'fan-out')!
+    const children = await runner.childSteps(fanOut.id)
+    expect(children).toHaveLength(3)
+    expect(children.every((c) => c.status === 'done')).toBe(true)
+
+    // The join received all 3 results.
+    const joinStep = seq.find((s) => s.kind === 'join')!
+    const joined = JSON.parse(joinStep.structuredJson!) as { results: { status: string }[]; failures: number }
+    expect(joined.results).toHaveLength(3)
+    expect(joined.failures).toBe(0)
+
+    // Partial failure: child-2 fails → the join (and run) are marked, all outcomes recorded.
+    failSecondChild = true
+    childTaskIds.length = 0
+    const runId2 = await runner.start('task1', DEF_FAN)
+    const run2 = await waitDone(runner, runId2)
+    expect(run2.status).toBe('failed')
+    const seq2 = await runner.steps(runId2)
+    const join2 = seq2.filter((s) => s.parentStepId == null).find((s) => s.kind === 'join')!
+    expect(join2.status).toBe('failed')
+    const joined2 = JSON.parse(join2.structuredJson!) as { results: { status: string }[]; failures: number }
+    expect(joined2.results).toHaveLength(3)
+    expect(joined2.failures).toBe(1)
+  }, 30_000)
+
   it('kill-and-reconstruct over the same DB mid-run → resumes from the persisted step', async () => {
     const runner = new WorkflowRunner(t.db, deps())
     const runId = await runner.start('task1', DEF)

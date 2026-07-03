@@ -14,7 +14,7 @@ import type { HeadlessOpts, HeadlessResult } from './headless'
 
 export type WorkflowStepDef = {
   name: string
-  kind?: 'agent' | 'gate-human' | 'gate-policy' | 'ci-loop'
+  kind?: 'agent' | 'gate-human' | 'gate-policy' | 'ci-loop' | 'fan-out' | 'join'
   profileId?: string
   model?: string
   prompt?: string
@@ -25,7 +25,13 @@ export type WorkflowStepDef = {
   // safety-rail terminal state.
   maxIterations?: number
   requiresRun?: string // run target the runner starts + hands the URL to the step (13)
+  // fan-out (14 P4): this step's structured output must carry a task list ({tasks: [...]}); each
+  // becomes a CHILD task (tasks.parentId) with its own branch/worktree, running childStep in
+  // parallel. The next `join` step aggregates the children's results.
+  childStep?: { name?: string; profileId?: string; model?: string; prompt?: string; schema?: object }
 }
+
+export type FanOutTaskSeed = { title: string; branch: string; prompt?: string }
 
 export type WorkflowDef = {
   name: string
@@ -50,6 +56,8 @@ export type RunnerDeps = {
   notify(taskId: string, kind: 'gate' | 'run-done', title: string): void
   // requires_run (13): start the target, resolve its URL for the step prompt.
   startRunTarget?(taskId: string, targetId: string): Promise<{ ok: boolean; url?: string }>
+  // fan-out (14 P4): materialise a child task (tasks.parentId) with its own branch worktree.
+  createChildTask?(parentTaskId: string, seed: FanOutTaskSeed): Promise<string>
 }
 
 type RunRow = typeof schema.workflowRuns.$inferSelect
@@ -108,6 +116,15 @@ export class WorkflowRunner {
     return this.db.select().from(schema.workflowSteps).where(eq(schema.workflowSteps.runId, runId)).orderBy(asc(schema.workflowSteps.idx))
   }
 
+  // The sequential flow — fan-out child rows (parentStepId set) live outside it.
+  private async sequentialSteps(runId: string): Promise<StepRow[]> {
+    return (await this.steps(runId)).filter((s) => s.parentStepId == null)
+  }
+
+  async childSteps(fanOutStepId: string): Promise<StepRow[]> {
+    return this.db.select().from(schema.workflowSteps).where(eq(schema.workflowSteps.parentStepId, fanOutStepId)).orderBy(asc(schema.workflowSteps.createdAt))
+  }
+
   private async setRun(runId: string, patch: Partial<RunRow>): Promise<void> {
     await this.db.update(schema.workflowRuns).set({ ...patch, updatedAt: now() }).where(eq(schema.workflowRuns.id, runId))
   }
@@ -152,7 +169,7 @@ export class WorkflowRunner {
         const run = await this.run(runId)
         if (!run || run.status !== 'running') return
         const def = JSON.parse(run.defJson) as WorkflowDef
-        const steps = await this.steps(runId)
+        const steps = await this.sequentialSteps(runId)
         if (steps.some((s) => s.status === 'failed')) return // terminal already recorded
         const next = steps.find((s) => s.status === 'pending')
         if (!next) {
@@ -194,6 +211,8 @@ export class WorkflowRunner {
       return false
     }
     if (kind === 'ci-loop') return this.runCiLoop(run, step, def)
+    if (kind === 'fan-out') return this.runFanOut(run, step, def)
+    if (kind === 'join') return this.runJoin(run, step, def)
 
     // agent step
     await this.setStep(step.id, { status: 'running' })
@@ -226,6 +245,103 @@ export class WorkflowRunner {
     // Handoff (09/14): the structured result is durable shared state for the next step's bundle.
     const handoff = result.capture.structuredOutput != null ? JSON.stringify(result.capture.structuredOutput, null, 2) : (result.capture.result ?? '')
     if (handoff) await this.deps.writeHandoff(run.taskId, def.name, handoff)
+    return true
+  }
+
+  // Fan-out (14 P4): a plan agent emits {tasks: [{title, branch, prompt?}]} → N child tasks in
+  // their own branch worktrees, childStep run per child IN PARALLEL, results persisted as child
+  // step rows (parentStepId = this step) for the join to aggregate.
+  private async runFanOut(run: RunRow, step: StepRow, def: WorkflowStepDef): Promise<boolean> {
+    if (!this.deps.createChildTask) {
+      await this.setStep(step.id, { status: 'failed', error: 'Fan-out unavailable (no child-task factory).' })
+      await this.setRun(run.id, { status: 'failed', error: `Step '${def.name}' cannot fan out.` })
+      return false
+    }
+    await this.setStep(step.id, { status: 'running' })
+    const plan = await this.deps.runStep(run.taskId, def, { prompt: def.prompt ?? '', model: def.model, schema: def.schema })
+    const structured = plan.capture.structuredOutput as { tasks?: FanOutTaskSeed[] } | FanOutTaskSeed[] | null
+    const seeds = Array.isArray(structured) ? structured : (structured?.tasks ?? null)
+    if (plan.status !== 'ok' || !Array.isArray(seeds) || !seeds.length) {
+      await this.setStep(step.id, { status: 'failed', error: plan.status !== 'ok' ? `plan ${plan.status}` : 'Plan emitted no task list.' })
+      await this.setRun(run.id, { status: 'failed', error: `Fan-out '${def.name}' produced no tasks.` })
+      return false
+    }
+    await this.setStep(step.id, { structuredJson: JSON.stringify(seeds), sessionId: plan.capture.sessionId, costUsd: plan.capture.costUsd })
+
+    const childDef: WorkflowStepDef = { name: def.childStep?.name ?? 'child', ...def.childStep }
+    const at = now()
+    const children = await Promise.all(
+      seeds.map(async (seed, i) => {
+        const childTaskId = await this.deps.createChildTask!(run.taskId, seed)
+        const rowId = randomUUID()
+        await this.db.insert(schema.workflowSteps).values({
+          id: rowId,
+          runId: run.id,
+          idx: step.idx,
+          name: `${childDef.name}:${i + 1} ${seed.title}`.slice(0, 120),
+          kind: 'agent',
+          mode: 'headless',
+          profileId: childDef.profileId ?? 'claude-code',
+          model: childDef.model ?? null,
+          status: 'pending',
+          parentStepId: step.id,
+          inputsJson: JSON.stringify({ childTaskId, seed }),
+          createdAt: at + i,
+          updatedAt: at + i,
+        })
+        return { childTaskId, rowId, seed }
+      }),
+    )
+
+    // Parallel execution — each child in its OWN worktree (per-branch isolation is the substrate).
+    const outcomes = await Promise.all(
+      children.map(async ({ childTaskId, rowId, seed }) => {
+        await this.setStep(rowId, { status: 'running' })
+        const prompt = [childDef.prompt ?? '', seed.prompt ?? '', `Task: ${seed.title}`].filter(Boolean).join('\n\n')
+        const result = await this.deps.runStep(childTaskId, childDef, { prompt, model: childDef.model, schema: childDef.schema })
+        const ok = result.status === 'ok'
+        await this.setStep(rowId, {
+          status: ok ? 'done' : 'failed',
+          resultJson: JSON.stringify({ status: result.status, result: result.capture.result }),
+          structuredJson: result.capture.structuredOutput != null ? JSON.stringify(result.capture.structuredOutput) : null,
+          sessionId: result.capture.sessionId,
+          costUsd: result.capture.costUsd,
+          error: ok ? null : `${result.status}`,
+        })
+        return ok
+      }),
+    )
+    // The fan-out itself is done once all children settled — partial failure is the JOIN's verdict.
+    await this.setStep(step.id, { status: 'done', resultJson: JSON.stringify({ children: children.length, failed: outcomes.filter((o) => !o).length }) })
+    return true
+  }
+
+  // Join (14 P4): aggregate the nearest previous fan-out's child results. Partial failure marks
+  // the join failed (and the run), with every child's outcome recorded for the human.
+  private async runJoin(run: RunRow, step: StepRow, def: WorkflowStepDef): Promise<boolean> {
+    const sequential = await this.sequentialSteps(run.id)
+    const fanOut = [...sequential].reverse().find((s) => s.idx < step.idx && s.kind === 'fan-out')
+    if (!fanOut) {
+      await this.setStep(step.id, { status: 'failed', error: 'No preceding fan-out to join.' })
+      await this.setRun(run.id, { status: 'failed', error: `Join '${def.name}' had nothing to join.` })
+      return false
+    }
+    const children = await this.childSteps(fanOut.id)
+    const results = children.map((c) => ({
+      name: c.name,
+      status: c.status,
+      structured: c.structuredJson ? (JSON.parse(c.structuredJson) as unknown) : null,
+      childTaskId: c.inputsJson ? (JSON.parse(c.inputsJson) as { childTaskId?: string }).childTaskId : undefined,
+    }))
+    const failures = results.filter((r) => r.status !== 'done')
+    await this.setStep(step.id, { structuredJson: JSON.stringify({ results, failures: failures.length }) })
+    if (failures.length) {
+      await this.setStep(step.id, { status: 'failed', error: `${failures.length}/${results.length} children failed.` })
+      await this.setRun(run.id, { status: 'failed', error: `Join '${def.name}': partial failure (${failures.length}/${results.length}).` })
+      return false
+    }
+    await this.setStep(step.id, { status: 'done' })
+    await this.deps.writeHandoff(run.taskId, def.name, JSON.stringify(results, null, 2))
     return true
   }
 
