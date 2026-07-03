@@ -24,6 +24,9 @@ export default function TerminalPanel(props: { onClose: () => void; task: Task |
   const [busy, setBusy] = createSignal(false)
   const [menuOpen, setMenuOpen] = createSignal(false)
   const [error, setError] = createSignal<string | null>(null)
+  // True while the rail-default profile is being auto-launched, so the body shows a loader instead
+  // of the empty-state text during the spawn round-trip.
+  const [launching, setLaunching] = createSignal(false)
   // Repo-path prompt: set when a launch needs a checkout we don't have mapped yet.
   const [prompt, setPrompt] = createSignal<{ owner: string; repo: string; number?: string } | null>(null)
   const [pendingProfile, setPendingProfile] = createSignal('shell')
@@ -45,9 +48,25 @@ export default function TerminalPanel(props: { onClose: () => void; task: Task |
 
   onMount(async () => {
     if (!api) return
+    // Rail default (Settings → Terminal): auto-launch a profile when the drawer opens empty.
+    // Set the loader flag up front so we never flash the "No sessions" empty state.
+    // ponytail: relies on the prefs query being warm by now — App loads it at startup. If it isn't,
+    // we just open empty, which is the safe fallback.
+    const def = prefs.data?.term_rail_default
+    const willAutoLaunch = !!def && def !== 'empty' && !!ws()
+    if (willAutoLaunch) setLaunching(true)
     setProfiles(await api.profiles())
     // The shared store (init'd in App) owns the onStatus subscription; just ensure we're populated.
     await refreshSessions()
+    if (willAutoLaunch && visibleSessions().length === 0) {
+      try {
+        await startProfile(def as string)
+      } finally {
+        setLaunching(false)
+      }
+    } else {
+      setLaunching(false)
+    }
   })
 
   const activeSession = createMemo(() => sessions().find((s) => s.id === activeId()) ?? null)
@@ -150,13 +169,13 @@ export default function TerminalPanel(props: { onClose: () => void; task: Task |
     await spawn(pendingProfile(), res.repoPath.path, ctx.owner, ctx.repo, ctx.number)
   }
 
-  // Single contextual control: kill a running session (it stays as an exited tab), dismiss an
-  // exited one (drops it) — vNext §12 "stay visible until dismissed".
+  // One click closes the tab: remove() kills a running session first, then drops it.
+  // Closing the last tab closes the whole drawer.
   async function closeTab(s: TerminalSession) {
     if (!api) return
-    if (s.status === 'running') await api.kill(s.id)
-    else await api.remove(s.id)
+    await api.remove(s.id)
     await refreshSessions()
+    if (visibleSessions().length === 0) props.onClose()
   }
 
   return (
@@ -262,7 +281,15 @@ export default function TerminalPanel(props: { onClose: () => void; task: Task |
         <Show when={error()}>{(msg) => <div class="terminal-prompt-error terminal-error-banner">{msg()}</div>}</Show>
 
         <div class="terminal-body">
-          <Show when={activeId()} fallback={<div class="terminal-empty">No sessions. Press + to open one.</div>} keyed>
+          <Show
+            when={activeId()}
+            fallback={
+              <div class="terminal-empty">
+                {launching() ? <span class="terminal-launching">Launching…</span> : 'No sessions. Press + to open one.'}
+              </div>
+            }
+            keyed
+          >
             {(id) => <TerminalSurface sessionId={id} onExit={() => void refreshSessions()} />}
           </Show>
         </div>

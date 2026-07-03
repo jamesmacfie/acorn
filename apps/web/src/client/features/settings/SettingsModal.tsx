@@ -1,20 +1,32 @@
 import { createSignal, For, Match, Show, Switch } from 'solid-js'
-import { createQuery } from '@tanstack/solid-query'
-import { workspacesOptions } from '../../queries'
+import { createQuery, useQueryClient } from '@tanstack/solid-query'
+import { prefsKey } from '../../../shared/api'
+import { prefsOptions, workspacesOptions } from '../../queries'
+import { setPref } from '../../mutations'
 import { SHORTCUTS } from '../../Shortcuts'
 import WorkspaceRepoAssignments from '../workspaces/WorkspaceRepoAssignments'
 import IntegrationsSettings from '../integrations/IntegrationsSettings'
 import WorkspaceSettings from './WorkspaceSettings'
 import McpSettings from './McpSettings'
+import WorkflowsSettings from './WorkflowsSettings'
 import './settings.css'
 
 // The Settings page (profile dropdown → Settings). Left tab rail + right pane. Tabs: the
 // repo→workspace mapping, one page per workspace, plus Integrations / Shortcuts / Permissions
 // (folded out of the account menu). `tab` is either a fixed key or a workspace id.
 export default function SettingsModal(props: { onClose: () => void; initialTab?: string; onPermissions: () => void | Promise<void> }) {
+  const qc = useQueryClient()
   const workspaces = createQuery(() => workspacesOptions(true))
+  const prefs = createQuery(() => prefsOptions(true))
   const [tab, setTab] = createSignal(props.initialTab ?? 'workspaces')
   const activeWorkspace = () => workspaces.data?.find((w) => w.id === tab())
+  const railDefault = () => prefs.data?.term_rail_default ?? 'empty'
+  // Write the pref AND update the shared ['prefs'] cache so consumers (e.g. TerminalPanel) see it
+  // without waiting for a refetch.
+  const savePref = async (key: string, value: string) => {
+    await setPref(key, value)
+    qc.setQueryData<Record<string, string>>(prefsKey, (old) => ({ ...(old ?? {}), [key]: value }))
+  }
 
   return (
     <div class="overlay-backdrop" onClick={props.onClose}>
@@ -37,6 +49,12 @@ export default function SettingsModal(props: { onClose: () => void; initialTab?:
           </button>
           <button type="button" class="settings-nav-item" classList={{ active: tab() === 'mcp' }} onClick={() => setTab('mcp')}>
             MCP
+          </button>
+          <button type="button" class="settings-nav-item" classList={{ active: tab() === 'workflows' }} onClick={() => setTab('workflows')}>
+            Workflows
+          </button>
+          <button type="button" class="settings-nav-item" classList={{ active: tab() === 'terminal' }} onClick={() => setTab('terminal')}>
+            Terminal
           </button>
           <button type="button" class="settings-nav-item" classList={{ active: tab() === 'shortcuts' }} onClick={() => setTab('shortcuts')}>
             Shortcuts
@@ -70,6 +88,26 @@ export default function SettingsModal(props: { onClose: () => void; initialTab?:
             <Match when={tab() === 'mcp'}>
               <div class="overlay-title">MCP</div>
               <McpSettings />
+            </Match>
+            <Match when={tab() === 'workflows'}>
+              <div class="overlay-title">Workflows</div>
+              <WorkflowsSettings />
+            </Match>
+            <Match when={tab() === 'terminal'}>
+              <div class="overlay-title">Terminal</div>
+              <label class="settings-field">
+                <span class="settings-label">When the terminal button is clicked, open</span>
+                <select
+                  class="integration-key-input"
+                  value={railDefault()}
+                  onChange={(e) => void savePref('term_rail_default', e.currentTarget.value)}
+                >
+                  <option value="empty">Empty (pick a profile with +)</option>
+                  <option value="shell">Shell</option>
+                  <option value="claude-code">Claude Code</option>
+                  <option value="codex">Codex</option>
+                </select>
+              </label>
             </Match>
             <Match when={tab() === 'shortcuts'}>
               <div class="overlay-title">Keyboard shortcuts</div>
