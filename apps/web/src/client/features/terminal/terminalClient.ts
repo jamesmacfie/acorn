@@ -59,6 +59,45 @@ export type TerminalApi = {
     onCreated(id: string): Promise<void>
     statuses(): Promise<TaskStatus[]>
   }
+  // Workflows (docs/next 14): the runner's IPC surface + gate/run-done notices for the bell.
+  workflow: {
+    start(taskId: string, def: unknown): Promise<{ runId?: string; error?: string }>
+    runs(taskId: string): Promise<WorkflowRunRow[]>
+    steps(runId: string): Promise<WorkflowStepRow[]>
+    gate(runId: string, stepId: string, approved: boolean): Promise<{ ok: boolean }>
+    onNotice(cb: (n: { taskId: string; kind: 'gate' | 'run-done'; title: string }) => void): () => void
+  }
+}
+
+// Renderer-side projections of the workflow rows (docs/next 14).
+export type WorkflowRunRow = {
+  id: string
+  taskId: string
+  name: string
+  status: 'running' | 'gated' | 'done' | 'failed' | 'safety-rail'
+  posture: string
+  error: string | null
+  createdAt: number
+  updatedAt: number
+}
+export type WorkflowStepRow = {
+  id: string
+  runId: string
+  idx: number
+  name: string
+  kind: string
+  mode: string
+  profileId: string | null
+  model: string | null
+  status: 'pending' | 'running' | 'waiting-gate' | 'done' | 'failed' | 'skipped'
+  resultJson: string | null
+  structuredJson: string | null
+  sessionId: string | null
+  costUsd: number | null
+  iteration: number
+  error: string | null
+  createdAt: number
+  updatedAt: number
 }
 
 declare global {

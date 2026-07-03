@@ -1,4 +1,4 @@
-import { integer, primaryKey, sqliteTable, text } from 'drizzle-orm/sqlite-core'
+import { integer, primaryKey, real, sqliteTable, text } from 'drizzle-orm/sqlite-core'
 
 // The read-model mirror + app-state schema (docs/data-layer.md). Mirror tables are cached,
 // revalidated projections of GitHub data; app-state tables (prefs, pins, viewed files) are the
@@ -434,6 +434,47 @@ export const terminalSessions = sqliteTable('terminal_sessions', {
   createdAt: integer('created_at').notNull(),
   exitedAt: integer('exited_at'),
   exitCode: integer('exit_code'),
+})
+
+// Workflow runs (docs/next 14 P2): the durable checkpoint for the main-process state machine —
+// every transition is persisted so a run survives an app restart (LangGraph-style checkpoint = the
+// rows; reconciliation mirrors the tmux pattern). Machine-scoped like tasks.
+export const workflowRuns = sqliteTable('workflow_runs', {
+  id: text('id').primaryKey(),
+  taskId: text('task_id').notNull(), // → tasks.id (the worktree/agent scope)
+  name: text('name').notNull(),
+  status: text('status').notNull(), // running | gated | done | failed | safety-rail
+  posture: text('posture').notNull().default('gated'), // gated (default) | autonomous (14 §posture)
+  trigger: text('trigger').notNull().default('manual'),
+  defJson: text('def_json').notNull(), // the WorkflowDef this run executes (frozen at start)
+  error: text('error'),
+  createdAt: integer('created_at').notNull(),
+  updatedAt: integer('updated_at').notNull(),
+})
+
+// One step of a run. Steps carry a FIRST-CLASS working context (worktreePath — bargain-bull's
+// hardest lesson); structured output is the edge currency (branch/join material).
+export const workflowSteps = sqliteTable('workflow_steps', {
+  id: text('id').primaryKey(),
+  runId: text('run_id').notNull(), // → workflow_runs.id
+  idx: integer('idx').notNull(), // sequence position
+  name: text('name').notNull(),
+  kind: text('kind').notNull().default('agent'), // agent | gate-human | gate-policy | ci-loop | fan-out | join
+  mode: text('mode').notNull().default('headless'), // headless | interactive
+  profileId: text('profile_id'),
+  model: text('model'),
+  status: text('status').notNull(), // pending | running | waiting-gate | done | failed | skipped
+  worktreePath: text('worktree_path'),
+  inputsJson: text('inputs_json'), // the assembled bundle handed to the step
+  resultJson: text('result_json'), // the captured HeadlessResult (sans events)
+  structuredJson: text('structured_json'), // the schema-conforming output — the edge currency
+  sessionId: text('session_id'), // for --resume (open in terminal, 15 P2)
+  costUsd: real('cost_usd'),
+  iteration: integer('iteration').notNull().default(0), // loop bound bookkeeping (14 §loop)
+  parentStepId: text('parent_step_id'), // fan-out lineage (14 P4)
+  error: text('error'),
+  createdAt: integer('created_at').notNull(),
+  updatedAt: integer('updated_at').notNull(),
 })
 
 // Per-user cache of fetched external issues (generic across providers, parallels integrations).

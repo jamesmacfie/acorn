@@ -65,6 +65,18 @@ contextBridge.exposeInMainWorld('acorn', {
     // Bracketed-paste delivery into an agent PTY (docs/next 04 §D).
     sendToAgent: (sessionId: string, text: string, submit: 'now' | 'after-ready' | 'draft') =>
       ipcRenderer.invoke('term:sendToAgent', { sessionId, text, submit }),
+    // Workflows (docs/next 14): start/list/inspect runs + the human-gate verdict; notices feed the bell.
+    workflow: {
+      start: (taskId: string, def: unknown) => ipcRenderer.invoke('workflow:start', { taskId, def }),
+      runs: (taskId: string) => ipcRenderer.invoke('workflow:runs', taskId),
+      steps: (runId: string) => ipcRenderer.invoke('workflow:steps', runId),
+      gate: (runId: string, stepId: string, approved: boolean) => ipcRenderer.invoke('workflow:gate', { runId, stepId, approved }),
+      onNotice: (cb: (n: { taskId: string; kind: string; title: string }) => void) => {
+        const listener = (_e: IpcRendererEvent, n: { taskId: string; kind: string; title: string }) => cb(n)
+        ipcRenderer.on('workflow:notice', listener)
+        return () => ipcRenderer.removeListener('workflow:notice', listener)
+      },
+    },
     // Subscribe to session-status pings (idle/exit changes for any session); returns unsubscribe.
     onStatus: (cb: () => void) => {
       const listener = () => cb()
