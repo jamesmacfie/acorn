@@ -346,6 +346,7 @@ export const tasks = sqliteTable('tasks', {
   worktreePath: text('worktree_path'), // null until a terminal is first opened (Flow C)
   pullNumber: integer('pull_number'), // null for local-first until a PR is inherited (Flow B)
   status: text('status').notNull(), // 'active' | 'archived'
+  parentId: text('parent_id'), // task tree (docs/next 14 P4): set on fan-out children; null = root
   sort: integer('sort').notNull().default(0), // rail ordering, like pinned_repos.sort
   createdAt: integer('created_at').notNull(),
   updatedAt: integer('updated_at').notNull(),

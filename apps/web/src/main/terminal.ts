@@ -8,7 +8,8 @@ import { existsSync, realpathSync, statSync } from 'node:fs'
 import { readdir, readFile, writeFile } from 'node:fs/promises'
 import { dirname, isAbsolute, join, resolve, sep } from 'node:path'
 import { homedir } from 'node:os'
-import { and, eq } from 'drizzle-orm'
+import { and, eq, max } from 'drizzle-orm'
+import { dedupeBranch, slugifyBranch } from '../shared/branch'
 import type { AppDatabase } from '../server/db'
 import { schema } from '../server/db'
 import type { ArchiveOpts, ArchiveResult, CreateOpts, ServerMsg, TerminalSession, TaskStatus } from '../shared/terminal'
@@ -886,6 +887,35 @@ export async function registerTerminalIpc(db: AppDatabase, worktreesDir: string,
       if (!started.ok) return { ok: false }
       const status = await runtime.status(taskId, targetId)
       return { ok: true, url: status.url }
+    },
+    // Fan-out (14 P4): materialise a child task on its own (de-duped, slugged) branch; the child's
+    // worktree is created lazily by resolveTaskCwd the moment its step runs.
+    createChildTask: async (parentTaskId, seed) => {
+      const parent = await loadTask(db, parentTaskId)
+      if (!parent) throw new Error('Parent task not found.')
+      const existing = (await db.select({ branch: schema.tasks.branch }).from(schema.tasks)).map((r) => r.branch)
+      const branch = dedupeBranch(slugifyBranch(seed.branch || seed.title) || `child-${parentTaskId.slice(0, 8)}`, existing)
+      const [{ value }] = await db.select({ value: max(schema.tasks.sort) }).from(schema.tasks)
+      const id = randomUUID()
+      const at = Date.now()
+      await db.insert(schema.tasks).values({
+        id,
+        title: seed.title,
+        origin: 'local',
+        repoOwner: parent.repoOwner,
+        repoName: parent.repoName,
+        branch,
+        pullNumber: null,
+        worktreePath: null,
+        status: 'active',
+        parentId: parentTaskId,
+        sort: (value ?? -1) + 1,
+        createdAt: at,
+        updatedAt: at,
+        archivedAt: null,
+      })
+      broadcastStatus()
+      return id
     },
   })
 

@@ -23,6 +23,7 @@ function rowToTask(row: Row, links: TaskLink[]): Task {
     worktreePath: row.worktreePath,
     pullNumber: row.pullNumber,
     status: row.status as Task['status'],
+    parentId: row.parentId,
     sort: row.sort,
     links,
   }
@@ -78,7 +79,7 @@ export const tasks = new Hono<AppEnv>()
     }
     return c.json(
       rowToTask(
-        { id, title, origin: seed.origin, repoOwner: seed.repoOwner, repoName: seed.repoName, branch: seed.branch, pullNumber: seed.pullNumber ?? null, worktreePath: null, status: 'active', sort, createdAt: now, updatedAt: now, archivedAt: null },
+        { id, title, origin: seed.origin, repoOwner: seed.repoOwner, repoName: seed.repoName, branch: seed.branch, pullNumber: seed.pullNumber ?? null, worktreePath: null, status: 'active', parentId: null, sort, createdAt: now, updatedAt: now, archivedAt: null },
         links,
       ),
     )
