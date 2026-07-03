@@ -4,22 +4,25 @@
 export type PaletteItem =
   | { kind: 'run'; id: string; label: string; hint: string; running: boolean }
   | { kind: 'layout'; id: string; label: string; hint: string }
+  | { kind: 'workflow'; id: string; label: string; hint: string } // committed .acorn/workflows (14 P5)
   | { kind: 'action'; id: string; label: string; hint?: string }
   | { kind: 'error'; id: string; label: string } // config parse errors (13 §B) — visible, not invocable
 
 export type PaletteSources = {
   targets: { id: string; command: string; running: boolean }[]
   layouts?: { id: string }[]
+  workflows?: { id: string; name: string; steps: unknown[] }[]
   errors: { source: string; message: string }[]
   actions: { id: string; label: string; hint?: string }[]
 }
 
-// Errors first (they explain why a target might be missing), then run targets, layouts, actions.
+// Errors first (they explain why a target might be missing), then run targets, layouts, workflows, actions.
 export function composeItems(src: PaletteSources): PaletteItem[] {
   return [
     ...src.errors.map((e, i): PaletteItem => ({ kind: 'error', id: `error:${i}`, label: `config error (${e.source}): ${e.message}` })),
     ...src.targets.map((t): PaletteItem => ({ kind: 'run', id: `run:${t.id}`, label: `${t.running ? 'Stop' : 'Run'}: ${t.id}`, hint: t.command, running: t.running })),
     ...(src.layouts ?? []).map((l): PaletteItem => ({ kind: 'layout', id: `layout:${l.id}`, label: `Layout: ${l.id}`, hint: 'open panes + start target' })),
+    ...(src.workflows ?? []).map((w): PaletteItem => ({ kind: 'workflow', id: `workflow:${w.id}`, label: `Workflow: ${w.name}`, hint: `${w.steps.length} steps` })),
     ...src.actions.map((a): PaletteItem => ({ kind: 'action', id: a.id, label: a.label, hint: a.hint })),
   ]
 }

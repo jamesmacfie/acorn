@@ -320,6 +320,27 @@ describe('WorkflowRunner (docs/next 14 P2)', () => {
     expect(joined2.failures).toBe(1)
   }, 30_000)
 
+  it("requires_run: the runner starts the target and hands its URL to the step (docs/next 13/14)", async () => {
+    const d = deps()
+    d.startRunTarget = vi.fn(async () => ({ ok: true, url: 'http://localhost:8080' }))
+    const runner = new WorkflowRunner(t.db, d)
+    const runId = await runner.start('task1', {
+      name: 'e2e',
+      steps: [{ name: 'verify', prompt: 'Check the login page.', requiresRun: 'dev' }],
+    })
+    const run = await waitDone(runner, runId)
+    expect(run.status).toBe('done')
+    expect(d.startRunTarget).toHaveBeenCalledWith('task1', 'dev')
+    expect(stepInputs.verify).toContain('The app is running at: http://localhost:8080')
+
+    // A target that cannot start fails the step cleanly.
+    const d2 = deps()
+    d2.startRunTarget = vi.fn(async () => ({ ok: false }))
+    const runner2 = new WorkflowRunner(t.db, d2)
+    const runId2 = await runner2.start('task1', { name: 'e2e2', steps: [{ name: 'verify', prompt: 'x', requiresRun: 'dev' }] })
+    expect((await waitDone(runner2, runId2)).status).toBe('failed')
+  })
+
   it('kill-and-reconstruct over the same DB mid-run → resumes from the persisted step', async () => {
     const runner = new WorkflowRunner(t.db, deps())
     const runId = await runner.start('task1', DEF)
