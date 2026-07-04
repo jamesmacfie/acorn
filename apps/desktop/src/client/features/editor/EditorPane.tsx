@@ -41,6 +41,18 @@ export default function EditorPane(props: { task: Task }) {
   const files = () => openFiles(props.task.id)
   const active = () => activeFile(props.task.id)
 
+  // Cmd/Ctrl+W closes the active file tab when focus is inside this pane (main suppresses the
+  // window-close accelerator and pings us — see electron.ts / preload).
+  let paneRef: HTMLElement | undefined
+  onMount(() => {
+    const off = window.acorn?.onClosePane?.(() => {
+      if (!paneRef?.contains(document.activeElement)) return
+      const p = active()
+      if (p) void close(p)
+    })
+    onCleanup(() => off?.())
+  })
+
   // Autosave (no Save button): debounce while typing, flush on blur / tab-switch / close.
   const scheduleSave = debounce((p: string) => void save(p), 1500)
 
@@ -156,7 +168,7 @@ export default function EditorPane(props: { task: Task }) {
   )
 
   return (
-    <section class="pane editor-pane" style={{ 'grid-column': '1 / 3' }}>
+    <section ref={paneRef} class="pane editor-pane" style={{ 'grid-column': '1 / 3' }}>
       <Show when={root() !== undefined} fallback={<div class="editor-empty muted">Loading…</div>}>
         <Show when={root()} fallback={<div class="editor-empty muted">Open a terminal first to map this repo's checkout.</div>}>
           <div class="editor-layout">

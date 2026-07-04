@@ -19,11 +19,24 @@
   animation: rail-tip-in 90ms ease-out;
 }
 .rail-tip-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
   font-family: var(--font-mono);
   font-size: var(--fs-sm);
   font-weight: 600;
   color: var(--text);
   line-height: 1.3;
+}
+.rail-tip-key {
+  font-family: var(--font-mono);
+  font-size: var(--fs-xs, 11px);
+  font-weight: 500;
+  color: var(--text-muted);
+  background: var(--bg-subtle);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 0 5px;
 }
 .rail-tip-sub {
   font-size: var(--fs-xs, 11px);

@@ -114,6 +114,8 @@ declare global {
     acorn?: {
       desktop?: boolean
       platform?: string
+      // Cmd/Ctrl+W → close the focused pane. Returns an unsubscribe.
+      onClosePane?: (cb: () => void) => () => void
       terminal?: TerminalApi
       editor?: import('../editor/editorClient').EditorApi
       notes?: import('../notes/notesClient').NotesApi

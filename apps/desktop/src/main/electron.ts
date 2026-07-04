@@ -91,6 +91,17 @@ async function createMainWindow() {
     },
   })
   hardenNavigation(win)
+  // Cmd/Ctrl+W closes the FOCUSED pane (terminal tab / editor file), not the whole window. We
+  // intercept in main because a menu accelerator can't be suppressed from the page — preventing
+  // before-input-event disables it (Electron docs). The renderer decides what "focused pane" is;
+  // if none owns focus, nothing closes (this is a single-window app — Cmd-Q quits).
+  win.webContents.on('before-input-event', (e, input) => {
+    if (input.type !== 'keyDown') return
+    if (input.key.toLowerCase() === 'w' && (input.meta || input.control) && !input.alt && !input.shift) {
+      e.preventDefault()
+      win.webContents.send('acorn:close-pane')
+    }
+  })
   win.once('ready-to-show', () => win.show())
   await win.loadURL(ORIGIN)
   return win

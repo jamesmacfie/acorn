@@ -1,7 +1,7 @@
-import { createEffect, createMemo, createResource, createSignal, For, on, Show, type JSX } from 'solid-js'
+import { createEffect, createMemo, createResource, createSignal, For, on, onCleanup, onMount, Show, type JSX } from 'solid-js'
 import { useNavigate } from '@solidjs/router'
 import { createQuery, useQueryClient } from '@tanstack/solid-query'
-import { tasksKey, tasksOptions, workspacesOptions, type Task } from '../../queries'
+import { prefsOptions, tasksKey, tasksOptions, workspacesOptions, type Task } from '../../queries'
 import { archiveTask } from '../../mutations'
 import PullDetail from '../../PullDetail'
 import DiffView from '../../DiffView'
@@ -17,6 +17,7 @@ import { refreshSessions } from '../terminal/sessions'
 import { terminalApi } from '../terminal/terminalClient'
 import { dispatchLayout, layoutForTask, paneForTask, recipeBrowserUrl, setActivePane, setActiveTaskId, setSelectedSource } from './tasks'
 import { defaultLayout, type LayoutAction, type PaneId } from './layout'
+import { paneKeymap, paneKeys, type PaneAction } from './paneShortcuts'
 import { taskStatus } from './taskStatus'
 import './task-view.css'
 
@@ -163,6 +164,34 @@ export default function TaskView(props: {
     return repoCfg()?.devPort != null ? `http://localhost:${repoCfg()?.devPort}` : null
   }
   const [agentsOpen, setAgentsOpen] = createSignal(false)
+
+  // Pane keyboard shortcuts (overridable via the `pane_shortcuts` pref). A single window listener,
+  // scoped to the task view by this component's lifetime. Guards typing targets + modifier chords,
+  // like the global handler, so text entry and OS/browser chords are untouched.
+  const prefs = createQuery(() => prefsOptions(true))
+  const paneKey = createMemo(() => paneKeys(prefs.data?.pane_shortcuts))
+  const keymap = createMemo(() => paneKeymap(prefs.data?.pane_shortcuts))
+  const activatePane = (a: PaneAction) => {
+    if (a === 'agents') return setAgentsOpen((o) => !o)
+    if (a === 'terminal') return props.onToggleTerminal()
+    if (a === 'pr' && !hasPr()) return
+    if (a === 'linear' && !linearLinks().length) return
+    if (a === 'rollbar' && !rollbarLinks().length) return
+    dispatch({ type: 'show', pane: a })
+  }
+  const onPaneKey = (e: KeyboardEvent) => {
+    const t = e.target
+    if (t instanceof HTMLInputElement || t instanceof HTMLTextAreaElement || t instanceof HTMLSelectElement) return
+    if (t instanceof HTMLElement && t.isContentEditable) return // editor/notes panes
+    if (e.metaKey || e.ctrlKey || e.altKey) return
+    const a = keymap().get(e.key.toLowerCase())
+    if (!a) return
+    e.preventDefault()
+    activatePane(a)
+  }
+  onMount(() => window.addEventListener('keydown', onPaneKey))
+  onCleanup(() => window.removeEventListener('keydown', onPaneKey))
+
   const [closeOpen, setCloseOpen] = createSignal(false)
   const [deleteWt, setDeleteWt] = createSignal(true)
   const [closeErr, setCloseErr] = createSignal('')
@@ -283,13 +312,13 @@ export default function TaskView(props: {
 
       <nav class="pane-switcher">
         <Show when={hasPr()}>
-          <button type="button" class="pane-switch-btn" classList={{ active: showsPane('pr') }} data-tip="PR review" data-tip-sub="Diff, files & review comments · ⌘-click to open beside" aria-label="PR review" onClick={(e) => onSwitch('pr', e)}>⌥</button>
+          <button type="button" class="pane-switch-btn" classList={{ active: showsPane('pr') }} data-tip="PR review" data-tip-key={paneKey().pr} data-tip-sub="Diff, files & review comments · ⌘-click to open beside" aria-label="PR review" onClick={(e) => onSwitch('pr', e)}>⌥</button>
         </Show>
         <Show when={linearLinks().length}>
-          <button type="button" class="pane-switch-btn" classList={{ active: showsPane('linear') }} data-tip="Linear" data-tip-sub={linearIds().join(', ')} aria-label="Linear" onClick={(e) => onSwitch('linear', e)}>◷</button>
+          <button type="button" class="pane-switch-btn" classList={{ active: showsPane('linear') }} data-tip="Linear" data-tip-key={paneKey().linear} data-tip-sub={linearIds().join(', ')} aria-label="Linear" onClick={(e) => onSwitch('linear', e)}>◷</button>
         </Show>
         <Show when={rollbarLinks().length}>
-          <button type="button" class="pane-switch-btn" classList={{ active: showsPane('rollbar') }} data-tip="Rollbar" data-tip-sub={`#${rollbarLinks().map((l) => l.identifier).join(', #')}`} aria-label="Rollbar" onClick={(e) => onSwitch('rollbar', e)}>◍</button>
+          <button type="button" class="pane-switch-btn" classList={{ active: showsPane('rollbar') }} data-tip="Rollbar" data-tip-key={paneKey().rollbar} data-tip-sub={`#${rollbarLinks().map((l) => l.identifier).join(', #')}`} aria-label="Rollbar" onClick={(e) => onSwitch('rollbar', e)}>◍</button>
         </Show>
         {/* Run targets only appear when configured (per-workspace dev script, repo config.toml, or the
             repo run-targets JSON) — otherwise the rail shows no run button (docs/next 13 §A). */}
@@ -310,13 +339,13 @@ export default function TaskView(props: {
             )}
           </For>
         </Show>
-        <button type="button" class="pane-switch-btn" classList={{ active: showsPane('changes') }} data-tip="Changes" data-tip-sub="Uncommitted working tree · ⌘-click to open beside" aria-label="Changes" onClick={(e) => onSwitch('changes', e)}>⎇</button>
-        <button type="button" class="pane-switch-btn" classList={{ active: showsPane('notes') }} data-tip="Notes" data-tip-sub="Workspace scratchpad · ⌘-click to open beside" aria-label="Notes" onClick={(e) => onSwitch('notes', e)}>✐</button>
-        <button type="button" class="pane-switch-btn" classList={{ active: showsPane('context') }} data-tip="Context" data-tip-sub="What an assembled send includes · ⌘-click to open beside" aria-label="Context" onClick={(e) => onSwitch('context', e)}>⊞</button>
-        <button type="button" class="pane-switch-btn" classList={{ active: showsPane('preview') }} data-tip="Browser preview" data-tip-sub="Live preview of the app · ⌘-click to open beside" aria-label="Browser preview" onClick={(e) => onSwitch('preview', e)}>◍</button>
-        <button type="button" class="pane-switch-btn" classList={{ active: showsPane('editor') }} data-tip="Editor" data-tip-sub="In-app code editor · ⌘-click to open beside" aria-label="Editor" onClick={(e) => onSwitch('editor', e)}>✎</button>
-        <button type="button" class="pane-switch-btn" classList={{ active: agentsOpen() }} data-tip="Agents" data-tip-sub="Roster · launcher · feed" aria-label="Agents" onClick={() => setAgentsOpen(!agentsOpen())}>⠿</button>
-        <button type="button" class="pane-switch-btn" classList={{ active: props.terminalOpen }} data-tip="Terminal" data-tip-sub="Shell in the worktree" aria-label="Terminal" onClick={props.onToggleTerminal}>{'>_'}</button>
+        <button type="button" class="pane-switch-btn" classList={{ active: showsPane('changes') }} data-tip="Changes" data-tip-key={paneKey().changes} data-tip-sub="Uncommitted working tree · ⌘-click to open beside" aria-label="Changes" onClick={(e) => onSwitch('changes', e)}>⎇</button>
+        <button type="button" class="pane-switch-btn" classList={{ active: showsPane('notes') }} data-tip="Notes" data-tip-key={paneKey().notes} data-tip-sub="Workspace scratchpad · ⌘-click to open beside" aria-label="Notes" onClick={(e) => onSwitch('notes', e)}>✐</button>
+        <button type="button" class="pane-switch-btn" classList={{ active: showsPane('context') }} data-tip="Context" data-tip-key={paneKey().context} data-tip-sub="What an assembled send includes · ⌘-click to open beside" aria-label="Context" onClick={(e) => onSwitch('context', e)}>⊞</button>
+        <button type="button" class="pane-switch-btn" classList={{ active: showsPane('preview') }} data-tip="Browser preview" data-tip-key={paneKey().preview} data-tip-sub="Live preview of the app · ⌘-click to open beside" aria-label="Browser preview" onClick={(e) => onSwitch('preview', e)}>◍</button>
+        <button type="button" class="pane-switch-btn" classList={{ active: showsPane('editor') }} data-tip="Editor" data-tip-key={paneKey().editor} data-tip-sub="In-app code editor · ⌘-click to open beside" aria-label="Editor" onClick={(e) => onSwitch('editor', e)}>✎</button>
+        <button type="button" class="pane-switch-btn" classList={{ active: agentsOpen() }} data-tip="Agents" data-tip-key={paneKey().agents} data-tip-sub="Roster · launcher · feed" aria-label="Agents" onClick={() => setAgentsOpen(!agentsOpen())}>⠿</button>
+        <button type="button" class="pane-switch-btn" classList={{ active: props.terminalOpen }} data-tip="Terminal" data-tip-key={paneKey().terminal} data-tip-sub="Shell in the worktree" aria-label="Terminal" onClick={props.onToggleTerminal}>{'>_'}</button>
         <button type="button" class="pane-switch-btn pane-switch-close" data-tip="Close task" aria-label="Close task" onClick={openClose}>✕</button>
       </nav>
 
