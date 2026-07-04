@@ -6,6 +6,13 @@ import type { CreateOpts, ServerMsg } from '../shared/terminal'
 contextBridge.exposeInMainWorld('acorn', {
   desktop: true,
   platform: process.platform,
+  // Cmd/Ctrl+W → close the focused pane (terminal tab / editor file), never the window. Main
+  // suppresses the native accelerator and pings here; the pane that owns focus handles it.
+  onClosePane: (cb: () => void) => {
+    const listener = () => cb()
+    ipcRenderer.on('acorn:close-pane', listener)
+    return () => ipcRenderer.removeListener('acorn:close-pane', listener)
+  },
   terminal: {
     list: () => ipcRenderer.invoke('term:list'),
     profiles: () => ipcRenderer.invoke('term:profiles'),

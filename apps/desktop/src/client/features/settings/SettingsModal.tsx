@@ -4,6 +4,7 @@ import { prefsKey } from '../../../shared/api'
 import { prefsOptions, workspacesOptions } from '../../queries'
 import { setPref } from '../../mutations'
 import { SHORTCUTS } from '../../Shortcuts'
+import { PANE_SHORTCUT_DEFAULTS, paneKeys, RESERVED_KEYS, type PaneAction } from '../tasks/paneShortcuts'
 import WorkspaceRepoAssignments from '../workspaces/WorkspaceRepoAssignments'
 import IntegrationsSettings from '../integrations/IntegrationsSettings'
 import WorkspaceSettings from './WorkspaceSettings'
@@ -47,6 +48,31 @@ export default function SettingsModal(props: { onClose: () => void; initialTab?:
   const savePref = async (key: string, value: string) => {
     await setPref(key, value)
     qc.setQueryData<Record<string, string>>(prefsKey, (old) => ({ ...(old ?? {}), [key]: value }))
+  }
+
+  // Pane shortcut editing: capture the next key press on the focused row's input, reject reserved
+  // keys and collisions, then persist a `pane_shortcuts` override diff (JSON Record<action, key>).
+  const [shortcutErr, setShortcutErr] = createSignal('')
+  const readOverrides = (): Record<string, string> => {
+    try {
+      return prefs.data?.pane_shortcuts ? (JSON.parse(prefs.data.pane_shortcuts) as Record<string, string>) : {}
+    } catch {
+      return {}
+    }
+  }
+  const captureKey = (id: PaneAction, e: KeyboardEvent) => {
+    e.preventDefault()
+    const input = e.currentTarget as HTMLElement
+    const k = e.key.toLowerCase()
+    if (k === 'escape' || k === 'tab') return input.blur()
+    if (k.length !== 1) return // ignore Shift, arrows, F-keys, …
+    if (RESERVED_KEYS.has(k)) return setShortcutErr(`“${k}” is reserved by a global shortcut`)
+    const keys = paneKeys(prefs.data?.pane_shortcuts)
+    const clash = (Object.keys(keys) as PaneAction[]).find((a) => a !== id && keys[a] === k)
+    if (clash) return setShortcutErr(`“${k}” is already used by ${PANE_SHORTCUT_DEFAULTS.find((s) => s.id === clash)?.label}`)
+    setShortcutErr('')
+    void savePref('pane_shortcuts', JSON.stringify({ ...readOverrides(), [id]: k }))
+    input.blur()
   }
 
   return (
@@ -182,6 +208,34 @@ export default function SettingsModal(props: { onClose: () => void; initialTab?:
             </Match>
             <Match when={tab() === 'shortcuts'}>
               <div class="overlay-title">Keyboard shortcuts</div>
+              <div class="settings-section-label">Panes</div>
+              <p class="muted">Click a key, then press the key you want. Active in the task view.</p>
+              <Show when={shortcutErr()}><div class="action-error">{shortcutErr()}</div></Show>
+              <dl class="help-list">
+                <For each={PANE_SHORTCUT_DEFAULTS}>
+                  {(s) => (
+                    <>
+                      <dt>
+                        <input
+                          type="text"
+                          class="help-key shortcut-input"
+                          readonly
+                          value={paneKeys(prefs.data?.pane_shortcuts)[s.id]}
+                          onKeyDown={(e) => captureKey(s.id, e)}
+                          aria-label={`Shortcut for ${s.label}`}
+                        />
+                      </dt>
+                      <dd class="help-desc">{s.label}</dd>
+                    </>
+                  )}
+                </For>
+              </dl>
+              <div class="settings-actions">
+                <button type="button" class="overlay-btn" onClick={() => { setShortcutErr(''); void savePref('pane_shortcuts', '{}') }}>
+                  Reset panes to defaults
+                </button>
+              </div>
+              <div class="settings-section-label">Global</div>
               <dl class="help-list">
                 <For each={SHORTCUTS}>
                   {([key, desc]) => (

@@ -32,6 +32,7 @@
 .notes-row-kind { flex: none; font-family: var(--font-mono); font-size: 10px; color: var(--text-faint); }
 .notes-row-title { flex: 1; min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
 .notes-row-author { flex: none; font-size: 10px; }
+.notes-row-scope { flex: none; font-size: 10px; }
 .notes-row-delete {
   flex: none;
   width: 22px;
@@ -60,6 +61,7 @@
 }
 .notes-group-header:hover { color: var(--text); }
 .notes-new { display: flex; flex-direction: column; gap: 6px; padding: 8px; border-top: 1px solid var(--border); }
+.notes-scope-select { font: inherit; font-size: 12px; color: var(--text); background: var(--bg-input, var(--bg)); border: 1px solid var(--border); border-radius: 4px; padding: 4px 6px; }
 .notes-main { flex: 1; min-width: 0; display: flex; flex-direction: column; }
 .notes-toolbar {
   flex: none;

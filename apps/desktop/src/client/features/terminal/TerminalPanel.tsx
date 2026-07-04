@@ -69,6 +69,18 @@ export default function TerminalPanel(props: { onClose: () => void; task: Task |
     }
   })
 
+  // Cmd/Ctrl+W closes the active terminal tab when focus is inside the drawer (main suppresses the
+  // window-close accelerator and pings us — see electron.ts / preload).
+  let drawerRef: HTMLElement | undefined
+  onMount(() => {
+    const off = window.acorn?.onClosePane?.(() => {
+      if (!drawerRef?.contains(document.activeElement)) return
+      const s = activeSession()
+      if (s) void closeTab(s)
+    })
+    onCleanup(() => off?.())
+  })
+
   const activeSession = createMemo(() => sessions().find((s) => s.id === activeId()) ?? null)
   const activeRunning = createMemo(() => activeSession()?.status === 'running')
 
@@ -180,7 +192,7 @@ export default function TerminalPanel(props: { onClose: () => void; task: Task |
 
   return (
     <Portal>
-      <aside class="terminal-drawer" style={{ height: `${height()}px` }}>
+      <aside ref={drawerRef} class="terminal-drawer" style={{ height: `${height()}px` }}>
         <div class="terminal-resize" onPointerDown={onHandleDown} title="Drag to resize" />
         <header class="terminal-tabs">
           <Show when={api} fallback={<span class="terminal-unavailable">Terminal service unavailable</span>}>

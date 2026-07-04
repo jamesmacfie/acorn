@@ -8,7 +8,7 @@ import './rail-tips.css'
 // `anchor` is the CSS offset for the side the bubble is pinned to: `left` when flying right off the
 // left rail, `right` when flying left off the right rail. Anchoring with `right` (rather than `left`
 // + a transform) is what gives the bubble real layout width instead of squeezing it to the edge.
-type Tip = { title: string; sub?: string; anchor: number; y: number; side: 'left' | 'right' }
+type Tip = { title: string; sub?: string; key?: string; anchor: number; y: number; side: 'left' | 'right' }
 
 export default function RailTips() {
   const [tip, setTip] = createSignal<Tip | null>(null)
@@ -21,6 +21,7 @@ export default function RailTips() {
     setTip({
       title,
       sub: el.getAttribute('data-tip-sub') ?? undefined,
+      key: el.getAttribute('data-tip-key') ?? undefined,
       anchor: side === 'right' ? rect.right + 8 : window.innerWidth - rect.left + 8,
       y: rect.top + rect.height / 2,
       side,
@@ -70,7 +71,12 @@ export default function RailTips() {
             top: `${t().y}px`,
           }}
         >
-          <span class="rail-tip-title">{t().title}</span>
+          <span class="rail-tip-title">
+            {t().title}
+            <Show when={t().key}>
+              <kbd class="rail-tip-key">{t().key}</kbd>
+            </Show>
+          </span>
           <Show when={t().sub}>
             <span class="rail-tip-sub">{t().sub}</span>
           </Show>
