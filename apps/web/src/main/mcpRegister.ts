@@ -29,8 +29,10 @@ export type Argv = { file: string; args: string[] }
 export function registerArgv(flavour: AgentFlavour, name: string, launcher: Launcher): Argv {
   const envFlags = Object.entries(launcher.env).flatMap(([k, v]) => ['--env', `${k}=${v}`])
   if (flavour === 'claude') {
-    // claude mcp add [options] <name> <command> [args...]
-    return { file: 'claude', args: ['mcp', 'add', '--scope', 'user', ...envFlags, name, '--', launcher.command, ...launcher.args] }
+    // claude mcp add [options] <name> <command> [args...]. `--env` is VARIADIC (`<env...>`), so it
+    // must come AFTER <name> — otherwise it swallows the name as an env value ("Invalid environment
+    // variable"). `--` then stops it before <command>.
+    return { file: 'claude', args: ['mcp', 'add', '--scope', 'user', name, ...envFlags, '--', launcher.command, ...launcher.args] }
   }
   // codex mcp add <name> [--env KEY=VAL] -- <command> [args...]
   return { file: 'codex', args: ['mcp', 'add', name, ...envFlags, '--', launcher.command, ...launcher.args] }

@@ -11,6 +11,22 @@ import McpSettings from './McpSettings'
 import WorkflowsSettings from './WorkflowsSettings'
 import './settings.css'
 
+// value → label. Must match the :root[data-theme="…"] blocks in tokens-layout.css.
+const THEMES: [string, string][] = [
+  ['light', 'Light'],
+  ['dark', 'Dark'],
+  ['solarized-light', 'Solarized Light'],
+  ['solarized-dark', 'Solarized Dark'],
+  ['monokai', 'Monokai'],
+  ['nord', 'Nord'],
+  ['catppuccin-latte', 'Catppuccin Latte'],
+  ['catppuccin-frappe', 'Catppuccin Frappé'],
+  ['catppuccin-macchiato', 'Catppuccin Macchiato'],
+  ['catppuccin-mocha', 'Catppuccin Mocha'],
+  ['one-dark', 'One Dark'],
+  ['dracula', 'Dracula'],
+]
+
 // The Settings page (profile dropdown → Settings). Left tab rail + right pane. Tabs: the
 // repo→workspace mapping, one page per workspace, plus Integrations / Shortcuts / Permissions
 // (folded out of the account menu). `tab` is either a fixed key or a workspace id.
@@ -21,6 +37,11 @@ export default function SettingsModal(props: { onClose: () => void; initialTab?:
   const [tab, setTab] = createSignal(props.initialTab ?? 'workspaces')
   const activeWorkspace = () => workspaces.data?.find((w) => w.id === tab())
   const railDefault = () => prefs.data?.term_rail_default ?? 'empty'
+  // Default to following the OS until the user has explicitly picked a theme.
+  const followSystem = () => (prefs.data?.theme_follow_system ?? (prefs.data?.theme ? 'false' : 'true')) === 'true'
+  const theme = () => prefs.data?.theme ?? 'light'
+  const lightTheme = () => prefs.data?.theme_light ?? 'light'
+  const darkTheme = () => prefs.data?.theme_dark ?? 'dark'
   // Write the pref AND update the shared ['prefs'] cache so consumers (e.g. TerminalPanel) see it
   // without waiting for a refetch.
   const savePref = async (key: string, value: string) => {
@@ -44,6 +65,9 @@ export default function SettingsModal(props: { onClose: () => void; initialTab?:
             )}
           </For>
           <div class="settings-nav-group">General</div>
+          <button type="button" class="settings-nav-item" classList={{ active: tab() === 'appearance' }} onClick={() => setTab('appearance')}>
+            Appearance
+          </button>
           <button type="button" class="settings-nav-item" classList={{ active: tab() === 'integrations' }} onClick={() => setTab('integrations')}>
             Integrations
           </button>
@@ -80,6 +104,53 @@ export default function SettingsModal(props: { onClose: () => void; initialTab?:
                   <WorkspaceSettings workspace={w} onDeleted={() => setTab('workspaces')} />
                 </>
               )}
+            </Match>
+            <Match when={tab() === 'appearance'}>
+              <div class="overlay-title">Appearance</div>
+              <label class="settings-field settings-field-row">
+                <input
+                  type="checkbox"
+                  checked={followSystem()}
+                  onChange={(e) => void savePref('theme_follow_system', e.currentTarget.checked ? 'true' : 'false')}
+                />
+                <span class="settings-label">Follow system light/dark setting</span>
+              </label>
+              <Show
+                when={followSystem()}
+                fallback={
+                  <label class="settings-field">
+                    <span class="settings-label">Theme</span>
+                    <select
+                      class="integration-key-input"
+                      value={theme()}
+                      onChange={(e) => void savePref('theme', e.currentTarget.value)}
+                    >
+                      <For each={THEMES}>{([value, label]) => <option value={value}>{label}</option>}</For>
+                    </select>
+                  </label>
+                }
+              >
+                <label class="settings-field">
+                  <span class="settings-label">Light theme</span>
+                  <select
+                    class="integration-key-input"
+                    value={lightTheme()}
+                    onChange={(e) => void savePref('theme_light', e.currentTarget.value)}
+                  >
+                    <For each={THEMES}>{([value, label]) => <option value={value}>{label}</option>}</For>
+                  </select>
+                </label>
+                <label class="settings-field">
+                  <span class="settings-label">Dark theme</span>
+                  <select
+                    class="integration-key-input"
+                    value={darkTheme()}
+                    onChange={(e) => void savePref('theme_dark', e.currentTarget.value)}
+                  >
+                    <For each={THEMES}>{([value, label]) => <option value={value}>{label}</option>}</For>
+                  </select>
+                </label>
+              </Show>
             </Match>
             <Match when={tab() === 'integrations'}>
               <div class="overlay-title">Integrations</div>

@@ -6,19 +6,20 @@ import { formatContextBlock } from '../../../shared/contextBlock'
 import { agentSessionsFor } from '../terminal/sessions'
 import { terminalApi } from '../terminal/terminalClient'
 import { memoryApi, type MemoryType } from '../memory/memoryClient'
+import { requestNoteOpen } from '../notes/notesClient'
+import { dispatchLayout } from '../tasks/tasks'
 import { DEFAULT_SELECTION, selectionToInclude, traySummary, type TraySelection } from './model'
 import './context-tray.css'
 
 const MEMORY_TYPE_OPTIONS: MemoryType[] = ['convention', 'architecture', 'decision', 'fix', 'reference', 'feedback', 'task', 'user']
 
-// The context tray (docs/next 11 §E): collapsible chrome above the task footer listing everything
-// attached to the task — PR, linked tickets/errors, notes, top memories — each with an include
-// checkbox, plus "Assemble & send → agent" (assembler → formatContextBlock → sendToAgent, gated on
-// the idle edge). Open by default; collapses to the one-line summary so it never becomes a fifth
-// always-on surface.
-export default function ContextTray(props: { task: Task }) {
+// The Context pane (docs/next 11 §E): a right-rail layout pane listing everything attached to the
+// task — PR, linked tickets/errors, notes, top memories — each with an include checkbox, plus
+// "Assemble & send → agent" (assembler → formatContextBlock → sendToAgent, gated on the idle edge).
+// Was a collapsible bottom tray; promoted to a pane so it gets a full slot (side-by-side) for the
+// detail it needs.
+export default function ContextPane(props: { task: Task }) {
   const api = terminalApi()
-  const [open, setOpen] = createSignal(true)
   const [sel, setSel] = createSignal<TraySelection>({ ...DEFAULT_SELECTION })
   const [msg, setMsg] = createSignal('')
 
@@ -29,6 +30,22 @@ export default function ContextTray(props: { task: Task }) {
   )
 
   const toggle = (k: TaskContextInclude) => setSel((s) => ({ ...s, [k]: !s[k] }))
+
+  // Per-item expand/collapse — the pane lists what's attached; a click reveals the detail.
+  const [expanded, setExpanded] = createSignal<Set<string>>(new Set())
+  const isOpen = (id: string) => expanded().has(id)
+  const toggleOpen = (id: string) =>
+    setExpanded((s) => {
+      const next = new Set(s)
+      next.has(id) ? next.delete(id) : next.add(id)
+      return next
+    })
+
+  // "Edit" jumps to the note in the Notes pane (opens/loads it there in editable state).
+  function editNote(slug: string) {
+    requestNoteOpen(slug)
+    dispatchLayout(props.task.id, { type: 'show', pane: 'notes' })
+  }
 
   // The human gate over auto-generated memory proposals (docs/next 12 P3): accept (with an
   // optional description edit) writes to the task worktree + index; reject leaves no trace.
@@ -96,50 +113,100 @@ export default function ContextTray(props: { task: Task }) {
   }
 
   return (
-    <div class="context-tray">
-      <button type="button" class="context-tray-head" onClick={() => setOpen(!open())} title="Context tray — what an assembled send includes">
-        <span class="context-tray-twist">{open() ? '▾' : '▸'}</span>
+    <section class="pane context-pane">
+      <div class="section-header context-tray-head">
         <span>context</span>
         <span class="muted">{traySummary(ctx())}</span>
         <Show when={msg()}>
           <span class="muted context-tray-msg">{msg()}</span>
         </Show>
-      </button>
-      <Show when={open() && ctx()}>
+      </div>
+      <Show when={ctx()}>
         {(c) => (
           <div class="context-tray-body">
             <Show when={c().pr}>
               {(pr) => (
-                <label class="context-tray-row">
-                  <input type="checkbox" checked={sel().pr} onChange={() => toggle('pr')} />
-                  <span class="context-tray-kind">PR</span>
-                  <span class="context-tray-label">#{pr().number} {pr().title}</span>
-                </label>
+                <div class="context-tray-item">
+                  <div class="context-tray-row">
+                    <input type="checkbox" checked={sel().pr} onChange={() => toggle('pr')} />
+                    <span class="context-tray-kind">PR</span>
+                    <button type="button" class="context-tray-expand" onClick={() => toggleOpen('pr')}>
+                      <span class="context-tray-twist">{isOpen('pr') ? '▾' : '▸'}</span>
+                      <span class="context-tray-label">#{pr().number} {pr().title}</span>
+                    </button>
+                  </div>
+                  <Show when={isOpen('pr')}>
+                    <div class="context-tray-detail">
+                      <Show when={pr().body}><div class="context-tray-detail-body">{pr().body}</div></Show>
+                      <Show when={pr().changedFiles.length}>
+                        <div class="muted">{pr().changedFiles.length} changed file{pr().changedFiles.length === 1 ? '' : 's'}</div>
+                        <ul class="context-tray-files"><For each={pr().changedFiles}>{(f) => <li>{f}</li>}</For></ul>
+                      </Show>
+                    </div>
+                  </Show>
+                </div>
               )}
             </Show>
             <For each={c().issues}>
               {(issue) => (
-                <label class="context-tray-row">
-                  <input type="checkbox" checked={sel().issues} onChange={() => toggle('issues')} />
-                  <span class="context-tray-kind">{issue.provider}</span>
-                  <span class="context-tray-label">{issue.identifier} — {issue.title}{issue.detail ? ` (${issue.detail})` : ''}</span>
-                </label>
+                <div class="context-tray-item">
+                  <div class="context-tray-row">
+                    <input type="checkbox" checked={sel().issues} onChange={() => toggle('issues')} />
+                    <span class="context-tray-kind">{issue.provider}</span>
+                    <button type="button" class="context-tray-expand" onClick={() => toggleOpen(`issue:${issue.identifier}`)}>
+                      <span class="context-tray-twist">{isOpen(`issue:${issue.identifier}`) ? '▾' : '▸'}</span>
+                      <span class="context-tray-label">{issue.identifier} — {issue.title}{issue.detail ? ` (${issue.detail})` : ''}</span>
+                    </button>
+                  </div>
+                  <Show when={isOpen(`issue:${issue.identifier}`)}>
+                    <div class="context-tray-detail">
+                      <div class="context-tray-detail-body">{issue.identifier} — {issue.title}</div>
+                      <Show when={issue.detail}><div class="muted">status: {issue.detail}</div></Show>
+                    </div>
+                  </Show>
+                </div>
               )}
             </For>
-            <Show when={c().notes.length}>
-              <label class="context-tray-row">
-                <input type="checkbox" checked={sel().notes} onChange={() => toggle('notes')} />
-                <span class="context-tray-kind">notes</span>
-                <span class="context-tray-label">{c().notes.map((n) => `“${n.title}”`).join(' · ')}</span>
-              </label>
-            </Show>
-            <Show when={c().memory.length}>
-              <label class="context-tray-row">
-                <input type="checkbox" checked={sel().memory} onChange={() => toggle('memory')} />
-                <span class="context-tray-kind">memory</span>
-                <span class="context-tray-label">{c().memory.length} repo memories ({c().memory.slice(0, 3).map((m) => m.name).join(', ')}{c().memory.length > 3 ? ', …' : ''})</span>
-              </label>
-            </Show>
+            <For each={c().notes}>
+              {(note) => {
+                const id = `note:${note.slug ?? note.title}`
+                return (
+                  <div class="context-tray-item">
+                    <div class="context-tray-row">
+                      <input type="checkbox" checked={sel().notes} onChange={() => toggle('notes')} />
+                      <span class="context-tray-kind">notes</span>
+                      <button type="button" class="context-tray-expand" onClick={() => toggleOpen(id)}>
+                        <span class="context-tray-twist">{isOpen(id) ? '▾' : '▸'}</span>
+                        <span class="context-tray-label">{note.title}</span>
+                      </button>
+                      <Show when={note.slug}>
+                        <button type="button" class="context-tray-edit" title="Edit in Notes" aria-label="Edit in Notes" onClick={() => editNote(note.slug!)}>✎</button>
+                      </Show>
+                    </div>
+                    <Show when={isOpen(id)}>
+                      <div class="context-tray-detail"><div class="context-tray-detail-body">{note.body}</div></div>
+                    </Show>
+                  </div>
+                )
+              }}
+            </For>
+            <For each={c().memory}>
+              {(mem) => (
+                <div class="context-tray-item">
+                  <div class="context-tray-row">
+                    <input type="checkbox" checked={sel().memory} onChange={() => toggle('memory')} />
+                    <span class="context-tray-kind">memory</span>
+                    <button type="button" class="context-tray-expand" onClick={() => toggleOpen(`mem:${mem.name}`)}>
+                      <span class="context-tray-twist">{isOpen(`mem:${mem.name}`) ? '▾' : '▸'}</span>
+                      <span class="context-tray-label">{mem.name}</span>
+                    </button>
+                  </div>
+                  <Show when={isOpen(`mem:${mem.name}`)}>
+                    <div class="context-tray-detail"><div class="context-tray-detail-body">{mem.description}</div></div>
+                  </Show>
+                </div>
+              )}
+            </For>
             <Show when={(proposals() ?? []).length}>
               <div class="context-tray-proposals">
                 <span class="muted">Memory proposals (auto-generated — review before they land):</span>
@@ -199,6 +266,6 @@ export default function ContextTray(props: { task: Task }) {
           </div>
         )}
       </Show>
-    </div>
+    </section>
   )
 }

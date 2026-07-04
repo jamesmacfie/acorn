@@ -100,8 +100,11 @@ export const stripToHunks = (patch: string): string => {
   return i < 0 ? '' : patch.slice(i + 1)
 }
 
-export async function localDiff(worktree: string, path: string, scope: LocalScope): Promise<{ patch: string }> {
+// `context` sets git's -U: the ChangesPane passes a huge value for a whole-file view (no expand
+// affordances), while the MCP tool keeps git's default (token-efficient hunks).
+export async function localDiff(worktree: string, path: string, scope: LocalScope, context?: number): Promise<{ patch: string }> {
   if (!isValidRelPath(path)) throw new Error('Invalid path.')
+  const ctx = context != null && Number.isInteger(context) && context >= 0 ? [`-U${context}`] : []
   // Untracked files aren't in the index: render an all-additions patch via --no-index (exits 1 on
   // "differences found" — that IS success for a diff).
   const tracked = await exec('git', ['-C', worktree, 'ls-files', '--error-unmatch', '--', path], { timeout: 10_000 })
@@ -109,7 +112,7 @@ export async function localDiff(worktree: string, path: string, scope: LocalScop
     .catch(() => false)
   if (!tracked && scope === 'unstaged') {
     try {
-      const { stdout } = await exec('git', ['-C', worktree, 'diff', '--no-index', '--', '/dev/null', path], { timeout: 15_000, maxBuffer: 50 * 1024 * 1024 })
+      const { stdout } = await exec('git', ['-C', worktree, 'diff', '--no-index', ...ctx, '--', '/dev/null', path], { timeout: 15_000, maxBuffer: 50 * 1024 * 1024 })
       return { patch: stripToHunks(stdout) }
     } catch (err) {
       const e = err as { code?: number; stdout?: string }
@@ -117,7 +120,7 @@ export async function localDiff(worktree: string, path: string, scope: LocalScop
       throw err
     }
   }
-  const args = ['-C', worktree, 'diff', ...(scope === 'staged' ? ['--staged'] : []), '--', path]
+  const args = ['-C', worktree, 'diff', ...(scope === 'staged' ? ['--staged'] : []), ...ctx, '--', path]
   const { stdout } = await exec('git', args, { timeout: 15_000, maxBuffer: 50 * 1024 * 1024 })
   return { patch: stripToHunks(stdout) }
 }
@@ -159,6 +162,13 @@ export async function commitStaged(worktree: string, message: string): Promise<G
   const msg = message.trim()
   if (!msg) return { ok: false, reason: 'Commit message required.' }
   return run(worktree, ['commit', '-m', msg])
+}
+
+// Push HEAD to origin. `-u origin HEAD` works for the first push (sets upstream) and every
+// push after (harmless re-affirm), so one command covers both — no upstream-detection round-trip.
+// ponytail: origin only; add a remote picker if a multi-remote worktree ever shows up.
+export async function pushBranch(worktree: string): Promise<GitActionResult> {
+  return run(worktree, ['push', '--set-upstream', 'origin', 'HEAD'])
 }
 
 // Recent commits on the branch (the MCP git_log tool, docs/next 06 catalog).

@@ -24,17 +24,26 @@ describe('loadRepoConfig (docs/next 13 §B)', () => {
 
   afterEach(() => rmSync(dir, { recursive: true, force: true }))
 
-  it('absent files → DB fallback, byte-for-byte today’s behaviour', () => {
+  it('absent files → DB fallback: scripts map through; scalar runCommand no longer creates a target', () => {
     const cfg = loadRepoConfig(repoDir, userDir, {
       setupScript: './setup.sh',
       teardownScript: 'docker compose down',
-      runCommand: 'pnpm dev',
-      devPort: 3000,
     })
     expect(cfg.errors).toEqual([])
     expect(cfg.scripts).toEqual({ setup: './setup.sh', archive: 'docker compose down' })
-    expect(cfg.runTargets).toEqual([{ id: 'dev', command: 'pnpm dev', default: true, url: 'http://localhost:3000' }])
+    expect(cfg.runTargets).toEqual([]) // no dev script / config → no run button
     expect(cfg.copy).toEqual([])
+  })
+
+  it('workspace devScript → a base `dev` target; repo config and the run_targets JSON override it', () => {
+    // Alone: the workspace dev script surfaces as a plain `dev` target (no default flag, no URL).
+    expect(loadRepoConfig(repoDir, userDir, { devScript: 'pnpm dev' }).runTargets).toEqual([{ id: 'dev', command: 'pnpm dev' }])
+    // The per-repo run_targets JSON column is more specific → it overrides the workspace base.
+    const json = JSON.stringify([{ id: 'dev', command: 'make run' }])
+    expect(loadRepoConfig(repoDir, userDir, { devScript: 'pnpm dev', runTargetsJson: json }).runTargets).toEqual([{ id: 'dev', command: 'make run' }])
+    // A committed repo config.toml also wins over the workspace base.
+    writeConfig(repoDir, `[scripts.run.dev]\ncommand = "./scripts/dev.sh"`)
+    expect(loadRepoConfig(repoDir, userDir, { devScript: 'pnpm dev' }).runTargets.find((t) => t.id === 'dev')?.command).toBe('./scripts/dev.sh')
   })
 
   it('a committed repo config wins over user config over DB', () => {
@@ -59,7 +68,7 @@ stop = "docker compose -p acorn-$ACORN_TASK_SLUG down"
 url = "http://localhost:8080"
 copy = [".env.local"]
 `)
-    const cfg = loadRepoConfig(repoDir, userDir, { setupScript: 'db-setup', runCommand: 'pnpm dev', devPort: 3000 })
+    const cfg = loadRepoConfig(repoDir, userDir, { setupScript: 'db-setup' })
     expect(cfg.errors).toEqual([])
     expect(cfg.scripts.setup).toBe('repo-setup')
     const ids = cfg.runTargets.map((t) => t.id).sort()
@@ -116,16 +125,11 @@ command = "pnpm db:seed"
   })
 })
 
-describe('legacyRunTargets mapping', () => {
-  it('maps previewMode url/script/port onto the default dev target', () => {
-    expect(legacyRunTargets({ runCommand: 'pnpm dev', previewMode: 'url', previewValue: 'https://app.test' })[0].url).toBe('https://app.test')
-    expect(legacyRunTargets({ runCommand: 'pnpm dev', previewMode: 'script', previewValue: './url.sh' })[0].urlCommand).toBe('./url.sh')
-    expect(legacyRunTargets({ runCommand: 'pnpm dev', previewMode: 'port', previewValue: '4000' })[0].url).toBe('http://localhost:4000')
-    expect(legacyRunTargets({})).toEqual([])
-  })
-  it('prefers the typed runTargets JSON column and survives malformed JSON', () => {
+describe('legacyRunTargets (run_targets JSON column)', () => {
+  it('reads the typed runTargets JSON column and survives malformed JSON', () => {
     const json = JSON.stringify([{ id: 'stack', command: 'docker compose up', stop: 'docker compose down' }])
-    expect(legacyRunTargets({ runTargetsJson: json, runCommand: 'pnpm dev' })[0].id).toBe('stack')
-    expect(legacyRunTargets({ runTargetsJson: '{not json', runCommand: 'pnpm dev' })[0].id).toBe('dev')
+    expect(legacyRunTargets({ runTargetsJson: json })[0].id).toBe('stack')
+    expect(legacyRunTargets({ runTargetsJson: '{not json' })).toEqual([]) // malformed → no targets
+    expect(legacyRunTargets({})).toEqual([])
   })
 })

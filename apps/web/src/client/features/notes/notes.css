@@ -44,7 +44,22 @@
 }
 .notes-row-wrap:hover .notes-row-delete { visibility: visible; }
 .notes-row-delete:hover { color: var(--del-marker); }
-.notes-new { display: flex; flex-direction: column; gap: 6px; margin-top: auto; padding: 8px; border-top: 1px solid var(--border); }
+.notes-bottom { margin-top: auto; display: flex; flex-direction: column; }
+.notes-group-header {
+  padding: 6px 10px;
+  font: inherit;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-faint);
+  text-align: left;
+  background: transparent;
+  border: 0;
+  border-top: 1px solid var(--border);
+  cursor: pointer;
+}
+.notes-group-header:hover { color: var(--text); }
+.notes-new { display: flex; flex-direction: column; gap: 6px; padding: 8px; border-top: 1px solid var(--border); }
 .notes-main { flex: 1; min-width: 0; display: flex; flex-direction: column; }
 .notes-toolbar {
   flex: none;

@@ -1,3 +1,5 @@
+import { createSignal } from 'solid-js'
+
 // Typed accessor for the preload's `window.acorn.notes` bridge (docs/next 09). The Window global
 // is declared once in terminalClient.ts.
 export type NoteAuthor = 'user' | 'agent' | 'workflow'
@@ -14,3 +16,10 @@ export type NotesApi = {
 }
 
 export const notesApi = (): NotesApi | null => window.acorn?.notes ?? null
+
+// Cross-pane request (docs/next 11 §E): the Context pane's per-note "Edit" opens the Notes pane and
+// asks it to load that slug in editable state. NotesPane consumes the signal on mount/change, clears it.
+const [noteToOpen, setNoteToOpen] = createSignal<string | null>(null)
+export { noteToOpen }
+export const requestNoteOpen = (slug: string) => setNoteToOpen(slug)
+export const clearNoteOpen = () => setNoteToOpen(null)

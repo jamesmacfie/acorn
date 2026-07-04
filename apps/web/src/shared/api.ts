@@ -147,6 +147,8 @@ export type Workspace = {
   sort: number
   setupScript: string | null // shell command run once when a task worktree is created; null/blank = none
   setupScriptTrigger: SetupTrigger | null
+  devScript: string | null // per-workspace "run dev" command surfaced as a `dev` run target; null/blank = none
+  devRestartScript: string | null // per-workspace restart command for the `dev` target; null/blank = stop+start
   teardownScript: string | null // shell command run in the worktree just before removal (docs/next 02); null/blank = none
   previewMode: PreviewMode | null // how the browser-preview URL is resolved; null → dev-server port
   previewValue: string | null // the URL, port, or command per previewMode; null/blank = unset
@@ -197,7 +199,8 @@ export type TaskContext = {
   task: { id: string; title: string; repo: string; branch: string; worktreePath: string | null; pullNumber: number | null }
   pr?: { number: number; title: string; body: string | null; changedFiles: string[] }
   issues: { provider: string; identifier: string; title: string; detail: string }[]
-  notes: { title: string; body: string }[]
+  notes: { slug?: string; title: string; body: string }[] // slug: client-only, lets the Context pane jump to the note in the Notes pane
+
   memory: { name: string; description: string }[]
 }
 export const taskContextRoute = (id: string, include?: TaskContextInclude[]) =>

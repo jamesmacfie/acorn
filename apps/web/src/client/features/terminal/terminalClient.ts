@@ -49,6 +49,7 @@ export type TerminalApi = {
     unstage(taskId: string, path: string): Promise<{ ok: boolean; reason?: string }>
     discard(taskId: string, path: string, untracked?: boolean): Promise<{ ok: boolean; reason?: string }>
     commit(taskId: string, message: string): Promise<{ ok: boolean; reason?: string }>
+    push(taskId: string): Promise<{ ok: boolean; reason?: string }>
   }
 
   task: {
@@ -58,13 +59,23 @@ export type TerminalApi = {
   }
   // Workflows (docs/next 14): the runner's IPC surface + gate/run-done notices for the bell.
   workflow: {
-    defs(taskId: string): Promise<{ workflows: { id: string; name: string; steps: unknown[] }[]; errors: { source: string; message: string }[] }>
+    defs(taskId: string): Promise<{ workflows: WorkflowDefSummary[]; errors: { source: string; message: string }[] }>
     start(taskId: string, def: unknown): Promise<{ runId?: string; error?: string }>
     runs(taskId: string): Promise<WorkflowRunRow[]>
     steps(runId: string): Promise<WorkflowStepRow[]>
     gate(runId: string, stepId: string, approved: boolean): Promise<{ ok: boolean }>
     onNotice(cb: (n: { taskId: string; kind: 'gate' | 'run-done'; title: string }) => void): () => void
   }
+}
+
+// A committed/user workflow definition as loadWorkflowFiles returns it (docs/next 14 P5): what the
+// palette launches and the settings inspector lists. `source` is the layer it was found in.
+export type WorkflowDefSummary = {
+  id: string
+  name: string
+  source: 'repo' | 'user'
+  posture?: 'gated' | 'autonomous'
+  steps: { name: string; kind?: string }[]
 }
 
 // Renderer-side projections of the workflow rows (docs/next 14).

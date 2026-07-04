@@ -70,6 +70,7 @@
 
 .settings-section { display: flex; flex-direction: column; gap: 18px; }
 .settings-field { display: flex; flex-direction: column; gap: 6px; }
+.settings-field-row { flex-direction: row; align-items: center; gap: 8px; margin-bottom: 14px; }
 .settings-label { font-size: var(--fs-sm); color: var(--text); }
 .settings-hint { font-size: var(--fs-sm); }
 .settings-script {

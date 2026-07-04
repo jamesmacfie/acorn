@@ -104,6 +104,28 @@ describe('RuntimeService over real processes', () => {
     expect((await svc.start('t1', 'nope')).ok).toBe(false)
   })
 
+  it('restart runs the declared restart command when present', async () => {
+    targets = [{ id: 'dev', command: 'sleep 30', restart: 'touch restarted.marker' }]
+    const svc = new RuntimeService(deps)
+    await svc.start('t1', 'dev')
+    await waitFor(() => deps.isRunning('s1'))
+    const res = await svc.restart('t1', 'dev')
+    expect(res.ok).toBe(true)
+    expect(existsSync(join(dir, 'restarted.marker'))).toBe(true)
+    // The original session is untouched (in-place restart, no kill).
+    expect(deps.isRunning('s1')).toBe(true)
+  })
+
+  it('restart with no restart command stops then starts (cold start when nothing was running)', async () => {
+    targets = [{ id: 'dev', command: 'touch started.marker && sleep 30' }]
+    const svc = new RuntimeService(deps)
+    const res = await svc.restart('t1', 'dev')
+    expect(res.ok).toBe(true)
+    await waitFor(() => existsSync(join(dir, 'started.marker')))
+    expect(existsSync(join(dir, 'started.marker'))).toBe(true)
+    expect((await svc.status('t1', 'dev')).running).toBe(true)
+  })
+
   it('defaultUrl prefers the default target and its fixed url', async () => {
     targets = [
       { id: 'seed', command: 'true' },

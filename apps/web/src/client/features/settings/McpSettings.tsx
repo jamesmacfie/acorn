@@ -78,7 +78,7 @@ export default function McpSettings() {
       <div class="settings-field">
         <span class="settings-label">acorn MCP server</span>
         <span class="muted settings-hint">
-          Exposes the current task (PR, linked issues, context) as tools to your agents. Registers via each agent's own CLI (`claude mcp add` / `codex mcp add`) — only when you click, idempotent, removable.
+          Exposes the current task (PR, linked issues, context) as tools to your agents. Auto-registered via each agent's own CLI (`claude mcp add` / `codex mcp add`) whenever a Claude Code / Codex terminal launches. These buttons re-register or remove it manually.
         </span>
         <div class="settings-actions">
           <For each={['claude', 'codex'] as const}>

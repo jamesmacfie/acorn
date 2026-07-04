@@ -3,7 +3,7 @@ import { useQueryClient } from '@tanstack/solid-query'
 import { tasksKey } from '../../queries'
 import { refreshSessions } from '../terminal/sessions'
 import { terminalApi } from '../terminal/terminalClient'
-import { activeLayout, activeTaskId, dispatchActiveLayout, dispatchLayout, isTerminalOpen, setRecipeBrowserUrl, setTerminalOpen } from '../tasks/tasks'
+import { activeTaskId, dispatchActiveLayout, dispatchLayout, isTerminalOpen, setRecipeBrowserUrl, setTerminalOpen } from '../tasks/tasks'
 import { invokeLayoutRecipe } from '../tasks/recipes'
 import { composeItems, fuzzyFilter, type PaletteItem } from './model'
 import './palette.css'
@@ -32,8 +32,6 @@ export default function CommandPalette() {
   const actions = () => {
     const id = activeTaskId()
     if (!id) return []
-    const layout = activeLayout()
-    const current = layout.maximised ?? layout.panes[layout.panes.length - 1]
     return [
       { id: 'action:new-terminal', label: 'New terminal', hint: 'open a shell in the task worktree' },
       { id: 'action:toggle-terminal', label: isTerminalOpen(id) ? 'Hide terminal drawer' : 'Show terminal drawer' },
@@ -41,8 +39,6 @@ export default function CommandPalette() {
       { id: 'action:pane-editor', label: 'Show pane: editor' },
       { id: 'action:pane-preview', label: 'Show pane: browser preview' },
       { id: 'action:pane-linear', label: 'Show pane: Linear' },
-      { id: 'action:maximise', label: layout.maximised ? 'Restore pane' : `Maximise ${current} pane` },
-      { id: 'action:pin', label: layout.pinned ? `Unpin ${layout.pinned} pane` : `Pin ${current} pane` },
       { id: 'action:archive', label: 'Archive task', hint: 'guarded teardown' },
     ]
   }
@@ -125,17 +121,6 @@ export default function CommandPalette() {
       case 'action:pane-linear':
         dispatchActiveLayout({ type: 'show', pane: 'linear' })
         break
-      case 'action:maximise': {
-        const layout = activeLayout()
-        dispatchActiveLayout({ type: 'toggleMaximise', pane: layout.maximised ?? layout.panes[layout.panes.length - 1] })
-        break
-      }
-      case 'action:pin': {
-        const layout = activeLayout()
-        if (layout.pinned) dispatchActiveLayout({ type: 'unpin' })
-        else dispatchActiveLayout({ type: 'pin', pane: layout.panes[layout.panes.length - 1] })
-        break
-      }
       case 'action:archive': {
         if (!window.confirm('Archive this task?')) break
         const res = await api.task.archive(taskId)

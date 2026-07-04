@@ -28,7 +28,7 @@ import {
   tmuxNewSessionArgs,
   trimRing,
 } from './terminalUtils'
-import { commitStaged, discardFile, localChanges, localDiff, localFileBlob, stageFile, unstageFile, type LocalScope } from './localDiff'
+import { commitStaged, discardFile, localChanges, localDiff, localFileBlob, pushBranch, stageFile, unstageFile, type LocalScope } from './localDiff'
 import { getProfile, listProfiles, profileAvailable, resolveCommand, tmuxAvailable } from './profiles'
 import { loadRepoConfig } from './repoConfig'
 import { getRepoPath, setRepoPath, setRunConfig, setRunTargets } from './repoPaths'
@@ -349,6 +349,7 @@ async function taskRunConfig(
     setupScript: ws?.setupScript,
     teardownScript: ws?.teardownScript,
     devScript: ws?.devScript,
+    devRestartScript: ws?.devRestartScript,
     runTargetsJson: mapped?.runTargets,
   })
   return { targets: cfg.runTargets, cwd, errors: cfg.errors, layouts: cfg.layouts }
@@ -813,6 +814,7 @@ export async function registerTerminalIpc(db: AppDatabase, worktreesDir: string,
     runTargets: (taskId) => runtime.targets(taskId),
     runStart: (taskId, targetId) => runtime.start(taskId, targetId),
     runStop: (taskId, targetId) => runtime.stop(taskId, targetId),
+    runRestart: (taskId, targetId) => runtime.restart(taskId, targetId),
     runStatus: (taskId, targetId) => runtime.status(taskId, targetId),
     // Drivable browser (docs/next 08): CDP over the bound preview webview; a missing binding is a
     // clean structured result (the agent is told to open the preview), never a throw.
@@ -1123,7 +1125,9 @@ export async function registerTerminalIpc(db: AppDatabase, worktreesDir: string,
     const root = await taskRoot(db, p?.taskId)
     if (!root) return { error: 'No worktree yet.' }
     try {
-      return await localDiff(root, p.path, p.scope === 'staged' ? 'staged' : 'unstaged')
+      // Whole-file context (docs/next 04): the pane shows the entire file with changes highlighted,
+      // so no expand affordances are needed. 1e6 lines caps any real file.
+      return await localDiff(root, p.path, p.scope === 'staged' ? 'staged' : 'unstaged', 1_000_000)
     } catch (e) {
       return { error: e instanceof Error ? e.message : 'diff failed' }
     }
@@ -1156,6 +1160,7 @@ export async function registerTerminalIpc(db: AppDatabase, worktreesDir: string,
   ipcMain.handle('local:commit', (_e: IpcMainInvokeEvent, p: { taskId: string; message: string }) =>
     withRoot(p?.taskId, (root) => commitStaged(root, typeof p.message === 'string' ? p.message : '')),
   )
+  ipcMain.handle('local:push', (_e: IpcMainInvokeEvent, p: { taskId: string }) => withRoot(p?.taskId, (root) => pushBranch(root)))
 
   // Monaco editor pane (docs/workspaces): read/write files on the task's worktree. Local-only, so
   // IPC not HTTP. All calls are keyed by taskId + a relative path confined to the worktree root by

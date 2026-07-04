@@ -47,7 +47,7 @@ async function taskTool(fn: (taskId: string) => Promise<ApiResult>) {
   return text(res.data)
 }
 
-export function buildServer(): McpServer {
+export function buildServer(opts: { hasRunTargets?: boolean } = {}): McpServer {
   const server = new McpServer({ name: process.env.ACORN_MCP_NAME ?? 'acorn', version: '0.1.0' })
 
   server.registerTool(
@@ -227,30 +227,53 @@ export function buildServer(): McpServer {
   )
 
   // --- Run targets (docs/next 13 §A): bring the stack up, learn where it listens, tear it down —
-  // without knowing whether it's compose or pnpm.
-  server.registerTool('run_targets', { description: "The repo's declared run targets with live status." }, () =>
-    taskTool((id) => apiGet(`/api/tasks/${id}/run`)),
-  )
-  server.registerTool('run_start', { description: 'Start a run target in the task worktree.', inputSchema: { id: z.string() } }, ({ id: target }) =>
-    taskTool((id) => apiSend('POST', `/api/tasks/${id}/run/${encodeURIComponent(target)}/start`, {})),
-  )
-  server.registerTool('run_stop', { description: "Stop a run target (runs its declared 'stop' first).", inputSchema: { id: z.string() } }, ({ id: target }) =>
-    taskTool((id) => apiSend('POST', `/api/tasks/${id}/run/${encodeURIComponent(target)}/stop`, {})),
-  )
-  server.registerTool('run_status', { description: 'A run target\'s status: { running, url?, exitCode? }.', inputSchema: { id: z.string() } }, ({ id: target }) =>
-    taskTool((id) => apiGet(`/api/tasks/${id}/run/${encodeURIComponent(target)}/status`)),
-  )
+  // without knowing whether it's compose or pnpm. These tools only exist when the task actually has
+  // run targets (a workspace dev script or repo/.acorn config) — an agent in a repo with nothing to
+  // run never sees them (opts.hasRunTargets, resolved once at connect in main()).
+  if (opts.hasRunTargets) {
+    server.registerTool('run_targets', { description: "The repo's declared run targets with live status." }, () =>
+      taskTool((id) => apiGet(`/api/tasks/${id}/run`)),
+    )
+    server.registerTool('run_start', { description: 'Start a run target in the task worktree.', inputSchema: { id: z.string() } }, ({ id: target }) =>
+      taskTool((id) => apiSend('POST', `/api/tasks/${id}/run/${encodeURIComponent(target)}/start`, {})),
+    )
+    server.registerTool('run_stop', { description: "Stop a run target (runs its declared 'stop' first).", inputSchema: { id: z.string() } }, ({ id: target }) =>
+      taskTool((id) => apiSend('POST', `/api/tasks/${id}/run/${encodeURIComponent(target)}/stop`, {})),
+    )
+    server.registerTool(
+      'run_restart',
+      { description: "Restart a run target: runs its declared restart command if it has one, else stops and starts it.", inputSchema: { id: z.string() } },
+      ({ id: target }) => taskTool((id) => apiSend('POST', `/api/tasks/${id}/run/${encodeURIComponent(target)}/restart`, {})),
+    )
+    server.registerTool('run_status', { description: 'A run target\'s status: { running, url?, exitCode? }.', inputSchema: { id: z.string() } }, ({ id: target }) =>
+      taskTool((id) => apiGet(`/api/tasks/${id}/run/${encodeURIComponent(target)}/status`)),
+    )
+  }
 
   return server
 }
 
+// Does this session's task have any run targets? Resolved once, at connect — the run_* tools are
+// gated on it. No task / acorn not running / API error → false (no run tools, which is correct: no
+// task context means nothing to run).
+async function hasRunTargets(): Promise<boolean> {
+  if (!TASK_ID) return false
+  const res = await apiGet(`/api/tasks/${TASK_ID}/run`)
+  if (!res.ok) return false
+  const data = res.data as { targets?: unknown[] }
+  return Array.isArray(data.targets) && data.targets.length > 0
+}
+
 export async function main(): Promise<void> {
-  const server = buildServer()
+  const server = buildServer({ hasRunTargets: await hasRunTargets() })
   await server.connect(new StdioServerTransport())
 }
 
-// Entry when run directly (node/tsx/Electron-as-node); importable for tests.
-const isDirect = process.argv[1]?.endsWith('server.ts') || process.argv[1]?.endsWith('server.js') || process.argv[1]?.endsWith('index.js')
+// Entry when run directly (node/tsx/Electron-as-node); importable for tests. The build emits this
+// module as out/main/mcp.js (electron.vite.config input name), so `mcp.js` MUST be here — otherwise
+// the launched process never calls main(), never speaks stdio, and the agent reports "Failed to
+// connect".
+const isDirect = ['server.ts', 'server.js', 'mcp.js', 'index.js'].some((f) => process.argv[1]?.endsWith(f))
 if (isDirect) {
   void main()
 }

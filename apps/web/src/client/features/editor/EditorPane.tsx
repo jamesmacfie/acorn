@@ -2,6 +2,7 @@ import { createEffect, createSignal, For, on, onCleanup, onMount, Show } from 's
 import * as monaco from 'monaco-editor'
 import './monacoSetup'
 import type { Task } from '../../queries'
+import { debounce } from '../../autosave'
 import { editorApi, type EditorEntry } from './editorClient'
 import { formatFileReference, sendReferenceToAgent } from '../agent/reference'
 import { isAppDark, watchTheme } from '../terminal/theme'
@@ -40,8 +41,12 @@ export default function EditorPane(props: { task: Task }) {
   const files = () => openFiles(props.task.id)
   const active = () => activeFile(props.task.id)
 
+  // Autosave (no Save button): debounce while typing, flush on blur / tab-switch / close.
+  const scheduleSave = debounce((p: string) => void save(p), 1500)
+
   onMount(() => {
     onCleanup(() => {
+      scheduleSave.flush()
       stopTheme?.()
       for (const m of models.values()) m.dispose()
       models.clear()
@@ -59,7 +64,8 @@ export default function EditorPane(props: { task: Task }) {
         readOnly: true, // until a file is opened
         minimap: { enabled: false },
       })
-      editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyS, () => void save())
+      editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyS, () => void save()) // explicit flush; autosave still runs
+      editor.onDidBlurEditorText(() => scheduleSave.flush())
       stopTheme = watchTheme(() => monaco.editor.setTheme(isAppDark() ? 'vs-dark' : 'vs'))
       window.addEventListener('focus', onFocus)
       const restore = active()
@@ -77,6 +83,7 @@ export default function EditorPane(props: { task: Task }) {
       // Dirty derives from the version id vs the last saved one — undo back to saved clears it.
       const dirty = model!.getAlternativeVersionId() !== savedVersion.get(relPath)
       editorSetDirty(props.task.id, relPath, dirty)
+      if (dirty) scheduleSave(relPath)
     })
     models.set(relPath, model)
     return model
@@ -85,6 +92,7 @@ export default function EditorPane(props: { task: Task }) {
   // Swap the reused instance to a path. THE only place currentPath changes.
   async function show(relPath: string) {
     if (!editor) return
+    scheduleSave.flush() // persist the outgoing file (pending arg is its path) before the swap
     setSaveErr('')
     const model = await modelFor(relPath)
     currentPath = relPath
@@ -97,19 +105,20 @@ export default function EditorPane(props: { task: Task }) {
     editorOpen(props.task.id, relPath, ephemeral) // the active() effect swaps the surface
   }
 
-  async function save() {
-    const p = currentPath
+  async function save(p: string | null = currentPath) {
     const model = p ? models.get(p) : undefined
     if (!api || !p || !model) return
+    const version = model.getAlternativeVersionId() // snapshot: the value we're about to write
     const res = await api.write(props.task.id, p, model.getValue())
     if (!res.ok) return setSaveErr(res.reason ?? 'Save failed')
-    savedVersion.set(p, model.getAlternativeVersionId())
-    editorSetDirty(props.task.id, p, false)
+    savedVersion.set(p, version)
+    // Still-dirty if the user typed more during the async write.
+    editorSetDirty(props.task.id, p, model.getAlternativeVersionId() !== version)
   }
 
-  function close(relPath: string) {
-    const file = files().find((x) => x.path === relPath)
-    if (file?.dirty && !window.confirm(`${relPath} has unsaved changes — close anyway?`)) return
+  async function close(relPath: string) {
+    scheduleSave.cancel()
+    await save(relPath) // autosave: persist before we discard the model
     editorClose(props.task.id, relPath) // active() moves to the neighbour; the effect swaps the surface
     models.get(relPath)?.dispose()
     models.delete(relPath)
@@ -169,13 +178,12 @@ export default function EditorPane(props: { task: Task }) {
                         {file.path.split('/').pop()}
                         {file.dirty ? ' ●' : ''}
                       </button>
-                      <button type="button" class="editor-tab-close" title="Close" onClick={() => close(file.path)}>✕</button>
+                      <button type="button" class="editor-tab-close" title="Close" onClick={() => void close(file.path)}>✕</button>
                     </div>
                   )}
                 </For>
                 <div class="editor-tab-actions">
                   <Show when={active()}>
-                    <button type="button" class="editor-save" onClick={() => void save()}>Save ⌘S</button>
                     <button
                       type="button"
                       class="editor-save"

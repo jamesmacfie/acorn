@@ -8,12 +8,9 @@
   border-right: 1px solid var(--border);
   background: var(--bg-subtle);
 }
-.changes-group-title {
-  padding: 6px 10px 2px;
-  font-size: var(--fs-sm);
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-}
+/* Group heads reuse .section-header (see JSX) so the two lists match the pane title; just size the
+   divider down a touch inside the scrolling list. */
+.changes-group-head { height: auto; padding-top: 6px; padding-bottom: 6px; }
 .changes-row {
   width: 100%;
   display: flex;
@@ -73,6 +70,9 @@
   cursor: pointer;
 }
 .changes-send:hover { background: var(--bg-hover); }
+.changes-send:disabled { opacity: 0.6; cursor: default; }
+/* Push status sits in the uppercased .section-header — opt back out of the shouty casing. */
+.changes-push-status { text-transform: none; letter-spacing: normal; font-weight: 400; color: var(--text-muted); }
 .review-note {
   display: flex;
   align-items: baseline;
