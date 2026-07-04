@@ -207,7 +207,15 @@
 
 /* Shiki dual-theme: light by default, dark when the app theme is dark (mirrors token theming). */
 .diff-code span { color: var(--l); }
-:root[data-theme='dark'] .diff-code span { color: var(--r); }
+:root[data-theme='dark'] .diff-code span,
+:root[data-theme='solarized-dark'] .diff-code span,
+:root[data-theme='monokai'] .diff-code span,
+:root[data-theme='nord'] .diff-code span,
+:root[data-theme='catppuccin-frappe'] .diff-code span,
+:root[data-theme='catppuccin-macchiato'] .diff-code span,
+:root[data-theme='catppuccin-mocha'] .diff-code span,
+:root[data-theme='one-dark'] .diff-code span,
+:root[data-theme='dracula'] .diff-code span { color: var(--r); }
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme='light']) .diff-code span { color: var(--r); }
 }

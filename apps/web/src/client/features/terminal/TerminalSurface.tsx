@@ -30,6 +30,17 @@ export default function TerminalSurface(props: { sessionId: string; onExit?: (ex
         props.onExit?.(m.exitCode)
       }
     })
+    // Shift+Enter → newline instead of submit. Terminals send CR (\r) for Enter and Claude submits
+    // on CR; a bare LF (\n, same byte as Ctrl+J) is Claude's setup-free "insert newline". Swallow
+    // the event so xterm doesn't also send the CR that would submit.
+    term.attachCustomKeyEventHandler((e) => {
+      if (e.type === 'keydown' && e.shiftKey && e.key === 'Enter') {
+        e.preventDefault() // stop the browser inserting its own newline into xterm's textarea
+        api.write(props.sessionId, '\n')
+        return false
+      }
+      return true
+    })
     term.onData((d) => api.write(props.sessionId, d))
     term.onResize(({ cols, rows }) => void api.resize(props.sessionId, cols, rows))
     void api.resize(props.sessionId, term.cols, term.rows)

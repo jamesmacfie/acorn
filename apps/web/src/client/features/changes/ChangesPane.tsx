@@ -55,7 +55,9 @@ export default function ChangesPane(props: { task: Task }) {
       const res = await api.local.diff(src.taskId, src.sel.path, src.sel.staged ? 'staged' : 'unstaged')
       if ('error' in res) return []
       const file = toPullFile(src.sel, res.patch)
-      const diff = buildDiffRows(file, tokenize())
+      // Whole-file view: the patch carries full context (server -U1e6), so drop the expand gaps and
+      // hunk-header rows — every line is already shown, just with +/- highlights.
+      const diff = buildDiffRows(file, tokenize()).filter((r) => r.kind !== 'gap' && r.kind !== 'hunk')
       return [{ kind: 'file', file }, ...(diff.length ? diff : [{ kind: 'nodiff' } as Row])]
     },
     { initialValue: [] },
@@ -121,6 +123,19 @@ export default function ChangesPane(props: { task: Task }) {
     setCommitMsg('')
     await refetch()
   }
+  // Push HEAD to origin (docs/next 04 P4). Network-bound → show pending; errors go to an alert
+  // (git's reason is multi-line and would look shouty in the uppercased header).
+  const [pushing, setPushing] = createSignal(false)
+  const [pushMsg, setPushMsg] = createSignal('')
+  async function push() {
+    if (!api || pushing()) return
+    setPushing(true)
+    setPushMsg('')
+    const res = await api.local.push(props.task.id)
+    setPushing(false)
+    if (res.ok) setPushMsg('Pushed')
+    else window.alert(res.reason ?? 'Push failed.')
+  }
 
   const notesForRow = (r: CodeRow): ReviewNote[] => {
     const a = anchorOf(r)
@@ -144,6 +159,12 @@ export default function ChangesPane(props: { task: Task }) {
     <section class="pane changes-pane">
       <div class="section-header changes-header">
         <span>Changes (uncommitted)</span>
+        <button type="button" class="changes-send" disabled={pushing()} data-tip="Push to origin" data-tip-sub="git push -u origin HEAD" onClick={() => void push()}>
+          {pushing() ? 'Pushing…' : 'Push → origin'}
+        </button>
+        <Show when={pushMsg()}>
+          <span class="changes-push-status">{pushMsg()}</span>
+        </Show>
         <Show when={unsent().length}>
           <button type="button" class="changes-send" title="Bracketed-paste the unsent notes into the task's agent (queued until idle)" onClick={() => void sendNotes()}>
             Send {unsent().length} note{unsent().length === 1 ? '' : 's'} → agent{agentSessionsFor(props.task.id)[0]?.idle ? ' ●' : ''}
@@ -158,7 +179,7 @@ export default function ChangesPane(props: { task: Task }) {
           <For each={[{ title: 'Staged', list: groups().staged }, { title: 'Changes', list: groups().unstaged }]}>
             {(group) => (
               <Show when={group.list.length}>
-                <div class="changes-group-title muted">{group.title}</div>
+                <div class="section-header changes-group-head">{group.title} ({group.list.length})</div>
                 <For each={group.list}>
                   {(c) => {
                     const status = () => fileStatusMeta(c.status === 'untracked' ? 'added' : c.status)
@@ -182,17 +203,18 @@ export default function ChangesPane(props: { task: Task }) {
                           when={c.staged}
                           fallback={
                             <>
-                              <button type="button" class="changes-to-agent" title="Stage file" onClick={() => api && void gitAction(() => api.local.stage(props.task.id, c.path))}>+</button>
-                              <button type="button" class="changes-to-agent" title="Discard changes (confirm)" onClick={() => void discard(c.path, c.status === 'untracked')}>↺</button>
+                              <button type="button" class="changes-to-agent" data-tip="Stage file" data-tip-sub="git add" onClick={() => api && void gitAction(() => api.local.stage(props.task.id, c.path))}>+</button>
+                              <button type="button" class="changes-to-agent" data-tip="Discard changes" data-tip-sub="Restore this file — cannot be undone" onClick={() => void discard(c.path, c.status === 'untracked')}>↺</button>
                             </>
                           }
                         >
-                          <button type="button" class="changes-to-agent" title="Unstage file" onClick={() => api && void gitAction(() => api.local.unstage(props.task.id, c.path))}>−</button>
+                          <button type="button" class="changes-to-agent" data-tip="Unstage file" data-tip-sub="git restore --staged" onClick={() => api && void gitAction(() => api.local.unstage(props.task.id, c.path))}>−</button>
                         </Show>
                         <button
                           type="button"
                           class="changes-to-agent"
-                          title="Add file reference to the agent composer"
+                          data-tip="Send to agent"
+                          data-tip-sub="Add file reference to the composer"
                           onClick={() => void sendRef(formatFileReference(c.path))}
                         >→</button>
                       </div>

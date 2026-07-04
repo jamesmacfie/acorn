@@ -114,18 +114,25 @@ export default function App() {
   })
   const activeTask = () => tasks.data?.find((w) => w.id === activeTaskId()) ?? null
 
-  // Apply the saved theme (falls back to prefers-color-scheme when unset).
+  // Apply the saved theme. When following system, swap between the chosen light/dark
+  // themes on the OS preference (and re-apply live when it changes).
   createEffect(() => {
-    const theme = prefs.data?.theme
-    if (theme) document.documentElement.dataset.theme = theme
+    if (prefs.data === undefined) return
+    const follow = (prefs.data.theme_follow_system ?? (prefs.data.theme ? 'false' : 'true')) === 'true'
+    if (!follow) {
+      document.documentElement.dataset.theme = prefs.data.theme ?? 'light'
+      return
+    }
+    const light = prefs.data.theme_light ?? 'light'
+    const dark = prefs.data.theme_dark ?? 'dark'
+    const mq = matchMedia('(prefers-color-scheme: dark)')
+    const apply = () => {
+      document.documentElement.dataset.theme = mq.matches ? dark : light
+    }
+    apply()
+    mq.addEventListener('change', apply)
+    onCleanup(() => mq.removeEventListener('change', apply))
   })
-  const toggleTheme = async () => {
-    const current = prefs.data?.theme ?? (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light')
-    const next = current === 'dark' ? 'light' : 'dark'
-    document.documentElement.dataset.theme = next
-    await setPref('theme', next)
-    queryClient.invalidateQueries({ queryKey: prefsKey })
-  }
 
   // Open the repo used last session once the list loads and no repo is in the URL (falling back to
   // the first repo). Electron always boots at the origin root, so this is what restores the
@@ -346,9 +353,6 @@ export default function App() {
               ▣
             </button>
           </Show>
-          <button type="button" class="theme-toggle" title="Toggle theme" onClick={toggleTheme}>
-            ◑
-          </button>
           <Show
             when={me.data}
             fallback={

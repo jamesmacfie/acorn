@@ -1,4 +1,5 @@
 import { createEffect, createSignal, For, Match, on, Show, Switch } from 'solid-js'
+import CopyButton from '../../CopyButton'
 import { fileStatusMeta } from '../../displayMeta'
 import MentionTextarea from '../../MentionTextarea'
 import type { Thread } from '../../queries'
@@ -34,11 +35,12 @@ export function NonCodeRow(props: {
         {(f) => {
           const status = () => fileStatusMeta(f().file.status)
           return (
-            <div class="diff-file-head" id={fileAnchor(f().file.path)}>
+            <div class="diff-file-head copyable" id={fileAnchor(f().file.path)}>
               <span class={`file-status file-status-${status().tone}`} title={status().label}>
                 {status().letter}
               </span>
               <span class="diff-file-path">{f().file.path}</span>
+              <CopyButton text={() => f().file.path} title="Copy path" />
               <span class="file-stat add">+{f().file.additions ?? 0}</span>
               <span class="file-stat del">&#8722;{f().file.deletions ?? 0}</span>
             </div>

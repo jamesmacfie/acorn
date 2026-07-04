@@ -7,7 +7,7 @@ describe('argv construction per agent flavour (docs/next 06 P3 — never execute
   it('claude: user-scoped add with the Electron-as-node launcher', () => {
     expect(registerArgv('claude', 'acorn', launcher)).toEqual({
       file: 'claude',
-      args: ['mcp', 'add', '--scope', 'user', '--env', 'ELECTRON_RUN_AS_NODE=1', 'acorn', '--', '/Applications/acorn.app/Contents/MacOS/acorn', '/app/out/main/mcp.js'],
+      args: ['mcp', 'add', '--scope', 'user', 'acorn', '--env', 'ELECTRON_RUN_AS_NODE=1', '--', '/Applications/acorn.app/Contents/MacOS/acorn', '/app/out/main/mcp.js'],
     })
     expect(removeArgv('claude', 'acorn-dev')).toEqual({ file: 'claude', args: ['mcp', 'remove', '--scope', 'user', 'acorn-dev'] })
   })

@@ -133,6 +133,12 @@ export const renameWorkspace = async (id: string, name: string) =>
 // Per-workspace worktree setup script (blank ⇒ cleared server-side).
 export const setWorkspaceSetupScript = async (id: string, setupScript: string) =>
   writeJson<{ ok: true }>(workspaceRoute(id), { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ setupScript }) }, (res) => `workspace ${res.status}`)
+// Per-workspace "run dev" command → a `dev` run target in the pane-switcher (blank ⇒ cleared, no button).
+export const setWorkspaceDevScript = async (id: string, devScript: string) =>
+  writeJson<{ ok: true }>(workspaceRoute(id), { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ devScript }) }, (res) => `workspace ${res.status}`)
+// Per-workspace restart command for the `dev` run target (blank ⇒ cleared server-side → run_restart falls back to stop+start).
+export const setWorkspaceDevRestartScript = async (id: string, devRestartScript: string) =>
+  writeJson<{ ok: true }>(workspaceRoute(id), { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ devRestartScript }) }, (res) => `workspace ${res.status}`)
 // Per-workspace worktree teardown script (docs/next 02; blank ⇒ cleared server-side).
 export const setWorkspaceTeardownScript = async (id: string, teardownScript: string) =>
   writeJson<{ ok: true }>(workspaceRoute(id), { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ teardownScript }) }, (res) => `workspace ${res.status}`)

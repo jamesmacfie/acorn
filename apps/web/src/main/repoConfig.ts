@@ -11,6 +11,7 @@ export type RunTarget = {
   id: string
   command: string
   stop?: string
+  restart?: string // explicit restart command; when absent run_restart falls back to stop+start
   url?: string
   urlCommand?: string // url_command in TOML
   icon?: string
@@ -35,15 +36,14 @@ export type RepoConfig = {
   errors: ConfigError[]
 }
 
-// The DB columns the file layers override (docs/next 13 §A: legacy runCommand/devPort +
-// previewMode/previewValue map into a default `dev` run target — no data migration).
+// The DB columns the file layers override. The `dev` run button now comes from the per-workspace
+// dev script (or explicit config); the old scalar runCommand/devPort no longer maps to a target
+// (devPort remains a browser-preview fallback in TaskView).
 export type DbConfigFallback = {
   setupScript?: string | null
   teardownScript?: string | null
-  runCommand?: string | null
-  devPort?: number | null
-  previewMode?: string | null
-  previewValue?: string | null
+  devScript?: string | null // per-workspace "run dev" command → a base `dev` target (repo config overrides)
+  devRestartScript?: string | null // per-workspace restart command for the base `dev` target
   runTargetsJson?: string | null // repo_paths.runTargets (JSON column, 13 §A DB fallback surface)
 }
 
@@ -71,6 +71,7 @@ function parseRunTarget(id: string, v: unknown, source: string, errors: ConfigEr
     id,
     command,
     stop: str(o.stop),
+    restart: str(o.restart),
     url,
     urlCommand,
     icon: str(o.icon),
@@ -138,43 +139,33 @@ function parseLayer(text: string, source: string, errors: ConfigError[]): Layer 
   return layer
 }
 
-// Legacy DB columns → the default `dev` run target (13 §A: existing setups keep working with no
-// data migration). previewMode url/script become the target's reachability; 'port' maps to a
-// localhost URL (the last remnant of port config — acorn itself allocates nothing).
+// The repo_paths.runTargets JSON column → RunTarget[] (the per-repo DB fallback surface). The old
+// scalar runCommand/devPort no longer produces a `dev` target — the per-workspace dev script (Settings
+// → workspace) replaces it, so an empty dev script means no run button. Malformed JSON → no targets.
 export function legacyRunTargets(db: DbConfigFallback): RunTarget[] {
-  // The typed JSON column wins over the scalar pair when present.
-  if (db.runTargetsJson) {
-    try {
-      const arr = JSON.parse(db.runTargetsJson) as unknown
-      if (Array.isArray(arr)) {
-        const out: RunTarget[] = []
-        for (const v of arr) {
-          if (v && typeof v === 'object' && str((v as Record<string, unknown>).id) && str((v as Record<string, unknown>).command)) {
-            const o = v as Record<string, unknown>
-            out.push({
-              id: (o.id as string).trim(),
-              command: (o.command as string).trim(),
-              stop: str(o.stop),
-              url: str(o.url),
-              urlCommand: str(o.urlCommand),
-              icon: str(o.icon),
-              default: o.default === true || undefined,
-            })
-          }
-        }
-        if (out.length) return out
+  if (!db.runTargetsJson) return []
+  try {
+    const arr = JSON.parse(db.runTargetsJson) as unknown
+    if (!Array.isArray(arr)) return []
+    const out: RunTarget[] = []
+    for (const v of arr) {
+      if (v && typeof v === 'object' && str((v as Record<string, unknown>).id) && str((v as Record<string, unknown>).command)) {
+        const o = v as Record<string, unknown>
+        out.push({
+          id: (o.id as string).trim(),
+          command: (o.command as string).trim(),
+          stop: str(o.stop),
+          url: str(o.url),
+          urlCommand: str(o.urlCommand),
+          icon: str(o.icon),
+          default: o.default === true || undefined,
+        })
       }
-    } catch {
-      // malformed JSON column → fall through to the scalar mapping
     }
+    return out
+  } catch {
+    return [] // malformed JSON column → no targets
   }
-  if (!db.runCommand?.trim()) return []
-  const target: RunTarget = { id: 'dev', command: db.runCommand.trim(), default: true }
-  if (db.previewMode === 'url' && db.previewValue?.trim()) target.url = db.previewValue.trim()
-  else if (db.previewMode === 'script' && db.previewValue?.trim()) target.urlCommand = db.previewValue.trim()
-  else if (db.previewMode === 'port' && db.previewValue?.trim()) target.url = `http://localhost:${db.previewValue.trim()}`
-  else if (db.devPort != null) target.url = `http://localhost:${db.devPort}`
-  return [target]
 }
 
 // Read + merge the layers. Repo overrides user overrides DB; run targets and layouts merge by id
@@ -198,6 +189,10 @@ export function loadRepoConfig(repoDir: string | null, userConfigDir: string | n
   const user = readLayer(userConfigDir, 'user')
 
   const run = new Map<string, RunTarget>()
+  // Per-workspace dev script is the lowest-precedence base `dev` target: any repo-specific config
+  // (legacy scalar, repo JSON, ~/.acorn, ./.acorn) overrides it. No `default` flag — it carries no
+  // URL, so flagging it would shadow a repo's real default target in RuntimeService.defaultUrl.
+  if (db.devScript?.trim()) run.set('dev', { id: 'dev', command: db.devScript.trim(), restart: db.devRestartScript?.trim() || undefined })
   for (const t of legacyRunTargets(db)) run.set(t.id, t)
   for (const t of user?.run.values() ?? []) run.set(t.id, t)
   for (const t of repo?.run.values() ?? []) run.set(t.id, t)

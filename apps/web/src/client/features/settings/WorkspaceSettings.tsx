@@ -1,8 +1,9 @@
-import { createResource, createSignal, For, Show } from 'solid-js'
+import { createResource, createSignal, For, onCleanup, Show } from 'solid-js'
 import { useQueryClient } from '@tanstack/solid-query'
+import { debounce } from '../../autosave'
 import { terminalApi } from '../terminal/terminalClient'
 import { workspacesKey } from '../../queries'
-import { deleteWorkspace, renameWorkspace, setWorkspaceColor, setWorkspaceIcon, setWorkspacePreview, setWorkspaceSetupScript, setWorkspaceSetupTrigger, setWorkspaceTeardownScript } from '../../mutations'
+import { deleteWorkspace, renameWorkspace, setWorkspaceColor, setWorkspaceDevRestartScript, setWorkspaceDevScript, setWorkspaceIcon, setWorkspacePreview, setWorkspaceSetupScript, setWorkspaceSetupTrigger, setWorkspaceTeardownScript } from '../../mutations'
 import type { PreviewMode, SetupTrigger, Workspace } from '../../../shared/api'
 import { resolveWorkspaceColor, WORKSPACE_COLORS } from '../../../shared/workspaceIdentity'
 
@@ -13,14 +14,13 @@ export default function WorkspaceSettings(props: { workspace: Workspace; onDelet
   const qc = useQueryClient()
   const [name, setName] = createSignal(props.workspace.name)
   const [script, setScript] = createSignal(props.workspace.setupScript ?? '')
+  const [dev, setDev] = createSignal(props.workspace.devScript ?? '')
+  const [devRestart, setDevRestart] = createSignal(props.workspace.devRestartScript ?? '')
   const [teardown, setTeardown] = createSignal(props.workspace.teardownScript ?? '')
-  const [teardownSaved, setTeardownSaved] = createSignal(false)
   const [trigger, setTrigger] = createSignal<SetupTrigger>(props.workspace.setupScriptTrigger ?? 'terminal')
   const [previewMode, setPreviewMode] = createSignal<PreviewMode | ''>(props.workspace.previewMode ?? '')
   const [previewValue, setPreviewValue] = createSignal(props.workspace.previewValue ?? '')
-  const [previewSaved, setPreviewSaved] = createSignal(false)
   const [busy, setBusy] = createSignal(false)
-  const [saved, setSaved] = createSignal(false)
   const [emoji, setEmoji] = createSignal(props.workspace.icon?.kind === 'emoji' ? props.workspace.icon.value : '')
   const [color, setColor] = createSignal(props.workspace.color ?? '')
   const [hex, setHex] = createSignal(props.workspace.color && !(props.workspace.color in WORKSPACE_COLORS) ? props.workspace.color : '')
@@ -49,16 +49,10 @@ export default function WorkspaceSettings(props: { workspace: Workspace; onDelet
     }
   }
 
+  // Autosave: text fields debounce while typing and flush on blur; selects/swatches save on change.
   const savePreview = async () => {
-    setBusy(true)
-    setPreviewSaved(false)
-    try {
-      await setWorkspacePreview(props.workspace.id, previewMode(), previewValue())
-      await refresh()
-      setPreviewSaved(true)
-    } finally {
-      setBusy(false)
-    }
+    await setWorkspacePreview(props.workspace.id, previewMode(), previewValue())
+    await refresh()
   }
 
   const changeTrigger = async (t: SetupTrigger) => {
@@ -84,27 +78,30 @@ export default function WorkspaceSettings(props: { workspace: Workspace; onDelet
     }
   }
   const saveScript = async () => {
-    setBusy(true)
-    setSaved(false)
-    try {
-      await setWorkspaceSetupScript(props.workspace.id, script())
-      await refresh()
-      setSaved(true)
-    } finally {
-      setBusy(false)
-    }
+    await setWorkspaceSetupScript(props.workspace.id, script())
+    await refresh()
+  }
+  const saveDev = async () => {
+    await setWorkspaceDevScript(props.workspace.id, dev())
+    await refresh()
+  }
+  const saveDevRestart = async () => {
+    await setWorkspaceDevRestartScript(props.workspace.id, devRestart())
+    await refresh()
   }
   const saveTeardown = async () => {
-    setBusy(true)
-    setTeardownSaved(false)
-    try {
-      await setWorkspaceTeardownScript(props.workspace.id, teardown())
-      await refresh()
-      setTeardownSaved(true)
-    } finally {
-      setBusy(false)
-    }
+    await setWorkspaceTeardownScript(props.workspace.id, teardown())
+    await refresh()
   }
+
+  // One debouncer per text field; blur flushes the same pending write immediately.
+  const debScript = debounce(() => void saveScript(), 1500)
+  const debTeardown = debounce(() => void saveTeardown(), 1500)
+  const debDev = debounce(() => void saveDev(), 1500)
+  const debDevRestart = debounce(() => void saveDevRestart(), 1500)
+  const debPreview = debounce(() => void savePreview(), 1500)
+  onCleanup(() => { debScript.flush(); debTeardown.flush(); debDev.flush(); debDevRestart.flush(); debPreview.flush() })
+
   const remove = async () => {
     if (!window.confirm(`Delete workspace “${props.workspace.name}”? Its repos move back to Default.`)) return
     setBusy(true)
@@ -197,19 +194,9 @@ export default function WorkspaceSettings(props: { workspace: Workspace; onDelet
           spellcheck={false}
           placeholder="./scripts/setup-worktree.sh"
           value={script()}
-          onInput={(e) => {
-            setScript(e.currentTarget.value)
-            setSaved(false)
-          }}
+          onInput={(e) => { setScript(e.currentTarget.value); debScript() }}
+          onBlur={() => debScript.flush()}
         />
-        <div class="settings-actions">
-          <button type="button" class="overlay-btn" disabled={busy()} onClick={() => void saveScript()}>
-            {busy() ? 'Saving…' : 'Save script'}
-          </button>
-          <Show when={saved()}>
-            <span class="muted">Saved.</span>
-          </Show>
-        </div>
       </label>
 
       <label class="settings-field">
@@ -223,19 +210,9 @@ export default function WorkspaceSettings(props: { workspace: Workspace; onDelet
           spellcheck={false}
           placeholder="docker compose -f dev.yml down"
           value={teardown()}
-          onInput={(e) => {
-            setTeardown(e.currentTarget.value)
-            setTeardownSaved(false)
-          }}
+          onInput={(e) => { setTeardown(e.currentTarget.value); debTeardown() }}
+          onBlur={() => debTeardown.flush()}
         />
-        <div class="settings-actions">
-          <button type="button" class="overlay-btn" disabled={busy()} onClick={() => void saveTeardown()}>
-            {busy() ? 'Saving…' : 'Save teardown'}
-          </button>
-          <Show when={teardownSaved()}>
-            <span class="muted">Saved.</span>
-          </Show>
-        </div>
       </label>
 
       <label class="settings-field">
@@ -245,6 +222,41 @@ export default function WorkspaceSettings(props: { workspace: Workspace; onDelet
           <option value="created">When the task is created</option>
           <option value="off">Off — never run it</option>
         </select>
+      </label>
+
+      <label class="settings-field">
+        <span class="settings-label">Dev script</span>
+        <span class="muted settings-hint">
+          A custom command for this workspace, shown as a ▶ run button on a task's right rail — it starts/stops
+          the script in its own terminal. Blank means no run button. A repo's <code>.acorn/config.toml</code> or
+          named run targets override it.
+        </span>
+        <textarea
+          class="settings-script"
+          rows="3"
+          spellcheck={false}
+          placeholder="pnpm dev"
+          value={dev()}
+          onInput={(e) => { setDev(e.currentTarget.value); debDev() }}
+          onBlur={() => debDev.flush()}
+        />
+      </label>
+
+      <label class="settings-field">
+        <span class="settings-label">Dev restart command</span>
+        <span class="muted settings-hint">
+          Optional. How to restart the dev script in place — e.g. <code>touch tmp/restart.txt</code>. Agents call this
+          via the <code>run_restart</code> tool. Blank means restart just stops and starts the dev script again.
+        </span>
+        <textarea
+          class="settings-script"
+          rows="2"
+          spellcheck={false}
+          placeholder="(blank = stop + start)"
+          value={devRestart()}
+          onInput={(e) => { setDevRestart(e.currentTarget.value); debDevRestart() }}
+          onBlur={() => debDevRestart.flush()}
+        />
       </label>
 
       <label class="settings-field">
@@ -258,7 +270,7 @@ export default function WorkspaceSettings(props: { workspace: Workspace; onDelet
           value={previewMode()}
           onChange={(e) => {
             setPreviewMode(e.currentTarget.value as PreviewMode | '')
-            setPreviewSaved(false)
+            void savePreview()
           }}
         >
           <option value="">Dev-server port (default)</option>
@@ -273,10 +285,8 @@ export default function WorkspaceSettings(props: { workspace: Workspace; onDelet
             spellcheck={false}
             placeholder="./scripts/preview-url.sh"
             value={previewValue()}
-            onInput={(e) => {
-              setPreviewValue(e.currentTarget.value)
-              setPreviewSaved(false)
-            }}
+            onInput={(e) => { setPreviewValue(e.currentTarget.value); debPreview() }}
+            onBlur={() => debPreview.flush()}
           />
           <span class="muted settings-hint">Run in the task's worktree; its stdout (trimmed) is loaded as the URL.</span>
         </Show>
@@ -286,20 +296,10 @@ export default function WorkspaceSettings(props: { workspace: Workspace; onDelet
             type={previewMode() === 'port' ? 'number' : 'text'}
             placeholder={previewMode() === 'port' ? '3000' : 'https://example.test'}
             value={previewValue()}
-            onInput={(e) => {
-              setPreviewValue(e.currentTarget.value)
-              setPreviewSaved(false)
-            }}
+            onInput={(e) => { setPreviewValue(e.currentTarget.value); debPreview() }}
+            onBlur={() => debPreview.flush()}
           />
         </Show>
-        <div class="settings-actions">
-          <button type="button" class="overlay-btn" disabled={busy()} onClick={() => void savePreview()}>
-            {busy() ? 'Saving…' : 'Save preview'}
-          </button>
-          <Show when={previewSaved()}>
-            <span class="muted">Saved.</span>
-          </Show>
-        </div>
       </label>
 
       <Show when={terminalApi() && (props.workspace.repos ?? []).length}>
@@ -335,19 +335,18 @@ function RepoRunTargets(props: { owner: string; name: string }) {
   )
   const [text, setText] = createSignal<string | null>(null)
   const [err, setErr] = createSignal('')
-  const [ok, setOk] = createSignal(false)
   const value = () => text() ?? row()?.runTargets ?? ''
 
   const save = async () => {
     if (!api) return
     setErr('')
-    setOk(false)
     const res = await api.repoPath.runTargets(props.owner, props.name, value())
-    if (!res.ok) return setErr(res.reason)
-    setOk(true)
+    if (!res.ok) return setErr(res.reason) // invalid JSON stays in the box for the user to fix
     setText(null)
     await refetch()
   }
+  const debSave = debounce(() => void save(), 1500)
+  onCleanup(() => debSave.flush())
 
   return (
     <div class="settings-field">
@@ -359,16 +358,10 @@ function RepoRunTargets(props: { owner: string; name: string }) {
           spellcheck={false}
           placeholder='[{"id":"dev","command":"./scripts/dev.sh","urlCommand":"./scripts/dev-url.sh","default":true}]'
           value={value()}
-          onInput={(e) => {
-            setText(e.currentTarget.value)
-            setOk(false)
-          }}
+          onInput={(e) => { setText(e.currentTarget.value); debSave() }}
+          onBlur={() => debSave.flush()}
         />
-        <div class="settings-actions">
-          <button type="button" class="overlay-btn" onClick={() => void save()}>Save targets</button>
-          <Show when={ok()}><span class="muted">Saved.</span></Show>
-          <Show when={err()}><span class="action-error">{err()}</span></Show>
-        </div>
+        <Show when={err()}><span class="action-error">{err()}</span></Show>
       </Show>
     </div>
   )

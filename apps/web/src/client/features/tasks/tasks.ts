@@ -14,10 +14,10 @@ const [selectedSource, setSelectedSource] = createSignal<SourceId | null>('githu
 // The active task (its terminals scope to this; its view shows when no Source is selected).
 const [activeTaskId, setActiveTaskId] = createSignal<string | null>(null)
 
-// Per-task pane layout (docs/next 03): 1–2 panes + ratio + pin + maximise. ALL transitions go
-// through the pure reducer (applyLayoutAction) via dispatchLayout — the single-writer rule that
-// keeps panes/pinned/maximised atomic. Persisted to the `task_layouts` pref (App.tsx), replacing
-// the old single-pane `task_panes` value (migrated on hydrate).
+// Per-task pane layout (docs/next 03): a left→right row of open panes. ALL transitions go
+// through the pure reducer (applyLayoutAction) via dispatchLayout — the single-writer rule.
+// Persisted to the `task_layouts` pref (App.tsx), replacing the old single-pane `task_panes`
+// value (migrated on hydrate).
 const [taskLayouts, setTaskLayouts] = createSignal<Record<string, TaskLayout>>({})
 
 export const layoutForTask = (taskId: string): TaskLayout | undefined => taskLayouts()[taskId]
@@ -35,15 +35,15 @@ export const dispatchActiveLayout = (action: LayoutAction): void => {
   if (id) dispatchLayout(id, action)
 }
 
-// --- Single-pane compatibility surface (ported call sites; docs/next 03 P1 = no visible change) ---
-// The "active" pane is the maximised pane, else the right-most slot (the one `show` targets).
+// --- Single-pane compatibility surface (ported call sites; no visible change) ---
+// The "active" pane is the right-most open pane.
 const activePane = (): PaneId => {
   const layout = activeLayout()
-  return layout.maximised ?? layout.panes[layout.panes.length - 1]
+  return layout.panes[layout.panes.length - 1]
 }
 export const paneForTask = (taskId: string): PaneId | undefined => {
-  const layout = taskLayouts()[taskId]
-  return layout ? layout.panes[layout.panes.length - 1] : undefined
+  const panes = taskLayouts()[taskId]?.panes
+  return panes ? panes[panes.length - 1] : undefined
 }
 export function setPaneForTask(taskId: string, pane: PaneId): void {
   dispatchLayout(taskId, { type: 'show', pane })

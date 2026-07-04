@@ -43,6 +43,7 @@ contextBridge.exposeInMainWorld('acorn', {
       unstage: (taskId: string, path: string) => ipcRenderer.invoke('local:unstage', { taskId, path }),
       discard: (taskId: string, path: string, untracked?: boolean) => ipcRenderer.invoke('local:discard', { taskId, path, untracked }),
       commit: (taskId: string, message: string) => ipcRenderer.invoke('local:commit', { taskId, message }),
+      push: (taskId: string) => ipcRenderer.invoke('local:push', { taskId }),
     },
     // Resolve a workspace's browser-preview URL by running its configured script in the task's
     // worktree (script mode only — url/port are computed client-side). Returns the trimmed stdout.

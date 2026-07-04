@@ -113,7 +113,15 @@
 }
 /* ANSI dual-theme: light token colour by default, dark when the app theme is dark (mirrors diff). */
 .step-log span { color: var(--l); }
-:root[data-theme='dark'] .step-log span { color: var(--r); }
+:root[data-theme='dark'] .step-log span,
+:root[data-theme='solarized-dark'] .step-log span,
+:root[data-theme='monokai'] .step-log span,
+:root[data-theme='nord'] .step-log span,
+:root[data-theme='catppuccin-frappe'] .step-log span,
+:root[data-theme='catppuccin-macchiato'] .step-log span,
+:root[data-theme='catppuccin-mocha'] .step-log span,
+:root[data-theme='one-dark'] .step-log span,
+:root[data-theme='dracula'] .step-log span { color: var(--r); }
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme='light']) .step-log span { color: var(--r); }
 }

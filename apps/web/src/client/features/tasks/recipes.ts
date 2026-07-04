@@ -20,17 +20,12 @@ export type RecipeServices = {
   openTerminal(taskId: string): void
 }
 
-// Recipe panes → a validated TaskLayout (1–2 known PaneIds; extras dropped; none valid → null).
+// Recipe panes → a validated TaskLayout: the known panes open left→right. Unknown/duplicate panes
+// dropped; none valid → null. (The recipe `ratio` is no longer used — panes split equally.)
 export function recipeToLayout(recipe: RecipeSpec): TaskLayout | null {
-  const panes = recipe.panes.filter(isPaneId)
+  const panes = [...new Set(recipe.panes.filter(isPaneId))]
   if (!panes.length) return null
-  const two = panes.length >= 2 && panes[0] !== panes[1]
-  return {
-    panes: two ? [panes[0], panes[1]] : [panes[0]],
-    ratio: two ? (typeof recipe.ratio === 'number' ? Math.min(0.8, Math.max(0.2, recipe.ratio)) : 0.5) : undefined,
-    pinned: null,
-    maximised: null,
-  }
+  return { panes }
 }
 
 export async function invokeLayoutRecipe(taskId: string, recipe: RecipeSpec, svc: RecipeServices): Promise<{ ok: boolean; reason?: string }> {

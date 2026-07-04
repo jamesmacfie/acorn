@@ -1,23 +1,8 @@
-/* Context tray (docs/next 11 §E): collapsible strip above the task footer. Flat, 1px borders. */
-.context-tray { flex: none; border-top: 1px solid var(--border); background: var(--bg-subtle); }
-.context-tray-head {
-  width: 100%;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 3px var(--pane-pad);
-  font: inherit;
-  font-size: var(--fs-sm);
-  text-align: left;
-  color: var(--text);
-  background: transparent;
-  border: 0;
-  cursor: pointer;
-}
-.context-tray-head:hover { background: var(--bg-hover); }
-.context-tray-twist { color: var(--text-faint); }
+/* Context pane (docs/next 11 §E): a right-rail layout pane listing what an assembled send includes. */
+.context-pane { display: flex; flex-direction: column; min-height: 0; }
+.context-tray-head { display: flex; align-items: center; gap: 8px; }
 .context-tray-msg { margin-left: auto; }
-.context-tray-body { padding: 2px var(--pane-pad) 6px; display: flex; flex-direction: column; gap: 2px; }
+.context-tray-body { flex: 1; min-height: 0; overflow-y: auto; padding: 6px var(--pane-pad) 8px; display: flex; flex-direction: column; gap: 2px; }
 .context-tray-row {
   display: flex;
   align-items: baseline;
@@ -26,7 +11,7 @@
   color: var(--text);
   cursor: pointer;
 }
-.context-tray-row input { accent-color: var(--accent); cursor: pointer; }
+.context-tray-row input { accent-color: var(--accent); cursor: pointer; flex: none; }
 .context-tray-kind {
   flex: none;
   min-width: 52px;
@@ -35,6 +20,48 @@
 }
 .context-tray-label { flex: 1; min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
 .context-tray-actions { display: flex; gap: 8px; margin-top: 4px; }
+
+/* Expandable list rows — click the label to reveal the item's detail below. */
+.context-tray-item { display: flex; flex-direction: column; }
+.context-tray-expand {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  font: inherit;
+  font-size: var(--fs-sm);
+  text-align: left;
+  color: var(--text);
+  background: transparent;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+}
+.context-tray-expand:hover .context-tray-label { color: var(--accent); }
+.context-tray-twist { flex: none; color: var(--text-faint); }
+.context-tray-edit {
+  flex: none;
+  padding: 0 4px;
+  font: inherit;
+  font-size: var(--fs-sm);
+  line-height: 1;
+  color: var(--text-faint);
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+}
+.context-tray-edit:hover { color: var(--accent); }
+.context-tray-detail {
+  margin: 2px 0 4px 60px;
+  padding-left: 8px;
+  border-left: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.context-tray-detail-body { font-size: var(--fs-sm); color: var(--text-muted); white-space: pre-wrap; word-break: break-word; }
+.context-tray-files { margin: 0; padding-left: 16px; font-family: var(--font-mono); font-size: var(--fs-xs, 11px); color: var(--text-muted); }
 
 /* Inline add-memory form (docs/next 12 P1). */
 .context-tray-memform { display: flex; flex-direction: column; gap: 6px; margin-top: 6px; padding-top: 6px; border-top: 1px solid var(--border); }

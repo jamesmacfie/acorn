@@ -19,6 +19,7 @@ export type HarnessBridge = {
   runTargets(taskId: string): Promise<unknown>
   runStart(taskId: string, targetId: string): Promise<unknown>
   runStop(taskId: string, targetId: string): Promise<unknown>
+  runRestart(taskId: string, targetId: string): Promise<unknown>
   runStatus(taskId: string, targetId: string): Promise<unknown>
   // Drivable browser (docs/next 08 P2): CDP over the task's preview webview.
   browserNavigate(taskId: string, url: string): Promise<unknown>
@@ -105,6 +106,10 @@ export const harness = new Hono<AppEnv>()
   })
   .post('/:id/run/:target/stop', async (c) => {
     const res = await withBridge((b) => b.runStop(c.req.param('id'), c.req.param('target')))
+    return res.ok ? c.json(res.data) : c.json({ error: res.error }, 503)
+  })
+  .post('/:id/run/:target/restart', async (c) => {
+    const res = await withBridge((b) => b.runRestart(c.req.param('id'), c.req.param('target')))
     return res.ok ? c.json(res.data) : c.json({ error: res.error }, 503)
   })
   .get('/:id/run/:target/status', async (c) => {

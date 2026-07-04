@@ -1,4 +1,4 @@
-import { createEffect, createMemo, createResource, createSignal, For, onCleanup, onMount, Show, type JSX } from 'solid-js'
+import { createEffect, createMemo, createResource, createSignal, For, on, Show, type JSX } from 'solid-js'
 import { useNavigate } from '@solidjs/router'
 import { createQuery, useQueryClient } from '@tanstack/solid-query'
 import { tasksKey, tasksOptions, workspacesOptions, type Task } from '../../queries'
@@ -10,7 +10,7 @@ import RollbarPane from '../integrations/RollbarPane'
 import AgentsPanel from '../agents/AgentsPanel'
 import EditorPane from '../editor/EditorPane'
 import ChangesPane from '../changes/ChangesPane'
-import ContextTray from '../context/ContextTray'
+import ContextPane from '../context/ContextPane'
 import NotesPane from '../notes/NotesPane'
 import { workspaceForRepo } from '../workspaces/activeWorkspace'
 import { refreshSessions } from '../terminal/sessions'
@@ -35,53 +35,21 @@ export default function TaskView(props: {
   const api = terminalApi()
   const hasPr = () => props.task.pullNumber != null
 
-  // Pane layout (docs/next 03): 1–2 slots + pin + maximise, all transitions via the reducer.
+  // Pane layout: a left→right row of open panes; ⌘/ctrl-click opens a pane beside the others.
+  // All transitions via the reducer.
   const layout = () => layoutForTask(props.task.id) ?? defaultLayout()
   const dispatch = (action: LayoutAction) => dispatchLayout(props.task.id, action)
-  // Maximised → that single pane fills the view (chrome collapses); else the 1–2 layout slots.
-  const visiblePanes = (): PaneId[] => {
-    const l = layout()
-    return l.maximised ? [l.maximised] : [...l.panes]
-  }
+  const visiblePanes = (): PaneId[] => layout().panes
   const showsPane = (p: PaneId) => visiblePanes().includes(p)
-  const slotIndex = (p: PaneId) => visiblePanes().indexOf(p)
-  const ratio = () => layout().ratio ?? 0.5
-  const growFor = (p: PaneId) => (visiblePanes().length === 2 ? (slotIndex(p) === 0 ? ratio() : 1 - ratio()) : 1)
-  // The pane pin/maximise controls target: the maximised pane, else the right-most slot.
-  const currentPane = (): PaneId => {
-    const l = layout()
-    return l.maximised ?? l.panes[l.panes.length - 1]
-  }
-  // Switcher click: toggle-close a visible second pane, otherwise show (pin-aware in the reducer).
-  function onSwitch(pane: PaneId) {
-    const l = layout()
-    if (l.maximised == null && l.panes.length === 2 && l.panes.includes(pane)) dispatch({ type: 'close', pane })
-    else dispatch({ type: 'show', pane })
-  }
-  // Esc restores a maximised pane (docs/next 03 P2).
-  const onEsc = (e: KeyboardEvent) => {
-    if (e.key === 'Escape' && layout().maximised) dispatch({ type: 'restore' })
-  }
-  onMount(() => window.addEventListener('keydown', onEsc))
-  onCleanup(() => window.removeEventListener('keydown', onEsc))
+  // Switcher click shows just that pane; ⌘/ctrl-click opens it to the right of the open ones.
+  const onSwitch = (pane: PaneId, e: MouseEvent) => dispatch(e.metaKey || e.ctrlKey ? { type: 'add', pane } : { type: 'show', pane })
+  // Close button (only shown when >1 pane is open), top-right of each slot.
+  const CloseBtn = (p: { pane: PaneId }) => (
+    <Show when={layout().panes.length > 1}>
+      <button type="button" class="pane-close-btn" title="Close pane" aria-label="Close pane" onClick={() => dispatch({ type: 'close', pane: p.pane })}>✕</button>
+    </Show>
+  )
 
-  // Divider drag updates the split ratio (docs/next 03 P3); clamped in the reducer.
-  let panesRef: HTMLElement | undefined
-  function startDivider(e: PointerEvent) {
-    e.preventDefault()
-    const onMove = (ev: PointerEvent) => {
-      const rect = panesRef?.getBoundingClientRect()
-      if (!rect) return
-      const usable = rect.width - 44 // minus the switcher rail
-      if (usable > 0) dispatch({ type: 'setRatio', ratio: (ev.clientX - rect.left) / usable })
-    }
-    const onUp = () => {
-      window.removeEventListener('pointermove', onMove)
-      window.removeEventListener('pointerup', onUp)
-    }
-    window.addEventListener('pointermove', onMove)
-    window.addEventListener('pointerup', onUp)
-  }
   // A task can link several Linear tickets (e.g. a PR that resolves multiple). The ◷ icon
   // shows only when there's at least one; the pane lets you switch between them.
   const linearLinks = createMemo(() => props.task.links.filter((l) => l.provider === 'linear'))
@@ -155,6 +123,11 @@ export default function TaskView(props: {
   // Browser-preview URL is configured per workspace (Settings → workspace). Falls back to the
   // dev-server port when unset. 'script' mode runs a command in the worktree (via IPC) for its URL.
   const previewWs = () => workspaceForRepo(workspacesQuery.data, props.task.repoOwner, props.task.repoName)
+  // The `dev` run target is sourced from the workspace dev script (Settings → workspace). Re-fetch
+  // the target list when it changes so the ▶ button shows/hides live once the modal saves — the
+  // resource is keyed only on task id, so it wouldn't otherwise notice. (defer: the resource already
+  // fetches on mount; only react to later edits.)
+  createEffect(on(() => previewWs()?.devScript, () => void refetchTargets(), { defer: true }))
   const [scriptUrl] = createResource(
     () => {
       const ws = previewWs()
@@ -264,6 +237,11 @@ export default function TaskView(props: {
     if (pane === 'editor') return <EditorPane task={props.task} />
     if (pane === 'changes') return <ChangesPane task={props.task} />
     if (pane === 'notes') return <NotesPane task={props.task} workspace={previewWs()} />
+    if (pane === 'context') return <ContextPane task={props.task} />
+    // Preview is rendered wherever it currently sits (active or pinned). Pin it to keep its <webview>
+    // mounted while you switch the active pane — the For below reuses the node for an unchanged pin.
+    // ponytail: dropped the always-mounted hidden slot; a pinned preview covers the persistent case.
+    if (pane === 'preview') return <PreviewPane taskId={props.task.id} url={previewUrl()} hidden={false} onConfigure={configureRun} />
     if (pane === 'rollbar') return <RollbarPane task={props.task} />
     if (pane === 'linear') {
       return (
@@ -291,44 +269,31 @@ export default function TaskView(props: {
 
   return (
     <div class="workspace-wrap">
-    <main class="panes panes-workspace task-layout" ref={panesRef}>
-      {/* Layout slots (docs/next 03): flex row ordered by slot index; the preview stays mounted
-          below (just hidden) so its <webview> and browse state survive layout changes. */}
-      <For each={visiblePanes().filter((p) => p !== 'preview')}>
+    <main class="panes panes-workspace task-layout">
+      {/* Open panes as an equal-width left→right row (⌘/ctrl-click a switcher icon to add one).
+          Each slot shows a close button when >1 is open. */}
+      <For each={visiblePanes()}>
         {(pane) => (
-          <div
-            class="task-slot"
-            classList={{ 'task-slot-pr': pane === 'pr' && hasPr() }}
-            style={{ order: slotIndex(pane) * 2, 'flex-grow': growFor(pane) }}
-          >
+          <div class="task-slot" classList={{ 'task-slot-pr': pane === 'pr' && hasPr() }}>
+            <CloseBtn pane={pane} />
             {paneBody(pane)}
           </div>
         )}
       </For>
-      <Show when={visiblePanes().length === 2}>
-        <div class="task-divider" style={{ order: 1 }} onPointerDown={startDivider} title="Drag to resize" />
-      </Show>
-      <div
-        class="task-slot task-slot-preview"
-        classList={{ 'is-hidden': !showsPane('preview') }}
-        style={{ order: showsPane('preview') ? slotIndex('preview') * 2 : undefined, 'flex-grow': showsPane('preview') ? growFor('preview') : 0 }}
-      >
-        <PreviewPane taskId={props.task.id} url={previewUrl()} hidden={!showsPane('preview')} onConfigure={configureRun} />
-      </div>
 
-      <nav class="pane-switcher" style={{ order: 99 }}>
+      <nav class="pane-switcher">
         <Show when={hasPr()}>
-          <button type="button" class="pane-switch-btn" classList={{ active: showsPane('pr'), pinned: layout().pinned === 'pr' }} data-tip="PR review" data-tip-sub="Diff, files & review comments" aria-label="PR review" onClick={() => onSwitch('pr')}>⌥</button>
+          <button type="button" class="pane-switch-btn" classList={{ active: showsPane('pr') }} data-tip="PR review" data-tip-sub="Diff, files & review comments · ⌘-click to open beside" aria-label="PR review" onClick={(e) => onSwitch('pr', e)}>⌥</button>
         </Show>
         <Show when={linearLinks().length}>
-          <button type="button" class="pane-switch-btn" classList={{ active: showsPane('linear'), pinned: layout().pinned === 'linear' }} data-tip="Linear" data-tip-sub={linearIds().join(', ')} aria-label="Linear" onClick={() => onSwitch('linear')}>◷</button>
+          <button type="button" class="pane-switch-btn" classList={{ active: showsPane('linear') }} data-tip="Linear" data-tip-sub={linearIds().join(', ')} aria-label="Linear" onClick={(e) => onSwitch('linear', e)}>◷</button>
         </Show>
         <Show when={rollbarLinks().length}>
-          <button type="button" class="pane-switch-btn" classList={{ active: showsPane('rollbar'), pinned: layout().pinned === 'rollbar' }} data-tip="Rollbar" data-tip-sub={`#${rollbarLinks().map((l) => l.identifier).join(', #')}`} aria-label="Rollbar" onClick={() => onSwitch('rollbar')}>◍</button>
+          <button type="button" class="pane-switch-btn" classList={{ active: showsPane('rollbar') }} data-tip="Rollbar" data-tip-sub={`#${rollbarLinks().map((l) => l.identifier).join(', #')}`} aria-label="Rollbar" onClick={(e) => onSwitch('rollbar', e)}>◍</button>
         </Show>
-        <Show when={(runTargets() ?? []).length} fallback={
-          <button type="button" class="pane-switch-btn" data-tip="Run targets" data-tip-sub="Configure commands to run" aria-label="Configure run targets" onClick={configureRun}>▶</button>
-        }>
+        {/* Run targets only appear when configured (per-workspace dev script, repo config.toml, or the
+            repo run-targets JSON) — otherwise the rail shows no run button (docs/next 13 §A). */}
+        <Show when={(runTargets() ?? []).length}>
           <For each={runTargets() ?? []}>
             {(t) => (
               <button
@@ -345,30 +310,11 @@ export default function TaskView(props: {
             )}
           </For>
         </Show>
-        <button type="button" class="pane-switch-btn" classList={{ active: showsPane('changes'), pinned: layout().pinned === 'changes' }} data-tip="Changes" data-tip-sub="Uncommitted working tree" aria-label="Changes" onClick={() => onSwitch('changes')}>⎇</button>
-        <button type="button" class="pane-switch-btn" classList={{ active: showsPane('notes'), pinned: layout().pinned === 'notes' }} data-tip="Notes" data-tip-sub="Workspace scratchpad" aria-label="Notes" onClick={() => onSwitch('notes')}>📝</button>
-        <button type="button" class="pane-switch-btn" classList={{ active: showsPane('preview'), pinned: layout().pinned === 'preview' }} data-tip="Browser preview" data-tip-sub="Live preview of the app" aria-label="Browser preview" onClick={() => onSwitch('preview')}>◍</button>
-        <button type="button" class="pane-switch-btn" classList={{ active: showsPane('editor'), pinned: layout().pinned === 'editor' }} data-tip="Editor" data-tip-sub="In-app code editor" aria-label="Editor" onClick={() => onSwitch('editor')}>✎</button>
-        {/* Pin (docs/next 03 P3): fixes the current pane's slot — switcher clicks then open in the
-            other slot. Maximise (P2): the current pane fills the view; Esc or a second click restores. */}
-        <button
-          type="button"
-          class="pane-switch-btn"
-          classList={{ active: layout().pinned != null }}
-          data-tip={layout().pinned ? `Unpin ${layout().pinned}` : `Pin ${currentPane()} pane`}
-          data-tip-sub="Keep this pane fixed in its slot"
-          aria-label="Pin pane"
-          onClick={() => (layout().pinned ? dispatch({ type: 'unpin' }) : dispatch({ type: 'pin', pane: currentPane() }))}
-        >⌖</button>
-        <button
-          type="button"
-          class="pane-switch-btn"
-          classList={{ active: layout().maximised != null }}
-          data-tip={layout().maximised ? 'Restore' : `Maximise ${currentPane()} pane`}
-          data-tip-sub="Fill the view · Esc restores"
-          aria-label="Maximise pane"
-          onClick={() => dispatch({ type: 'toggleMaximise', pane: currentPane() })}
-        >⤢</button>
+        <button type="button" class="pane-switch-btn" classList={{ active: showsPane('changes') }} data-tip="Changes" data-tip-sub="Uncommitted working tree · ⌘-click to open beside" aria-label="Changes" onClick={(e) => onSwitch('changes', e)}>⎇</button>
+        <button type="button" class="pane-switch-btn" classList={{ active: showsPane('notes') }} data-tip="Notes" data-tip-sub="Workspace scratchpad · ⌘-click to open beside" aria-label="Notes" onClick={(e) => onSwitch('notes', e)}>✐</button>
+        <button type="button" class="pane-switch-btn" classList={{ active: showsPane('context') }} data-tip="Context" data-tip-sub="What an assembled send includes · ⌘-click to open beside" aria-label="Context" onClick={(e) => onSwitch('context', e)}>⊞</button>
+        <button type="button" class="pane-switch-btn" classList={{ active: showsPane('preview') }} data-tip="Browser preview" data-tip-sub="Live preview of the app · ⌘-click to open beside" aria-label="Browser preview" onClick={(e) => onSwitch('preview', e)}>◍</button>
+        <button type="button" class="pane-switch-btn" classList={{ active: showsPane('editor') }} data-tip="Editor" data-tip-sub="In-app code editor · ⌘-click to open beside" aria-label="Editor" onClick={(e) => onSwitch('editor', e)}>✎</button>
         <button type="button" class="pane-switch-btn" classList={{ active: agentsOpen() }} data-tip="Agents" data-tip-sub="Roster · launcher · feed" aria-label="Agents" onClick={() => setAgentsOpen(!agentsOpen())}>⠿</button>
         <button type="button" class="pane-switch-btn" classList={{ active: props.terminalOpen }} data-tip="Terminal" data-tip-sub="Shell in the worktree" aria-label="Terminal" onClick={props.onToggleTerminal}>{'>_'}</button>
         <button type="button" class="pane-switch-btn pane-switch-close" data-tip="Close task" aria-label="Close task" onClick={openClose}>✕</button>
@@ -385,7 +331,7 @@ export default function TaskView(props: {
           identifier={linearId()}
           identifiers={linearIds()}
           onSelectIdentifier={setPicked}
-          onClose={() => onSwitch('linear')}
+          onClose={() => dispatch({ type: 'close', pane: 'linear' })}
           onContentClick={() => {}}
         />
       </Show>
@@ -438,8 +384,6 @@ export default function TaskView(props: {
         </div>
       </Show>
     </main>
-    <Show when={!layout().maximised}>
-    <ContextTray task={props.task} />
     <footer class="workspace-footer">
       <Show when={props.task.worktreePath} fallback={<span class="muted">No worktree yet — created on first terminal.</span>}>
         {(p) => (
@@ -458,7 +402,6 @@ export default function TaskView(props: {
         )}
       </Show>
     </footer>
-    </Show>
     </div>
   )
 }

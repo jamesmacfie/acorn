@@ -188,6 +188,7 @@ describe('acorn MCP server over stdio JSON-RPC (docs/next 06 B)', () => {
         'pr_changed_files',
         'pr_current',
         'repo_info',
+        'run_restart',
         'run_start',
         'run_status',
         'run_stop',
@@ -251,6 +252,8 @@ describe('acorn MCP server over stdio JSON-RPC (docs/next 06 B)', () => {
       expect(toolText(await client.send('tools/call', { name: 'run_targets', arguments: {} }))).toMatchObject({ targets: [{ id: 'dev' }] })
       await client.send('tools/call', { name: 'run_start', arguments: { id: 'dev' } })
       expect(posts.some((p) => p.url.includes('/run/dev/start'))).toBe(true)
+      await client.send('tools/call', { name: 'run_restart', arguments: { id: 'dev' } })
+      expect(posts.some((p) => p.url.includes('/run/dev/restart'))).toBe(true)
       expect(toolText(await client.send('tools/call', { name: 'run_status', arguments: { id: 'dev' } }))).toEqual({ running: true, url: 'http://localhost:5173' })
 
       // Loopback calls carried the internal bearer (never a cookie).
