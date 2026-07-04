@@ -12,7 +12,7 @@ importers:
         specifier: ^2
         version: 2.9.18
 
-  apps/web:
+  apps/desktop:
     dependencies:
       '@hono/node-server':
         specifier: ^2.0.6

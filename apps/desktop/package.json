@@ -1,5 +1,5 @@
 {
-  "name": "@acorn/web",
+  "name": "@acorn/desktop",
   "private": true,
   "type": "module",
   "main": "out/main/index.js",

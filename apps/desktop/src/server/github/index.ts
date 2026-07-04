@@ -1,5 +1,5 @@
 // Thin GitHub client (docs/api-structure.md "start lean"). Injects the standard headers and
-// returns the raw Response so callers handle status/parsing. Stays here in apps/web/src/server/
+// returns the raw Response so callers handle status/parsing. Stays here in apps/desktop/src/server/
 // until a third consumer justifies promoting it to packages/.
 // ponytail: no client-side ETag parsing yet (callers pass If-None-Match themselves); ghError
 // below normalizes auth / rate-limit / SSO statuses for every route.

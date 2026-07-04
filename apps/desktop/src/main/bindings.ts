@@ -76,7 +76,7 @@ function diskKV(dir: string): KVish {
 }
 
 // drizzle-generated migrations: packaged as extraResources (process.resourcesPath/migrations) in a
-// built app, else resolved from this module at apps/web/migrations. Never from process.cwd().
+// built app, else resolved from this module at apps/desktop/migrations. Never from process.cwd().
 const migrationsFolder = (() => {
   const packaged = process.resourcesPath ? join(process.resourcesPath, 'migrations') : null
   if (packaged && existsSync(packaged)) return packaged

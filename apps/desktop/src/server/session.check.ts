@@ -1,5 +1,5 @@
 // Self-check for the session crypto path (ponytail: security logic gets one runnable check).
-// Run: `node apps/web/src/server/session.check.ts` (Node 24 strips types) or `npx tsx <path>`.
+// Run: `node apps/desktop/src/server/session.check.ts` (Node 24 strips types) or `npx tsx <path>`.
 import assert from 'node:assert'
 import { openSession, sealSession, type SessionData } from './session.ts'
 
