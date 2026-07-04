@@ -4,7 +4,7 @@
 # migrate --remote, build + deploy. Each step is y/N gated so re-runs skip done work.
 set -euo pipefail
 
-APP_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../apps/web" && pwd)"
+APP_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../apps/desktop" && pwd)"
 CONFIG="$APP_DIR/wrangler.jsonc"
 cd "$APP_DIR"
 
@@ -88,7 +88,7 @@ fi
 
 # --- Build + deploy ----------------------------------------------------------
 if confirm "Build and deploy the Worker?"; then
-  pnpm --filter @acorn/web build
+  pnpm --filter @acorn/desktop build
   pnpm wrangler deploy
 fi
 
