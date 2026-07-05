@@ -4,8 +4,10 @@ import { A, useNavigate, useParams } from '@solidjs/router'
 import { createVirtualizer } from '@tanstack/solid-virtual'
 import { checksState, formatRelativeTime } from './displayMeta'
 import { prefetchOpenPulls, schedulePullSummaryPrefetch } from './prefetch'
-import { closedPullsInfiniteOptions, integrationsOptions, pullDetailOptions, pullsOptions, reposOptions, tasksKey, type Pull } from './queries'
+import { closedPullsInfiniteOptions, integrationsOptions, pullDetailOptions, pullsOptions, reposOptions, tasksKey, workspacesOptions, type Pull } from './queries'
 import { filterPulls } from './features/pullList/model'
+import { prFilterFor, setPrFilter } from './features/pullList/filterState'
+import { workspaceForRepo } from './features/workspaces/activeWorkspace'
 import { createTask } from './mutations'
 import { scanLinearRefs } from './features/integrations/scanLinearRefs'
 import { activateTaskSignals } from './features/tasks/activate'
@@ -16,8 +18,15 @@ import { activateTaskSignals } from './features/tasks/activate'
 export default function PullList() {
   const params = useParams()
   const navigate = useNavigate()
-  const [tab, setTab] = createSignal<'open' | 'closed'>('open')
-  const [filter, setFilter] = createSignal('')
+  // Tab + filter are kept per workspace (features/pullList/filterState). The active workspace is
+  // derived from the routed repo, so switching repos within a workspace keeps the filter and
+  // switching workspaces swaps to that workspace's saved filter.
+  const workspaces = createQuery(() => workspacesOptions(true))
+  const wsId = () => workspaceForRepo(workspaces.data, params.owner, params.repo)?.id ?? ''
+  const tab = () => prFilterFor(wsId()).tab
+  const setTab = (t: 'open' | 'closed') => setPrFilter(wsId(), { tab: t })
+  const filter = () => prFilterFor(wsId()).filter
+  const setFilter = (f: string) => setPrFilter(wsId(), { filter: f })
   const queryClient = useQueryClient()
   const repos = createQuery(() => reposOptions(true))
   const repoKnown = () => !!repos.data?.some((r) => r.owner === params.owner && r.name === params.repo)
@@ -40,15 +49,6 @@ export default function PullList() {
       void prefetchOpenPulls(queryClient, params.owner ?? '', params.repo ?? '', ac.signal).catch(() => {})
       onCleanup(() => ac.abort())
     },
-  ))
-
-  createEffect(on(
-    () => `${params.owner ?? ''}/${params.repo ?? ''}`,
-    () => {
-      setTab('open')
-      setFilter('')
-    },
-    { defer: true },
   ))
 
   // Client-side text filter over the loaded tab (title / author / #number).

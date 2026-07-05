@@ -160,6 +160,17 @@ export async function worktreePorcelain(path: string): Promise<{ dirty: boolean;
   }
 }
 
+// The checkout's current branch (`git branch --show-current`), or null on a detached HEAD or error.
+// Used to seed a "current-checkout" task with the branch it actually borrows.
+export async function currentBranch(checkout: string): Promise<string | null> {
+  try {
+    const { stdout } = await exec('git', ['-C', checkout, 'branch', '--show-current'], { timeout: 10_000 })
+    return stdout.trim() || null
+  } catch {
+    return null
+  }
+}
+
 // Remove a worktree via the main checkout. Refuses a dirty worktree unless force is set (which
 // discards uncommitted changes) — surfaced to the UI so removal is never silently destructive.
 export async function removeWorktree(checkout: string, path: string, force = false): Promise<WorktreeResult> {

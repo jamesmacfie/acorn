@@ -20,6 +20,10 @@ export type OverlayPalette = {
   setInputRef: (el: HTMLInputElement) => void
 }
 
+// Only one overlay open at a time: opening one dismisses whichever other is open. Module-scoped
+// (single-window app) so the four independent instances coordinate without a shared store.
+let activeClose: (() => void) | null = null
+
 export function createOverlayPalette(opts: {
   /** Current result-list length; ↑/↓ clamp to it. */
   count: () => number
@@ -36,13 +40,26 @@ export function createOverlayPalette(opts: {
   const [query, setQuerySignal] = createSignal('')
   const [sel, setSel] = createSignal(0)
   let inputRef: HTMLInputElement | undefined
+  let prevFocus: HTMLElement | null = null // element focused when we opened (e.g. the Monaco editor)
 
   const close = () => {
+    if (activeClose === close) activeClose = null
     setOpen(false)
     setQuerySignal('')
     setSel(0)
+    // Return focus to wherever it was before we grabbed it, so Esc / backdrop / re-toggle dismissal
+    // doesn't strand keyboard focus on <body>. Skip if that element is gone — a pick that navigated
+    // or opened a file unmounted it, and that action's own focus target wins.
+    const prev = prevFocus
+    prevFocus = null
+    if (prev?.isConnected && prev !== document.activeElement) prev.focus()
   }
   const show = () => {
+    // Close any other open overlay first (it restores its own prevFocus), then capture ours — so the
+    // element we return to on dismissal is the real pre-overlay one, not the other palette's input.
+    if (activeClose && activeClose !== close) activeClose()
+    activeClose = close
+    prevFocus = document.activeElement as HTMLElement | null
     setOpen(true)
     opts.onOpen?.()
     queueMicrotask(() => inputRef?.focus())
@@ -55,6 +72,10 @@ export function createOverlayPalette(opts: {
   const onKey = (e: KeyboardEvent) => {
     if (opts.isToggle?.(e)) {
       e.preventDefault()
+      // Capture-phase + stopPropagation so the chord beats Monaco's keybinding service, which
+      // otherwise swallows ⌘K (chord prefix) and ⌘L (expand line selection) while the editor is
+      // focused and the palette would never open. ⌘P is unbound in Monaco but harmless to stop too.
+      e.stopPropagation()
       if (open()) close()
       else show()
       return
@@ -79,8 +100,9 @@ export function createOverlayPalette(opts: {
     }
   }
 
-  onMount(() => window.addEventListener('keydown', onKey))
-  onCleanup(() => window.removeEventListener('keydown', onKey))
+  // Capture phase: intercept toggle chords before Monaco's editor-scoped keydown handler (see onKey).
+  onMount(() => window.addEventListener('keydown', onKey, { capture: true }))
+  onCleanup(() => window.removeEventListener('keydown', onKey, { capture: true }))
 
   // Keep the selection in range when the list shrinks under it (data refetch narrows results).
   createEffect(() => {

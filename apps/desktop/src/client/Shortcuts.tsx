@@ -15,11 +15,13 @@ import type { PullFile } from './queries'
 
 // Keyboard shortcut reference, rendered by the Settings → Shortcuts tab.
 export const SHORTCUTS: Array<[string, string]> = [
+  ['⌘0', 'Go to GitHub in the left rail'],
   ['⌘1 – ⌘9', 'Jump to task 1–9 in the rail'],
   ['⌘⇧N', 'New task'],
   ['⌘,', 'Open settings'],
   ['⌘K', 'Command palette (panes, tasks, run targets)'],
   ['⌘P', 'Go to file in the task worktree'],
+  ['⌘L', 'Switch workspace'],
   ['j / k', 'Next / previous PR'],
   ['[ / ]', 'Previous / next file'],
   ['/', 'Find file in this PR'],

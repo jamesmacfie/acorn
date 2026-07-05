@@ -20,9 +20,11 @@ import SettingsModal from './features/settings/SettingsModal'
 import TerminalPanel from './features/terminal/TerminalPanel'
 import CommandPalette from './features/palette/CommandPalette'
 import FilePalette from './features/palette/FilePalette'
+import WorkspacePalette from './features/palette/WorkspacePalette'
 import NotificationBell from './features/notifications/NotificationBell'
 import { hydrateNotices, initWorkflowNotices, notices, serializeNotices } from './features/notifications/notifications'
 import { editorStateByTask, hydrateEditorState, serializeEditorState } from './features/editor/editorState'
+import { hydratePrFilters, prFilters } from './features/pullList/filterState'
 import { initSessions } from './features/terminal/sessions'
 import TabRail from './features/tabs/TabRail'
 import RailTips from './features/tooltip/RailTips'
@@ -179,6 +181,7 @@ export default function App() {
     }
     hydrateNotices(prefs.data.notices)
     hydrateEditorState(prefs.data.editor_open_files)
+    hydratePrFilters(prefs.data.pr_filters)
   })
 
   // Persist the current view so a relaunch reopens it. Separate effects so each writes only when its
@@ -207,6 +210,10 @@ export default function App() {
   createEffect(() => {
     void editorStateByTask()
     if (restored()) void setPref('editor_open_files', serializeEditorState())
+  })
+  createEffect(() => {
+    const f = prFilters()
+    if (restored()) void setPref('pr_filters', JSON.stringify(f))
   })
 
   // Left-pane collapse, persisted via the `left_collapsed` pref. Seed the local signal from prefs
@@ -460,6 +467,7 @@ export default function App() {
       </Show>
       <CommandPalette />
       <FilePalette />
+      <WorkspacePalette />
     </div>
     <RailTips />
     </div>

@@ -7,24 +7,29 @@ import type { PaneId } from './layout'
 
 export type PaneAction = PaneId | 'agents' | 'terminal'
 
+// Defaults are ⌘⇧<letter> chords: plain ⌘<letter> collides too readily with the OS/browser/Monaco
+// (⌘E, ⌘G, ⌘L, ⌘T, …), so the pane switcher lives on the shifted layer. Letters mirror the pane
+// name where free; Notes can't be ⌘⇧N (reserved for New task), so it takes ⌘⇧D. All rebindable in
+// Settings → Shortcuts.
 export const PANE_SHORTCUT_DEFAULTS: { id: PaneAction; label: string; key: string }[] = [
-  { id: 'pr', label: 'PR review', key: 'meta+r' },
-  { id: 'changes', label: 'Changes', key: 'meta+g' },
-  { id: 'notes', label: 'Notes', key: 'meta+n' },
-  { id: 'context', label: 'Context', key: 'meta+x' },
-  { id: 'preview', label: 'Browser preview', key: 'meta+b' },
-  { id: 'editor', label: 'Editor', key: 'meta+e' },
-  { id: 'linear', label: 'Linear', key: 'meta+l' },
-  { id: 'rollbar', label: 'Rollbar', key: 'meta+o' },
-  { id: 'agents', label: 'Agents', key: 'meta+a' },
-  { id: 'terminal', label: 'Terminal', key: 'meta+t' },
+  { id: 'pr', label: 'PR review', key: 'meta+shift+r' },
+  { id: 'changes', label: 'Changes', key: 'meta+shift+g' },
+  { id: 'notes', label: 'Notes', key: 'meta+shift+d' },
+  { id: 'context', label: 'Context', key: 'meta+shift+x' },
+  { id: 'preview', label: 'Browser preview', key: 'meta+shift+b' },
+  { id: 'editor', label: 'Editor', key: 'meta+shift+e' },
+  { id: 'linear', label: 'Linear', key: 'meta+shift+l' },
+  { id: 'rollbar', label: 'Rollbar', key: 'meta+shift+o' },
+  { id: 'agents', label: 'Agents', key: 'meta+shift+a' },
+  { id: 'terminal', label: 'Terminal', key: 'meta+shift+t' },
 ]
 
 // Chords the app already owns globally — never assignable to a pane. ⌘K palette, ⌘P file finder,
-// ⌘1–9 task rail, ⌘S editor save, ⌘W close pane, ⌘⇧N new task, ⌘, settings.
+// ⌘L workspace switcher, ⌘0 GitHub source, ⌘1–9 task rail, ⌘S editor save, ⌘W close pane,
+// ⌘⇧N new task, ⌘, settings.
 export const RESERVED_CHORDS = new Set([
-  'meta+k', 'meta+p', 'meta+s', 'meta+w', 'meta+shift+n', 'meta+,',
-  'meta+1', 'meta+2', 'meta+3', 'meta+4', 'meta+5', 'meta+6', 'meta+7', 'meta+8', 'meta+9',
+  'meta+k', 'meta+p', 'meta+l', 'meta+s', 'meta+w', 'meta+shift+n', 'meta+,',
+  'meta+0', 'meta+1', 'meta+2', 'meta+3', 'meta+4', 'meta+5', 'meta+6', 'meta+7', 'meta+8', 'meta+9',
 ])
 
 const MODS = ['meta', 'ctrl', 'alt', 'shift'] as const

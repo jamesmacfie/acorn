@@ -3,6 +3,7 @@
 // stop sessions → remove worktree → mark archived — is testable under plain Node against a real
 // temp git repo. Electron/PTY concerns (the live session map, drawer streaming) are injected.
 import { execFile } from 'node:child_process'
+import { resolve } from 'node:path'
 import { promisify } from 'node:util'
 import { and, eq } from 'drizzle-orm'
 import type { AppDatabase } from '../server/db'
@@ -87,7 +88,10 @@ export async function archiveTask(db: AppDatabase, id: string, opts: ArchiveOpts
   if (running) deps.killRunning(id)
   if (deleteWorktree && t.worktreePath) {
     const mapped = await getRepoPath(db, t.repoOwner, t.repoName)
-    if (mapped) {
+    // A "current-checkout" task borrows the main checkout (worktreePath === checkout) rather than
+    // owning an isolated worktree — never git-remove it, just drop the reference on archive.
+    const borrowsCheckout = mapped && resolve(t.worktreePath) === resolve(mapped.path)
+    if (mapped && !borrowsCheckout) {
       const res = await removeWorktree(mapped.path, t.worktreePath, force) // force discards a dirty tree
       if (!res.ok) return res
     }

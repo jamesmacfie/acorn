@@ -2,7 +2,7 @@ import { createSignal, For, onCleanup, onMount, Show } from 'solid-js'
 import { useNavigate, useParams } from '@solidjs/router'
 import { createQuery, useQueryClient } from '@tanstack/solid-query'
 import { integrationsOptions, prefsKey, prefsOptions, pullDetailOptions, tasksKey, tasksOptions, workspacesOptions, type Task } from '../../queries'
-import { archiveTask, createTask, renameTask, setPref } from '../../mutations'
+import { archiveTask, createCheckoutTask, createTask, renameTask, setPref } from '../../mutations'
 import { applyRailOrder, isPinned, moveTask, parseRailOrder, pinTask, serializeRailOrder, unpinTask, type RailOrder } from './railOrder'
 import { checksState } from '../../displayMeta'
 import { activeTaskId, selectedSource, setActiveTaskId, setSelectedSource, type SourceId } from '../tasks/tasks'
@@ -60,6 +60,9 @@ export default function TabRail() {
   // edits the branch field directly, then their value wins.
   const [branchText, setBranchText] = createSignal('')
   const [branchTouched, setBranchTouched] = createSignal(false)
+  // "Use the current checkout" (docs/terminal-and-agents.md): borrow the mapped checkout + its current
+  // branch instead of cutting an isolated worktree. Hides the branch field (main picks the branch).
+  const [useCheckout, setUseCheckout] = createSignal(false)
 
   const branchesInRepo = (repoKey: string) =>
     (query.data ?? []).filter((t) => `${t.repoOwner}/${t.repoName}` === repoKey).map((t) => t.branch)
@@ -101,8 +104,8 @@ export default function TabRail() {
   }
 
   // ⌘1–9 / Ctrl1–9: jump to the Nth task in the rail (docs/command-palette-and-shortcuts.md). Mirrors browser-tab
-  // switching; the order is exactly what's rendered (workspace-scoped + rail order). A meta/ctrl
-  // combo, so it's safe to leave active even while typing.
+  // switching; the order is exactly what's rendered (workspace-scoped + rail order). ⌘0 selects the
+  // GitHub source (the left rail's browse view). A meta/ctrl combo, so it's safe even while typing.
   onMount(() => {
     const onKey = (e: KeyboardEvent) => {
       // ⌘⇧N: new task in the active workspace — same flow as the rail's + button.
@@ -112,6 +115,12 @@ export default function TabRail() {
         return
       }
       if (!(e.metaKey || e.ctrlKey) || e.altKey || e.shiftKey) return
+      if (e.key === '0') {
+        e.preventDefault()
+        setMenuId(null)
+        setSelectedSource('github')
+        return
+      }
       if (e.key < '1' || e.key > '9') return
       const t = visibleTasks()[Number(e.key) - 1]
       if (!t) return
@@ -137,6 +146,7 @@ export default function TabRail() {
     setText('')
     setBranchText('')
     setBranchTouched(false)
+    setUseCheckout(false)
     setDraft({ mode: 'new' })
   }
 
@@ -154,9 +164,12 @@ export default function TabRail() {
     if (d.mode === 'new') {
       const [owner, repo] = newRepo().split('/')
       if (!owner || !repo) return setDraft(null)
-      const branch = effectiveBranch()
+      // Current-checkout task: main adopts the checkout's real branch; the seed branch is only the
+      // fallback when the desktop bridge is absent. Otherwise cut a worktree on the derived branch.
+      const branch = useCheckout() ? effectiveBranch() || 'HEAD' : effectiveBranch()
       if (!branch) return
-      const w = await createTask({ origin: 'local', repoOwner: owner, repoName: repo, branch, title: value })
+      const seed = { origin: 'local' as const, repoOwner: owner, repoName: repo, branch, title: value }
+      const w = useCheckout() ? await createCheckoutTask(seed) : await createTask(seed)
       await invalidate()
       activateTaskSignals(w, { pane: 'pr' }) // fresh local task → start on the PR/default pane
       navigate(pathForTask(w))
@@ -340,12 +353,16 @@ export default function TabRail() {
               <div class="overlay-title">{d().mode === 'new' ? 'New task' : 'Rename task'}</div>
               <div class="overlay-body">
                 <Show when={d().mode === 'new'}>
-                  <p class="muted">A local-first task on a new branch.</p>
+                  <p class="muted">{useCheckout() ? "Works in the repo's current checkout and branch — no worktree." : 'A local-first task on a new branch.'}</p>
                   <select class="integration-key-input" value={newRepo()} onChange={(e) => setNewRepo(e.currentTarget.value)}>
                     <For each={activeWorkspace()?.repos ?? []}>
                       {(r) => <option value={`${r.owner}/${r.name}`}>{r.owner}/{r.name}</option>}
                     </For>
                   </select>
+                  <label class="muted" style={{ display: 'flex', 'align-items': 'center', gap: '6px' }}>
+                    <input type="checkbox" checked={useCheckout()} onChange={(e) => setUseCheckout(e.currentTarget.checked)} />
+                    Use current checkout (no worktree)
+                  </label>
                 </Show>
                 <form class="integration-key-row" style={{ 'flex-direction': 'column', 'align-items': 'stretch', gap: '6px' }} onSubmit={submitDraft}>
                   <input
@@ -357,7 +374,7 @@ export default function TabRail() {
                     onInput={(e) => setText(e.currentTarget.value)}
                     onKeyDown={(e) => e.key === 'Escape' && setDraft(null)}
                   />
-                  <Show when={d().mode === 'new'}>
+                  <Show when={d().mode === 'new' && !useCheckout()}>
                     <input
                       class="integration-key-input"
                       type="text"
@@ -371,7 +388,7 @@ export default function TabRail() {
                       onKeyDown={(e) => e.key === 'Escape' && setDraft(null)}
                     />
                   </Show>
-                  <button type="submit" class="overlay-btn" disabled={!text().trim() || (d().mode === 'new' && !effectiveBranch())}>
+                  <button type="submit" class="overlay-btn" disabled={!text().trim() || (d().mode === 'new' && !useCheckout() && !effectiveBranch())}>
                     {d().mode === 'new' ? 'Create' : 'Save'}
                   </button>
                 </form>

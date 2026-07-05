@@ -1,11 +1,12 @@
 import { createMemo, createResource, For, Show } from 'solid-js'
 import { createQuery, useQueryClient } from '@tanstack/solid-query'
-import { useNavigate } from '@solidjs/router'
+import { useNavigate, useParams } from '@solidjs/router'
 import type { RunTargetInfo } from '../../../shared/terminal'
-import { tasksKey, tasksOptions } from '../../queries'
+import { tasksKey, tasksOptions, workspacesOptions } from '../../queries'
+import { workspaceForRepo } from '../workspaces/activeWorkspace'
 import { refreshSessions } from '../terminal/sessions'
 import { terminalApi } from '../terminal/terminalClient'
-import { activeLayout, activeTaskId, dispatchActiveLayout, dispatchLayout, isTerminalOpen, setRecipeBrowserUrl, setTerminalOpen } from '../tasks/tasks'
+import { activeLayout, activeTaskId, dispatchActiveLayout, dispatchLayout, isTerminalOpen, selectedSource, setRecipeBrowserUrl, setSelectedSource, setTerminalOpen } from '../tasks/tasks'
 import { activateTaskSignals, pathForTask } from '../tasks/activate'
 import { evictPreviewWebview } from '../preview/PreviewPane'
 import { PANE_LABELS, PANE_ORDER, type PaneId } from '../tasks/layout'
@@ -26,7 +27,9 @@ export default function CommandPalette() {
   const api = terminalApi()
   const queryClient = useQueryClient()
   const navigate = useNavigate()
+  const params = useParams()
   const tasks = createQuery(() => tasksOptions(true))
+  const workspaces = createQuery(() => workspacesOptions(true))
 
   const palette = createOverlayPalette({
     count: () => items().length,
@@ -82,11 +85,20 @@ export default function CommandPalette() {
       .map((t) => ({ id: t.id, label: `Go to task: ${t.title}`, hint: `${t.repoOwner}/${t.repoName}` }))
   }
 
+  // Switch-workspace rows: every workspace except the current one (derived from the route repo, like
+  // App's activeWorkspace). Picking one navigates to its first repo, mirroring the topbar picker.
+  const workspaceItems = () => {
+    const active = workspaceForRepo(workspaces.data, params.owner, params.repo)
+    return (workspaces.data ?? [])
+      .filter((w) => w.id !== active?.id)
+      .map((w) => ({ id: w.id, label: `Switch workspace: ${w.name}`, hint: `${(w.repos ?? []).length} repos` }))
+  }
+
   const items = createMemo<PaletteItem[]>(() => {
     const { targets, errors, layouts } = runInfo()
     const wf = wfData()
     return fuzzyFilter(
-      composeItems({ targets, errors: [...errors, ...(wf?.errors ?? [])], layouts, workflows: wf?.workflows ?? [], actions: actions(), tasks: taskItems() }),
+      composeItems({ targets, errors: [...errors, ...(wf?.errors ?? [])], layouts, workflows: wf?.workflows ?? [], actions: actions(), workspaces: workspaceItems(), tasks: taskItems() }),
       palette.query(),
     )
   })
@@ -101,6 +113,16 @@ export default function CommandPalette() {
       if (t) {
         activateTaskSignals(t)
         navigate(pathForTask(t))
+      }
+      return
+    }
+    if (item.kind === 'workspace') {
+      // Navigation, not task-scoped — mirror the topbar picker: jump to the workspace's first repo.
+      const w = workspaces.data?.find((x) => `workspace:${x.id}` === item.id)
+      const first = w?.repos[0]
+      if (first) {
+        if (!selectedSource()) setSelectedSource('github')
+        navigate(`/${first.owner}/${first.name}`)
       }
       return
     }
@@ -172,7 +194,7 @@ export default function CommandPalette() {
           <input
             ref={palette.setInputRef}
             class="palette-input"
-            placeholder="Run a target, switch a pane or task, archive…"
+            placeholder="Run a target, switch a pane, task or workspace, archive…"
             value={palette.query()}
             onInput={(e) => palette.setQuery(e.currentTarget.value)}
           />

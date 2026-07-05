@@ -177,6 +177,14 @@ export const createTask = async (seed: TaskSeed) => {
   void terminalApi()?.task.onCreated(task.id)
   return task
 }
+// Create a task that borrows the mapped checkout (current dir + current branch) instead of an
+// isolated worktree. Awaits useCheckout (not onCreated) so no worktree is ever created; without the
+// desktop bridge it degrades to a normal local task on the seed branch. Callers invalidate tasksKey.
+export const createCheckoutTask = async (seed: TaskSeed) => {
+  const task = await post<Task>(tasksRoute, seed)
+  const patch = await terminalApi()?.task.useCheckout(task.id)
+  return patch ? { ...task, ...patch } : task
+}
 // Local review notes (docs/panes.md). Callers invalidate reviewNotesKey(taskId) after.
 export const addReviewNote = (taskId: string, seed: ReviewNoteSeed) => post<ReviewNote>(reviewNotesRoute(taskId), seed)
 export const editReviewNote = (taskId: string, noteId: string, body: string) =>
