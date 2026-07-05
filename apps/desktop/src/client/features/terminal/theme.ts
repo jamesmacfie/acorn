@@ -9,7 +9,7 @@ import { getHighlighter } from '../../shiki'
 //    with (github-light/dark ship `terminal.ansi*` colours), so terminal output and diff syntax
 //    share one colour source. Adding an app theme = CSS tokens + a Shiki theme; nothing here.
 
-const token = (name: string) => getComputedStyle(document.documentElement).getPropertyValue(name).trim()
+export const token = (name: string) => getComputedStyle(document.documentElement).getPropertyValue(name).trim()
 
 const ANSI = ['black', 'red', 'green', 'yellow', 'blue', 'magenta', 'cyan', 'white'] as const
 
