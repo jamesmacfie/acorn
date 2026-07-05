@@ -127,7 +127,8 @@ describe('local diff over a real worktree', () => {
     await expect(localFileBlob(dir, 'src/a.ts', '--evil')).rejects.toThrow('Invalid ref')
   })
 
-  it('stage/unstage/discard/commit land the reviewed work (docs/next 04 P4)', async () => {
+  // ~15 sequential git spawns — over vitest's 5s default on a busy machine.
+  it('stage/unstage/discard/commit land the reviewed work (docs/next 04 P4)', { timeout: 15_000 }, async () => {
     // stage → commit
     writeFileSync(join(dir, 'src', 'a.ts'), 'line1\nCOMMIT ME\nline3\n')
     expect(await stageFile(dir, 'src/a.ts')).toEqual({ ok: true })

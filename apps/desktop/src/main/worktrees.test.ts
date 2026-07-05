@@ -42,7 +42,8 @@ describe('worktree base-ref precedence (docs/next 02 P2)', () => {
 
   afterEach(() => rmSync(dir, { recursive: true, force: true }))
 
-  it('resolveBaseRef: preferred → origin/main → null', async () => {
+  // Several sequential git spawns — over vitest's 5s default when the whole suite runs in parallel.
+  it('resolveBaseRef: preferred → origin/main → null', { timeout: 15_000 }, async () => {
     expect(await resolveBaseRef(checkout, 'origin/develop')).toBe('origin/develop')
     expect(await resolveBaseRef(checkout, 'missing/ref')).toBe('origin/main')
     expect(await resolveBaseRef(checkout, null)).toBe('origin/main')
