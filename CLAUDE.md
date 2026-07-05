@@ -68,9 +68,12 @@ pnpm workspace + Turborepo; all app code is in `apps/desktop`.
   from the OS keychain (planned, Phase 3). `SESSION_ENC_KEY` must be **exactly 64 hex chars**
   (`openssl rand -hex 32`); `session.ts` rejects anything else. It also encrypts integration tokens
   at rest (e.g. Linear) via `encryptSecret`/`decryptSecret`, so it stays even if the cookie does not.
-- **better-sqlite3 ABI:** the native module builds for *one* ABI at a time. `pnpm dev` (Electron)
-  needs the Electron ABI (`pnpm --filter @acorn/desktop electron:rebuild`); `dev:node`/`db:migrate` (plain
-  Node) need the Node ABI (`node:rebuild`). Switch with those scripts.
+- **better-sqlite3 ABI:** `better-sqlite3`/`node-pty` are native — a compiled `.node` matches *one*
+  ABI at a time. `pnpm dev` (Electron) needs the Electron ABI; `pnpm test` / `dev:node` / `db:migrate`
+  (plain Node) need the Node ABI. `pnpm test` self-heals — it rebuilds for the Node ABI first (a fast
+  no-op when already there), so it works from any state. Afterwards run `pnpm run rebuild` (Electron
+  ABI) before `pnpm dev`. (`node:rebuild`/`electron:rebuild` switch manually; the old
+  `pnpm rebuild …` form is shadowed by the root `rebuild` script and always builds Electron.)
 - **OAuth callback:** register `http://127.0.0.1:4317/auth/callback` (the `127.0.0.1` form, not
   `localhost`) on the GitHub OAuth app. See [docs/electron.md](./docs/electron.md) §4f.
 - **Blob cache:** `BLOBS` is a local on-disk dir keyed by SHA (`patch:<sha>` / `filebody:<sha>`
