@@ -5,7 +5,7 @@ import type { Task } from '../../queries'
 import { debounce } from '../../autosave'
 import { editorApi, type EditorEntry } from './editorClient'
 import { formatFileReference, sendReferenceToAgent } from '../agent/reference'
-import { isAppDark, watchTheme } from '../terminal/theme'
+import { isAppDark, token, watchTheme } from '../terminal/theme'
 import { onClosePaneWithin } from '../../lib/onClosePaneWithin'
 import { activeFile, editorActivate, editorClose, editorOpen, editorPromote, editorSetDirty, openFiles } from './editorState'
 import './editor.css'
@@ -19,6 +19,28 @@ const EXT_LANG: Record<string, string> = {
   sh: 'shell', bash: 'shell', yml: 'yaml', yaml: 'yaml', sql: 'sql', toml: 'ini', ini: 'ini',
 }
 const langFor = (name: string): string => EXT_LANG[name.split('.').pop()?.toLowerCase() ?? ''] ?? 'plaintext'
+
+// Monaco (like xterm) ignores CSS custom properties, so it gets an explicit theme: base vs/vs-dark
+// supplies the syntax colours, chrome colours come from the live app tokens (tokens-layout.css) —
+// the same recipe terminal/theme.ts uses. Re-defining 'app' on theme change updates in place; the
+// name is global, so every editor instance follows.
+function applyMonacoTheme() {
+  monaco.editor.defineTheme('app', {
+    base: isAppDark() ? 'vs-dark' : 'vs',
+    inherit: true,
+    rules: [],
+    colors: {
+      'editor.background': token('--bg'),
+      'editor.foreground': token('--text'),
+      'editorCursor.foreground': token('--text'),
+      'editorLineNumber.foreground': token('--text-faint'),
+      'editorLineNumber.activeForeground': token('--text-muted'),
+      'editor.lineHighlightBackground': token('--bg-hover'),
+      'editor.selectionBackground': token('--bg-selected'),
+    },
+  })
+  monaco.editor.setTheme('app')
+}
 
 // The Monaco editor pane (docs/next 07): a lazy file tree on the left, a file TAB BAR + one reused
 // Monaco instance on the right. Single-click opens an ephemeral (italic) preview tab; editing or
@@ -66,15 +88,16 @@ export default function EditorPane(props: { task: Task }) {
       const r = await api.root(props.task.id)
       setRoot(r) // renders the host div synchronously when truthy
       if (!r || !host) return
+      applyMonacoTheme()
       editor = monaco.editor.create(host, {
         automaticLayout: true,
-        theme: isAppDark() ? 'vs-dark' : 'vs',
+        theme: 'app',
         readOnly: true, // until a file is opened
         minimap: { enabled: false },
       })
       editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyS, () => void save()) // explicit flush; autosave still runs
       editor.onDidBlurEditorText(() => scheduleSave.flush())
-      stopTheme = watchTheme(() => monaco.editor.setTheme(isAppDark() ? 'vs-dark' : 'vs'))
+      stopTheme = watchTheme(applyMonacoTheme)
       window.addEventListener('focus', onFocus)
       const restore = active()
       if (restore) void show(restore)
