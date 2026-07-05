@@ -173,7 +173,7 @@ caching each hit under its resolving connection.
 
 ## 5. Rollbar
 
-Rollbar is the newer, thinner Source (designed in `docs/next/10`). Its client
+Rollbar is the newer, thinner Source. Its client
 (`server/rollbar/index.ts`) is a REST wrapper over `https://api.rollbar.com/api/1`, authenticating
 with a project-read token in `X-Rollbar-Access-Token`. Rollbar wraps every response as
 `{ err, result }`, so `rollbarData` treats a non-zero `err` (or HTTP failure) as an error.

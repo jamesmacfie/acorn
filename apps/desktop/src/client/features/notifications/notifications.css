@@ -1,4 +1,4 @@
-/* Notification bell + popover (docs/next 05). Popovers are the only elevated surface. */
+/* Notification bell + popover (docs/terminal-and-agents.md). Popovers are the only elevated surface. */
 .notify-bell { position: relative; }
 .notify-count {
   position: absolute;
@@ -68,7 +68,7 @@
 .notify-detail { flex: 1; min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
 .notify-time { flex: none; margin-left: auto; }
 
-/* Rail needs-input marker (docs/next 05): unread notice on a task row. */
+/* Rail needs-input marker (docs/terminal-and-agents.md): unread notice on a task row. */
 .tabrail-needs {
   position: absolute;
   top: 4px;

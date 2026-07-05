@@ -30,7 +30,7 @@ const agent = (over: Partial<S>): S => ({
   ...over,
 })
 
-describe('detectEdges (docs/next 05)', () => {
+describe('detectEdges (docs/terminal-and-agents.md)', () => {
   it('working → idle raises finished', () => {
     const out = detectEdges([agent({})], [agent({ idle: true, agentState: 'idle' })], 100)
     expect(out).toEqual([{ taskId: 't1', kind: 'finished', title: 'claude finished', detail: 'agent went idle', at: 100 }])

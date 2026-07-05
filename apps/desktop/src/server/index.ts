@@ -38,12 +38,12 @@ export function createApp() {
     .route('/api/prefs', prefs)
     .route('/api/workspaces', workspaces)
     .route('/api/tasks', tasks)
-    .route('/api/tasks', reviewNotes) // /:id/review-notes — local inline notes (docs/next 04 §C)
+    .route('/api/tasks', reviewNotes) // /:id/review-notes — local inline notes (docs/panes.md)
     .route('/api/tasks', taskContext) // /:id/context — the assembled task context (docs/next 11 §C)
-    .route('/api/tasks', harness) // /:id/notes|memory|run — the MCP feature-tool surface (docs/next 06)
+    .route('/api/tasks', harness) // /:id/notes|memory|run — the MCP feature-tool surface (docs/mcp.md)
     .route('/api/integrations', integrations) // connect/disconnect/status for third-party providers
     .route('/api/linear', linear) // Linear issues referenced from a PR (read, cached per-user)
-    .route('/api/rollbar', rollbar) // Rollbar items browse + detail, cached into `issues` (docs/next 10)
+    .route('/api/rollbar', rollbar) // Rollbar items browse + detail, cached into `issues` (docs/integrations.md)
     .route('/api/repos', repos)
     .route('/api/repos', repoLabels) // /:owner/:repo/labels — repo label choices for the PR picker
     .route('/api/repos', pulls) // repo-scoped sub-resources, e.g. /:owner/:repo/pulls

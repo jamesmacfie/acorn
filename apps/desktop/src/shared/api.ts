@@ -107,7 +107,7 @@ export type LinearProjectsResponse = { projects: LinearProject[] }
 export type LinearProjectIssue = LinearIssueSummary & { integrationId: string; branchName: string | null }
 export type LinearProjectIssuesResponse = { issues: LinearProjectIssue[] }
 
-// --- Rollbar (docs/next 10): deduped error items, cached into `issues` — zero new schema. ---
+// --- Rollbar (docs/integrations.md): deduped error items, cached into `issues` — zero new schema. ---
 export type RollbarItem = {
   integrationId: string
   identifier: string // the visible item counter ('142')
@@ -134,7 +134,7 @@ export type SetupTrigger = 'off' | 'created' | 'terminal'
 // How the browser-preview pane resolves its URL: a fixed URL, http://localhost:<port>, or the
 // stdout of a shell command run in the repo's worktree. null falls back to the dev-server port.
 export type PreviewMode = 'url' | 'port' | 'script'
-// Workspace identity (docs/next 01): a small JSON-stored icon union (grows without migrations) and
+// Workspace identity (docs/workspaces-and-tasks.md): a small JSON-stored icon union (grows without migrations) and
 // a colour (preset token key or 6-hex). null → derived defaults (name-hash colour, initial glyph).
 export type WorkspaceIcon =
   | { kind: 'emoji'; value: string }
@@ -149,7 +149,7 @@ export type Workspace = {
   setupScriptTrigger: SetupTrigger | null
   devScript: string | null // per-workspace "run dev" command surfaced as a `dev` run target; null/blank = none
   devRestartScript: string | null // per-workspace restart command for the `dev` target; null/blank = stop+start
-  teardownScript: string | null // shell command run in the worktree just before removal (docs/next 02); null/blank = none
+  teardownScript: string | null // shell command run in the worktree just before removal (docs/terminal-and-agents.md); null/blank = none
   previewMode: PreviewMode | null // how the browser-preview URL is resolved; null → dev-server port
   previewValue: string | null // the URL, port, or command per previewMode; null/blank = unset
   icon: WorkspaceIcon | null
@@ -206,7 +206,7 @@ export type TaskContext = {
 export const taskContextRoute = (id: string, include?: TaskContextInclude[]) =>
   `/api/tasks/${id}/context${include?.length ? `?include=${include.join(',')}` : ''}`
 
-// Local review notes (docs/next 04 §C): inline annotations on uncommitted changes, acorn-owned.
+// Local review notes (docs/panes.md): inline annotations on uncommitted changes, acorn-owned.
 export type ReviewNote = {
   id: string
   taskId: string

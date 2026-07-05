@@ -26,7 +26,7 @@ export default function WorkspaceSettings(props: { workspace: Workspace; onDelet
   const [hex, setHex] = createSignal(props.workspace.color && !(props.workspace.color in WORKSPACE_COLORS) ? props.workspace.color : '')
   const refresh = () => qc.invalidateQueries({ queryKey: workspacesKey })
 
-  // Identity (docs/next 01): emoji icon (blank clears back to the derived initial) + a colour
+  // Identity (docs/workspaces-and-tasks.md): emoji icon (blank clears back to the derived initial) + a colour
   // swatch row (preset tokens) with a free hex input. Saves immediately — these are single scalars.
   const saveIcon = async (value: string) => {
     setBusy(true)

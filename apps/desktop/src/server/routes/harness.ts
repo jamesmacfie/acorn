@@ -1,7 +1,7 @@
 import { Hono, type Context } from 'hono'
 import type { AppEnv } from '../middleware/auth'
 
-// Harness routes (docs/next 06 catalog): the loopback surface the acorn MCP server's feature tools
+// Harness routes (docs/mcp.md): the loopback surface the acorn MCP server's feature tools
 // call — notes, memory (search/get/list + PROPOSE, never a silent write), run targets and the
 // drivable browser. The backings live in the main process (NotesStore, memory index + runtime
 // service, CDP driver), which shares this process in Electron; main/harnessWiring.ts injects one
@@ -34,7 +34,7 @@ export type RunBridge = {
   status(taskId: string, targetId: string): Promise<unknown>
 }
 
-// Drivable browser (docs/next 08 P2): CDP over the task's preview webview.
+// Drivable browser (docs/panes.md): CDP over the task's preview webview.
 export type BrowserBridge = {
   navigate(taskId: string, url: string): Promise<unknown>
   snapshot(taskId: string): Promise<unknown>

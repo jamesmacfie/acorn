@@ -36,7 +36,7 @@ const API_ITEM = {
   last_occurrence_timestamp: 1_700_100_000,
 }
 
-describe('Rollbar source (docs/next 10 — zero schema changes)', () => {
+describe('Rollbar source (docs/integrations.md — zero schema changes)', () => {
   let t: TestDb
   let app: Hono<AppEnv>
 

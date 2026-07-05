@@ -18,7 +18,7 @@ export type LayoutAction =
   | { type: 'close'; pane: PaneId }
   | { type: 'replace'; layout: TaskLayout } // recipe seeding — validated wholesale
 
-// Human labels for each pane, used by the switcher tooltips and the command palette (docs/next 17).
+// Human labels for each pane, used by the switcher tooltips and the command palette (docs/command-palette-and-shortcuts.md).
 export const PANE_LABELS: Record<PaneId, string> = {
   pr: 'PR review',
   linear: 'Linear',

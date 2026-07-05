@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { inspectMcpConfig, maskSecretEnv, MCP_CANDIDATES } from './mcp'
 
-describe('inspectMcpConfig (docs/next 06 A)', () => {
+describe('inspectMcpConfig (docs/mcp.md)', () => {
   it('parses the real-world .mcp.json shape (stdio + http)', () => {
     const text = JSON.stringify({
       mcpServers: {

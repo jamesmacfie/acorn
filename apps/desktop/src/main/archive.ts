@@ -1,4 +1,4 @@
-// Task archive orchestration (docs/workspaces 05 + docs/next 02 P1). Extracted from the IPC
+// Task archive orchestration (docs/workspaces 05 + docs/terminal-and-agents.md). Extracted from the IPC
 // handler so the lifecycle ordering — guard → teardown script (while the worktree still exists) →
 // stop sessions → remove worktree → mark archived — is testable under plain Node against a real
 // temp git repo. Electron/PTY concerns (the live session map, drawer streaming) are injected.
@@ -66,7 +66,7 @@ export async function archiveTask(db: AppDatabase, id: string, opts: ArchiveOpts
   const [t] = await db.select().from(schema.tasks).where(eq(schema.tasks.id, id))
   if (!t) return { ok: false, reason: 'Task not found.' }
 
-  // Teardown (docs/next 02): runs while the worktree and any services still exist — before
+  // Teardown (docs/terminal-and-agents.md): runs while the worktree and any services still exist — before
   // sessions are stopped and before removal. Non-zero exit pauses the archive so the caller can
   // choose continue (re-invoke with skipTeardown) or abort; nothing has been torn down yet.
   if (deleteWorktree && !opts.skipTeardown && t.worktreePath && deps.isDir(t.worktreePath)) {

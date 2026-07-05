@@ -11,7 +11,8 @@
 
 ```ts
 // Named group of repos — the top-level unit (machine-scoped). Has grown per-group settings
-// (docs/next 01/02/08/13): setup/dev/teardown scripts, preview resolution, icon & color.
+// (docs/workspaces-and-tasks.md; run/config design in docs/next 13): setup/dev/teardown scripts,
+// preview resolution, icon & color.
 workspaces            { id, name, isDefault, sort, setupScript, setupScriptTrigger,
                         devScript, devRestartScript, teardownScript, previewMode, previewValue,
                         icon, color, createdAt, updatedAt }

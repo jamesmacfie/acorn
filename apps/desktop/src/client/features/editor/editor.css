@@ -110,7 +110,7 @@
   font-size: 9px;
 }
 
-/* File tab bar (docs/next 07): flat/square, 1px borders; italic = ephemeral preview tab. */
+/* File tab bar (docs/panes.md): flat/square, 1px borders; italic = ephemeral preview tab. */
 .editor-tabs {
   flex: none;
   display: flex;

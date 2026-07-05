@@ -85,7 +85,7 @@
 .repo-picker-label { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
 .repo-picker-chevron { flex: none; color: var(--text-muted); font-size: 10px; }
 
-/* Workspace colour dot leading the workspace-picker rows (docs/next 01). */
+/* Workspace colour dot leading the workspace-picker rows (docs/workspaces-and-tasks.md). */
 .ws-color-dot {
   flex: none;
   width: 10px;

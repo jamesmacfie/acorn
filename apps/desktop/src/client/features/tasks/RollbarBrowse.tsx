@@ -19,9 +19,9 @@ const relTime = (at: number | null): string => {
   return `${Math.round(s / 86400)}d`
 }
 
-// The Rollbar Source browse (docs/next 10): recent error items across connected projects. An
+// The Rollbar Source browse (docs/integrations.md): recent error items across connected projects. An
 // error has no inherent repo/branch, so promotion prompts for both (branch defaults to a slug of
-// the title, docs/next 02); with a task active, a row can instead attach to it (11 §A link growth).
+// the title, docs/terminal-and-agents.md); with a task active, a row can instead attach to it (11 §A link growth).
 export default function RollbarBrowse() {
   const navigate = useNavigate()
   const params = useParams()
@@ -63,7 +63,7 @@ export default function RollbarBrowse() {
     navigate(`/${owner}/${repo}`)
   }
 
-  // Rollbar's most common flow (docs/next 10): the error belongs to the task you're already on.
+  // Rollbar's most common flow (docs/integrations.md): the error belongs to the task you're already on.
   async function attach(item: RollbarItem) {
     const taskId = activeTaskId()
     if (!taskId) return window.alert('No active task — open one first, or use “open as task”.')

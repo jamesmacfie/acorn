@@ -7,8 +7,7 @@ read-only **Settings → MCP** inspector for the agents' own config files. This 
 > Maturity: the MCP server and its Settings surface are wired and used when the desktop app is
 > running (the agent/terminal features it depends on are desktop-only and always on; see
 > [terminal-and-agents.md](./terminal-and-agents.md)). The feature-tool endpoints require
-> the main-process harness bridge and degrade to a clean `503` without it (e.g. `dev:node`). Designed
-> in `docs/next/06-mcp.md`.
+> the main-process harness bridge and degrade to a clean `503` without it (e.g. `dev:node`).
 
 ## 1. What it is
 

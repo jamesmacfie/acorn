@@ -19,7 +19,7 @@ const STATE_GLYPH: Record<string, string> = {
   unknown: '·',
 }
 
-// The Agents panel (docs/next 15 P1–P2): ONE right-rail surface = roster (PTY sessions + workflow
+// The Agents panel (docs/terminal-and-agents.md): ONE right-rail surface = roster (PTY sessions + workflow
 // steps) + "+ New agent" launcher + the per-agent view — an activity feed for headless/workflow
 // agents (their stream-json has no TUI), a jump-to-terminal for interactive ones, gate prompts
 // inline, and "open in terminal" (--resume) for any step with a session id. The raw xterm drawer

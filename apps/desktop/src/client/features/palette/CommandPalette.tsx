@@ -61,7 +61,7 @@ export default function CommandPalette() {
     const id = activeTaskId()
     if (!id) return []
     const openPanes = new Set(activeLayout().panes)
-    // Show any pane (docs/next 17 §B.1 — full PaneId set, not the old 4); Close only open panes,
+    // Show any pane (docs/command-palette-and-shortcuts.md — full PaneId set, not the old 4); Close only open panes,
     // and only when >1 is open (closing the last pane is a no-op the reducer guards anyway).
     const paneShow = PANE_ORDER.map((p) => ({ id: `action:pane-${p}`, label: `Show pane: ${PANE_LABELS[p]}` }))
     const paneClose = openPanes.size > 1 ? PANE_ORDER.filter((p) => openPanes.has(p)).map((p) => ({ id: `action:pane-close-${p}`, label: `Close pane: ${PANE_LABELS[p]}` })) : []
@@ -105,7 +105,7 @@ export default function CommandPalette() {
       return
     }
     if (item.kind === 'action' && item.id.startsWith('action:pane-')) {
-      // Generic pane transitions (docs/next 17 §B.1): "close-<id>" closes, "<id>" shows.
+      // Generic pane transitions (docs/command-palette-and-shortcuts.md): "close-<id>" closes, "<id>" shows.
       const isClose = item.id.startsWith('action:pane-close-')
       const pane = item.id.slice((isClose ? 'action:pane-close-' : 'action:pane-').length) as PaneId
       dispatchActiveLayout({ type: isClose ? 'close' : 'show', pane })

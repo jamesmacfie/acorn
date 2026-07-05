@@ -1,4 +1,4 @@
-// Notification centre (docs/next 05): a bounded in-memory ring of agent-event notices, mirrored to
+// Notification centre (docs/terminal-and-agents.md): a bounded in-memory ring of agent-event notices, mirrored to
 // a prefs blob so the last ~50 survive a reload — ephemeral app state, not a table (the durable
 // truth is the session/task). Signals-only, like sessions.ts. Edge detection is pure (detectEdges),
 // fed by the sessions store on every refresh; OS toasts are focus-gated + cooldown/deduped here
@@ -64,7 +64,7 @@ export function hydrateNotices(json: string | undefined): void {
 }
 export const serializeNotices = (): string => JSON.stringify(notices())
 
-// --- Pure edge detection (docs/next 05): compare consecutive session snapshots. Edges are
+// --- Pure edge detection (docs/terminal-and-agents.md): compare consecutive session snapshots. Edges are
 // tracked unconditionally (suppression only affects the OS toast) so the NEXT transition is right.
 type SessionEdgeState = Pick<TerminalSession, 'id' | 'taskId' | 'title' | 'kind' | 'status' | 'idle' | 'agentState' | 'exitCode'>
 
@@ -93,7 +93,7 @@ export function detectEdges(prev: SessionEdgeState[], next: SessionEdgeState[], 
   return out
 }
 
-// --- OS-toast gating (docs/next 05 P2): focused window → bell only; plus a per-(task,kind)
+// --- OS-toast gating (docs/terminal-and-agents.md): focused window → bell only; plus a per-(task,kind)
 // cooldown so a chatty agent can't spam. Pure — state is passed in.
 export const TOAST_COOLDOWN_MS = 30_000
 
@@ -110,7 +110,7 @@ export function shouldToast(
   return true
 }
 
-// Workflow notices (docs/next 14/05): main broadcasts gate/run-done events; they land in the same
+// Workflow notices (docs/next 14, docs/terminal-and-agents.md): main broadcasts gate/run-done events; they land in the same
 // bell + toast gate. Returns unsubscribe; noop off-desktop.
 export function initWorkflowNotices(): () => void {
   const wf = window.acorn?.terminal?.workflow

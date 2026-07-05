@@ -6,7 +6,7 @@ import { openSession, sealSession, SESSION_COOKIE, SESSION_TTL_SECONDS, type Ses
 export type SessionUser = SessionData
 export type AppEnv = { Bindings: Env; Variables: { user: SessionUser | null } }
 
-// Internal loopback auth (docs/next 06 B): the acorn MCP server holds no session cookie; it sends
+// Internal loopback auth (docs/mcp.md): the acorn MCP server holds no session cookie; it sends
 // the per-app-run INTERNAL_TOKEN instead. The identity is the machine's single user (this is a
 // machine-local single-user app — same reasoning as the machine-scoped tables), resolved from the
 // mirror's user rows; the GitHub token stays empty, so internal callers can only read local

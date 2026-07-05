@@ -6,7 +6,7 @@ import type { AppEnv } from '../middleware/auth'
 import { itemByCounterPath, itemsPath, levelName, rollbarData, rollbarFetch, type RollbarApiItem } from '../rollbar'
 import { decryptSecret } from '../session'
 
-// /api/rollbar — the Rollbar Source's reads (docs/next 10): recent items per connection + one
+// /api/rollbar — the Rollbar Source's reads (docs/integrations.md): recent items per connection + one
 // item's detail, cached into the generic `issues` table (provider 'rollbar', identifier = the
 // visible counter) with serve-then-revalidate — ZERO new schema, the litmus test the Source
 // contract was built for.

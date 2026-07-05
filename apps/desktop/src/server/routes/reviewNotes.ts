@@ -5,7 +5,7 @@ import type { ReviewNote } from '../../shared/api'
 import { getDb, schema } from '../db'
 import type { AppEnv } from '../middleware/auth'
 
-// Local review notes (docs/next 04 §C): CRUD over the machine-scoped review_notes table. The send
+// Local review notes (docs/panes.md): CRUD over the machine-scoped review_notes table. The send
 // loop: create (unsent) → deliver via sendToAgent → POST /sent stamps sentAt → an edit clears it,
 // so the UI always shows sent/unsent truthfully. Mounted under /api/tasks.
 

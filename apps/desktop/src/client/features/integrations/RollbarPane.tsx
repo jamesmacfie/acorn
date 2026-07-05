@@ -4,7 +4,7 @@ import { rollbarItemRoute, type RollbarItem, type Task, type TaskLink } from '..
 
 const fmt = (at: number | null): string => (at ? new Date(at).toLocaleString() : '—')
 
-// The Rollbar provider pane (docs/next 10 P2 / 03 §providers): the task's linked errors, resolved
+// The Rollbar provider pane (docs/integrations.md / docs/panes.md): the task's linked errors, resolved
 // task_links → the /api/rollbar detail route (which serves the `issues` cache). A chip strip
 // switches between several linked items, mirroring the Linear panel's shape.
 export default function RollbarPane(props: { task: Task }) {

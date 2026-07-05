@@ -9,7 +9,7 @@ const integration = (provider: Integration['provider'], connected = true): Integ
   connected,
 })
 
-describe('availableSources (docs/next 10 — gated by integration rows)', () => {
+describe('availableSources (docs/integrations.md — gated by integration rows)', () => {
   it('GitHub always; Linear/Rollbar iff connected', () => {
     expect(availableSources(undefined).map((s) => s.id)).toEqual(['github'])
     expect(availableSources([integration('linear')]).map((s) => s.id)).toEqual(['github', 'linear'])

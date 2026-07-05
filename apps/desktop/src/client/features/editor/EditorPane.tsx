@@ -42,7 +42,7 @@ function applyMonacoTheme() {
   monaco.editor.setTheme('app')
 }
 
-// The Monaco editor pane (docs/next 07): a lazy file tree on the left, a file TAB BAR + one reused
+// The Monaco editor pane (docs/panes.md): a lazy file tree on the left, a file TAB BAR + one reused
 // Monaco instance on the right. Single-click opens an ephemeral (italic) preview tab; editing or
 // double-click promotes it. ⌘S saves; dirty dot on the tab; reload-on-focus with a dirty guard
 // (the agent and the human share the worktree).
@@ -156,7 +156,7 @@ export default function EditorPane(props: { task: Task }) {
     savedVersion.delete(relPath)
   }
 
-  // External-change reload on window focus (docs/next 07 P2): the agent edits the same worktree.
+  // External-change reload on window focus (docs/panes.md): the agent edits the same worktree.
   // A clean model reloads silently; a dirty one is guarded (never clobber unsaved human edits).
   async function onFocus() {
     const p = currentPath

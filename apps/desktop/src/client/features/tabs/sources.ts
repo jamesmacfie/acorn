@@ -1,4 +1,4 @@
-// Source gating (docs/workspaces 04 / docs/next 10): which browse Sources the rail shows.
+// Source gating (docs/workspaces 04 / docs/integrations.md): which browse Sources the rail shows.
 // GitHub is always available; Linear/Rollbar appear iff a connected integration row exists.
 // Pure — unit tested; TabRail is the consumer.
 import type { Integration } from '../../../shared/api'

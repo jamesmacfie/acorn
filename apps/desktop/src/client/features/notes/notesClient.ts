@@ -1,6 +1,6 @@
 import { createSignal } from 'solid-js'
 
-// Typed accessor for the preload's `window.acorn.notes` bridge (docs/next 09). The Window global
+// Typed accessor for the preload's `window.acorn.notes` bridge (docs/notes-and-memory.md). The Window global
 // is declared once in terminalClient.ts. Note shapes are canonical in shared/notes.ts (main's
 // NotesStore imports the same types) — re-exported here so existing feature imports keep working.
 import type { Note, NoteAuthor, NoteKind, NoteSummary } from '../../../shared/notes'

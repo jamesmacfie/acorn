@@ -38,12 +38,12 @@ contextBridge.exposeInMainWorld('acorn', {
       status: (taskId: string, targetId: string) => ipcRenderer.invoke('run:status', { taskId, targetId }),
       defaultUrl: (taskId: string) => ipcRenderer.invoke('run:defaultUrl', taskId),
     },
-    // Local-changes review (docs/next 04): working-tree status/diffs/blobs for the ChangesPane.
+    // Local-changes review (docs/panes.md): working-tree status/diffs/blobs for the ChangesPane.
     local: {
       changes: (taskId: string) => ipcRenderer.invoke('local:changes', taskId),
       diff: (taskId: string, path: string, scope: 'unstaged' | 'staged') => ipcRenderer.invoke('local:diff', { taskId, path, scope }),
       blob: (taskId: string, path: string, ref?: string) => ipcRenderer.invoke('local:blob', { taskId, path, ref }),
-      // Stage/commit actions (docs/next 04 P4). Discard is confirmed in the renderer first.
+      // Stage/commit actions (docs/panes.md). Discard is confirmed in the renderer first.
       stage: (taskId: string, path: string) => ipcRenderer.invoke('local:stage', { taskId, path }),
       unstage: (taskId: string, path: string) => ipcRenderer.invoke('local:unstage', { taskId, path }),
       discard: (taskId: string, path: string, untracked?: boolean) => ipcRenderer.invoke('local:discard', { taskId, path, untracked }),
@@ -63,7 +63,7 @@ contextBridge.exposeInMainWorld('acorn', {
       statuses: () => ipcRenderer.invoke('term:task:statuses'),
     },
     write: (id: string, data: string) => ipcRenderer.send('term:input', { id, data }),
-    // Bracketed-paste delivery into an agent PTY (docs/next 04 §D).
+    // Bracketed-paste delivery into an agent PTY (docs/panes.md).
     sendToAgent: (sessionId: string, text: string, submit: 'now' | 'after-ready' | 'draft') =>
       ipcRenderer.invoke('term:sendToAgent', { sessionId, text, submit }),
     // Workflows (docs/next 14): start/list/inspect runs + the human-gate verdict; notices feed the bell.
@@ -96,11 +96,11 @@ contextBridge.exposeInMainWorld('acorn', {
       }
     },
   },
-  // Drivable browser (docs/next 08): bind the task's preview webview so main can drive it via CDP.
+  // Drivable browser (docs/panes.md): bind the task's preview webview so main can drive it via CDP.
   browser: {
     bind: (taskId: string, webContentsId: number) => ipcRenderer.invoke('browser:bind', { taskId, webContentsId }),
   },
-  // MCP config inspector (docs/next 06 A): known candidate files only, secrets masked in main.
+  // MCP config inspector (docs/mcp.md): known candidate files only, secrets masked in main.
   mcp: {
     inspect: (taskId: string) => ipcRenderer.invoke('mcp:inspect', taskId),
     createStarter: (taskId: string) => ipcRenderer.invoke('mcp:createStarter', taskId),
@@ -116,7 +116,7 @@ contextBridge.exposeInMainWorld('acorn', {
     resolveProposal: (id: string, approved: boolean, edited?: { name: string; type: string; description: string; body: string }) =>
       ipcRenderer.invoke('memory:proposal:resolve', { id, approved, edited }),
   },
-  // Workspace notes (docs/next 09): .md files with frontmatter under the app data dir; the pane
+  // Workspace notes (docs/notes-and-memory.md): .md files with frontmatter under the app data dir; the pane
   // and (later) the MCP notes_* tools share the one main-process store.
   notes: {
     list: (workspaceId: string) => ipcRenderer.invoke('notes:list', workspaceId),

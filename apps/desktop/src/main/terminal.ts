@@ -76,7 +76,7 @@ type Session = {
 
 const sessions = new Map<string, Session>()
 
-// sendToAgent (docs/next 04 §D): bracketed-paste delivery into agent PTYs, with 'after-ready'
+// sendToAgent (docs/panes.md): bracketed-paste delivery into agent PTYs, with 'after-ready'
 // queued on the idle edge below. One instance over the live session map.
 const agentSender = new AgentSender((id) => {
   const s = sessions.get(id)
@@ -89,7 +89,7 @@ const agentSender = new AgentSender((id) => {
 // memory.
 let memoryInjector: ((taskId: string, sessionId: string) => Promise<void>) | null = null
 
-// Loopback API access for agent-spawned processes (docs/next 06 B): the MCP server reads
+// Loopback API access for agent-spawned processes (docs/mcp.md): the MCP server reads
 // ACORN_API_URL + ACORN_API_TOKEN from its (inherited) session env. Set by registerTerminalIpc.
 let internalApiEnv: Record<string, string> = {}
 
@@ -99,7 +99,7 @@ let memoryReviewTrigger: ((taskId: string, transcriptTail: string) => Promise<vo
 
 const channel = (id: string) => `term:out:${id}`
 
-// PTY-tier AgentState (docs/next 05): shells stay 'unknown'; agents flip working/idle with the
+// PTY-tier AgentState (docs/terminal-and-agents.md): shells stay 'unknown'; agents flip working/idle with the
 // silence detector ('blocked' lands with the prompt-pattern scan).
 const ptyState = (kind: 'shell' | 'agent', status: 'running' | 'exited', idle: boolean): TerminalSession['agentState'] =>
   kind !== 'agent' ? 'unknown' : status !== 'running' ? 'done' : idle ? 'idle' : 'working'
@@ -244,7 +244,7 @@ function startIdleWatch() {
         // An idle session showing an input prompt in its tail is BLOCKED, not done (05 P3).
         s.meta.agentState = matchBlockedPrompt(s.ring.slice(-4000)) ? 'blocked' : 'idle'
         agentSender.onIdle(s.meta.id) // flush 'after-ready' sends on the busy→idle edge (04 §D)
-        // The OS toast moved to the renderer (docs/next 05): focus-gated + cooldown/dedup there.
+        // The OS toast moved to the renderer (docs/terminal-and-agents.md): focus-gated + cooldown/dedup there.
         broadcastStatus()
       }
     }
@@ -288,8 +288,8 @@ async function spawnOne(
   // merged in; otherwise the profile's binary. resolveCommand stays the path for shells/agents.
   const command = opts.command?.trim() || resolveCommand(profile)
   const id = randomUUID()
-  // Every task-scoped session carries the ACORN_* identity vars (docs/next 02/11) plus its own
-  // session id — MCP notes/memory writes use it for `author: agent` provenance (docs/next 09).
+  // Every task-scoped session carries the ACORN_* identity vars (docs/terminal-and-agents.md, docs/next 11) plus its own
+  // session id — MCP notes/memory writes use it for `author: agent` provenance (docs/notes-and-memory.md).
   const env = buildSessionEnv({
     taskId: opts.taskId,
     cwd,
@@ -346,7 +346,7 @@ async function spawnOne(
 }
 
 // acorn MCP server: the launcher + build-flavored name (dev vs prod), and which agent profiles get
-// it auto-registered when their terminal spawns (docs/next 06 P3). Module-level so both spawnOne and
+// it auto-registered when their terminal spawns (docs/mcp.md). Module-level so both spawnOne and
 // the ipc handlers share them.
 const mcpName = () => serverName(!process.defaultApp && !process.env.ELECTRON_IS_DEV)
 const mcpLauncher = () => launcherSpec(process.execPath, resolveMcpEntry(dirname(fileURLToPath(import.meta.url))), mcpName())
@@ -391,7 +391,7 @@ export async function registerTerminalIpc(db: AppDatabase, worktreesDir: string,
   setWorktreesRoot(worktreesDir)
   if (internal) internalApiEnv = { ACORN_API_URL: internal.apiUrl, ACORN_API_TOKEN: internal.token }
 
-  // Notes + memory surfaces (docs/next 09/12) — also hands back the stores/closures shared below.
+  // Notes + memory surfaces (docs/notes-and-memory.md, docs/next 12) — also hands back the stores/closures shared below.
   const knowledge = registerKnowledgeIpc(db, dirname(worktreesDir), {
     sendToAgent: (sessionId, text, submit) => void agentSender.send(sessionId, text, submit),
   })
@@ -415,14 +415,14 @@ export async function registerTerminalIpc(db: AppDatabase, worktreesDir: string,
   })
   registerRunIpc(runtime)
 
-  // The MCP feature-tool surface (docs/next 06): per-domain harness bridges into the Hono routes.
+  // The MCP feature-tool surface (docs/mcp.md): per-domain harness bridges into the Hono routes.
   wireHarnessBridges({ db, notesStore: knowledge.notesStore, proposals: knowledge.proposals, runtime, reconciled: knowledge.reconciled })
 
-  // Workflows (docs/next 14) + local-git/editor (docs/next 04).
+  // Workflows (docs/next 14) + local-git/editor (docs/panes.md).
   await registerWorkflowIpc(db, { runtime, notesStore: knowledge.notesStore, internalApiEnv })
   registerLocalGitIpc(db)
 
-  // MCP config inspector (docs/next 06 A): read ONLY the known candidate files (worktree
+  // MCP config inspector (docs/mcp.md): read ONLY the known candidate files (worktree
   // .mcp.json / .cursor/mcp.json, ~/.claude.json), parse + MASK IN MAIN — raw secrets never cross
   // to the renderer. Read-only; acorn never launches these servers.
   ipcMain.handle('mcp:inspect', async (_e: IpcMainInvokeEvent, taskId: string): Promise<{ file: string; servers: McpServerSummary[] }[]> => {
@@ -470,7 +470,7 @@ export async function registerTerminalIpc(db: AppDatabase, worktreesDir: string,
 
   ipcMain.handle('term:create', (_e: IpcMainInvokeEvent, opts: CreateOpts) => create(db, opts ?? {}))
 
-  // sendToAgent (docs/next 04 §D): bracketed paste into an agent session's PTY with a submit mode.
+  // sendToAgent (docs/panes.md): bracketed paste into an agent session's PTY with a submit mode.
   ipcMain.handle('term:sendToAgent', (_e: IpcMainInvokeEvent, p: { sessionId: string; text: string; submit: SendSubmit }) => {
     if (typeof p?.sessionId !== 'string' || typeof p?.text !== 'string' || !p.text) return { ok: false, reason: 'Invalid payload.' }
     const submit: SendSubmit = p.submit === 'now' || p.submit === 'after-ready' || p.submit === 'draft' ? p.submit : 'draft'
@@ -556,7 +556,7 @@ export async function registerTerminalIpc(db: AppDatabase, worktreesDir: string,
   })
 
   // Archive orchestration lives in archive.ts (guard → teardown → stop sessions → remove worktree →
-  // mark archived, docs/next 02); this handler just injects the live-session + drawer glue. The ONLY
+  // mark archived, docs/terminal-and-agents.md); this handler just injects the live-session + drawer glue. The ONLY
   // path allowed to tear a worktree down, and never automatic.
   ipcMain.handle('term:task:archive', async (_e: IpcMainInvokeEvent, id: string, opts?: ArchiveOpts): Promise<ArchiveResult> => {
     if (typeof id !== 'string' || !id) return { ok: false, reason: 'Invalid task.' }

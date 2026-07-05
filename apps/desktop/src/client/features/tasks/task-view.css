@@ -240,7 +240,7 @@
 }
 .pane-close-btn:hover { opacity: 1; background: var(--bg-hover); color: var(--del-marker); }
 
-/* Rollbar pane + browse (docs/next 10). */
+/* Rollbar pane + browse (docs/integrations.md). */
 .rollbar-pane { display: flex; flex-direction: column; overflow-y: auto; }
 .rollbar-detail { padding: 4px var(--pane-pad); }
 .rollbar-title { font-size: var(--fs-lg); font-weight: 600; margin: 8px 0; }

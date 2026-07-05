@@ -5,7 +5,7 @@ import { renderMarkdown } from '../integrations/markdown'
 import { clearNoteOpen, GLOBAL_NOTES_ID, notesApi, noteToOpen, type NoteScope, type NoteSummary } from './notesClient'
 import './notes.css'
 
-// The Notes pane (docs/next 09 P1): .md notes at two SCOPES — this workspace (shared by every
+// The Notes pane (docs/notes-and-memory.md): .md notes at two SCOPES — this workspace (shared by every
 // task/worktree in the group) and GLOBAL (shared across all workspaces). Both render here, grouped
 // so the distinction is visible; you pick the scope when creating. List + textarea editor + the
 // existing sanitized markdown preview. ponytail: textarea over TipTap; a richer editor only if

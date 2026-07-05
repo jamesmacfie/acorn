@@ -51,7 +51,7 @@ export function memoryReviewProfile(): ProfileDef | null {
 }
 
 export function registerKnowledgeIpc(db: AppDatabase, dataRoot: string, deps: KnowledgeDeps): Knowledge {
-  // Workspace notes (docs/next 09 P1): files under <dataDir>/notes/<workspaceId>/, beside the
+  // Workspace notes (docs/notes-and-memory.md): files under <dataDir>/notes/<workspaceId>/, beside the
   // worktrees dir. ONE store — the UI reads it here; the MCP notes_* tools reuse it (harness).
   const notesStore = new NotesStore(join(dataRoot, 'notes'))
   const proposals = new MemoryProposalStore(join(dataRoot, 'memory-proposals'))
@@ -64,7 +64,7 @@ export function registerKnowledgeIpc(db: AppDatabase, dataRoot: string, deps: Kn
     }
   }
 
-  // Fill the context assembler's notes seam (docs/next 09 P2 / 11 §C): the task's workspace notes
+  // Fill the context assembler's notes seam (docs/notes-and-memory.md / docs/next 11 §C): the task's workspace notes
   // ride TaskContext.notes. Newest first, capped — the push block stays compact.
   setContextNotesSource(async (taskId) => {
     const t = await loadTask(db, taskId)

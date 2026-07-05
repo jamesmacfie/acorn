@@ -5,7 +5,7 @@ export type PaletteItem =
   | { kind: 'run'; id: string; label: string; hint: string; running: boolean }
   | { kind: 'layout'; id: string; label: string; hint: string }
   | { kind: 'workflow'; id: string; label: string; hint: string } // committed .acorn/workflows (14 P5)
-  | { kind: 'task'; id: string; label: string; hint?: string } // Go to task (docs/next 17 §B.3)
+  | { kind: 'task'; id: string; label: string; hint?: string } // Go to task (docs/command-palette-and-shortcuts.md)
   | { kind: 'action'; id: string; label: string; hint?: string }
   | { kind: 'error'; id: string; label: string } // config parse errors (13 §B) — visible, not invocable
 

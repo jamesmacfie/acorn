@@ -1,4 +1,4 @@
-// ChangesPane model (docs/next 04 §B): pure grouping/ordering/selection over LocalChange[] and the
+// ChangesPane model (docs/panes.md): pure grouping/ordering/selection over LocalChange[] and the
 // adapter that feeds a local patch into the existing PR diff pipeline (PullFile shape → diff.ts).
 import type { PullFile } from '../../../shared/api'
 import type { LocalChange } from '../../../shared/terminal'

@@ -18,7 +18,7 @@ const [selectedSource, setSelectedSource] = createSignal<SourceId | null>('githu
 // The active task (its terminals scope to this; its view shows when no Source is selected).
 const [activeTaskId, setActiveTaskId] = createSignal<string | null>(null)
 
-// Per-task pane layout (docs/next 03): a left→right row of open panes. ALL transitions go
+// Per-task pane layout (docs/panes.md): a left→right row of open panes. ALL transitions go
 // through the pure reducer (applyLayoutAction) via dispatchLayout — the single-writer rule.
 // Persisted to the `task_layouts` pref (App.tsx), replacing the old single-pane `task_panes`
 // value (migrated on hydrate).

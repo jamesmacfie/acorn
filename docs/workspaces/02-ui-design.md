@@ -5,9 +5,10 @@
 > Read "Workspace" as **Task** (README two-tier note). The notable divergences from this doc:
 > - **The pane model outgrew "single active pane"**: a task's layout is a left→right *row* of open
 >   panes (⌘-click a switcher icon opens beside; pane-scoped close), owned by one pure reducer —
->   `features/tasks/layout.ts`, designed in [`../next/03-panes-and-layout.md`](../next/03-panes-and-layout.md).
+>   `features/tasks/layout.ts`, documented in [`../panes.md`](../panes.md).
 > - **The shipped pane set** is `pr | linear | rollbar | preview | editor | changes | notes |
->   browser | context` — larger than the five sketched below.
+>   context` — larger than the five sketched below (agent-driving is a capability of `preview`,
+>   not a separate `browser` pane).
 > - **Terminal and dev server are *not* panes.** The terminal stayed a bottom **drawer** scoped to
 >   the active task, and dev servers shipped as **run targets** running as drawer terminal
 >   sessions (docs/next 13 §A) — a deliberate ponytail call noted in `TaskView.tsx`.

@@ -9,7 +9,7 @@ const git = (cwd: string, ...args: string[]) => execFileSync('git', ['-C', cwd, 
 
 // A checkout with a fake `origin/main` + `origin/develop` (remote-tracking refs written directly —
 // no network) whose HEAD is a *different* commit, so "created from base ref" is distinguishable.
-describe('worktree base-ref precedence (docs/next 02 P2)', () => {
+describe('worktree base-ref precedence (docs/terminal-and-agents.md)', () => {
   let dir: string
   let checkout: string
   let root: string

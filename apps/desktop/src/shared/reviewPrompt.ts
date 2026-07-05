@@ -1,4 +1,4 @@
-// Review-notes prompt formatter (docs/next 04 §C): plain, copy-pasteable, exactly the doc's shape.
+// Review-notes prompt formatter (docs/panes.md): plain, copy-pasteable, exactly the doc's shape.
 // Pure — unit tested; delivered via sendToAgent as one bracketed-paste block.
 import type { ReviewNote } from './api'
 

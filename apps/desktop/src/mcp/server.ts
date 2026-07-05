@@ -1,4 +1,4 @@
-// The acorn MCP server (docs/next 06 B): a stdio server exposing acorn's task context as tools.
+// The acorn MCP server (docs/mcp.md): a stdio server exposing acorn's task context as tools.
 // Launched by the AGENT (registered via `claude mcp add …` with the Electron-as-node launcher over
 // the `main.ts` entry module), so it scopes itself entirely from inherited env: ACORN_TASK_ID
 // (which task) plus the loopback client's ACORN_API_URL/ACORN_API_TOKEN (see ./api.ts). Outside a
@@ -97,7 +97,7 @@ export function buildServer(opts: { hasRunTargets?: boolean } = {}): McpServer {
     () => taskTool((id) => apiGet(`/api/tasks/${id}/repo-info`)),
   )
 
-  // --- Changes (docs/next 04): straight git over the inherited worktree — the same module the
+  // --- Changes (docs/panes.md): straight git over the inherited worktree — the same module the
   // app's ChangesPane uses, so there is exactly one implementation.
   const NO_WORKTREE = text({ status: 'no-active-task', hint: 'No ACORN_WORKTREE_PATH in this session.' })
 
@@ -129,7 +129,7 @@ export function buildServer(opts: { hasRunTargets?: boolean } = {}): McpServer {
     async ({ n }) => (WORKTREE ? text(await gitLog(WORKTREE, n ?? 10)) : NO_WORKTREE),
   )
 
-  // --- Notes (docs/next 09): the workspace note files, over loopback. Writes stamp
+  // --- Notes (docs/notes-and-memory.md): the workspace note files, over loopback. Writes stamp
   // author: agent + this session's id (provenance) server-side.
   server.registerTool('notes_list', { description: 'Workspace notes for the current task (slug, title, kind, author).' }, () =>
     taskTool((id) => apiGet(`/api/tasks/${id}/notes`)),
@@ -177,7 +177,7 @@ export function buildServer(opts: { hasRunTargets?: boolean } = {}): McpServer {
       taskTool((id) => apiSend('POST', `/api/tasks/${id}/memory/propose`, { name, type, description, body, sessionId: SESSION_ID })),
   )
 
-  // --- Browser (docs/next 08 P2): drive the task's preview webview — navigate (URL from
+  // --- Browser (docs/panes.md): drive the task's preview webview — navigate (URL from
   // run_status, never a guessed port), snapshot (accessibility tree with refs), click/fill by ref,
   // read the console. The 08 §example loop.
   server.registerTool(

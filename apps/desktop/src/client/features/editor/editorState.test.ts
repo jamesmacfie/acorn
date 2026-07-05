@@ -18,7 +18,7 @@ import {
 
 const f = (path: string, over: Partial<OpenFile> = {}): OpenFile => ({ path, ephemeral: false, dirty: false, ...over })
 
-describe('open/promote/close/dirty transitions (docs/next 07)', () => {
+describe('open/promote/close/dirty transitions (docs/panes.md)', () => {
   it('ephemeral opens reuse the single preview slot', () => {
     let list = openFileIn([], 'a.ts', true)
     list = openFileIn(list, 'b.ts', true)

@@ -35,7 +35,7 @@ export const loadTask = async (db: AppDatabase, id: string): Promise<TaskRow | u
   return t
 }
 
-// Per-repo preferred base ref for NEW branches (docs/next 02 P2): the prefs key
+// Per-repo preferred base ref for NEW branches (docs/terminal-and-agents.md): the prefs key
 // `base_ref:<owner>/<repo>`. Read by key alone — machine-local single-user app.
 export const baseRefPref = async (db: AppDatabase, owner: string, repo: string): Promise<string | null> => {
   const [row] = await db.select().from(schema.prefs).where(eq(schema.prefs.key, `base_ref:${owner}/${repo}`)).limit(1)

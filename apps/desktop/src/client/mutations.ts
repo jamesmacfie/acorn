@@ -139,7 +139,7 @@ export const setWorkspaceDevScript = async (id: string, devScript: string) =>
 // Per-workspace restart command for the `dev` run target (blank ⇒ cleared server-side → run_restart falls back to stop+start).
 export const setWorkspaceDevRestartScript = async (id: string, devRestartScript: string) =>
   writeJson<{ ok: true }>(workspaceRoute(id), { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ devRestartScript }) }, (res) => `workspace ${res.status}`)
-// Per-workspace worktree teardown script (docs/next 02; blank ⇒ cleared server-side).
+// Per-workspace worktree teardown script (docs/terminal-and-agents.md; blank ⇒ cleared server-side).
 export const setWorkspaceTeardownScript = async (id: string, teardownScript: string) =>
   writeJson<{ ok: true }>(workspaceRoute(id), { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ teardownScript }) }, (res) => `workspace ${res.status}`)
 // When the setup script runs: off / on task creation / on first terminal open.
@@ -148,7 +148,7 @@ export const setWorkspaceSetupTrigger = async (id: string, setupScriptTrigger: S
 // How the browser-preview pane resolves its URL: '' (dev-server port), 'url', 'port', or 'script'.
 export const setWorkspacePreview = async (id: string, previewMode: PreviewMode | '', previewValue: string) =>
   writeJson<{ ok: true }>(workspaceRoute(id), { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ previewMode, previewValue }) }, (res) => `workspace ${res.status}`)
-// Workspace identity (docs/next 01): icon (null clears) + colour (preset token or hex; null clears).
+// Workspace identity (docs/workspaces-and-tasks.md): icon (null clears) + colour (preset token or hex; null clears).
 export const setWorkspaceIcon = async (id: string, icon: WorkspaceIcon | null) =>
   writeJson<{ ok: true }>(workspaceRoute(id), { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ icon }) }, (res) => `workspace ${res.status}`)
 export const setWorkspaceColor = async (id: string, color: string | null) =>
@@ -177,7 +177,7 @@ export const createTask = async (seed: TaskSeed) => {
   void terminalApi()?.task.onCreated(task.id)
   return task
 }
-// Local review notes (docs/next 04 §C). Callers invalidate reviewNotesKey(taskId) after.
+// Local review notes (docs/panes.md). Callers invalidate reviewNotesKey(taskId) after.
 export const addReviewNote = (taskId: string, seed: ReviewNoteSeed) => post<ReviewNote>(reviewNotesRoute(taskId), seed)
 export const editReviewNote = (taskId: string, noteId: string, body: string) =>
   writeJson<{ ok: true }>(reviewNoteRoute(taskId, noteId), { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ body }) })

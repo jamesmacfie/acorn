@@ -1,4 +1,4 @@
-// Editor session state (docs/next 07): open-file tabs per task — ephemeral preview slot, dirty
+// Editor session state (docs/panes.md): open-file tabs per task — ephemeral preview slot, dirty
 // flags, active file — persisted to the 'editor_open_files' pref so relaunch restores the tabs
 // (dirty resets: content isn't persisted). Pure list ops + a thin signal store, like tasks.ts.
 import { createSignal } from 'solid-js'

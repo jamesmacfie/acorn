@@ -4,7 +4,7 @@ import { resolveWorkspaceColor } from '../shared/workspaceIdentity'
 
 // The top-level workspace selector (docs/workspaces). Sits in the topbar; picking a workspace
 // navigates to one of its repos (the caller derives "active" from the current repo). Reuses the
-// shared Picker primitive, like RepoPicker. Rows carry the workspace identity (docs/next 01):
+// shared Picker primitive, like RepoPicker. Rows carry the workspace identity (docs/workspaces-and-tasks.md):
 // a colour dot (stored colour or name-hash default) and the emoji icon when one is set.
 export default function WorkspacePicker(props: {
   workspaces: Workspace[]
