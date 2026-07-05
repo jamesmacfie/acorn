@@ -44,14 +44,16 @@ export async function xtermTheme(dark: boolean): Promise<ITheme> {
   return { ...baseTheme(dark), ...ansiPalette(colors ?? {}) }
 }
 
-// Effective theme: an explicit data-theme on <html> wins (the app's manual toggle), else fall back
-// to the OS preference — exactly the precedence tokens-layout.css uses.
-export function isAppDark(): boolean {
-  const set = document.documentElement.dataset.theme
-  if (set === 'dark') return true
-  if (set === 'light') return false
-  return window.matchMedia('(prefers-color-scheme: dark)').matches
+// Perceived-luminance dark check on a 6-digit hex colour. Pure; exported for tests.
+export const isDarkColor = (hex: string): boolean => {
+  const n = parseInt(hex.slice(1), 16)
+  // Rec. 601 luma — plenty for "is this background dark?".
+  return 0.299 * (n >> 16) + 0.587 * ((n >> 8) & 0xff) + 0.114 * (n & 0xff) < 128
 }
+
+// Is the effective app theme dark? Judged from the live `--bg` token rather than a hardcoded list
+// of dark theme names, so every entry in settings/themes.ts (and any future one) classifies itself.
+export const isAppDark = (): boolean => isDarkColor(token('--bg'))
 
 // Match the app's mono font (falls back to monospace before the token is available).
 export const monoFont = (): string => token('--font-mono') || 'monospace'
