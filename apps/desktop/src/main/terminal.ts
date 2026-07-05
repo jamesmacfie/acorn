@@ -52,7 +52,7 @@ import {
   workspaceSetup,
   type TaskRow,
 } from './taskWorktree'
-import { ensureWorktree } from './worktrees'
+import { currentBranch, ensureWorktree } from './worktrees'
 
 // vNext Phase 2: PTYs live in the main process. Sessions run on one of two backends —
 //  - node-pty: spawn the command directly. Survives a window reload (PTY is in main), not an app
@@ -553,6 +553,23 @@ export async function registerTerminalIpc(db: AppDatabase, worktreesDir: string,
     await copyConfiguredFiles(db, t, mapped.path, wt.path)
     await maybeRunSetup(db, t, wt.path, taskContext(t))
     broadcastStatus() // rail/footer pick up the new worktree; panel re-lists to show the Setup tab
+  })
+
+  // "New task here": point a task at the mapped checkout itself instead of an isolated worktree, and
+  // adopt the checkout's current branch. worktreePath === checkout is the marker every guard keys off
+  // (resolveTaskCwd reuses it as-is; archive skips removeWorktree for it). taskId is the capability —
+  // the path is re-derived from the DB here, never renderer-supplied. Returns the corrected fields so
+  // the renderer can patch its Task; null if no checkout is mapped (caller falls back to a worktree).
+  ipcMain.handle('term:task:useCheckout', async (_e: IpcMainInvokeEvent, id: string): Promise<{ worktreePath: string; branch: string } | null> => {
+    if (typeof id !== 'string' || !id) return null
+    const t = await loadTask(db, id)
+    if (!t) return null
+    const mapped = await getRepoPath(db, t.repoOwner, t.repoName)
+    if (!mapped || !isDir(mapped.path)) return null
+    const branch = (await currentBranch(mapped.path)) || t.branch // detached HEAD → keep the seed branch
+    await db.update(schema.tasks).set({ worktreePath: mapped.path, branch, updatedAt: Date.now() }).where(eq(schema.tasks.id, t.id))
+    broadcastStatus() // rail/footer pick up the borrowed checkout
+    return { worktreePath: mapped.path, branch }
   })
 
   // Archive orchestration lives in archive.ts (guard → teardown → stop sessions → remove worktree →

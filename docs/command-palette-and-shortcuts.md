@@ -1,7 +1,7 @@
 # Command palette & keyboard model
 
-acorn is keyboard-driven. This doc covers the three overlays — the **command palette** (⌘K), the
-**file finder** (⌘P), and the in-PR **changed-file finder** (`/`) — plus the full global shortcut
+acorn is keyboard-driven. This doc covers the four overlays — the **command palette** (⌘K), the
+**file finder** (⌘P), the **workspace switcher** (⌘L), and the in-PR **changed-file finder** (`/`) — plus the full global shortcut
 table, the Task-view **pane shortcuts**, and the **Settings → Shortcuts** tab where the pane bindings
 are edited. Every overlay reuses the same flat `.overlay` shell (`docs/ui-design.md`) and the shared
 `createOverlayPalette` hook (`features/palette/overlay.ts`): one `window` keydown listener per
@@ -26,10 +26,11 @@ score. The kinds, in composition order:
 | 3 | `layout` | `Layout: <id>` | A layout recipe: seed panes + auto-start a target. Hint `open panes + start target`. |
 | 4 | `workflow` | `Workflow: <name>` | A committed `.acorn/workflows` definition. Hint `<n> steps`. |
 | 5 | `action` | `New terminal`, `Show/Hide terminal drawer`, `Show pane: <label>`, `Close pane: <label>`, `Archive task` | Built-in task actions (see below). |
-| 6 | `task` | `Go to task: <title>` | Navigation to another task, **last** — it's navigation, not a command. Hint `owner/name`. |
+| 6 | `workspace` | `Switch workspace: <name>` | Navigation to another workspace (excludes the current one). Hint `<n> repos`. |
+| 7 | `task` | `Go to task: <title>` | Navigation to another task, **last** — it's navigation, not a command. Hint `owner/name`. |
 
-Errors are placed first deliberately (they explain missing targets); Go-to-task rows are placed last
-deliberately (navigation, not a command). See `model.ts:23` for the exact order.
+Errors are placed first deliberately (they explain missing targets); the navigation rows (switch
+workspace, then Go-to-task) are placed last deliberately. See `model.ts:23` for the exact order.
 
 ### The built-in actions
 
@@ -51,6 +52,8 @@ deliberately (navigation, not a command). See `model.ts:23` for the exact order.
 - `error` — returns immediately, never invoked.
 - `task` — navigation only. **No active task or terminal API required**; calls `activateTaskSignals`
   + `navigate(pathForTask(t))`.
+- `workspace` — navigation only. **No active task or terminal API required**; navigates to the
+  workspace's first repo (same as the topbar `WorkspacePicker` and the ⌘L switcher below).
 - `action:pane-*` (Show/Close pane) — dispatch a layout action; needs an active task but **not** the
   terminal API.
 - `run`, `workflow`, `layout`, and the remaining actions (`new-terminal`, `toggle-terminal`,
@@ -107,6 +110,17 @@ over IPC).
 - Keyboard mirrors the command palette: ⌘P toggles, ↑/↓ move, Enter picks, Esc closes.
   `preventDefault` on ⌘P blocks the browser print dialog since Monaco binds nothing there.
 
+## 2b. Workspace switcher (⌘L)
+
+`WorkspacePalette.tsx` is a fuzzy switcher over workspaces (`docs/workspaces`), reusing the same
+palette shell and `fuzzyScore` over workspace names (fetched via `workspacesOptions`). It mirrors the
+topbar `WorkspacePicker`: picking a workspace navigates to its **first repo** (the active workspace is
+*derived* from the current repo, so there is no separate active-workspace state), defaulting the
+source to `github` if none is selected. Empty query lists all workspaces; empty workspaces stay put.
+Rows show the workspace colour dot + emoji icon and a `<n> repos` hint. Keyboard mirrors the others:
+⌘L toggles (`preventDefault` blocks the browser address-bar focus), ↑/↓ move, Enter picks, Esc closes.
+The same switch is also reachable from the ⌘K command palette (`Switch workspace: <name>` rows).
+
 ### `/` — the in-PR changed-file finder (distinct)
 
 Do not confuse ⌘P with `/`. The `/` finder lives in `Shortcuts.tsx` and searches **only the changed
@@ -135,6 +149,7 @@ Settings → Shortcuts tab:
 | `⌘1 – ⌘9` | Jump to task 1–9 in the rail |
 | `⌘K` | Command palette (panes, tasks, run targets) |
 | `⌘P` | Go to file in the task worktree |
+| `⌘L` | Switch workspace |
 | `j / k` | Next / previous PR |
 | `[ / ]` | Previous / next file |
 | `/` | Find file in this PR |
@@ -189,37 +204,40 @@ active terminal tab respectively. If neither owns focus, nothing closes (this is
 
 ## 4. Pane shortcuts (Task view)
 
-`apps/desktop/src/client/features/tasks/paneShortcuts.ts` defines **single bare keys** that switch
-panes inside the Task view. Most dispatch a layout `show`; `agents` and `terminal` are toggles, not
-layout panes. Defaults (`PANE_SHORTCUT_DEFAULTS`):
+`apps/desktop/src/client/features/tasks/paneShortcuts.ts` defines **⌘⇧-chords** that switch panes
+inside the Task view. Most dispatch a layout `show`; `agents` and `terminal` are toggles, not layout
+panes. Plain ⌘<letter> collides too readily with the OS/browser/Monaco, so the switcher lives on the
+shifted layer. Defaults (`PANE_SHORTCUT_DEFAULTS`):
 
-| Key | Action | Key | Action |
+| Chord | Action | Chord | Action |
 | --- | --- | --- | --- |
-| `r` | PR review | `e` | Editor |
-| `g` | Changes | `l` | Linear |
-| `n` | Notes | `o` | Rollbar |
-| `x` | Context | `a` | Agents (toggle) |
-| `b` | Browser preview | `t` | Terminal (toggle) |
+| `⌘⇧R` | PR review | `⌘⇧E` | Editor |
+| `⌘⇧G` | Changes | `⌘⇧L` | Linear |
+| `⌘⇧D` | Notes | `⌘⇧O` | Rollbar |
+| `⌘⇧X` | Context | `⌘⇧A` | Agents (toggle) |
+| `⌘⇧B` | Browser preview | `⌘⇧T` | Terminal (toggle) |
 
-These are active **only in the Task view** (the listener lives for that component's lifetime,
-`TaskView.tsx`) and follow the app's bare-key convention (like `j`/`k`/`c`). The handler guards
-typing targets — including `contentEditable` surfaces like the notes pane — and modifier chords,
-same as the global handler. Some panes are availability-gated: `r` (PR review) is a no-op when the
-task has no PR, and `l`/`o` are no-ops when the task has no Linear/Rollbar links. The defaults are
-chosen to dodge the global bare-key shortcuts.
+Letters mirror the pane name where free; Notes can't be `⌘⇧N` (reserved for New task) so it takes
+`⌘⇧D`. These are active **only in the Task view** (the listener lives for that component's lifetime,
+`TaskView.tsx`). The handler guards typing targets — including `contentEditable` surfaces like the
+notes/editor panes — so a focused editor keeps its own ⌘⇧ bindings (⌘⇧O go-to-symbol, etc.); the
+exception is the terminal, where ⌘ chords are safe. Some panes are availability-gated: `⌘⇧R` (PR
+review) is a no-op when the task has no PR, and `⌘⇧L`/`⌘⇧O` are no-ops when the task has no
+Linear/Rollbar links.
 
-### Overriding & reserved keys
+### Overriding & reserved chords
 
-Bindings are overridable via the `pane_shortcuts` pref — a JSON `Record<PaneAction, key>` edited in
+Bindings are overridable via the `pane_shortcuts` pref — a JSON `Record<PaneAction, chord>` edited in
 Settings → Shortcuts. `paneKeys()` merges overrides over defaults; `paneKeymap()` builds the reverse
-key→action map (first definition wins on a collision). Each override value must be a single
-character.
+chord→action map (first definition wins on a collision). Each override value is a canonical chord
+token (modifiers in fixed order + base key, e.g. `meta+shift+e`); a legacy bare letter is upgraded to
+`meta+<letter>`.
 
-Seven keys are **reserved** and can't be reassigned to a pane because the global handler / PullList
-already own them (`RESERVED_KEYS`, `paneShortcuts.ts:23`):
+Chords the app already owns globally are **reserved** and can't be reassigned to a pane
+(`RESERVED_CHORDS`, `paneShortcuts.ts`):
 
 ```
-c   j   k   ?   /   [   ]
+⌘K  ⌘P  ⌘L  ⌘S  ⌘W  ⌘⇧N  ⌘,  ⌘1–⌘9
 ```
 
 ## 5. Settings → Shortcuts tab

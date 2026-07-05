@@ -59,6 +59,8 @@ contextBridge.exposeInMainWorld('acorn', {
       archive: (id: string, opts?: { deleteWorktree?: boolean; force?: boolean; skipTeardown?: boolean }) => ipcRenderer.invoke('term:task:archive', id, opts),
       // Notify main a task was created, so it can run the setup script now if configured to.
       onCreated: (id: string) => ipcRenderer.invoke('term:task:onCreated', id),
+      // Point a task at the mapped checkout (no isolated worktree) + adopt its current branch.
+      useCheckout: (id: string) => ipcRenderer.invoke('term:task:useCheckout', id),
       // Live worktree statuses (dirty / missing) for the rail + footer markers.
       statuses: () => ipcRenderer.invoke('term:task:statuses'),
     },

@@ -6,6 +6,7 @@ export type PaletteItem =
   | { kind: 'layout'; id: string; label: string; hint: string }
   | { kind: 'workflow'; id: string; label: string; hint: string } // committed .acorn/workflows (14 P5)
   | { kind: 'task'; id: string; label: string; hint?: string } // Go to task (docs/command-palette-and-shortcuts.md)
+  | { kind: 'workspace'; id: string; label: string; hint?: string } // Switch workspace (⌘L)
   | { kind: 'action'; id: string; label: string; hint?: string }
   | { kind: 'error'; id: string; label: string } // config parse errors (13 §B) — visible, not invocable
 
@@ -14,6 +15,7 @@ export type PaletteSources = {
   layouts?: { id: string }[]
   workflows?: { id: string; name: string; steps: unknown[] }[]
   tasks?: { id: string; label: string; hint?: string }[]
+  workspaces?: { id: string; label: string; hint?: string }[]
   errors: { source: string; message: string }[]
   actions: { id: string; label: string; hint?: string }[]
 }
@@ -27,6 +29,7 @@ export function composeItems(src: PaletteSources): PaletteItem[] {
     ...(src.layouts ?? []).map((l): PaletteItem => ({ kind: 'layout', id: `layout:${l.id}`, label: `Layout: ${l.id}`, hint: 'open panes + start target' })),
     ...(src.workflows ?? []).map((w): PaletteItem => ({ kind: 'workflow', id: `workflow:${w.id}`, label: `Workflow: ${w.name}`, hint: `${w.steps.length} steps` })),
     ...src.actions.map((a): PaletteItem => ({ kind: 'action', id: a.id, label: a.label, hint: a.hint })),
+    ...(src.workspaces ?? []).map((w): PaletteItem => ({ kind: 'workspace', id: `workspace:${w.id}`, label: w.label, hint: w.hint })),
     ...(src.tasks ?? []).map((t): PaletteItem => ({ kind: 'task', id: `task:${t.id}`, label: t.label, hint: t.hint })),
   ]
 }

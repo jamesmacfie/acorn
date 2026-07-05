@@ -2,6 +2,7 @@ import { execFileSync } from 'node:child_process'
 import { existsSync, mkdtempSync, readFileSync, realpathSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { eq } from 'drizzle-orm'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { makeTestDb, type TestDb } from '../server/routes/testDb'
 import { schema } from '../server/db'
@@ -127,5 +128,18 @@ describe('archiveTask teardown ordering', () => {
     const res = await archiveTask(t.db, 'task1', {}, d)
     expect(res.ok).toBe(false)
     if (!res.ok) expect(res.reason).toContain('running session')
+  })
+
+  it('current-checkout task (worktreePath === checkout) archives without removing the checkout', async () => {
+    // Point the task at the main checkout itself, and dirty it — a real worktree would be refused.
+    await t.db.update(schema.tasks).set({ worktreePath: checkout }).where(eq(schema.tasks.id, 'task1'))
+    writeFileSync(join(checkout, 'scratch.txt'), 'wip')
+    const res = await archiveTask(t.db, 'task1', {}, deps())
+    expect(res).toEqual({ ok: true })
+    expect(existsSync(checkout)).toBe(true) // never git-removed
+    expect(existsSync(join(checkout, 'scratch.txt'))).toBe(true) // dirty files untouched
+    const [row] = await t.db.select().from(schema.tasks)
+    expect(row.status).toBe('archived')
+    expect(row.worktreePath).toBeNull()
   })
 })

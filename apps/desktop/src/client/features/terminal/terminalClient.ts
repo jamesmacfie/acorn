@@ -54,6 +54,7 @@ export type TerminalApi = {
   task: {
     archive(id: string, opts?: ArchiveOpts): Promise<ArchiveResult>
     onCreated(id: string): Promise<void>
+    useCheckout(id: string): Promise<{ worktreePath: string; branch: string } | null>
     statuses(): Promise<TaskStatus[]>
   }
   // Workflows (docs/next 14): the runner's IPC surface + gate/run-done notices for the bell.
