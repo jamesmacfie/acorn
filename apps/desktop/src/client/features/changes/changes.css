@@ -1,0 +1,101 @@
+/* ChangesPane (docs/next 04 §B): file list + local diff, flat/1px-bordered per docs/ui-design.md. */
+.changes-pane { display: flex; flex-direction: column; overflow: hidden; padding: 0; }
+.changes-body { flex: 1; min-height: 0; display: flex; }
+.changes-list {
+  flex: 0 0 clamp(200px, 18vw, 300px);
+  min-width: 0;
+  overflow-y: auto;
+  border-right: 1px solid var(--border);
+  background: var(--bg-subtle);
+}
+/* Group heads reuse .section-header (see JSX) so the two lists match the pane title; just size the
+   divider down a touch inside the scrolling list. */
+.changes-group-head { height: auto; padding-top: 6px; padding-bottom: 6px; }
+.changes-row {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  font: inherit;
+  font-size: var(--fs-sm);
+  text-align: left;
+  color: var(--text);
+  background: transparent;
+  border: 0;
+  border-left: 2px solid transparent;
+  cursor: pointer;
+}
+.changes-row:hover { background: var(--bg-hover); }
+.changes-row.active { background: var(--bg-selected); border-left-color: var(--accent); }
+.changes-row-path {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  direction: rtl; /* keep the filename end visible */
+  text-align: left;
+  font-family: var(--font-mono);
+}
+.changes-empty { padding: 10px; font-size: var(--fs-sm); }
+.changes-diff { flex: 1; min-width: 0; overflow: auto; }
+
+/* File-row "add to agent" affordance (docs/next 04 §E). */
+.changes-row-wrap { display: flex; align-items: stretch; }
+.changes-row-wrap .changes-row { flex: 1; min-width: 0; }
+.changes-to-agent {
+  flex: none;
+  width: 22px;
+  font: inherit;
+  font-size: var(--fs-sm);
+  color: var(--text-faint);
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+  visibility: hidden;
+}
+.changes-row-wrap:hover .changes-to-agent { visibility: visible; }
+.changes-to-agent:hover { color: var(--text); }
+
+/* Review notes (docs/next 04 §C): flat inline annotation under its anchor line. */
+.changes-header { display: flex; align-items: center; gap: 10px; }
+.changes-send {
+  font: inherit;
+  font-size: var(--fs-sm);
+  padding: 2px 8px;
+  color: var(--text);
+  background: var(--bg);
+  border: 1px solid var(--border-strong);
+  cursor: pointer;
+}
+.changes-send:hover { background: var(--bg-hover); }
+.changes-send:disabled { opacity: 0.6; cursor: default; }
+/* Push status sits in the uppercased .section-header — opt back out of the shouty casing. */
+.changes-push-status { text-transform: none; letter-spacing: normal; font-weight: 400; color: var(--text-muted); }
+.review-note {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin: 2px 0 2px 90px;
+  padding: 4px 8px;
+  font-size: var(--fs-sm);
+  background: var(--bg-subtle);
+  border: 1px solid var(--border-strong);
+  border-left: 3px solid var(--warn);
+}
+.review-note-sent { border-left-color: var(--add-marker); opacity: 0.75; }
+.review-note-status { flex: none; color: var(--text-muted); }
+.review-note-body { flex: 1; min-width: 0; white-space: pre-wrap; }
+.review-note-delete {
+  flex: none;
+  font: inherit;
+  color: var(--text-faint);
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+}
+.review-note-delete:hover { color: var(--del-marker); }
+
+/* Commit box (docs/next 04 P4) at the bottom of the file list. */
+.changes-commit { display: flex; flex-direction: column; gap: 6px; padding: 8px 10px; border-top: 1px solid var(--border); }

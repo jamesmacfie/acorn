@@ -1,0 +1,129 @@
+/* Settings page (SettingsModal.tsx): a wide two-column modal — left tab rail, right scrolling pane.
+   Reuses .overlay-backdrop / .overlay from overlays.css; this widens it and lays out the columns. */
+.overlay.settings {
+  flex-direction: row;
+  width: min(820px, 94vw);
+  height: 72vh;
+  max-height: 72vh;
+}
+
+.settings-nav {
+  flex: none;
+  width: 200px;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  padding: 8px;
+  overflow-y: auto;
+  border-right: 1px solid var(--border);
+  background: var(--bg-subtle);
+}
+.settings-nav-group {
+  font-size: var(--fs-sm);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-muted);
+  padding: 10px 8px 4px;
+}
+.settings-nav-item {
+  font: inherit;
+  font-size: var(--fs-sm);
+  text-align: left;
+  color: var(--text);
+  background: transparent;
+  border: 0;
+  border-radius: var(--radius);
+  padding: 6px 8px;
+  cursor: pointer;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.settings-nav-item:hover { background: var(--bg-hover); }
+.settings-nav-item.active { background: var(--bg-selected); color: var(--text); }
+.settings-nav-sub { padding-left: 16px; }
+
+.settings-pane {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: var(--pane-pad);
+  overflow-y: auto;
+}
+.settings-pane .overlay-title { padding: 0 0 8px; margin: 0 32px 0 0; }
+.settings-close {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  font: inherit;
+  color: var(--text-muted);
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+  line-height: 1;
+  padding: 4px;
+}
+.settings-close:hover { color: var(--text); }
+
+.settings-section { display: flex; flex-direction: column; gap: 18px; }
+.settings-field { display: flex; flex-direction: column; gap: 6px; }
+.settings-field-row { flex-direction: row; align-items: center; gap: 8px; margin-bottom: 14px; }
+.settings-label { font-size: var(--fs-sm); color: var(--text); }
+.settings-hint { font-size: var(--fs-sm); }
+.settings-script {
+  font-family: var(--font-mono);
+  font-size: var(--fs-sm);
+  color: var(--text);
+  background: var(--bg);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+  padding: 8px;
+  resize: vertical;
+  outline: none;
+}
+.settings-script:focus { border-color: var(--accent); }
+.settings-actions { display: flex; align-items: center; gap: 10px; }
+.settings-section-label { margin-top: 16px; font-size: var(--fs-sm); font-weight: 600; color: var(--text); }
+/* Editable shortcut key: styled like .help-key but focusable/centred; highlights on focus while it waits for a keypress. */
+.shortcut-input { width: 3.5em; text-align: center; text-transform: lowercase; outline: none; cursor: pointer; }
+.shortcut-input:focus { border-color: var(--accent); color: var(--accent); }
+.settings-danger { margin-top: 8px; padding-top: 14px; border-top: 1px solid var(--border); }
+.settings-delete { color: var(--danger, #c0392b); border-color: var(--danger, #c0392b); }
+
+/* Workspace identity (docs/next 01): flat preview chip + swatch row, 1px borders, square. */
+.ws-identity-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.ws-identity-preview {
+  width: 32px;
+  height: 32px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: var(--fs-lg);
+  border: 1px solid var(--border-strong);
+  border-left-width: 3px;
+  background: var(--bg-subtle);
+}
+.ws-emoji-input { width: 64px; text-align: center; }
+.ws-swatches { display: flex; align-items: center; gap: 6px; }
+.ws-swatch {
+  width: 18px;
+  height: 18px;
+  border: 1px solid var(--border-strong);
+  cursor: pointer;
+  padding: 0;
+}
+.ws-swatch.active { outline: 2px solid var(--accent); outline-offset: 1px; }
+.ws-hex-input { width: 90px; font-family: var(--font-mono); }
+
+/* MCP inspector (docs/next 06 A). */
+.mcp-file { font-family: var(--font-mono); font-size: var(--fs-sm); }
+.mcp-server { display: flex; align-items: baseline; gap: 10px; padding: 3px 0 3px 12px; font-size: var(--fs-sm); flex-wrap: wrap; }
+.mcp-server-name { font-family: var(--font-mono); color: var(--text); }
+.mcp-server-status { color: var(--add-marker); }
+.mcp-server-status.mcp-disabled { color: var(--text-faint); }
+.mcp-server-status.mcp-invalid { color: var(--del-marker); }
+.mcp-server-cmd { max-width: 40ch; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; font-family: var(--font-mono); }
+.mcp-server-env { font-family: var(--font-mono); }

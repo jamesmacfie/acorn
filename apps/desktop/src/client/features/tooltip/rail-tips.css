@@ -1,0 +1,50 @@
+/* Shared rail tooltip: a small floating bubble with a title and optional muted description. Fixed so
+   it escapes the rails' clipping; centred on its button and flying left/right toward the content. */
+.rail-tip {
+  position: fixed;
+  z-index: 1000;
+  transform: translateY(-50%);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  width: max-content;
+  min-width: 120px;
+  max-width: 260px;
+  padding: 6px 10px;
+  background: var(--bg);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+  box-shadow: 0 4px 16px var(--shadow-popover);
+  pointer-events: none;
+  animation: rail-tip-in 90ms ease-out;
+}
+.rail-tip-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-family: var(--font-mono);
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  color: var(--text);
+  line-height: 1.3;
+}
+.rail-tip-key {
+  font-family: var(--font-mono);
+  font-size: var(--fs-xs, 11px);
+  font-weight: 500;
+  color: var(--text-muted);
+  background: var(--bg-subtle);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 0 5px;
+}
+.rail-tip-sub {
+  font-size: var(--fs-xs, 11px);
+  color: var(--text-muted);
+  line-height: 1.35;
+}
+
+@keyframes rail-tip-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}

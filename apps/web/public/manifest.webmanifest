@@ -1,9 +1,0 @@
-{
-  "name": "acorn",
-  "short_name": "acorn",
-  "description": "GitHub PR review tool",
-  "start_url": "/",
-  "display": "standalone",
-  "background_color": "#121212",
-  "theme_color": "#121212"
-}

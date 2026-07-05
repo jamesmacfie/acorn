@@ -1,0 +1,70 @@
+.onboarding {
+  max-width: 640px;
+  width: 90vw;
+}
+/* The overlay is a fixed-height flex column; let the body scroll so the footer (Done) stays
+   visible instead of being clipped by the overlay's overflow:hidden. */
+.onboarding .overlay-body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+}
+/* Stretch so the Add button matches the input's height (input has slightly more padding). */
+.onboarding-newrow {
+  margin-bottom: 4px;
+  align-items: stretch;
+}
+.onboarding-listhead {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: var(--fs-sm);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.onboarding-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.onboarding-row {
+  display: grid;
+  grid-template-columns: auto 1fr 180px auto;
+  align-items: center;
+  gap: 8px;
+}
+/* Hidden repos: fade the label to a lighter grey; the disabled select/button grey themselves.
+   (Avoid row-level opacity — it'd dim the eye toggle too, since opacity makes a compositing group.) */
+.onboarding-row.onboarding-ignored .onboarding-repo {
+  color: var(--text-muted);
+}
+.onboarding-eye {
+  font: inherit;
+  font-size: 14px;
+  line-height: 1;
+  background: none;
+  border: 0;
+  padding: 2px;
+  cursor: pointer;
+  opacity: 0.85;
+}
+.onboarding-eye:hover { opacity: 1; }
+.onboarding-eye.hidden { opacity: 1; }
+.onboarding-repo {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 13px;
+}
+.onboarding-browse {
+  white-space: nowrap;
+}
+/* Pinned footer below the scrolling body. */
+.onboarding-footer {
+  flex: none;
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: var(--pane-pad);
+  border-top: 1px solid var(--border);
+}

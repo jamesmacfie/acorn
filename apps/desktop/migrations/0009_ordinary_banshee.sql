@@ -1,0 +1,1 @@
+ALTER TABLE `repo_paths` ADD `run_targets` text;

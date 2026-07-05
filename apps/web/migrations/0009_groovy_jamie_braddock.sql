@@ -1,1 +1,0 @@
-ALTER TABLE `checks` ADD `run_id` integer;

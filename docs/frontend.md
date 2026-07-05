@@ -1,168 +1,263 @@
 # Frontend
 
-The acorn client is a SolidJS single-page app under `apps/web/src/client/`. It is served as static assets by the local Hono server (in the Electron main process) and talks to the same origin over cookie-authenticated `fetch`. State lives in [TanStack Query](./caching.md) (server data) and SolidJS signals (transient UI). There is no client-side store beyond those two.
+The acorn client shell — how the SolidJS SPA boots, how the layout switches between browse
+sources / tasks / the classic PR browser, how session state is restored, and where each kind of
+state lives. Per-pane behaviour lives in [panes.md](./panes.md); this doc is about the shell and
+its state model.
 
-## Entry point
+## Overview
 
-`index.tsx` mounts the app:
+The client is a SolidJS single-page app under `apps/desktop/src/client/`. It is served as static
+assets by the in-process Hono server (running in the Electron main process on
+`http://127.0.0.1:4317`) and talks to that same origin over cookie-authenticated `fetch` — the
+GitHub token never reaches the browser (see [authentication.md](./authentication.md)).
 
-- Constructs a single `QueryClient` (`refetchOnWindowFocus: true`, `gcTime: 24h`) wrapped in `PersistQueryClientProvider`, persisting the cache to IndexedDB via `idb-keyval` under key `acorn-cache` (see [caching](./caching.md) and [offline/PWA](./offline-pwa.md)).
-- A global `QueryCache`/`MutationCache` `onError` bounces to `/auth/login` when an error message matches `/\b401\b|reauth|unauthenticated/`.
-- Registers `/sw.js` on `load`, and wipes the persisted cache on the `acorn:logout` window event.
-- Mounts `<Router root={App}>` with three routes whose components are all `noop` — routes exist only to populate `useParams()`; `App` renders the actual UI.
+State is deliberately split three ways, with no other store:
 
-## Layout
+| Kind | Home | Survives reload? |
+| --- | --- | --- |
+| Server data (PRs, repos, tasks, workspaces, Linear/Rollbar) | [TanStack Query](./caching.md) cache | Yes — persisted to IndexedDB |
+| Transient UI (popovers, filters, drag, active task) | module-level / component SolidJS signals | No |
+| Durable view state (last repo, layouts, theme, shortcuts) | server-persisted `prefs` (the `/api/prefs` key/value store) | Yes — round-trips through GitHub-scoped SQLite |
 
-`App.tsx` is the router root: a top bar plus three independently-scrolling panes in a CSS grid (`grid-template-rows: var(--topbar-h) 1fr`). See [ui-design](./ui-design.md) for tokens and spacing.
+## Entry point (`index.tsx`)
+
+`index.tsx` mounts the app and owns cross-cutting cache concerns:
+
+- Constructs a **single** `QueryClient` with `refetchOnWindowFocus: true` and `gcTime: 24h`. The
+  long `gcTime` is required so persisted entries outlive a session and survive reload
+  (`apps/desktop/src/client/index.tsx:21`).
+- Wraps the tree in `PersistQueryClientProvider`, persisting the whole cache to **IndexedDB** via
+  `idb-keyval` under key `acorn-cache` (`maxAge` 24h). This gives instant render from last-known
+  data and offline browsing of recently-seen PRs (`index.tsx:30`).
+- A global `QueryCache`/`MutationCache` `onError` bounces to `/auth/login?return_to=…` whenever an
+  error message matches `/\b401\b|reauth|unauthenticated/` — a revoked/expired token surfaces as a
+  401 from any read or write. The `me` query returns `null` on 401 (the valid logged-out state) so
+  it never trips this (`index.tsx:14`).
+- Wipes the persisted cache on the `acorn:logout` window event, so the next user can't read it
+  (`index.tsx:51`), and unregisters any service worker left over from a prior web (Cloudflare
+  Workers) visit to this origin (`index.tsx:55`).
+- Mounts `<Router root={App}>` with four routes whose components are all `noop` — **routes exist
+  only to populate `useParams()`**; `App` is the layout root and renders the actual UI from those
+  params (`index.tsx:39`).
+
+### Routes
+
+| Route | Params | Purpose |
+| --- | --- | --- |
+| `/` | — | Boot root. Electron always launches here; `App` redirects to the last/first repo once data loads. |
+| `/:owner/:repo` | `owner`, `repo` | Scopes the app to a repo (and, derived from it, a workspace). |
+| `/:owner/:repo/new` | `owner`, `repo` | Create-PR mode (static segment; outranks `:number`). |
+| `/:owner/:repo/:number` | `+ number` | A specific PR (classic browser detail/diff, or a PR task). |
+
+The active **workspace** carries no URL dimension — it is derived from the current repo
+(`workspaceForRepo`, a partition: a repo belongs to exactly one workspace). The selected browse
+**source** and **active task** are signals, not routes.
+
+## Layout shell (`App.tsx`)
+
+`App` is the router root. It gates on auth (`<Show when={me.data}>`, else `LoginGate`), applies the
+theme, and lays out a left `TabRail` beside a topbar + a main-area `Switch`:
 
 ```
-┌──────────────────────────────────────────────────────────┐
-│ topbar:  [«] RepoPicker      owner / repo / #n      ◑ Acct │
-├───────────────┬────────────────────┬───────────────────────┤
-│ Reviews       │ Navigator          │ Diff                  │
-│ (PullList)    │ (PullDetail)       │ (DiffView)            │
-│ left          │ mid                │ right                 │
-└───────────────┴────────────────────┴───────────────────────┘
+┌──────┬───────────────────────────────────────────────────────────────┐
+│ Tab  │ topbar: [«] Workspace  Repo    owner / repo / #n   🔔 ▣ Account │
+│ Rail ├───────────────────────────────────────────────────────────────┤
+│      │ main <Switch>:                                                  │
+│ src  │   • selectedSource==='linear'  → <LinearBrowse>                 │
+│ src  │   • selectedSource==='rollbar' → <RollbarBrowse>               │
+│ ──   │   • no source && activeTask()  → <TaskView> (panes + terminal)  │
+│ task │   • fallback (github browse)   → 3-pane PR browser:             │
+│ task │        [ PullList | PullDetail | DiffView ]                     │
+│  +   │        or /new → [ CreatePullForm | ComparePreview ]           │
+└──────┴───────────────────────────────────────────────────────────────┘
+            terminal drawer (bottom, per-task, flagged) ─┘
 ```
 
-Top bar (`.topbar`, a `1fr auto 1fr` grid):
+The left `TabRail` (see [workspaces-and-tasks.md](./workspaces-and-tasks.md)) holds the source
+buttons (GitHub always; Linear/Rollbar when connected) and the workspace-scoped task rows; it is
+always mounted. The right column is a CSS grid of `var(--topbar-h) 1fr` — topbar over the main
+`Switch`. See [ui-design.md](./ui-design.md) for tokens.
 
-- **Left cluster** — a collapse toggle (`«` / `»`) and the `RepoPicker`. Collapse state is local signal `collapsed`, seeded from and persisted to the `left_collapsed` pref; collapsing zeroes the left grid column and hides `.pane-left`.
-- **Center** — a breadcrumb (`owner / repo / #number`) or the `acorn` brand when no repo is routed.
-- **Right cluster** — a theme toggle (`◑`) and either a `Login` link or the `AccountMenu`.
+### Topbar clusters
 
-The three panes each carry a sticky `.section-header` ("Reviews", "Navigator", "Diff") and render `PullList`, `PullDetail`, and `DiffView` respectively. `Shortcuts` is mounted once at the end (no visible markup until an overlay opens).
+`.topbar` is a `1fr auto 1fr` grid with three regions:
 
-### Theme
-
-`App` applies `prefs.data.theme` to `document.documentElement.dataset.theme` (falling back to `prefers-color-scheme`). `toggleTheme` flips `light`/`dark`, writes the `theme` pref, and invalidates `['prefs']`.
-
-## Routing
-
-A single dynamic route shape drives everything; the panes read `useParams()` directly rather than receiving props.
-
-| Route | Params | Effect |
-| --- | --- | --- |
-| `/` | — | Shows brand; `App` redirects to the first repo once `repos` loads. |
-| `/:owner/:repo` | `owner`, `repo` | `PullList` loads that repo's PRs; detail/diff show "Select a PR." |
-| `/:owner/:repo/:number` | `+ number` | `PullDetail` and `DiffView` load the PR. |
-
-The selected file within a PR is **not** in the path — it is the `?file=` search param (see [diff-rendering](./diff-rendering.md)).
-
-## Component map
-
-| Component | Pane / role |
+| Region | Contents |
 | --- | --- |
-| `App` | Layout root, top bar, theme, collapse, redirect-to-first-repo, logout/permissions. |
-| `PullList` | Left pane. Open/Closed tabs, client-side text filter, virtualized PR rows. |
-| `PullDetail` | Mid pane. PR header, description, labels, files, checks, conversation, write actions. |
-| `DiffView` | Right pane. The diff subsystem — see [diff-rendering](./diff-rendering.md). |
-| `RepoPicker` | Top bar. Searchable repo popover with pin-to-top and refresh. |
-| `AccountMenu` | Top bar. Signed-in dropdown: Permissions, Logout. |
-| `Shortcuts` | Global keyboard handler + help / file-finder overlays. |
-| `UserAvatar` | GitHub avatar `<img>` (`sm` 18px / `md` 24px) with a dashed placeholder when login is absent. |
+| Left (`.topbar-side`) | Collapse toggle (`«`/`»`, drives the `left_collapsed` pref); `WorkspacePicker` (selecting a workspace navigates to its first repo); `RepoPicker` (scoped to the active workspace, **disabled inside a task view** since the repo is fixed to that worktree). |
+| Center (`.breadcrumb`) | `owner / repo / #number` crumbs (the `#n` crumb links out to GitHub), or the `acorn` brand when no repo is routed. |
+| Right (`.topbar-end`) | `NotificationBell`; a terminal toggle `▣` (only when `terminalEnabled` and in a task view); `AccountMenu` (Settings / Clear cache / Logout) or a `Login` link. |
 
-Feature-owned helpers sit next to the views that use them:
+### The four main modes
 
-- `features/diff/model.ts` parses patches, attaches word diffs, builds renderable rows, and derives split-mode bands.
-- `features/diff/DiffRows.tsx` renders non-code rows, code lines, split cells, line composers, and review-thread rows.
-- `features/pullDetail/model.ts` merges reviews, issue comments, commits, and review threads into conversation entries and extracts file-thread snippets.
-- `features/pullDetail/Conversation.tsx` renders the conversation cards used by `PullDetail`.
+The main-area `<Switch>` (`App.tsx:370`) selects exactly one view from two signals —
+`selectedSource()` and `activeTask()`:
 
-### PullList
-
-Reads the shared `repos` cache and gates the `pulls` query on `repoKnown()` — the repo must be in the server's list before requesting its PRs, avoiding a 404 race on a cold URL. `tab` (`'open' | 'closed'`) and `filter` are signals, reset on repo change. The visible list is a `createMemo` filtering by `#number`, title, and author. Rows are virtualized with `@tanstack/solid-virtual` (`estimateSize: 36`, `overscan: 12`) in `.pr-list-scroll`. Each row is an `<A>` link to `/:owner/:repo/:number`. `PullList` owns the `j` / `k` next/prev-PR shortcut via its own `window` keydown listener (ignored while a form field is focused).
-
-### PullDetail
-
-Gates its `pull` + `files` queries on the routed PR number. Builds a single time-sorted `conversationEntries` memo via `features/pullDetail/model.ts`, merging reviews, issue comments, commits, and review threads (`{ kind: 'review' | 'comment' | 'commit' | 'thread' }`). Renders:
-
-- Header: `#number`, title, state badge, author chip, `base ← head` branch flow, file/±line summary, relative age.
-- Action bar (state-dependent): merge-method `<select>` + **Merge** / **Close** / **Convert to draft**, or **Reopen** when closed.
-- Collapsible `<details>` sections: **Description** (sanitized `bodyHTML` via `innerHTML`), **Labels** (full-row assigned labels + repo-label picker), **Files** (per-file viewed checkbox, status letter, ± stats; clicking sets `?file=` and dispatches a scroll request), **Checks** (status dots + **Rerun** on failed runs), **Comments/Commits** (comment composer + mixed timeline; file threads render a context snippet parsed from the file patch).
-
-`refresh()` invalidates `['pull', owner, repo]` and `['pulls', owner, repo]` after any mutation, since state changes drop a PR from the open list.
-
-### RepoPicker
-
-Replaces a native `<select>`. A button shows the current `owner/name`; clicking opens a popover (`open` signal) with a filter input and a scrollable list. Pinned repos (`★`) float to the top via a stable partition (the server already returns recent-push order); the pin button calls `setPin` and invalidates `['pins']`. A refresh button POSTs `/api/repos/refresh` and invalidates `['repos']` (401 redirects to login). `Escape` and outside pointer-down close it.
-
-### AccountMenu
-
-Signed-in dropdown. Button shows the avatar + chevron; the popover (`role="menu"`) lists the login, **Permissions** (re-runs the OAuth scope grant), and **Logout**. Closes on `Escape` / outside click.
-
-### Shortcuts
-
-Mounted once in `App`; owns a single `window` keydown listener and the help + file-finder overlays. `j` / `k` are deliberately left to `PullList`. All shortcuts except `Esc` are ignored while focus is in an `<input>`/`<textarea>`/`<select>`. The finder ranks files by substring match, then looser subsequence match; `ArrowUp`/`ArrowDown`/`Enter` navigate its results. Finder state is reset per PR.
-
-## TanStack Query
-
-Query option factories live in `queries.ts` so the dropdown and list share one definition. Route builders, response types, and query-key factories live in `../shared/api.ts`; `queries.ts` imports them and keeps the runtime path as plain same-origin cookie `fetch`. A 401 on `/api/me` is the valid logged-out state (returns `null`), elsewhere it throws.
-
-| Factory | Query key | Endpoint |
+| Condition | View | Notes |
 | --- | --- | --- |
-| `meOptions()` | `['me']` | `GET /api/me` |
-| `reposOptions(enabled)` | `['repos']` | `GET /api/repos` |
-| `pullsOptions(o,r,state,enabled)` | `['pulls', o, r, state]` | `GET /api/repos/:o/:r/pulls?state=` |
-| `pullDetailOptions(o,r,n,enabled)` | `['pull', o, r, n]` | `GET /api/repos/:o/:r/pulls/:n` |
-| `filesOptions(o,r,n,enabled)` | `['files', o, r, n]` | `GET /api/repos/:o/:r/pulls/:n/files` |
-| `pinsOptions(enabled)` | `['pins']` | `GET /api/pins` |
-| `prefsOptions(enabled)` | `['prefs']` | `GET /api/prefs` |
+| `selectedSource() === 'linear'` | `LinearBrowse` | Linear ticket browse (integration live). |
+| `selectedSource() === 'rollbar'` | `RollbarBrowse` | Rollbar error browse. |
+| no source **and** an active task | `TaskView` | The task's pane row + per-task terminal drawer. |
+| fallback (github source) | classic 3-pane PR browser | `PullList` / `PullDetail` / `DiffView`, or on `/new` a `CreatePullForm` + `ComparePreview`, or the `Acorn` mark when no repo is routed. |
 
-`enabled` gates dependent queries (most are gated on `repoKnown()` / a routed PR number). Query-key shapes match the invalidation calls below and are characterized in `apps/web/src/shared/api.test.ts`; keep them in sync. See [caching](./caching.md) for SWR and persistence behaviour.
+So "GitHub browse" is the fallback: `selectedSource()` is `'github'` and no task is active. Picking
+a source in the rail sets `selectedSource`; clicking a task row clears the source and sets
+`activeTaskId`. Task activation is shared logic — `activateTaskSignals` + `pathForTask`
+(`features/tasks/activate.ts`) flip the signals, mark the task's notices read, and compute the
+route, and are reused by the rail rows, ⌘1–9, and the palette's Go-to-task. Overlays
+(`SettingsModal`, `OnboardingModal`, `TerminalPanel`, `CommandPalette`, `FilePalette`) and the
+global `Shortcuts` handler are mounted after the switch, independent of the active mode.
 
-### Mutations
+### Login gate + theme
 
-`mutations.ts` exposes write helpers and uses the same shared route builders as `queries.ts`. Reads are GET; writes are same-origin POST/PUT/DELETE (the server checks the `Origin` header for CSRF). A non-OK response throws the structured `error` code from the body so callers can branch (e.g. `merge_failed`, `reauth`).
+`LoginGate` shows the bare `Acorn` mark while auth is unknown (initial load / cache restore) to
+avoid a redirect flash, then bounces to GitHub OAuth once settled-logged-out — unless the user
+explicitly logged out (`sessionStorage['acorn:loggedout']`), in which case it holds and offers a
+manual Login (else GitHub silently re-auths and logout is a no-op) (`App.tsx:269`, `464`).
 
-| Helper | Verb / endpoint |
+Theme is applied by a `createEffect` writing `document.documentElement.dataset.theme`
+(`App.tsx:119`). When `theme_follow_system` is on it swaps the chosen `theme_light`/`theme_dark`
+on the OS `prefers-color-scheme` and re-applies live on change; otherwise it uses the fixed `theme`
+pref.
+
+## Session restore
+
+`App` treats `prefs` (the `/api/prefs` map) as the durable view layer. It **hydrates once** — a
+`restored` signal gates the write-back effects so startup defaults never clobber saved values
+(`App.tsx:158`) — then writes each slice back in its own `createEffect` when that slice changes.
+The restore is careful about ordering: it waits for `useIsRestoring()` (the IndexedDB rehydrate)
+and for `prefs.data` before navigating, so it doesn't flash the first repo before the saved one or
+drop a gated query mid-restore (`App.tsx:143`).
+
+Prefs that make up a restored session (written from `App` unless noted):
+
+| Pref key | Restores | Writer |
+| --- | --- | --- |
+| `last_path` | The `/:owner/:repo[/:number]` that reopens on relaunch. | `App` |
+| `last_source` | The selected browse source (`''` = a task view was active). | `App` |
+| `last_task` | Which task is focused. | `App` |
+| `task_layouts` | Each task's pane row (`Record<taskId, TaskLayout>`; legacy `task_panes` migrated on hydrate). | `App` |
+| `rail_order` | Task rail pin-to-top + drag order. | `TabRail` |
+| `left_collapsed` | Left-pane collapse (`'1'`/`'0'`). | `App` (topbar toggle) |
+| `theme`, `theme_follow_system`, `theme_light`, `theme_dark` | Theme selection + follow-system. | `AppearanceSettings` |
+| `pane_shortcuts` | Per-pane keyboard-shortcut overrides (JSON). | `ShortcutsSettings` |
+| `term_rail_default` | Default terminal profile for a new task's rail. | `TerminalSettings` |
+| `term_height` | Terminal drawer height. | `TerminalPanel` |
+| `notices` | The last ~50 notification-centre notices (bounded ring). | `App` |
+| `editor_open_files` | Open-file tabs per task (content not persisted; dirty resets). | `App` |
+| `onboarded` | Whether the onboarding modal has been dismissed. | `OnboardingModal` |
+
+Write-back deliberately **does not** invalidate `prefsKey` — these keys are read once at startup, so
+skipping invalidation avoids a write→refetch loop (`App.tsx:176`).
+
+## State management
+
+### TanStack Query (server data)
+
+Query option factories live in `queries.ts` so multiple consumers share one definition (e.g. the
+`RepoPicker` dropdown and `PullList` both read `repos`). Route builders, response types, and
+query-key factories live in `../shared/api.ts`; `queries.ts` imports them and keeps the runtime
+path as plain same-origin cookie `fetch` via the thin `apiClient.ts` (`readJson`/`writeJson`,
+where `readJson(..., { nullOn401: true })` powers the logged-out `me` state). Writes live in
+`mutations.ts` and POST/PUT/DELETE to the same route builders (the server checks `Origin` for CSRF).
+
+Refetch behaviour is tuned per query rather than globally:
+
+- **Polled:** `pullsOptions` refetches every 60s; `tasksOptions` refetches on focus (keeps
+  dirty/PR markers fresh).
+- **Short staleTime:** `runJobsOptions` (15s, running jobs change), Linear enrichment /
+  `repoLabels` / `mentions` (5 min).
+- **Immutable → `staleTime: Infinity`:** `fileBlobOptions` (body keyed by immutable SHA) and
+  `jobLogOptions` (a completed job's log never changes). See [caching.md](./caching.md).
+
+`prefetch.ts` warms the open-PR list in the background after it loads — batch-fetching each PR's
+detail + file summaries (`CHUNK` 5, `CONCURRENCY` 2) and seeding the per-PR caches for an instant
+first paint, abortable on repo switch, and `seedIfNotNewer` so it never overwrites fresher data.
+It also exposes `schedulePullSummaryPrefetch`, an 80ms-debounced per-row hover prefetch. Patch
+bodies are deliberately **not** warmed — they stay intent-driven in `DiffView` (see
+[diff-rendering.md](./diff-rendering.md)).
+
+### IndexedDB persistence
+
+The whole query cache is mirrored to IndexedDB (see entry point). Consumers must gate first mount on
+`useIsRestoring()` — mounting a gated query mid-restore can drop its fetch as the `enabled` flip
+races the restore boundary (this is why `App`'s repo-redirect waits on `isRestoring()`).
+
+### Module-level signal stores
+
+Transient/live state that must not survive reload lives in signals-only modules (no query cache, no
+prefs). They export getters + mutators in the codebase's single-writer style:
+
+| Module | Owns |
 | --- | --- |
-| `mergePr(o,r,n,method)` | `POST …/merge` |
-| `closePr` / `reopenPr` | `POST …/close`, `…/reopen` |
-| `setDraft(…, draft)` | `POST …/draft` |
-| `addComment(…, body)` | `POST …/comments` |
-| `addLabel` / `removeLabel` | `POST` / `DELETE …/labels` |
-| `addReviewComment(…, body, path, line, side)` | `POST …/review-comments` |
-| `replyReview(…, databaseId, body)` | `POST …/review-comments/:id/replies` |
-| `resolveThread(…, threadId, resolved)` | `POST …/threads/:id/resolve` |
-| `setViewed(…, path, viewed)` | `POST …/viewed` |
-| `rerunFailed(o,r,runId)` | `POST /api/repos/:o/:r/actions/:runId/rerun` |
-| `setPin(repoId, pinned)` | `PUT /api/pins` |
-| `setPref(key, value)` | `PUT /api/prefs` |
+| `features/tasks/tasks.ts` | `selectedSource`, `activeTaskId`, and per-task `taskLayouts` (all layout transitions go through `dispatchLayout` → the pure `applyLayoutAction` reducer); plus per-task terminal-open and recipe-browser-URL state. |
+| `features/terminal/sessions.ts` | The live terminal-session list + a single `onStatus` subscription, so the rail/topbar can show agent-working activity even with the drawer closed. |
+| `features/tasks/taskStatus.ts` | Live worktree status per task (dirty count / `missing`), 5s-polled + `onStatus` edges. |
+| `features/notifications/notifications.ts` | The bounded in-memory notice ring (mirrored to the `notices` pref) + pure edge detection over session snapshots. |
+| `features/editor/editorState.ts` | Open-file tabs per task (mirrored to `editor_open_files`). |
 
-### Update pattern
+These are initialised once in `App`'s `onMount` (`initSessions`/`initTaskStatuses`/
+`initWorkflowNotices`), each a no-op when the terminal bridge is absent, so they naturally show
+nothing on a non-desktop build.
 
-Mutations follow a **mutate → invalidate → refetch** pattern rather than client-side optimistic cache writes:
+### Task pane layout
 
-- `PullDetail` wraps each action in `run(p)`, which `.then(refresh)` (invalidate `['pull', …]` + `['pulls', …]`) and `.catch` into an `actionError` signal.
-- `DiffView` thread/line-comment mutations call an `invalidate()` of `['pull', …]` on success; this refetches threads without re-tokenizing patches.
-- Toggles backed by prefs (`theme`, `left_collapsed`, `diff_view`) update the DOM/signal **immediately** for responsiveness, then `setPref` + invalidate `['prefs']` to persist. This is the closest thing to an optimistic update in the client.
+A task's layout is a **flat left→right row** of open panes: `TaskLayout = { panes: PaneId[] }`
+(`features/tasks/layout.ts`). `PaneId` ∈ `pr | linear | rollbar | preview | editor | changes |
+notes | context`. One pure reducer `applyLayoutAction` owns every transition — `show`
+(single pane, from a switcher click), `add` (open beside via ⌘/Ctrl-click), `close`, `replace`
+(recipe seeding). `normalizeLayout`/`parseTaskLayouts` defensively validate the persisted
+`task_layouts` value (tolerating legacy shapes). Pane internals are documented in
+[panes.md](./panes.md). (`ponytail:` a flat row, not a layout tree — open-what-you-want side by
+side is enough.)
 
-## Local UI state (signals)
+## Desktop IPC bridges (`window.acorn.*`)
 
-Transient state that must not survive reload lives in `createSignal`, never in the query cache:
+The Electron preload (`apps/desktop/src/main/preload.ts`) exposes a **narrow** capability surface
+on `window.acorn` via `contextBridge` — never raw `ipcRenderer`. Each feature has a typed accessor
+that returns the bridge or `null`, so consumers degrade gracefully on a non-desktop build:
 
-- `App`: `collapsed`, `touched` (left-pane collapse).
-- `PullList`: `tab`, `filter`.
-- `PullDetail`: `mergeMethod`, `draftText`, `reviewBody`, `actionError`.
-- `RepoPicker`: `open`, `filter`, `refreshing`, `refreshFailed`.
-- `Shortcuts`: `overlay`, `filter`, `active`.
-- `DiffView`: `parsed`, `scrollEl`, plus per-composer `open`/`body`/`busy`/`err`.
-
-`createMemo` derives filtered/sorted lists; `createEffect` syncs derived state (theme, redirect, scroll). Persistent preferences are the exception — they round-trip through the `prefs` query.
-
-## Keyboard shortcuts
-
-Exact bindings, from `Shortcuts.tsx` (overlay help list) and `PullList.tsx` (`j`/`k`):
-
-| Key | Action | Owner |
+| Accessor | Bridge | Purpose |
 | --- | --- | --- |
-| `j` | Next PR in the list | `PullList` |
-| `k` | Previous PR in the list | `PullList` |
-| `[` | Previous changed file (`?file=`, wraps) | `Shortcuts` |
-| `]` | Next changed file (`?file=`, wraps) | `Shortcuts` |
-| `/` | Open fuzzy file finder for this PR | `Shortcuts` |
-| `?` | Toggle the keyboard-shortcut help overlay | `Shortcuts` |
-| `Esc` | Close the open overlay (works even from a field) | `Shortcuts` |
+| `terminalApi()` — `features/terminal/terminalClient.ts` | `window.acorn.terminal` | PTY sessions, profiles, run targets, local-changes review, guarded task archive/teardown, `sendToAgent`, workflow calls, status/output subscriptions. |
+| `memoryApi()` — `features/memory/memoryClient.ts` | `window.acorn.memory` | Committed `.acorn/memory` files + FTS search + proposal gate. |
+| `notesApi()` — `features/notes/notesClient.ts` | `window.acorn.notes` | Workspace `.md` notes CRUD. |
+| `editorApi()` — `features/editor/editorClient.ts` | `window.acorn.editor` | Read/list/write files on the task's worktree (Monaco pane). |
+| `window.acorn.mcp` | — | MCP config inspector + register/unregister acorn's own MCP server. |
+| `window.acorn.browser` | — | Bind a task's preview webview for CDP driving. |
 
-Within the finder overlay: `ArrowDown` / `ArrowUp` move the active row, `Enter` opens the highlighted file. All shortcuts except `Esc` are suppressed while a form field is focused.
+`window.acorn.desktop` (plus `platform`, `onClosePane`) marks the desktop build. Everything above is
+`null` on a web build. Availability is answered in one place: `capabilities()`
+(`features/capabilities.ts`) reports `{ desktop, terminal }` from bridge presence — the terminal
+surface (drawer, agent sessions, run targets, workflows) is **always on when the bridge exists**
+(the old `acorn:term` localStorage flag is gone); bridge-absent (a plain browser via `dev:node`)
+is the degraded mode. The typed accessors above remain the way to *invoke* the bridge. See
+[terminal-and-agents.md](./terminal-and-agents.md) and [mcp.md](./mcp.md).
+
+## Source
+
+Key files: `apps/desktop/src/client/{index.tsx,App.tsx,apiClient.ts,queries.ts,mutations.ts,prefetch.ts}`,
+`features/tabs/TabRail.tsx`, `features/tasks/{tasks.ts,layout.ts,activate.ts,TaskView.tsx}`, and the
+signal stores under `features/{terminal,notifications,editor}/`.
+
+See also: [panes.md](./panes.md) (the pane catalog), [workspaces-and-tasks.md](./workspaces-and-tasks.md)
+(the rail + task model), [diff-rendering.md](./diff-rendering.md), [caching.md](./caching.md),
+[ui-design.md](./ui-design.md), and
+[command-palette-and-shortcuts.md](./command-palette-and-shortcuts.md).
+
+## Notes on shared plumbing
+
+- Task activation lives once in `features/tasks/activate.ts`: `activateTaskSignals(t, { pane? })`
+  (rail rows, ⌘1–9, the new-task flow, browse promotes, the notification bell, the palette) plus
+  `pathForTask`. The optional `pane` forces a pane (promotes land on their provider pane);
+  otherwise the saved layout is restored and only the first activation picks a default.
+- Layout state has no single-pane shim: all pane transitions go through
+  `dispatchLayout(taskId, action)` / `layoutForTask(taskId)` with an explicit task id.
+- `last_source` restore validates against the `SourceId` union in one place (`isSourceId`,
+  `features/tasks/tasks.ts`), so every source — including Rollbar — restores correctly.
+- API failures are typed: `apiClient.ts` throws `ApiError` (message + HTTP `status`); the auth
+  bounce in `index.tsx` is structural (`err instanceof ApiError && err.status === 401`), not
+  message-text matching.
+</content>
+</invoke>

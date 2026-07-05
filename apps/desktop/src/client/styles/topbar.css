@@ -1,0 +1,276 @@
+/* Top bar side clusters: dropdown (start) and auth (end). */
+.topbar-side { display: inline-flex; align-items: center; gap: var(--pane-pad); }
+.topbar-end { justify-content: flex-end; }
+.theme-toggle {
+  font: inherit;
+  color: var(--text-muted);
+  background: none;
+  border: 0;
+  cursor: pointer;
+  padding: 2px 6px;
+  line-height: 1;
+}
+.theme-toggle:hover { color: var(--text); }
+
+/* Agent-working badge beside the terminal toggle: spinning glyph + active count. */
+.term-working {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: var(--fs-sm);
+  color: var(--accent);
+  line-height: 1;
+  margin-left: -2px;
+}
+
+/* Left-pane collapse chevron: a quiet glyph toggle next to the picker. */
+.collapse-toggle {
+  font: inherit;
+  color: var(--text-muted);
+  background: none;
+  border: 0;
+  cursor: pointer;
+  padding: 2px 6px;
+  line-height: 1;
+}
+.collapse-toggle:hover { color: var(--text); }
+
+/* Breadcrumb (top-bar center): owner / repo / #number, each segment muted, the number bold. */
+.breadcrumb {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  justify-self: center;
+  max-width: 100%;
+  overflow: hidden;
+  font-size: var(--fs-sm);
+}
+.crumb {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.crumb-link {
+  font: inherit;
+  font-size: var(--fs-sm);
+  color: var(--text-muted);
+  background: none;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+}
+.crumb-link:hover { color: var(--text); }
+.crumb-sep { color: var(--text-faint); flex: none; }
+.crumb-num { color: var(--text); font-weight: 600; flex: none; }
+
+/* Searchable repo picker: a button that opens an absolute-positioned popover. */
+.repo-picker { position: relative; }
+.repo-picker-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 36px;
+  max-width: 300px;
+  box-sizing: border-box;
+  font: inherit;
+  color: var(--text);
+  background: var(--bg);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+  padding: 0 10px;
+  cursor: pointer;
+}
+.repo-picker-button:hover:not(:disabled) { background: var(--bg-hover); border-color: var(--accent); }
+.repo-picker-button:disabled { opacity: 0.5; cursor: default; }
+.repo-picker-label { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.repo-picker-chevron { flex: none; color: var(--text-muted); font-size: 10px; }
+
+/* Workspace colour dot leading the workspace-picker rows (docs/next 01). */
+.ws-color-dot {
+  flex: none;
+  width: 10px;
+  height: 10px;
+  margin-left: 6px;
+  border: 1px solid var(--border-strong);
+  display: inline-block;
+}
+
+.repo-picker-popover {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  z-index: 40;
+  width: 300px;
+  max-width: 90vw;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+  box-shadow: 0 12px 28px var(--shadow-popover);
+  overflow: hidden;
+}
+/* Portalled to body and pinned to the button's rect (inline top/left/width) so it overlays
+   adjacent panes instead of being clipped by their overflow. */
+.repo-picker-popover-fixed { position: fixed; top: auto; left: auto; z-index: 60; }
+.repo-picker-tools {
+  display: flex;
+  align-items: stretch;
+  border-bottom: 1px solid var(--border);
+}
+.repo-picker-filter {
+  flex: 1;
+  min-width: 0;
+  font: inherit;
+  font-size: var(--fs-sm);
+  color: var(--text);
+  background: var(--bg);
+  border: 0;
+  padding: 8px 10px;
+  outline: none;
+}
+.repo-picker-refresh {
+  flex: none;
+  width: 34px;
+  font: inherit;
+  font-size: var(--fs);
+  color: var(--text-muted);
+  background: var(--bg);
+  border: 0;
+  border-left: 1px solid var(--border);
+  padding: 0;
+  cursor: pointer;
+}
+.repo-picker-refresh:hover:not(:disabled) { color: var(--text); background: var(--bg-hover); }
+.repo-picker-refresh:disabled { color: var(--text-faint); cursor: wait; }
+.repo-picker-status {
+  margin: 0;
+  padding: 6px 10px;
+  border-bottom: 1px solid var(--border);
+  color: var(--text-muted);
+  font-size: var(--fs-sm);
+}
+.repo-picker-empty { color: var(--text-muted); font-size: var(--fs-sm); padding: 10px; margin: 0; }
+/* overflow-x: hidden is load-bearing: without it `overflow-y: auto` computes overflow-x to `auto`
+   too, so long branch names get a horizontal scrollbar instead of ellipsizing (.repo-picker-name
+   already clips). max-height tracks the viewport so the list runs near-full-height before scrolling. */
+.repo-picker-list { list-style: none; margin: 0; padding: 4px 0; max-height: min(70vh, 560px); overflow-y: auto; overflow-x: hidden; }
+.repo-picker-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 6px;
+  border-left: 2px solid transparent;
+}
+.repo-picker-row:hover { background: var(--bg-subtle); }
+.repo-picker-row.active { background: var(--bg-selected); border-left-color: var(--accent); }
+.repo-pin {
+  flex: none;
+  font: inherit;
+  font-size: var(--fs-sm);
+  color: var(--text-faint);
+  background: none;
+  border: 0;
+  padding: 2px 4px;
+  cursor: pointer;
+  line-height: 1;
+}
+.repo-pin:hover { color: var(--text-muted); }
+.repo-pin.pinned { color: var(--warn); }
+.repo-picker-name {
+  flex: 1;
+  min-width: 0;
+  font: inherit;
+  font-size: var(--fs-sm);
+  color: var(--text);
+  background: none;
+  border: 0;
+  padding: 6px 4px;
+  text-align: left;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  cursor: pointer;
+}
+
+/* Auth controls (top-right): Login link, or signed-in account dropdown. */
+.auth-control {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--text);
+  text-decoration: none;
+  font-size: var(--fs-sm);
+}
+.auth-control:hover { color: var(--text-muted); }
+
+.account-menu { position: relative; }
+.account-menu-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 32px;
+  font: inherit;
+  color: var(--text-muted);
+  background: var(--bg);
+  border: 1px solid transparent;
+  border-radius: var(--radius);
+  padding: 3px 6px 3px 3px;
+  cursor: pointer;
+}
+.account-menu-button:hover,
+.account-menu-button[aria-expanded="true"] {
+  color: var(--text);
+  background: var(--bg-hover);
+  border-color: var(--border);
+}
+.account-menu-chevron { flex: none; font-size: 10px; line-height: 1; }
+
+.avatar {
+  border-radius: 50%;
+  border: 1px solid var(--border);
+  display: block;
+}
+
+.account-menu-popover {
+  position: absolute;
+  top: calc(100% + 4px);
+  right: 0;
+  z-index: 40;
+  width: 184px;
+  max-width: calc(100vw - (2 * var(--pane-pad)));
+  display: flex;
+  flex-direction: column;
+  padding: 4px;
+  background: var(--bg);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+  box-shadow: 0 12px 28px var(--shadow-popover);
+}
+.account-menu-user {
+  min-width: 0;
+  padding: 7px 8px 8px;
+  border-bottom: 1px solid var(--border);
+  color: var(--text-muted);
+  font-size: var(--fs-sm);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.account-menu-item {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  min-height: 30px;
+  font: inherit;
+  font-size: var(--fs-sm);
+  color: var(--text);
+  background: none;
+  border: 0;
+  border-radius: var(--radius);
+  padding: 6px 8px;
+  text-align: left;
+  text-decoration: none;
+  cursor: pointer;
+}
+.account-menu-item:hover { background: var(--bg-hover); }

@@ -1,0 +1,1 @@
+ALTER TABLE `workspaces` ADD `setup_script_trigger` text;

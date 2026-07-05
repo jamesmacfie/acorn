@@ -11,10 +11,10 @@ server exchanges the OAuth code for an access token and seals it into an
 encrypted cookie. **The token never reaches the browser** — only public profile fields
 do.
 
-Source: `apps/web/src/server/routes/auth.ts`,
-`apps/web/src/server/session.ts`,
-`apps/web/src/server/middleware/auth.ts`,
-`apps/web/src/server/routes/me.ts`.
+Source: `apps/desktop/src/server/routes/auth.ts`,
+`apps/desktop/src/server/session.ts`,
+`apps/desktop/src/server/middleware/auth.ts`,
+`apps/desktop/src/server/routes/me.ts`.
 
 ## OAuth web flow
 
@@ -30,11 +30,16 @@ repo read:org read:user
 ### `GET /auth/login`
 
 1. Mint a one-time state: `crypto.randomUUID()`.
-2. Store it in the `OAUTH_STATE` in-memory TTL map with a 300s TTL
-   (`expirationTtl: STATE_TTL_SECONDS`), value `'1'`.
+2. Issue it into the `OAUTH_STATE` store (`OauthStateStore.issue` — an
+   in-memory map whose 5-minute TTL is internal to the store,
+   `main/bindings.ts`).
 3. Set a short-lived `oauth_state` cookie (httpOnly, `SameSite=Lax`,
    `path=/auth`, `maxAge` 300s) bound to this browser.
-4. Redirect to `https://github.com/login/oauth/authorize` with `client_id`,
+4. Preserve the deep link: `?return_to=` is sanitized by `safeReturnTo` (must
+   start with `/`, must not start with `//` — no external or protocol-relative
+   URLs, preventing open redirect) and stored in a second short-lived cookie,
+   `oauth_return_to` (same attributes as `oauth_state`).
+5. Redirect to `https://github.com/login/oauth/authorize` with `client_id`,
    `redirect_uri` (`/auth/callback`), `scope` and `state`.
 
 This is **login-CSRF protection**: the state must be both a live, one-time
@@ -52,20 +57,24 @@ A state minted in one browser cannot be completed in another.
 4. POST `code` + `client_secret` to
    `https://github.com/login/oauth/access_token`. No `access_token` →
    redirect back to `/auth/login`.
-5. Fetch `/user` with the new token for the profile (login, name, avatar).
-6. Seal the session (below) and set the session cookie. Redirect to `/`.
+5. Fetch `/user` with the new token for the profile (login, name, avatar);
+   failure redirects back to `/auth/login`. The granted `scope` list from the
+   token response is kept on the session.
+6. Seal the session (below) and set the session cookie. Redirect to the
+   `oauth_return_to` cookie's path (re-sanitized; default `/`), deleting that
+   cookie.
 
 ### `GET /auth/permissions`
 
 Convenience redirect to the GitHub OAuth app settings page
 (`https://github.com/settings/connections/applications/<client_id>`) so a user
-can review/revoke the grant.
+can review/revoke the grant. Falls back to
+`https://github.com/settings/applications` when the client id is blank.
 
 ### `POST /auth/logout`
 
-Deletes both possible session cookies (`__Host-session` and the dev `session`
-fallback) and returns `204`. The client also wipes its persisted IndexedDB
-cache on logout — see [offline-pwa](./offline-pwa.md).
+Deletes the `session` cookie and returns `204`. The client also wipes its
+persisted IndexedDB cache on logout — see [caching](./caching.md).
 
 ## The stateless encrypted session
 
@@ -95,27 +104,39 @@ so callers uniformly treat a broken cookie as "no session."
 
 ### Cookie attributes
 
-`cookieAttrs(reqUrl)` picks the cookie name and `Secure` flag from the request
-protocol:
-
-- **HTTPS (prod):** `__Host-session`, `Secure`. The `__Host-` prefix requires
-  `Secure` + `path=/` + no `Domain`.
-- **HTTP localhost (dev):** browsers reject `__Host-` over plain HTTP, so it
-  falls back to `session` without `Secure`. See
-  [local-development](./local-development.md).
-
-Both are set `httpOnly`, `SameSite=Lax`, `path=/`.
+The session cookie is named `session` (`SESSION_COOKIE` in `session.ts`), set
+`httpOnly`, `SameSite=Lax`, `path=/`, without `Secure`. The server only ever
+runs on plain-HTTP loopback (`http://127.0.0.1:4317`), so the `Secure` flag —
+and the Workers-era `__Host-session` name, which requires it — can never
+apply; that branch has been removed.
 
 ### Per-request decryption (auth middleware)
 
 `authMiddleware` runs on every `/api/*` request:
 
-1. Read the session cookie, decrypt it **in-CPU** (0 DB reads, no session store).
-2. Attach `ctx.user` (the `SessionData`, or `null`).
-3. On success, re-seal and re-set the cookie with a fresh 7-day expiry (the
-   sliding TTL).
-4. Never throws. Routes that require auth check `ctx.user` for `null` and
+1. Read the session cookie, decrypt it **in-CPU** (no DB reads, no session store).
+2. No (or broken) cookie? Fall back to the internal loopback token (below).
+3. Attach `ctx.user` (the `SessionData`, or `null`).
+4. When the identity came from the cookie, re-seal and re-set it with a fresh
+   7-day expiry (the sliding TTL). Internal-token callers hold no cookie and
+   are not issued one.
+5. Never throws. Routes that require auth check `ctx.user` for `null` and
    return `401`.
+
+## Internal loopback auth (`x-acorn-internal`)
+
+The acorn MCP server calls the API over loopback and holds no browser cookie.
+It authenticates with the **`x-acorn-internal: <INTERNAL_TOKEN>`** header
+instead. `INTERNAL_TOKEN` is a fresh `randomUUID()` minted per app run in
+`apps/desktop/src/main/bindings.ts` and injected into task terminal sessions as
+`ACORN_API_TOKEN`, so agent-spawned processes inherit it.
+
+`internalUser` (`middleware/auth.ts`) resolves the identity as the machine's
+single user — the `userId` of the first `prefs` (or `repos`) mirror row,
+falling back to `'local'` — with an **empty GitHub token**. Internal callers
+can therefore read local mirrors and app-state, but any route that would call
+GitHub live fails with `401 reauth` (empty bearer). See
+[api-reference](./api-reference.md#middleware--auth) and [mcp](./mcp.md).
 
 ## `GET /api/me`
 
@@ -146,14 +167,21 @@ A revoked or expired GitHub token surfaces as a `401` / `reauth` /
 Query error handler matches that and bounces to the OAuth login:
 
 ```ts
+// apps/desktop/src/client/index.tsx
 const onError = (err: unknown) => {
   const msg = err instanceof Error ? err.message : ''
-  if (/\b401\b|reauth|unauthenticated/.test(msg)) window.location.href = '/auth/login'
+  if (/\b401\b|reauth|unauthenticated/.test(msg))
+    window.location.href =
+      '/auth/login?return_to=' + encodeURIComponent(window.location.pathname + window.location.search)
 }
 ```
 
+The current location rides along as `return_to`, so the user lands back where
+they were after re-auth (see `GET /auth/login` above).
+
 The `me` query is exempt — it returns `null` on `401` (a normal logged-out
 state) so it never trips the bounce. Routes that hit GitHub and get a `401`
-back translate it to `{ error: 'reauth' }` so a stale token (not just a missing
-cookie) also triggers re-auth. See
+back translate it to `{ error: 'reauth' }` (via the shared `ghError()` helper)
+so a stale token (not just a missing cookie) also triggers re-auth. See
 [api-reference](./api-reference.md#error-codes).
+
