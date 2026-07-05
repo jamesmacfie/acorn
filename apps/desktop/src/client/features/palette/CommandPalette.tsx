@@ -70,6 +70,8 @@ export default function CommandPalette() {
     const paneClose = openPanes.size > 1 ? PANE_ORDER.filter((p) => openPanes.has(p)).map((p) => ({ id: `action:pane-close-${p}`, label: `Close pane: ${PANE_LABELS[p]}` })) : []
     return [
       { id: 'action:new-terminal', label: 'New terminal', hint: 'open a shell in the task worktree' },
+      { id: 'action:new-claude', label: 'New Claude Code terminal', hint: 'run claude in the task worktree' },
+      { id: 'action:new-codex', label: 'New Codex terminal', hint: 'run codex in the task worktree' },
       { id: 'action:toggle-terminal', label: isTerminalOpen(id) ? 'Hide terminal drawer' : 'Show terminal drawer' },
       ...paneShow,
       ...paneClose,
@@ -170,6 +172,16 @@ export default function CommandPalette() {
     switch (item.id) {
       case 'action:new-terminal':
         await api.create({ taskId, profileId: 'shell' })
+        setTerminalOpen(taskId, true)
+        await refreshSessions()
+        break
+      case 'action:new-claude':
+        await api.create({ taskId, profileId: 'claude-code' })
+        setTerminalOpen(taskId, true)
+        await refreshSessions()
+        break
+      case 'action:new-codex':
+        await api.create({ taskId, profileId: 'codex' })
         setTerminalOpen(taskId, true)
         await refreshSessions()
         break
