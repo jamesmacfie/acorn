@@ -6,7 +6,7 @@ import { execFile } from 'node:child_process'
 import { readdir, readFile, writeFile } from 'node:fs/promises'
 import { promisify } from 'node:util'
 import type { AppDatabase } from '../server/db'
-import { commitStaged, discardFile, localChanges, localDiff, localFileBlob, pushBranch, stageFile, unstageFile, type LocalScope } from './localDiff'
+import { commitStaged, discardAll, discardFile, localChanges, localDiff, localFileBlob, pushBranch, stageAll, stageFile, unstageAll, unstageFile, type LocalScope } from './localDiff'
 import { broadcastStatus } from './notify'
 import { resolveInRoot, taskRoot } from './taskWorktree'
 
@@ -62,6 +62,9 @@ export function registerLocalGitIpc(db: AppDatabase): void {
   ipcMain.handle('local:commit', (_e: IpcMainInvokeEvent, p: { taskId: string; message: string }) =>
     withRoot(p?.taskId, (root) => commitStaged(root, typeof p.message === 'string' ? p.message : '')),
   )
+  ipcMain.handle('local:stageAll', (_e: IpcMainInvokeEvent, p: { taskId: string }) => withRoot(p?.taskId, stageAll))
+  ipcMain.handle('local:unstageAll', (_e: IpcMainInvokeEvent, p: { taskId: string }) => withRoot(p?.taskId, unstageAll))
+  ipcMain.handle('local:discardAll', (_e: IpcMainInvokeEvent, p: { taskId: string }) => withRoot(p?.taskId, discardAll))
   ipcMain.handle('local:push', (_e: IpcMainInvokeEvent, p: { taskId: string }) => withRoot(p?.taskId, (root) => pushBranch(root)))
 
   // Monaco editor pane (docs/workspaces): read/write files on the task's worktree. Local-only, so

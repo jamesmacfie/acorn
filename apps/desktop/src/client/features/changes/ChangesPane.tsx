@@ -116,6 +116,12 @@ export default function ChangesPane(props: { task: Task }) {
     if (!window.confirm(`Discard changes to ${path}? This cannot be undone.`)) return
     await gitAction(() => api.local.discard(props.task.id, path, untracked))
   }
+  // Bulk toolbar actions (docs/panes.md): whole working tree at once. Discard-all is destructive → confirm.
+  async function discardAll() {
+    if (!api) return
+    if (!window.confirm('Discard ALL changes, including untracked files? This cannot be undone.')) return
+    await gitAction(() => api.local.discardAll(props.task.id))
+  }
   async function commit() {
     if (!api || !commitMsg().trim()) return
     const res = await api.local.commit(props.task.id, commitMsg())
@@ -159,6 +165,13 @@ export default function ChangesPane(props: { task: Task }) {
     <section class="pane changes-pane">
       <div class="section-header changes-header">
         <span>Changes (uncommitted)</span>
+        <Show when={groups().staged.length || groups().unstaged.length}>
+          <span class="changes-toolbar">
+            <button type="button" class="changes-to-agent" disabled={!groups().unstaged.length} data-tip="Stage all" data-tip-sub="git add -A" onClick={() => api && void gitAction(() => api.local.stageAll(props.task.id))}>++</button>
+            <button type="button" class="changes-to-agent" disabled={!groups().staged.length} data-tip="Unstage all" data-tip-sub="git reset" onClick={() => api && void gitAction(() => api.local.unstageAll(props.task.id))}>−−</button>
+            <button type="button" class="changes-to-agent" data-tip="Discard all" data-tip-sub="Reset tracked + remove untracked — cannot be undone" onClick={() => void discardAll()}>↺</button>
+          </span>
+        </Show>
         <button type="button" class="changes-send" disabled={pushing()} data-tip="Push to origin" data-tip-sub="git push -u origin HEAD" onClick={() => void push()}>
           {pushing() ? 'Pushing…' : 'Push → origin'}
         </button>

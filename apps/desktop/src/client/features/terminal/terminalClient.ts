@@ -48,6 +48,9 @@ export type TerminalApi = {
     unstage(taskId: string, path: string): Promise<{ ok: boolean; reason?: string }>
     discard(taskId: string, path: string, untracked?: boolean): Promise<{ ok: boolean; reason?: string }>
     commit(taskId: string, message: string): Promise<{ ok: boolean; reason?: string }>
+    stageAll(taskId: string): Promise<{ ok: boolean; reason?: string }>
+    unstageAll(taskId: string): Promise<{ ok: boolean; reason?: string }>
+    discardAll(taskId: string): Promise<{ ok: boolean; reason?: string }>
     push(taskId: string): Promise<{ ok: boolean; reason?: string }>
   }
 

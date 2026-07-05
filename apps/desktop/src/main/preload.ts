@@ -48,6 +48,9 @@ contextBridge.exposeInMainWorld('acorn', {
       unstage: (taskId: string, path: string) => ipcRenderer.invoke('local:unstage', { taskId, path }),
       discard: (taskId: string, path: string, untracked?: boolean) => ipcRenderer.invoke('local:discard', { taskId, path, untracked }),
       commit: (taskId: string, message: string) => ipcRenderer.invoke('local:commit', { taskId, message }),
+      stageAll: (taskId: string) => ipcRenderer.invoke('local:stageAll', { taskId }),
+      unstageAll: (taskId: string) => ipcRenderer.invoke('local:unstageAll', { taskId }),
+      discardAll: (taskId: string) => ipcRenderer.invoke('local:discardAll', { taskId }),
       push: (taskId: string) => ipcRenderer.invoke('local:push', { taskId }),
     },
     // Resolve a workspace's browser-preview URL by running its configured script in the task's
