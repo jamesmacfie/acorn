@@ -20,7 +20,7 @@ import { dispatchLayout, layoutForTask, recipeBrowserUrl, setActiveTaskId, setSe
 import { activateTaskSignals, pathForTask } from './activate'
 import { defaultLayout, type LayoutAction, type PaneId } from './layout'
 import { eventChord, formatChord, paneKeymap, paneKeys, type PaneAction } from './paneShortcuts'
-import { isTypingTarget } from '../../lib/isTypingTarget'
+import { isTerminalTarget, isTypingTarget } from '../../lib/isTypingTarget'
 import { taskStatus } from './taskStatus'
 import './task-view.css'
 
@@ -153,7 +153,9 @@ export default function TaskView(props: {
   }
   const onPaneKey = (e: KeyboardEvent) => {
     if (!(e.metaKey || e.ctrlKey || e.altKey)) return // pane shortcuts are chords, never bare keys
-    if (isTypingTarget(e.target)) return // form fields + contentEditable (editor/notes panes)
+    // Form fields + contentEditable (editor/notes panes) own their keystrokes — except the
+    // terminal, where ⌘ chords are safe (Ctrl/Alt chords stay with the shell: Ctrl+C etc.).
+    if (isTypingTarget(e.target) && !(e.metaKey && isTerminalTarget(e.target))) return
     const c = eventChord(e)
     if (!c) return
     const a = keymap().get(c)

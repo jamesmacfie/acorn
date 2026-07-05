@@ -39,6 +39,9 @@ export default function TerminalSurface(props: { sessionId: string; onExit?: (ex
         api.write(props.sessionId, '\n')
         return false
       }
+      // ⌘ chords belong to the app (pane shortcuts, ⌘K, ⌘,, ⌘⇧N …), never the PTY — skip xterm's
+      // handling so they bubble to the window listeners. Ctrl/Alt chords stay terminal input.
+      if (e.type === 'keydown' && e.metaKey) return false
       return true
     })
     term.onData((d) => api.write(props.sessionId, d))

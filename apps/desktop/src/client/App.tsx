@@ -52,6 +52,17 @@ export default function App() {
     setSettingsTab(tab)
     setSettingsOpen(true)
   }
+  // ⌘, opens Settings — the macOS convention. Fires everywhere (typing targets and the terminal
+  // included) and is reserved in paneShortcuts, so it can never be rebound or shadowed.
+  onMount(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (!(e.metaKey || e.ctrlKey) || e.altKey || e.shiftKey || e.key !== ',') return
+      e.preventDefault()
+      openSettings()
+    }
+    window.addEventListener('keydown', onKey)
+    onCleanup(() => window.removeEventListener('keydown', onKey))
+  })
   // The terminal drawer belongs to a task, not the app: it's shown only in the Task view (a Source
   // browse like Pull requests has no terminal) and its open/closed state is tracked per task, so
   // switching tabs swaps it. `termOpen` reflects the active task's state within the Task view.

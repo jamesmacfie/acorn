@@ -105,6 +105,12 @@ export default function TabRail() {
   // combo, so it's safe to leave active even while typing.
   onMount(() => {
     const onKey = (e: KeyboardEvent) => {
+      // ⌘⇧N: new task in the active workspace — same flow as the rail's + button.
+      if ((e.metaKey || e.ctrlKey) && e.shiftKey && !e.altKey && e.code === 'KeyN') {
+        e.preventDefault()
+        openNew()
+        return
+      }
       if (!(e.metaKey || e.ctrlKey) || e.altKey || e.shiftKey) return
       if (e.key < '1' || e.key > '9') return
       const t = visibleTasks()[Number(e.key) - 1]

@@ -5,9 +5,17 @@ import { SHORTCUTS } from '../../Shortcuts'
 import { eventChord, formatChord, PANE_SHORTCUT_DEFAULTS, paneKeys, RESERVED_CHORDS, type PaneAction } from '../tasks/paneShortcuts'
 import { savePref } from './savePref'
 
-// Settings → Shortcuts: editable pane chords plus the read-only global list. Editing captures the
-// next key press on the focused row's input, rejects reserved keys and collisions, then persists a
-// `pane_shortcuts` override diff (JSON Record<action, chord>).
+// Settings → Shortcuts: editable pane chords plus the read-only global + terminal lists. Editing
+// captures the next key press on the focused row's input, rejects reserved keys and collisions,
+// then persists a `pane_shortcuts` override diff (JSON Record<action, chord>).
+
+// Shortcuts owned by the terminal drawer (handlers live in features/terminal). ⌘ chords pass
+// through a focused terminal to the app; Ctrl/Alt chords are terminal input (Ctrl+C etc.).
+const TERMINAL_SHORTCUTS: Array<[string, string]> = [
+  ['⌘⇧1 – ⌘⇧9', 'Focus terminal tab 1–9 (drawer open)'],
+  ['⌘W', 'Close the active terminal tab (focus in the drawer)'],
+  ['⇧↩', 'Insert a newline instead of submitting (agent prompts)'],
+]
 export default function ShortcutsSettings() {
   const qc = useQueryClient()
   const prefs = createQuery(() => prefsOptions(true))
@@ -67,6 +75,18 @@ export default function ShortcutsSettings() {
       <div class="settings-section-label">Global</div>
       <dl class="help-list">
         <For each={SHORTCUTS}>
+          {([key, desc]) => (
+            <>
+              <dt class="help-key">{key}</dt>
+              <dd class="help-desc">{desc}</dd>
+            </>
+          )}
+        </For>
+      </dl>
+      <div class="settings-section-label">Terminal</div>
+      <p class="muted">⌘ shortcuts (panes, palette, global) still work while the terminal is focused; ⌃/⌥ keys go to the shell.</p>
+      <dl class="help-list">
+        <For each={TERMINAL_SHORTCUTS}>
           {([key, desc]) => (
             <>
               <dt class="help-key">{key}</dt>

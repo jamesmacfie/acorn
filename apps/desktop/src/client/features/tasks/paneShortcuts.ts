@@ -21,9 +21,9 @@ export const PANE_SHORTCUT_DEFAULTS: { id: PaneAction; label: string; key: strin
 ]
 
 // Chords the app already owns globally — never assignable to a pane. ⌘K palette, ⌘P file finder,
-// ⌘1–9 task rail, ⌘S editor save, ⌘W close pane.
+// ⌘1–9 task rail, ⌘S editor save, ⌘W close pane, ⌘⇧N new task, ⌘, settings.
 export const RESERVED_CHORDS = new Set([
-  'meta+k', 'meta+p', 'meta+s', 'meta+w',
+  'meta+k', 'meta+p', 'meta+s', 'meta+w', 'meta+shift+n', 'meta+,',
   'meta+1', 'meta+2', 'meta+3', 'meta+4', 'meta+5', 'meta+6', 'meta+7', 'meta+8', 'meta+9',
 ])
 
