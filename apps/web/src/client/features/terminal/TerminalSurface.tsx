@@ -3,7 +3,7 @@ import { Terminal } from '@xterm/xterm'
 import { FitAddon } from '@xterm/addon-fit'
 import '@xterm/xterm/css/xterm.css'
 import { terminalApi } from './terminalClient'
-import { isAppDark, monoFont, watchTheme, xtermTheme } from './theme'
+import { baseTheme, isAppDark, monoFont, watchTheme, xtermTheme } from './theme'
 
 // One xterm bound to one live session over IPC (vNext §5). Keyed by session id in the parent, so
 // switching tabs unmounts this (detach, keep PTY running) and remounts a fresh xterm that replays
@@ -14,14 +14,18 @@ export default function TerminalSurface(props: { sessionId: string; onExit?: (ex
 
   onMount(() => {
     if (!api) return
-    const term = new Terminal({ convertEol: true, fontFamily: monoFont(), fontSize: 13, theme: xtermTheme(isAppDark()) })
+    const term = new Terminal({ convertEol: true, fontFamily: monoFont(), fontSize: 13, theme: baseTheme(isAppDark()) })
     const fit = new FitAddon()
     term.loadAddon(fit)
     term.open(host)
     fit.fit()
 
-    // Follow the app's light/dark theme live (manual toggle or OS preference change).
-    const unwatchTheme = watchTheme(() => (term.options.theme = xtermTheme(isAppDark())))
+    // Follow the app theme live (manual toggle or OS preference change). The full theme resolves
+    // async (ANSI palette comes from the Shiki theme); guard against applying to a disposed term.
+    let disposed = false
+    const applyTheme = () => void xtermTheme(isAppDark()).then((t) => { if (!disposed) term.options.theme = t })
+    applyTheme()
+    const unwatchTheme = watchTheme(applyTheme)
 
     const detach = api.attach(props.sessionId, (m) => {
       if (m.type === 'output') term.write(m.data)
@@ -40,6 +44,7 @@ export default function TerminalSurface(props: { sessionId: string; onExit?: (ex
     const ro = new ResizeObserver(() => fit.fit())
     ro.observe(host)
     onCleanup(() => {
+      disposed = true
       detach()
       unwatchTheme()
       ro.disconnect()
