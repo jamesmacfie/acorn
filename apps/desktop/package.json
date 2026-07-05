@@ -10,9 +10,9 @@
     "dist": "electron-vite build && electron-builder --mac",
     "electron:dev": "electron-vite dev",
     "electron:rebuild": "electron-rebuild -f -w better-sqlite3,node-pty",
-    "node:rebuild": "pnpm rebuild better-sqlite3 node-pty",
+    "node:rebuild": "node scripts/rebuild-node-abi.mjs",
     "lint": "tsc --noEmit",
-    "test": "vitest run",
+    "test": "node scripts/rebuild-node-abi.mjs && vitest run",
     "db:generate": "drizzle-kit generate && tsx scripts/check-migrations.ts",
     "db:check": "tsx scripts/check-migrations.ts",
     "db:migrate": "tsx scripts/migrate.ts"
