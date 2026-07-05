@@ -86,4 +86,18 @@ describe('task links grow/shrink', () => {
     const res = await app.fetch(jsonReq(`/api/tasks/${task.id}/links`, 'POST', { provider: 'linear' }), {} as Env)
     expect(res.status).toBe(400)
   })
+
+  it('unknown task → 404 on PATCH', async () => {
+    const res = await app.fetch(jsonReq('/api/tasks/nope', 'PATCH', { title: 'Ghost' }), {} as Env)
+    expect(res.status).toBe(404)
+  })
+
+  it('PATCH renames an existing task', async () => {
+    const task = await createTask()
+    const res = await app.fetch(jsonReq(`/api/tasks/${task.id}`, 'PATCH', { title: 'Renamed' }), {} as Env)
+    expect(res.status).toBe(200)
+    const list = await app.fetch(new Request('http://acorn.test/api/tasks'), {} as Env)
+    const all: Task[] = await list.json()
+    expect(all.find((x) => x.id === task.id)?.title).toBe('Renamed')
+  })
 })

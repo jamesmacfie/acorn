@@ -50,18 +50,22 @@ export type TokenizeLine = (path: string, content: string) => Tok[]
 export const isCodeRow = (r: Row): r is CodeRow => r.kind === 'normal' || r.kind === 'insert' || r.kind === 'delete'
 export const fileAnchor = (path: string) => `diff-file:${path}`
 
-const DIFF_LINE_HEIGHT = 20
-const DIFF_FILE_HEADER_HEIGHT = 36
-const DIFF_THREAD_HEIGHT = 140
-const DIFF_RESOLVED_THREAD_HEIGHT = 50
+// Virtualizer size estimates per row kind — the single source for these numbers (DiffView's
+// fallback estimate imports DIFF_LOAD_ROW_HEIGHT rather than redefining 36).
+export const DIFF_LINE_HEIGHT = 20
+export const DIFF_FILE_HEADER_HEIGHT = 36
+export const DIFF_THREAD_HEIGHT = 140
+export const DIFF_RESOLVED_THREAD_HEIGHT = 50
+export const DIFF_LOAD_ROW_HEIGHT = 36
+export const DIFF_GAP_ROW_HEIGHT = 28
 
 export const estimateRowSize = (row: Row | undefined) => {
   if (!row) return DIFF_LINE_HEIGHT
   if (row.kind === 'file') return DIFF_FILE_HEADER_HEIGHT
   if (row.kind === 'thread') return row.thread.resolved ? DIFF_RESOLVED_THREAD_HEIGHT : DIFF_THREAD_HEIGHT
-  if (row.kind === 'nodiff') return 28
-  if (row.kind === 'load') return 36
-  if (row.kind === 'gap') return 28
+  if (row.kind === 'nodiff') return DIFF_GAP_ROW_HEIGHT
+  if (row.kind === 'load') return DIFF_LOAD_ROW_HEIGHT
+  if (row.kind === 'gap') return DIFF_GAP_ROW_HEIGHT
   return DIFF_LINE_HEIGHT
 }
 

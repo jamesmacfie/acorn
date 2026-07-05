@@ -3,9 +3,8 @@ import { Hono } from 'hono'
 import { getDb, schema } from '../db'
 import type { AppEnv } from '../middleware/auth'
 
-const app = new Hono<AppEnv>()
-
-app.get('/:owner/:repo/mentions', async (c) => {
+// Participant logins for @-mention autocomplete, read straight from the mirror tables.
+export const mentions = new Hono<AppEnv>().get('/:owner/:repo/mentions', async (c) => {
   const user = c.get('user')
   if (!user) return c.json({ error: 'unauthenticated' }, 401)
   const db = getDb(c.env)
@@ -36,5 +35,3 @@ app.get('/:owner/:repo/mentions', async (c) => {
   const logins = [...new Set(all.map((r) => r.login).filter((l): l is string => !!l))].sort()
   return c.json(logins)
 })
-
-export { app as mentions }

@@ -7,13 +7,3 @@
 @import './styles/checks-panel.css';
 @import './styles/integrations-panel.css';
 @import './styles/copy.css';
-
-/* Workspace colour dot in the picker rows (docs/next 01). */
-.ws-color-dot {
-  flex: none;
-  width: 10px;
-  height: 10px;
-  margin-left: 6px;
-  border: 1px solid var(--border-strong);
-  display: inline-block;
-}

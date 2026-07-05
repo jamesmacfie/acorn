@@ -13,7 +13,8 @@
     "node:rebuild": "pnpm rebuild better-sqlite3 node-pty",
     "lint": "tsc --noEmit",
     "test": "vitest run",
-    "db:generate": "drizzle-kit generate",
+    "db:generate": "drizzle-kit generate && tsx scripts/check-migrations.ts",
+    "db:check": "tsx scripts/check-migrations.ts",
     "db:migrate": "tsx scripts/migrate.ts"
   },
   "dependencies": {

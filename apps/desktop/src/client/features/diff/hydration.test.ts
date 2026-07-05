@@ -1,15 +1,8 @@
-import { QueryClient } from '@tanstack/solid-query'
 import { createRoot } from 'solid-js'
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import type { PullFile } from '../../queries'
 import { createDiffHydrator } from './hydration'
 import type { ParsedFile, TokenizeLine } from './model'
-
-const jsonResponse = (body: unknown, status = 200) =>
-  new Response(JSON.stringify(body), {
-    status,
-    headers: { 'Content-Type': 'application/json' },
-  })
 
 const pullFile = (path: string, patch: string | null): PullFile => ({
   path,
@@ -37,32 +30,27 @@ const waitFor = async (assertion: () => void) => {
   throw last
 }
 
-describe('diff hydrator', () => {
-  afterEach(() => {
-    vi.unstubAllGlobals()
-  })
+type HydratorOptions = Parameters<typeof createDiffHydrator>[0]
 
-  it('automatically batch-fetches patches and parses the prioritized file first', async () => {
-    const fileA = pullFile('src/a.ts', '@@ a')
-    const fileB = pullFile('src/b.ts', '@@ b')
-    const fetchMock = vi.fn(async () => jsonResponse([fileA, fileB]))
-    vi.stubGlobal('fetch', fetchMock)
-
-    const queryClient = new QueryClient()
-    const parsed: ParsedFile[] = []
-    let disposeRoot!: () => void
-    const hydrator = createRoot((dispose) => {
-      disposeRoot = dispose
-      return createDiffHydrator({
-        owner: 'acorn',
-        repo: 'web',
-        number: '42',
-        queryClient,
-        tokenizerForFile: async () => plain,
-        parseFile: (file) => ({ file, diff: [] }),
-        onParsed: (file) => parsed.push(file),
-      })
+const makeHydrator = (parsed: ParsedFile[], overrides: Partial<HydratorOptions> = {}) => {
+  let disposeRoot!: () => void
+  const hydrator = createRoot((dispose) => {
+    disposeRoot = dispose
+    return createDiffHydrator({
+      tokenizerForFile: async () => plain,
+      parseFile: (file) => ({ file, diff: [] }),
+      onParsed: (file) => parsed.push(file),
+      ...overrides,
     })
+  })
+  return { hydrator, disposeRoot }
+}
+
+describe('diff hydrator', () => {
+  it('batch-fetches missing patches via fetchPatches and parses the prioritized file first', async () => {
+    const fetchPatches = vi.fn(async (paths: string[]) => paths.map((path) => pullFile(path, `@@ ${path}`)))
+    const parsed: ParsedFile[] = []
+    const { hydrator, disposeRoot } = makeHydrator(parsed, { fetchPatches })
 
     try {
       hydrator.reset([pullFile('src/a.ts', null), pullFile('src/b.ts', null)], 'src/b.ts')
@@ -70,13 +58,8 @@ describe('diff hydrator', () => {
       await waitFor(() => {
         expect(parsed.map((file) => file.file.path)).toEqual(['src/b.ts', 'src/a.ts'])
       })
-      expect(fetchMock).toHaveBeenCalledTimes(1)
-      expect(fetchMock).toHaveBeenCalledWith('/api/repos/acorn/web/pulls/42/files/patches', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ paths: ['src/b.ts', 'src/a.ts'] }),
-        signal: expect.any(AbortSignal),
-      })
+      expect(fetchPatches).toHaveBeenCalledTimes(1)
+      expect(fetchPatches).toHaveBeenCalledWith(['src/b.ts', 'src/a.ts'], expect.any(AbortSignal))
       expect(hydrator.status('src/a.ts')).toBe('loaded')
       expect(hydrator.status('src/b.ts')).toBe('loaded')
     } finally {
@@ -86,24 +69,9 @@ describe('diff hydrator', () => {
   })
 
   it('parses already-loaded patch-bearing files without fetching patch batches', async () => {
-    const fetchMock = vi.fn()
-    vi.stubGlobal('fetch', fetchMock)
-
-    const queryClient = new QueryClient()
+    const fetchPatches = vi.fn(async () => [] as PullFile[])
     const parsed: ParsedFile[] = []
-    let disposeRoot!: () => void
-    const hydrator = createRoot((dispose) => {
-      disposeRoot = dispose
-      return createDiffHydrator({
-        owner: 'acorn',
-        repo: 'web',
-        number: '42',
-        queryClient,
-        tokenizerForFile: async () => plain,
-        parseFile: (file) => ({ file, diff: [] }),
-        onParsed: (file) => parsed.push(file),
-      })
-    })
+    const { hydrator, disposeRoot } = makeHydrator(parsed, { fetchPatches })
 
     try {
       hydrator.reset([pullFile('src/a.ts', '@@ a'), pullFile('src/b.ts', '@@ b')], 'src/b.ts')
@@ -111,9 +79,44 @@ describe('diff hydrator', () => {
       await waitFor(() => {
         expect(parsed.map((file) => file.file.path)).toEqual(['src/b.ts', 'src/a.ts'])
       })
-      expect(fetchMock).not.toHaveBeenCalled()
+      expect(fetchPatches).not.toHaveBeenCalled()
       expect(hydrator.status('src/a.ts')).toBe('loaded')
       expect(hydrator.status('src/b.ts')).toBe('loaded')
+    } finally {
+      hydrator.dispose()
+      disposeRoot()
+    }
+  })
+
+  it('resolves patch-less files through cachedFile without needing fetchPatches', async () => {
+    // The compare-preview wiring: every body is inline, so cachedFile serves even null-patch
+    // (binary) files and no fetchPatches is provided.
+    const binary = pullFile('img.png', null)
+    const parsed: ParsedFile[] = []
+    const { hydrator, disposeRoot } = makeHydrator(parsed, { cachedFile: (path) => (path === 'img.png' ? binary : null) })
+
+    try {
+      hydrator.reset([binary])
+      await waitFor(() => {
+        expect(parsed.map((file) => file.file.path)).toEqual(['img.png'])
+      })
+      expect(hydrator.status('img.png')).toBe('loaded')
+    } finally {
+      hydrator.dispose()
+      disposeRoot()
+    }
+  })
+
+  it('marks files with no resolvable body as errors when fetchPatches is omitted', async () => {
+    const parsed: ParsedFile[] = []
+    const { hydrator, disposeRoot } = makeHydrator(parsed)
+
+    try {
+      hydrator.reset([pullFile('src/a.ts', null)])
+      await waitFor(() => {
+        expect(hydrator.status('src/a.ts')).toBe('error')
+      })
+      expect(parsed).toEqual([])
     } finally {
       hydrator.dispose()
       disposeRoot()

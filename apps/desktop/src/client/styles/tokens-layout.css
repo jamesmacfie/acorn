@@ -1,4 +1,4 @@
-/* Design tokens — docs/ui-style.md §2. Everything visual references a token so theming
+/* Design tokens — docs/ui-design.md. Everything visual references a token so theming
    is a single attribute flip. Light is the :root default; dark via prefers-color-scheme
    (unless manually forced light) and via [data-theme="dark"] (manual toggle wins). */
 :root {
@@ -25,32 +25,49 @@
   --dur-short: 150ms;
 }
 
+/* Dark token VALUES, defined once as --dark-* (inert until mapped below). Two paths apply them —
+   the manual data-theme="dark" toggle and the OS preference (unless forced light); the mappings
+   are thin var() indirections so a dark tweak is made in exactly one place. Named themes below
+   override the media-query mapping by source order (same 0,2,0 specificity). */
+:root {
+  --dark-bg: #121212;        --dark-bg-subtle: #1a1a1a;   --dark-bg-hover: #202020;   --dark-bg-selected: #262626;
+  --dark-border: #2a2a2a;    --dark-border-strong: #424242;
+  --dark-text: #dddddd;      --dark-text-muted: #8d8d8d;  --dark-text-faint: #5d5d5d;
+  --dark-accent: #dddddd;    --dark-focus: #dddddd;
+  --dark-add-bg: #12261b;    --dark-add-marker: #3fb950;
+  --dark-del-bg: #2a1416;    --dark-del-marker: #f85149;
+  --dark-add-word-bg: #1f6f33; --dark-del-word-bg: #7a2630;
+  --dark-hunk-bg: #161f2b;   --dark-hunk-text: #8b949e;
+  --dark-warn: #d29922;      --dark-badge-border: #383838;
+  --dark-shadow-popover: rgba(0, 0, 0, 0.42);
+}
+
 /* Manual toggle: setting data-theme="dark" on <html> wins over the media query. */
 :root[data-theme="dark"] {
-  --bg: #121212;        --bg-subtle: #1a1a1a;   --bg-hover: #202020;   --bg-selected: #262626;
-  --border: #2a2a2a;    --border-strong: #424242;
-  --text: #dddddd;      --text-muted: #8d8d8d;  --text-faint: #5d5d5d;
-  --accent: #dddddd;    --focus: #dddddd;
-  --add-bg: #12261b;    --add-marker: #3fb950;
-  --del-bg: #2a1416;    --del-marker: #f85149;
-  --add-word-bg: #1f6f33; --del-word-bg: #7a2630;
-  --hunk-bg: #161f2b;   --hunk-text: #8b949e;
-  --warn: #d29922;      --badge-border: #383838;
-  --shadow-popover: rgba(0, 0, 0, 0.42);
+  --bg: var(--dark-bg);        --bg-subtle: var(--dark-bg-subtle);   --bg-hover: var(--dark-bg-hover);   --bg-selected: var(--dark-bg-selected);
+  --border: var(--dark-border);    --border-strong: var(--dark-border-strong);
+  --text: var(--dark-text);      --text-muted: var(--dark-text-muted);  --text-faint: var(--dark-text-faint);
+  --accent: var(--dark-accent);    --focus: var(--dark-focus);
+  --add-bg: var(--dark-add-bg);    --add-marker: var(--dark-add-marker);
+  --del-bg: var(--dark-del-bg);    --del-marker: var(--dark-del-marker);
+  --add-word-bg: var(--dark-add-word-bg); --del-word-bg: var(--dark-del-word-bg);
+  --hunk-bg: var(--dark-hunk-bg);   --hunk-text: var(--dark-hunk-text);
+  --warn: var(--dark-warn);      --badge-border: var(--dark-badge-border);
+  --shadow-popover: var(--dark-shadow-popover);
 }
 
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
-    --bg: #121212;        --bg-subtle: #1a1a1a;   --bg-hover: #202020;   --bg-selected: #262626;
-    --border: #2a2a2a;    --border-strong: #424242;
-    --text: #dddddd;      --text-muted: #8d8d8d;  --text-faint: #5d5d5d;
-    --accent: #dddddd;    --focus: #dddddd;
-    --add-bg: #12261b;    --add-marker: #3fb950;
-    --del-bg: #2a1416;    --del-marker: #f85149;
-    --add-word-bg: #1f6f33; --del-word-bg: #7a2630;
-    --hunk-bg: #161f2b;   --hunk-text: #8b949e;
-    --warn: #d29922;      --badge-border: #383838;
-    --shadow-popover: rgba(0, 0, 0, 0.42);
+    --bg: var(--dark-bg);        --bg-subtle: var(--dark-bg-subtle);   --bg-hover: var(--dark-bg-hover);   --bg-selected: var(--dark-bg-selected);
+    --border: var(--dark-border);    --border-strong: var(--dark-border-strong);
+    --text: var(--dark-text);      --text-muted: var(--dark-text-muted);  --text-faint: var(--dark-text-faint);
+    --accent: var(--dark-accent);    --focus: var(--dark-focus);
+    --add-bg: var(--dark-add-bg);    --add-marker: var(--dark-add-marker);
+    --del-bg: var(--dark-del-bg);    --del-marker: var(--dark-del-marker);
+    --add-word-bg: var(--dark-add-word-bg); --del-word-bg: var(--dark-del-word-bg);
+    --hunk-bg: var(--dark-hunk-bg);   --hunk-text: var(--dark-hunk-text);
+    --warn: var(--dark-warn);      --badge-border: var(--dark-badge-border);
+    --shadow-popover: var(--dark-shadow-popover);
   }
 }
 
@@ -258,9 +275,12 @@ body {
   border-right: 1px solid var(--border);
   padding: 0;
   overflow: auto;
-  contain: layout paint; /* isolate reflow per pane (docs/ui-style.md §4) */
+  contain: layout paint; /* isolate reflow per pane (docs/ui-design.md) */
 }
-.pane-right { border-right: 0; }
+/* Right-most pane: drops the trailing border, and is a flex column so the sticky header stays put
+   while the diff scroller below owns the viewport. Sole owner of .pane-right (was split with diff.css). */
+.pane-right { border-right: 0; display: flex; flex-direction: column; overflow: hidden; }
+.pane-right .section-header { flex: none; }
 /* Left pane is a flex column so the PR list scrolls (and virtualizes) independently of the tabs. */
 .pane-left { display: flex; flex-direction: column; overflow: hidden; }
 .pr-list-scroll { flex: 1; min-height: 0; overflow: auto; margin: 0; padding: 0; }

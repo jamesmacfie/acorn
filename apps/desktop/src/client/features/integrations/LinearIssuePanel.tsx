@@ -9,10 +9,12 @@ import { renderMarkdown } from './markdown'
 // Glyph per activity kind (Linear-style compact feed). State changes are tinted by the new state.
 const ACTIVITY_GLYPH: Record<string, string> = { created: '✦', state: '◐', assignee: '○', label: '▣', title: '✎' }
 
-// Side panel for one referenced Linear ticket (mirrors ChecksPanel). Fetches full detail on open
-// via linearIssueOptions, which forces a fresh server read so the panel is always current. Bodies
-// are raw markdown (renderMarkdown → sanitized HTML). Activity Log replays the issue history;
-// comments are threaded with an inline reply box (GitHub-style), plus a composer at the bottom.
+// One referenced Linear ticket. Two variants: the default right-anchored overlay (PullDetail's
+// Integrations section — mirrors ChecksPanel) and `variant="pane"`, which renders the same content
+// in a Task-view layout slot like the other provider panes (docs/panes.md). Fetches full detail on
+// open via linearIssueOptions, which forces a fresh server read so the panel is always current.
+// Bodies are raw markdown (renderMarkdown → sanitized HTML). Activity Log replays the issue
+// history; comments are threaded with an inline reply box (GitHub-style), plus a bottom composer.
 export default function LinearIssuePanel(props: {
   identifier: string
   onClose: () => void
@@ -21,6 +23,7 @@ export default function LinearIssuePanel(props: {
   // them (docs/workspaces). Omitted by the single-ticket PR-detail caller.
   identifiers?: string[]
   onSelectIdentifier?: (id: string) => void
+  variant?: 'overlay' | 'pane'
 }) {
   const qc = useQueryClient()
   const issue = createQuery(() => linearIssueOptions(props.identifier, true))
@@ -31,7 +34,9 @@ export default function LinearIssuePanel(props: {
   const [posting, setPosting] = createSignal(false)
   const [postError, setPostError] = createSignal('')
 
+  // Escape-close belongs to the overlay; the pane variant closes via the layout (slot ✕ / switcher).
   onMount(() => {
+    if (props.variant === 'pane') return
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') props.onClose()
     }
@@ -108,40 +113,28 @@ export default function LinearIssuePanel(props: {
     </li>
   )
 
-  return (
-    <Portal>
-      <div class="integrations-panel-backdrop" onClick={props.onClose} />
-      <aside class="integrations-panel">
-        <header class="integrations-panel-head">
-          <span class="integrations-panel-title">{props.identifier}</span>
-          <Show when={issue.data?.url}>
-            {(url) => (
-              <a class="integrations-panel-link muted" href={url()} target="_blank" rel="noreferrer">
-                Open in Linear ↗
-              </a>
-            )}
-          </Show>
-          <button type="button" class="integrations-panel-close" onClick={props.onClose} aria-label="Close">
-            ✕
-          </button>
-        </header>
-        <Show when={(props.identifiers?.length ?? 0) > 1}>
-          <div class="integrations-panel-tabs">
-            <For each={props.identifiers}>
-              {(id) => (
-                <button
-                  type="button"
-                  class="integrations-panel-tab"
-                  classList={{ active: id === props.identifier }}
-                  onClick={() => props.onSelectIdentifier?.(id)}
-                >
-                  {id}
-                </button>
-              )}
-            </For>
-          </div>
-        </Show>
-        <div class="integrations-panel-body" onClick={props.onContentClick}>
+  // Chip strip + scrolling detail body, shared verbatim by both variants (only one renders —
+  // `variant` is fixed per call site).
+  const tabs = () => (
+    <Show when={(props.identifiers?.length ?? 0) > 1}>
+      <div class="integrations-panel-tabs">
+        <For each={props.identifiers}>
+          {(id) => (
+            <button
+              type="button"
+              class="integrations-panel-tab"
+              classList={{ active: id === props.identifier }}
+              onClick={() => props.onSelectIdentifier?.(id)}
+            >
+              {id}
+            </button>
+          )}
+        </For>
+      </div>
+    </Show>
+  )
+  const body = () => (
+    <div class="integrations-panel-body" onClick={props.onContentClick}>
           <Show when={!issue.isLoading} fallback={<p class="muted">Loading ticket…</p>}>
             <Show when={issue.data} fallback={<p class="muted">{issue.isError ? 'Failed to load ticket.' : 'Not found.'}</p>}>
               {(data) => (
@@ -205,7 +198,48 @@ export default function LinearIssuePanel(props: {
             </Show>
           </Show>
         </div>
-      </aside>
-    </Portal>
+  )
+
+  return (
+    <Show
+      when={props.variant === 'pane'}
+      fallback={
+        <Portal>
+          <div class="integrations-panel-backdrop" onClick={props.onClose} />
+          <aside class="integrations-panel">
+            <header class="integrations-panel-head">
+              <span class="integrations-panel-title">{props.identifier}</span>
+              <Show when={issue.data?.url}>
+                {(url) => (
+                  <a class="integrations-panel-link muted" href={url()} target="_blank" rel="noreferrer">
+                    Open in Linear ↗
+                  </a>
+                )}
+              </Show>
+              <button type="button" class="integrations-panel-close" onClick={props.onClose} aria-label="Close">
+                ✕
+              </button>
+            </header>
+            {tabs()}
+            {body()}
+          </aside>
+        </Portal>
+      }
+    >
+      <section class="pane linear-pane">
+        <div class="section-header">
+          <span>Linear · {props.identifier}</span>
+          <Show when={issue.data?.url}>
+            {(url) => (
+              <a class="integrations-panel-link muted" style={{ 'text-align': 'right' }} href={url()} target="_blank" rel="noreferrer">
+                Open in Linear ↗
+              </a>
+            )}
+          </Show>
+        </div>
+        {tabs()}
+        {body()}
+      </section>
+    </Show>
   )
 }

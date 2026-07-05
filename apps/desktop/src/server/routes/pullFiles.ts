@@ -2,12 +2,12 @@ import { and, eq } from 'drizzle-orm'
 import type { Context } from 'hono'
 import { Hono } from 'hono'
 import type { PullFilesPatchRequest } from '../../shared/api'
+import { trackBackgroundRefresh } from '../background'
 import { getDb, schema } from '../db'
 import { filesResource } from '../db/resourceKeys'
-import { ghError } from '../github'
 import type { AppEnv } from '../middleware/auth'
 import { fetchFiles, mirrorFiles, readFiles, STALE_AFTER_MS } from './prMirror'
-import { resolveRepoForUser, waitUntilLogged, type RouteResult } from './repoMirror'
+import { resolveRepoForUser, type RouteResult } from './repoMirror'
 
 const MAX_PATCH_PATHS = 20
 
@@ -60,16 +60,15 @@ const handleFilesRead = async (c: Context<AppEnv>, options: { summaryOnly?: bool
   if (sync && sync.fetchedAt + STALE_AFTER_MS > Date.now()) return c.json(await readCached())
 
   const refresh = async (): Promise<RouteResult<Awaited<ReturnType<typeof readCached>>>> => {
-    const { res, body } = await fetchFiles(user.token, owner, repo, number)
-    const err = ghError(res)
-    if (err) return { ok: false, failure: err }
-    await mirrorFiles(c.env, db, key, body ?? [])
+    const files = await fetchFiles(user.token, owner, repo, number)
+    if (!files.ok) return files
+    await mirrorFiles(c.env, db, key, files.value)
     return { ok: true, value: await readCached() }
   }
 
   if (sync) {
     const cached = await readCached()
-    waitUntilLogged(`files:${owner}/${repo}#${number}`, refresh())
+    trackBackgroundRefresh(`files:${owner}/${repo}#${number}`, refresh())
     return c.json(cached)
   }
 

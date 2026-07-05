@@ -1,46 +1,91 @@
-import { Hono } from 'hono'
+import { Hono, type Context } from 'hono'
 import type { AppEnv } from '../middleware/auth'
 
 // Harness routes (docs/next 06 catalog): the loopback surface the acorn MCP server's feature tools
-// call — notes, memory (search/get/list + PROPOSE, never a silent write), and run targets. The
-// backings live in the main process (NotesStore, memory index + runtime service), which shares
-// this process in Electron; terminal.ts injects them via setHarnessBridge — the seam keeps these
-// routes testable and keeps dev:node (no Electron) degrading to a clean 503.
+// call — notes, memory (search/get/list + PROPOSE, never a silent write), run targets and the
+// drivable browser. The backings live in the main process (NotesStore, memory index + runtime
+// service, CDP driver), which shares this process in Electron; main/harnessWiring.ts injects one
+// sub-bridge per domain via the setters below — the seam keeps these routes testable and keeps
+// dev:node (no Electron) degrading to a clean 503.
 
-export type HarnessBridge = {
-  notesList(taskId: string): Promise<unknown[]>
-  notesRead(taskId: string, slug: string): Promise<unknown>
-  notesWrite(taskId: string, slug: string, body: string, agentSessionId?: string): Promise<void>
-  notesAppend(taskId: string, slug: string, text: string, agentSessionId?: string): Promise<void>
-  memorySearch(taskId: string, query: string, type?: string): Promise<unknown[]>
-  memoryList(taskId: string, type?: string): Promise<unknown[]>
-  memoryGet(taskId: string, name: string): Promise<unknown | null>
-  memoryPropose(taskId: string, p: { name: string; type: string; description: string; body: string; originSessionId?: string }): Promise<unknown>
-  runTargets(taskId: string): Promise<unknown>
-  runStart(taskId: string, targetId: string): Promise<unknown>
-  runStop(taskId: string, targetId: string): Promise<unknown>
-  runRestart(taskId: string, targetId: string): Promise<unknown>
-  runStatus(taskId: string, targetId: string): Promise<unknown>
-  // Drivable browser (docs/next 08 P2): CDP over the task's preview webview.
-  browserNavigate(taskId: string, url: string): Promise<unknown>
-  browserSnapshot(taskId: string): Promise<unknown>
-  browserClick(taskId: string, ref: string): Promise<unknown>
-  browserFill(taskId: string, ref: string, text: string): Promise<unknown>
-  browserScreenshot(taskId: string): Promise<unknown>
-  browserConsole(taskId: string): Promise<unknown>
+// ─── Per-domain sub-bridges (wired independently by main/harnessWiring.ts) ──────────────────────
+
+export type NotesBridge = {
+  list(taskId: string): Promise<unknown[]>
+  read(taskId: string, slug: string): Promise<unknown>
+  write(taskId: string, slug: string, body: string, agentSessionId?: string): Promise<void>
+  append(taskId: string, slug: string, text: string, agentSessionId?: string): Promise<void>
 }
 
-let bridge: HarnessBridge | null = null
-export const setHarnessBridge = (b: HarnessBridge | null): void => {
-  bridge = b
+export type MemoryBridge = {
+  search(taskId: string, query: string, type?: string): Promise<unknown[]>
+  list(taskId: string, type?: string): Promise<unknown[]>
+  get(taskId: string, name: string): Promise<unknown | null>
+  // memory_write → a PROPOSAL through the human gate (docs/next 12); nothing lands on disk as
+  // memory until the gate accepts.
+  propose(taskId: string, p: { name: string; type: string; description: string; body: string; originSessionId?: string }): Promise<unknown>
 }
 
-const withBridge = async <T>(fn: (b: HarnessBridge) => Promise<T>): Promise<{ ok: true; data: T } | { ok: false; error: string }> => {
-  if (!bridge) return { ok: false, error: 'bridge-unavailable' }
+export type RunBridge = {
+  targets(taskId: string): Promise<unknown>
+  start(taskId: string, targetId: string): Promise<unknown>
+  stop(taskId: string, targetId: string): Promise<unknown>
+  restart(taskId: string, targetId: string): Promise<unknown>
+  status(taskId: string, targetId: string): Promise<unknown>
+}
+
+// Drivable browser (docs/next 08 P2): CDP over the task's preview webview.
+export type BrowserBridge = {
+  navigate(taskId: string, url: string): Promise<unknown>
+  snapshot(taskId: string): Promise<unknown>
+  click(taskId: string, ref: string): Promise<unknown>
+  fill(taskId: string, ref: string, text: string): Promise<unknown>
+  screenshot(taskId: string): Promise<unknown>
+  console(taskId: string): Promise<unknown>
+}
+
+const bridges: { notes: NotesBridge | null; memory: MemoryBridge | null; run: RunBridge | null; browser: BrowserBridge | null } = {
+  notes: null,
+  memory: null,
+  run: null,
+  browser: null,
+}
+
+export const setNotesBridge = (b: NotesBridge | null): void => void (bridges.notes = b)
+export const setMemoryBridge = (b: MemoryBridge | null): void => void (bridges.memory = b)
+export const setRunBridge = (b: RunBridge | null): void => void (bridges.run = b)
+export const setBrowserBridge = (b: BrowserBridge | null): void => void (bridges.browser = b)
+
+// ─── Typed errors (docs/api-reference.md): domain failures are NOT 503s ─────────────────────────
+
+// A bridge implementation throws HarnessError to classify a failure; anything else it throws is
+// 'failed' (or the route's declared errorKind). 'unavailable' is reserved for the missing-bridge
+// case (dev:node, or main not wired yet).
+export type HarnessErrorKind = 'unavailable' | 'not_found' | 'bad_request' | 'failed'
+
+export class HarnessError extends Error {
+  constructor(
+    public readonly kind: Exclude<HarnessErrorKind, 'unavailable'>,
+    message: string,
+  ) {
+    super(message)
+    this.name = 'HarnessError'
+  }
+}
+
+const STATUS: Record<HarnessErrorKind, 503 | 404 | 400 | 500> = { unavailable: 503, not_found: 404, bad_request: 400, failed: 500 }
+
+// The one route body (previously repeated eighteen times): resolve the domain bridge, run the
+// call, JSON the data; map a missing bridge to 503 and thrown errors to their kind's status.
+// `errorKind` classifies untyped throws for routes whose failures have one obvious meaning
+// (e.g. a notes read that throws is a missing note).
+async function respond<B>(c: Context<AppEnv>, bridge: B | null, fn: (b: B) => Promise<unknown>, opts?: { errorKind?: HarnessError['kind'] }): Promise<Response> {
+  if (!bridge) return c.json({ error: 'bridge-unavailable', kind: 'unavailable' }, 503)
   try {
-    return { ok: true, data: await fn(bridge) }
+    return c.json(await fn(bridge))
   } catch (e) {
-    return { ok: false, error: e instanceof Error ? e.message : 'harness call failed' }
+    const kind: HarnessErrorKind = e instanceof HarnessError ? e.kind : (opts?.errorKind ?? 'failed')
+    return c.json({ error: e instanceof Error ? e.message : 'harness call failed', kind }, STATUS[kind])
   }
 }
 
@@ -49,100 +94,77 @@ export const harness = new Hono<AppEnv>()
     if (!c.get('user')) return c.json({ error: 'unauthenticated' }, 401)
     await next()
   })
-  .get('/:id/notes', async (c) => {
-    const res = await withBridge((b) => b.notesList(c.req.param('id')))
-    return res.ok ? c.json(res.data) : c.json({ error: res.error }, 503)
-  })
-  .get('/:id/notes/:slug', async (c) => {
-    const res = await withBridge((b) => b.notesRead(c.req.param('id'), c.req.param('slug')))
-    return res.ok ? c.json(res.data) : c.json({ error: res.error }, res.error === 'bridge-unavailable' ? 503 : 404)
-  })
+  .get('/:id/notes', (c) => respond(c, bridges.notes, (b) => b.list(c.req.param('id'))))
+  .get('/:id/notes/:slug', (c) => respond(c, bridges.notes, (b) => b.read(c.req.param('id'), c.req.param('slug')), { errorKind: 'not_found' }))
   .put('/:id/notes/:slug', async (c) => {
     const body = (await c.req.json().catch(() => ({}))) as { body?: string; sessionId?: string }
     if (typeof body.body !== 'string') return c.json({ error: 'bad_request' }, 400)
-    const res = await withBridge((b) => b.notesWrite(c.req.param('id'), c.req.param('slug'), body.body!, body.sessionId))
-    return res.ok ? c.json({ ok: true }) : c.json({ error: res.error }, 503)
+    return respond(c, bridges.notes, async (b) => {
+      await b.write(c.req.param('id'), c.req.param('slug'), body.body!, body.sessionId)
+      return { ok: true }
+    })
   })
   .post('/:id/notes/:slug/append', async (c) => {
     const body = (await c.req.json().catch(() => ({}))) as { text?: string; sessionId?: string }
     if (!body.text) return c.json({ error: 'bad_request' }, 400)
-    const res = await withBridge((b) => b.notesAppend(c.req.param('id'), c.req.param('slug'), body.text!, body.sessionId))
-    return res.ok ? c.json({ ok: true }) : c.json({ error: res.error }, 503)
+    return respond(c, bridges.notes, async (b) => {
+      await b.append(c.req.param('id'), c.req.param('slug'), body.text!, body.sessionId)
+      return { ok: true }
+    })
   })
-  .get('/:id/memory', async (c) => {
+  .get('/:id/memory', (c) => {
     const q = c.req.query('q')
     const type = c.req.query('type')
-    const res = await withBridge((b) => (q ? b.memorySearch(c.req.param('id'), q, type) : b.memoryList(c.req.param('id'), type)))
-    return res.ok ? c.json(res.data) : c.json({ error: res.error }, 503)
+    return respond(c, bridges.memory, (b) => (q ? b.search(c.req.param('id'), q, type) : b.list(c.req.param('id'), type)))
   })
-  .get('/:id/memory/:name', async (c) => {
-    const res = await withBridge((b) => b.memoryGet(c.req.param('id'), c.req.param('name')))
-    if (!res.ok) return c.json({ error: res.error }, 503)
-    return res.data ? c.json(res.data) : c.json({ error: 'not_found' }, 404)
-  })
-  // memory_write → a PROPOSAL through the human gate (docs/next 12); nothing lands on disk as
-  // memory until the gate accepts.
+  .get('/:id/memory/:name', (c) =>
+    respond(c, bridges.memory, async (b) => {
+      const memory = await b.get(c.req.param('id'), c.req.param('name'))
+      if (!memory) throw new HarnessError('not_found', 'not_found')
+      return memory
+    }),
+  )
   .post('/:id/memory/propose', async (c) => {
     const body = (await c.req.json().catch(() => ({}))) as { name?: string; type?: string; description?: string; body?: string; sessionId?: string }
     if (!body.name || !body.type || !body.description) return c.json({ error: 'bad_request' }, 400)
-    const res = await withBridge((b) =>
-      b.memoryPropose(c.req.param('id'), {
-        name: body.name!,
-        type: body.type!,
-        description: body.description!,
-        body: body.body ?? '',
-        originSessionId: body.sessionId,
+    return respond(
+      c,
+      bridges.memory,
+      async (b) => ({
+        ok: true,
+        proposal: await b.propose(c.req.param('id'), {
+          name: body.name!,
+          type: body.type!,
+          description: body.description!,
+          body: body.body ?? '',
+          originSessionId: body.sessionId,
+        }),
       }),
+      // Propose validation (bad name/type) throws plain Errors from the store — they're the
+      // caller's fault, not a server fault.
+      { errorKind: 'bad_request' },
     )
-    return res.ok ? c.json({ ok: true, proposal: res.data }) : c.json({ error: res.error }, res.error === 'bridge-unavailable' ? 503 : 400)
   })
-  .get('/:id/run', async (c) => {
-    const res = await withBridge((b) => b.runTargets(c.req.param('id')))
-    return res.ok ? c.json(res.data) : c.json({ error: res.error }, 503)
-  })
-  .post('/:id/run/:target/start', async (c) => {
-    const res = await withBridge((b) => b.runStart(c.req.param('id'), c.req.param('target')))
-    return res.ok ? c.json(res.data) : c.json({ error: res.error }, 503)
-  })
-  .post('/:id/run/:target/stop', async (c) => {
-    const res = await withBridge((b) => b.runStop(c.req.param('id'), c.req.param('target')))
-    return res.ok ? c.json(res.data) : c.json({ error: res.error }, 503)
-  })
-  .post('/:id/run/:target/restart', async (c) => {
-    const res = await withBridge((b) => b.runRestart(c.req.param('id'), c.req.param('target')))
-    return res.ok ? c.json(res.data) : c.json({ error: res.error }, 503)
-  })
-  .get('/:id/run/:target/status', async (c) => {
-    const res = await withBridge((b) => b.runStatus(c.req.param('id'), c.req.param('target')))
-    return res.ok ? c.json(res.data) : c.json({ error: res.error }, 503)
-  })
+  .get('/:id/run', (c) => respond(c, bridges.run, (b) => b.targets(c.req.param('id'))))
+  .post('/:id/run/:target/start', (c) => respond(c, bridges.run, (b) => b.start(c.req.param('id'), c.req.param('target'))))
+  .post('/:id/run/:target/stop', (c) => respond(c, bridges.run, (b) => b.stop(c.req.param('id'), c.req.param('target'))))
+  .post('/:id/run/:target/restart', (c) => respond(c, bridges.run, (b) => b.restart(c.req.param('id'), c.req.param('target'))))
+  .get('/:id/run/:target/status', (c) => respond(c, bridges.run, (b) => b.status(c.req.param('id'), c.req.param('target'))))
   .post('/:id/browser/navigate', async (c) => {
     const body = (await c.req.json().catch(() => ({}))) as { url?: string }
     if (!body.url || typeof body.url !== 'string') return c.json({ error: 'bad_request' }, 400)
-    const res = await withBridge((b) => b.browserNavigate(c.req.param('id'), body.url!))
-    return res.ok ? c.json(res.data) : c.json({ error: res.error }, 503)
+    return respond(c, bridges.browser, (b) => b.navigate(c.req.param('id'), body.url!))
   })
-  .get('/:id/browser/snapshot', async (c) => {
-    const res = await withBridge((b) => b.browserSnapshot(c.req.param('id')))
-    return res.ok ? c.json(res.data) : c.json({ error: res.error }, 503)
-  })
+  .get('/:id/browser/snapshot', (c) => respond(c, bridges.browser, (b) => b.snapshot(c.req.param('id'))))
   .post('/:id/browser/click', async (c) => {
     const body = (await c.req.json().catch(() => ({}))) as { ref?: string }
     if (!body.ref) return c.json({ error: 'bad_request' }, 400)
-    const res = await withBridge((b) => b.browserClick(c.req.param('id'), body.ref!))
-    return res.ok ? c.json(res.data) : c.json({ error: res.error }, 503)
+    return respond(c, bridges.browser, (b) => b.click(c.req.param('id'), body.ref!))
   })
   .post('/:id/browser/fill', async (c) => {
     const body = (await c.req.json().catch(() => ({}))) as { ref?: string; text?: string }
     if (!body.ref || typeof body.text !== 'string') return c.json({ error: 'bad_request' }, 400)
-    const res = await withBridge((b) => b.browserFill(c.req.param('id'), body.ref!, body.text!))
-    return res.ok ? c.json(res.data) : c.json({ error: res.error }, 503)
+    return respond(c, bridges.browser, (b) => b.fill(c.req.param('id'), body.ref!, body.text!))
   })
-  .get('/:id/browser/screenshot', async (c) => {
-    const res = await withBridge((b) => b.browserScreenshot(c.req.param('id')))
-    return res.ok ? c.json(res.data) : c.json({ error: res.error }, 503)
-  })
-  .get('/:id/browser/console', async (c) => {
-    const res = await withBridge((b) => b.browserConsole(c.req.param('id')))
-    return res.ok ? c.json(res.data) : c.json({ error: res.error }, 503)
-  })
+  .get('/:id/browser/screenshot', (c) => respond(c, bridges.browser, (b) => b.screenshot(c.req.param('id'))))
+  .get('/:id/browser/console', (c) => respond(c, bridges.browser, (b) => b.console(c.req.param('id'))))

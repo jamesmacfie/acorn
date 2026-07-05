@@ -1,5 +1,11 @@
 # 01 — Organizing models: options & recommendation
 
+> **✅ Status: recommendation adopted and shipped.** The task-as-unit model below was built — with
+> one refinement the research didn't anticipate: the unit shipped under the name **Task**, and
+> **Workspace** became a *group of repos* above it (the two-tier note in
+> [`README.md`](./README.md)). So the entity this doc argues for is today's `tasks` table +
+> rail rows; everything in "Where acorn is today" is historical.
+
 The central design question is: **what is the top-level "thing" a user works on, and what does it
 own?** Every comparable tool answers this differently. There are four answers in the wild.
 
@@ -13,6 +19,9 @@ own?** Every comparable tool answers this differently. There are four answers in
 | **Task-as-unit** | **Conductor**, Wave | a unit of work that *owns* worktree + branch + terminal + diff + agent | Matches the user's mental model; bundles everything; PR/branch become derived outputs | Most opinionated to build; must own creation→archive lifecycle; risks divergence from raw git if the abstraction leaks |
 
 ## Competitive research
+
+*(All source links below are a **mid-2025 snapshot** — Conductor, cmux, Warp and Wave have moved
+since. Treat this section as the design-time record, not current competitive intel.)*
 
 ### Conductor (conductor.build) — task-as-unit
 The clearest articulation of the model we want. "Each task gets its own workspace, branch, files,
@@ -79,12 +88,13 @@ The vNext terminal/agent work is already drifting toward worktree-as-unit (Phase
 the cautionary point cmux describes: worktrees exist as transient paths, with no owning entity, no
 lifecycle, and no link to the PR or ticket they belong to.
 
-## Recommendation: the generalized Workspace (task-as-unit)
+## Recommendation: the generalized Task (task-as-unit)
 
-**Adopt task-as-unit, call it a Workspace, and generalize the origin** so a Workspace can be created
-from a GitHub PR, a Linear ticket, a Rollbar error, *or* plain local code. The Workspace owns the
-repo + branch + worktree + linked PR + linked issues + panes; the PR becomes a derived artifact
-(created from, or attached to, the Workspace), exactly as Conductor does.
+**Adopt task-as-unit — the entity that shipped as `Task` (this doc originally said "call it a
+Workspace") — and generalize the origin** so a Task can be created from a GitHub PR, a Linear
+ticket, a Rollbar error, *or* plain local code. The Task owns the repo + branch + worktree +
+linked PR + linked issues + panes; the PR becomes a derived artifact (created from, or attached
+to, the Task), exactly as Conductor does.
 
 **Why this and not the others:**
 - **vs PR-as-unit** (today): a PR can't be the home for work that has no PR yet (local-first
@@ -93,19 +103,24 @@ repo + branch + worktree + linked PR + linked issues + panes; the PR becomes a d
 - **vs branch-as-unit:** serial by construction; can't hold several things in flight, which is the
   user's explicit requirement ("you might be looking at different pull requests at once").
 - **vs worktree-as-unit (raw):** this is the right *isolation primitive* but the wrong *top-level
-  object* — cmux proves that without an owning entity, lifecycle and linkage rot. The Workspace **is**
+  object* — cmux proves that without an owning entity, lifecycle and linkage rot. The Task **is**
   a worktree-as-unit *with the owning entity bolted on*.
 - **vs multiple OS windows (VS Code):** loses the single-pane roster the user wants ("tabs on the
   left… all the stuff you're working on").
 
 **What we keep deferred (named here so it isn't mistaken for missing):** runtime isolation beyond
-the filesystem (per-workspace ports/DB/containers) and crash-recovery snapshots. Near-term we solve
-file isolation (worktrees) + a per-workspace dev-server command/port; containers are a later rung.
-See [`05-lifecycle-and-isolation.md`](./05-lifecycle-and-isolation.md).
+the filesystem (per-task ports/DB/containers) and crash-recovery snapshots. Near-term we solve
+file isolation (worktrees) + a per-task dev-server command/port; containers are a later rung.
+See [`05-lifecycle-and-isolation.md`](./05-lifecycle-and-isolation.md). *(Shipped note: the
+"command/port" slice landed as **run targets** — named per-repo commands with URL resolution, no
+port allocation; containers and crash snapshots remain unbuilt, as planned.)*
 
 ## Handling "several things at once"
 The single-window **roster** (Conductor/Wave) is the right concurrency UI for acorn: a left-rail
-list of in-flight Workspaces you click between, each showing live status (agent working, dirty
+list of in-flight Tasks you click between, each showing live status (agent working, dirty
 worktree, PR checks). We reject the multi-window (VS Code) and dependency-stack (Graphite) shapes —
 the first has no roster, the second only models *related* work. Detailed in
 [`02-ui-design.md`](./02-ui-design.md).
+
+*(Shipped extension: `tasks.parent_id` — fan-out task trees, docs/next 14 — lets a task have child
+tasks, extending the flat-roster model argued here; the rail still renders a flat list.)*

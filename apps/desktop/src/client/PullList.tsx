@@ -8,7 +8,7 @@ import { closedPullsInfiniteOptions, integrationsOptions, pullDetailOptions, pul
 import { filterPulls } from './features/pullList/model'
 import { createTask } from './mutations'
 import { scanLinearRefs } from './features/integrations/scanLinearRefs'
-import { setActivePane, setActiveTaskId, setSelectedSource } from './features/tasks/tasks'
+import { activateTaskSignals } from './features/tasks/activate'
 
 // Left-pane PR list for the routed repo. Access checks live on the server; this pane only needs
 // route params before it can ask for the repo's PRs. The list is virtualized in its own scroll
@@ -54,7 +54,7 @@ export default function PullList() {
   // Client-side text filter over the loaded tab (title / author / #number).
   const shown = createMemo(() => filterPulls(list(), filter()))
 
-  // j/k move to the next/prev PR in the list (docs/ui-style.md keyboard nav). Ignore while typing.
+  // j/k move to the next/prev PR in the list (docs/ui-design.md keyboard nav). Ignore while typing.
   const onKey = (e: KeyboardEvent) => {
     if (e.key !== 'j' && e.key !== 'k') return
     const el = document.activeElement
@@ -89,9 +89,7 @@ export default function PullList() {
     const links = soleLinear ? scanLinearRefs([detail?.pull?.body]).map((r) => ({ integrationId: soleLinear, provider: 'linear', identifier: r.identifier })) : []
     const w = await createTask({ origin: 'github-pr', repoOwner: owner, repoName: repo, branch: pr.headRef, pullNumber: pr.number, links })
     await queryClient.invalidateQueries({ queryKey: tasksKey })
-    setSelectedSource(null)
-    setActiveTaskId(w.id)
-    setActivePane('pr')
+    activateTaskSignals(w, { pane: 'pr' })
     navigate(`/${owner}/${repo}/${pr.number}`)
   }
 

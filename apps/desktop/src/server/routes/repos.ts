@@ -1,8 +1,9 @@
 import { eq } from 'drizzle-orm'
 import { Hono } from 'hono'
+import { trackBackgroundRefresh } from '../background'
 import { getDb, schema } from '../db'
 import type { AppEnv } from '../middleware/auth'
-import { readCachedRepos, refreshRepos, REPOS_STALE_AFTER_MS, toPublicRepo, waitUntilLogged } from './repoMirror'
+import { readCachedRepos, refreshRepos, REPOS_STALE_AFTER_MS, toPublicRepo } from './repoMirror'
 
 export const repos = new Hono<AppEnv>()
   .get('/', async (c) => {
@@ -21,7 +22,7 @@ export const repos = new Hono<AppEnv>()
 
     // Stale-but-present is enough for first paint; revalidate outside the response.
     if (cached.length > 0) {
-      waitUntilLogged('repos', refreshRepos(user.token, db, userId))
+      trackBackgroundRefresh('repos', refreshRepos(user.token, db, userId))
       return c.json(cached.map(toPublicRepo))
     }
 

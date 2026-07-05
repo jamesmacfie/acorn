@@ -3,7 +3,10 @@
 // more than one is open) to drop it. ONE pure reducer owns every transition.
 // ponytail: a flat panes[] row, not a LayoutNode tree — open-what-you-want side by side is enough.
 
-export type PaneId = 'pr' | 'linear' | 'rollbar' | 'preview' | 'editor' | 'changes' | 'notes' | 'browser' | 'context'
+// NOTE: there is no separate 'browser' pane — agent-driving is a capability of `preview` (the
+// shared per-task <webview> is bound for CDP once it reaches dom-ready). Config recipes that still
+// name unknown pane ids are tolerated: isPaneId filters them out wherever layouts are parsed.
+export type PaneId = 'pr' | 'linear' | 'rollbar' | 'preview' | 'editor' | 'changes' | 'notes' | 'context'
 
 export type TaskLayout = {
   panes: PaneId[] // left→right, at least one; no duplicates
@@ -15,10 +18,26 @@ export type LayoutAction =
   | { type: 'close'; pane: PaneId }
   | { type: 'replace'; layout: TaskLayout } // recipe seeding — validated wholesale
 
+// Human labels for each pane, used by the switcher tooltips and the command palette (docs/next 17).
+export const PANE_LABELS: Record<PaneId, string> = {
+  pr: 'PR review',
+  linear: 'Linear',
+  rollbar: 'Rollbar',
+  preview: 'Browser preview',
+  editor: 'Editor',
+  changes: 'Changes',
+  notes: 'Notes',
+  context: 'Context',
+}
+
+// Canonical pane ordering for pane pickers (e.g. the palette's "Show pane" rows): task-context
+// panes first, then providers. Lives next to PANE_LABELS so order and labels stay in one place.
+export const PANE_ORDER: readonly PaneId[] = ['pr', 'changes', 'notes', 'context', 'editor', 'preview', 'linear', 'rollbar']
+
 export const DEFAULT_PANE: PaneId = 'pr'
 export const defaultLayout = (pane: PaneId = DEFAULT_PANE): TaskLayout => ({ panes: [pane] })
 
-const PANE_IDS: readonly PaneId[] = ['pr', 'linear', 'rollbar', 'preview', 'editor', 'changes', 'notes', 'browser', 'context']
+const PANE_IDS: readonly PaneId[] = ['pr', 'linear', 'rollbar', 'preview', 'editor', 'changes', 'notes', 'context']
 export const isPaneId = (v: unknown): v is PaneId => typeof v === 'string' && (PANE_IDS as readonly string[]).includes(v)
 
 export function applyLayoutAction(layout: TaskLayout, action: LayoutAction): TaskLayout {

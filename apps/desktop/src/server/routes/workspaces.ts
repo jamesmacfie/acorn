@@ -10,13 +10,19 @@ import { isValidWorkspaceColor, isValidWorkspaceIcon, parseWorkspaceIcon, serial
 // user_id) like tasks / repo_paths, but auth-gated. A repo belongs to exactly one workspace
 // (workspace_repos PK is (owner, repo)); the `Default` workspace is the catch-all.
 
+// The `owner/repo` keys of every ignored repo — the shared filter for hiding them from the
+// selector / rail / scoping while their workspace membership is kept.
+async function ignoredRepoSet(db: ReturnType<typeof getDb>): Promise<Set<string>> {
+  return new Set((await db.select().from(schema.ignoredRepos)).map((i) => `${i.owner}/${i.repo}`))
+}
+
 async function listWorkspaces(db: ReturnType<typeof getDb>): Promise<Workspace[]> {
   const rows = await db.select().from(schema.workspaces).orderBy(schema.workspaces.sort)
   if (!rows.length) return []
   const ids = rows.map((r) => r.id)
   const repoRows = await db.select().from(schema.workspaceRepos).where(inArray(schema.workspaceRepos.workspaceId, ids))
   // Ignored repos keep their membership but are hidden from the main UI (selector / rail / scoping).
-  const ignored = new Set((await db.select().from(schema.ignoredRepos)).map((i) => `${i.owner}/${i.repo}`))
+  const ignored = await ignoredRepoSet(db)
   const byWs = new Map<string, WorkspaceRepo[]>()
   for (const r of repoRows) {
     if (ignored.has(`${r.repoOwner}/${r.repoName}`)) continue
@@ -64,8 +70,8 @@ export const workspaces = new Hono<AppEnv>()
     const defaultId = await ensureDefault(db)
     const repos = await db.select().from(schema.repos).where(eq(schema.repos.userId, user.login))
     const mapped = await db.select().from(schema.workspaceRepos)
-    const ignored = await db.select().from(schema.ignoredRepos)
-    const skip = new Set([...mapped.map((m) => `${m.repoOwner}/${m.repoName}`), ...ignored.map((i) => `${i.owner}/${i.repo}`)])
+    const ignored = await ignoredRepoSet(db)
+    const skip = new Set([...mapped.map((m) => `${m.repoOwner}/${m.repoName}`), ...ignored])
     const now = Date.now()
     const toAdd = repos
       .filter((r) => !skip.has(`${r.owner}/${r.name}`))
@@ -126,7 +132,11 @@ export const workspaces = new Hono<AppEnv>()
       else return c.json({ error: 'bad_request' }, 400)
     }
     if (set.name === undefined && set.setupScript === undefined && set.setupScriptTrigger === undefined && set.devScript === undefined && set.devRestartScript === undefined && set.teardownScript === undefined && set.previewMode === undefined && set.previewValue === undefined && set.icon === undefined && set.color === undefined) return c.json({ error: 'bad_request' }, 400)
-    await getDb(c.env).update(schema.workspaces).set(set).where(eq(schema.workspaces.id, c.req.param('id')))
+    const db = getDb(c.env)
+    const id = c.req.param('id')
+    const [existing] = await db.select({ id: schema.workspaces.id }).from(schema.workspaces).where(eq(schema.workspaces.id, id))
+    if (!existing) return c.json({ error: 'not_found' }, 404)
+    await db.update(schema.workspaces).set(set).where(eq(schema.workspaces.id, id))
     return c.json({ ok: true })
   })
   .delete('/:id', async (c) => {
@@ -166,7 +176,7 @@ export const workspaces = new Hono<AppEnv>()
     if (!c.get('user')) return c.json({ error: 'unauthenticated' }, 401)
     const db = getDb(c.env)
     const rows = await db.select().from(schema.workspaceRepos)
-    const ignored = new Set((await db.select().from(schema.ignoredRepos)).map((i) => `${i.owner}/${i.repo}`))
+    const ignored = await ignoredRepoSet(db)
     return c.json(rows.map((r) => ({ owner: r.repoOwner, name: r.repoName, workspaceId: r.workspaceId, ignored: ignored.has(`${r.repoOwner}/${r.repoName}`) })))
   })
   // Hide a repo (keeps its workspace membership; just flags it ignored so it's excluded from the

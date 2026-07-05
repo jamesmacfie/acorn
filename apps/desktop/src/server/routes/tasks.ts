@@ -89,6 +89,8 @@ export const tasks = new Hono<AppEnv>()
     const id = c.req.param('id')
     const body = (await c.req.json().catch(() => ({}))) as { title?: string; status?: 'active' | 'archived' }
     const db = getDb(c.env)
+    const [existing] = await db.select({ id: schema.tasks.id }).from(schema.tasks).where(eq(schema.tasks.id, id))
+    if (!existing) return c.json({ error: 'not_found' }, 404)
     const patch: Partial<Row> = { updatedAt: Date.now() }
     if (typeof body.title === 'string' && body.title.trim()) patch.title = body.title.trim()
     if (body.status === 'archived' || body.status === 'active') {

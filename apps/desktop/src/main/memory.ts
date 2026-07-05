@@ -180,6 +180,17 @@ export async function reconcileMemories(db: AppDatabase, sources: MemorySource[]
 
 export type MemoryHit = typeof schema.memories.$inferSelect & { rank: number }
 
+// Recall bookkeeping (docs/notes-and-memory.md): a memory that was actually READ (search hit /
+// memory_get) bumps lastAccessedAt + accessCount — the inputs for future decay/ranking. Listing
+// the index does NOT count as a read. Stats survive reconciles by content-hash id.
+async function touchMemories(db: AppDatabase, ids: string[]): Promise<void> {
+  if (!ids.length) return
+  await db
+    .update(schema.memories)
+    .set({ lastAccessedAt: Date.now(), accessCount: sql`${schema.memories.accessCount} + 1` })
+    .where(inArray(schema.memories.id, ids))
+}
+
 // FTS5 BM25 search, repo-scoped: repo rows for this repo + private rows. Query terms are quoted so
 // user input can't inject FTS syntax.
 export async function searchMemories(db: AppDatabase, query: string, opts: { repo?: string | null; type?: MemoryType; limit?: number }): Promise<MemoryHit[]> {
@@ -194,13 +205,23 @@ export async function searchMemories(db: AppDatabase, query: string, opts: { rep
   if (!matches.length) return []
   const rankById = new Map(matches.map((m) => [m.id, m.rank]))
   const rows = await db.select().from(schema.memories).where(inArray(schema.memories.id, [...rankById.keys()]))
-  return rows
+  const hits = rows
     .filter((r) => (opts.repo ? r.repo === opts.repo || r.scope === 'private' : true))
     .filter((r) => (opts.type ? r.type === opts.type : true))
     .filter((r) => !r.supersededBy)
     .map((r) => ({ ...r, rank: rankById.get(r.id) ?? 0 }))
     .sort((a, b) => a.rank - b.rank || b.updatedAt - a.updatedAt) // bm25 rank: lower = better
     .slice(0, opts.limit ?? 10)
+  await touchMemories(db, hits.map((h) => h.id))
+  return hits
+}
+
+// One memory by name (the memory_get read path), repo-scoped like listMemories. Reading it bumps
+// the recall stats.
+export async function getMemory(db: AppDatabase, opts: { repo?: string | null; name: string }): Promise<typeof schema.memories.$inferSelect | null> {
+  const match = (await listMemories(db, { repo: opts.repo })).find((m) => m.name === opts.name) ?? null
+  if (match) await touchMemories(db, [match.id])
+  return match
 }
 
 export async function listMemories(db: AppDatabase, opts: { repo?: string | null; type?: MemoryType }): Promise<(typeof schema.memories.$inferSelect)[]> {

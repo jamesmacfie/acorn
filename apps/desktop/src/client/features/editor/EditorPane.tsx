@@ -6,6 +6,7 @@ import { debounce } from '../../autosave'
 import { editorApi, type EditorEntry } from './editorClient'
 import { formatFileReference, sendReferenceToAgent } from '../agent/reference'
 import { isAppDark, watchTheme } from '../terminal/theme'
+import { onClosePaneWithin } from '../../lib/onClosePaneWithin'
 import { activeFile, editorActivate, editorClose, editorOpen, editorPromote, editorSetDirty, openFiles } from './editorState'
 import './editor.css'
 
@@ -41,16 +42,11 @@ export default function EditorPane(props: { task: Task }) {
   const files = () => openFiles(props.task.id)
   const active = () => activeFile(props.task.id)
 
-  // Cmd/Ctrl+W closes the active file tab when focus is inside this pane (main suppresses the
-  // window-close accelerator and pings us — see electron.ts / preload).
+  // Cmd/Ctrl+W closes the active file tab when focus is inside this pane.
   let paneRef: HTMLElement | undefined
-  onMount(() => {
-    const off = window.acorn?.onClosePane?.(() => {
-      if (!paneRef?.contains(document.activeElement)) return
-      const p = active()
-      if (p) void close(p)
-    })
-    onCleanup(() => off?.())
+  onClosePaneWithin(() => paneRef, () => {
+    const p = active()
+    if (p) void close(p)
   })
 
   // Autosave (no Save button): debounce while typing, flush on blur / tab-switch / close.

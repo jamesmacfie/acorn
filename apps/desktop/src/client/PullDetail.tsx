@@ -1,11 +1,12 @@
 import { createEffect, createMemo, createSignal, For, Show } from 'solid-js'
 import { createMutation, createQuery, useQueryClient } from '@tanstack/solid-query'
-import { useNavigate, useParams, useSearchParams } from '@solidjs/router'
+import { useNavigate, useParams } from '@solidjs/router'
+import { useChangedFiles } from './changedFiles'
 import { checksState, FAILED_STATUSES, fileStatusMeta, formatRelativeTime, summarizeFileStats } from './displayMeta'
 import { requestFileScroll, routeKey } from './fileNavigation'
 import Picker from './Picker'
 import CopyButton from './CopyButton'
-import { fileSummariesOptions, integrationsOptions, linearIssuesOptions, mentionsOptions, pullDetailOptions, pullPrefixKey, pullsPrefixKey, repoLabelsOptions, reposOptions, type Label } from './queries'
+import { integrationsOptions, linearIssuesOptions, mentionsOptions, pullDetailOptions, pullPrefixKey, pullsPrefixKey, repoLabelsOptions, reposOptions, type Label } from './queries'
 import MentionTextarea from './MentionTextarea'
 import { addComment, addLabel, closePr, disableAutoMerge, enableAutoMerge, mergePr, removeLabel, removeReviewer, reopenPr, rerunFailed, requestReviewer, setDraft, setViewed, submitReview } from './mutations'
 import { UserAvatar } from './UserAvatar'
@@ -48,10 +49,9 @@ const rememberOpen = (key: string) => (el: HTMLDetailsElement) => {
 }
 
 // Mid (Navigator) pane: PR header + description + changed-files + checks + conversation.
-// Bodies are GitHub-sanitized bodyHTML, rendered via innerHTML (docs/ui-style.md §5).
+// Bodies are GitHub-sanitized bodyHTML, rendered via innerHTML (docs/ui-design.md).
 export default function PullDetail() {
   const params = useParams()
-  const [searchParams, setSearchParams] = useSearchParams()
   const qc = useQueryClient()
   const repos = createQuery(() => reposOptions(true))
   const repoKnown = () => !!repos.data?.some((r) => r.owner === params.owner && r.name === params.repo)
@@ -61,13 +61,15 @@ export default function PullDetail() {
   const hasRepoParams = () => !!params.owner && !!params.repo
   const hasPullParams = () => hasRepoParams() && !!params.number
   const detail = createQuery(() => pullDetailOptions(o(), r(), n(), hasPullParams()))
-  const files = createQuery(() => fileSummariesOptions(o(), r(), n(), hasPullParams()))
+  // Changed files + `?file=` selection via the shared hook, so the finder, [ / ] cycling, and
+  // this file list all agree on one file order/source.
+  const changedFiles = useChangedFiles(() => (hasPullParams() ? { owner: o(), repo: r(), number: n() } : null))
   const mentionsQuery = createQuery(() => mentionsOptions(o(), r(), hasRepoParams()))
   const repoLabels = createQuery(() => repoLabelsOptions(o(), r(), hasRepoParams()))
   const mentionsList = () => mentionsQuery.data ?? []
-  const fileSummary = createMemo(() => summarizeFileStats(files.data))
+  const fileSummary = createMemo(() => summarizeFileStats(changedFiles.files()))
   const conversationEntries = createMemo(() => buildConversationEntries(detail.data))
-  const threadSnippetIndex = createMemo(() => buildThreadSnippetIndex(files.data))
+  const threadSnippetIndex = createMemo(() => buildThreadSnippetIndex(changedFiles.files()))
 
   // Integrations: Linear tickets linked from the PR body / comments / reviews / threads.
   const linearRefs = createMemo(() => {
@@ -161,7 +163,7 @@ export default function PullDetail() {
   }
   const chooseLabel = (label: Label) => run(addLabel(o(), r(), n(), label.name))
   const selectFile = (path: string) => {
-    setSearchParams({ file: path })
+    changedFiles.selectFile(path)
     requestFileScroll({ routeKey: routeKey(o(), r(), n()), path })
   }
 
@@ -351,14 +353,14 @@ export default function PullDetail() {
 
             <details class="nav-section" open ref={rememberOpen('files')}>
               <summary>
-                Files <span class="muted">({files.data?.length ?? 0})</span>
+                Files <span class="muted">({changedFiles.files().length})</span>
               </summary>
               <ul class="file-list">
-                <For each={files.data} fallback={<li class="placeholder">{files.isLoading ? 'Loading…' : 'No files.'}</li>}>
+                <For each={changedFiles.files()} fallback={<li class="placeholder">{changedFiles.isLoading() ? 'Loading…' : 'No files.'}</li>}>
                   {(f) => {
                     const status = () => fileStatusMeta(f.status)
                     return (
-                      <li class="file-row" classList={{ active: searchParams.file === f.path, viewed: f.viewed }}>
+                      <li class="file-row" classList={{ active: changedFiles.currentFile() === f.path, viewed: f.viewed }}>
                         <input
                           type="checkbox"
                           class="file-viewed"

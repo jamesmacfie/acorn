@@ -1,6 +1,6 @@
 // Test-only helper: a real better-sqlite3 DB in a tmp dir with all Drizzle migrations applied —
 // the plan's pattern for DB-shape-critical route tests. Requires the Node ABI build of
-// better-sqlite3 (`pnpm --filter @acorn/web node:rebuild`); vitest runs under plain Node.
+// better-sqlite3 (`pnpm --filter @acorn/desktop node:rebuild`); vitest runs under plain Node.
 import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'

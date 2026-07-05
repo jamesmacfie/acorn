@@ -1,15 +1,18 @@
-import { createSignal, For, Show } from 'solid-js'
+import { createSignal, For, onCleanup, onMount, Show } from 'solid-js'
 import { useNavigate, useParams } from '@solidjs/router'
 import { createQuery, useQueryClient } from '@tanstack/solid-query'
 import { integrationsOptions, prefsKey, prefsOptions, pullDetailOptions, tasksKey, tasksOptions, workspacesOptions, type Task } from '../../queries'
 import { archiveTask, createTask, renameTask, setPref } from '../../mutations'
 import { applyRailOrder, isPinned, moveTask, parseRailOrder, pinTask, serializeRailOrder, unpinTask, type RailOrder } from './railOrder'
 import { checksState } from '../../displayMeta'
-import { activeTaskId, paneForTask, selectedSource, setActivePane, setActiveTaskId, setSelectedSource, type SourceId } from '../tasks/tasks'
+import { activeTaskId, selectedSource, setActiveTaskId, setSelectedSource, type SourceId } from '../tasks/tasks'
+import { activateTaskSignals, pathForTask } from '../tasks/activate'
+import { evictPreviewWebview } from '../preview/PreviewPane'
+import { capabilities } from '../capabilities'
 import { availableSources } from './sources'
 import { taskStatus } from '../tasks/taskStatus'
 import { workingCountFor } from '../terminal/sessions'
-import { markTaskRead, unreadForTask } from '../notifications/notifications'
+import { unreadForTask } from '../notifications/notifications'
 import { workspaceForRepo } from '../workspaces/activeWorkspace'
 import { resolveWorkspaceColor } from '../../../shared/workspaceIdentity'
 import { dedupeBranch, slugifyBranch } from '../../../shared/branch'
@@ -74,12 +77,9 @@ export default function TabRail() {
   const visibleTasks = () => {
     const ws = activeWorkspace()
     const all = query.data ?? []
-    const scoped = ws ? all.filter((t) => new Set((ws.repos ?? []).map((r) => `${r.owner}/${r.name}`)).has(`${t.repoOwner}/${t.repoName}`)) : all
+    const inWs = ws ? new Set((ws.repos ?? []).map((r) => `${r.owner}/${r.name}`)) : null
+    const scoped = inWs ? all.filter((t) => inWs.has(`${t.repoOwner}/${t.repoName}`)) : all
     return applyRailOrder(scoped, railOrder())
-  }
-
-  function pathFor(w: Task): string {
-    return `/${w.repoOwner}/${w.repoName}${w.pullNumber != null ? `/${w.pullNumber}` : ''}`
   }
 
   // Sources: GitHub always; Linear/Rollbar when connected (docs/workspaces 04, docs/next 10).
@@ -96,13 +96,27 @@ export default function TabRail() {
       return
     }
     setMenuId(null)
-    setSelectedSource(null)
-    setActiveTaskId(w.id)
-    markTaskRead(w.id) // viewing acknowledges its notices (docs/next 05)
-    // Restore the pane last used for this task; only pick a default the first time it's opened.
-    if (paneForTask(w.id) == null) setActivePane(w.pullNumber != null ? 'pr' : w.links.some((l) => l.provider === 'linear') ? 'linear' : 'pr')
-    navigate(pathFor(w))
+    activateTaskSignals(w)
+    navigate(pathForTask(w))
   }
+
+  // ⌘1–9 / Ctrl1–9: jump to the Nth task in the rail (docs/next 17 §B.3). Mirrors browser-tab
+  // switching; the order is exactly what's rendered (workspace-scoped + rail order). A meta/ctrl
+  // combo, so it's safe to leave active even while typing.
+  onMount(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (!(e.metaKey || e.ctrlKey) || e.altKey || e.shiftKey) return
+      if (e.key < '1' || e.key > '9') return
+      const t = visibleTasks()[Number(e.key) - 1]
+      if (!t) return
+      e.preventDefault()
+      setMenuId(null)
+      activateTaskSignals(t)
+      navigate(pathForTask(t))
+    }
+    window.addEventListener('keydown', onKey)
+    onCleanup(() => window.removeEventListener('keydown', onKey))
+  })
 
   function openNew() {
     setMenuId(null)
@@ -138,10 +152,8 @@ export default function TabRail() {
       if (!branch) return
       const w = await createTask({ origin: 'local', repoOwner: owner, repoName: repo, branch, title: value })
       await invalidate()
-      setSelectedSource(null)
-      setActiveTaskId(w.id)
-      setActivePane('pr')
-      navigate(pathFor(w))
+      activateTaskSignals(w, { pane: 'pr' }) // fresh local task → start on the PR/default pane
+      navigate(pathForTask(w))
     } else if (value !== d.w.title) {
       await renameTask(d.w.id, value)
       await invalidate()
@@ -149,18 +161,31 @@ export default function TabRail() {
     setDraft(null)
   }
 
-  // Archive runs through the guarded main-process teardown when on desktop (refuses while sessions
-  // run or the worktree is dirty, removes the worktree); falls back to the plain HTTP flip otherwise.
-  async function onArchive(w: Task) {
+  // Archive confirm/error use the same modal shell as create/rename (Electron has no window.prompt/
+  // confirm-styling; the rail's dialogs stay consistent). When the bridge is present the archive
+  // ALWAYS runs through the guarded main-process teardown (main decides "no worktree → plain flip",
+  // refuses while sessions run or the worktree is dirty); the plain HTTP flip exists only for the
+  // bridge-absent browser dev build (capabilities()).
+  const [archiving, setArchiving] = createSignal<Task | null>(null)
+  const [archiveErr, setArchiveErr] = createSignal('')
+
+  function openArchive(w: Task) {
     setMenuId(null)
-    if (!window.confirm(`Archive "${w.title}"?`)) return
-    const api = terminalApi()
-    if (api) {
-      const res = await api.task.archive(w.id)
-      if (!res.ok) return window.alert(res.reason)
+    setArchiveErr('')
+    setArchiving(w)
+  }
+
+  async function confirmArchive() {
+    const w = archiving()
+    if (!w) return
+    if (capabilities().terminal) {
+      const res = await terminalApi()!.task.archive(w.id)
+      if (!res.ok) return setArchiveErr(res.output ? `${res.reason}\n${res.output}` : res.reason)
     } else {
       await archiveTask(w.id)
     }
+    evictPreviewWebview(w.id) // drop the archived task's kept-alive <webview>
+    setArchiving(null)
     if (activeTaskId() === w.id) {
       setActiveTaskId(null)
       setSelectedSource('github') // archived the active task → fall back to the GitHub browse
@@ -270,7 +295,7 @@ export default function TabRail() {
                   <button type="button" class="tabrail-close" onClick={() => openRename(w)}>
                     Rename
                   </button>
-                  <button type="button" class="tabrail-close" onClick={() => void onArchive(w)}>
+                  <button type="button" class="tabrail-close" onClick={() => openArchive(w)}>
                     Archive
                   </button>
                 </div>
@@ -283,6 +308,25 @@ export default function TabRail() {
       <button type="button" class="tabrail-add" data-tip="New task" data-tip-sub="Start a task on a new branch" aria-label="New task" onClick={openNew}>
         +
       </button>
+      <Show when={archiving()}>
+        {(w) => (
+          <div class="overlay-backdrop" onClick={() => setArchiving(null)}>
+            <div class="overlay" role="dialog" aria-modal="true" onClick={(e) => e.stopPropagation()}>
+              <div class="overlay-title">Archive task</div>
+              <div class="overlay-body">
+                <p class="muted">Archive “{w().title}” and remove it from the rail?</p>
+                <Show when={archiveErr()}>
+                  <div class="action-error" style={{ 'white-space': 'pre-wrap' }}>{archiveErr()}</div>
+                </Show>
+                <div class="close-actions">
+                  <button type="button" class="overlay-btn" onClick={() => setArchiving(null)}>Cancel</button>
+                  <button type="button" class="overlay-btn close-confirm" onClick={() => void confirmArchive()}>Archive</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+      </Show>
       <Show when={draft()}>
         {(d) => (
           <div class="overlay-backdrop" onClick={() => setDraft(null)}>

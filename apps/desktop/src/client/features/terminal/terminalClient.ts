@@ -19,7 +19,6 @@ export type TerminalApi = {
     get(owner: string, repo: string): Promise<RepoPath | null>
     set(owner: string, repo: string, path: string): Promise<RepoPathResult>
     pick(): Promise<string | null>
-    runConfig(owner: string, repo: string, runCommand: string, devPort: number): Promise<RepoPathResult>
     runTargets(owner: string, repo: string, runTargets: string): Promise<RepoPathResult>
   }
   // Run targets (docs/next 13 §A): list with live status, start/stop/status, and the default
@@ -29,7 +28,7 @@ export type TerminalApi = {
       | {
           targets: RunTargetInfo[]
           errors: { source: string; message: string }[]
-          layouts: { id: string; panes: string[]; ratio?: number; terminal?: string; browser?: string }[]
+          layouts: { id: string; panes: string[]; terminal?: string; browser?: string }[]
         }
       | { error: string }
     >
@@ -126,8 +125,6 @@ declare global {
       mcp?: {
         inspect(taskId: string): Promise<{ file: string; servers: import('../../../shared/mcp').McpServerSummary[] }[]>
         createStarter(taskId: string): Promise<{ ok: boolean; reason?: string }>
-        register(flavour: 'claude' | 'codex'): Promise<{ ok: boolean; reason?: string }>
-        unregister(flavour: 'claude' | 'codex'): Promise<{ ok: boolean; reason?: string }>
       }
     }
   }

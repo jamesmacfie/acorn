@@ -26,6 +26,10 @@ export type MemoryProposalRow = {
   type: MemoryType
   description: string
   body: string
+  // Verification flags from the auto-generation verify pass (e.g. "contradicts the existing
+  // '<name>' — accepting supersedes it"). Structural — rendered as badges beside the description,
+  // never folded into it. Defaulted to [] by main for proposals written before the field existed.
+  flags: string[]
   status: 'pending' | 'accepted' | 'rejected'
   createdAt: number
 }

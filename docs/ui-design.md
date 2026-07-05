@@ -2,7 +2,7 @@
 
 acorn's visual language is deliberately minimal and information-dense: a flat, monospaced, three-pane shell where every pixel of chrome earns its place. There are no shadows except on floating popovers, no gradients, no rounded panes — just 1px dividers, square panes, and a small set of muted greys with two semantic accents (green for additions, red for deletions). The aim is a tool that disappears so the review can foreground.
 
-The SPA imports `apps/web/src/client/styles.css` at boot. That file is now a manifest of feature-owned stylesheets under `apps/web/src/client/styles/`:
+The SPA imports `apps/desktop/src/client/styles.css` at boot. That file is now a manifest of feature-owned stylesheets under `apps/desktop/src/client/styles/`:
 
 - `tokens-layout.css` — design tokens, reset, shell grid, pane containment.
 - `pull-list.css` — PR tabs, filters, and virtualized list rows.
@@ -10,8 +10,11 @@ The SPA imports `apps/web/src/client/styles.css` at boot. That file is now a man
 - `diff.css` — diff toolbar, virtualized rows, split mode, composers, and thread rows.
 - `topbar.css` — collapse toggle, repo picker, account menu, and auth controls.
 - `overlays.css` — keyboard shortcuts and file finder overlays.
+- `checks-panel.css` — the CI checks/jobs panel.
+- `integrations-panel.css` — settings integration cards.
+- `copy.css` — shared prose/markdown copy styles.
 
-Vite still emits one client CSS asset, so the split changes ownership and reviewability without adding render-blocking files.
+Feature modules under `features/` co-locate their stylesheet next to the component and import it directly (e.g. `features/tabs/tabrail.css`, `features/palette/palette.css`, `features/tasks/task-view.css`, `features/terminal/terminal.css`), so the manifest covers only the classic shell. Vite still emits one client CSS asset, so the split changes ownership and reviewability without adding render-blocking files.
 
 ## Principles
 
@@ -23,7 +26,9 @@ Vite still emits one client CSS asset, so the split changes ownership and review
 
 ## Design tokens
 
-All tokens are CSS custom properties on `:root`. Light is the default; dark applies via `prefers-color-scheme` (unless the user has forced light) and via `[data-theme="dark"]` (a manual toggle, which wins over the media query).
+All tokens are CSS custom properties on `:root`. Light is the default; dark applies via `prefers-color-scheme` (scoped to `:root:not([data-theme="light"])`, so a forced light theme opts out) and via `[data-theme="dark"]` (a manual toggle, which wins over the media query). The dark **values** are defined exactly once, as `--dark-*` properties on `:root`; both dark paths are thin `var()` mappings onto them, so a dark tweak is a one-place change.
+
+Beyond plain light/dark, `tokens-layout.css` defines **named themes** as further `:root[data-theme="…"]` blocks, each redefining the full token set: `solarized-light`, `solarized-dark`, `monokai`, `nord`, `catppuccin-latte`, `catppuccin-frappe`, `catppuccin-macchiato`, `catppuccin-mocha`, `one-dark`, and `dracula`. The picker is the `THEMES` list (`features/settings/themes.ts`, rendered by `AppearanceSettings.tsx`); it is hand-synced with those blocks, and `features/settings/themes.test.ts` reads the stylesheet and fails the suite if the two sets drift. Named themes may tint `--accent`/`--focus` (e.g. Nord's cyan, Dracula's purple) — the greys-only rule below describes the default light/dark pair.
 
 ### Colour — light (`:root`)
 
@@ -87,14 +92,15 @@ Syntax highlighting follows the same theme split: Shiki emits dual `github-light
 | `--row-h` | `36px` | Fixed list-row height (PR rows, file rows, check rows) |
 | `--topbar-h` | `48px` | Top-bar height |
 | `--pane-head-h` | `48px` | Sticky section-header height |
+| `--tabrail-w` | `52px` | Width of the left task rail |
 | `--ease-out` | `cubic-bezier(0.16, 1, 0.3, 1)` | Transition easing |
 | `--dur-short` | `150ms` | Hover/focus colour transitions |
 
-Pills (state badges, labels) use `border-radius: 999px`; everything structural is square. Motion is limited to short colour/border transitions on interactive elements — there are no layout animations.
+Pills (state badges, labels) use `border-radius: 999px`; everything structural is square. Motion is limited to short colour/border transitions on interactive elements — there are no layout animations. The one continuous animation, the `.spin` agent-working glyph, is disabled under `prefers-reduced-motion: reduce`.
 
 ## Three-pane layout
 
-`.app` is a CSS grid of `var(--topbar-h) 1fr`: the top bar over `.panes`. `.panes` is a three-column grid:
+`.shell` is a full-height flex row: the `TabRail` (sources + task rows, `--tabrail-w` wide) on the far left, then `.app`. `.app` is a CSS grid of `var(--topbar-h) 1fr`: the top bar over `.panes`. `.panes` is a three-column grid:
 
 ```
 grid-template-columns:
@@ -107,7 +113,7 @@ Each `.pane` scrolls independently (`overflow: auto`), is separated by a 1px rig
 
 Collapsing the left pane (a top-bar toggle, persisted via the `left_collapsed` pref) zeroes the left grid column and sets the pane to `display: none`, leaving no stray border.
 
-The top bar is a `1fr auto 1fr` grid: a left cluster (collapse toggle + repo picker), a centered breadcrumb / brand, and a right cluster (theme toggle + account control). See [frontend](./frontend.md) for the components that fill it.
+The top bar is a `1fr auto 1fr` grid: a left cluster (collapse toggle + workspace picker + repo picker), a centered breadcrumb / brand, and a right cluster (notification bell, terminal toggle, account menu). See [frontend](./frontend.md) for the components that fill it.
 
 ## Surfaces and accents
 
@@ -116,3 +122,4 @@ The top bar is a `1fr auto 1fr` grid: a left cluster (collapse toggle + repo pic
 - **Floating surfaces** — the repo picker popover, account menu, and keyboard overlays — are the only elements with elevation, using `box-shadow` with `--shadow-popover` over a `--border-strong` outline.
 - **Diff lines** colour by state: insert rows take `--add-bg` with a green `+` marker, delete rows `--del-bg` with a red `−`; word-level changes layer the stronger `--*-word-bg` over the line. Hunk headers sit on `--hunk-bg`.
 - **Status semantics** reuse the diff palette: open PR state and passing checks use `--add-marker`, closed/failing use `--del-marker`, pending/draft use `--warn`.
+

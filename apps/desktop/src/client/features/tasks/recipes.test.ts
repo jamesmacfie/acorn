@@ -12,7 +12,7 @@ const stubSvc = (overrides: Partial<RecipeServices> = {}): RecipeServices => ({
 
 describe('recipeToLayout', () => {
   it('opens the known panes left→right; drops unknown/duplicate panes; null when none valid', () => {
-    expect(recipeToLayout({ id: 'review', panes: ['pr', 'changes'], ratio: 0.5 })).toEqual({ panes: ['pr', 'changes'] })
+    expect(recipeToLayout({ id: 'review', panes: ['pr', 'changes'] })).toEqual({ panes: ['pr', 'changes'] })
     expect(recipeToLayout({ id: 'x', panes: ['pr', 'pr', 'bogus'] })).toEqual({ panes: ['pr'] })
     expect(recipeToLayout({ id: 'x', panes: ['nope'] })).toBeNull()
   })
@@ -21,7 +21,7 @@ describe('recipeToLayout', () => {
 describe('invokeLayoutRecipe (13 §C example)', () => {
   it('seeds the layout, starts the terminal target, resolves the browser URL', async () => {
     const svc = stubSvc()
-    const res = await invokeLayoutRecipe('t1', { id: 'review', panes: ['pr', 'changes'], ratio: 0.5, terminal: 'dev', browser: 'run:dev' }, svc)
+    const res = await invokeLayoutRecipe('t1', { id: 'review', panes: ['pr', 'changes'], terminal: 'dev', browser: 'run:dev' }, svc)
     expect(res).toEqual({ ok: true })
     expect(svc.setLayout).toHaveBeenCalledWith('t1', { panes: ['pr', 'changes'] })
     expect(svc.startTarget).toHaveBeenCalledTimes(1) // browser target === terminal target → one start

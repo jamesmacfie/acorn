@@ -1,17 +1,23 @@
-import { createEffect, createMemo, createSignal, For, onCleanup, onMount, Show } from 'solid-js'
-import { createQuery } from '@tanstack/solid-query'
-import { useNavigate, useParams, useSearchParams } from '@solidjs/router'
-import { fileSummariesOptions, type PullFile } from './queries'
+import { createEffect, createMemo, For, Show } from 'solid-js'
+import { useNavigate, useParams } from '@solidjs/router'
+import { useChangedFiles } from './changedFiles'
+import { fuzzyScore } from './features/palette/model'
+import { createOverlayPalette } from './features/palette/overlay'
+import { isTypingTarget } from './lib/isTypingTarget'
+import type { PullFile } from './queries'
 
 // Global keyboard shortcuts + the file finder. Mounted once in App. Owns a single window
-// keydown listener. PullList owns j/k (next/prev PR) — those keys are deliberately untouched
-// here. All shortcuts except Escape are ignored while focus is in a form field.
+// keydown listener (via the shared createOverlayPalette hook). PullList owns j/k (next/prev PR) —
+// those keys are deliberately untouched here. All shortcuts except Escape are ignored while focus
+// is in a typing target (form fields and contentEditable surfaces).
 // The finder is local; the shortcut *reference* now lives in Settings → Shortcuts, so `?` opens
 // that tab (via onOpenShortcuts) rather than a local help overlay.
-type Overlay = 'finder' | null
 
 // Keyboard shortcut reference, rendered by the Settings → Shortcuts tab.
 export const SHORTCUTS: Array<[string, string]> = [
+  ['⌘1 – ⌘9', 'Jump to task 1–9 in the rail'],
+  ['⌘K', 'Command palette (panes, tasks, run targets)'],
+  ['⌘P', 'Go to file in the task worktree'],
   ['j / k', 'Next / previous PR'],
   ['[ / ]', 'Previous / next file'],
   ['/', 'Find file in this PR'],
@@ -20,27 +26,9 @@ export const SHORTCUTS: Array<[string, string]> = [
   ['Esc', 'Close overlay'],
 ]
 
-// Subsequence match (fuzzy): every char of the query appears in order within the path.
-function subsequence(query: string, target: string): boolean {
-  let i = 0
-  for (let j = 0; j < target.length && i < query.length; j++) {
-    if (target[j] === query[i]) i++
-  }
-  return i === query.length
-}
-
-function isTypingTarget(t: EventTarget | null): boolean {
-  return t instanceof HTMLInputElement || t instanceof HTMLTextAreaElement || t instanceof HTMLSelectElement
-}
-
 export default function Shortcuts(props: { onOpenShortcuts: () => void }) {
   const params = useParams()
   const navigate = useNavigate()
-  const [searchParams, setSearchParams] = useSearchParams()
-  const [overlay, setOverlay] = createSignal<Overlay>(null)
-  const [filter, setFilter] = createSignal('')
-  const [active, setActive] = createSignal(0)
-  let inputRef: HTMLInputElement | undefined
   let lastRouteKey = ''
 
   // Current PR's changed files (same source/order PullDetail uses). Only fetched when a PR is open.
@@ -48,99 +36,58 @@ export default function Shortcuts(props: { onOpenShortcuts: () => void }) {
     if (!params.owner || !params.repo || !params.number) return null
     return { owner: params.owner, repo: params.repo, number: params.number, key: `${params.owner}/${params.repo}#${params.number}` }
   })
-  const files = createQuery(() => {
-    const r = route()
-    return fileSummariesOptions(r?.owner ?? '', r?.repo ?? '', r?.number ?? '', !!r)
-  })
-  const allFiles = (): PullFile[] => files.data ?? []
-  const currentFile = () => (typeof searchParams.file === 'string' ? searchParams.file : undefined)
+  const changedFiles = useChangedFiles(route)
+  const allFiles = changedFiles.files
 
-  // Filtered + ranked finder results: substring matches first, then looser subsequence matches.
+  const finder = createOverlayPalette({
+    count: () => results().length,
+    onPick: (index) => {
+      const sel = results()[index]
+      if (sel) selectFile(sel.path)
+    },
+    // The remaining bare-key shortcuts, active only while the finder is closed. They ignore
+    // typing targets and modifier chords — those belong to text entry and the OS/browser (⌘C, etc.).
+    onClosedKey: (e) => {
+      if (isTypingTarget(e.target)) return
+      if (e.metaKey || e.ctrlKey || e.altKey) return
+      if (e.key === '?') {
+        e.preventDefault()
+        props.onOpenShortcuts()
+      } else if (e.key === '/') {
+        e.preventDefault()
+        if (route()) finder.show()
+      } else if (e.key === ']') {
+        e.preventDefault()
+        changedFiles.cycleFile(1)
+      } else if (e.key === '[') {
+        e.preventDefault()
+        changedFiles.cycleFile(-1)
+      } else if (e.key === 'c' && params.owner && params.repo) {
+        e.preventDefault()
+        navigate(`/${params.owner}/${params.repo}/new`)
+      }
+    },
+  })
+
+  // Finder results ranked with the palette's fuzzy scorer: every query char must appear in order
+  // in the path, and contiguous runs / word-start hits score higher — so substring-ish matches
+  // sort above looser subsequence ones. Ties keep the PR's file order (stable sort); an empty
+  // query lists all files in PR order.
   const results = createMemo(() => {
-    const q = filter().trim().toLowerCase()
+    const q = finder.query().trim()
     const list = allFiles()
     if (!q) return list
-    return list.filter((f) => {
-      const p = f.path.toLowerCase()
-      return p.includes(q) || subsequence(q, p)
-    })
+    return list
+      .map((file) => ({ file, score: fuzzyScore(q, file.path) }))
+      .filter((x): x is { file: PullFile; score: number } => x.score !== null)
+      .sort((a, b) => b.score - a.score)
+      .map((x) => x.file)
   })
 
-  function openFinder() {
-    if (!route()) return
-    setFilter('')
-    setActive(0)
-    setOverlay('finder')
-  }
-
   function selectFile(path: string) {
-    setSearchParams({ file: path })
-    setOverlay(null)
+    changedFiles.selectFile(path)
+    finder.close()
   }
-
-  // Move ?file= to the next/prev changed file, wrapping. No-op when there are no files.
-  function cycleFile(dir: 1 | -1) {
-    const list = allFiles()
-    if (!list.length) return
-    const i = list.findIndex((f) => f.path === currentFile())
-    const base = i < 0 ? (dir === 1 ? -1 : 0) : i
-    const next = (base + dir + list.length) % list.length
-    setSearchParams({ file: list[next].path })
-  }
-
-  const onKey = (e: KeyboardEvent) => {
-    // Escape always closes the finder, even from within its input.
-    if (e.key === 'Escape') {
-      if (overlay()) {
-        e.preventDefault()
-        setOverlay(null)
-      }
-      return
-    }
-
-    // When the finder is open, its input owns arrow/enter navigation.
-    if (overlay() === 'finder') {
-      const list = results()
-      if (e.key === 'ArrowDown') {
-        e.preventDefault()
-        setActive((a) => (list.length ? (a + 1) % list.length : 0))
-      } else if (e.key === 'ArrowUp') {
-        e.preventDefault()
-        setActive((a) => (list.length ? (a - 1 + list.length) % list.length : 0))
-      } else if (e.key === 'Enter') {
-        e.preventDefault()
-        const sel = list[active()]
-        if (sel) selectFile(sel.path)
-      }
-      return
-    }
-
-    // All remaining shortcuts ignore form fields.
-    if (isTypingTarget(e.target)) return
-
-    // …and modifier chords (Cmd+C to copy, Ctrl+/, etc.) belong to the OS/browser, not us.
-    if (e.metaKey || e.ctrlKey || e.altKey) return
-
-    if (e.key === '?') {
-      e.preventDefault()
-      props.onOpenShortcuts()
-    } else if (e.key === '/') {
-      e.preventDefault()
-      openFinder()
-    } else if (e.key === ']') {
-      e.preventDefault()
-      cycleFile(1)
-    } else if (e.key === '[') {
-      e.preventDefault()
-      cycleFile(-1)
-    } else if (e.key === 'c' && params.owner && params.repo) {
-      e.preventDefault()
-      navigate(`/${params.owner}/${params.repo}/new`)
-    }
-  }
-
-  onMount(() => window.addEventListener('keydown', onKey))
-  onCleanup(() => window.removeEventListener('keydown', onKey))
 
   // Finder state is per PR. Route changes keep `?file=` intact for DiffView's scroll target,
   // but the transient finder UI should not carry across pages.
@@ -148,18 +95,7 @@ export default function Shortcuts(props: { onOpenShortcuts: () => void }) {
     const key = route()?.key ?? ''
     if (key === lastRouteKey) return
     lastRouteKey = key
-    setFilter('')
-    setActive(0)
-    setOverlay((current) => (current === 'finder' ? null : current))
-  })
-
-  // Focus the finder input when it opens; keep the active row in range as the filter narrows.
-  createEffect(() => {
-    if (overlay() === 'finder') inputRef?.focus()
-  })
-  createEffect(() => {
-    const len = results().length
-    if (active() >= len) setActive(len ? len - 1 : 0)
+    finder.close()
   })
 
   // Split a path into directory + basename so the finder can emphasize the filename.
@@ -169,43 +105,38 @@ export default function Shortcuts(props: { onOpenShortcuts: () => void }) {
   }
 
   return (
-    <Show when={overlay() === 'finder'}>
-      <div class="overlay-backdrop" onClick={() => setOverlay(null)}>
+    <Show when={finder.open()}>
+      <div class="overlay-backdrop" onClick={finder.close}>
         <div class="overlay" role="dialog" aria-modal="true" onClick={(e) => e.stopPropagation()}>
-          <Show when={overlay() === 'finder'}>
-            <input
-              ref={inputRef}
-              class="finder-input"
-              placeholder="Find file…"
-              value={filter()}
-              onInput={(e) => {
-                setFilter(e.currentTarget.value)
-                setActive(0)
-              }}
-            />
-            <Show
-              when={results().length}
-              fallback={<p class="finder-empty">{allFiles().length ? 'No matching files.' : 'No changed files.'}</p>}
-            >
-              <ul class="finder-list">
-                <For each={results()}>
-                  {(file, i) => {
-                    const parts = splitPath(file.path)
-                    return (
-                      <li
-                        class="finder-row"
-                        classList={{ active: i() === active() }}
-                        onMouseMove={() => setActive(i())}
-                        onClick={() => selectFile(file.path)}
-                      >
-                        <span class="finder-dir">{parts.dir}</span>
-                        <span class="finder-name">{parts.name}</span>
-                      </li>
-                    )
-                  }}
-                </For>
-              </ul>
-            </Show>
+          <input
+            ref={finder.setInputRef}
+            class="finder-input"
+            placeholder="Find file…"
+            value={finder.query()}
+            onInput={(e) => finder.setQuery(e.currentTarget.value)}
+          />
+          <Show
+            when={results().length}
+            fallback={<p class="finder-empty">{allFiles().length ? 'No matching files.' : 'No changed files.'}</p>}
+          >
+            <ul class="finder-list">
+              <For each={results()}>
+                {(file, i) => {
+                  const parts = splitPath(file.path)
+                  return (
+                    <li
+                      class="finder-row"
+                      classList={{ active: i() === finder.sel() }}
+                      onMouseMove={() => finder.setSel(i())}
+                      onClick={() => selectFile(file.path)}
+                    >
+                      <span class="finder-dir">{parts.dir}</span>
+                      <span class="finder-name">{parts.name}</span>
+                    </li>
+                  )
+                }}
+              </For>
+            </ul>
           </Show>
         </div>
       </div>

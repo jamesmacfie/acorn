@@ -10,7 +10,7 @@ describe('server db helpers', () => {
     expect(filesResource(42, 7)).toBe('files:42:7')
   })
 
-  it('chunks rows by D1 bound-parameter budget', () => {
+  it('chunks rows by the bound-parameter budget', () => {
     const rows = Array.from({ length: 15 }, (_, i) => ({
       c1: i,
       c2: i,

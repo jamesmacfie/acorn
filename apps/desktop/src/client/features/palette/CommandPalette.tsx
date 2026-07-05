@@ -1,70 +1,116 @@
-import { createMemo, createResource, createSignal, For, onCleanup, onMount, Show } from 'solid-js'
-import { useQueryClient } from '@tanstack/solid-query'
-import { tasksKey } from '../../queries'
+import { createMemo, createResource, For, Show } from 'solid-js'
+import { createQuery, useQueryClient } from '@tanstack/solid-query'
+import { useNavigate } from '@solidjs/router'
+import type { RunTargetInfo } from '../../../shared/terminal'
+import { tasksKey, tasksOptions } from '../../queries'
 import { refreshSessions } from '../terminal/sessions'
 import { terminalApi } from '../terminal/terminalClient'
-import { activeTaskId, dispatchActiveLayout, dispatchLayout, isTerminalOpen, setRecipeBrowserUrl, setTerminalOpen } from '../tasks/tasks'
-import { invokeLayoutRecipe } from '../tasks/recipes'
+import { activeLayout, activeTaskId, dispatchActiveLayout, dispatchLayout, isTerminalOpen, setRecipeBrowserUrl, setTerminalOpen } from '../tasks/tasks'
+import { activateTaskSignals, pathForTask } from '../tasks/activate'
+import { evictPreviewWebview } from '../preview/PreviewPane'
+import { PANE_LABELS, PANE_ORDER, type PaneId } from '../tasks/layout'
+import { invokeLayoutRecipe, type RecipeSpec } from '../tasks/recipes'
 import { composeItems, fuzzyFilter, type PaletteItem } from './model'
+import { createOverlayPalette } from './overlay'
 import './palette.css'
+
+// Normalized run-targets payload (the resource resolves to the data shape or `{ error }`, and is
+// `undefined` while the palette is closed) — unwrapped once, with empty defaults.
+type RunSources = { targets: RunTargetInfo[]; errors: { source: string; message: string }[]; layouts: RecipeSpec[] }
+const EMPTY_RUN_SOURCES: RunSources = { targets: [], errors: [], layouts: [] }
 
 // ⌘K command palette (docs/next 13 §D): fuzzy search over run targets, built-in actions, and
 // config parse-error rows (13 §B — a broken .acorn/config.toml is visible, not silent). Thin glue
-// over the pure model; reuses the shared overlay shell.
+// over the pure model; keyboard/overlay plumbing comes from the shared createOverlayPalette hook.
 export default function CommandPalette() {
   const api = terminalApi()
   const queryClient = useQueryClient()
-  const [open, setOpen] = createSignal(false)
-  const [query, setQuery] = createSignal('')
-  const [sel, setSel] = createSignal(0)
-  let inputRef: HTMLInputElement | undefined
+  const navigate = useNavigate()
+  const tasks = createQuery(() => tasksOptions(true))
+
+  const palette = createOverlayPalette({
+    count: () => items().length,
+    onPick: (index) => {
+      const item = items()[index]
+      if (item) void invoke(item)
+    },
+    isToggle: (e) => (e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k',
+    // Refetch both config-backed resources on open so run-target AND workflow edits made while
+    // the app runs show up without a task switch.
+    onOpen: () => {
+      void refetch()
+      void refetchWf()
+    },
+  })
 
   const [runData, { refetch }] = createResource(
-    () => (open() ? activeTaskId() : null),
+    () => (palette.open() ? activeTaskId() : null),
     async (id) => (id && api ? await api.run.targets(id) : null),
   )
   // Committed workflows for the task (docs/next 14 P5); their parse/cycle errors join the rows.
   const [wfData, { refetch: refetchWf }] = createResource(
-    () => (open() ? activeTaskId() : null),
+    () => (palette.open() ? activeTaskId() : null),
     async (id) => (id && api ? await api.workflow.defs(id) : null),
   )
+  const runInfo = createMemo<RunSources>(() => {
+    const data = runData()
+    return data && 'targets' in data ? data : EMPTY_RUN_SOURCES
+  })
 
   const actions = () => {
     const id = activeTaskId()
     if (!id) return []
+    const openPanes = new Set(activeLayout().panes)
+    // Show any pane (docs/next 17 §B.1 — full PaneId set, not the old 4); Close only open panes,
+    // and only when >1 is open (closing the last pane is a no-op the reducer guards anyway).
+    const paneShow = PANE_ORDER.map((p) => ({ id: `action:pane-${p}`, label: `Show pane: ${PANE_LABELS[p]}` }))
+    const paneClose = openPanes.size > 1 ? PANE_ORDER.filter((p) => openPanes.has(p)).map((p) => ({ id: `action:pane-close-${p}`, label: `Close pane: ${PANE_LABELS[p]}` })) : []
     return [
       { id: 'action:new-terminal', label: 'New terminal', hint: 'open a shell in the task worktree' },
       { id: 'action:toggle-terminal', label: isTerminalOpen(id) ? 'Hide terminal drawer' : 'Show terminal drawer' },
-      { id: 'action:pane-pr', label: 'Show pane: PR review' },
-      { id: 'action:pane-editor', label: 'Show pane: editor' },
-      { id: 'action:pane-preview', label: 'Show pane: browser preview' },
-      { id: 'action:pane-linear', label: 'Show pane: Linear' },
+      ...paneShow,
+      ...paneClose,
       { id: 'action:archive', label: 'Archive task', hint: 'guarded teardown' },
     ]
   }
 
+  // Go-to-task rows: every other task, jumpable by name (⌘1–9 covers the first nine by position).
+  const taskItems = () => {
+    const cur = activeTaskId()
+    return (tasks.data ?? [])
+      .filter((t) => t.id !== cur)
+      .map((t) => ({ id: t.id, label: `Go to task: ${t.title}`, hint: `${t.repoOwner}/${t.repoName}` }))
+  }
+
   const items = createMemo<PaletteItem[]>(() => {
-    const data = runData()
-    const targets = data && 'targets' in data ? data.targets : []
-    const errors = data && 'targets' in data ? data.errors : []
-    const layouts = data && 'targets' in data ? data.layouts : []
+    const { targets, errors, layouts } = runInfo()
     const wf = wfData()
     return fuzzyFilter(
-      composeItems({ targets, errors: [...errors, ...(wf?.errors ?? [])], layouts, workflows: wf?.workflows ?? [], actions: actions() }),
-      query(),
+      composeItems({ targets, errors: [...errors, ...(wf?.errors ?? [])], layouts, workflows: wf?.workflows ?? [], actions: actions(), tasks: taskItems() }),
+      palette.query(),
     )
   })
-
-  const close = () => {
-    setOpen(false)
-    setQuery('')
-    setSel(0)
-  }
 
   async function invoke(item: PaletteItem) {
     const taskId = activeTaskId()
     if (item.kind === 'error') return // visible, not invocable
-    close()
+    palette.close()
+    if (item.kind === 'task') {
+      // Navigation, not a task-scoped command — no active task / terminal API required.
+      const t = tasks.data?.find((x) => `task:${x.id}` === item.id)
+      if (t) {
+        activateTaskSignals(t)
+        navigate(pathForTask(t))
+      }
+      return
+    }
+    if (item.kind === 'action' && item.id.startsWith('action:pane-')) {
+      // Generic pane transitions (docs/next 17 §B.1): "close-<id>" closes, "<id>" shows.
+      const isClose = item.id.startsWith('action:pane-close-')
+      const pane = item.id.slice((isClose ? 'action:pane-close-' : 'action:pane-').length) as PaneId
+      dispatchActiveLayout({ type: isClose ? 'close' : 'show', pane })
+      return
+    }
     if (!taskId || !api) return
     if (item.kind === 'run') {
       const targetId = item.id.slice('run:'.length)
@@ -86,8 +132,7 @@ export default function CommandPalette() {
     if (item.kind === 'layout') {
       // Layout recipe (docs/next 13 §C): seed panes, auto-start the named target, resolve the
       // browser URL — all through the pure executor.
-      const data = runData()
-      const recipe = data && 'targets' in data ? data.layouts.find((r) => `layout:${r.id}` === item.id) : undefined
+      const recipe = runInfo().layouts.find((r) => `layout:${r.id}` === item.id)
       if (!recipe) return
       const res = await invokeLayoutRecipe(taskId, recipe, {
         setLayout: (tid, layout) => dispatchLayout(tid, { type: 'replace', layout }),
@@ -109,72 +154,27 @@ export default function CommandPalette() {
       case 'action:toggle-terminal':
         setTerminalOpen(taskId, !isTerminalOpen(taskId))
         break
-      case 'action:pane-pr':
-        dispatchActiveLayout({ type: 'show', pane: 'pr' })
-        break
-      case 'action:pane-editor':
-        dispatchActiveLayout({ type: 'show', pane: 'editor' })
-        break
-      case 'action:pane-preview':
-        dispatchActiveLayout({ type: 'show', pane: 'preview' })
-        break
-      case 'action:pane-linear':
-        dispatchActiveLayout({ type: 'show', pane: 'linear' })
-        break
       case 'action:archive': {
         if (!window.confirm('Archive this task?')) break
         const res = await api.task.archive(taskId)
         if (!res.ok) window.alert(res.reason)
+        else evictPreviewWebview(taskId) // drop the archived task's kept-alive <webview>
         await queryClient.invalidateQueries({ queryKey: tasksKey })
         break
       }
     }
   }
 
-  const onKey = (e: KeyboardEvent) => {
-    if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
-      e.preventDefault()
-      if (open()) close()
-      else {
-        setOpen(true)
-        void refetch()
-        queueMicrotask(() => inputRef?.focus())
-      }
-      return
-    }
-    if (!open()) return
-    if (e.key === 'Escape') {
-      e.preventDefault()
-      close()
-    } else if (e.key === 'ArrowDown') {
-      e.preventDefault()
-      setSel((s) => Math.min(s + 1, items().length - 1))
-    } else if (e.key === 'ArrowUp') {
-      e.preventDefault()
-      setSel((s) => Math.max(s - 1, 0))
-    } else if (e.key === 'Enter') {
-      e.preventDefault()
-      const item = items()[sel()]
-      if (item) void invoke(item)
-    }
-  }
-
-  onMount(() => window.addEventListener('keydown', onKey))
-  onCleanup(() => window.removeEventListener('keydown', onKey))
-
   return (
-    <Show when={open()}>
-      <div class="overlay-backdrop" onClick={close}>
+    <Show when={palette.open()}>
+      <div class="overlay-backdrop" onClick={palette.close}>
         <div class="overlay palette" role="dialog" aria-modal="true" onClick={(e) => e.stopPropagation()}>
           <input
-            ref={inputRef}
+            ref={palette.setInputRef}
             class="palette-input"
-            placeholder="Run a target, switch a pane, archive…"
-            value={query()}
-            onInput={(e) => {
-              setQuery(e.currentTarget.value)
-              setSel(0)
-            }}
+            placeholder="Run a target, switch a pane or task, archive…"
+            value={palette.query()}
+            onInput={(e) => palette.setQuery(e.currentTarget.value)}
           />
           <ul class="palette-list">
             <For each={items()} fallback={<li class="palette-empty muted">No matches.</li>}>
@@ -183,8 +183,8 @@ export default function CommandPalette() {
                   <button
                     type="button"
                     class="palette-row"
-                    classList={{ selected: i() === sel(), 'palette-error': item.kind === 'error' }}
-                    onMouseEnter={() => setSel(i())}
+                    classList={{ selected: i() === palette.sel(), 'palette-error': item.kind === 'error' }}
+                    onMouseEnter={() => palette.setSel(i())}
                     onClick={() => void invoke(item)}
                   >
                     <span class="palette-label">{item.label}</span>

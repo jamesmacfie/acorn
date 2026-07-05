@@ -7,18 +7,21 @@ import { createApp } from '../server/index'
 import { makeBindings, type RuntimeBindings } from './bindings'
 
 const here = dirname(fileURLToPath(import.meta.url))
-// Resolve packaged paths from this module, never process.cwd() — Phase 1 launches from Finder.
+// Resolve packaged paths from this module, never process.cwd() — the app launches from Finder.
 const clientDir = resolve(here, '../../dist/client')
-// Local app data root (gitignored). Exported so the terminal service can place PR worktrees under
-// it (vNext §9) rather than polluting the user's source tree.
-export const dataDir = resolve(here, '../../.acorn')
+// DEV data root: the repo-local apps/desktop/.acorn (gitignored). Only valid while running from a
+// checkout — a packaged app's module dir is the read-only asar, so electron.ts passes an
+// app.getPath('userData') root into startServer() instead when app.isPackaged.
+export const devDataDir = resolve(here, '../../.acorn')
 const indexHtml = readFileSync(resolve(clientDir, 'index.html'), 'utf8')
 
 export const ACORN_PORT = Number(process.env.ACORN_PORT) || 4317
 
 // Resolves with the live server and the runtime bindings — Electron passes runtime.DB to the
 // terminal service so it shares this one SQLite connection (vNext §7) rather than opening a second.
-export function startServer(): Promise<{ server: ServerType; runtime: RuntimeBindings }> {
+// `dataDir` is the writable app-data root (DB, blobs, worktrees, notes): userData when packaged,
+// the repo-local .acorn in dev / under plain Node.
+export function startServer(dataDir: string = devDataDir): Promise<{ server: ServerType; runtime: RuntimeBindings }> {
   const runtime = makeBindings({
     dbPath: resolve(dataDir, 'acorn.sqlite'),
     blobsDir: resolve(dataDir, 'blobs'),
@@ -35,12 +38,17 @@ export function startServer(): Promise<{ server: ServerType; runtime: RuntimeBin
   })
 
   // Loopback Host guard (docs/electron.md §4g): we bind 127.0.0.1, but reject unexpected Host
-  // headers too so a DNS-rebinding page can't reach the local API as some other origin.
-  const allowedHosts = new Set([`127.0.0.1:${ACORN_PORT}`, `localhost:${ACORN_PORT}`])
+  // headers too so a DNS-rebinding page can't reach the local API as some other origin. Only the
+  // 127.0.0.1 form is allowed — the OAuth app, window origin, and docs all standardise on it.
+  const allowedHost = `127.0.0.1:${ACORN_PORT}`
   const fetch = (request: Request, nodeEnv: HttpBindings | Http2Bindings) => {
     const host = request.headers.get('host')
-    if (!host || !allowedHosts.has(host)) return new Response('Forbidden host', { status: 403 })
-    return app.fetch(request, { ...nodeEnv, ...runtime } as unknown as Env)
+    if (!host || host !== allowedHost) return new Response('Forbidden host', { status: 403 })
+    // serve() below creates a plain node:http server, so nodeEnv is always HttpBindings — narrow
+    // it once here. Env extends RuntimeBindings + Partial<HttpBindings> (env.d.ts), so the merged
+    // object IS the env the routes see — no `as unknown as Env` double cast at this seam.
+    const env: Env = { ...(nodeEnv as HttpBindings), ...runtime }
+    return app.fetch(request, env)
   }
 
   // serve() binds asynchronously — resolve only once listening so callers (Electron) can safely

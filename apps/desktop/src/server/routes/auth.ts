@@ -1,10 +1,11 @@
 import { Hono } from 'hono'
 import { deleteCookie, getCookie, setCookie } from 'hono/cookie'
 import { gh } from '../github'
-import { cookieAttrs, sealSession, SESSION_TTL_SECONDS } from '../session'
+import { sealSession, SESSION_COOKIE, SESSION_TTL_SECONDS } from '../session'
 
-// GitHub OAuth web flow (docs/auth.md). The Worker exchanges the code for a token and seals
-// it into the session cookie; the browser never sees the token.
+// GitHub OAuth web flow (docs/authentication.md). The local server exchanges the code for a
+// token and seals it into the session cookie; the browser never sees the token. All cookies
+// are plain-HTTP (no Secure flag): the server only ever runs on loopback http://127.0.0.1.
 
 const GITHUB_SCOPES = 'repo read:org read:user'
 const STATE_COOKIE = 'oauth_state'
@@ -37,11 +38,11 @@ export const auth = new Hono<{ Bindings: Env }>()
     const state = crypto.randomUUID()
     // CSRF: remember the state for 5 min (one-time use, consumed on callback) AND bind it to
     // this browser via a short-lived cookie, so a state minted in one browser can't be
-    // completed in another (login-CSRF). Both must match on callback.
-    await c.env.OAUTH_STATE.put(state, '1', { expirationTtl: STATE_TTL_SECONDS })
+    // completed in another (login-CSRF). Both must match on callback. The store's TTL is
+    // internal (main/bindings.ts) and matches STATE_TTL_SECONDS here.
+    c.env.OAUTH_STATE.issue(state)
     setCookie(c, STATE_COOKIE, state, {
       httpOnly: true,
-      secure: cookieAttrs(c.req.url).secure,
       sameSite: 'Lax',
       path: '/auth',
       maxAge: STATE_TTL_SECONDS,
@@ -50,7 +51,6 @@ export const auth = new Hono<{ Bindings: Env }>()
     const returnTo = safeReturnTo(c.req.query('return_to'))
     setCookie(c, RETURN_TO_COOKIE, returnTo, {
       httpOnly: true,
-      secure: cookieAttrs(c.req.url).secure,
       sameSite: 'Lax',
       path: '/auth',
       maxAge: STATE_TTL_SECONDS,
@@ -71,11 +71,10 @@ export const auth = new Hono<{ Bindings: Env }>()
 
     // Browser binding: the state must match the cookie set at /login (same browser)…
     const cookieState = getCookie(c, STATE_COOKIE)
-    deleteCookie(c, STATE_COOKIE, { path: '/auth', secure: cookieAttrs(c.req.url).secure })
+    deleteCookie(c, STATE_COOKIE, { path: '/auth' })
     if (!cookieState || !timingSafeEqual(cookieState, state)) return c.text('invalid state', 403)
-    // …and still be a live, one-time server-issued state (consumed here).
-    if (!(await c.env.OAUTH_STATE.get(state))) return c.text('invalid state', 403)
-    await c.env.OAUTH_STATE.delete(state)
+    // …and still be a live, one-time server-issued state (consume removes it).
+    if (!c.env.OAUTH_STATE.consume(state)) return c.text('invalid state', 403)
 
     // Exchange the code for an access token.
     const tokenRes = await fetch('https://github.com/login/oauth/access_token', {
@@ -108,21 +107,17 @@ export const auth = new Hono<{ Bindings: Env }>()
       c.env.SESSION_ENC_KEY,
     )
 
-    const { name, secure } = cookieAttrs(c.req.url)
-    setCookie(c, name, sealed, {
+    setCookie(c, SESSION_COOKIE, sealed, {
       httpOnly: true,
-      secure,
       sameSite: 'Lax',
       path: '/',
       maxAge: SESSION_TTL_SECONDS,
     })
     const returnTo = safeReturnTo(getCookie(c, RETURN_TO_COOKIE))
-    deleteCookie(c, RETURN_TO_COOKIE, { path: '/auth', secure: cookieAttrs(c.req.url).secure })
+    deleteCookie(c, RETURN_TO_COOKIE, { path: '/auth' })
     return c.redirect(returnTo)
   })
   .post('/logout', (c) => {
-    // Clear whichever cookie is in play (prod __Host-session and the dev fallback).
-    deleteCookie(c, '__Host-session', { path: '/', secure: true })
-    deleteCookie(c, 'session', { path: '/' })
+    deleteCookie(c, SESSION_COOKIE, { path: '/' })
     return c.body(null, 204)
   })

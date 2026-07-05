@@ -8,20 +8,14 @@
 import { mkdirSync } from 'node:fs'
 import { readdir, readFile, rename, stat, unlink, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
+import type { Note, NoteAuthor, NoteKind, NoteSummary } from '../shared/notes'
 
-export type NoteAuthor = 'user' | 'agent' | 'workflow'
-export type NoteKind = 'scratch' | 'plan' | 'finding' | 'handoff'
+// Canonical wire shapes live in shared/notes.ts (imported by the client too); re-exported here so
+// main-side callers keep one import point.
+export type { Note, NoteAuthor, NoteKind, NoteSummary } from '../shared/notes'
 
-export type NoteMeta = {
-  title: string
-  author: NoteAuthor
-  kind: NoteKind
-  originSessionId: string | null // set when an agent/workflow wrote it (provenance)
-  createdAt: number
-}
-
-export type NoteSummary = { slug: string; title: string; author: NoteAuthor; kind: NoteKind; updatedAt: number }
-export type Note = NoteMeta & { slug: string; body: string }
+// The frontmatter block of a note file — Note minus slug/body.
+export type NoteMeta = Omit<Note, 'slug' | 'body'>
 
 // Safe filename component: no traversal, no separators, no dotfiles.
 export const isValidSlug = (s: string): boolean => /^[a-z0-9][a-z0-9._-]*$/i.test(s) && !s.includes('..')

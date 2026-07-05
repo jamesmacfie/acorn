@@ -1,5 +1,18 @@
 # 02 — UI design (conceptual UX)
 
+> **✅ Status: shipped, with divergences.** The two-zone rail, promotion flows (A/B/C), Source
+> gating, and the pane switcher all landed (`features/tabs/TabRail.tsx`, `features/tasks/TaskView.tsx`).
+> Read "Workspace" as **Task** (README two-tier note). The notable divergences from this doc:
+> - **The pane model outgrew "single active pane"**: a task's layout is a left→right *row* of open
+>   panes (⌘-click a switcher icon opens beside; pane-scoped close), owned by one pure reducer —
+>   `features/tasks/layout.ts`, designed in [`../next/03-panes-and-layout.md`](../next/03-panes-and-layout.md).
+> - **The shipped pane set** is `pr | linear | rollbar | preview | editor | changes | notes |
+>   browser | context` — larger than the five sketched below.
+> - **Terminal and dev server are *not* panes.** The terminal stayed a bottom **drawer** scoped to
+>   the active task, and dev servers shipped as **run targets** running as drawer terminal
+>   sessions (docs/next 13 §A) — a deliberate ponytail call noted in `TaskView.tsx`.
+> - The open questions at the bottom are answered inline.
+
 This describes the interaction model. Layout/theming conventions defer to
 [`../ui-design.md`](../ui-design.md); this doc is about *structure and flow*, not pixels.
 
@@ -23,6 +36,13 @@ discover work** from **what you're working on**.
 └────────────────────┘
 ```
 
+**Rail row status glyphs, as shipped** (`TabRail.tsx` — a different vocabulary than sketched):
+- `⠿` — agent(s) working, from `workingCountFor()` (`features/terminal/sessions.ts`)
+- `‼` — "an agent needs you": unread notifications, from `unreadForTask()` (`features/notifications/notifications.ts`)
+- `✎` dirty worktree (uncommitted count) / `⚠` worktree missing — from `taskStatus.ts` polling
+- PR checks — a coloured status **dot** (`checks-dot`), not the sketched `✓/✗`
+- Row glyph — the workspace's emoji icon when set, else `ORIGIN_GLYPH` by task origin
+
 **Sources (top)** are the browse surfaces. GitHub's source view is essentially today's `PullList`
 across repos. Linear's is a ticket list; Rollbar's is an error list. They are stateless entry
 points — you look, then **promote** something into a Workspace.
@@ -36,7 +56,9 @@ keys off the workspace's sessions instead of a path.
 ## The Workspace view (panes + switcher)
 
 Selecting a Workspace replaces the browse area with that workspace's view: a single active pane plus
-a **pane switcher** (the small view icons the user already has, now given a job).
+a **pane switcher** (the small view icons the user already has, now given a job — shipped as the
+`pane-switch-btn` button row in `features/tasks/TaskView.tsx`, whose tooltips carry each pane's
+shortcut key).
 
 ```
 ┌─ Workspace: acme/api · PR #123 · feat/login ──────────────────────────┐
@@ -50,6 +72,11 @@ a **pane switcher** (the small view icons the user already has, now given a job)
 │ worktree: .acorn/worktrees/acme-api-pr-123   ● dirty (3 files)         │
 └────────────────────────────────────────────────────────────────────────┘
 ```
+
+*(Original proposal sketch, kept as drawn. As shipped there is no `>_ claude` or `dev server`
+pane — terminals and run targets live in the bottom drawer — and the pane set grew to the nine
+`PaneId`s in `features/tasks/layout.ts` (`PANE_IDS`):
+`pr | linear | rollbar | preview | editor | changes | notes | browser | context`.)*
 
 Pane types:
 - **PR review** — today's `PullDetail` + `DiffView`, scoped to this workspace's PR. (The cross-PR
@@ -110,7 +137,8 @@ view."
 
 Detection reuses the existing PR mirror: a Workspace with a `branch` and no `pullNumber` is matched
 against `pull_requests.headRef` for its repo on the next sync. This is the inheritance the user
-wants, falling out of data we already store.
+wants, falling out of data we already store. *(Shipped: the match runs in
+`apps/desktop/src/server/routes/pulls.ts` on mirror sync, exactly as described.)*
 
 ## Flow C — lazy worktree on first terminal
 
@@ -137,13 +165,20 @@ open terminal pane in a workspace
 | `PullList` | The **GitHub Source** view (cross-PR browse) — keeps its home, no longer "the app" |
 | `PullDetail` + `DiffView` | The **PR review pane** inside a workspace |
 | `LinearIssuePanel` (inline portal) | The **Linear pane** inside a workspace |
-| `TerminalPanel` (URL-filtered global store) | **Terminal/dev panes** scoped to `workspaceId` |
+| `TerminalPanel` (URL-filtered global store) | **Terminal/dev panes** scoped to `workspaceId` *(shipped as the drawer's `visibleSessions` filter on `taskId`, not a pane)* |
 | `IntegrationsModal` | Unchanged — still where you connect Linear/Rollbar; now also gates which Sources appear |
 
-## Open UI questions (deferred to implementation)
-- Does the PR review pane keep its three-column layout inside the workspace, or collapse the list
-  column (since the list now lives in the Source view)? Leaning collapse.
-- Multiple terminals per workspace: tabs within the terminal pane, or multiple terminal panes? The
-  pane switcher can hold N terminals; defer the exact affordance.
-- Keyboard model: today's `j/k` PR-list nav and shortcuts need a workspace-switch binding
-  (e.g. `⌘1..9` to the rail). Defer to the shortcuts pass.
+## Open UI questions — now answered
+- ~~Does the PR review pane keep its three-column layout inside the workspace, or collapse the list
+  column (since the list now lives in the Source view)? Leaning collapse.~~ **Answered:** the PR
+  pane reuses `PullDetail` + `DiffView` scoped via the URL the rail navigated to; the cross-PR list
+  stays in the GitHub Source view (`TaskView.tsx`).
+- ~~Multiple terminals per workspace: tabs within the terminal pane, or multiple terminal panes?~~
+  **Answered:** neither — the terminal is a bottom *drawer* with a tab strip of the task's
+  sessions (`TerminalPanel.tsx`); run targets add their sessions to the same strip.
+- ~~Keyboard model: today's `j/k` PR-list nav and shortcuts need a workspace-switch binding.~~
+  **Answered (shortcuts pass done):** `⌘1–9` jumps to rail tasks; single-key mnemonics switch
+  panes, user-overridable via the `pane_shortcuts` pref (`features/tasks/paneShortcuts.ts`); and
+  **Cmd/Ctrl+W closes the focused pane, not the window** — intercepted in the main process via
+  `before-input-event` and forwarded as `acorn:close-pane` (`main/electron.ts`), because a menu
+  accelerator can't be suppressed from the page.

@@ -31,7 +31,7 @@ class McpClient {
   private nextId = 1
 
   constructor(env: Record<string, string | undefined>) {
-    this.child = spawn(process.execPath, ['--import', 'tsx', 'src/mcp/server.ts'], {
+    this.child = spawn(process.execPath, ['--import', 'tsx', 'src/mcp/main.ts'], {
       cwd: appRoot,
       env: { ...process.env, ...env },
       stdio: ['pipe', 'pipe', 'pipe'],

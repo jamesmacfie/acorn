@@ -4,6 +4,11 @@ import { getDb, schema } from '../db'
 import { prResource } from '../db/resourceKeys'
 import type { AppEnv } from '../middleware/auth'
 
+// Write-path PR resolution — MIRROR-ONLY, deliberately stricter than the read path's
+// resolveRepoForUser (repoMirror.ts), which falls through to a live GitHub fetch on a miss.
+// Every PR write targets a PR the user is looking at, so its repo (and usually the PR row) is
+// already mirrored; a miss here means the client skipped the read path, and 404 is the honest
+// answer rather than lazily mirroring on a write.
 export async function resolvePr(c: Context<AppEnv>) {
   const user = c.get('user')
   if (!user) return { error: 'unauthenticated' as const, status: 401 as const }

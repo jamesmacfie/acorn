@@ -1,7 +1,5 @@
-import type { QueryClient } from '@tanstack/solid-query'
 import { createSignal } from 'solid-js'
-import { filesKey } from '../../../shared/api'
-import { fetchFilePatches, filePatchKey, type PullFile } from '../../queries'
+import type { PullFile } from '../../queries'
 import type { ParsedFile, TokenizeLine } from './model'
 
 export type DiffHydrationStatus = 'idle' | 'queued' | 'loading' | 'loaded' | 'error'
@@ -10,13 +8,16 @@ const PATCH_BATCH_SIZE = 4
 const BACKGROUND_BATCH_DELAY_MS = 80
 
 type HydratorOptions = {
-  owner: string
-  repo: string
-  number: string
-  queryClient: QueryClient
   tokenizerForFile: (file: PullFile) => Promise<TokenizeLine>
   parseFile: (file: PullFile, tokenize: TokenizeLine) => ParsedFile
   onParsed: (parsed: ParsedFile) => void
+  // Patch-body source, injected so the hydrator stays agnostic of where diffs come from (the PR
+  // diff wires the query cache + batch endpoint; the compare preview has every body inline):
+  /** Resolve a body for a file whose reset() snapshot entry has no patch (e.g. binary → null patch,
+   * or a cache entry restored without bodies). Checked before fetchPatches. */
+  cachedFile?: (path: string) => PullFile | null
+  /** Batch-fetch bodies still missing after cachedFile. Omitted → those files go to 'error'. */
+  fetchPatches?: (paths: string[], signal: AbortSignal | undefined) => Promise<PullFile[]>
 }
 
 const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms))
@@ -54,10 +55,7 @@ export function createDiffHydrator(options: HydratorOptions) {
   const cachedFile = (path: string) => {
     const current = fileByPath.get(path)
     if (current?.patch != null) return current
-    const direct = options.queryClient.getQueryData<PullFile>(filePatchKey(options.owner, options.repo, options.number, path))
-    if (direct) return direct
-    const warmed = options.queryClient.getQueryData<PullFile[]>(filesKey(options.owner, options.repo, options.number))
-    return warmed?.find((file) => file.path === path) ?? null
+    return options.cachedFile?.(path) ?? null
   }
 
   const enqueueFront = (paths: string[]) => {
@@ -94,11 +92,8 @@ export function createDiffHydrator(options: HydratorOptions) {
     }
 
     let fetched: PullFile[] = []
-    if (fetchPaths.length) {
-      fetched = await fetchFilePatches(options.owner, options.repo, options.number, fetchPaths, signal)
-      for (const file of fetched) {
-        options.queryClient.setQueryData(filePatchKey(options.owner, options.repo, options.number, file.path), file)
-      }
+    if (fetchPaths.length && options.fetchPatches) {
+      fetched = await options.fetchPatches(fetchPaths, signal)
     }
 
     const byPath = new Map([...cached, ...fetched].map((file) => [file.path, file]))

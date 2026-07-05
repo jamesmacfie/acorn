@@ -18,6 +18,17 @@ describe('composeItems', () => {
     expect(items[2].label).toBe('Stop: stack')
     expect(items[3].id).toBe('layout:review')
   })
+
+  it('appends Go-to-task rows last, with prefixed ids', () => {
+    const items = composeItems({
+      targets: [{ id: 'dev', command: 'pnpm dev', running: false }],
+      errors: [],
+      actions: [{ id: 'action:archive', label: 'Archive task' }],
+      tasks: [{ id: 'abc', label: 'Go to task: fix login', hint: 'runn/runn' }],
+    })
+    expect(items.map((i) => i.kind)).toEqual(['run', 'action', 'task'])
+    expect(items[2]).toMatchObject({ kind: 'task', id: 'task:abc', hint: 'runn/runn' })
+  })
 })
 
 describe('fuzzy filter', () => {

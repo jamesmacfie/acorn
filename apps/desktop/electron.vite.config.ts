@@ -20,8 +20,9 @@ export default defineConfig({
       rollupOptions: {
         external: externalizeBareImports,
         // `mcp` is the acorn MCP server (docs/next 06 B) — launched by agents via
-        // ELECTRON_RUN_AS_NODE=1 <electron> out/main/mcp.js, not by the app itself.
-        input: { index: resolve(__dirname, 'src/main/electron.ts'), mcp: resolve(__dirname, 'src/mcp/server.ts') },
+        // ELECTRON_RUN_AS_NODE=1 <electron> out/main/mcp.js, not by the app itself. The input is
+        // the dedicated entry module (src/mcp/main.ts) that imports and calls main().
+        input: { index: resolve(__dirname, 'src/main/electron.ts'), mcp: resolve(__dirname, 'src/mcp/main.ts') },
         output: { entryFileNames: '[name].js', format: 'es' },
       },
     },

@@ -6,14 +6,15 @@ import { createAsyncStoragePersister } from '@tanstack/query-async-storage-persi
 import { Route, Router } from '@solidjs/router'
 import { clear, del, get, set } from 'idb-keyval'
 import App from './App'
+import { ApiError } from './apiClient'
 import './styles.css'
 
-// A revoked/expired token surfaces as a 401 / reauth / unauthenticated error from any read or
-// write → bounce to the OAuth login (docs/api-structure.md error layer). The `me` query returns
-// null on 401 (logged-out) so it never trips this.
+// A revoked/expired token surfaces as a 401 from any read or write → bounce to the OAuth login
+// (docs/authentication.md). Structural: every API failure is an ApiError carrying the response
+// status (apiClient.ts), so no message-text matching. The `me` query returns null on 401
+// (nullOn401 — logged-out) so it never trips this.
 const onError = (err: unknown) => {
-  const msg = err instanceof Error ? err.message : ''
-  if (/\b401\b|reauth|unauthenticated/.test(msg)) window.location.href = '/auth/login?return_to=' + encodeURIComponent(window.location.pathname + window.location.search)
+  if (err instanceof ApiError && err.status === 401) window.location.href = '/auth/login?return_to=' + encodeURIComponent(window.location.pathname + window.location.search)
 }
 
 // TanStack Query is the client cache (SWR). App is the layout root and renders the panes from

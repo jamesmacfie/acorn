@@ -7,16 +7,7 @@ import { activeTaskId } from '../tasks/tasks'
 export default function McpSettings() {
   const api = () => window.acorn?.mcp ?? null
   const [msg, setMsg] = createSignal('')
-  const [regMsg, setRegMsg] = createSignal('')
   const taskId = () => activeTaskId()
-
-  async function doRegister(flavour: 'claude' | 'codex', add: boolean) {
-    const a = api()
-    if (!a) return
-    setRegMsg('…')
-    const res = add ? await a.register(flavour) : await a.unregister(flavour)
-    setRegMsg(res.ok ? (add ? `Registered with ${flavour}.` : `Removed from ${flavour}.`) : (res.reason ?? 'Failed.'))
-  }
 
   const [configs, { refetch }] = createResource(
     () => taskId() ?? 'no-task',
@@ -78,19 +69,8 @@ export default function McpSettings() {
       <div class="settings-field">
         <span class="settings-label">acorn MCP server</span>
         <span class="muted settings-hint">
-          Exposes the current task (PR, linked issues, context) as tools to your agents. Auto-registered via each agent's own CLI (`claude mcp add` / `codex mcp add`) whenever a Claude Code / Codex terminal launches. These buttons re-register or remove it manually.
+          Exposes the current task (PR, linked issues, context) as tools to your agents. Auto-registered via each agent's own CLI (`claude mcp add` / `codex mcp add`) whenever a Claude Code / Codex terminal launches — no setup needed. To opt out, remove the `acorn` server with `claude mcp remove` / `codex mcp remove`.
         </span>
-        <div class="settings-actions">
-          <For each={['claude', 'codex'] as const}>
-            {(flavour) => (
-              <>
-                <button type="button" class="overlay-btn" onClick={() => void doRegister(flavour, true)}>Register with {flavour}</button>
-                <button type="button" class="overlay-btn" onClick={() => void doRegister(flavour, false)}>Remove from {flavour}</button>
-              </>
-            )}
-          </For>
-          <Show when={regMsg()}><span class="muted">{regMsg()}</span></Show>
-        </div>
       </div>
     </div>
   )

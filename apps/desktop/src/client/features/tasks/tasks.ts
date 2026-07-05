@@ -3,12 +3,16 @@
 // task's pane layout. Signals-only, like ../terminal/sessions.ts. The terminal drawer + topbar key
 // off activeTaskId.
 import { createSignal } from 'solid-js'
-import { applyLayoutAction, defaultLayout, type LayoutAction, type PaneId, type TaskLayout } from './layout'
+import { applyLayoutAction, defaultLayout, type LayoutAction, type TaskLayout } from './layout'
 
 export type { PaneId, TaskLayout } from './layout'
 
 // Which browse Source is selected, or null when a task is the active view (docs/workspaces 04).
-export type SourceId = 'github' | 'linear' | 'rollbar'
+// The id list is the one source of truth — isSourceId validates persisted values (last_source)
+// against it so a new source can't be forgotten in the restore path.
+export const SOURCE_IDS = ['github', 'linear', 'rollbar'] as const
+export type SourceId = (typeof SOURCE_IDS)[number]
+export const isSourceId = (v: unknown): v is SourceId => typeof v === 'string' && (SOURCE_IDS as readonly string[]).includes(v)
 const [selectedSource, setSelectedSource] = createSignal<SourceId | null>('github')
 
 // The active task (its terminals scope to this; its view shows when no Source is selected).
@@ -35,24 +39,6 @@ export const dispatchActiveLayout = (action: LayoutAction): void => {
   if (id) dispatchLayout(id, action)
 }
 
-// --- Single-pane compatibility surface (ported call sites; no visible change) ---
-// The "active" pane is the right-most open pane.
-const activePane = (): PaneId => {
-  const layout = activeLayout()
-  return layout.panes[layout.panes.length - 1]
-}
-export const paneForTask = (taskId: string): PaneId | undefined => {
-  const panes = taskLayouts()[taskId]?.panes
-  return panes ? panes[panes.length - 1] : undefined
-}
-export function setPaneForTask(taskId: string, pane: PaneId): void {
-  dispatchLayout(taskId, { type: 'show', pane })
-}
-// setActivePane targets the active task (call sites set activeTaskId first).
-const setActivePane = (pane: PaneId): void => {
-  const id = activeTaskId()
-  if (id) dispatchLayout(id, { type: 'show', pane })
-}
 // Seed from persisted prefs at startup without clobbering any layout the user changed pre-hydration.
 export function hydrateTaskLayouts(map: Record<string, TaskLayout>): void {
   setTaskLayouts((p) => ({ ...map, ...p }))
@@ -80,4 +66,4 @@ export function setTerminalOpen(taskId: string, open: boolean): void {
   })
 }
 
-export { activeTaskId, setActiveTaskId, selectedSource, setSelectedSource, activePane, setActivePane, taskLayouts }
+export { activeTaskId, setActiveTaskId, selectedSource, setSelectedSource, taskLayouts }

@@ -74,4 +74,9 @@ describe('workspace icon + colour', () => {
     expect((await app.fetch(jsonReq(`/api/workspaces/${w.id}`, 'PATCH', { icon: { kind: 'image', value: 'x.png' } }), {} as Env)).status).toBe(400)
     expect((await app.fetch(jsonReq(`/api/workspaces/${w.id}`, 'PATCH', { color: 'reddish' }), {} as Env)).status).toBe(400)
   })
+
+  it('404s a PATCH for an unknown workspace id', async () => {
+    const res = await app.fetch(jsonReq('/api/workspaces/nope', 'PATCH', { name: 'Ghost' }), {} as Env)
+    expect(res.status).toBe(404)
+  })
 })
