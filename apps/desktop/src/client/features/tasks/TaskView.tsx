@@ -174,6 +174,11 @@ export default function TaskView(props: {
   const hasTeardown = () => !!previewWs()?.teardownScript?.trim()
   const hasWorktree = () => !!props.task.worktreePath
   const dirtyCount = () => (st()?.missing ? 0 : st()?.dirty ? (st()?.dirtyCount ?? 0) : 0)
+  // Discarding a dirty worktree is force-destructive, so it needs an explicit ack — without it the
+  // "discards them" line was decorative and Close would force-remove uncommitted work silently.
+  const [discardAck, setDiscardAck] = createSignal(false)
+  const needsDiscardAck = () => deleteWt() && dirtyCount() > 0
+  const closeBlocked = () => needsDiscardAck() && !discardAck()
 
   // The workspace-scoped, sort-ordered rail list (mirrors TabRail's visibleTasks) — the task's repo
   // is the current repo, so scope by it. Pick the task just below the one being closed, else above.
@@ -191,13 +196,14 @@ export default function TaskView(props: {
     setCloseErr('')
     setTeardownFailed(false)
     setDeleteWt(true)
+    setDiscardAck(false)
     setCloseOpen(true)
   }
 
   async function confirmClose(skipTeardown = false) {
     const next = nextTask() // resolve before archiving — the list still holds this task
     if (api) {
-      const res = await api.task.archive(props.task.id, { deleteWorktree: deleteWt(), force: true, skipTeardown })
+      const res = await api.task.archive(props.task.id, { deleteWorktree: deleteWt(), force: !closeBlocked(), skipTeardown })
       if (!res.ok) {
         setTeardownFailed(!!res.teardownFailed)
         return setCloseErr(res.output ? `${res.reason}\n${res.output}` : res.reason)
@@ -343,17 +349,20 @@ export default function TaskView(props: {
                   <input type="checkbox" checked={deleteWt()} onChange={(e) => setDeleteWt(e.currentTarget.checked)} />
                   <span>Also delete this worktree</span>
                 </label>
-                <Show when={deleteWt() && dirtyCount() > 0}>
-                  <div class="action-error">⚠ {dirtyCount()} uncommitted change{dirtyCount() === 1 ? '' : 's'} — deleting the worktree discards them.</div>
+                <Show when={needsDiscardAck()}>
+                  <label class="close-check action-error">
+                    <input type="checkbox" checked={discardAck()} onChange={(e) => setDiscardAck(e.currentTarget.checked)} />
+                    <span>⚠ Discard {dirtyCount()} uncommitted change{dirtyCount() === 1 ? '' : 's'} — this can't be undone</span>
+                  </label>
                 </Show>
               </Show>
               <Show when={closeErr()}><div class="action-error" style={{ 'white-space': 'pre-wrap' }}>{closeErr()}</div></Show>
               <div class="close-actions">
                 <button type="button" class="overlay-btn" onClick={() => setCloseOpen(false)}>Cancel</button>
                 <Show when={teardownFailed()}>
-                  <button type="button" class="overlay-btn close-confirm" onClick={() => void confirmClose(true)}>Close anyway (skip teardown)</button>
+                  <button type="button" class="overlay-btn close-confirm" disabled={closeBlocked()} onClick={() => void confirmClose(true)}>Close anyway (skip teardown)</button>
                 </Show>
-                <button type="button" class="overlay-btn close-confirm" onClick={() => void confirmClose()}>Close task</button>
+                <button type="button" class="overlay-btn close-confirm" disabled={closeBlocked()} onClick={() => void confirmClose()}>Close task</button>
               </div>
             </div>
           </div>
