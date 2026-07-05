@@ -1,12 +1,13 @@
 import { Hono } from 'hono'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { settleBackground } from '../background'
 import { getDb } from '../db'
 import { gh } from '../github'
 import type { AppEnv } from '../middleware/auth'
 import { STALE_AFTER_MS as FILES_STALE_AFTER_MS } from './prMirror'
 import { pullFiles } from './pullFiles'
 import { repos } from './repos'
-import { REPOS_STALE_AFTER_MS, resolveRepoForUser, settleBackground } from './repoMirror'
+import { REPOS_STALE_AFTER_MS, resolveRepoForUser } from './repoMirror'
 
 vi.mock('../db', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../db')>()
@@ -78,13 +79,13 @@ const makePullFilesDb = (selectRows: unknown[][]) => {
 }
 
 describe('resolveRepoForUser', () => {
-  it('uses the user-scoped D1 repo row when present', async () => {
+  it('uses the user-scoped mirrored repo row when present', async () => {
     const fetcher = vi.fn()
-    const { db, insert } = makeResolverDb([{ id: 123, private: false }])
+    const { db, insert } = makeResolverDb([{ id: 123 }])
 
     const result = await resolveRepoForUser(db, 'token', 'james', 'Runn-Fast', 'runn', fetcher)
 
-    expect(result).toEqual({ ok: true, value: { repoId: 123, private: false } })
+    expect(result).toEqual({ ok: true, value: { repoId: 123 } })
     expect(fetcher).not.toHaveBeenCalled()
     expect(insert).not.toHaveBeenCalled()
   })
@@ -95,7 +96,7 @@ describe('resolveRepoForUser', () => {
 
     const result = await resolveRepoForUser(db, 'token', 'james', 'Runn-Fast', 'runn', fetcher)
 
-    expect(result).toEqual({ ok: true, value: { repoId: 19847, private: true } })
+    expect(result).toEqual({ ok: true, value: { repoId: 19847 } })
     expect(fetcher).toHaveBeenCalledWith('token', '/repos/Runn-Fast/runn')
     expect(inserted).toHaveLength(1)
     expect(inserted[0]).toMatchObject({
@@ -106,8 +107,6 @@ describe('resolveRepoForUser', () => {
       private: true,
       defaultBranch: 'main',
       pushedAt: Date.parse('2026-06-25T01:00:00Z'),
-      staleAfter: REPOS_STALE_AFTER_MS,
-      etag: '"repo-etag"',
     })
   })
 
@@ -127,7 +126,7 @@ describe('repos stale-while-revalidate', () => {
     vi.clearAllMocks()
   })
 
-  it('returns stale D1 rows immediately and schedules refresh with waitUntil', async () => {
+  it('returns stale mirror rows immediately and schedules a background refresh', async () => {
     const staleRows = [
       {
         userId: 'james',
@@ -138,8 +137,6 @@ describe('repos stale-while-revalidate', () => {
         defaultBranch: 'main',
         pushedAt: Date.parse('2026-06-25T01:00:00Z'),
         fetchedAt: Date.now() - REPOS_STALE_AFTER_MS - 1,
-        staleAfter: REPOS_STALE_AFTER_MS,
-        etag: null,
       },
     ]
     const db = makeReposDb(staleRows)
@@ -186,7 +183,7 @@ describe('pull files stale-while-revalidate', () => {
     vi.clearAllMocks()
   })
 
-  it('returns stale file summaries immediately and refreshes in waitUntil without reading patch blobs', async () => {
+  it('returns stale file summaries immediately and refreshes in the background without reading patch blobs', async () => {
     const fileRow = {
       userId: 'james',
       repoId: 19847,
@@ -196,10 +193,9 @@ describe('pull files stale-while-revalidate', () => {
       additions: 3,
       deletions: 1,
       sha: 'abc123',
-      patch: null,
     }
     const db = makePullFilesDb([
-      [{ id: 19847, private: false }],
+      [{ id: 19847 }],
       [{ userId: 'james', resource: 'files:19847:12', etag: null, fetchedAt: Date.now() - FILES_STALE_AFTER_MS - 1 }],
       [fileRow],
       [],
@@ -250,7 +246,7 @@ describe('pull files stale-while-revalidate', () => {
     await settleBackground()
   })
 
-  it('returns stale requested patches in request order and refreshes in waitUntil', async () => {
+  it('returns stale requested patches in request order and refreshes in the background', async () => {
     const rowA = {
       userId: 'james',
       repoId: 19847,
@@ -260,7 +256,6 @@ describe('pull files stale-while-revalidate', () => {
       additions: 2,
       deletions: 0,
       sha: 'sha-a',
-      patch: null,
     }
     const rowB = {
       userId: 'james',
@@ -271,10 +266,9 @@ describe('pull files stale-while-revalidate', () => {
       additions: 1,
       deletions: 1,
       sha: 'sha-b',
-      patch: null,
     }
     const db = makePullFilesDb([
-      [{ id: 19847, private: false }],
+      [{ id: 19847 }],
       [{ userId: 'james', resource: 'files:19847:12', etag: null, fetchedAt: Date.now() - FILES_STALE_AFTER_MS - 1 }],
       [rowB, rowA],
       [],

@@ -8,7 +8,6 @@ import { join } from 'node:path'
 import { promisify } from 'node:util'
 
 export type AgentFlavour = 'claude' | 'codex'
-export const AGENT_FLAVOURS: readonly AgentFlavour[] = ['claude', 'codex']
 
 export const serverName = (isPackaged: boolean): string => (isPackaged ? 'acorn' : 'acorn-dev')
 
@@ -18,10 +17,12 @@ export type Launcher = { command: string; args: string[]; env: Record<string, st
 
 export const resolveMcpEntry = (mainOutDir: string): string => join(mainOutDir, 'mcp.js')
 
-export const launcherSpec = (electronPath: string, mcpEntry: string): Launcher => ({
+// `name` is the build-flavoured server name (serverName above): the MCP server self-reports it
+// via ACORN_MCP_NAME, so an `acorn-dev` registration identifies as acorn-dev, not `acorn`.
+export const launcherSpec = (electronPath: string, mcpEntry: string, name: string): Launcher => ({
   command: electronPath,
   args: [mcpEntry],
-  env: { ELECTRON_RUN_AS_NODE: '1' },
+  env: { ELECTRON_RUN_AS_NODE: '1', ACORN_MCP_NAME: name },
 })
 
 export type Argv = { file: string; args: string[] }
@@ -63,17 +64,6 @@ export async function registerAcornMcp(
   const add = registerArgv(flavour, name, launcher)
   try {
     await exec(add.file, add.args)
-    return { ok: true }
-  } catch (e) {
-    const msg = e instanceof Error ? e.message : String(e)
-    return { ok: false, reason: msg.includes('ENOENT') ? `'${flavour}' CLI not found on PATH.` : msg.slice(0, 300) }
-  }
-}
-
-export async function removeAcornMcp(flavour: AgentFlavour, name: string, exec: ExecLike = realExec): Promise<{ ok: boolean; reason?: string }> {
-  const argv = removeArgv(flavour, name)
-  try {
-    await exec(argv.file, argv.args)
     return { ok: true }
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e)

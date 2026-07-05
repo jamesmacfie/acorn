@@ -18,10 +18,8 @@ export const repos = sqliteTable(
     private: integer('private', { mode: 'boolean' }).notNull().default(false),
     defaultBranch: text('default_branch'),
     pushedAt: integer('pushed_at'), // epoch ms — repo selector orders by this
-    // staleness: row is stale when now > fetchedAt + staleAfter; etag drives revalidation
+    // Staleness is fetchedAt + a route constant (REPOS_STALE_AFTER_MS); list ETags live in sync_state.
     fetchedAt: integer('fetched_at').notNull(),
-    staleAfter: integer('stale_after').notNull(),
-    etag: text('etag'),
   },
   (t) => [primaryKey({ columns: [t.userId, t.id] })],
 )
@@ -46,9 +44,8 @@ export const pullRequests = sqliteTable(
     mergeable: text('mergeable'), // MERGEABLE | CONFLICTING | UNKNOWN
     mergeStateStatus: text('merge_state_status'), // CLEAN | BLOCKED | BEHIND | DIRTY | DRAFT | UNSTABLE | UNKNOWN
     autoMergeEnabled: integer('auto_merge_enabled', { mode: 'boolean' }).notNull().default(false),
+    // Staleness is fetchedAt + a route constant; the list ETag lives in sync_state (no per-row home).
     fetchedAt: integer('fetched_at').notNull(),
-    staleAfter: integer('stale_after').notNull(),
-    etag: text('etag'),
   },
   (t) => [primaryKey({ columns: [t.userId, t.repoId, t.number] })],
 )
@@ -67,8 +64,7 @@ export const prFiles = sqliteTable(
     status: text('status'), // changeType / GitHub status: added | modified | removed | renamed | …
     additions: integer('additions'),
     deletions: integer('deletions'),
-    sha: text('sha'), // blob sha — immutability key for the patch (docs/caching.md)
-    patch: text('patch'), // private-repo patch body; public bodies live in KV by sha, this stays null
+    sha: text('sha'), // blob sha — patch bodies live in the on-disk BLOBS cache keyed by this (docs/caching.md)
   },
   (t) => [primaryKey({ columns: [t.userId, t.repoId, t.number, t.path] })],
 )
@@ -191,6 +187,12 @@ export const syncState = sqliteTable(
 )
 
 // --- App-state tables: data GitHub doesn't have, we are the source of truth ---
+//
+// user_id on prefs / pinned_repos / viewed_files is the SINGLE canonical user id: the
+// authenticated GitHub login (auth middleware's user.login). This is a single-user app, so the
+// column isn't multi-tenancy — it just pins app state to the GitHub identity so a login switch
+// doesn't inherit another account's state. Newer app-state tables (tasks, repo_paths, …) are
+// machine-scoped and drop it.
 
 // Per-user "I've reviewed this file" checkboxes. Survives mirror re-syncs (not a GitHub concept).
 export const viewedFiles = sqliteTable(
@@ -252,13 +254,9 @@ export const repoPaths = sqliteTable(
     repo: text('repo').notNull(),
     githubRepoId: integer('github_repo_id'),
     path: text('path').notNull(),
-    // Per-repo dev-server config (docs/workspaces 05 / P5). runCommand is run in a workspace's
-    // worktree with PORT = devPort + the workspace's rail offset, so two workspaces don't collide.
-    runCommand: text('run_command'),
-    devPort: integer('dev_port'),
     // Named run targets (docs/next 13 §A): JSON RunTarget[] — the DB fallback below a committed
-    // .acorn/config.toml. runCommand/devPort stay and map into a default 'dev' target when this
-    // is null (loadRepoConfig.legacyRunTargets) — no data migration.
+    // .acorn/config.toml (parsed by main/runConfig.ts legacyRunTargets). The legacy scalar
+    // run_command/dev_port columns were folded into this JSON by migration 0017 and dropped in 0018.
     runTargets: text('run_targets'),
     // External editor command for this repo's worktrees (docs/next 01 P2): 'code' | 'zed' |
     // 'cursor -n' | an absolute path. null → the prefs 'editor_command_default' → 'code'.
@@ -304,10 +302,11 @@ export const workspaceRepos = sqliteTable(
   (t) => [primaryKey({ columns: [t.repoOwner, t.repoName] })],
 )
 
-// Repos the user has chosen to hide from workspaces (docs/workspaces). An ignored repo has no
-// workspace_repos row, so it's excluded from the selector/rail/scoping everywhere; the onboarding
-// modal still lists it (it iterates all mirrored repos) so it can be reassigned to bring it back.
-// Bootstrap skips repos that are ignored so they don't silently reappear in Default.
+// Repos the user has chosen to hide from workspaces (docs/workspaces). Ignoring only inserts a
+// row here — the repo KEEPS its workspace_repos membership; readers filter it out of the
+// selector/rail/scoping (workspaces.ts ignoredRepoSet). The onboarding modal still lists it,
+// greyed under its workspace, so it can be un-ignored in place. Bootstrap skips ignored repos so
+// they don't silently reappear in Default.
 export const ignoredRepos = sqliteTable(
   'ignored_repos',
   {

@@ -21,22 +21,20 @@ import TerminalPanel from './features/terminal/TerminalPanel'
 import CommandPalette from './features/palette/CommandPalette'
 import FilePalette from './features/palette/FilePalette'
 import NotificationBell from './features/notifications/NotificationBell'
-import { hydrateNotices, initWorkflowNotices, markTaskRead, notices, serializeNotices } from './features/notifications/notifications'
+import { hydrateNotices, initWorkflowNotices, notices, serializeNotices } from './features/notifications/notifications'
 import { editorStateByTask, hydrateEditorState, serializeEditorState } from './features/editor/editorState'
 import { initSessions } from './features/terminal/sessions'
 import TabRail from './features/tabs/TabRail'
 import RailTips from './features/tooltip/RailTips'
-import { activeTaskId, hydrateTaskLayouts, isTerminalOpen, selectedSource, setActiveTaskId, setSelectedSource, setTerminalOpen, taskLayouts } from './features/tasks/tasks'
+import { activeTaskId, hydrateTaskLayouts, isSourceId, isTerminalOpen, selectedSource, setActiveTaskId, setSelectedSource, setTerminalOpen, taskLayouts } from './features/tasks/tasks'
+import { activateTaskSignals, pathForTask } from './features/tasks/activate'
 import { parseTaskLayouts } from './features/tasks/layout'
 import { initTaskStatuses } from './features/tasks/taskStatus'
+import { capabilities } from './features/capabilities'
 import TaskView from './features/tasks/TaskView'
 import LinearBrowse from './features/tasks/LinearBrowse'
 import RollbarBrowse from './features/tasks/RollbarBrowse'
 import Acorn from './Acorn'
-
-// vNext Phase 0 flag: terminal only exists on desktop (Electron IPC) and stays behind a flag —
-// enable in devtools with `localStorage.setItem('acorn:term','1')` then reload. ponytail.
-const terminalEnabled = !!window.acorn?.desktop && localStorage.getItem('acorn:term') === '1'
 
 // Layout root (Router root): top bar + three panes. Panes are params-driven — PullList (left)
 // and PullDetail (mid) read useParams() directly; routes exist only to populate params.
@@ -65,9 +63,10 @@ export default function App() {
   }
 
   // Track terminal sessions globally (independent of the drawer) so the tab rail and the topbar
-  // badge can show agent-working activity. No-op when the terminal bridge is absent.
+  // badge can show agent-working activity. No-op when the terminal bridge is absent (plain browser
+  // via dev:node) — the terminal is always on when the bridge exists (capabilities()).
   onMount(() => {
-    if (!terminalEnabled) return
+    if (!capabilities().terminal) return
     onCleanup(initSessions())
     onCleanup(initTaskStatuses())
     onCleanup(initWorkflowNotices())
@@ -161,7 +160,7 @@ export default function App() {
     setRestored(true)
     const src = prefs.data.last_source
     if (src === '') setSelectedSource(null)
-    else if (src === 'github' || src === 'linear') setSelectedSource(src)
+    else if (isSourceId(src)) setSelectedSource(src) // validated against the SourceId union in one place
     try {
       hydrateTaskLayouts(parseTaskLayouts(prefs.data.task_layouts, prefs.data.task_panes))
     } catch {
@@ -342,13 +341,11 @@ export default function App() {
             onSelectTask={(taskId) => {
               const t = tasks.data?.find((x) => x.id === taskId)
               if (!t) return
-              setSelectedSource(null)
-              setActiveTaskId(taskId)
-              markTaskRead(taskId)
-              navigate(`/${t.repoOwner}/${t.repoName}${t.pullNumber != null ? `/${t.pullNumber}` : ''}`)
+              activateTaskSignals(t)
+              navigate(pathForTask(t))
             }}
           />
-          <Show when={terminalEnabled && inTaskView()}>
+          <Show when={capabilities().terminal && inTaskView()}>
             <button type="button" class="theme-toggle" title="Terminal" aria-pressed={termOpen()} onClick={toggleTerm}>
               ▣
             </button>

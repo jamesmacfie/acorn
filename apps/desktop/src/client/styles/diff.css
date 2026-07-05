@@ -1,6 +1,5 @@
-/* Diff pane (right): flex column so the diff scroller owns the viewport (virtualized rows). */
-.pane-right { display: flex; flex-direction: column; padding: 0; overflow: hidden; }
-.pane-right .section-header { flex: none; }
+/* Diff pane content. The .pane-right container itself (flex column, no trailing border) is owned
+   by tokens-layout.css with the rest of the pane layout. */
 .diff {
   flex: 1;
   min-height: 0;

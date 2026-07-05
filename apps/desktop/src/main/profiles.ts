@@ -45,5 +45,16 @@ export const tmuxAvailable = (): boolean => onPath('tmux')
 // The shell profile is always available; agents only if their command is on PATH (vNext §8).
 export const profileAvailable = (p: ProfileDef): boolean => (p.kind === 'shell' ? true : onPath(p.command))
 
-export const listProfiles = (): TerminalProfile[] =>
-  BUILTIN_PROFILES.map((p) => ({ id: p.id, label: p.label, kind: p.kind, available: profileAvailable(p) }))
+// `tmuxMissing`: the profile prefers the durable tmux backend but tmux isn't on PATH, so sessions
+// silently degrade to node-pty (resolveBackend) and won't survive an app restart — surfaced as a
+// hint in the drawer's profile menu rather than hidden.
+export const listProfiles = (): TerminalProfile[] => {
+  const tmux = tmuxAvailable()
+  return BUILTIN_PROFILES.map((p) => ({
+    id: p.id,
+    label: p.label,
+    kind: p.kind,
+    available: profileAvailable(p),
+    tmuxMissing: p.backendPreference === 'tmux' && !tmux ? true : undefined,
+  }))
+}

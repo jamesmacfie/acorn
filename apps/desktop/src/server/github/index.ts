@@ -1,4 +1,4 @@
-// Thin GitHub client (docs/api-structure.md "start lean"). Injects the standard headers and
+// Thin GitHub client (docs/github-integration.md). Injects the standard headers and
 // returns the raw Response so callers handle status/parsing. Stays here in apps/desktop/src/server/
 // until a third consumer justifies promoting it to packages/.
 // ponytail: no client-side ETag parsing yet (callers pass If-None-Match themselves); ghError
@@ -40,4 +40,20 @@ export const ghError = (res: Response): { error: string; status: 401 | 403 | 429
     return { error: 'forbidden', status: 403 }
   }
   return { error: 'github_unavailable', status: 502 }
+}
+
+// Parse a GraphQL Response once: HTTP-level failures map through ghError; a 200 with an `errors`
+// array is surfaced as kind 'graphql' with its messages so each caller can apply its own
+// endpoint-specific mapping (e.g. prActions' 422 auto_merge_not_allowed) without re-parsing.
+export type GhGraphQLResult<T> =
+  | { ok: true; data: T }
+  | { ok: false; kind: 'http'; failure: { error: string; status: 401 | 403 | 429 | 502 } }
+  | { ok: false; kind: 'graphql'; messages: string[] }
+
+export const ghGraphQLResult = async <T>(res: Response): Promise<GhGraphQLResult<T>> => {
+  const err = ghError(res)
+  if (err) return { ok: false, kind: 'http', failure: err }
+  const body = (await res.json().catch(() => ({}))) as { data?: T; errors?: { message?: string }[] }
+  if (body.errors?.length) return { ok: false, kind: 'graphql', messages: body.errors.map((e) => e.message ?? 'unknown graphql error') }
+  return { ok: true, data: body.data as T }
 }

@@ -1,6 +1,6 @@
 // PR write actions. Same-origin POST (cookie auth; the Worker's csrf() checks Origin). Throws the
 // structured error code on failure so callers can branch (e.g. merge_failed, reauth).
-import { apiError, writeJson } from './apiClient'
+import { ApiError, apiError, writeJson } from './apiClient'
 import { terminalApi } from './features/terminal/terminalClient'
 import {
   autoMergeRoute,
@@ -58,7 +58,7 @@ export const mergePr = (o: string, r: string, n: string, method: string) => post
 export const enableAutoMerge = (o: string, r: string, n: string, method: string) => post(autoMergeRoute(o, r, n), { method })
 export const disableAutoMerge = async (o: string, r: string, n: string) => {
   const res = await fetch(autoMergeRoute(o, r, n), { method: 'DELETE' })
-  if (!res.ok) throw new Error(await apiError(res, `${res.status}`))
+  if (!res.ok) throw new ApiError(await apiError(res, `${res.status}`), res.status)
   return res.json()
 }
 export const closePr = (o: string, r: string, n: string) => post(pullRoute(o, r, n, 'close'))
@@ -76,7 +76,7 @@ export const connectIntegration = (provider: ConnectIntegrationRequest['provider
   post<{ integration: Integration }>(integrationsRoute, { provider, token } satisfies ConnectIntegrationRequest)
 export const deleteIntegration = async (id: string) => {
   const res = await fetch(integrationRoute(id), { method: 'DELETE' })
-  if (!res.ok) throw new Error(await apiError(res, `${res.status}`))
+  if (!res.ok) throw new ApiError(await apiError(res, `${res.status}`), res.status)
 }
 // Add a comment / threaded reply to a Linear ticket; caller refetches the issue after.
 export const postLinearComment = (identifier: string, body: string, parentId?: string) =>
@@ -87,7 +87,7 @@ export const removeLabel = async (o: string, r: string, n: string, name: string)
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ name }),
   })
-  if (!res.ok) throw new Error(await apiError(res, `${res.status}`))
+  if (!res.ok) throw new ApiError(await apiError(res, `${res.status}`), res.status)
   return res.json()
 }
 
@@ -99,7 +99,7 @@ export const removeReviewer = async (o: string, r: string, n: string, login: str
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ login }),
   })
-  if (!res.ok) throw new Error(await apiError(res, `${res.status}`))
+  if (!res.ok) throw new ApiError(await apiError(res, `${res.status}`), res.status)
   return res.json()
 }
 

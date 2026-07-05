@@ -12,12 +12,15 @@ import EditorPane from '../editor/EditorPane'
 import ChangesPane from '../changes/ChangesPane'
 import ContextPane from '../context/ContextPane'
 import NotesPane from '../notes/NotesPane'
+import PreviewPane, { evictPreviewWebview } from '../preview/PreviewPane'
 import { workspaceForRepo } from '../workspaces/activeWorkspace'
 import { refreshSessions } from '../terminal/sessions'
 import { terminalApi } from '../terminal/terminalClient'
-import { dispatchLayout, layoutForTask, paneForTask, recipeBrowserUrl, setActivePane, setActiveTaskId, setSelectedSource } from './tasks'
+import { dispatchLayout, layoutForTask, recipeBrowserUrl, setActiveTaskId, setSelectedSource } from './tasks'
+import { activateTaskSignals, pathForTask } from './activate'
 import { defaultLayout, type LayoutAction, type PaneId } from './layout'
-import { paneKeymap, paneKeys, type PaneAction } from './paneShortcuts'
+import { eventChord, formatChord, paneKeymap, paneKeys, type PaneAction } from './paneShortcuts'
+import { isTypingTarget } from '../../lib/isTypingTarget'
 import { taskStatus } from './taskStatus'
 import './task-view.css'
 
@@ -60,12 +63,6 @@ export default function TaskView(props: {
   const linearId = () => (picked() && linearIds().includes(picked()!) ? picked()! : linearIds()[0])
   const st = () => taskStatus(props.task.id)
 
-  // Per-repo dev config (legacy run command/port — maps into the default 'dev' run target).
-  const [repoCfg, { refetch }] = createResource(
-    () => `${props.task.repoOwner}/${props.task.repoName}`,
-    () => api?.repoPath.get(props.task.repoOwner, props.task.repoName) ?? null,
-  )
-
   // Run targets (docs/next 13 §A): the merged config list with live status. One ▶ button per
   // target; acorn allocates no ports — isolation is the script's job via ACORN_TASK_SLUG.
   const [runTargets, { refetch: refetchTargets }] = createResource(
@@ -77,21 +74,6 @@ export default function TaskView(props: {
     },
   )
 
-  const [cfgOpen, setCfgOpen] = createSignal(false)
-  const [cmd, setCmd] = createSignal('')
-  const [portInput, setPortInput] = createSignal('')
-  const [cfgErr, setCfgErr] = createSignal('')
-
-  // Open the per-repo config overlay (legacy runCommand/devPort — they map to a 'dev' target).
-  function configureRun() {
-    const cfg = repoCfg()
-    if (!cfg?.path) return window.alert('Open a shell terminal in this task first to map the repo checkout.')
-    setCmd(cfg.runCommand ?? 'pnpm dev')
-    setPortInput(String(cfg.devPort ?? 3000))
-    setCfgErr('')
-    setCfgOpen(true)
-  }
-
   // Start / stop a run target through the runtime service (docs/next 13 §A). The instance is a
   // terminal session in the worktree, so the drawer shows its output.
   async function toggleTarget(id: string, running: boolean) {
@@ -101,16 +83,6 @@ export default function TaskView(props: {
     await refreshSessions()
     await refetchTargets()
     if (!running && res.ok) props.onOpenTerminal()
-  }
-
-  async function saveCfg(e: Event) {
-    e.preventDefault()
-    if (!api) return
-    const res = await api.repoPath.runConfig(props.task.repoOwner, props.task.repoName, cmd().trim(), Number(portInput()))
-    if (!res.ok) return setCfgErr(res.reason)
-    setCfgOpen(false)
-    await refetch()
-    await refetchTargets()
   }
 
   // Close-task flow (the ✕ at the bottom of the switcher): confirm, tear the task down (killing any
@@ -161,13 +133,13 @@ export default function TaskView(props: {
       return val && Number.isInteger(p) && p >= 1 && p <= 65535 ? `http://localhost:${p}` : null
     }
     if (ws?.previewMode === 'script') return scriptUrl() ?? null
-    return repoCfg()?.devPort != null ? `http://localhost:${repoCfg()?.devPort}` : null
+    return null
   }
   const [agentsOpen, setAgentsOpen] = createSignal(false)
 
   // Pane keyboard shortcuts (overridable via the `pane_shortcuts` pref). A single window listener,
-  // scoped to the task view by this component's lifetime. Guards typing targets + modifier chords,
-  // like the global handler, so text entry and OS/browser chords are untouched.
+  // scoped to the task view by this component's lifetime. Each shortcut is a ⌘/Ctrl chord; the typing-
+  // target guard still stands so ⌘A/⌘X/⌘S keep editing inside the editor and notes panes.
   const prefs = createQuery(() => prefsOptions(true))
   const paneKey = createMemo(() => paneKeys(prefs.data?.pane_shortcuts))
   const keymap = createMemo(() => paneKeymap(prefs.data?.pane_shortcuts))
@@ -180,11 +152,11 @@ export default function TaskView(props: {
     dispatch({ type: 'show', pane: a })
   }
   const onPaneKey = (e: KeyboardEvent) => {
-    const t = e.target
-    if (t instanceof HTMLInputElement || t instanceof HTMLTextAreaElement || t instanceof HTMLSelectElement) return
-    if (t instanceof HTMLElement && t.isContentEditable) return // editor/notes panes
-    if (e.metaKey || e.ctrlKey || e.altKey) return
-    const a = keymap().get(e.key.toLowerCase())
+    if (!(e.metaKey || e.ctrlKey || e.altKey)) return // pane shortcuts are chords, never bare keys
+    if (isTypingTarget(e.target)) return // form fields + contentEditable (editor/notes panes)
+    const c = eventChord(e)
+    if (!c) return
+    const a = keymap().get(c)
     if (!a) return
     e.preventDefault()
     activatePane(a)
@@ -201,7 +173,6 @@ export default function TaskView(props: {
   const hasWorktree = () => !!props.task.worktreePath
   const dirtyCount = () => (st()?.missing ? 0 : st()?.dirty ? (st()?.dirtyCount ?? 0) : 0)
 
-  const pathFor = (t: Task) => `/${t.repoOwner}/${t.repoName}${t.pullNumber != null ? `/${t.pullNumber}` : ''}`
   // The workspace-scoped, sort-ordered rail list (mirrors TabRail's visibleTasks) — the task's repo
   // is the current repo, so scope by it. Pick the task just below the one being closed, else above.
   function nextTask(): Task | null {
@@ -232,12 +203,11 @@ export default function TaskView(props: {
     } else {
       await archiveTask(props.task.id)
     }
+    evictPreviewWebview(props.task.id) // drop the archived task's kept-alive <webview>
     setCloseOpen(false)
     if (next) {
-      setSelectedSource(null)
-      setActiveTaskId(next.id)
-      if (paneForTask(next.id) == null) setActivePane('pr')
-      navigate(pathFor(next))
+      activateTaskSignals(next)
+      navigate(pathForTask(next))
     } else {
       setActiveTaskId(null)
       setSelectedSource('github') // no tasks left → fall back to the GitHub browse
@@ -267,18 +237,22 @@ export default function TaskView(props: {
     if (pane === 'changes') return <ChangesPane task={props.task} />
     if (pane === 'notes') return <NotesPane task={props.task} workspace={previewWs()} />
     if (pane === 'context') return <ContextPane task={props.task} />
-    // Preview is rendered wherever it currently sits (active or pinned). Pin it to keep its <webview>
-    // mounted while you switch the active pane — the For below reuses the node for an unchanged pin.
-    // ponytail: dropped the always-mounted hidden slot; a pinned preview covers the persistent case.
-    if (pane === 'preview') return <PreviewPane taskId={props.task.id} url={previewUrl()} hidden={false} onConfigure={configureRun} />
+    // Preview is rendered wherever it currently sits; its per-task <webview> lives in
+    // features/preview and survives pane/task switches (evicted on archive).
+    if (pane === 'preview') return <PreviewPane taskId={props.task.id} url={previewUrl()} />
     if (pane === 'rollbar') return <RollbarPane task={props.task} />
-    if (pane === 'linear') {
+    // Linear renders in its slot like every other provider pane (variant="pane"); the same
+    // component still serves PullDetail's Integrations section as a right-anchored overlay.
+    if (pane === 'linear' && linearIds().length) {
       return (
-        <section class="pane pane-empty">
-          <div class="workspace-empty-inner">
-            <p class="muted">Linear panel is open on the right.</p>
-          </div>
-        </section>
+        <LinearIssuePanel
+          variant="pane"
+          identifier={linearId()}
+          identifiers={linearIds()}
+          onSelectIdentifier={setPicked}
+          onClose={() => dispatch({ type: 'close', pane: 'linear' })}
+          onContentClick={() => {}}
+        />
       )
     }
     return (
@@ -312,13 +286,13 @@ export default function TaskView(props: {
 
       <nav class="pane-switcher">
         <Show when={hasPr()}>
-          <button type="button" class="pane-switch-btn" classList={{ active: showsPane('pr') }} data-tip="PR review" data-tip-key={paneKey().pr} data-tip-sub="Diff, files & review comments · ⌘-click to open beside" aria-label="PR review" onClick={(e) => onSwitch('pr', e)}>⌥</button>
+          <button type="button" class="pane-switch-btn" classList={{ active: showsPane('pr') }} data-tip="PR review" data-tip-key={formatChord(paneKey().pr)} data-tip-sub="Diff, files & review comments · ⌘-click to open beside" aria-label="PR review" onClick={(e) => onSwitch('pr', e)}>⌥</button>
         </Show>
         <Show when={linearLinks().length}>
-          <button type="button" class="pane-switch-btn" classList={{ active: showsPane('linear') }} data-tip="Linear" data-tip-key={paneKey().linear} data-tip-sub={linearIds().join(', ')} aria-label="Linear" onClick={(e) => onSwitch('linear', e)}>◷</button>
+          <button type="button" class="pane-switch-btn" classList={{ active: showsPane('linear') }} data-tip="Linear" data-tip-key={formatChord(paneKey().linear)} data-tip-sub={linearIds().join(', ')} aria-label="Linear" onClick={(e) => onSwitch('linear', e)}>◷</button>
         </Show>
         <Show when={rollbarLinks().length}>
-          <button type="button" class="pane-switch-btn" classList={{ active: showsPane('rollbar') }} data-tip="Rollbar" data-tip-key={paneKey().rollbar} data-tip-sub={`#${rollbarLinks().map((l) => l.identifier).join(', #')}`} aria-label="Rollbar" onClick={(e) => onSwitch('rollbar', e)}>◍</button>
+          <button type="button" class="pane-switch-btn" classList={{ active: showsPane('rollbar') }} data-tip="Rollbar" data-tip-key={formatChord(paneKey().rollbar)} data-tip-sub={`#${rollbarLinks().map((l) => l.identifier).join(', #')}`} aria-label="Rollbar" onClick={(e) => onSwitch('rollbar', e)}>◍</button>
         </Show>
         {/* Run targets only appear when configured (per-workspace dev script, repo config.toml, or the
             repo run-targets JSON) — otherwise the rail shows no run button (docs/next 13 §A). */}
@@ -339,47 +313,18 @@ export default function TaskView(props: {
             )}
           </For>
         </Show>
-        <button type="button" class="pane-switch-btn" classList={{ active: showsPane('changes') }} data-tip="Changes" data-tip-key={paneKey().changes} data-tip-sub="Uncommitted working tree · ⌘-click to open beside" aria-label="Changes" onClick={(e) => onSwitch('changes', e)}>⎇</button>
-        <button type="button" class="pane-switch-btn" classList={{ active: showsPane('notes') }} data-tip="Notes" data-tip-key={paneKey().notes} data-tip-sub="Workspace scratchpad · ⌘-click to open beside" aria-label="Notes" onClick={(e) => onSwitch('notes', e)}>✐</button>
-        <button type="button" class="pane-switch-btn" classList={{ active: showsPane('context') }} data-tip="Context" data-tip-key={paneKey().context} data-tip-sub="What an assembled send includes · ⌘-click to open beside" aria-label="Context" onClick={(e) => onSwitch('context', e)}>⊞</button>
-        <button type="button" class="pane-switch-btn" classList={{ active: showsPane('preview') }} data-tip="Browser preview" data-tip-key={paneKey().preview} data-tip-sub="Live preview of the app · ⌘-click to open beside" aria-label="Browser preview" onClick={(e) => onSwitch('preview', e)}>◍</button>
-        <button type="button" class="pane-switch-btn" classList={{ active: showsPane('editor') }} data-tip="Editor" data-tip-key={paneKey().editor} data-tip-sub="In-app code editor · ⌘-click to open beside" aria-label="Editor" onClick={(e) => onSwitch('editor', e)}>✎</button>
-        <button type="button" class="pane-switch-btn" classList={{ active: agentsOpen() }} data-tip="Agents" data-tip-key={paneKey().agents} data-tip-sub="Roster · launcher · feed" aria-label="Agents" onClick={() => setAgentsOpen(!agentsOpen())}>⠿</button>
-        <button type="button" class="pane-switch-btn" classList={{ active: props.terminalOpen }} data-tip="Terminal" data-tip-key={paneKey().terminal} data-tip-sub="Shell in the worktree" aria-label="Terminal" onClick={props.onToggleTerminal}>{'>_'}</button>
+        <button type="button" class="pane-switch-btn" classList={{ active: showsPane('changes') }} data-tip="Changes" data-tip-key={formatChord(paneKey().changes)} data-tip-sub="Uncommitted working tree · ⌘-click to open beside" aria-label="Changes" onClick={(e) => onSwitch('changes', e)}>⎇</button>
+        <button type="button" class="pane-switch-btn" classList={{ active: showsPane('notes') }} data-tip="Notes" data-tip-key={formatChord(paneKey().notes)} data-tip-sub="Workspace scratchpad · ⌘-click to open beside" aria-label="Notes" onClick={(e) => onSwitch('notes', e)}>✐</button>
+        <button type="button" class="pane-switch-btn" classList={{ active: showsPane('context') }} data-tip="Context" data-tip-key={formatChord(paneKey().context)} data-tip-sub="What an assembled send includes · ⌘-click to open beside" aria-label="Context" onClick={(e) => onSwitch('context', e)}>⊞</button>
+        <button type="button" class="pane-switch-btn" classList={{ active: showsPane('preview') }} data-tip="Browser preview" data-tip-key={formatChord(paneKey().preview)} data-tip-sub="Live preview of the app · ⌘-click to open beside" aria-label="Browser preview" onClick={(e) => onSwitch('preview', e)}>◍</button>
+        <button type="button" class="pane-switch-btn" classList={{ active: showsPane('editor') }} data-tip="Editor" data-tip-key={formatChord(paneKey().editor)} data-tip-sub="In-app code editor · ⌘-click to open beside" aria-label="Editor" onClick={(e) => onSwitch('editor', e)}>✎</button>
+        <button type="button" class="pane-switch-btn" classList={{ active: agentsOpen() }} data-tip="Agents" data-tip-key={formatChord(paneKey().agents)} data-tip-sub="Roster · launcher · feed" aria-label="Agents" onClick={() => setAgentsOpen(!agentsOpen())}>⠿</button>
+        <button type="button" class="pane-switch-btn" classList={{ active: props.terminalOpen }} data-tip="Terminal" data-tip-key={formatChord(paneKey().terminal)} data-tip-sub="Shell in the worktree" aria-label="Terminal" onClick={props.onToggleTerminal}>{'>_'}</button>
         <button type="button" class="pane-switch-btn pane-switch-close" data-tip="Close task" aria-label="Close task" onClick={openClose}>✕</button>
       </nav>
 
-      {/* Linear pane reuses the existing ticket panel (a right-anchored overlay). With several linked
-          tickets it shows a chip strip to switch between them. */}
       <Show when={agentsOpen()}>
         <AgentsPanel task={props.task} onClose={() => setAgentsOpen(false)} />
-      </Show>
-
-      <Show when={showsPane('linear') && linearIds().length}>
-        <LinearIssuePanel
-          identifier={linearId()}
-          identifiers={linearIds()}
-          onSelectIdentifier={setPicked}
-          onClose={() => dispatch({ type: 'close', pane: 'linear' })}
-          onContentClick={() => {}}
-        />
-      </Show>
-
-      <Show when={cfgOpen()}>
-        <div class="overlay-backdrop" onClick={() => setCfgOpen(false)}>
-          <div class="overlay" role="dialog" aria-modal="true" onClick={(e) => e.stopPropagation()}>
-            <div class="overlay-title">Dev server — {props.task.repoOwner}/{props.task.repoName}</div>
-            <div class="overlay-body">
-              <p class="muted">Legacy run command + port — becomes the default “dev” run target (URL: localhost:port). For named targets, set them in workspace settings or commit .acorn/config.toml.</p>
-              <form class="integration-key-row" onSubmit={saveCfg}>
-                <input class="integration-key-input" type="text" placeholder="pnpm dev" value={cmd()} onInput={(e) => setCmd(e.currentTarget.value)} />
-                <input class="integration-key-input" type="number" style={{ 'max-width': '90px' }} placeholder="3000" value={portInput()} onInput={(e) => setPortInput(e.currentTarget.value)} />
-                <button type="submit" class="overlay-btn" disabled={!cmd().trim() || !portInput().trim()}>Run</button>
-              </form>
-              <Show when={cfgErr()}><div class="action-error">{cfgErr()}</div></Show>
-            </div>
-          </div>
-        </div>
       </Show>
 
       <Show when={closeOpen()}>
@@ -432,128 +377,5 @@ export default function TaskView(props: {
       </Show>
     </footer>
     </div>
-  )
-}
-
-// Electron's <webview> isn't a typed JSX element; this is the slice of its API the chrome drives.
-type WebviewEl = HTMLElement & {
-  src: string
-  loadURL(url: string): void
-  reload(): void
-  stop(): void
-  goBack(): void
-  goForward(): void
-  canGoBack(): boolean
-  canGoForward(): boolean
-  getURL(): string
-  getWebContentsId(): number
-}
-const withScheme = (v: string) => (/^[a-z]+:\/\//i.test(v) ? v : `https://${v}`)
-
-// One live <webview> per task, kept for the whole app session so browse state (page, scroll, form
-// input) survives pane and task switches — only a page reload (app restart) starts fresh. Not GC'd
-// on task close.
-// ponytail: session-lifetime leak; add cleanup on task archive if it ever bites.
-const previewWebviews = new Map<string, WebviewEl>()
-
-// The browser-preview pane: browser chrome (back/forward/stop-reload/home + editable URL bar +
-// loading spinner) over the per-task <webview>. props.url is the workspace-configured "home"; the
-// main process's will-attach-webview guard keeps it to http(s).
-function PreviewPane(props: { taskId: string; url: string | null; hidden: boolean; onConfigure: () => void }) {
-  let host!: HTMLDivElement
-  const [loading, setLoading] = createSignal(false)
-  const [addr, setAddr] = createSignal('')
-  const [canBack, setCanBack] = createSignal(false)
-  const [canFwd, setCanFwd] = createSignal(false)
-  const active = () => previewWebviews.get(props.taskId) ?? null
-  const isActive = (el: WebviewEl) => previewWebviews.get(props.taskId) === el
-  const syncFrom = (el: WebviewEl) => {
-    try {
-      setAddr(el.getURL() || props.url || '')
-      setCanBack(el.canGoBack())
-      setCanFwd(el.canGoForward())
-    } catch {
-      setAddr(props.url ?? '')
-      setCanBack(false)
-      setCanFwd(false)
-    }
-  }
-
-  // Show the current task's webview (creating it on first open), hide the others. Re-appends after a
-  // TaskView remount (leaving/returning the task view), which reloads that one webview.
-  createEffect(() => {
-    const taskId = props.taskId
-    const url = props.url
-    if (!host || !url) return
-    let el = previewWebviews.get(taskId)
-    if (!el) {
-      el = document.createElement('webview') as WebviewEl
-      el.setAttribute('src', url)
-      el.setAttribute('data-acorn-home', url)
-      el.style.width = '100%'
-      el.style.height = '100%'
-      const captured = el
-      el.addEventListener('did-start-loading', () => isActive(captured) && setLoading(true))
-      el.addEventListener('did-stop-loading', () => isActive(captured) && (setLoading(false), syncFrom(captured)))
-      const onNav = (e: Event) => isActive(captured) && (setAddr((e as Event & { url?: string }).url ?? captured.getURL()), syncFrom(captured))
-      el.addEventListener('did-navigate', onNav)
-      el.addEventListener('did-navigate-in-page', onNav)
-      // Bind for agent driving (docs/next 08): main resolves the webContents id → CDP driver.
-      el.addEventListener('dom-ready', () => {
-        try {
-          void window.acorn?.browser?.bind(taskId, captured.getWebContentsId())
-        } catch {
-          /* driving is optional; the preview still works */
-        }
-      }, { once: true })
-      previewWebviews.set(taskId, el)
-    }
-    if (el.parentElement !== host) host.appendChild(el) // fresh host after a remount → reload
-    // A changed home URL (a layout recipe resolved a run target, docs/next 13 §C) navigates there.
-    if (el.getAttribute('data-acorn-home') !== url) {
-      el.setAttribute('data-acorn-home', url)
-      try {
-        el.loadURL(url)
-      } catch {
-        /* webview not ready yet — the src attribute already points home */
-      }
-    }
-    for (const [id, w] of previewWebviews) w.style.display = id === taskId ? 'flex' : 'none'
-    setLoading(false)
-    syncFrom(el)
-  })
-
-  const go = () => {
-    const el = active()
-    const v = addr().trim()
-    if (el && v) el.loadURL(withScheme(v))
-  }
-
-  return (
-    <section class="pane workspace-preview" classList={{ 'is-hidden': props.hidden }} style={{ 'grid-column': '1 / 3' }}>
-      <Show when={props.url} fallback={
-        <div class="workspace-empty-inner">
-          <p class="muted">No dev server port configured.</p>
-          <button type="button" class="workspace-empty-term" onClick={props.onConfigure}>Configure & run</button>
-        </div>
-      }>
-        <div class="preview-chrome">
-          <button type="button" class="preview-nav-btn" title="Back" disabled={!canBack()} onClick={() => active()?.goBack()}>‹</button>
-          <button type="button" class="preview-nav-btn" title="Forward" disabled={!canFwd()} onClick={() => active()?.goForward()}>›</button>
-          <button type="button" class="preview-nav-btn" title={loading() ? 'Stop' : 'Reload'} onClick={() => (loading() ? active()?.stop() : active()?.reload())}>{loading() ? '✕' : '↻'}</button>
-          <button type="button" class="preview-nav-btn" title="Home" onClick={() => props.url && active()?.loadURL(props.url)}>⌂</button>
-          <input
-            class="preview-url"
-            type="text"
-            spellcheck={false}
-            value={addr()}
-            onInput={(e) => setAddr(e.currentTarget.value)}
-            onKeyDown={(e) => e.key === 'Enter' && go()}
-          />
-          <Show when={loading()}><span class="preview-spinner spin">◐</span></Show>
-        </div>
-      </Show>
-      <div class="workspace-preview-host" ref={host} />
-    </section>
   )
 }

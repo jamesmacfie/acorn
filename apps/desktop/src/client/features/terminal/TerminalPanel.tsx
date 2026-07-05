@@ -4,6 +4,7 @@ import { createQuery } from '@tanstack/solid-query'
 import { prefsOptions, type Task } from '../../queries'
 import { setPref } from '../../mutations'
 import { terminalApi } from './terminalClient'
+import { onClosePaneWithin } from '../../lib/onClosePaneWithin'
 import { refreshSessions, sessions } from './sessions'
 import TerminalSurface from './TerminalSurface'
 import type { TerminalProfile, TerminalSession } from '../../../shared/terminal'
@@ -69,16 +70,32 @@ export default function TerminalPanel(props: { onClose: () => void; task: Task |
     }
   })
 
-  // Cmd/Ctrl+W closes the active terminal tab when focus is inside the drawer (main suppresses the
-  // window-close accelerator and pings us — see electron.ts / preload).
+  // Cmd/Ctrl+W closes the active terminal tab when focus is inside the drawer.
   let drawerRef: HTMLElement | undefined
+  onClosePaneWithin(() => drawerRef, () => {
+    const s = activeSession()
+    if (s) void closeTab(s)
+  })
+
+  // ⌘/Ctrl+Shift+1–9 focuses the Nth terminal in this task's strip, from anywhere (e.g. the editor)
+  // as long as the drawer is open — this component only exists while it is, so we never auto-open it.
+  // Scoped to the active task via visibleSessions. Matches on e.code — with Shift held the digit keys
+  // report shifted glyphs (!@#…), not '1'–'9'. TaskView's ⌘1–9 task-jump bails on Shift, so the two
+  // never collide. Focus is explicit (not just via remount) so re-selecting the already-active tab
+  // still pulls focus off whatever else had it; rAF lets a tab switch remount the surface first.
   onMount(() => {
-    const off = window.acorn?.onClosePane?.(() => {
-      if (!drawerRef?.contains(document.activeElement)) return
-      const s = activeSession()
-      if (s) void closeTab(s)
-    })
-    onCleanup(() => off?.())
+    const onKey = (e: KeyboardEvent) => {
+      if (!(e.metaKey || e.ctrlKey) || !e.shiftKey || e.altKey) return
+      const m = /^Digit([1-9])$/.exec(e.code)
+      if (!m) return
+      const s = visibleSessions()[Number(m[1]) - 1]
+      if (!s) return
+      e.preventDefault()
+      setActiveId(s.id)
+      requestAnimationFrame(() => drawerRef?.querySelector<HTMLTextAreaElement>('.xterm-helper-textarea')?.focus())
+    }
+    window.addEventListener('keydown', onKey)
+    onCleanup(() => window.removeEventListener('keydown', onKey))
   })
 
   const activeSession = createMemo(() => sessions().find((s) => s.id === activeId()) ?? null)
@@ -237,12 +254,17 @@ export default function TerminalPanel(props: { onClose: () => void; task: Task |
                           type="button"
                           class="terminal-menu-item"
                           disabled={!p.available}
-                          title={p.available ? undefined : `${p.label} not found on PATH`}
+                          title={!p.available ? `${p.label} not found on PATH` : p.tmuxMissing ? 'tmux not found on PATH — this session will not survive an app restart' : undefined}
                           onClick={() => void startProfile(p.id)}
                         >
                           {p.label}
                           <Show when={!p.available}>
                             <span class="terminal-menu-missing">not found</span>
+                          </Show>
+                          {/* tmux degrade hint (docs/terminal-and-agents.md): the profile still works,
+                              but the durable backend silently fell back to node-pty. */}
+                          <Show when={p.available && p.tmuxMissing}>
+                            <span class="terminal-menu-missing">tmux missing — won't survive restart</span>
                           </Show>
                         </button>
                       )}

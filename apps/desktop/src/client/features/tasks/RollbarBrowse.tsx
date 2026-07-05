@@ -7,7 +7,8 @@ import { dedupeBranch, slugifyBranch } from '../../../shared/branch'
 import { tasksKey, tasksOptions } from '../../queries'
 import { createQuery } from '@tanstack/solid-query'
 import { addTaskLink, createTask } from '../../mutations'
-import { activeTaskId, setActivePane, setActiveTaskId, setSelectedSource } from './tasks'
+import { activeTaskId } from './tasks'
+import { activateTaskSignals } from './activate'
 
 const relTime = (at: number | null): string => {
   if (!at) return ''
@@ -58,9 +59,7 @@ export default function RollbarBrowse() {
     })
     await qc.invalidateQueries({ queryKey: tasksKey })
     setPromoting(null)
-    setSelectedSource(null)
-    setActiveTaskId(w.id)
-    setActivePane('rollbar')
+    activateTaskSignals(w, { pane: 'rollbar' }) // a promoted error lands on its Rollbar pane
     navigate(`/${owner}/${repo}`)
   }
 

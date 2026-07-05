@@ -1,13 +1,13 @@
 import { and, eq } from 'drizzle-orm'
 import { Hono, type Context } from 'hono'
 import { schema } from '../db'
-import { gh, ghError, ghGraphQL } from '../github'
+import { gh, ghError, ghGraphQL, ghGraphQLResult } from '../github'
 import type { AppEnv } from '../middleware/auth'
 import { bustPrSync, resolvePr, setPrState } from './prContext'
 
-// PR write actions (docs/github-api.md). Each calls GitHub, updates the D1 mirror so a read
-// within the TTL window reflects the change, and returns the canonical bit. The client layers
-// optimistic updates / invalidation on top.
+// PR write actions (docs/github-integration.md). Each calls GitHub, updates the local mirror so
+// a read within the TTL window reflects the change, and returns the canonical bit. The client
+// layers optimistic updates / invalidation on top.
 
 export const prActions = new Hono<AppEnv>()
   // Merge: PUT /pulls/{n}/merge. 405 = not mergeable, 409 = head moved.
@@ -38,11 +38,12 @@ export const prActions = new Hono<AppEnv>()
       `mutation($id:ID!,$m:PullRequestMergeMethod!){ enablePullRequestAutoMerge(input:{pullRequestId:$id, mergeMethod:$m}){ clientMutationId } }`,
       { id: r.nodeId, m: (method ?? 'merge').toUpperCase() },
     )
-    const err = ghError(res)
-    if (err) return c.json({ error: err.error }, err.status)
-    // GraphQL surfaces "auto-merge not allowed / PR already mergeable" as errors, not a status code.
-    const body = (await res.json().catch(() => ({}))) as { errors?: unknown }
-    if (body.errors) return c.json({ error: 'auto_merge_not_allowed' }, 422)
+    const result = await ghGraphQLResult(res)
+    if (!result.ok) {
+      // GraphQL surfaces "auto-merge not allowed / PR already mergeable" as errors, not a status code.
+      if (result.kind === 'graphql') return c.json({ error: 'auto_merge_not_allowed' }, 422)
+      return c.json({ error: result.failure.error }, result.failure.status)
+    }
     await r.db
       .update(schema.pullRequests)
       .set({ autoMergeEnabled: true })
@@ -57,10 +58,11 @@ export const prActions = new Hono<AppEnv>()
     const res = await ghGraphQL(r.user.token, `mutation($id:ID!){ disablePullRequestAutoMerge(input:{pullRequestId:$id}){ clientMutationId } }`, {
       id: r.nodeId,
     })
-    const err = ghError(res)
-    if (err) return c.json({ error: err.error }, err.status)
-    const body = (await res.json().catch(() => ({}))) as { errors?: unknown }
-    if (body.errors) return c.json({ error: 'github_unavailable' }, 502)
+    const result = await ghGraphQLResult(res)
+    if (!result.ok) {
+      if (result.kind === 'graphql') return c.json({ error: 'github_unavailable' }, 502)
+      return c.json({ error: result.failure.error }, result.failure.status)
+    }
     await r.db
       .update(schema.pullRequests)
       .set({ autoMergeEnabled: false })
@@ -92,10 +94,11 @@ export const prActions = new Hono<AppEnv>()
       ? `mutation($id:ID!){ convertPullRequestToDraft(input:{pullRequestId:$id}){ clientMutationId } }`
       : `mutation($id:ID!){ markPullRequestReadyForReview(input:{pullRequestId:$id}){ clientMutationId } }`
     const res = await ghGraphQL(r.user.token, mutation, { id: r.nodeId })
-    const err = ghError(res)
-    if (err) return c.json({ error: err.error }, err.status)
-    const body = (await res.json().catch(() => ({}))) as { errors?: unknown }
-    if (body.errors) return c.json({ error: 'github_unavailable' }, 502)
+    const result = await ghGraphQLResult(res)
+    if (!result.ok) {
+      if (result.kind === 'graphql') return c.json({ error: 'github_unavailable' }, 502)
+      return c.json({ error: result.failure.error }, result.failure.status)
+    }
     await r.db
       .update(schema.pullRequests)
       .set({ draft: !!draft })
@@ -204,10 +207,11 @@ export const prActions = new Hono<AppEnv>()
     const res = await ghGraphQL(r.user.token, `mutation($id:ID!){ ${field}(input:{threadId:$id}){ thread { id } } }`, {
       id: threadId,
     })
-    const err = ghError(res)
-    if (err) return c.json({ error: err.error }, err.status)
-    const out = (await res.json().catch(() => ({}))) as { errors?: unknown }
-    if (out.errors) return c.json({ error: 'github_unavailable' }, 502)
+    const result = await ghGraphQLResult(res)
+    if (!result.ok) {
+      if (result.kind === 'graphql') return c.json({ error: 'github_unavailable' }, 502)
+      return c.json({ error: result.failure.error }, result.failure.status)
+    }
     await bustPrSync(r.db, r.user.login, r.repoId, r.number)
     return c.json({ resolved: !!resolved })
   })

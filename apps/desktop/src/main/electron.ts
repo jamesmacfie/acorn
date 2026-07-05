@@ -1,13 +1,19 @@
 import { app, BrowserWindow, shell } from 'electron'
 import { join } from 'node:path'
-import { ACORN_PORT, dataDir, startServer } from './server'
+import { ACORN_PORT, devDataDir, startServer } from './server'
 import { registerTerminalIpc } from './terminal'
 
 const ORIGIN = `http://127.0.0.1:${ACORN_PORT}`
 const PRELOAD = join(import.meta.dirname, '../preload/index.cjs')
 
-// Dev: load secrets from .env. Packaged builds have no .env (this no-ops) and will read from the
-// OS keychain — see docs/electron.md §4b/Phase 3.
+// Writable app-data root (DB, blobs, worktrees, notes). Packaged builds must not write next to the
+// module (that's the read-only asar) — use the OS-standard userData dir. Dev keeps the repo-local
+// apps/desktop/.acorn so a checkout's data stays with the checkout.
+const dataDir = app.isPackaged ? app.getPath('userData') : devDataDir
+
+// Dev: load secrets from .env. Packaged builds have no .env (this no-ops), and OS-keychain secret
+// storage is planned but NOT built yet (docs/electron.md Phase 3) — until it lands, a packaged app
+// needs the secrets already present in its environment.
 try {
   process.loadEnvFile(join(import.meta.dirname, '../../.env'))
 } catch {
@@ -108,7 +114,7 @@ async function createMainWindow() {
 }
 
 app.whenReady().then(async () => {
-  const { runtime } = await startServer() // resolves once listening on the pinned loopback port
+  const { runtime } = await startServer(dataDir) // resolves once listening on the pinned loopback port
   await registerTerminalIpc(runtime.DB, join(dataDir, 'worktrees'), { apiUrl: ORIGIN, token: runtime.INTERNAL_TOKEN }) // PTYs + tmux + repo paths + worktrees
   mainWindow = await createMainWindow()
 })

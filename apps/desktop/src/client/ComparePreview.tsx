@@ -1,11 +1,12 @@
-import { createEffect, createMemo, createSignal, For, onCleanup, Show } from 'solid-js'
+import { createEffect, createMemo, createSignal, For, on, onCleanup, Show } from 'solid-js'
 import { createQuery } from '@tanstack/solid-query'
 import { useParams, useSearchParams } from '@solidjs/router'
 import { compareOptions, reposOptions } from './queries'
 import { getHighlighter } from './shiki'
 import { DiffLine, NonCodeRow } from './features/diff/DiffRows'
-import { parseFilesInChunks } from './features/diff/chunkedParse'
+import { createDiffHydrator } from './features/diff/hydration'
 import {
+  buildDiffRows,
   buildRenderableRows,
   highlighterTokenize,
   isCodeRow,
@@ -17,9 +18,12 @@ import {
 } from './features/diff/model'
 
 // Right (Diff) pane in create mode: read-only base..head preview. Reuses the diff engine
-// (chunked parsing / buildRenderableRows + Shiki) and the row components, but with no review
-// threads, line composers, or gap expansion — none of those exist before the PR does. Rows still
-// render in normal flow; parsing is chunked so branch changes do not pin the main thread.
+// (createDiffHydrator + buildRenderableRows + Shiki) and the row components, but with no review
+// threads, line composers, or gap expansion — none of those exist before the PR does. Rows render
+// in normal flow (no virtualizer); the hydrator parses in small idle batches so branch changes do
+// not pin the main thread, and its generation counter cancels a stale run when the file set flips.
+// Every patch body arrives inline on the compare payload, so `cachedFile` serves them all (binary /
+// too-large files have a null patch and render the "No diff" row) and no fetchPatches is wired.
 const noop = async () => {}
 
 export default function ComparePreview() {
@@ -33,29 +37,36 @@ export default function ComparePreview() {
   const head = () => (typeof searchParams.head === 'string' ? searchParams.head : '')
   const comparable = () => !!head() && head() !== base()
   const compare = createQuery(() => compareOptions(o(), r(), base(), head(), !!repo() && comparable()))
+  const compareFiles = () => compare.data?.files ?? []
 
-  // Parse + highlight all files once the tokenizer loads. Cancels if the file set changes mid-flight.
-  const [parsed, setParsed] = createSignal<ParsedFile[]>([])
-  let parseRun = 0
-  createEffect(() => {
-    const list = compare.data?.files ?? []
-    const run = ++parseRun
-    let cancelled = false
-    onCleanup(() => {
-      cancelled = true
+  const [parsedByPath, setParsedByPath] = createSignal<Map<string, ParsedFile>>(new Map())
+  let tokenizerPromise: Promise<TokenizeLine> | null = null
+  const loadTokenizer = async () => {
+    return (tokenizerPromise ??= getHighlighter().then(highlighterTokenize).catch(() => plainTokenize))
+  }
+
+  const hydrator = createDiffHydrator({
+    tokenizerForFile: () => loadTokenizer(),
+    parseFile: (file, tokenize) => ({ file, diff: buildDiffRows(file, tokenize) }),
+    onParsed: (parsedFile) => setParsedByPath((prev) => new Map(prev).set(parsedFile.file.path, parsedFile)),
+    cachedFile: (path) => compareFiles().find((file) => file.path === path) ?? null,
+  })
+  onCleanup(hydrator.dispose)
+
+  // Re-hydrate when the compared file set changes; reset() bumps the generation, cancelling any
+  // in-flight parse of the previous branch pair.
+  createEffect(on(compareFiles, (list) => {
+    setParsedByPath(new Map())
+    hydrator.reset(list)
+  }))
+
+  const parsed = createMemo<ParsedFile[]>(() => {
+    const parsedFiles = parsedByPath()
+    return compareFiles().map((file) => {
+      const parsedFile = parsedFiles.get(file.path)
+      if (parsedFile) return parsedFile
+      return { file, diff: [{ kind: 'load', file, status: hydrator.status(file.path) === 'error' ? 'error' : 'loading' }] }
     })
-    setParsed([])
-    if (!list.length) return
-    void (async () => {
-      const tokenize: TokenizeLine = await getHighlighter()
-        .then(highlighterTokenize)
-        .catch(() => plainTokenize)
-      if (cancelled || run !== parseRun) return
-      await parseFilesInChunks(list, tokenize, {
-        isCancelled: () => cancelled || run !== parseRun,
-        onChunk: setParsed,
-      })
-    })()
   })
   const rows = createMemo<Row[]>(() => buildRenderableRows(parsed(), undefined))
 
@@ -77,12 +88,20 @@ export default function ComparePreview() {
                       'diff-add': row.kind === 'insert',
                       'diff-del': row.kind === 'delete',
                       'diff-file-row': row.kind === 'file',
-                      'diff-thread-row': row.kind === 'nodiff',
+                      'diff-thread-row': row.kind === 'nodiff' || row.kind === 'load',
                     }}
                   >
                     <Show
                       when={isCodeRow(row) ? row : null}
-                      fallback={<NonCodeRow row={row as Exclude<Row, CodeRow>} onMutated={noop} resolveThread={noop} reply={noop} />}
+                      fallback={
+                        <NonCodeRow
+                          row={row as Exclude<Row, CodeRow>}
+                          onMutated={noop}
+                          resolveThread={noop}
+                          reply={noop}
+                          retryDiff={(file) => hydrator.retry(file.path)}
+                        />
+                      }
                     >
                       {(cr) => <DiffLine r={cr()} canAdd={false} addComment={noop} onMutated={noop} />}
                     </Show>

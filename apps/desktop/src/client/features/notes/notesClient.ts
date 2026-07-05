@@ -1,17 +1,16 @@
 import { createSignal } from 'solid-js'
 
 // Typed accessor for the preload's `window.acorn.notes` bridge (docs/next 09). The Window global
-// is declared once in terminalClient.ts.
-export type NoteAuthor = 'user' | 'agent' | 'workflow'
-export type NoteKind = 'scratch' | 'plan' | 'finding' | 'handoff'
+// is declared once in terminalClient.ts. Note shapes are canonical in shared/notes.ts (main's
+// NotesStore imports the same types) — re-exported here so existing feature imports keep working.
+import type { Note, NoteAuthor, NoteKind, NoteSummary } from '../../../shared/notes'
+export type { Note, NoteAuthor, NoteKind, NoteSummary } from '../../../shared/notes'
 
 // Notes are scoped either to the current workspace or GLOBAL (shared across every workspace). The
 // store keys by an opaque id; global notes live under this reserved key. Workspace ids are uuids,
 // so 'global' can never collide with a real one. No store change — just a well-known key.
 export type NoteScope = 'workspace' | 'global'
 export const GLOBAL_NOTES_ID = 'global'
-export type NoteSummary = { slug: string; title: string; author: NoteAuthor; kind: NoteKind; updatedAt: number }
-export type Note = { slug: string; title: string; author: NoteAuthor; kind: NoteKind; originSessionId: string | null; createdAt: number; body: string }
 
 export type NotesApi = {
   list(workspaceId: string): Promise<NoteSummary[] | { error: string }>

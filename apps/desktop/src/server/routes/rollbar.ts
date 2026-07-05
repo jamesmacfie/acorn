@@ -67,17 +67,21 @@ export const rollbar = new Hono<AppEnv>()
       }
       const token = await decryptSecret(row.accessToken, c.env.SESSION_ENC_KEY)
       if (!token) continue
+      // Track what this connection already contributed: a fetch can fail AFTER some items were
+      // pushed, and the stale-cache fallback below must not emit those items a second time.
+      const pushed = new Set<string>()
       try {
         const res = await rollbarFetch(token, itemsPath)
         const { items } = await rollbarData<{ items: RollbarApiItem[] }>(res)
         for (const raw of items) {
           const item = toItem(row.id, raw)
           out.push(item)
+          pushed.add(item.identifier)
           await cacheItem(c, user.login, item, now)
         }
       } catch {
-        // a failing connection degrades to its cache (already pushed? no — push stale cache now)
-        out.push(...cached.map((r) => JSON.parse(r.data) as RollbarItem))
+        // A failing connection degrades to its cache — minus whatever the fetch already pushed.
+        out.push(...cached.filter((r) => !pushed.has(r.identifier)).map((r) => JSON.parse(r.data) as RollbarItem))
       }
     }
     out.sort((a, b) => (b.lastOccurrenceAt ?? 0) - (a.lastOccurrenceAt ?? 0))

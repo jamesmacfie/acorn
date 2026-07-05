@@ -1,20 +1,21 @@
 import { describe, expect, it, vi } from 'vitest'
-import { launcherSpec, registerAcornMcp, registerArgv, removeAcornMcp, removeArgv, resolveMcpEntry, serverName } from './mcpRegister'
+import { launcherSpec, registerAcornMcp, registerArgv, removeArgv, resolveMcpEntry, serverName } from './mcpRegister'
 
-const launcher = launcherSpec('/Applications/acorn.app/Contents/MacOS/acorn', '/app/out/main/mcp.js')
+const launcher = launcherSpec('/Applications/acorn.app/Contents/MacOS/acorn', '/app/out/main/mcp.js', 'acorn')
+const devLauncher = launcherSpec('/Applications/acorn.app/Contents/MacOS/acorn', '/app/out/main/mcp.js', 'acorn-dev')
 
 describe('argv construction per agent flavour (docs/next 06 P3 — never executed here)', () => {
   it('claude: user-scoped add with the Electron-as-node launcher', () => {
     expect(registerArgv('claude', 'acorn', launcher)).toEqual({
       file: 'claude',
-      args: ['mcp', 'add', '--scope', 'user', 'acorn', '--env', 'ELECTRON_RUN_AS_NODE=1', '--', '/Applications/acorn.app/Contents/MacOS/acorn', '/app/out/main/mcp.js'],
+      args: ['mcp', 'add', '--scope', 'user', 'acorn', '--env', 'ELECTRON_RUN_AS_NODE=1', '--env', 'ACORN_MCP_NAME=acorn', '--', '/Applications/acorn.app/Contents/MacOS/acorn', '/app/out/main/mcp.js'],
     })
     expect(removeArgv('claude', 'acorn-dev')).toEqual({ file: 'claude', args: ['mcp', 'remove', '--scope', 'user', 'acorn-dev'] })
   })
   it('codex: add/remove with the same launcher', () => {
-    expect(registerArgv('codex', 'acorn-dev', launcher)).toEqual({
+    expect(registerArgv('codex', 'acorn-dev', devLauncher)).toEqual({
       file: 'codex',
-      args: ['mcp', 'add', 'acorn-dev', '--env', 'ELECTRON_RUN_AS_NODE=1', '--', '/Applications/acorn.app/Contents/MacOS/acorn', '/app/out/main/mcp.js'],
+      args: ['mcp', 'add', 'acorn-dev', '--env', 'ELECTRON_RUN_AS_NODE=1', '--env', 'ACORN_MCP_NAME=acorn-dev', '--', '/Applications/acorn.app/Contents/MacOS/acorn', '/app/out/main/mcp.js'],
     })
     expect(removeArgv('codex', 'acorn-dev')).toEqual({ file: 'codex', args: ['mcp', 'remove', 'acorn-dev'] })
   })
@@ -22,7 +23,9 @@ describe('argv construction per agent flavour (docs/next 06 P3 — never execute
     expect(serverName(true)).toBe('acorn')
     expect(serverName(false)).toBe('acorn-dev')
     expect(resolveMcpEntry('/app/out/main')).toBe('/app/out/main/mcp.js')
-    expect(launcher.env).toEqual({ ELECTRON_RUN_AS_NODE: '1' })
+    // The flavoured name rides the env so the server self-reports correctly (ACORN_MCP_NAME).
+    expect(launcher.env).toEqual({ ELECTRON_RUN_AS_NODE: '1', ACORN_MCP_NAME: 'acorn' })
+    expect(devLauncher.env.ACORN_MCP_NAME).toBe('acorn-dev')
   })
 })
 
@@ -44,11 +47,5 @@ describe('register/remove round-trip through a stubbed exec', () => {
       throw new Error('spawn codex ENOENT')
     })
     expect(await registerAcornMcp('codex', 'acorn', launcher, exec)).toEqual({ ok: false, reason: "'codex' CLI not found on PATH." })
-    expect(await removeAcornMcp('codex', 'acorn', exec)).toEqual({ ok: false, reason: "'codex' CLI not found on PATH." })
-  })
-  it('remove succeeds through the stub', async () => {
-    const exec = vi.fn(async () => ({ stdout: 'Removed' }))
-    expect(await removeAcornMcp('claude', 'acorn-dev', exec)).toEqual({ ok: true })
-    expect(exec).toHaveBeenCalledWith('claude', ['mcp', 'remove', '--scope', 'user', 'acorn-dev'])
   })
 })

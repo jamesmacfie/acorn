@@ -16,6 +16,10 @@ export type MemoryProposal = {
   type: MemoryType
   description: string
   body: string
+  // Verification FLAGS from the auto-generation pass (memoryGen verifyCandidates) — e.g. a
+  // contradiction with an existing memory. Carried structurally (never folded into description,
+  // which would leak into the memory file on accept) so the gate UI can render them separately.
+  flags: string[]
   originSessionId: string | null
   status: 'pending' | 'accepted' | 'rejected'
   createdAt: number
@@ -42,11 +46,11 @@ export class MemoryProposalStore {
     }
   }
 
-  async propose(input: Omit<MemoryProposal, 'id' | 'status' | 'createdAt'>): Promise<MemoryProposal> {
+  async propose(input: Omit<MemoryProposal, 'id' | 'status' | 'createdAt' | 'flags'> & { flags?: string[] }): Promise<MemoryProposal> {
     if (!input.name || !isValidMemoryName(input.name)) throw new Error('Invalid memory name.')
     if (!MEMORY_TYPES.includes(input.type)) throw new Error('Invalid memory type.')
     if (!input.description.trim()) throw new Error('Description required.')
-    const proposal: MemoryProposal = { ...input, id: randomUUID(), status: 'pending', createdAt: Date.now() }
+    const proposal: MemoryProposal = { ...input, flags: input.flags ?? [], id: randomUUID(), status: 'pending', createdAt: Date.now() }
     await this.atomicWrite(this.fileFor(proposal.id), proposal)
     return proposal
   }
@@ -57,7 +61,9 @@ export class MemoryProposalStore {
     for (const name of entries) {
       if (!name.endsWith('.json')) continue
       try {
-        const p = JSON.parse(await readFile(join(this.root, name), 'utf8')) as MemoryProposal
+        // Default `flags` so proposals written before the field existed still parse as complete.
+        const parsed = JSON.parse(await readFile(join(this.root, name), 'utf8')) as Omit<MemoryProposal, 'flags'> & { flags?: string[] }
+        const p: MemoryProposal = { ...parsed, flags: parsed.flags ?? [] }
         if (!status || p.status === status) out.push(p)
       } catch {
         // unreadable proposal → skipped
@@ -68,7 +74,8 @@ export class MemoryProposalStore {
 
   async get(id: string): Promise<MemoryProposal | null> {
     try {
-      return JSON.parse(await readFile(this.fileFor(id), 'utf8')) as MemoryProposal
+      const parsed = JSON.parse(await readFile(this.fileFor(id), 'utf8')) as Omit<MemoryProposal, 'flags'> & { flags?: string[] }
+      return { ...parsed, flags: parsed.flags ?? [] }
     } catch {
       return null
     }

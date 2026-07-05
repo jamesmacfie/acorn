@@ -15,7 +15,11 @@ export type TerminalSession = {
   status: 'running' | 'exited'
   idle: boolean // agent has produced no output for a while (vNext §3); always false for shells
   agentState: AgentState // docs/next 05 — PTY tier emits working|idle|blocked|unknown
-  isWorktree: boolean // cwd is an isolated PR worktree (vNext §9); in-memory only, not persisted
+  // cwd is the task's isolated worktree. DERIVED, never stored: tasks.worktreePath is the truth
+  // (docs/workspaces 03) and main computes cwd === task.worktreePath at session create AND during
+  // reconcileTmux, so the flag survives app restarts. It stays on the wire as a denormalized copy
+  // so the renderer doesn't need the task join for a per-session badge/cleanup affordance.
+  isWorktree: boolean
   taskId: string // → tasks.id (docs/workspaces); a session always belongs to a task
   cwd: string
   command: string
@@ -65,30 +69,32 @@ export type TaskStatus = {
 }
 
 // A launchable profile as the renderer sees it (vNext §8). `available` is false when the command
-// isn't on PATH — the UI disables it. command/backend stay in main.
+// isn't on PATH — the UI disables it. command/backend stay in main. `tmuxMissing` is true when the
+// profile prefers the durable tmux backend but tmux isn't installed, so a session would silently
+// degrade to node-pty (no restart survival) — the drawer surfaces the hint.
 export type TerminalProfile = {
   id: string
   label: string
   kind: 'shell' | 'agent'
   available: boolean
+  tmuxMissing?: boolean
 }
 
-// Local checkout mapping for a repo (vNext §9). Returned by repoPath.get / set. runCommand / devPort
-// are the per-repo dev-server config (docs/workspaces P5), null until configured.
+// Local checkout mapping for a repo (vNext §9). Returned by repoPath.get / set.
 export type RepoPath = {
   owner: string
   repo: string
   path: string
-  runCommand: string | null
-  devPort: number | null
   runTargets: string | null // JSON RunTarget[] (docs/next 13 §A) — the DB fallback config surface
 }
 
 // Run targets as the renderer sees them (docs/next 13 §A): the merged config list + live status.
+// CANONICAL shapes for the run surface — main/runtime.ts imports these; nothing redeclares them.
 export type RunTargetInfo = {
   id: string
   command: string
   stop?: string
+  restart?: string
   url?: string
   urlCommand?: string
   icon?: string

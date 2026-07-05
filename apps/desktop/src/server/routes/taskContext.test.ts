@@ -49,8 +49,6 @@ describe('GET /api/tasks/:id/context (docs/next 11 §C)', () => {
       defaultBranch: 'main',
       pushedAt: null,
       fetchedAt: now,
-      staleAfter: 60_000,
-      etag: null,
     })
     await t.db.insert(schema.pullRequests).values({
       userId: 'james',
@@ -70,12 +68,10 @@ describe('GET /api/tasks/:id/context (docs/next 11 §C)', () => {
       mergeStateStatus: null,
       autoMergeEnabled: false,
       fetchedAt: now,
-      staleAfter: 60_000,
-      etag: null,
     })
     await t.db.insert(schema.prFiles).values([
-      { userId: 'james', repoId: 99, number: 813, path: 'src/auth/login.ts', status: 'modified', additions: 3, deletions: 1, sha: 's1', patch: null },
-      { userId: 'james', repoId: 99, number: 813, path: 'src/auth/token.ts', status: 'modified', additions: 1, deletions: 0, sha: 's2', patch: null },
+      { userId: 'james', repoId: 99, number: 813, path: 'src/auth/login.ts', status: 'modified', additions: 3, deletions: 1, sha: 's1' },
+      { userId: 'james', repoId: 99, number: 813, path: 'src/auth/token.ts', status: 'modified', additions: 1, deletions: 0, sha: 's2' },
     ])
     await t.db.insert(schema.taskLinks).values([
       { taskId: 'task1', integrationId: 'lin1', provider: 'linear', identifier: 'ENG-42', createdAt: now },

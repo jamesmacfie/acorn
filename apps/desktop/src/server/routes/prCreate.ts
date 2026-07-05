@@ -2,10 +2,10 @@ import { and, eq } from 'drizzle-orm'
 import { Hono } from 'hono'
 import { getDb, schema } from '../db'
 import { pullsResource } from '../db/resourceKeys'
-import { gh, ghError, ghGraphQL } from '../github'
+import { gh, ghError, ghGraphQL, ghGraphQLResult } from '../github'
 import type { AppEnv } from '../middleware/auth'
 
-// Open-a-PR support: branch list + base..head compare (both read-only proxies, no D1 mirror —
+// Open-a-PR support: branch list + base..head compare (both read-only proxies, no local mirror —
 // branches/compare change too often and are cheap to fetch) and the create POST. Creating busts
 // the open-pulls sync_state so the list refetches the new PR; the PR detail mirror fills on
 // navigation via the existing pullDetail route.
@@ -47,21 +47,19 @@ export const prCreate = new Hono<AppEnv>()
     let after: string | null = null
     for (let page = 0; page < 30; page++) {
       const res = await ghGraphQL(user.token, query, { owner, repo, after })
-      const err = ghError(res)
-      if (err) return c.json({ error: err.error }, err.status)
-      const body = (await res.json()) as {
-        data?: {
-          repository?: {
-            refs?: {
-              pageInfo: { hasNextPage: boolean; endCursor: string | null }
-              nodes: { name: string; target: { committedDate?: string } | null }[]
-            }
+      const result = await ghGraphQLResult<{
+        repository?: {
+          refs?: {
+            pageInfo: { hasNextPage: boolean; endCursor: string | null }
+            nodes: { name: string; target: { committedDate?: string } | null }[]
           }
         }
-        errors?: unknown
+      }>(res)
+      if (!result.ok) {
+        if (result.kind === 'graphql') return c.json({ error: 'github_unavailable' }, 502)
+        return c.json({ error: result.failure.error }, result.failure.status)
       }
-      if (body.errors) return c.json({ error: 'github_unavailable' }, 502)
-      const refs = body.data?.repository?.refs
+      const refs = result.data?.repository?.refs
       if (!refs) break
       for (const n of refs.nodes)
         collected.push({ name: n.name, date: n.target?.committedDate ? Date.parse(n.target.committedDate) : 0 })
@@ -119,7 +117,6 @@ export const prCreate = new Hono<AppEnv>()
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ title: title.trim(), body: body ?? '', base, head, draft: !!draft }),
     })
-    if (res.status === 401) return c.json({ error: 'reauth' }, 401)
     if (res.status === 422) {
       const detail = (await res.json().catch(() => ({}))) as { message?: string; errors?: { message?: string }[] }
       return c.json({ error: detail.errors?.[0]?.message ?? detail.message ?? 'validation_failed' }, 422)

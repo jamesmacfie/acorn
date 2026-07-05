@@ -5,7 +5,7 @@ import { linearProjectsOptions, tasksKey, workspaceProjectsKey, workspaceProject
 import { createTask, setWorkspaceProjects } from '../../mutations'
 import type { LinearProjectIssue, WorkspaceProject } from '../../../shared/api'
 import { workspaceForRepo } from '../workspaces/activeWorkspace'
-import { setActivePane, setActiveTaskId, setSelectedSource } from './tasks'
+import { activateTaskSignals } from './activate'
 
 // The Linear Source browse (docs/workspaces 04). Linear projects are linked at the WORKSPACE level
 // and may span several connected Linear workspaces; each linked project is an (integrationId,
@@ -62,9 +62,7 @@ export default function LinearBrowse() {
       links: [{ integrationId: it.integrationId, provider: 'linear', identifier: it.identifier }],
     })
     await qc.invalidateQueries({ queryKey: tasksKey })
-    setSelectedSource(null)
-    setActiveTaskId(w.id)
-    setActivePane('linear')
+    activateTaskSignals(w, { pane: 'linear' }) // a promoted ticket lands on its Linear pane
     navigate(`/${owner}/${repo}`)
   }
 

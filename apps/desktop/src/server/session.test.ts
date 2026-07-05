@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { cookieAttrs, openSession, sealSession, type SessionData } from './session'
+import { openSession, sealSession, type SessionData } from './session'
 
 // jose's A256GCM uses WebCrypto (crypto.subtle), a Node global since v20 — no Workers-only
 // APIs here, so this runs under vitest's default Node environment.
@@ -32,6 +32,11 @@ describe('sealSession / openSession round-trip', () => {
     expect(await openSession(jwt, OTHER_KEY)).toBeNull()
   })
 
+  it('returns null for a tampered ciphertext (AEAD tag mismatch)', async () => {
+    const jwt = await sealSession(data, KEY)
+    expect(await openSession(jwt.slice(0, -2) + 'xx', KEY)).toBeNull()
+  })
+
   it('returns null for garbage / non-JWE input', async () => {
     expect(await openSession('not-a-jwt', KEY)).toBeNull()
     expect(await openSession('', KEY)).toBeNull()
@@ -41,15 +46,5 @@ describe('sealSession / openSession round-trip', () => {
   it('rejects keys that are not 64 hex chars', async () => {
     await expect(sealSession(data, 'tooshort')).rejects.toThrow(/64 hex chars/)
     await expect(sealSession(data, 'z'.repeat(64))).rejects.toThrow(/64 hex chars/)
-  })
-})
-
-describe('cookieAttrs', () => {
-  it('uses the __Host- prefix + Secure over https', () => {
-    expect(cookieAttrs('https://example.com/api/x')).toEqual({ name: '__Host-session', secure: true })
-  })
-
-  it('drops the prefix + Secure over http (localhost dev)', () => {
-    expect(cookieAttrs('http://localhost:5173/api/x')).toEqual({ name: 'session', secure: false })
   })
 })

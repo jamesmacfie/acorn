@@ -1,7 +1,8 @@
 import { EncryptJWT, jwtDecrypt } from 'jose'
 
 // The stateless session: { token, user } sealed into an encrypted cookie (AES-256-GCM via
-// JWE `dir`). Decrypted in-CPU on every /api/* request — 0 KV reads. See docs/auth.md.
+// JWE `dir`). Decrypted in-CPU on every /api/* request — no server-side session store.
+// See docs/authentication.md.
 
 export type SessionData = {
   token: string // GitHub OAuth token — NEVER returned to the browser in plaintext
@@ -57,9 +58,7 @@ export async function decryptSecret(jwt: string, hexKey: string): Promise<string
   }
 }
 
-// __Host- requires a Secure (https) connection. Over http://localhost (dev), browsers reject
-// it, so drop the prefix + Secure there. docs/local-development.md "Local gotchas".
-export function cookieAttrs(reqUrl: string): { name: '__Host-session' | 'session'; secure: boolean } {
-  const secure = new URL(reqUrl).protocol === 'https:'
-  return { name: secure ? '__Host-session' : 'session', secure }
-}
+// The server is always plain-HTTP loopback (http://127.0.0.1:4317), so the `__Host-` prefix
+// (which requires Secure/https) can never apply — `session` is the only cookie name.
+// See docs/authentication.md.
+export const SESSION_COOKIE = 'session'

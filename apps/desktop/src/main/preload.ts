@@ -26,8 +26,6 @@ contextBridge.exposeInMainWorld('acorn', {
       set: (owner: string, repo: string, path: string) => ipcRenderer.invoke('term:repoPath:set', { owner, repo, path }),
       // Native folder picker (onboarding / repo mapping). Returns the chosen absolute path or null.
       pick: () => ipcRenderer.invoke('term:repoPath:pick'),
-      runConfig: (owner: string, repo: string, runCommand: string, devPort: number) =>
-        ipcRenderer.invoke('term:repoPath:runConfig', { owner, repo, runCommand, devPort }),
       // Per-repo run targets as a JSON RunTarget[] string (docs/next 13 §A DB fallback).
       runTargets: (owner: string, repo: string, runTargets: string) =>
         ipcRenderer.invoke('term:repoPath:runTargets', { owner, repo, runTargets }),
@@ -106,9 +104,6 @@ contextBridge.exposeInMainWorld('acorn', {
   mcp: {
     inspect: (taskId: string) => ipcRenderer.invoke('mcp:inspect', taskId),
     createStarter: (taskId: string) => ipcRenderer.invoke('mcp:createStarter', taskId),
-    // Register/remove acorn's own MCP server via the agent's CLI (explicit user action only).
-    register: (flavour: 'claude' | 'codex') => ipcRenderer.invoke('mcp:register', flavour),
-    unregister: (flavour: 'claude' | 'codex') => ipcRenderer.invoke('mcp:unregister', flavour),
   },
   // Memory (docs/next 12): committed .acorn/memory files + the derived FTS index.
   memory: {

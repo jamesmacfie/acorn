@@ -66,7 +66,16 @@
 /* Inline add-memory form (docs/next 12 P1). */
 .context-tray-memform { display: flex; flex-direction: column; gap: 6px; margin-top: 6px; padding-top: 6px; border-top: 1px solid var(--border); }
 
-/* Auto-generated memory proposals (docs/next 12 P3 — the human gate). */
+/* Auto-generated memory proposals (docs/next 12 P3 — the human gate; MemoryTray.tsx). */
 .context-tray-proposals { display: flex; flex-direction: column; gap: 4px; margin-top: 6px; padding-top: 6px; border-top: 1px solid var(--border); font-size: var(--fs-sm); }
 .context-tray-proposal { display: flex; align-items: center; gap: 8px; }
 .context-tray-proposal-desc { flex: 1; min-width: 0; }
+/* Structural verification flags under a proposal row (never folded into the description). */
+.context-tray-proposal-flags { display: flex; flex-wrap: wrap; gap: 4px; padding-left: 8px; }
+.context-tray-proposal-flag {
+  font-size: var(--fs-sm);
+  color: var(--warn);
+  border: 1px solid var(--warn);
+  border-radius: 999px;
+  padding: 0 8px;
+}

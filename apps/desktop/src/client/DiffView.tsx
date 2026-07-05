@@ -1,16 +1,18 @@
 import { createEffect, createMemo, createSignal, For, on, onCleanup, onMount, Show } from 'solid-js'
 import { createQuery, useQueryClient } from '@tanstack/solid-query'
 import { useParams, useSearchParams } from '@solidjs/router'
-import { createVirtualizer } from '@tanstack/solid-virtual'
-import { fileBlobOptions, filesOptions, mentionsOptions, prefsKey, prefsOptions, pullDetailOptions, pullKey, type PullFile, type Thread } from './queries'
+import { filesKey } from '../shared/api'
+import { fetchFilePatches, fileBlobOptions, filePatchKey, filesOptions, mentionsOptions, prefsKey, prefsOptions, pullDetailOptions, pullKey, type PullFile, type Thread } from './queries'
 import { addReviewComment, replyReview, resolveThread, setPref } from './mutations'
 import { getHighlighter } from './shiki'
 import { FILE_SCROLL_EVENT, routeKey as makeRouteKey, type FileScrollDetail } from './fileNavigation'
 import { DiffLine, NonCodeRow, SplitCell, type LineComposerController, type ThreadCollapseController } from './features/diff/DiffRows'
 import { createDiffHydrator } from './features/diff/hydration'
+import { createDiffMeasureSchedulers, createDiffVirtualizer } from './features/diff/virtualization'
 import {
   buildDiffRows,
   buildRenderableRows,
+  DIFF_LOAD_ROW_HEIGHT,
   estimateRowSize,
   estimateSplitBandSize,
   expandGap,
@@ -31,14 +33,17 @@ import {
 } from './features/diff/model'
 
 // Right (Diff) pane: render EVERY changed file's diff stacked one after another in a single
-// virtualized list (docs/git-diff.md, docs/ui-style.md §6). Each file opens with a header row;
+// virtualized list (docs/diff-rendering.md, docs/ui-design.md). Each file opens with a header row;
 // `?file=` no longer picks which file is shown — it's the scroll target (the file list, finder,
 // and [ / ] all set it), so selecting a file scrolls the combined diff to it.
 //
-// The PR load fetches the full changed-file payload so every patch body is present for that PR.
-// Parsing and Shiki highlighting still hydrate in priority order so large PRs do not turn one
-// network gap into one giant main-thread block. Review threads are interleaved at render time
-// (matched by path) so thread mutations rerender without re-tokenizing patches.
+// The files query returns the full changed-file payload, so patch bodies are normally all present
+// up front; the hydrator's fetchPatches fallback re-fetches any body that is still missing (a
+// leftover of the earlier summaries-first design that now only covers partial/restored caches —
+// binary and too-large files legitimately have no patch and render a "No diff" row instead).
+// Parsing and Shiki highlighting hydrate in priority order so large PRs do not turn one network
+// gap into one giant main-thread block. Review threads are interleaved at render time (matched by
+// path) so thread mutations rerender without re-tokenizing patches.
 //
 type PullRoute = {
   owner: string
@@ -46,7 +51,6 @@ type PullRoute = {
   number: string
   key: string
 }
-const FALLBACK_ROW_ESTIMATE = 36
 const HIGHLIGHT_MAX_PATCH_CHARS = 120_000
 const HIGHLIGHT_MAX_PATCH_LINES = 2_000
 
@@ -116,13 +120,25 @@ function DiffForPull(props: { route: PullRoute }) {
   }
 
   const hydrator = createDiffHydrator({
-    owner,
-    repo,
-    number,
-    queryClient,
     tokenizerForFile: (file) => (shouldUsePlainTokenizer(file) ? Promise.resolve(plainTokenize) : loadTokenizer()),
     parseFile: (file, tokenize) => ({ file, diff: buildDiffRows(file, tokenize) }),
     onParsed: (parsedFile) => setParsedByPath((prev) => new Map(prev).set(parsedFile.file.path, parsedFile)),
+    // Patch-body source: the query cache first (per-path patch entries, then the warmed files
+    // query — which also resolves binary/too-large files to their legitimate null patch)…
+    cachedFile: (path) => {
+      const direct = queryClient.getQueryData<PullFile>(filePatchKey(owner, repo, number, path))
+      if (direct) return direct
+      const warmed = queryClient.getQueryData<PullFile[]>(filesKey(owner, repo, number))
+      return warmed?.find((file) => file.path === path) ?? null
+    },
+    // …then the batch patch endpoint for anything still missing, seeding per-path cache entries.
+    fetchPatches: async (paths, signal) => {
+      const fetched = await fetchFilePatches(owner, repo, number, paths, signal)
+      for (const file of fetched) {
+        queryClient.setQueryData(filePatchKey(owner, repo, number, file.path), file)
+      }
+      return fetched
+    },
   })
   onCleanup(hydrator.dispose)
 
@@ -180,64 +196,25 @@ function DiffForPull(props: { route: PullRoute }) {
   // the same tick a cached query fills rows() — otherwise it freezes a 0-height viewport and the
   // range stays empty. measure() then drives that post-layout re-read.
   const [scrollEl, setScrollEl] = createSignal<HTMLDivElement>()
-  const virt = createVirtualizer({
-    get count() {
-      return rows().length
-    },
-    getScrollElement: () => scrollEl() ?? null,
-    getItemKey: (index) => rowKeys()[index] ?? `row:${index}`,
-    estimateSize: (index) => {
-      const row = rows()[index]
-      return row ? estimateRowSize(row) : FALLBACK_ROW_ESTIMATE
-    },
-    overscan: 20,
+  const virt = createDiffVirtualizer({
+    items: rows,
+    keys: rowKeys,
+    keyPrefix: 'row',
+    estimateSize: (row) => (row ? estimateRowSize(row) : DIFF_LOAD_ROW_HEIGHT),
+    scrollEl,
   })
-  const splitVirt = createVirtualizer({
-    get count() {
-      return bands().length
-    },
-    getScrollElement: () => scrollEl() ?? null,
-    getItemKey: (index) => bandKeys()[index] ?? `band:${index}`,
-    estimateSize: (index) => estimateSplitBandSize(bands()[index]),
-    overscan: 20,
+  const splitVirt = createDiffVirtualizer({
+    items: bands,
+    keys: bandKeys,
+    keyPrefix: 'band',
+    estimateSize: estimateSplitBandSize,
+    scrollEl,
   })
 
-  let virtualMeasureFrame = 0
-  let needsUnifiedMeasure = false
-  let needsSplitMeasure = false
-  const scheduleVirtualMeasure = (target: 'unified' | 'split') => {
-    if (target === 'unified') needsUnifiedMeasure = true
-    else needsSplitMeasure = true
-    if (virtualMeasureFrame) return
-    virtualMeasureFrame = requestAnimationFrame(() => {
-      virtualMeasureFrame = 0
-      if (!scrollEl()) return
-      if (needsUnifiedMeasure) virt.measure()
-      if (needsSplitMeasure) splitVirt.measure()
-      needsUnifiedMeasure = false
-      needsSplitMeasure = false
-    })
-  }
-
-  const pendingUnifiedMeasures = new Set<HTMLElement>()
-  const pendingSplitMeasures = new Set<HTMLElement>()
-  let elementMeasureFrame = 0
-  const scheduleElementMeasure = (target: 'unified' | 'split', el: HTMLElement) => {
-    if (target === 'unified') pendingUnifiedMeasures.add(el)
-    else pendingSplitMeasures.add(el)
-    if (elementMeasureFrame) return
-    elementMeasureFrame = requestAnimationFrame(() => {
-      elementMeasureFrame = 0
-      for (const item of pendingUnifiedMeasures) {
-        if (item.isConnected) virt.measureElement(item)
-      }
-      for (const item of pendingSplitMeasures) {
-        if (item.isConnected) splitVirt.measureElement(item)
-      }
-      pendingUnifiedMeasures.clear()
-      pendingSplitMeasures.clear()
-    })
-  }
+  const { scheduleVirtualMeasure, scheduleElementMeasure, cancel: cancelMeasures } = createDiffMeasureSchedulers(
+    { unified: virt, split: splitVirt },
+    scrollEl,
+  )
 
   const shouldMeasureRow = (row: Row) => row.kind === 'thread' || isCodeRow(row)
   const shouldMeasureBand = (band: SplitBand) => band.kind === 'pair' || (band.kind === 'full' && band.row.kind === 'thread')
@@ -351,8 +328,7 @@ function DiffForPull(props: { route: PullRoute }) {
   let scrollFrame = 0
   onCleanup(() => {
     cancelAnimationFrame(scrollFrame)
-    cancelAnimationFrame(virtualMeasureFrame)
-    cancelAnimationFrame(elementMeasureFrame)
+    cancelMeasures()
   })
   const resetScrollPosition = () => {
     const el = scrollEl()
@@ -549,6 +525,9 @@ function DiffForPull(props: { route: PullRoute }) {
                 const measureBand = () => {
                   if (bandEl) scheduleElementMeasure('split', bandEl)
                 }
+                // The <Show> fallback below only renders when the band is NOT a pair, so this
+                // narrowed accessor is safe there — one cast instead of one per use.
+                const fullRow = () => (band as Extract<SplitBand, { kind: 'full' }>).row
                 return (
                   <div
                     class="diff-split-band"
@@ -565,16 +544,13 @@ function DiffForPull(props: { route: PullRoute }) {
                         <div
                           class="diff-split-full"
                           classList={{
-                            'diff-hunk': (band as Extract<SplitBand, { kind: 'full' }>).row.kind === 'hunk',
-                            'diff-file-row': (band as Extract<SplitBand, { kind: 'full' }>).row.kind === 'file',
-                            'diff-thread-row':
-                              (band as Extract<SplitBand, { kind: 'full' }>).row.kind === 'thread' ||
-                              (band as Extract<SplitBand, { kind: 'full' }>).row.kind === 'nodiff' ||
-                              (band as Extract<SplitBand, { kind: 'full' }>).row.kind === 'load',
+                            'diff-hunk': fullRow().kind === 'hunk',
+                            'diff-file-row': fullRow().kind === 'file',
+                            'diff-thread-row': fullRow().kind === 'thread' || fullRow().kind === 'nodiff' || fullRow().kind === 'load',
                           }}
                         >
                           <NonCodeRow
-                            row={(band as Extract<SplitBand, { kind: 'full' }>).row}
+                            row={fullRow()}
                             onMutated={invalidate}
                             resolveThread={(threadId, resolved) => resolveThread(owner, repo, number, threadId, resolved)}
                             reply={(databaseId, body) => replyReview(owner, repo, number, databaseId, body)}

@@ -1,130 +1,118 @@
 # 06 — Implementation phases
 
-A path from today's three-axis system to the Workspace model, in the incremental style of
-[`../vNext.md`](../vNext.md). Each phase is independently shippable and leaves the app working. The
-ordering front-loads a **clean schema baseline** (P0) and the **entity + drift fix** (the
-highest-value wins) and defers the bigger UI surgery.
+> ## ✅ Status: all phases (P0–P5) shipped
+> Every phase below has landed, with the renames from the two-tier table in
+> [`README.md`](./README.md): the entity built here is the **`tasks`** table / `Task` type, and
+> `terminal_sessions` got **`task_id`**, not `workspace_id`. The phase bodies below are a short
+> **"how it was built" record** — the step-by-step procedure text (schema resets, ABI dances,
+> acceptance criteria) was one-time work and has been collapsed; `schema.ts` and
+> [`03-data-model.md`](./03-data-model.md) are the source of truth for the shipped shapes.
+> Follow-on work (multi-pane layout, editor/browser/notes/context panes, run targets, MCP, memory,
+> workflows) is specified in [`../next/`](../next/README.md), not here.
 
-There is **no production data worth preserving**: the GitHub mirror re-syncs from GitHub on launch,
-and a single user re-creates their workspaces by hand. So we skip incremental schema surgery
-entirely — P0 wipes the data model and migrations and lands the *whole* schema (mirror + app-state +
-workspaces) as one fresh baseline. Every later phase then builds against a clean schema, with no
+The original plan: a path from the three-axis system to the Workspace model, in the incremental
+style of [`../vNext.md`](../vNext.md), each phase independently shippable. The ordering
+front-loaded a **clean schema baseline** (P0) and the **entity + drift fix** (the highest-value
+wins) and deferred the bigger UI surgery. There was **no production data worth preserving** (the
+GitHub mirror re-syncs on launch), so P0 skipped incremental schema surgery entirely and landed the
+whole schema as one fresh baseline — every later phase built against a clean schema, with no
 backward-compat, no nullable hedges, and no migration of old state.
 
 ---
 
-## P0 — Reset the schema baseline
+## P0 — Reset the schema baseline ✅ done
+
 **Goal:** one fresh migration that already contains the Workspace tables; no legacy data to tend.
 
-- Fold the new tables into `schema.ts` up front: `workspaces`, `workspace_links`, and
-  `workspaceId` **`NOT NULL`** on `terminal_sessions` ([`03`](./03-data-model.md)). A clean slate
-  means every session belongs to a workspace from row one — no nullable hedge, no rebuild migration.
-- **Drop** the now-redundant `repo_owner` / `repo_name` / `pull_number` columns from
-  `terminal_sessions`: repo / branch / PR are derived through the `workspaceId` → `workspaces` join.
-  The main process fills the `TerminalSession` wire type's `repo` / `pull` fields from that join.
-- Delete `apps/web/migrations/*` (all 16 files + `meta/`), then
-  `pnpm --filter @acorn/web db:generate` → emits a **single `0000` baseline** for the entire schema.
-- Delete `apps/web/.acorn/acorn.sqlite` (and `blobs/`). Next launch auto-migrates the baseline
-  (`openDb()` → `migrate()` in `apps/web/src/main/bindings.ts`), re-syncs the GitHub mirror, and
-  starts with zero workspaces.
-- **better-sqlite3 ABI dance** still applies: `node:rebuild` for `db:migrate`, `electron:rebuild`
-  for `pnpm dev` — see [`../local-development.md`](./../local-development.md) and CLAUDE.md.
-- **Done when:** a fresh DB is created from one migration; the schema has `workspaces`,
-  `workspace_links`, and `terminal_sessions.workspaceId`; the app launches and re-mirrors GitHub.
+**How it went:** the reset happened — `apps/desktop/migrations/0000_useful_magik.sql` is the fresh
+baseline and already contains `tasks`, `task_links`, `workspaces`, `workspace_repos`, and
+`terminal_sessions` with a `NOT NULL task_id` (the loose `repo_owner`/`repo_name`/`pull_number`
+columns were never created — exactly as designed, so the Drizzle `NOT NULL` table-rebuild quirk
+never bit). Since then the baseline has accrued incremental migrations (`ignored_repos`, workspace
+scripts/preview/icon/color, the `workspace_projects`/`integrations`/`issues`/`task_links` re-key
+onto `integrationId`, `review_notes`, `memories` + FTS5, `workflow_runs`/`workflow_steps`,
+`tasks.parent_id`, run targets, editor command, …). That's normal post-baseline evolution, not
+drift — the "single `0000` baseline" state is historical.
 
-## P1 — The `workspaces` entity + rail backed by it
+## P1 — The owning entity + rail backed by it ✅ done (as `tasks`)
+
 **Goal:** a real owning entity exists; the rail reads from it.
 
-The tables already exist (P0), so this phase is pure feature code — no migration.
+**How it went:** the entity shipped as **`tasks`** (`apps/desktop/src/server/routes/tasks.ts`:
+create / list-active / rename / archive), and a *second* router shipped for the new group-level
+`workspaces` (`routes/workspaces.ts`, including the idempotent `bootstrap`). `TabRail.tsx` renders
+Task rows from `tasksOptions` — with more than planned: pin/drag ordering
+(`features/tabs/railOrder.ts`, a client pref, not a route), per-task unread notification badges,
+worktree dirty markers (`taskStatus.ts`), workspace colors, and ⌘1–9 activation. The path-bookmark
+`Tab` mechanism was never built, as designed.
 
-- Server routes: CRUD for workspaces (create / list-active / rename / archive). New router under
-  `apps/web/src/server/routes/`, bindings already provide the DB.
-- Client: the **Workspaces** zone of `TabRail.tsx` renders rows from a `workspacesOptions` query.
-  The rail is wired to workspace entities from the start (the path-bookmark tab mechanism in
-  `features/tabs/model.ts` / `tabs.ts` is never built — see [`03`](./03-data-model.md)). Keep the
-  `workingCountFor()` agent indicator.
-- **Done when:** you can create/rename/archive a workspace and it persists across restart; the rail
-  shows workspace rows.
+## P2 — Bind terminals to the entity (kill the drift) ✅ done (as `taskId`)
 
-## P2 — Bind terminals to `workspaceId` (kill the drift)
 **Goal:** the disconnect from [`README.md`](./README.md) is gone.
 
-The `workspaceId` column landed in P0, so this is wiring only — no schema step.
+**How it went:** `TerminalSession.taskId` / `CreateOpts.taskId` are in
+`apps/desktop/src/shared/terminal.ts`, and `TerminalPanel.tsx` filters
+`sessions().filter(s => s.taskId === task.id)` (the `visibleSessions` memo) — the URL coupling is
+gone; a terminal opened in task A never shows under task B. The main process derives the wire
+type's `repo` / `pull` from the task join, as designed. The column landed in P0, so this phase was
+wiring only.
 
-- Add `workspaceId` (and the derived `repo` / `pull`) to the wire types `TerminalSession` /
-  `CreateOpts` (`apps/web/src/shared/terminal.ts`).
-- `TerminalPanel` visibility filter changes from `params.owner/repo` (`TerminalPanel.tsx:36`) to
-  `s.workspaceId === activeWorkspace.id`. The global `sessions` store stays; only the filter changes.
-- Session creation passes the active workspace's id.
-- **Done when:** switching workspaces swaps the visible terminals; a terminal opened in workspace A
-  never shows under workspace B, regardless of the URL.
+## P3 — Promotion flow + persisted worktree lifecycle ✅ done
 
-## P3 — Promotion flow + persisted worktree lifecycle
-**Goal:** Source items become workspaces; worktrees are owned and torn down cleanly.
+**Goal:** Source items become tasks; worktrees are owned and torn down cleanly.
 
-- "Open as workspace" on GitHub PR rows (Flow A, [`02`](./02-ui-design.md)) → creates a workspace
-  with `origin: 'github-pr'`, `branch = headRef`, `pullNumber`, and Linear-id links parsed from the
-  PR body.
-- Local-first: "New workspace" → repo + new branch (`origin: 'local'`).
-- Lazy worktree on first terminal (Flow C): persist `worktreePath`; reuse on subsequent terminals.
-  Reuse existing `api.worktree.ensure()` / `.remove()` (vNext §9); re-key the path by branch.
-- Archive guard: refuse teardown when sessions are running or the worktree is dirty
-  ([`05`](./05-lifecycle-and-isolation.md)).
-- PR inheritance (Flow B): on PR sync, match a no-`pullNumber` workspace's `branch` against
-  `pull_requests.headRef` and set `pullNumber`.
-- **Done when:** you can promote a PR, open a terminal (worktree appears, owned by the workspace),
-  archive it (worktree removed only when clean + idle), and a local-first workspace gains a PR
-  automatically after one is opened.
+**How it went:** all of it landed. "Open as task" on PR rows seeds Linear links from the PR body at
+promotion time (`PullList.tsx` `scanLinearRefs` — only when exactly one Linear connection exists,
+since `task_links` now needs an `integrationId`); local-first "New task"; lazy branch-keyed
+worktrees (`main/terminal.ts` → `main/worktrees.ts`); PR inheritance (Flow B) runs in
+`routes/pulls.ts` on mirror sync. Archive went **beyond** the design: `ArchiveOpts` supports
+`deleteWorktree` / `force` / `skipTeardown`, and a per-workspace **teardown script** (docs/next 02)
+runs before removal, with `teardownFailed` surfaced to the UI — the guarded flow is drawn in
+[`05`](./05-lifecycle-and-isolation.md).
 
-## P4 — Pane switcher + PR review as a pane + Sources split out
+## P4 — Pane switcher + PR review as a pane + Sources split out ✅ done (extended)
+
 **Goal:** the cohesive single-window view.
 
-- Pane switcher (the small view icons) drives the active pane per workspace.
-- `PullDetail` + `DiffView` become the **PR review pane** (likely dropping the list column).
-- `LinearIssuePanel` becomes the **Linear pane**, resolving via `workspace_links`.
-- Rail gains the **Sources** zone; `PullList` becomes the **GitHub Source** browse view.
-- Linear Source browse view (thin list over existing `linearIssuesOptions`).
-- **Done when:** a workspace shows PR review / Linear / terminal panes via the switcher; the GitHub
-  Source view lists PRs cross-repo and promotes them; Linear appears as a Source when connected.
+**How it went:** `TaskView.tsx` + the pane reducer (`features/tasks/layout.ts`) shipped, then grew
+past this spec: the layout is a **multi-pane row** (⌘-click opens a pane beside the others,
+docs/next 03), and the pane set is `pr | linear | rollbar | preview | editor | changes | notes |
+browser | context`. Terminal is **not** a pane — it stayed a bottom drawer (deliberate; see
+[`02`](./02-ui-design.md)'s shipped notes). The Sources zone shipped with integration gating
+(`availableSources()` in `features/tabs/sources.ts`), plus `LinearBrowse.tsx` / `RollbarBrowse.tsx`
+browse views; `PullList` became the GitHub Source browse view.
 
-## P5 — Dev-server pane + Rollbar + browser preview (seam)
+## P5 — Dev-server support + Rollbar + browser preview ✅ done (divergent)
+
 **Goal:** local-run support and the remaining integrations.
 
-- Per-repo run command + per-workspace port ([`05`](./05-lifecycle-and-isolation.md)); **dev-server
-  pane** runs it in the worktree.
-- **Browser-preview pane**: a `<webview>` onto `localhost:<port>`. Electron `<webview>` only;
-  respect the existing hardened-window posture in [`../electron.md`](../electron.md).
-- **Rollbar Source**: `integrations` row + `IntegrationsModal` field + a browse view caching into
-  `issues` ([`04`](./04-sources-and-integrations.md)).
-- **Done when:** a workspace can run its dev server and preview it; Rollbar errors can be promoted to
-  workspaces.
+**How it went:** all three landed, but the dev-server design diverged: there is **no per-task port
+allocation**. Dev servers shipped as **run targets** (docs/next 13 §A) — named commands from a
+committed `.acorn/config.toml` or the `repo_paths.run_targets` JSON fallback (the interim
+`run_command`/`dev_port` columns that predated run targets have been removed) — running as
+ordinary terminal sessions in the drawer; "acorn allocates no ports". The preview `<webview>`
+shipped (`webviewTag: true`, guest pinned to localhost in `main/electron.ts`) and resolves its URL
+via `workspaces.preview_mode` (`url | port | script`) or a run target's `url`/`url_command` —
+richer than the design's "base + rail offset" scheme, which was never built
+([`05`](./05-lifecycle-and-isolation.md) has the honest trade-off). Rollbar shipped exactly as the
+litmus test hoped: `routes/rollbar.ts` caches into the generic `issues` table with zero new schema.
 
 ---
 
-## Sequencing rationale
-- **P0 is a one-time reset**: collapsing the migrations and landing the full schema once is far
-  cheaper than threading `workspaceId` through a populated table with incremental ALTERs — and
-  there's no data to lose.
-- **P1+P2 are the cheap, high-value core**: they fix the actual disconnect and create the entity,
-  with almost no UI surgery. If the project stops after P2, acorn is already meaningfully better.
-- **P3 is the behavioural heart** (promotion + owned worktrees) — the part that needs the most care
-  (the lifecycle guards in [`05`](./05-lifecycle-and-isolation.md)).
-- **P4 is presentation** — reorganizing components that already exist into panes.
-- **P5 is additive** — new panes/sources that don't change the core model.
-
-## Risks & gotchas
-- **better-sqlite3 ABI** (P0 / any `db:migrate`): the recurring footgun — see the CLAUDE.md note and
-  [`../local-development.md`](../local-development.md).
-- **The Drizzle `NOT NULL` table-rebuild quirk does not bite here**: because P0 generates the schema
-  from scratch (empty table), `terminal_sessions.workspaceId` can be `NOT NULL` with no hand-trimmed
-  `INSERT … SELECT` rebuild — the exact pain the clean baseline avoids.
-- **`Env` type** (`apps/web/src/env.d.ts`): only needs updating if a phase changes the bindings
-  shape; the new tables don't.
-- **Confirm the wipe is intended**: P0 deletes the local DB and all migrations. That's the agreed
-  premise (no data worth keeping), but it is the one irreversible-feeling step — the GitHub mirror
-  re-syncs, yet local-only state (e.g. viewed-file checkmarks) is gone.
+## Sequencing rationale (design-time, kept for the record)
+- **P0 was a one-time reset**: collapsing the migrations and landing the full schema once was far
+  cheaper than threading `task_id` through a populated table with incremental ALTERs — and there
+  was no data to lose.
+- **P1+P2 were the cheap, high-value core**: they fixed the actual disconnect and created the
+  entity, with almost no UI surgery.
+- **P3 was the behavioural heart** (promotion + owned worktrees) — the part that needed the most
+  care (the lifecycle guards in [`05`](./05-lifecycle-and-isolation.md)).
+- **P4 was presentation** — reorganizing components that already existed into panes.
+- **P5 was additive** — new panes/sources that didn't change the core model.
 
 ## Out of scope (named, not built)
 Container/devcontainer runtime isolation; crash-time content snapshots; cross-source dedup;
 bi-directional integration sync. See the deferred sections of [`04`](./04-sources-and-integrations.md)
-and [`05`](./05-lifecycle-and-isolation.md).
+and [`05`](./05-lifecycle-and-isolation.md). These remain unbuilt as of the shipped-status pass;
+some now have designs in [`../next/`](../next/README.md).
+

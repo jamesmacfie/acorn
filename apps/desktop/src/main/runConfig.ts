@@ -1,7 +1,8 @@
-// Layered repo config (docs/next 13 §B): ./.acorn/config.toml (committed, team-shared) →
-// ~/.acorn/config.toml (personal defaults) → DB columns (today's storage, the fallback). Returns a
-// typed, validated config PLUS structured parse errors — a broken file is surfaced (palette row,
-// 13 §B), never silently ignored. A repo with no .acorn/ behaves exactly as today.
+// Layered run/config source (docs/next 13 §B) — the merged run-target config plus lifecycle
+// scripts/copy/layouts: ./.acorn/config.toml (committed, team-shared) → ~/.acorn/config.toml
+// (personal defaults) → DB columns (fallback only). Returns a typed, validated config PLUS
+// structured parse errors — a broken file is surfaced (palette row, 13 §B), never silently
+// ignored. A repo with no .acorn/ behaves exactly as today.
 // ponytail: smol-toml + hand validation — no config framework.
 import { existsSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
@@ -20,8 +21,7 @@ export type RunTarget = {
 
 export type LayoutRecipe = {
   id: string
-  panes: string[]
-  ratio?: number
+  panes: string[] // panes split equally — there is deliberately no ratio field
   terminal?: string // run.<id> to auto-start in the drawer
   browser?: string // 'run:<id>' — point the browser at that target's resolved URL
 }
@@ -36,9 +36,8 @@ export type RepoConfig = {
   errors: ConfigError[]
 }
 
-// The DB columns the file layers override. The `dev` run button now comes from the per-workspace
-// dev script (or explicit config); the old scalar runCommand/devPort no longer maps to a target
-// (devPort remains a browser-preview fallback in TaskView).
+// The DB columns the file layers override. The `dev` run button comes from the per-workspace dev
+// script (or explicit config) — see the layering comment in loadRepoConfig below.
 export type DbConfigFallback = {
   setupScript?: string | null
   teardownScript?: string | null
@@ -130,7 +129,6 @@ function parseLayer(text: string, source: string, errors: ConfigError[]): Layer 
       layer.layouts.set(id, {
         id,
         panes,
-        ratio: typeof o.ratio === 'number' ? o.ratio : undefined,
         terminal: str(o.terminal),
         browser: str(o.browser),
       })
@@ -139,9 +137,9 @@ function parseLayer(text: string, source: string, errors: ConfigError[]): Layer 
   return layer
 }
 
-// The repo_paths.runTargets JSON column → RunTarget[] (the per-repo DB fallback surface). The old
-// scalar runCommand/devPort no longer produces a `dev` target — the per-workspace dev script (Settings
-// → workspace) replaces it, so an empty dev script means no run button. Malformed JSON → no targets.
+// The repo_paths.runTargets JSON column → RunTarget[] (the per-repo DB fallback surface).
+// Malformed JSON → no targets. (The pre-0017 scalar runCommand/devPort columns are gone — data
+// migration 0017 folded them into this JSON column, and 0018 dropped them.)
 export function legacyRunTargets(db: DbConfigFallback): RunTarget[] {
   if (!db.runTargetsJson) return []
   try {
@@ -189,9 +187,15 @@ export function loadRepoConfig(repoDir: string | null, userConfigDir: string | n
   const user = readLayer(userConfigDir, 'user')
 
   const run = new Map<string, RunTarget>()
-  // Per-workspace dev script is the lowest-precedence base `dev` target: any repo-specific config
-  // (legacy scalar, repo JSON, ~/.acorn, ./.acorn) overrides it. No `default` flag — it carries no
-  // URL, so flagging it would shadow a repo's real default target in RuntimeService.defaultUrl.
+  // THE `dev` target's layering, in one place (docs/workflows.md): `.acorn/config.toml` is the
+  // CANONICAL home for run targets — commit `[scripts.run.dev]` there. The DB surfaces are
+  // fallback layers only, and the merge order below makes toml win by inserting later:
+  //   1. workspaces.devScript/devRestartScript → a base `dev` target (lowest precedence)
+  //   2. repo_paths.runTargets JSON (per-repo Settings surface)
+  //   3. ~/.acorn/config.toml (personal defaults)
+  //   4. ./.acorn/config.toml (committed — always wins)
+  // The base `dev` target gets no `default` flag — it carries no URL, so flagging it would shadow
+  // a repo's real default target in RuntimeService.defaultUrl.
   if (db.devScript?.trim()) run.set('dev', { id: 'dev', command: db.devScript.trim(), restart: db.devRestartScript?.trim() || undefined })
   for (const t of legacyRunTargets(db)) run.set(t.id, t)
   for (const t of user?.run.values() ?? []) run.set(t.id, t)

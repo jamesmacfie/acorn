@@ -7,7 +7,6 @@ import { isPaneId, type TaskLayout } from './layout'
 export type RecipeSpec = {
   id: string
   panes: string[]
-  ratio?: number
   terminal?: string // run.<id> to auto-start (shows in the terminal drawer)
   browser?: string // 'run:<id>' — browser home = that target's resolved URL
 }
@@ -21,7 +20,8 @@ export type RecipeServices = {
 }
 
 // Recipe panes → a validated TaskLayout: the known panes open left→right. Unknown/duplicate panes
-// dropped; none valid → null. (The recipe `ratio` is no longer used — panes split equally.)
+// dropped (configs may name ids we no longer model); none valid → null. Panes split equally —
+// main's parser dropped the old `ratio` key and this type followed.
 export function recipeToLayout(recipe: RecipeSpec): TaskLayout | null {
   const panes = [...new Set(recipe.panes.filter(isPaneId))]
   if (!panes.length) return null

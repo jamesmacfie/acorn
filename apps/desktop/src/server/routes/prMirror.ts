@@ -1,15 +1,18 @@
 import { and, eq, inArray } from 'drizzle-orm'
 import type { SQLiteColumn } from 'drizzle-orm/sqlite-core'
 import type { PullDetail, PullFile } from '../../shared/api'
+import { patchBlobKey } from '../blobs'
 import { getDb, schema } from '../db'
 import { chunkRowsByColumnBudget } from '../db/batch'
 import { filesResource, prResource } from '../db/resourceKeys'
-import { gh } from '../github'
+import { gh, ghError } from '../github'
+import type { RouteResult } from './repoMirror'
 
-// Shared PR mirror helpers: the GraphQL→D1 detail mirror and the REST→KV/D1 files mirror, plus
-// their read-backs. Both the single-PR routes (pullDetail / pullFiles) and the batch route
-// (pullsBatch) read+write the same mirror tables, so the logic lives here once to avoid drift.
-// PR data is "fast-changing" (docs/caching.md) — freshness is a 45s TTL gate in sync_state.
+// Shared PR mirror helpers: the GraphQL detail mirror and the REST files mirror (SQLite rows +
+// on-disk patch blobs), plus their read-backs. Both the single-PR routes (pullDetail / pullFiles)
+// and the batch route (pullsBatch) read+write the same mirror tables, so the logic lives here
+// once to avoid drift. PR data is "fast-changing" (docs/caching.md) — freshness is a 45s TTL gate
+// in sync_state.
 export const STALE_AFTER_MS = 45_000
 
 type Db = ReturnType<typeof getDb>
@@ -111,8 +114,8 @@ const childWhere = (t: { userId: SQLiteColumn; repoId: SQLiteColumn; number: SQL
   and(eq(t.userId, key.userId), eq(t.repoId, key.repoId), eq(t.number, key.number))
 
 // Atomically re-mirror one PR's detail composite: upsert the pull row, replace all child rows,
-// bump sync_state. D1 caps bound params at 100/statement, so rows per insert are capped by column
-// count. Runs in one db.batch; callers can fan these out in parallel across PRs.
+// bump sync_state. Rows per insert are capped by the bound-parameter budget in db/batch.ts.
+// Runs in one db.batch; callers can fan these out in parallel across PRs.
 export const mirrorPr = async (db: Db, key: PrKey, pr: GqlPull, now: number) => {
   const pullRow = {
     ...key,
@@ -130,8 +133,6 @@ export const mirrorPr = async (db: Db, key: PrKey, pr: GqlPull, now: number) => 
     mergeStateStatus: pr.mergeStateStatus ?? null,
     autoMergeEnabled: pr.autoMergeRequest != null,
     fetchedAt: now,
-    staleAfter: STALE_AFTER_MS,
-    etag: null,
   }
   const labelRows = pr.labels.nodes.map((l) => ({ ...key, name: l.name, color: l.color }))
   const reviewRows = pr.reviews.nodes.map((r) => ({
@@ -280,9 +281,9 @@ export const readComposite = async (db: Db, key: PrKey): Promise<PullDetail> => 
   }
 }
 
-// ─── Files (REST /files → KV/D1) ─────────────────────────────────────────────
+// ─── Files (REST /files → SQLite rows + BLOBS patch bodies) ──────────────────
 
-type GitHubFile = {
+export type GitHubFile = {
   filename: string
   status: string
   additions: number
@@ -291,24 +292,22 @@ type GitHubFile = {
   patch?: string // omitted for binary / too-large / pure-rename files
 }
 
-// Patch bodies key off an immutable sha and live in the local on-disk BLOBS cache (the D1 `patch`
-// column is always null now). The public/private split is gone — it only mattered for Workers'
-// shared KV; on a single-user machine the cache is yours (docs/electron.md §5).
-const blobKey = (sha: string) => `patch:${sha}`
-
 // Fetch one PR's changed files from the REST API. ponytail: first 100 files — Link-header
-// pagination deferred. Returns null on a non-OK response (caller decides how to surface).
-export const fetchFiles = async (token: string, owner: string, repo: string, number: number) => {
+// pagination deferred. Non-OK responses are normalized through ghError (same RouteResult shape
+// as refreshRepos), so callers don't re-derive failures themselves.
+export const fetchFiles = async (token: string, owner: string, repo: string, number: number): Promise<RouteResult<GitHubFile[]>> => {
   const res = await gh(token, `/repos/${owner}/${repo}/pulls/${number}/files?per_page=100`)
-  if (!res.ok) return { res, body: null as GitHubFile[] | null }
-  return { res, body: (await res.json()) as GitHubFile[] }
+  const err = ghError(res)
+  if (err) return { ok: false, failure: err }
+  return { ok: true, value: (await res.json()) as GitHubFile[] }
 }
 
-// Re-mirror one PR's files: patch bodies → on-disk BLOBS by sha (immutable, deduped). The file
-// metadata rows go to the DB; the large patch bodies do not (resolved from BLOBS on read).
+// Re-mirror one PR's files: patch bodies → on-disk BLOBS by immutable sha (deduped, cached
+// forever — see server/blobs.ts); only the metadata rows go to the DB. Bodies resolve back from
+// BLOBS on read.
 export const mirrorFiles = async (env: Env, db: Db, key: PrKey, body: GitHubFile[]) => {
   const now = Date.now()
-  await Promise.all(body.filter((f) => f.patch != null).map((f) => env.BLOBS.put(blobKey(f.sha), f.patch as string)))
+  await Promise.all(body.filter((f) => f.patch != null).map((f) => env.BLOBS.put(patchBlobKey(f.sha), f.patch as string)))
   const rows = body.map((f) => ({
     ...key,
     path: f.filename,
@@ -316,7 +315,6 @@ export const mirrorFiles = async (env: Env, db: Db, key: PrKey, body: GitHubFile
     additions: f.additions,
     deletions: f.deletions,
     sha: f.sha,
-    patch: null,
   }))
   const fileWhere = and(eq(schema.prFiles.userId, key.userId), eq(schema.prFiles.repoId, key.repoId), eq(schema.prFiles.number, key.number))
   const resource = filesResource(key.repoId, key.number)
@@ -358,7 +356,7 @@ export const readFiles = async (env: Env, db: Db, key: PrKey, options: ReadFiles
       deletions: f.deletions,
       sha: f.sha,
       viewed: seen.has(f.path),
-      patch: includePatches ? (f.patch ?? (f.sha ? await env.BLOBS.get(blobKey(f.sha)) : null)) : null,
+      patch: includePatches && f.sha ? await env.BLOBS.get(patchBlobKey(f.sha)) : null,
     })),
   )
 }

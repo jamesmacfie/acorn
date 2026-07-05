@@ -2,7 +2,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import { legacyRunTargets, loadRepoConfig } from './repoConfig'
+import { legacyRunTargets, loadRepoConfig } from './runConfig'
 
 describe('loadRepoConfig (docs/next 13 §B)', () => {
   let dir: string
@@ -95,7 +95,8 @@ browser = "run:dev"
     expect(cfg.errors).toEqual([])
     expect(cfg.copy).toEqual(['.env.local', '.env.development'])
     expect(cfg.scripts.archive).toBe('docker compose down')
-    expect(cfg.layouts).toEqual([{ id: 'review', panes: ['pr', 'changes'], ratio: 0.5, terminal: 'dev', browser: 'run:dev' }])
+    // `ratio` in the file is tolerated but not parsed — panes split equally (docs/workflows.md).
+    expect(cfg.layouts).toEqual([{ id: 'review', panes: ['pr', 'changes'], terminal: 'dev', browser: 'run:dev' }])
   })
 
   it('malformed TOML → structured error, not a throw; falls back to lower layers', () => {

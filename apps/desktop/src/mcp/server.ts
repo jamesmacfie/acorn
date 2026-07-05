@@ -1,38 +1,19 @@
 // The acorn MCP server (docs/next 06 B): a stdio server exposing acorn's task context as tools.
-// Launched by the AGENT (registered via `claude mcp add …` with the Electron-as-node launcher), so
-// it scopes itself entirely from inherited env: ACORN_TASK_ID (which task), ACORN_API_URL +
-// ACORN_API_TOKEN (loopback into the running app's Hono API — tools NEVER open their own DB or
-// GitHub client, so they stay in sync with the UI for free). Outside a task session or with acorn
-// not running, tools return structured 'no-active-task' / 'acorn-not-running' results — never an
-// error (the registration is user-wide; plain terminals load this server too).
+// Launched by the AGENT (registered via `claude mcp add …` with the Electron-as-node launcher over
+// the `main.ts` entry module), so it scopes itself entirely from inherited env: ACORN_TASK_ID
+// (which task) plus the loopback client's ACORN_API_URL/ACORN_API_TOKEN (see ./api.ts). Outside a
+// task session or with acorn not running, tools return structured 'no-active-task' /
+// 'acorn-not-running' results — never an error (the registration is user-wide; plain terminals
+// load this server too). This module exports only buildServer/main — the entry is ./main.ts.
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 import { z } from 'zod'
 import { gitLog, localChanges, localDiff } from '../main/localDiff'
+import { apiGet, apiSend, type ApiResult } from './api'
 
-const API_URL = process.env.ACORN_API_URL ?? 'http://127.0.0.1:4317'
-const API_TOKEN = process.env.ACORN_API_TOKEN ?? ''
 const TASK_ID = process.env.ACORN_TASK_ID ?? ''
 const WORKTREE = process.env.ACORN_WORKTREE_PATH ?? ''
 const SESSION_ID = process.env.ACORN_SESSION_ID ?? ''
-
-type ApiResult = { ok: true; data: unknown } | { ok: false; kind: 'acorn-not-running' | 'api-error'; detail: string }
-
-async function apiCall(path: string, init?: RequestInit): Promise<ApiResult> {
-  try {
-    const res = await fetch(`${API_URL}${path}`, {
-      ...init,
-      headers: { 'x-acorn-internal': API_TOKEN, ...(init?.body ? { 'content-type': 'application/json' } : {}), ...(init?.headers ?? {}) },
-    })
-    if (!res.ok) return { ok: false, kind: 'api-error', detail: `${res.status} ${await res.text().catch(() => '')}`.trim() }
-    return { ok: true, data: await res.json() }
-  } catch (e) {
-    return { ok: false, kind: 'acorn-not-running', detail: e instanceof Error ? e.message : String(e) }
-  }
-}
-
-export const apiGet = (path: string): Promise<ApiResult> => apiCall(path)
-const apiSend = (method: string, path: string, body: unknown): Promise<ApiResult> => apiCall(path, { method, body: JSON.stringify(body) })
 
 const text = (value: unknown) => ({ content: [{ type: 'text' as const, text: typeof value === 'string' ? value : JSON.stringify(value, null, 2) }] })
 
@@ -267,13 +248,4 @@ async function hasRunTargets(): Promise<boolean> {
 export async function main(): Promise<void> {
   const server = buildServer({ hasRunTargets: await hasRunTargets() })
   await server.connect(new StdioServerTransport())
-}
-
-// Entry when run directly (node/tsx/Electron-as-node); importable for tests. The build emits this
-// module as out/main/mcp.js (electron.vite.config input name), so `mcp.js` MUST be here — otherwise
-// the launched process never calls main(), never speaks stdio, and the agent reports "Failed to
-// connect".
-const isDirect = ['server.ts', 'server.js', 'mcp.js', 'index.js'].some((f) => process.argv[1]?.endsWith(f))
-if (isDirect) {
-  void main()
 }

@@ -1,6 +1,24 @@
 # 04 — Sources as entry points
 
-A **Source** is a browse surface that produces Workspaces. GitHub, Linear, and Rollbar are all
+> **✅ Status: shipped** (read "Workspace" as **Task**). All three Sources exist: gating lives in
+> `features/tabs/sources.ts`, browse views are `PullList` (GitHub), `features/tasks/LinearBrowse.tsx`
+> and `RollbarBrowse.tsx`, and Rollbar's reads are `server/routes/rollbar.ts` — which cached into
+> the generic `issues` table with **zero new schema**, passing the litmus test at the bottom of
+> this doc. Divergences from the design as written:
+> - **The `Source` record below stayed conceptual.** What shipped is the same contract split
+>   across a pure gating function (`availableSources`), per-source browse components, and one task
+>   creation path (`TaskSeed` → `POST /api/tasks`) — no literal `Source` object; the uniformity
+>   survived, the shape didn't.
+> - **`integrations` went multi-row per provider**: opaque `id` PK + `label`, so a user can
+>   connect several Linears/Rollbars. Consequently links carry an `integrationId`
+>   (`task_links`, née `workspace_links`) and the `issues` cache is keyed
+>   `(userId, integrationId, identifier)`.
+> - **Promotion-time Linear-id parsing shipped with a caveat**: PR-body refs seed `task_links`
+>   only when exactly *one* Linear connection exists (`PullList.tsx` `scanLinearRefs`), because a
+>   bare `ENG-42` can't name which connection it belongs to. Multi-connection disambiguation is an
+>   open question (below).
+
+GitHub, Linear, and Rollbar are all
 Sources. The design goal: adding a new integration should be *mechanical* — provide a browse view
 and a way to turn one of its items into a Workspace, and it slots into the rail with no special
 casing.
@@ -21,23 +39,28 @@ type Source = {
   label: string
   available: () => boolean            // gated by integrations (see below)
   BrowseView: Component                // the list UI in the main area
-  toWorkspace: (item) => WorkspaceSeed // { origin, repoOwner, repoName, branch, pullNumber?, links[] }
+  toWorkspace: (item) => TaskSeed      // { origin, repoOwner, repoName, branch, pullNumber?, links[] }
 }
 ```
 
-`WorkspaceSeed` is exactly the non-derived columns of the `workspaces` row plus initial
-`workspace_links` (see [`03-data-model.md`](./03-data-model.md)). Workspace creation is one code
-path regardless of which Source produced the seed — that uniformity is the whole value.
+`TaskSeed` (the shipped type — designed here as `WorkspaceSeed` — in
+`apps/desktop/src/shared/api.ts`, consumed by `routes/tasks.ts` `POST /api/tasks`) is exactly the
+non-derived columns of the `tasks` row plus initial links (see
+[`03-data-model.md`](./03-data-model.md)). Task creation is one code path regardless of which
+Source produced the seed — that uniformity is the whole value.
 
 ## Which Sources appear
 The **Sources** zone of the rail is driven by connected integrations, the way the terminal already
-gates agent profiles by PATH availability (`TerminalProfile.available`, `shared/terminal.ts:40`).
+gates agent profiles by PATH availability (`TerminalProfile.available` in `shared/terminal.ts`).
+The shipped check is `availableSources()` in `features/tabs/sources.ts`, a pure function over the
+integrations list.
 
 - **GitHub** — always available (it's the app's reason to exist; the session cookie already carries
   the token).
-- **Linear** — appears iff `integrations` has a `linear` row (`schema.ts:232`). Connected via the
-  existing `IntegrationsModal` (`features/integrations/IntegrationsModal.tsx`).
-- **Rollbar** — appears iff a `rollbar` integration row exists (new; see below).
+- **Linear** — appears iff a connected `linear` integration exists (`availableSources()` tests
+  `provider === 'linear' && connected`). Connected via the existing `IntegrationsModal`
+  (`features/integrations/IntegrationsModal.tsx`).
+- **Rollbar** — appears iff a connected `rollbar` integration exists (same check; new — see below).
 
 ## GitHub source
 The browse view is essentially today's `PullList` (`features/.../PullList.tsx`), generalized to span
@@ -72,8 +95,10 @@ I'm looking at." It fits the contract with no new concepts:
   exactly like Linear — `integrations.accessToken`, `session.ts encryptSecret`). Extend
   `IntegrationsModal` with a Rollbar field.
 - **Browse view:** a list of recent error items (Rollbar REST API). Items cache into the generic
-  `issues` table (`provider: 'rollbar'`, `identifier:` the Rollbar item id, `data:` the JSON) — the
-  table was built generic for exactly this (`schema.ts:286`).
+  `issues` table (`provider: 'rollbar'`, `identifier:` the item's visible **counter** —
+  `String(raw.counter)` in `routes/rollbar.ts`, the number users see in Rollbar URLs, *not* the
+  internal item id — `data:` the JSON). The table was built generic for exactly this (`issues` in
+  `schema.ts`).
 - **`toWorkspace`:** an error rarely knows its repo/branch, so promotion prompts for repo + new
   branch (`origin: 'rollbar'`), attaching the error as a `workspace_links` row. The "Rollbar pane"
   shows the error detail/stacktrace; the user then opens a terminal/agent to fix it.
@@ -90,6 +115,16 @@ Today every integration is bespoke: Linear is hardcoded into `PullDetail`. The S
 
 ## Deferred
 - Cross-source dedup (a PR, its Linear ticket, and a Rollbar error that are all *the same work*
-  could collapse into one Workspace's links). Nice, not now.
+  could collapse into one Workspace's links). Nice, not now. *(Still not built.)*
 - Bi-directional sync (commenting on Linear from acorn already exists via `LinearIssuePanel`;
-  extending that per-Source is out of scope here).
+  extending that per-Source is out of scope here). *(Still not built.)*
+
+## Open questions (post-ship)
+- **Multi-connection link disambiguation.** With several Linear connections, promotion-time
+  parsing currently skips seeding links entirely (see the status note). Options: prompt at
+  promotion, try each connection's API until the identifier resolves, or a per-repo default
+  connection. Not decided — today the user adds the link by hand in the Linear pane.
+- **Should Sources be data-driven after all?** Three hardcoded `SourceId`s (`'github' | 'linear' |
+  'rollbar'` in `features/tasks/tasks.ts`) are fine at N=3; if a fourth integration lands, revisit
+  whether the conceptual `Source` record should become real to avoid touching the rail, the
+  palette, and `sources.ts` each time.

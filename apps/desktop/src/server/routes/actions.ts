@@ -4,8 +4,8 @@ import type { AppEnv } from '../middleware/auth'
 import type { RunJobs } from '../../shared/api'
 
 // Read-only Actions endpoints for the checks side panel. Writes (rerun) live in prActions.ts.
-// No D1 mirror / KV: the client query cache (IndexedDB-persisted) covers reuse.
-// ponytail: no KV. Add a KV cache keyed by jobId for public+completed jobs if cross-device sharing matters.
+// Deliberately uncached on the server — no mirror table, no BLOBS entry: the client query cache
+// (IndexedDB-persisted) already covers reuse on this machine, and job/log payloads go stale fast.
 
 type GhJob = {
   id: number

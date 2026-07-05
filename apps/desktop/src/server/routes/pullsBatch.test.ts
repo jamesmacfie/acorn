@@ -62,7 +62,7 @@ describe('pulls batch route', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     vi.mocked(getDb).mockReturnValue(makeDb() as never)
-    vi.mocked(resolveRepoForUser).mockResolvedValue({ ok: true, value: { repoId: 19847, private: false } })
+    vi.mocked(resolveRepoForUser).mockResolvedValue({ ok: true, value: { repoId: 19847 } })
     vi.mocked(readComposite).mockResolvedValue({
       pull: null,
       labels: [],
