@@ -2,7 +2,6 @@ import { createMemo, For, Show } from 'solid-js'
 import { createQuery } from '@tanstack/solid-query'
 import { useNavigate } from '@solidjs/router'
 import { workspacesOptions, type Workspace } from '../../queries'
-import { setSelectedSource, selectedSource } from '../tasks/tasks'
 import { resolveWorkspaceColor } from '../../../shared/workspaceIdentity'
 import { fuzzyScore } from './model'
 import { createOverlayPalette } from './overlay'
@@ -40,7 +39,7 @@ export default function WorkspacePalette() {
     palette.close()
     const first = w.repos[0]
     if (!first) return // empty workspace has nowhere to go, same as the topbar picker
-    if (!selectedSource()) setSelectedSource('github')
+    // Rail source is restored per-workspace by the activeWorkspace effect in App.tsx.
     navigate(`/${first.owner}/${first.name}`)
   }
 
