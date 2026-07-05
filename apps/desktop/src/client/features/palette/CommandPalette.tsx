@@ -6,7 +6,7 @@ import { tasksKey, tasksOptions, workspacesOptions } from '../../queries'
 import { workspaceForRepo } from '../workspaces/activeWorkspace'
 import { refreshSessions } from '../terminal/sessions'
 import { terminalApi } from '../terminal/terminalClient'
-import { activeLayout, activeTaskId, dispatchActiveLayout, dispatchLayout, isTerminalOpen, selectedSource, setRecipeBrowserUrl, setSelectedSource, setTerminalOpen } from '../tasks/tasks'
+import { activeLayout, activeTaskId, dispatchActiveLayout, dispatchLayout, isTerminalOpen, setRecipeBrowserUrl, setTerminalOpen } from '../tasks/tasks'
 import { activateTaskSignals, pathForTask } from '../tasks/activate'
 import { evictPreviewWebview } from '../preview/PreviewPane'
 import { PANE_LABELS, PANE_ORDER, type PaneId } from '../tasks/layout'
@@ -123,7 +123,7 @@ export default function CommandPalette() {
       const w = workspaces.data?.find((x) => `workspace:${x.id}` === item.id)
       const first = w?.repos[0]
       if (first) {
-        if (!selectedSource()) setSelectedSource('github')
+        // Rail source is restored per-workspace by the activeWorkspace effect in App.tsx.
         navigate(`/${first.owner}/${first.name}`)
       }
       return

@@ -15,6 +15,15 @@ export type SourceId = (typeof SOURCE_IDS)[number]
 export const isSourceId = (v: unknown): v is SourceId => typeof v === 'string' && (SOURCE_IDS as readonly string[]).includes(v)
 const [selectedSource, setSelectedSource] = createSignal<SourceId | null>('github')
 
+// Per-workspace memory of the last-selected rail source, so switching workspaces returns you to the
+// tab you left it on rather than always jumping back to GitHub. Session-only (not persisted); a task
+// view (null source) is not recorded — returning to such a workspace defaults to GitHub.
+const railByWorkspace = new Map<string, SourceId>()
+export const rememberWorkspaceSource = (workspaceId: string, source: SourceId): void => {
+  railByWorkspace.set(workspaceId, source)
+}
+export const workspaceSource = (workspaceId: string): SourceId | undefined => railByWorkspace.get(workspaceId)
+
 // The active task (its terminals scope to this; its view shows when no Source is selected).
 const [activeTaskId, setActiveTaskId] = createSignal<string | null>(null)
 

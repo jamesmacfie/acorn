@@ -1,4 +1,4 @@
-import { createEffect, createSignal, Match, onCleanup, onMount, Show, Switch } from 'solid-js'
+import { createEffect, createSignal, Match, on, onCleanup, onMount, Show, Switch, untrack } from 'solid-js'
 import { createQuery, useIsRestoring, useQueryClient } from '@tanstack/solid-query'
 import { useMatch, useNavigate, useParams } from '@solidjs/router'
 import { clear } from 'idb-keyval'
@@ -28,7 +28,7 @@ import { hydratePrFilters, prFilters } from './features/pullList/filterState'
 import { initSessions } from './features/terminal/sessions'
 import TabRail from './features/tabs/TabRail'
 import RailTips from './features/tooltip/RailTips'
-import { activeTaskId, hydrateTaskLayouts, isSourceId, isTerminalOpen, selectedSource, setActiveTaskId, setSelectedSource, setTerminalOpen, taskLayouts } from './features/tasks/tasks'
+import { activeTaskId, hydrateTaskLayouts, isSourceId, isTerminalOpen, rememberWorkspaceSource, selectedSource, setActiveTaskId, setSelectedSource, setTerminalOpen, taskLayouts, workspaceSource } from './features/tasks/tasks'
 import { activateTaskSignals, pathForTask } from './features/tasks/activate'
 import { parseTaskLayouts } from './features/tasks/layout'
 import { initTaskStatuses } from './features/tasks/taskStatus'
@@ -113,6 +113,19 @@ export default function App() {
     const set = new Set((ws.repos ?? []).map((r) => `${r.owner}/${r.name}`))
     return (repos.data ?? []).filter((r) => set.has(`${r.owner}/${r.name}`))
   }
+
+  // Remember the rail source per workspace so switching workspaces returns you to the tab you left,
+  // not always GitHub. On each real workspace change: record the source we're leaving, then restore
+  // the one we're entering (default GitHub). `defer` skips the startup null→workspace resolution so
+  // the persisted `last_source` restore below still wins on first load; the `prevWs` guard likewise
+  // leaves that first entry untouched. A task view (null source) isn't recorded.
+  createEffect(
+    on(activeWorkspace, (ws, prevWs) => {
+      const leaving = untrack(selectedSource)
+      if (prevWs && leaving) rememberWorkspaceSource(prevWs.id, leaving)
+      if (ws && prevWs && ws.id !== prevWs.id) setSelectedSource(workspaceSource(ws.id) ?? 'github')
+    }, { defer: true }),
+  )
 
   // Focus a task once the list loads (no navigation — selecting a row in the rail is what
   // navigates). The terminal drawer + topbar badge key off this. Prefer the task focused last
@@ -313,7 +326,7 @@ export default function App() {
                 // from the repo, so no extra state. Empty workspaces stay put.
                 const first = w.repos[0]
                 if (!first) return
-                if (!selectedSource()) setSelectedSource('github')
+                // Rail source is restored per-workspace by the activeWorkspace effect above.
                 navigate(`/${first.owner}/${first.name}`)
               }}
             />
