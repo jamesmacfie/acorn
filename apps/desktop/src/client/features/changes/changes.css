@@ -58,6 +58,11 @@
 .changes-row-wrap:hover .changes-to-agent { visibility: visible; }
 .changes-to-agent:hover { color: var(--text); }
 
+/* Bulk actions live in the header, not a hoverable row — keep them always visible. */
+.changes-toolbar { display: inline-flex; gap: 2px; }
+.changes-toolbar .changes-to-agent { visibility: visible; }
+.changes-toolbar .changes-to-agent:disabled { opacity: 0.35; cursor: default; color: var(--text-faint); }
+
 /* Review notes (docs/panes.md): flat inline annotation under its anchor line. */
 .changes-header { display: flex; align-items: center; gap: 10px; }
 .changes-send {

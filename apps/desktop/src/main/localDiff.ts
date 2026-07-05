@@ -157,6 +157,15 @@ export async function discardFile(worktree: string, path: string, untracked: boo
   return untracked ? run(worktree, ['clean', '-f', '--', path]) : run(worktree, ['restore', '--', path])
 }
 
+// Bulk variants for the ChangesPane toolbar — the whole working tree at once.
+export const stageAll = (worktree: string): Promise<GitActionResult> => run(worktree, ['add', '-A'])
+export const unstageAll = (worktree: string): Promise<GitActionResult> => run(worktree, ['reset'])
+// Discard everything (destructive — caller MUST confirm): drop staged+unstaged AND untracked files.
+export async function discardAll(worktree: string): Promise<GitActionResult> {
+  const reset = await run(worktree, ['reset', '--hard'])
+  return reset.ok ? run(worktree, ['clean', '-fd']) : reset
+}
+
 // Commit whatever is staged. `--` never applies: -m is fixed and message is a value argv.
 export async function commitStaged(worktree: string, message: string): Promise<GitActionResult> {
   const msg = message.trim()
