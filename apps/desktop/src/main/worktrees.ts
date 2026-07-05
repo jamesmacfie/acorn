@@ -72,15 +72,21 @@ export async function ensureWorktree(
   mkdirSync(worktreesRoot, { recursive: true })
 
   if (pullNumber != null) {
-    // PR workspace: fetch the head (uses the checkout's git credentials) and check it out detached —
-    // no branch name to collide with the main checkout. `--` ends option parsing before positionals.
+    // PR workspace: fetch the head (uses the checkout's git credentials) and check it out on the
+    // PR's branch (`branch` == pr.headRef) so the worktree tracks a real branch, not a detached
+    // commit — new branch from FETCH_HEAD, or reuse the branch if it already exists locally.
+    // `--` ends option parsing before positionals.
     try {
       await exec('git', ['-C', checkout, 'fetch', 'origin', `pull/${pullNumber}/head`], { timeout: 60_000 })
     } catch {
       return { ok: false, reason: `Could not fetch pull/${pullNumber}/head.` }
     }
+    const exists = await branchExists(checkout, branch)
+    const args = exists
+      ? ['-C', checkout, 'worktree', 'add', '--', path, branch]
+      : ['-C', checkout, 'worktree', 'add', '-b', branch, '--', path, 'FETCH_HEAD']
     try {
-      await exec('git', ['-C', checkout, 'worktree', 'add', '--detach', '--', path, 'FETCH_HEAD'], { timeout: 60_000 })
+      await exec('git', args, { timeout: 60_000 })
     } catch {
       return { ok: false, reason: 'Could not create the worktree.' }
     }
