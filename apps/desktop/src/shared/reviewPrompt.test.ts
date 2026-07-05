@@ -16,7 +16,7 @@ const note = (over: Partial<ReviewNote>): ReviewNote => ({
   ...over,
 })
 
-describe('formatReviewPrompt (docs/next 04 §C format)', () => {
+describe('formatReviewPrompt (docs/panes.md)', () => {
   it('matches the doc format: numbered, path:range, quoted snippet, body', () => {
     const out = formatReviewPrompt([
       note({}),

@@ -13,7 +13,7 @@ const FIXTURE: CdpAxNode[] = [
   { nodeId: '7', parentId: '6', role: { value: 'StaticText' }, name: { value: 'Forgot password?' }, backendDOMNodeId: 7 },
 ]
 
-describe('buildAxTree (docs/next 08 — CDP AX payload → refs)', () => {
+describe('buildAxTree (docs/panes.md — CDP AX payload → refs)', () => {
   it('builds a compact tree: anonymous structure flattened, refs on actionable nodes', () => {
     const snap = buildAxTree(FIXTURE)
     expect(snap.tree).toEqual([

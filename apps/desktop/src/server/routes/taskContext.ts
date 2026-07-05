@@ -31,7 +31,7 @@ const parseInclude = (raw: string | undefined): Set<TaskContextInclude> => {
 }
 
 export const taskContext = new Hono<AppEnv>()
-  // Repo facts for the MCP repo_info tool (docs/next 06): owner/name/defaultBranch off the mirror.
+  // Repo facts for the MCP repo_info tool (docs/mcp.md): owner/name/defaultBranch off the mirror.
   .get('/:id/repo-info', async (c) => {
     const user = c.get('user')
     if (!user) return c.json({ error: 'unauthenticated' }, 401)

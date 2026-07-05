@@ -1,7 +1,7 @@
 // Shared terminal protocol (vNext §5). Imported by main, preload, and renderer — so it holds the
 // wire contract only, never node-pty types: main owns the PTY, this just describes what crosses IPC.
 
-// The ONE AgentState vocabulary (docs/next 05, README decision 15) — defined here, reused verbatim
+// The ONE AgentState vocabulary (docs/terminal-and-agents.md, README decision 15) — defined here, reused verbatim
 // by the agent surfaces (15); no other module redeclares it. Each transport emits only the subset
 // it can detect: PTY sessions 'working|idle|blocked|unknown'; managed/headless agents the full set.
 export type AgentState = 'starting' | 'working' | 'waiting' | 'idle' | 'blocked' | 'permission' | 'done' | 'unknown'
@@ -14,7 +14,7 @@ export type TerminalSession = {
   backend: 'node-pty' | 'tmux'
   status: 'running' | 'exited'
   idle: boolean // agent has produced no output for a while (vNext §3); always false for shells
-  agentState: AgentState // docs/next 05 — PTY tier emits working|idle|blocked|unknown
+  agentState: AgentState // docs/terminal-and-agents.md — PTY tier emits working|idle|blocked|unknown
   // cwd is the task's isolated worktree. DERIVED, never stored: tasks.worktreePath is the truth
   // (docs/workspaces 03) and main computes cwd === task.worktreePath at session create AND during
   // reconcileTmux, so the flag survives app restarts. It stays on the wire as a denormalized copy
@@ -51,7 +51,7 @@ export type WorktreeResult = { ok: true; path: string } | { ok: false; reason: s
 
 // Result of archiving a task (docs/workspaces 05). `reason` carries the guard refusal
 // (running sessions / dirty worktree) for the UI to surface. A failed teardown script
-// (docs/next 02) sets teardownFailed so the UI can offer continue (re-archive with
+// (docs/terminal-and-agents.md) sets teardownFailed so the UI can offer continue (re-archive with
 // skipTeardown) or abort; `output` is the script's tail for display.
 export type ArchiveResult = { ok: true } | { ok: false; reason: string; teardownFailed?: boolean; output?: string }
 
@@ -106,7 +106,7 @@ export type RunStatus = { running: boolean; url?: string; exitCode?: number | nu
 // Result of validating/saving a checkout path. `reason` explains a rejection for the UI.
 export type RepoPathResult = { ok: true; repoPath: RepoPath } | { ok: false; reason: string }
 
-// Local-changes review (docs/next 04 §A): one working-tree change as the ChangesPane sees it.
+// Local-changes review (docs/panes.md): one working-tree change as the ChangesPane sees it.
 // A file changed in both the index and the worktree appears once per scope (staged flag).
 export type LocalChange = {
   path: string

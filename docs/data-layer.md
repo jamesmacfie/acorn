@@ -235,7 +235,7 @@ top bar (see [workspaces-and-tasks](./workspaces-and-tasks.md)). PK opaque `id`.
 | `setupScriptTrigger` | text | `off` \| `created` \| `terminal` — when to run it; null → `terminal` |
 | `devScript` | text | per-workspace "run dev" → a `dev` run target; null/blank = no run button |
 | `devRestartScript` | text | restart command for the `dev` target; when set, `run_restart` uses it instead of stop+start |
-| `teardownScript` | text | shell run in the worktree just before removal (docs/next 02); null/blank = none |
+| `teardownScript` | text | shell run in the worktree just before removal (docs/terminal-and-agents.md); null/blank = none |
 | `previewMode` | text | `url` \| `port` \| `script` — how the browser-preview URL resolves; null → dev-server port |
 | `previewValue` | text | the URL/port/command per `previewMode`; null/blank = unset |
 | `icon` | text | JSON `WorkspaceIcon` (`emoji`/`lucide`/`github`); null → derived default |

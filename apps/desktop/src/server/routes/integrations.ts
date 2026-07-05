@@ -37,7 +37,7 @@ export const integrations = new Hono<AppEnv>()
     if (!token || typeof token !== 'string') return c.json({ error: 'bad_request' }, 400)
     if (provider !== 'linear' && provider !== 'rollbar') return c.json({ error: 'unsupported_provider' }, 400)
 
-    // Rollbar (docs/next 10): a project-read token, validated with one cheap /project call.
+    // Rollbar (docs/integrations.md): a project-read token, validated with one cheap /project call.
     if (provider === 'rollbar') {
       let project: RollbarProject
       try {

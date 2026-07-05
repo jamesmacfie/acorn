@@ -1,4 +1,4 @@
-// Local (uncommitted) diff source (docs/next 04 §A): parsed `git status --porcelain=v2`, unified
+// Local (uncommitted) diff source (docs/panes.md): parsed `git status --porcelain=v2`, unified
 // patches per file/scope, and blob reads — all against a task's worktree. Patches are emitted as
 // HUNKS-ONLY bodies (like GitHub's per-file `patch`), so the renderer's existing diff.ts/synth +
 // gitdiff-parser path works unchanged. execFile with arg arrays only; repo-relative paths are
@@ -125,7 +125,7 @@ export async function localDiff(worktree: string, path: string, scope: LocalScop
   return { patch: stripToHunks(stdout) }
 }
 
-// --- Stage/commit actions (docs/next 04 P4): one-line git calls; the pane can land the work it
+// --- Stage/commit actions (docs/panes.md): one-line git calls; the pane can land the work it
 // reviewed. Stops here per the doc — no hunk staging, no rebase UI. ---
 
 export type GitActionResult = { ok: true } | { ok: false; reason: string }
@@ -171,7 +171,7 @@ export async function pushBranch(worktree: string): Promise<GitActionResult> {
   return run(worktree, ['push', '--set-upstream', 'origin', 'HEAD'])
 }
 
-// Recent commits on the branch (the MCP git_log tool, docs/next 06 catalog).
+// Recent commits on the branch (the MCP git_log tool, docs/mcp.md).
 export type GitLogEntry = { sha: string; subject: string; author: string; committedAt: number }
 
 export function parseGitLog(stdout: string): GitLogEntry[] {

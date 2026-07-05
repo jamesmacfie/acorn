@@ -19,7 +19,7 @@ const relTime = (at: number): string => {
   return `${Math.round(s / 86400)}d`
 }
 
-// The top-bar bell (docs/next 05): unread pill + popover inbox. Clicking a row selects its task.
+// The top-bar bell (docs/terminal-and-agents.md): unread pill + popover inbox. Clicking a row selects its task.
 export default function NotificationBell(props: { onSelectTask: (taskId: string) => void }) {
   const [open, setOpen] = createSignal(false)
   let rootRef: HTMLDivElement | undefined

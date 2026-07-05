@@ -40,7 +40,7 @@ export default function TabRail() {
   const [menuId, setMenuId] = createSignal<string | null>(null)
   const [dragId, setDragId] = createSignal<string | null>(null)
 
-  // Rail order (docs/next 03 §rail): pin-to-top + drag-reorder in a dedicated pref — never
+  // Rail order (docs/panes.md): pin-to-top + drag-reorder in a dedicated pref — never
   // tasks.sort. The pure model lives in railOrder.ts.
   const railOrder = () => parseRailOrder(prefs.data?.rail_order)
   const saveOrder = async (o: RailOrder) => {
@@ -56,7 +56,7 @@ export default function TabRail() {
   const [draft, setDraft] = createSignal<Draft | null>(null)
   const [text, setText] = createSignal('')
   const [newRepo, setNewRepo] = createSignal('') // "owner/name" for the new-task repo selector
-  // Custom branch name (docs/next 02 P2): defaults to a de-duped slug of the title until the user
+  // Custom branch name (docs/terminal-and-agents.md): defaults to a de-duped slug of the title until the user
   // edits the branch field directly, then their value wins.
   const [branchText, setBranchText] = createSignal('')
   const [branchTouched, setBranchTouched] = createSignal(false)
@@ -82,7 +82,7 @@ export default function TabRail() {
     return applyRailOrder(scoped, railOrder())
   }
 
-  // Sources: GitHub always; Linear/Rollbar when connected (docs/workspaces 04, docs/next 10).
+  // Sources: GitHub always; Linear/Rollbar when connected (docs/workspaces 04, docs/integrations.md).
   // Selecting one fills the main area with that source's browse view.
   const sources = () => availableSources(integrations.data?.integrations)
   function selectSource(id: SourceId) {
@@ -100,7 +100,7 @@ export default function TabRail() {
     navigate(pathForTask(w))
   }
 
-  // ⌘1–9 / Ctrl1–9: jump to the Nth task in the rail (docs/next 17 §B.3). Mirrors browser-tab
+  // ⌘1–9 / Ctrl1–9: jump to the Nth task in the rail (docs/command-palette-and-shortcuts.md). Mirrors browser-tab
   // switching; the order is exactly what's rendered (workspace-scoped + rail order). A meta/ctrl
   // combo, so it's safe to leave active even while typing.
   onMount(() => {
@@ -226,7 +226,7 @@ export default function TabRail() {
             const detail = createQuery(() => pullDetailOptions(w.repoOwner, w.repoName, w.pullNumber != null ? String(w.pullNumber) : '', w.pullNumber != null))
             const checks = () => detail.data?.checks ?? []
             const st = () => taskStatus(w.id)
-            // Workspace identity derived onto the row (docs/next 01): 3px accent in the
+            // Workspace identity derived onto the row (docs/workspaces-and-tasks.md): 3px accent in the
             // workspace's colour, matching the active-row accent convention in docs/ui-design.md.
             const ws = () => workspaceForRepo(workspaces.data, w.repoOwner, w.repoName)
             const accent = () => {
@@ -269,7 +269,7 @@ export default function TabRail() {
               <Show when={w.pullNumber != null && checks().length}>
                 <span class={`tabrail-checks checks-dot checks-dot-${checksState(checks())}`} title="PR checks" />
               </Show>
-              {/* Agent-working spinner (docs/next 05 — workingCountFor, finally wired) and the
+              {/* Agent-working spinner (docs/terminal-and-agents.md — workingCountFor, finally wired) and the
                   needs-you marker for unread notices, cleared when the task is viewed. */}
               <Show when={workingCountFor(w.id)}>
                 <span class="tabrail-spinner spin" title={`${workingCountFor(w.id)} agent(s) working`}>⠿</span>

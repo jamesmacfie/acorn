@@ -11,7 +11,7 @@ import { broadcastStatus } from './notify'
 import { resolveInRoot, taskRoot } from './taskWorktree'
 
 export function registerLocalGitIpc(db: AppDatabase): void {
-  // Local-changes review (docs/next 04 §A): parsed status / per-file unified patch / blob read
+  // Local-changes review (docs/panes.md): parsed status / per-file unified patch / blob read
   // against the task's worktree.
   ipcMain.handle('local:changes', async (_e: IpcMainInvokeEvent, taskId: string) => {
     const root = await taskRoot(db, taskId)
@@ -27,7 +27,7 @@ export function registerLocalGitIpc(db: AppDatabase): void {
     const root = await taskRoot(db, p?.taskId)
     if (!root) return { error: 'No worktree yet.' }
     try {
-      // Whole-file context (docs/next 04): the pane shows the entire file with changes highlighted,
+      // Whole-file context (docs/panes.md): the pane shows the entire file with changes highlighted,
       // so no expand affordances are needed. 1e6 lines caps any real file.
       return await localDiff(root, p.path, p.scope === 'staged' ? 'staged' : 'unstaged', 1_000_000)
     } catch (e) {
@@ -45,7 +45,7 @@ export function registerLocalGitIpc(db: AppDatabase): void {
     }
   })
 
-  // Stage/commit actions (docs/next 04 P4). Discard is destructive — the renderer confirms before
+  // Stage/commit actions (docs/panes.md). Discard is destructive — the renderer confirms before
   // calling; main still keeps the path validation.
   const withRoot = async (taskId: string, fn: (root: string) => Promise<{ ok: boolean; reason?: string }>) => {
     const root = await taskRoot(db, taskId)

@@ -244,7 +244,7 @@ Each session is an acorn-owned local resource (the v3 idea, unchanged). The ship
 ```ts
 // As shipped. vs the original design: status simplified from
 // 'starting'|'running'|'exited'|'failed'; lastAttachedAt / exitedAt / signal dropped from the
-// wire; gained idle, agentState (docs/next 05), isWorktree, and — after docs/workspaces — a
+// wire; gained idle, agentState (docs/terminal-and-agents.md), isWorktree, and — after docs/workspaces — a
 // required taskId, with repo/pull derived from the task join instead of stored on the session.
 export type TerminalSession = {
   id: string
@@ -254,7 +254,7 @@ export type TerminalSession = {
   backend: 'node-pty' | 'tmux'
   status: 'running' | 'exited'
   idle: boolean                  // no output for a while (Phase 3); always false for shells
-  agentState: AgentState         // the ONE shared agent-state vocabulary (docs/next 05)
+  agentState: AgentState         // the ONE shared agent-state vocabulary (docs/terminal-and-agents.md)
   isWorktree: boolean            // in-memory convenience; the truth is tasks.worktreePath
   taskId: string                 // → tasks.id (docs/workspaces); a session always belongs to a task
   cwd: string

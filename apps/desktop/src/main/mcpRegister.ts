@@ -1,4 +1,4 @@
-// acorn MCP registration (docs/next 06 P3 — REUSE-FIRST): register via each agent's OWN mechanism
+// acorn MCP registration (docs/mcp.md — REUSE-FIRST): register via each agent's OWN mechanism
 // (`claude mcp add --scope user`, `codex mcp add`), only ever on explicit user action. acorn never
 // writes through into agent config files. Names are build-flavored (acorn / acorn-dev) so dev and
 // prod don't clobber each other; register is remove-then-add (idempotent) and removable.

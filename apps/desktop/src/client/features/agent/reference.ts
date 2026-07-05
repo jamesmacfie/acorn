@@ -1,4 +1,4 @@
-// "Add file/line to agent" quick path (docs/next 04 §E): format a path[:line[–line]] reference and
+// "Add file/line to agent" quick path (docs/panes.md): format a path[:line[–line]] reference and
 // drop it into the task's agent composer as a draft (the user finishes the thought and submits).
 import { agentSessionsFor } from '../terminal/sessions'
 import { terminalApi } from '../terminal/terminalClient'

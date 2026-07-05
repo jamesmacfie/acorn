@@ -119,7 +119,7 @@ export const workspaces = new Hono<AppEnv>()
       const p = Number(set.previewValue)
       if (!/^\d{1,5}$/.test(set.previewValue) || p < 1 || p > 65535) return c.json({ error: 'bad_request' }, 400)
     }
-    // Identity (docs/next 01): icon is a validated JSON union stored as text; colour a preset token
+    // Identity (docs/workspaces-and-tasks.md): icon is a validated JSON union stored as text; colour a preset token
     // or 6-hex. Explicit null clears either back to the derived default.
     if (body.icon !== undefined) {
       if (body.icon === null) set.icon = null

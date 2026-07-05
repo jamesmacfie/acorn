@@ -1,4 +1,4 @@
-// sendToAgent (docs/next 04 §D): THE shared delivery primitive — review notes, "add file/line to
+// sendToAgent (docs/panes.md): THE shared delivery primitive — review notes, "add file/line to
 // agent", and the context assembler all push text into an agent PTY through this. One bracketed
 // paste block per send; three submit modes:
 //   'now'         → paste, then '\r' after a short settle delay

@@ -46,7 +46,7 @@ export const resolveBackend = (preference: 'node-pty' | 'tmux', tmuxAvailable: b
 // PR worktree directory name (vNext §9): `<owner>-<repo>-pr-<number>` under the worktrees root.
 export const worktreeDirName = (owner: string, repo: string, number: number | string) => `${owner}-${repo}-pr-${number}`
 
-// The filesystem/DNS-safe branch slug (docs/next 02): shared by the worktree dir name and the
+// The filesystem/DNS-safe branch slug (docs/terminal-and-agents.md): shared by the worktree dir name and the
 // ACORN_TASK_SLUG env var — the isolation handle for parallel tasks (compose -p, derived names).
 export const branchSlug = (branch: string) => branch.replace(/[^A-Za-z0-9._-]/g, '-')
 
@@ -84,7 +84,7 @@ export function childEnv(env: NodeJS.ProcessEnv = process.env): Record<string, s
   return out
 }
 
-// Blocked-prompt detection (docs/next 05 P3): when an agent session is otherwise idle, scan the
+// Blocked-prompt detection (docs/terminal-and-agents.md): when an agent session is otherwise idle, scan the
 // tail of its PTY ring for a tiny const rule list of input prompts. ponytail: a heuristic with a
 // known ceiling — the upgrade path is config-injected agent hooks (deferred, invasive).
 // eslint-disable-next-line no-control-regex
@@ -114,7 +114,7 @@ export function matchBlockedPrompt(ringTail: string): boolean {
   return /\?\s*$/.test(lines[lines.length - 1])
 }
 
-// Bracketed paste (docs/next 04 §D): agent TUIs treat the wrapped payload as ONE pasted block, so
+// Bracketed paste (docs/panes.md): agent TUIs treat the wrapped payload as ONE pasted block, so
 // multi-line prompts don't submit per-line. Sanitize: strip any stray paste markers from the
 // payload (a payload containing ESC[201~ would end the paste early — the injection risk) and trim
 // trailing whitespace so a submit '\r' is the only terminator.
@@ -132,7 +132,7 @@ export function wrapBracketedPaste(text: string): string {
 // drizzle types and testable under plain Node.
 export type SessionTaskInfo = { repoOwner: string; repoName: string; branch: string; title: string }
 
-// Environment for every task-scoped session and lifecycle script (docs/next 02/11): the childEnv
+// Environment for every task-scoped session and lifecycle script (docs/terminal-and-agents.md, docs/next 11): the childEnv
 // whitelist (never secrets), plus the ACORN_* identity vars agents / MCP / setup / teardown scripts
 // key off. Caller-supplied opts.env still wins — it's spread last.
 export function buildSessionEnv(opts: {

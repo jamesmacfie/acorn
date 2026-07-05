@@ -2,7 +2,7 @@ import { createResource, createSignal, For, Show } from 'solid-js'
 import type { McpServerSummary } from '../../../shared/mcp'
 import { activeTaskId } from '../tasks/tasks'
 
-// Settings → MCP (docs/next 06 A): a read-only inspector over the MCP config files the agents in
+// Settings → MCP (docs/mcp.md): a read-only inspector over the MCP config files the agents in
 // this task's worktree would load (plus ~/.claude.json). Secrets arrive already masked from main.
 export default function McpSettings() {
   const api = () => window.acorn?.mcp ?? null

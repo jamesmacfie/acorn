@@ -15,7 +15,7 @@ import { terminalApi } from '../terminal/terminalClient'
 import { changeKey, groupChanges, pickSelected, toPullFile } from './model'
 import './changes.css'
 
-// ChangesPane (docs/next 04 §B): a PR-style "Files changed" view over the task worktree's
+// ChangesPane (docs/panes.md): a PR-style "Files changed" view over the task worktree's
 // UNCOMMITTED changes — the existing diff pipeline (diff.ts synth → gitdiff-parser → DiffRows)
 // fed by the local:changes/local:diff IPC instead of GitHub patches. Refreshes on the existing
 // dirty-poll signal (taskStatus). Read-only in P1; stage/commit actions land in P4.
@@ -65,13 +65,13 @@ export default function ChangesPane(props: { task: Task }) {
 
   const noop = async () => {}
 
-  // "Add file/line to agent" (docs/next 04 §E): drop a path[:line] draft into the agent composer.
+  // "Add file/line to agent" (docs/panes.md): drop a path[:line] draft into the agent composer.
   async function sendRef(ref: string) {
     const res = await sendReferenceToAgent(props.task.id, ref)
     if (!res.ok && res.reason) window.alert(res.reason)
   }
 
-  // Review notes (docs/next 04 §C): inline annotations on the local diff. Created via the shared
+  // Review notes (docs/panes.md): inline annotations on the local diff. Created via the shared
   // line composer, rendered under their anchor line, sent as one prompt via sendToAgent
   // ('after-ready' — queued until the agent idles) and stamped sentAt on delivery.
   const [notes, { refetch: refetchNotes }] = createResource(
@@ -104,7 +104,7 @@ export default function ChangesPane(props: { task: Task }) {
     await refetchNotes()
   }
 
-  // Stage/commit actions (docs/next 04 P4). Discard is destructive → explicit confirm.
+  // Stage/commit actions (docs/panes.md). Discard is destructive → explicit confirm.
   const [commitMsg, setCommitMsg] = createSignal('')
   async function gitAction(fn: () => Promise<{ ok: boolean; reason?: string }>) {
     const res = await fn()
@@ -123,7 +123,7 @@ export default function ChangesPane(props: { task: Task }) {
     setCommitMsg('')
     await refetch()
   }
-  // Push HEAD to origin (docs/next 04 P4). Network-bound → show pending; errors go to an alert
+  // Push HEAD to origin (docs/panes.md). Network-bound → show pending; errors go to an alert
   // (git's reason is multi-line and would look shouty in the uppercased header).
   const [pushing, setPushing] = createSignal(false)
   const [pushMsg, setPushMsg] = createSignal('')

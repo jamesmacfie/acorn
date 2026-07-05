@@ -13,7 +13,7 @@ export async function refreshSessions(): Promise<void> {
   const api = terminalApi()
   if (!api) return
   const next = await api.list()
-  // Notification centre (docs/next 05): edge-detect against the previous snapshot on every refresh.
+  // Notification centre (docs/terminal-and-agents.md): edge-detect against the previous snapshot on every refresh.
   trackSessionEdges(sessions(), next)
   setSessions(next)
 }
@@ -27,7 +27,7 @@ export function initSessions(): () => void {
   return api.onStatus(() => void refreshSessions())
 }
 
-// Target-picker data for sendToAgent (docs/next 04 §D): the task's running agent sessions,
+// Target-picker data for sendToAgent (docs/panes.md): the task's running agent sessions,
 // most-recent first (the default target), each with its idle dot.
 export function agentSessionsFor(taskId: string | null): TerminalSession[] {
   if (!taskId) return []

@@ -1,4 +1,4 @@
-// Drivable browser — pure layer (docs/next 08): CDP accessibility payloads → a compact AxNode
+// Drivable browser — pure layer (docs/panes.md): CDP accessibility payloads → a compact AxNode
 // tree with stable per-snapshot refs (e1, e2, …), and the ref book-keeping clicks/fills resolve
 // against. The Playwright ARIA-snapshot model: agents reference refs, never CSS selectors. The
 // Electron webContents/debugger glue lives in browserService.ts; this module tests under plain Node.

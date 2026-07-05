@@ -93,7 +93,7 @@
 .settings-danger { margin-top: 8px; padding-top: 14px; border-top: 1px solid var(--border); }
 .settings-delete { color: var(--danger, #c0392b); border-color: var(--danger, #c0392b); }
 
-/* Workspace identity (docs/next 01): flat preview chip + swatch row, 1px borders, square. */
+/* Workspace identity (docs/workspaces-and-tasks.md): flat preview chip + swatch row, 1px borders, square. */
 .ws-identity-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 .ws-identity-preview {
   width: 32px;
@@ -118,7 +118,7 @@
 .ws-swatch.active { outline: 2px solid var(--accent); outline-offset: 1px; }
 .ws-hex-input { width: 90px; font-family: var(--font-mono); }
 
-/* MCP inspector (docs/next 06 A). */
+/* MCP inspector (docs/mcp.md). */
 .mcp-file { font-family: var(--font-mono); font-size: var(--fs-sm); }
 .mcp-server { display: flex; align-items: baseline; gap: 10px; padding: 3px 0 3px 12px; font-size: var(--fs-sm); flex-wrap: wrap; }
 .mcp-server-name { font-family: var(--font-mono); color: var(--text); }

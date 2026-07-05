@@ -21,12 +21,13 @@ is documented with the Changes pane — see [panes.md](./panes.md). The boundary
 | Agent write | direct (stamped as agent) | **propose only** (human gate) | n/a (human authors, sent as a prompt) |
 | Doc | this file | this file | [panes.md](./panes.md) (Changes pane) |
 
-The rule of thumb (docs/next/09, docs/next/12): a note is *"what I'm thinking on this task"*; a memory
+The rule of thumb (docs/next/12): a note is *"what I'm thinking on this task"*; a memory
 is *"how this repo works."* Notes are meant to be thrown away; the valuable distillate is promoted into
 memory, where it is reviewed exactly like code (via the PR that carries the file).
 
-The design rationale lives in `docs/next/09-notes-and-markdown.md` and `docs/next/12-memory.md`; the
-paragraphs below describe **what exists in code today**.
+The unbuilt parts of the memory design live in `docs/next/12-memory.md` (the notes design shipped
+in full and was distilled into this doc); the paragraphs below describe **what exists in code
+today**.
 
 ## Notes
 
@@ -261,8 +262,7 @@ query cache, blob cache, and workspace notes).
   `apps/desktop/src/client/features/context/{ContextPane.tsx,model.ts}`
 - Assembly: `apps/desktop/src/shared/{api.ts,contextBlock.ts}`
 - MCP tools: `apps/desktop/src/mcp/server.ts`
-- Design: `docs/next/09-notes-and-markdown.md`, `docs/next/11-context-assembly.md`,
-  `docs/next/12-memory.md`
+- Design (remaining unshipped parts): `docs/next/11-context-assembly.md`, `docs/next/12-memory.md`
 
 See also: [panes.md](./panes.md) (Context / Notes / Changes panes),
 [mcp.md](./mcp.md), [workspaces-and-tasks.md](./workspaces-and-tasks.md),

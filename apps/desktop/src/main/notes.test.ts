@@ -10,7 +10,7 @@ vi.mock('node:fs/promises', async (importOriginal) => {
   return { ...actual, rename: vi.fn(actual.rename) }
 })
 
-describe('note frontmatter round-trip (docs/next 09)', () => {
+describe('note frontmatter round-trip (docs/notes-and-memory.md)', () => {
   it('serialize → parse preserves meta + body', () => {
     const meta = { title: 'repro steps', author: 'agent' as const, kind: 'finding' as const, originSessionId: 's-1', createdAt: 123 }
     const { meta: parsed, body } = parseNote(serializeNote(meta, '# repro\nsteps here\n'), 'repro-steps')

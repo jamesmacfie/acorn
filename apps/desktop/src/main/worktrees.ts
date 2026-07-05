@@ -33,7 +33,7 @@ async function refExists(checkout: string, ref: string): Promise<boolean> {
   }
 }
 
-// Base-ref precedence for a NEW branch (docs/next 02 P2, verne's order): per-repo preferred ref
+// Base-ref precedence for a NEW branch (docs/terminal-and-agents.md, verne's order): per-repo preferred ref
 // (prefs key `base_ref:<owner>/<repo>`, resolved by the caller) → origin/main → origin/master →
 // null (= HEAD, today's behaviour).
 export async function resolveBaseRef(checkout: string, preferred?: string | null): Promise<string | null> {
@@ -88,7 +88,7 @@ export async function ensureWorktree(
   }
 
   // Local-first workspace: add a worktree on the branch. A NEW branch starts from the resolved
-  // base ref (per-repo preference → origin/main → origin/master → HEAD, docs/next 02 P2). `--`
+  // base ref (per-repo preference → origin/main → origin/master → HEAD, docs/terminal-and-agents.md). `--`
   // ends option parsing so a branch/path can never be mistaken for a flag (argv-injection guard).
   const exists = await branchExists(checkout, branch)
   const baseRef = exists ? null : await resolveBaseRef(checkout, preferredBaseRef)

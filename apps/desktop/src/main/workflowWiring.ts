@@ -24,7 +24,7 @@ import { WorkflowRunner, type WorkflowDef } from './workflowRunner'
 export type WorkflowWiringDeps = {
   runtime: RuntimeService
   notesStore: NotesStore
-  // Loopback API access for the context assembler (docs/next 06 B): ACORN_API_URL/ACORN_API_TOKEN.
+  // Loopback API access for the context assembler (docs/mcp.md): ACORN_API_URL/ACORN_API_TOKEN.
   internalApiEnv: Record<string, string>
 }
 

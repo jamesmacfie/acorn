@@ -90,7 +90,7 @@ const toolText = (res: { result?: unknown }): unknown => {
   return JSON.parse(content[0].text)
 }
 
-describe('acorn MCP server over stdio JSON-RPC (docs/next 06 B)', () => {
+describe('acorn MCP server over stdio JSON-RPC (docs/mcp.md)', () => {
   let stub: Server
   let port: number
   const seenHeaders: string[] = []

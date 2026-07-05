@@ -69,7 +69,7 @@ export function wireHarnessBridges({ db, notesStore, proposals, runtime, reconci
     status: (taskId, targetId) => runtime.status(taskId, targetId),
   })
 
-  // Drivable browser (docs/next 08): CDP over the bound preview webview; a missing binding is a
+  // Drivable browser (docs/panes.md): CDP over the bound preview webview; a missing binding is a
   // clean structured result (the agent is told to open the preview), never a throw.
   setBrowserBridge({
     navigate: async (taskId, url) => driverFor(taskId)?.navigate(url) ?? { ok: false, reason: 'No preview webview for this task — open the browser pane first.' },

@@ -51,8 +51,8 @@ file changes don't ping `onStatus`.
 Archiving a workspace (`status: 'archived'`, `archivedAt` set) is the **only** thing allowed to
 remove a worktree, and it must be explicit and guarded. The shipped flow (`archiveTask` in
 `main/archive.ts`; `ArchiveOpts` / `ArchiveResult` in `shared/terminal.ts`) grew a teardown-script
-step and override branches beyond the original sketch — the richer lifecycle design lives in
-[`../next/02-worktree-lifecycle.md`](../next/02-worktree-lifecycle.md):
+step and override branches beyond the original sketch — that richer lifecycle shipped and is what
+the flow below shows (see also [`../terminal-and-agents.md`](../terminal-and-agents.md)):
 
 ```
 archive task T   opts: { deleteWorktree = true, force = false, skipTeardown = false }

@@ -1,4 +1,4 @@
-// MCP config inspector (docs/next 06 A): pure parse + secret masking over the agents' own config
+// MCP config inspector (docs/mcp.md): pure parse + secret masking over the agents' own config
 // files (.mcp.json / .cursor/mcp.json / ~/.claude.json). Read-only — acorn never launches or
 // manages these servers (the agent does; orca's stance). Masking happens in MAIN before anything
 // crosses to the renderer.

@@ -4,7 +4,7 @@ import { launcherSpec, registerAcornMcp, registerArgv, removeArgv, resolveMcpEnt
 const launcher = launcherSpec('/Applications/acorn.app/Contents/MacOS/acorn', '/app/out/main/mcp.js', 'acorn')
 const devLauncher = launcherSpec('/Applications/acorn.app/Contents/MacOS/acorn', '/app/out/main/mcp.js', 'acorn-dev')
 
-describe('argv construction per agent flavour (docs/next 06 P3 — never executed here)', () => {
+describe('argv construction per agent flavour (docs/mcp.md — never executed here)', () => {
   it('claude: user-scoped add with the Electron-as-node launcher', () => {
     expect(registerArgv('claude', 'acorn', launcher)).toEqual({
       file: 'claude',

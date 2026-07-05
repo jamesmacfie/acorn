@@ -1,4 +1,4 @@
-// Agent-surfaces model (docs/next 15): pure mappers from headless stream-json events to the ONE
+// Agent-surfaces model (docs/terminal-and-agents.md): pure mappers from headless stream-json events to the ONE
 // AgentState enum (05 — never redeclared) and to activity-feed items, plus roster composition
 // (PTY sessions + workflow steps merged into one list). Unit tested; AgentsPanel is thin glue.
 import type { AgentState, TerminalSession } from '../../../shared/terminal'

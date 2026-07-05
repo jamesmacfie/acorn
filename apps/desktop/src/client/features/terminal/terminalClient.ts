@@ -11,7 +11,7 @@ export type TerminalApi = {
   remove(id: string): Promise<boolean>
   resize(id: string, cols: number, rows: number): Promise<boolean>
   write(id: string, data: string): void
-  // Bracketed-paste delivery into an agent PTY (docs/next 04 §D): one block, three submit modes.
+  // Bracketed-paste delivery into an agent PTY (docs/panes.md): one block, three submit modes.
   sendToAgent(sessionId: string, text: string, submit: 'now' | 'after-ready' | 'draft'): Promise<{ ok: boolean; queued?: boolean; reason?: string }>
   onStatus(cb: () => void): () => void
   attach(id: string, on: (m: ServerMsg) => void): () => void
@@ -39,7 +39,7 @@ export type TerminalApi = {
   }
   // Run a workspace's browser-preview script in the task's worktree; stdout (trimmed) is the URL.
   previewUrl(taskId: string, script: string): Promise<{ ok: boolean; url?: string; reason?: string }>
-  // Local-changes review (docs/next 04): working-tree status/diffs/blobs for the ChangesPane.
+  // Local-changes review (docs/panes.md): working-tree status/diffs/blobs for the ChangesPane.
   local: {
     changes(taskId: string): Promise<LocalChange[]>
     diff(taskId: string, path: string, scope: 'unstaged' | 'staged'): Promise<{ patch: string } | { error: string }>

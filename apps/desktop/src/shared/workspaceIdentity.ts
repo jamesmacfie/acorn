@@ -1,4 +1,4 @@
-// Workspace identity helpers (docs/next 01): icon JSON parse/serialize and the deterministic
+// Workspace identity helpers (docs/workspaces-and-tasks.md): icon JSON parse/serialize and the deterministic
 // name-hash default colour. Pure — shared by the Hono routes (parse on read) and the renderer
 // (render + settings picker), unit-tested beside this file.
 import type { WorkspaceIcon } from './api'

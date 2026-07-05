@@ -1,4 +1,4 @@
-// Drivable browser — the CDP service (docs/next 08 P1): drives the task's EXISTING preview
+// Drivable browser — the CDP service (docs/panes.md): drives the task's EXISTING preview
 // webview via webContents.debugger. One driver per task; refs come from the last snapshot
 // (browserAuto.ts owns the pure transforms). Commands originate from main/agent only — never from
 // page script (vNext §11 posture); navigation stays http(s)-only like the will-attach-webview guard.

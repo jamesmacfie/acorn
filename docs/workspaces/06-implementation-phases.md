@@ -66,7 +66,7 @@ promotion time (`PullList.tsx` `scanLinearRefs` — only when exactly one Linear
 since `task_links` now needs an `integrationId`); local-first "New task"; lazy branch-keyed
 worktrees (`main/terminal.ts` → `main/worktrees.ts`); PR inheritance (Flow B) runs in
 `routes/pulls.ts` on mirror sync. Archive went **beyond** the design: `ArchiveOpts` supports
-`deleteWorktree` / `force` / `skipTeardown`, and a per-workspace **teardown script** (docs/next 02)
+`deleteWorktree` / `force` / `skipTeardown`, and a per-workspace **teardown script** (docs/terminal-and-agents.md)
 runs before removal, with `teardownFailed` surfaced to the UI — the guarded flow is drawn in
 [`05`](./05-lifecycle-and-isolation.md).
 
@@ -76,8 +76,8 @@ runs before removal, with `teardownFailed` surfaced to the UI — the guarded fl
 
 **How it went:** `TaskView.tsx` + the pane reducer (`features/tasks/layout.ts`) shipped, then grew
 past this spec: the layout is a **multi-pane row** (⌘-click opens a pane beside the others,
-docs/next 03), and the pane set is `pr | linear | rollbar | preview | editor | changes | notes |
-browser | context`. Terminal is **not** a pane — it stayed a bottom drawer (deliberate; see
+docs/panes.md), and the pane set is `pr | linear | rollbar | preview | editor | changes | notes |
+context`. Terminal is **not** a pane — it stayed a bottom drawer (deliberate; see
 [`02`](./02-ui-design.md)'s shipped notes). The Sources zone shipped with integration gating
 (`availableSources()` in `features/tabs/sources.ts`), plus `LinearBrowse.tsx` / `RollbarBrowse.tsx`
 browse views; `PullList` became the GitHub Source browse view.

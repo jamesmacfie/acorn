@@ -16,7 +16,7 @@ export function pathForTask(t: Task): string {
 export function activateTaskSignals(t: Task, options?: { pane?: PaneId }): void {
   setSelectedSource(null)
   setActiveTaskId(t.id)
-  markTaskRead(t.id) // viewing acknowledges its notices (docs/next 05)
+  markTaskRead(t.id) // viewing acknowledges its notices (docs/terminal-and-agents.md)
   if (options?.pane) return dispatchLayout(t.id, { type: 'show', pane: options.pane })
   // First open: a PR-less task with a Linear link starts on 'linear'; everything else on 'pr'
   // (also the reducer's default, but seeding it keeps the persisted layout explicit).

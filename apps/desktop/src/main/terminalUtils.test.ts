@@ -104,7 +104,7 @@ describe('path-traversal guards', () => {
   })
 })
 
-describe('matchBlockedPrompt (docs/next 05 P3)', () => {
+describe('matchBlockedPrompt (docs/terminal-and-agents.md)', () => {
   it.each([
     ['Do you want to proceed? (y/n)', true],
     ['Overwrite existing file? [Y/n]', true],

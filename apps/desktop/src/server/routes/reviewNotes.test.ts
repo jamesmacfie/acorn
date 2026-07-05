@@ -18,7 +18,7 @@ const jsonReq = (url: string, method: string, body?: unknown) =>
     body: body === undefined ? undefined : JSON.stringify(body),
   })
 
-describe('review notes CRUD + sentAt lifecycle (docs/next 04 §C)', () => {
+describe('review notes CRUD + sentAt lifecycle (docs/panes.md)', () => {
   let t: TestDb
   let app: Hono<AppEnv>
 

@@ -1,4 +1,4 @@
-/* Agents panel (docs/next 15): right-anchored drawer — the LinearIssuePanel shape. Flat, 1px. */
+/* Agents panel (docs/terminal-and-agents.md): right-anchored drawer — the LinearIssuePanel shape. Flat, 1px. */
 .agents-panel {
   position: fixed;
   top: var(--topbar-h, 40px);

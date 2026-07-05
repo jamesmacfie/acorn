@@ -258,7 +258,7 @@ export const repoPaths = sqliteTable(
     // .acorn/config.toml (parsed by main/runConfig.ts legacyRunTargets). The legacy scalar
     // run_command/dev_port columns were folded into this JSON by migration 0017 and dropped in 0018.
     runTargets: text('run_targets'),
-    // External editor command for this repo's worktrees (docs/next 01 P2): 'code' | 'zed' |
+    // External editor command for this repo's worktrees (docs/workspaces-and-tasks.md): 'code' | 'zed' |
     // 'cursor -n' | an absolute path. null → the prefs 'editor_command_default' → 'code'.
     editorCommand: text('editor_command'),
     createdAt: integer('created_at').notNull(),
@@ -279,7 +279,7 @@ export const workspaces = sqliteTable('workspaces', {
   setupScriptTrigger: text('setup_script_trigger'), // 'off' | 'created' | 'terminal' — when to run it; null → 'terminal'
   devScript: text('dev_script'), // per-workspace "run dev" command → a `dev` run target; null/blank = no run button
   devRestartScript: text('dev_restart_script'), // per-workspace restart command for the `dev` target; when set, run_restart runs it instead of stop+start
-  teardownScript: text('teardown_script'), // shell command run in the worktree just before removal (docs/next 02); null/blank = none
+  teardownScript: text('teardown_script'), // shell command run in the worktree just before removal (docs/terminal-and-agents.md); null/blank = none
   previewMode: text('preview_mode'), // 'url' | 'port' | 'script' — how the browser-preview URL is resolved; null → dev-server port
   previewValue: text('preview_value'), // the URL, port, or shell command per previewMode; null/blank = unset
   icon: text('icon'), // JSON WorkspaceIcon ({"kind":"emoji","value":"🌰"} | {"kind":"lucide",…} | {"kind":"github"}); null → derived default
@@ -370,7 +370,7 @@ export const taskLinks = sqliteTable(
   (t) => [primaryKey({ columns: [t.taskId, t.integrationId, t.identifier] })],
 )
 
-// Local review notes (docs/next 04 §C): inline annotations on UNCOMMITTED changes, sent to the
+// Local review notes (docs/panes.md): inline annotations on UNCOMMITTED changes, sent to the
 // agent as a prompt — acorn-owned app state (PR comments stay GitHub-owned). Machine-scoped like
 // tasks/terminal_sessions (no user_id). THE single home for anchored annotations (README decision
 // 16): when editor/browser annotations arrive, generalize the anchor (nullable anchorJson) rather

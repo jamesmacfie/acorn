@@ -1,4 +1,4 @@
-// Rollbar REST client (docs/next 10) — the thin sibling of server/linear/. A connection is a
+// Rollbar REST client (docs/integrations.md) — the thin sibling of server/linear/. A connection is a
 // project-read access token; items are Rollbar's deduped errors, identified in acorn by their
 // visible `counter` (#142). Exported fetch is mocked in route tests; never called live there.
 

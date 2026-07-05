@@ -1,4 +1,4 @@
-/* Notes pane (docs/next 09): list + textarea/preview, flat + 1px borders. */
+/* Notes pane (docs/notes-and-memory.md): list + textarea/preview, flat + 1px borders. */
 .notes-pane { display: flex; flex-direction: column; overflow: hidden; padding: 0; }
 .notes-body { flex: 1; min-height: 0; display: flex; }
 .notes-list {

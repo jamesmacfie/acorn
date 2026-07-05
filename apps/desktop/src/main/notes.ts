@@ -1,4 +1,4 @@
-// Workspace notes store (docs/next 09 P1): plain .md files with YAML-ish frontmatter at
+// Workspace notes store (docs/notes-and-memory.md): plain .md files with YAML-ish frontmatter at
 // <dataDir>/notes/<workspaceId>/<slug>.md — ONE store (main process) read by the UI and, later,
 // the MCP notes_* tools. Files are gitignored working state (Conductor's .context-in-git bug is
 // the warning); durable knowledge is promoted into committed memory (12). Kinds are

@@ -1,4 +1,4 @@
-/* ChangesPane (docs/next 04 §B): file list + local diff, flat/1px-bordered per docs/ui-design.md. */
+/* ChangesPane (docs/panes.md): file list + local diff, flat/1px-bordered per docs/ui-design.md. */
 .changes-pane { display: flex; flex-direction: column; overflow: hidden; padding: 0; }
 .changes-body { flex: 1; min-height: 0; display: flex; }
 .changes-list {
@@ -41,7 +41,7 @@
 .changes-empty { padding: 10px; font-size: var(--fs-sm); }
 .changes-diff { flex: 1; min-width: 0; overflow: auto; }
 
-/* File-row "add to agent" affordance (docs/next 04 §E). */
+/* File-row "add to agent" affordance (docs/panes.md). */
 .changes-row-wrap { display: flex; align-items: stretch; }
 .changes-row-wrap .changes-row { flex: 1; min-width: 0; }
 .changes-to-agent {
@@ -58,7 +58,7 @@
 .changes-row-wrap:hover .changes-to-agent { visibility: visible; }
 .changes-to-agent:hover { color: var(--text); }
 
-/* Review notes (docs/next 04 §C): flat inline annotation under its anchor line. */
+/* Review notes (docs/panes.md): flat inline annotation under its anchor line. */
 .changes-header { display: flex; align-items: center; gap: 10px; }
 .changes-send {
   font: inherit;
@@ -97,5 +97,5 @@
 }
 .review-note-delete:hover { color: var(--del-marker); }
 
-/* Commit box (docs/next 04 P4) at the bottom of the file list. */
+/* Commit box (docs/panes.md) at the bottom of the file list. */
 .changes-commit { display: flex; flex-direction: column; gap: 6px; padding: 8px 10px; border-top: 1px solid var(--border); }

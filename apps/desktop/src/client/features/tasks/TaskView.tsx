@@ -169,7 +169,7 @@ export default function TaskView(props: {
   const [closeOpen, setCloseOpen] = createSignal(false)
   const [deleteWt, setDeleteWt] = createSignal(true)
   const [closeErr, setCloseErr] = createSignal('')
-  // A failed teardown pauses the close (docs/next 02): offer "close anyway" (skip teardown) or abort.
+  // A failed teardown pauses the close (docs/terminal-and-agents.md): offer "close anyway" (skip teardown) or abort.
   const [teardownFailed, setTeardownFailed] = createSignal(false)
   const hasTeardown = () => !!previewWs()?.teardownScript?.trim()
   const hasWorktree = () => !!props.task.worktreePath

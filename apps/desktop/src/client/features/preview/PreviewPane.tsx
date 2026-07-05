@@ -75,7 +75,7 @@ export default function PreviewPane(props: { taskId: string; url: string | null 
       const onNav = (e: Event) => isActive(captured) && (setAddr((e as Event & { url?: string }).url ?? captured.getURL()), syncFrom(captured))
       el.addEventListener('did-navigate', onNav)
       el.addEventListener('did-navigate-in-page', onNav)
-      // Bind for agent driving (docs/next 08): main resolves the webContents id → CDP driver.
+      // Bind for agent driving (docs/panes.md): main resolves the webContents id → CDP driver.
       el.addEventListener('dom-ready', () => {
         try {
           void window.acorn?.browser?.bind(taskId, captured.getWebContentsId())

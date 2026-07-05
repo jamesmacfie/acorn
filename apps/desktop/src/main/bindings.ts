@@ -18,7 +18,7 @@ export type RuntimeBindings = {
   GITHUB_CLIENT_ID: string
   GITHUB_CLIENT_SECRET: string
   // Per-app-run bearer for loopback callers that hold no session cookie — the acorn MCP server
-  // (docs/next 06 B). Injected into task session env (ACORN_API_TOKEN) so agent-spawned servers
+  // (docs/mcp.md). Injected into task session env (ACORN_API_TOKEN) so agent-spawned servers
   // inherit it; auth middleware maps it to the machine's single user.
   INTERNAL_TOKEN: string
 }
