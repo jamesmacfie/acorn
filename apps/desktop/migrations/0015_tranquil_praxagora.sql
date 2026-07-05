@@ -1,0 +1,1 @@
+ALTER TABLE `workspaces` ADD `dev_restart_script` text;

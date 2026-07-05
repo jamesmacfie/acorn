@@ -1,0 +1,278 @@
+/* Diff pane content. The .pane-right container itself (flex column, no trailing border) is owned
+   by tokens-layout.css with the rest of the pane layout. */
+.diff {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding: 0;
+  font-family: var(--font-mono);
+  font-size: var(--fs-sm);
+  line-height: 20px;
+}
+.diff-rows { position: relative; width: 100%; }
+/* Read-only compare preview (create mode): same rows rendered in normal document flow instead of
+   the virtualizer's absolute positioning. */
+.compare-diff .diff-rows { position: static; }
+.compare-diff .diff-row { position: static; transform: none; }
+.diff-row {
+  position: absolute;
+  top: 0;
+  left: 0;
+  display: flex;
+  flex-wrap: wrap; /* lets an inline composer drop to its own line below the code */
+  align-items: flex-start;
+  width: 100%;
+  min-width: 100%;
+  min-height: 20px;
+  white-space: normal;
+}
+.diff-gutter { flex: none; width: 44px; padding-right: 8px; text-align: right; color: var(--text-faint); user-select: none; }
+.diff-marker { flex: none; width: 14px; text-align: center; color: var(--text-faint); user-select: none; }
+.diff-code {
+  flex: 1 1 0;
+  min-width: 0;
+  padding-right: var(--pane-pad);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.diff-add { background: var(--add-bg); }
+.diff-add .diff-marker { color: var(--add-marker); }
+.diff-del { background: var(--del-bg); }
+.diff-del .diff-marker { color: var(--del-marker); }
+.diff-hunk { background: var(--hunk-bg); color: var(--hunk-text); padding-left: var(--pane-pad); font-weight: 500; }
+
+/* Clickable band that reveals hidden unchanged context (GitHub-style expand). Full-width in both
+   the flex unified row and the .diff-split-full wrapper. */
+.diff-gap {
+  flex: 1 0 100%;
+  display: block;
+  width: 100%;
+  padding: 3px var(--pane-pad);
+  border: none;
+  background: var(--hunk-bg);
+  color: var(--hunk-text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  user-select: none;
+}
+.diff-gap:hover:not(:disabled) { background: var(--bg-hover); color: var(--text); }
+.diff-gap:disabled { cursor: default; opacity: 0.6; }
+
+.diff-load {
+  flex: 1 0 100%;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 3px var(--pane-pad);
+  background: var(--bg);
+  color: var(--text-muted);
+  font: inherit;
+  user-select: none;
+  white-space: normal;
+}
+.diff-load-error { color: var(--del-marker); }
+.diff-load-retry {
+  font: inherit;
+  font-size: var(--fs-sm);
+  color: var(--text-muted);
+  background: none;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+}
+.diff-load-retry:hover { color: var(--text); }
+
+/* Per-file header that opens each file's section in the stacked all-files diff. Kept in-flow so
+   virtual row measurement cannot overlap it with the following hunk. */
+.diff-file-row {
+  display: block;
+  width: 100%;
+  min-width: 100%;
+  height: 36px;
+  overflow: hidden;
+  white-space: normal;
+}
+.diff-file-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 36px;
+  padding: 0 var(--pane-pad);
+  background: var(--bg-subtle);
+  border-top: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+  font-weight: 600;
+  line-height: 20px;
+}
+.diff-file-head .diff-file-path {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.diff-file-head .file-stat { flex: none; }
+.diff-nodiff { display: block; padding: 4px var(--pane-pad); }
+
+/* Inline review threads + new-line composer. Thread rows are full-width, variable-height blocks
+   (measured by the virtualizer); the add-comment "+" reveals on row hover. */
+.diff-add-btn {
+  flex: none;
+  width: 16px;
+  height: 16px;
+  margin-right: 4px;
+  padding: 0;
+  font: inherit;
+  font-size: 11px;
+  line-height: 14px;
+  color: var(--text-muted);
+  background: var(--bg);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+  cursor: pointer;
+  visibility: hidden;
+}
+.diff-row:hover .diff-add-btn, .diff-add-btn:focus-visible { visibility: visible; }
+.diff-add-btn:hover { color: var(--text); background: var(--bg-hover); border-color: var(--accent); }
+
+/* Thread / composer rows opt out of the single-line flex layout used by code rows. */
+.diff-thread-row {
+  display: block;
+  align-items: stretch;
+  width: 100%;
+  min-width: 100%;
+  white-space: normal;
+}
+
+.diff-thread {
+  margin: 6px var(--pane-pad);
+  padding: 9px 10px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-left: 2px solid var(--accent);
+  border-radius: var(--radius);
+  line-height: var(--lh);
+}
+.diff-thread-resolved { background: var(--bg-subtle); border-left-color: var(--add-marker); }
+.diff-thread-head { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+.diff-thread-collapsed .diff-thread-head { margin-bottom: 0; }
+.diff-thread-status {
+  font-size: var(--fs-sm);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-muted);
+  font-weight: 600;
+}
+.diff-thread-resolved .diff-thread-status { color: var(--add-marker); }
+.diff-thread-link {
+  margin-left: auto;
+  font: inherit;
+  font-size: var(--fs-sm);
+  color: var(--text-muted);
+  background: none;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+}
+.diff-thread-link + .diff-thread-link { margin-left: 0; }
+.diff-thread-link:hover:not(:disabled) { color: var(--text); }
+.diff-thread-link:disabled { opacity: 0.5; cursor: default; }
+.diff-thread-comment { padding: 8px 0; border-top: 1px solid var(--border); }
+.diff-thread-comment:first-of-type { border-top: 0; }
+.diff-thread-comment .comment-meta { margin-bottom: 5px; }
+
+/* Reply box (thread) + new-line composer share the textarea + action styling. */
+.diff-reply, .diff-composer { display: flex; flex-direction: column; gap: 6px; margin-top: 6px; }
+.diff-composer { flex-basis: 100%; padding: 7px var(--pane-pad) 7px 68px; white-space: normal; }
+.diff-reply-input {
+  width: 100%;
+  min-height: 48px;
+  font: inherit;
+  font-family: var(--font-mono);
+  font-size: var(--fs-sm);
+  color: var(--text);
+  background: var(--bg);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+  padding: 6px 8px;
+  resize: vertical;
+  white-space: normal;
+}
+.diff-reply-input:disabled { opacity: 0.5; }
+.diff-composer-actions { display: flex; gap: 6px; }
+.diff-thread-err { font-size: var(--fs-sm); color: var(--del-marker); }
+
+/* Shiki dual-theme: light by default, dark when the app theme is dark (mirrors token theming). */
+.diff-code span { color: var(--l); }
+:root[data-theme='dark'] .diff-code span,
+:root[data-theme='solarized-dark'] .diff-code span,
+:root[data-theme='monokai'] .diff-code span,
+:root[data-theme='nord'] .diff-code span,
+:root[data-theme='catppuccin-frappe'] .diff-code span,
+:root[data-theme='catppuccin-macchiato'] .diff-code span,
+:root[data-theme='catppuccin-mocha'] .diff-code span,
+:root[data-theme='one-dark'] .diff-code span,
+:root[data-theme='dracula'] .diff-code span { color: var(--r); }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) .diff-code span { color: var(--r); }
+}
+
+/* Diff view-mode toggle (Unified | Split), persisted via the `diff_view` pref. Sits above the
+   diff scroller; segmented control styled with the shared button tokens. */
+.diff-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  min-height: 40px;
+  padding: 6px var(--pane-pad);
+  border-bottom: 1px solid var(--border);
+  background: var(--bg);
+}
+.diff-viewmode { display: inline-flex; border: 1px solid var(--border-strong); border-radius: var(--radius); overflow: hidden; }
+.diff-viewmode-btn {
+  font: inherit;
+  font-size: var(--fs-sm);
+  color: var(--text-muted);
+  background: var(--bg);
+  border: 0;
+  padding: 4px 12px;
+  cursor: pointer;
+}
+.diff-viewmode-btn + .diff-viewmode-btn { border-left: 1px solid var(--border-strong); }
+.diff-viewmode-btn:hover:not(.active) { color: var(--text); }
+.diff-viewmode-btn.active { color: var(--text); background: var(--bg-selected); }
+
+/* Word-level intra-line diff: changed spans within a paired delete/insert line get a stronger
+   background + (inherited) marker glyph on the line — never colour alone. Layers over the line bg. */
+.diff-word-del { background: var(--del-word-bg); border-radius: 2px; }
+.diff-word-add { background: var(--add-word-bg); border-radius: 2px; }
+
+/* Split (side-by-side) mode. Bands are virtualized; each mounted pair band is a two-column grid,
+   while hunk headers + threads span both columns full-width. */
+.diff-split { padding-top: 0; }
+.diff-split-rows { position: relative; width: 100%; }
+.diff-split-band {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  min-height: 20px;
+}
+.diff-split-pair { display: grid; grid-template-columns: 1fr 1fr; align-items: stretch; }
+.diff-split-cell {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  min-width: 0;
+  white-space: normal;
+  border-left: 1px solid var(--border);
+}
+.diff-split-cell:first-child { border-left: 0; }
+.diff-split-cell .diff-code { min-width: 0; }
+.diff-split-empty { background: var(--bg-subtle); }
+.diff-split-full { width: 100%; white-space: normal; }
+.diff-split-full.diff-hunk { display: block; white-space: pre; }
+.diff-split-full.diff-file-row { padding: 0; }
+.diff-split-pair:hover .diff-add-btn { visibility: visible; }

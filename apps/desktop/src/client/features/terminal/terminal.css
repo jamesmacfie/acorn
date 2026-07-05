@@ -1,0 +1,241 @@
+.terminal-drawer {
+  position: fixed;
+  /* Sit between the two icon rails (left TabRail, right pane-switcher — both --tabrail-w wide),
+     not over either. The terminal only shows in the Task view, where the right rail is present. */
+  left: var(--tabrail-w);
+  right: var(--tabrail-w);
+  bottom: 0;
+  min-height: 160px;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-subtle);
+  color: var(--text);
+  border-top: 1px solid var(--border);
+  z-index: 50;
+}
+.terminal-resize {
+  height: 6px;
+  cursor: ns-resize;
+  background: transparent;
+}
+.terminal-resize:hover {
+  background: var(--border);
+}
+
+/* Header = a scrolling tab strip (flex:1) + pinned actions, so tabs never squish and the +/^C/close
+   stay visible no matter how many sessions are open. */
+.terminal-tabs {
+  display: flex;
+  align-items: stretch;
+  border-bottom: 1px solid var(--border);
+  font: var(--fs-sm) / 1 var(--font-mono);
+  color: var(--text-muted);
+}
+.terminal-tabstrip {
+  display: flex;
+  gap: 2px;
+  flex: 1;
+  min-width: 0;
+  overflow-x: auto;
+  padding-left: 6px;
+}
+.terminal-actions {
+  display: flex;
+  align-items: center;
+  flex: none;
+  gap: 2px;
+  padding: 0 4px;
+  border-left: 1px solid var(--border);
+}
+.terminal-tab {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: none;
+  padding: 6px 8px;
+  cursor: pointer;
+  color: var(--text-muted);
+  border-bottom: 2px solid transparent;
+  white-space: nowrap;
+}
+.terminal-tab.active {
+  color: var(--text);
+  border-bottom-color: var(--accent);
+}
+.terminal-tab-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--add-marker);
+  flex: none;
+}
+.terminal-tab-dot.exited {
+  background: var(--text-faint);
+}
+.terminal-tab-dot.idle {
+  background: var(--warn);
+}
+.terminal-tab-idle {
+  font-size: 10px;
+  color: var(--warn);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.terminal-tab-title {
+  max-width: 220px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.terminal-tab-x,
+.terminal-new,
+.terminal-close,
+.terminal-interrupt {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: var(--fs-sm);
+  padding: 2px 4px;
+}
+.terminal-tab-x:hover,
+.terminal-new:hover,
+.terminal-close:hover,
+.terminal-interrupt:hover {
+  color: var(--text);
+}
+.terminal-new {
+  font-size: 16px;
+  padding: 0 8px;
+}
+.terminal-new-wrap {
+  position: relative;
+}
+/* Click-away layer for the "+" profile menu (sits behind the menu, above the rest). */
+.terminal-menu-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 59;
+}
+.terminal-menu {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  z-index: 60;
+  min-width: 180px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 4px;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 8px 24px var(--shadow-popover);
+}
+.terminal-menu-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  background: none;
+  border: none;
+  color: var(--text);
+  text-align: left;
+  padding: 5px 8px;
+  border-radius: 3px;
+  cursor: pointer;
+  font: var(--fs-sm) / 1.2 var(--font-mono);
+}
+.terminal-menu-item:hover:not(:disabled) {
+  background: var(--bg-hover);
+}
+.terminal-menu-item:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+.terminal-menu-missing {
+  font-size: 10px;
+  color: var(--text-faint);
+}
+.terminal-menu-wt {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 8px;
+  font: 11px / 1.2 var(--font-mono);
+  color: var(--text-muted);
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 2px;
+  cursor: pointer;
+}
+.terminal-interrupt {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+.terminal-close {
+  font-size: 13px;
+  margin-right: 8px;
+  margin-left: 2px;
+}
+.terminal-unavailable {
+  padding: 6px 8px;
+  color: var(--del-marker);
+}
+.terminal-drawer-btn {
+  background: none;
+  border: 1px solid var(--border);
+  color: var(--text);
+  border-radius: var(--radius);
+  padding: 2px 8px;
+  cursor: pointer;
+}
+.terminal-prompt {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--border);
+  font: var(--fs-sm) / 1.4 var(--font-mono);
+  color: var(--text);
+  flex-wrap: wrap;
+}
+.terminal-prompt-input {
+  flex: 1;
+  min-width: 200px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  color: var(--text);
+  border-radius: var(--radius);
+  padding: 4px 6px;
+  font: var(--fs-sm) var(--font-mono);
+}
+.terminal-prompt-error {
+  color: var(--del-marker);
+}
+.terminal-error-banner {
+  padding: 4px 8px;
+  border-bottom: 1px solid var(--border);
+}
+.terminal-body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+}
+.terminal-surface {
+  flex: 1;
+  min-height: 0;
+  width: 100%;
+  padding: 4px 6px;
+}
+.terminal-empty {
+  margin: auto;
+  color: var(--text-faint);
+  font: var(--fs-sm) var(--font-mono);
+}
+
+.terminal-launching {
+  animation: terminal-pulse 1.2s ease-in-out infinite;
+}
+
+@keyframes terminal-pulse {
+  0%, 100% { opacity: 0.4; }
+  50% { opacity: 1; }
+}

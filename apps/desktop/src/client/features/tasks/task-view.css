@@ -1,0 +1,277 @@
+/* Workspace view (docs/workspaces P4): PR-review (Navigator + Diff) or an empty state, plus a thin
+   pane-switcher rail on the right. Mirrors the .panes grid but with the switcher as a 3rd column.
+   `.panes.panes-workspace` (specificity 0,2,0) so it reliably beats the base `.panes` 3-col rule —
+   otherwise the switcher falls into a 1fr track (huge right gap) and the Navigator widens. */
+/* Wrap so a status footer can sit below the panes (docs/workspaces 02). */
+/* Reserve room for the terminal drawer when it's open (--term-drawer-h, set by TerminalPanel) so
+   the panes + footer shrink to sit above it — the drawer is a fixed overlay and would otherwise
+   cover the bottom of the panes and their scrollbars. */
+/* padding-right reserves the full-height .pane-switcher (fixed, right:0); padding-bottom reserves the
+   terminal drawer. Both rails/overlays are position:fixed, so content shrinks via padding, not flow. */
+.workspace-wrap { display: flex; flex-direction: column; min-height: 0; height: 100%; padding-right: var(--tabrail-w); padding-bottom: var(--term-drawer-h, 0px); }
+.panes.panes-workspace {
+  flex: 1;
+  min-height: 0;
+  grid-template-columns: clamp(360px, 23vw, 430px) minmax(0, 1fr) auto;
+}
+/* `.app.left-collapsed .panes` (0,3,0) otherwise beats the rule above (0,2,0) and forces the PR
+   view's `0 | mid | 1fr` grid onto the workspace's [Navigator | Diff | switcher] children —
+   collapsing the Navigator and dropping the switcher into the 1fr track (huge right gap). The
+   workspace has no left pane to collapse, so keep its own 3-track grid when the left is collapsed. */
+.app.left-collapsed .panes.panes-workspace {
+  grid-template-columns: clamp(360px, 23vw, 430px) minmax(0, 1fr) auto;
+}
+
+/* Worktree status line under the panes: path + dirty/clean/needs-repair. */
+.workspace-footer {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 4px var(--pane-pad);
+  border-top: 1px solid var(--border);
+  background: var(--bg-subtle);
+  font-size: var(--fs-sm);
+  color: var(--text-muted);
+}
+.workspace-footer-path {
+  font-family: var(--font-mono);
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.workspace-footer-dirty { flex: none; color: var(--warn); }
+.workspace-footer-repair { flex: none; color: var(--del-marker); }
+
+/* No-PR / no-pane state spans the content columns, leaving the switcher its own column. */
+.workspace-empty {
+  grid-column: 1 / 3;
+  align-items: center;
+  justify-content: center;
+}
+.workspace-empty-inner {
+  max-width: 380px;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  padding: 1rem;
+}
+.workspace-empty-term {
+  align-self: center;
+  font: inherit;
+  font-size: var(--fs-sm);
+  padding: 4px 12px;
+  color: var(--text);
+  background: var(--bg);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+  cursor: pointer;
+}
+.workspace-empty-term:hover { background: var(--bg-hover); }
+
+/* Browser-preview pane: the <webview> fills the content columns. */
+.workspace-preview { grid-column: 1 / 3; display: flex; flex-direction: column; overflow: hidden; padding: 0; }
+.workspace-preview-host { flex: 1; min-height: 0; display: flex; }
+.workspace-preview .workspace-empty-inner { margin: auto; text-align: center; }
+
+/* Browser chrome above the preview webview: back / forward / stop-reload / home + URL bar + spinner. */
+.preview-chrome { flex: none; display: flex; align-items: center; gap: 4px; padding: 5px 6px; border-bottom: 1px solid var(--border); background: var(--bg-subtle); }
+.preview-nav-btn {
+  flex: none;
+  width: 26px;
+  height: 26px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-mono);
+  font-size: var(--fs-lg);
+  line-height: 1;
+  color: var(--text-muted);
+  background: transparent;
+  border: 0;
+  border-radius: var(--radius);
+  cursor: pointer;
+}
+.preview-nav-btn:hover:not(:disabled) { background: var(--bg-hover); color: var(--text); }
+.preview-nav-btn:disabled { opacity: 0.35; cursor: default; }
+.preview-url {
+  flex: 1;
+  min-width: 0;
+  height: 26px;
+  padding: 0 10px;
+  font-family: var(--font-mono);
+  font-size: var(--fs-sm);
+  color: var(--text);
+  background: var(--bg-subtle);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+}
+.preview-url:focus { outline: none; border-color: var(--accent); }
+.preview-spinner { flex: none; font-size: var(--fs-sm); color: var(--accent); padding: 0 4px; }
+
+/* The pane-switcher mirrors the left TabRail exactly — same width and button size — for a symmetric
+   pair of icon rails. (Accent sits on the right edge since this rail is on the right.) */
+.pane-switcher {
+  /* Fixed so it runs the full height of the right edge — beside the panes AND the terminal drawer —
+     instead of being squeezed above the drawer with the rest of .workspace-wrap's flow. Same
+     top-anchor as .agents-panel; the drawer's right: var(--tabrail-w) stops exactly at its left. */
+  position: fixed;
+  top: var(--topbar-h);
+  right: 0;
+  bottom: 0;
+  z-index: 20;
+  width: var(--tabrail-w);
+  display: flex;
+  flex-direction: column;
+  border-left: 1px solid var(--border);
+  background: var(--bg-subtle);
+}
+.pane-switch-btn {
+  width: 100%;
+  height: 52px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-mono);
+  font-size: var(--fs-lg);
+  color: var(--text-muted);
+  background: transparent;
+  border: 0;
+  border-bottom: 1px solid var(--border);
+  border-right: 2px solid transparent;
+  cursor: pointer;
+  line-height: 1;
+}
+.pane-switch-btn:hover { background: var(--bg-hover); color: var(--text); }
+.pane-switch-btn.active { background: var(--bg-selected); color: var(--text); border-right-color: var(--accent); }
+/* Close-task ✕ sits at the bottom of the rail, set off from the pane switches above it. */
+.pane-switch-close { margin-top: auto; border-bottom: 0; border-top: 1px solid var(--border); }
+.pane-switch-close:hover { color: var(--del-marker); }
+
+/* Close-task confirmation modal bits (reuses the shared .overlay shell). */
+.close-check { display: flex; align-items: center; gap: 8px; font-size: var(--fs-sm); color: var(--text); cursor: pointer; }
+.close-check input { accent-color: var(--accent); cursor: pointer; }
+.close-actions { display: flex; justify-content: flex-end; gap: 10px; }
+.close-confirm { color: var(--del-marker); border-color: var(--del-marker); }
+
+/* Linear Source browse (LinearBrowse.tsx): a thin list of linked tickets. */
+.linear-browse { display: flex; flex-direction: column; overflow: hidden; }
+.linear-browse-list { list-style: none; margin: 0; padding: 0; overflow-y: auto; }
+.linear-browse-row {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  font: inherit;
+  text-align: left;
+  color: inherit;
+  background: transparent;
+  border: 0;
+  border-bottom: 1px solid var(--border);
+  cursor: pointer;
+}
+.linear-browse-row:hover { background: var(--bg-hover); }
+.linear-browse-id { flex: none; color: var(--text-muted); font-variant-numeric: tabular-nums; }
+.linear-browse-title { flex: 1; min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.linear-browse-state {
+  flex: none;
+  font-size: var(--fs-sm);
+  color: var(--state-color, var(--text-muted));
+}
+
+/* Linear project picker (modal). */
+.linear-project-picker { list-style: none; margin: 0; padding: 0; max-height: 40vh; overflow-y: auto; }
+.linear-project-picker label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 2px;
+  font-size: var(--fs-sm);
+  color: var(--text);
+  cursor: pointer;
+}
+.linear-project-picker input { accent-color: var(--accent); cursor: pointer; }
+
+/* Run-target buttons (docs/next 13 §A): one ▶ per named target, id shown under the glyph. */
+.pane-switch-run { flex-direction: column; gap: 1px; }
+.pane-switch-run-id {
+  font-size: 8px;
+  line-height: 1;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Layout: an equal-width flex row of open panes + the fixed switcher rail (above). A slot divides
+   from the next with a rule; ⌘/ctrl-click a switcher icon adds a pane to the right. */
+.panes.panes-workspace.task-layout,
+.app.left-collapsed .panes.panes-workspace.task-layout {
+  display: flex;
+}
+.task-slot { position: relative; flex: 1 1 0; display: flex; min-width: 0; min-height: 0; overflow: hidden; }
+.task-slot + .task-slot { border-left: 1px solid var(--border); }
+.task-slot > .pane { flex: 1; min-width: 0; }
+.task-slot-pr > .pane-mid { flex: 0 0 clamp(280px, 20vw, 430px); }
+.task-slot-pr > .pane-right { flex: 1; }
+/* Close button, top-right of each slot (only rendered when more than one pane is open). */
+.pane-close-btn {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  z-index: 5;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  line-height: 1;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  background: var(--bg);
+  color: var(--text-muted);
+  opacity: 0.55;
+  cursor: pointer;
+}
+.pane-close-btn:hover { opacity: 1; background: var(--bg-hover); color: var(--del-marker); }
+
+/* Rollbar pane + browse (docs/next 10). */
+.rollbar-pane { display: flex; flex-direction: column; overflow-y: auto; }
+.rollbar-detail { padding: 4px var(--pane-pad); }
+.rollbar-title { font-size: var(--fs-lg); font-weight: 600; margin: 8px 0; }
+.rollbar-level { color: var(--del-marker); font-family: var(--font-mono); font-size: var(--fs-sm); }
+.rollbar-level[data-level='warning'] { color: var(--warn); }
+.rollbar-facts { display: grid; grid-template-columns: auto 1fr; gap: 4px 14px; font-size: var(--fs-sm); margin: 10px 0; }
+.rollbar-facts dt { color: var(--text-muted); }
+.rollbar-facts dd { margin: 0; font-family: var(--font-mono); }
+.rollbar-chips { display: flex; gap: 6px; padding: 6px var(--pane-pad) 0; flex-wrap: wrap; }
+.rollbar-chip {
+  font: inherit;
+  font-size: var(--fs-sm);
+  font-family: var(--font-mono);
+  padding: 2px 8px;
+  color: var(--text-muted);
+  background: var(--bg);
+  border: 1px solid var(--border-strong);
+  cursor: pointer;
+}
+.rollbar-chip.active { color: var(--text); background: var(--bg-selected); }
+.rollbar-row-wrap { display: flex; align-items: stretch; }
+.rollbar-row-wrap .linear-browse-row { flex: 1; min-width: 0; }
+.rollbar-attach {
+  flex: none;
+  font: inherit;
+  font-size: var(--fs-sm);
+  padding: 0 10px;
+  color: var(--text-faint);
+  background: transparent;
+  border: 0;
+  border-bottom: 1px solid var(--border);
+  cursor: pointer;
+}
+.rollbar-attach:hover { color: var(--text); background: var(--bg-hover); }

@@ -2,34 +2,40 @@
 
 > Status: **Migration complete.** Phases 0–2 done (Node-server spike + Electron shell + Cloudflare
 > cut) plus the Phase 3 caching cleanup. The Hono app runs under `@hono/node-server` on
-> `http://127.0.0.1:4317` with a better-sqlite3 + KV-shim Bindings object, wrapped in an Electron app
+> `http://127.0.0.1:4317` with a better-sqlite3-backed Bindings object (typed stores — the KV shim
+> is gone), wrapped in an Electron app
 > whose main process starts that server and loads the loopback origin. **Cloudflare/wrangler is fully
-> removed** — Electron is the only runtime. The remaining Phase 3 items are **optional enhancements,
-> not migration work**: OS-keychain secrets, GitHub device flow (drop `client_secret`), and the
-> separate **v2 terminal** feature (§8). This doc is the full change inventory and the record of a
-> clean, phased transition off Cloudflare Workers to a local Electron app.
+> removed** — Electron is the only runtime. The **v2 terminal (§8) has since shipped**: node-pty
+> sessions run in the main process (`src/main/terminal.ts`, desktop-only and always on — see
+> [terminal-and-agents.md](./terminal-and-agents.md)). The remaining Phase 3 items are **optional
+> enhancements, not migration work**: OS-keychain secrets and GitHub device flow (drop
+> `client_secret`). This doc is the full change inventory and the record of a clean, phased
+> transition off Cloudflare Workers to a local Electron app — read it for the *why* behind the
+> current runtime shape; [architecture-overview.md](./architecture-overview.md) describes what
+> exists today.
 >
-> Companion doc: [vNext.md](./vNext.md) (terminal/agent sessions) — that feature collapses into the
-> Electron main process once this lands (see §8).
+> Companion doc: [vNext.md](./vNext.md) (terminal/agent sessions) — that feature collapsed into the
+> Electron main process as §8 predicted; [terminal-and-agents.md](./terminal-and-agents.md) now
+> documents the shipped version.
 >
-> **Phase 0 artifacts:** `apps/web/src/main/bindings.ts` (DB + `.batch` shim, in-mem `OAUTH_STATE`,
-> on-disk `BLOBS`, secrets from `process.env`), `apps/web/src/main/server.ts` (node-server bootstrap
+> **Phase 0 artifacts:** `apps/desktop/src/main/bindings.ts` (DB + `.batch` shim, in-mem `OAUTH_STATE`,
+> on-disk `BLOBS`, secrets from `process.env`), `apps/desktop/src/main/server.ts` (node-server bootstrap
 > + static + SPA fallback), `createApp()` factory in `src/server/index.ts`, DB driver swap in
-> `src/server/db/index.ts`. Run with `pnpm --filter @acorn/web dev:node`. Local data lives under
-> `apps/web/.acorn/` (gitignored).
+> `src/server/db/index.ts`. Run with `pnpm --filter @acorn/desktop dev:node`. Local data lives under
+> `apps/desktop/.acorn/` (gitignored).
 >
-> **Phase 1 artifacts:** `apps/web/src/main/electron.ts` (main process: starts the server, hardened
+> **Phase 1 artifacts:** `apps/desktop/src/main/electron.ts` (main process: starts the server, hardened
 > BrowserWindow, navigation guard, dedicated OAuth window), `src/main/preload.ts` (minimal sandboxed
 > bridge), `electron.vite.config.ts` (main/preload/renderer→dist/client), SW gate in
 > `src/client/index.tsx`, loopback Host-header guard in `server.ts`. **`pnpm dev` now launches the
 > Electron app** (`electron-vite build && electron-vite preview`; old Cloudflare dev server → `dev:web`),
-> plus `electron:dev`, `electron:build`, `electron:rebuild`/`node:rebuild` (better-sqlite3 ABI switch —
-> see caveat in §4i). The window loads the node-server origin (`:4317`), never electron-vite's renderer
-> dev server, so the SPA and `/api` stay same-origin and the session cookie/OAuth keep working.
-> Verified headlessly: app boots, server binds, better-sqlite3 loads under Electron's ABI, SPA serves,
-> and the 401→/auth/login→OAuth-window→GitHub chain fires. **Not yet verified (needs your machine):**
-> the visible window, a full GitHub login round-trip, and a packaged `.dmg` (electron-builder config
-> is not written yet — see §4i).
+> plus `electron:dev`, `electron:rebuild`/`node:rebuild` (native-module ABI switch — see caveat in
+> §4i; the interim `electron:build` script was folded into `build`/`dist` in Phase 2). The window
+> loads the node-server origin (`:4317`), never electron-vite's renderer dev server, so the SPA and
+> `/api` stay same-origin and the session cookie/OAuth keep working. Originally verified headlessly
+> (app boots, server binds, better-sqlite3 loads under Electron's ABI, SPA serves, the
+> 401→/auth/login→OAuth-window→GitHub chain fires); the visible window and the full GitHub login
+> round-trip have since been verified in daily use.
 
 ## 1. Why Electron (decision recap)
 
@@ -72,7 +78,7 @@ cookie, CSRF, and OAuth-callback flow all keep working unchanged. We do **not** 
 already exists).
 
 Prefer a **stable loopback origin** (`127.0.0.1` + one pinned port) even though GitHub loopback
-OAuth can technically use a dynamic port. The app's IndexedDB query cache, service-worker state,
+OAuth can technically use a dynamic port. The app's IndexedDB query cache,
 Chromium permissions, and renderer storage are origin-scoped; a new port every launch gives the
 user a fresh browser profile for those features. Pick a high, uncommon port, enforce single-instance
 startup, and fail with a clear error if another process owns it.
@@ -91,7 +97,7 @@ Exhaustive — this is everything that isn't portable as-is:
 | Secrets / vars | `SESSION_ENC_KEY`, `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET` via `c.env` + `.dev.vars` | `.env` / OS keychain → injected into Bindings |
 | Worker entry | `src/server/index.ts:44` (`export default app`) | `@hono/node-server` `serve(app)` |
 | Static + SPA fallback | `wrangler.jsonc` `assets` block | `serveStatic` + index.html fallback in the Hono app |
-| PWA shell | `src/client/index.tsx`, `public/sw.js`, `manifest.webmanifest` | disable or explicitly version for desktop so a stale service worker cannot mask app updates |
+| PWA shell | `src/client/index.tsx`, `public/sw.js`, `manifest.webmanifest` | removed — the service worker and web manifest are gone; the renderer only unregisters any leftover web-origin service worker (§4h) |
 | Build plugin | `vite.config.ts` `@cloudflare/vite-plugin` | `electron-vite` (main/preload/renderer) |
 | Env types | `worker-configuration.d.ts` (`Env`), `typegen` script | hand-written `Bindings` type |
 
@@ -102,7 +108,7 @@ fetch, no R2. Globals already in Node: `fetch`, `crypto.randomUUID`, `atob`, `Te
 
 That's the entire list. Everything else — all 16 route modules' business logic, the Drizzle schema,
 the migration SQL, the GitHub client, and the SolidJS product UI — is untouched. The only renderer
-change called out below is the service-worker registration gate (§4h).
+change called out below is removing the service worker (§4h).
 
 ## 4. The changes
 
@@ -177,13 +183,14 @@ electron.whenReady().then(async () => {
 
 Port policy: use a pinned port for a stable app origin. GitHub's loopback redirect handling does
 not require the runtime port to match the registered callback port, so OAuth is not the reason to
-pin it; IndexedDB and service-worker continuity are.
+pin it; IndexedDB continuity is.
 
 ### 4b. The Bindings shim (replaces `Env`)
 
 One module constructs the object the routes already expect via `c.env`. Hand-write the type to
 replace the deleted `worker-configuration.d.ts`, and keep the app-level type separate from
-`@hono/node-server`'s HTTP bindings:
+`@hono/node-server`'s HTTP bindings (as designed at migration time — the `KVish` shim below has
+since been replaced by typed stores: `OauthStateStore` / `BlobCache`):
 
 ```ts
 import type { HttpBindings } from '@hono/node-server'
@@ -209,6 +216,17 @@ export type AppBindings = RuntimeBindings & Partial<HttpBindings>
 
 The KV shim only needs the handful of methods actually called (`get`, `put` with optional
 `expirationTtl`, `delete`) — not the full KV surface.
+
+**As shipped**, `RuntimeBindings` (`src/main/bindings.ts`) matches the sketch above with two
+divergences. One post-migration addition: `INTERNAL_TOKEN`, a per-app-run `randomUUID()` bearer for
+loopback callers that hold no session cookie (the acorn MCP server — agents inherit it as
+`ACORN_API_TOKEN`; the auth middleware maps it to the machine's single user). And the KV shim is
+gone: the sketch's `KVish` was retired for plain typed modules that say what they mean —
+`OauthStateStore { issue(state), consume(state) }` (in-memory, TTL internal) and
+`BlobCache { get(key), put(key, value) }` (on-disk by sha; immutable content, so no TTL and no
+delete). The global `Env` in `src/env.d.ts` extends `RuntimeBindings` **and**
+`Partial<HttpBindings>` — exactly the `AppBindings` sketch — so `main/server.ts` builds the env at
+the `app.fetch()` seam without a cast.
 
 ### 4c. DB driver swap
 
@@ -253,17 +271,28 @@ export const getDb = (env: Env): AppDatabase => {
 - Store the writable database under `electron.app.getPath('userData')`, e.g.
   `<userData>/acorn.sqlite`. Do not put it under the app bundle or `resources`; those paths are
   read-only after packaging.
-- Open SQLite with the desktop pragmas explicitly:
-  `foreign_keys = ON`, `journal_mode = WAL`, and a short `busy_timeout`. D1 hides most of this;
-  `better-sqlite3` does not.
+  *As shipped:* `main/electron.ts` resolves the data root once — `app.getPath('userData')` when
+  `app.isPackaged`, else the repo-local `apps/desktop/.acorn/` (so a dev checkout's data stays with
+  the checkout) — and passes it into `startServer(dataDir)`; the plain-Node `dev:node` entry
+  defaults to the repo-local dir (`devDataDir` in `main/server.ts`).
+- Open SQLite with the desktop pragmas explicitly: `journal_mode = WAL` and a short
+  `busy_timeout`. (`foreign_keys = ON` was deliberately dropped — the schema declares no FK
+  constraints, so the pragma was a misleading no-op; see docs/data-layer.md.)
 - Package migrations as readable resources (`extraResources` or an import-time manifest) and resolve
   `migrationsFolder` from `process.resourcesPath` / `import.meta.url`, never from `process.cwd()`.
 - **Native-module rebuild (decided approach):** `better-sqlite3` must be rebuilt against Electron's
   ABI via `@electron/rebuild`. Wire it into a `postinstall` script in Phase 1 so it's automatic and
   CI-safe; this same setup covers `node-pty` for v2 (§8) — solve once. (Fallback only if it ever
   bites: `@libsql/client` prebuilds with `drizzle-orm/libsql`.)
+  *What shipped differs:* the rebuild stayed **manual** (`electron:rebuild` / `node:rebuild`, both
+  now covering `better-sqlite3` *and* `node-pty`) because the plain-Node paths (`dev:node`,
+  `db:migrate`) outlived Phase 2 and need the Node ABI — a `postinstall` pinning the Electron ABI
+  would silently break them. The two-script switch is the accepted trade-off.
 
 ### 4d. `waitUntil` shim
+
+*(Historical — the helper has since been renamed `trackBackgroundRefresh` and moved to
+`src/server/background.ts`.)*
 
 `repoMirror.ts` already centralizes this in one helper (`waitUntilLogged`). In Workers,
 `ctx.waitUntil` keeps the isolate alive past the response; in Node the process stays alive anyway,
@@ -279,10 +308,15 @@ Callers (`pulls.ts`, `repos.ts`, `pullDetail.ts`, `pullFiles.ts`) pass `c.execut
 them; the helper just stops using it. (Optionally drop the arg later for cleanliness.)
 
 **What Phase 0 actually did:** the helper was left fully unchanged. Hono's `c.executionCtx` getter
-*throws* when no context is supplied, and the callers still read it — so the Node bootstrap passes a
+*throws* when no context is supplied, and the callers still read it — so the Node bootstrap passed a
 no-op stub `{ waitUntil(){}, passThroughOnException(){} }` as the third arg to `app.fetch`. With a
 no-op `waitUntil`, the background promise still runs to completion in the long-lived Node process and
-its `.catch` still logs. Zero route/helper edits needed; revisit only if §4d's cleanup is wanted.
+its `.catch` still logs.
+
+**Since cleaned up (post-Phase 2):** the ctx arg was dropped entirely — the helper (now
+`trackBackgroundRefresh(label, promise)` in `src/server/background.ts`) is a plain fire-and-forget
+with error logging, the callers no longer read `c.executionCtx`, and `server.ts` passes no
+execution-context stub. The Workers-era `waitUntilLogged` name is gone too.
 
 ### 4e. Static assets + SPA fallback
 
@@ -304,8 +338,9 @@ The current web flow (`routes/auth.ts`) works **almost unchanged** because the r
 - `redirect_uri` resolves to `http://127.0.0.1:<port>/auth/callback`. Register a loopback callback
   for the GitHub OAuth app. GitHub allows a loopback redirect URL to use a runtime port that differs
   from the registered callback port; we still prefer a pinned port for stable browser storage (§2).
-- `cookieAttrs()` already returns the non-secure `session` cookie name over `http://` (it was built
-  for dev localhost) — so the sealed-cookie session works as-is. No auth rewrite required for v1.
+- The session cookie is the non-secure `session` name over `http://` — so the sealed-cookie session
+  works as-is; no auth rewrite required for v1. (The HTTPS `__Host-` branch and `cookieAttrs()` have
+  since been deleted — `SESSION_COOKIE` in `session.ts` is the single cookie name.)
 - Trigger `/auth/login` in a dedicated OAuth `BrowserWindow` that uses the same Electron session
   partition as the app, but has **no preload**, `nodeIntegration: false`, `contextIsolation: true`,
   and `sandbox: true`. Close it after `/auth/callback` completes and refresh `/api/me` in the main
@@ -344,14 +379,15 @@ renderer ↔ preload ↔ main. Treat that as a narrow capability API, not a gene
 
 ### 4h. PWA / service worker decision
 
-The current SPA registers `public/sw.js` unconditionally. In Electron, that service worker is no
+The old web SPA registered `public/sw.js` unconditionally. In Electron the service worker is no
 longer needed to make the app installable, and it can create confusing update bugs by serving an
 old cached app shell after an app upgrade.
 
-Recommended v1: gate service-worker registration out of the Electron renderer build and unregister
-any existing registrations for the app origin on first desktop launch. Keep the IndexedDB TanStack
-Query cache; it still gives fast warm reads. If offline shell support is deliberately kept, version
-the cache from the packaged app version so updates cannot be masked.
+Resolved: the service worker (`public/sw.js`) and web manifest (`public/manifest.webmanifest`) have
+been removed entirely, along with the `<link rel="manifest">`/`theme-color` tags in `index.html`.
+The renderer boot in `src/client/index.tsx` now only unregisters any service worker left over from a
+prior web (Cloudflare Workers) visit to this origin. The IndexedDB TanStack Query cache is kept — it
+gives fast warm reads and offline browsing without a service worker (see [caching](./caching.md)).
 
 ### 4i. Build & packaging
 
@@ -382,14 +418,13 @@ Do this in **Phase 2**, *after* the Electron path is proven working, so we never
 in-between (see §7). Then delete decisively:
 
 **Files / config:**
-- `apps/web/wrangler.jsonc`
-- `apps/web/worker-configuration.d.ts` (replaced by hand-written `Bindings`)
-- `apps/web/.dev.vars` → `.env` (update `.gitignore` note in CLAUDE.md)
+- `apps/desktop/wrangler.jsonc`
+- `apps/desktop/worker-configuration.d.ts` (replaced by hand-written `Bindings`)
+- `apps/desktop/.dev.vars` → `.env` (update `.gitignore` note in CLAUDE.md)
 - `.wrangler/` state dir
 - `observability` config (Workers-only) — use Electron logging instead
 - root `build-deploy` script and README production-deploy instructions
-- PWA install metadata if not used by desktop (`manifest.webmanifest`; keep `sw.js` only if §4h
-  chooses explicit desktop offline-shell support)
+- PWA install metadata and the service worker (`manifest.webmanifest`, `sw.js`) — removed (§4h)
 
 **Dependencies:**
 - remove `wrangler`, `@cloudflare/vite-plugin`
@@ -420,7 +455,7 @@ To keep the transition calm, note how much does **not** move:
 
 - The SolidJS product UI (`src/client/**`) — router, TanStack Query, IndexedDB persistence, Shiki,
   all panels. It just loads from `http://127.0.0.1:<port>` instead of the Worker. The exception is
-  the boot-time service-worker gate in `src/client/index.tsx` (§4h).
+  the boot-time service-worker unregister in `src/client/index.tsx` (§4h).
 - All 16 route modules' business logic and the Hono routing in `index.ts` (now a `createApp()` factory).
 - The Drizzle **schema** and all migration SQL.
 - The GitHub client (`github/index.ts`) — plain `fetch`.
@@ -436,7 +471,7 @@ To keep the transition calm, note how much does **not** move:
 (better-sqlite3 + `.batch` emulation, in-mem `OAUTH_STATE`, on-disk `BLOBS`). `wrangler`/Cloudflare
 config is untouched and `pnpm build` still succeeds (reversible). Verified: `pnpm lint` + all 88
 tests pass; SPA shell at `/`, `/api/me` → 401 (session crypto works in Node), SPA fallback for client
-routes, `/api/*` 404s preserved, static assets served, SQLite migrated (WAL) under `apps/web/.acorn/`,
+routes, `/api/*` 404s preserved, static assets served, SQLite migrated (WAL) under `apps/desktop/.acorn/`,
 and the `.batch` shim is atomic. The riskiest step (DB driver, waitUntil, bindings) is behind us.
 
 Remaining one-time setup for OAuth login: register `http://127.0.0.1:4317/auth/callback` as a
@@ -452,9 +487,9 @@ the server binds, the native module loads, the SPA serves, and the login redirec
 
 > **better-sqlite3 ABI caveat:** the native module can be built for the Node ABI *or* the Electron
 > ABI, not both. `electron:rebuild` switches it to Electron (needed to run the app); `node:rebuild`
-> switches it back for `dev:node`. This is why the rebuild is **not** a `postinstall` yet — that
-> would silently break the parallel `dev:node` path we keep until Phase 2. Make it a postinstall
-> once Cloudflare/Node-only-dev is gone.
+> switches it back for `dev:node`. This is why the rebuild is **not** a `postinstall` — that would
+> silently break the parallel `dev:node` path. That path (plus `db:migrate`) survived Phase 2, so
+> the manual two-script switch is permanent, and both scripts now also cover `node-pty` (§4c).
 
 **Phase 2 — Cut Cloudflare. ✅ DONE.** Deleted `wrangler.jsonc`, `worker-configuration.d.ts`,
 `vite.config.ts`, `.wrangler/`; removed `wrangler` + `@cloudflare/vite-plugin`; `.dev.vars`→`.env`.
@@ -463,11 +498,14 @@ added `electron-builder.yml` (mac dmg/zip, `asarUnpack` the native `.node`, migr
 `extraResources` resolved via `process.resourcesPath`), reworked scripts (`build`→electron-vite,
 `dist`→electron-builder, `db:migrate`→`tsx scripts/migrate.ts`, dropped `typegen`/`dev:web`), and
 updated `CLAUDE.md`. Verified: `pnpm lint`, 88/88 tests, `pnpm build`, and `pnpm dev` boots clean.
-**Not verified headlessly:** a packaged `.dmg` from `pnpm dist` (run it on your machine).
+**Still not verified:** a packaged `.dmg` from `pnpm dist`. (The old blocker is gone: the data
+root now resolves to `app.getPath('userData')` when packaged — §4c — so nothing tries to write
+inside the read-only asar. Keychain secrets remain the outstanding packaged-build gap: packaged
+builds have no `.env`, and keychain storage is planned-but-not-built.)
 
-**Phase 3 — Desktop-native cleanups + features.** Caching simplification (§5) **✅ done**. Still
-planned: optional keychain auth, GitHub device flow (drop `client_secret`), and the **v2 terminal**
-(§8).
+**Phase 3 — Desktop-native cleanups + features.** Caching simplification (§5) **✅ done**. The
+**v2 terminal** (§8) **✅ shipped** — node-pty sessions in the main process, desktop-only and always
+on. Still planned: optional keychain auth and GitHub device flow (drop `client_secret`).
 
 Each phase is independently shippable and Phase 0–1 are reversible (Cloudflare config still there
 until Phase 2). That's the clean transition.
@@ -475,26 +513,32 @@ until Phase 2). That's the clean transition.
 ## 8. What this does to the terminal feature
 
 The original terminal RFCs designed around a Worker's *lack* of a process model — a separate
-local daemon + a Vite WebSocket proxy. **Electron removes that entire workaround:**
+local daemon + a Vite WebSocket proxy. **Electron removed that entire workaround**, and the feature
+has since been **built** (`src/main/terminal.ts`, registered from `electron.ts` at startup,
+desktop-only and always on):
 
 - node-pty runs **in the Electron main process**. No separate daemon, no `ws` server, no Vite proxy.
-- Renderer (xterm.js) ↔ main over **Electron IPC** (or a localhost WS on the same node-server),
-  instead of `ws://localhost:5173/term`.
-- tmux-backed persistence still applies for surviving an app restart; surviving a *window* reload
-  is automatic since the PTY lives in main.
-- The `@electron/rebuild` step from §4c already covers node-pty's native build.
+- Renderer (xterm.js) ↔ main over **Electron IPC** (`term:*` channels exposed through the
+  `src/main/preload.ts` bridge), instead of `ws://localhost:5173/term`.
+- tmux-backed persistence applies for surviving an app restart; surviving a *window* reload is
+  automatic since the PTY lives in main.
+- The `@electron/rebuild` step from §4c covers node-pty's native build (`electron:rebuild` rebuilds
+  both native modules).
+- The terminal service shares the server's single SQLite connection: `startServer()` returns the
+  runtime bindings and `electron.ts` hands `runtime.DB` (plus `INTERNAL_TOKEN`, §4b) to
+  `registerTerminalIpc`.
 
-Net: the terminal gets simpler and more native. The full Electron-reframed design lives in
-[vNext.md](./vNext.md); build it after the migration settles.
+Net: the terminal got simpler and more native, exactly as predicted. The Electron-reframed design
+lives in [vNext.md](./vNext.md); the shipped feature is documented in
+[terminal-and-agents.md](./terminal-and-agents.md).
 
 ## 9. Risks & open questions
 
 1. **Pinned app port** must be free. If taken, the stable origin cannot start. Mitigation: enforce
    single-instance startup, pick an uncommon port, and surface a clear error. A dynamic fallback is
-   possible, but it creates a new IndexedDB/service-worker origin.
+   possible, but it creates a new IndexedDB origin.
 2. **`client_secret` in the binary** if we ever distribute (§4f) — device flow is the answer.
-3. **Service worker masking app updates** if it remains enabled (§4h). Either disable it in desktop
-   builds or version the cache from the packaged app version.
+3. ~~**Service worker masking app updates**~~ — resolved: the service worker was removed (§4h).
 4. **Packaged migrations/native modules** can work in dev and fail in a signed app if paths are
    resolved from `process.cwd()` or native `.node` files stay inside `asar`. Resolve paths from app
    resources and unpack native modules.
@@ -504,16 +548,19 @@ Net: the terminal gets simpler and more native. The full Electron-reframed desig
 **Decided:**
 - **macOS-only.** No Windows/Linux builds. Packaging targets `dmg`/`zip`; ad-hoc signing for
   personal use, Developer ID + notarization only if distributing (§4i).
-- **Native rebuilds via `@electron/rebuild`** in a `postinstall` (§4c) — accepted as the path for
-  both `better-sqlite3` and `node-pty`.
+- **Native rebuilds via `@electron/rebuild`** (§4c) for both `better-sqlite3` and `node-pty` — kept
+  as explicit `electron:rebuild`/`node:rebuild` scripts rather than a `postinstall`, since the
+  plain-Node dev paths need the opposite ABI.
 
 ## 10. Dependency delta
 
 **Remove:** `wrangler`, `@cloudflare/vite-plugin`.
 **Add:** `electron`, `electron-vite`, `electron-builder`, `@hono/node-server`, `better-sqlite3`,
-`@types/better-sqlite3`, `@electron/rebuild`, `dotenv` (or an equivalent dev `.env` loader).
-(`node-pty` arrives with v2.)
+`@types/better-sqlite3`, `@electron/rebuild`. (`node-pty` arrived with the v2 terminal. No `dotenv`
+was needed — the main process uses Node's built-in `process.loadEnvFile`, and `dev:node` passes
+`--env-file=.env`.)
 **Unchanged:** `hono`, `drizzle-orm`, `drizzle-kit`, `jose`, `solid-js`, `@solidjs/router`,
 TanStack Query, `shiki`, `idb-keyval`.
 
 The runtime moves; the application doesn't.
+

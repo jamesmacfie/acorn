@@ -1,0 +1,353 @@
+/* Linear ticket side panel (LinearIssuePanel.tsx): right-anchored drawer over a dimmed backdrop,
+   mirroring checks-panel.css. Opened from the PR detail Integrations section. */
+.integrations-panel-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  background: rgba(0, 0, 0, 0.4);
+}
+.integrations-panel {
+  position: fixed;
+  inset: 0 0 0 auto;
+  z-index: 61;
+  width: min(620px, 92vw);
+  display: flex;
+  flex-direction: column;
+  background: var(--bg);
+  border-left: 1px solid var(--border-strong);
+  box-shadow: -12px 0 28px var(--shadow-popover);
+}
+.integrations-panel-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: var(--pane-pad);
+  border-bottom: 1px solid var(--border);
+}
+.integrations-panel-title {
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  color: var(--text);
+}
+/* Ticket switcher when a workspace links several Linear tickets (docs/workspaces). */
+.integrations-panel-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  padding: 6px var(--pane-pad);
+  border-bottom: 1px solid var(--border);
+}
+.integrations-panel-tab {
+  font: inherit;
+  font-size: var(--fs-sm);
+  color: var(--text-muted);
+  background: var(--bg-subtle);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 2px 8px;
+  cursor: pointer;
+}
+.integrations-panel-tab:hover { color: var(--text); border-color: var(--border-strong); }
+.integrations-panel-tab.active { color: var(--text); background: var(--bg-selected); border-color: var(--accent); }
+.integrations-panel-link {
+  flex: 1;
+  font-size: var(--fs-sm);
+  text-decoration: none;
+}
+.integrations-panel-link:hover {
+  color: var(--accent);
+}
+.integrations-panel-close {
+  font: inherit;
+  color: var(--text-muted);
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+  padding: 2px 6px;
+}
+.integrations-panel-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: var(--pane-pad);
+}
+.linear-issue-title {
+  margin: 0 0 8px;
+  font-size: var(--fs-md);
+  font-weight: 600;
+  color: var(--text);
+}
+.linear-issue-meta {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+/* Status pill tinted by Linear's state colour (passed as --state-color). */
+.linear-state {
+  font-size: var(--fs-sm);
+  padding: 1px 8px;
+  border-radius: 10px;
+  color: var(--state-color, var(--text-muted));
+  border: 1px solid var(--state-color, var(--border));
+}
+.linear-section-head {
+  margin: 20px 0 8px;
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  color: var(--text);
+}
+
+/* Activity Log: Linear-style one-line events (icon · actor + text · time). */
+.linear-activity {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.linear-activity-row {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 3px 0;
+  font-size: var(--fs-sm);
+  color: var(--text-muted);
+}
+.linear-activity-icon {
+  flex-shrink: 0;
+  width: 1em;
+  text-align: center;
+  color: var(--text-faint);
+}
+.linear-activity-text {
+  flex: 1;
+}
+.linear-activity-actor {
+  color: var(--text);
+}
+.linear-activity-time {
+  flex-shrink: 0;
+}
+
+.linear-comments {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.linear-comment {
+  padding: 8px 0;
+  border-top: 1px solid var(--border);
+}
+.linear-comment-children {
+  list-style: none;
+  margin: 6px 0 0;
+  padding: 0 0 0 16px;
+  border-left: 2px solid var(--border);
+}
+.linear-comment-children .linear-comment:first-child {
+  border-top: 0;
+}
+.linear-comment-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: var(--fs-sm);
+  margin-bottom: 4px;
+}
+.linear-comment-author {
+  color: var(--text);
+  font-weight: 600;
+}
+/* Reply button sits at the right of the comment header (styled as a normal button via pull-detail.css). */
+.linear-reply-btn {
+  margin-left: auto;
+}
+/* Inline reply box under a comment (GitHub-style). Reuses .composer for the textarea + buttons. */
+.linear-reply-box {
+  margin-top: 8px;
+}
+.linear-reply-box .composer-input {
+  min-height: 48px;
+}
+/* Bottom composer for a new top-level comment, separated from the thread. */
+.linear-composer-sep {
+  margin-top: 16px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+}
+/* Integrations settings (account menu → Integrations overlay). */
+.integration-setting {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: var(--pane-pad);
+}
+.integration-key-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+.integration-key-input {
+  flex: 1;
+  font: inherit;
+  font-size: var(--fs-sm);
+  color: var(--text);
+  background: var(--bg-subtle);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+  padding: 7px 10px;
+}
+.integration-key-input::placeholder {
+  color: var(--text-faint);
+}
+.integration-key-input:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+.integration-setting-head {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+}
+.integration-setting-name {
+  font-weight: 600;
+  color: var(--text);
+}
+
+/* --- Integrations settings: card list + slide-down add panel --- */
+.integrations { display: flex; flex-direction: column; gap: 14px; padding: var(--pane-pad); }
+.integrations-list { display: flex; flex-direction: column; gap: 8px; }
+
+.integration-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  background: var(--bg-subtle);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+
+/* Logo slot — branded square; carries a real mark (SVG) or a monogram fallback. Adding a provider
+   later = drop in its mark + a data-provider colour rule. */
+.integration-logo {
+  flex: none;
+  width: 30px;
+  height: 30px;
+  display: grid;
+  place-items: center;
+  border-radius: 7px;
+  background: var(--bg-hover);
+  color: var(--text);
+}
+.integration-logo svg { width: 18px; height: 18px; display: block; }
+.integration-logo-mono { font-weight: 700; font-size: 14px; line-height: 1; }
+.integration-logo[data-provider='github'] { background: #24292f; color: #fff; }
+.integration-logo[data-provider='linear'] { background: #5e6ad2; color: #fff; }
+.integration-logo[data-provider='rollbar'] { background: #f24f4f; color: #fff; }
+
+.integration-meta { display: flex; flex-direction: column; gap: 2px; min-width: 0; flex: 1; }
+.integration-title { font-weight: 600; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.integration-sub { font-size: var(--fs-sm); color: var(--text-faint); }
+.integration-actions { flex: none; display: flex; align-items: center; gap: 8px; }
+.integration-badge {
+  font-size: var(--fs-sm);
+  color: var(--text-faint);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 2px 9px;
+}
+.integration-remove { color: var(--danger, #c0392b); border-color: transparent; background: transparent; }
+.integration-remove:hover:not(:disabled) { border-color: var(--danger, #c0392b); }
+
+/* "Add integration" — the trigger. */
+.integration-add-btn {
+  align-self: flex-start;
+  gap: 7px;
+}
+.integration-add-btn.open { background: var(--bg-selected); }
+.integration-add-icon { font-size: 15px; line-height: 1; transition: transform 0.18s ease; }
+.integration-add-btn.open .integration-add-icon { transform: rotate(45deg); }
+
+/* The panel that "comes down" from the Add button. Animated via max-height so it slides. */
+.integration-add-panel {
+  max-height: 0;
+  opacity: 0;
+  overflow: hidden;
+  transition: max-height 0.2s ease, opacity 0.2s ease;
+}
+.integration-add-panel.open { max-height: 320px; opacity: 1; }
+.integration-add-inner {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px;
+  background: var(--bg-subtle);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+.integration-provider-chips { display: flex; gap: 8px; flex-wrap: wrap; }
+.integration-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 10px;
+  border: 1px solid var(--border-strong);
+  border-radius: 999px;
+  color: var(--text);
+  background: transparent;
+}
+.integration-chip.active { border-color: var(--accent); color: var(--text); background: var(--bg-selected); }
+.integration-chip:disabled { opacity: 0.5; cursor: default; }
+.integration-chip .soon { font-size: 10px; text-transform: uppercase; letter-spacing: 0.04em; color: var(--text-faint); }
+.integration-add-label { font-size: var(--fs-sm); color: var(--text); }
+.integration-add-hint { font-size: var(--fs-sm); margin: 0; }
+
+/* Clickable ticket row in the PR detail Integrations list. */
+.integration-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  font: inherit;
+  font-size: var(--fs-sm);
+  color: var(--text);
+  text-align: left;
+  background: transparent;
+  border: 0;
+  padding: 6px 0;
+  cursor: pointer;
+}
+.integration-row:hover .integration-row-title {
+  color: var(--accent);
+  text-decoration: underline;
+}
+.integration-row-id {
+  font-family: var(--font-mono);
+  color: var(--text-muted);
+  flex-shrink: 0;
+}
+.integration-row-title {
+  flex: 1;
+  min-width: 0; /* allow the title to shrink (ellipsis) so the status pill stays inline, not pushed off-row */
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* Inline Linear id link (linkified bare ids in GitHub titles/bodies, and the title component). */
+.linear-inline-link {
+  color: var(--accent);
+  cursor: pointer;
+  text-decoration: none;
+}
+.linear-inline-link:hover {
+  text-decoration: underline;
+}
+
+/* Status badge pill in the list row, tinted by the Linear state colour. */
+.integration-row-state {
+  flex-shrink: 0;
+  font-size: var(--fs-xs, 11px);
+  padding: 1px 7px;
+  border-radius: 9px;
+  color: var(--state-color, var(--text-muted));
+  border: 1px solid var(--state-color, var(--border));
+}

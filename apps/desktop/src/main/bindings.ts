@@ -1,0 +1,145 @@
+import { randomUUID } from 'node:crypto'
+import { existsSync, mkdirSync } from 'node:fs'
+import { readFile, writeFile } from 'node:fs/promises'
+import { createRequire } from 'node:module'
+import { dirname, join, resolve } from 'node:path'
+import { fileURLToPath } from 'node:url'
+import { drizzle } from 'drizzle-orm/better-sqlite3'
+import { migrate } from 'drizzle-orm/better-sqlite3/migrator'
+import { type AppDatabase, schema } from '../server/db'
+
+// The runtime object the routes read via c.env (typed as the global Env in env.d.ts). Built once
+// at startup and handed to the Hono app at the single app.fetch() seam in main/server.ts.
+export type RuntimeBindings = {
+  DB: AppDatabase
+  OAUTH_STATE: OauthStateStore
+  BLOBS: BlobCache
+  SESSION_ENC_KEY: string
+  GITHUB_CLIENT_ID: string
+  GITHUB_CLIENT_SECRET: string
+  // Per-app-run bearer for loopback callers that hold no session cookie — the acorn MCP server
+  // (docs/next 06 B). Injected into task session env (ACORN_API_TOKEN) so agent-spawned servers
+  // inherit it; auth middleware maps it to the machine's single user.
+  INTERNAL_TOKEN: string
+}
+
+// One-time OAuth CSRF states (docs/authentication.md): /auth/login issues a state, /auth/callback
+// consumes it. TTL is internal — states are short-lived and never persisted.
+export type OauthStateStore = {
+  issue(state: string): void
+  // True when the state was live (issued, unexpired, not yet consumed). Consuming removes it.
+  consume(state: string): boolean
+}
+
+// In-memory with lazy expiry. The TTL matches the /auth state cookie's maxAge (routes/auth.ts).
+const OAUTH_STATE_TTL_MS = 5 * 60_000
+export function oauthStateStore(ttlMs = OAUTH_STATE_TTL_MS): OauthStateStore {
+  const store = new Map<string, number>() // state → expiresAt
+  return {
+    issue(state) {
+      store.set(state, Date.now() + ttlMs)
+    },
+    consume(state) {
+      const expiresAt = store.get(state)
+      if (expiresAt == null) return false
+      store.delete(state)
+      return expiresAt >= Date.now()
+    },
+  }
+}
+
+// Immutable blob/patch bodies keyed by sha (docs/caching.md) — content never changes for a key, so
+// there is no TTL and no delete. One file per key under `dir`; keys are `filebody:<sha>` /
+// `patch:<sha>` — sanitize the colon for a safe filename.
+export type BlobCache = {
+  get(key: string): Promise<string | null>
+  put(key: string, value: string): Promise<void>
+}
+
+export function diskBlobCache(dir: string): BlobCache {
+  mkdirSync(dir, { recursive: true })
+  const fileFor = (key: string) => join(dir, key.replace(/[^a-zA-Z0-9._-]/g, '_'))
+  return {
+    async get(key) {
+      try {
+        return await readFile(fileFor(key), 'utf8')
+      } catch {
+        return null // ENOENT (cache miss) and any read error → treat as miss
+      }
+    },
+    async put(key, value) {
+      await writeFile(fileFor(key), value, 'utf8')
+    },
+  }
+}
+
+// drizzle-generated migrations: packaged as extraResources (process.resourcesPath/migrations) in a
+// built app, else resolved from this module at apps/desktop/migrations. Never from process.cwd().
+const migrationsFolder = (() => {
+  const packaged = process.resourcesPath ? join(process.resourcesPath, 'migrations') : null
+  if (packaged && existsSync(packaged)) return packaged
+  return resolve(dirname(fileURLToPath(import.meta.url)), '../../migrations')
+})()
+
+// better-sqlite3 is a native module built for ONE ABI at a time (Electron vs Node — see
+// docs/local-development.md). Load it lazily so an ABI mismatch surfaces as an actionable error
+// naming the right rebuild script, instead of a bare NODE_MODULE_VERSION stack at import time.
+const nodeRequire = createRequire(import.meta.url)
+function loadDatabase(): typeof import('better-sqlite3') {
+  try {
+    return nodeRequire('better-sqlite3') as typeof import('better-sqlite3')
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e)
+    if (msg.includes('NODE_MODULE_VERSION') || msg.includes('was compiled against a different Node.js version')) {
+      const fix = process.versions.electron
+        ? 'pnpm --filter @acorn/desktop electron:rebuild (this is an Electron process)'
+        : 'pnpm --filter @acorn/desktop node:rebuild (this is a plain Node process)'
+      throw new Error(`better-sqlite3 is built for the wrong ABI. Run: ${fix}\n\nOriginal error: ${msg}`)
+    }
+    throw e
+  }
+}
+
+export function openDb(dbPath: string): AppDatabase {
+  mkdirSync(dirname(dbPath), { recursive: true }) // better-sqlite3 won't create parent dirs
+  const Database = loadDatabase()
+  const sqlite = new Database(dbPath)
+  // WAL for concurrent read/write, and a short busy timeout instead of immediate SQLITE_BUSY.
+  // No foreign_keys pragma: the schema declares no FK constraints (docs/data-layer.md), so
+  // enabling enforcement would be a misleading no-op.
+  sqlite.pragma('journal_mode = WAL')
+  sqlite.pragma('busy_timeout = 5000')
+
+  const db = drizzle(sqlite, { schema })
+  migrate(db, { migrationsFolder })
+
+  // `.batch([...])` (which better-sqlite3 lacks) as a synchronous transaction — all-or-nothing
+  // semantics. Statements are built on `db`, so they run on this connection inside the
+  // BEGIN/COMMIT, keeping the route call sites untouched.
+  const withBatch = db as unknown as AppDatabase
+  withBatch.batch = (async (statements: ReadonlyArray<{ run(): unknown }>) =>
+    db.transaction((_tx) => statements.map((stmt) => stmt.run()))) as AppDatabase['batch']
+  return withBatch
+}
+
+export type BindingsOptions = { dbPath: string; blobsDir: string }
+
+// Build the bindings object once at startup. Electron resolves the data root in electron.ts
+// (app.getPath('userData') when packaged, the repo-local apps/desktop/.acorn in dev) and passes
+// the paths in; the Node-only entry (dev:node) defaults to the repo-local dir in server.ts.
+export function makeBindings({ dbPath, blobsDir }: BindingsOptions): RuntimeBindings {
+  const secret = (name: string): string => {
+    const value = process.env[name]
+    if (!value) throw new Error(`Missing required env var ${name} (set it in .env or the environment)`)
+    return value
+  }
+  return {
+    DB: openDb(dbPath),
+    OAUTH_STATE: oauthStateStore(),
+    BLOBS: diskBlobCache(blobsDir),
+    SESSION_ENC_KEY: secret('SESSION_ENC_KEY'),
+    GITHUB_CLIENT_ID: secret('GITHUB_CLIENT_ID'),
+    GITHUB_CLIENT_SECRET: secret('GITHUB_CLIENT_SECRET'),
+    INTERNAL_TOKEN: randomUUID(),
+  }
+}

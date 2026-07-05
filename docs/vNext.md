@@ -1,10 +1,19 @@
 # vNext — Terminal & agent sessions (Electron)
 
-> Status: **implemented (Phases 0–4) + Phase 5 seam.** The terminal drawer ships behind a flag
-> (`localStorage['acorn:term']='1'`). Built per the phasing below; deliberate ponytail deferrals are
-> noted inline (no user-editable profile CRUD, no prompt-injection, no "open diff from worktree", no
-> structured-transport runtime). Code lives in `apps/web/src/main/{terminal,profiles,repoPaths,
-> worktrees,terminalUtils}.ts`, `src/shared/terminal.ts`, and `src/client/features/terminal/`. This
+> ## Historical — the terminal shipped; this doc is the design record
+> The feature this doc designs is **built and in daily use**:
+> **[terminal-and-agents.md](./terminal-and-agents.md) documents the shipped version** — read that
+> for what exists today; read this for the *why* (the same treatment
+> [electron.md](./electron.md) got). Code sketches below have been redrawn from the shipped
+> shapes where they had drifted; remaining deltas are in §17.
+>
+> Status detail: **implemented (Phases 0–4) + Phase 5 seam.** The terminal drawer is always on
+> when the desktop preload bridge is present (the old `acorn:term` flag is deleted — see §17).
+> Built per the phasing below; deliberate ponytail
+> deferrals are noted inline (no user-editable profile CRUD, no prompt-injection, no "open diff
+> from worktree", no structured-transport runtime). Code lives in
+> `apps/desktop/src/main/{terminal,profiles,repoPaths,worktrees,terminalUtils}.ts`,
+> `src/shared/terminal.ts`, and `src/client/features/terminal/`. This
 > supersedes and unifies two earlier terminal
 > RFCs (the former `v2.md` "remote-agent terminal sessions" and `v3.md` "local agent terminal
 > sessions", now removed), rewritten for the runtime acorn actually ships on now: a **local macOS
@@ -61,7 +70,7 @@ lack of a process model collapses:
 | Local Host REST/WS API on `:7331` | Browser had to reach a foreign process | **Gone.** A narrow preload bridge replaces the HTTP/WS control plane. |
 | Pairing token + `Origin`/`Host`/CORS checks | Browser and daemon were different trust domains | **Gone.** Renderer and main are one app; the boundary is the **preload contract** (electron.md §4g). |
 | "Cloud ships terminal disabled" / hostname feature-detect | Two deploy targets (cloud vs local) | **Gone.** There is no cloud; acorn is always local. The panel always exists. |
-| Separate `~/.acorn/local.db` for metadata | Worker owned the app DB (D1); daemon needed its own | **Reuse the app's SQLite** (`apps/web/.acorn/acorn.sqlite`) via the existing Drizzle pipeline. |
+| Separate `~/.acorn/local.db` for metadata | Worker owned the app DB (D1); daemon needed its own | **Reuse the app's SQLite** (`apps/desktop/.acorn/acorn.sqlite`) via the existing Drizzle pipeline. |
 | Native-module packaging as a fresh problem | New daemon process | **Already solved.** `@electron/rebuild` rebuilds `node-pty` exactly as it does `better-sqlite3` (electron.md §4c) — "solve once." |
 
 What **carries over unchanged** from v2/v3: xterm.js + node-pty as the stack; tmux as the durability
@@ -108,24 +117,27 @@ talking over IPC. No new process, no network surface.
   the Host-header check already in `server.ts`. Prefer IPC; keep WS in pocket if we ever want the
   exact browser-portable transport for tests — see §5.)*
 - **Metadata reuses the app's SQLite.** Terminal session/repo-path/profile rows are new Drizzle
-  tables in `apps/web/.acorn/acorn.sqlite`, applied through the existing migration pipeline
+  tables in `apps/desktop/.acorn/acorn.sqlite`, applied through the existing migration pipeline
   (`db:generate` / startup `migrate`). They are **app-state** (acorn owns them), like `prefs` and
   `pinned_repos` — not GitHub mirror data. Terminal **output is never persisted** (see §8).
 
-### Where the code lives
+### Where the code lives (as shipped)
+
+Main-process code is **flat files**, not the `terminal/` dir the plan sketched:
 
 ```
-apps/web/src/main/terminal/
-  service.ts        TerminalService — spawn/attach/resize/kill, ring buffers, tmux
-  ipc.ts            registers ipcMain handlers; validates every payload at the boundary
-  profiles.ts       built-in + user agent profiles, PATH detection
-  repoPaths.ts      github repo ↔ local checkout mapping + validation
-apps/web/src/main/preload.ts        + terminal channels on the existing contextBridge surface
-apps/web/src/server/db/schema.ts    + terminal tables (Drizzle)
-apps/web/src/shared/terminal.ts     shared message/DTO types  (the src/shared/api.ts pattern — electron.md §4g)
-apps/web/src/client/features/terminal/
-  TerminalPanel.tsx TerminalTabs.tsx TerminalSessionList.tsx TerminalSurface.tsx
-  terminalClient.ts model.ts terminal.css
+apps/desktop/src/main/terminal.ts       TerminalService + ipcMain registration (spawn/attach/
+                                        resize/kill, ring buffers, tmux, payload validation)
+apps/desktop/src/main/profiles.ts       built-in agent profiles, PATH detection
+apps/desktop/src/main/repoPaths.ts      github repo ↔ local checkout mapping + validation
+apps/desktop/src/main/worktrees.ts      worktree create/reuse/remove (Phase 4)
+apps/desktop/src/main/terminalUtils.ts  shared helpers (session env, tmux plumbing)
+apps/desktop/src/main/preload.ts        terminal channels on the existing contextBridge surface
+apps/desktop/src/server/db/schema.ts    terminal tables (Drizzle)
+apps/desktop/src/shared/terminal.ts     shared wire/DTO types  (the src/shared/api.ts pattern — electron.md §4g)
+apps/desktop/src/client/features/terminal/
+  TerminalPanel.tsx TerminalSurface.tsx sessions.ts terminalClient.ts theme.ts terminal.css
+  (no separate TerminalTabs / TerminalSessionList / model.ts)
 ```
 
 No `apps/local-host` package and no `packages/terminal-protocol` (v3): there's no separate
@@ -164,10 +176,9 @@ Takeaways we copy: xterm.js + node-pty; **lean on tmux** for persistence rather 
 The preload exposes one narrow object; nothing else (no raw `ipcRenderer`, per electron.md §4g):
 
 ```ts
-// src/shared/terminal.ts — the contract, shared by main, preload, renderer
-export type ClientMsg =
-  | { type: 'input'; data: string }
-  | { type: 'resize'; cols: number; rows: number }
+// src/shared/terminal.ts — as shipped. Only main→renderer pushes have an envelope; there is NO
+// ClientMsg type: renderer→main input and resize are separate IPC calls (term:input send /
+// term:resize invoke), so nothing wraps them.
 export type ServerMsg =
   | { type: 'ready'; session: TerminalSession; replayed: boolean }
   | { type: 'output'; data: string }
@@ -176,19 +187,25 @@ export type ServerMsg =
 ```
 
 ```ts
-// preload.ts — added to the existing contextBridge.exposeInMainWorld('acorn', { … })
+// preload.ts — the shipped terminal core (abridged from main/preload.ts; the real surface has
+// since grown run targets, local-changes, task archive/statuses, sendToAgent, workflows, …)
 terminal: {
-  list:    ()                       => ipcRenderer.invoke('term:list'),
-  create:  (opts: CreateOpts)       => ipcRenderer.invoke('term:create', opts),
-  kill:    (id: string)             => ipcRenderer.invoke('term:kill', id),
-  resize:  (id: string, c: number, r: number) => ipcRenderer.invoke('term:resize', { id, cols: c, rows: r }),
-  write:   (id: string, data: string)         => ipcRenderer.send('term:input', { id, data }),
-  // attach: subscribe to output for one session; returns an unsubscribe
-  attach:  (id: string, on: (m: ServerMsg) => void) => { /* ipcRenderer.on(`term:out:${id}`, …) */ },
+  list:      ()                 => ipcRenderer.invoke('term:list'),
+  profiles:  ()                 => ipcRenderer.invoke('term:profiles'),
+  create:    (opts: CreateOpts) => ipcRenderer.invoke('term:create', opts),
+  kill:      (id: string)       => ipcRenderer.invoke('term:kill', id),
+  interrupt: (id: string)       => ipcRenderer.invoke('term:interrupt', id),
+  remove:    (id: string)       => ipcRenderer.invoke('term:remove', id),
+  resize:    (id: string, cols: number, rows: number) => ipcRenderer.invoke('term:resize', { id, cols, rows }),
+  write:     (id: string, data: string)               => ipcRenderer.send('term:input', { id, data }),
+  // status pings (idle/exit changes for any session); returns an unsubscribe
+  onStatus:  (cb: () => void) => { /* ipcRenderer.on('term:status', …) */ },
+  // attach: subscribe to one session's output; returns an unsubscribe. Detaching keeps the PTY running.
+  attach:    (id: string, on: (m: ServerMsg) => void) => { /* ipcRenderer.on(`term:out:${id}`, …) + term:attach / term:detach */ },
 }
 ```
 
-`main/terminal/ipc.ts` registers the `ipcMain` handlers and **validates every payload at the
+`main/terminal.ts` registers the `ipcMain` handlers and **validates every payload at the
 boundary** — session id is a known uuid, `cwd` is an allowed path, `cols`/`rows` are sane integers,
 input is a string, lifecycle commands map to a fixed set (electron.md §4g). The renderer treats its
 subscription as an *attachment* to a session, not the session itself: closing the drawer or reloading
@@ -221,27 +238,34 @@ token needed since it's the same same-origin app. IPC is the default; WS is the 
 
 ## 6. Session model
 
-Each session is an acorn-owned local resource (from v3, unchanged):
+Each session is an acorn-owned local resource (the v3 idea, unchanged). The shipped wire type
+(`src/shared/terminal.ts`):
 
 ```ts
-type TerminalSession = {
+// As shipped. vs the original design: status simplified from
+// 'starting'|'running'|'exited'|'failed'; lastAttachedAt / exitedAt / signal dropped from the
+// wire; gained idle, agentState (docs/next 05), isWorktree, and — after docs/workspaces — a
+// required taskId, with repo/pull derived from the task join instead of stored on the session.
+export type TerminalSession = {
   id: string
   title: string
   kind: 'shell' | 'agent'
   profileId: string
   backend: 'node-pty' | 'tmux'
-  status: 'starting' | 'running' | 'exited' | 'failed'
+  status: 'running' | 'exited'
+  idle: boolean                  // no output for a while (Phase 3); always false for shells
+  agentState: AgentState         // the ONE shared agent-state vocabulary (docs/next 05)
+  isWorktree: boolean            // in-memory convenience; the truth is tasks.worktreePath
+  taskId: string                 // → tasks.id (docs/workspaces); a session always belongs to a task
   cwd: string
-  repo?: { owner: string; name: string; githubId?: number }
-  pull?: { number: number; headRef?: string; baseRef?: string; headSha?: string }
   command: string
-  argv: string[]
-  createdAt: number
-  lastAttachedAt: number | null
-  exitedAt: number | null
-  exitCode: number | null
+  tmuxSession?: string
+  repo?: { owner: string; name: string }  // derived from the task join (main process)
+  pull?: { number: number }               // derived from the task join (main process)
   cols: number
   rows: number
+  createdAt: number
+  exitCode: number | null
 }
 ```
 
@@ -267,19 +291,32 @@ sessions production-ready; **default agent profiles to tmux when available**, fa
 
 ## 7. Local data model
 
-Terminal metadata is app-state — add it to the existing Drizzle schema in
-`apps/web/.acorn/acorn.sqlite` (not a separate `~/.acorn/local.db` as v3 proposed; there's no Worker
-owning the app DB anymore, so reuse it). New tables:
+Terminal metadata is app-state — added to the existing Drizzle schema in
+`apps/desktop/.acorn/acorn.sqlite` (not a separate `~/.acorn/local.db` as v3 proposed; there's no Worker
+owning the app DB anymore, so reuse it). The shipped tables (`schema.ts`):
 
 ```text
-repo_paths            owner, repo (PK), github_repo_id?, path, created_at, updated_at
-terminal_sessions     id (PK), title, kind, profile_id, backend, status, cwd,
-                      repo_owner?, repo_name?, pull_number?, command, argv_json,
-                      tmux_session?, pid?, cols, rows, created_at, last_attached_at?,
-                      exited_at?, exit_code?
+repo_paths            owner, repo (PK), github_repo_id?, path, run_targets?, editor_command?,
+                      created_at, updated_at
+terminal_sessions     id (PK), title, kind, profile_id, backend, status, cwd, task_id (NOT NULL),
+                      command, argv_json, tmux_session?, cols, rows, created_at, exited_at?,
+                      exit_code?
+
+-- NEVER BUILT — kept only as the shape user-editable profile CRUD would take if it ever ships
+-- (the Phase 2 deferral stuck; profiles are hardcoded built-ins in main/profiles.ts). If profile
+-- CRUD ships via .acorn/config.toml instead (docs/next 13), delete this sketch outright.
 agent_profiles        id (PK), label, command, argv_template_json, backend_preference,
                       env_json, enabled, created_at, updated_at
 ```
+
+Deltas from the original design, for the record:
+- `terminal_sessions` is a **deliberate subset**: no `pid` / `last_attached_at` (liveness
+  re-derives from tmux — only tmux-backed rows are persisted at all), and the loose
+  `repo_owner` / `repo_name` / `pull_number` columns were **replaced by a `NOT NULL task_id`**
+  when docs/workspaces landed — repo/PR context derives from the `tasks` join.
+- `repo_paths` gained per-repo config from the workspaces/next docs (`run_targets`,
+  `editor_command`); the interim `run_command`/`dev_port` columns that predated run targets have
+  been removed.
 
 These are **not** user-scoped by GitHub login the way the mirror tables are — they describe *this
 machine*. **No terminal output column.** Drawer open/closed state and size live in the existing
@@ -332,9 +369,11 @@ fetch the PR ref → create/reuse .acorn/worktrees/<owner>-<repo>-pr-<number> �
 ## 10. Frontend integration
 
 A feature-owned module mirroring the existing panel patterns (`ChecksPanel` / `LinearIssuePanel`):
-a `Portal`-based drawer, `Escape` to close, state lifted into `PullDetail`/top bar, open/size persisted
-in `prefs`. Dependencies: `@xterm/xterm`, `@xterm/addon-fit`, `@xterm/addon-search`,
-`@xterm/addon-web-links` (and `@xterm/addon-serialize` later).
+a `Portal`-based drawer, `Escape` to close, open/size persisted in `prefs`. *(The design said
+"state lifted into `PullDetail`/top bar" — that predates the Task view: as shipped, drawer state
+keys off `activeTaskId` (`features/tasks/tasks.ts`) and sessions scope to the task, not the PR
+URL — superseded by docs/workspaces 02 / P2.)* Dependencies: `@xterm/xterm`, `@xterm/addon-fit`,
+`@xterm/addon-search`, `@xterm/addon-web-links` (and `@xterm/addon-serialize` later).
 
 UI shape (from v3): a **drawer**, not a fourth permanent pane. Bottom drawer (240px–70vh, resizable)
 spanning the main area works well for terminal width; a right drawer is better for watching an agent
@@ -411,11 +450,13 @@ backend-agnostic (works for codex/aider) and free of coupling to an undocumented
 detection, cleanup control. _Deferred: "open diff from worktree" into acorn's DiffView (optional, deep
 integration)._
 
-**Phase 5 — structured agent protocols. ◻︎ seam only.** `transport: 'pty'` field added to the profile
-model as the documented extension point; PTY is the universal transport. _Structured backends
-(JSON-RPC / ACP-like / MCP-like / SDK-native) intentionally not built — no concrete agent targets one
-yet, so a runtime now would be speculative dead code. Branch on `transport` in `terminal.ts` when a
-real one appears._
+**Phase 5 — structured agent protocols. ◻︎ seam only.** A `transport: 'pty'` field exists on the
+profile model (`main/profiles.ts`) as the *documented* extension point; PTY is the universal
+transport. To be precise about how thin the seam is: it's typed as the **literal `'pty'`** — there
+is no runtime plumbing behind it, so adding a structured backend means widening the type *and*
+adding the branch in `terminal.ts`, not flipping a switch. _Structured backends (JSON-RPC /
+ACP-like / MCP-like / SDK-native) intentionally not built — no concrete agent targets one yet, so
+a runtime now would be speculative dead code._
 
 > Note vs v3: there is **no separate "local supervisor" phase**. v3 needed `acorn local` to start the
 > web app + daemon together and inject a pairing token. Electron already *is* that supervisor — one
@@ -423,19 +464,22 @@ real one appears._
 
 ---
 
-## 13. Open questions
+## 13. Open questions — resolved as built
 
-1. **IPC vs WS** as the shipped transport. IPC is recommended (no network surface, VS Code precedent);
-   WS-on-node-server is more portable/testable. Decide before phase 0; the shared protocol envelope
-   makes switching cheap.
-2. **Drawer placement** — bottom (terminal width) vs right (watch agent while reviewing diffs).
-3. **Default backend** — node-pty for all MVP sessions, or tmux for agent profiles as soon as available.
-4. **tmux as a hard dependency** — ubiquitous but not guaranteed; degrade to bare PTY when absent
-   (lose only app-restart survival).
-5. **Repo checkout management** — only map existing checkouts, or also offer to clone missing repos?
-6. **Transcript policy** — no persistence by default is safest; some users will want searchable agent
-   transcripts (opt-in).
-7. **Multiple attachments** — disallow >1 renderer attach per session unless explicitly shareable.
+1. ~~**IPC vs WS** as the shipped transport.~~ **IPC won** (`term:*` channels via the preload
+   bridge, `main/preload.ts`); the WS escape hatch was never needed.
+2. ~~**Drawer placement**~~ — **bottom drawer** shipped (`TerminalPanel.tsx`), resizable, persisted
+   in `prefs`.
+3. ~~**Default backend**~~ — as recommended: agent profiles default to **tmux** when available,
+   shells to node-pty (`main/profiles.ts` `backendPreference`).
+4. ~~**tmux as a hard dependency**~~ — soft: degrade to bare PTY when absent, durable mode marked
+   unavailable. As designed.
+5. **Repo checkout management** — still map-only: acorn never clones. *(Still open as a future
+   nicety; the repo-path prompt covers the gap.)*
+6. **Transcript policy** — shipped as designed: no persistence, ring-buffer replay only. Opt-in
+   searchable transcripts remain unbuilt.
+7. **Multiple attachments** — in practice one renderer window exists (single-window app), so the
+   question never forced a decision; the attach API doesn't enforce a limit.
 
 ---
 
@@ -477,3 +521,4 @@ a separate daemon script, a `packages/terminal-protocol` package, a pairing/toke
 
 The Hono server, SQLite mirror, session crypto, and existing panels are untouched — the terminal is
 additive main-process code plus a renderer drawer.
+

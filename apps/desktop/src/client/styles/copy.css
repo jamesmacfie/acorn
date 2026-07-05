@@ -1,0 +1,39 @@
+/* Copy-on-hover button (CopyButton.tsx). Hidden until a `.copyable` ancestor is hovered. */
+.copy-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2px;
+  border: 0;
+  background: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.1s ease;
+}
+.copyable:hover .copy-btn,
+.copy-btn:focus-visible {
+  opacity: 1;
+}
+.copy-btn:hover {
+  color: var(--text);
+}
+/* Push to the hard-right edge of a flex header (e.g. the Description summary). */
+.copy-right {
+  margin-left: auto;
+}
+/* Pin to the top-right of a positioned card (e.g. a comment). */
+.copy-abs {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+}
+.comment-card {
+  position: relative;
+}
+/* PR number + its copy button sit inline together. */
+.pr-num.copyable {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+}
