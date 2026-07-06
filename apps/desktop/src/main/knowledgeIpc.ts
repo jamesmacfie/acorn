@@ -71,7 +71,9 @@ export function registerKnowledgeIpc(db: AppDatabase, dataRoot: string, deps: Kn
     if (!t) return []
     const ws = await workspaceConfigRow(db, t.repoOwner, t.repoName)
     if (!ws) return []
-    const list = await notesStore.list(ws.id)
+    // Skip deselected notes and other tasks' seeded notes (originTaskId auto-scopes PR/ticket notes
+    // to the task they were seeded for; hand-written notes have no originTaskId and are shared).
+    const list = (await notesStore.list(ws.id)).filter((n) => n.included && (!n.originTaskId || n.originTaskId === taskId))
     const out: { slug: string; title: string; body: string }[] = []
     for (const summary of list.slice(0, 10)) {
       const note = await notesStore.read(ws.id, summary.slug).catch(() => null)
@@ -244,6 +246,12 @@ export function registerKnowledgeIpc(db: AppDatabase, dataRoot: string, deps: Kn
   ipcMain.handle('notes:write', (_e: IpcMainInvokeEvent, p: { workspaceId: string; slug: string; body: string }) =>
     guard(async () => {
       await notesStore.write(p.workspaceId, p.slug, String(p.body ?? ''))
+      return { ok: true }
+    }),
+  )
+  ipcMain.handle('notes:setIncluded', (_e: IpcMainInvokeEvent, p: { workspaceId: string; slug: string; included: boolean }) =>
+    guard(async () => {
+      await notesStore.setIncluded(p.workspaceId, p.slug, !!p.included)
       return { ok: true }
     }),
   )

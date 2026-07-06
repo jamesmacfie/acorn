@@ -128,6 +128,7 @@ contextBridge.exposeInMainWorld('acorn', {
     read: (workspaceId: string, slug: string) => ipcRenderer.invoke('notes:read', { workspaceId, slug }),
     create: (workspaceId: string, title: string, kind?: string) => ipcRenderer.invoke('notes:create', { workspaceId, title, kind }),
     write: (workspaceId: string, slug: string, body: string) => ipcRenderer.invoke('notes:write', { workspaceId, slug, body }),
+    setIncluded: (workspaceId: string, slug: string, included: boolean) => ipcRenderer.invoke('notes:setIncluded', { workspaceId, slug, included }),
     remove: (workspaceId: string, slug: string) => ipcRenderer.invoke('notes:remove', { workspaceId, slug }),
   },
   // Monaco editor pane: read/write files on the task's worktree. Separate bridge from `terminal`

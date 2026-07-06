@@ -42,6 +42,9 @@ export function serializeNote(meta: NoteMeta, body: string): string {
     `author: ${meta.author}`,
     `kind: ${meta.kind}`,
     ...(meta.originSessionId ? [`originSessionId: ${meta.originSessionId}`] : []),
+    ...(meta.originTaskId ? [`originTaskId: ${meta.originTaskId}`] : []),
+    // Default (included) is omitted so hand-edited/legacy notes stay clean — only the opt-out is written.
+    ...(meta.included ? [] : ['included: false']),
     `createdAt: ${meta.createdAt}`,
     '---',
     '',
@@ -69,6 +72,8 @@ export function parseNote(text: string, slug: string): { meta: NoteMeta; body: s
     author: AUTHORS.includes(fields.author as NoteAuthor) ? (fields.author as NoteAuthor) : 'user',
     kind: KINDS.includes(fields.kind as NoteKind) ? (fields.kind as NoteKind) : 'scratch',
     originSessionId: fields.originSessionId || null,
+    originTaskId: fields.originTaskId || null,
+    included: fields.included !== 'false', // absent → included (back-compat)
     createdAt: Number(fields.createdAt) || 0,
   }
   return { meta, body }
@@ -115,7 +120,7 @@ export class NotesStore {
         const file = join(dir, name)
         const [text, st] = await Promise.all([readFile(file, 'utf8'), stat(file)])
         const { meta } = parseNote(text, slug)
-        out.push({ slug, title: meta.title, author: meta.author, kind: meta.kind, updatedAt: st.mtimeMs })
+        out.push({ slug, title: meta.title, author: meta.author, kind: meta.kind, included: meta.included, originTaskId: meta.originTaskId, updatedAt: st.mtimeMs })
       } catch {
         // unreadable note → skipped, never breaks the list
       }
@@ -129,7 +134,7 @@ export class NotesStore {
     return { slug, body, ...meta }
   }
 
-  async create(workspaceId: string, title: string, opts?: { author?: NoteAuthor; kind?: NoteKind; originSessionId?: string; body?: string }): Promise<{ slug: string }> {
+  async create(workspaceId: string, title: string, opts?: { author?: NoteAuthor; kind?: NoteKind; originSessionId?: string; originTaskId?: string; included?: boolean; body?: string }): Promise<{ slug: string }> {
     const base = slugifyTitle(title)
     const existing = new Set((await this.list(workspaceId)).map((n) => n.slug))
     let slug = base
@@ -139,6 +144,8 @@ export class NotesStore {
       author: opts?.author ?? 'user',
       kind: opts?.kind ?? 'scratch',
       originSessionId: opts?.originSessionId ?? null,
+      originTaskId: opts?.originTaskId ?? null,
+      included: opts?.included ?? true,
       createdAt: Date.now(),
     }
     await this.atomicWrite(this.fileFor(workspaceId, slug), serializeNote(meta, opts?.body ?? ''))
@@ -153,6 +160,14 @@ export class NotesStore {
     await this.atomicWrite(file, serializeNote(meta, body))
   }
 
+  // Toggle whether a note is fed to the agent as context (Notes-pane select/deselect). Preserves body.
+  async setIncluded(workspaceId: string, slug: string, included: boolean): Promise<void> {
+    const file = this.fileFor(workspaceId, slug)
+    const { meta, body } = parseNote(await readFile(file, 'utf8'), slug)
+    meta.included = included
+    await this.atomicWrite(file, serializeNote(meta, body))
+  }
+
   // Append (agents logging findings). Missing note → created with the writer's identity.
   async append(workspaceId: string, slug: string, text: string, opts?: { author?: NoteAuthor; originSessionId?: string }): Promise<void> {
     const file = this.fileFor(workspaceId, slug)
@@ -163,6 +178,8 @@ export class NotesStore {
         author: opts?.author ?? 'user',
         kind: 'finding',
         originSessionId: opts?.originSessionId ?? null,
+        originTaskId: null,
+        included: true,
         createdAt: Date.now(),
       }
       await this.atomicWrite(file, serializeNote(meta, text.endsWith('\n') ? text : `${text}\n`))

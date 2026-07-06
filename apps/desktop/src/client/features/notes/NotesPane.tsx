@@ -95,6 +95,15 @@ export default function NotesPane(props: { task: Task; workspace: Workspace | nu
     await open(scope, res.slug)
   }
 
+  // Select/deselect whether a workspace note is fed to the agent as context (docs/notes-and-memory.md).
+  async function toggleIncluded(slug: string, included: boolean) {
+    const id = wsId()
+    if (!api || !id) return
+    const res = await api.setIncluded(id, slug, included)
+    if ('error' in res) return window.alert(res.error)
+    await refetchWs()
+  }
+
   async function remove(scope: NoteScope, slug: string) {
     const id = keyFor(scope)
     if (!api || !id) return
@@ -117,6 +126,7 @@ export default function NotesPane(props: { task: Task; workspace: Workspace | nu
             <For each={userNotes()}>
               {(n) => (
                 <div class="notes-row-wrap">
+                  <input type="checkbox" class="notes-row-include" title={n.included ? 'Included in agent context' : 'Excluded from agent context'} checked={n.included} onChange={(e) => void toggleIncluded(n.slug, e.currentTarget.checked)} />
                   <button type="button" class="notes-row" classList={{ active: isActive('workspace', n.slug) }} onClick={() => void open('workspace', n.slug)}>
                     <span class="notes-row-title">{n.title}</span>
                   </button>
@@ -151,6 +161,7 @@ export default function NotesPane(props: { task: Task; workspace: Workspace | nu
                   <For each={agentNotes()}>
                     {(n) => (
                       <div class="notes-row-wrap">
+                        <input type="checkbox" class="notes-row-include" title={n.included ? 'Included in agent context' : 'Excluded from agent context'} checked={n.included} onChange={(e) => void toggleIncluded(n.slug, e.currentTarget.checked)} />
                         <button type="button" class="notes-row" classList={{ active: isActive('workspace', n.slug) }} title={`${n.kind} · by ${n.author}`} onClick={() => void open('workspace', n.slug)}>
                           <span class="notes-row-kind">{n.kind}</span>
                           <span class="notes-row-title">{n.title}</span>
