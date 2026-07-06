@@ -1,4 +1,4 @@
-import { createEffect, createSignal, Show } from 'solid-js'
+import { createEffect, createSignal, onCleanup, onMount, Show } from 'solid-js'
 
 // The browser-preview pane (docs/panes.md): browser chrome (back/forward/stop-reload/home + an
 // editable URL bar + a loading spinner) over a per-task Electron <webview>. `props.url` is the
@@ -26,6 +26,23 @@ const withScheme = (v: string) => (/^[a-z]+:\/\//i.test(v) ? v : `https://${v}`)
 // form input) survives — only a page reload (app restart) starts fresh. Entries are evicted when
 // their task is archived (evictPreviewWebview below), so dead webviews don't accumulate.
 const previewWebviews = new Map<string, WebviewEl>()
+
+// All webviews live in one persistent layer parented to <body>, outside SolidJS's render tree, so
+// pane/task/workspace navigation never detaches them — Electron reloads a <webview>'s guest whenever
+// it's removed from and re-added to the DOM, which was wiping browse state on every remount. Instead
+// of parenting into PreviewPane's (churned) host div, we position this layer over the current host's
+// rect. z-index sits above pane content but below app modals/palette (z-index 40+).
+let previewLayer: HTMLDivElement | null = null
+function getPreviewLayer(): HTMLDivElement {
+  if (previewLayer) return previewLayer
+  const el = document.createElement('div')
+  el.style.position = 'fixed'
+  el.style.display = 'none'
+  el.style.zIndex = '10'
+  previewLayer = el
+  document.body.appendChild(el)
+  return el
+}
 
 // Drop an archived task's webview (called by every archive path: TaskView's close flow, the rail
 // menu, the palette action). Detaches it from the DOM so the guest process is torn down.
@@ -56,12 +73,41 @@ export default function PreviewPane(props: { taskId: string; url: string | null 
     }
   }
 
-  // Show the current task's webview (creating it on first open), hide the others. Re-appends after a
-  // TaskView remount (leaving/returning the task view), which reloads that one webview.
+  // Keep the persistent layer positioned over this pane's host slot. Fires on host resize (pane
+  // layout changes) and window resize; the pane area itself doesn't scroll.
+  // ponytail: rect follows host via ResizeObserver + resize; add scroll handling if the pane ever
+  // lives in a scroll container.
+  const syncRect = () => {
+    const r = host.getBoundingClientRect()
+    const layer = getPreviewLayer()
+    layer.style.top = `${r.top}px`
+    layer.style.left = `${r.left}px`
+    layer.style.width = `${r.width}px`
+    layer.style.height = `${r.height}px`
+  }
+  onMount(() => {
+    const layer = getPreviewLayer()
+    const ro = new ResizeObserver(syncRect)
+    ro.observe(host)
+    window.addEventListener('resize', syncRect)
+    onCleanup(() => {
+      ro.disconnect()
+      window.removeEventListener('resize', syncRect)
+      layer.style.display = 'none' // hide the floating webviews when the preview pane isn't shown
+    })
+  })
+
+  // Show the current task's webview (creating it on first open) in the persistent layer, hide the
+  // others. The webview is never detached from the layer, so browse state survives navigation.
   createEffect(() => {
     const taskId = props.taskId
     const url = props.url
-    if (!host || !url) return
+    const layer = getPreviewLayer()
+    if (!host) return
+    if (!url) {
+      layer.style.display = 'none'
+      return
+    }
     let el = previewWebviews.get(taskId)
     if (!el) {
       el = document.createElement('webview') as WebviewEl
@@ -85,7 +131,7 @@ export default function PreviewPane(props: { taskId: string; url: string | null 
       }, { once: true })
       previewWebviews.set(taskId, el)
     }
-    if (el.parentElement !== host) host.appendChild(el) // fresh host after a remount → reload
+    if (el.parentElement !== layer) layer.appendChild(el) // parented once; never re-detached
     // A changed home URL (a layout recipe resolved a run target, docs/next 13 §C) navigates there.
     if (el.getAttribute('data-acorn-home') !== url) {
       el.setAttribute('data-acorn-home', url)
@@ -96,6 +142,8 @@ export default function PreviewPane(props: { taskId: string; url: string | null 
       }
     }
     for (const [id, w] of previewWebviews) w.style.display = id === taskId ? 'flex' : 'none'
+    layer.style.display = 'block'
+    syncRect()
     setLoading(false)
     syncFrom(el)
   })
