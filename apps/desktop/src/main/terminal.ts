@@ -642,6 +642,11 @@ export async function registerTerminalIpc(db: AppDatabase, worktreesDir: string,
     s.subscribers.add(e.sender)
     e.sender.send(channel(id), { type: 'ready', session: s.meta, replayed: s.ring.length > 0 } satisfies ServerMsg)
     if (s.ring) e.sender.send(channel(id), { type: 'output', data: s.ring } satisfies ServerMsg)
+    // The ring is a raw byte window, not a screen: for a cursor-addressed TUI (Claude/Codex) the
+    // replay is lossy and corrupts. Nudge the app to repaint from live state over it with Ctrl-L.
+    // ponytail: Ctrl-L repaint; the proper fix is a headless-emulator serialize (docs note), add
+    // when a non-repainting TUI still garbles.
+    if (s.ring && s.meta.kind === 'agent' && s.meta.status === 'running') s.pty.write('\x0c')
     e.sender.once('destroyed', () => s.subscribers.delete(e.sender))
   })
 
