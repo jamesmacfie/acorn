@@ -3,7 +3,7 @@ import { useQueryClient } from '@tanstack/solid-query'
 import { debounce } from '../../autosave'
 import { terminalApi } from '../terminal/terminalClient'
 import { workspacesKey } from '../../queries'
-import { deleteWorkspace, renameWorkspace, setWorkspaceColor, setWorkspaceDevRestartScript, setWorkspaceDevScript, setWorkspaceIcon, setWorkspacePreview, setWorkspaceSetupScript, setWorkspaceSetupTrigger, setWorkspaceTeardownScript } from '../../mutations'
+import { deleteWorkspace, renameWorkspace, setWorkspaceColor, setWorkspaceDbUrlScript, setWorkspaceDevRestartScript, setWorkspaceDevScript, setWorkspaceIcon, setWorkspacePreview, setWorkspaceSetupScript, setWorkspaceSetupTrigger, setWorkspaceTeardownScript } from '../../mutations'
 import type { PreviewMode, SetupTrigger, Workspace } from '../../../shared/api'
 import { resolveWorkspaceColor, WORKSPACE_COLORS } from '../../../shared/workspaceIdentity'
 
@@ -17,6 +17,7 @@ export default function WorkspaceSettings(props: { workspace: Workspace; onDelet
   const [dev, setDev] = createSignal(props.workspace.devScript ?? '')
   const [devRestart, setDevRestart] = createSignal(props.workspace.devRestartScript ?? '')
   const [teardown, setTeardown] = createSignal(props.workspace.teardownScript ?? '')
+  const [dbUrl, setDbUrl] = createSignal(props.workspace.dbUrlScript ?? '')
   const [trigger, setTrigger] = createSignal<SetupTrigger>(props.workspace.setupScriptTrigger ?? 'terminal')
   const [previewMode, setPreviewMode] = createSignal<PreviewMode | ''>(props.workspace.previewMode ?? '')
   const [previewValue, setPreviewValue] = createSignal(props.workspace.previewValue ?? '')
@@ -93,6 +94,10 @@ export default function WorkspaceSettings(props: { workspace: Workspace; onDelet
     await setWorkspaceTeardownScript(props.workspace.id, teardown())
     await refresh()
   }
+  const saveDbUrl = async () => {
+    await setWorkspaceDbUrlScript(props.workspace.id, dbUrl())
+    await refresh()
+  }
 
   // One debouncer per text field; blur flushes the same pending write immediately.
   const debScript = debounce(() => void saveScript(), 1500)
@@ -100,7 +105,8 @@ export default function WorkspaceSettings(props: { workspace: Workspace; onDelet
   const debDev = debounce(() => void saveDev(), 1500)
   const debDevRestart = debounce(() => void saveDevRestart(), 1500)
   const debPreview = debounce(() => void savePreview(), 1500)
-  onCleanup(() => { debScript.flush(); debTeardown.flush(); debDev.flush(); debDevRestart.flush(); debPreview.flush() })
+  const debDbUrl = debounce(() => void saveDbUrl(), 1500)
+  onCleanup(() => { debScript.flush(); debTeardown.flush(); debDev.flush(); debDevRestart.flush(); debPreview.flush(); debDbUrl.flush() })
 
   const remove = async () => {
     if (!window.confirm(`Delete workspace “${props.workspace.name}”? Its repos move back to Default.`)) return
@@ -212,6 +218,25 @@ export default function WorkspaceSettings(props: { workspace: Workspace; onDelet
           value={teardown()}
           onInput={(e) => { setTeardown(e.currentTarget.value); debTeardown() }}
           onBlur={() => debTeardown.flush()}
+        />
+      </label>
+
+      <label class="settings-field">
+        <span class="settings-label">Database connection script</span>
+        <span class="muted settings-hint">
+          Optional. A shell command run in a task's worktree that prints a Postgres connection URL for the
+          Database pane (docs/next/pg.md). Blank means auto-detect from <code>DATABASE_URL</code> in the
+          worktree <code>.env</code> or the environment. Use this for setups auto-detect can't read, e.g.
+          <code>bin/rails runner 'puts ActiveRecord::Base.connection_db_config.url'</code>.
+        </span>
+        <textarea
+          class="settings-script"
+          rows="2"
+          spellcheck={false}
+          placeholder="(blank = auto-detect)"
+          value={dbUrl()}
+          onInput={(e) => { setDbUrl(e.currentTarget.value); debDbUrl() }}
+          onBlur={() => debDbUrl.flush()}
         />
       </label>
 

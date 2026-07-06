@@ -40,6 +40,7 @@ async function listWorkspaces(db: ReturnType<typeof getDb>): Promise<Workspace[]
     devScript: r.devScript,
     devRestartScript: r.devRestartScript,
     teardownScript: r.teardownScript,
+    dbUrlScript: r.dbUrlScript,
     previewMode: r.previewMode as PreviewMode | null,
     previewValue: r.previewValue,
     icon: parseWorkspaceIcon(r.icon),
@@ -88,13 +89,13 @@ export const workspaces = new Hono<AppEnv>()
     const now = Date.now()
     const id = randomUUID()
     await db.insert(schema.workspaces).values({ id, name: body.name.trim(), isDefault: false, sort: (value ?? -1) + 1, createdAt: now, updatedAt: now })
-    return c.json({ id, name: body.name.trim(), isDefault: false, sort: (value ?? -1) + 1, setupScript: null, setupScriptTrigger: null, devScript: null, devRestartScript: null, teardownScript: null, previewMode: null, previewValue: null, icon: null, color: null, repos: [] } satisfies Workspace)
+    return c.json({ id, name: body.name.trim(), isDefault: false, sort: (value ?? -1) + 1, setupScript: null, setupScriptTrigger: null, devScript: null, devRestartScript: null, teardownScript: null, dbUrlScript: null, previewMode: null, previewValue: null, icon: null, color: null, repos: [] } satisfies Workspace)
   })
   // Update a workspace's name, worktree setup script, and/or when it runs. Blank script ⇒ null.
   .patch('/:id', async (c) => {
     if (!c.get('user')) return c.json({ error: 'unauthenticated' }, 401)
-    const body = (await c.req.json().catch(() => ({}))) as { name?: string; setupScript?: string; setupScriptTrigger?: SetupTrigger; devScript?: string; devRestartScript?: string; teardownScript?: string; previewMode?: string; previewValue?: string; icon?: unknown; color?: string | null }
-    const set: { name?: string; setupScript?: string | null; setupScriptTrigger?: string; devScript?: string | null; devRestartScript?: string | null; teardownScript?: string | null; previewMode?: string | null; previewValue?: string | null; icon?: string | null; color?: string | null; updatedAt: number } = { updatedAt: Date.now() }
+    const body = (await c.req.json().catch(() => ({}))) as { name?: string; setupScript?: string; setupScriptTrigger?: SetupTrigger; devScript?: string; devRestartScript?: string; teardownScript?: string; dbUrlScript?: string; previewMode?: string; previewValue?: string; icon?: unknown; color?: string | null }
+    const set: { name?: string; setupScript?: string | null; setupScriptTrigger?: string; devScript?: string | null; devRestartScript?: string | null; teardownScript?: string | null; dbUrlScript?: string | null; previewMode?: string | null; previewValue?: string | null; icon?: string | null; color?: string | null; updatedAt: number } = { updatedAt: Date.now() }
     if (body.name !== undefined) {
       if (!body.name.trim()) return c.json({ error: 'bad_request' }, 400)
       set.name = body.name.trim()
@@ -103,6 +104,7 @@ export const workspaces = new Hono<AppEnv>()
     if (body.devScript !== undefined) set.devScript = body.devScript.trim() || null
     if (body.devRestartScript !== undefined) set.devRestartScript = body.devRestartScript.trim() || null
     if (body.teardownScript !== undefined) set.teardownScript = body.teardownScript.trim() || null
+    if (body.dbUrlScript !== undefined) set.dbUrlScript = body.dbUrlScript.trim() || null
     if (body.setupScriptTrigger !== undefined) {
       if (!['off', 'created', 'terminal'].includes(body.setupScriptTrigger)) return c.json({ error: 'bad_request' }, 400)
       set.setupScriptTrigger = body.setupScriptTrigger
@@ -131,7 +133,7 @@ export const workspaces = new Hono<AppEnv>()
       else if (typeof body.color === 'string' && isValidWorkspaceColor(body.color)) set.color = body.color
       else return c.json({ error: 'bad_request' }, 400)
     }
-    if (set.name === undefined && set.setupScript === undefined && set.setupScriptTrigger === undefined && set.devScript === undefined && set.devRestartScript === undefined && set.teardownScript === undefined && set.previewMode === undefined && set.previewValue === undefined && set.icon === undefined && set.color === undefined) return c.json({ error: 'bad_request' }, 400)
+    if (set.name === undefined && set.setupScript === undefined && set.setupScriptTrigger === undefined && set.devScript === undefined && set.devRestartScript === undefined && set.teardownScript === undefined && set.dbUrlScript === undefined && set.previewMode === undefined && set.previewValue === undefined && set.icon === undefined && set.color === undefined) return c.json({ error: 'bad_request' }, 400)
     const db = getDb(c.env)
     const id = c.req.param('id')
     const [existing] = await db.select({ id: schema.workspaces.id }).from(schema.workspaces).where(eq(schema.workspaces.id, id))

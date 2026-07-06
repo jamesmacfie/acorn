@@ -121,6 +121,7 @@ declare global {
       onClosePane?: (cb: () => void) => () => void
       terminal?: TerminalApi
       editor?: import('../editor/editorClient').EditorApi
+      database?: import('../database/databaseClient').DatabaseApi
       notes?: import('../notes/notesClient').NotesApi
       memory?: import('../memory/memoryClient').MemoryApi
       browser?: {

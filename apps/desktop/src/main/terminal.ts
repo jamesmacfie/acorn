@@ -33,6 +33,7 @@ import { fileURLToPath } from 'node:url'
 import { inspectMcpConfig, MCP_CANDIDATES, STARTER_MCP_JSON, type McpServerSummary } from '../shared/mcp'
 import { launcherSpec, registerAcornMcp, resolveMcpEntry, serverName, type AgentFlavour } from './mcpRegister'
 import { wireHarnessBridges } from './harnessWiring'
+import { registerDatabaseIpc } from './database'
 import { registerKnowledgeIpc } from './knowledgeIpc'
 import { registerLocalGitIpc } from './localGitIpc'
 import { broadcastStatus } from './notify'
@@ -422,6 +423,7 @@ export async function registerTerminalIpc(db: AppDatabase, worktreesDir: string,
   // Workflows (docs/next 14) + local-git/editor (docs/panes.md).
   await registerWorkflowIpc(db, { runtime, notesStore: knowledge.notesStore, internalApiEnv })
   registerLocalGitIpc(db)
+  registerDatabaseIpc(db) // Database pane (docs/next/pg.md): per-task Postgres browse/edit over IPC.
 
   // MCP config inspector (docs/mcp.md): read ONLY the known candidate files (worktree
   // .mcp.json / .cursor/mcp.json, ~/.claude.json), parse + MASK IN MAIN — raw secrets never cross
