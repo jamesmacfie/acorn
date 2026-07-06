@@ -230,6 +230,37 @@
   border-bottom: 1px solid var(--border);
   background: var(--bg);
 }
+/* In-diff find (⌘F). Lives in the toolbar, pushed to the far left so the view-mode toggle keeps
+   its flex-end spot. */
+.diff-find { display: flex; align-items: center; gap: 4px; margin-right: auto; }
+.diff-find-input {
+  width: 200px;
+  padding: 3px 8px;
+  font: inherit;
+  color: var(--text);
+  background: var(--bg);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+}
+.diff-find-input:focus { outline: none; border-color: var(--focus); }
+.diff-find-count { min-width: 40px; font-size: var(--fs-sm); color: var(--text-faint); text-align: center; }
+.diff-find-btn {
+  padding: 2px 6px;
+  color: var(--text-muted);
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: var(--radius);
+  cursor: pointer;
+}
+.diff-find-btn:hover:not(:disabled) { color: var(--text); background: var(--bg-hover); }
+.diff-find-btn:disabled { opacity: 0.4; cursor: default; }
+.diff-find-btn.active { color: var(--text); background: var(--bg-selected); }
+
+/* Match highlights layer over the line/word backgrounds; theme-independent yellow/orange so the
+   syntax colour underneath stays legible. */
+.diff-find-hit { background: rgba(255, 200, 0, 0.28); border-radius: 2px; }
+.diff-find-current { background: rgba(255, 145, 0, 0.6); border-radius: 2px; }
+
 .diff-viewmode { display: inline-flex; border: 1px solid var(--border-strong); border-radius: var(--radius); overflow: hidden; }
 .diff-viewmode-btn {
   font: inherit;

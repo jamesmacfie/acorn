@@ -5,6 +5,7 @@ import MentionTextarea from '../../MentionTextarea'
 import type { Thread } from '../../queries'
 import { UserAvatar } from '../../UserAvatar'
 import { fileAnchor, type CodeRow, type FileRow, type GapRow, type HunkRow, type LoadDiffRow, type Row, type ThreadRowT } from './model'
+import { markTokens, type FindHighlight } from './find'
 import { persistDraft } from '../comments/draftState'
 
 export type LineComposerController = {
@@ -112,6 +113,7 @@ export function DiffLine(props: {
   onMutated: () => void
   composer?: LineComposerController
   mentions?: string[]
+  highlight?: FindHighlight
 }) {
   return (
     <>
@@ -119,7 +121,7 @@ export function DiffLine(props: {
       <span class="diff-gutter">{props.r.newNo ?? ''}</span>
       <span class="diff-marker">{props.r.kind === 'insert' ? '+' : props.r.kind === 'delete' ? '\u2212' : ' '}</span>
       <LineComposer canAdd={props.canAdd} addComment={props.addComment} onMutated={props.onMutated} composer={props.composer} mentions={props.mentions ?? []}>
-        <CodeContent r={props.r} />
+        <CodeContent r={props.r} highlight={props.highlight} />
       </LineComposer>
     </>
   )
@@ -133,6 +135,7 @@ export function SplitCell(props: {
   onMutated: () => void
   composer?: LineComposerController
   mentions?: string[]
+  highlight?: FindHighlight
 }) {
   return (
     <div
@@ -149,7 +152,7 @@ export function SplitCell(props: {
             <span class="diff-gutter">{props.gutter ?? ''}</span>
             <span class="diff-marker">{r().kind === 'insert' ? '+' : r().kind === 'delete' ? '\u2212' : ' '}</span>
             <LineComposer canAdd={props.canAdd} addComment={props.addComment} onMutated={props.onMutated} composer={props.composer} mentions={props.mentions ?? []}>
-              <CodeContent r={r()} />
+              <CodeContent r={r()} highlight={props.highlight} />
             </LineComposer>
           </>
         )}
@@ -158,23 +161,52 @@ export function SplitCell(props: {
   )
 }
 
-function CodeContent(props: { r: CodeRow }) {
+function CodeContent(props: { r: CodeRow; highlight?: FindHighlight }) {
+  const hl = () => (props.highlight && props.highlight.ranges.length ? props.highlight : null)
   return (
     <Show
       when={props.r.words}
       fallback={
         <span class="diff-code">
-          <For each={props.r.toks}>{(t) => <span style={{ '--l': t.light, '--r': t.dark }}>{t.content}</span>}</For>
+          <Show
+            when={hl()}
+            fallback={<For each={props.r.toks}>{(t) => <span style={{ '--l': t.light, '--r': t.dark }}>{t.content}</span>}</For>}
+          >
+            {(h) => (
+              <For each={markTokens(props.r.toks, h().ranges, h().current)}>
+                {(t) => (
+                  <span style={{ '--l': t.light, '--r': t.dark }} classList={{ 'diff-find-hit': t.mark > 0, 'diff-find-current': t.mark === 2 }}>
+                    {t.content}
+                  </span>
+                )}
+              </For>
+            )}
+          </Show>
         </span>
       }
     >
       {(words) => (
         <span class="diff-code">
-          <For each={words()}>
-            {(w) => (
-              <span classList={{ 'diff-word-add': w.kind === 'add', 'diff-word-del': w.kind === 'del' }}>{w.content}</span>
+          <Show
+            when={hl()}
+            fallback={
+              <For each={words()}>
+                {(w) => <span classList={{ 'diff-word-add': w.kind === 'add', 'diff-word-del': w.kind === 'del' }}>{w.content}</span>}
+              </For>
+            }
+          >
+            {(h) => (
+              <For each={markTokens(words(), h().ranges, h().current)}>
+                {(w) => (
+                  <span
+                    classList={{ 'diff-word-add': w.kind === 'add', 'diff-word-del': w.kind === 'del', 'diff-find-hit': w.mark > 0, 'diff-find-current': w.mark === 2 }}
+                  >
+                    {w.content}
+                  </span>
+                )}
+              </For>
             )}
-          </For>
+          </Show>
         </span>
       )}
     </Show>

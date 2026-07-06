@@ -7,6 +7,8 @@ import { addReviewComment, replyReview, resolveThread, setPref } from './mutatio
 import { getHighlighter } from './shiki'
 import { FILE_SCROLL_EVENT, routeKey as makeRouteKey, type FileScrollDetail } from './fileNavigation'
 import { DiffLine, NonCodeRow, SplitCell, type LineComposerController, type ThreadCollapseController } from './features/diff/DiffRows'
+import { collectMatches, type FindHighlight } from './features/diff/find'
+import { isTypingTarget } from './lib/isTypingTarget'
 import { createDiffHydrator } from './features/diff/hydration'
 import { readDraft, writeDraft } from './features/comments/draftState'
 import { createDiffMeasureSchedulers, createDiffVirtualizer } from './features/diff/virtualization'
@@ -216,6 +218,80 @@ function DiffForPull(props: { route: PullRoute }) {
     { unified: virt, split: splitVirt },
     scrollEl,
   )
+
+  // In-diff find (⌘F). Because the list is virtualized, we search the row model — not the DOM — then
+  // scroll the virtualizer to the current match and highlight the matched substrings in place.
+  const [findOpen, setFindOpen] = createSignal(false)
+  const [findQuery, setFindQuery] = createSignal('')
+  const [findCase, setFindCase] = createSignal(false)
+  const [matchIdx, setMatchIdx] = createSignal(0)
+  const [findFocusTick, setFindFocusTick] = createSignal(0)
+  let findInput: HTMLInputElement | undefined
+  // ponytail: linear rescan of all code rows on every keystroke; fine until diffs get pathological.
+  const matches = createMemo(() => (findOpen() ? collectMatches(rows(), findQuery(), findCase()) : []))
+  const matchesByRow = createMemo(() => {
+    const map = new Map<CodeRow, [number, number][]>()
+    for (const m of matches()) {
+      const ranges = map.get(m.row)
+      if (ranges) ranges.push([m.start, m.end])
+      else map.set(m.row, [[m.start, m.end]])
+    }
+    return map
+  })
+  const currentMatch = () => matches()[matchIdx()] ?? null
+  const findHighlight = (row: CodeRow): FindHighlight | undefined => {
+    const ranges = matchesByRow().get(row)
+    if (!ranges) return undefined
+    const cur = currentMatch()
+    return { ranges, current: cur && cur.row === row ? [cur.start, cur.end] : null }
+  }
+  const openFind = () => {
+    setFindOpen(true)
+    setFindFocusTick((t) => t + 1)
+  }
+  const closeFind = () => setFindOpen(false)
+  const gotoMatch = (delta: number) => {
+    const n = matches().length
+    if (n) setMatchIdx((i) => (i + delta + n) % n)
+  }
+  // New query starts from the first match; also clamp if the match set shrinks under the cursor.
+  createEffect(on(findQuery, () => setMatchIdx(0)))
+  createEffect(() => {
+    if (matchIdx() >= matches().length) setMatchIdx(0)
+  })
+  createEffect(() => {
+    findFocusTick()
+    if (findOpen() && findInput) {
+      findInput.focus()
+      findInput.select()
+    }
+  })
+  // Keep the current match on screen as the query or selection changes.
+  createEffect(() => {
+    if (!findOpen()) return
+    const m = currentMatch()
+    if (!m) return
+    if (viewMode() === 'split') {
+      const target = m.row
+      const idx = bands().findIndex((b) => b.kind === 'pair' && (b.left === target || b.right === target))
+      if (idx >= 0) splitVirt.scrollToIndex(idx, { align: 'center' })
+    } else {
+      virt.scrollToIndex(m.rowIndex, { align: 'center' })
+    }
+  })
+  onMount(() => {
+    const onFindKey = (e: KeyboardEvent) => {
+      if (!(e.metaKey || e.ctrlKey) || e.shiftKey || e.altKey) return
+      if (e.key.toLowerCase() !== 'f') return
+      // Leave ⌘F to whatever owns text entry (the editor's Monaco find, notes, textareas). The diff
+      // rows aren't typing targets, so viewing the diff still opens this find.
+      if (isTypingTarget(e.target) && e.target !== findInput) return
+      e.preventDefault()
+      openFind()
+    }
+    window.addEventListener('keydown', onFindKey)
+    onCleanup(() => window.removeEventListener('keydown', onFindKey))
+  })
 
   const shouldMeasureRow = (row: Row) => row.kind === 'thread' || isCodeRow(row)
   const shouldMeasureBand = (band: SplitBand) => band.kind === 'pair' || (band.kind === 'full' && band.row.kind === 'thread')
@@ -438,6 +514,40 @@ function DiffForPull(props: { route: PullRoute }) {
       fallback={<p class="placeholder">{files.isLoading ? 'Loading…' : 'No files.'}</p>}
     >
       <div class="diff-toolbar">
+        <Show when={findOpen()}>
+          <div class="diff-find" role="search">
+            <input
+              ref={findInput}
+              class="diff-find-input"
+              type="text"
+              placeholder="Find in diff…"
+              value={findQuery()}
+              onInput={(e) => setFindQuery(e.currentTarget.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault()
+                  gotoMatch(e.shiftKey ? -1 : 1)
+                } else if (e.key === 'Escape') {
+                  e.preventDefault()
+                  closeFind()
+                }
+              }}
+            />
+            <span class="diff-find-count">{findQuery() ? `${matches().length ? matchIdx() + 1 : 0}/${matches().length}` : ''}</span>
+            <button type="button" class="diff-find-btn" title="Previous match (⇧⏎)" disabled={!matches().length} onClick={() => gotoMatch(-1)}>
+              ↑
+            </button>
+            <button type="button" class="diff-find-btn" title="Next match (⏎)" disabled={!matches().length} onClick={() => gotoMatch(1)}>
+              ↓
+            </button>
+            <button type="button" class="diff-find-btn" classList={{ active: findCase() }} title="Match case" onClick={() => setFindCase((v) => !v)}>
+              Aa
+            </button>
+            <button type="button" class="diff-find-btn" title="Close (Esc)" onClick={closeFind}>
+              ✕
+            </button>
+          </div>
+        </Show>
         <div class="diff-viewmode" role="group" aria-label="Diff view mode">
           <button
             type="button"
@@ -513,6 +623,7 @@ function DiffForPull(props: { route: PullRoute }) {
                               onMutated={invalidate}
                               composer={lc.canAdd ? composerFor(lc.key) : undefined}
                               mentions={mentionsList()}
+                              highlight={findHighlight(r())}
                             />
                           )
                         }}
@@ -581,6 +692,7 @@ function DiffForPull(props: { route: PullRoute }) {
                             onMutated={invalidate}
                             composer={splitComposer(pair().left, 'LEFT')}
                             mentions={mentionsList()}
+                            highlight={pair().left ? findHighlight(pair().left!) : undefined}
                           />
                           <SplitCell
                             r={pair().right}
@@ -590,6 +702,7 @@ function DiffForPull(props: { route: PullRoute }) {
                             onMutated={invalidate}
                             composer={splitComposer(pair().right, 'RIGHT')}
                             mentions={mentionsList()}
+                            highlight={pair().right ? findHighlight(pair().right!) : undefined}
                           />
                         </div>
                       )}
