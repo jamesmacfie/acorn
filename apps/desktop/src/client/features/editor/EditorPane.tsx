@@ -20,6 +20,12 @@ const EXT_LANG: Record<string, string> = {
 }
 const langFor = (name: string): string => EXT_LANG[name.split('.').pop()?.toLowerCase() ?? ''] ?? 'plaintext'
 
+// Scroll + cursor + selection per file, keyed `${taskId}:${path}`. Module-level so it survives the
+// pane unmounting on task/workspace switch — you return to the same spot. Session-only (content
+// isn't persisted, so restoring scroll after relaunch would be against a possibly-changed file).
+const viewStates = new Map<string, monaco.editor.ICodeEditorViewState>()
+const viewKey = (taskId: string, path: string): string => `${taskId}:${path}`
+
 // Monaco (like xterm) ignores CSS custom properties, so it gets an explicit theme: base vs/vs-dark
 // supplies the syntax colours, chrome colours come from the live app tokens (tokens-layout.css) —
 // the same recipe terminal/theme.ts uses. Re-defining 'app' on theme change updates in place; the
@@ -74,8 +80,17 @@ export default function EditorPane(props: { task: Task }) {
   // Autosave (no Save button): debounce while typing, flush on blur / tab-switch / close.
   const scheduleSave = debounce((p: string) => void save(p), 1500)
 
+  // Stash the current file's scroll/cursor so it can be restored after a tab swap or a remount.
+  const saveViewState = () => {
+    if (editor && currentPath) {
+      const vs = editor.saveViewState()
+      if (vs) viewStates.set(viewKey(props.task.id, currentPath), vs)
+    }
+  }
+
   onMount(() => {
     onCleanup(() => {
+      saveViewState() // pane unmounting (task/workspace switch) — remember where we were
       scheduleSave.flush()
       stopTheme?.()
       for (const m of models.values()) m.dispose()
@@ -124,10 +139,13 @@ export default function EditorPane(props: { task: Task }) {
   async function show(relPath: string) {
     if (!editor) return
     scheduleSave.flush() // persist the outgoing file (pending arg is its path) before the swap
+    saveViewState() // remember the outgoing file's scroll/cursor before we swap models
     setSaveErr('')
     const model = await modelFor(relPath)
     currentPath = relPath
     editor.setModel(model)
+    const vs = viewStates.get(viewKey(props.task.id, relPath))
+    if (vs) editor.restoreViewState(vs)
     editor.updateOptions({ readOnly: false })
     editorActivate(props.task.id, relPath)
   }
