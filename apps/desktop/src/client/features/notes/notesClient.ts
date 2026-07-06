@@ -17,6 +17,7 @@ export type NotesApi = {
   read(workspaceId: string, slug: string): Promise<Note | { error: string }>
   create(workspaceId: string, title: string, kind?: NoteKind): Promise<{ slug: string } | { error: string }>
   write(workspaceId: string, slug: string, body: string): Promise<{ ok: boolean } | { error: string }>
+  setIncluded(workspaceId: string, slug: string, included: boolean): Promise<{ ok: boolean } | { error: string }>
   remove(workspaceId: string, slug: string): Promise<{ ok: boolean } | { error: string }>
 }
 

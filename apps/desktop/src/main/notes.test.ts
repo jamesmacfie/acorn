@@ -12,10 +12,17 @@ vi.mock('node:fs/promises', async (importOriginal) => {
 
 describe('note frontmatter round-trip (docs/notes-and-memory.md)', () => {
   it('serialize → parse preserves meta + body', () => {
-    const meta = { title: 'repro steps', author: 'agent' as const, kind: 'finding' as const, originSessionId: 's-1', createdAt: 123 }
+    const meta = { title: 'repro steps', author: 'agent' as const, kind: 'finding' as const, originSessionId: 's-1', originTaskId: null, included: true, createdAt: 123 }
     const { meta: parsed, body } = parseNote(serializeNote(meta, '# repro\nsteps here\n'), 'repro-steps')
     expect(parsed).toEqual(meta)
     expect(body).toBe('# repro\nsteps here\n')
+  })
+  it('included defaults to true when absent, round-trips false, and carries originTaskId', () => {
+    expect(parseNote('body only', 's').meta.included).toBe(true) // legacy note → included
+    const meta = { title: 't', author: 'user' as const, kind: 'scratch' as const, originSessionId: null, originTaskId: 'task-9', included: false, createdAt: 1 }
+    const { meta: parsed } = parseNote(serializeNote(meta, 'x'), 's')
+    expect(parsed.included).toBe(false)
+    expect(parsed.originTaskId).toBe('task-9')
   })
   it('title derivation: frontmatter → # heading → slug; junk fields degrade safely', () => {
     expect(parseNote('# From Heading\nbody', 'the-slug').meta.title).toBe('From Heading')
@@ -60,6 +67,17 @@ describe('NotesStore over a temp dir', () => {
     expect(list.map((n) => n.slug).sort()).toEqual(['agent-conventions', 'agent-conventions-2'])
     // A human could edit this by hand: plain frontmatter + markdown.
     expect(readFileSync(join(dir, 'ws1', 'agent-conventions.md'), 'utf8')).toContain('kind: plan')
+  })
+
+  it('setIncluded toggles the context flag, preserving body + provenance', async () => {
+    const { slug } = await store.create('ws1', 'Seeded PR', { originTaskId: 'task-1', body: 'pr body' })
+    expect((await store.read('ws1', slug)).included).toBe(true) // seeded → included by default
+    await store.setIncluded('ws1', slug, false)
+    const note = await store.read('ws1', slug)
+    expect(note.included).toBe(false)
+    expect(note.body).toBe('pr body')
+    expect(note.originTaskId).toBe('task-1')
+    expect((await store.list('ws1')).find((n) => n.slug === slug)?.included).toBe(false)
   })
 
   it('append creates a missing note with the writer identity (agent findings)', async () => {

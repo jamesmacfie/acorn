@@ -38,6 +38,7 @@ import { registerLocalGitIpc } from './localGitIpc'
 import { broadcastStatus } from './notify'
 import { createRuntimeService, registerRunIpc } from './runIpc'
 import { registerWorkflowIpc } from './workflowWiring'
+import { seedTaskNotes } from './seedTaskNotes'
 import {
   baseRefPref,
   computeTaskStatuses,
@@ -542,7 +543,11 @@ export async function registerTerminalIpc(db: AppDatabase, worktreesDir: string,
   ipcMain.handle('term:task:onCreated', async (_e: IpcMainInvokeEvent, id: string): Promise<void> => {
     if (typeof id !== 'string' || !id) return
     const t = await loadTask(db, id)
-    if (!t || (t.worktreePath && isDir(t.worktreePath))) return
+    if (!t) return
+    // Snapshot PR/ticket context into curatable notes (docs/notes-and-memory.md). Best-effort and
+    // independent of worktree setup — runs even when there's no setup script / the worktree exists.
+    await seedTaskNotes(db, knowledge.notesStore, internalApiEnv, t).catch((e) => console.warn('[notes] seed failed:', e))
+    if (t.worktreePath && isDir(t.worktreePath)) return
     const { script, trigger } = await workspaceSetup(db, t.repoOwner, t.repoName)
     if (trigger !== 'created' || !script?.trim()) return
     const mapped = await getRepoPath(db, t.repoOwner, t.repoName)

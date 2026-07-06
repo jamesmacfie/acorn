@@ -4,7 +4,7 @@ import { DEFAULT_SELECTION, selectionToInclude, traySummary } from './model'
 
 describe('selectionToInclude', () => {
   it('maps checked slices to the include param', () => {
-    expect(selectionToInclude(DEFAULT_SELECTION)).toEqual(['pr', 'issues', 'notes'])
+    expect(selectionToInclude(DEFAULT_SELECTION)).toEqual(['notes']) // PR/issues superseded by seeded notes
     expect(selectionToInclude({ pr: false, issues: true, notes: false, memory: true })).toEqual(['issues', 'memory'])
     expect(selectionToInclude({ pr: false, issues: false, notes: false, memory: false })).toEqual([])
   })

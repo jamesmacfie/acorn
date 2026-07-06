@@ -11,6 +11,7 @@
   background: var(--bg-subtle);
 }
 .notes-row-wrap { display: flex; align-items: stretch; }
+.notes-row-include { flex: none; align-self: center; margin: 0 0 0 8px; cursor: pointer; }
 .notes-row {
   flex: 1;
   min-width: 0;

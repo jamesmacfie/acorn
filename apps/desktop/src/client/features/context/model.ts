@@ -4,9 +4,11 @@ import type { TaskContext, TaskContextInclude } from '../../../shared/api'
 
 export type TraySelection = Record<TaskContextInclude, boolean>
 
-// Default to the always-safe slice checked (task + PR + linked issue titles + notes); memory is
-// opt-in per the 11 §example.
-export const DEFAULT_SELECTION: TraySelection = { pr: true, issues: true, notes: true, memory: false }
+// Notes now supersede the PR/issue auto-include: a PR-originated task's description, comments and
+// linked-ticket bodies are seeded as curatable notes (docs/notes-and-memory.md), so PR/issues
+// default off to avoid feeding the agent the same content twice. Both stay available to tick
+// manually (they carry structural extras like the changed-file list). Memory stays opt-in.
+export const DEFAULT_SELECTION: TraySelection = { pr: false, issues: false, notes: true, memory: false }
 
 export function selectionToInclude(sel: TraySelection): TaskContextInclude[] {
   return (Object.keys(sel) as TaskContextInclude[]).filter((k) => sel[k])
