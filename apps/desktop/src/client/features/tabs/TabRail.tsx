@@ -56,6 +56,10 @@ export default function TabRail() {
   const [draft, setDraft] = createSignal<Draft | null>(null)
   const [text, setText] = createSignal('')
   const [newRepo, setNewRepo] = createSignal('') // "owner/name" for the new-task repo selector
+  // Repo options are snapshotted when the modal opens, not bound to the reactive activeWorkspace().
+  // Otherwise a workspace switch mid-modal (App.tsx restore-nav / workspaces refetch) repopulates the
+  // <select> while newRepo() stays on the old repo → the task is created in the wrong workspace.
+  const [newRepoOptions, setNewRepoOptions] = createSignal<{ owner: string; name: string }[]>([])
   // Custom branch name (docs/terminal-and-agents.md): defaults to a de-duped slug of the title until the user
   // edits the branch field directly, then their value wins.
   const [branchText, setBranchText] = createSignal('')
@@ -142,6 +146,7 @@ export default function TabRail() {
     }
     // Default the repo to the current one if it's in this workspace, else the first.
     const cur = `${params.owner}/${params.repo}`
+    setNewRepoOptions(repos)
     setNewRepo(repos.some((r) => `${r.owner}/${r.name}` === cur) ? cur : `${repos[0].owner}/${repos[0].name}`)
     setText('')
     setBranchText('')
@@ -355,7 +360,7 @@ export default function TabRail() {
                 <Show when={d().mode === 'new'}>
                   <p class="muted">{useCheckout() ? "Works in the repo's current checkout and branch — no worktree." : 'A local-first task on a new branch.'}</p>
                   <select class="integration-key-input" value={newRepo()} onChange={(e) => setNewRepo(e.currentTarget.value)}>
-                    <For each={activeWorkspace()?.repos ?? []}>
+                    <For each={newRepoOptions()}>
                       {(r) => <option value={`${r.owner}/${r.name}`}>{r.owner}/{r.name}</option>}
                     </For>
                   </select>
