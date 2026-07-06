@@ -11,6 +11,7 @@ import { workspaceForRepo } from './features/workspaces/activeWorkspace'
 import { createTask } from './mutations'
 import { scanLinearRefs } from './features/integrations/scanLinearRefs'
 import { activateTaskSignals } from './features/tasks/activate'
+import { isTypingTarget } from './lib/isTypingTarget'
 
 // Left-pane PR list for the routed repo. Access checks live on the server; this pane only needs
 // route params before it can ask for the repo's PRs. The list is virtualized in its own scroll
@@ -57,8 +58,7 @@ export default function PullList() {
   // j/k move to the next/prev PR in the list (docs/ui-design.md keyboard nav). Ignore while typing.
   const onKey = (e: KeyboardEvent) => {
     if (e.key !== 'j' && e.key !== 'k') return
-    const el = document.activeElement
-    if (el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement || el instanceof HTMLSelectElement) return
+    if (isTypingTarget(e.target)) return
     const list = shown()
     if (!list.length) return
     const i = list.findIndex((p) => String(p.number) === params.number)
