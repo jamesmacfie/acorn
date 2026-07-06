@@ -5,7 +5,7 @@ import { prefsOptions, type Task } from '../../queries'
 import { setPref } from '../../mutations'
 import { terminalApi } from './terminalClient'
 import { onClosePaneWithin } from '../../lib/onClosePaneWithin'
-import { refreshSessions, sessions } from './sessions'
+import { activeTerminal, rememberActiveTerminal, refreshSessions, sessions } from './sessions'
 import TerminalSurface from './TerminalSurface'
 import type { TerminalProfile, TerminalSession } from '../../../shared/terminal'
 import './terminal.css'
@@ -41,10 +41,21 @@ export default function TerminalPanel(props: { onClose: () => void; task: Task |
     return id ? sessions().filter((s) => s.taskId === id) : []
   })
 
-  // Keep the active session in sync with what's visible (e.g. after switching tasks).
+  // Keep the active session in sync with what's visible (e.g. after switching tasks). On a fresh
+  // mount (task/workspace switch back) prefer the tab we last viewed for this task, so you return to
+  // the same terminal instead of the first one; fall back to the first visible session.
   createEffect(() => {
     const vis = visibleSessions()
-    if (!vis.some((s) => s.id === activeId())) setActiveId(vis[0]?.id ?? null)
+    if (vis.some((s) => s.id === activeId())) return
+    const remembered = activeTerminal(ws()?.id ?? '')
+    setActiveId((remembered && vis.some((s) => s.id === remembered) ? remembered : vis[0]?.id) ?? null)
+  })
+
+  // Remember the viewed tab per task so the effect above can restore it after a remount.
+  createEffect(() => {
+    const id = ws()?.id
+    const a = activeId()
+    if (id && a) rememberActiveTerminal(id, a)
   })
 
   onMount(async () => {

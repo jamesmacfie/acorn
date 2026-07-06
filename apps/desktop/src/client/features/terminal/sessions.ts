@@ -27,6 +27,14 @@ export function initSessions(): () => void {
   return api.onStatus(() => void refreshSessions())
 }
 
+// Which terminal tab was last viewed, per task (session-only, like isTerminalOpen). Lets the drawer
+// reopen on the same tab after a task/workspace switch instead of snapping back to the first.
+const activeByTask = new Map<string, string>()
+export const activeTerminal = (taskId: string): string | undefined => activeByTask.get(taskId)
+export const rememberActiveTerminal = (taskId: string, sessionId: string): void => {
+  activeByTask.set(taskId, sessionId)
+}
+
 // Target-picker data for sendToAgent (docs/panes.md): the task's running agent sessions,
 // most-recent first (the default target), each with its idle dot.
 export function agentSessionsFor(taskId: string | null): TerminalSession[] {
