@@ -80,6 +80,8 @@
 .markdown :is(pre, code) { font-family: var(--font-mono); background: var(--bg-subtle); border-radius: var(--radius); }
 .markdown pre { padding: 8px; overflow-x: auto; border: 1px solid var(--border); }
 .markdown :is(h1, h2, h3) { font-size: var(--fs); margin: 8px 0 4px; }
+/* Links track the theme accent instead of the browser-default blue (clashes with non-blue themes). */
+.markdown a, .linear-md a { color: var(--accent); }
 
 .check-list, .file-list { list-style: none; margin: 0; padding: 0; }
 .check-row {
