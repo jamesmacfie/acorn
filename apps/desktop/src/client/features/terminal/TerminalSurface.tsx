@@ -14,7 +14,10 @@ export default function TerminalSurface(props: { sessionId: string; onExit?: (ex
 
   onMount(() => {
     if (!api) return
-    const term = new Terminal({ convertEol: true, fontFamily: monoFont(), fontSize: 13, theme: baseTheme(isAppDark()) })
+    // No convertEol: the PTY already emits CRLF for normal output (kernel ONLCR) and a full-screen
+    // TUI (Claude/Codex) drives the cursor itself — rewriting bare \n to \r\n injects stray carriage
+    // returns that shift redraws to column 0, interleaving frames into garbage.
+    const term = new Terminal({ fontFamily: monoFont(), fontSize: 13, theme: baseTheme(isAppDark()) })
     const fit = new FitAddon()
     term.loadAddon(fit)
     term.open(host)
