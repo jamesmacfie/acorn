@@ -15,14 +15,15 @@ export type SourceId = (typeof SOURCE_IDS)[number]
 export const isSourceId = (v: unknown): v is SourceId => typeof v === 'string' && (SOURCE_IDS as readonly string[]).includes(v)
 const [selectedSource, setSelectedSource] = createSignal<SourceId | null>('github')
 
-// Per-workspace memory of the last-selected rail source, so switching workspaces returns you to the
-// tab you left it on rather than always jumping back to GitHub. Session-only (not persisted); a task
-// view (null source) is not recorded — returning to such a workspace defaults to GitHub.
-const railByWorkspace = new Map<string, SourceId>()
-export const rememberWorkspaceSource = (workspaceId: string, source: SourceId): void => {
-  railByWorkspace.set(workspaceId, source)
+// Per-workspace memory of the last view — a rail source (browse) or a task — so switching workspaces
+// returns you to exactly what you were looking at rather than always jumping back to GitHub.
+// Session-only (not persisted); first-load restore is handled by the last_source/last_task prefs.
+export type WorkspaceView = { source: SourceId } | { taskId: string }
+const viewByWorkspace = new Map<string, WorkspaceView>()
+export const rememberWorkspaceView = (workspaceId: string, view: WorkspaceView): void => {
+  viewByWorkspace.set(workspaceId, view)
 }
-export const workspaceSource = (workspaceId: string): SourceId | undefined => railByWorkspace.get(workspaceId)
+export const workspaceView = (workspaceId: string): WorkspaceView | undefined => viewByWorkspace.get(workspaceId)
 
 // The active task (its terminals scope to this; its view shows when no Source is selected).
 const [activeTaskId, setActiveTaskId] = createSignal<string | null>(null)
