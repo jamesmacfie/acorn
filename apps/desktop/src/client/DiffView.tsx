@@ -8,6 +8,7 @@ import { getHighlighter } from './shiki'
 import { FILE_SCROLL_EVENT, routeKey as makeRouteKey, type FileScrollDetail } from './fileNavigation'
 import { DiffLine, NonCodeRow, SplitCell, type LineComposerController, type ThreadCollapseController } from './features/diff/DiffRows'
 import { createDiffHydrator } from './features/diff/hydration'
+import { readDraft, writeDraft } from './features/comments/draftState'
 import { createDiffMeasureSchedulers, createDiffVirtualizer } from './features/diff/virtualization'
 import {
   buildDiffRows,
@@ -404,6 +405,10 @@ function DiffForPull(props: { route: PullRoute }) {
   }
 
   const commentTargetKey = (path: string, side: 'LEFT' | 'RIGHT', lineNo: number) => JSON.stringify([path, side, lineNo])
+  // Persist an in-progress new-line comment per line so it survives navigation/reload. The composer
+  // is single-slot (one open line at a time), so we seed body from the draft when it opens and write
+  // back on edit; submitting sets body to '' which removes the key.
+  const lineDraftKey = (key: string) => `line-comment:${owner}/${repo}/${number}:${key}`
   const composerFor = (key: string): LineComposerController => ({
     isOpen: () => lineComposer()?.key === key,
     body: () => {
@@ -412,11 +417,14 @@ function DiffForPull(props: { route: PullRoute }) {
     },
     setOpen: (open) => {
       setLineComposer((current) => {
-        if (open) return { key, body: current?.key === key ? current.body : '' }
+        if (open) return { key, body: current?.key === key ? current.body : readDraft(lineDraftKey(key)) }
         return current?.key === key ? null : current
       })
     },
-    setBody: (body) => setLineComposer({ key, body }),
+    setBody: (body) => {
+      writeDraft(lineDraftKey(key), body)
+      setLineComposer({ key, body })
+    },
   })
 
   const splitComposer = (r: CodeRow | null, side: 'LEFT' | 'RIGHT') => {

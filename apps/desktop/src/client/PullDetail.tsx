@@ -16,6 +16,7 @@ import LinearIssuePanel from './features/integrations/LinearIssuePanel'
 import { scanLinearRefs } from './features/integrations/scanLinearRefs'
 import { linkifyLinearIds, makeContentLinkHandler, splitLinearIds } from './contentLinks'
 import { buildConversationEntries, buildThreadSnippetIndex } from './features/pullDetail/model'
+import { persistDraft } from './features/comments/draftState'
 
 const labelColor = (color: string | null | undefined) => (color ? `#${color}` : 'var(--text-faint)')
 
@@ -125,6 +126,9 @@ export default function PullDetail() {
   const [mergeMethod, setMergeMethod] = createSignal('squash')
   const [draftText, setDraftText] = createSignal('')
   const [reviewBody, setReviewBody] = createSignal('')
+  // Persist in-progress comment/review text per PR so it survives navigation and reloads.
+  persistDraft(() => (hasPullParams() ? `pr-comment:${o()}/${r()}/${n()}` : null), draftText, setDraftText)
+  persistDraft(() => (hasPullParams() ? `review-body:${o()}/${r()}/${n()}` : null), reviewBody, setReviewBody)
   const [actionError, setActionError] = createSignal('')
   const run = (p: Promise<unknown>) => p.then(refresh).catch((e) => setActionError(String(e.message ?? e)))
 
