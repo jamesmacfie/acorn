@@ -13,6 +13,11 @@
   border-top: 1px solid var(--border);
   z-index: 50;
 }
+/* Maximized (⌘⇧⏎): stretch from just under the top bar to the bottom, filling the pane region
+   between the two rails. top + bottom (no inline height) makes the flex column fill. */
+.terminal-drawer.maximized {
+  top: var(--topbar-h);
+}
 .terminal-resize {
   height: 6px;
   cursor: ns-resize;

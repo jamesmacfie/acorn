@@ -28,7 +28,8 @@ import { hydratePrFilters, prFilters } from './features/pullList/filterState'
 import { initSessions } from './features/terminal/sessions'
 import TabRail from './features/tabs/TabRail'
 import RailTips from './features/tooltip/RailTips'
-import { activeTaskId, hydrateTaskLayouts, isSourceId, isTerminalOpen, rememberWorkspaceView, selectedSource, setActiveTaskId, setSelectedSource, setTerminalOpen, taskLayouts, workspaceView } from './features/tasks/tasks'
+import { activeTaskId, hydrateTaskLayouts, isSourceId, isTerminalMax, isTerminalOpen, rememberWorkspaceView, selectedSource, setActiveTaskId, setSelectedSource, setTerminalMax, setTerminalOpen, taskLayouts, workspaceView } from './features/tasks/tasks'
+import { isTerminalTarget } from './lib/isTypingTarget'
 import { activateTaskSignals, pathForTask } from './features/tasks/activate'
 import { parseTaskLayouts } from './features/tasks/layout'
 import { initTaskStatuses } from './features/tasks/taskStatus'
@@ -74,6 +75,29 @@ export default function App() {
     const id = activeTaskId()
     if (id) setTerminalOpen(id, !isTerminalOpen(id))
   }
+
+  // ⌘⇧⏎ is a size control for the terminal drawer, directioned by focus: pressed while the terminal
+  // is focused it grows (opens → maximizes → back to partial); pressed from any other pane (editor,
+  // notes, …) it minimizes a step (maximized → partial → hidden). Capture phase so it wins over
+  // Monaco/xterm before they can swallow ⏎. Fires app-wide but only acts inside the Task view.
+  onMount(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (!(e.metaKey || e.ctrlKey) || !e.shiftKey || e.altKey || e.key !== 'Enter') return
+      const id = activeTaskId()
+      if (!inTaskView() || !id) return
+      e.preventDefault()
+      const inTerm = isTerminalTarget(e.target) || isTerminalTarget(document.activeElement)
+      if (inTerm) {
+        setTerminalMax(id, !isTerminalMax(id)) // terminal focused ⇒ toggle fill-the-pane
+      } else if (isTerminalMax(id)) {
+        setTerminalMax(id, false) // minimize: full → partial
+      } else if (isTerminalOpen(id)) {
+        setTerminalOpen(id, false) // minimize: partial → hidden
+      }
+    }
+    window.addEventListener('keydown', onKey, true)
+    onCleanup(() => window.removeEventListener('keydown', onKey, true))
+  })
 
   // Track terminal sessions globally (independent of the drawer) so the tab rail and the topbar
   // badge can show agent-working activity. No-op when the terminal bridge is absent (plain browser
