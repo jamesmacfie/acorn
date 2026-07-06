@@ -5,6 +5,7 @@ import { prefsOptions, type Task } from '../../queries'
 import { setPref } from '../../mutations'
 import { terminalApi } from './terminalClient'
 import { onClosePaneWithin } from '../../lib/onClosePaneWithin'
+import { isTerminalMax } from '../tasks/tasks'
 import { activeTerminal, clearTerminalFocus, pendingTerminalFocus, rememberActiveTerminal, refreshSessions, sessions } from './sessions'
 import TerminalSurface from './TerminalSurface'
 import type { TerminalProfile, TerminalSession } from '../../../shared/terminal'
@@ -138,6 +139,9 @@ export default function TerminalPanel(props: { onClose: () => void; task: Task |
   const activeSession = createMemo(() => sessions().find((s) => s.id === activeId()) ?? null)
   const activeRunning = createMemo(() => activeSession()?.status === 'running')
 
+  // Maximized (⌘⇧⏎) fills the pane region via CSS (top: --topbar-h); the partial drag-height is ignored.
+  const maximized = () => isTerminalMax(ws()?.id)
+
   // Drawer height, seeded once from the `term_height` pref then dragged + persisted (§10).
   const [height, setHeight] = createSignal(360)
   let seeded = false
@@ -246,8 +250,10 @@ export default function TerminalPanel(props: { onClose: () => void; task: Task |
 
   return (
     <Portal>
-      <aside ref={drawerRef} class="terminal-drawer" style={{ height: `${height()}px` }}>
-        <div class="terminal-resize" onPointerDown={onHandleDown} title="Drag to resize" />
+      <aside ref={drawerRef} class="terminal-drawer" classList={{ maximized: maximized() }} style={{ height: maximized() ? undefined : `${height()}px` }}>
+        <Show when={!maximized()}>
+          <div class="terminal-resize" onPointerDown={onHandleDown} title="Drag to resize" />
+        </Show>
         <header class="terminal-tabs">
           <Show when={api} fallback={<span class="terminal-unavailable">Terminal service unavailable</span>}>
             <div class="terminal-tabstrip">

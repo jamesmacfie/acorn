@@ -74,6 +74,21 @@ export function setTerminalOpen(taskId: string, open: boolean): void {
     else next.delete(taskId)
     return next
   })
+  if (!open) setTerminalMax(taskId, false) // a closed drawer is never maximized
+}
+
+// The drawer's third state (⌘⇧⏎): a maximized task drawer fills the whole pane region instead of the
+// partial-height bottom slice. Session-only + per-task, mirroring open/closed above.
+const [terminalMaxTasks, setTerminalMaxTasks] = createSignal<Set<string>>(new Set())
+export const isTerminalMax = (taskId: string | null | undefined): boolean => !!taskId && terminalMaxTasks().has(taskId)
+export function setTerminalMax(taskId: string, max: boolean): void {
+  setTerminalMaxTasks((prev) => {
+    if (max === prev.has(taskId)) return prev
+    const next = new Set(prev)
+    if (max) next.add(taskId)
+    else next.delete(taskId)
+    return next
+  })
 }
 
 export { activeTaskId, setActiveTaskId, selectedSource, setSelectedSource, taskLayouts }
