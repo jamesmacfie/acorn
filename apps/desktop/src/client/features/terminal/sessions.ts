@@ -35,6 +35,18 @@ export const rememberActiveTerminal = (taskId: string, sessionId: string): void 
   activeByTask.set(taskId, sessionId)
 }
 
+// A session the drawer should switch to and focus once it appears — the command palette creates
+// terminals but can't reach TerminalPanel's local activeId, so it requests focus here. One-shot:
+// the drawer clears it on apply.
+const [pendingTerminalFocus, setPendingTerminalFocus] = createSignal<string | null>(null)
+export { pendingTerminalFocus }
+export const requestTerminalFocus = (sessionId: string): void => {
+  setPendingTerminalFocus(sessionId)
+}
+export const clearTerminalFocus = (): void => {
+  setPendingTerminalFocus(null)
+}
+
 // Target-picker data for sendToAgent (docs/panes.md): the task's running agent sessions,
 // most-recent first (the default target), each with its idle dot.
 export function agentSessionsFor(taskId: string | null): TerminalSession[] {
