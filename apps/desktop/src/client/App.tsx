@@ -28,7 +28,7 @@ import { hydratePrFilters, prFilters } from './features/pullList/filterState'
 import { initSessions } from './features/terminal/sessions'
 import TabRail from './features/tabs/TabRail'
 import RailTips from './features/tooltip/RailTips'
-import { activeTaskId, hydrateTaskLayouts, isSourceId, isTerminalOpen, rememberWorkspaceSource, selectedSource, setActiveTaskId, setSelectedSource, setTerminalOpen, taskLayouts, workspaceSource } from './features/tasks/tasks'
+import { activeTaskId, hydrateTaskLayouts, isSourceId, isTerminalOpen, rememberWorkspaceView, selectedSource, setActiveTaskId, setSelectedSource, setTerminalOpen, taskLayouts, workspaceView } from './features/tasks/tasks'
 import { activateTaskSignals, pathForTask } from './features/tasks/activate'
 import { parseTaskLayouts } from './features/tasks/layout'
 import { initTaskStatuses } from './features/tasks/taskStatus'
@@ -114,16 +114,32 @@ export default function App() {
     return (repos.data ?? []).filter((r) => set.has(`${r.owner}/${r.name}`))
   }
 
-  // Remember the rail source per workspace so switching workspaces returns you to the tab you left,
-  // not always GitHub. On each real workspace change: record the source we're leaving, then restore
-  // the one we're entering (default GitHub). `defer` skips the startup null→workspace resolution so
-  // the persisted `last_source` restore below still wins on first load; the `prevWs` guard likewise
-  // leaves that first entry untouched. A task view (null source) isn't recorded.
+  // Remember the last view per workspace (a rail source or a task) so switching workspaces returns
+  // you to exactly what you were looking at, not always GitHub. On each real workspace change: record
+  // the view we're leaving, then restore the one we're entering (default GitHub). `defer` skips the
+  // startup null→workspace resolution so the persisted `last_source`/`last_task` restore below still
+  // wins on first load; the `prevWs` guard likewise leaves that first entry untouched.
   createEffect(
     on(activeWorkspace, (ws, prevWs) => {
-      const leaving = untrack(selectedSource)
-      if (prevWs && leaving) rememberWorkspaceSource(prevWs.id, leaving)
-      if (ws && prevWs && ws.id !== prevWs.id) setSelectedSource(workspaceSource(ws.id) ?? 'github')
+      if (prevWs) {
+        const src = untrack(selectedSource)
+        const tid = untrack(activeTaskId)
+        if (src) rememberWorkspaceView(prevWs.id, { source: src })
+        else if (tid) rememberWorkspaceView(prevWs.id, { taskId: tid })
+      }
+      if (ws && prevWs && ws.id !== prevWs.id) {
+        const view = workspaceView(ws.id)
+        // Restore a remembered task if it still exists; else fall back to the remembered source (or
+        // GitHub). Navigating to the task's own path keeps the URL/breadcrumb in step — it stays in
+        // this workspace, so this effect's id guard skips the re-entrant run.
+        const task = view && 'taskId' in view ? tasks.data?.find((t) => t.id === view.taskId) : undefined
+        if (task) {
+          activateTaskSignals(task)
+          navigate(pathForTask(task), { replace: true })
+        } else {
+          setSelectedSource(view && 'source' in view ? view.source : 'github')
+        }
+      }
     }, { defer: true }),
   )
 
@@ -326,7 +342,8 @@ export default function App() {
                 // from the repo, so no extra state. Empty workspaces stay put.
                 const first = w.repos[0]
                 if (!first) return
-                // Rail source is restored per-workspace by the activeWorkspace effect above.
+                // The last view (source or task) is restored per-workspace by the activeWorkspace
+                // effect above, which may re-navigate to a remembered task's own path.
                 navigate(`/${first.owner}/${first.name}`)
               }}
             />
