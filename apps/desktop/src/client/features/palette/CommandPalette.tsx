@@ -4,7 +4,7 @@ import { useNavigate, useParams } from '@solidjs/router'
 import type { RunTargetInfo } from '../../../shared/terminal'
 import { tasksKey, tasksOptions, workspacesOptions } from '../../queries'
 import { workspaceForRepo } from '../workspaces/activeWorkspace'
-import { refreshSessions } from '../terminal/sessions'
+import { refreshSessions, requestTerminalFocus } from '../terminal/sessions'
 import { terminalApi } from '../terminal/terminalClient'
 import { activeLayout, activeTaskId, dispatchActiveLayout, dispatchLayout, isTerminalOpen, setRecipeBrowserUrl, setTerminalOpen } from '../tasks/tasks'
 import { activateTaskSignals, pathForTask } from '../tasks/activate'
@@ -170,21 +170,27 @@ export default function CommandPalette() {
       return
     }
     switch (item.id) {
-      case 'action:new-terminal':
-        await api.create({ taskId, profileId: 'shell' })
+      case 'action:new-terminal': {
+        const s = await api.create({ taskId, profileId: 'shell' })
         setTerminalOpen(taskId, true)
         await refreshSessions()
+        requestTerminalFocus(s.id)
         break
-      case 'action:new-claude':
-        await api.create({ taskId, profileId: 'claude-code' })
+      }
+      case 'action:new-claude': {
+        const s = await api.create({ taskId, profileId: 'claude-code' })
         setTerminalOpen(taskId, true)
         await refreshSessions()
+        requestTerminalFocus(s.id)
         break
-      case 'action:new-codex':
-        await api.create({ taskId, profileId: 'codex' })
+      }
+      case 'action:new-codex': {
+        const s = await api.create({ taskId, profileId: 'codex' })
         setTerminalOpen(taskId, true)
         await refreshSessions()
+        requestTerminalFocus(s.id)
         break
+      }
       case 'action:toggle-terminal':
         setTerminalOpen(taskId, !isTerminalOpen(taskId))
         break

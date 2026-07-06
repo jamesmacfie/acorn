@@ -5,7 +5,7 @@ import { prefsOptions, type Task } from '../../queries'
 import { setPref } from '../../mutations'
 import { terminalApi } from './terminalClient'
 import { onClosePaneWithin } from '../../lib/onClosePaneWithin'
-import { activeTerminal, rememberActiveTerminal, refreshSessions, sessions } from './sessions'
+import { activeTerminal, clearTerminalFocus, pendingTerminalFocus, rememberActiveTerminal, refreshSessions, sessions } from './sessions'
 import TerminalSurface from './TerminalSurface'
 import type { TerminalProfile, TerminalSession } from '../../../shared/terminal'
 import './terminal.css'
@@ -90,6 +90,17 @@ export default function TerminalPanel(props: { onClose: () => void; task: Task |
 
   const focusActiveSurface = () =>
     requestAnimationFrame(() => drawerRef?.querySelector<HTMLTextAreaElement>('.xterm-helper-textarea')?.focus())
+
+  // The command palette creates a terminal and requests focus on it (it can't reach activeId here).
+  // Switch to it once it shows up in this task's strip, then focus explicitly — closing the palette
+  // returns focus elsewhere, so the keyed remount's own focus isn't enough on its own.
+  createEffect(() => {
+    const want = pendingTerminalFocus()
+    if (!want || !visibleSessions().some((s) => s.id === want)) return
+    setActiveId(want)
+    clearTerminalFocus()
+    focusActiveSurface()
+  })
 
   // ⌘/Ctrl+Shift+1–9 focuses the Nth terminal in this task's strip; ⌘/Ctrl+Shift+[ / ] steps to the
   // previous / next tab (wrapping). Works from anywhere (e.g. the editor) as long as the drawer is
