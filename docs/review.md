@@ -434,3 +434,105 @@ the HTTP surface. This is a single-user loopback app; compile-time linkage made
 mandatory (items 1, 3) is the right cost/benefit. Save runtime validation for the
 two places data genuinely arrives untrusted: SQLite JSON blobs written by older
 app versions, and anything an agent can send through the harness.
+
+---
+
+## Technology choices
+
+Follow-up analysis (2026-07-07), Electron taken as fixed. The stack is current —
+Electron 42, Vite 8, TS 6, zod 4, nothing rotting — and most choices are right.
+The through-line: the riskiest tech exposure is not any library going stale; it
+is the two places the app fights its platform (`<webview>`, dual-ABI natives)
+and the one place it has three of something it needs one of (transports).
+
+### Changes to make, ranked
+
+**1. Collapse the three transports toward one — move the IPC surface onto the
+loopback server, WebSocket for streams.** Almost everything on Electron IPC is
+request/response that could be plain HTTP routes on the Hono server already
+running in the same process. The only thing that genuinely needs a streaming
+channel is PTY output (`term:out:<id>`), and a WebSocket on the loopback origin
+covers it — same-origin cookie auth works unchanged. Gains: one auth story, one
+typed contract seam instead of three (§3's worst drift surface disappears
+structurally rather than by discipline), a preload that shrinks to almost
+nothing, `dev:node` browser mode approaching full functionality, and the plugin
+model's "main parts" mostly becoming "server parts" — the agent-tool projection
+in [extensability.md](./extensability.md) §4.8 gets its transport for free.
+Trade-offs to respect: PTY output needs explicit flow control over WS (xterm has
+a standard pattern; IPC currently gives backpressure semi-for-free), and a
+minimal IPC residue stays for true Electron-isms (dialogs, `browser.bind`'s
+webContents IDs).
+
+**2. Migrate the preview pane from the `<webview>` tag to `WebContentsView`.**
+Electron's docs have discouraged the `webview` tag for years (guest-view
+internals, explicitly subject to change/removal) — and the code is already
+fighting it: the body-parented `previewWebviews` Map, the position-over-host-rect
+dance, and the three-call-site eviction obligation all exist because a
+DOM-embedded guest dies with its DOM node. `WebContentsView` is main-owned and
+bounds-managed — surviving pane switches is its natural behavior, not a hack —
+and it composes directly with `browserService.ts`'s CDP binding. This is the one
+place the app is built on an API with a stated deprecation trajectory.
+
+**3. Plan the exit from better-sqlite3 to `node:sqlite`.** The ABI
+double-rebuild dance is the most-documented gotcha in the repo, and
+better-sqlite3 is the module that needs *both* ABIs (Electron for the app, Node
+for tests/`dev:node`/migrate). Electron 42's bundled Node ships `node:sqlite`
+stable; a built-in kills half the native-module problem outright. Verify first:
+Drizzle's `node:sqlite` driver maturity, FTS5 availability in the bundled build
+(the memory index depends on it), and the `db.batch`/transaction semantics the
+mirror writes rely on. node-pty has no non-native alternative, so the dance
+doesn't fully die — but two dual-ABI natives becoming one is a real reduction.
+
+**4. Secrets: Electron `safeStorage`, not keytar, for the planned Phase-3
+keychain work.** keytar is archived/unmaintained; `safeStorage` is built in and
+needs no native rebuild. Worth pinning now since it's on the roadmap.
+
+### Keep, with eyes open
+
+- **SolidJS — keep, but keep the framework surface thin.** The right runtime
+  model for this workload: fine-grained reactivity with no VDOM churn under live
+  terminals and virtualized diffs. The risks are ecosystem-shaped — second-tier
+  TanStack/tooling support, no component library (hand-rolling costs little given
+  the flat design language), and, genuinely relevant for an agent-workspace
+  product built with agents, LLMs write React more reliably than Solid (the
+  destructured-props and effect-semantics traps). The mitigation is already
+  half-built: the pure-model discipline (`layout.ts`, `diff/model.ts`,
+  `palette/model.ts`). Keep pushing logic out of components and the framework
+  stays a thin view layer. A migration would never pay for itself; the
+  discipline does.
+- **Hono + loopback HTTP — keep; it's the load-bearing asset** and the reason
+  change #1 is possible. Optional consideration: Hono's RPC client (`hc`) would
+  make the server↔client contract structural instead of opt-in `satisfies`, at
+  the cost of constraining route-authoring style (chained definitions). Reach
+  for it only if the mandatory-`satisfies` convention (recommendation #1 above)
+  proves leaky in practice.
+- **Monaco — keep.** CodeMirror 6 is lighter and more modular, but that would
+  mean running two editors (Monaco's SQL support and model/marker APIs do real
+  work in the database pane), and bundle weight is a non-issue in a desktop app.
+- **xterm.js — keep, and adopt `@xterm/addon-serialize` with a headless
+  terminal for attach-replay.** Cashes in the TODO already in `terminal.ts`: the
+  raw ring-buffer + Ctrl-L repaint nudge is the known-lossy hack and this is the
+  standard fix. Load-bearing for agent TUI panes — the highest-value small tech
+  adoption on this list.
+- **tmux as the durability backend — keep.** Unusual but earning its keep
+  (sessions survive app restarts with zero custom daemon code). Costs an
+  external binary and macOS/Linux coupling — fine for a personal macOS app;
+  first thing to revisit if Windows ever matters.
+- **Turborepo — neutral hold.** One app in the workspace means turbo adds
+  nothing today, but if the plugin architecture lands and plugins become
+  workspace packages, the task graph starts paying rent.
+- **Drizzle + SQLite, TanStack Query + IndexedDB persistence, jose, smol-toml,
+  pg, shiki, idb-keyval** — all fine, all current, no action.
+
+### Gaps where there is no tech at all
+
+- **E2E testing:** the riskiest untestable surface (§6 — the App.tsx restore
+  choreography, the IPC wiring) is exactly what unit tests can't reach.
+  Playwright's Electron driver is the standard answer and the only meaningful
+  new dev-dependency worth adding.
+- **Observability:** `console.error` into the void (§21 in the server findings).
+  Not pino-scale — JSON lines to a file under `userData` with a settings-pane
+  tail would do — but *some* persistent log matters for an app whose failure
+  mode is "background refresh silently stopped."
+- **Auto-update:** electron-builder is fine; add electron-updater + notarization
+  only when distribution beyond one machine becomes real. Not before.
