@@ -36,6 +36,7 @@ import { wireHarnessBridges } from './harnessWiring'
 import { registerDatabaseIpc } from './database'
 import { registerKnowledgeIpc } from './knowledgeIpc'
 import { registerLocalGitIpc } from './localGitIpc'
+import { registerSearchIpc } from './searchIpc'
 import { broadcastStatus } from './notify'
 import { createRuntimeService, registerRunIpc } from './runIpc'
 import { registerWorkflowIpc } from './workflowWiring'
@@ -423,6 +424,7 @@ export async function registerTerminalIpc(db: AppDatabase, worktreesDir: string,
   // Workflows (docs/next 14) + local-git/editor (docs/panes.md).
   await registerWorkflowIpc(db, { runtime, notesStore: knowledge.notesStore, internalApiEnv })
   registerLocalGitIpc(db)
+  registerSearchIpc(db) // Find-in-files (docs/panes.md): ripgrep over the task's worktree.
   registerDatabaseIpc(db) // Database pane (docs/next/pg.md): per-task Postgres browse/edit over IPC.
 
   // MCP config inspector (docs/mcp.md): read ONLY the known candidate files (worktree

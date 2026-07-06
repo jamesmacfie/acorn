@@ -141,6 +141,12 @@ contextBridge.exposeInMainWorld('acorn', {
     write: (taskId: string, relPath: string, content: string) =>
       ipcRenderer.invoke('editor:write', { taskId, relPath, content }),
   },
+  // Find-in-files pane: ripgrep over the task's worktree. Separate bridge from `editor` (own IPC
+  // channel), though both resolve the worktree from taskId in the main process.
+  search: {
+    findInFiles: (taskId: string, query: string, opts: import('../shared/search').SearchOpts) =>
+      ipcRenderer.invoke('search:findInFiles', { taskId, query, opts }),
+  },
   // Database pane (docs/next/pg.md): a per-task Postgres connection, resolved on demand from the
   // worktree (never persisted). Browse tables/rows + run SQL + edit rows over IPC.
   database: {

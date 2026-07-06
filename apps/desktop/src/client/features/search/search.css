@@ -1,0 +1,121 @@
+.search-pane {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.search-bar {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: var(--pane-pad);
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-subtle);
+}
+.search-input {
+  flex: 1;
+  min-width: 0;
+  font: inherit;
+  font-size: var(--fs-sm);
+  color: var(--text);
+  background: var(--bg);
+  border: 1px solid var(--border-strong);
+  border-radius: 4px;
+  padding: 4px 8px;
+}
+.search-toggles {
+  flex: none;
+  display: flex;
+  gap: 4px;
+}
+.search-toggle {
+  font-family: var(--font-mono);
+  font-size: var(--fs-sm);
+  min-width: 26px;
+  padding: 3px 5px;
+  color: var(--text-muted);
+  background: var(--bg);
+  border: 1px solid var(--border-strong);
+  border-radius: 4px;
+  cursor: pointer;
+}
+.search-toggle:hover {
+  color: var(--text);
+}
+.search-toggle.active {
+  color: var(--text);
+  background: var(--bg-selected);
+  border-color: var(--border-strong);
+}
+.search-status {
+  flex: none;
+  padding: 4px var(--pane-pad);
+  font-size: var(--fs-sm);
+  border-bottom: 1px solid var(--border);
+}
+.search-truncated {
+  color: var(--text-muted);
+}
+.search-results {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  font-family: var(--font-mono);
+  font-size: var(--fs-sm);
+}
+.search-file {
+  padding: 2px 0;
+}
+.search-file-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px var(--pane-pad);
+  position: sticky;
+  top: 0;
+  background: var(--bg-subtle);
+  border-bottom: 1px solid var(--border);
+}
+.search-file-path {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  direction: rtl; /* keep the filename (right end) visible when the path overflows */
+  text-align: left;
+}
+.search-file-count {
+  flex: none;
+  margin-left: auto;
+}
+.search-hit {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  width: 100%;
+  text-align: left;
+  padding: 2px var(--pane-pad) 2px 20px;
+  color: var(--text-muted);
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+  font: inherit;
+}
+.search-hit:hover {
+  background: var(--bg-hover);
+  color: var(--text);
+}
+.search-hit-line {
+  flex: none;
+  min-width: 34px;
+  text-align: right;
+}
+.search-hit-preview {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.search-mark {
+  background: var(--bg-selected);
+  color: var(--text);
+  border-radius: 2px;
+}

@@ -18,6 +18,7 @@ export const PANE_SHORTCUT_DEFAULTS: { id: PaneAction; label: string; key: strin
   { id: 'context', label: 'Context', key: 'meta+shift+x' },
   { id: 'preview', label: 'Browser preview', key: 'meta+shift+b' },
   { id: 'editor', label: 'Editor', key: 'meta+shift+e' },
+  { id: 'search', label: 'Find in Files', key: 'meta+shift+f' },
   { id: 'database', label: 'Database', key: 'meta+shift+j' },
   { id: 'linear', label: 'Linear', key: 'meta+shift+l' },
   { id: 'rollbar', label: 'Rollbar', key: 'meta+shift+o' },
