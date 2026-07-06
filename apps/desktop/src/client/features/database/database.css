@@ -1,0 +1,291 @@
+/* Database pane (docs/next/pg.md). Tokens only — square panes, 1px borders, monospace, dense rows,
+   active-row accent — per docs/ui-design.md, so it tracks the theme automatically. */
+
+.db-pane {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden; /* children scroll, not the pane */
+}
+
+.db-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.db-status {
+  font-size: var(--fs-sm);
+  color: var(--text-muted);
+  text-transform: none;
+}
+.db-status.ok { color: var(--add-marker, var(--accent)); }
+.db-status.err { color: var(--del-marker, var(--warn)); }
+.db-head .db-icon-btn { margin-left: auto; }
+
+.db-icon-btn {
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--text-muted);
+  border-radius: var(--radius);
+  padding: 2px 8px;
+  font: inherit;
+  font-size: var(--fs-sm);
+  cursor: pointer;
+}
+.db-icon-btn:hover:not(:disabled) { background: var(--bg-hover); color: var(--text); }
+.db-icon-btn:disabled { opacity: 0.5; cursor: default; }
+
+.db-error {
+  padding: 6px var(--pane-pad);
+  font-size: var(--fs-sm);
+  color: var(--del-marker, var(--warn));
+  background: var(--del-bg, var(--bg-subtle));
+  border-bottom: 1px solid var(--border);
+  white-space: pre-wrap;
+}
+
+.db-body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+}
+
+/* Sidebar — searchable table list */
+.db-sidebar {
+  width: clamp(180px, 22%, 280px);
+  border-right: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+.db-filter {
+  margin: 8px;
+  flex: none;
+}
+.db-table-list {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+}
+.db-table-row {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 0 12px;
+  height: var(--row-h);
+  line-height: var(--row-h);
+  border: none;
+  border-left: 3px solid transparent;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-size: var(--fs-sm);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  cursor: pointer;
+}
+.db-table-row:hover { background: var(--bg-hover); }
+.db-table-row.active {
+  background: var(--bg-selected);
+  border-left-color: var(--accent);
+}
+
+/* Main — SQL editor over results grid */
+.db-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+.db-editor {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  min-height: 80px;
+}
+.db-editor-host {
+  flex: 1;
+  min-height: 0;
+}
+.db-editor-bar {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  justify-content: flex-end;
+  padding: 5px 10px;
+  border-top: 1px solid var(--border);
+}
+.db-hint { font-size: var(--fs-sm); }
+.db-run-btn {
+  background: var(--accent);
+  color: #fff;
+  border: none;
+  border-radius: var(--radius);
+  padding: 4px 12px;
+  font: inherit;
+  font-size: var(--fs-sm);
+  cursor: pointer;
+}
+.db-run-btn:disabled { opacity: 0.5; cursor: default; }
+.db-del-btn {
+  background: transparent;
+  color: var(--del-marker, var(--warn));
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 4px 12px;
+  font: inherit;
+  font-size: var(--fs-sm);
+  cursor: pointer;
+}
+.db-del-btn:hover:not(:disabled) { background: var(--del-bg, var(--bg-hover)); }
+
+.db-split {
+  flex: none;
+  height: 6px;
+  cursor: ns-resize;
+  background: var(--border);
+}
+.db-split:hover { background: var(--border-strong); }
+
+.db-result {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.db-result-bar {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 4px 10px;
+  border-bottom: 1px solid var(--border);
+}
+.db-footer {
+  font-size: var(--fs-sm);
+  color: var(--text-muted);
+}
+.db-result-bar .db-icon-btn { margin-left: auto; }
+
+/* Virtualized result grid */
+.dbgrid-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+}
+.dbgrid { position: relative; }
+.dbgrid-head {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  display: grid;
+  height: var(--row-h);
+  background: var(--bg-subtle, var(--bg));
+  border-bottom: 1px solid var(--border);
+}
+.dbgrid-hcell {
+  padding: 0 8px;
+  line-height: var(--row-h);
+  font-size: var(--fs-sm);
+  color: var(--text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  border-right: 1px solid var(--border);
+}
+.dbgrid-body { position: relative; }
+.dbgrid-row {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  display: grid;
+  align-items: center;
+  cursor: pointer;
+  border-bottom: 1px solid var(--border);
+}
+.dbgrid-row:hover { background: var(--bg-hover); }
+.dbgrid-row.active { background: var(--bg-selected); }
+.dbgrid-cell {
+  padding: 0 8px;
+  font-size: var(--fs-sm);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  border-right: 1px solid var(--border);
+}
+.dbgrid-cell.is-null { color: var(--text-faint); font-style: italic; }
+
+/* Row detail / editor panel */
+.db-detail {
+  width: clamp(280px, 32%, 420px);
+  border-left: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  background: var(--bg);
+}
+.db-detail-head {
+  flex: none;
+  display: flex;
+  align-items: center;
+  height: var(--pane-head-h);
+  padding: 0 var(--pane-pad);
+  border-bottom: 1px solid var(--border);
+  font-size: var(--fs-sm);
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+.db-detail-head .db-icon-btn { margin-left: auto; }
+.db-detail-fields {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding: 8px var(--pane-pad);
+}
+.db-field { display: block; margin-bottom: 10px; }
+.db-field-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--fs-sm);
+  color: var(--text-muted);
+  margin-bottom: 3px;
+}
+.db-pk {
+  font-style: normal;
+  font-size: 10px;
+  color: var(--accent);
+  border: 1px solid var(--accent);
+  border-radius: var(--radius);
+  padding: 0 3px;
+}
+.db-field-type { margin-left: auto; color: var(--text-faint); font-size: 11px; }
+.db-field-input {
+  width: 100%;
+  resize: vertical;
+  background: var(--bg-subtle, var(--bg));
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  color: var(--text);
+  font: inherit;
+  font-size: var(--fs-sm);
+  padding: 4px 6px;
+}
+.db-field-input:disabled { color: var(--text-faint); }
+.db-null-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-top: 3px;
+}
+.db-detail-actions {
+  flex: none;
+  display: flex;
+  gap: 8px;
+  padding: 8px var(--pane-pad);
+  border-top: 1px solid var(--border);
+}

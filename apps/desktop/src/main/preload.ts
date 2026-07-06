@@ -141,4 +141,20 @@ contextBridge.exposeInMainWorld('acorn', {
     write: (taskId: string, relPath: string, content: string) =>
       ipcRenderer.invoke('editor:write', { taskId, relPath, content }),
   },
+  // Database pane (docs/next/pg.md): a per-task Postgres connection, resolved on demand from the
+  // worktree (never persisted). Browse tables/rows + run SQL + edit rows over IPC.
+  database: {
+    connect: (taskId: string) => ipcRenderer.invoke('db:connect', taskId),
+    disconnect: (taskId: string) => ipcRenderer.invoke('db:disconnect', taskId),
+    tables: (taskId: string) => ipcRenderer.invoke('db:tables', taskId),
+    columns: (taskId: string, schema: string, name: string) => ipcRenderer.invoke('db:columns', { taskId, schema, name }),
+    rows: (taskId: string, schema: string, name: string, offset?: number) => ipcRenderer.invoke('db:rows', { taskId, schema, name, offset }),
+    query: (taskId: string, sql: string) => ipcRenderer.invoke('db:query', { taskId, sql }),
+    update: (taskId: string, schema: string, name: string, column: string, value: string | null, pk: Record<string, string | null>) =>
+      ipcRenderer.invoke('db:update', { taskId, schema, name, column, value, pk }),
+    insert: (taskId: string, schema: string, name: string, values: Record<string, string | null>) =>
+      ipcRenderer.invoke('db:insert', { taskId, schema, name, values }),
+    remove: (taskId: string, schema: string, name: string, pk: Record<string, string | null>) =>
+      ipcRenderer.invoke('db:delete', { taskId, schema, name, pk }),
+  },
 })

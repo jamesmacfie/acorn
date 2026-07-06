@@ -134,6 +134,13 @@
       "when": 1783228993348,
       "tag": "0018_acoustic_namora",
       "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "6",
+      "when": 1783308226808,
+      "tag": "0019_mighty_yellow_claw",
+      "breakpoints": true
     }
   ]
 }

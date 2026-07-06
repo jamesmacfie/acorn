@@ -6,7 +6,7 @@
 // NOTE: there is no separate 'browser' pane — agent-driving is a capability of `preview` (the
 // shared per-task <webview> is bound for CDP once it reaches dom-ready). Config recipes that still
 // name unknown pane ids are tolerated: isPaneId filters them out wherever layouts are parsed.
-export type PaneId = 'pr' | 'linear' | 'rollbar' | 'preview' | 'editor' | 'changes' | 'notes' | 'context'
+export type PaneId = 'pr' | 'linear' | 'rollbar' | 'preview' | 'editor' | 'changes' | 'notes' | 'context' | 'database'
 
 export type TaskLayout = {
   panes: PaneId[] // left→right, at least one; no duplicates
@@ -28,16 +28,17 @@ export const PANE_LABELS: Record<PaneId, string> = {
   changes: 'Changes',
   notes: 'Notes',
   context: 'Context',
+  database: 'Database',
 }
 
 // Canonical pane ordering for pane pickers (e.g. the palette's "Show pane" rows): task-context
 // panes first, then providers. Lives next to PANE_LABELS so order and labels stay in one place.
-export const PANE_ORDER: readonly PaneId[] = ['pr', 'changes', 'notes', 'context', 'editor', 'preview', 'linear', 'rollbar']
+export const PANE_ORDER: readonly PaneId[] = ['pr', 'changes', 'notes', 'context', 'editor', 'database', 'preview', 'linear', 'rollbar']
 
 export const DEFAULT_PANE: PaneId = 'pr'
 export const defaultLayout = (pane: PaneId = DEFAULT_PANE): TaskLayout => ({ panes: [pane] })
 
-const PANE_IDS: readonly PaneId[] = ['pr', 'linear', 'rollbar', 'preview', 'editor', 'changes', 'notes', 'context']
+const PANE_IDS: readonly PaneId[] = ['pr', 'linear', 'rollbar', 'preview', 'editor', 'changes', 'notes', 'context', 'database']
 export const isPaneId = (v: unknown): v is PaneId => typeof v === 'string' && (PANE_IDS as readonly string[]).includes(v)
 
 export function applyLayoutAction(layout: TaskLayout, action: LayoutAction): TaskLayout {
