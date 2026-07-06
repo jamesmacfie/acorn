@@ -5,6 +5,7 @@ import MentionTextarea from '../../MentionTextarea'
 import type { Thread } from '../../queries'
 import { UserAvatar } from '../../UserAvatar'
 import { fileAnchor, type CodeRow, type FileRow, type GapRow, type HunkRow, type LoadDiffRow, type Row, type ThreadRowT } from './model'
+import { persistDraft } from '../comments/draftState'
 
 export type LineComposerController = {
   isOpen: () => boolean
@@ -255,6 +256,8 @@ function ThreadRow(props: {
   const [busy, setBusy] = createSignal(false)
   const [err, setErr] = createSignal<string | null>(null)
   const replyId = () => props.thread.comments[0]?.databaseId ?? null
+  // Persist an in-progress reply per thread so it survives navigation and reloads.
+  persistDraft(() => `thread-reply:${props.thread.threadId}`, body, setBody)
   const resolved = () => optimisticResolved() ?? props.thread.resolved
   const collapsed = () => resolved() && (props.collapse?.collapsed() ?? localCollapsed())
   const setCollapsed = (value: boolean) => {
