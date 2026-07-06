@@ -27,12 +27,18 @@ export default function TerminalSurface(props: { sessionId: string; onExit?: (ex
     applyTheme()
     const unwatchTheme = watchTheme(applyTheme)
 
-    const detach = api.attach(props.sessionId, (m) => {
-      if (m.type === 'output') term.write(m.data)
-      else if (m.type === 'exit') {
-        term.write(`\r\n\x1b[90m[process exited${m.exitCode != null ? ` (${m.exitCode})` : ''}]\x1b[0m\r\n`)
-        props.onExit?.(m.exitCode)
-      }
+    let detach: (() => void) | undefined
+    // Size the PTY to the fitted dims BEFORE attaching, so the replayed ring + repaint land at the
+    // right width — a mismatched width reflows the replayed TUI frame into garbage.
+    void api.resize(props.sessionId, term.cols, term.rows).then(() => {
+      if (disposed) return
+      detach = api.attach(props.sessionId, (m) => {
+        if (m.type === 'output') term.write(m.data)
+        else if (m.type === 'exit') {
+          term.write(`\r\n\x1b[90m[process exited${m.exitCode != null ? ` (${m.exitCode})` : ''}]\x1b[0m\r\n`)
+          props.onExit?.(m.exitCode)
+        }
+      })
     })
     // Shift+Enter → newline instead of submit. Terminals send CR (\r) for Enter and Claude submits
     // on CR; a bare LF (\n, same byte as Ctrl+J) is Claude's setup-free "insert newline". Swallow
@@ -50,7 +56,6 @@ export default function TerminalSurface(props: { sessionId: string; onExit?: (ex
     })
     term.onData((d) => api.write(props.sessionId, d))
     term.onResize(({ cols, rows }) => void api.resize(props.sessionId, cols, rows))
-    void api.resize(props.sessionId, term.cols, term.rows)
     term.focus()
 
     // Refit on any size change of the surface — drawer drag-resize, window resize, layout shifts.
@@ -59,7 +64,7 @@ export default function TerminalSurface(props: { sessionId: string; onExit?: (ex
     ro.observe(host)
     onCleanup(() => {
       disposed = true
-      detach()
+      detach?.()
       unwatchTheme()
       ro.disconnect()
       term.dispose()
