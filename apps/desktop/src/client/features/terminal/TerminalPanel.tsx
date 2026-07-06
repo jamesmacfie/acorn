@@ -77,22 +77,37 @@ export default function TerminalPanel(props: { onClose: () => void; task: Task |
     if (s) void closeTab(s)
   })
 
-  // ⌘/Ctrl+Shift+1–9 focuses the Nth terminal in this task's strip, from anywhere (e.g. the editor)
-  // as long as the drawer is open — this component only exists while it is, so we never auto-open it.
-  // Scoped to the active task via visibleSessions. Matches on e.code — with Shift held the digit keys
-  // report shifted glyphs (!@#…), not '1'–'9'. TaskView's ⌘1–9 task-jump bails on Shift, so the two
-  // never collide. Focus is explicit (not just via remount) so re-selecting the already-active tab
-  // still pulls focus off whatever else had it; rAF lets a tab switch remount the surface first.
+  const focusActiveSurface = () =>
+    requestAnimationFrame(() => drawerRef?.querySelector<HTMLTextAreaElement>('.xterm-helper-textarea')?.focus())
+
+  // ⌘/Ctrl+Shift+1–9 focuses the Nth terminal in this task's strip; ⌘/Ctrl+Shift+[ / ] steps to the
+  // previous / next tab (wrapping). Works from anywhere (e.g. the editor) as long as the drawer is
+  // open — this component only exists while it is, so we never auto-open it. Scoped to the active
+  // task via visibleSessions. Matches on e.code — with Shift held the digit/bracket keys report
+  // shifted glyphs (!@#…, {}), not '1'–'9'/'['/']'. TaskView's ⌘1–9 task-jump bails on Shift, so the
+  // two never collide. Focus is explicit (not just via remount) so re-selecting the already-active
+  // tab still pulls focus off whatever else had it; rAF lets a tab switch remount the surface first.
   onMount(() => {
     const onKey = (e: KeyboardEvent) => {
       if (!(e.metaKey || e.ctrlKey) || !e.shiftKey || e.altKey) return
+      const vis = visibleSessions()
+      if (e.code === 'BracketLeft' || e.code === 'BracketRight') {
+        if (vis.length === 0) return
+        e.preventDefault()
+        const cur = vis.findIndex((s) => s.id === activeId())
+        const step = e.code === 'BracketRight' ? 1 : -1
+        const next = vis[(Math.max(cur, 0) + step + vis.length) % vis.length]
+        setActiveId(next.id)
+        focusActiveSurface()
+        return
+      }
       const m = /^Digit([1-9])$/.exec(e.code)
       if (!m) return
-      const s = visibleSessions()[Number(m[1]) - 1]
+      const s = vis[Number(m[1]) - 1]
       if (!s) return
       e.preventDefault()
       setActiveId(s.id)
-      requestAnimationFrame(() => drawerRef?.querySelector<HTMLTextAreaElement>('.xterm-helper-textarea')?.focus())
+      focusActiveSurface()
     }
     window.addEventListener('keydown', onKey)
     onCleanup(() => window.removeEventListener('keydown', onKey))
