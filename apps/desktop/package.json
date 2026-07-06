@@ -19,6 +19,7 @@
   },
   "dependencies": {
     "@hono/node-server": "^2.0.6",
+    "@vscode/ripgrep": "^1.15.9",
     "@modelcontextprotocol/sdk": "^1.29.0",
     "@solidjs/router": "^0.16.1",
     "@tanstack/query-async-storage-persister": "^5.101.0",

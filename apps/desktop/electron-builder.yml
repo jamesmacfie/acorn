@@ -10,9 +10,11 @@ files:
   - dist/client/**
   - package.json
 # Native modules can't live inside the asar — unpack them so the .node loads at runtime.
+# ripgrep ships a platform-native `rg` binary the search pane execs — same rule (see searchIpc.ts).
 asarUnpack:
   - "**/*.node"
   - node_modules/better-sqlite3/**
+  - node_modules/@vscode/ripgrep/**
 # Drizzle migrations are read at runtime; ship them as resources so process.resourcesPath/migrations
 # resolves (see migrationsFolder in src/main/bindings.ts).
 extraResources:

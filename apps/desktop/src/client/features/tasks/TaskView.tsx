@@ -9,6 +9,7 @@ import LinearIssuePanel from '../integrations/LinearIssuePanel'
 import RollbarPane from '../integrations/RollbarPane'
 import AgentsPanel from '../agents/AgentsPanel'
 import EditorPane from '../editor/EditorPane'
+import SearchPane from '../search/SearchPane'
 import DatabasePane from '../database/DatabasePane'
 import ChangesPane from '../changes/ChangesPane'
 import ContextPane from '../context/ContextPane'
@@ -243,6 +244,7 @@ export default function TaskView(props: {
       )
     }
     if (pane === 'editor') return <EditorPane task={props.task} />
+    if (pane === 'search') return <SearchPane task={props.task} />
     if (pane === 'database') return <DatabasePane task={props.task} />
     if (pane === 'changes') return <ChangesPane task={props.task} />
     if (pane === 'notes') return <NotesPane task={props.task} workspace={previewWs()} />
@@ -328,6 +330,7 @@ export default function TaskView(props: {
         <button type="button" class="pane-switch-btn" classList={{ active: showsPane('context') }} data-tip="Context" data-tip-key={formatChord(paneKey().context)} data-tip-sub="What an assembled send includes · ⌘-click to open beside" aria-label="Context" onClick={(e) => onSwitch('context', e)}>⊞</button>
         <button type="button" class="pane-switch-btn" classList={{ active: showsPane('preview') }} data-tip="Browser preview" data-tip-key={formatChord(paneKey().preview)} data-tip-sub="Live preview of the app · ⌘-click to open beside" aria-label="Browser preview" onClick={(e) => onSwitch('preview', e)}>◍</button>
         <button type="button" class="pane-switch-btn" classList={{ active: showsPane('editor') }} data-tip="Editor" data-tip-key={formatChord(paneKey().editor)} data-tip-sub="In-app code editor · ⌘-click to open beside" aria-label="Editor" onClick={(e) => onSwitch('editor', e)}>✎</button>
+        <button type="button" class="pane-switch-btn" classList={{ active: showsPane('search') }} data-tip="Find in Files" data-tip-key={formatChord(paneKey().search)} data-tip-sub="Search file contents across the worktree · ⌘-click to open beside" aria-label="Find in Files" onClick={(e) => onSwitch('search', e)}>⌕</button>
         <button type="button" class="pane-switch-btn" classList={{ active: showsPane('database') }} data-tip="Database" data-tip-key={formatChord(paneKey().database)} data-tip-sub="Browse & edit the task's Postgres DB · ⌘-click to open beside" aria-label="Database" onClick={(e) => onSwitch('database', e)}>▦</button>
         <button type="button" class="pane-switch-btn" classList={{ active: agentsOpen() }} data-tip="Agents" data-tip-key={formatChord(paneKey().agents)} data-tip-sub="Roster · launcher · feed" aria-label="Agents" onClick={() => setAgentsOpen(!agentsOpen())}>⠿</button>
         <button type="button" class="pane-switch-btn" classList={{ active: props.terminalOpen }} data-tip="Terminal" data-tip-key={formatChord(paneKey().terminal)} data-tip-sub="Shell in the worktree" aria-label="Terminal" onClick={props.onToggleTerminal}>{'>_'}</button>

@@ -7,7 +7,7 @@ import { editorApi, type EditorEntry } from './editorClient'
 import { formatFileReference, sendReferenceToAgent } from '../agent/reference'
 import { isAppDark, token, watchTheme } from '../terminal/theme'
 import { onClosePaneWithin } from '../../lib/onClosePaneWithin'
-import { activeFile, editorActivate, editorClose, editorOpen, editorPromote, editorSetDirty, openFiles } from './editorState'
+import { activeFile, clearEditorReveal, editorActivate, editorClose, editorOpen, editorPromote, editorSetDirty, openFiles, pendingEditorReveal } from './editorState'
 import './editor.css'
 
 // Minimal filename → Monaco language id. Anything unmapped falls back to plaintext (still editable,
@@ -148,6 +148,19 @@ export default function EditorPane(props: { task: Task }) {
     if (vs) editor.restoreViewState(vs)
     editor.updateOptions({ readOnly: false })
     editorActivate(props.task.id, relPath)
+    maybeReveal(relPath)
+  }
+
+  // Consume a pending find-in-files reveal for the just-shown file: scroll to the match line and put
+  // the cursor there. One-shot — cleared once applied so it doesn't re-fire on the next tab switch.
+  function maybeReveal(relPath: string) {
+    const r = pendingEditorReveal()
+    if (!editor || !r || r.taskId !== props.task.id || r.path !== relPath) return
+    const line = Math.max(1, r.line)
+    editor.revealLineInCenter(line)
+    editor.setPosition({ lineNumber: line, column: 1 })
+    editor.focus()
+    clearEditorReveal()
   }
 
   function openPath(relPath: string, ephemeral: boolean) {
@@ -201,6 +214,14 @@ export default function EditorPane(props: { task: Task }) {
         currentPath = null
         editor.setModel(null)
       }
+    }, { defer: true }),
+  )
+
+  // A reveal request for the file that's ALREADY current: show() won't re-run (editorOpen didn't
+  // change active), so apply it here. The show() path covers the case where the file has to load.
+  createEffect(
+    on(pendingEditorReveal, (r) => {
+      if (r && currentPath && r.taskId === props.task.id && r.path === currentPath) maybeReveal(currentPath)
     }, { defer: true }),
   )
 
