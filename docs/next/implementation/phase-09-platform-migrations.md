@@ -11,6 +11,41 @@ Execute platform migrations that reduce technical load or unblock better UX, but
 do not gate the core extension sequence. Each migration is independently
 shippable and should not be bundled with unrelated architecture work.
 
+## Required Context
+
+Read these sections before implementation:
+
+- [review.md](../review.md) technology choices rank the platform migrations and
+  distinguish useful simplification from optional churn.
+- [feature-parity.md](../feature-parity.md) §13 defines preview/browser parity;
+  §18 defines dev/build/package operational contracts.
+- [security.md](../security.md) §2 lists invariants that must survive platform
+  changes; §3 covers transport/loopback rules; §6 covers secrets posture.
+- [performance.md](../performance.md) §1.5 and §3.6 are relevant to migrations
+  that touch app launch; §3.3 applies if preview/browser transport changes
+  interact with PTY or stream work.
+- [testing.md](../testing.md) §1 defines smoke tests that should gate preview,
+  boot, storage, or app-launch changes.
+- [docs-overhaul.md](../docs-overhaul.md) §2 names Electron,
+  local-development, packaging, and operational docs that must track migration
+  outcomes.
+
+These migrations are not a license to reopen core architecture. Each one should
+either reduce platform coupling, retire a brittle dependency, or improve a
+documented UX/security constraint.
+
+## Design Guardrails
+
+- **Extensibility:** platform services should expose stable core capabilities
+  that plugins can consume later, not product-specific shortcuts.
+- **Simplicity:** each migration is isolated and reversible. Do not combine a
+  platform migration with registry, transport, or foldering design work.
+- **Robustness:** preserve storage origin, auth/session behavior, preview
+  security restrictions, and operational scripts before claiming a migration is
+  complete.
+- **Maintainability:** if a spike question fails, document the decision and stop
+  rather than forcing the codebase onto a weaker abstraction.
+
 ## Migration A — Webview to WebContentsView
 
 Move the preview pane from `<webview>` to `WebContentsView`.
@@ -35,6 +70,11 @@ Move the preview pane from `<webview>` to `WebContentsView`.
 - Non-http(s) navigation is blocked through an equivalent of the current
   `will-attach-webview` restriction.
 - `browser:bind` stays IPC-only.
+- Preview ownership is main-process/platform code; product panes consume a
+  capability rather than embedding platform details.
+- Degraded browser-mode behavior remains aligned with
+  [feature-parity.md](../feature-parity.md) §17 where WebContentsView is not
+  available.
 
 ### Verification
 
@@ -59,6 +99,10 @@ Spike before committing.
 - If it proceeds, mirror writes remain atomic and memory FTS behavior is
   preserved.
 - ABI rebuild scripts are updated but node-pty rebuild needs remain understood.
+- The migration does not weaken transaction behavior used by Phase 2 mirror
+  writes or Phase 7 provider codecs.
+- Packaging and local-development docs state exactly which native rebuilds
+  remain necessary after the decision.
 
 ## Migration C — safeStorage path
 
@@ -70,6 +114,13 @@ Use Electron `safeStorage`, not keytar, for planned keychain work.
 - Keep the threat model in [security](../security.md) current.
 - Avoid speculative packaging work until packaging actually needs it.
 
+### Acceptance Criteria
+
+- `SESSION_ENC_KEY` storage has a documented read/write/migration path and a
+  failure mode that does not silently create a second identity.
+- Secrets remain absent from logs, responses, and persisted renderer state.
+- The security doc's secrets posture matches the shipped storage behavior.
+
 ## Cross-Migration Acceptance Criteria
 
 - Each migration has its own PR or clearly isolated PR stack.
@@ -77,6 +128,9 @@ Use Electron `safeStorage`, not keytar, for planned keychain work.
 - The app preserves stable `127.0.0.1:4317` storage origin and `ACORN_PORT`
   override.
 - `dev:node` remains first-class.
+- Migrations that touch preview, storage, boot, transport, or packaging include
+  before/after notes for affected parity sections.
+- Any deferred migration has a written stop reason, not an ambiguous TODO.
 
 ## Verification
 

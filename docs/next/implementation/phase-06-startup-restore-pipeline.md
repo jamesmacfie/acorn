@@ -26,6 +26,32 @@ PersistedStateSlice descriptors
   -> scoped eviction on lifecycle events
 ```
 
+## Required Context
+
+Read these sections before implementation:
+
+- [state-and-policies.md](../state-and-policies.md) §5.1 defines state tiers,
+  scopes, ownership, and the one-writer rule; §5.1a defines persisted-state
+  schema expectations.
+- [inventories.md](../inventories.md) §3a lists pref keys; §3c lists keyed
+  module-scope collections that need lifecycle eviction.
+- [performance.md](../performance.md) §1.4 and §3.4 explain current
+  persistence cost and the required persister filter/throttle.
+- [ui-state.md](../ui-state.md) §2.1 and §3 require visible failure surfaces for
+  failed mutations and state writes.
+- [feature-parity.md](../feature-parity.md) §2 and §4 cover workspace/task and
+  repo/worktree lifecycle behavior that restore must preserve.
+- [ux.md](../ux.md) §7 and §8 define pane-management persistence semantics and
+  UI invariants.
+- [testing.md](../testing.md) §1 defines restore smoke coverage; manual restore
+  matrices should complement it until the suite covers every slice.
+- [docs-overhaul.md](../docs-overhaul.md) §3 names the state doc this phase
+  creates.
+
+The restore pipeline owns ordering, codecs, storage keys, persistence arming,
+and eviction. Features own slice semantics. No feature should write raw prefs or
+depend on effect timing for startup correctness.
+
 ## Implementation Plan
 
 1. Audit state tiers.
@@ -73,6 +99,17 @@ PersistedStateSlice descriptors
    collections listed in [inventories](../inventories.md) §3c. Build container
    machinery only if hand-keyed collections keep multiplying.
 
+## Design Guardrails
+
+- **Extensibility:** plugin-owned persisted state must be described through the
+  same descriptor shape as core state, with scope and codec declared up front.
+- **Simplicity:** ordered phases are enough. Do not add a general workflow
+  engine for startup.
+- **Robustness:** hydrate-before-persist prevents boot clobber, codecs reject
+  bad stored data, and oversize writes fail visibly without corrupting state.
+- **Maintainability:** every persisted key is named in `PrefKeys`, every T3
+  slice has a versioned codec, and localStorage exceptions are documented.
+
 ## Slice Order
 
 1. Tier audit table, `PrefKeys`, no-op descriptor registry.
@@ -90,12 +127,21 @@ PersistedStateSlice descriptors
 - Restore phases are descriptor data.
 - Persistence arms only after restore completes.
 - Every T3 slice has a descriptor and codec.
+- Every pref/localStorage item in [inventories.md](../inventories.md) §3a is
+  classified as T3, local UI state, server state, or deliberate localStorage
+  exception with a reason.
 - No feature writes raw JSON to prefs.
 - Every pref key is a `PrefKeys` member.
 - Failed pref writes surface as notices.
 - File bodies and patches are not persisted into IndexedDB.
 - Scoped keyed collections evict on archive/removal events.
 - `rail_order` remains distinct from server-side `tasks.sort`.
+- Unknown persisted contribution ids are retained through restore/save cycles so
+  disabled or missing plugins do not destroy user layout.
+- Persisted pane layout semantics from Phase 5 remain intact: weights and pins
+  persist, maximize does not.
+- `docs/state.md` documents restore phases, slice descriptors, codecs, failure
+  handling, and eviction ownership.
 
 ## Verification
 

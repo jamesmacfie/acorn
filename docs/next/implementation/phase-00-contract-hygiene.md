@@ -37,6 +37,29 @@ protected app -> requireUser middleware                        -> handler
 `requireUser`; harness routes retain `INTERNAL_TOKEN` auth and only add user
 identity where the specific route needs it.
 
+## Required Context
+
+Read these sections before implementation. They are the contract this phase is
+making enforceable:
+
+- [review.md](../review.md) §3 explains why the current route contract is too
+  easy to bypass; §6 explains why tests must move closer to route risk.
+- [inventories.md](../inventories.md) §2a lists auth-guard targets, §2b lists
+  error-shape drift, and §2c lists mapper sites that lack `satisfies`.
+- [feature-parity.md](../feature-parity.md) §16 defines auth and error
+  vocabulary parity. Preserve user-visible and machine-readable error behavior
+  unless this phase names a mapping explicitly.
+- [security.md](../security.md) §2 lists invariants that must survive every
+  phase; §7 names verification expectations for route boundaries.
+- [testing.md](../testing.md) §2 describes how route tests should scale with
+  risk, including auth, malformed body, and boundary behavior.
+- [docs-overhaul.md](../docs-overhaul.md) §1 and §2 require docs updates in the
+  same PR when API, auth, or error facts change.
+
+The important boundary is server construction, not client interpretation.
+Handlers may keep domain-specific logic, but response construction, auth
+absence, and error envelope shape must become shared conventions.
+
 ## Implementation Plan
 
 1. Add the shared contract.
@@ -91,6 +114,18 @@ identity where the specific route needs it.
    `unauthenticated` returns. While touching route files, adopt
    `resolveRepoForUser` where routes hand-roll mirror repo lookup.
 
+## Design Guardrails
+
+- **Extensibility:** new route modules should get auth and error behavior by
+  mounting under the protected app or using the shared helper, not by copying a
+  local idiom.
+- **Simplicity:** do not introduce a route framework or generated API layer in
+  this phase. The win is mandatory local typing plus one error helper.
+- **Robustness:** preserve machine-code spelling for provider/auth flows so
+  existing client branches and tests continue to describe real behavior.
+- **Maintainability:** every exception must be named. `/auth` and harness auth
+  are allowed exceptions; ad-hoc route-level unauthenticated bodies are not.
+
 ## Slice Order
 
 1. Add `ApiError`, `respondError`, `requireUser`, and tests for one low-risk
@@ -104,12 +139,21 @@ identity where the specific route needs it.
 
 - Adding a required field to a shared response type fails `pnpm lint` in every
   mapper that omits it.
+- Every route response mapper listed in [inventories](../inventories.md) §2c is
+  either migrated or has an explicit follow-up entry with owner and reason.
 - All server error bodies conform to `ApiError`.
+- Error bodies never include a second shape such as `{ kind }`, body-level
+  `status`, provider-specific object envelopes, or prose-only `error` values
+  where a machine code is required.
 - No route file contains an inline `unauthenticated` response.
 - `/auth` is still unauthenticated by construction.
 - Harness/internal routes retain `INTERNAL_TOKEN` semantics.
 - Meaningful machine error codes keep their existing spelling unless this phase
   explicitly names the mapping.
+- Protected-router mounting order is documented in code or tests so future
+  routes cannot accidentally mount outside `requireUser`.
+- API docs that describe error envelopes, auth, or response typing are updated
+  in the same PR according to [docs-overhaul.md](../docs-overhaul.md) §2.
 
 ## Verification
 

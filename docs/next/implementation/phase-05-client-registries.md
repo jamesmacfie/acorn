@@ -30,6 +30,33 @@ feature contribution -> registry -> shell host -> capability gate -> error bound
 
 Unknown persisted contribution ids are retained but inert.
 
+## Required Context
+
+Read these sections before implementation:
+
+- [extensibility.md](../extensibility.md) §3 defines the plugin unit,
+  activation, UI slots, cross-plugin extension, and UI composability; §9
+  describes the order of operations.
+- [contribution-points.md](../contribution-points.md) §4.1, §4.3, §4.4, §4.6,
+  and §4.13 define panes, commands, keybindings, settings pages, and smaller UI
+  registries.
+- [inventories.md](../inventories.md) §3a-§3h are the checklists for pref keys,
+  keydown listeners, module-scope keyed collections, panes, command actions,
+  mailbox signals, alert/confirm sites, and polling sites.
+- [ux.md](../ux.md) §1, §4, §5, §7, and §8 specify will-phase confirmation,
+  keybindings, visible errors, pane management, and non-regression invariants.
+- [ui-state.md](../ui-state.md) §2 names current state-reaction failure modes;
+  §3 gives the rules for visible failures and latest-wins behavior.
+- [state-and-policies.md](../state-and-policies.md) §5.1 defines state tiers and
+  ownership; Phase 6 will turn the persisted pieces into descriptors.
+- [feature-parity.md](../feature-parity.md) §12, §15, and §17 cover settings,
+  notifications/unread behavior, and degraded browser mode.
+- [testing.md](../testing.md) §1 and §4 define smoke and conformance gates.
+
+This phase opens client extension seams. It should not move folders or invent
+the final plugin layout. The output is registries/services that later foldering
+can reveal mechanically.
+
 ## Implementation Plan
 
 1. Pane registry.
@@ -94,6 +121,18 @@ Unknown persisted contribution ids are retained but inert.
     Add theme contributions, notification-kind contributions, content-link
     contributions, and initial task-status poller contributions where owned.
 
+## Design Guardrails
+
+- **Extensibility:** shell hosts render contributions; feature modules declare
+  them. A new pane, command, settings page, or notification kind should not edit
+  switch statements in the shell.
+- **Simplicity:** registry objects should be small and local to feature
+  ownership. Avoid a generic plugin runtime in this phase.
+- **Robustness:** capability gates, error boundaries, unknown-id retention, and
+  will-phase timeouts are not polish; they are required failure containment.
+- **Maintainability:** keep persisted layout shape id-keyed and versionable so
+  Phase 6 can add codecs without reverse-engineering UI effects.
+
 ## Slice Order
 
 1. Pane registry only.
@@ -108,6 +147,9 @@ Unknown persisted contribution ids are retained but inert.
 ## Acceptance Criteria
 
 - Adding a pane is one contribution file plus one registration line.
+- Adding a command, keybinding, settings page, notification kind, theme, or
+  content-link follows the same contribution pattern and does not require shell
+  switch edits.
 - The help screen and command palette derive from registries.
 - `dev:node` has no bridge crashes for gated contributions.
 - `window.alert` / `confirm` count is zero.
@@ -117,6 +159,14 @@ Unknown persisted contribution ids are retained but inert.
 - Keyboard navigation satisfies pane conformance: tab focuses panes, lists use
   roving navigation, and pane-local chords fire only while focused.
 - Registry-rendered contribution failures degrade to inert placeholders.
+- The will-phase gathers close/archive/quit concerns with a timeout and shows
+  the [ux.md](../ux.md) §1 confirmation semantics.
+- All keydown listeners in [inventories.md](../inventories.md) §3b are either
+  migrated to the dispatcher or explicitly justified as local input handling.
+- Mailbox signals in [inventories.md](../inventories.md) §3f are replaced by
+  typed events or pane intents.
+- Client docs describe registry ownership and capability gates as the shipped
+  extension mechanism.
 
 ## Verification
 
