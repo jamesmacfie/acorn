@@ -32,7 +32,7 @@ const qid = (id: string): string => `"${id.replace(/"/g, '""')}"`
 
 type Selected = { schema: string; name: string } | null
 
-// The Database pane (docs/next/pg.md): a searchable table list, a Monaco SQL editor over a
+// The Database pane (docs/pg.md): a searchable table list, a Monaco SQL editor over a
 // virtualized results grid, and a row-detail panel that doubles as the edit/insert/delete surface.
 export default function DatabasePane(props: { task: Task }) {
   const api = databaseApi()
@@ -298,7 +298,7 @@ export default function DatabasePane(props: { task: Task }) {
   )
 }
 
-// Row viewer + editor (docs/next/pg.md): column→value fields; editable when the rows belong to a
+// Row viewer + editor (docs/pg.md): column→value fields; editable when the rows belong to a
 // single table with a primary key (ad-hoc SQL results are read-only). Save commits changed columns;
 // Delete removes by PK. In `insert` mode the fields start blank and Save inserts a new row.
 function RowDetail(props: {

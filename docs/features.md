@@ -204,8 +204,8 @@ Be aware of what's real today:
   the `acorn:term` localStorage flag has been deleted.
 - **In progress:** the workflow engine — scaffolding exists (schema, routes, inspector, palette),
   but it is not a finished orchestrator.
-- **Design-stage (not shipped):** Pulse (background PR triage) and other proposals live in
-  `docs/next/*` as design specs, cited here only as rationale — the features above describe what
+- **Design-stage (not shipped):** future proposals live in `docs/next/` (the architecture review,
+  the plugin-platform design, and its implementation guide) — the features above describe what
   exists in code today.
 
 ## Source

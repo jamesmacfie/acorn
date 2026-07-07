@@ -142,7 +142,7 @@ export const setWorkspaceDevRestartScript = async (id: string, devRestartScript:
 // Per-workspace worktree teardown script (docs/terminal-and-agents.md; blank ⇒ cleared server-side).
 export const setWorkspaceTeardownScript = async (id: string, teardownScript: string) =>
   writeJson<{ ok: true }>(workspaceRoute(id), { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ teardownScript }) }, (res) => `workspace ${res.status}`)
-// Per-workspace Database-pane connection script (docs/next/pg.md; blank ⇒ cleared → auto-detect).
+// Per-workspace Database-pane connection script (docs/pg.md; blank ⇒ cleared → auto-detect).
 export const setWorkspaceDbUrlScript = async (id: string, dbUrlScript: string) =>
   writeJson<{ ok: true }>(workspaceRoute(id), { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ dbUrlScript }) }, (res) => `workspace ${res.status}`)
 // When the setup script runs: off / on task creation / on first terminal open.

@@ -153,6 +153,7 @@ Detailed docs live in [`docs/`](./docs). Start with the architecture overview.
 - [features.md](./docs/features.md) — a tour of what acorn can do.
 - [workspaces-and-tasks.md](./docs/workspaces-and-tasks.md) — the Workspace → Task model and the rail.
 - [panes.md](./docs/panes.md) — the pane system and a catalog of every pane.
+- [pg.md](./docs/pg.md) — the Database pane: a native Postgres viewer/editor.
 - [frontend.md](./docs/frontend.md) — the SolidJS shell, routing, and state model.
 - [diff-rendering.md](./docs/diff-rendering.md) — Shiki highlighting, virtualization, threads.
 - [ui-design.md](./docs/ui-design.md) — UI conventions, theming, design tokens.
@@ -165,12 +166,11 @@ Detailed docs live in [`docs/`](./docs). Start with the architecture overview.
 - [mcp.md](./docs/mcp.md) — the acorn MCP server and its task-scoped tools.
 - [notes-and-memory.md](./docs/notes-and-memory.md) — the notes and memory systems.
 - [workflows.md](./docs/workflows.md) — run targets and the (in-progress) workflow engine.
-- [vNext.md](./docs/vNext.md) — the terminal & agent-session design.
 
 **Setup & reference**
 
 - [local-development.md](./docs/local-development.md) — full local setup & dev workflow.
 
-Design proposals for upcoming work live in [`docs/next/`](./docs/next); the original Workspaces design
-notes (using the older "Workspace" = Task terminology) are in [`docs/workspaces/`](./docs/workspaces).
+Future work lives in [`docs/next/`](./docs/next): the architecture review, the plugin-platform
+design, and the staged implementation guide for building it.
 </content>

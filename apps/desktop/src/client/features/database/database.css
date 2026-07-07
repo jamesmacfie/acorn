@@ -1,4 +1,4 @@
-/* Database pane (docs/next/pg.md). Tokens only — square panes, 1px borders, monospace, dense rows,
+/* Database pane (docs/pg.md). Tokens only — square panes, 1px borders, monospace, dense rows,
    active-row accent — per docs/ui-design.md, so it tracks the theme automatically. */
 
 .db-pane {

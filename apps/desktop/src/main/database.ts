@@ -1,4 +1,4 @@
-// Database pane IPC (docs/next/pg.md): a per-task Postgres connection for browsing + editing the
+// Database pane IPC (docs/pg.md): a per-task Postgres connection for browsing + editing the
 // task's dev database. Mirrors the local-git/editor surfaces — the taskId is the capability, and
 // everything is re-derived from the DB per call. Local-only, so IPC not HTTP.
 //
@@ -211,7 +211,7 @@ export function registerDatabaseIpc(db: AppDatabase): void {
     }
   })
 
-  // Row edits happen in the detail panel (docs/next/pg.md): update one column, insert a row, or
+  // Row edits happen in the detail panel (docs/pg.md): update one column, insert a row, or
   // delete by PK. All identifiers validated; all values parameterized.
   ipcMain.handle('db:update', async (_e: IpcMainInvokeEvent, p: { taskId: string; schema: string; name: string; column: string; value: DbCell; pk: DbPk }): Promise<DbWriteResult> => {
     const pool = getPool(p?.taskId)

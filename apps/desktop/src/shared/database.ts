@@ -1,4 +1,4 @@
-// Wire types for the Database pane IPC surface (docs/next/pg.md), shared between the main-process
+// Wire types for the Database pane IPC surface (docs/pg.md), shared between the main-process
 // handlers (main/database.ts) and the renderer client (client/features/database/databaseClient.ts).
 // Cell values are normalized to string | null in main (numbers/booleans → string, objects → JSON,
 // dates → ISO) so the grid renders uniformly and `null` stays distinct for NULL styling.

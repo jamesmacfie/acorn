@@ -205,7 +205,7 @@ nothing on a non-desktop build.
 
 A task's layout is a **flat left→right row** of open panes: `TaskLayout = { panes: PaneId[] }`
 (`features/tasks/layout.ts`). `PaneId` ∈ `pr | linear | rollbar | preview | editor | changes |
-notes | context`. One pure reducer `applyLayoutAction` owns every transition — `show`
+notes | context | database | search`. One pure reducer `applyLayoutAction` owns every transition — `show`
 (single pane, from a switcher click), `add` (open beside via ⌘/Ctrl-click), `close`, `replace`
 (recipe seeding). `normalizeLayout`/`parseTaskLayouts` defensively validate the persisted
 `task_layouts` value (tolerating legacy shapes). Pane internals are documented in

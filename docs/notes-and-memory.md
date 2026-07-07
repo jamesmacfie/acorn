@@ -21,12 +21,12 @@ is documented with the Changes pane — see [panes.md](./panes.md). The boundary
 | Agent write | direct (stamped as agent) | **propose only** (human gate) | n/a (human authors, sent as a prompt) |
 | Doc | this file | this file | [panes.md](./panes.md) (Changes pane) |
 
-The rule of thumb (docs/next/12): a note is *"what I'm thinking on this task"*; a memory
+The rule of thumb: a note is *"what I'm thinking on this task"*; a memory
 is *"how this repo works."* Notes are meant to be thrown away; the valuable distillate is promoted into
 memory, where it is reviewed exactly like code (via the PR that carries the file).
 
-The unbuilt parts of the memory design live in `docs/next/12-memory.md` (the notes design shipped
-in full and was distilled into this doc); the paragraphs below describe **what exists in code
+The notes design shipped in full and was distilled into this doc; the unbuilt parts of the memory
+design are listed under "Maturity" below. The paragraphs below describe **what exists in code
 today**.
 
 ## Notes
@@ -92,7 +92,7 @@ same `.md` files.
 
 ### Files are the truth; SQLite is a derived index
 
-Memory is markdown files, at two scopes (docs/next/12, schema comment `schema.ts:392-397`):
+Memory is markdown files, at two scopes (schema comment `schema.ts:392-397`):
 
 ```
 <worktree>/.acorn/memory/*.md   + MEMORY.md   ← repo scope: COMMITTED, reviewed in PRs, portable
@@ -114,7 +114,7 @@ plain file tools even if the MCP is off. The **`memories` SQLite table** (`schem
 A companion **FTS5 virtual table `memories_fts`** (Porter tokenizer over `name`/`description`/`body`,
 created by hand in migration `0011` since Drizzle doesn't model virtual tables — `schema.ts:394-396`)
 powers ranked keyword search. No embeddings; FTS5 ships with better-sqlite3, so keyword retrieval needs
-zero new deps (`ponytail:` docs/next/12).
+zero new deps.
 
 ### Fields
 
@@ -132,7 +132,7 @@ zero new deps (`ponytail:` docs/next/12).
 | `supersededBy` | version-chain pointer (never delete) |
 | `lastAccessedAt` / `accessCount` | recall bookkeeping |
 
-The `type` enum (docs/next/12) splits by decay policy: `convention`/`architecture`/`decision`/`user`
+The `type` enum splits by decay policy: `convention`/`architecture`/`decision`/`user`
 are stable; `fix`/`reference` are episodic and `reference` "rots on refactor" (verify); `task` is
 in-flight and dropped on completion.
 
@@ -219,14 +219,14 @@ path for memory alone:
 
 `formatContextBlock` is compact by design: it emits note titles + bodies but the memory **index only**
 (`- name — description`) with the hint "ask for bodies via memory_get" (`contextBlock.ts:32-35`). The
-mantra (docs/next/11): the primary agent should never burn context on storage strategy — it pulls
+mantra: the primary agent should never burn context on storage strategy — it pulls
 memory bodies on demand.
 
 ### The committed `.acorn/` convention
 
 Both memory (repo scope) and notes reference a **single `.acorn/` directory**, not a dotfile per
 feature. In a repo/worktree it holds `config.toml` (run targets, editor — see
-[workflows.md](./workflows.md), docs/next/13), `memory/`, and workflow assets; committed content is
+[workflows.md](./workflows.md)), `memory/`, and workflow assets; committed content is
 team-shared, while acorn's own local state lives under `apps/desktop/.acorn/` (gitignored: the client
 query cache, blob cache, and workspace notes).
 
@@ -242,7 +242,7 @@ query cache, blob cache, and workspace notes).
   agent-session-end hook fires the headless memory-review pass over the diff + transcript
   (`memoryGen.ts`, wired in `knowledgeIpc.ts`; see "Auto-generation" above). It depends on an
   agent CLI being installed and is best-effort by design. What remains **design-stage**
-  (docs/next/12) is the separate *periodic consolidation* pass (re-distilling/merging existing
+  is the separate *periodic consolidation* pass (re-distilling/merging existing
   memories over time) and richer decay handling for episodic types.
 
 ## Source
@@ -262,7 +262,6 @@ query cache, blob cache, and workspace notes).
   `apps/desktop/src/client/features/context/{ContextPane.tsx,model.ts}`
 - Assembly: `apps/desktop/src/shared/{api.ts,contextBlock.ts}`
 - MCP tools: `apps/desktop/src/mcp/server.ts`
-- Design (remaining unshipped parts): `docs/next/11-context-assembly.md`, `docs/next/12-memory.md`
 
 See also: [panes.md](./panes.md) (Context / Notes / Changes panes),
 [mcp.md](./mcp.md), [workspaces-and-tasks.md](./workspaces-and-tasks.md),

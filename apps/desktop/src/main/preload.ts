@@ -147,7 +147,7 @@ contextBridge.exposeInMainWorld('acorn', {
     findInFiles: (taskId: string, query: string, opts: import('../shared/search').SearchOpts) =>
       ipcRenderer.invoke('search:findInFiles', { taskId, query, opts }),
   },
-  // Database pane (docs/next/pg.md): a per-task Postgres connection, resolved on demand from the
+  // Database pane (docs/pg.md): a per-task Postgres connection, resolved on demand from the
   // worktree (never persisted). Browse tables/rows + run SQL + edit rows over IPC.
   database: {
     connect: (taskId: string) => ipcRenderer.invoke('db:connect', taskId),

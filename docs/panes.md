@@ -3,7 +3,7 @@
 How the Task view is laid out, and what every pane does. A **pane** is a surface inside the Task view
 (the single-repo unit of work — repo + branch + optional worktree + optional PR). A task's layout is a
 flat left→right row of open panes; one pure reducer owns every transition. This doc covers the pane
-model and a catalog of all eight panes, plus the two non-pane surfaces that render over the task view.
+model and a catalog of all ten panes, plus the two non-pane surfaces that render over the task view.
 
 For where the Task view sits in the app, see [frontend.md](./frontend.md) and
 [workspaces-and-tasks.md](./workspaces-and-tasks.md).
@@ -13,7 +13,7 @@ For where the Task view sits in the app, see [frontend.md](./frontend.md) and
 A layout is just an ordered list of pane ids:
 
 ```ts
-type PaneId = 'pr' | 'linear' | 'rollbar' | 'preview' | 'editor' | 'changes' | 'notes' | 'context'
+type PaneId = 'pr' | 'linear' | 'rollbar' | 'preview' | 'editor' | 'changes' | 'notes' | 'context' | 'database' | 'search'
 type TaskLayout = { panes: PaneId[] } // left→right, at least one, no duplicates
 ```
 
@@ -72,23 +72,23 @@ The command palette exposes the same transitions as `Show pane: …` / `Close pa
 
 ### Keyboard shortcuts
 
-`features/tasks/paneShortcuts.ts` defines bare single-key shortcuts, scoped to the task view by a
-window listener in `TaskView` (`onPaneKey`, `TaskView.tsx:182`) that ignores text-entry targets and
-modifier chords. Defaults:
+`features/tasks/paneShortcuts.ts` defines modifier **chords** (⌘/⌃/⌥/⇧ + a base key — they never
+fire while typing), dispatched from the task view. Defaults live on the ⌘⇧ layer (plain ⌘<letter>
+collides too readily with the OS/browser/Monaco):
 
-| Key | Target | | Key | Target |
+| Chord | Target | | Chord | Target |
 | --- | --- | --- | --- | --- |
-| `r` | PR review | | `e` | Editor |
-| `g` | Changes | | `l` | Linear |
-| `n` | Notes | | `o` | Rollbar |
-| `x` | Context | | `a` | Agents (toggle) |
-| `b` | Browser preview | | `t` | Terminal (toggle) |
+| `⌘⇧R` | PR review | | `⌘⇧E` | Editor |
+| `⌘⇧G` | Changes | | `⌘⇧F` | Find in Files |
+| `⌘⇧D` | Notes | | `⌘⇧J` | Database |
+| `⌘⇧X` | Context | | `⌘⇧L` | Linear |
+| `⌘⇧B` | Browser preview | | `⌘⇧O` | Rollbar |
+| `⌘⇧A` | Agents (toggle) | | `⌘⇧T` | Terminal (toggle) |
 
-`agents` and `terminal` are toggles, not layout panes; the rest dispatch a `show`. Keys are
-overridable via the `pane_shortcuts` pref (Settings → Shortcuts); `paneKeys`/`paneKeymap` resolve
-override-else-default and the switcher tooltip shows the effective key. `RESERVED_KEYS`
-(`c j k ? / [ ]`, `paneShortcuts.ts:23`) are owned by the global handler and PullList and can never be
-assigned to a pane.
+`agents` and `terminal` are toggles, not layout panes; the rest dispatch a `show`. Chords are
+overridable via the `pane_shortcuts` pref (Settings → Shortcuts); the switcher tooltip shows the
+effective chord. `RESERVED_CHORDS` (`paneShortcuts.ts:32` — ⌘K, ⌘P, ⌘L, ⌘S, ⌘W, ⌘⇧N, ⌘`,`, ⌘0–9)
+are owned by the app globally and can never be assigned to a pane.
 
 ### Layout recipes
 
@@ -105,7 +105,7 @@ one shot. `invokeLayoutRecipe` (`recipes.ts:31`), a pure executor over injected 
 The recipe's old `ratio` field is gone (main's parser stopped emitting it and the client type
 followed) — panes always split equally. Recipe-resolved browser home
 URLs live in a separate signal (`recipeBrowserUrl`, `tasks.ts:64`) that wins over the workspace's
-configured preview URL for that session. Recipes are designed in `docs/next/13 §C`; run targets are
+configured preview URL for that session. Run targets are
 covered in [terminal-and-agents.md](./terminal-and-agents.md).
 
 ---
@@ -203,6 +203,27 @@ renderer; the focus-containment subscription is the shared `onClosePaneWithin` h
 
 Source: `features/editor/EditorPane.tsx`, `features/editor/editorState.ts`,
 `features/editor/editorClient.ts`.
+
+### `search` — find in files
+
+Project-wide text search over the task's worktree, backed by **ripgrep** in the main process
+(`search:findInFiles` IPC). Substring search by default with case / whole-word / regex toggles;
+keystrokes are debounced so a ripgrep isn't spawned per character. Results group hits by file;
+clicking a hit opens the file in the **Editor pane beside this one**, scrolled to the match line
+(`editorOpen` + `requestEditorReveal`).
+
+Source: `features/search/SearchPane.tsx`, `features/search/searchClient.ts`.
+
+### `database` — Postgres viewer/editor
+
+A native Postgres pane, Postico-shaped: a searchable virtualized table list, a row grid with a
+detail panel that edits/inserts/deletes, and a Monaco SQL editor with a results grid. The
+connection is per-task, resolved on demand (workspace `dbUrlScript` → `.env` `DATABASE_URL` →
+`process.env`) and never persisted; one `pg.Pool` per task lives in main, spoken to over `db:*`
+IPC. Full detail: [pg.md](./pg.md).
+
+Source: `features/database/DatabasePane.tsx`, `features/database/ResultGrid.tsx`,
+`features/database/databaseClient.ts`, `main/database.ts`.
 
 ### `linear` — Linear ticket(s)
 

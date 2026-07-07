@@ -225,7 +225,7 @@ export default function WorkspaceSettings(props: { workspace: Workspace; onDelet
         <span class="settings-label">Database connection script</span>
         <span class="muted settings-hint">
           Optional. A shell command run in a task's worktree that prints a Postgres connection URL for the
-          Database pane (docs/next/pg.md). Blank means auto-detect from <code>DATABASE_URL</code> in the
+          Database pane (docs/pg.md). Blank means auto-detect from <code>DATABASE_URL</code> in the
           worktree <code>.env</code> or the environment. Use this for setups auto-detect can't read, e.g.
           <code>bin/rails runner 'puts ActiveRecord::Base.connection_db_config.url'</code>.
         </span>

@@ -1,5 +1,5 @@
 // Typed accessor for the preload's `window.acorn.database` bridge — a per-task Postgres connection
-// (docs/next/pg.md), resolved on demand from the worktree and never persisted. Mirrors editorClient.ts.
+// (docs/pg.md), resolved on demand from the worktree and never persisted. Mirrors editorClient.ts.
 import type {
   DbCell,
   DbColumnsResult,

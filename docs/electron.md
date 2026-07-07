@@ -14,9 +14,9 @@
 > current runtime shape; [architecture-overview.md](./architecture-overview.md) describes what
 > exists today.
 >
-> Companion doc: [vNext.md](./vNext.md) (terminal/agent sessions) — that feature collapsed into the
-> Electron main process as §8 predicted; [terminal-and-agents.md](./terminal-and-agents.md) now
-> documents the shipped version.
+> Companion doc: [terminal-and-agents.md](./terminal-and-agents.md) — the terminal/agent-session
+> feature collapsed into the Electron main process as §8 predicted. (Its design record, `vNext.md`,
+> is now removed — see git history.)
 >
 > **Phase 0 artifacts:** `apps/desktop/src/main/bindings.ts` (DB + `.batch` shim, in-mem `OAUTH_STATE`,
 > on-disk `BLOBS`, secrets from `process.env`), `apps/desktop/src/main/server.ts` (node-server bootstrap
@@ -528,9 +528,9 @@ desktop-only and always on):
   runtime bindings and `electron.ts` hands `runtime.DB` (plus `INTERNAL_TOKEN`, §4b) to
   `registerTerminalIpc`.
 
-Net: the terminal got simpler and more native, exactly as predicted. The Electron-reframed design
-lives in [vNext.md](./vNext.md); the shipped feature is documented in
-[terminal-and-agents.md](./terminal-and-agents.md).
+Net: the terminal got simpler and more native, exactly as predicted. The shipped feature is
+documented in [terminal-and-agents.md](./terminal-and-agents.md) (its design record, `vNext.md`,
+is removed — see git history).
 
 ## 9. Risks & open questions
 
