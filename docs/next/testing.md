@@ -73,7 +73,12 @@ DI, `makeTestDb`, 8 route files already tested). Priority order, by risk:
    absent / wrong), the `respond()` envelope, one test per bridge verb.
    Becomes the projection conformance test in Phase 4 (one test per projected
    tool, table-driven off the registry).
-4. **One migrated router per Phase 3 domain PR** — each PR that moves an IPC
+4. **`taskContext.ts` / context-section registry** — Phase 4's other
+   projection surface. Route tests pin per-section defaults, include-set
+   curation, declared budgets/truncation, memory index-only vs notes bodies,
+   note jump slugs, and linked-provider stale/missing-cache behaviour. These
+   tests land with the context registry, not with Phase 7's provider port.
+5. **One migrated router per Phase 3 domain PR** — each PR that moves an IPC
    domain to HTTP routes carries tests proving: happy path, 401 without a
    session ([security.md](./security.md) §7), and input rejection on malformed
    bodies for anything that writes. The security-sensitive domains carry
@@ -82,11 +87,11 @@ DI, `makeTestDb`, 8 route files already tested). Priority order, by risk:
    stale-buffer** cases; the database routes get SQL-surface cases —
    generated-SQL identifier validation rejects non-introspected identifiers,
    the connection URL is never persisted, pools tear down on disconnect.
-5. **Phase 2's sync engine** — unit tests on the extracted state machine
+6. **Phase 2's sync engine** — unit tests on the extracted state machine
    (fresh / stale-serve-and-refresh / cold-block / 304 / backoff), which is
    precisely the logic too risky to keep testing five separate hand-rolled
    copies of.
-6. **Phase 7's provider regression tests** — before (or with) the provider
+7. **Phase 7's provider regression tests** — before (or with) the provider
    port, pin the Linear/Rollbar behaviours the generic provider contract
    doesn't express ([feature-parity.md](./feature-parity.md) §6):
    first-hit-wins bare-id resolution, workspace-scoped project links,

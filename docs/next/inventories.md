@@ -112,8 +112,11 @@ State-machine sites to port: `pulls.ts:29-196` (decision block 178-195, ETag
 `pullFiles.ts:36-78` (60/69-73/75-77), `repos.ts:9-33` (21/24-27/30-32; POST
 /refresh force at 34-40), `pullsBatch.ts:19-111` (per-resource `isFresh`
 47-52). `linear.ts:156-242` and `rollbar.ts:49-121` are the variants that use
-`issues.fetchedAt` **instead of `sync_state`** — the engine must support both
-bookkeeping backends or (better) migrate them onto `sync_state` while porting.
+`issues.fetchedAt` **instead of `sync_state`** — the Phase 2 engine must
+support that descriptor-supplied freshness backend while owning the shared
+flow. Per [implementation.md](./implementation.md) Phase 2, do **not** migrate
+them onto `sync_state` in this phase; that is a later data-model choice if
+per-item freshness proves insufficient.
 
 TTL constants to centralize:
 
