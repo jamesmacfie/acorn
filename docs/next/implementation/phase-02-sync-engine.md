@@ -24,6 +24,30 @@ Copies diverge on cold detection, TTL constants, and ETag handling. The engine
 must own flow, in-flight dedupe, TTL decisions, 304 handling, and backoff. It
 must not assume the resource key is repo-scoped.
 
+## Required Context
+
+Read these sections before implementation:
+
+- [review.md](../review.md) §1c explains why mirrored-resource sync is the
+  server-side extensibility choke point; recommendation #2 names the extraction.
+- [contribution-points.md](../contribution-points.md) §4.9 defines mirrored
+  resource descriptors and the future contract this engine must support.
+- [inventories.md](../inventories.md) §2d lists the existing copied
+  serve-then-revalidate implementations and TTLs that must be centralized.
+- [integrations.md](../integrations.md) §7 describes cache, sync, and codecs for
+  providers; the engine should serve those needs without becoming provider
+  specific.
+- [performance.md](../performance.md) §3 and §3.5 explain why cache policy,
+  indexes, and refresh work need named budgets.
+- [testing.md](../testing.md) §2 applies to route behavior moved behind the
+  engine; route tests remain the proof that product behavior did not change.
+- [docs-overhaul.md](../docs-overhaul.md) §2 names cache/data/GitHub docs that
+  must change when sync ownership moves.
+
+The engine owns *when* to serve, refresh, dedupe, and back off. Callers own
+*what* a resource means, how mirror writes stay atomic, and how provider codecs
+validate stored data.
+
 ## Implementation Plan
 
 1. Add `server/sync/engine.ts`.
@@ -69,6 +93,18 @@ must not assume the resource key is repo-scoped.
    `sync_state`. The engine owns flow, not the bookkeeping store. Do not force
    them onto `sync_state` in this phase.
 
+## Design Guardrails
+
+- **Extensibility:** resource keys stay opaque and descriptor-friendly so Phase
+  7 can add provider resources without changing engine internals.
+- **Simplicity:** keep one small decision function plus one wrapper. Do not
+  invent a scheduler, job queue, or generic dataflow engine.
+- **Robustness:** stale data must remain usable during upstream failures,
+  backoff, and 304 responses. Concurrent stale reads must dedupe refresh work.
+- **Maintainability:** TTLs and cache policy live in one module, and route files
+  should read as domain mapping plus `serveThenRevalidate`, not local cache
+  state machines.
+
 ## Slice Order
 
 1. Decision function and tests.
@@ -81,6 +117,8 @@ must not assume the resource key is repo-scoped.
 ## Acceptance Criteria
 
 - No route hand-implements serve-then-revalidate.
+- Every copied site in [inventories](../inventories.md) §2d is either migrated
+  or listed with a deliberate reason it is not the same pattern.
 - TTLs are centralized in `server/sync/policy.ts`.
 - Cold detection is consistently `read() === null`.
 - Two stale hits for the same resource do not fire two refreshes.
@@ -88,6 +126,13 @@ must not assume the resource key is repo-scoped.
 - Atomic mirror writes remain atomic inside `refresh`; the engine does not
   split delete/insert batches.
 - Resource keys remain opaque and caller-defined.
+- Provider/item-level freshness can use the engine without forcing data into
+  `sync_state`.
+- Route-visible behavior for PR lists, PR detail, PR files, repos, Linear, and
+  Rollbar stays within the parity contracts in [feature-parity.md](../feature-parity.md)
+  §4 and §6.
+- Cache and data-layer docs identify the engine as the single owner of
+  serve-then-revalidate policy.
 
 ## Verification
 

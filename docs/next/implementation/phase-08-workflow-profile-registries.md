@@ -24,6 +24,29 @@ The target is a registry-backed runtime where new step kinds and profiles are
 small modules, parser errors are named and early, and cancellation is owned by
 the engine.
 
+## Required Context
+
+Read these sections before implementation:
+
+- [agent-runtime.md](../agent-runtime.md) §1 records current runtime facts; §2
+  lists corrections; §3 defines agent UI control needs; §4 defines the workflow
+  runtime contract; §5 lists non-goals; §6 records adopted near-term decisions.
+- [agent-runtime-influences.md](../agent-runtime-influences.md) §3 explains the
+  adopted decisions: concurrency governance, cancel tree, tool allowlists,
+  `decide`, triggers, typed failure recovery, and memory-scope framing.
+- [contribution-points.md](../contribution-points.md) §4.10 defines workflow
+  step kinds and policies; §4.11 defines agent profiles.
+- [security.md](../security.md) §4 defines tool risk tiers that ceilings must
+  narrow, never bypass.
+- [memory.md](../memory.md) §6 and §9 define workflow/agent memory obligations.
+- [ux.md](../ux.md) §6 defines agent visibility and control expectations.
+- [testing.md](../testing.md) §1 and §4 set smoke/conformance direction for
+  runtime-facing changes.
+
+The workflow engine's durable skeleton is an asset: rows, re-entrant `tick()`,
+and dependency injection stay. This phase replaces closed ladders and implicit
+binding rules, not the persistence model.
+
 ## Implementation Plan
 
 1. 8A: Registry extraction, no behavior change.
@@ -71,6 +94,17 @@ the engine.
    memory-review on terminal workflow states, and poll-to-push panel updates are
    phase-independent but must follow [agent-runtime](../agent-runtime.md).
 
+## Design Guardrails
+
+- **Extensibility:** new step kinds, policies, profiles, and triggers are
+  registry entries. Core runtime code should not grow new ladders for each one.
+- **Simplicity:** keep templating deliberately shallow as defined in
+  [agent-runtime.md](../agent-runtime.md) §4. Do not build a dataflow engine.
+- **Robustness:** invalid TOML fails before execution with named errors,
+  cancellation owns all active handlers, and concurrency caps protect resources.
+- **Maintainability:** parser contracts, status transitions, and profile spawn
+  behavior must be testable without launching a full app session.
+
 ## Slice Order
 
 1. Step and policy registries, behavior-preserving.
@@ -92,6 +126,16 @@ the engine.
 - Tool ceilings narrow correctly and cannot bypass user permissions.
 - Cancel-run stops fan-out children and child tasks with no orphaned process.
 - Trigger-started runs record the trigger id.
+- Step ceilings cannot widen workflow ceilings, and workflow ceilings cannot
+  widen global/user permissions from Phase 4.
+- Explicit `joins:` replaces nearest-preceding-fan-out binding without changing
+  valid existing workflows except where migration notes are required.
+- Non-selected branch targets become `skipped`, and unmatched verdicts fail
+  unless `default` exists.
+- Profile contributions declare spawn, resume, MCP registration, stream JSON,
+  backend preference, and any one-shot structured mode explicitly.
+- Agent control UI can cancel runs and see running-step state in line with
+  [ux.md](../ux.md) §6.
 
 ## Verification
 

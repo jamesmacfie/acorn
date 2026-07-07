@@ -35,6 +35,30 @@ electron.ts
 `terminal.ts` becomes the PTY engine. It should not know that knowledge,
 workflow, database, local-git, or harness domains exist.
 
+## Required Context
+
+Read these sections before implementation:
+
+- [review.md](../review.md) §2 describes the accidental composition root and
+  the risks created by wiring through global mutation.
+- [review.md](../review.md) §7 names vestigial abstractions; do not preserve
+  old Workers-era layering if moving wiring exposes a simpler direct boundary.
+- [extensibility.md](../extensibility.md) §2.3 defines main-process core; §3.2
+  defines activation and lifecycle expectations the composition root must later
+  host.
+- [performance.md](../performance.md) §3.1 requires baseline boot marks before
+  boot paths move; §3.6 defines the target boot policy.
+- [security.md](../security.md) §2 lists loopback/session invariants that must
+  survive boot-order changes.
+- [testing.md](../testing.md) §1 defines the smoke tests that should eventually
+  prove boot and quit behavior.
+- [docs-overhaul.md](../docs-overhaul.md) §2 names the architecture and Electron
+  docs that become stale when boot ownership changes.
+
+The root owns construction order and lifecycle only. Domain modules keep domain
+behavior. If the root begins to know product rules rather than service
+dependencies, this phase has crossed the wrong boundary.
+
 ## Implementation Plan
 
 1. Add `apps/desktop/src/main/bootstrap.ts`.
@@ -77,6 +101,20 @@ workflow, database, local-git, or harness domains exist.
    Log migration, listener-up, reconcile substeps, and teardown into the
    observability log described by [performance](../performance.md) §3.1.
 
+## Design Guardrails
+
+- **Extensibility:** every later registry/projection needs one host to install
+  and dispose contributions. Shape `bootstrap()` around contribution activation,
+  even before plugins exist.
+- **Simplicity:** start with a thin wrapper and move wiring one domain at a
+  time. Avoid redesigning terminal, workflow, or database behavior while moving
+  ownership.
+- **Robustness:** listener startup must happen after bridge/route installation
+  and before non-critical reconciliation. Quit must tolerate partially
+  constructed services.
+- **Maintainability:** disposal order should mirror construction order in one
+  visible chain, not rely on module-level cleanup side effects.
+
 ## Slice Order
 
 1. Thin `bootstrap()` wrapper and boot timing logs.
@@ -87,13 +125,21 @@ workflow, database, local-git, or harness domains exist.
 ## Acceptance Criteria
 
 - `electron.ts` calls `bootstrap()` once.
+- The bootstrap file shows the ordered phases: migrate, construct, install,
+  start listener, create window, reconcile, dispose.
 - `terminal.ts` no longer imports unrelated domains.
 - No `set*Bridge` call occurs after the listener starts.
 - The listener starts only after bridge wiring is installed.
 - Quit runs a logged teardown.
+- Teardown is idempotent enough that a failed partial boot can still dispose the
+  services that were constructed.
 - The 503 fallback in bridge routes remains until Phase 4 deletes it.
 - Boot policy matches [performance](../performance.md) §3.6: migration before
   listener, window before accumulated reconciliation work.
+- Boot/reconcile timing marks are captured before and after the phase, and
+  regressions are either fixed or documented with a concrete reason.
+- Updated Electron/architecture docs describe the composition root as the
+  shipped boot path, not as a proposal.
 
 ## Verification
 

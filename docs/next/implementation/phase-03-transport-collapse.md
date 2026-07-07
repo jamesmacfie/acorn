@@ -33,6 +33,31 @@ Target residue:
 All former request/response channels from [inventories](../inventories.md) §1a
 must become routes. Stream channels from §1b become WS frames.
 
+## Required Context
+
+Read these sections before implementation:
+
+- [inventories.md](../inventories.md) §1a is the authoritative
+  request/response channel checklist; §1b is the stream checklist; §1c names
+  IPC residue that must not be forced into HTTP; §1d names deletion targets.
+- [security.md](../security.md) §1 defines the loopback threat model; §2 lists
+  invariants; §3 adds Phase-3 route/WS rules; §7 defines verification.
+- [feature-parity.md](../feature-parity.md) §7, §9, §13, §14, and §17 cover
+  database, terminal/session, preview/browser, editor/search/local-git, and
+  degraded browser-mode behavior.
+- [performance.md](../performance.md) §3.1 requires baseline marks; §3.3 sets
+  the PTY coalescing expectation.
+- [agent-runtime.md](../agent-runtime.md) §3.2 and §3.3 describe running-step
+  visibility and the poll-to-push direction that the WS path should support.
+- [testing.md](../testing.md) §1 gates this phase with the Electron smoke suite;
+  §2 applies to newly exposed HTTP routes.
+- [docs-overhaul.md](../docs-overhaul.md) §2 names API, Electron, auth, and
+  local-development docs that become stale as channels move.
+
+The boundary is capability, not convenience. A channel becomes HTTP when it is a
+request/response app contract. It stays IPC only when it needs an Electron
+handle, native dialog, main-to-window signal, or platform probe.
+
 ## Implementation Plan
 
 1. Establish route/client/test convention.
@@ -94,6 +119,19 @@ must become routes. Stream channels from §1b become WS frames.
    surfaces must work in `dev:node`; desktop-only surfaces hide or degrade with
    a visible reason.
 
+## Design Guardrails
+
+- **Extensibility:** route ownership must be compatible with future plugin route
+  contributions. Do not add a new preload/client hand-sync list while deleting
+  the old one.
+- **Simplicity:** use conventional HTTP routes and one WS endpoint. Avoid
+  per-domain transports or protocol negotiation unless a current parity
+  contract forces it.
+- **Robustness:** every write/execute boundary gets schema validation and a
+  malformed-body test. Terminal attach replay must be deterministic under load.
+- **Maintainability:** migrate by domain and delete the old domain bridge in the
+  same slice only after tests prove the replacement.
+
 ## Slice Order
 
 1. Pattern PR with `search`.
@@ -108,12 +146,22 @@ must become routes. Stream channels from §1b become WS frames.
 
 - Preload exposes only the named residue and capability probes.
 - Every former request/response IPC channel has a typed HTTP route.
+- Every channel in [inventories](../inventories.md) §1a is checked off with its
+  replacement route and test owner.
 - Every former stream channel has a WS frame.
+- Every stream in [inventories](../inventories.md) §1b is checked off with frame
+  names, auth expectations, replay behavior, and backpressure/coalescing notes.
 - Route bodies at untrusted/write/execute boundaries are validated.
+- Editor, search, local-git, database, run, and terminal-control routes have the
+  security tests named in this phase and [security.md](../security.md) §7.
 - Terminal streaming has no visible regression under a busy TUI.
 - `dev:node` has an explicit capability map and does not crash on missing
   Electron bridge APIs.
 - Replay ordering on terminal attach is deterministic.
+- The residue list matches [inventories.md](../inventories.md) §1c exactly, or
+  any extra residue has a documented capability reason.
+- API and local-development docs explain the HTTP/WS surface and degraded
+  browser-mode capability rules.
 
 ## Verification
 

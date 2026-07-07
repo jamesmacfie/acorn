@@ -22,6 +22,32 @@ and conformance descriptor-driven.
 Core owns the connection machinery and lifecycle. Providers own policy,
 formatting, auth validation hooks, codecs, and source/pane/link behavior.
 
+## Required Context
+
+Read these sections before implementation:
+
+- [integrations.md](../integrations.md) §1 defines the provider descriptor; §3
+  defines connection lifecycle hooks; §4 defines capabilities; §5 defines
+  external refs and link integrity; §7 defines cache/sync/codecs; §8-§11 cover
+  browse, context, pane intents, and mutations; §12-§19 define errors,
+  lifecycle, webhooks, agent tools, memory evidence, budgets, conformance, and
+  the minimum contract.
+- [contribution-points.md](../contribution-points.md) §4.2 defines sources and
+  promotion; §4.14 defines integration providers.
+- [memory.md](../memory.md) §4, §5, §8, and §9 constrain provider memory
+  evidence, retention, deletion, and implementation obligations.
+- [security.md](../security.md) §8 defines provider-specific secrets and
+  response/logging rules.
+- [feature-parity.md](../feature-parity.md) §6 lists Linear and Rollbar
+  behavior that must not regress.
+- [testing.md](../testing.md) §4 defines the conformance suite direction.
+- [docs-overhaul.md](../docs-overhaul.md) §3 names the integration docs created
+  by this phase.
+
+The core data model should identify connections and links. Provider-specific
+data lives behind codecs and descriptors. Do not make `providerId` a substitute
+for `connectionId` where account/workspace scope matters.
+
 ## Implementation Plan
 
 1. Provider descriptor registry.
@@ -82,6 +108,21 @@ formatting, auth validation hooks, codecs, and source/pane/link behavior.
 
    Table-drive the suite from descriptors and run it against Linear and Rollbar.
 
+## Design Guardrails
+
+- **Extensibility:** a third provider should add descriptor files and feature
+  contributions, not edit source switches, settings tabs, context formatters, or
+  link writers in core.
+- **Simplicity:** core owns connection lifecycle and integrity checks; providers
+  own policy hooks. Avoid a meta-framework that hides where auth, codecs, or
+  mutations are implemented.
+- **Robustness:** provider data is parsed at read seams, secrets never cross
+  response/log boundaries, and link writes cannot mismatch provider and
+  connection identity.
+- **Maintainability:** Linear and Rollbar should be the conformance fixtures.
+  If they need special cases, the descriptor contract is incomplete unless the
+  special case is explicitly justified.
+
 ## Slice Order
 
 1. Descriptor registry and `forEachConnection`, no behavior change.
@@ -107,6 +148,18 @@ formatting, auth validation hooks, codecs, and source/pane/link behavior.
 - Summary refresh never clobbers detailed issue fields.
 - Provider secrets never reach responses or logs.
 - Accepted memory remains human-gated and provider-independent.
+- Provider capabilities, mutations, pane intents, linkifiers, context
+  formatters, source promotion, and budgets come from descriptors or
+  contribution points.
+- Linear and Rollbar parity rows in [feature-parity.md](../feature-parity.md)
+  §6 are explicitly checked during the phase.
+- `task_links.refJson` stores complete external refs where needed, while core
+  still stamps `providerId` from the connection.
+- Provider error branches use the generic taxonomy from
+  [integrations.md](../integrations.md) §12 and preserve required client
+  behavior.
+- Integration docs explain connection identity, provider descriptors, codecs,
+  link integrity, and conformance expectations.
 
 ## Verification
 
@@ -129,7 +182,7 @@ formatting, auth validation hooks, codecs, and source/pane/link behavior.
 - [integrations.md](../integrations.md) all sections, especially §1, §3, §5,
   §7-§19.
 - [contribution-points.md](../contribution-points.md) §4.2 and §4.14.
-- [memory.md](../memory.md) §4, §5, §16.1.
+- [memory.md](../memory.md) §4, §5, §8, §9.
 - [security.md](../security.md) §8.
 - [feature-parity.md](../feature-parity.md) §6.
 - [docs-overhaul.md](../docs-overhaul.md) §3 for `docs/integrations.md`.
