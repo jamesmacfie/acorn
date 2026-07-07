@@ -499,14 +499,15 @@ export default function App() {
           <RollbarBrowse />
         </Match>
         <Match when={!selectedSource() && activeTask()}>
-          {(task) => (
-            <TaskView
-              task={task()}
-              terminalOpen={termOpen()}
-              onToggleTerminal={() => void toggleTerm()}
-              onOpenTerminal={() => { if (!termOpen()) void toggleTerm() }}
-            />
-          )}
+          {/* Read the stable activeTask() signal, not the <Match> accessor: binding TaskView to the
+              accessor makes its memos re-run and read a stale value the instant selectedSource flips
+              (before the Switch disposes this branch) — "Stale read from <Match>". */}
+          <TaskView
+            task={activeTask()!}
+            terminalOpen={termOpen()}
+            onToggleTerminal={() => void toggleTerm()}
+            onOpenTerminal={() => { if (!termOpen()) void toggleTerm() }}
+          />
         </Match>
       </Switch>
       <Shortcuts onOpenShortcuts={() => openSettings('shortcuts')} />

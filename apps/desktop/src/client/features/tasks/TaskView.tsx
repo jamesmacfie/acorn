@@ -219,8 +219,10 @@ export default function TaskView(props: {
       activateTaskSignals(next)
       navigate(pathForTask(next))
     } else {
-      setActiveTaskId(null)
+      // Switch away from the task view before clearing the id: nulling activeTaskId while this
+      // (task) Match is still the active branch would render TaskView with a null task.
       setSelectedSource('github') // no tasks left → fall back to the GitHub browse
+      setActiveTaskId(null)
       navigate('/')
     }
     await queryClient.invalidateQueries({ queryKey: tasksKey })

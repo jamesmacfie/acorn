@@ -21,11 +21,15 @@ export default function TerminalSurface(props: { sessionId: string; onExit?: (ex
     const fit = new FitAddon()
     term.loadAddon(fit)
     term.open(host)
-    fit.fit()
+    // fit() reaches into xterm's render service, which is torn down on dispose and momentarily
+    // absent between a resize and the next paint. Guard so a ResizeObserver tick that lands during
+    // teardown (or before the first paint) can't throw "reading 'dimensions' of undefined".
+    let disposed = false
+    const safeFit = () => { if (!disposed) { try { fit.fit() } catch { /* term detached mid-resize */ } } }
+    safeFit()
 
     // Follow the app theme live (manual toggle or OS preference change). The full theme resolves
     // async (ANSI palette comes from the Shiki theme); guard against applying to a disposed term.
-    let disposed = false
     const applyTheme = () => void xtermTheme(isAppDark()).then((t) => { if (!disposed) term.options.theme = t })
     applyTheme()
     const unwatchTheme = watchTheme(applyTheme)
@@ -63,7 +67,7 @@ export default function TerminalSurface(props: { sessionId: string; onExit?: (ex
 
     // Refit on any size change of the surface — drawer drag-resize, window resize, layout shifts.
     // A ResizeObserver catches the drawer-height change that window 'resize' would miss.
-    const ro = new ResizeObserver(() => fit.fit())
+    const ro = new ResizeObserver(() => safeFit())
     ro.observe(host)
     onCleanup(() => {
       disposed = true
