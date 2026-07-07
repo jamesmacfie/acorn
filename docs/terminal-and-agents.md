@@ -2,8 +2,8 @@
 
 The terminal drawer, agent sessions, and the agent-monitoring surfaces: the bottom drawer of
 persistent local shell/agent sessions scoped to the active task, and the right-rail Agents panel that
-watches them. This is the **as-built** companion to [vNext.md](./vNext.md) (the historical design
-record) — read vNext.md for deeper rationale; this describes what is in code today.
+watches them. This describes what is in code today. (The historical design record, `vNext.md`, has
+been removed — see git history for the original rationale.)
 
 > **Maturity — read this first.** This entire surface is **desktop-only and always on** (the old
 > `acorn:term` localStorage flag is deleted). It requires the preload bridge: in the Electron app
@@ -130,7 +130,7 @@ newline) instead of the `\r` that would submit.
 `BUILTIN_PROFILES` are hard-coded (a user-editable table is a later enhancement): `shell` (command
 `$SHELL`, node-pty), `claude-code` (`claude`, tmux), `codex` (`codex`, tmux), `aider` (`aider`,
 tmux). Every profile has `transport: 'pty'` — the universal xterm↔PTY transport is the only one
-implemented; structured transports are a deliberately-unbuilt vNext §12 seam. `profileAvailable`
+implemented; structured transports are a deliberately-unbuilt seam. `profileAvailable`
 checks `which` (macOS-only, so `which` is fine); the shell is always available.
 
 ### Worktrees (`main/worktrees.ts`, `resolveTaskCwd` in `main/taskWorktree.ts`)
@@ -262,8 +262,6 @@ error`); `attach` subscribes and returns an unsubscribe that detaches without ki
 
 ## See also
 
-- [vNext.md](./vNext.md) — the design doc this implements (§3 architecture, §5 transport, §8 profiles,
-  §9 worktrees, §12 phasing)
 - [workflows.md](./workflows.md) — the headless step runner, run targets, and human gates
 - [mcp.md](./mcp.md) — how `ACORN_TASK_ID` + the loopback env scope the task-aware MCP tools
 - [panes.md](./panes.md) — the Changes/Editor/Context panes that feed send-to-agent

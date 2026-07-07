@@ -15,10 +15,8 @@ start/stop/reach), and a workflow is the composable multi-step machine that cons
 >   launch, an Agents-panel viewer) but is **young and in progress** — it drives real agent CLIs,
 >   depends on capabilities that are still being fleshed out (context assembly, notes handoff), has
 >   **no GUI authoring**, and its loops run **only while the app is open** (no daemon). Do not read
->   this as a finished orchestrator. The design intent lives in
->   [`docs/next/14-workflows.md`](./next/14-workflows.md) and
->   [`docs/next/13-commands-and-config.md`](./next/13-commands-and-config.md) — cited below as
->   **design**, not shipped guarantees.
+>   this as a finished orchestrator — anything marked **design** below is intent, not a shipped
+>   guarantee.
 
 ---
 
@@ -63,14 +61,13 @@ the canonical layering comment lives at its merge point):
 
 | Layer | Source | Notes |
 | --- | --- | --- |
-| repo | `./.acorn/config.toml` (committed, team-shared) | **canonical** — `[scripts.run.<id>]` tables; **design** in [`13` §A](./next/13-commands-and-config.md) |
+| repo | `./.acorn/config.toml` (committed, team-shared) | **canonical** — `[scripts.run.<id>]` tables |
 | user | `~/.acorn/config.toml` (personal defaults) | same shape, personal overrides |
 | db | `repo_paths.runTargets` JSON, else `workspaces.devScript` as a base `dev` target | fallback layers only; `legacyRunTargets` (`runConfig.ts`) parses the JSON column. (The old scalar `run_command`/`dev_port` columns were folded into the JSON by migration `0017` and dropped in `0018`.) |
 
 The committed `.acorn/config.toml` file (`[scripts.run.<id>]` with `command` / `stop` / `url` /
-`url_command` / `icon` / `default`) is the **design** shape from
-[`13` §A](./next/13-commands-and-config.md); the reader (`runConfig.ts`) parses it today, surfacing
-malformed files as visible error rows rather than silently dropping them (the `13` §B DX rule).
+`url_command` / `icon` / `default`) is the canonical shape; the reader (`runConfig.ts`) parses it
+today, surfacing malformed files as visible error rows rather than silently dropping them.
 
 Per-workspace scripts on the `workspaces` table also feed targets: `devScript` maps to a `dev` run
 target, and `devRestartScript`, when set, is what `run_restart` runs instead of stop+start
@@ -138,9 +135,8 @@ target's resolved URL. The pure executor is `invokeLayoutRecipe`
 
 Recipes surface as **`Layout: <id>`** palette rows (`model.ts:27`); `CommandPalette.tsx` wires the
 real layout/runtime/browser services into `invokeLayoutRecipe`. The `[layout.<id>]` TOML block itself
-(`panes` / `terminal` / `browser`) is the **design** shape from
-[`13` §C](./next/13-commands-and-config.md); `runConfig.ts` parses these `layouts` today. (A
-`ratio` key in the file is tolerated but not parsed — panes split equally.)
+(`panes` / `terminal` / `browser`) is the **design** shape; `runConfig.ts` parses these `layouts`
+today. (A `ratio` key in the file is tolerated but not parsed — panes split equally.)
 
 ---
 
@@ -262,7 +258,7 @@ capabilities still being fleshed out (context assembly, notes handoff, the agent
 modes), and there is **no GUI workflow builder** — you author in files. Loops run only while the app
 is open. Treat autonomous, multi-agent runs as experimental.
 
-**Design-stage (not built — see [`docs/next/14`](./next/14-workflows.md)):** a general DAG engine,
+**Design-stage (not built):** a general DAG engine,
 sub-workflow depth beyond one level, saved-prompt/skills-as-steps polish, cross-machine or
 daemon-backed execution, and acorn-as-a-Linear-agent-host. These are the design rationale, not
 shipped behaviour.
@@ -295,6 +291,4 @@ shipped behaviour.
 - [panes.md](./panes.md) — the pane model layout recipes arrange
 - [command-palette-and-shortcuts.md](./command-palette-and-shortcuts.md) — the `⌘K` palette surface
 - [data-layer.md](./data-layer.md) — the SQLite schema and app-state tables
-- **Design references (not shipped):** [`docs/next/14-workflows.md`](./next/14-workflows.md),
-  [`docs/next/13-commands-and-config.md`](./next/13-commands-and-config.md)
 

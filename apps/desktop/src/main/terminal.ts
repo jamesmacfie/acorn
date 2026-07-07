@@ -425,7 +425,7 @@ export async function registerTerminalIpc(db: AppDatabase, worktreesDir: string,
   await registerWorkflowIpc(db, { runtime, notesStore: knowledge.notesStore, internalApiEnv })
   registerLocalGitIpc(db)
   registerSearchIpc(db) // Find-in-files (docs/panes.md): ripgrep over the task's worktree.
-  registerDatabaseIpc(db) // Database pane (docs/next/pg.md): per-task Postgres browse/edit over IPC.
+  registerDatabaseIpc(db) // Database pane (docs/pg.md): per-task Postgres browse/edit over IPC.
 
   // MCP config inspector (docs/mcp.md): read ONLY the known candidate files (worktree
   // .mcp.json / .cursor/mcp.json, ~/.claude.json), parse + MASK IN MAIN — raw secrets never cross

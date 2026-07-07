@@ -280,7 +280,7 @@ export const workspaces = sqliteTable('workspaces', {
   devScript: text('dev_script'), // per-workspace "run dev" command → a `dev` run target; null/blank = no run button
   devRestartScript: text('dev_restart_script'), // per-workspace restart command for the `dev` target; when set, run_restart runs it instead of stop+start
   teardownScript: text('teardown_script'), // shell command run in the worktree just before removal (docs/terminal-and-agents.md); null/blank = none
-  dbUrlScript: text('db_url_script'), // shell command run in the worktree to print a Postgres connection URL for the Database pane (docs/next/pg.md); null/blank = auto-detect from .env / $DATABASE_URL
+  dbUrlScript: text('db_url_script'), // shell command run in the worktree to print a Postgres connection URL for the Database pane (docs/pg.md); null/blank = auto-detect from .env / $DATABASE_URL
   previewMode: text('preview_mode'), // 'url' | 'port' | 'script' — how the browser-preview URL is resolved; null → dev-server port
   previewValue: text('preview_value'), // the URL, port, or shell command per previewMode; null/blank = unset
   icon: text('icon'), // JSON WorkspaceIcon ({"kind":"emoji","value":"🌰"} | {"kind":"lucide",…} | {"kind":"github"}); null → derived default

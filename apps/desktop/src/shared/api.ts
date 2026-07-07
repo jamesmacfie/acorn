@@ -150,7 +150,7 @@ export type Workspace = {
   devScript: string | null // per-workspace "run dev" command surfaced as a `dev` run target; null/blank = none
   devRestartScript: string | null // per-workspace restart command for the `dev` target; null/blank = stop+start
   teardownScript: string | null // shell command run in the worktree just before removal (docs/terminal-and-agents.md); null/blank = none
-  dbUrlScript: string | null // shell command run in the worktree to print a Postgres URL for the Database pane (docs/next/pg.md); null/blank = auto-detect
+  dbUrlScript: string | null // shell command run in the worktree to print a Postgres URL for the Database pane (docs/pg.md); null/blank = auto-detect
   previewMode: PreviewMode | null // how the browser-preview URL is resolved; null → dev-server port
   previewValue: string | null // the URL, port, or command per previewMode; null/blank = unset
   icon: WorkspaceIcon | null

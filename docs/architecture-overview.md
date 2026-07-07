@@ -86,11 +86,10 @@ Workspace ("Runn", "Acorn")            ← group of repos, picked in the top bar
 - **Task** — the single-repo *unit of work*: repo + branch + optional git
   worktree + optional linked PR + its panes and terminals. Shown as a row in the
   left **TabRail**. A task's `origin` is one of `github-pr | linear | rollbar |
-  local`. (Terminology note: earlier design docs in
-  [docs/workspaces/](./workspaces/) called a Task a "Workspace" — it was renamed;
-  Workspace now means the group.)
+  local`. (Terminology note: earlier design docs called a Task a "Workspace" —
+  it was renamed; Workspace now means the group.)
 - **Pane** — a surface inside the Task view. `PaneId` is one of `pr | linear |
-  rollbar | preview | editor | changes | notes | browser | context`
+  rollbar | preview | editor | changes | notes | context | database | search`
   (`apps/desktop/src/client/features/tasks/layout.ts`). A task's layout is a flat
   left→right row of open panes (`TaskLayout = { panes: PaneId[] }`); one pure
   reducer `applyLayoutAction` owns every transition (`show` = single pane, `add`
@@ -237,8 +236,7 @@ for the detail. All of it is desktop-only (bridge-gated, always on).
 ## What acorn deliberately does not have
 
 - **No webhooks or background jobs** — everything is read-driven. (A background
-  triage loop, "Pulse", is designed in [docs/next/16](./next/16-pulse.md) but is
-  not shipped.)
+  triage loop, "Pulse", has been designed but is not shipped.)
 - **No server-side session store** — the session lives entirely in an encrypted
   cookie, decrypted per request.
 - **No GitHub token in the browser** — only public profile fields cross the wire.
@@ -279,6 +277,8 @@ for the detail. All of it is desktop-only (bridge-gated, always on).
   inline review comments, and viewed-file state.
 - [ui-design](./ui-design.md) — layout, theming, and the monospace/flat design
   language.
+- [pg](./pg.md) — the Database pane: a native Postgres viewer/editor over
+  per-task IPC connections.
 
 **Agents & automation**
 
@@ -301,12 +301,12 @@ for the detail. All of it is desktop-only (bridge-gated, always on).
   OAuth callback setup, local SQLite/blob state, the ABI gotcha.
 - [authentication](./authentication.md) — GitHub OAuth web flow, the encrypted
   stateless session cookie, CSRF protections, the 401 → reauth bounce.
-- [vNext](./vNext.md) — the roadmap and in-flight work.
 
-**Design history & proposals** — [docs/next/](./next/) holds the numbered
-design/proposal specs (worktrees, MCP, context assembly, memory, workflows,
-Pulse, …) that the shipped features were built from; cite them for rationale.
-[docs/workspaces/](./workspaces/) is the earlier Workspace/Task design history
-(where a Task was still called a "Workspace"). Both describe intent — the root
-docs above describe what exists in code today.
+**Future work** — [docs/next/](./next/) holds what has *not* been built yet:
+[review.md](./next/review.md) (the critical architecture review),
+[extensability.md](./next/extensability.md) (the plugin-platform design it
+motivates), and [implementation.md](./next/implementation.md) (the staged guide
+for building it). The root docs above describe what exists in code today;
+superseded design records (the old `vNext.md`, `docs/workspaces/`) have been
+removed — see git history for the original rationale.
 

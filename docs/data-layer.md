@@ -216,7 +216,7 @@ filesystem, read by the terminal service outside any GitHub user context.
 | `owner`, `repo` | text | PK |
 | `githubRepoId` | integer | link back to the mirror (nullable) |
 | `path` | text | absolute checkout path |
-| `runTargets` | text | JSON `RunTarget[]` — DB fallback below a committed `.acorn/config.toml` (docs/next 13), parsed by `main/runConfig.ts`. (The legacy scalar `run_command`/`dev_port` columns were folded into it by migration `0017` and dropped by `0018`.) |
+| `runTargets` | text | JSON `RunTarget[]` — DB fallback below a committed `.acorn/config.toml`, parsed by `main/runConfig.ts`. (The legacy scalar `run_command`/`dev_port` columns were folded into it by migration `0017` and dropped by `0018`.) |
 | `editorCommand` | text | external editor for this repo's worktrees (`code`/`zed`/`cursor -n`/abs path); null → prefs `editor_command_default` → `code` |
 | `createdAt`, `updatedAt` | integer | epoch ms |
 
@@ -296,7 +296,7 @@ via `workspace_repos` on `(repoOwner, repoName)`. Machine-scoped (it owns a loca
 | `worktreePath` | text | null until a terminal is first opened |
 | `pullNumber` | integer | null for local-first until a PR is inherited |
 | `status` | text | `active` \| `archived` |
-| `parentId` | text | task tree (docs/next 14); set on fan-out children; null = root |
+| `parentId` | text | task tree; set on fan-out children; null = root |
 | `sort` | integer | rail ordering |
 | `createdAt`, `updatedAt` | integer | epoch ms |
 | `archivedAt` | integer | set on archive; row kept for history/teardown audit |
@@ -400,7 +400,7 @@ The durable checkpoint for the main-process workflow state machine — every tra
 a run survives an app restart. PK opaque `id`. Machine-scoped. **Design-stage / in progress**: real
 scaffolding exists (schema, `run_*`/gate harness routes, read-only WorkflowsSettings inspector,
 palette entries) but there is no finished orchestrator; gated with the terminal flag. See
-[workflows](./workflows.md) and docs/next 14.
+[workflows](./workflows.md).
 
 | Column | Type | Note |
 | --- | --- | --- |

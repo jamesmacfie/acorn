@@ -1,11 +1,11 @@
-# Database pane (Postgres) — `pg`
+# Database pane (Postgres)
 
 A native Postgres viewer/editor pane, Postico-shaped, in acorn's own design language. Tasks run
 against per-worktree dev Postgres databases (e.g. Runn's `runn_development`); this pane lets you
 inspect and edit them without leaving for Postico/psql, and without embedding a foreign web app in
 the hardened window (a cross-origin iframe can't be restyled, so it would never match the theme).
 
-## Scope (v1)
+## Scope (v1, shipped)
 
 - **Table list** sidebar — searchable, virtualized (the PullList recipe).
 - **Row viewer/editor** — click a table → grid of rows; click a row → a detail panel that also
@@ -58,21 +58,18 @@ Settings alongside the dev/setup scripts. It handles setups auto-detect can't re
 Cell values are normalized in main (objects → JSON, dates → ISO) so the grid renders uniformly;
 `null` stays distinct for `NULL` styling.
 
-## Files
+## Where the code lives
 
-**New:** `apps/desktop/src/main/database.ts`;
-`apps/desktop/src/client/features/database/{databaseClient.ts,DatabasePane.tsx,ResultGrid.tsx,database.css}`.
-**Edited:** `package.json` (+`pg`); `main/{preload.ts,terminal.ts}`;
-`client/features/terminal/terminalClient.ts` (window decl);
-`client/features/tasks/{layout.ts,TaskView.tsx,paneShortcuts.ts}`;
-`server/db/schema.ts` (+migration); `server/routes/workspaces.ts`; `shared/api.ts`;
-`client/mutations.ts`; `client/features/settings/WorkspaceSettings.tsx`.
+Main process: `apps/desktop/src/main/database.ts` (IPC + pool cache + `resolveDbUrl`), registered
+from `main/terminal.ts`, exposed via `main/preload.ts`. Wire types: `shared/database.ts`.
+Client: `apps/desktop/src/client/features/database/{databaseClient.ts,DatabasePane.tsx,ResultGrid.tsx,database.css}`,
+wired into the pane system in `client/features/tasks/{layout.ts,TaskView.tsx,paneShortcuts.ts}`.
+The `workspaces.dbUrlScript` column lives in `server/db/schema.ts`, edited via
+`client/features/settings/WorkspaceSettings.tsx` → `server/routes/workspaces.ts`.
 
-## Verification
+## Smoke test
 
-1. `pnpm lint` + `pnpm test`.
-2. `pnpm --filter @acorn/desktop db:generate && db:migrate` — one clean `ADD COLUMN` (no rebuild).
-3. `pnpm run rebuild` → `pnpm dev`; open a task with a reachable Postgres, open the Database pane:
-   auto-detect connects; table list filters; click table → grid; click row → detail; edit/+Row/
-   delete; SQL editor runs SELECT (grid) and DML (rowcount); set a workspace `dbUrlScript` →
-   reconnect uses it. Toggle theme → editor + grid follow tokens.
+Open a task with a reachable Postgres, open the Database pane: auto-detect connects; table list
+filters; click table → grid; click row → detail; edit/+Row/delete; SQL editor runs SELECT (grid)
+and DML (rowcount); set a workspace `dbUrlScript` → reconnect uses it. Toggle theme → editor +
+grid follow tokens.

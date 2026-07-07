@@ -1,9 +1,9 @@
 # Workspaces & Tasks
 
 acorn's core organizing model: two tiers. A **Workspace** is a named *group of repos*; a **Task** is
-the single-repo *unit of work* (a branch + optional worktree + optional PR + its panes). This is the
-as-built companion to the design docs in [`workspaces/`](./workspaces/) — read those for rationale;
-read this for what the code does today.
+the single-repo *unit of work* (a branch + optional worktree + optional PR + its panes). This
+describes what the code does today. (The original design docs, `docs/workspaces/`, have been
+removed — see git history for the rationale and alternatives considered.)
 
 ## The two-tier model
 
@@ -16,18 +16,17 @@ Selecting a workspace is not stored — it is inferred. `workspaceForRepo` (`app
 
 ### Terminology note (old docs vs. today)
 
-The design docs under [`workspaces/`](./workspaces/) were written when **"Workspace" meant a single
-unit of work** (one repo + branch + PR + worktree + terminals). That entity was renamed **Task**, and
-"Workspace" was repurposed to mean the *group of repos*.
+The original design docs (the removed `docs/workspaces/`) were written when **"Workspace" meant a
+single unit of work** (one repo + branch + PR + worktree + terminals). That entity was renamed
+**Task**, and "Workspace" was repurposed to mean the *group of repos*.
 
-| Concept | Old `docs/workspaces/` name | Current name |
+| Concept | Old design-doc name | Current name |
 | --- | --- | --- |
 | One repo + branch + PR + worktree + terminals (a rail row) | "Workspace" | **Task** |
 | A named group of repos (top selector) | — (did not exist) | **Workspace** |
 
-When reading the design docs, mentally substitute "Workspace → Task" unless the text clearly means the
-group. Those docs remain valuable as **design history** (the alternatives considered, the phased build,
-the lifecycle model). See [`workspaces/README.md`](./workspaces/README.md) for the full reconciliation.
+When reading anything from that era (old commits, the removed design docs), mentally substitute
+"Workspace → Task" unless the text clearly means the group.
 
 ---
 

@@ -2,7 +2,7 @@ import { createEffect, createSignal, For, on, onCleanup } from 'solid-js'
 import { createVirtualizer } from '@tanstack/solid-virtual'
 import type { DbCell } from '../../../shared/database'
 
-// A read-only, vertically-virtualized result grid (docs/next/pg.md). There's no generic table
+// A read-only, vertically-virtualized result grid (docs/pg.md). There's no generic table
 // component in the client, so this rolls its own using the PullList/DiffView virtualizer recipe:
 // a sticky header + absolutely-positioned rows inside an overflow-auto canvas. Columns are a fixed
 // width so header and rows share one grid template and horizontal scroll just works.
