@@ -74,6 +74,19 @@ model + thin view, error containment, the [ui-state.md](./ui-state.md) §3
 reaction rules) is enforced by the conformance suite
 ([testing.md](./testing.md) §4), not by review comments.
 
+**Pane content is keyboard-navigable by default** — this is a pane obligation,
+not an opt-in flag (a flag for a mandatory default is speculative, and an
+opt-*out* invites plugins to skip it). A pane's focusable content is reachable
+and operable by keyboard: focus moves in/out cleanly, collections navigate by
+arrow keys with a single tab-stop (roving focus), and focus entering the pane
+marks it the focused surface ([ux.md](./ux.md) §7). Plugins get this by
+composing the kit's focus primitives rather than hand-rolling `tabindex`/ARIA
+(extensibility §3.5); pane-local chords register at `when: 'pane'` scope (§4.4).
+The carve-out is the same as the chord system's: `keepAlive`/webview panes and
+editor/terminal surfaces own their internal focus (Monaco, xterm), and the
+default applies *around* them, not inside. The conformance suite asserts
+keyboard reachability and focus-marks-surface ([testing.md](./testing.md) §4).
+
 `keepAlive: 'dom'` is the honest generalization of the preview pane's
 body-parented webview: the core owns an off-tree layer keyed by (pane, task) and
 the positioning dance, instead of the plugin hand-managing `previewWebviews`.
@@ -125,6 +138,15 @@ project browsing and Rollbar promotion navigate across repos and rely on
 this), and **"ignored" is not "unassigned"** — ignored repos keep their
 `workspace_repos` membership and are merely excluded from the main UI.
 
+One forward-looking caveat on the first invariant: "derived from the current
+repo" is a derivation rule, **not** a guarantee that a workspace/repo is
+*always* active. Carry the workspace context as a parameter of the current
+view, not as a global always-present singleton the whole shell reads — a
+future app-level surface with no workspace (a cross-workspace dashboard, ext
+§9) is a new top-level view mode, and it should stay a purely additive change
+rather than a shell refactor. Don't build it now; just don't wire "there is
+always a current workspace" into core as load-bearing.
+
 ## 4.3 Commands & palettes
 
 ```ts
@@ -149,7 +171,9 @@ toggle chords.
 
 ```ts
 interface KeybindingContribution {
-  id: string; chord: string; when?: 'global' | 'task' | 'typing-exempt'
+  id: string; chord: string
+  when?: 'global' | 'task' | 'pane' | 'typing-exempt'
+  pane?: string                     // required when when: 'pane' — the owning pane id
   command: string                   // command id — bindings bind commands, not closures
 }
 ```
@@ -165,6 +189,21 @@ semantics are real UI boundaries. Editor/terminal handling also stays local
 where focus semantics genuinely differ (Monaco ⌘S, xterm passthrough).
 Conflict-resolution semantics and the remapping UX are specified in
 [ux.md](./ux.md) §4.
+
+The **`pane` scope** is the home for chords that fire only while their pane is
+the focused surface — today's hand-rolled, typing-guarded `window` listeners
+(`PullList.tsx:69` bare `j`/`k`, `DiffView.tsx:292` `⌘F` — inv §3b) that would
+otherwise survive the collapse as more scattered listeners. The one core
+dispatcher already knows the focused pane (pane focus is core-owned,
+[ux.md](./ux.md) §7), so a pane-scoped chord is just a `when` predicate on it:
+the binding is live only when `pane` matches the focused surface, and it
+inherits conflict detection (a `pane` chord may reuse a chord another pane
+owns; it must not collide with a `global`/`task` binding), remapping, and the
+help screen — which shows pane-local chords when that pane is focused, for
+free. Chords that must reach *inside* a focus black-hole (Monaco `⌘S`, xterm
+passthrough) still stay component-local per the carve-out above; the `pane`
+scope is for chords the pane host dispatches *around* its content, not keys the
+content itself swallows.
 
 ## 4.5 API routes (server)
 
@@ -265,7 +304,7 @@ interface AgentToolContribution {
   input: ZodSchema
   scope: 'task'                     // receives { taskId, worktreePath, sessionId }
   risk: 'read' | 'write' | 'execute'  // tenet 8: what the tool can do, declared
-  when?: (task) => Promise<boolean> // replaces the connect-time hasRunTargets freeze
+  when?: (task) => boolean          // sync read of already-held state; async work rides ctx.poll
   handler: (input, scope) => Promise<unknown>   // runs in main
   exposeToRenderer?: boolean        // also project a typed renderer client method
 }
@@ -312,6 +351,14 @@ interface MirroredResource<Row> {
 }
 ```
 
+The `key` is **provider-defined and opaque to the engine**. Every key today is
+repo-scoped, but the type carries no such assumption on purpose: a user-scoped
+feed keyed by connection/user identity — a future dashboard's "PRs assigned to
+me across all repos", an inbox — is the same descriptor with a different key.
+Keep the engine and `sync_state` (`(resource, key)`) repo-agnostic so that
+surface stays purely additive (ext §8.5 for the matching user-scoped table
+rule, ext §9 for the future seam).
+
 The core sync engine owns the four-branch serve/revalidate/cold state machine,
 `sync_state` bookkeeping, background-refresh tracking, and rate-limit backoff —
 in one place instead of five divergent copies (review.md §1c; implementation
@@ -330,6 +377,24 @@ all specified in [integrations.md](./integrations.md) §7.
 ```ts
 ctx.workflows.registerStepKind('ci-loop', ciLoopHandler)      // Map<kind, StepHandler>
 ctx.workflows.registerPolicy('checks-green', checksGreenEval) // github plugin contributes
+
+interface StepHandlerContext {
+  run: RunRow
+  step: StepRow
+  def: WorkflowStepDef
+  renderedPrompt: string
+  tools: EffectiveToolSet
+  signal: AbortSignal
+  emit(event: WorkflowStepEvent): void
+}
+
+type StepHandlerOutcome =
+  | { status: 'done'; result?: unknown; structured?: unknown; sessionId?: string | null }
+  | { status: 'failed'; error: string }
+  | { status: 'safety-rail'; error: string }
+  | { status: 'waiting-gate' }
+
+type StepHandler = (ctx: StepHandlerContext) => Promise<StepHandlerOutcome>
 ```
 
 Replaces the `executeStep` if-ladder (`workflowRunner.ts:189-250`) and the
@@ -338,9 +403,24 @@ one-case `evaluatePolicy` switch. Note the layering this reveals:
 plugin while the *engine* is the workflows plugin — exactly the dependency the
 current code hides inside `workflowWiring.ts`. Step kinds named in
 `.acorn/workflows/*.toml` resolve against the registry; unknown kinds surface as
-parse errors (the loader already does this well). The runtime's behavioral
-corrections and ceilings (handoff scoping, resume, budgets, cancel) are
-[agent-runtime.md](./agent-runtime.md) — independent of this registry work.
+parse errors (the loader already does this well). Handlers do not write
+`workflow_runs` or `workflow_steps` directly; the engine owns persistence,
+status transitions, live events, cancellation, and reconcile. The full runtime
+contract — statuses, `joins`, branch semantics, tool ceilings, and cancellation
+races — is [agent-runtime.md](./agent-runtime.md) §4.1.
+
+This registry is where the near-term additions from the agentfield study land
+([agent-runtime-influences.md](./agent-runtime-influences.md) §3–4): a **`decide`/branch
+step kind** (a one-shot structured, tool-free routing call, whose `structuredJson.verdict`
+selects the next forward step via `WorkflowStepDef.branches`), a **per-run/step
+tool allowlist or risk ceiling** (workflow-level and step-level ceilings
+intersect, then global user permissions apply), and — later — a **typed
+failure-recovery** outcome on the `StepHandler` contract. The cheap `decide`
+tier reuses the profile registry via a new one-shot structured mode on
+`AgentProfileContribution` (§4.11, an `aiArgv?`/single-turn variant beside
+`headlessArgv`/`resumeArgv`), not a new transport. Triggers that *start* a run
+are a separate seam — source/integration contributions evaluated by `ctx.poll`,
+never a daemon (influences §3E).
 
 ## 4.11 Agent profiles
 
@@ -351,6 +431,7 @@ interface AgentProfileContribution {
   mcpRegistration?: (spec: LauncherSpec) => RegisterArgv   // replaces PROFILE_MCP_FLAVOUR
   headlessArgv?: (opts) => string[]                        // replaces headless.ts branches
   resumeArgv?: (sessionRef) => string[]                    // replaces resumeCommandFor
+  aiArgv?: (opts) => string[]                              // one-shot structured decide calls
   streamJson?: StreamJsonAdapter                           // agents-panel activity parsing
 }
 ```

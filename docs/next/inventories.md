@@ -222,7 +222,8 @@ errors. Invocation switch: `:172-205`.
 | `noteToOpen` (`notesClient.ts:28-31`) | ContextPane `:45` → NotesPane `:62-66` |
 | `pendingEditorReveal` (`editorState.ts:68-73`) | Search pane → EditorPane |
 
-(The last two were not in review.md — the pattern is four instances, not two.)
+(The last two were absent from review.md's original finding — the pattern is
+four instances, not two; review.md now defers to this list.)
 
 ### 3g. `window.alert` / `confirm` sites (Phase 5 — one error surface)
 

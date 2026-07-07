@@ -91,7 +91,9 @@ deliberately boring: identity, storage, process plumbing, and empty UI sockets.
   main area, bottom drawer socket, right panel socket, overlay layer) — each
   region exposing **slots** (§3.3) that plugins fill. Today's `App.tsx` is the
   shell *plus* ten features fused together; the core shell is App.tsx with the
-  features extracted.
+  features extracted. Keep the region layout parameterized on the current
+  workspace context rather than assuming a workspace is always active — an
+  app-level view with no workspace is an anticipated future surface (§9).
 - **The Workspace → Task model and stores**: `tasks`, `taskLinks`, workspace
   membership, the active-task/selected-source signals, the layout reducer
   `applyLayoutAction` (kept pure and pane-agnostic, but not verbatim: `PaneId`
@@ -267,6 +269,58 @@ delivers a consistent frame around inconsistent content:
    same rule: styles are namespaced per plugin — today's per-feature `.css`
    files share one global class namespace, which two plugins will eventually
    collide in.
+
+   **Kit scope is grounded in what ships today — not a general component
+   library.** No speculative catalog (no `Table` — the app renders zero
+   `<table>` elements; lists are div-based, covered by "list rows" above). The
+   kit is exactly what is already duplicated across features:
+
+   - **Form controls, currently raw native + per-feature CSS.** `<button>` is
+     used ~198 times, plus `<input>` (~42), `<textarea>` (~13), `<select>`
+     (~13), and disclosure (`<details>`/`<summary>`). The duplication is real,
+     not anticipated — these become kit components (`Button`, `TextField`,
+     `Select`, `Disclosure`) so a plugin's button is *the* button. This is the
+     highest-value extraction and the one most exposed to drift.
+   - **The two custom interactive primitives already shared:** `Picker` (the
+     filterable dropdown, ~18 uses) and the tooltip. Promote them from
+     feature-local to kit; they are also the accessibility-hard ones (focus,
+     keyboard nav, ARIA, click-outside).
+   - **The existing small composed bits:** `CopyButton`, `UserAvatar`.
+   - **Overlays/modals/palettes stay core**, not kit — they are the overlay
+     slot's mechanics (§3.3, §4.3), and dialogs are already div-over-overlay,
+     not native `<dialog>`.
+
+   **Own the skin, adopt the behavior.** "Our own library, not someone else's"
+   splits cleanly: the styling and tokens are ours and in-tree (tenet 5), but
+   the *accessible behavior* of the hard controls — the dropdown/`Picker`, the
+   tooltip, any focus-trapped surface — is not worth hand-rolling per control
+   (focus management and ARIA are where a11y bugs breed). Wrap a headless Solid
+   primitive there and style it through our tokens — the shadcn model (headless
+   behavior + owned styling), not a from-scratch widget set. Native controls
+   that are already accessible (`button`, `input`, `select`) just get a styled
+   wrapper and need no headless layer.
+
+   **Focus and keyboard navigation are kit primitives, not per-plugin code.**
+   The pane contract requires keyboard-navigable content by default (§4.1), and
+   that only holds if the navigable behavior is the path of least resistance.
+   Three conventions, same "adopt the behavior, own the styling" rule:
+   - a **list-navigation primitive** (`createListNavigation` hook + `use:`
+     directive) — roving tabindex (one tab-stop per collection, arrows/`j`/`k`/
+     Home/End move within), `role`/`aria-activedescendant` wiring, and the same
+     typing-exempt guard the chord dispatcher uses so it never hijacks keys
+     inside an input. Adopt it from the headless primitive lib (Kobalte's
+     listbox/roving), don't hand-roll focus + ARIA per pane;
+   - a **`use:paneFocus` directive** applied by the core pane host: mark the
+     focused surface on `focusin`, not only click — so tabbing into a pane
+     activates it for maximize/move ([ux.md](./ux.md) §7), closing the
+     keyboard-vs-pointer gap;
+   - a **focus-scope/trap primitive** for the overlay layer (dialogs, palettes)
+     — the [ux.md](./ux.md) §8 "keyboard-first dialogs" invariant needs it and
+     it is the same adopt-headless call.
+   These live in `client/ui/` beside the control wrappers; pane-local chords
+   ride the `when: 'pane'` keybinding scope (§4.4), so movement, activation, and
+   pane-scoped shortcuts are three sides of one keyboard story, not per-plugin
+   reinvention.
 
 2. **Render failure is contained at the slot.** Tenet 6 covers *unknown*
    contributions; a *throwing* one is worse — there is currently zero
@@ -471,7 +525,10 @@ declared rules:
   seam is that repo identity is *dual* — mirror tables key by the GitHub numeric
   `repoId`, machine tables by `(owner, name)` strings — so a repo rename
   silently strands machine-scoped rows. `repo_paths.githubRepoId` is the
-  partial bridge; make it the stated one.
+  partial bridge; make it the stated one. The rule already covers the
+  anticipated repo-less case (§9.1): a user-scoped *feed* table (a dashboard's
+  "assigned to me", an inbox) is derived from a provider identity → user-scoped,
+  keyed by connection with no repo column — the same rule, no new category.
 - **Parent lineage is declared.** Task-scoped tables (`task_links`,
   `review_notes`, `terminal_sessions`, `workflow_runs`) declare their parent
   column in the table contribution, and core derives the cascade
@@ -551,3 +608,29 @@ mapping is noted per step below.
 
 The litmus test for done: adding a Sentry integration (source + pane + context
 section + linkifier) or a fourth agent profile touches **zero** core files.
+
+### 9.1 Anticipated future surfaces (don't foreclose, don't build)
+
+Named here so the phases above avoid decisions that would make them a rewrite
+later. Neither is planned; both stay purely additive if the seams below hold.
+
+- **A dashboard** — per-workspace, and/or a cross-workspace surface above all
+  workspaces, where each plugin contributes cards for "what the user should
+  know": PRs assigned to or awaiting review, assigned Linear issues, a
+  Dockerfile-check status, eventually an email inbox. Architecturally this is
+  **an aggregating consumer over the source registry** — what the context pane
+  (§4.7) is to context sections — not a new mechanism. Its card point would be
+  a sibling of context sections (§4.7) and badges/pollers (§4.13): a component +
+  a data source + `scope` + `when` + an item→action, with cards refreshing
+  through `ctx.poll` (state §5.2) and rows acting through promotion (§4.2). No
+  new state axis is needed — app/workspace scope already covers it (state
+  §5.1). Two things must not be foreclosed before then: (1) the sync engine's
+  resource key stays **opaque/connection-keyed, not repo-typed** (§4.9,
+  implementation Phase 2), so a user-scoped feed ("assigned to me across all
+  repos", an inbox) is the same descriptor with a different key, backed by a
+  user-scoped table (§8.5); and (2) the shell must not treat "a workspace is
+  always active" as load-bearing (§2.1, §4.2), so an app-level view with no
+  workspace is a new view mode rather than a shell refactor. The provider
+  capability set (integrations §4) stays open so a `userFeed`-style capability
+  slots in as data. Guard those and the dashboard is additive.
+- **A dynamic loader** — §9 step 8 above.

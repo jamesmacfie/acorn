@@ -279,7 +279,7 @@ machine is extracted once.
 
   ```ts
   serveThenRevalidate<T>(c, {
-    resource: string          // sync_state key (db/resourceKeys.ts builders)
+    resource: string          // sync_state key (db/resourceKeys.ts builders) — opaque
     ttlMs: number             // from the cache-policy module
     etag?: boolean            // If-None-Match revalidation
     read: () => Promise<T | null>       // cached view; null = cold
@@ -316,7 +316,13 @@ watch it update).
 **Considerations:** preserve the atomic delete-then-insert `db.batch` writes
 inside `refresh` — the engine wraps them, it must not unbundle them. Don't
 change any TTL value in this phase; centralize first, tune later (a TTL change
-is user-visible behavior).
+is user-visible behavior). Keep the `resource` key **opaque and
+caller-defined** — the engine must not assume it encodes a repo. Every key
+today happens to be repo-scoped, but a future user-scoped feed (a dashboard's
+"PRs assigned to me across all repos", an inbox) keys by connection/user
+identity instead, and `sync_state` is keyed on `(resource, key)` with no repo
+assumption. This costs nothing now and is expensive to retrofit after the
+engine ships (ext §9 future-seams).
 
 **First PR checklist:** extract the pure decision function and test the four
 branches before moving any route; then port one GitHub route, then the
@@ -532,7 +538,14 @@ moves.
   *(inv §3b)* into one dispatcher that reproduces the two existing semantics:
   capture-phase pre-emption (the palette-over-Monaco trick) and
   modifier-disambiguation (TabRail ⌘digit vs TerminalPanel ⌘⇧digit). The four
-  Esc-close locals stay component-local (genuine focus semantics).
+  Esc-close locals stay component-local (genuine focus semantics). Include the
+  **`when: 'pane'` scope** (points §4.4): the dispatcher gates a pane-scoped
+  chord on the core focused-surface signal (from `use:paneFocus`, below), so
+  today's hand-rolled typing-guarded pane listeners — `PullList` bare `j`/`k`
+  (`PullList.tsx:69`), `DiffView` `⌘F` (`DiffView.tsx:292`) *(inv §3b)* —
+  register as bindings instead of surviving as new `window` listeners. Pane
+  chords may reuse a chord another pane owns but must not collide with
+  `global`/`task`; they appear in the help screen when their pane is focused.
 - **Settings-page registry** replacing the `TABS` list in `SettingsModal.tsx`.
   The current modal is more than a tab list — appearance themes, integration
   cards (GitHub synthesized/non-disconnectable), the MCP inspector, the
@@ -548,7 +561,7 @@ moves.
 - **Client event bus** (`ctx.events` shape from state §5): `task:archived`
   etc.; convert the three `evictPreviewWebview` call sites and all four
   mailbox signals *(inv §3f — including `noteToOpen` and
-  `pendingEditorReveal`, which review.md missed)* into subscriptions /
+  `pendingEditorReveal`, which review.md's original finding missed)* into subscriptions /
   `openPane(id, intent)`. Include the **will-phase** for destructive events:
   handlers return concerns (timeout-bounded), core renders them in one
   confirmation dialog per [ux.md](./ux.md) §1 — the hardcoded close-task
@@ -562,7 +575,24 @@ moves.
   ErrorBoundary usage today, so one throwing pane kills the shell. Promote
   the loose shared components (`CopyButton`, `UserAvatar`, `Picker`, tooltip)
   into a `client/ui/` kit on the token layer; seed it with the `QueryGate`
-  loading/error primitive *(ui-state §2.5, states per ux §5)*.
+  loading/error primitive *(ui-state §2.5, states per ux §5)*. Extract the
+  form-control wrappers the app already duplicates raw — `Button` (~198 native
+  `<button>` sites), `TextField`/`Select`/`Disclosure` — into the same kit;
+  wrap a headless Solid primitive for `Picker`/tooltip a11y and skin it with
+  tokens rather than hand-rolling focus/ARIA. Scope is what ships today, no
+  speculative catalog (no `Table` — lists are div-based) *(ext §3.5)*.
+- **Keyboard-navigation primitives** *(ext §3.5, points §4.1 pane contract,
+  ux §7)*: land three in `client/ui/` alongside the kit so navigable content
+  is the path of least resistance, not per-plugin effort — (1) a
+  `createListNavigation` hook + `use:` directive (roving tabindex, arrow/`j`/
+  `k`/Home/End, `role`/`aria-activedescendant`, reusing the dispatcher's
+  `isTypingTarget` guard); (2) the core `use:paneFocus` directive the pane host
+  applies to mark the focused surface on `focusin`, not just click — this is
+  the signal the `when: 'pane'` scope reads and it closes the keyboard-vs-click
+  gap in ux §7; (3) a focus-scope/trap for the overlay layer (dialogs,
+  palettes, ux §8). Adopt the behavior from the same headless lib as the
+  controls; the roving primitive is what makes the pane keyboard contract
+  (§4.1) satisfiable without every pane reinventing focus.
 - **One error surface** *(ui-state §3 rule 1, ux §5)*: mutations report
   failures through inline signals (foreground) or notices (background);
   retire all 25 `window.alert`/`confirm` sites *(inv §3g — 15 files, not just
@@ -573,19 +603,33 @@ moves.
 by re-registering `search` or `database` through the registry; the help screen
 and palette derive from registries; `window.alert` count is zero; panes
 resize, pin, move, and maximize per ux §7 and the persisted arrangement
-(pane set/order/id-keyed weights/pins) survives relaunch.
+(pane set/order/id-keyed weights/pins) survives relaunch. Pane content is
+keyboard-navigable by default (§4.1) — tabbing into a pane marks it the focused
+surface, collections navigate by arrow/`j`/`k` with one tab-stop, and pane-local
+chords fire only while their pane is focused; the conformance suite enforces it
+([testing.md](./testing.md) §4).
 
 **Verify:** `pnpm lint`, `pnpm test` (the pure models keep their tests),
 smoke S3, the conformance suite over all ten panes, and a keyboard walkthrough
 of every chord and palette row (the inv §3b table is the checklist). For pane
 management: drag a divider with a terminal and Monaco open (no tearing, refit
 coalesced), pin + `show` flips, ⌘⇧⏎ on a focused pane and on a focused
-terminal, relaunch restores id-keyed weights and pins but not maximize.
+terminal, relaunch restores id-keyed weights and pins but not maximize. For
+keyboard nav: `Tab` into a pane activates it (not just click) and traverses its
+content in DOM order without bleeding into the next pane; arrow keys move within
+a list on one tab-stop; a pane chord (`j`/`k`, `⌘F`) fires only while its pane
+is focused and is inert otherwise.
 
 **Considerations:** this phase is big — slice it as six PRs in the bullet
 order above (pane registry first; it's the pattern-setter, with pane
-management as its follow-up PR once conformance is green). The keybinding
-dispatcher is the riskiest slice: get the capture-phase and typing-target
+management as its follow-up PR once conformance is green). While extracting the
+shell into region slots, keep the layout **parameterized on the current
+workspace context rather than assuming a workspace is always active** — "no
+selected-workspace dimension, derived from the current repo" (points §4.2) is a
+derivation rule, not a guarantee one is always present. This costs nothing now
+and keeps a future app-level view with no workspace (a cross-workspace
+dashboard, ext §9.1) an additive change rather than a shell refactor. The
+keybinding dispatcher is the riskiest slice: get the capture-phase and typing-target
 semantics wrong and Monaco/xterm users feel it immediately; port the existing
 guards (`isTypingTarget`, `e.code`-based digit checks) verbatim, don't
 re-derive them.
@@ -593,9 +637,13 @@ re-derive them.
 **First PR checklist:** pane registry only. Re-register one simple pane first,
 prove all derived lists come from the registry, then convert the rest and fix
 the `pr` pane contract. The immediate follow-up PR is pane management on top
-of that host: reducer shape + tests first, then dividers/pin/maximize/move UI.
-Do not start keybindings until pane conformance and pane-management reducer
-tests are green.
+of that host: reducer shape + tests first, then dividers/pin/maximize/move UI,
+and the `use:paneFocus` directive lands here (it belongs to the pane host and
+is the focused-surface signal both maximize/move and the `when: 'pane'` scope
+read). Do not start keybindings until pane conformance and pane-management
+reducer tests are green — and the `when: 'pane'` scope depends on
+`use:paneFocus` already being in place. The `client/ui/` list-navigation and
+focus-scope primitives are their own slice, sequenced with the UI-kit seed.
 
 ## Phase 6 — Startup restore pipeline
 
@@ -733,9 +781,12 @@ contract, not against the two existing providers' shapes.
   `canPromote`/`prepare`/`create`/`afterCreate` contract, with
   attach-to-current-task as a distinct mode (Rollbar's `+task` — parity §6).
 - **Capabilities, mutations, error taxonomy** *(integrations §4, §11, §12)* —
-  capability declarations resolved per connection at validation; Linear's
-  comment becomes a declared mutation (capability-gated, invalidation policy
-  named); provider error codes migrate onto the generic `provider_*`
+  capability declarations resolved per connection at validation; keep the
+  capability set **open** (a new flag is additive data, not a union break) —
+  `webhooks` and `userFeed` are the declared-but-not-yet-consumed markers, the
+  latter reserving the future-dashboard "user-scoped feed" gate (ext §9.1);
+  Linear's comment becomes a declared mutation (capability-gated, invalidation
+  policy named); provider error codes migrate onto the generic `provider_*`
   taxonomy — a **deliberate rename with client branches updated in the same
   PR** (not a Phase 0-style sweep; the GitHub identity codes `reauth`/`sso`/
   `rate_limited` stay byte-identical per security invariant 9). Lifecycle
@@ -801,32 +852,57 @@ change.
 
 **What:**
 
-- `Map<kind, StepHandler>` registry in `workflowRunner.ts` replacing the
-  `executeStep` ladder; policy registry replacing `evaluatePolicy`
-  (`checks-green` registered by the GitHub side — the layering points §4.10
-  calls out). Replace `runJoin`'s nearest-preceding-fan-out index scan with
-  an explicit `joins:` reference; unknown kinds/references surface as parse
-  errors (the TOML loader already does this well for other errors).
-- Agent-profile contributions per points §4.11 (`command`,
-  `backendPreference`, `mcpRegistration`, `headlessArgv`, `resumeArgv`,
-  `streamJson`) replacing `BUILTIN_PROFILES`, `PROFILE_MCP_FLAVOUR`, and the
-  per-agent branches in `headless.ts`/`agents/model.ts`. Adding an agent =
-  one small module.
-- The runtime *corrections* (handoff-note scoping, ci-loop session resume,
-  concurrency/cost budgets, cancel) live in
-  [agent-runtime.md](./agent-runtime.md) §2–3 and **don't wait for this
-  phase** — see ongoing tracks. If step-to-step data passing ever needs
-  explicit edges, the decided shape is `${steps.<name>.output}` prompt
-  templating (agent-runtime §4), not a dataflow engine — build it when the
-  first workflow needs it.
+- **8A: registry extraction, no behavior change.** Add `Map<kind,
+  StepHandler>` in `workflowRunner.ts` replacing the `executeStep` ladder, with
+  the `StepHandler` contract from [agent-runtime.md](./agent-runtime.md) §4.1.
+  Add the policy registry replacing `evaluatePolicy`; `checks-green` is
+  registered by the GitHub side, revealing the layering points §4.10 calls
+  out. Existing step kinds keep their current behavior.
+- **8B: parser/runtime control-flow contract.** Replace `runJoin`'s
+  nearest-preceding-fan-out index scan with explicit `joins:`. Add
+  `${steps.<name>.output}` templating and the `decide` branch step. Unknown
+  kinds, dangling `joins:`, invalid/backward branch targets, and invalid
+  template references surface as parse/start errors with named messages.
+  Non-selected branch targets become `skipped`; unmatched verdicts fail unless
+  a `default` branch exists.
+- **8C: agent-profile registry.** Agent-profile contributions per points §4.11
+  (`command`, `backendPreference`, `mcpRegistration`, `headlessArgv`,
+  `resumeArgv`, `streamJson`) replace `BUILTIN_PROFILES`,
+  `PROFILE_MCP_FLAVOUR`, and the per-agent branches in
+  `headless.ts`/`agents/model.ts`. Adding an agent = one small module. Add the
+  **one-shot structured mode** (`aiArgv?`/single-turn) the `decide` step needs;
+  the cheap tier reuses this registry, not a new transport.
+- **8D: tool ceilings once Phase 4 exists.** A workflow and step may declare a
+  tool allowlist/risk ceiling; step ceilings can only narrow workflow ceilings,
+  and global user permissions apply last. Enforcement is the same permission
+  filter the Phase 4 projection consults (agent-runtime §4.1/§6.2).
+- **8E: cancellation controls.** Cancel-run and kill-step use the engine-owned
+  active-handler registry from agent-runtime §4.1. Cancel cascades to fan-out
+  child steps *and* their child tasks (`parentStepId`/`tasks.parentId`), kills
+  in-flight processes, and adds `cancelling`/`cancelled` to the persisted
+  status vocabulary.
+- **8F: triggers after `ctx.poll`.** Source/integration contributions
+  (points §4.2/§4.14) register trigger predicates with `ctx.poll` (state §5.2)
+  — app-open, no daemon; `workflow_runs.trigger` widens past `'manual'`. This
+  is the shippable slice of "Pulse".
+- The remaining runtime *corrections* (handoff-note scoping, ci-loop session
+  resume, concurrency budgets) live in [agent-runtime.md](./agent-runtime.md)
+  §2 and **don't wait for this phase** — see ongoing tracks. Concurrency
+  governance (semaphore + turn/depth caps, agent-runtime §2.3) is design-docs
+  only, not a phase deliverable; there is deliberately **no cost budgeting**
+  (subscriptions). Typed failure-recovery (agent-runtime §6.4) is a decided
+  shape, deferred until a workflow needs it.
 
-**Done when:** a new step kind or agent profile is one registration; a TOML
-workflow using an unknown kind or a dangling `joins:` fails at parse with a
-named error.
+**Done when:** the substeps above have landed in order; a new step kind or
+agent profile is one registration; a TOML workflow using an unknown kind, a
+dangling `joins:`, an invalid branch target, or an invalid template reference
+fails with a named error; cancel-run stops a running fan-out and all its
+children; trigger-started runs record the contributing trigger id.
 
-**Verify:** existing workflow runner tests keep passing; a TOML workflow
-using every step kind runs end-to-end; each profile still
-spawns/resumes/registers MCP (live check per profile).
+**Verify:** existing workflow runner tests keep passing; a TOML workflow using
+every step kind (including a `decide` branch) runs end-to-end; a fan-out
+cancelled mid-flight leaves every child `cancelled` with no orphaned process;
+each profile still spawns/resumes/registers MCP (live check per profile).
 
 ## Phase 9 — Platform migrations
 
@@ -911,8 +987,9 @@ mode (Phase 3 makes it *better*; nothing later may make it second-class).
   from context on run completion (§2.1 — a confirmed cross-run/cross-task
   bleed with silent truncation on top; **do this one first**); pass the prior
   iteration's `sessionId` to ci-loop headless runs (§2.2 — resume is plumbed
-  and never used); a `MAX_CONCURRENT_HEADLESS` semaphore + optional
-  `max_cost_usd` → safety-rail (§2.3 — fan-out is an uncapped `Promise.all`);
+  and never used); a `MAX_CONCURRENT_HEADLESS` semaphore, per-step turn cap,
+  and fan-out depth cap → safety-rail (§2.3 — fan-out is an uncapped
+  `Promise.all`; deliberately no cost ceiling);
   cancel-run/kill-step in the agents panel (§3.1, UX per [ux.md](./ux.md) §6
   — today nothing running can be stopped). Plus poll→push for the panel via
   the runner's existing `notify` path (§3.3).

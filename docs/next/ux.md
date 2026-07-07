@@ -214,12 +214,20 @@ keeps a future tree migration open — this is not a one-way door.
   with no migration. The reducer stays pure and keeps its test file — every
   new action lands with cases in `layout.test.ts`, including close→reopen,
   reorder, unknown ids, and min-width clamping.
-- **Focus and accessibility.** Pane focus is core-owned: clicking inside a pane
-  marks it as the focused surface for maximize and move commands, but panes do
-  not read or write global focus state directly. Dividers are keyboard
-  reachable separators with left/right resize commands; pointer drag captures
-  the pointer until release and must not steal text selection inside Monaco or
-  xterm.
+- **Focus and accessibility.** Two grains of focus, both core-owned. *Coarse*
+  (which pane is the focused surface for maximize/move commands) is set on both
+  click **and** keyboard `focusin` via the core `use:paneFocus` directive
+  (extensibility §3.5) — tabbing into a pane activates it, not just clicking;
+  panes never read or write this state directly. *Fine* (which element inside a
+  pane holds focus) belongs to the pane's content but follows one rule: content
+  is keyboard-navigable by default (§4.1 pane contract), built from the kit's
+  list-navigation/roving-focus primitive rather than hand-rolled `tabindex`.
+  `Tab` traverses within-pane DOM order; moving *between* panes is a chord (the
+  pane-switch/maximize commands), not `Tab` bleeding into the next pane. Fine
+  focus position is T4 session state (state §5.1) — it returns on in-session
+  navigation and resets on relaunch. Dividers are keyboard-reachable separators
+  with left/right resize commands; pointer drag captures the pointer until
+  release and must not steal text selection inside Monaco or xterm.
 
 ## 8. Invariants the refactors must not regress
 
@@ -229,7 +237,11 @@ measurable ([performance.md](./performance.md) §2):
 
 - **Keyboard-first everything**: any new surface (dialogs above included) is
   fully keyboard-operable; chords keep working while it's open or it closes
-  on Esc.
+  on Esc. This extends to *pane content*, not just shell surfaces — every
+  pane's focusable content is reachable and operable by keyboard by default
+  (§4.1 pane contract), verified by the conformance suite
+  ([testing.md](./testing.md) §4). "By default" only holds because the build
+  fails when a pane isn't navigable, not because contributors remember.
 - **Pane switch ≤ one frame; task switch ≤ 100 ms** — registries add lookup
   indirection, not render weight.
 - **Terminal echo ≤ 50 ms p95** through the WS migration; a busy TUI never

@@ -6,6 +6,23 @@ This is a critical review. The strengths section at the bottom is real, but the 
 is deliberately weighted toward what will hurt as the codebase grows. Every finding
 carries file:line references so it can be verified or challenged.
 
+> **Status (updated 2026-07-07):** this review is the motivating analysis; the
+> findings and recommendations below have since been taken up, resequenced, and in
+> places superseded by the rest of `docs/next`. [implementation.md](./implementation.md)
+> is now the **authoritative build order** — where it and this review disagree on a
+> detail, it wins. Where a finding's disposition has changed, this doc points forward:
+> §1b/#7 → [integrations.md](./integrations.md) (the full provider contract subsuming
+> the sketched `Provider` interface); §1c/#2 → the extracted sync engine
+> ([contribution-points.md](./contribution-points.md) §4.9); §1d/#13 → the agent-tool
+> projection (points §4.8); §1e/#10 → workflow-engine extensibility in
+> [implementation.md](./implementation.md) Phase 8 plus the runtime corrections in
+> [agent-runtime.md](./agent-runtime.md); §3/#3 → the transport collapse (technology
+> change #1) rather than a typed IPC bus; §4 → [ui-state.md](./ui-state.md) (runtime
+> reactions) and [ux.md](./ux.md) (shortcut/error surfaces); §5 →
+> [performance.md](./performance.md) (retention + indexes); §6 →
+> [testing.md](./testing.md) (the operative test plan; the coverage numbers stand).
+> Exact counts throughout are authoritative in [inventories.md](./inventories.md).
+
 ## Verdict
 
 acorn is a well-disciplined codebase with an **extension problem**. The type hygiene
@@ -199,8 +216,9 @@ architecture:
   exists in three hand-synced copies: the preload implementation
   (`main/preload.ts`, every return `Promise<any>` via `ipcRenderer.invoke`), the
   client's hand-declared `TerminalApi`/`EditorApi`/etc.
-  (`terminalClient.ts:5-136` + siblings), and ~69 string-keyed
-  `ipcMain.handle('run:targets', …)` registrations in main. Nothing links the
+  (`terminalClient.ts:5-136` + siblings), and 67 `ipcMain.handle` (plus 3
+  `ipcMain.on`) string-keyed `ipcMain.handle('run:targets', …)` registrations in
+  main (exact counts: inv §1). Nothing links the
   channel string in preload to the one in main, nor a handler's actual return to
   the client's declared type. A typo or shape change fails only at runtime — and
   this is also the least-tested layer (§6).
@@ -244,8 +262,9 @@ concern (theme, restore, persistence) into its own composable.
 
 ### Cross-cutting client policy is scattered
 
-- **Keyboard shortcuts:** 13 `window` keydown listener sites (9 global sites plus
-  4 component-local Esc handlers; inventory §3b has the full list) with
+- **Keyboard shortcuts:** 13 `window` keydown listener sites (global-chord sites
+  plus 4 component-local Esc handlers; inventory §3b has the authoritative list)
+  with
   conflict-avoidance by a hand-maintained denylist
   (`paneShortcuts.ts:31 RESERVED_CHORDS`) and prose comments
   (`TerminalPanel.tsx:106-111`). The help screen (`Shortcuts.tsx:17-31`) is a third
@@ -263,12 +282,16 @@ concern (theme, restore, persistence) into its own composable.
   (`App.tsx:216-218`), while `TabRail.saveOrder` (:48), `DiffView.setViewMode`
   (:94), and `toggleCollapsed` (`App.tsx:261`) *do* invalidate — triggering the
   app-wide reactive fan-out the first protocol was designed to avoid. Pref keys
-  themselves are ~22 bare string literals with no central `PrefKeys` const.
-- **One-shot mailbox coupling:** `pendingTerminalFocus` (`sessions.ts:41-48`,
-  written by CommandPalette, read-then-cleared by TerminalPanel) and the
-  `FILE_SCROLL_EVENT` window CustomEvent (`DiffView.tsx:373-382`) are ad-hoc
-  pub/sub channels invisible at the call site. Two instances is a pattern
-  forming; it deserves either a named event bus or props.
+  themselves are 20 bare string literals with no central `PrefKeys` const (full
+  key list + tier split: inv §3a).
+- **One-shot mailbox coupling:** four ad-hoc pub/sub channels invisible at the
+  call site — `pendingTerminalFocus` (`sessions.ts:41-46`, written by
+  CommandPalette, read-then-cleared by TerminalPanel), the `FILE_SCROLL_EVENT`
+  window CustomEvent (`fileNavigation.ts:1,13` → DiffView), `noteToOpen`
+  (`notesClient.ts:28-31`, ContextPane → NotesPane), and `pendingEditorReveal`
+  (`editorState.ts:68-73`, Search → EditorPane). (This review originally named
+  only the first two; inv §3f is the complete list — four instances, not two.)
+  Four instances is a pattern; it deserves either a named event bus or props.
 
 ### Feature isolation is cosmetic
 
@@ -413,11 +436,11 @@ Ordered by leverage per unit of effort.
 |---|--------|--------|--------|
 | 1 | `satisfies` on every `c.json` mapper; add `ApiError` to `shared/api.ts` + one `respondError` helper | §3 server drift, error envelope | S |
 | 2 | Extract `serveThenRevalidate()` + a cache-policy constants module; delete the duplicated `STALE_AFTER_MS` | §1c divergence | M |
-| 3 | Collapse request/response IPC to loopback HTTP routes plus one WS for streams; keep only true Electron-ism IPC residue | §3 IPC drift (the top risk) | M |
+| 3 | ~~Typed IPC contract module linking the preload/main/client channel copies~~ — **superseded by technology change #1** (collapse request/response IPC onto loopback HTTP + one WS for streams; keep only true Electron-ism residue), which closes §3's IPC drift structurally. The typed bus survives only as the fallback if that collapse stalls. | §3 IPC drift (the top risk) | M |
 | 4 | Neutral `main/bootstrap.ts` composition root; wire bridges before the listener starts; add a `will-quit` teardown | §2 entirely | M |
 | 5 | Pane registry (`id/label/order/shortcut/render`) driving `PANE_IDS`, shortcuts, switcher, `paneBody` | §1a | M |
 | 6 | Require-user middleware on protected routers (delete the 56 inline guards); shared mirror-repo lookup helper | server boilerplate | S |
-| 7 | `Provider` interface + `forEachConnection` before integration #3 | §1b | M |
+| 7 | Provider abstraction before integration #3 — this minimal `Provider` interface (`validate`/`fetchItems`/`fetchDetail`/`toIssue` + `forEachConnection`) is **subsumed by the fuller `IntegrationProviderContribution`** now specified normatively in [integrations.md](./integrations.md) (points §4.14); the "before integration #3" deadline stands (integrations §19) | §1b | M |
 | 8 | Client shortcut registry owning bindings, conflicts, and the help screen | §4 shortcuts | M |
 | 9 | Extract App.tsx restore/persist into an ordered `createStartupRestore()` composable; unify the prefs write-back protocol | §4 App.tsx | M |
 | 10 | Step-handler registry in `workflowRunner`; explicit `joins:` reference | §1e | S |
@@ -427,8 +450,8 @@ Ordered by leverage per unit of effort.
 | 14 | Retire the `Env`/`BLOBS` costume: `createApp(runtime)`, plain `readBlob/writeBlob` | §7 | M |
 
 Items 1–5 are the structural core: contract enforcement, the sync abstraction, the
-IPC contract, the composition root, and the pane registry. Everything after is
-compounding hygiene.
+transport collapse (technology change #1, superseding #3), the composition root, and
+the pane registry. Everything after is compounding hygiene.
 
 One deliberate non-recommendation: do **not** add runtime validation (zod) across
 the HTTP surface. This is a single-user loopback app; compile-time linkage made
@@ -462,7 +485,15 @@ in [contribution-points.md](./contribution-points.md) §4.8 gets its transport f
 Trade-offs to respect: PTY output needs explicit flow control over WS (xterm has
 a standard pattern; IPC currently gives backpressure semi-for-free), and a
 minimal IPC residue stays for true Electron-isms (dialogs, `browser.bind`'s
-webContents IDs).
+webContents IDs). This is now the executed path (it supersedes recommendation
+#3's typed-IPC bus) — [implementation.md](./implementation.md) Phase 3. Two
+docs add conditions this analysis didn't carry: the post-collapse threat model
+([security.md](./security.md) §3 — every migrated route behind `requireUser`,
+WS upgrade must verify Host + session cookie + exact loopback `Origin`, PTY
+input treated as a privileged write), and the requirement that a perf baseline
+land first so Phase 3's "no regression under a busy TUI" is verifiable, with the
+WS coalescing reframed as a throughput win ([performance.md](./performance.md)
+§3.3).
 
 **2. Migrate the preview pane from the `<webview>` tag to `WebContentsView`.**
 Electron's docs have discouraged the `webview` tag for years (guest-view
@@ -473,6 +504,8 @@ DOM-embedded guest dies with its DOM node. `WebContentsView` is main-owned and
 bounds-managed — surviving pane switches is its natural behavior, not a hack —
 and it composes directly with `browserService.ts`'s CDP binding. This is the one
 place the app is built on an API with a stated deprecation trajectory.
+Scheduled for [implementation.md](./implementation.md) Phase 9, paired with
+Phase 5's `keepAlive` pane slot (whichever lands second gets simpler).
 
 **3. Plan the exit from better-sqlite3 to `node:sqlite`.** The ABI
 double-rebuild dance is the most-documented gotcha in the repo, and
@@ -483,10 +516,15 @@ Drizzle's `node:sqlite` driver maturity, FTS5 availability in the bundled build
 (the memory index depends on it), and the `db.batch`/transaction semantics the
 mirror writes rely on. node-pty has no non-native alternative, so the dance
 doesn't fully die — but two dual-ABI natives becoming one is a real reduction.
+Decided as **spike-first** ([implementation.md](./implementation.md) Phase 9):
+a time-boxed PR proves the driver/FTS5/`db.batch` questions before any
+migration; any one failing parks it.
 
-**4. Secrets: Electron `safeStorage`, not keytar, for the planned Phase-3
+**4. Secrets: Electron `safeStorage`, not keytar, for the planned packaged-build
 keychain work.** keytar is archived/unmaintained; `safeStorage` is built in and
-needs no native rebuild. Worth pinning now since it's on the roadmap.
+needs no native rebuild. **Decided** — built when packaging matters, with
+`SESSION_ENC_KEY` moving first ([implementation.md](./implementation.md) Phase 9;
+[security.md](./security.md) §6).
 
 ### Keep, with eyes open
 
@@ -530,10 +568,14 @@ needs no native rebuild. Worth pinning now since it's on the roadmap.
 - **E2E testing:** the riskiest untestable surface (§6 — the App.tsx restore
   choreography, the IPC wiring) is exactly what unit tests can't reach.
   Playwright's Electron driver is the standard answer and the only meaningful
-  new dev-dependency worth adding.
+  new dev-dependency worth adding. *Now planned* as a five-test smoke suite
+  (S1–S5) gating Phases 3/5/6 — [testing.md](./testing.md) §1.
 - **Observability:** `console.error` into the void (§21 in the server findings).
   Not pino-scale — JSON lines to a file under `userData` with a settings-pane
   tail would do — but *some* persistent log matters for an app whose failure
-  mode is "background refresh silently stopped."
+  mode is "background refresh silently stopped." *Now scoped* as the
+  observability track ([performance.md](./performance.md) §3.1 baseline marks;
+  [security.md](./security.md) §6 — log route + status + timing, never request
+  bodies or headers).
 - **Auto-update:** electron-builder is fine; add electron-updater + notarization
   only when distribution beyond one machine becomes real. Not before.
