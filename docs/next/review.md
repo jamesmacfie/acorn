@@ -44,8 +44,8 @@ if-ladder (`TaskView.tsx:230-281`), and a hand-written switcher button
 (`TaskView.tsx:297-334`). The command palette derives its rows from `PANE_ORDER`
 (the one table-driven consumer); everything else is manual. Forget the switcher
 button and the pane exists but is unreachable. The evidence this bites: the
-`database` pane was added and `docs/panes.md` still says there are eight panes
-(code has nine — `panes.md:6,16` vs `layout.ts:9`).
+`database` and `search` panes were added and `docs/panes.md` still says there
+are eight panes (code has ten — `panes.md:6,16` vs `layout.ts:9`).
 
 **Fix shape:** one pane registry — `{ id, label, order, shortcut, render(task) }` —
 that `PANE_IDS`, the shortcut defaults, the switcher, and `paneBody()` all derive
@@ -213,14 +213,15 @@ architecture:
   good ones parse to `unknown` then normalize (`layout.ts` `normalizeLayout`), the
   bad ones cast to a concrete type (`ShortcutsSettings.tsx:25`).
 
-**Fix shape:** three cheap moves close most of this. (1) `satisfies` on every
-`c.json` mapper — mechanical, an afternoon. (2) A single typed IPC contract module
-shared by preload, main handlers, and the client — channel names as constants,
-one `Invoke<C>` mapping channel → request/response, so all three copies collapse
-to one. (3) An `ApiError` type in `shared/api.ts` plus one `respondError` helper.
-Full runtime validation (zod on bodies) is worth it only at the genuinely
-untrusted boundaries; for a single-user loopback app, compile-time linkage is the
-right level — but it has to be *mandatory*, not opt-in.
+**Fix shape:** three moves close most of this. (1) `satisfies` on every
+`c.json` mapper — mechanical, an afternoon. (2) Collapse request/response IPC
+onto the loopback HTTP contract, with one WS for streams and only true
+Electron-ism channels left in preload; the typed IPC bus is now only the
+fallback if that collapse stalls. (3) An `ApiError` type in `shared/api.ts`
+plus one `respondError` helper. Full runtime validation (zod on bodies) is
+worth it only at the genuinely untrusted boundaries; for a single-user
+loopback app, compile-time linkage is the right level — but it has to be
+*mandatory*, not opt-in.
 
 ---
 
@@ -243,9 +244,9 @@ concern (theme, restore, persistence) into its own composable.
 
 ### Cross-cutting client policy is scattered
 
-- **Keyboard shortcuts:** ten independent `window` keydown listeners (App, TabRail,
-  TaskView, TerminalPanel, Shortcuts, overlay.ts ×3, plus component-local ones)
-  with conflict-avoidance by a hand-maintained denylist
+- **Keyboard shortcuts:** 13 `window` keydown listener sites (9 global sites plus
+  4 component-local Esc handlers; inventory §3b has the full list) with
+  conflict-avoidance by a hand-maintained denylist
   (`paneShortcuts.ts:31 RESERVED_CHORDS`) and prose comments
   (`TerminalPanel.tsx:106-111`). The help screen (`Shortcuts.tsx:17-31`) is a third
   hand-synced copy that lies the moment a binding is added without updating it.
@@ -330,7 +331,7 @@ pure modules, client pure models, and the workflow runner). The architecture
 makes route testing cheap — `createApp()` factory, `getDb(c.env)` DI,
 `makeTestDb` — yet:
 
-- **19 of 27 route files are untested**, including the highest-risk ones:
+- **18 of 26 route files are untested**, including the highest-risk ones:
   `prActions.ts` (merge/close/comment against GitHub), `prCreate.ts`, `pulls.ts`,
   `pullDetail.ts`, `integrations.ts` (token encrypt/store), and the entire
   `harness.ts` agent surface.
@@ -412,7 +413,7 @@ Ordered by leverage per unit of effort.
 |---|--------|--------|--------|
 | 1 | `satisfies` on every `c.json` mapper; add `ApiError` to `shared/api.ts` + one `respondError` helper | §3 server drift, error envelope | S |
 | 2 | Extract `serveThenRevalidate()` + a cache-policy constants module; delete the duplicated `STALE_AFTER_MS` | §1c divergence | M |
-| 3 | Typed IPC contract module (channel constants + `Invoke<C>` map) shared by preload/main/client | §3 IPC drift (the top risk) | M |
+| 3 | Collapse request/response IPC to loopback HTTP routes plus one WS for streams; keep only true Electron-ism IPC residue | §3 IPC drift (the top risk) | M |
 | 4 | Neutral `main/bootstrap.ts` composition root; wire bridges before the listener starts; add a `will-quit` teardown | §2 entirely | M |
 | 5 | Pane registry (`id/label/order/shortcut/render`) driving `PANE_IDS`, shortcuts, switcher, `paneBody` | §1a | M |
 | 6 | Require-user middleware on protected routers (delete the 56 inline guards); shared mirror-repo lookup helper | server boilerplate | S |
@@ -421,7 +422,7 @@ Ordered by leverage per unit of effort.
 | 9 | Extract App.tsx restore/persist into an ordered `createStartupRestore()` composable; unify the prefs write-back protocol | §4 App.tsx | M |
 | 10 | Step-handler registry in `workflowRunner`; explicit `joins:` reference | §1e | S |
 | 11 | Route tests for `prActions`/`prCreate`/`harness` (the factories already make this cheap) | §6 | M |
-| 12 | Child-row prune alongside the PR-list prune; decide FK-vs-helper for cascades | §5 rot | S |
+| 12 | Child-row prune alongside the PR-list prune; use declared parent lineage as the cascade/prune/index source of truth | §5 rot | S |
 | 13 | Collapse the notes/memory channel fork (one store API with provenance params, both channels call it) | §1d semantics | M |
 | 14 | Retire the `Env`/`BLOBS` costume: `createApp(runtime)`, plain `readBlob/writeBlob` | §7 | M |
 
@@ -457,7 +458,7 @@ typed contract seam instead of three (§3's worst drift surface disappears
 structurally rather than by discipline), a preload that shrinks to almost
 nothing, `dev:node` browser mode approaching full functionality, and the plugin
 model's "main parts" mostly becoming "server parts" — the agent-tool projection
-in [extensability.md](./extensability.md) §4.8 gets its transport for free.
+in [contribution-points.md](./contribution-points.md) §4.8 gets its transport for free.
 Trade-offs to respect: PTY output needs explicit flow control over WS (xterm has
 a standard pattern; IPC currently gives backpressure semi-for-free), and a
 minimal IPC residue stays for true Electron-isms (dialogs, `browser.bind`'s
