@@ -8,9 +8,30 @@ and can that model reach 100% parity with what ships today?*
 
 It is grounded in a full inventory of what every pane and shell surface actually
 consumes (routes, IPC channels, main-process modules, prefs, shortcuts, palette
-entries, context contributions, lifecycle obligations). The parity map in §7 is
-the proof obligation: every current feature is expressed as a plugin over the
-contribution points in §4, or explicitly kept in core with a reason.
+entries, context contributions, lifecycle obligations). The parity map in §7
+shows every current feature has a *home*: expressed as a plugin over the
+contribution points, or explicitly kept in core with a reason. The
+*behaviour-level* proof obligation is
+[feature-parity.md](./feature-parity.md) — one checkbox per shipped behaviour.
+
+> **This design spans four files** (split for navigability; section numbers are
+> stable across the set, so a citation like "§4.8" is unambiguous):
+>
+> - **This file** — tenets (§1), the core (§2), the extension model (§3), the
+>   assembled layout (§6), the parity map (§7), the hard parts (§8), and the
+>   order of operations (§9).
+> - **[contribution-points.md](./contribution-points.md)** — §4, the full
+>   contribution-point catalog (§4.1–§4.14).
+> - **[state-and-policies.md](./state-and-policies.md)** — §5, the core services
+>   plugins consume, the state model (§5.1), and the runtime policies (§5.2).
+> - **[integrations.md](./integrations.md)** — the integration-provider
+>   contract (§4.14's full specification): connections/auth, capabilities,
+>   link identity, lifecycle, error taxonomy, conformance. Cited as
+>   *(integrations §N)*.
+>
+> The build order that turns this design into shipped code is
+> [implementation.md](./implementation.md); this doc is the *target*, that doc
+> is the *route*.
 
 ---
 
@@ -47,6 +68,15 @@ contribution points in §4, or explicitly kept in core with a reason.
    `core.terminal-drawer`. The closed unions (`PaneId`, `SourceId`,
    `WorkflowStepDef.kind`) that today leak into 18 files become registry-validated
    strings with branded types at the edges.
+8. **Plugins are trusted; the repo is not.** Tenet 5's trust extends to code in
+   this repository — not to data that arrives *from a cloned repo*.
+   `.acorn/config.toml` contributes run targets and workflow definitions that
+   execute shell commands, which makes every checkout a config source with the
+   VS Code "trusted workspace" problem. Repo-sourced executable config requires
+   a one-time acknowledgment (§4.12); agent tools declare a risk tier (§4.8).
+   The security posture of the whole loopback surface — what these gates defend
+   and what they deliberately don't — is written down in
+   [security.md](./security.md).
 
 ---
 
@@ -64,13 +94,16 @@ deliberately boring: identity, storage, process plumbing, and empty UI sockets.
   features extracted.
 - **The Workspace → Task model and stores**: `tasks`, `taskLinks`, workspace
   membership, the active-task/selected-source signals, the layout reducer
-  `applyLayoutAction` (kept verbatim — it's already pure and pane-agnostic; only
-  `PaneId` widens from a union to validated strings).
+  `applyLayoutAction` (kept pure and pane-agnostic, but not verbatim: `PaneId`
+  widens from a union to validated strings, and the model grows pane-id-keyed
+  weights, pins, and move/resize actions for modern pane management —
+  [ux.md](./ux.md) §7).
 - **The data layer**: the TanStack Query client, IndexedDB persistence, the
   `readJson`/`writeJson` client, and the **prefs service** (namespaced key-value
   with hydrate-once/persist semantics — the ordered startup-restore pipeline from
   review.md §4 becomes a core service plugins register slices into, instead of
-  effects hand-ordered in App.tsx).
+  effects hand-ordered in App.tsx). Persisted plugin state goes through
+  versioned descriptors/codecs (state §5.1a), not raw `writeJson`.
 - **Registries + the event bus** (§3).
 - **Capability detection**: `desktop` / bridge-present flags; plugins declare
   which capabilities their parts require and the core gates activation.
@@ -101,13 +134,16 @@ deliberately boring: identity, storage, process plumbing, and empty UI sockets.
 - **The worktree service**: `taskWorktree.ts` unchanged — the taskId-as-capability
   model (`resolveTaskCwd`/`resolveInRoot`) is already the best boundary in the
   codebase and becomes the core primitive every plugin gets file access through.
-- **The IPC bus**: one typed channel registry (review.md recommendation #3).
-  Plugins declare channels with request/response types; the core generates the
-  preload exposure and the renderer client from the same declaration. A plugin
-  never touches `ipcMain`/`ipcRenderer` directly. (Per review.md's technology
-  analysis, the endgame is smaller still: most IPC collapses onto the loopback
-  HTTP server with a WebSocket for PTY streams, leaving only true Electron-isms —
-  dialogs, webContents binding — on this bus.)
+- **The transport**: per [implementation.md](./implementation.md) decision 1,
+  the request/response surface between renderer and main collapses onto the
+  loopback HTTP server (typed through `shared/api.ts`), with one WebSocket for
+  PTY/step streams and a *minimal* hand-typed IPC residue for true Electron-isms
+  (dialogs, webContents binding). Plugins never touch `ipcMain`/`ipcRenderer`
+  directly: a plugin's "main part" exposes its surface as server routes or agent
+  tools, and the residue channels are core-owned. (An earlier draft of this
+  design proposed a typed IPC bus as a core service; the transport collapse
+  supersedes it — the bus survives only as the fallback plan if the collapse
+  stalls.)
 - **The run-config loader**: the layered `.acorn/config.toml` → `~/.acorn` → DB
   merge (`runConfig.ts`) — already the most plugin-shaped thing in the app; it
   becomes the core's *file-configurable contribution* mechanism (workflows and
@@ -158,6 +194,11 @@ services (§5), and the event bus. Nothing is imported from another plugin's
 internals; cross-plugin extension happens through contribution points the
 *extended* plugin itself declares (§3.4).
 
+**Contract:** `activate()` only registers. No I/O, no network, no filesystem —
+first real work happens on first use or first poll tick (§5.2). This is what
+keeps activation cheap as plugins multiply, and it is testable: the plugin
+conformance suite ([testing.md](./testing.md) §4) asserts it.
+
 ### 3.2 Activation & lifecycle
 
 - Static registry (`plugins/index.ts` lists them; a pref can disable one).
@@ -167,7 +208,9 @@ internals; cross-plugin extension happens through contribution points the
   in reverse. The three-call-site `evictPreviewWebview` obligation becomes one
   `ctx.events.on('task:archived', …)` subscription inside the preview plugin.
 - Boot-time recovery: a `main` part may register `reconcile()` (tmux resurrect,
-  worktree prune, workflow resume); the composition root runs them in one place.
+  worktree prune, workflow resume); the composition root runs them in one place,
+  **after** the window is up — reconcile work grows with accumulated state and
+  must stay off the boot critical path ([performance.md](./performance.md) §3.6).
 
 ### 3.3 UI slots
 
@@ -181,7 +224,7 @@ contributions with a `when` predicate (reactive):
 | `rail.sources` | GitHub/Linear/Rollbar source buttons | from source registry (§4.2) |
 | `rail.taskRow.badges` | checks dot, dirty ✎, needs-you ‼, unread, missing ⚠ | `(task) => Badge \| null` |
 | `main.view` | browse views + task view + PR three-pane | from source/pane registries |
-| `task.paneRow` | the 9 panes | from pane registry (§4.1) |
+| `task.paneRow` | the 10 panes | from pane registry (§4.1) |
 | `task.switcher.extra` | run ▶ buttons, agents ⠿, terminal >_ | button + `when` |
 | `drawer.bottom` | TerminalPanel | singleton socket |
 | `panel.right` | AgentsPanel | singleton socket |
@@ -207,288 +250,56 @@ the notes pane. The rule: **the extended plugin declares the point.**
   `openPane(paneId, intent)` — replacing the `noteToOpen` / `requestTerminalFocus`
   one-shot mailbox signals with one core mechanism.
 
+### 3.5 UI composability inside contributions
+
+Slots make the *shell* composable; they say nothing about the UI plugins put in
+them. Three rules keep contributed UI coherent — without them the plugin model
+delivers a consistent frame around inconsistent content:
+
+1. **Core UI kit.** The core exports the primitive vocabulary: the token layer
+   (already theme-contributed, §4.13) plus the small widget set every pane
+   currently re-invents — list rows, badges, empty states, section headers,
+   toolbars, tooltip, and the `QueryGate` loading/error primitive
+   ([ui-state.md](./ui-state.md) §2.5). Today the shared layer is a handful of
+   loose components (`CopyButton`, `UserAvatar`, `Picker`) and consistency is
+   single-author discipline; under plugins it must be structural. Plugin
+   components compose core primitives and consume core tokens. CSS follows the
+   same rule: styles are namespaced per plugin — today's per-feature `.css`
+   files share one global class namespace, which two plugins will eventually
+   collide in.
+
+2. **Render failure is contained at the slot.** Tenet 6 covers *unknown*
+   contributions; a *throwing* one is worse — there is currently zero
+   `ErrorBoundary` usage, so one bad pane render takes down the shell. The slot
+   renderer wraps every contribution in an error boundary degrading to an inert
+   placeholder (a pane shows "failed" + plugin id; a badge simply disappears).
+   This extends tenet 6 from persisted state to runtime.
+
+3. **Pure model + thin view inside panes.** The plugin model bounds features;
+   it does not decompose them (§8.1). The existing discipline — `layout.ts`,
+   `diff/model.ts`, `palette/model.ts` — *is* the intra-pane composability
+   story, and the contract new panes are held to: logic in a testable model
+   module, the component a thin reactive view over it. This is also the Solid
+   mitigation review.md's technology section leans on. The companion rules for
+   how contributed UI *reacts* — failure surfaces, latest-wins refreshes,
+   derive-don't-effect — are [ui-state.md](./ui-state.md) §3 and bind equally.
+
 ---
 
 ## 4. Contribution point catalog
 
-Each point below names its consumer registry, its interface (abbreviated), and
-the current code it replaces.
+Moved to **[contribution-points.md](./contribution-points.md)** (§4.1–§4.14,
+numbering preserved). The catalog names, for each point, its consumer registry,
+its interface, the current code it replaces, and the implementation phase that
+lands it. The integration-provider point (§4.14) has its own full contract
+doc, [integrations.md](./integrations.md).
 
-### 4.1 Panes
+## 5. Core services, state, and runtime policies
 
-```ts
-interface PaneContribution {
-  id: string                        // 'github.pr', 'core.editor'
-  label: string; glyph: string
-  order: number                     // replaces PANE_ORDER
-  defaultChord?: string             // 'meta+shift+e' — into keybinding registry
-  when?: (task: Task) => boolean    // replaces hasPr()/linearLinks() switcher gating
-  component: Component<{ task: Task }>
-  keepAlive?: 'dom' | 'none'        // preview's persistent <webview> contract
-}
-```
-
-Replaces: the `PaneId` union + `PANE_LABELS` + `PANE_ORDER` + `PANE_IDS`
-(`layout.ts:9-41`), the `paneBody()` ladder and hand-written switcher buttons
-(`TaskView.tsx:172-262`), `PANE_SHORTCUT_DEFAULTS` (`paneShortcuts.ts:14`).
-The palette's Show/Close-pane rows, the switcher, the shortcut defaults, and the
-help screen all derive from this registry. Persisted layouts keep unknown ids
-inert (generalizing `isPaneId`).
-
-The **pane contract must be uniform**: a pane receives `{ task }` and must not
-read the router. This forces the one real fix the current code needs — the `pr`
-pane's PullDetail/DiffView read `useParams()` and require global navigation
-(`TaskView.tsx:174-186`, `activate.ts:11-15`). Under the plugin model the github
-plugin's pane resolves owner/repo/number from `task` itself.
-
-`keepAlive: 'dom'` is the honest generalization of the preview pane's
-body-parented webview: the core owns an off-tree layer keyed by (pane, task) and
-the positioning dance, instead of the plugin hand-managing `previewWebviews`.
-
-### 4.2 Sources (rail entry + browse view + task origin)
-
-```ts
-interface SourceContribution {
-  id: string                        // 'github', 'linear', 'rollbar'
-  glyph: string; label: string
-  when?: () => boolean              // 'integration connected' — replaces availableSources()
-  browse: Component                 // LinearBrowse / RollbarBrowse / the PR three-pane
-  originGlyph: string               // replaces ORIGIN_GLYPH
-  defaultPane?: string              // pane to open when a task is promoted from this source
-  seedTask?: (item) => TaskSeed     // the promote flow
-}
-```
-
-Replaces: `SOURCE_IDS`/`isSourceId` (`tasks.ts:13-15`), `availableSources`
-(`sources.ts:9`), the hand-written `<Match>` per source in `App.tsx:415-487`,
-`ORIGIN_GLYPH` (`TabRail.tsx:28`), the per-source branch in `activateTaskSignals`
-(`activate.ts:23`). Task `origin` becomes the contributing source's id (the
-schema column is already free text). Adding a source drops from ~10 touch points
-(inventory §2) to one contribution.
-
-### 4.3 Commands & palettes
-
-```ts
-interface CommandContribution {
-  id: string; title: string; category: 'action' | 'task' | 'workspace' | …
-  when?: () => boolean
-  run: (ctx) => void | Promise<void>
-}
-```
-
-One command registry feeds ⌘K. The palette's hardcoded action list
-(`CommandPalette.tsx:63-80`) becomes contributions from the owning plugins (New
-terminal → terminal plugin; Archive → core tasks; New Claude Code → the
-claude-code profile plugin). Run targets, layout recipes, and workflows already
-arrive as *data*; they become palette **item providers** — a second, coarser
-contribution for plugins that inject dynamic rows (`(query) => PaletteItem[]`).
-The overlay mechanics (`createOverlayPalette`, the `activeClose` mutex) are core;
-FilePalette/WorkspacePalette are plugins registering overlays with their own
-toggle chords.
-
-### 4.4 Keybindings
-
-```ts
-interface KeybindingContribution {
-  id: string; chord: string; when?: 'global' | 'task' | 'typing-exempt'
-  command: string                   // command id — bindings bind commands, not closures
-}
-```
-
-One registry owns: registration, conflict *detection* (replacing the
-hand-maintained `RESERVED_CHORDS` denylist and the prose comments coordinating
-TabRail vs TerminalPanel numerics), user remapping (generalizing the
-`pane_shortcuts` pref machinery), and the help screen (replacing the third
-hand-synced copy in `Shortcuts.tsx:17-31` — the help renders the registry, so it
-cannot lie). The ten scattered `window` keydown listeners collapse into one core
-dispatcher plus component-local editor/terminal handling where focus semantics
-genuinely differ (Monaco ⌘S, xterm passthrough).
-
-### 4.5 API routes (server)
-
-```ts
-ctx.routes.mount('/api/linear', linearRouter)        // namespaced by convention
-```
-
-Server plugin parts mount routers exactly as `server/index.ts:31-58` does today
-— that mechanism is fine; it just moves from one hand-edited file into plugin
-activation. The core enforces the two things convention currently carries:
-authenticated-by-default (a `requireUser` wrapper — review.md #6) and the shared
-error envelope. The `/api/repos` fan-in of 11 routers becomes internal structure
-of the github plugin.
-
-### 4.6 Settings pages
-
-```ts
-interface SettingsContribution {
-  id: string; label: string; group: 'general' | 'workspace'
-  component: Component<{ workspace?: Workspace }>
-}
-```
-
-Replaces the `TABS` list in `SettingsModal.tsx:23-31`. Appearance/shortcuts/
-permissions are core pages; integrations, MCP inspector, workflows inspector,
-terminal defaults, and the per-workspace script editors come from their plugins.
-Workspace-scoped script fields (setup/dev/teardown/dbUrl) become **workspace
-config contributions** — a plugin declares the fields it stores on the workspace
-and the settings form renders them — so the `workspaces` table stops accreting
-per-feature columns (`schema.ts:278-285`).
-
-### 4.7 Context sections
-
-```ts
-interface ContextSectionContribution {
-  id: string                        // 'pr' | 'issues' | 'notes' | 'memory' | …
-  label: string
-  defaultIncluded: boolean          // context pane tray default
-  assemble: (task: TaskRef) => Promise<ContextSection | null>   // server-side
-}
-```
-
-Replaces the hardcoded `include=pr,issues,notes,memory` sections in
-`taskContext.ts` and the `setContextNotesSource`/`setContextMemorySource` global
-setters. The assembler route iterates the registry; the Context pane tray, the
-`formatContextBlock` push path, and the MCP `task_context` pull path all follow
-automatically. A future "recent CI failures" section is one contribution.
-
-### 4.8 Agent tools — the keystone point
-
-```ts
-interface AgentToolContribution {
-  name: string                      // 'notes_append', 'browser_click'
-  description: string
-  input: ZodSchema
-  scope: 'task'                     // receives { taskId, worktreePath, sessionId }
-  when?: (task) => Promise<boolean> // replaces the connect-time hasRunTargets freeze
-  handler: (input, scope) => Promise<unknown>   // runs in main
-  exposeToRenderer?: boolean        // also project a typed IPC client
-}
-```
-
-One declaration; the core projects it three ways:
-- an **MCP tool** (schema straight from `input`; availability re-evaluated, with
-  `tools/list_changed` on transitions);
-- a **harness HTTP route** (`POST /api/tasks/:id/tools/:name`, `INTERNAL_TOKEN`
-  auth, the `respond()` envelope) — so non-MCP agents and tests hit the same
-  surface;
-- optionally a **renderer client method** over the typed IPC bus.
-
-This collapses the five-edit-site pipeline (preload → knowledgeIpc → harness
-route → bridge → MCP tool) into one object, and structurally prevents the
-semantic forks the current channels have already grown (agent-vs-UI note
-creation differing in frontmatter/provenance — review.md §1d): there is one
-handler, and provenance (`author`, `sessionId`) comes from `scope`, supplied by
-the channel.
-
-Replaces: all of `harness.ts`'s bridge types + setters, `harnessWiring.ts`, the
-per-tool bodies in `mcp/server.ts`, and the notes/memory/run/browser groups in
-`preload.ts`/`knowledgeIpc.ts`.
-
-### 4.9 Mirrored resources (server sync descriptors)
-
-```ts
-interface MirroredResource<Row> {
-  id: string                        // 'github.pulls', 'linear.issues'
-  ttlMs: number                     // today: 45s / 300s / 600s / 120s, centralized at last
-  etag?: boolean
-  fetch: (key, prior: SyncState) => Fetched<Row> | NotModified
-  persist: (tx, key, rows: Row[]) => void      // atomic delete-then-insert inside db.batch
-}
-```
-
-The core sync engine owns the four-branch serve/revalidate/cold state machine,
-`sync_state` bookkeeping, background-refresh tracking, and rate-limit backoff —
-in one place instead of five divergent copies (review.md §1c). The github plugin
-registers pulls/detail/files/repos descriptors; linear and rollbar register
-theirs. TTL constants live on the descriptor: the caching policy becomes
-greppable data.
-
-### 4.10 Workflow step kinds & policies
-
-```ts
-ctx.workflows.registerStepKind('ci-loop', ciLoopHandler)      // Map<kind, StepHandler>
-ctx.workflows.registerPolicy('checks-green', checksGreenEval) // github plugin contributes
-```
-
-Replaces the `executeStep` if-ladder (`workflowRunner.ts:189-250`) and the
-one-case `evaluatePolicy` switch. Note the layering this reveals:
-`checks-green` needs the GitHub mirror, so the *policy* belongs to the github
-plugin while the *engine* is the workflows plugin — exactly the dependency the
-current code hides inside `workflowWiring.ts`. Step kinds named in
-`.acorn/workflows/*.toml` resolve against the registry; unknown kinds surface as
-parse errors (the loader already does this well).
-
-### 4.11 Agent profiles
-
-```ts
-interface AgentProfileContribution {
-  id: string                        // 'claude-code', 'codex', 'aider', 'shell'
-  command: string; backendPreference: 'tmux' | 'node-pty'
-  mcpRegistration?: (spec: LauncherSpec) => RegisterArgv   // replaces PROFILE_MCP_FLAVOUR
-  headlessArgv?: (opts) => string[]                        // replaces headless.ts branches
-  resumeArgv?: (sessionRef) => string[]                    // replaces resumeCommandFor
-  streamJson?: StreamJsonAdapter                           // agents-panel activity parsing
-}
-```
-
-Replaces `BUILTIN_PROFILES` (`profiles.ts:21-26`), `PROFILE_MCP_FLAVOUR`
-(`terminal.ts:356`), the per-agent branches in `headless.ts:30` and
-`agents/model.ts`. Each agent (claude-code, codex, aider) becomes a small plugin;
-adding one no longer edits four files. The deferred `agent_profiles` table
-(`profiles.ts:4`) becomes unnecessary — file-based plugins *are* the
-user-editable registry.
-
-### 4.12 Run targets & layout recipes — already there
-
-`.acorn/config.toml` (`runConfig.ts`) is the existing proof that acorn's
-contribution model works: run targets, recipes, and workflows are declarative,
-layered (repo → user → DB), validated with surfaced errors, and consumed by
-several subsystems (palette, preview, MCP, TaskView) without those consumers
-knowing each other. The plugin architecture keeps this mechanism as-is and adds
-one thing: plugins may register **config sections** (schema + parser) so a new
-plugin can extend the TOML without editing `runConfig.ts`.
-
-### 4.13 Themes, notifications, content links, status pollers
-
-- **Themes**: `{ id, label, css }` contributions replacing the `THEMES` array +
-  hand-edited `tokens-layout.css` blocks (the existing test that guards
-  list-vs-CSS becomes a registry invariant).
-- **Notification kinds**: `{ kind, glyph, toastPolicy }` replacing the
-  `NoticeKind` union and `KIND_GLYPH`; anyone can `ctx.notices.push(...)`. Edge
-  detection (`detectEdges`) stays in the terminal plugin; workflow notices in the
-  workflows plugin.
-- **Content links**: pattern + resolver + in-app navigation target
-  (generalizing `contentLinks.ts`), consumed by any plugin that renders rich text.
-- **Task status pollers**: the rail's dirty/checks poll becomes per-plugin
-  contributions feeding the badge slot, instead of `term:task:statuses` carrying
-  a fixed shape.
-
----
-
-## 5. Core services plugins consume
-
-The other half of the contract — what `ctx` hands a plugin:
-
-| Service | Backing (today) | Notes |
-| --- | --- | --- |
-| `ctx.tasks` / `ctx.workspaces` | `tasks.ts`, tasks/workspaces routes | read + typed mutations; no direct table access from plugin client code |
-| `ctx.layout` | `applyLayoutAction` dispatch | `openPane(id, intent?)` replaces the mailbox signals |
-| `ctx.query` | TanStack client + shared key discipline | plugins namespace keys; invalidation helpers per resource |
-| `ctx.prefs` | prefs table + restore pipeline | namespaced (`plugin:key`); hydrate/persist ordering owned by core |
-| `ctx.storage.files(taskId)` | `taskWorktree` capability | the only path-resolution API; confinement enforced |
-| `ctx.db` (server/main) | shared SQLite conn | plugins own their tables; migrations contributed per plugin, run by core |
-| `ctx.blobs` | on-disk SHA store | plain `readBlob/writeBlob` (the KV costume retired) |
-| `ctx.terminal` | PTY engine | `create/attach/sendToAgent/onStatus`; profiles come from §4.11 |
-| `ctx.ipc` | typed channel bus | declare-once channels; preload + client generated |
-| `ctx.events` | new | typed bus: `task:created/activated/archived`, `workspace:switched`, `session:status`, `boot:restored` |
-| `ctx.gh` | `server/github` clients | the REST/GraphQL clients + `ghError` taxonomy, exposed to server plugin parts (github plugin is its main user; others may read rate-limit state) |
-
-`ctx.events` deserves emphasis: it is the disciplined replacement for the three
-ad-hoc coupling channels found in review (`pendingTerminalFocus`,
-`FILE_SCROLL_EVENT`, manual `evictPreviewWebview`) and for the archive flow's
-"three obligations that must stay in sync" (inventory §11 note). `task:archived`
-fires once from core; terminal teardown, worktree removal, preview eviction, and
-query invalidation are each a subscriber.
+Moved to **[state-and-policies.md](./state-and-policies.md)** (§5, §5.1, §5.2,
+numbering preserved): the `ctx` service table, the event bus and will-phase
+consent, the state tier/scope/ownership model, and the concurrency/budget/
+retention policies.
 
 ---
 
@@ -498,7 +309,7 @@ query invalidation are each a subscriber.
 core/
   client/   shell, slots, registries, layout reducer, prefs pipeline, event bus
   server/   createApp, session/auth, sync engine, harness gateway, prefs routes
-  main/     composition root, PTY engine, worktree service, IPC bus, config loader
+  main/     composition root, PTY engine, worktree service, IPC residue, config loader
   mcp/      stdio skeleton, tool projection
 
 plugins/
@@ -508,19 +319,19 @@ plugins/
   linear/          integration provider · source + browse · issue pane ·
                    issues context section · linkifier · comment mutation
   rollbar/         integration provider · source + browse · item pane
-  editor/          editor pane · file palette overlay · editor IPC · autosave
-  changes/         changes pane · local-git IPC · review notes (+ routes) ·
+  editor/          editor pane · file palette overlay · editor routes · autosave
+  changes/         changes pane · local-git routes · review notes (+ routes) ·
                    dirty badge · review-prompt sendToAgent
   notes/           notes pane · NotesStore · notes context section ·
                    notes_* agent tools · note seeding
   memory/          memory tray · memory index/proposals · memory context section ·
                    memory_* agent tools · review trigger
   context/         context pane (tray UI over the section registry)
-  preview/         preview pane (keepAlive) · webview layer · browser_* agent tools ·
+  preview/         preview pane (keepAlive) · WebContentsView layer · browser_* agent tools ·
                    CDP driver · url resolution over run targets
-  database/        database pane · pg pools · db IPC · dbUrl workspace config
+  database/        database pane · pg pools · db routes · dbUrl workspace config
   terminal/        bottom drawer · sessions store · session-edge notices ·
-                   term IPC surface · run-target execution (RuntimeService)
+                   term WS/routes surface · run-target execution (RuntimeService)
   agents/          right panel · roster model · stream-json adapters
   profiles-claude/ agent profile (+ mcp registration flavour)   [tiny]
   profiles-codex/  agent profile                                 [tiny]
@@ -530,9 +341,9 @@ plugins/
   onboarding/      first-run modal
 ```
 
-Boot: composition root → core services → plugins (topo order) → shell mounts
-slots → listener starts → `boot:restored` fires → prefs pipeline hydrates
-plugin slices in registration order.
+Boot: composition root → core services → plugins (topo order) → listener
+starts → shell mounts slots → restore pipeline hydrates plugin slices in
+phase order → `boot:restored` fires → persistence arms.
 
 ---
 
@@ -540,6 +351,14 @@ plugin slices in registration order.
 
 Every shipped feature, its plugin, and the contribution points it uses. ✅ = no
 open design question; ⚠ = named hard part (§8).
+
+> **This map is deliberately coarse** — it proves every feature has a home.
+> Many rows are whole feature clusters ("PR detail + conversation + reviews",
+> "Settings modal (all pages)") and a row here can pass review while a small
+> contract at a join is dropped. The fine-grained proof obligation —
+> per-behaviour checkboxes with owners and verification methods — is
+> **[feature-parity.md](./feature-parity.md)**; the changeover doesn't begin
+> until every row there is owned or explicitly struck as a non-goal.
 
 | Current feature | Plugin | Points used | |
 | --- | --- | --- | --- |
@@ -549,19 +368,19 @@ open design question; ⚠ = named hard part (§8).
 | Checks panel + rerun + rail checks dot | github | pane section, badge slot, poller | ✅ |
 | Create PR flow | github | commands, routes | ✅ |
 | PR context section + `pr_current`/`pr_changed_files` tools | github | context section, agent tools | ✅ |
-| Linear connect/browse/pane/comments | linear | integration, source, pane, routes | ✅ |
-| Linear linkification in PR body | linear → github | contentLinks | ✅ |
-| Rollbar connect/browse/pane | rollbar | integration, source, pane | ✅ |
-| Issues context section + `linked_issues` | linear/rollbar | context section, agent tool | ✅ |
-| Editor pane + tree + autosave + ⌘P file finder | editor | pane, overlay, IPC channels, prefs slice | ✅ |
-| Changes pane + stage/commit/push + review notes | changes | pane, IPC, routes, badge | ✅ |
+| Linear connect/browse/pane/comments | linear | integration provider (§4.14), source, pane, mutations | ✅ |
+| Linear linkification in PR body | linear → github | contentLinks (reference resolver — integrations §13) | ✅ |
+| Rollbar connect/browse/pane | rollbar | integration provider (§4.14), source, pane | ✅ |
+| Issues context section + `linked_issues` | linear/rollbar | context section, link context formatter (integrations §9), agent tool | ✅ |
+| Editor pane + tree + autosave + ⌘P file finder | editor | pane, overlay, routes, prefs slice | ✅ |
+| Changes pane + stage/commit/push + review notes | changes | pane, routes, badge | ✅ |
 | `local_changes`/`local_diff`/`git_log` tools | changes | agent tools (in-process handler, no loopback hop) | ✅ |
 | Notes pane + global notes + included-flag | notes | pane, agent tools, context section | ✅ |
 | Memory tray + proposals + FTS index | memory | context section, agent tools, settings | ✅ |
 | Context pane + send-to-agent | context | pane, `ctx.terminal.sendToAgent` | ✅ |
 | Preview pane + persistent webview | preview | pane (`keepAlive`), events (`task:archived`) | ⚠ §8.2 |
 | Agent-drivable browser (`browser_*`) | preview | agent tools + CDP driver | ✅ |
-| Database pane + pools + dbUrl script | database | pane, IPC, workspace config contribution | ✅ |
+| Database pane + pools + dbUrl script | database | pane, routes, workspace config contribution | ✅ |
 | Terminal drawer + tabs + tmux persistence | terminal | drawer socket, PTY service, prefs | ✅ |
 | Run targets + ▶ buttons + `run_*` tools + recipes | terminal | config sections, palette provider, agent tools (`when:` un-freezes availability) | ✅ |
 | Agents panel + roster + resume | agents | panel socket, profile registry, workflow read API | ✅ |
@@ -602,7 +421,10 @@ layer that provides `keepAlive: 'dom'` has to own reparenting, z-index vs
 overlays, and eviction. This is genuinely intricate (the current implementation
 is subtle for good reasons) but it is *one* plugin's requirement generalized —
 and centralizing it is still better than the module-level `previewWebviews` Map
-with three manual eviction call sites.
+with three manual eviction call sites. The `WebContentsView` migration
+([implementation.md](./implementation.md) Phase 9) changes the mechanics —
+main-owned, bounds-managed — but not the contract: whichever of the two lands
+second gets simpler.
 
 **8.3 The restore pipeline is ordering-sensitive.** Slices are not independent:
 workspace restore must precede task activation, which must precede pane focus;
@@ -610,7 +432,8 @@ workspace restore must precede task activation, which must precede pane focus;
 (`restore: 'workspace' | 'view' | 'panes'`) rather than pretending slices are
 order-free — otherwise the plugin model just re-scatters today's App.tsx race
 into fifteen plugins. This is the single riskiest piece of core to build; do it
-first and port slices one at a time.
+first and port slices one at a time. ([implementation.md](./implementation.md)
+Phase 6 is this, as its own phase, gated on the smoke suite.)
 
 **8.4 Typing without closed unions.** `PaneId` as a union gives exhaustiveness
 checks the registry model gives up. Mitigations: branded `PaneId` strings minted
@@ -620,12 +443,78 @@ genuinely matters (the layout reducer), the logic is already id-agnostic. The
 trade is real but small — and today's "union + 4 parallel hand-synced lists" is
 exhaustiveness theater anyway (`PANE_IDS` can silently drift from `PaneId` now).
 
-**8.5 Cross-plugin schema coupling.** `task_links.provider`, `issues.provider`,
+**8.5 The data model under plugins.** `task_links.provider`, `issues.provider`,
 task `origin` are provider strings owned by source plugins but stored in core
 tables. Rule: core owns generic tables keyed by contribution id; plugins own
 their private tables and contribute migrations. The `issues.data` JSON blob gets
 a per-plugin codec (parse + validate at the boundary) instead of today's
-cast-and-hope.
+cast-and-hope. Two integration-specific corollaries (full contract in
+[integrations.md](./integrations.md) §5): the denormalized `provider` column
+becomes **derived** — core stamps it from the connection on every task-link
+and binding write, never trusting a caller-supplied string — and link
+identity generalizes to `ExternalRef` (display id, canonical external id,
+locator, URL, connection id), with `task_links.identifier` remaining the
+display id and a nullable `refJson` carrying full refs for providers that
+need locators.
+
+The schema itself is in good shape for this — the mirror/app-state split maps
+1:1 onto tiers T1/T2 (§5.1), and `tasks`/`task_links`/`integrations`/`issues`
+are already provider-generic. Four things that are convention today must become
+declared rules:
+
+- **Scope is declared, not implied.** Two identity scopes coexist: user-scoped
+  (mirror tables, `prefs`, `integrations`, `issues` — keyed to the GitHub login)
+  and machine-scoped (`tasks`, `workspaces`, `repo_paths`, `terminal_sessions`,
+  `workflow_*`, `review_notes`, `memories` — they own local filesystem/process
+  resources). A plugin table declares which; the rule: derived from a provider
+  identity → user-scoped; owns machine resources → machine-scoped. The subtle
+  seam is that repo identity is *dual* — mirror tables key by the GitHub numeric
+  `repoId`, machine tables by `(owner, name)` strings — so a repo rename
+  silently strands machine-scoped rows. `repo_paths.githubRepoId` is the
+  partial bridge; make it the stated one.
+- **Parent lineage is declared.** Task-scoped tables (`task_links`,
+  `review_notes`, `terminal_sessions`, `workflow_runs`) declare their parent
+  column in the table contribution, and core derives the cascade
+  (retiring the hand-maintained `db/cascade.ts` list), the prune pass (the
+  nine orphaned PR child tables — review §5), **and a secondary index on the
+  declared parent column** ([performance.md](./performance.md) §3.5) from the
+  registry — one declaration, three artifacts — instead of a comment saying
+  "remember to extend this".
+- **Workspace config gets a table.** §4.6's workspace config contributions land
+  as one generic `workspace_config (workspaceId, key, value)` row store —
+  `prefs`' shape at workspace scope, values validated by the contributing
+  plugin's codec. The nine per-feature columns on `workspaces` (setup/dev/
+  restart/teardown/dbUrl scripts, previewMode/previewValue) fold into it; the
+  table stops accreting and ends as identity + ordering + appearance.
+
+  This is a migration risk, not just a data-model move — the values are
+  machine-local and drive shell execution, database connection resolution,
+  and preview URLs. The compatibility contract:
+
+  - **One-time migration, not lazy.** A single Drizzle migration copies
+    `setupScript`, `setupScriptTrigger`, `devScript`, `devRestartScript`,
+    `teardownScript`, `dbUrlScript`, `previewMode`, and `previewValue` into
+    `workspace_config` rows and drops the columns; the code switches to the
+    new store **in the same PR**. No transition window means no split-brain:
+    old columns and new rows are never both live writers, and settings pages
+    only ever see one store.
+  - **What stays on `workspaces`:** identity, ordering, and appearance —
+    `name`, `isDefault`, `sort`, `icon`, `color`. These are core workspace
+    fields, not plugin config.
+  - **Codecs preserve today's validation**, not just the values: blank
+    strings normalize to null, port-mode preview values are validated,
+    `setupScriptTrigger` is validated against `'off' | 'created' |
+    'terminal'` (null → `'terminal'`), and the existing error codes survive
+    (§16 of [feature-parity.md](./feature-parity.md) — standardize shape,
+    keep vocabulary).
+  - **Workspace deletion clears `workspace_config` rows** alongside
+    `workspace_projects` — derived from the declared parent lineage above,
+    not a second hand-maintained cascade list.
+- **One migration journal while plugins are in-tree.** Plugins own their schema
+  *files* (drizzle-kit merges multiple schema paths) but there is one drizzle
+  project and one linear migration history. Per-plugin journals with ordering
+  negotiation is dynamic-loader territory (§9 step 8) — pure tax today, per
+  tenet 5.
 
 ---
 
@@ -633,24 +522,30 @@ cast-and-hope.
 
 This is a direction, not a rewrite. Each step is independently shippable and
 most are already recommended in review.md for non-plugin reasons.
+**[implementation.md](./implementation.md) is the authoritative build order** —
+it resequences these steps, resolves the alternatives, and adds gates; the
+mapping is noted per step below.
 
 1. **Registries in place, same code** — pane registry (review.md #5), command
    registry, keybinding registry, settings-page registry. Hardcoded ladders
    become registry iteration; features still statically imported. This alone
-   delivers most of the extensibility win.
+   delivers most of the extensibility win. *(→ implementation Phase 5.)*
 2. **The event bus + composition root** (review.md #4) — kill the global-setter
    wiring, the boot race, the manual eviction trio; add `will-quit`.
-3. **The typed IPC bus** (review.md #3) — declare-once channels; preload
-   generated.
+   *(→ implementation Phases 1 and 5.)*
+3. **The typed IPC bus** (review.md #3) — *superseded*: implementation.md
+   decision 1 collapses the transport onto loopback HTTP + WS instead
+   (Phase 3); the typed bus is the fallback only if that stalls.
 4. **Agent-tool projection** (§4.8) — collapse harness/MCP/IPC into one
    declaration; port notes/memory/run/browser tools onto it.
+   *(→ implementation Phase 4.)*
 5. **The sync engine** (review.md #2) — extract, then express github/linear/
-   rollbar reads as descriptors.
+   rollbar reads as descriptors. *(→ implementation Phases 2 and 7.)*
 6. **The restore pipeline** (§8.3) — phased core service; port App.tsx effects
-   slice by slice.
+   slice by slice. *(→ implementation Phase 6.)*
 7. **Foldering** — only now move code into `core/` + `plugins/`; the seams
    already exist, so this step is `git mv` plus lint rules (no plugin→plugin
-   internal imports, no core→plugin imports).
+   internal imports, no core→plugin imports). *(→ implementation Phase 10.)*
 8. **Optional endgame** — a dynamic loader and out-of-tree plugins, if a real
    need appears. Everything above is worth it even if this step never happens.
 

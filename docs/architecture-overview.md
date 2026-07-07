@@ -304,8 +304,9 @@ for the detail. All of it is desktop-only (bridge-gated, always on).
 
 **Future work** — [docs/next/](./next/) holds what has *not* been built yet:
 [review.md](./next/review.md) (the critical architecture review),
-[extensability.md](./next/extensability.md) (the plugin-platform design it
-motivates), and [implementation.md](./next/implementation.md) (the staged guide
+[extensibility.md](./next/extensibility.md) (the plugin-platform design it
+motivates, split across three files — see [docs/next/README.md](./next/README.md)),
+and [implementation.md](./next/implementation.md) (the staged guide
 for building it). The root docs above describe what exists in code today;
 superseded design records (the old `vNext.md`, `docs/workspaces/`) have been
 removed — see git history for the original rationale.
