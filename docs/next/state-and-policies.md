@@ -313,7 +313,7 @@ lands, the preservation stance is explicit. **Never deleted automatically:**
 - active tasks and their worktree paths;
 - workspace/repo assignments — including *ignored* repos (ignored ≠
   unassigned) — and repo path mappings;
-- notes, memory files, and memory proposals;
+- notes, accepted memory files, and pending memory proposals;
 - user-created review notes, until an explicit archive/retention policy says
   otherwise;
 - integration rows, unless the user disconnects.
@@ -334,10 +334,15 @@ log). T2 archived tasks keep their rows (the audit trail is the point)
 but their *children* age out — terminal-session and workflow rows for tasks
 archived more than N days become part of the same reconcile sweep, noting
 that **workflow runs are also an audit trail**: the retention constant is a
-deliberate, documented choice, not a default; `memories`
-already has `supersededBy`/`accessCount` — the sweep is where superseded,
-never-accessed entries eventually compact. One home (reconcile), one policy
-constant per table, greppable like the TTLs (§4.9). The client-side IndexedDB
-cache is the fifth retention surface — its bound is the persister filter +
-`maxAge` ([performance.md](./performance.md) §3.4, implementation Phase 6);
-the filter excludes reconstructable payloads but always keeps T3 slices.
+deliberate, documented choice, not a default. Memory retention is stricter than
+mirror/cache retention: the `memories` index may be rebuilt or compacted
+because it is derived, rejected/stale proposals may age out under a named
+proposal policy, but accepted repo/private memory files are not deleted by
+task archive, plugin disable, provider disconnect, or ordinary sweeps
+([memory.md](./memory.md) §8). Superseded accepted memories compact only
+through an explicit audited governance policy. One home (reconcile), one
+policy constant per prunable table/store, greppable like the TTLs (§4.9). The
+client-side IndexedDB cache is the fifth retention surface — its bound is the
+persister filter + `maxAge` ([performance.md](./performance.md) §3.4,
+implementation Phase 6); the filter excludes reconstructable payloads but
+always keeps T3 slices.

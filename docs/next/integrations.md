@@ -632,6 +632,35 @@ source of truth for risk tier), and whether they can create task links (only
 via the stamped path). The risk-tier permission page *(ux §3)* thereby shows
 provider write tools alongside everything else — one honest inventory.
 
+## 16.1 Memory evidence and proposals
+
+Provider data can inform memory, but providers do not own accepted memory.
+The memory contract is [memory.md](./memory.md): accepted repo/private memory
+is core-governed markdown, and non-human writes are proposals.
+
+An integration may contribute:
+
+- evidence formatting for a linked external ref, using the same codec,
+  staleness markers, and budgets as §9 context formatting;
+- memory candidate extraction from task-linked items, provider mutations,
+  webhook/trigger events, or repeated workflow outcomes;
+- agent tools that create links, fetch provider context, or propose memory
+  through the core `memory_write` proposal path.
+
+It may not:
+
+- write `.acorn/memory/*.md` or `~/.acorn/memory/*.md` directly;
+- store raw provider payloads, secrets, logs, or transient item status as
+  memory;
+- delete accepted memories on plugin disable, provider disconnect, or
+  connection reauth failure.
+
+Provider-sourced memory candidates must stamp `providerId`, `connectionId`,
+and codec-owned `ExternalRef` provenance. If the connection later disappears,
+the accepted memory remains and its evidence link renders inert, just like a
+stale commit/file reference. Redaction/deletion of accepted memory is a
+separate governance action, not part of integration cascade.
+
 ## 17. Performance budgets
 
 The shared scheduler and cheap-predicate rules (state §5.2) apply; providers
