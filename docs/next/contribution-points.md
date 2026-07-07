@@ -11,6 +11,25 @@ the current code it replaces. The interfaces are the *design shape* — the
 implementing phase owns the final signature, and where the two differ the phase
 wins (update this file when that happens).
 
+Every client-rendered contribution also carries capability metadata, even when
+the abbreviated interfaces below omit it for readability:
+
+```ts
+type ClientCapabilityRequirement =
+  | 'none'
+  | 'desktop'
+  | 'browser:bind'
+  | 'native-dialog'
+  | 'close-pane-ping'
+```
+
+The core capability registry consumes that field to keep degraded browser mode
+explicit ([feature-parity.md](./feature-parity.md) §17): server-backed
+contributions stay usable in `dev:node`, desktop-only contributions hide or
+render inert with a visible reason, and no contribution directly probes
+`window.acorn` to decide whether it exists. [implementation.md](./implementation.md)
+Phases 3 and 5 land the probe and make registry renderers consume it.
+
 **Index — every point, where it lands:**
 
 | § | Point | Registry lives in | Lands in ([implementation.md](./implementation.md)) |
@@ -40,6 +59,7 @@ interface PaneContribution {
   label: string; glyph: string
   order: number                     // replaces PANE_ORDER
   defaultChord?: string             // 'meta+shift+e' — into keybinding registry
+  requires?: ClientCapabilityRequirement // default 'none'; editor/terminal/database/preview need desktop
   when?: (task: Task) => boolean    // replaces hasPr()/linearLinks() switcher gating
   component: Component<{ task: Task }>
   keepAlive?: 'dom' | 'none'        // preview's persistent-webview contract

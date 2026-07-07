@@ -213,7 +213,7 @@ separate:
 
 ## 9. Implementation obligations
 
-The implementation plan needs three additions:
+The implementation plan carries three obligations:
 
 1. **Phase 4:** the agent-tool projection must preserve the memory asymmetry:
    `memory_write` maps to proposal creation only, and write-tier permissions do not create an

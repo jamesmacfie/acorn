@@ -95,7 +95,9 @@ layout makes the alternative clearly simpler, and record the reason in the PR.
 | HTTP routes replacing IPC | feature-owned `server/routes/*` modules mounted from the app factory | typed route + route test + 401 test |
 | Stream transport | one WS module beside the loopback server startup | frame union, authenticated upgrade, attach replay ordering |
 | Agent tool projection | core tool registry plus feature-owned tool definition modules | registry, MCP projection, harness route projection, permission filtering |
+| Context section projection | `client/core/registries/contextSections.ts` + server-side task-context registry | declared budgets, default include state, jump intents, provider formatter dispatch |
 | Client registries | `client/core/registries/*` until Phase 10 foldering | register/derive/dispose APIs, conformance hooks |
+| Client capability gates | `client/core/capabilities.ts` + contribution metadata | `desktop` / bridge-present requirements; hide-or-degrade decisions for `dev:node` |
 | Startup restore | `client/core/startup/createStartupRestore.ts` until Phase 10 foldering | phased hydrate/persist pipeline, `PrefKeys`, failure notices |
 | Event bus / will-phase | `client/core/events/*` until Phase 10 foldering | typed `on`, `emit`, `will`, timeout-bounded concern collection |
 
@@ -152,8 +154,9 @@ so phases don't re-litigate them:
 discipline, not the compiler: only 9 `c.json` sites use `satisfies`
 *(inv §2c)*, 191 error responses use four ad-hoc shapes *(inv §2b)*, and 56
 inline session guards repeat the same three lines *(inv §2a)*. Everything
-later (Phase 3 adds ~65 routes; Phase 4 projects tools onto routes) multiplies
-whichever convention exists — so fix the convention while the surface is small.
+later multiplies whichever convention exists — Phase 3 adds ~65 routes, and
+Phase 4 projects tools/context onto shared surfaces — so fix the convention
+while the surface is small.
 
 **What:**
 
@@ -395,11 +398,19 @@ Phase 4's tool projection and agent-runtime §3.2's live step tail need.
   capability handle — must never be HTTP-reachable), `term:repoPath:pick`
   (native dialog), `acorn:close-pane` (main→window ping). `preload.ts` ends
   at exactly these three plus platform flags/capability probes.
+- **State the bridge capability contract while deleting preload** *(parity
+  §17)*. Each migrated pane/tool/surface declares whether it needs no bridge,
+  the desktop bridge generally, or a named IPC-residue capability
+  (`browser:bind`, native repo picker, close-pane ping). Server-backed
+  surfaces work in `dev:node`; desktop-only surfaces hide or render inert with
+  a visible reason. This is part of the transport collapse because deleting
+  preload is when browser-mode capability boundaries become explicit.
 
 **Done when:** preload exposes only the residue; every former channel has a
 typed route or WS frame; the terminal streams over WS with no visible
 regression under a busy TUI (verifiable because the keystroke-echo and
-busy-TUI baseline marks were captured first).
+busy-TUI baseline marks were captured first); `dev:node` has an explicit
+capability map instead of accidental bridge failures.
 
 **Verify:** `pnpm lint`, `pnpm test`, smoke suite (S4 especially),
 keystroke-echo marks vs baseline, then a live pass per migrated pane; finally
@@ -422,7 +433,7 @@ changing.
 
 ## Phase 4 — Agent-tool projection (the keystone)
 
-*(points §4.8, review #13, review §1d — depends on Phases 1 and 3)*
+*(points §4.7/§4.8, review #13, review §1d — depends on Phases 1 and 3)*
 
 **Why:** one agent verb currently costs five edit sites across four layers
 (preload → knowledgeIpc → harness route → bridge → MCP tool), and the layers
@@ -468,16 +479,34 @@ model hangs off.
   typed tool error; the projection layer alone translates that into MCP
   content, harness HTTP `ApiError`, or renderer response. Do not let feature
   tool handlers know which projection called them.
+- **Context section registry rides this phase too** *(points §4.7,
+  parity §11)*. The old `taskContext.ts` path is the other half of the
+  knowledge surface Phase 4 moves: register `pr`, `issues`, `notes`, and
+  `memory` sections with `{ id, defaultIncluded, budget, assemble, jump? }`;
+  make the Context pane tray derive its include list from that registry; make
+  the push path (`formatContextBlock`) and MCP `task_context` pull path call
+  the same assembler; and delete the global
+  `setContextNotesSource`/`setContextMemorySource` setters. Preserve the
+  product semantics while doing it: memory is index-only by default, notes
+  include bodies + slugs, linked provider items come from stale-safe cached
+  blobs, missing cache is explicit, and every section declares its own
+  truncation posture. Provider-specific linked-item formatting is a Phase 7
+  descriptor hook, but Phase 4 leaves the dispatch seam in place so core never
+  grows a second shape-guessing path.
 
 **Done when:** adding one agent verb is one object in one file, reachable via
 MCP, harness HTTP, and (if exposed) the renderer; the permissions page lists
-every tool with its tier.
+every tool with its tier; adding one context section is one contribution and
+the tray, compact block, and MCP `task_context` all see it without another
+edit site.
 
 **Verify:** MCP `tools/list` identical before/after (minus the availability
 fix — `run_*` tools now appear when a repo gains targets mid-session); a
 table-driven harness route test per projected tool ([testing.md](./testing.md)
-§2.3); a live agent session exercising notes + run tools; toggling a tier off
-makes the tool vanish from `tools/list`.
+§2.3); `taskContext` route tests over include defaults, per-section budgets,
+missing/stale provider cache, and note/memory asymmetry; a live agent session
+exercising notes + run tools; toggling a tier off makes the tool vanish from
+`tools/list`.
 
 **Considerations:** keep tool *names and schemas* byte-identical through the
 port — agents in the wild have these memorized in their MCP configs; renames
@@ -500,7 +529,8 @@ behaviours intact.
 
 **First PR checklist:** land the registry and project one read-only tool
 (`git_log` or `notes_list`) end-to-end. Then port notes/memory as the
-provenance fix, then run/browser execute-tier tools with permissions.
+provenance fix and the context-section registry, then run/browser
+execute-tier tools with permissions.
 
 ## Phase 5 — Client registries
 
@@ -567,6 +597,14 @@ moves.
   integrations page moves as-is in this phase — its hardcoded provider cards
   and credential form are replaced by the provider registry in Phase 7
   *(integrations §3)*; don't generalize them here.
+- **Client capability metadata for degraded browser mode** *(parity §17)*:
+  panes, commands, settings pages, overlays, and tools register the desktop
+  capability they require (`none`, `desktop`, or a named residue capability).
+  The registry host gates unavailable contributions consistently: server-
+  backed panes stay available in `dev:node`, desktop-only panes render a
+  hidden-or-inert state, and help/palette/settings rows explain why a command
+  is unavailable instead of throwing. Phase 3 creates the capability probe;
+  Phase 5 makes every contribution renderer consume it.
 - **Client event bus** (`ctx.events` shape from state §5): `task:archived`
   etc.; convert the three `evictPreviewWebview` call sites and all four
   mailbox signals *(inv §3f — including `noteToOpen` and
@@ -607,10 +645,20 @@ moves.
   retire all 25 `window.alert`/`confirm` sites *(inv §3g — 15 files, not just
   ChangesPane)* as their features convert. Four error dialects collapse to
   one users can actually see.
+- **The remaining small client registries from points §4.13 land here unless
+  an owning phase names a later home**: theme contributions replace the
+  `THEMES` array + token-list sync test; notification-kind contributions
+  replace `NoticeKind`/`KIND_GLYPH` and carry identity/read/toast/action
+  invalidation semantics *(parity §15)*; content-link contributions replace
+  the hardcoded `contentLinks.ts` registry and are consumed by PR/issue
+  markdown renderers. Task-status pollers may start as contributions here but
+  must migrate onto `ctx.poll` when the scheduler lands; no feature keeps a
+  private interval after that migration.
 
 **Done when:** adding a pane is one file plus one registration line — prove it
 by re-registering `search` or `database` through the registry; the help screen
-and palette derive from registries; `window.alert` count is zero; panes
+and palette derive from registries; contribution capability gates make
+`dev:node` usable without bridge crashes; `window.alert` count is zero; panes
 resize, pin, move, and maximize per ux §7 and the persisted arrangement
 (pane set/order/id-keyed weights/pins) survives relaunch. Pane content is
 keyboard-navigable by default (§4.1) — tabbing into a pane marks it the focused
@@ -802,6 +850,18 @@ contract, not against the two existing providers' shapes.
   semantics land here too: disconnect keeps its cascade but becomes the core
   default around provider hooks, and disable/reauth stop implying deletion
   *(integrations §14)*.
+- **Reference resolution, pane intents, and provider budgets**
+  *(integrations §10, §13, §17)* — providers that render links declare
+  `ReferenceResolver` detection/resolution/linkify behavior, so URL refs can
+  become task links through the stamped `ExternalRef` path and bare-id
+  ceilings are explicit. Integration panes declare supported intents
+  (`show-ref`, `show-comment`, `compose-comment`) and unresolved intents
+  degrade to a notice-level marker. Provider descriptors also carry the
+  greppable budgets core enforces: outbound concurrency per provider and
+  connection, pagination caps, cached-item size caps, context item budgets,
+  backoff floors, and identifier-resolution batch limits. These are not
+  polish; without them the first Sentry/Better Stack/Notion provider creates
+  new ad-hoc policy.
 - **Memory evidence hooks** *(memory §4, §5; integrations §16.1)* — provider
   descriptors declare whether linked items/mutations/triggers may feed memory
   candidates, how evidence is summarized under budget, and which provider refs
@@ -853,7 +913,8 @@ Linear/Rollbar expressed as descriptors with **zero behaviour change** —
 prove the registry by deleting the if-else, not by changing flows. Then the
 connect-flow PR (it touches user-visible settings; the regression tests for
 parity §6 should exist by then), then link integrity, then codecs/formatters,
-then sources/promotion, then capabilities/mutations/errors, then conformance.
+then sources/promotion, then capabilities/mutations/errors, then
+refs/intents/budgets, then conformance.
 
 ## Phase 8 — Workflow and profile registries
 
@@ -960,6 +1021,15 @@ extension only through declared contribution points. This phase should feel
 anticlimactic — if it doesn't (if a move forces an API change), a seam was
 missed and the move waits. Update the repo map in CLAUDE.md and the README
 per [docs-overhaul.md](./docs-overhaul.md) §4.
+
+Server route mounting moves with the folders. The Hono app factory still owns
+host/auth/csrf/session middleware and `requireUser`; plugin server parts expose
+route contributions that the static plugin registry mounts under their
+namespaces. No plugin imports another plugin's route module, and core no
+longer imports `github`/`linear`/`rollbar` route files directly. The API route
+contribution point *(points §4.5)* is done only when route ownership follows
+the folder move and route tests still prove the Phase 0 envelope/auth
+contract.
 
 The operational contracts move too *(parity §18)*: the ABI rebuild scripts,
 the smoke-browser script, `electron-builder` packaging config, and the
@@ -1107,7 +1177,7 @@ or a fourth agent profile touches **zero** core files.
 
 ```
 Phase 0 (contracts) ──┐
-Phase 1 (comp. root) ─┼─→ Phase 3 (transport) ─→ Phase 4 (tool projection)
+Phase 1 (comp. root) ─┼─→ Phase 3 (transport) ─→ Phase 4 (tools + context)
 Phase 2 (sync engine) ┘         ↑ smoke suite + perf baseline gate
                                                 Phase 7 (providers) ← Phase 2
 Phase 5 (registries) ─→ Phase 6 (restore) · Phase 8 (workflow/profiles)

@@ -732,10 +732,15 @@ non-trivial provider lands, these exist:
 7. The typed promotion/attach contract on source contributions (§8,
    *points §4.2*).
 8. Provider-owned context formatters; core shape-guessing deleted (§9).
-9. Capability declarations consumed by UI, mutations, and agent tools (§4).
-10. The generic provider error taxonomy with the deliberate code migration
+9. Integration pane intents with unresolved-intent degradation (§10).
+10. Capability declarations consumed by UI, mutations, and agent tools (§4).
+11. Reference resolvers for linkify/detect/resolve paths, including the
+   declared bare-id ceiling (§13).
+12. Provider budgets enforced by core — concurrency, pagination, cached-item
+   size, context size, backoff, and batch-resolution caps (§17).
+13. The generic provider error taxonomy with the deliberate code migration
     (§12).
-11. The conformance suite running against Linear and Rollbar expressed as
+14. The conformance suite running against Linear and Rollbar expressed as
     providers (§18).
 
 Deferred with named seams: OAuth flow + refresh (§3 — first OAuth provider),
