@@ -258,10 +258,28 @@ capabilities still being fleshed out (context assembly, notes handoff, the agent
 modes), and there is **no GUI workflow builder** — you author in files. Loops run only while the app
 is open. Treat autonomous, multi-agent runs as experimental.
 
-**Design-stage (not built):** a general DAG engine,
-sub-workflow depth beyond one level, saved-prompt/skills-as-steps polish, cross-machine or
-daemon-backed execution, and acorn-as-a-Linear-agent-host. These are the design rationale, not
-shipped behaviour.
+**Design-stage (not built), with a sharpened shape** — see
+[docs/next/agent-runtime.md](./next/agent-runtime.md) and its rationale doc
+[agent-runtime-influences.md](./next/agent-runtime-influences.md) (a design study of
+[agentfield](https://agentfield.ai)):
+
+- **cancel-tree** — stop a run and cascade to fan-out children (steps + child tasks); no way to
+  stop anything exists today;
+- a **`decide`/branch step kind** — cheap one-shot structured routing (conditional branching),
+  vs today's linear + fan-out/join only, with `${steps.<name>.output}` templating for named edges;
+- **per-run tool allowlists / risk ceilings** — an autonomous run declares which agent tools its
+  steps may use;
+- **triggers** — start a run from something acorn already observes (a PR opened, checks red) or a
+  while-app-open schedule, riding the poll scheduler (the shippable slice of "Pulse");
+- **concurrency ceilings** — a `MAX_CONCURRENT_HEADLESS` semaphore, per-step turn caps, and a
+  fan-out depth cap.
+
+**Deliberate non-goals** (what the design studied in agentfield and rejected): no control plane
+or agent fleet, **no daemon / background execution** (the runner ticks only while the app is
+open), **no cost budgeting** (acorn drives Claude/Codex on subscriptions), no cryptographic
+identity/audit governance, and no inter-agent message bus (the notes/memory/DB substrate stays
+the only channel). Also still unbuilt: a general DAG engine, sub-workflow depth beyond one level,
+saved-prompt/skills-as-steps polish, and acorn-as-a-Linear-agent-host.
 
 ---
 

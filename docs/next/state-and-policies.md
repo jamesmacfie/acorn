@@ -265,15 +265,26 @@ coalesces ticks, pauses when the window is hidden —
 signals from `ctx.gh`), which is where the rail's dirty/checks pollers (§4.13)
 land; (2) `when` predicates and badge contributions must be synchronous reads
 of already-held state — anything that computes registers a poller and reads a
-signal. Activation stays cheap by construction: entrypoints are lazy imports
-(extensibility §3.1) and `activate()` must only register — first real work
-happens on first use or first poll tick. Integration providers additionally
+signal. Hold both rules strictly and grandfather no private intervals: the
+motivating future case is a dashboard (extensibility §9.1) — N cards each
+wanting fresh data is exactly the "slow one contribution at a time" scenario,
+and it is only affordable if every card refreshes through the one visibility-
+paused, coalesced scheduler. Activation stays cheap by construction:
+entrypoints are lazy imports (extensibility §3.1) and `activate()` must only
+register — first real work happens on first use or first poll tick. Integration providers additionally
 declare per-provider/per-connection budgets — outbound concurrency,
 pagination caps, cached-item and context size limits, backoff floors — on
 their descriptors, enforced by core ([integrations.md](./integrations.md)
-§17). The most expensive resource of all — concurrent headless agents and
-their spend — is governed separately: [agent-runtime.md](./agent-runtime.md)
-§2.3 (`MAX_CONCURRENT_HEADLESS`, `max_cost_usd` → safety-rail).
+§17). The heaviest resource of all — concurrent headless agents — is governed
+separately: [agent-runtime.md](./agent-runtime.md) §2.3
+(`MAX_CONCURRENT_HEADLESS` semaphore, per-step turn caps, and a fan-out depth
+cap → safety-rail). There is deliberately **no cost dimension** — acorn runs
+Claude/Codex on subscriptions, so per-call spend is moot
+([agent-runtime-influences.md](./agent-runtime-influences.md) §3A). Workflow
+**triggers** are not a fourth budget axis either: a trigger that starts a run
+registers with `ctx.poll` like any other recurring work — coalesced,
+visibility-paused, app-open-only — so scheduled/event-driven runs need no daemon
+(agent-runtime §6.3).
 
 **State performance: scoped, lazy, bounded.** The state model should make
 navigation feel instant without keeping an unbounded app in memory.

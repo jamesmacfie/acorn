@@ -124,6 +124,13 @@ contributors multiply:
 - **Pane renders from a bare `{ task }`** — no router provider in the test
   harness, so any `useParams()` read throws. (This pins the Phase 5 `pr`-pane
   contract fix and prevents recurrence.)
+- **Pane content is keyboard-navigable** ([contribution-points.md](./contribution-points.md)
+  §4.1, [ux.md](./ux.md) §7–§8) — every focusable element is reachable by
+  keyboard (no positive `tabindex`, no focusable-but-unreachable content),
+  collections expose a single roving tab-stop, and `focusin` marks the pane the
+  focused surface. This is what makes "keyboard-navigable by default" a
+  build-time obligation rather than a hope; `keepAlive`/editor/terminal panes
+  are exempted for their internal focus per the §4.1 carve-out.
 - **`activate()` only registers** — run it with a `ctx` whose services throw
   on use; activation must complete. Disposal returns the registry count to
   its pre-activation baseline (leak check).

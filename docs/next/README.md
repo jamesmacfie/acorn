@@ -21,9 +21,11 @@ verify, and the risks per phase. Everything else in this folder augments it.
 | [contribution-points.md](./contribution-points.md) | §4 of the extensibility design: the full contribution-point catalog (panes, sources, commands, agent tools, …) |
 | [state-and-policies.md](./state-and-policies.md) | §5 of the extensibility design: `ctx` services, the state tier/scope model, concurrency/budget/retention policies |
 | [integrations.md](./integrations.md) | The integration-provider contract: descriptor, connections/auth, capabilities, link identity, promotion, context formatting, mutations, error taxonomy, lifecycle, conformance — normative for Linear/Rollbar and every future provider (Sentry, Better Stack, Notion, …) |
+| [memory.md](./memory.md) | The next-era memory contract: files remain truth, plugins/integrations/workflows feed human-gated proposals, provenance/scope/retrieval/retention rules |
 | [inventories.md](./inventories.md) | Ground truth: the exact IPC channels, pref keys, error sites, TTLs, listeners the phases work through. Checklists, not estimates |
 | [feature-parity.md](./feature-parity.md) | The proof obligation: one checkbox per shipped behaviour, grouped into per-domain contracts with owners and verification methods. Parity means behaviours, not feature names |
-| [agent-runtime.md](./agent-runtime.md) | Workflow/agent runtime corrections: the handoff-note bug, session resume, concurrency/cost ceilings, cancel controls |
+| [agent-runtime.md](./agent-runtime.md) | Workflow/agent runtime corrections and adopted additions: the handoff-note bug, session resume, concurrency ceilings, cancel-tree, the `decide`/branch step kind, per-run tool ceilings, triggers |
+| [agent-runtime-influences.md](./agent-runtime-influences.md) | The agentfield design study: what acorn borrowed, what it validated, what it rejected — the rationale behind agent-runtime.md's additions, with the plugin-fit mapping |
 | [performance.md](./performance.md) | Perf baseline, budgets, and the five fixes folded into phases — plus the diff-pipeline constraint |
 | [ui-state.md](./ui-state.md) | How UI state changes propagate and fail: the three reaction rules (failure surfaces, latest-wins, derive-don't-effect) |
 | [security.md](./security.md) | The loopback threat model, the invariants every phase must preserve, the new rules Phase 3 must add |
@@ -34,6 +36,8 @@ verify, and the risks per phase. Everything else in this folder augments it.
 Citation conventions used across the set: *(review #N)* = review.md's
 recommendation table; *(ext §N)* = extensibility.md; *(points §4.N)* =
 contribution-points.md; *(state §5.N)* = state-and-policies.md;
-*(integrations §N)* = integrations.md; *(inv §N)* = inventories.md;
-*(parity §N)* = feature-parity.md; *(perf/ui-state/agent-runtime §N)* = the
-matching doc.
+*(integrations §N)* = integrations.md; *(memory §N)* = memory.md;
+*(inv §N)* = inventories.md;
+*(parity §N)* = feature-parity.md;
+*(perf/ui-state/agent-runtime §N)* = the matching doc; *(influences §N)* =
+agent-runtime-influences.md.

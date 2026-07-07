@@ -212,8 +212,17 @@ type ProviderCapabilities = {
   repoAffinity?: 'intrinsic' | 'project' | 'workspace' | 'none'
   contextFormat?: boolean
   webhooks?: boolean                 // §15 — declared, not yet consumed
+  userFeed?: boolean                 // ext §9.1 — can produce a user-scoped feed
+                                     //   (assigned-to-me, inbox); declared, not yet consumed
 }
 ```
+
+The set is **open by design** — a new capability is additive data, not a
+breaking change to a closed union. `webhooks` and `userFeed` are the current
+declared-but-not-yet-consumed markers: `userFeed` reserves the "this provider
+can produce a user-scoped, repo-less feed" flag a future dashboard (ext §9.1)
+would gate cards on, so providers that can't (e.g. an error tracker with no
+per-user assignment) simply omit it and contribute no card.
 
 Capabilities are declared per provider and *resolved per connection* at
 validation time (a token may lack the scope for a declared capability —
