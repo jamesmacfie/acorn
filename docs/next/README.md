@@ -7,15 +7,17 @@ performant, extendable, understandable.**
 
 ## Start here
 
-**[implementation.md](./implementation.md)** — the build order. Written for
-the developer doing the work: what to do, why, what "done" means, how to
-verify, and the risks per phase. Everything else in this folder augments it.
+**[implementation.md](./implementation.md)** — the build order summary and
+cross-phase gates. The comprehensive build guides live in
+[`implementation/`](./implementation/), with one markdown file per phase: what
+to do, why, what "done" means, how to verify, and the risks for that phase.
+Everything else in this folder augments those guides.
 
 ## Reading order
 
 | Doc | What it is |
 | --- | --- |
-| [implementation.md](./implementation.md) | **The hub.** Phased execution plan with gates, done-criteria, and risk notes |
+| [implementation.md](./implementation.md) + [`implementation/`](./implementation/) | **The hub and phase guides.** Sequencing summary plus one comprehensive build guide per phase |
 | [review.md](./review.md) | The architecture review that motivates the work — findings with file:line evidence, prioritized recommendations, technology choices |
 | [extensibility.md](./extensibility.md) | The target: acorn as a plugin platform. Tenets, the core, the extension model, parity map, hard parts, sequencing |
 | [contribution-points.md](./contribution-points.md) | §4 of the extensibility design: the full contribution-point catalog (panes, sources, commands, agent tools, …) |
