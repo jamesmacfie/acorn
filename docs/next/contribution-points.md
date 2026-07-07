@@ -280,8 +280,11 @@ Current context assembly has product semantics beyond "iterate sections"
   the include keys are contribution ids.
 - **Memory contributes index-only** in the compact block — agents call
   `memory_get` for bodies; that is its declared `overflow: 'index-only'`
-  posture, not a truncation accident. **Notes include bodies and slugs** so
-  the tray can jump to the Notes pane (`jump`).
+  posture, not a truncation accident. This is also the memory contract in
+  [memory.md](./memory.md) §7: plugins may contribute linked context, but they
+  do not inject their own durable-memory blocks beside the core memory
+  section. **Notes include bodies and slugs** so the tray can jump to the
+  Notes pane (`jump`).
 - **Sections declare their own size posture.** The invisible global slice in
   `knowledgeIpc` (2,000 chars × first 10 notes) already caused the workflow
   handoff bug ([agent-runtime.md](./agent-runtime.md) §2.1); a contribution
@@ -338,6 +341,13 @@ per tier or per tool, persisted as a prefs slice the projection consults in
 job is to give the user one honest page saying what agents can do, and one
 switch to narrow it. The page's UX is specified in [ux.md](./ux.md) §3; what
 the tier does and does not defend is [security.md](./security.md) §4.
+
+Memory tools keep one extra invariant: `memory_write` is a write-tier tool
+because it creates a **proposal**, not because it can write accepted memory.
+The accepted repo/private memory file is still created only by a human action
+in the memory UI. Plugins and integrations that want durable knowledge use
+memory candidate contributions/proposals, not a private accepted-write API
+([memory.md](./memory.md) §4/§9).
 
 ## 4.9 Mirrored resources (server sync descriptors)
 

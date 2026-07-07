@@ -27,6 +27,12 @@ and that non-design should be kept deliberately (§5). But the sweep found one c
 correctness bug, three small high-value corrections, and three missing UI controls. All are
 independent of the phase sequence and mostly tiny.
 
+Memory is part of that substrate only at task/run boundaries. It is not the
+workflow data bus: handoff notes carry run-scoped step output, while the memory
+review pass distills durable lessons into human-gated proposals after an
+interactive session or workflow run reaches a boundary
+([memory.md](./memory.md) §6).
+
 One boundary up front: these are *additions* on top of the existing PTY/session contracts users
 already rely on — tmux persistence vs `node-pty` death-with-app, ring-buffer-only replay (no
 output on disk), Shift+Enter newline, the three `sendToAgent` modes with bracketed-paste

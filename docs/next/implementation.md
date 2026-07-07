@@ -14,6 +14,9 @@ full map is [README.md](./README.md). The immediate sources:
 - [integrations.md](./integrations.md) — the integration-provider contract
   Phase 7 implements and every future provider (Sentry, Better Stack, Notion)
   is built against; citations *(integrations §N)*.
+- [memory.md](./memory.md) — the next-era memory contract: files remain the
+  truth, plugins/integrations/workflows feed human-gated proposals, and
+  accepted memory is not plugin/provider-owned; citations *(memory §N)*.
 - [inventories.md](./inventories.md) — the exact channel/route/pref/listener
   lists the phases work through; citations *(inv §N)*. **Work from the
   inventory, not from memory** — it turns "migrate the IPC surface" into a
@@ -444,6 +447,10 @@ model hangs off.
   (`git_log`/`local_changes`/`local_diff`). This deletes `harnessWiring.ts`,
   the bridge setters in `harness.ts`, the per-tool bodies in `mcp/server.ts`,
   and the matching preload/`knowledgeIpc.ts` groups (whatever Phase 3 left).
+- Preserve memory's write asymmetry while porting: `memory_write` remains a
+  proposal-creation tool only. Its `risk: 'write'` tier means "may ask a
+  human to accept durable memory", not "may write `.acorn/memory/*.md`."
+  There is no plugin/agent accepted-write bypass *(memory §1, §4, §9)*.
 - Collapse the notes-channel semantic fork while porting: one store API where
   provenance (`author`, `sessionId`) comes from the channel's `scope`, so
   agent-created and UI-created notes can't drift again.
@@ -476,7 +483,9 @@ makes the tool vanish from `tools/list`.
 port — agents in the wild have these memorized in their MCP configs; renames
 are a separate, deliberate change. The `when` re-evaluation must be cheap
 (state §5.2's synchronous-predicate rule) — `hasRunTargets` reads loaded
-config, not disk.
+config, not disk. The memory port is a security/product invariant as much as a
+mechanical move: a permissions toggle can hide proposal tools, but it must not
+create a second path that silently accepts agent-authored memory.
 
 **The MCP feature is more than tool calls** *(parity §8)* — don't let the
 projection absorb all MCP attention and orphan the settings/inspection
@@ -793,6 +802,13 @@ contract, not against the two existing providers' shapes.
   semantics land here too: disconnect keeps its cascade but becomes the core
   default around provider hooks, and disable/reauth stop implying deletion
   *(integrations §14)*.
+- **Memory evidence hooks** *(memory §4, §5; integrations §16.1)* — provider
+  descriptors declare whether linked items/mutations/triggers may feed memory
+  candidates, how evidence is summarized under budget, and which provider refs
+  get stamped into provenance. This rides the context/mutation PRs, because it
+  uses the same codecs and staleness rules. It does **not** grant providers a
+  direct accepted-memory write path and it does **not** cascade-delete accepted
+  memories on disconnect.
 - **Integration conformance suite** *(integrations §18, testing §4)* —
   table-driven off the descriptor, running against Linear and Rollbar as
   expressed providers. This is part of the phase, not a follow-up: the
@@ -991,8 +1007,11 @@ mode (Phase 3 makes it *better*; nothing later may make it second-class).
   and fan-out depth cap → safety-rail (§2.3 — fan-out is an uncapped
   `Promise.all`; deliberately no cost ceiling);
   cancel-run/kill-step in the agents panel (§3.1, UX per [ux.md](./ux.md) §6
-  — today nothing running can be stopped). Plus poll→push for the panel via
-  the runner's existing `notify` path (§3.3).
+  — today nothing running can be stopped); run the memory-review proposal pass
+  at workflow terminal states, using run-scoped handoff notes, structured step
+  outputs, the diff/transcript tail, and linked-provider context as evidence
+  while still queueing candidates for human review *(memory §6, §9)*. Plus
+  poll→push for the panel via the runner's existing `notify` path (§3.3).
 - **Data-model hygiene** *(review #12, §5; ext §8.5)*: prune the nine child
   tables alongside the PR-list prune. The decision is: no broad FK retrofit in
   this phase sequence; use declared parent lineage as the source of truth. The
@@ -1062,7 +1081,10 @@ mode (Phase 3 makes it *better*; nothing later may make it second-class).
   composition root's `reconcile()` (size-capped LRU over the blob dir — it
   currently has no deletion path at all — plus aging out terminal/workflow
   child rows of long-archived tasks), with per-table policy constants
-  alongside the Phase 2 TTLs.
+  alongside the Phase 2 TTLs. Keep accepted memory out of ordinary retention
+  sweeps: only derived indexes and stale/rejected proposals are ordinary
+  cleanup; accepted-memory compaction/deletion is audited governance
+  *(memory §8)*.
 - **Plugin conformance tests** — [testing.md](./testing.md) §4: pane renders
   from a bare `{ task }`; `activate()` only registers and its disposables
   dispose; persisted-state parsers tolerate unknown ids. Cheapest insurance
