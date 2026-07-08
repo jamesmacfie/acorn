@@ -28,6 +28,7 @@ Everything else in this folder augments those guides.
 | [feature-parity.md](./feature-parity.md) | The proof obligation: one checkbox per shipped behaviour, grouped into per-domain contracts with owners and verification methods. Parity means behaviours, not feature names |
 | [agent-runtime.md](./agent-runtime.md) | Workflow/agent runtime corrections and adopted additions: the handoff-note bug, session resume, concurrency ceilings, cancel-tree, the `decide`/branch step kind, per-run tool ceilings, triggers |
 | [agent-runtime-influences.md](./agent-runtime-influences.md) | The agentfield design study: what acorn borrowed, what it validated, what it rejected — the rationale behind agent-runtime.md's additions, with the plugin-fit mapping |
+| [self-improvement.md](./self-improvement.md) | The self-improvement axis (Lilian Weng study): where acorn sits, and which already-designed types keep the door open without a reshape. Annotation-only — nothing to build yet |
 | [performance.md](./performance.md) | Perf baseline, budgets, and the five fixes folded into phases — plus the diff-pipeline constraint |
 | [ui-state.md](./ui-state.md) | How UI state changes propagate and fail: the three reaction rules (failure surfaces, latest-wins, derive-don't-effect) |
 | [security.md](./security.md) | The loopback threat model, the invariants every phase must preserve, the new rules Phase 3 must add |
@@ -42,4 +43,4 @@ contribution-points.md; *(state §5.N)* = state-and-policies.md;
 *(inv §N)* = inventories.md;
 *(parity §N)* = feature-parity.md;
 *(perf/ui-state/agent-runtime §N)* = the matching doc; *(influences §N)* =
-agent-runtime-influences.md.
+agent-runtime-influences.md; *(self-improve §N)* = self-improvement.md.

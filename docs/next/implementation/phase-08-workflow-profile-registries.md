@@ -24,6 +24,16 @@ The target is a registry-backed runtime where new step kinds and profiles are
 small modules, parser errors are named and early, and cancellation is owned by
 the engine.
 
+Futureproofing (annotation, not work): this registry is the seam the
+self-improvement axis would ride ([self-improvement.md](../self-improvement.md)
+§5). A future fitness/quality signal or an evolutionary step-kind is a new
+`registerStepKind` + `registerPolicy` pair plus an additive `StepHandlerOutcome`
+field — the outcome union is *already* designed to extend
+([agent-runtime.md](../agent-runtime.md) §6.4), so it is reused, not reshaped.
+Keep run/step records self-contained (seed prompt + repo ref + structured
+outcome) so runs stay replayable by a future eval harness. Do not build any of
+this now.
+
 ## Required Context
 
 Read these sections before implementation:

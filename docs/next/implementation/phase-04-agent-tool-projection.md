@@ -29,6 +29,15 @@ AgentToolContribution
 Tool handlers return domain data or throw typed tool errors. Projection layers
 translate to their surface-specific envelopes.
 
+Futureproofing (annotation, not work): this registry is also the harness search
+surface for the self-improvement axis ([self-improvement.md](../self-improvement.md)
+§5). `AgentToolContribution` already carries enough to be self-describing
+(`name`/`description`/`input`/`risk`), so a future read-only "describe the
+harness" introspection is a *fourth projection target* beside MCP/HTTP/renderer —
+additive, no reshape. Keep the contribution shape self-describing for that reason
+(ext tenet 2: "core can index, list, conflict-check"). Do not build the
+introspection now.
+
 ## Required Context
 
 Read these sections before implementation:

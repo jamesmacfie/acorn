@@ -178,6 +178,13 @@ run, existing memory index, and relevant linked-provider context. It emits candi
 then verifies file refs, duplicate content hashes, same-name contradictions, source-ref shape, and
 budget limits before queueing proposals.
 
+Futureproofing note: this review loop is acorn's primitive "evolving playbook" on the
+self-improvement axis ([self-improvement.md](./self-improvement.md) §3). The `'consolidation'`
+origin kind (§3) is the reserved seam for a future curator/consolidation pass; like every other
+generator it **emits candidates only** and never bypasses the human-gated write-path invariant
+(§1#2/§4). Any effectiveness ranking would use access signals already tracked in the index as
+*candidate ranking input*, not as a direct write. Nothing to build now.
+
 ## 7. Retrieval and context
 
 Retrieval has three paths:
