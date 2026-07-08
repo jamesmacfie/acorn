@@ -372,6 +372,14 @@ Rejected agentfield machinery (scale-driven complexity with no single-user payof
 - **No canary/versioning/weighted routing, multi-backend storage abstraction, or
   restart-with-result-reuse ("golden runs").** Revisit only if a real need appears.
 
+Separate axis, also a non-goal for now: **self-improvement** — a harness that gets better at
+its job over time (context/workflow/harness-code optimization, evolutionary search). It is
+orthogonal to the scale concerns above and needs almost none of the rejected machinery. acorn
+sits at a human-gated Level 1 (memory review = a primitive "evolving playbook"). The designed
+contracts here (`StepHandlerOutcome`, `WorkflowDef`/`ToolCeiling`, the registries) are already
+extensible in the directions it would need — additive, no reshape. Shape decided, deliberately
+unbuilt, in the spirit of §6.4: [self-improvement.md](./self-improvement.md).
+
 ## 6. Adopted from the agentfield study (near-term)
 
 Four capabilities the study surfaced as in-scope. Each rides an existing contribution point —

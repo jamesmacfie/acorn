@@ -369,6 +369,12 @@ in the memory UI. Plugins and integrations that want durable knowledge use
 memory candidate contributions/proposals, not a private accepted-write API
 ([memory.md](./memory.md) §4/§9).
 
+Futureproofing note: this same metadata (`name`/`description`/`input`/`risk`) is
+what makes the registry a **self-describing harness surface** for the
+self-improvement axis — a read-only introspection projection is additive and
+needs no reshape ([self-improvement.md](./self-improvement.md) §5). Nothing to
+build; keep the shape self-describing.
+
 ## 4.9 Mirrored resources (server sync descriptors)
 
 ```ts
@@ -450,7 +456,9 @@ tier reuses the profile registry via a new one-shot structured mode on
 `AgentProfileContribution` (§4.11, an `aiArgv?`/single-turn variant beside
 `headlessArgv`/`resumeArgv`), not a new transport. Triggers that *start* a run
 are a separate seam — source/integration contributions evaluated by `ctx.poll`,
-never a daemon (influences §3E).
+never a daemon (influences §3E). The same `StepHandlerOutcome` union is also the
+extension point a future self-improvement fitness/quality signal would ride —
+reused, not reshaped ([self-improvement.md](./self-improvement.md) §5).
 
 ## 4.11 Agent profiles
 

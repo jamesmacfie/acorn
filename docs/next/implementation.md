@@ -144,6 +144,10 @@ the next touched file:
 - Deduplication, observability, component decomposition, autosave clobber guard,
   repo-config trust gate, poll scheduler, retention sweep, and plugin
   conformance tests.
+- Self-improvement futureproofing from [self-improvement.md](./self-improvement.md):
+  **annotation-only, nothing to build.** The axis rides the registries already
+  sequenced in Phase 4 (agent tools) and Phase 8 (step kinds/profiles) plus the
+  memory `'consolidation'` seam — no phase gate, no new work, just seams kept open.
 
 These tracks do not replace the phase files. If an ongoing-track change touches
 a phase-owned boundary, follow that phase's rules.
