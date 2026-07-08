@@ -100,6 +100,13 @@ can reveal mechanically.
    subscriptions and pane intents. Add timeout-bounded concern collection for
    destructive events such as close task, archive, workspace removal, and quit.
 
+   Give event payloads plain serializable data and namespaced string kinds (no
+   live signals, closures, or DOM refs), and keep runtime/session events (agent/
+   session status, workflow step, PTY / worktree / task / workspace lifecycle)
+   distinct from pure presentation events (open overlay, selection) — so a future
+   events-over-WS projection is additive rather than a rewrite of every emitter
+   ([security.md](../security.md) §9 seam 2).
+
 8. Slot error boundaries and UI kit seed.
 
    Wrap registry-rendered contributions in error boundaries. Seed `client/ui/`
@@ -132,6 +139,12 @@ can reveal mechanically.
   will-phase timeouts are not polish; they are required failure containment.
 - **Maintainability:** keep persisted layout shape id-keyed and versionable so
   Phase 6 can add codecs without reverse-engineering UI effects.
+- **External-control forward-compatibility:** the event bus is client-side, so it
+  is the one control-relevant surface the transport collapse does not put on the
+  wire. Keep runtime/session events serializable and stably named, and distinct
+  from pure presentation events, so a future events-over-WS projection is
+  additive, not a rewrite of every emitter ([security.md](../security.md) §9
+  seam 2).
 
 ## Slice Order
 

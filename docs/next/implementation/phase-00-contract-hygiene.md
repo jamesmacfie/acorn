@@ -125,6 +125,14 @@ absence, and error envelope shape must become shared conventions.
   existing client branches and tests continue to describe real behavior.
 - **Maintainability:** every exception must be named. `/auth` and harness auth
   are allowed exceptions; ad-hoc route-level unauthenticated bodies are not.
+- **External-control forward-compatibility:** write the guard to resolve a
+  `Principal` (a `kind`, a capability set, and the GitHub-token posture) from
+  whichever credential is present — the cookie (`user`) and `INTERNAL_TOKEN`
+  (internal) are the two kinds today — and have routes gate on the principal,
+  not on "a cookie is present." This adds no work now (the guard already handles
+  two credential types) but keeps a future authorized external principal a new
+  `kind`, not a re-touch of every migrated route. Rationale and the other four
+  seams: [security.md](../security.md) §9.
 
 ## Slice Order
 
@@ -171,6 +179,6 @@ absence, and error envelope shape must become shared conventions.
 
 - [review.md](../review.md) recommendation #1 and #6.
 - [inventories.md](../inventories.md) §2a, §2b, §2c.
-- [security.md](../security.md) §2 and §7.
+- [security.md](../security.md) §2, §7, and §9.
 - [feature-parity.md](../feature-parity.md) §16.
 - [docs-overhaul.md](../docs-overhaul.md) §2 for `docs/api-reference.md`.

@@ -634,3 +634,16 @@ later. Neither is planned; both stay purely additive if the seams below hold.
   capability set (integrations §4) stays open so a `userFeed`-style capability
   slots in as data. Guard those and the dashboard is additive.
 - **A dynamic loader** — §9 step 8 above.
+- **An external-control principal** — a CLI, an external agent, or a companion
+  tool authorized to drive acorn over the loopback surface the transport
+  collapse already builds ([implementation.md](./implementation.md) Phase 3).
+  This is *not* a new API: after Phase 3 the whole control surface is loopback
+  HTTP behind one guard, so enabling an authorized non-browser caller reduces to
+  the guard recognizing a new principal kind — provided the auth guard is
+  principal-based (not cookie-based), runtime/session events are serializable and
+  wire-reachable, the stream WebSocket is a typed multi-channel multiplexer,
+  mutation provenance derives from the principal, and control mutations land as
+  routes rather than preload residue. The threat model deliberately *blocks*
+  unauthorized local callers today ([security.md](./security.md) §1); the five
+  seams that keep an authorized one additive-not-a-rewrite are
+  [security.md](./security.md) §9. Don't build it; keep those seams open.

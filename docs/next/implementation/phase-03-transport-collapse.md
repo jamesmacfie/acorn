@@ -103,6 +103,10 @@ handle, native dialog, main-to-window signal, or platform probe.
    - `workflow:notice`;
    - reserved `workflow:step:event`.
 
+   Frame the envelope as kind-tagged channels so an `events` channel can be added
+   later without a second socket, and keep every frame serializable with a stable
+   string kind ([security.md](../security.md) §9 seams 2–3).
+
    Upgrade auth requires Host guard, session cookie, exact-Origin check, and
    403 on failure. Coalesce PTY output into roughly 16 ms frames and guarantee
    attach replay arrives before live frames.
@@ -131,6 +135,14 @@ handle, native dialog, main-to-window signal, or platform probe.
   malformed-body test. Terminal attach replay must be deterministic under load.
 - **Maintainability:** migrate by domain and delete the old domain bridge in the
   same slice only after tests prove the replacement.
+- **External-control forward-compatibility:** two shape choices keep a future
+  authorized external client additive (full rationale: [security.md](../security.md)
+  §9). (1) Frame the WebSocket as kind-tagged channels so an `events` channel is
+  additive, and keep every frame envelope serializable — runtime/session frames
+  carry plain data and stable string kinds, never live objects. (2) Classify a
+  channel as IPC residue *only* when it needs a true Electron capability handle;
+  a control mutation (open pane, focus task, create workspace) is a route behind
+  the guard, not residue, so an authorized principal can reach it later.
 
 ## Slice Order
 
@@ -177,7 +189,7 @@ handle, native dialog, main-to-window signal, or platform probe.
 
 - [inventories.md](../inventories.md) §1a, §1b, §1c, §1d.
 - [review.md](../review.md) §3.
-- [security.md](../security.md) §3 and §7.
+- [security.md](../security.md) §3, §7, and §9.
 - [performance.md](../performance.md) §3.3.
 - [agent-runtime.md](../agent-runtime.md) §3.2.
 - [feature-parity.md](../feature-parity.md) §7, §14, §17.

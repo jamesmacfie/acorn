@@ -211,3 +211,71 @@ per-provider by convention:
 - **OAuth callback routes** (when the first OAuth provider lands) bind
   provider id + CSRF state into the OAuth `state` parameter and are
   core-owned (integrations §3).
+
+## 9. External-control forward-compatibility (keep open, do not build)
+
+Herdr-style tools expose their whole control surface to any local process over a
+socket. acorn deliberately does the opposite: §1 lists "a non-browser local
+process calling the API (`curl`)" as a threat the cookie guard **blocks**, and
+that posture stays. This section is not a plan to open that door. It is the set
+of seams that keep the door *lockable with issuable keys* — so that authorizing
+an external client later (a CLI, an external agent, a companion tool) is a matter
+of recognizing a new principal, not re-architecting auth, events, and transport.
+
+The reason preserving these seams is cheap: **after Phase 3 the entire control
+surface already is loopback HTTP behind one guard** (§3). There is no separate
+external API to build later — only the guard's answer to "is this caller
+authorized" to extend. Keep these five seams open (this mirrors extensibility
+tenet 5 and §9.1's "don't foreclose, don't build"). Nothing here is built now.
+
+1. **Auth is principal-based, not cookie-based** (Phase 0 — the one expensive-to-
+   retrofit seam). The shared guard already resolves more than one credential:
+   the session cookie (`user`, real GitHub token) and `INTERNAL_TOKEN` (internal
+   identity, empty GitHub token, `middleware/auth.ts:21`). Write it to resolve a
+   `Principal` — a `kind`, a capability set, and the GitHub-token posture — from
+   whichever credential is present, and gate routes on the principal, never on "a
+   cookie is present." A future authorized external caller is then a new `kind`
+   plus a token issuer, not a re-touch of every migrated route. This is nearly
+   free now precisely because the guard must already handle two credential types;
+   it is ruinous to retrofit across ~65 routes once the cookie-shape is copied.
+
+2. **Runtime/session events are serializable and stably named** (Phases 3, 5).
+   Herdr's most-used external capability is `events.subscribe` / `wait
+   agent-status`. acorn's `ctx.events` is an in-process client bus, so it is the
+   one control-relevant surface Phase 3 does *not* automatically put on the wire.
+   Two rules keep a later projection additive: (a) distinguish **runtime/session
+   events** (agent/session status, workflow step events, PTY / worktree / task /
+   workspace lifecycle) from **pure presentation events** (which overlay is open,
+   selection) — the former carry plain serializable data and namespaced string
+   kinds, never live signals, closures, or DOM refs; (b) emit the runtime/session
+   ones at a wire-reachable tier (main/server), not client-only. A client-only
+   bus of live objects cannot be projected without touching every emitter.
+
+3. **The one WebSocket is a typed multi-channel multiplexer** (Phase 3). The
+   §3/Phase-3 socket carries PTY frames and workflow-step frames. Frame it as
+   kind-tagged channels so an `events` (or future control-response) channel is
+   additive rather than a second socket with its own auth-at-upgrade story. The
+   upgrade auth (Host guard + credential + exact-Origin) is identical regardless
+   of channel count.
+
+4. **Mutation provenance derives from the principal, in an open representation**
+   (data-model track). Mutations already record provenance from the calling
+   channel (contribution-points §4.8, integrations §11), and task `origin` is
+   free text. Source the recorded actor from the request principal (seam 1) as an
+   open representation, not a closed `{ human | agent }` union — then an external
+   caller's writes are attributable without a migration. This is the only place
+   external-control forward-compat reaches the schema, and it is a stance choice,
+   not a column.
+
+5. **App-control mutations land as HTTP routes, not preload residue** (Phase 3
+   classification). The only reason a channel stays IPC residue is that it needs a
+   true Electron capability handle (dialogs, `browser:bind`'s raw `webContents`
+   id — §3). Do not residue-classify a control mutation (open pane, focus task,
+   create workspace) merely because only the renderer calls it today; if it is a
+   serializable request/response app contract it becomes a route behind the guard,
+   and is thereby reachable by a future authorized principal.
+
+Verification is only that the seams hold, not that external access works: the
+guard is principal-shaped (a second principal `kind` can be added in a test
+without editing routes), and runtime events and WS frames are serializable and
+kind-tagged. Everything else is the ordinary Phase 3/5 work.
