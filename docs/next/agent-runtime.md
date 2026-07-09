@@ -76,24 +76,30 @@ compounding consequences:
    inlines every included note into every step's prompt.
 2. **Cross-task bleed:** `notesStore.append()` creates the missing note with
    `originTaskId: null` (`notes.ts:181`) — and doesn't accept an `originTaskId` option at all
-   (`notes.ts:172`). Notes are workspace(repo)-scoped (`taskWorktree.ts:167-184`), and the
-   context filter shares any note *without* an `originTaskId` across tasks
+   (`notes.ts:172`). *Today* notes are only workspace(repo)-scoped (`taskWorktree.ts:167-184`),
+   and the context filter shares any note *without* an `originTaskId` across tasks
    (`knowledgeIpc.ts:74-76`). So two tasks on the same repo read each other's workflow handoffs.
+   The future-state fix is structural: **task** is a first-class note scope with its own storage
+   home (`notes/task/<taskId>/`, [feature-parity.md](./feature-parity.md) §10 `NoteLocation`), so
+   agent/handoff writes default there and can't reach a sibling task regardless of `originTaskId`.
 3. **Silent truncation kills the mechanism:** the assembler slices each note body to 2,000 chars
    and takes only the first 10 notes (`knowledgeIpc.ts:78-80`). Once the shared note outgrows
    that, **newer handoffs stop reaching the next step entirely** — the pipeline keeps "working"
    while passing stale data.
 
-**Fix:** per-run slug (`workflow-handoffs-<runId>`), `append()` grows an `originTaskId` option
-(stamped from the run's task), and the run's completion (`done`/`failed`/`safety-rail`) flips the
-note to `included: false` — it stays as an audit trail but leaves the context. Small, and it
-makes the handoff mechanism actually mean "output of the previous step in *this* run".
+**Fix:** the handoff note is written in **task** scope (the run's task, `notes/task/<taskId>/`)
+under a per-run slug (`workflow-handoffs-<runId>`); `append()` grows an `originTaskId` option
+(stamped from the run's task) for provenance, and the run's completion
+(`done`/`failed`/`safety-rail`) flips the note to `included: false` — it stays as an audit trail
+but leaves the context. Small, and it makes the handoff mechanism actually mean "output of the
+previous step in *this* run".
 
-This is best understood as **adding a scope the substrate was missing**, not a one-off patch.
-agentfield's memory fabric distinguishes global / session / actor / **run** scopes; acorn's
-substrate already spans global (memory files), workspace/repo (notes), and task — the bug is
-precisely the absence of the *run* scope, and the per-run slug is that scope
-([agent-runtime-influences.md](./agent-runtime-influences.md) §3G).
+This is best understood as **realising the scopes the substrate was missing**, not a one-off patch.
+agentfield's memory fabric distinguishes global / session / actor / **run** scopes; the future-state
+acorn substrate spans global (memory files), workspace/repo (notes), and **task** (notes' own
+`notes/task/<taskId>/` home) — and the per-run slug is the *run* refinement *inside* task scope, not
+a fourth peer ([feature-parity.md](./feature-parity.md) §10 `NoteLocation`;
+[agent-runtime-influences.md](./agent-runtime-influences.md) §3G).
 
 ### 2.2 Session resume is plumbed and never used
 

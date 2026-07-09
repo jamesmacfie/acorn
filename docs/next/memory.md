@@ -49,7 +49,11 @@ Current Acorn scopes are enough if they are named precisely:
 | `private` | `~/.acorn/memory/*.md` | this machine/operator | personal preferences, local setup, private account quirks |
 | `proposal` | app data under `apps/desktop/.acorn/memory-proposals/` | reviewer until accepted/rejected | agent/workflow/integration suggestions |
 | `run` | workflow handoff notes, not memory | only the workflow run | intermediate step outputs |
-| `task` | notes/review notes, not memory | current task or workspace according to notes rules | active plan, findings, handoff text |
+| `task` | notes/review notes, not memory — task notes have their own durable home `notes/task/<taskId>/` | only this task (deleted with it) | active plan, findings, handoff text, seeded PR/ticket notes |
+
+Notes' own scope model (`global`/`workspace`/`task`, with `run` a refinement inside task) is the
+canonical `NoteScope`/`NoteLocation` contract in [feature-parity.md](./feature-parity.md) §10 —
+the `run` and `task` rows above are its memory-side view.
 
 Do not add a plugin-specific durable memory scope. Plugin-specific data belongs in plugin T1/T2
 storage; durable cross-session knowledge either belongs to the repo, to the operator privately, or

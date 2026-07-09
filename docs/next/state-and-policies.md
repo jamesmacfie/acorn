@@ -313,7 +313,9 @@ lands, the preservation stance is explicit. **Never deleted automatically:**
 - active tasks and their worktree paths;
 - workspace/repo assignments — including *ignored* repos (ignored ≠
   unassigned) — and repo path mappings;
-- notes, accepted memory files, and pending memory proposals;
+- global and workspace notes, accepted memory files, and pending memory
+  proposals (**task-scoped notes are the exception** — `notes/task/<taskId>/`
+  is removed with its task, [feature-parity.md](./feature-parity.md) §10);
 - user-created review notes, until an explicit archive/retention policy says
   otherwise;
 - integration rows, unless the user disconnects.
