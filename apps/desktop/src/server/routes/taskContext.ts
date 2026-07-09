@@ -3,6 +3,8 @@ import { Hono } from 'hono'
 import type { TaskContext, TaskContextInclude } from '../../shared/api'
 import { getDb, schema } from '../db'
 import type { AppEnv } from '../middleware/auth'
+import { getUser } from '../middleware/requireUser'
+import { respondError } from '../respond'
 
 // The context assembler (docs/next 11 §C): ONE endpoint composing everything attached to a task —
 // the scalar PR (via the mirror), task_links → issues.data, notes and the memory-index slice
@@ -33,11 +35,10 @@ const parseInclude = (raw: string | undefined): Set<TaskContextInclude> => {
 export const taskContext = new Hono<AppEnv>()
   // Repo facts for the MCP repo_info tool (docs/mcp.md): owner/name/defaultBranch off the mirror.
   .get('/:id/repo-info', async (c) => {
-    const user = c.get('user')
-    if (!user) return c.json({ error: 'unauthenticated' }, 401)
+    const user = getUser(c)
     const db = getDb(c.env)
     const [t] = await db.select().from(schema.tasks).where(eq(schema.tasks.id, c.req.param('id')))
-    if (!t) return c.json({ error: 'not_found' }, 404)
+    if (!t) return respondError(c, 404, 'not_found')
     const [repoRow] = await db
       .select()
       .from(schema.repos)
@@ -45,11 +46,10 @@ export const taskContext = new Hono<AppEnv>()
     return c.json({ owner: t.repoOwner, name: t.repoName, defaultBranch: repoRow?.defaultBranch ?? null, branch: t.branch, worktreePath: t.worktreePath })
   })
   .get('/:id/context', async (c) => {
-  const user = c.get('user')
-  if (!user) return c.json({ error: 'unauthenticated' }, 401)
+  const user = getUser(c)
   const db = getDb(c.env)
   const [t] = await db.select().from(schema.tasks).where(eq(schema.tasks.id, c.req.param('id')))
-  if (!t) return c.json({ error: 'not_found' }, 404)
+  if (!t) return respondError(c, 404, 'not_found')
   const include = parseInclude(c.req.query('include'))
   const repo = `${t.repoOwner}/${t.repoName}`
 

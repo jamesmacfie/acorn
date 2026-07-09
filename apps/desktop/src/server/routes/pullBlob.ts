@@ -1,9 +1,11 @@
-import { and, eq } from 'drizzle-orm'
 import { Hono } from 'hono'
 import { fileBodyBlobKey } from '../blobs'
-import { getDb, schema } from '../db'
+import { getDb } from '../db'
 import { gh, ghError } from '../github'
 import type { AppEnv } from '../middleware/auth'
+import { getUser } from '../middleware/requireUser'
+import { respondError } from '../respond'
+import { resolveRepoForUser } from './repoMirror'
 
 // Full file body at an immutable blob sha — used to expand unchanged context around diff hunks.
 // The sha keys immutable content, so bodies cache forever in the local on-disk BLOBS dir
@@ -13,8 +15,7 @@ const decodeBase64 = (content: string) =>
   new TextDecoder().decode(Uint8Array.from(atob(content.replace(/\n/g, '')), (c) => c.charCodeAt(0)))
 
 export const pullBlob = new Hono<AppEnv>().get('/:owner/:repo/blobs/:sha', async (c) => {
-  const user = c.get('user')
-  if (!user) return c.json({ error: 'unauthenticated' }, 401)
+  const user = getUser(c)
 
   const db = getDb(c.env)
   const userId = user.login
@@ -22,18 +23,17 @@ export const pullBlob = new Hono<AppEnv>().get('/:owner/:repo/blobs/:sha', async
   const repo = c.req.param('repo')
   const sha = c.req.param('sha')
 
-  const [repoRow] = await db
-    .select({ id: schema.repos.id })
-    .from(schema.repos)
-    .where(and(eq(schema.repos.userId, userId), eq(schema.repos.owner, owner), eq(schema.repos.name, repo)))
-  if (!repoRow) return c.json({ error: 'repo_not_found' }, 404)
+  // Same repo resolution as the sibling read routes (pulls/pullDetail/pullFiles): mirror hit, else
+  // live fetch + mirror; a private-repo 403 folds to repo_not_found.
+  const resolved = await resolveRepoForUser(db, user.token, userId, owner, repo)
+  if (!resolved.ok) return respondError(c, resolved.failure.status, resolved.failure.error)
 
   const cached = await c.env.BLOBS.get(fileBodyBlobKey(sha))
   if (cached != null) return c.json({ text: cached })
 
   const res = await gh(user.token, `/repos/${owner}/${repo}/git/blobs/${sha}`)
   const err = ghError(res)
-  if (err) return c.json({ error: err.error }, err.status)
+  if (err) return respondError(c, err.status, err.error)
   const body = (await res.json()) as { content: string; encoding: string }
   const text = body.encoding === 'base64' ? decodeBase64(body.content) : body.content
 

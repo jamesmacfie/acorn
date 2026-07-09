@@ -6,6 +6,8 @@ import { trackBackgroundRefresh } from '../background'
 import { getDb, schema } from '../db'
 import { filesResource } from '../db/resourceKeys'
 import type { AppEnv } from '../middleware/auth'
+import { getUser } from '../middleware/requireUser'
+import { respondError } from '../respond'
 import { fetchFiles, mirrorFiles, readFiles, STALE_AFTER_MS } from './prMirror'
 import { resolveRepoForUser, type RouteResult } from './repoMirror'
 
@@ -34,19 +36,18 @@ const uniqueStringPaths = (paths: unknown): string[] | null => {
 }
 
 const handleFilesRead = async (c: Context<AppEnv>, options: { summaryOnly?: boolean; paths?: string[] } = {}) => {
-  const user = c.get('user')
-  if (!user) return c.json({ error: 'unauthenticated' }, 401)
+  const user = getUser(c)
 
   const db = getDb(c.env)
   const userId = user.login
   const owner = c.req.param('owner')
   const repo = c.req.param('repo')
   const number = Number(c.req.param('number'))
-  if (!owner || !repo) return c.json({ error: 'repo_not_found' }, 404)
-  if (!Number.isInteger(number)) return c.json({ error: 'bad_number' }, 400)
+  if (!owner || !repo) return respondError(c, 404, 'repo_not_found')
+  if (!Number.isInteger(number)) return respondError(c, 400, 'bad_number')
 
   const resolved = await resolveRepoForUser(db, user.token, userId, owner, repo)
-  if (!resolved.ok) return c.json({ error: resolved.failure.error }, resolved.failure.status)
+  if (!resolved.ok) return respondError(c, resolved.failure.status, resolved.failure.error)
   const { repoId } = resolved.value
   const key = { userId, repoId, number }
   const paths = options.paths?.length ? options.paths : undefined
@@ -73,7 +74,7 @@ const handleFilesRead = async (c: Context<AppEnv>, options: { summaryOnly?: bool
   }
 
   const refreshed = await refresh()
-  if (!refreshed.ok) return c.json({ error: refreshed.failure.error }, refreshed.failure.status)
+  if (!refreshed.ok) return respondError(c, refreshed.failure.status, refreshed.failure.error)
   return c.json(refreshed.value)
 }
 
@@ -87,8 +88,8 @@ export const pullFiles = new Hono<AppEnv>().get('/:owner/:repo/pulls/:number/fil
 }).post('/:owner/:repo/pulls/:number/files/patches', async (c) => {
   const body = (await c.req.json().catch(() => null)) as PullFilesPatchRequest | null
   const paths = uniqueStringPaths(body?.paths)
-  if (!paths) return c.json({ error: 'bad_paths' }, 400)
-  if (paths.length > MAX_PATCH_PATHS) return c.json({ error: 'too_many_paths' }, 400)
+  if (!paths) return respondError(c, 400, 'bad_paths')
+  if (paths.length > MAX_PATCH_PATHS) return respondError(c, 400, 'too_many_paths')
   if (paths.length === 0) return c.json([])
   return handleFilesRead(c, { paths })
 })

@@ -1,3 +1,6 @@
+// The one error envelope every /api route returns. `error` is a stable machine code
+// (see docs/api-reference.md §error-codes); `detail` carries human/upstream prose.
+export type ApiError = { error: string; detail?: string[] }
 export type Me = { login: string; name: string; avatar: string; scopes: string[] }
 export type Repo = {
   id: number

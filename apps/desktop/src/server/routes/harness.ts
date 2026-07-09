@@ -1,5 +1,6 @@
 import { Hono, type Context } from 'hono'
 import type { AppEnv } from '../middleware/auth'
+import { respondError } from '../respond'
 
 // Harness routes (docs/mcp.md): the loopback surface the acorn MCP server's feature tools
 // call — notes, memory (search/get/list + PROPOSE, never a silent write), run targets and the
@@ -80,25 +81,26 @@ const STATUS: Record<HarnessErrorKind, 503 | 404 | 400 | 500> = { unavailable: 5
 // `errorKind` classifies untyped throws for routes whose failures have one obvious meaning
 // (e.g. a notes read that throws is a missing note).
 async function respond<B>(c: Context<AppEnv>, bridge: B | null, fn: (b: B) => Promise<unknown>, opts?: { errorKind?: HarnessError['kind'] }): Promise<Response> {
-  if (!bridge) return c.json({ error: 'bridge-unavailable', kind: 'unavailable' }, 503)
+  if (!bridge) return respondError(c, 503, 'bridge-unavailable')
   try {
     return c.json(await fn(bridge))
   } catch (e) {
+    // The former `kind` discriminator becomes the machine `error` code; the human/upstream
+    // message rides in `detail` (docs/api-reference.md §error-codes).
     const kind: HarnessErrorKind = e instanceof HarnessError ? e.kind : (opts?.errorKind ?? 'failed')
-    return c.json({ error: e instanceof Error ? e.message : 'harness call failed', kind }, STATUS[kind])
+    const message = e instanceof Error ? e.message : 'harness call failed'
+    return respondError(c, STATUS[kind], kind, [message])
   }
 }
 
+// Auth is enforced globally by requireUser in createApp() (docs/next/security.md §3); harness
+// keeps no inline guard. Internal-token callers pass the same gate (they resolve a principal).
 export const harness = new Hono<AppEnv>()
-  .use('*', async (c, next) => {
-    if (!c.get('user')) return c.json({ error: 'unauthenticated' }, 401)
-    await next()
-  })
   .get('/:id/notes', (c) => respond(c, bridges.notes, (b) => b.list(c.req.param('id'))))
   .get('/:id/notes/:slug', (c) => respond(c, bridges.notes, (b) => b.read(c.req.param('id'), c.req.param('slug')), { errorKind: 'not_found' }))
   .put('/:id/notes/:slug', async (c) => {
     const body = (await c.req.json().catch(() => ({}))) as { body?: string; sessionId?: string }
-    if (typeof body.body !== 'string') return c.json({ error: 'bad_request' }, 400)
+    if (typeof body.body !== 'string') return respondError(c, 400, 'bad_request')
     return respond(c, bridges.notes, async (b) => {
       await b.write(c.req.param('id'), c.req.param('slug'), body.body!, body.sessionId)
       return { ok: true }
@@ -106,7 +108,7 @@ export const harness = new Hono<AppEnv>()
   })
   .post('/:id/notes/:slug/append', async (c) => {
     const body = (await c.req.json().catch(() => ({}))) as { text?: string; sessionId?: string }
-    if (!body.text) return c.json({ error: 'bad_request' }, 400)
+    if (!body.text) return respondError(c, 400, 'bad_request')
     return respond(c, bridges.notes, async (b) => {
       await b.append(c.req.param('id'), c.req.param('slug'), body.text!, body.sessionId)
       return { ok: true }
@@ -126,7 +128,7 @@ export const harness = new Hono<AppEnv>()
   )
   .post('/:id/memory/propose', async (c) => {
     const body = (await c.req.json().catch(() => ({}))) as { name?: string; type?: string; description?: string; body?: string; sessionId?: string }
-    if (!body.name || !body.type || !body.description) return c.json({ error: 'bad_request' }, 400)
+    if (!body.name || !body.type || !body.description) return respondError(c, 400, 'bad_request')
     return respond(
       c,
       bridges.memory,
@@ -152,18 +154,18 @@ export const harness = new Hono<AppEnv>()
   .get('/:id/run/:target/status', (c) => respond(c, bridges.run, (b) => b.status(c.req.param('id'), c.req.param('target'))))
   .post('/:id/browser/navigate', async (c) => {
     const body = (await c.req.json().catch(() => ({}))) as { url?: string }
-    if (!body.url || typeof body.url !== 'string') return c.json({ error: 'bad_request' }, 400)
+    if (!body.url || typeof body.url !== 'string') return respondError(c, 400, 'bad_request')
     return respond(c, bridges.browser, (b) => b.navigate(c.req.param('id'), body.url!))
   })
   .get('/:id/browser/snapshot', (c) => respond(c, bridges.browser, (b) => b.snapshot(c.req.param('id'))))
   .post('/:id/browser/click', async (c) => {
     const body = (await c.req.json().catch(() => ({}))) as { ref?: string }
-    if (!body.ref) return c.json({ error: 'bad_request' }, 400)
+    if (!body.ref) return respondError(c, 400, 'bad_request')
     return respond(c, bridges.browser, (b) => b.click(c.req.param('id'), body.ref!))
   })
   .post('/:id/browser/fill', async (c) => {
     const body = (await c.req.json().catch(() => ({}))) as { ref?: string; text?: string }
-    if (!body.ref || typeof body.text !== 'string') return c.json({ error: 'bad_request' }, 400)
+    if (!body.ref || typeof body.text !== 'string') return respondError(c, 400, 'bad_request')
     return respond(c, bridges.browser, (b) => b.fill(c.req.param('id'), body.ref!, body.text!))
   })
   .get('/:id/browser/screenshot', (c) => respond(c, bridges.browser, (b) => b.screenshot(c.req.param('id'))))

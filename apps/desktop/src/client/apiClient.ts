@@ -1,3 +1,5 @@
+import type { ApiError as ApiErrorBody } from '../shared/api'
+
 // Typed error for non-OK API responses: carries the HTTP status so consumers branch structurally
 // (e.g. index.tsx's 401 → reauth bounce) instead of pattern-matching message text.
 export class ApiError extends Error {
@@ -19,7 +21,10 @@ export async function readJson<T>(url: string, options: ReadOptions = {}): Promi
 }
 
 export async function apiError(res: Response, fallback: string): Promise<string> {
-  const err = (await res.json().catch(() => ({}))) as { error?: string }
+  const err = (await res.json().catch(() => ({}))) as Partial<ApiErrorBody>
+  // Prefer the human/upstream prose in `detail` (e.g. GitHub's verbatim 422 reason) over the
+  // machine code in `error` — the code is for branching, the detail is for people.
+  if (err.detail?.length) return err.detail.join('\n')
   return err.error ?? fallback
 }
 

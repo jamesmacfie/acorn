@@ -2,11 +2,13 @@ import { and, eq } from 'drizzle-orm'
 import { Hono } from 'hono'
 import { getDb, schema } from '../db'
 import type { AppEnv } from '../middleware/auth'
+import { getUser } from '../middleware/requireUser'
 
-// Participant logins for @-mention autocomplete, read straight from the mirror tables.
+// Participant logins for @-mention autocomplete, read straight from the mirror tables. Mirror-only
+// and best-effort: an unmirrored repo yields an empty list (the client just gets no suggestions),
+// so this deliberately keeps its own lookup rather than resolveRepoForUser's live-fetch-on-miss.
 export const mentions = new Hono<AppEnv>().get('/:owner/:repo/mentions', async (c) => {
-  const user = c.get('user')
-  if (!user) return c.json({ error: 'unauthenticated' }, 401)
+  const user = getUser(c)
   const db = getDb(c.env)
   const owner = c.req.param('owner')!
   const repo = c.req.param('repo')!

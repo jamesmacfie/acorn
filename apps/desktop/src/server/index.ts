@@ -1,6 +1,8 @@
 import { Hono } from 'hono'
 import { csrf } from 'hono/csrf'
 import { authMiddleware, type AppEnv } from './middleware/auth'
+import { requireUser } from './middleware/requireUser'
+import { onServerError } from './respond'
 import { actions } from './routes/actions'
 import { auth } from './routes/auth'
 import { integrations } from './routes/integrations'
@@ -29,10 +31,15 @@ import { tasks } from './routes/tasks'
 // static asset serving + SPA fallback. createApp() is a factory so the bootstrap can build a fresh
 // instance without mutating the default export that tests use.
 export function createApp() {
+  // Mount order is the auth invariant: /auth is public (it establishes the session), then every
+  // /api/* request passes csrf → authMiddleware (resolve principal) → requireUser (enforce it)
+  // before any router. A router mounted before requireUser would be an unauthenticated hole, so
+  // all /api routers stay below this line. See docs/next/security.md §3.
   return new Hono<AppEnv>()
     .route('/auth', auth)
     .use('/api/*', csrf()) // Origin / Sec-Fetch-Site check on mutating calls
-    .use('/api/*', authMiddleware) // stateless cookie → ctx.user (stub for now)
+    .use('/api/*', authMiddleware) // resolve ctx.principal from cookie or internal token
+    .use('/api/*', requireUser) // single 401 gate over the protected router table
     .route('/api/me', me)
     .route('/api/pins', pins)
     .route('/api/prefs', prefs)
@@ -55,6 +62,7 @@ export function createApp() {
     .route('/api/repos', actions) // Actions reads: /:owner/:repo/actions/runs/:runId/jobs + jobs/:jobId/logs
     .route('/api/repos', prCreate) // create PR + branches/compare reads for the create view
     .route('/api/repos', mentions) // /:owner/:repo/mentions — participant logins for @autocomplete
+    .onError(onServerError) // uncaught throws still speak ApiError on /api (docs/api-reference.md §error-codes)
 }
 
 export default createApp()

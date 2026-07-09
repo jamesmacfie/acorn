@@ -4,6 +4,7 @@ import { Hono } from 'hono'
 import type { ReviewNote } from '../../shared/api'
 import { getDb, schema } from '../db'
 import type { AppEnv } from '../middleware/auth'
+import { respondError } from '../respond'
 
 // Local review notes (docs/panes.md): CRUD over the machine-scoped review_notes table. The send
 // loop: create (unsent) → deliver via sendToAgent → POST /sent stamps sentAt → an edit clears it,
@@ -26,13 +27,11 @@ const rowToNote = (r: Row): ReviewNote => ({
 
 export const reviewNotes = new Hono<AppEnv>()
   .get('/:id/review-notes', async (c) => {
-    if (!c.get('user')) return c.json({ error: 'unauthenticated' }, 401)
     const db = getDb(c.env)
     const rows = await db.select().from(schema.reviewNotes).where(eq(schema.reviewNotes.taskId, c.req.param('id'))).orderBy(schema.reviewNotes.createdAt)
     return c.json(rows.map(rowToNote))
   })
   .post('/:id/review-notes', async (c) => {
-    if (!c.get('user')) return c.json({ error: 'unauthenticated' }, 401)
     const taskId = c.req.param('id')
     const body = (await c.req.json().catch(() => ({}))) as Partial<ReviewNote>
     const startLine = Number(body.startLine)
@@ -47,10 +46,10 @@ export const reviewNotes = new Hono<AppEnv>()
       endLine < startLine ||
       !body.body?.trim()
     )
-      return c.json({ error: 'bad_request' }, 400)
+      return respondError(c, 400, 'bad_request')
     const db = getDb(c.env)
     const [t] = await db.select().from(schema.tasks).where(eq(schema.tasks.id, taskId))
-    if (!t) return c.json({ error: 'not_found' }, 404)
+    if (!t) return respondError(c, 404, 'not_found')
     const row: Row = {
       id: randomUUID(),
       taskId,
@@ -68,9 +67,8 @@ export const reviewNotes = new Hono<AppEnv>()
   })
   // Edit clears sentAt (orca's pattern) — an edited note is unsent again.
   .patch('/:id/review-notes/:noteId', async (c) => {
-    if (!c.get('user')) return c.json({ error: 'unauthenticated' }, 401)
     const body = (await c.req.json().catch(() => ({}))) as { body?: string }
-    if (!body.body?.trim()) return c.json({ error: 'bad_request' }, 400)
+    if (!body.body?.trim()) return respondError(c, 400, 'bad_request')
     const db = getDb(c.env)
     await db
       .update(schema.reviewNotes)
@@ -79,7 +77,6 @@ export const reviewNotes = new Hono<AppEnv>()
     return c.json({ ok: true })
   })
   .delete('/:id/review-notes/:noteId', async (c) => {
-    if (!c.get('user')) return c.json({ error: 'unauthenticated' }, 401)
     const db = getDb(c.env)
     await db
       .delete(schema.reviewNotes)
@@ -88,10 +85,9 @@ export const reviewNotes = new Hono<AppEnv>()
   })
   // Stamp sentAt on confirmed delivery (the send loop's final step).
   .post('/:id/review-notes/sent', async (c) => {
-    if (!c.get('user')) return c.json({ error: 'unauthenticated' }, 401)
     const body = (await c.req.json().catch(() => ({}))) as { ids?: string[] }
     const ids = (body.ids ?? []).filter((x): x is string => typeof x === 'string')
-    if (!ids.length) return c.json({ error: 'bad_request' }, 400)
+    if (!ids.length) return respondError(c, 400, 'bad_request')
     const db = getDb(c.env)
     await db
       .update(schema.reviewNotes)

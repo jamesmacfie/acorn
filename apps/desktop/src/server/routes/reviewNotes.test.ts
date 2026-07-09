@@ -27,7 +27,7 @@ describe('review notes CRUD + sentAt lifecycle (docs/panes.md)', () => {
     vi.mocked(getDb).mockReturnValue(t.db)
     app = new Hono<AppEnv>()
     app.use('/api/*', async (c, next) => {
-      c.set('user', { token: 'token', login: 'james', name: '', avatar: '', scopes: [] })
+      c.set('principal', { kind: 'user', user: { token: 'token', login: 'james', name: '', avatar: '', scopes: [] } })
       await next()
     })
     app.route('/api/tasks', reviewNotes)

@@ -70,6 +70,11 @@ global incl. inline browser/mcp), `editorClient.ts`, `searchClient.ts`,
 
 ### 2a. Auth guards (Phase 0)
 
+**✓ Consumed by Phase 0.** All 56 inline guards deleted; auth is one `requireUser` middleware
+mounted over `/api/*` in `createApp()` (gates on the resolved `Principal`), harness's inline
+`.use('*')` guard removed. `prContext.ts`'s `unauthenticated` helper branch removed too. Handlers
+read identity via `getUser(c)`.
+
 **56 inline `unauthenticated` sites** (55 `c.json({ error: 'unauthenticated' }, 401)`
 + 1 plain-object variant in `prContext.ts:14`). Every `/api` router repeats the
 guard inline **except `harness.ts:93-96`**, which centralizes it in a
@@ -80,6 +85,11 @@ never enforces — enforcement is 100% per-route today.
 
 ### 2b. Error shapes (Phase 0)
 
+**✓ Consumed by Phase 0.** All error emissions now route through `respondError(c, status, code, detail?)`
+→ the `ApiError` envelope. Semantic fixes: `prActions.ts` dropped body-level `status` from
+`merge_failed`; harness dropped `{ kind }` (kind → `error` code, message → `detail`); `prCreate.ts`
+422 puts GitHub prose in `detail` with code `validation_failed`. Machine codes unchanged.
+
 **191 `c.json({ error … })` sites across 22 files.** Distinct shapes:
 `{error}` (dominant), `{error, status}` (`prActions.ts:23`), `{error, detail}`
 (`pullsBatch.ts:79`, `pullDetail.ts:76`), `{error, kind}` (harness-only,
@@ -89,6 +99,12 @@ Confirmed upstream-prose leak: `prCreate.ts:122` returns GitHub's verbatim 422
 message in the `error` field.
 
 ### 2c. Mappers lacking `satisfies` (Phase 0)
+
+**✓ Consumed by Phase 0.** All mappers in the table below now `satisfies` their shared response
+type on the constructed literal (`me`, `pulls`, `prMirror`, `repoMirror`, `rollbar`, `linear`,
+`prCreate`). Applying `satisfies Pull` surfaced a real gap — `pulls.ts` list mappers omitted
+`mergeable`/`mergeStateStatus`/`autoMergeEnabled`; now projected (mirror row for the open path,
+`null`/`false` for the GitHub closed path).
 
 Only **9** `satisfies` sites exist (`workspaces.ts:92,222`,
 `integrations.ts:29`, `rollbar.ts:88`, `linear.ts:134,146,152,164,209`).

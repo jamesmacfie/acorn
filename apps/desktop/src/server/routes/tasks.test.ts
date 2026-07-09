@@ -14,7 +14,7 @@ vi.mock('../db', async (importOriginal) => {
 const makeApp = () => {
   const app = new Hono<AppEnv>()
   app.use('/api/*', async (c, next) => {
-    c.set('user', { token: 'token', login: 'james', name: '', avatar: '', scopes: [] })
+    c.set('principal', { kind: 'user', user: { token: 'token', login: 'james', name: '', avatar: '', scopes: [] } })
     await next()
   })
   app.route('/api/tasks', tasks)

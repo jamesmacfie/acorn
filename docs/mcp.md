@@ -155,9 +155,10 @@ Everything crosses the `window.acorn.mcp` bridge (`apps/desktop/src/main/preload
   which delegates to four per-domain sub-bridges (`NotesBridge` / `MemoryBridge` / `RunBridge` /
   `BrowserBridge`) wired independently by `apps/desktop/src/main/harnessWiring.ts`. Without a
   bridge — e.g. running the server alone with `dev:node`, no Electron — every harness route returns a
-  clean `503 { error: 'bridge-unavailable', kind: 'unavailable' }` and the corresponding tools report
+  clean `503 { error: 'bridge-unavailable' }` and the corresponding tools report
   `api-error` rather than crashing. With the bridge up, failures are typed (`HarnessError` kinds
-  `not_found`/`bad_request`/`failed` → 404/400/500), so a domain error like an unknown run target no
+  become the machine `error` code — `not_found`/`bad_request`/`failed` → 404/400/500, with the
+  human message in `detail`), so a domain error like an unknown run target no
   longer reads as service-unavailable. The context/repo-info routes (`taskContext.ts`) do not need
   the bridge.
 - The `mcp__acorn-dev__*` tools an operator may see listed in Claude Code are exactly this server's

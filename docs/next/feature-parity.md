@@ -525,16 +525,16 @@ Owner: **core**. Moved by Phases 0 and 3. Verified by: route tests
 The `ApiError` envelope standardizes the **shape**, never the **semantic
 vocabulary** — the sweep must not erase meaningful machine codes.
 
-- [ ] A GitHub `401` from upstream maps to **`reauth`** and the client
-  bounces to login.
-- [ ] **SAML SSO, rate-limit, forbidden, and private-repo-not-found foldings
-  keep their current meanings** (`sso`, `rate_limited`, and friends).
-- [ ] `node_id_unknown` (§4), `validation_failed`, and provider reauth codes
-  survive as stable codes.
-- [ ] **`/auth/*` stays outside `requireUser`**; internal-token routes never
-  inherit a GitHub token (`token: ''`).
-- [ ] **The GitHub token never reaches renderer or agents**
-  ([security.md](./security.md) §2 invariant 1).
+- [x] A GitHub `401` from upstream maps to **`reauth`** and the client
+  bounces to login. *(Phase 0: `ghError` unchanged; envelope preserves the code.)*
+- [x] **SAML SSO, rate-limit, forbidden, and private-repo-not-found foldings
+  keep their current meanings** (`sso`, `rate_limited`, and friends). *(Phase 0: codes byte-identical.)*
+- [x] `node_id_unknown` (§4), `validation_failed`, and provider reauth codes
+  survive as stable codes. *(Phase 0: preserved; `validation_failed` is the create-PR 422 code, prose in `detail`.)*
+- [x] **`/auth/*` stays outside `requireUser`**; internal-token routes never
+  inherit a GitHub token (`token: ''`). *(Phase 0: `/auth` mounts before the `/api/*` chain — tested; internal identity unchanged.)*
+- [x] **The GitHub token never reaches renderer or agents**
+  ([security.md](./security.md) §2 invariant 1). *(Phase 0: `/api/me` still projects public fields only — tested.)*
 - [ ] **GitHub OAuth permissions re-request stays a settings feature** (§12),
   distinct from the agent-tool permissions page.
 - [ ] **Integration tokens stay encrypted with the session root key** until

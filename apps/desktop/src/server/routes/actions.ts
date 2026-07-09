@@ -1,6 +1,8 @@
 import { Hono } from 'hono'
 import { gh, ghError } from '../github'
 import type { AppEnv } from '../middleware/auth'
+import { getUser } from '../middleware/requireUser'
+import { respondError } from '../respond'
 import type { RunJobs } from '../../shared/api'
 
 // Read-only Actions endpoints for the checks side panel. Writes (rerun) live in prActions.ts.
@@ -18,14 +20,13 @@ type GhJob = {
 export const actions = new Hono<AppEnv>()
   // A workflow run's jobs + their steps. One cheap call; the panel filters to the clicked job.
   .get('/:owner/:repo/actions/runs/:runId/jobs', async (c) => {
-    const user = c.get('user')
-    if (!user) return c.json({ error: 'unauthenticated' }, 401)
+    const user = getUser(c)
     const owner = c.req.param('owner')
     const repo = c.req.param('repo')
     const runId = c.req.param('runId')
     const res = await gh(user.token, `/repos/${owner}/${repo}/actions/runs/${runId}/jobs?per_page=100`)
     const err = ghError(res)
-    if (err) return c.json({ error: err.error }, err.status)
+    if (err) return respondError(c, err.status, err.error)
     const json = (await res.json()) as { jobs?: GhJob[] }
     const body: RunJobs = {
       jobs: (json.jobs ?? []).map((j) => ({
@@ -41,8 +42,7 @@ export const actions = new Hono<AppEnv>()
   // Full plaintext log for one job. GitHub 302-redirects to signed blob storage; follow it
   // manually and re-fetch WITHOUT the auth header (the target rejects/leaks the token otherwise).
   .get('/:owner/:repo/actions/jobs/:jobId/logs', async (c) => {
-    const user = c.get('user')
-    if (!user) return c.json({ error: 'unauthenticated' }, 401)
+    const user = getUser(c)
     const owner = c.req.param('owner')
     const repo = c.req.param('repo')
     const jobId = c.req.param('jobId')
@@ -50,11 +50,11 @@ export const actions = new Hono<AppEnv>()
     const location = res.headers.get('location')
     if (res.status >= 300 && res.status < 400 && location) {
       const blob = await fetch(location)
-      if (!blob.ok) return c.json({ error: 'github_unavailable' }, 502)
+      if (!blob.ok) return respondError(c, 502, 'github_unavailable')
       return c.json({ text: await blob.text() })
     }
     const err = ghError(res)
-    if (err) return c.json({ error: err.error }, err.status)
+    if (err) return respondError(c, err.status, err.error)
     // No redirect (e.g. logs not yet available): return whatever body we got as text.
     return c.json({ text: await res.text() })
   })
