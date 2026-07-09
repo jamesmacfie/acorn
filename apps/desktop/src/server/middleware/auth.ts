@@ -4,7 +4,16 @@ import { getDb, schema } from '../db'
 import { openSession, sealSession, SESSION_COOKIE, SESSION_TTL_SECONDS, type SessionData } from '../session'
 
 export type SessionUser = SessionData
-export type AppEnv = { Bindings: Env; Variables: { user: SessionUser | null } }
+
+// The authenticated caller, resolved from whichever credential is present. Routes gate on
+// "a principal exists" (via requireUser), never on "a cookie is present" — so a future
+// authorized external caller is a new `kind` here + one branch in authMiddleware, not a
+// re-touch of every route. See docs/next/security.md §9.1.
+// ponytail: kind + identity is the seam §9.1 needs now; a capability set is added when a
+// third principal kind (external caller) actually lands, not before.
+export type PrincipalKind = 'user' | 'internal'
+export type Principal = { kind: PrincipalKind; user: SessionUser }
+export type AppEnv = { Bindings: Env; Variables: { principal: Principal | null } }
 
 // Internal loopback auth (docs/mcp.md): the acorn MCP server holds no session cookie; it sends
 // the per-app-run INTERNAL_TOKEN instead. The identity is the machine's single user (this is a
@@ -29,7 +38,12 @@ export const authMiddleware = createMiddleware<AppEnv>(async (c, next) => {
   const raw = getCookie(c, SESSION_COOKIE)
   const cookieUser = raw ? await openSession(raw, c.env.SESSION_ENC_KEY) : null
   const user = cookieUser ?? (await internalUser(c))
-  c.set('user', user)
+  const principal: Principal | null = cookieUser
+    ? { kind: 'user', user: cookieUser }
+    : user
+      ? { kind: 'internal', user }
+      : null
+  c.set('principal', principal)
 
   if (cookieUser) {
     const resealed = await sealSession(cookieUser, c.env.SESSION_ENC_KEY)

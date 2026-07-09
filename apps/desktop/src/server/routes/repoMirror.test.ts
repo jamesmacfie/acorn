@@ -150,7 +150,7 @@ describe('repos stale-while-revalidate', () => {
 
     const app = new Hono<AppEnv>()
     app.use('/api/*', async (c, next) => {
-      c.set('user', { token: 'token', login: 'james', name: '', avatar: '', scopes: [] })
+      c.set('principal', { kind: 'user', user: { token: 'token', login: 'james', name: '', avatar: '', scopes: [] } })
       await next()
     })
     app.route('/api/repos', repos)
@@ -212,7 +212,7 @@ describe('pull files stale-while-revalidate', () => {
 
     const app = new Hono<AppEnv>()
     app.use('/api/*', async (c, next) => {
-      c.set('user', { token: 'token', login: 'james', name: '', avatar: '', scopes: [] })
+      c.set('principal', { kind: 'user', user: { token: 'token', login: 'james', name: '', avatar: '', scopes: [] } })
       await next()
     })
     app.route('/api/repos', pullFiles)
@@ -285,7 +285,7 @@ describe('pull files stale-while-revalidate', () => {
 
     const app = new Hono<AppEnv>()
     app.use('/api/*', async (c, next) => {
-      c.set('user', { token: 'token', login: 'james', name: '', avatar: '', scopes: [] })
+      c.set('principal', { kind: 'user', user: { token: 'token', login: 'james', name: '', avatar: '', scopes: [] } })
       await next()
     })
     app.route('/api/repos', pullFiles)

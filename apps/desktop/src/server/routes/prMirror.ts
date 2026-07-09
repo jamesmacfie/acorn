@@ -1,6 +1,6 @@
 import { and, eq, inArray } from 'drizzle-orm'
 import type { SQLiteColumn } from 'drizzle-orm/sqlite-core'
-import type { PullDetail, PullFile } from '../../shared/api'
+import type { Check, Comment, Label, PullCommit, PullDetail, PullFile, Review, Thread } from '../../shared/api'
 import { patchBlobKey } from '../blobs'
 import { getDb, schema } from '../db'
 import { chunkRowsByColumnBudget } from '../db/batch'
@@ -220,31 +220,32 @@ export const mirrorPr = async (db: Db, key: PrKey, pr: GqlPull, now: number) => 
   ])
 }
 
-type ThreadComment = { id: string; databaseId: number | null; author: string | null; body: string | null; createdAt: number | null }
-const toThread = (row: typeof schema.reviewThreads.$inferSelect) => ({
-  threadId: row.threadId,
-  path: row.path,
-  line: row.line,
-  side: row.side,
-  resolved: row.resolved,
-  comments: [] as ThreadComment[],
-})
+const toThread = (row: typeof schema.reviewThreads.$inferSelect) =>
+  ({
+    threadId: row.threadId,
+    path: row.path,
+    line: row.line,
+    side: row.side,
+    resolved: row.resolved,
+    comments: [] as Thread['comments'],
+  }) satisfies Thread
 
-const toPublicPull = (p: typeof schema.pullRequests.$inferSelect) => ({
-  number: p.number,
-  title: p.title,
-  body: p.body,
-  state: p.state,
-  draft: p.draft,
-  author: p.author,
-  headSha: p.headSha,
-  headRef: p.headRef,
-  baseRef: p.baseRef,
-  updatedAt: p.updatedAt,
-  mergeable: p.mergeable,
-  mergeStateStatus: p.mergeStateStatus,
-  autoMergeEnabled: p.autoMergeEnabled,
-})
+const toPublicPull = (p: typeof schema.pullRequests.$inferSelect) =>
+  ({
+    number: p.number,
+    title: p.title,
+    body: p.body,
+    state: p.state,
+    draft: p.draft,
+    author: p.author,
+    headSha: p.headSha,
+    headRef: p.headRef,
+    baseRef: p.baseRef,
+    updatedAt: p.updatedAt,
+    mergeable: p.mergeable,
+    mergeStateStatus: p.mergeStateStatus,
+    autoMergeEnabled: p.autoMergeEnabled,
+  }) satisfies NonNullable<PullDetail['pull']>
 
 // Read one PR's detail composite back out of the mirror tables.
 export const readComposite = async (db: Db, key: PrKey): Promise<PullDetail> => {
@@ -271,12 +272,12 @@ export const readComposite = async (db: Db, key: PrKey): Promise<PullDetail> => 
   }
   return {
     pull: pull ? toPublicPull(pull) : null,
-    labels: labels.map((l) => ({ name: l.name, color: l.color })),
-    reviews: reviews.map((r) => ({ id: r.id, author: r.author, state: r.state, body: r.body, submittedAt: r.submittedAt })),
+    labels: labels.map((l) => ({ name: l.name, color: l.color }) satisfies Label),
+    reviews: reviews.map((r) => ({ id: r.id, author: r.author, state: r.state, body: r.body, submittedAt: r.submittedAt }) satisfies Review),
     requestedReviewers: reviewRequests.map((r) => r.login),
-    comments: comments.map((m) => ({ id: m.id, author: m.author, body: m.body, createdAt: m.createdAt })),
-    commits: commits.map((m) => ({ sha: m.sha, message: m.message, author: m.author, authorLogin: m.authorLogin, committedAt: m.committedAt })),
-    checks: checks.map((k) => ({ name: k.name, status: k.status, url: k.url, runId: k.runId })),
+    comments: comments.map((m) => ({ id: m.id, author: m.author, body: m.body, createdAt: m.createdAt }) satisfies Comment),
+    commits: commits.map((m) => ({ sha: m.sha, message: m.message, author: m.author, authorLogin: m.authorLogin, committedAt: m.committedAt }) satisfies PullCommit),
+    checks: checks.map((k) => ({ name: k.name, status: k.status, url: k.url, runId: k.runId }) satisfies Check),
     threads: [...tmap.values()],
   }
 }
@@ -349,14 +350,17 @@ export const readFiles = async (env: Env, db: Db, key: PrKey, options: ReadFiles
   ])
   const seen = new Set(viewed.map((v) => v.path))
   return Promise.all(
-    files.map(async (f) => ({
-      path: f.path,
-      status: f.status,
-      additions: f.additions,
-      deletions: f.deletions,
-      sha: f.sha,
-      viewed: seen.has(f.path),
-      patch: includePatches && f.sha ? await env.BLOBS.get(patchBlobKey(f.sha)) : null,
-    })),
+    files.map(
+      async (f) =>
+        ({
+          path: f.path,
+          status: f.status,
+          additions: f.additions,
+          deletions: f.deletions,
+          sha: f.sha,
+          viewed: seen.has(f.path),
+          patch: includePatches && f.sha ? await env.BLOBS.get(patchBlobKey(f.sha)) : null,
+        }) satisfies PullFile,
+    ),
   )
 }

@@ -12,28 +12,45 @@ and [electron](./electron.md).
 
 ## Middleware & auth
 
-Every `/api/*` route runs through two middlewares before the handler
-(`apps/desktop/src/server/index.ts:33`):
+Every `/api/*` route runs through three middlewares before the handler, in this exact order
+(`apps/desktop/src/server/index.ts`):
 
 1. `csrf()` — Origin / `Sec-Fetch-Site` check on mutating calls.
-2. `authMiddleware` (`apps/desktop/src/server/middleware/auth.ts`) — resolves `ctx.user` (or `null`)
-   from **either** of two credentials:
-   - the AES-256-GCM session **cookie** (decrypted in-CPU, then re-sealed with a sliding TTL); or
-   - the internal-loopback header **`x-acorn-internal: <INTERNAL_TOKEN>`**. This is the acorn MCP
-     server calling over loopback — it holds no cookie. `INTERNAL_TOKEN` is a fresh `randomUUID()`
-     per app run (`apps/desktop/src/main/bindings.ts`), injected into task terminal sessions as
-     `ACORN_API_TOKEN`. The identity is the machine's single user (resolved from the mirror's
-     `prefs`/`repos` rows), and its GitHub token is left **empty**, so internal callers can only
-     read local mirrors — a live GitHub call with the empty token would just come back `401 reauth`.
+2. `authMiddleware` (`apps/desktop/src/server/middleware/auth.ts`) — resolves a **`Principal`**
+   (`{ kind, user }`) plus the raw `ctx.user` (or `null`) from **either** of two credentials:
+   - the AES-256-GCM session **cookie** (decrypted in-CPU, then re-sealed with a sliding TTL) →
+     `kind: 'user'`; or
+   - the internal-loopback header **`x-acorn-internal: <INTERNAL_TOKEN>`** → `kind: 'internal'`.
+     This is the acorn MCP server calling over loopback — it holds no cookie. `INTERNAL_TOKEN` is a
+     fresh `randomUUID()` per app run (`apps/desktop/src/main/bindings.ts`), injected into task
+     terminal sessions as `ACORN_API_TOKEN`. The identity is the machine's single user (resolved
+     from the mirror's `prefs`/`repos` rows), and its GitHub token is left **empty**, so internal
+     callers can only read local mirrors — a live GitHub call with the empty token would just come
+     back `401 reauth`.
+3. `requireUser` (`apps/desktop/src/server/middleware/requireUser.ts`) — the single auth gate.
+   It rejects any request with no resolved principal → `401 { error: 'unauthenticated' }`. Routes
+   no longer carry inline session guards; handlers read the identity via `getUser(c)` (safe because
+   the gate guarantees a principal). Gating on the principal, not on "a cookie is present," keeps a
+   future authorized external caller a new `kind` rather than a per-route change
+   ([docs/next/security.md](./next/security.md) §9.1).
 
-A route that needs a session returns `401 { error: 'unauthenticated' }` when `ctx.user` is `null`.
-`/auth/*` routes bypass this chain (they establish the session). See
+`/auth/*` routes bypass this chain (they establish the session) and are unauthenticated by
+construction — they mount *before* the `/api/*` middlewares. See
 [authentication](./authentication.md).
 
 ## Conventions
 
 - All responses are JSON unless noted (`/auth/*` errors are plain text). Timestamps are epoch
   **milliseconds**.
+- **Error envelope:** every `/api/*` error body is `ApiError` — `{ error: string; detail?: string[] }`
+  (`apps/desktop/src/shared/api.ts`) — built by one server helper, `respondError(c, status, code, detail?)`
+  (`apps/desktop/src/server/respond.ts`). `error` is a stable machine code (see
+  [Error codes](#error-codes)); `detail` carries human/upstream prose (GraphQL messages, GitHub's
+  422 text, harness failure messages). There is no second error shape — no body-level `status`, no
+  `{ kind }`, no prose in `error`.
+- Success **response mappers** are checked against the shared response types with `satisfies`
+  (`apps/desktop/src/shared/api.ts`), so adding a required field to a response type fails
+  `pnpm lint` at every mapper that omits it.
 - Reads return public projections (no `userId`, no staleness columns, no token).
 - Mutating requests take a JSON body.
 - **Repo resolution:** mirror-backed repo-scoped **reads** (`pulls`, `pullDetail`, `pullFiles`,
@@ -224,9 +241,11 @@ The loopback surface the **acorn MCP server** calls (typically with the `x-acorn
 Every handler proxies to one of four main-process sub-bridges — `NotesBridge` / `MemoryBridge` /
 `RunBridge` / `BrowserBridge` — wired independently by `apps/desktop/src/main/harnessWiring.ts`
 (notes store, memory index, run-target runtime, drivable preview browser). When a bridge is absent
-— e.g. `dev:node` with no Electron — the route degrades to
-**`503 { error: 'bridge-unavailable', kind: 'unavailable' }`**. These
-are gated by the terminal/agents feature flag in the UI and are **Bridge**-sourced. Cross-link
+— e.g. `dev:node` with no Electron — the route degrades to **`503 { error: 'bridge-unavailable' }`**.
+A bridge that throws maps its failure kind to the `error` **code** (`not_found` → `404`,
+`bad_request` → `400`, otherwise `failed` → `500`) with the message in `detail` — the former body
+`kind` discriminator is gone (all bodies are `ApiError`). These are gated by the terminal/agents
+feature flag in the UI and are **Bridge**-sourced. Cross-link
 [mcp](./mcp.md), [notes-and-memory](./notes-and-memory.md), [terminal-and-agents](./terminal-and-agents.md),
 [workflows](./workflows.md).
 
@@ -251,12 +270,13 @@ are gated by the terminal/agents feature flag in the UI and are **Bridge**-sourc
 | `GET` | `/api/tasks/:id/browser/screenshot` | Screenshot the preview. | — |
 | `GET` | `/api/tasks/:id/browser/console` | Preview console output. | — |
 
-`400 bad_request` on missing body fields; `503 { error: 'bridge-unavailable', kind: 'unavailable' }`
-whenever the bridge is absent. Bridge-up failures are **typed**: a bridge may throw `HarnessError`
-with a kind (`not_found` → `404`, `bad_request` → `400`, `failed` → `500`); untyped throws map to
-the route's declared default (`not_found` for notes read, `bad_request` for memory propose,
-otherwise `failed`/`500`). Error bodies are `{ error: <message>, kind }` — a domain error no longer
-reads as service-unavailable.
+`400 bad_request` on missing body fields; `503 { error: 'bridge-unavailable' }` whenever the bridge
+is absent. Bridge-up failures are **typed**: a bridge may throw `HarnessError` with a kind
+(`not_found` → `404`, `bad_request` → `400`, `failed` → `500`); untyped throws map to the route's
+declared default (`not_found` for notes read, `bad_request` for memory propose, otherwise
+`failed`/`500`). The failure kind becomes the `ApiError` **`error` code** and the message rides in
+`detail` (`{ error: 'not_found', detail: [<message>] }`) — a domain error no longer reads as
+service-unavailable, and there is no body-level `kind`.
 
 ---
 
@@ -491,7 +511,7 @@ Body `{ method?: 'merge' | 'squash' | 'rebase' }` (default `merge`).
 
 ```ts
 200 → { state: 'merged' }
-409 → { error: 'merge_failed', status: 405 | 409 }   // 405 not mergeable, 409 head moved
+409 → { error: 'merge_failed' }   // GitHub 405 (not mergeable) or 409 (head moved)
 502 → { error: 'github_unavailable' }
 ```
 
@@ -664,6 +684,9 @@ no commits / bad branch — GitHub's message is surfaced verbatim), `502 github_
 
 ## Error codes {#error-codes}
 
+Every error body is the `ApiError` envelope `{ error, detail? }` (see [Conventions](#conventions));
+the `error` values below are the stable machine codes, and `detail` (when present) carries prose.
+
 | Code | Error | Meaning |
 | --- | --- | --- |
 | `400` | `bad_number`, `bad_request`, `bad_numbers`, `bad_files_mode`, `bad_paths`, `too_many_paths`, `empty_body`, `empty_name`, `empty_login`, `body_required` | Malformed request |
@@ -675,15 +698,16 @@ no commits / bad branch — GitHub's message is surfaced verbatim), `502 github_
 | `403` | `sso` | GitHub `403` requiring SAML SSO authorization (`x-github-sso` header) |
 | `403` | (auth) `invalid state` | OAuth state mismatch/consumed (`/auth/callback`) |
 | `404` | `repo_not_found`, `pull_not_found`, `not_found` | Resource not in this user's mirror / not on the provider. Mirror-backed reads try a live repo fetch before 404ing (and fold a plain GitHub `403` into `repo_not_found`); PR writes check the mirror only |
-| `409` | `merge_failed` (`status` 405\|409) | Not mergeable (405) or head moved (409) |
+| `409` | `merge_failed` | Not mergeable (GitHub 405) or head moved (409) |
 | `409` | `node_id_unknown`, `head_sha_unknown` | Mirror lacks node id / head sha — open the PR first |
-| `422` | `auto_merge_not_allowed`, `<github message>` | GraphQL/REST validation refusal (auto-merge, create PR) |
+| `422` | `auto_merge_not_allowed`, `validation_failed` | GraphQL/REST validation refusal (auto-merge, create PR). Create-PR puts GitHub's verbatim 422 prose in `detail` |
 | `429` | `rate_limited` | GitHub primary/secondary rate limit |
 | `502` | `github_unavailable` | Any other non-OK GitHub response (incl. GraphQL mutation errors) |
 | `502` | `graphql` (`detail: string[]`) | Composite/batch GraphQL query returned errors |
 | `502` | `comment_failed` | Linear `commentCreate` did not succeed |
-| `500` | harness error message (`kind: 'failed'`) | Harness route whose bridge call threw an unclassified error |
-| `503` | `bridge-unavailable` (`kind: 'unavailable'`) | Harness `/api/tasks/:id/{notes,memory,run,browser}` with no main-process bridge (e.g. `dev:node`) |
+| `500` | `failed` (message in `detail`) | Harness route whose bridge call threw an unclassified error |
+| `500` | `internal` (message in `detail`) | Any route that threw an uncaught error — the app-level `onError` backstop |
+| `503` | `bridge-unavailable` | Harness `/api/tasks/:id/{notes,memory,run,browser}` with no main-process bridge (e.g. `dev:node`) |
 
 > The `401`/`429`/`403`(`forbidden`/`sso`) rows are produced by the shared `ghError()` helper in
 > `apps/desktop/src/server/github/index.ts`, applied uniformly across every GitHub-backed route.

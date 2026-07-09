@@ -3,6 +3,8 @@ import { Hono } from 'hono'
 import type { RollbarItem, RollbarItemsResponse } from '../../shared/api'
 import { getDb, schema } from '../db'
 import type { AppEnv } from '../middleware/auth'
+import { getUser } from '../middleware/requireUser'
+import { respondError } from '../respond'
 import { itemByCounterPath, itemsPath, levelName, rollbarData, rollbarFetch, type RollbarApiItem } from '../rollbar'
 import { decryptSecret } from '../session'
 
@@ -22,17 +24,18 @@ const rollbarRows = (c: { env: Env }, userId: string): Promise<IntegrationRow[]>
     .from(schema.integrations)
     .where(and(eq(schema.integrations.userId, userId), eq(schema.integrations.provider, PROVIDER)))
 
-const toItem = (integrationId: string, raw: RollbarApiItem): RollbarItem => ({
-  integrationId,
-  identifier: String(raw.counter),
-  title: raw.title,
-  level: levelName(raw.level),
-  environment: raw.environment,
-  status: raw.status,
-  totalOccurrences: raw.total_occurrences,
-  firstOccurrenceAt: raw.first_occurrence_timestamp ? raw.first_occurrence_timestamp * 1000 : null,
-  lastOccurrenceAt: raw.last_occurrence_timestamp ? raw.last_occurrence_timestamp * 1000 : null,
-})
+const toItem = (integrationId: string, raw: RollbarApiItem) =>
+  ({
+    integrationId,
+    identifier: String(raw.counter),
+    title: raw.title,
+    level: levelName(raw.level),
+    environment: raw.environment,
+    status: raw.status,
+    totalOccurrences: raw.total_occurrences,
+    firstOccurrenceAt: raw.first_occurrence_timestamp ? raw.first_occurrence_timestamp * 1000 : null,
+    lastOccurrenceAt: raw.last_occurrence_timestamp ? raw.last_occurrence_timestamp * 1000 : null,
+  }) satisfies RollbarItem
 
 async function cacheItem(c: { env: Env }, userId: string, item: RollbarItem, now: number): Promise<void> {
   await getDb(c.env)
@@ -47,10 +50,9 @@ async function cacheItem(c: { env: Env }, userId: string, item: RollbarItem, now
 export const rollbar = new Hono<AppEnv>()
   // Recent active items across every connected Rollbar project; each cached into `issues`.
   .get('/items', async (c) => {
-    const user = c.get('user')
-    if (!user) return c.json({ error: 'unauthenticated' }, 401)
+    const user = getUser(c)
     const rows = await rollbarRows(c, user.login)
-    if (!rows.length) return c.json({ error: 'rollbar_not_connected' }, 403)
+    if (!rows.length) return respondError(c, 403, 'rollbar_not_connected')
     const db = getDb(c.env)
     const now = Date.now()
     const out: RollbarItem[] = []
@@ -89,14 +91,13 @@ export const rollbar = new Hono<AppEnv>()
   })
   // One item's detail (?integration=<id>) — the provider pane resolves task_links through this.
   .get('/items/:identifier', async (c) => {
-    const user = c.get('user')
-    if (!user) return c.json({ error: 'unauthenticated' }, 401)
+    const user = getUser(c)
     const identifier = c.req.param('identifier')
     const integrationId = c.req.query('integration')
-    if (!integrationId) return c.json({ error: 'bad_request' }, 400)
+    if (!integrationId) return respondError(c, 400, 'bad_request')
     const rows = await rollbarRows(c, user.login)
     const row = rows.find((r) => r.id === integrationId)
-    if (!row) return c.json({ error: 'rollbar_not_connected' }, 403)
+    if (!row) return respondError(c, 403, 'rollbar_not_connected')
     const db = getDb(c.env)
     const now = Date.now()
     const cached = (
@@ -107,7 +108,7 @@ export const rollbar = new Hono<AppEnv>()
     )[0]
     if (cached && cached.fetchedAt + ITEMS_STALE_AFTER_MS > now) return c.json(JSON.parse(cached.data) as RollbarItem)
     const token = await decryptSecret(row.accessToken, c.env.SESSION_ENC_KEY)
-    if (!token) return c.json({ error: 'rollbar_not_connected' }, 403)
+    if (!token) return respondError(c, 403, 'rollbar_not_connected')
     try {
       const res = await rollbarFetch(token, itemByCounterPath(identifier))
       const raw = await rollbarData<RollbarApiItem>(res)
@@ -116,6 +117,6 @@ export const rollbar = new Hono<AppEnv>()
       return c.json(item)
     } catch {
       if (cached) return c.json(JSON.parse(cached.data) as RollbarItem) // stale beats nothing
-      return c.json({ error: 'not_found' }, 404)
+      return respondError(c, 404, 'not_found')
     }
   })

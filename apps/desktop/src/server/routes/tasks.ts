@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto'
 import { and, eq, inArray, max } from 'drizzle-orm'
 import { getDb, schema } from '../db'
 import type { AppEnv } from '../middleware/auth'
+import { respondError } from '../respond'
 import { Hono } from 'hono'
 import type { Task, TaskLink, TaskSeed } from '../../shared/api'
 
@@ -31,7 +32,6 @@ function rowToTask(row: Row, links: TaskLink[]): Task {
 
 export const tasks = new Hono<AppEnv>()
   .get('/', async (c) => {
-    if (!c.get('user')) return c.json({ error: 'unauthenticated' }, 401)
     const db = getDb(c.env)
     const rows = await db.select().from(schema.tasks).where(eq(schema.tasks.status, 'active')).orderBy(schema.tasks.sort)
     if (!rows.length) return c.json([] as Task[])
@@ -46,9 +46,8 @@ export const tasks = new Hono<AppEnv>()
     return c.json(rows.map((r) => rowToTask(r, byTask.get(r.id) ?? [])))
   })
   .post('/', async (c) => {
-    if (!c.get('user')) return c.json({ error: 'unauthenticated' }, 401)
     const seed = (await c.req.json().catch(() => ({}))) as Partial<TaskSeed>
-    if (!seed.origin || !seed.repoOwner || !seed.repoName || !seed.branch) return c.json({ error: 'bad_request' }, 400)
+    if (!seed.origin || !seed.repoOwner || !seed.repoName || !seed.branch) return respondError(c, 400, 'bad_request')
     const db = getDb(c.env)
     const [{ value }] = await db.select({ value: max(schema.tasks.sort) }).from(schema.tasks)
     const now = Date.now()
@@ -85,12 +84,11 @@ export const tasks = new Hono<AppEnv>()
     )
   })
   .patch('/:id', async (c) => {
-    if (!c.get('user')) return c.json({ error: 'unauthenticated' }, 401)
     const id = c.req.param('id')
     const body = (await c.req.json().catch(() => ({}))) as { title?: string; status?: 'active' | 'archived' }
     const db = getDb(c.env)
     const [existing] = await db.select({ id: schema.tasks.id }).from(schema.tasks).where(eq(schema.tasks.id, id))
-    if (!existing) return c.json({ error: 'not_found' }, 404)
+    if (!existing) return respondError(c, 404, 'not_found')
     const patch: Partial<Row> = { updatedAt: Date.now() }
     if (typeof body.title === 'string' && body.title.trim()) patch.title = body.title.trim()
     if (body.status === 'archived' || body.status === 'active') {
@@ -104,13 +102,12 @@ export const tasks = new Hono<AppEnv>()
   // with its birth links" into "a task that accumulates context as work unfolds". Mirrors the
   // create-time insert above — same onConflictDoNothing, so a duplicate add is a no-op.
   .post('/:id/links', async (c) => {
-    if (!c.get('user')) return c.json({ error: 'unauthenticated' }, 401)
     const id = c.req.param('id')
     const body = (await c.req.json().catch(() => ({}))) as Partial<TaskLink>
-    if (!body.integrationId || !body.provider || !body.identifier) return c.json({ error: 'bad_request' }, 400)
+    if (!body.integrationId || !body.provider || !body.identifier) return respondError(c, 400, 'bad_request')
     const db = getDb(c.env)
     const [t] = await db.select().from(schema.tasks).where(eq(schema.tasks.id, id))
-    if (!t) return c.json({ error: 'not_found' }, 404)
+    if (!t) return respondError(c, 404, 'not_found')
     await db
       .insert(schema.taskLinks)
       .values({ taskId: id, integrationId: body.integrationId, provider: body.provider, identifier: body.identifier, createdAt: Date.now() })
@@ -118,10 +115,9 @@ export const tasks = new Hono<AppEnv>()
     return c.json({ ok: true })
   })
   .delete('/:id/links', async (c) => {
-    if (!c.get('user')) return c.json({ error: 'unauthenticated' }, 401)
     const id = c.req.param('id')
     const body = (await c.req.json().catch(() => ({}))) as Partial<Pick<TaskLink, 'integrationId' | 'identifier'>>
-    if (!body.integrationId || !body.identifier) return c.json({ error: 'bad_request' }, 400)
+    if (!body.integrationId || !body.identifier) return respondError(c, 400, 'bad_request')
     const db = getDb(c.env)
     await db
       .delete(schema.taskLinks)

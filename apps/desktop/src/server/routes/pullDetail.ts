@@ -5,6 +5,8 @@ import { getDb, schema } from '../db'
 import { prResource } from '../db/resourceKeys'
 import { ghGraphQL, ghGraphQLResult } from '../github'
 import type { AppEnv } from '../middleware/auth'
+import { getUser } from '../middleware/requireUser'
+import { respondError } from '../respond'
 import { mirrorPr, PR_FRAGMENT, readComposite, STALE_AFTER_MS, type GqlPull } from './prMirror'
 import { resolveRepoForUser, type RouteResult } from './repoMirror'
 
@@ -21,18 +23,17 @@ query PR($owner: String!, $repo: String!, $number: Int!) {
 }${PR_FRAGMENT}`
 
 export const pullDetail = new Hono<AppEnv>().get('/:owner/:repo/pulls/:number', async (c) => {
-  const user = c.get('user')
-  if (!user) return c.json({ error: 'unauthenticated' }, 401)
+  const user = getUser(c)
 
   const db = getDb(c.env)
   const userId = user.login
   const owner = c.req.param('owner')
   const repo = c.req.param('repo')
   const number = Number(c.req.param('number'))
-  if (!Number.isInteger(number)) return c.json({ error: 'bad_number' }, 400)
+  if (!Number.isInteger(number)) return respondError(c, 400, 'bad_number')
 
   const resolved = await resolveRepoForUser(db, user.token, userId, owner, repo)
-  if (!resolved.ok) return c.json({ error: resolved.failure.error }, resolved.failure.status)
+  if (!resolved.ok) return respondError(c, resolved.failure.status, resolved.failure.error)
   const repoId = resolved.value.repoId
   const key = { userId, repoId, number }
 
@@ -73,7 +74,7 @@ export const pullDetail = new Hono<AppEnv>().get('/:owner/:repo/pulls/:number', 
   const refreshed = await refresh()
   if (!refreshed.ok) {
     const { error, status, detail } = refreshed.failure
-    return c.json(detail ? { error, detail } : { error }, status)
+    return respondError(c, status, error, detail)
   }
   return c.json(refreshed.value)
 })

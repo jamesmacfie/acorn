@@ -5,6 +5,8 @@ import { getDb, schema } from '../db'
 import { cascadeDeleteIntegration } from '../db/cascade'
 import { type Viewer, VIEWER_QUERY, linearData, linearError, linearFetch } from '../linear'
 import type { AppEnv } from '../middleware/auth'
+import { getUser } from '../middleware/requireUser'
+import { respondError } from '../respond'
 import { projectPath, rollbarData, rollbarFetch, type RollbarProject } from '../rollbar'
 import { encryptSecret } from '../session'
 import type { ConnectIntegrationRequest, Integration, IntegrationsResponse } from '../../shared/api'
@@ -19,8 +21,7 @@ const rowToIntegration = (r: IntegrationRow): Integration => ({ id: r.id, provid
 // read surfaces live in their own routers: routes/linear.ts, routes/rollbar.ts.
 export const integrations = new Hono<AppEnv>()
   .get('/', async (c) => {
-    const user = c.get('user')
-    if (!user) return c.json({ error: 'unauthenticated' }, 401)
+    const user = getUser(c)
     const rows = await getDb(c.env).select().from(schema.integrations).where(eq(schema.integrations.userId, user.login))
     const list: Integration[] = [
       { id: 'github', provider: 'github', label: user.login, connected: true },
@@ -31,11 +32,10 @@ export const integrations = new Hono<AppEnv>()
   // Connect a provider by pasting a token (validated + encrypted). Returns the new row. Multiple
   // rows of the same provider are allowed — each is a distinct connection.
   .post('/', async (c) => {
-    const user = c.get('user')
-    if (!user) return c.json({ error: 'unauthenticated' }, 401)
+    const user = getUser(c)
     const { provider, token } = (await c.req.json().catch(() => ({}))) as Partial<ConnectIntegrationRequest>
-    if (!token || typeof token !== 'string') return c.json({ error: 'bad_request' }, 400)
-    if (provider !== 'linear' && provider !== 'rollbar') return c.json({ error: 'unsupported_provider' }, 400)
+    if (!token || typeof token !== 'string') return respondError(c, 400, 'bad_request')
+    if (provider !== 'linear' && provider !== 'rollbar') return respondError(c, 400, 'unsupported_provider')
 
     // Rollbar (docs/integrations.md): a project-read token, validated with one cheap /project call.
     if (provider === 'rollbar') {
@@ -43,7 +43,7 @@ export const integrations = new Hono<AppEnv>()
       try {
         project = await rollbarData<RollbarProject>(await rollbarFetch(token.trim(), projectPath))
       } catch {
-        return c.json({ error: 'invalid_key' }, 400)
+        return respondError(c, 400, 'invalid_key')
       }
       const row = {
         id: randomUUID(),
@@ -60,12 +60,12 @@ export const integrations = new Hono<AppEnv>()
 
     // Validate the key by reading the viewer; reject anything that doesn't authenticate.
     const res = await linearFetch(token.trim(), VIEWER_QUERY, {})
-    if (linearError(res)) return c.json({ error: 'invalid_key' }, 400)
+    if (linearError(res)) return respondError(c, 400, 'invalid_key')
     let workspace: string
     try {
       workspace = (await linearData<Viewer>(res)).viewer.organization.name
     } catch {
-      return c.json({ error: 'invalid_key' }, 400)
+      return respondError(c, 400, 'invalid_key')
     }
 
     const row = { id: randomUUID(), userId: user.login, provider: 'linear', label: `Linear · ${workspace}`, accessToken: await encryptSecret(token.trim(), c.env.SESSION_ENC_KEY), meta: JSON.stringify({ workspace }), createdAt: Date.now() }
@@ -75,10 +75,9 @@ export const integrations = new Hono<AppEnv>()
   // Disconnect one connection by id; cascade its workspace links, cached issues, and task links
   // (application-level — no FKs in the schema; see db/cascade.ts).
   .delete('/:id', async (c) => {
-    const user = c.get('user')
-    if (!user) return c.json({ error: 'unauthenticated' }, 401)
+    const user = getUser(c)
     const id = c.req.param('id')
-    if (id === 'github') return c.json({ error: 'cannot_disconnect_github' }, 400)
+    if (id === 'github') return respondError(c, 400, 'cannot_disconnect_github')
     await cascadeDeleteIntegration(getDb(c.env), user.login, id)
     return c.body(null, 204)
   })

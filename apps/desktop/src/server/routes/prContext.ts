@@ -2,16 +2,29 @@ import { and, eq } from 'drizzle-orm'
 import type { Context } from 'hono'
 import { getDb, schema } from '../db'
 import { prResource } from '../db/resourceKeys'
-import type { AppEnv } from '../middleware/auth'
+import type { AppEnv, SessionUser } from '../middleware/auth'
+import { getUser } from '../middleware/requireUser'
+
+type Db = ReturnType<typeof getDb>
+type PrFailure = { error: 'bad_number'; status: 400 } | { error: 'repo_not_found'; status: 404 }
+type PrContext = {
+  user: SessionUser
+  db: Db
+  owner: string
+  repo: string
+  number: number
+  repoId: number
+  nodeId: string | null
+  headSha: string | null
+}
 
 // Write-path PR resolution — MIRROR-ONLY, deliberately stricter than the read path's
 // resolveRepoForUser (repoMirror.ts), which falls through to a live GitHub fetch on a miss.
 // Every PR write targets a PR the user is looking at, so its repo (and usually the PR row) is
 // already mirrored; a miss here means the client skipped the read path, and 404 is the honest
 // answer rather than lazily mirroring on a write.
-export async function resolvePr(c: Context<AppEnv>) {
-  const user = c.get('user')
-  if (!user) return { error: 'unauthenticated' as const, status: 401 as const }
+export async function resolvePr(c: Context<AppEnv>): Promise<PrFailure | PrContext> {
+  const user = getUser(c) // auth is enforced by requireUser upstream
   const db = getDb(c.env)
   const owner = c.req.param('owner')!
   const repo = c.req.param('repo')!

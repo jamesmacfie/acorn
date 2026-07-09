@@ -5,7 +5,10 @@ import { getDb, schema } from '../db'
 import { chunkRowsByColumnBudget } from '../db/batch'
 import { pullsResource } from '../db/resourceKeys'
 import { gh, ghError } from '../github'
+import type { ClosedPullsPage, Pull } from '../../shared/api'
 import type { AppEnv } from '../middleware/auth'
+import { getUser } from '../middleware/requireUser'
+import { respondError } from '../respond'
 import { resolveRepoForUser, type RouteResult } from './repoMirror'
 
 // PR list for a repo (docs/caching.md serve-then-revalidate). PR data is "fast-changing":
@@ -27,8 +30,7 @@ type GitHubPull = {
 }
 
 export const pulls = new Hono<AppEnv>().get('/:owner/:repo/pulls', async (c) => {
-  const user = c.get('user')
-  if (!user) return c.json({ error: 'unauthenticated' }, 401)
+  const user = getUser(c)
 
   const db = getDb(c.env)
   const userId = user.login
@@ -38,7 +40,7 @@ export const pulls = new Hono<AppEnv>().get('/:owner/:repo/pulls', async (c) => 
   const state = c.req.query('state') === 'closed' ? 'closed' : 'open'
 
   const resolved = await resolveRepoForUser(db, user.token, userId, owner, repo)
-  if (!resolved.ok) return c.json({ error: resolved.failure.error }, resolved.failure.status)
+  if (!resolved.ok) return respondError(c, resolved.failure.status, resolved.failure.error)
   const repoId = resolved.value.repoId
 
   // Closed PRs are historical/effectively-immutable and unbounded — no point mirroring them
@@ -51,10 +53,10 @@ export const pulls = new Hono<AppEnv>().get('/:owner/:repo/pulls', async (c) => 
       `/repos/${owner}/${repo}/pulls?state=closed&sort=updated&direction=desc&per_page=${CLOSED_PAGE_SIZE}&page=${page}`,
     )
     const err = ghError(res)
-    if (err) return c.json({ error: err.error }, err.status)
+    if (err) return respondError(c, err.status, err.error)
     const body = (await res.json()) as GitHubPull[]
     const hasNext = /\brel="next"/.test(res.headers.get('link') ?? '')
-    return c.json({ pulls: body.map(ghToPublic), nextPage: hasNext ? page + 1 : null })
+    return c.json({ pulls: body.map(ghToPublic), nextPage: hasNext ? page + 1 : null } satisfies ClosedPullsPage)
   }
 
   const resource = pullsResource(repoId, state)
@@ -172,7 +174,9 @@ export const pulls = new Hono<AppEnv>().get('/:owner/:repo/pulls', async (c) => 
       ...taskUpdates,
     ])
 
-    return { ok: true, value: rows.map(toPublic) }
+    // Re-read from the mirror rather than mapping the write-shaped `rows`: the DB carries the
+    // detail-route-owned mergeable/mergeStateStatus that the list upsert deliberately preserves.
+    return { ok: true, value: await readPublicRows() }
   }
 
   const force = c.req.query('force') === 'true'
@@ -191,39 +195,40 @@ export const pulls = new Hono<AppEnv>().get('/:owner/:repo/pulls', async (c) => 
 
   // force=true or no prior sync → block on a real GitHub fetch.
   const refreshed = await revalidate()
-  if (!refreshed.ok) return c.json({ error: refreshed.failure.error }, refreshed.failure.status)
+  if (!refreshed.ok) return respondError(c, refreshed.failure.status, refreshed.failure.error)
   return c.json(refreshed.value)
 })
 
-// Same public shape as toPublic, but mapped straight from a GitHub payload (closed path, no mirror row).
-const ghToPublic = (p: GitHubPull) => ({
-  number: p.number,
-  title: p.title,
-  state: p.state,
-  draft: p.draft,
-  author: p.user?.login ?? null,
-  headRef: p.head?.ref ?? null,
-  baseRef: p.base?.ref ?? null,
-  updatedAt: p.updated_at ? Date.parse(p.updated_at) : null,
-})
+// Same public shape as toPublic, but mapped straight from a GitHub payload (closed path, no mirror
+// row). The closed-list endpoint carries no merge state, so those fields are null/false.
+const ghToPublic = (p: GitHubPull) =>
+  ({
+    number: p.number,
+    title: p.title,
+    state: p.state,
+    draft: p.draft,
+    author: p.user?.login ?? null,
+    headRef: p.head?.ref ?? null,
+    baseRef: p.base?.ref ?? null,
+    updatedAt: p.updated_at ? Date.parse(p.updated_at) : null,
+    mergeable: null,
+    mergeStateStatus: null,
+    autoMergeEnabled: false,
+  }) satisfies Pull
 
-// Public projection — the fields the SPA PR list needs; no staleness bookkeeping.
-const toPublic = (r: {
-  number: number
-  title: string
-  state: string
-  draft: boolean
-  author: string | null
-  headRef: string | null
-  baseRef: string | null
-  updatedAt: number | null
-}) => ({
-  number: r.number,
-  title: r.title,
-  state: r.state,
-  draft: r.draft,
-  author: r.author,
-  headRef: r.headRef,
-  baseRef: r.baseRef,
-  updatedAt: r.updatedAt,
-})
+// Public projection — the fields the SPA PR list needs; no staleness bookkeeping. Reads the full
+// mirror row so merge state (owned by the detail route) rides along.
+const toPublic = (r: typeof schema.pullRequests.$inferSelect) =>
+  ({
+    number: r.number,
+    title: r.title,
+    state: r.state,
+    draft: r.draft,
+    author: r.author,
+    headRef: r.headRef,
+    baseRef: r.baseRef,
+    updatedAt: r.updatedAt,
+    mergeable: r.mergeable,
+    mergeStateStatus: r.mergeStateStatus,
+    autoMergeEnabled: r.autoMergeEnabled,
+  }) satisfies Pull

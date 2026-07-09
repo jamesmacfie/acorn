@@ -17,8 +17,10 @@ import {
   linearFetch,
 } from '../linear'
 import type { AppEnv } from '../middleware/auth'
+import { getUser } from '../middleware/requireUser'
+import { respondError } from '../respond'
 import { decryptSecret } from '../session'
-import type { LinearActivity, LinearIssueDetail, LinearIssuesRequest, LinearIssuesResponse, LinearProject, LinearProjectIssue, LinearProjectIssuesResponse, LinearProjectsResponse } from '../../shared/api'
+import type { LinearActivity, LinearComment, LinearIssueDetail, LinearIssueSummary, LinearIssuesRequest, LinearIssuesResponse, LinearProject, LinearProjectIssue, LinearProjectIssuesResponse, LinearProjectsResponse } from '../../shared/api'
 
 const PROVIDER = 'linear'
 const ISSUES_STALE_AFTER_MS = 600_000 // 10 min — tickets change slower than PRs; panel forces fresh
@@ -84,7 +86,7 @@ function buildActivity(n: LinearNode): LinearActivity[] {
   return items.sort((a, b) => (a.createdAt ?? 0) - (b.createdAt ?? 0))
 }
 
-function nodeToDetail(n: LinearNode): LinearIssueDetail {
+function nodeToDetail(n: LinearNode) {
   return {
     id: n.id,
     identifier: n.identifier,
@@ -93,18 +95,22 @@ function nodeToDetail(n: LinearNode): LinearIssueDetail {
     state: n.state,
     assignee: n.assignee?.name ?? null,
     description: n.description ?? null,
-    comments: (n.comments?.nodes ?? []).map((cm) => ({
-      id: cm.id,
-      author: cm.user?.name ?? null,
-      body: cm.body,
-      createdAt: Date.parse(cm.createdAt) || null,
-      parentId: cm.parent?.id ?? null,
-    })),
+    comments: (n.comments?.nodes ?? []).map(
+      (cm) =>
+        ({
+          id: cm.id,
+          author: cm.user?.name ?? null,
+          body: cm.body,
+          createdAt: Date.parse(cm.createdAt) || null,
+          parentId: cm.parent?.id ?? null,
+        }) satisfies LinearComment,
+    ),
     activity: buildActivity(n),
-  }
+  } satisfies LinearIssueDetail
 }
 
-const toSummary = (d: LinearIssueDetail) => ({ identifier: d.identifier, title: d.title, url: d.url, state: d.state, assignee: d.assignee })
+const toSummary = (d: LinearIssueDetail) =>
+  ({ identifier: d.identifier, title: d.title, url: d.url, state: d.state, assignee: d.assignee }) satisfies LinearIssueSummary
 
 // /api/linear — read Linear issues referenced from a PR. Per-user, cached locally (never shared).
 // A bare identifier is resolved across all connected Linear integrations (resolveIssues);
@@ -114,10 +120,9 @@ export const linear = new Hono<AppEnv>()
   // Projects across every connected Linear integration, each tagged with its connection so the
   // picker can span multiple Linears (docs/workspaces 04). A failing connection is skipped.
   .get('/projects', async (c) => {
-    const user = c.get('user')
-    if (!user) return c.json({ error: 'unauthenticated' }, 401)
+    const user = getUser(c)
     const rows = await linearRows(c, user.login)
-    if (!rows.length) return c.json({ error: 'linear_not_connected' }, 403)
+    if (!rows.length) return respondError(c, 403, 'linear_not_connected')
     const out: LinearProject[] = []
     for (const row of rows) {
       const key = await rowKey(c, row)
@@ -135,18 +140,17 @@ export const linear = new Hono<AppEnv>()
   })
   // Active issues for the given project ids within ONE connection (?integration=<id>&ids=).
   .get('/project-issues', async (c) => {
-    const user = c.get('user')
-    if (!user) return c.json({ error: 'unauthenticated' }, 401)
+    const user = getUser(c)
     const rows = await linearRows(c, user.login)
     const row = rows.find((r) => r.id === c.req.query('integration'))
-    if (!row) return c.json({ error: 'linear_not_connected' }, 403)
+    if (!row) return respondError(c, 403, 'linear_not_connected')
     const key = await rowKey(c, row)
-    if (!key) return c.json({ error: 'linear_not_connected' }, 403)
+    if (!key) return respondError(c, 403, 'linear_not_connected')
     const ids = [...new Set((c.req.query('ids') ?? '').split(',').map((s) => s.trim()).filter(Boolean))]
     if (!ids.length) return c.json({ issues: [] } satisfies LinearProjectIssuesResponse)
     const res = await linearFetch(key, PROJECT_ISSUES_QUERY, { filter: projectIssuesFilter(ids) })
     const err = linearError(res)
-    if (err) return c.json({ error: err.error }, err.status)
+    if (err) return respondError(c, err.status, err.error)
     const { issues } = await linearData<{ issues: { nodes: LinearNode[] } }>(res)
     const out: LinearProjectIssue[] = issues.nodes.map((n) => ({ ...toSummary(nodeToDetail(n)), integrationId: row.id, branchName: n.branchName ?? null }))
     return c.json({ issues: out } satisfies LinearProjectIssuesResponse)
@@ -154,10 +158,9 @@ export const linear = new Hono<AppEnv>()
   // Batch enrichment for referenced tickets: summaries, serve-then-revalidate (10-min TTL). Stale
   // identifiers are resolved across all connections; each result is cached under its connection.
   .post('/issues', async (c) => {
-    const user = c.get('user')
-    if (!user) return c.json({ error: 'unauthenticated' }, 401)
+    const user = getUser(c)
     const rows = await linearRows(c, user.login)
-    if (!rows.length) return c.json({ error: 'linear_not_connected' }, 403)
+    if (!rows.length) return respondError(c, 403, 'linear_not_connected')
 
     const body = (await c.req.json().catch(() => ({}))) as Partial<LinearIssuesRequest>
     const identifiers = [...new Set((body.identifiers ?? []).filter((s) => typeof s === 'string'))]
@@ -210,10 +213,9 @@ export const linear = new Hono<AppEnv>()
   })
   // Full detail for the side panel. refresh=1 (panel open) always refetches to stay current.
   .get('/issues/:identifier', async (c) => {
-    const user = c.get('user')
-    if (!user) return c.json({ error: 'unauthenticated' }, 401)
+    const user = getUser(c)
     const rows = await linearRows(c, user.login)
-    if (!rows.length) return c.json({ error: 'linear_not_connected' }, 403)
+    if (!rows.length) return respondError(c, 403, 'linear_not_connected')
 
     const identifier = c.req.param('identifier')
     const refresh = c.req.query('refresh') === '1'
@@ -230,9 +232,9 @@ export const linear = new Hono<AppEnv>()
     }
 
     const filter = issuesFilter([identifier])
-    if (!filter) return c.json({ error: 'not_found' }, 404)
+    if (!filter) return respondError(c, 404, 'not_found')
     const resolved = await resolveIssues(c, rows, ISSUE_DETAIL_QUERY, { filter })
-    if (!resolved) return c.json({ error: 'not_found' }, 404)
+    if (!resolved) return respondError(c, 404, 'not_found')
     const detail = nodeToDetail(resolved.nodes[0])
     await db
       .insert(schema.issues)
@@ -242,32 +244,31 @@ export const linear = new Hono<AppEnv>()
   })
   // Add a comment (or threaded reply via parentId) to a ticket. Client refetches detail after.
   .post('/issues/:identifier/comments', async (c) => {
-    const user = c.get('user')
-    if (!user) return c.json({ error: 'unauthenticated' }, 401)
+    const user = getUser(c)
     const rows = await linearRows(c, user.login)
-    if (!rows.length) return c.json({ error: 'linear_not_connected' }, 403)
+    if (!rows.length) return respondError(c, 403, 'linear_not_connected')
 
     const identifier = c.req.param('identifier')
     const { body, parentId } = (await c.req.json().catch(() => ({}))) as { body?: string; parentId?: string }
-    if (!body || !body.trim()) return c.json({ error: 'bad_request' }, 400)
+    if (!body || !body.trim()) return respondError(c, 400, 'bad_request')
 
     // commentCreate keys off the internal issue UUID; resolve it (and the owning connection's key).
     const filter = issuesFilter([identifier])
-    if (!filter) return c.json({ error: 'not_found' }, 404)
+    if (!filter) return respondError(c, 404, 'not_found')
     const resolved = await resolveIssues(c, rows, ISSUE_ID_QUERY, { filter })
     const issueId = resolved?.nodes[0]?.id
-    if (!resolved || !issueId) return c.json({ error: 'not_found' }, 404)
+    if (!resolved || !issueId) return respondError(c, 404, 'not_found')
 
     const input: Record<string, unknown> = { issueId, body: body.trim() }
     if (parentId) input.parentId = parentId
     const res = await linearFetch(resolved.key, COMMENT_CREATE, { input })
     const err = linearError(res)
-    if (err) return c.json({ error: err.error }, err.status)
+    if (err) return respondError(c, err.status, err.error)
     try {
       const data = await linearData<{ commentCreate: { success: boolean } }>(res)
-      if (!data.commentCreate.success) return c.json({ error: 'comment_failed' }, 502)
+      if (!data.commentCreate.success) return respondError(c, 502, 'comment_failed')
     } catch {
-      return c.json({ error: 'comment_failed' }, 502)
+      return respondError(c, 502, 'comment_failed')
     }
     return c.json({ ok: true })
   })

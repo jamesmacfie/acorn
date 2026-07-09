@@ -2,13 +2,14 @@ import { and, eq, max } from 'drizzle-orm'
 import { Hono } from 'hono'
 import { getDb, schema } from '../db'
 import type { AppEnv } from '../middleware/auth'
+import { getUser } from '../middleware/requireUser'
+import { respondError } from '../respond'
 
 // Pinned repos for the selector — app-state, source of truth is us (not GitHub), user-scoped.
 // GET returns this user's pinned repo ids (sort ascending); PUT pins/unpins one repo.
 export const pins = new Hono<AppEnv>()
   .get('/', async (c) => {
-    const user = c.get('user')
-    if (!user) return c.json({ error: 'unauthenticated' }, 401)
+    const user = getUser(c)
     const rows = await getDb(c.env)
       .select({ repoId: schema.pinnedRepos.repoId })
       .from(schema.pinnedRepos)
@@ -17,10 +18,9 @@ export const pins = new Hono<AppEnv>()
     return c.json(rows.map((r) => r.repoId))
   })
   .put('/', async (c) => {
-    const user = c.get('user')
-    if (!user) return c.json({ error: 'unauthenticated' }, 401)
+    const user = getUser(c)
     const { repoId, pinned } = (await c.req.json().catch(() => ({}))) as { repoId?: number; pinned?: boolean }
-    if (typeof repoId !== 'number' || typeof pinned !== 'boolean') return c.json({ error: 'bad_request' }, 400)
+    if (typeof repoId !== 'number' || typeof pinned !== 'boolean') return respondError(c, 400, 'bad_request')
     const db = getDb(c.env)
     if (pinned) {
       // Append to the end: next sort = current max + 1 (0 when the user has no pins yet).

@@ -2,6 +2,7 @@ import { and, desc, eq } from 'drizzle-orm'
 import { getDb, schema } from '../db'
 import { chunkRowsByColumnBudget } from '../db/batch'
 import { gh, ghError } from '../github'
+import type { Repo } from '../../shared/api'
 
 // Repo metadata is "slow-changing"; the local SQLite mirror is a user-scoped cache, never the
 // source of access truth. Cold misses resolve against GitHub, stale hits serve from the mirror.
@@ -33,14 +34,15 @@ export const toPublicRepo = (r: {
   private: boolean
   defaultBranch: string | null
   pushedAt: number | null
-}) => ({
-  id: r.id,
-  owner: r.owner,
-  name: r.name,
-  private: r.private,
-  defaultBranch: r.defaultBranch,
-  pushedAt: r.pushedAt,
-})
+}) =>
+  ({
+    id: r.id,
+    owner: r.owner,
+    name: r.name,
+    private: r.private,
+    defaultBranch: r.defaultBranch,
+    pushedAt: r.pushedAt,
+  }) satisfies Repo
 
 const routeFailureFromGithub = (res: Response): RouteFailure | null => {
   if (res.status === 404) return { error: 'repo_not_found', status: 404 }
