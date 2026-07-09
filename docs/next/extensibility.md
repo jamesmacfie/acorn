@@ -376,8 +376,9 @@ plugins/
   editor/          editor pane · file palette overlay · editor routes · autosave
   changes/         changes pane · local-git routes · review notes (+ routes) ·
                    dirty badge · review-prompt sendToAgent
-  notes/           notes pane · NotesStore · notes context section ·
-                   notes_* agent tools · note seeding
+  notes/           notes pane · NotesStore (global/workspace/task scopes) ·
+                   notes context section · notes_* agent tools ·
+                   task-scoped PR/ticket note seeding
   memory/          memory tray · memory index/proposals · memory context section ·
                    memory_* agent tools · review trigger
   context/         context pane (tray UI over the section registry)
@@ -429,7 +430,7 @@ open design question; ⚠ = named hard part (§8).
 | Editor pane + tree + autosave + ⌘P file finder | editor | pane, overlay, routes, prefs slice | ✅ |
 | Changes pane + stage/commit/push + review notes | changes | pane, routes, badge | ✅ |
 | `local_changes`/`local_diff`/`git_log` tools | changes | agent tools (in-process handler, no loopback hop) | ✅ |
-| Notes pane + global notes + included-flag | notes | pane, agent tools, context section | ✅ |
+| Notes pane + global/workspace/task scopes + included-flag | notes | pane, agent tools, context section | ✅ |
 | Memory tray + proposals + FTS index | memory | context section, agent tools, settings | ✅ |
 | Context pane + send-to-agent | context | pane, `ctx.terminal.sendToAgent` | ✅ |
 | Preview pane + persistent webview | preview | pane (`keepAlive`), events (`task:archived`) | ⚠ §8.2 |
@@ -536,7 +537,10 @@ declared rules:
   nine orphaned PR child tables — review §5), **and a secondary index on the
   declared parent column** ([performance.md](./performance.md) §3.5) from the
   registry — one declaration, three artifacts — instead of a comment saying
-  "remember to extend this".
+  "remember to extend this". Task-scoped **note files** (`notes/task/<taskId>/`,
+  [feature-parity.md](./feature-parity.md) §10) are the filesystem parallel: they
+  are files, not a scoped SQLite table (unlike `review_notes`), so their cleanup
+  rides the same task-deletion cascade as a side effect, not a foreign key.
 - **Workspace config gets a table.** §4.6's workspace config contributions land
   as one generic `workspace_config (workspaceId, key, value)` row store —
   `prefs`' shape at workspace scope, values validated by the contributing

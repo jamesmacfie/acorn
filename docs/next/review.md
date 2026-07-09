@@ -446,7 +446,7 @@ Ordered by leverage per unit of effort.
 | 10 | Step-handler registry in `workflowRunner`; explicit `joins:` reference | §1e | S |
 | 11 | Route tests for `prActions`/`prCreate`/`harness` (the factories already make this cheap) | §6 | M |
 | 12 | Child-row prune alongside the PR-list prune; use declared parent lineage as the cascade/prune/index source of truth | §5 rot | S |
-| 13 | Collapse the notes/memory channel fork (one store API with provenance params, both channels call it) | §1d semantics | M |
+| 13 | Collapse the notes/memory channel fork (one store API with provenance **and target scope** (`NoteLocation`, feature-parity §10) params, both channels call it) | §1d semantics | M |
 | 14 | Retire the `Env`/`BLOBS` costume: `createApp(runtime)`, plain `readBlob/writeBlob` | §7 | M |
 
 Items 1–5 are the structural core: contract enforcement, the sync abstraction, the

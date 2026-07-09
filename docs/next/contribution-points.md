@@ -304,7 +304,10 @@ Current context assembly has product semantics beyond "iterate sections"
   [memory.md](./memory.md) §7: plugins may contribute linked context, but they
   do not inject their own durable-memory blocks beside the core memory
   section. **Notes include bodies and slugs** so the tray can jump to the
-  Notes pane (`jump`).
+  Notes pane (`jump`). The notes section **assembles across the active task's
+  three scopes** — `task/<taskId>` + `<workspaceId>` + `global`
+  ([feature-parity.md](./feature-parity.md) §10 `NoteLocation`) — so a sibling
+  task's PR/handoff notes are absent by storage location, not by soft filter.
 - **Sections declare their own size posture.** The invisible global slice in
   `knowledgeIpc` (2,000 chars × first 10 notes) already caused the workflow
   handoff bug ([agent-runtime.md](./agent-runtime.md) §2.1); a contribution
@@ -347,6 +350,14 @@ semantic forks the current channels have already grown (agent-vs-UI note
 creation differing in frontmatter/provenance — review.md §1d): there is one
 handler, and provenance (`author`, `sessionId`) comes from `scope`, supplied by
 the channel.
+
+For the notes tools specifically, `scope: 'task'` is the *execution* scope (the handler receives
+`{ taskId, worktreePath, sessionId }`); the *note target* is a `NoteScope`
+([feature-parity.md](./feature-parity.md) §10) that **defaults to `task`** and is overridable to
+`workspace`/`global` via an explicit `input` field. So `notes_append`/`notes_write` land in the
+current task's `notes/task/<taskId>/` unless asked otherwise — both provenance and target scope
+come from the declaration, which closes the note-creation fork completely and is the structural fix
+for the cross-task handoff bleed ([agent-runtime.md](./agent-runtime.md) §2.1).
 
 Replaces: all of `harness.ts`'s bridge types + setters, `harnessWiring.ts`, the
 per-tool bodies in `mcp/server.ts`, and the notes/memory/run/browser groups in

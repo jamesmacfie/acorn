@@ -338,10 +338,18 @@ The next docs collapse duplicated *channels*; they must not flatten these
 *domain* boundaries. "One store API with provenance" for notes is right;
 "one knowledge store" would be a regression. Migration invariants:
 
-- [ ] **Notes are workspace/global, gitignored, disposable context.** Humans
+- [ ] **Notes are global/workspace/task, gitignored, disposable context.** Humans
   create `scratch`; agents and workflows create `plan`/`finding`/`handoff`;
   agent/workflow notes group separately and render read-only in the Notes
   pane.
+- [ ] **Task-scoped notes** live under `notes/task/<taskId>/`, are what the PR
+  description/comment and linked-ticket **seeds** land in, and are **removed when
+  the task is deleted** (global/workspace notes persist —
+  [state-and-policies.md](./state-and-policies.md) §retention). Agent
+  `plan`/`finding`/`handoff` writes **default to the current task's scope**;
+  `workspace`/`global` are explicit opt-in. This is what keeps one task's PR notes
+  and workflow handoffs off its siblings — storage location, not a soft filter
+  (contrast the pre-migration bug, [agent-runtime.md](./agent-runtime.md) §2.1).
 - [ ] **Memory is durable repo/private knowledge. Files are truth; SQLite +
   FTS5 are a derived index.** Repo memory commits through the worktree;
   private memory lives under `~/.acorn`.
@@ -355,6 +363,25 @@ The next docs collapse duplicated *channels*; they must not flatten these
 - [ ] **`review_notes` are neither notes nor memory**: anchored inline
   annotations on local changes with `sentAt` semantics, owned by the changes
   plugin.
+
+**Note scope contract (canonical — other docs reference this, never restate it):**
+
+```ts
+type NoteScope = 'global' | 'workspace' | 'task'
+type NoteLocation =
+  | { scope: 'global' }                              // <dataDir>/notes/global/
+  | { scope: 'workspace'; workspaceId: string }      // <dataDir>/notes/<workspaceId>/
+  | { scope: 'task'; taskId: string }                // <dataDir>/notes/task/<taskId>/
+```
+
+The note store keys by `NoteLocation`, **not** a bare `workspaceId` — a bare string can't
+disambiguate a task uuid from a workspace uuid; the union does. `task/` is a reserved subtree that
+cannot collide with a workspace uuid or the `global` key (the same trick that lets `global` be a
+well-known key), so **no migration** of existing notes is required. Notes are files, not a SQLite
+table — there is nothing to alter in Drizzle. `originTaskId` frontmatter survives only as
+**provenance** ("which task seeded this note"), no longer as the scoping mechanism. `run` handoff
+notes are task-scoped notes with a `workflow-handoffs-<runId>` slug (§2.1 of
+[agent-runtime.md](./agent-runtime.md)) — a refinement *within* task scope, not a fourth peer.
 
 ## §11 Context assembly contract
 
@@ -374,6 +401,10 @@ The section registry ([contribution-points.md](./contribution-points.md)
   expects agents to call `memory_get` for bodies (§10).
 - [ ] **Notes sections include bodies and slugs** so the Context pane can
   jump to the Notes pane (a declared jump intent post-Phase 5).
+- [ ] **The notes section merges the active task's three scopes** — `task/<taskId>`
+  + `<workspaceId>` + `global` (§10 `NoteLocation`) — grouped task → workspace →
+  global. Sibling tasks' PR/handoff notes are excluded by *storage location*, so
+  the assembler no longer leans on the `originTaskId` soft-filter to keep them out.
 - [ ] **Linked issues resolve from cached provider blobs**; the stale/missing
   cache rule is: serve stale marked as stale; a missing blob yields an
   explicitly absent section, never a silent hole.
