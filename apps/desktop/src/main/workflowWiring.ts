@@ -26,9 +26,13 @@ export type WorkflowWiringDeps = {
   notesStore: NotesStore
   // Loopback API access for the context assembler (docs/mcp.md): ACORN_API_URL/ACORN_API_TOKEN.
   internalApiEnv: Record<string, string>
+  // Resolves when the composition root's post-window reconcile pass is done (always resolves, even
+  // on failure). workflow:start/gate await it: reconcile() sweeps EVERY 'running' step to
+  // 'pending', so a run started before the sweep would have its live step re-queued.
+  reconciled: Promise<void>
 }
 
-export async function registerWorkflowIpc(db: AppDatabase, { runtime, notesStore, internalApiEnv }: WorkflowWiringDeps): Promise<WorkflowRunner> {
+export async function registerWorkflowIpc(db: AppDatabase, { runtime, notesStore, internalApiEnv, reconciled }: WorkflowWiringDeps): Promise<WorkflowRunner> {
   const failingChecksFor = async (taskId: string): Promise<string | null> => {
     const t = await loadTask(db, taskId)
     if (!t || t.pullNumber == null) return null
@@ -133,6 +137,7 @@ export async function registerWorkflowIpc(db: AppDatabase, { runtime, notesStore
 
   ipcMain.handle('workflow:start', async (_e: IpcMainInvokeEvent, p: { taskId: string; def: WorkflowDef }) => {
     if (typeof p?.taskId !== 'string' || !p.def?.name || !Array.isArray(p.def.steps)) return { error: 'bad_request' }
+    await reconciled // don't start a run the restart sweep would immediately re-queue
     return { runId: await workflowRunner.start(p.taskId, p.def) }
   })
   ipcMain.handle('workflow:runs', async (_e: IpcMainInvokeEvent, taskId: string) => {
@@ -141,10 +146,12 @@ export async function registerWorkflowIpc(db: AppDatabase, { runtime, notesStore
   })
   ipcMain.handle('workflow:steps', (_e: IpcMainInvokeEvent, runId: string) => workflowRunner.steps(String(runId)))
   ipcMain.handle('workflow:gate', async (_e: IpcMainInvokeEvent, p: { runId: string; stepId: string; approved: boolean }) => {
+    await reconciled // an approval resumes a step the restart sweep could otherwise clobber
     await workflowRunner.resolveGate(String(p?.runId), String(p?.stepId), !!p?.approved)
     return { ok: true }
   })
-  await workflowRunner.reconcile() // resume/fail-cleanly across app restarts (14 §checkpoint)
-
+  // Note: workflowRunner.reconcile() (resume/fail-cleanly across app restarts, 14 §checkpoint) is
+  // NOT run here — the composition root drives it in its coordinated reconcile() step, off the
+  // paint-critical path (review §2, performance §3.6).
   return workflowRunner
 }

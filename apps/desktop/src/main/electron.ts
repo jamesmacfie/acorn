@@ -1,7 +1,7 @@
-import { app, BrowserWindow, shell } from 'electron'
+import { app, BrowserWindow, dialog, shell } from 'electron'
 import { join } from 'node:path'
-import { ACORN_PORT, devDataDir, startServer } from './server'
-import { registerTerminalIpc } from './terminal'
+import { bootstrap } from './bootstrap'
+import { ACORN_PORT, devDataDir } from './server'
 
 const ORIGIN = `http://127.0.0.1:${ACORN_PORT}`
 const PRELOAD = join(import.meta.dirname, '../preload/index.cjs')
@@ -114,9 +114,17 @@ async function createMainWindow() {
 }
 
 app.whenReady().then(async () => {
-  const { runtime } = await startServer(dataDir) // resolves once listening on the pinned loopback port
-  await registerTerminalIpc(runtime.DB, join(dataDir, 'worktrees'), { apiUrl: ORIGIN, token: runtime.INTERNAL_TOKEN }) // PTYs + tmux + repo paths + worktrees
-  mainWindow = await createMainWindow()
+  // One call into the composition root: it migrates, constructs services, installs bridges, starts
+  // the loopback listener, then creates the window (main/bootstrap.ts owns the order + teardown).
+  try {
+    mainWindow = await bootstrap({ dataDir, origin: ORIGIN, createWindow: createMainWindow })
+  } catch (e) {
+    // Boot is all-or-nothing: a failure here (migration, EADDRINUSE on the pinned port, …) means no
+    // origin to load — surface it and quit rather than sit headless in the dock forever (this
+    // macOS build has no window-all-closed quit).
+    dialog.showErrorBox('acorn failed to start', e instanceof Error ? (e.stack ?? e.message) : String(e))
+    app.quit()
+  }
 })
 
 app.on('second-instance', () => {
@@ -127,7 +135,9 @@ app.on('second-instance', () => {
 })
 
 app.on('activate', () => {
-  if (BrowserWindow.getAllWindows().length === 0) void createMainWindow().then((w) => (mainWindow = w))
+  // mainWindow set ⇒ bootstrap finished (listener up). Before that, a Dock-click window would
+  // loadURL an origin nothing is serving yet — and bootstrap is about to create its own window.
+  if (mainWindow && BrowserWindow.getAllWindows().length === 0) void createMainWindow().then((w) => (mainWindow = w))
 })
 
 // macOS-only build; standard behavior is to stay alive until Cmd-Q (no window-all-closed quit).

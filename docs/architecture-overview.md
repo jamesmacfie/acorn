@@ -28,13 +28,17 @@ are the same app: one origin, one database, one window.
 
 ## One local server, one origin
 
-The Electron main process (`apps/desktop/src/main/electron.ts`) builds the
-runtime bindings and starts a single Hono app
-(`apps/desktop/src/server/index.ts`, a `createApp()` factory) under
-`@hono/node-server` on `http://127.0.0.1:4317` (the port is pinned for a stable
-browser-storage origin; `ACORN_PORT` in the environment overrides it), then
-points a hardened `BrowserWindow` at that origin. The server serves three
-things from the same origin:
+The Electron main process boots through one composition root
+(`apps/desktop/src/main/bootstrap.ts`, called once from `electron.ts`): it
+migrates the DB, constructs the domain services, installs their bridges/IPC,
+then starts a single Hono app (`apps/desktop/src/server/index.ts`, a
+`createApp()` factory) under `@hono/node-server` on `http://127.0.0.1:4317` (the
+port is pinned for a stable browser-storage origin; `ACORN_PORT` in the
+environment overrides it), and points a hardened `BrowserWindow` at that origin.
+Durable-state reconciliation runs after the window, off the paint path, and a
+`will-quit` teardown disposes services in reverse (see
+[electron.md](./electron.md) §11). The server serves three things from the same
+origin:
 
 - the SPA shell and static assets (`dist/client`),
 - the `/api/*` JSON API, and

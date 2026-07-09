@@ -135,6 +135,15 @@ async function assertColumns(pool: InstanceType<typeof Pool>, schema: string, na
   return meta
 }
 
+// Shutdown disposal (review §2): end every open pg pool so quit doesn't leak connections. Called
+// by the composition root's reverse-order teardown. Idempotent — an empty map is a no-op.
+export async function endDbPools(): Promise<void> {
+  for (const [taskId, { pool }] of pools) {
+    await pool.end().catch(() => {})
+    pools.delete(taskId)
+  }
+}
+
 export function registerDatabaseIpc(db: AppDatabase): void {
   // Connect: resolve the URL on demand, (re)build the pool, confirm reachability. Never persists the URL.
   ipcMain.handle('db:connect', async (_e: IpcMainInvokeEvent, taskId: string): Promise<DbConnectResult> => {

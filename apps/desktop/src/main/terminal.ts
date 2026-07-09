@@ -32,24 +32,15 @@ import { getRepoPath, setRepoPath, setRunTargets } from './repoPaths'
 import { fileURLToPath } from 'node:url'
 import { inspectMcpConfig, MCP_CANDIDATES, STARTER_MCP_JSON, type McpServerSummary } from '../shared/mcp'
 import { launcherSpec, registerAcornMcp, resolveMcpEntry, serverName, type AgentFlavour } from './mcpRegister'
-import { wireHarnessBridges } from './harnessWiring'
-import { registerDatabaseIpc } from './database'
-import { registerKnowledgeIpc } from './knowledgeIpc'
-import { registerLocalGitIpc } from './localGitIpc'
-import { registerSearchIpc } from './searchIpc'
 import { broadcastStatus } from './notify'
-import { createRuntimeService, registerRunIpc } from './runIpc'
-import { registerWorkflowIpc } from './workflowWiring'
-import { seedTaskNotes } from './seedTaskNotes'
+import type { RunSessionGlue } from './runIpc'
 import {
   baseRefPref,
   computeTaskStatuses,
   copyConfiguredFiles,
   isDir,
   loadTask,
-  reconcileWorktrees,
   resolveTaskCwd,
-  setWorktreesRoot,
   taskContext,
   taskRoot,
   workspaceSetup,
@@ -87,18 +78,27 @@ const agentSender = new AgentSender((id) => {
   return { write: (data: string) => s.pty.write(data), running: () => s.meta.status === 'running', idle: () => s.meta.idle }
 })
 
-// Set by registerTerminalIpc (knowledgeIpc owns the implementation): pushes the memory block into
-// a fresh agent session (docs/next 12 P2). Best-effort — a session must never fail to launch over
-// memory.
+// Queue a text block into an agent session on its idle edge (knowledgeIpc's memory injector calls
+// this). Exported so the composition root can hand it to knowledge without knowledge importing the
+// terminal engine — the dependency points one way (review §2).
+export function sendToAgent(sessionId: string, text: string, submit: SendSubmit): void {
+  void agentSender.send(sessionId, text, submit)
+}
+
+// The cross-domain hooks the composition root injects at boot (review §2: setter-injection stays,
+// installation moves to one place). Held as nullable module state only because the handlers close
+// over module scope — TerminalIpcDeps requires all of them, so registerTerminalIpc sets every one
+// before any session can spawn.
+// - memoryInjector: push the repo-memory block into a fresh agent session (docs/next 12 P2).
+// - memoryReviewTrigger: fire the auto-generation pass when an agent session exits (docs/next 12 P3).
+// - seedNotes: snapshot PR/ticket context into curatable notes on task creation (docs/notes-and-memory.md).
+// - internalApiEnv: loopback API access (ACORN_API_URL/ACORN_API_TOKEN) inherited by session env.
+// - bootReconciled: the composition root's reconcile pass — archive awaits it (see the handler).
 let memoryInjector: ((taskId: string, sessionId: string) => Promise<void>) | null = null
-
-// Loopback API access for agent-spawned processes (docs/mcp.md): the MCP server reads
-// ACORN_API_URL + ACORN_API_TOKEN from its (inherited) session env. Set by registerTerminalIpc.
-let internalApiEnv: Record<string, string> = {}
-
-// Memory auto-generation trigger (docs/next 12 P3, implemented in knowledgeIpc): fired when an
-// agent session for a task exits, with that session's ring tail as the transcript input.
 let memoryReviewTrigger: ((taskId: string, transcriptTail: string) => Promise<void>) | null = null
+let seedNotes: ((task: TaskRow) => Promise<void>) | null = null
+let internalApiEnv: Record<string, string> = {}
+let bootReconciled: Promise<void> = Promise.resolve()
 
 const channel = (id: string) => `term:out:${id}`
 
@@ -237,9 +237,12 @@ function wireSession(db: AppDatabase, meta: TerminalSession, pty: IPty): Session
 }
 
 // One timer flips running agents to idle after enough output silence, notifying once per transition
-// (vNext §3). The busy→idle edge lives here; the idle→busy edge lives in onData above.
+// (vNext §3). The busy→idle edge lives here; the idle→busy edge lives in onData above. The handle is
+// held so the composition root can clear it on quit (review §2 — it used to leak).
+let idleWatch: ReturnType<typeof setInterval> | null = null
 function startIdleWatch() {
-  setInterval(() => {
+  if (idleWatch) return // registered once; a second boot must not stack a second timer
+  idleWatch = setInterval(() => {
     const now = Date.now()
     for (const s of sessions.values()) {
       if (computeIdle(s.meta.kind, s.meta.status, s.lastActivityAt, now) && !s.meta.idle) {
@@ -363,8 +366,9 @@ function killSession(s: Session) {
 }
 
 // On startup, re-attach tmux sessions that are still alive and drop DB rows whose tmux is gone
-// (vNext §12: app restart rediscovers tmux sessions). Runs once before the window opens.
-async function reconcileTmux(db: AppDatabase) {
+// (vNext §12: app restart rediscovers tmux sessions). Run by the composition root's coordinated
+// reconcile() step, off the paint-critical path (review §2, performance §3.6).
+export async function reconcileTmux(db: AppDatabase) {
   let rows: (typeof schema.terminalSessions.$inferSelect)[]
   try {
     rows = await db.select().from(schema.terminalSessions)
@@ -373,59 +377,84 @@ async function reconcileTmux(db: AppDatabase) {
   }
   if (!rows.length) return
   const alive = tmuxAvailable() ? listTmuxSessions() : new Set<string>()
+  let reattached = 0
   for (const row of rows) {
-    if (row.backend === 'tmux' && row.tmuxSession && alive.has(row.tmuxSession)) {
-      const task = await loadTask(db, row.taskId)
-      // isWorktree is derived, not persisted (docs/workspaces 03): tasks.worktreePath is the truth,
-      // so recompute it here so a session that survives an app restart keeps its worktree affordance.
-      const isWorktree = !!task?.worktreePath && resolve(row.cwd) === resolve(task.worktreePath)
-      wireSession(db, rowToMeta(row, taskContext(task), isWorktree), attachTmuxPty(row.tmuxSession, row.cols, row.rows))
-    } else {
-      await deleteRow(db, row.id)
+    // Per-row guard: one corrupt row / failed attach must not abort the remaining rows (or, via
+    // the composition root, the rest of the reconcile pass).
+    try {
+      if (row.backend === 'tmux' && row.tmuxSession && alive.has(row.tmuxSession)) {
+        const task = await loadTask(db, row.taskId)
+        // isWorktree is derived, not persisted (docs/workspaces 03): tasks.worktreePath is the truth,
+        // so recompute it here so a session that survives an app restart keeps its worktree affordance.
+        const isWorktree = !!task?.worktreePath && resolve(row.cwd) === resolve(task.worktreePath)
+        wireSession(db, rowToMeta(row, taskContext(task), isWorktree), attachTmuxPty(row.tmuxSession, row.cols, row.rows))
+        reattached++
+      } else {
+        await deleteRow(db, row.id)
+      }
+    } catch (e) {
+      console.warn('[terminal] tmux reconcile failed for session', row.id, e)
     }
   }
+  // This now runs after the window (composition root step 6), so the renderer's initial term:list
+  // has already fired — ping it to re-list, or resurrected sessions stay invisible until some
+  // unrelated broadcast (shell sessions never hit the idle-edge broadcasts).
+  if (reattached) broadcastStatus()
 }
 
-// Registered once at app start. Every payload is validated here — the renderer is the less-trusted
-// side (vNext §5, §11). Exited sessions linger until explicitly removed (term:remove). Composes the
-// per-surface modules: knowledge (notes/memory), local-git/editor, run targets, workflows and the
-// harness bridges.
-export async function registerTerminalIpc(db: AppDatabase, worktreesDir: string, internal?: { apiUrl: string; token: string }) {
-  setWorktreesRoot(worktreesDir)
-  if (internal) internalApiEnv = { ACORN_API_URL: internal.apiUrl, ACORN_API_TOKEN: internal.token }
-
-  // Notes + memory surfaces (docs/notes-and-memory.md, docs/next 12) — also hands back the stores/closures shared below.
-  const knowledge = registerKnowledgeIpc(db, dirname(worktreesDir), {
-    sendToAgent: (sessionId, text, submit) => void agentSender.send(sessionId, text, submit),
-  })
-  memoryInjector = knowledge.memoryInjector
-  memoryReviewTrigger = knowledge.memoryReviewTrigger
-
-  // Run targets (docs/next 13 §A) over the session engine's glue.
-  const runtime = createRuntimeService(db, {
-    startSession: async (taskId, target, cwd) => {
+// The session-engine glue the run-target service (runIpc) needs: spawn a target's command as a
+// terminal session in the task worktree, and observe/kill it. Exported so the composition root can
+// build the RuntimeService without this engine importing the run domain (review §2 — the run
+// service depends on the engine, not the reverse).
+export function terminalRunGlue(db: AppDatabase): RunSessionGlue {
+  return {
+    startSession: async (taskId: string, target: { id: string; command: string }, cwd: string) => {
       const t = await loadTask(db, taskId)
       const meta = await spawnOne(db, { taskId, command: target.command, title: `▶ ${target.id}` }, cwd, true, taskContext(t), t)
       broadcastStatus()
       return meta.id
     },
-    isRunning: (sessionId) => sessions.get(sessionId)?.meta.status === 'running',
-    exitCode: (sessionId) => sessions.get(sessionId)?.meta.exitCode,
-    killSession: (sessionId) => {
+    isRunning: (sessionId: string) => sessions.get(sessionId)?.meta.status === 'running',
+    exitCode: (sessionId: string) => sessions.get(sessionId)?.meta.exitCode,
+    killSession: (sessionId: string) => {
       const s = sessions.get(sessionId)
       if (s) killSession(s)
     },
-  })
-  registerRunIpc(runtime)
+  }
+}
 
-  // The MCP feature-tool surface (docs/mcp.md): per-domain harness bridges into the Hono routes.
-  wireHarnessBridges({ db, notesStore: knowledge.notesStore, proposals: knowledge.proposals, runtime, reconciled: knowledge.reconciled })
+// The cross-domain hooks the composition root injects when it registers this engine. They break the
+// knowledge↔terminal cycle: knowledge is built with the engine's exported sendToAgent, and its
+// memory/notes closures come back in here — so the engine never imports knowledge (review §2).
+export type TerminalIpcDeps = {
+  internalApiEnv: Record<string, string>
+  memoryInjector: (taskId: string, sessionId: string) => Promise<void>
+  memoryReviewTrigger: (taskId: string, transcriptTail: string) => Promise<void>
+  seedTaskNotes: (task: TaskRow) => Promise<void>
+  // Resolves when the composition root's post-window reconcile pass is done (always resolves,
+  // even on reconcile failure). Mutating surfaces that read the sessions map await it.
+  reconciled: Promise<void>
+}
 
-  // Workflows (docs/next 14) + local-git/editor (docs/panes.md).
-  await registerWorkflowIpc(db, { runtime, notesStore: knowledge.notesStore, internalApiEnv })
-  registerLocalGitIpc(db)
-  registerSearchIpc(db) // Find-in-files (docs/panes.md): ripgrep over the task's worktree.
-  registerDatabaseIpc(db) // Database pane (docs/pg.md): per-task Postgres browse/edit over IPC.
+// Clear the engine's own background work on quit (review §2). Idempotent — safe to call after a
+// partial boot that never started the idle-watch.
+export function disposeTerminal(): void {
+  if (idleWatch) {
+    clearInterval(idleWatch)
+    idleWatch = null
+  }
+}
+
+// Registered once at app start by the composition root (main/bootstrap.ts). Every payload is
+// validated here — the renderer is the less-trusted side (vNext §5, §11). Exited sessions linger
+// until explicitly removed (term:remove). This is the PTY engine + its own term:*/mcp:*/browser:*
+// surfaces only; the other domains are wired by the composition root.
+export function registerTerminalIpc(db: AppDatabase, worktreesDir: string, deps: TerminalIpcDeps): void {
+  internalApiEnv = deps.internalApiEnv
+  memoryInjector = deps.memoryInjector
+  memoryReviewTrigger = deps.memoryReviewTrigger
+  seedNotes = deps.seedTaskNotes
+  bootReconciled = deps.reconciled
 
   // MCP config inspector (docs/mcp.md): read ONLY the known candidate files (worktree
   // .mcp.json / .cursor/mcp.json, ~/.claude.json), parse + MASK IN MAIN — raw secrets never cross
@@ -550,7 +579,7 @@ export async function registerTerminalIpc(db: AppDatabase, worktreesDir: string,
     if (!t) return
     // Snapshot PR/ticket context into curatable notes (docs/notes-and-memory.md). Best-effort and
     // independent of worktree setup — runs even when there's no setup script / the worktree exists.
-    await seedTaskNotes(db, knowledge.notesStore, internalApiEnv, t).catch((e) => console.warn('[notes] seed failed:', e))
+    await seedNotes?.(t).catch((e) => console.warn('[notes] seed failed:', e))
     if (t.worktreePath && isDir(t.worktreePath)) return
     const { script, trigger } = await workspaceSetup(db, t.repoOwner, t.repoName)
     if (trigger !== 'created' || !script?.trim()) return
@@ -586,6 +615,10 @@ export async function registerTerminalIpc(db: AppDatabase, worktreesDir: string,
   // path allowed to tear a worktree down, and never automatic.
   ipcMain.handle('term:task:archive', async (_e: IpcMainInvokeEvent, id: string, opts?: ArchiveOpts): Promise<ArchiveResult> => {
     if (typeof id !== 'string' || !id) return { ok: false, reason: 'Invalid task.' }
+    // Archive right after relaunch must wait for tmux reconcile: before it, the sessions map is
+    // empty, so the running-session guard passes vacuously, killRunning kills nothing, and the
+    // task's live tmux session would survive (and be re-attached) past its deleted worktree.
+    await bootReconciled
     return archiveTask(db, id, opts ?? {}, {
       isDir,
       runningCount: (taskId) => [...sessions.values()].filter((s) => s.meta.taskId === taskId && s.meta.status === 'running').length,
@@ -656,7 +689,7 @@ export async function registerTerminalIpc(db: AppDatabase, worktreesDir: string,
     sessions.get(id)?.subscribers.delete(e.sender)
   })
 
-  await reconcileTmux(db)
-  await reconcileWorktrees(db)
+  // Durable-state reconciliation (reconcileTmux) is driven by the composition root's reconcile()
+  // step, off the paint-critical path. The idle-watch is engine-owned and starts here.
   startIdleWatch()
 }
