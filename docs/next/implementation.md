@@ -32,19 +32,19 @@ and its phase files win. Update the design doc in the same PR.
 
 ## Phase Index
 
-| Phase | File | Purpose | Unlocks |
-| --- | --- | --- | --- |
-| 0 | [Contract hygiene](./implementation/phase-00-contract-hygiene.md) | Make the server/client contract mandatory: response typing, one error envelope, shared auth guard. | Safer route growth in Phase 3 and projected tool routes in Phase 4. |
-| 1 | [Composition root + lifecycle](./implementation/phase-01-composition-root-lifecycle.md) | Move boot wiring out of terminal code and add ordered startup/reconcile/shutdown. | Any later registry or projection has one place to register and dispose. |
-| 2 | [Sync engine](./implementation/phase-02-sync-engine.md) | Extract serve-then-revalidate and cache policy from copied route logic. | Provider/source descriptors in Phase 7 and future mirrored resources. |
-| 3 | [Transport collapse](./implementation/phase-03-transport-collapse.md) | Move request/response IPC to loopback HTTP and streams to one authenticated WS. | Agent-tool projection, browser-mode capability clarity, route-owned plugins. |
-| 4 | [Agent-tool projection](./implementation/phase-04-agent-tool-projection.md) | Declare tools and context sections once, then project to MCP, harness HTTP, and renderer clients. | Tool permissions, provider context formatting, workflow tool ceilings. |
-| 5 | [Client registries](./implementation/phase-05-client-registries.md) | Open client extension seams: panes, commands, keybindings, settings, events, UI slots, notices. | Startup restore descriptors, provider UI contributions, workflow/profile UI. |
-| 6 | [Startup restore pipeline](./implementation/phase-06-startup-restore-pipeline.md) | Replace effect-order startup state with ordered persisted-state descriptors. | Stable plugin-owned persisted state and scoped eviction. |
-| 7 | [Integration providers and source contributions](./implementation/phase-07-integration-providers.md) | Express Linear/Rollbar through the provider contract before a third provider exists. | Zero-core-file provider additions and provider-owned source/context/link surfaces. |
-| 8 | [Workflow and profile registries](./implementation/phase-08-workflow-profile-registries.md) | Make step kinds, policies, profiles, tool ceilings, cancellation, and triggers declarative. | Workflow extensibility and runtime control surfaces. |
-| 9 | [Platform migrations](./implementation/phase-09-platform-migrations.md) | Opportunistic platform shifts: WebContentsView, node:sqlite spike, safeStorage path. | Cleaner platform layer before final foldering. |
-| 10 | [Foldering](./implementation/phase-10-foldering.md) | Move into `core/` + `plugins/` only after the seams exist. | Completion of the plugin-platform architecture. |
+| Phase | File | Purpose | Unlocks | Completed |
+| --- | --- | --- | --- | --- |
+| 0 | [Contract hygiene](./implementation/phase-00-contract-hygiene.md) | Make the server/client contract mandatory: response typing, one error envelope, shared auth guard. | Safer route growth in Phase 3 and projected tool routes in Phase 4. | ✅ |
+| 1 | [Composition root + lifecycle](./implementation/phase-01-composition-root-lifecycle.md) | Move boot wiring out of terminal code and add ordered startup/reconcile/shutdown. | Any later registry or projection has one place to register and dispose. | |
+| 2 | [Sync engine](./implementation/phase-02-sync-engine.md) | Extract serve-then-revalidate and cache policy from copied route logic. | Provider/source descriptors in Phase 7 and future mirrored resources. | |
+| 3 | [Transport collapse](./implementation/phase-03-transport-collapse.md) | Move request/response IPC to loopback HTTP and streams to one authenticated WS. | Agent-tool projection, browser-mode capability clarity, route-owned plugins. | |
+| 4 | [Agent-tool projection](./implementation/phase-04-agent-tool-projection.md) | Declare tools and context sections once, then project to MCP, harness HTTP, and renderer clients. | Tool permissions, provider context formatting, workflow tool ceilings. | |
+| 5 | [Client registries](./implementation/phase-05-client-registries.md) | Open client extension seams: panes, commands, keybindings, settings, events, UI slots, notices. | Startup restore descriptors, provider UI contributions, workflow/profile UI. | |
+| 6 | [Startup restore pipeline](./implementation/phase-06-startup-restore-pipeline.md) | Replace effect-order startup state with ordered persisted-state descriptors. | Stable plugin-owned persisted state and scoped eviction. | |
+| 7 | [Integration providers and source contributions](./implementation/phase-07-integration-providers.md) | Express Linear/Rollbar through the provider contract before a third provider exists. | Zero-core-file provider additions and provider-owned source/context/link surfaces. | |
+| 8 | [Workflow and profile registries](./implementation/phase-08-workflow-profile-registries.md) | Make step kinds, policies, profiles, tool ceilings, cancellation, and triggers declarative. | Workflow extensibility and runtime control surfaces. | |
+| 9 | [Platform migrations](./implementation/phase-09-platform-migrations.md) | Opportunistic platform shifts: WebContentsView, node:sqlite spike, safeStorage path. | Cleaner platform layer before final foldering. | |
+| 10 | [Foldering](./implementation/phase-10-foldering.md) | Move into `core/` + `plugins/` only after the seams exist. | Completion of the plugin-platform architecture. | |
 
 ## Completion Definition
 
