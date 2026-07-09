@@ -11,21 +11,17 @@ const here = dirname(fileURLToPath(import.meta.url))
 const clientDir = resolve(here, '../../dist/client')
 // DEV data root: the repo-local apps/desktop/.acorn (gitignored). Only valid while running from a
 // checkout — a packaged app's module dir is the read-only asar, so electron.ts passes an
-// app.getPath('userData') root into startServer() instead when app.isPackaged.
+// app.getPath('userData') root into bootstrap() instead when app.isPackaged.
 export const devDataDir = resolve(here, '../../.acorn')
 const indexHtml = readFileSync(resolve(clientDir, 'index.html'), 'utf8')
 
 export const ACORN_PORT = Number(process.env.ACORN_PORT) || 4317
 
-// Resolves with the live server and the runtime bindings — Electron passes runtime.DB to the
-// terminal service so it shares this one SQLite connection (vNext §7) rather than opening a second.
-// `dataDir` is the writable app-data root (DB, blobs, worktrees, notes): userData when packaged,
-// the repo-local .acorn in dev / under plain Node.
-export function startServer(dataDir: string = devDataDir): Promise<{ server: ServerType; runtime: RuntimeBindings }> {
-  const runtime = makeBindings({
-    dbPath: resolve(dataDir, 'acorn.sqlite'),
-    blobsDir: resolve(dataDir, 'blobs'),
-  })
+// Start the loopback HTTP listener over an already-built runtime. Split from startServer so the
+// composition root (main/bootstrap.ts) can wire the harness/context bridges into the route modules
+// BEFORE the listener accepts requests (review §2 boot-order fix). Resolves once listening so
+// callers can safely loadURL the origin.
+export function startListener(runtime: RuntimeBindings): Promise<ServerType> {
   const app = createApp()
 
   // Serve the built SPA, and fall back to the shell only for non-API/auth navigations — so
@@ -52,15 +48,36 @@ export function startServer(dataDir: string = devDataDir): Promise<{ server: Ser
   }
 
   // serve() binds asynchronously — resolve only once listening so callers (Electron) can safely
-  // loadURL the origin and read server.address() without a race.
-  return new Promise((resolveServer) => {
+  // loadURL the origin and read server.address() without a race. Reject on listen failure
+  // (EADDRINUSE on the pinned port — e.g. a dev:node process still running) so bootstrap can
+  // surface it instead of the raw 'error' event crashing the process before any window exists.
+  return new Promise((resolveServer, reject) => {
     const server = serve({ fetch, hostname: '127.0.0.1', port: ACORN_PORT }, (info) => {
       console.log(`acorn server on http://127.0.0.1:${info.port}`)
-      resolveServer({ server, runtime })
+      server.off('error', reject) // listening — later runtime errors are not listen failures
+      resolveServer(server)
     })
+    server.once('error', reject)
   })
 }
 
-// Auto-start only under plain Node (the `dev:node` entry). Under Electron the main process calls
-// startServer() explicitly, and this module is bundled in — so skip to avoid a double bind.
+// One definition of the on-disk app-data layout under `dataDir` (DB, blobs) — Electron's
+// composition root and the plain-Node `dev:node` entry both build their runtime through it.
+export function makeRuntime(dataDir: string): RuntimeBindings {
+  return makeBindings({
+    dbPath: resolve(dataDir, 'acorn.sqlite'),
+    blobsDir: resolve(dataDir, 'blobs'),
+  })
+}
+
+// Build the runtime bindings AND start listening in one call — the plain-Node `dev:node` entry
+// has no composition root, so it needs both. Not exported: Electron must route through
+// main/bootstrap.ts (build bindings, wire bridges, then startListener) or bridge routes 503.
+function startServer(dataDir: string = devDataDir): Promise<ServerType> {
+  return startListener(makeRuntime(dataDir))
+}
+
+// Auto-start only under plain Node (the `dev:node` entry). Under Electron the composition root
+// (main/bootstrap.ts) calls startListener() itself, and this module is bundled in — so skip to
+// avoid a double bind.
 if (!process.versions.electron) void startServer()

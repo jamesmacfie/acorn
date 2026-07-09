@@ -524,9 +524,8 @@ desktop-only and always on):
   automatic since the PTY lives in main.
 - The `@electron/rebuild` step from §4c covers node-pty's native build (`electron:rebuild` rebuilds
   both native modules).
-- The terminal service shares the server's single SQLite connection: `startServer()` returns the
-  runtime bindings and `electron.ts` hands `runtime.DB` (plus `INTERNAL_TOKEN`, §4b) to
-  `registerTerminalIpc`.
+- The terminal service shares the server's single SQLite connection, handed to it (with
+  `INTERNAL_TOKEN`, §4b) by the composition root (§10).
 
 Net: the terminal got simpler and more native, exactly as predicted. The shipped feature is
 documented in [terminal-and-agents.md](./terminal-and-agents.md) (its design record, `vNext.md`,
@@ -563,4 +562,30 @@ was needed — the main process uses Node's built-in `process.loadEnvFile`, and 
 TanStack Query, `shiki`, `idb-keyval`.
 
 The runtime moves; the application doesn't.
+
+## 11. Composition root & lifecycle
+
+`apps/desktop/src/main/bootstrap.ts` is the one explicit main-process composition root. `electron.ts`
+calls `bootstrap()` exactly once from `app.whenReady()`; `bootstrap` owns construction **order** and
+**lifecycle**, while each domain module keeps its own behaviour. The ordered phases are visible
+top-to-bottom in that file:
+
+```text
+migrate (openDb runs migrations)
+  → construct domain services (knowledge, runtime, workflow, …)
+  → install bridges + IPC (all set*Bridge / register*Ipc calls)
+  → start loopback listener (startListener — only now do requests get served)
+  → create window (electron.ts supplies createWindow; bootstrap owns when)
+  → reconcile durable state (tmux resurrect, worktree prune, workflow resume) off the paint path
+  → dispose in reverse on will-quit (loopback listener, idle-watch interval, pg pools)
+```
+
+Two invariants this closes (review §2): the listener starts **after** every harness/context bridge
+is installed — no more boot-order window where `/api/tasks/:id/notes` 503s — and there is now a
+logged `will-quit` teardown (registered first, idempotent, tolerant of a partial boot). `terminal.ts`
+is no longer the accidental `main()`: it is the PTY engine plus its own `term:*/mcp:*/browser:*`
+surfaces, and it imports no other product domain — the composition root injects what it needs
+(`memoryInjector`, `memoryReviewTrigger`, `seedTaskNotes`, `internalApiEnv`) and consumes what it
+exports (`sendToAgent`, `terminalRunGlue`, `reconcileTmux`, `disposeTerminal`). Boot/reconcile/teardown
+timing marks are logged as `[boot] <label> +Nms` lines (performance §3.1).
 
