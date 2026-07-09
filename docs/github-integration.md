@@ -126,10 +126,13 @@ The client layers optimistic updates / invalidation on top. See
 
 ## ETags and rate limits
 
-- **ETags** are acorn's main rate-limit defense. The PR-list route sends
-  `If-None-Match` with the stored `sync_state.etag`; a `304` costs nothing
-  against the limit and re-serves the mirror. The repos route and GraphQL reads
-  (PR detail) have no ETag and rely on the TTL gate.
+- **ETags** are acorn's main rate-limit defense. The **PR-list** and **repos-list**
+  routes send `If-None-Match` with the stored `sync_state.etag`; a `304` costs
+  nothing against the limit and just bumps freshness (the mirror is re-served).
+  GraphQL reads (PR detail) and REST files have no usable ETag and rely on the
+  TTL gate. All of this runs behind the sync engine (`server/sync/engine.ts`);
+  the 304 branch lives in each route's `refresh` because it is specific to the
+  `sync_state` ETag store.
 - A shared `ghError(res)` helper in `server/github/index.ts` maps any non-OK GitHub
   REST/GraphQL response to a normalized `{ error, status }`, applied uniformly across
   every route:

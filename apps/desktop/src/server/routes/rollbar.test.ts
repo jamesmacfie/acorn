@@ -5,8 +5,9 @@ import { getDb, schema } from '../db'
 import type { AppEnv } from '../middleware/auth'
 import { rollbarFetch } from '../rollbar'
 import { encryptSecret } from '../session'
+import { ROLLBAR_ITEMS_STALE_AFTER_MS } from '../sync/policy'
 import { integrations } from './integrations'
-import { ITEMS_STALE_AFTER_MS, rollbar } from './rollbar'
+import { rollbar } from './rollbar'
 import { makeTestDb, type TestDb } from './testDb'
 
 vi.mock('../db', async (importOriginal) => {
@@ -119,7 +120,7 @@ describe('Rollbar source (docs/integrations.md — zero schema changes)', () => 
     const cached = await t.db.select().from(schema.issues)
     expect(cached).toHaveLength(1)
     expect(cached[0]).toMatchObject({ provider: 'rollbar', identifier: '142', integrationId })
-    expect(cached[0].fetchedAt + ITEMS_STALE_AFTER_MS).toBeGreaterThan(Date.now())
+    expect(cached[0].fetchedAt + ROLLBAR_ITEMS_STALE_AFTER_MS).toBeGreaterThan(Date.now())
 
     // Second call within the TTL → no new API hit (connect used 1, list used 1).
     const before = vi.mocked(rollbarFetch).mock.calls.length
@@ -136,7 +137,7 @@ describe('Rollbar source (docs/integrations.md — zero schema changes)', () => 
     expect((await res.json()) as RollbarItem).toMatchObject({ identifier: '142', level: 'error' })
 
     // Expire the cache, make the API fail → stale beats nothing.
-    await t.db.update(schema.issues).set({ fetchedAt: Date.now() - ITEMS_STALE_AFTER_MS - 1 })
+    await t.db.update(schema.issues).set({ fetchedAt: Date.now() - ROLLBAR_ITEMS_STALE_AFTER_MS - 1 })
     vi.mocked(rollbarFetch).mockResolvedValueOnce(new Response('boom', { status: 500 }))
     const res2 = await app.fetch(new Request(`http://acorn.test/api/rollbar/items/142?integration=${integrationId}`), env())
     expect(res2.status).toBe(200)

@@ -75,7 +75,7 @@ Mirror of the repos the user can see. PK `(userId, id)` — `id` is the GitHub r
 | `private` | boolean | repo visibility; no longer affects caching (all bodies cache locally) |
 | `defaultBranch` | text | nullable |
 | `pushedAt` | integer | epoch ms; the repo selector orders by this |
-| `fetchedAt` | integer | epoch ms; staleness base — the route compares against `REPOS_STALE_AFTER_MS` |
+| `fetchedAt` | integer | epoch ms; legacy staleness base — the sync engine now gates the repos list on the `repos` `sync_state` row's `fetchedAt` (this column is the pre-ETag fallback for un-synced mirrors); TTL is `REPOS_STALE_AFTER_MS` in `server/sync/policy.ts` |
 
 #### `pull_requests`
 
@@ -531,13 +531,22 @@ the machine-scoped side. This is the one place the two scopes meet by key.
 
 Two freshness patterns coexist:
 
-- **Per-row** (`repos`, `pull_requests`): a row is stale when `now > fetchedAt + TTL`; the TTL is a
-  route constant, not a column (the old write-only `staleAfter`/`etag` columns are dropped).
-  Conditional (`If-None-Match` → 304) revalidation is wired for the PR list only, via `sync_state`.
-- **Per-collection** (`sync_state`): the PR-detail children and the PR/file lists have no per-row
-  staleness. A single `sync_state` row (keyed by resource, above) carries the collection's `etag` and
-  `fetchedAt` and gates the whole set. Mutations bust the relevant row to force a refetch.
-- **TTL only** (`issues`): serve-then-revalidate by `fetchedAt` age; no ETag.
+The single owner of *when* to serve/refresh is `serveThenRevalidate`
+(`server/sync/engine.ts`); TTLs live in `server/sync/policy.ts`. The store that
+backs freshness varies:
+
+- **Per-collection** (`sync_state`): the repos list, PR list, PR-detail children,
+  and PR/file lists gate on a single `sync_state` row (keyed by resource) that
+  carries the collection's `etag` and `fetchedAt`. Conditional (`If-None-Match` →
+  304) revalidation is wired for the **repos list** and the **PR list**; the
+  GraphQL PR-detail and REST files are TTL-only (no usable ETag). Mutations bust
+  the relevant row to force a refetch. TTL is a `policy.ts` constant, not a column
+  (the old write-only `staleAfter`/`etag` columns are dropped).
+- **TTL only** (`issues`): Linear/Rollbar serve-then-revalidate by the `issues`
+  row's own `fetchedAt` age; no ETag, not `sync_state`.
+
+The `fetchedAt` columns on `repos`/`pull_requests` remain the prune key for the
+atomic mirror rewrites and a pre-ETag fallback for the repos list.
 
 One accepted staleness hole, by decision: `resolveRepoForUser` (`routes/repoMirror.ts`) serves a
 cached repo row with **no TTL check** on the resolve path — repo rows only refresh via the

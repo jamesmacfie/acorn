@@ -7,13 +7,19 @@ import { ghError, ghGraphQL } from '../github'
 import type { AppEnv } from '../middleware/auth'
 import { getUser } from '../middleware/requireUser'
 import { respondError } from '../respond'
-import { fetchFiles, mirrorFiles, mirrorPr, PR_FRAGMENT, readComposite, readFiles, STALE_AFTER_MS, type GqlPull } from './prMirror'
+import { PULLS_STALE_AFTER_MS } from '../sync/policy'
+import { fetchFiles, mirrorFiles, mirrorPr, PR_FRAGMENT, readComposite, readFiles, type GqlPull } from './prMirror'
 import { resolveRepoForUser } from './repoMirror'
 
 // Batch prefetch — warm the mirror for several open PRs at once so client navigation is instant.
 // Detail is one multi-alias GraphQL call for all stale PRs (one GitHub round-trip); files stay N
 // parallel REST calls (REST can't be aliased). Per-PR TTL skip means already-fresh PRs cost no
 // GitHub calls. Reuses the same mirror tables/logic as the single-PR routes (prMirror.ts).
+//
+// Deliberately NOT on the serve-then-revalidate engine (inventories.md §2d): this is a multi-item
+// prefetch that always blocks and never serves-then-revalidates (there is no single response
+// resource to hand back stale). It shares the engine's TTL (PULLS_STALE_AFTER_MS) but owns its own
+// per-item freshness gate below.
 const MAX_BATCH = 10 // bounds the GraphQL query size; the client sends ~5
 const isFilesMode = (value: unknown): value is PullBatchFilesMode =>
   value === 'full' || value === 'summary' || value === 'none'
@@ -47,7 +53,7 @@ export const pullsBatch = new Hono<AppEnv>().post('/:owner/:repo/pulls/batch', a
   const freshAt = new Map(syncRows.map((s) => [s.resource, s.fetchedAt]))
   const isFresh = (resource: string) => {
     const f = freshAt.get(resource)
-    return f != null && f + STALE_AFTER_MS > now
+    return f != null && f + PULLS_STALE_AFTER_MS > now
   }
   const staleDetail = numbers.filter((n) => !isFresh(prResource(repoId, n)))
   const staleFiles = filesMode === 'none' ? [] : numbers.filter((n) => !isFresh(filesResource(repoId, n)))

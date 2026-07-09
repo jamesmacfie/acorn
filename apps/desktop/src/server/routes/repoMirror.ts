@@ -1,17 +1,17 @@
 import { and, desc, eq } from 'drizzle-orm'
 import { getDb, schema } from '../db'
 import { chunkRowsByColumnBudget } from '../db/batch'
+import { reposResource } from '../db/resourceKeys'
 import { gh, ghError } from '../github'
+import type { RefreshResult, RouteFailure, RouteResult } from '../sync/engine'
 import type { Repo } from '../../shared/api'
 
-// Repo metadata is "slow-changing"; the local SQLite mirror is a user-scoped cache, never the
-// source of access truth. Cold misses resolve against GitHub, stale hits serve from the mirror.
-export const REPOS_STALE_AFTER_MS = 300_000
+// Failure/result taxonomy now lives with the sync engine (the shared flow layer); re-exported here
+// so the pulls / pullDetail / pullFiles / prMirror routes keep importing it from repoMirror.
+export type { RouteFailure, RouteResult } from '../sync/engine'
 
 type Db = ReturnType<typeof getDb>
 type GitHubFetcher = (token: string, path: string, init?: RequestInit) => Promise<Response>
-export type RouteFailure = { error: string; status: 401 | 403 | 404 | 429 | 502; detail?: string[] }
-export type RouteResult<T> = { ok: true; value: T } | { ok: false; failure: RouteFailure }
 
 type GitHubRepo = {
   id: number
@@ -67,20 +67,50 @@ const repoRow = (userId: string, repo: GitHubRepo, fetchedAt: number) => ({
   fetchedAt,
 })
 
-export const refreshRepos = async (token: string, db: Db, userId: string, fetcher: GitHubFetcher = gh): Promise<RouteResult<Awaited<ReturnType<typeof readCachedRepos>>>> => {
-  const res = await fetcher(token, '/user/repos?sort=pushed&direction=desc&per_page=100')
+// Refresh the user's repo mirror from GitHub, atomically (one db.batch, like mirrorPr). The repos
+// list carries an ETag in sync_state (`repos`), so a 304 costs no rate budget — just bump freshness
+// and keep the mirror. Returns RouteResult<void>: the sync engine re-reads the mirror after a cold
+// refresh, so there is no value to hand back.
+export const refreshRepos = async (token: string, db: Db, userId: string, fetcher: GitHubFetcher = gh): Promise<RefreshResult> => {
+  const resource = reposResource()
+  const [sync] = await db
+    .select()
+    .from(schema.syncState)
+    .where(and(eq(schema.syncState.userId, userId), eq(schema.syncState.resource, resource)))
+
+  const res = await fetcher(token, '/user/repos?sort=pushed&direction=desc&per_page=100', {
+    headers: sync?.etag ? { 'If-None-Match': sync.etag } : {},
+  })
+  const now = Date.now()
+
+  // 304 Not Modified → mirror still valid; bump freshness only (free against the rate limit).
+  if (res.status === 304) {
+    await db
+      .insert(schema.syncState)
+      .values({ userId, resource, etag: sync?.etag ?? null, fetchedAt: now })
+      .onConflictDoUpdate({ target: [schema.syncState.userId, schema.syncState.resource], set: { fetchedAt: now } })
+    return { ok: true }
+  }
+
   const err = ghError(res)
   if (err) return { ok: false, failure: err }
 
-  const fetchedAt = Date.now()
+  const etag = res.headers.get('etag')
   const body = (await res.json()) as GitHubRepo[]
-  const rows = body.map((repo) => repoRow(userId, repo, fetchedAt))
+  const rows = body.map((repo) => repoRow(userId, repo, now))
 
-  const del = db.delete(schema.repos).where(eq(schema.repos.userId, userId))
-  const inserts = chunkRowsByColumnBudget(rows).map((part) => db.insert(schema.repos).values(part))
-  await db.batch([del, ...inserts])
+  // Full-list replace + sync bump, all-or-nothing: a mid-refresh failure leaves the prior mirror and
+  // stale sync intact, and the next request retries.
+  await db.batch([
+    db.delete(schema.repos).where(eq(schema.repos.userId, userId)),
+    ...chunkRowsByColumnBudget(rows).map((part) => db.insert(schema.repos).values(part)),
+    db
+      .insert(schema.syncState)
+      .values({ userId, resource, etag, fetchedAt: now })
+      .onConflictDoUpdate({ target: [schema.syncState.userId, schema.syncState.resource], set: { etag, fetchedAt: now } }),
+  ])
 
-  return { ok: true, value: rows }
+  return { ok: true }
 }
 
 // Read-path repo resolution: a mirror miss falls through to a live GitHub fetch (+ mirror), so a

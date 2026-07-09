@@ -1,11 +1,14 @@
-import { eq } from 'drizzle-orm'
+import { and, eq } from 'drizzle-orm'
 import { Hono } from 'hono'
-import { trackBackgroundRefresh } from '../background'
+import type { Repo } from '../../shared/api'
 import { getDb, schema } from '../db'
+import { reposResource } from '../db/resourceKeys'
 import type { AppEnv } from '../middleware/auth'
 import { getUser } from '../middleware/requireUser'
 import { respondError } from '../respond'
-import { readCachedRepos, refreshRepos, REPOS_STALE_AFTER_MS, toPublicRepo } from './repoMirror'
+import { REPOS_STALE_AFTER_MS } from '../sync/policy'
+import { type Cached, serveThenRevalidate } from '../sync/engine'
+import { readCachedRepos, refreshRepos, toPublicRepo } from './repoMirror'
 
 export const repos = new Hono<AppEnv>()
   .get('/', async (c) => {
@@ -13,28 +16,40 @@ export const repos = new Hono<AppEnv>()
 
     const db = getDb(c.env)
     const userId = user.login // ponytail: login as the scope key — stable enough; revisit if logins churn.
+    const resource = reposResource()
 
-    const cached = await readCachedRepos(db, userId)
-
-    // Fresh if we have rows and the most recent sync is within the staleness window.
-    const newest = cached.reduce((max, r) => Math.max(max, r.fetchedAt), 0)
-    const fresh = cached.length > 0 && newest + REPOS_STALE_AFTER_MS > Date.now()
-    if (fresh) return c.json(cached.map(toPublicRepo))
-
-    // Stale-but-present is enough for first paint; revalidate outside the response.
-    if (cached.length > 0) {
-      trackBackgroundRefresh('repos', refreshRepos(user.token, db, userId))
-      return c.json(cached.map(toPublicRepo))
+    // Freshness comes from sync_state (bumped on every 200/304). A pre-ETag mirror has repo rows but
+    // no sync row yet — fall back to the newest row's fetchedAt so it serves as stale (not cold) and
+    // self-heals on the first refresh. Cold only when nothing was ever fetched.
+    const read = async (): Promise<Cached<Repo[]> | null> => {
+      const [[sync], rows] = await Promise.all([
+        db.select().from(schema.syncState).where(and(eq(schema.syncState.userId, userId), eq(schema.syncState.resource, resource))),
+        readCachedRepos(db, userId),
+      ])
+      if (!sync && rows.length === 0) return null
+      const fetchedAt = sync?.fetchedAt ?? rows.reduce((max, r) => Math.max(max, r.fetchedAt), 0)
+      return { data: rows.map(toPublicRepo), fetchedAt }
     }
 
-    // Cold mirror: no rows exist yet, so the selector has nothing useful to render.
-    const refreshed = await refreshRepos(user.token, db, userId)
-    if (!refreshed.ok) return respondError(c, refreshed.failure.status, refreshed.failure.error)
-    return c.json(refreshed.value.map(toPublicRepo))
+    const result = await serveThenRevalidate({
+      resource,
+      userId,
+      ttlMs: REPOS_STALE_AFTER_MS,
+      read,
+      refresh: () => refreshRepos(user.token, db, userId),
+    })
+    if (!result.ok) return respondError(c, result.failure.status, result.failure.error, result.failure.detail)
+    return c.json(result.value)
   })
   .post('/refresh', async (c) => {
     const user = getUser(c)
 
-    await getDb(c.env).update(schema.repos).set({ fetchedAt: 0 }).where(eq(schema.repos.userId, user.login))
+    // Force the next GET stale: zero both freshness sources (sync row + legacy row fetchedAt). The
+    // ETag stays, so the refetch can still 304 (nothing changed → cheap re-validate).
+    const db = getDb(c.env)
+    await db.batch([
+      db.update(schema.repos).set({ fetchedAt: 0 }).where(eq(schema.repos.userId, user.login)),
+      db.update(schema.syncState).set({ fetchedAt: 0 }).where(and(eq(schema.syncState.userId, user.login), eq(schema.syncState.resource, reposResource()))),
+    ])
     return c.body(null, 204)
   })
