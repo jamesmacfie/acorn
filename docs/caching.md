@@ -26,24 +26,25 @@ The mirror is the local server's read cache of GitHub. Every read goes through i
 (see the serve-then-revalidate pattern below). Freshness is governed by a TTL
 and, where available, an ETag.
 
-### TTLs (`STALE_AFTER_MS`)
+### TTLs (`server/sync/policy.ts`)
 
-Exact values from the route source:
+Every serve-then-revalidate TTL lives in **one** greppable module,
+`server/sync/policy.ts` — the sync engine owns the *flow*, `policy.ts` owns the
+*numbers*. No route declares its own TTL constant anymore.
 
-| Resource | Constant | TTL |
+| Resource | Constant (`server/sync/policy.ts`) | TTL |
 | --- | --- | --- |
-| Repos list | `REPOS_STALE_AFTER_MS`, `routes/repoMirror.ts` (used by `routes/repos.ts`) | `300_000` ms (5 min) — "slow-changing" metadata |
-| PR list (open) | `STALE_AFTER_MS`, `routes/pulls.ts` | `45_000` ms (45 s) — "fast-changing" list data |
-| PR detail (composite) | `STALE_AFTER_MS`, `routes/prMirror.ts` (shared by `pullDetail.ts` / `pullsBatch.ts`) | `45_000` ms (45 s) — "fast-changing" |
-| PR files | same `prMirror.ts` constant (via `pullFiles.ts` / `pullsBatch.ts`) | `45_000` ms (45 s) |
-| Linear issues | `ISSUES_STALE_AFTER_MS`, `routes/linear.ts` | `600_000` ms (10 min) — tickets move slowly; the panel forces fresh with `?refresh=1` |
-| Rollbar items | `ITEMS_STALE_AFTER_MS`, `routes/rollbar.ts` | `120_000` ms (2 min) — errors move fast |
+| Repos list | `REPOS_STALE_AFTER_MS` | `300_000` ms (5 min) — "slow-changing" metadata |
+| PR list (open), PR detail, PR files | `PULLS_STALE_AFTER_MS` | `45_000` ms (45 s) — "fast-changing"; one constant, shared by `pulls.ts` / `prMirror.ts` / `pullFiles.ts` / `pullsBatch.ts` |
+| Linear issues | `LINEAR_ISSUES_STALE_AFTER_MS` | `600_000` ms (10 min) — tickets move slowly; the panel forces fresh with `?refresh=1` |
+| Rollbar items | `ROLLBAR_ITEMS_STALE_AFTER_MS` | `120_000` ms (2 min) — errors move fast |
 
-A row/collection is fresh when `fetchedAt + STALE_AFTER_MS > Date.now()`. Repos
-gate on the newest row's `fetchedAt`; the PR list, PR detail and files gate on
-the matching `sync_state` row; external issues gate on the `issues` row's
-`fetchedAt`. The TTL windows live only in the route constants above — there is
-no per-row `staleAfter` column.
+A row/collection is fresh when `fetchedAt + <TTL> > Date.now()`. Repos, the PR
+list, PR detail and PR files gate on the matching `sync_state` row; external
+issues (Linear/Rollbar) gate on the `issues` row's own `fetchedAt`. The engine
+reads none of these stores directly — the caller's `read()` reports the cached
+data plus its `fetchedAt`, so the freshness backend stays opaque. There is no
+per-row `staleAfter` column.
 
 The batch-prefetch route (`routes/pullsBatch.ts`) warms detail + files for up to
 10 PRs at once and applies the same per-PR `sync_state` gates, so already-fresh
@@ -54,8 +55,8 @@ PRs cost no GitHub calls.
 When stale, endpoints that have an ETag revalidate conditionally rather than
 blindly refetching:
 
-- **Open PR list** stores the collection ETag in `sync_state` and sends
-  `If-None-Match` on the next fetch. (The **closed** PR list does *not* go
+- **Open PR list** and the **repos list** store the collection ETag in
+  `sync_state` and send `If-None-Match` on the next fetch. (The **closed** PR list does *not* go
   through the mirror at all — it is proxied straight from GitHub one 50-item
   page per request and load-mored client-side; closed PRs are historical, so
   there is nothing worth caching in the mirror with a 45 s TTL.) A **`304 Not Modified` is free** against
@@ -67,7 +68,7 @@ if (res.status === 304) {
   await db.insert(schema.syncState)
     .values({ userId, resource, etag: sync?.etag ?? null, fetchedAt: now })
     .onConflictDoUpdate({ target: [...], set: { fetchedAt: now } })
-  return { ok: true, value: await readPublicRows() }
+  return { ok: true }
 }
 ```
 
@@ -76,37 +77,59 @@ if (res.status === 304) {
   gate. The same is true for `pr_files` (it's TTL-only in `sync_state`; the REST
   files call does not currently send `If-None-Match`).
 
-> Conditional `If-None-Match` revalidation is wired in the PR-list route only;
-> the repos route and `pr_files`/PR-detail are TTL-only (no stored ETag — the
-> one-time write-only `etag`/`staleAfter` columns were dropped from
-> `repos`/`pull_requests`). Rate-limit responses (`403`/`429`) are detected
+> Conditional `If-None-Match` revalidation is wired for the **PR list** and the
+> **repos list**; `pr_files`/PR-detail are TTL-only (no ETag — GraphQL/REST-files
+> don't supply a usable one). Rate-limit responses (`403`/`429`) are detected
 > centrally by `ghError()` — see
 > [github integration](./github-integration.md#etags-and-rate-limits).
 
-### Serve-then-revalidate pattern
+### Serve-then-revalidate pattern (`server/sync/engine.ts`)
 
-Every mirror read follows the same shape:
+The four-branch flow lives in **one** place — `serveThenRevalidate` in
+`server/sync/engine.ts`. Routes no longer hand-roll it; they supply a `read()`
+(cached data + its `fetchedAt`, or `null` when never fetched) and a `refresh()`
+(the atomic mirror write). The engine owns *when*:
 
 ```
-1. Read sync_state / newest fetchedAt.
-2. Fresh within TTL?    → serve the mirror rows. No GitHub call.
-3. Stale but present?   → serve the mirror rows immediately, refresh in the
-                          background (fire-and-forget).
-4. Cold (nothing cached) or forced (`?force=true` on the PR list)?
-                        → block on the GitHub fetch (conditional If-None-Match
-                          if we have an ETag).
-     - 304 → bump sync_state.fetchedAt, serve existing rows.
-     - 200 → rewrite the mirror rows + upsert sync_state, then serve.
+read() → { data, fetchedAt } | null
+1. null?                → COLD: block on refresh(), then re-read and serve.
+2. fresh within TTL?    → serve data. No GitHub call.
+3. stale?               → serve data immediately; refresh() in the background.
+   (?force=true)        → treated as cold: block on refresh() even if fresh.
+                          Forced refreshes never join an in-flight refresh —
+                          "force means fresh", not "force means whatever fetch
+                          happened to be running".
 ```
 
-Background refreshes go through `trackBackgroundRefresh`
-(`src/server/background.ts`) — a tracked fire-and-forget set with error logging.
-Production never awaits them; tests settle them via `settleBackground()` from
-the same module.
+The engine also owns two cross-cutting concerns the copies used to get wrong:
+
+- **In-flight dedupe** (keyed by `userId` + `resource` — mirrors are per-user,
+  so flow state is too): two stale hits for the same user's resource join one
+  refresh instead of firing two.
+- **Rate-limit backoff** (same `userId` + `resource` key): after a `429`
+  background refresh, further *background*
+  refreshes for that resource are suppressed for `RATE_LIMIT_BACKOFF_MS`
+  (`policy.ts`) — stale data keeps serving instead of hammering a throttled
+  upstream. Cold reads still try (there's nothing else to serve).
+
+The engine never touches the caller's store. ETag/304 handling stays inside each
+caller's `refresh()` because it's specific to the `sync_state` ETag store, not
+universal to the flow — a `304` is just a successful (data-preserving) refresh
+from the engine's point of view. Background refreshes go through
+`trackBackgroundRefresh` (`src/server/background.ts`); tests settle them via
+`settleBackground()`.
+
+**Not on the engine** (deliberately, see `inventories.md` §2d): `pullsBatch.ts`
+(a multi-item prefetch that always blocks — no single response resource to serve
+stale), and the Linear/Rollbar reads (multi-connection fan-out with partial
+results and per-item freshness). They share the engine's TTLs from `policy.ts`
+but own their own flow.
 
 Two explicit invalidation paths bypass the TTL: `POST /api/repos/refresh` zeroes
-every repo row's `fetchedAt`, and PR mutations bust the PR's `sync_state` row
-(`bustPrSync` in `routes/prContext.ts`) so the next read refetches.
+both the repo rows' and the repos `sync_state` row's `fetchedAt` (the ETag is
+kept so the refetch can still `304`), and PR mutations bust the PR's
+`sync_state` row (`bustPrSync` in `routes/prContext.ts`) so the next read
+refetches.
 
 How the 200 path rewrites the mirror differs per resource:
 

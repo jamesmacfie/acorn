@@ -4,10 +4,9 @@ import { settleBackground } from '../background'
 import { getDb } from '../db'
 import { gh } from '../github'
 import type { AppEnv } from '../middleware/auth'
-import { STALE_AFTER_MS as FILES_STALE_AFTER_MS } from './prMirror'
+import { PULLS_STALE_AFTER_MS as FILES_STALE_AFTER_MS } from '../sync/policy'
 import { pullFiles } from './pullFiles'
-import { repos } from './repos'
-import { REPOS_STALE_AFTER_MS, resolveRepoForUser } from './repoMirror'
+import { resolveRepoForUser } from './repoMirror'
 
 vi.mock('../db', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../db')>()
@@ -45,17 +44,6 @@ const makeResolverDb = (rows: unknown[] = []) => {
     })),
   }))
   return { db: { select, insert } as never, inserted, insert }
-}
-
-const makeReposDb = (rows: unknown[]) => {
-  const select = vi.fn(() => ({ from: vi.fn(() => ({ where: vi.fn(() => ({ orderBy: vi.fn(async () => rows) })) })) }))
-  const db = {
-    select,
-    delete: vi.fn(() => ({ where: vi.fn(() => ({ kind: 'delete' })) })),
-    insert: vi.fn(() => ({ values: vi.fn(() => ({ kind: 'insert' })) })),
-    batch: vi.fn(async () => []),
-  }
-  return db as never
 }
 
 const makePullFilesDb = (selectRows: unknown[][]) => {
@@ -118,63 +106,6 @@ describe('resolveRepoForUser', () => {
 
     expect(result).toEqual({ ok: false, failure: { error: 'repo_not_found', status: 404 } })
     expect(inserted).toHaveLength(0)
-  })
-})
-
-describe('repos stale-while-revalidate', () => {
-  beforeEach(() => {
-    vi.clearAllMocks()
-  })
-
-  it('returns stale mirror rows immediately and schedules a background refresh', async () => {
-    const staleRows = [
-      {
-        userId: 'james',
-        id: 19847,
-        owner: 'Runn-Fast',
-        name: 'runn',
-        private: true,
-        defaultBranch: 'main',
-        pushedAt: Date.parse('2026-06-25T01:00:00Z'),
-        fetchedAt: Date.now() - REPOS_STALE_AFTER_MS - 1,
-      },
-    ]
-    const db = makeReposDb(staleRows)
-    vi.mocked(getDb).mockReturnValue(db)
-
-    let resolveGh!: (res: Response) => void
-    const ghPromise = new Promise<Response>((resolve) => {
-      resolveGh = resolve
-    })
-    vi.mocked(gh).mockReturnValue(ghPromise)
-
-    const app = new Hono<AppEnv>()
-    app.use('/api/*', async (c, next) => {
-      c.set('principal', { kind: 'user', user: { token: 'token', login: 'james', name: '', avatar: '', scopes: [] } })
-      await next()
-    })
-    app.route('/api/repos', repos)
-
-    const response = await Promise.race([
-      app.fetch(new Request('http://acorn.test/api/repos'), {} as Env),
-      new Promise<null>((resolve) => setTimeout(() => resolve(null), 20)),
-    ])
-
-    expect(response).toBeInstanceOf(Response)
-    expect(response && (await response.json())).toEqual([
-      {
-        id: 19847,
-        owner: 'Runn-Fast',
-        name: 'runn',
-        private: true,
-        defaultBranch: 'main',
-        pushedAt: Date.parse('2026-06-25T01:00:00Z'),
-      },
-    ])
-    expect(gh).toHaveBeenCalledWith('token', '/user/repos?sort=pushed&direction=desc&per_page=100')
-
-    resolveGh(responseJson([]))
-    await settleBackground()
   })
 })
 

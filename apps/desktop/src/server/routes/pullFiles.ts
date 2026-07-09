@@ -1,15 +1,16 @@
 import { and, eq } from 'drizzle-orm'
 import type { Context } from 'hono'
 import { Hono } from 'hono'
-import type { PullFilesPatchRequest } from '../../shared/api'
-import { trackBackgroundRefresh } from '../background'
+import type { PullFile, PullFilesPatchRequest } from '../../shared/api'
 import { getDb, schema } from '../db'
 import { filesResource } from '../db/resourceKeys'
 import type { AppEnv } from '../middleware/auth'
 import { getUser } from '../middleware/requireUser'
 import { respondError } from '../respond'
-import { fetchFiles, mirrorFiles, readFiles, STALE_AFTER_MS } from './prMirror'
-import { resolveRepoForUser, type RouteResult } from './repoMirror'
+import { type Cached, type RefreshResult, serveThenRevalidate } from '../sync/engine'
+import { PULLS_STALE_AFTER_MS } from '../sync/policy'
+import { fetchFiles, mirrorFiles, readFiles } from './prMirror'
+import { resolveRepoForUser } from './repoMirror'
 
 const MAX_PATCH_PATHS = 20
 
@@ -53,29 +54,30 @@ const handleFilesRead = async (c: Context<AppEnv>, options: { summaryOnly?: bool
   const paths = options.paths?.length ? options.paths : undefined
   const includePatches = !options.summaryOnly || !!paths
 
-  const [sync] = await db
-    .select()
-    .from(schema.syncState)
-    .where(and(eq(schema.syncState.userId, userId), eq(schema.syncState.resource, filesResource(repoId, number))))
+  const resource = filesResource(repoId, number)
   const readCached = async () => orderedByRequest(await readFiles(c.env, db, key, { includePatches, paths }), paths)
-  if (sync && sync.fetchedAt + STALE_AFTER_MS > Date.now()) return c.json(await readCached())
 
-  const refresh = async (): Promise<RouteResult<Awaited<ReturnType<typeof readCached>>>> => {
+  // Cold only when the files were never fetched (no sync row); a PR with zero changed files still
+  // has a sync row → serves `{ data: [], fetchedAt }`.
+  const read = async (): Promise<Cached<PullFile[]> | null> => {
+    const [sync] = await db
+      .select()
+      .from(schema.syncState)
+      .where(and(eq(schema.syncState.userId, userId), eq(schema.syncState.resource, resource)))
+    if (!sync) return null
+    return { data: await readCached(), fetchedAt: sync.fetchedAt }
+  }
+
+  const refresh = async (): Promise<RefreshResult> => {
     const files = await fetchFiles(user.token, owner, repo, number)
     if (!files.ok) return files
     await mirrorFiles(c.env, db, key, files.value)
-    return { ok: true, value: await readCached() }
+    return { ok: true }
   }
 
-  if (sync) {
-    const cached = await readCached()
-    trackBackgroundRefresh(`files:${owner}/${repo}#${number}`, refresh())
-    return c.json(cached)
-  }
-
-  const refreshed = await refresh()
-  if (!refreshed.ok) return respondError(c, refreshed.failure.status, refreshed.failure.error)
-  return c.json(refreshed.value)
+  const result = await serveThenRevalidate({ resource, userId, ttlMs: PULLS_STALE_AFTER_MS, read, refresh })
+  if (!result.ok) return respondError(c, result.failure.status, result.failure.error, result.failure.detail)
+  return c.json(result.value)
 }
 
 // PR changed-files + patches. REST /pulls/{n}/files is the single writer of pr_files (it carries

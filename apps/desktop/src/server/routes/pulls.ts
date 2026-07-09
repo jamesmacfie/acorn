@@ -1,6 +1,5 @@
 import { and, desc, eq, isNull, lt, ne, sql } from 'drizzle-orm'
 import { Hono } from 'hono'
-import { trackBackgroundRefresh } from '../background'
 import { getDb, schema } from '../db'
 import { chunkRowsByColumnBudget } from '../db/batch'
 import { pullsResource } from '../db/resourceKeys'
@@ -9,12 +8,15 @@ import type { ClosedPullsPage, Pull } from '../../shared/api'
 import type { AppEnv } from '../middleware/auth'
 import { getUser } from '../middleware/requireUser'
 import { respondError } from '../respond'
-import { resolveRepoForUser, type RouteResult } from './repoMirror'
+import { type Cached, type RefreshResult, serveThenRevalidate } from '../sync/engine'
+import { PULLS_STALE_AFTER_MS } from '../sync/policy'
+import { resolveRepoForUser } from './repoMirror'
 
-// PR list for a repo (docs/caching.md serve-then-revalidate). PR data is "fast-changing":
-// short TTL + conditional If-None-Match. The list ETag lives in sync_state (no per-row home);
-// 304s are free against the rate limit. Rows are user-scoped (private PRs never cross users).
-const STALE_AFTER_MS = 45_000 // ~45s — "fast-changing" list data (docs/caching.md)
+// PR list for a repo (docs/caching.md serve-then-revalidate, via server/sync/engine.ts). PR data is
+// "fast-changing": short TTL + conditional If-None-Match. The list ETag lives in sync_state (no
+// per-row home); 304s are free against the rate limit. Rows are user-scoped (private PRs never
+// cross users). The engine owns fresh/stale/cold/dedupe; the ETag/304 branch stays here because it
+// is specific to the sync_state ETag store.
 const CLOSED_PAGE_SIZE = 50 // closed PRs load on demand, one page at a time (load-more)
 
 type GitHubPull = {
@@ -60,10 +62,6 @@ export const pulls = new Hono<AppEnv>().get('/:owner/:repo/pulls', async (c) => 
   }
 
   const resource = pullsResource(repoId, state)
-  const [sync] = await db
-    .select()
-    .from(schema.syncState)
-    .where(and(eq(schema.syncState.userId, userId), eq(schema.syncState.resource, resource)))
 
   // Partition open vs closed within the shared table so the two tabs don't clobber each other.
   const stateFilter = state === 'open' ? eq(schema.pullRequests.state, 'open') : ne(schema.pullRequests.state, 'open')
@@ -72,8 +70,19 @@ export const pulls = new Hono<AppEnv>().get('/:owner/:repo/pulls', async (c) => 
   const readRows = () =>
     db.select().from(schema.pullRequests).where(scope).orderBy(desc(schema.pullRequests.updatedAt))
   const readPublicRows = async () => (await readRows()).map(toPublic)
+  const readSync = async () =>
+    (await db.select().from(schema.syncState).where(and(eq(schema.syncState.userId, userId), eq(schema.syncState.resource, resource))))[0]
 
-  const revalidate = async (): Promise<RouteResult<ReturnType<typeof toPublic>[]>> => {
+  // Cold only when the list was never fetched (no sync row). A synced-but-empty repo returns
+  // `{ data: [], fetchedAt }` so it serves as fresh/stale, never re-blocks.
+  const read = async (): Promise<Cached<Pull[]> | null> => {
+    const sync = await readSync()
+    if (!sync) return null
+    return { data: await readPublicRows(), fetchedAt: sync.fetchedAt }
+  }
+
+  const refresh = async (): Promise<RefreshResult> => {
+    const sync = await readSync()
     const res = await gh(user.token, `/repos/${owner}/${repo}/pulls?state=${state}&sort=updated&direction=desc&per_page=100`, {
       headers: sync?.etag ? { 'If-None-Match': sync.etag } : {},
     })
@@ -89,7 +98,7 @@ export const pulls = new Hono<AppEnv>().get('/:owner/:repo/pulls', async (c) => 
           target: [schema.syncState.userId, schema.syncState.resource],
           set: { fetchedAt: now },
         })
-      return { ok: true, value: await readPublicRows() }
+      return { ok: true }
     }
 
     // 304 handled above; auth, rate-limit, SSO, and upstream failures all map here.
@@ -174,29 +183,21 @@ export const pulls = new Hono<AppEnv>().get('/:owner/:repo/pulls', async (c) => 
       ...taskUpdates,
     ])
 
-    // Re-read from the mirror rather than mapping the write-shaped `rows`: the DB carries the
-    // detail-route-owned mergeable/mergeStateStatus that the list upsert deliberately preserves.
-    return { ok: true, value: await readPublicRows() }
+    // The engine re-reads the mirror after a cold refresh (not the write-shaped `rows`), so the
+    // detail-route-owned mergeable/mergeStateStatus the list upsert preserves rides along.
+    return { ok: true }
   }
 
-  const force = c.req.query('force') === 'true'
-
-  // Fresh → serve the mirror, no GitHub call.
-  if (!force && sync && sync.fetchedAt + STALE_AFTER_MS > Date.now()) {
-    return c.json(await readPublicRows())
-  }
-
-  // Stale but cached → serve immediately and revalidate in the background, unless forced.
-  if (!force && sync) {
-    const cached = await readPublicRows()
-    trackBackgroundRefresh(`pulls:${owner}/${repo}`, revalidate())
-    return c.json(cached)
-  }
-
-  // force=true or no prior sync → block on a real GitHub fetch.
-  const refreshed = await revalidate()
-  if (!refreshed.ok) return respondError(c, refreshed.failure.status, refreshed.failure.error)
-  return c.json(refreshed.value)
+  const result = await serveThenRevalidate({
+    resource,
+    userId,
+    ttlMs: PULLS_STALE_AFTER_MS,
+    force: c.req.query('force') === 'true',
+    read,
+    refresh,
+  })
+  if (!result.ok) return respondError(c, result.failure.status, result.failure.error, result.failure.detail)
+  return c.json(result.value)
 })
 
 // Same public shape as toPublic, but mapped straight from a GitHub payload (closed path, no mirror

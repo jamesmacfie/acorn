@@ -11,9 +11,8 @@ import type { RouteResult } from './repoMirror'
 // Shared PR mirror helpers: the GraphQL detail mirror and the REST files mirror (SQLite rows +
 // on-disk patch blobs), plus their read-backs. Both the single-PR routes (pullDetail / pullFiles)
 // and the batch route (pullsBatch) read+write the same mirror tables, so the logic lives here
-// once to avoid drift. PR data is "fast-changing" (docs/caching.md) — freshness is a 45s TTL gate
-// in sync_state.
-export const STALE_AFTER_MS = 45_000
+// once to avoid drift. PR data is "fast-changing" (docs/caching.md) — freshness is a TTL gate in
+// sync_state (PULLS_STALE_AFTER_MS, server/sync/policy.ts).
 
 type Db = ReturnType<typeof getDb>
 export type PrKey = { userId: string; repoId: number; number: number }

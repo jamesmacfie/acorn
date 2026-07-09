@@ -20,10 +20,14 @@ import type { AppEnv } from '../middleware/auth'
 import { getUser } from '../middleware/requireUser'
 import { respondError } from '../respond'
 import { decryptSecret } from '../session'
+import { LINEAR_ISSUES_STALE_AFTER_MS } from '../sync/policy'
 import type { LinearActivity, LinearComment, LinearIssueDetail, LinearIssueSummary, LinearIssuesRequest, LinearIssuesResponse, LinearProject, LinearProjectIssue, LinearProjectIssuesResponse, LinearProjectsResponse } from '../../shared/api'
 
+// TTL centralized in server/sync/policy.ts. Linear's reads fan out across all connected
+// integrations with partial results and per-item (`issues.fetchedAt`) freshness, so they do NOT use
+// the serve-then-revalidate wrapper (inventories.md §2d) — the engine owns single-resource flow,
+// this owns multi-connection resolution.
 const PROVIDER = 'linear'
-const ISSUES_STALE_AFTER_MS = 600_000 // 10 min — tickets change slower than PRs; panel forces fresh
 
 type IntegrationRow = typeof schema.integrations.$inferSelect
 
@@ -176,7 +180,7 @@ export const linear = new Hono<AppEnv>()
     const fresh = new Set<string>()
     for (const row of cached) {
       byId.set(row.identifier, JSON.parse(row.data) as LinearIssueDetail)
-      if (row.fetchedAt + ISSUES_STALE_AFTER_MS > now) fresh.add(row.identifier)
+      if (row.fetchedAt + LINEAR_ISSUES_STALE_AFTER_MS > now) fresh.add(row.identifier)
     }
 
     let stale = identifiers.filter((id) => !fresh.has(id))
@@ -228,7 +232,7 @@ export const linear = new Hono<AppEnv>()
         .from(schema.issues)
         .where(and(eq(schema.issues.userId, user.login), eq(schema.issues.provider, PROVIDER), eq(schema.issues.identifier, identifier)))
       const row = cached[0]
-      if (row && row.fetchedAt + ISSUES_STALE_AFTER_MS > now) return c.json(JSON.parse(row.data) as LinearIssueDetail)
+      if (row && row.fetchedAt + LINEAR_ISSUES_STALE_AFTER_MS > now) return c.json(JSON.parse(row.data) as LinearIssueDetail)
     }
 
     const filter = issuesFilter([identifier])

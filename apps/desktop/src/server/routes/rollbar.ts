@@ -7,14 +7,17 @@ import { getUser } from '../middleware/requireUser'
 import { respondError } from '../respond'
 import { itemByCounterPath, itemsPath, levelName, rollbarData, rollbarFetch, type RollbarApiItem } from '../rollbar'
 import { decryptSecret } from '../session'
+import { ROLLBAR_ITEMS_STALE_AFTER_MS } from '../sync/policy'
 
 // /api/rollbar — the Rollbar Source's reads (docs/integrations.md): recent items per connection + one
 // item's detail, cached into the generic `issues` table (provider 'rollbar', identifier = the
 // visible counter) with serve-then-revalidate — ZERO new schema, the litmus test the Source
 // contract was built for.
 
+// TTL centralized in server/sync/policy.ts. This route keeps its own per-item freshness + fan-out
+// across connections with partial results, so it does NOT use the serve-then-revalidate wrapper
+// (inventories.md §2d) — it is a multi-connection blocking read, not serve-then-revalidate.
 const PROVIDER = 'rollbar'
-export const ITEMS_STALE_AFTER_MS = 120_000 // errors move fast; 2 min is fresh enough for browse
 
 type IntegrationRow = typeof schema.integrations.$inferSelect
 
@@ -62,7 +65,7 @@ export const rollbar = new Hono<AppEnv>()
         .select()
         .from(schema.issues)
         .where(and(eq(schema.issues.userId, user.login), eq(schema.issues.integrationId, row.id), eq(schema.issues.provider, PROVIDER)))
-      const freshEnough = cached.length > 0 && cached.every((r) => r.fetchedAt + ITEMS_STALE_AFTER_MS > now)
+      const freshEnough = cached.length > 0 && cached.every((r) => r.fetchedAt + ROLLBAR_ITEMS_STALE_AFTER_MS > now)
       if (freshEnough) {
         out.push(...cached.map((r) => JSON.parse(r.data) as RollbarItem))
         continue
@@ -106,7 +109,7 @@ export const rollbar = new Hono<AppEnv>()
         .from(schema.issues)
         .where(and(eq(schema.issues.userId, user.login), eq(schema.issues.integrationId, integrationId), eq(schema.issues.identifier, identifier)))
     )[0]
-    if (cached && cached.fetchedAt + ITEMS_STALE_AFTER_MS > now) return c.json(JSON.parse(cached.data) as RollbarItem)
+    if (cached && cached.fetchedAt + ROLLBAR_ITEMS_STALE_AFTER_MS > now) return c.json(JSON.parse(cached.data) as RollbarItem)
     const token = await decryptSecret(row.accessToken, c.env.SESSION_ENC_KEY)
     if (!token) return respondError(c, 403, 'rollbar_not_connected')
     try {

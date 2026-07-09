@@ -1,14 +1,16 @@
 import { and, eq } from 'drizzle-orm'
 import { Hono } from 'hono'
-import { trackBackgroundRefresh } from '../background'
+import type { PullDetail } from '../../shared/api'
 import { getDb, schema } from '../db'
 import { prResource } from '../db/resourceKeys'
 import { ghGraphQL, ghGraphQLResult } from '../github'
 import type { AppEnv } from '../middleware/auth'
 import { getUser } from '../middleware/requireUser'
 import { respondError } from '../respond'
-import { mirrorPr, PR_FRAGMENT, readComposite, STALE_AFTER_MS, type GqlPull } from './prMirror'
-import { resolveRepoForUser, type RouteResult } from './repoMirror'
+import { type Cached, type RefreshResult, serveThenRevalidate } from '../sync/engine'
+import { PULLS_STALE_AFTER_MS } from '../sync/policy'
+import { mirrorPr, PR_FRAGMENT, readComposite, type GqlPull } from './prMirror'
+import { resolveRepoForUser } from './repoMirror'
 
 // PR detail — the composite GraphQL read (docs/github-integration.md), the primary read for the
 // PR screen: PR + reviews + comments + checks in one round-trip. GraphQL has no ETag, so
@@ -36,16 +38,23 @@ export const pullDetail = new Hono<AppEnv>().get('/:owner/:repo/pulls/:number', 
   if (!resolved.ok) return respondError(c, resolved.failure.status, resolved.failure.error)
   const repoId = resolved.value.repoId
   const key = { userId, repoId, number }
+  const resource = prResource(repoId, number)
 
-  const [sync] = await db
-    .select()
-    .from(schema.syncState)
-    .where(and(eq(schema.syncState.userId, userId), eq(schema.syncState.resource, prResource(repoId, number))))
+  // Cold when never fetched (no sync row) OR the composite has no pull yet — both mean "nothing
+  // usable to serve, block on a refresh". `pull` is written atomically with the sync row by
+  // mirrorPr, so a fresh sync row always carries a pull; the null-pull case is the stale-empty one.
+  const read = async (): Promise<Cached<PullDetail> | null> => {
+    const [sync] = await db
+      .select()
+      .from(schema.syncState)
+      .where(and(eq(schema.syncState.userId, userId), eq(schema.syncState.resource, resource)))
+    if (!sync) return null
+    const composite = await readComposite(db, key)
+    if (!composite.pull) return null
+    return { data: composite, fetchedAt: sync.fetchedAt }
+  }
 
-  // Fresh → serve the mirror, no GraphQL call.
-  if (sync && sync.fetchedAt + STALE_AFTER_MS > Date.now()) return c.json(await readComposite(db, key))
-
-  const refresh = async (): Promise<RouteResult<Awaited<ReturnType<typeof readComposite>>>> => {
+  const refresh = async (): Promise<RefreshResult> => {
     const res = await ghGraphQL(user.token, COMPOSITE_QUERY, { owner, repo, number })
     const result = await ghGraphQLResult<{ repository?: { pullRequest?: GqlPull | null } }>(res)
     if (!result.ok) {
@@ -60,21 +69,10 @@ export const pullDetail = new Hono<AppEnv>().get('/:owner/:repo/pulls/:number', 
     if (!pr) return { ok: false, failure: { error: 'pull_not_found', status: 404 } }
 
     await mirrorPr(db, key, pr, Date.now())
-    return { ok: true, value: await readComposite(db, key) }
+    return { ok: true }
   }
 
-  if (sync) {
-    const cached = await readComposite(db, key)
-    if (cached.pull) {
-      trackBackgroundRefresh(`pull:${owner}/${repo}#${number}`, refresh())
-      return c.json(cached)
-    }
-  }
-
-  const refreshed = await refresh()
-  if (!refreshed.ok) {
-    const { error, status, detail } = refreshed.failure
-    return respondError(c, status, error, detail)
-  }
-  return c.json(refreshed.value)
+  const result = await serveThenRevalidate({ resource, userId, ttlMs: PULLS_STALE_AFTER_MS, read, refresh })
+  if (!result.ok) return respondError(c, result.failure.status, result.failure.error, result.failure.detail)
+  return c.json(result.value)
 })

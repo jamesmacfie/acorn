@@ -123,31 +123,37 @@ Unchecked mappers to fix, highest traffic first:
 
 ### 2d. Serve-then-revalidate copies + TTLs (Phase 2)
 
-State-machine sites to port: `pulls.ts:29-196` (decision block 178-195, ETag
-304 handling 82-91), `pullDetail.ts:23-79` (45/65-71/73-78),
-`pullFiles.ts:36-78` (60/69-73/75-77), `repos.ts:9-33` (21/24-27/30-32; POST
-/refresh force at 34-40), `pullsBatch.ts:19-111` (per-resource `isFresh`
-47-52). `linear.ts:156-242` and `rollbar.ts:49-121` are the variants that use
-`issues.fetchedAt` **instead of `sync_state`** — the Phase 2 engine must
-support that descriptor-supplied freshness backend while owning the shared
-flow. Per [implementation.md](./implementation.md) Phase 2, do **not** migrate
-them onto `sync_state` in this phase; that is a later data-model choice if
-per-item freshness proves insufficient.
+**✓ Consumed by Phase 2.** The four-branch flow now lives once in
+`server/sync/engine.ts` (`serveThenRevalidate` + the pure `decideSync`), which
+owns fresh/stale/cold branching, in-flight dedupe, and rate-limit backoff. The
+engine is store-agnostic: `read()` returns `{ data, fetchedAt } | null` (`null`
+is the single cold idiom), so the freshness backend stays opaque. ETag/304 stays
+in each caller's `refresh` (specific to the `sync_state` ETag store).
 
-TTL constants to centralize:
+Ported to the engine: `pulls.ts` (open list; ETag/304 + Flow B kept in
+`refresh`), `pullDetail.ts`, `pullFiles.ts`, `repos.ts` (+ **new** ETag
+revalidation via `refreshRepos`; POST /refresh now zeroes the `repos`
+`sync_state` row too). **Not** ported, with reason: `pullsBatch.ts` (multi-item
+prefetch, always blocks — no single response resource to serve stale) and
+`linear.ts` / `rollbar.ts` (multi-connection fan-out with partial results,
+per-item `issues.fetchedAt` freshness). Those keep their own flow but now share
+the centralized TTLs. Per [implementation.md](./implementation.md) Phase 2, the
+providers were **not** migrated onto `sync_state`.
 
-| Name | Value | Where | Exported |
-| --- | --- | --- | --- |
-| `STALE_AFTER_MS` | 45 s | `prMirror.ts:16` | yes |
-| `STALE_AFTER_MS` | 45 s | `pulls.ts:14` | **no — duplicate decl, prime dedupe target** |
-| `REPOS_STALE_AFTER_MS` | 300 s | `repoMirror.ts:8` | yes |
-| `ITEMS_STALE_AFTER_MS` | 120 s | `rollbar.ts:15` | yes |
-| `ISSUES_STALE_AFTER_MS` | 600 s | `linear.ts:24` | no |
+TTL constants centralized → `server/sync/policy.ts`:
+
+| Old name / site | New name (`server/sync/policy.ts`) | Value |
+| --- | --- | --- |
+| `STALE_AFTER_MS` (`prMirror.ts`) + duplicate (`pulls.ts`) | `PULLS_STALE_AFTER_MS` (deduped) | 45 s |
+| `REPOS_STALE_AFTER_MS` (`repoMirror.ts`) | `REPOS_STALE_AFTER_MS` | 300 s |
+| `ITEMS_STALE_AFTER_MS` (`rollbar.ts`) | `ROLLBAR_ITEMS_STALE_AFTER_MS` | 120 s |
+| `ISSUES_STALE_AFTER_MS` (`linear.ts`) | `LINEAR_ISSUES_STALE_AFTER_MS` | 600 s |
+| — (new) | `RATE_LIMIT_BACKOFF_MS` | 60 s |
 
 (Out of scope for the cache-policy module: `SESSION_TTL_SECONDS`,
-auth `STATE_TTL_SECONDS`.) `sync_state` keys are already centralized in
-`db/resourceKeys.ts` (`pulls:` / `pr:` / `files:` prefixes); `etag` is only
-ever populated by `pulls.ts` — the repos list leaves ETag savings on the table.
+auth `STATE_TTL_SECONDS`.) `sync_state` keys stay centralized in
+`db/resourceKeys.ts` (now `repos` / `pulls:` / `pr:` / `files:` prefixes); the
+repos list now populates `etag` too (was the ETag saving left on the table).
 
 ### 2e. Route test coverage (testing track)
 
