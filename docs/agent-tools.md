@@ -63,8 +63,10 @@ and per-tool toggles, persisted as ONE prefs slice under `agentTools.perms`
 toggle and is narrowed only per tool; write/execute have tier masters with mixed state. The filter is
 consulted by every projection: turning a tier or tool off removes it from `tools/list` **and** makes
 a direct harness call `404` (a hidden tool is *gone*, not forbidden — the surface must not leak that
-it exists). These permissions apply **before** any workflow/profile tool ceiling — Phase 8 can only
-narrow the set further, never widen it.
+it exists). Workflow/profile ceilings now ride the same manifest/call projection: a headless MCP
+process sends its encoded run/step `allow`/`maxRisk` cap, and the route intersects it with these
+global preferences. Either filter can remove a tool; a workflow can never re-enable one the user
+disabled.
 
 ## 4. Context sections
 

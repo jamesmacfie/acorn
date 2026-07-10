@@ -18,7 +18,7 @@ import { acceptProposal, generateMemoryProposals, rejectProposal } from './memor
 import { MemoryProposalStore } from './memoryProposals'
 import { NotesStore, type NoteKind } from './notes'
 import { broadcastWorkflowNotice } from './notify'
-import { BUILTIN_PROFILES, profileAvailable, resolveCommand, type ProfileDef } from './profiles'
+import { listProfileDefs, profileAvailable, resolveCommand, type ProfileDef } from './profiles'
 import { isDir, loadTask, workspaceConfigRow } from './taskWorktree'
 import { buildSessionEnv } from './terminalUtils'
 
@@ -46,7 +46,7 @@ export type Knowledge = {
 // auto-generation for Codex-only users (docs/notes-and-memory.md).
 export function memoryReviewProfile(): ProfileDef | null {
   return (
-    BUILTIN_PROFILES.find((p) => p.kind === 'agent' && profileAvailable(p) && buildHeadlessArgv(p.id, resolveCommand(p), { prompt: '' }) !== null) ?? null
+    listProfileDefs().find((p) => p.kind === 'agent' && profileAvailable(p) && buildHeadlessArgv(p.id, resolveCommand(p), { prompt: '' }) !== null) ?? null
   )
 }
 

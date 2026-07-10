@@ -1,8 +1,8 @@
 // Workflow wiring (docs/next 14 P2–P5), split out of terminal.ts: constructs the main-process
 // WorkflowRunner over the fake-able headless runner with its real deps — handoff notes, the
 // loopback context assembler, a re-derived checks-green policy, gate/run-done notices — and wires
-// the WorkflowBridge behind the HTTP routes (server/routes/workflow.ts). The gate/run-done notice
-// PUSH still rides IPC (notify.ts) until the WebSocket lands (Phase 3 slice 6).
+// the WorkflowBridge behind the HTTP routes (server/routes/workflow.ts). Gate/run-done notices,
+// status invalidations, and live parsed step events share the authenticated WebSocket.
 import { randomUUID } from 'node:crypto'
 import { homedir } from 'node:os'
 import { and, eq, max } from 'drizzle-orm'
@@ -11,16 +11,19 @@ import { formatContextBlock } from '../shared/contextBlock'
 import type { AppDatabase } from '../server/db'
 import { schema } from '../server/db'
 import { setWorkflowBridge } from '../server/routes/workflow'
+import { DEFAULT_PROFILE_ID } from './agentProfiles'
 import { buildHeadlessArgv, runHeadless } from './headless'
 import type { NotesStore } from './notes'
-import { broadcastStatus, broadcastWorkflowNotice } from './notify'
-import { getProfile, resolveCommand } from './profiles'
+import { broadcastStatus, broadcastWorkflowNotice, broadcastWorkflowStepEvent } from './notify'
+import { getProfile, requireProfile, resolveCommand } from './profiles'
 import { getRepoPath } from './repoPaths'
 import type { RuntimeService } from './runtime'
 import { isDir, loadTask, resolveTaskCwd } from './taskWorktree'
 import { buildSessionEnv } from './terminalUtils'
 import { loadWorkflowFiles } from './workflowFiles'
 import { WorkflowRunner, type WorkflowDef } from './workflowRunner'
+import { encodeToolCeiling } from './workflowTools'
+import { WorkflowValidationError } from './workflowValidation'
 
 export type WorkflowWiringDeps = {
   runtime: RuntimeService
@@ -31,9 +34,13 @@ export type WorkflowWiringDeps = {
   // on failure). workflow:start/gate await it: reconcile() sweeps EVERY 'running' step to
   // 'pending', so a run started before the sweep would have its live step re-queued.
   reconciled: Promise<void>
+  memoryReviewTrigger?: (taskId: string, transcriptTail: string) => Promise<void>
 }
 
-export async function registerWorkflowIpc(db: AppDatabase, { runtime, notesStore, internalApiEnv, reconciled }: WorkflowWiringDeps): Promise<WorkflowRunner> {
+export async function registerWorkflowIpc(
+  db: AppDatabase,
+  { runtime, notesStore, internalApiEnv, reconciled, memoryReviewTrigger }: WorkflowWiringDeps,
+): Promise<WorkflowRunner> {
   const failingChecksFor = async (taskId: string): Promise<string | null> => {
     const t = await loadTask(db, taskId)
     if (!t || t.pullNumber == null) return null
@@ -54,23 +61,33 @@ export async function registerWorkflowIpc(db: AppDatabase, { runtime, notesStore
       const mapped = t ? await getRepoPath(db, t.repoOwner, t.repoName) : null
       const baseCheckout = mapped?.path && isDir(mapped.path) ? mapped.path : undefined
       const { cwd } = t ? await resolveTaskCwd(db, t, baseCheckout) : { cwd: homedir() }
-      const profile = getProfile(def.profileId)
-      const argv = buildHeadlessArgv(profile.id, resolveCommand(profile), opts)
-      if (!argv) return { status: 'error', exitCode: null, capture: { result: null, structuredOutput: null, sessionId: null, costUsd: null, events: [] }, stderrTail: `Profile '${profile.id}' has no headless mode.` }
+      const profile = requireProfile(def.profileId ?? DEFAULT_PROFILE_ID)
+      const argv = opts.mode === 'ai' ? profile.aiArgv?.(resolveCommand(profile), opts) : buildHeadlessArgv(profile.id, resolveCommand(profile), opts)
+      if (!argv) {
+        return {
+          status: 'error',
+          exitCode: null,
+          capture: { result: null, structuredOutput: null, sessionId: null, costUsd: null, events: [] },
+          stderrTail: `Profile '${profile.id}' has no ${opts.mode === 'ai' ? 'one-shot structured' : 'headless'} mode.`,
+        }
+      }
       const env = buildSessionEnv({
         taskId,
         cwd,
         task: t ? { repoOwner: t.repoOwner, repoName: t.repoName, branch: t.branch, title: t.title } : null,
-        env: internalApiEnv,
+        env: { ...internalApiEnv, ACORN_TOOL_CEILING: encodeToolCeiling(opts.tools ?? {}) },
       })
-      return runHeadless(argv, { cwd, env })
+      return runHeadless(argv, { cwd, env, signal: opts.signal, onEvent: opts.onEvent, adapter: profile.streamJson })
     },
-    writeHandoff: async (taskId, stepName, body) => {
-      await notesStore.append({ scope: 'task', taskId }, 'workflow-handoffs', `## ${stepName}\n${body}\n`, { author: 'workflow', originTaskId: taskId })
+    writeHandoff: async (taskId, runId, stepName, body) => {
+      await notesStore.append({ scope: 'task', taskId }, `workflow-handoffs-${runId}`, `## ${stepName}\n${body}\n`, { author: 'workflow', originTaskId: taskId })
     },
-    assembleContext: async (taskId) => {
+    finishHandoffs: (taskId, runId) => notesStore.setIncluded({ scope: 'task', taskId }, `workflow-handoffs-${runId}`, false),
+    assembleContext: async (taskId, runId) => {
       try {
-        const res = await fetch(`${internalApiEnv.ACORN_API_URL}/api/tasks/${taskId}/context`, { headers: { 'x-acorn-internal': internalApiEnv.ACORN_API_TOKEN ?? '' } })
+        const res = await fetch(`${internalApiEnv.ACORN_API_URL}/api/tasks/${taskId}/context?workflowRunId=${encodeURIComponent(runId)}`, {
+          headers: { 'x-acorn-internal': internalApiEnv.ACORN_API_TOKEN ?? '' },
+        })
         if (!res.ok) return ''
         return formatContextBlock((await res.json()) as Parameters<typeof formatContextBlock>[0])
       } catch {
@@ -88,6 +105,13 @@ export async function registerWorkflowIpc(db: AppDatabase, { runtime, notesStore
     },
     failingChecks: failingChecksFor,
     notify: broadcastWorkflowNotice,
+    statusChanged: broadcastStatus,
+    emitStepEvent: broadcastWorkflowStepEvent,
+    onRunTerminal: async (taskId, runId) => {
+      if (!memoryReviewTrigger) return
+      const handoff = await notesStore.read({ scope: 'task', taskId }, `workflow-handoffs-${runId}`).catch(() => null)
+      await memoryReviewTrigger(taskId, handoff?.body ?? `Workflow ${runId} reached a terminal state.`)
+    },
     startRunTarget: async (taskId, targetId) => {
       const started = await runtime.start(taskId, targetId)
       if (!started.ok) return { ok: false }
@@ -123,6 +147,10 @@ export async function registerWorkflowIpc(db: AppDatabase, { runtime, notesStore
       broadcastStatus()
       return id
     },
+    cancelChildTask: async (taskId) => {
+      await db.update(schema.tasks).set({ status: 'cancelled', updatedAt: Date.now() }).where(eq(schema.tasks.id, taskId))
+      broadcastStatus()
+    },
   })
 
   setWorkflowBridge({
@@ -133,22 +161,44 @@ export async function registerWorkflowIpc(db: AppDatabase, { runtime, notesStore
       if (!t) return { workflows: [], errors: [] }
       const mapped = await getRepoPath(db, t.repoOwner, t.repoName)
       const repoDir = t.worktreePath && isDir(t.worktreePath) ? t.worktreePath : mapped?.path && isDir(mapped.path) ? mapped.path : null
-      return loadWorkflowFiles(repoDir, homedir())
+      return loadWorkflowFiles(repoDir, homedir(), workflowRunner.validationCatalog())
     },
     start: async (taskId, def) => {
       await reconciled // don't start a run the restart sweep would immediately re-queue
-      return { runId: await workflowRunner.start(taskId, def as WorkflowDef) }
+      try {
+        return { runId: await workflowRunner.start(taskId, def as WorkflowDef) }
+      } catch (error) {
+        return { error: error instanceof WorkflowValidationError ? error.message : 'Failed to start workflow.' }
+      }
     },
     runs: async (taskId) => {
       const rows = await db.select().from(schema.workflowRuns).where(eq(schema.workflowRuns.taskId, taskId))
       return rows.sort((a, b) => b.createdAt - a.createdAt)
     },
-    steps: (runId) => workflowRunner.steps(runId),
+    steps: async (runId) =>
+      (await workflowRunner.steps(runId)).map((step) => {
+        if (!step.sessionId || !step.profileId || /[^A-Za-z0-9_-]/.test(step.sessionId)) return step
+        const profile = getProfile(step.profileId)
+        if (profile.id !== step.profileId) return { ...step, resumeCommand: null }
+        const resume = profile.resumeArgv?.(resolveCommand(profile), step.sessionId)
+        return { ...step, resumeCommand: resume ? [resume.file, ...resume.args].join(' ') : null }
+      }),
     gate: async (runId, stepId, approved) => {
       await reconciled // an approval resumes a step the restart sweep could otherwise clobber
       await workflowRunner.resolveGate(runId, stepId, approved)
       return { ok: true }
     },
+    cancel: async (runId) => {
+      await reconciled
+      await workflowRunner.cancelRun(runId)
+      return { ok: true }
+    },
+    kill: async (runId, stepId) => {
+      await reconciled
+      await workflowRunner.killStep(runId, stepId)
+      return { ok: true }
+    },
+    pollTriggers: () => workflowRunner.pollTriggers(),
   })
 
   // Note: workflowRunner.reconcile() (resume/fail-cleanly across app restarts, 14 §checkpoint) is

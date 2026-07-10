@@ -138,7 +138,7 @@ stored. Columns (`apps/desktop/src/server/db/schema.ts:341`):
 | `branch` | The branch this task works on. |
 | `worktreePath` | Path to its git worktree; **null until a terminal is first opened** (Flow C). |
 | `pullNumber` | Linked PR number; **null for local-first tasks until a PR is inherited** (Flow B). |
-| `status` | `active` \| `archived`. |
+| `status` | `active` \| `archived`; workflow-created child tasks may be `cancelled`. |
 | `parentId` | Task-tree lineage — set on fan-out children; null = root (workflow feature, design-stage). |
 | `sort` | Rail ordering seed, like `pinned_repos.sort`. **Not** the visible order (see `rail_order` below). |
 | `createdAt`, `updatedAt`, `archivedAt` | Epoch **milliseconds**. `archivedAt` is set on archive; the row is kept for history/teardown audit. |
@@ -337,4 +337,3 @@ Shared: `apps/desktop/src/shared/{workspaceIdentity.ts,branch.ts}`. Schema:
 [`integrations.md`](./integrations.md) (Linear/Rollbar connections) ·
 [`data-layer.md`](./data-layer.md) · [`api-reference.md`](./api-reference.md) ·
 [`workspaces/`](./workspaces/) (design history).
-

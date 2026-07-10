@@ -6,7 +6,7 @@ import { refreshSessions, sessions } from '../terminal/sessions'
 import { terminalApi, type WorkflowStepRow } from '../terminal/terminalClient'
 import { workflowApi } from './workflowClient'
 import { setTerminalOpen } from '../tasks/tasks'
-import { buildRoster, resumeCommandFor, stepFeed, type RosterRow } from './model'
+import { buildRoster, feedFromEvents, resumeCommandFor, stepFeed, type RosterRow, type StreamEvent } from './model'
 import './agents-panel.css'
 
 const STATE_GLYPH: Record<string, string> = {
@@ -30,6 +30,8 @@ export default function AgentsPanel(props: { task: Task; onClose: () => void }) 
   const [selected, setSelected] = createSignal<string | null>(null)
   const [launcherOpen, setLauncherOpen] = createSignal(false)
   const [actionError, setActionError] = createSignal('')
+  const [liveEvents, setLiveEvents] = createSignal<Record<string, StreamEvent[]>>({})
+  const [clock, setClock] = createSignal(Date.now())
 
   const [workflowData, { refetch }] = createResource(
     () => props.task.id,
@@ -41,12 +43,24 @@ export default function AgentsPanel(props: { task: Task; onClose: () => void }) 
     },
     { initialValue: { runs: [], steps: [] } },
   )
-  // Read-driven refresh: session-status pings + a slow tick while the panel is open.
+  // Push-driven refresh: status transitions and live stream events share the authenticated WS.
   onMount(() => {
-    const off = api?.onStatus(() => void refetch())
-    const timer = setInterval(() => void refetch(), 3000)
+    const off = api?.onStatus(() =>
+      void Promise.resolve(refetch()).then(() => {
+        // Live buffers only matter while a step is running — drop finished/foreign entries.
+        const running = new Set(workflowData().steps.filter((s) => s.status === 'running').map((s) => s.id))
+        setLiveEvents((current) => Object.fromEntries(Object.entries(current).filter(([stepId]) => running.has(stepId))))
+      }),
+    )
+    const offEvent = api?.workflow.onStepEvent(({ runId, stepId, event }) => {
+      if (!event || typeof event !== 'object') return
+      if (!workflowData().runs.some((run) => run.id === runId)) return // other tasks' runs share the WS
+      setLiveEvents((current) => ({ ...current, [stepId]: [...(current[stepId] ?? []), event as StreamEvent].slice(-100) }))
+    })
+    const timer = setInterval(() => setClock(Date.now()), 5000)
     onCleanup(() => {
       off?.()
+      offEvent?.()
       clearInterval(timer)
     })
   })
@@ -85,6 +99,27 @@ export default function AgentsPanel(props: { task: Task; onClose: () => void }) 
     await refetch()
   }
 
+  async function cancelRun(row: Extract<RosterRow, { kind: 'step' }>) {
+    if (!row.run) return
+    setActionError('')
+    try {
+      await workflowApi.cancel(row.run.id)
+      await refetch()
+    } catch (error) {
+      setActionError(error instanceof Error ? error.message : 'Failed to cancel workflow.')
+    }
+  }
+
+  async function killStep(row: Extract<RosterRow, { kind: 'step' }>) {
+    setActionError('')
+    try {
+      await workflowApi.kill(row.step.runId, row.step.id)
+      await refetch()
+    } catch (error) {
+      setActionError(error instanceof Error ? error.message : 'Failed to kill step.')
+    }
+  }
+
   return (
     <Portal>
       <aside class="agents-panel">
@@ -115,7 +150,7 @@ export default function AgentsPanel(props: { task: Task; onClose: () => void }) 
                   <span class="agents-dot" data-state={row.state}>{STATE_GLYPH[row.state] ?? '·'}</span>
                   <span class="agents-row-title">{row.title}</span>
                   <span class="agents-row-state muted">
-                    {row.state}
+                    {row.kind === 'step' ? row.step.status : row.state}
                     {row.kind === 'step' && row.step.costUsd != null ? ` $${row.step.costUsd.toFixed(2)}` : ''}
                   </span>
                 </button>
@@ -125,53 +160,77 @@ export default function AgentsPanel(props: { task: Task; onClose: () => void }) 
         </ul>
 
         <Show when={current()}>
-          {(row) => (
-            <div class="agents-detail">
-              <div class="agents-detail-head">
-                <span class="agents-row-title">{row().title}</span>
-                <button type="button" class="overlay-btn" onClick={() => void openInTerminal(row())}>
-                  {row().kind === 'session' ? 'show terminal' : 'open in terminal'}
-                </button>
-              </div>
-              <Show when={row().kind === 'step' && row().state !== 'unknown'}>
-                <Show
-                  when={(row() as Extract<RosterRow, { kind: 'step' }>).gate}
-                  fallback={
-                    <ul class="agents-feed">
-                      <For
-                        each={stepFeed((row() as Extract<RosterRow, { kind: 'step' }>).step).items}
-                        fallback={<li class="muted">No captured activity{(row() as Extract<RosterRow, { kind: 'step' }>).step.status === 'running' ? ' yet — running…' : '.'}</li>}
-                      >
-                        {(item) => (
-                          <li class="agents-feed-item" data-kind={item.kind}>
-                            <span class="agents-feed-glyph">
-                              {item.kind === 'tool_call' ? '▸' : item.kind === 'tool_result' ? '◂' : item.kind === 'result' ? '■' : item.kind === 'thinking' ? '…' : '·'}
-                            </span>
-                            <span class="agents-feed-text">
-                              {item.text}
-                              {item.kind === 'result' && item.costUsd != null ? ` ($${item.costUsd.toFixed(4)})` : ''}
-                            </span>
-                          </li>
-                        )}
-                      </For>
-                    </ul>
-                  }
-                >
-                  {/* Gate prompt in the feed (15 P2 / 14): approve/reject → the 6.3 IPC. */}
-                  <div class="agents-gate">
-                    <p>This workflow is waiting at a human gate: <strong>{(row() as Extract<RosterRow, { kind: 'step' }>).step.name}</strong></p>
-                    <div class="agents-gate-actions">
-                      <button type="button" class="overlay-btn" onClick={() => void resolveGate(row(), true)}>Approve</button>
-                      <button type="button" class="overlay-btn agents-reject" onClick={() => void resolveGate(row(), false)}>Reject</button>
-                    </div>
+          {(row) => {
+            // Narrow once; every step-only branch below is guarded by a kind === 'step' check.
+            const stepRow = () => row() as Extract<RosterRow, { kind: 'step' }>
+            return (
+              <div class="agents-detail">
+                <div class="agents-detail-head">
+                  <span class="agents-row-title">{row().title}</span>
+                  <div class="agents-gate-actions">
+                    <Show when={row().kind === 'step' && stepRow().step.status === 'running'}>
+                      <button type="button" class="overlay-btn agents-reject" onClick={() => void killStep(stepRow())}>kill step</button>
+                    </Show>
+                    <Show when={row().kind === 'step' && ['running', 'gated'].includes(stepRow().run?.status ?? '')}>
+                      <button type="button" class="overlay-btn agents-reject" onClick={() => void cancelRun(stepRow())}>cancel run</button>
+                    </Show>
+                    <button type="button" class="overlay-btn" onClick={() => void openInTerminal(row())}>
+                      {row().kind === 'session' ? 'show terminal' : 'open in terminal'}
+                    </button>
                   </div>
+                </div>
+                <Show when={row().kind === 'step' && row().state !== 'unknown'}>
+                  <Show
+                    when={stepRow().gate}
+                    fallback={
+                      <ul class="agents-feed">
+                        <For
+                          each={[
+                            ...stepFeed(stepRow().step).items,
+                            ...(stepRow().step.status === 'running' ? feedFromEvents(liveEvents()[stepRow().step.id] ?? []) : []),
+                          ]}
+                          fallback={
+                            <li class="muted">
+                              No captured activity
+                              {stepRow().step.status === 'running'
+                                ? clock() - stepRow().step.updatedAt > 30_000
+                                  ? ' — no output for 30 seconds.'
+                                  : ' yet — running…'
+                                : '.'}
+                            </li>
+                          }
+                        >
+                          {(item) => (
+                            <li class="agents-feed-item" data-kind={item.kind}>
+                              <span class="agents-feed-glyph">
+                                {item.kind === 'tool_call' ? '▸' : item.kind === 'tool_result' ? '◂' : item.kind === 'result' ? '■' : item.kind === 'thinking' ? '…' : '·'}
+                              </span>
+                              <span class="agents-feed-text">
+                                {item.text}
+                                {item.kind === 'result' && item.costUsd != null ? ` ($${item.costUsd.toFixed(4)})` : ''}
+                              </span>
+                            </li>
+                          )}
+                        </For>
+                      </ul>
+                    }
+                  >
+                    {/* Gate prompt in the feed (15 P2 / 14): approve/reject → the 6.3 IPC. */}
+                    <div class="agents-gate">
+                      <p>This workflow is waiting at a human gate: <strong>{stepRow().step.name}</strong></p>
+                      <div class="agents-gate-actions">
+                        <button type="button" class="overlay-btn" onClick={() => void resolveGate(row(), true)}>Approve</button>
+                        <button type="button" class="overlay-btn agents-reject" onClick={() => void resolveGate(row(), false)}>Reject</button>
+                      </div>
+                    </div>
+                  </Show>
                 </Show>
-              </Show>
-              <Show when={row().kind === 'session'}>
-                <p class="muted agents-hint">Interactive session — it lives in the terminal drawer (raw TUI stays the escape hatch).</p>
-              </Show>
-            </div>
-          )}
+                <Show when={row().kind === 'session'}>
+                  <p class="muted agents-hint">Interactive session — it lives in the terminal drawer (raw TUI stays the escape hatch).</p>
+                </Show>
+              </div>
+            )
+          }}
         </Show>
       </aside>
     </Portal>

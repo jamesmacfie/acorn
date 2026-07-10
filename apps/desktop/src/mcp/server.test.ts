@@ -84,7 +84,7 @@ const toolText = (res: { result?: unknown }): unknown => JSON.parse((res.result 
 describe('acorn MCP server projects the agent-tool registry over stdio (docs/agent-tools.md)', () => {
   let stub: Server
   let port: number
-  const posts: { url: string; body: unknown; internal: string; session: string }[] = []
+  const posts: { url: string; body: unknown; internal: string; session: string; ceiling: string }[] = []
 
   beforeAll(async () => {
     stub = createServer((req, res) => {
@@ -97,7 +97,13 @@ describe('acorn MCP server projects the agent-tool registry over stdio (docs/age
         let raw = ''
         req.on('data', (c) => (raw += c))
         req.on('end', () => {
-          posts.push({ url, body: raw ? JSON.parse(raw) : null, internal: String(req.headers['x-acorn-internal'] ?? ''), session: String(req.headers['x-acorn-session-id'] ?? '') })
+          posts.push({
+            url,
+            body: raw ? JSON.parse(raw) : null,
+            internal: String(req.headers['x-acorn-internal'] ?? ''),
+            session: String(req.headers['x-acorn-session-id'] ?? ''),
+            ceiling: String(req.headers['x-acorn-tool-ceiling'] ?? ''),
+          })
           if (url.endsWith('/tools/task_current')) return json({ repo: 'acme/api', branch: 'fix/null-token', pullNumber: 813, links: [{ provider: 'linear' }] })
           json({ ok: true })
         })
@@ -114,7 +120,13 @@ describe('acorn MCP server projects the agent-tool registry over stdio (docs/age
   afterAll(() => stub.close())
 
   it('tools/list mirrors the manifest; tools/call proxies args with bearer + session header', async () => {
-    const client = new McpClient({ ACORN_TASK_ID: 't1', ACORN_API_URL: `http://127.0.0.1:${port}`, ACORN_API_TOKEN: 'internal-token', ACORN_SESSION_ID: 'sess-42' })
+    const client = new McpClient({
+      ACORN_TASK_ID: 't1',
+      ACORN_API_URL: `http://127.0.0.1:${port}`,
+      ACORN_API_TOKEN: 'internal-token',
+      ACORN_SESSION_ID: 'sess-42',
+      ACORN_TOOL_CEILING: 'encoded-scope',
+    })
     try {
       await client.init()
 
@@ -133,6 +145,7 @@ describe('acorn MCP server projects the agent-tool registry over stdio (docs/age
       expect(post?.body).toEqual({ slug: 'plan', text: 'Done.' })
       expect(post?.internal).toBe('internal-token')
       expect(post?.session).toBe('sess-42')
+      expect(post?.ceiling).toBe('encoded-scope')
     } finally {
       client.kill()
     }

@@ -15,7 +15,7 @@ import {
   terminalTaskStatusesRoute,
 } from '../../../shared/api'
 import { readJson, writeJson } from '../../apiClient'
-import { wsAttach, wsOnNotice, wsOnStatus, wsWrite } from './wsClient'
+import { wsAttach, wsOnNotice, wsOnStatus, wsOnWorkflowStepEvent, wsWrite } from './wsClient'
 
 export type TerminalApi = {
   list(): Promise<TerminalSession[]>
@@ -48,6 +48,7 @@ export type TerminalApi = {
   // Phase 3; only the gate/run-done notice PUSH stays on the bridge until the WebSocket lands.
   workflow: {
     onNotice(cb: (n: { taskId: string; kind: 'gate' | 'run-done'; title: string }) => void): () => void
+    onStepEvent(cb: (event: { runId: string; stepId: string; event: unknown }) => void): () => void
   }
 }
 
@@ -66,7 +67,7 @@ export type WorkflowRunRow = {
   id: string
   taskId: string
   name: string
-  status: 'running' | 'gated' | 'done' | 'failed' | 'safety-rail'
+  status: 'running' | 'gated' | 'cancelling' | 'done' | 'failed' | 'safety-rail' | 'cancelled'
   posture: string
   error: string | null
   createdAt: number
@@ -81,7 +82,7 @@ export type WorkflowStepRow = {
   mode: string
   profileId: string | null
   model: string | null
-  status: 'pending' | 'running' | 'waiting-gate' | 'done' | 'failed' | 'skipped'
+  status: 'pending' | 'running' | 'waiting-gate' | 'done' | 'failed' | 'skipped' | 'safety-rail' | 'cancelled'
   resultJson: string | null
   structuredJson: string | null
   sessionId: string | null
@@ -90,6 +91,7 @@ export type WorkflowStepRow = {
   error: string | null
   createdAt: number
   updatedAt: number
+  resumeCommand?: string | null
 }
 
 // What the preload `window.acorn.terminal` bridge exposes AFTER Phase 3: only the native folder
@@ -155,6 +157,6 @@ export const terminalApi = (): TerminalApi | null => {
       useCheckout: (id) => post<{ result: { worktreePath: string; branch: string } | null }>(taskUseCheckoutRoute(id)).then((r) => r.result),
       statuses: () => readJson<TaskStatus[]>(terminalTaskStatusesRoute),
     },
-    workflow: { onNotice: wsOnNotice },
+    workflow: { onNotice: wsOnNotice, onStepEvent: wsOnWorkflowStepEvent },
   }
 }

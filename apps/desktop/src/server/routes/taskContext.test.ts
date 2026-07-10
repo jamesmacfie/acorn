@@ -155,6 +155,17 @@ describe('GET /api/tasks/:id/context (docs/next 11 §C)', () => {
     expect(ctx.memory).toEqual([{ name: 'auth-conventions', description: 'how auth flows work' }])
   })
 
+  it('gives workflow assembly only its own run-scoped handoff note', async () => {
+    notesSource = async () => [
+      { slug: 'human-plan', scope: 'task', title: 'human plan', kind: 'plan', body: 'keep me' },
+      { slug: 'workflow-handoffs-run-a', scope: 'task', title: 'run a', kind: 'handoff', body: 'current output' },
+      { slug: 'workflow-handoffs-run-b', scope: 'task', title: 'run b', kind: 'handoff', body: 'other run output' },
+    ]
+    const ctx = await fetchCtx('?include=notes&workflowRunId=run-a')
+    expect(ctx.notes.map((note) => note.slug)).toEqual(['human-plan', 'workflow-handoffs-run-a'])
+    expect(ctx.sections[0].compact).not.toContain('other run output')
+  })
+
   it('workspace notes ride the assembler once the 09 P2 source is wired (real NotesStore)', async () => {
     const { mkdtempSync, rmSync } = await import('node:fs')
     const { tmpdir } = await import('node:os')

@@ -15,3 +15,7 @@ export function broadcastWorkflowNotice(taskId: string, kind: 'gate' | 'run-done
   wsBroadcast({ channel: 'workflow:notice', notice: { taskId, kind, title } })
   broadcastStatus()
 }
+
+export function broadcastWorkflowStepEvent(runId: string, stepId: string, event: unknown): void {
+  wsBroadcast({ channel: 'workflow:step:event', runId, stepId, event })
+}

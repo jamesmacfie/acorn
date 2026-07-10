@@ -198,7 +198,7 @@ export type Task = {
   branch: string
   worktreePath: string | null
   pullNumber: number | null
-  status: 'active' | 'archived'
+  status: 'active' | 'archived' | 'cancelled'
   parentId: string | null // task tree (docs/next 14 P4): fan-out children point at their root
   sort: number
   links: TaskLink[]
@@ -297,6 +297,9 @@ export const workflowStartRoute = (taskId: string) => `/api/tasks/${taskId}/work
 export const workflowRunsRoute = (taskId: string) => `/api/tasks/${taskId}/workflows/runs`
 export const workflowStepsRoute = (runId: string) => `/api/workflows/runs/${runId}/steps`
 export const workflowGateRoute = (runId: string) => `/api/workflows/runs/${runId}/gate`
+export const workflowCancelRoute = (runId: string) => `/api/workflows/runs/${runId}/cancel`
+export const workflowKillRoute = (runId: string) => `/api/workflows/runs/${runId}/kill`
+export const workflowTriggerPollRoute = '/api/workflows/triggers/poll'
 
 // Local-changes review (docs/panes.md): working-tree status/diff/blob + stage/commit/discard/push.
 // Was the `local:*` IPC channels (Phase 3).

@@ -21,4 +21,4 @@ export type WsServerFrame =
   | { channel: 'term:out'; id: string; msg: ServerMsg }
   | { channel: 'term:status' }
   | { channel: 'workflow:notice'; notice: { taskId: string; kind: 'gate' | 'run-done'; title: string } }
-  | { channel: 'workflow:step:event'; runId: string; event: unknown } // reserved (agent-runtime.md §3.2)
+  | { channel: 'workflow:step:event'; runId: string; stepId: string; event: unknown }

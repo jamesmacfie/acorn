@@ -33,7 +33,7 @@ import { getProfile, listProfiles, resolveCommand, tmuxAvailable } from './profi
 import { getRepoPath, setRepoPath, setRunTargets } from './repoPaths'
 import { fileURLToPath } from 'node:url'
 import { inspectMcpConfig, MCP_CANDIDATES, STARTER_MCP_JSON, type McpServerSummary } from '../shared/mcp'
-import { launcherSpec, registerAcornMcp, resolveMcpEntry, serverName, type AgentFlavour } from './mcpRegister'
+import { launcherSpec, resolveMcpEntry, serverName } from './mcpRegister'
 import { broadcastStatus } from './notify'
 import type { RunSessionGlue } from './runIpc'
 import {
@@ -362,8 +362,7 @@ async function spawnOne(
   // Auto-register the acorn MCP server with this agent's CLI before it launches, so the current
   // task's tools are always available — no manual "Register" click. Idempotent (remove-then-add),
   // failures (CLI missing) are swallowed. Awaited so the agent sees it at startup.
-  const mcpFlavour = PROFILE_MCP_FLAVOUR[profile.id]
-  if (mcpFlavour) await registerAcornMcp(mcpFlavour, mcpName(), mcpLauncher()).catch(() => undefined)
+  if (profile.mcpRegistration) await profile.mcpRegistration(mcpName(), mcpLauncher()).catch(() => undefined)
 
   let pty: IPty
   if (backend === 'tmux') {
@@ -382,12 +381,10 @@ async function spawnOne(
   return meta
 }
 
-// acorn MCP server: the launcher + build-flavored name (dev vs prod), and which agent profiles get
-// it auto-registered when their terminal spawns (docs/mcp.md). Module-level so both spawnOne and
-// the ipc handlers share them.
+// acorn MCP server launcher + build-flavored name. Whether/how a CLI registers it is declared by
+// that profile contribution rather than a second profile-id lookup table.
 const mcpName = () => serverName(!process.defaultApp && !process.env.ELECTRON_IS_DEV)
 const mcpLauncher = () => launcherSpec(process.execPath, resolveMcpEntry(dirname(fileURLToPath(import.meta.url))), mcpName())
-const PROFILE_MCP_FLAVOUR: Record<string, AgentFlavour> = { 'claude-code': 'claude', codex: 'codex' }
 
 // Killing a tmux session's attach PTY only *detaches* it — the session keeps running. To actually
 // stop a tmux agent we must kill the tmux session itself (which then EOFs the PTY → onExit).

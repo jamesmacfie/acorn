@@ -15,6 +15,7 @@ import { noticeKindRegistry } from './registries/notices'
 import { noticeKindContributions } from './features/notifications/kindContributions'
 import { pollerRegistry } from './registries/pollers'
 import { taskStatusPollerContribution } from './features/tasks/taskStatus'
+import { workflowTriggerPollerContribution } from './features/agents/triggerPoller'
 import { uiSlotRegistry } from './registries/uiSlots'
 import { shellSlotContributions } from './features/shell/slotContributions'
 import { persistedStateRegistry } from './persistence/persistedState'
@@ -39,6 +40,7 @@ for (const page of settingsPageContributions) settingsRegistry.register(page)
 activatePreviewEvents()
 for (const kind of noticeKindContributions) noticeKindRegistry.register(kind)
 pollerRegistry.register(taskStatusPollerContribution)
+pollerRegistry.register(workflowTriggerPollerContribution)
 for (const contribution of shellSlotContributions) uiSlotRegistry.register(contribution)
 for (const slice of [...persistedFeatureSlices, ...directPreferenceSlices]) persistedStateRegistry.register(slice)
 activateScopedStateEviction()

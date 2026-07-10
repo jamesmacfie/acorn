@@ -2,6 +2,7 @@ import { Hono } from 'hono'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { z } from 'zod'
 import type { ApiError } from '../../shared/api'
+import { encodeToolCeiling } from '../../shared/workflow'
 import { setAgentTools, ToolError, TOOL_PERMS_PREF_KEY, type AgentToolContribution, type ToolPerms } from '../agentTools/registry'
 import { getDb, schema } from '../db'
 import type { AppEnv } from '../middleware/auth'
@@ -180,6 +181,19 @@ describe('agent-tool harness projection (docs/agent-tools.md)', () => {
     const m2 = (await (await get('/api/tasks/t1/tools')).json()) as { tools: { name: string }[] }
     expect(m2.tools.map((t) => t.name)).not.toContain('read_tool')
     expect((await post('/api/tasks/t1/tools/read_tool', {})).status).toBe(404)
+  })
+
+  it('intersects workflow allowlists/risk ceilings with global permissions for list and call', async () => {
+    const ceiling = encodeToolCeiling({ allow: ['read_tool', 'write_tool'], maxRisk: 'read' })
+    const headers = { 'x-acorn-tool-ceiling': ceiling }
+    const manifest = (await (await get('/api/tasks/ready/tools', headers)).json()) as { tools: { name: string }[] }
+    expect(manifest.tools.map((tool) => tool.name).sort()).toEqual(['read_tool'])
+    expect((await post('/api/tasks/ready/tools/write_tool', { slug: 'x' }, headers)).status).toBe(404)
+    expect((await post('/api/tasks/ready/tools/read_tool', {}, headers)).status).toBe(200)
+
+    // Global permission is still authoritative even when the workflow allowlist includes a tool.
+    await setPerms({ tools: { read_tool: false } })
+    expect((await post('/api/tasks/ready/tools/read_tool', {}, headers)).status).toBe(404)
   })
 
   it('catalog lists every registered tool with its risk tier (settings page source)', async () => {

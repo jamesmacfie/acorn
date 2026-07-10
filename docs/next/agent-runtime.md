@@ -58,10 +58,9 @@ them, and the WS/profile refactors (Phases 3 and 8) re-verify them.
   `inputsJson`/`resultJson` (last 100 stream events)/`structuredJson`/`sessionId`/`costUsd` land
   in `workflow_steps` (`db/schema.ts:460-481`); `reconcile()` resets orphaned `running` steps to
   `pending` on boot (`workflowRunner.ts:152-161`).
-- **The agents panel** merges PTY sessions + workflow steps into an urgency-sorted roster
-  (`features/agents/model.ts:101-124`), approves/rejects gates, and can resume a completed step's
-  session as an interactive TUI (`model.ts:83-88`). It refetches runs + per-run steps every 3 s
-  (`AgentsPanel.tsx:45`).
+- **The agents panel** merges PTY sessions + workflow steps into an urgency-sorted roster,
+  approves/rejects gates, resumes a completed step through the profile adapter, cancels runs/kills
+  steps, and refetches transitions on the shared WS status ping. Parsed step events render live.
 
 ---
 
@@ -154,14 +153,11 @@ on it. This decision is recorded so it isn't re-proposed
 
 ## 3. UI management of agents
 
-### 3.1 There is no way to stop anything (the missing control)
+### 3.1 Cancel-tree controls (implemented in Phase 8)
 
-No cancel-run, no kill-step — from the agents panel or anywhere. A wrong-prompt headless step
-runs its full 10 minutes; a mis-planned fan-out runs every child. The pieces already exist: the
-process-group kill (`headless.ts:122-130`), the `cancelled` terminal status named in §4.1,
-and the panel's action row. Cancel-run = mark run + pending steps, kill the in-flight child
-process(es); kill-step = the same scoped to one step.
-This is the highest-priority item in this doc after §2.1.
+The Agents panel now exposes cancel-run and kill-step. The engine's active-handler registry aborts
+the process group, persists `cancelling`/`cancelled`, and gives cancellation precedence over a
+racing handler completion.
 
 **Cancel must be a *tree*, not a single row.** agentfield learned this the hard way and has a
 dedicated cancel-tree: a cancel scoped to one execution can't reach a fan-out's children. In
@@ -171,22 +167,17 @@ every non-terminal descendant `cancelled` and killing each in-flight child proce
 top-level sequential steps. Cancel is immediate and needs no confirmation: stopping an agent is
 recoverable ([ux.md](./ux.md) §6).
 
-### 3.2 Running steps are invisible
+### 3.2 Running-step live tail (implemented in Phase 8)
 
-The activity feed parses `resultJson.events`, which is written **only at step completion**
-(`workflowRunner.ts:233-239`) — a live 10-minute agent shows nothing. Phase 3's WS is the natural
-transport: design the socket's framing for a second frame type from day one (`term:out` frames
-and `workflow:step:event` frames on one connection), and have `runHeadless` emit parsed
-stream-json lines as they arrive instead of only buffering. The persistence story doesn't change
-(the last-100-events snapshot still lands in `resultJson`); the live tail is a view, not a store.
+`runHeadless` emits parsed stream lines on `workflow:step:event`; the Agents panel renders that
+ephemeral live tail and still persists only the capped final event snapshot. A running step with no
+output for 30 seconds shows a quiet-step hint.
 
-### 3.3 Poll → push
+### 3.3 Poll → push (implemented in Phase 8)
 
-The runner already has a `notify` path used for gates (`workflowRunner.ts:196`,
-`workflowWiring.ts:145`). Emit step status transitions through it and the agents panel's 3 s
-`setInterval` (`AgentsPanel.tsx:45`) becomes an `onStatus`-driven refetch — simpler *and*
-cheaper. Whatever polling remains rides `ctx.poll` when it lands (state §5.2), and pauses when
-hidden per [performance.md](./performance.md) §3.2.
+Every persisted workflow transition emits the shared status ping, so the Agents panel refetches on
+push instead of a 3-second data poll. Trigger evaluation is the remaining workflow poller and rides
+the visibility-paused client poll registry.
 
 Minor, deferred: the roster is per-task; there is no cross-task "everything running right now"
 view. Rail badges partially cover it — defer until it's actually missed.

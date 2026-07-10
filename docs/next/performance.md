@@ -43,15 +43,16 @@ migration files the only index-like object is the `memories_fts` FTS5 virtual ta
 This decays exactly along the axis the retention findings (state §5.2, review §5) already name:
 unpruned rows accumulate, and the scans that read them are linear.
 
-### 1.3 Polling never pauses
+### 1.3 Polling is only partly centralized
 
-Grep for `visibilitychange` / `document.hidden` / `visibilityState` across the app: **zero
-matches**. Meanwhile:
+Registry pollers pause while `document.hidden`; the remaining query-library refresh and main-side
+idle watch have separate policies:
 
 | What | Interval | Where |
 | --- | --- | --- |
-| Agents panel runs+steps refetch | 3 s | `features/agents/AgentsPanel.tsx:45` |
+| Agents panel runs+steps refetch | push-driven | shared WS status ping; a 5 s local clock only updates the quiet-step hint |
 | Task status (dirty/checks) | 5 s | `features/tasks/taskStatus.ts:28` |
+| Workflow trigger evaluation | 30 s | client poll registry; app-open and visibility-paused |
 | Open-PR list `refetchInterval` | 60 s | `client/queries.ts:120` |
 | Main-process idle watch | 3 s | `main/terminal.ts:242-254` |
 
@@ -144,11 +145,10 @@ That is the entire measurement story — no telemetry, no dashboards; a log you 
 
 ### 3.2 Visibility pause — now, independent of everything
 
-~10 lines: a shared `document.hidden` check that pauses the 3 s/5 s client intervals and skips
-`refetchInterval` ticks while hidden (TanStack accepts a function for `refetchInterval`). This
-should **not** wait for the `ctx.poll` scheduler (state §5.2) — the scheduler subsumes it later;
-the one-liner stops the bleeding today. When `ctx.poll` lands, visibility-awareness moves into it
-and the ad-hoc checks are deleted.
+The shared client poll registry now owns the `document.hidden` check for task status and workflow
+triggers. The remaining action is to make TanStack's 60-second PR refresh visibility-aware; the
+main-process idle watch is intentionally independent because PTY state must stay current while the
+window is hidden.
 
 ### 3.3 PTY output coalescing — Phase 3, as part of the WS migration
 

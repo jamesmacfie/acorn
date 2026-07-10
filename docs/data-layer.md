@@ -298,7 +298,7 @@ via `workspace_repos` on `(repoOwner, repoName)`. Machine-scoped (it owns a loca
 | `branch` | text | the branch this task works on |
 | `worktreePath` | text | null until a terminal is first opened |
 | `pullNumber` | integer | null for local-first until a PR is inherited |
-| `status` | text | `active` \| `archived` |
+| `status` | text | `active` \| `archived`; workflow-created child tasks may end as `cancelled` |
 | `parentId` | text | task tree; set on fan-out children; null = root |
 | `sort` | integer | rail ordering |
 | `createdAt`, `updatedAt` | integer | epoch ms |

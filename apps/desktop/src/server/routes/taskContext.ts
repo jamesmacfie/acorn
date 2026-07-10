@@ -26,7 +26,9 @@ export const taskContext = new Hono<AppEnv>()
     return c.json({ owner: t.repoOwner, name: t.repoName, defaultBranch: repoRow?.defaultBranch ?? null, branch: t.branch, worktreePath: t.worktreePath })
   })
   .get('/:id/context', async (c) => {
-    const ctx = await assembleContext(getDb(c.env), getUser(c).login, c.req.param('id'), parseInclude(c.req.query('include')))
+    const ctx = await assembleContext(getDb(c.env), getUser(c).login, c.req.param('id'), parseInclude(c.req.query('include')), {
+      workflowRunId: c.req.query('workflowRunId'),
+    })
     if (!ctx) return respondError(c, 404, 'not_found')
     return c.json(ctx)
   })

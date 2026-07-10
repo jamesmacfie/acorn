@@ -6,18 +6,41 @@
 import { existsSync, readdirSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { parse as parseToml } from 'smol-toml'
-import type { WorkflowDef, WorkflowStepDef } from './workflowRunner'
+import { agentProfileRegistry } from './agentProfiles'
+import { BUILTIN_POLICIES, BUILTIN_STEP_KINDS } from './workflowBuiltins'
+import type { ToolCeiling, ToolRisk, WorkflowDef, WorkflowStepDef } from './workflowContracts'
+import { validateWorkflow, type WorkflowValidationCatalog } from './workflowValidation'
 
 export type WorkflowFileError = { source: string; message: string }
 export type LoadedWorkflow = WorkflowDef & { id: string; source: 'repo' | 'user' }
 
-const STEP_KINDS = new Set(['agent', 'gate-human', 'gate-policy', 'ci-loop', 'fan-out', 'join'])
+const defaultCatalog = (): WorkflowValidationCatalog => ({
+  stepKinds: new Set<string>(BUILTIN_STEP_KINDS),
+  policies: new Set<string>(BUILTIN_POLICIES),
+  profiles: new Set(agentProfileRegistry.list().map((profile) => profile.id)),
+  structuredProfiles: new Set(agentProfileRegistry.list().filter((profile) => profile.aiArgv).map((profile) => profile.id)),
+})
 
 const str = (v: unknown): string | undefined => (typeof v === 'string' && v.trim() ? v.trim() : undefined)
 
 // A raw parsed step: WorkflowStepDef plus the unexpanded sub-workflow reference.
 type RawStep = WorkflowStepDef & { workflowRef?: string }
-type RawWorkflow = { id: string; name: string; posture?: 'gated' | 'autonomous'; steps: RawStep[]; source: 'repo' | 'user' }
+type RawWorkflow = { id: string; name: string; posture?: 'gated' | 'autonomous'; trigger?: string; tools?: ToolCeiling; steps: RawStep[]; source: 'repo' | 'user' }
+
+function parseTools(value: unknown): ToolCeiling | undefined {
+  if (!value || typeof value !== 'object') return undefined
+  const raw = value as Record<string, unknown>
+  const allow = Array.isArray(raw.allow) && raw.allow.every((id) => typeof id === 'string') ? raw.allow : undefined
+  const maxRisk = typeof raw.max_risk === 'string' && ['read', 'write', 'execute'].includes(raw.max_risk) ? (raw.max_risk as ToolRisk) : undefined
+  return allow || maxRisk ? { allow, maxRisk } : undefined
+}
+
+function parseBranches(value: unknown): Record<string, string> | undefined {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return undefined
+  const entries = Object.entries(value as Record<string, unknown>)
+  if (!entries.length || entries.some(([, target]) => typeof target !== 'string' || !target.trim())) return undefined
+  return Object.fromEntries(entries.map(([verdict, target]) => [verdict, (target as string).trim()]))
+}
 
 function parseStep(v: unknown, id: string, i: number, errors: WorkflowFileError[], source: string): RawStep | null {
   if (!v || typeof v !== 'object') {
@@ -27,10 +50,6 @@ function parseStep(v: unknown, id: string, i: number, errors: WorkflowFileError[
   const o = v as Record<string, unknown>
   const workflowRef = str(o.workflow)
   const kind = str(o.kind) ?? 'agent'
-  if (!workflowRef && !STEP_KINDS.has(kind)) {
-    errors.push({ source, message: `${id}: step ${i + 1} has unknown kind '${kind}'` })
-    return null
-  }
   const name = str(o.name) ?? (workflowRef ? `→ ${workflowRef}` : `step-${i + 1}`)
   let schema: object | undefined
   const schemaJson = str(o.schema_json)
@@ -50,11 +69,12 @@ function parseStep(v: unknown, id: string, i: number, errors: WorkflowFileError[
           profileId: str((childRaw as Record<string, unknown>).profile),
           model: str((childRaw as Record<string, unknown>).model),
           prompt: str((childRaw as Record<string, unknown>).prompt),
+          tools: parseTools((childRaw as Record<string, unknown>).tools),
         }
       : undefined
   return {
     name,
-    kind: kind as WorkflowStepDef['kind'],
+    kind,
     profileId: str(o.profile),
     model: str(o.model),
     prompt: str(o.prompt),
@@ -63,6 +83,9 @@ function parseStep(v: unknown, id: string, i: number, errors: WorkflowFileError[
     maxIterations: typeof o.max_iterations === 'number' ? o.max_iterations : undefined,
     requiresRun: str(o.requires_run),
     childStep: child,
+    joins: str(o.joins),
+    branches: parseBranches(o.branches),
+    tools: parseTools(o.tools),
     workflowRef,
   }
 }
@@ -87,6 +110,8 @@ export function parseWorkflowToml(text: string, id: string, source: 'repo' | 'us
     id,
     name: str(doc.name) ?? id,
     posture: posture === 'autonomous' ? 'autonomous' : posture === 'gated' || posture === undefined ? 'gated' : undefined,
+    trigger: str(doc.trigger),
+    tools: parseTools(doc.tools),
     steps,
     source,
   }
@@ -94,7 +119,7 @@ export function parseWorkflowToml(text: string, id: string, source: 'repo' | 'us
 
 // Inline sub-workflow expansion with cycle rejection (a self/loop reference is an error row, not a
 // hang). Nested references expand recursively but a chain revisiting an id is refused.
-export function expandWorkflows(raw: RawWorkflow[], errors: WorkflowFileError[]): LoadedWorkflow[] {
+export function expandWorkflows(raw: RawWorkflow[], errors: WorkflowFileError[], catalog: WorkflowValidationCatalog = defaultCatalog()): LoadedWorkflow[] {
   const byId = new Map(raw.map((w) => [w.id, w]))
   const out: LoadedWorkflow[] = []
 
@@ -117,20 +142,41 @@ export function expandWorkflows(raw: RawWorkflow[], errors: WorkflowFileError[])
       }
       const inner = expand(target, [...chain, step.workflowRef])
       if (!inner) return null
-      steps.push(...inner.map((s) => ({ ...s, name: `${step.workflowRef}:${s.name}` })))
+      const prefix = `${step.workflowRef}:`
+      steps.push(
+        ...inner.map((s) => ({
+          ...s,
+          name: `${prefix}${s.name}`,
+          joins: s.joins ? `${prefix}${s.joins}` : undefined,
+          branches: s.branches ? Object.fromEntries(Object.entries(s.branches).map(([verdict, targetName]) => [verdict, `${prefix}${targetName}`])) : undefined,
+          prompt: s.prompt?.replace(/\$\{steps\.([^}]+)\.output\}/g, `\${steps.${prefix}$1.output}`),
+          childStep: s.childStep
+            ? { ...s.childStep, prompt: s.childStep.prompt?.replace(/\$\{steps\.([^}]+)\.output\}/g, `\${steps.${prefix}$1.output}`) }
+            : undefined,
+        })),
+      )
     }
     return steps
   }
 
   for (const w of raw) {
     const steps = expand(w, [w.id])
-    if (steps) out.push({ id: w.id, name: w.name, posture: w.posture, steps, source: w.source })
+    if (steps) {
+      const workflow = { id: w.id, name: w.name, posture: w.posture, trigger: w.trigger, tools: w.tools, steps, source: w.source }
+      const problems = validateWorkflow(workflow, catalog)
+      if (problems.length) errors.push(...problems.map((message) => ({ source: `${w.source}:${w.id}`, message: `${w.id}: ${message}` })))
+      else out.push(workflow)
+    }
   }
   return out
 }
 
 // Scan `.acorn/workflows/*.toml` in the repo checkout/worktree + `~/.acorn/workflows` (repo wins).
-export function loadWorkflowFiles(repoDir: string | null, userDir: string | null): { workflows: LoadedWorkflow[]; errors: WorkflowFileError[] } {
+export function loadWorkflowFiles(
+  repoDir: string | null,
+  userDir: string | null,
+  catalog: WorkflowValidationCatalog = defaultCatalog(),
+): { workflows: LoadedWorkflow[]; errors: WorkflowFileError[] } {
   const errors: WorkflowFileError[] = []
   const raw = new Map<string, RawWorkflow>()
   const scan = (base: string | null, source: 'repo' | 'user') => {
@@ -151,5 +197,5 @@ export function loadWorkflowFiles(repoDir: string | null, userDir: string | null
   }
   scan(repoDir, 'repo')
   scan(userDir, 'user')
-  return { workflows: expandWorkflows([...raw.values()], errors), errors }
+  return { workflows: expandWorkflows([...raw.values()], errors, catalog), errors }
 }

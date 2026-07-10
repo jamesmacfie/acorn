@@ -94,11 +94,11 @@ const run: WorkflowRunRow = { id: 'r1', taskId: 't1', name: 'build-review', stat
 
 describe('resumeCommandFor (15 P2 — open in terminal)', () => {
   it('builds the resume command per profile from the captured session id', () => {
-    expect(resumeCommandFor({ profileId: 'claude-code', sessionId: 'sess-9' })).toBe('claude --resume sess-9')
-    expect(resumeCommandFor({ profileId: 'codex', sessionId: 'abc123' })).toBe('codex resume abc123')
+    expect(resumeCommandFor({ profileId: 'claude-code', sessionId: 'sess-9', resumeCommand: 'claude --resume sess-9' })).toBe('claude --resume sess-9')
+    expect(resumeCommandFor({ profileId: 'codex', sessionId: 'abc123', resumeCommand: 'codex resume abc123' })).toBe('codex resume abc123')
     expect(resumeCommandFor({ profileId: 'claude-code', sessionId: null })).toBeNull()
     // Shell-metachar session ids are refused (the command runs through $SHELL -lc).
-    expect(resumeCommandFor({ profileId: 'claude-code', sessionId: 'x; rm -rf /' })).toBeNull()
+    expect(resumeCommandFor({ profileId: 'claude-code', sessionId: 'x; rm -rf /', resumeCommand: 'unsafe' })).toBeNull()
   })
 })
 
