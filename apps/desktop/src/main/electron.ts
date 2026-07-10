@@ -1,6 +1,7 @@
 import { app, BrowserWindow, dialog, ipcMain, shell } from 'electron'
 import { join } from 'node:path'
 import { bootstrap } from './bootstrap'
+import { resolveSessionKey } from './sessionKeyStore'
 import { ACORN_PORT, devDataDir } from './server'
 
 const ORIGIN = `http://127.0.0.1:${ACORN_PORT}`
@@ -11,9 +12,9 @@ const PRELOAD = join(import.meta.dirname, '../preload/index.cjs')
 // apps/desktop/.acorn so a checkout's data stays with the checkout.
 const dataDir = app.isPackaged ? app.getPath('userData') : devDataDir
 
-// Dev: load secrets from .env. Packaged builds have no .env (this no-ops), and OS-keychain secret
-// storage is planned but NOT built yet (docs/electron.md Phase 3) — until it lands, a packaged app
-// needs the secrets already present in its environment.
+// Dev: load secrets from .env. Packaged builds have no .env (this no-ops); SESSION_ENC_KEY then
+// falls through to safeStorage (resolveSessionKey, in whenReady below). GITHUB_CLIENT_* still need
+// to be present in the environment for a packaged build until their keychain path lands.
 try {
   process.loadEnvFile(join(import.meta.dirname, '../../.env'))
 } catch {
@@ -87,17 +88,9 @@ function hardenNavigation(win: BrowserWindow) {
     void shell.openExternal(url)
     return { action: 'deny' }
   })
-  // Browser-preview pane (docs/workspaces P5): the URL is user-configured per workspace (a dev-server
-  // port, a fixed URL, or a script's output), so allow any http(s) origin — but never give the guest
-  // a preload or node integration (hardened posture kept for the guest itself).
-  win.webContents.on('will-attach-webview', (e, webPreferences, params) => {
-    delete webPreferences.preload
-    webPreferences.nodeIntegration = false
-    webPreferences.contextIsolation = true
-    // http(s) only, and no userinfo in the authority (`http://localhost@evil.com`) so a preview URL
-    // can't disguise a foreign host as localhost.
-    if (!/^https?:\/\/[^@/?#]+(?::\d+)?(\/|$)/.test(params.src ?? '')) e.preventDefault()
-  })
+  // The browser-preview pane is now a main-owned WebContentsView (previewService.ts, Phase 9 A), not
+  // a <webview> guest — its http(s)-only navigation guard lives per-view there, so no
+  // will-attach-webview handler here anymore.
 }
 
 async function createMainWindow() {
@@ -111,9 +104,6 @@ async function createMainWindow() {
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: true,
-      // Browser-preview pane (docs/workspaces P5): a <webview> onto the workspace's local dev server.
-      // The guest gets no node integration; will-attach-webview below pins it to localhost.
-      webviewTag: true,
     },
   })
   hardenNavigation(win)
@@ -137,6 +127,7 @@ app.whenReady().then(async () => {
   // One call into the composition root: it migrates, constructs services, installs bridges, starts
   // the loopback listener, then creates the window (main/bootstrap.ts owns the order + teardown).
   try {
+    resolveSessionKey(dataDir) // safeStorage-backed SESSION_ENC_KEY (Phase 9 C) before any binding reads it
     mainWindow = await bootstrap({ dataDir, origin: ORIGIN, createWindow: createMainWindow })
   } catch (e) {
     // Boot is all-or-nothing: a failure here (migration, EADDRINUSE on the pinned port, …) means no

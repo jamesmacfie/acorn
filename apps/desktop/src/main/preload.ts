@@ -28,9 +28,22 @@ contextBridge.exposeInMainWorld('acorn', {
       pick: () => ipcRenderer.invoke('term:repoPath:pick'),
     },
   },
-  // Drivable browser (docs/panes.md): bind the task's preview webview so main can drive it via CDP.
-  // A raw webContents id → capability handle, so it stays IPC (never HTTP).
-  browser: {
-    bind: (taskId: string, webContentsId: number) => ipcRenderer.invoke('browser:bind', { taskId, webContentsId }),
+  // Browser-preview surface (docs/panes.md, Phase 9 A): a main-owned WebContentsView per task. The
+  // renderer drives lifecycle/chrome over IPC and positions the native view over the pane's host rect;
+  // main pushes chrome state (loading, url, back/forward) back via onEvent. Agent CDP driving binds
+  // inside main when the view is created, so no webContents id ever crosses this bridge.
+  preview: {
+    ensure: (taskId: string, url: string) => ipcRenderer.invoke('preview:ensure', { taskId, url }),
+    setBounds: (taskId: string, rect: { x: number; y: number; width: number; height: number }) => ipcRenderer.send('preview:bounds', { taskId, rect }),
+    show: (taskId: string) => ipcRenderer.send('preview:show', { taskId }),
+    hide: () => ipcRenderer.send('preview:hide'),
+    load: (taskId: string, url: string) => ipcRenderer.send('preview:load', { taskId, url }),
+    command: (taskId: string, action: 'back' | 'forward' | 'reload' | 'stop') => ipcRenderer.send('preview:command', { taskId, action }),
+    evict: (taskId: string) => ipcRenderer.send('preview:evict', { taskId }),
+    onEvent: (cb: (s: { taskId: string; url: string; loading: boolean; canGoBack: boolean; canGoForward: boolean }) => void) => {
+      const listener = (_e: unknown, s: { taskId: string; url: string; loading: boolean; canGoBack: boolean; canGoForward: boolean }) => cb(s)
+      ipcRenderer.on('preview:event', listener)
+      return () => ipcRenderer.removeListener('preview:event', listener)
+    },
   },
 })

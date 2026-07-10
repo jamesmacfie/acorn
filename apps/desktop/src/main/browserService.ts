@@ -1,7 +1,7 @@
 // Drivable browser — the CDP service (docs/panes.md): drives the task's EXISTING preview
-// webview via webContents.debugger. One driver per task; refs come from the last snapshot
+// WebContentsView via webContents.debugger. One driver per task; refs come from the last snapshot
 // (browserAuto.ts owns the pure transforms). Commands originate from main/agent only — never from
-// page script (vNext §11 posture); navigation stays http(s)-only like the will-attach-webview guard.
+// page script (vNext §11 posture); navigation stays http(s)-only like the preview navigation guard.
 import type { WebContents } from 'electron'
 import { buildAxTree, isAllowedBrowserUrl, isBenignNavError, renderAxTree, resolveRef, type AxSnapshot } from './browserAuto'
 
@@ -115,13 +115,22 @@ export class BrowserDriver {
   }
 }
 
-// Per-task drivers over the bound preview webviews (the renderer binds ids after webview creation).
+// Per-task drivers over the preview WebContentsView (previewService.ts binds each view's webContents
+// on creation — main-owned, so no renderer round-trip).
 const drivers = new Map<string, BrowserDriver>()
 const contentsByTask = new Map<string, DrivableContents>()
 
 export function bindBrowserContents(taskId: string, contents: DrivableContents): void {
   contentsByTask.set(taskId, contents)
-  drivers.delete(taskId) // a fresh webview invalidates the old driver + refs
+  drivers.delete(taskId) // a fresh view invalidates the old driver + refs
+}
+
+// Preview eviction owns the inverse binding. The identity guard prevents a late close from deleting
+// a replacement view that has already been bound for the same task.
+export function unbindBrowserContents(taskId: string, contents: DrivableContents): void {
+  if (contentsByTask.get(taskId) !== contents) return
+  contentsByTask.delete(taskId)
+  drivers.delete(taskId)
 }
 
 export function driverFor(taskId: string): BrowserDriver | null {

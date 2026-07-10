@@ -143,6 +143,29 @@ Use Electron `safeStorage`, not keytar, for planned keychain work.
 - Documentation check for `docs/electron.md`, `docs/local-development.md`, and
   packaging/ABI notes touched by the migration.
 
+## Outcome (2026-07-10)
+
+- **Migration A — WebContentsView: implemented.** `main/previewService.ts` owns one
+  `WebContentsView` per task (parented to `win.contentView`); the renderer drives lifecycle/chrome
+  and positions it over the pane host rect (`PreviewPane.tsx`), main pushes chrome state back over
+  `preview:*` IPC. Per-view http(s)-only / no-userinfo guard (`isAllowedPreviewUrl`) replaces
+  `will-attach-webview`; the CDP driver binds inside main on view creation, so `browser:bind` and the
+  `webviewTag` are gone. Overlay occlusion is handled renderer-side by hiding the view when a probe
+  finds the pane covered (documented ceiling: centre-point probe, corner-only overlays not detected).
+  Degraded browser mode shows a "needs the desktop app" gate. **Static verification done** (lint,
+  full test suite, `electron-vite build`, CDP driver smoke). **Pending interactive sign-off:** the
+  visual preview pass, pane/task-switch state preservation, and live occlusion behaviour — these need
+  a human driving a real workspace with a running dev server.
+- **Migration B — node:sqlite: PARKED.** Spike question #1 fails: Drizzle ships no `node:sqlite`
+  driver (verified against latest 0.45.2). `node:sqlite` itself handles FTS5(porter) + transactions
+  under the bundled Node, but adopting it would mean the generic `sqlite-proxy` driver or dropping
+  Drizzle, and `node-pty` keeps the dual-ABI rebuild alive regardless. Stop reason recorded in
+  `docs/local-development.md`. Revisit if Drizzle adds a first-party `node:sqlite` driver.
+- **Migration C — safeStorage: implemented.** `main/sessionKeyStore.ts` resolves `SESSION_ENC_KEY`
+  (env wins and migrates to safeStorage → fresh-root mint; an existing DB without either source and
+  decrypt failures are fatal to avoid a second identity), covered by `sessionKeyStore.test.ts`.
+  Security/electron/CLAUDE docs updated.
+
 ## References
 
 - [review.md](../review.md) technology changes #2-#4.

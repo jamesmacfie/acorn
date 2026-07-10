@@ -103,6 +103,9 @@ export type TerminalStreamBridge = {
   repoPath: { pick(): Promise<string | null> }
 }
 
+// Chrome state pushed from main for the active preview view (PreviewPane consumes it).
+export type PreviewState = { taskId: string; url: string; loading: boolean; canGoBack: boolean; canGoForward: boolean }
+
 declare global {
   interface Window {
     acorn?: {
@@ -113,8 +116,16 @@ declare global {
       // App quit lifecycle concern collection. Returns an unsubscribe.
       onWillQuit?: (cb: () => boolean | Promise<boolean>) => () => void
       terminal?: TerminalStreamBridge
-      browser?: {
-        bind(taskId: string, webContentsId: number): Promise<boolean>
+      // Browser-preview surface (Phase 9 A): drive the task's main-owned WebContentsView.
+      preview?: {
+        ensure(taskId: string, url: string): Promise<boolean>
+        setBounds(taskId: string, rect: { x: number; y: number; width: number; height: number }): void
+        show(taskId: string): void
+        hide(): void
+        load(taskId: string, url: string): void
+        command(taskId: string, action: 'back' | 'forward' | 'reload' | 'stop'): void
+        evict(taskId: string): void
+        onEvent(cb: (s: PreviewState) => void): () => void
       }
     }
   }
