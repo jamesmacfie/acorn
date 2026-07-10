@@ -10,7 +10,12 @@ export type Capabilities = {
   terminal: boolean // main-process terminal/worktree engine available (drawer, agents, run targets, workflows, PTY streams)
 }
 
+export type ClientCapabilityRequirement = 'none' | keyof Capabilities
+
 export const capabilities = (): Capabilities => ({
   desktop: !!window.acorn?.desktop,
   terminal: !!window.acorn?.terminal,
 })
+
+export const hasClientCapability = (requirement: ClientCapabilityRequirement = 'none'): boolean =>
+  requirement === 'none' || capabilities()[requirement]

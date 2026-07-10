@@ -1,4 +1,5 @@
 import { createEffect, createSignal, onCleanup, onMount, Show } from 'solid-js'
+import { clientEvents } from '../../registries/clientEvents'
 
 // The browser-preview pane (docs/panes.md): browser chrome (back/forward/stop-reload/home + an
 // editable URL bar + a loading spinner) over a per-task Electron <webview>. `props.url` is the
@@ -52,6 +53,9 @@ export function evictPreviewWebview(taskId: string): void {
   el.remove()
   previewWebviews.delete(taskId)
 }
+
+export const activatePreviewEvents = (): (() => void) =>
+  clientEvents.on('runtime:task-archived', ({ taskId }) => evictPreviewWebview(taskId))
 
 export default function PreviewPane(props: { taskId: string; url: string | null }) {
   let host!: HTMLDivElement

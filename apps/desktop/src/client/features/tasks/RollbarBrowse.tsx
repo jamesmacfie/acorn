@@ -66,17 +66,21 @@ export default function RollbarBrowse() {
   // Rollbar's most common flow (docs/integrations.md): the error belongs to the task you're already on.
   async function attach(item: RollbarItem) {
     const taskId = activeTaskId()
-    if (!taskId) return window.alert('No active task — open one first, or use “open as task”.')
+    setAttachMessage('')
+    if (!taskId) return setAttachMessage('No active task — open one first, or use “open as task”.')
     await addTaskLink(taskId, { integrationId: item.integrationId, provider: 'rollbar', identifier: item.identifier })
     await qc.invalidateQueries({ queryKey: tasksKey })
-    window.alert('Attached to the current task.')
+    setAttachMessage('Attached to the current task.')
   }
+
+  const [attachMessage, setAttachMessage] = createSignal('')
 
   return (
     <main class="panes panes-empty">
       <section class="pane linear-browse">
         <div class="section-header">
           Rollbar — recent errors
+          <Show when={attachMessage()}><span class="muted" role="status">{attachMessage()}</span></Show>
           <button type="button" class="new-pr-btn" onClick={() => void refetch()}>Refresh</button>
         </div>
         <Show when={!items.loading} fallback={<p class="placeholder">Loading…</p>}>

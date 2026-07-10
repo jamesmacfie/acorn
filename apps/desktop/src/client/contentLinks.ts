@@ -1,6 +1,19 @@
 // Recognise links inside rendered content (GitHub bodyHTML + Linear markdown) that Acorn can open
 // itself instead of sending the user to github.com / linear.app. Shared by the PR conversation and
 // the Linear ticket panel.
+import { Registry } from './registries/registry'
+
+export type InAppTarget =
+  | { kind: 'linear'; identifier: string }
+  | { kind: 'pr'; owner: string; repo: string; number: string }
+  | { kind: 'repo'; owner: string; repo: string }
+
+export type ContentLinkContribution = {
+  id: string
+  parse: (href: string) => InAppTarget | null
+}
+
+export const contentLinkRegistry = new Registry<ContentLinkContribution>('content-link')
 
 const LINEAR_ISSUE_RE = /^https?:\/\/linear\.app\/[^/]+\/issue\/([A-Za-z][A-Za-z0-9]*-\d+)/i
 const GH_PR_RE = /^https?:\/\/github\.com\/([^/]+)\/([^/]+)\/pull\/(\d+)/i
@@ -9,10 +22,30 @@ const GH_REPO_RE = /^https?:\/\/github\.com\/([^/?#]+)\/([^/?#]+)\/?(?:[?#].*)?$
 // already won't match GH_REPO_RE, but these two-ish reserved roots could look like an owner).
 const GH_RESERVED = new Set(['orgs', 'sponsors', 'settings', 'notifications', 'marketplace', 'explore', 'topics', 'about'])
 
-export type InAppTarget =
-  | { kind: 'linear'; identifier: string }
-  | { kind: 'pr'; owner: string; repo: string; number: string }
-  | { kind: 'repo'; owner: string; repo: string }
+const builtInContentLinks: ContentLinkContribution[] = [
+  {
+    id: 'linear.issue',
+    parse: (href) => {
+      const match = LINEAR_ISSUE_RE.exec(href)
+      return match ? { kind: 'linear', identifier: match[1].toUpperCase() } : null
+    },
+  },
+  {
+    id: 'github.pull-request',
+    parse: (href) => {
+      const match = GH_PR_RE.exec(href)
+      return match ? { kind: 'pr', owner: match[1], repo: match[2], number: match[3] } : null
+    },
+  },
+  {
+    id: 'github.repository',
+    parse: (href) => {
+      const match = GH_REPO_RE.exec(href)
+      return match && !GH_RESERVED.has(match[1].toLowerCase()) ? { kind: 'repo', owner: match[1], repo: match[2] } : null
+    },
+  },
+]
+if (!contentLinkRegistry.entries().length) for (const contribution of builtInContentLinks) contentLinkRegistry.register(contribution)
 
 const escapeRegExp = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 
@@ -67,12 +100,10 @@ export function linkifyLinearIds(root: HTMLElement, prefixes: string[]): void {
 }
 
 export function parseInAppTarget(href: string): InAppTarget | null {
-  const linear = LINEAR_ISSUE_RE.exec(href)
-  if (linear) return { kind: 'linear', identifier: linear[1].toUpperCase() }
-  const pr = GH_PR_RE.exec(href)
-  if (pr) return { kind: 'pr', owner: pr[1], repo: pr[2], number: pr[3] }
-  const repo = GH_REPO_RE.exec(href)
-  if (repo && !GH_RESERVED.has(repo[1].toLowerCase())) return { kind: 'repo', owner: repo[1], repo: repo[2] }
+  for (const contribution of contentLinkRegistry.entries()) {
+    const target = contribution.parse(href)
+    if (target) return target
+  }
   return null
 }
 

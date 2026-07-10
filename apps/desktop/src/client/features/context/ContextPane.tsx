@@ -7,7 +7,6 @@ import { agentSessionsFor } from '../terminal/sessions'
 import { terminalApi } from '../terminal/terminalClient'
 import MemoryTray from '../memory/MemoryTray'
 import { requestNoteOpen } from '../notes/notesClient'
-import { dispatchLayout } from '../tasks/tasks'
 import { selectionFromContext, selectionToInclude, traySummary, type TraySelection } from './model'
 import './context-tray.css'
 
@@ -42,8 +41,7 @@ export default function ContextPane(props: { task: Task }) {
 
   function followJump(item: ContextItem) {
     if (item.jump?.pane !== 'notes' || !item.jump.itemId || !item.jump.noteScope) return
-    requestNoteOpen(item.jump.itemId, item.jump.noteScope)
-    dispatchLayout(props.task.id, { type: 'show', pane: 'notes' })
+    requestNoteOpen(props.task.id, item.jump.itemId, item.jump.noteScope)
   }
 
   async function assembleAndSend() {

@@ -1,4 +1,4 @@
-export const FILE_SCROLL_EVENT = 'acorn:file-scroll'
+import { clientEvents } from './registries/clientEvents'
 
 export type FileScrollDetail = {
   routeKey: string
@@ -10,5 +10,5 @@ export function routeKey(owner: string, repo: string, number: string): string {
 }
 
 export function requestFileScroll(detail: FileScrollDetail): void {
-  window.dispatchEvent(new CustomEvent<FileScrollDetail>(FILE_SCROLL_EVENT, { detail }))
+  clientEvents.emit('presentation:file-scroll', detail)
 }

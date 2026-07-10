@@ -14,30 +14,30 @@ import PullDetail from './PullDetail'
 import CreatePullForm from './CreatePullForm'
 import ComparePreview from './ComparePreview'
 import DiffView from './DiffView'
-import Shortcuts from './Shortcuts'
 import AccountMenu from './AccountMenu'
 import SettingsModal from './features/settings/SettingsModal'
 import TerminalPanel from './features/terminal/TerminalPanel'
-import CommandPalette from './features/palette/CommandPalette'
-import FilePalette from './features/palette/FilePalette'
-import WorkspacePalette from './features/palette/WorkspacePalette'
-import NotificationBell from './features/notifications/NotificationBell'
-import { hydrateNotices, initWorkflowNotices, notices, serializeNotices } from './features/notifications/notifications'
+import { hydrateNotices, initWorkflowNotices, notices, pushBackgroundError, serializeNotices } from './features/notifications/notifications'
 import { editorStateByTask, hydrateEditorState, serializeEditorState } from './features/editor/editorState'
 import { hydratePrFilters, prFilters } from './features/pullList/filterState'
-import { initSessions } from './features/terminal/sessions'
+import { initSessions, sessions } from './features/terminal/sessions'
 import TabRail from './features/tabs/TabRail'
 import RailTips from './features/tooltip/RailTips'
-import { activeTaskId, hydrateTaskLayouts, isSourceId, isTerminalMax, isTerminalOpen, rememberWorkspaceView, selectedSource, setActiveTaskId, setSelectedSource, setTerminalMax, setTerminalOpen, taskLayouts, workspaceView } from './features/tasks/tasks'
+import { activeTaskId, focusedPane, hydrateTaskLayouts, isSourceId, isTerminalMax, isTerminalOpen, maximizedPane, rememberWorkspaceView, selectedSource, setActiveTaskId, setMaximizedPane, setSelectedSource, setTerminalMax, setTerminalOpen, taskLayouts, toggleFocusedPaneMax, workspaceView } from './features/tasks/tasks'
 import { isTerminalTarget } from './lib/isTypingTarget'
 import { activateTaskSignals, pathForTask } from './features/tasks/activate'
 import { parseTaskLayouts } from './features/tasks/layout'
-import { initTaskStatuses } from './features/tasks/taskStatus'
+import { taskStatus } from './features/tasks/taskStatus'
 import { capabilities } from './features/capabilities'
 import TaskView from './features/tasks/TaskView'
 import LinearBrowse from './features/tasks/LinearBrowse'
 import RollbarBrowse from './features/tasks/RollbarBrowse'
 import Acorn from './Acorn'
+import { registerCommands } from './registries/commands'
+import { KeybindingDispatcher, registerKeybindings } from './registries/keybindings'
+import { confirmWillEvent, registerWillHandler, WillConfirmationHost } from './registries/willPhase'
+import { startClientPollers } from './registries/pollers'
+import { SlotHost, type UiSlotContext } from './registries/uiSlots'
 
 // Layout root (Router root): top bar + three panes. Panes are params-driven — PullList (left)
 // and PullDetail (mid) read useParams() directly; routes exist only to populate params.
@@ -55,17 +55,6 @@ export default function App() {
     setSettingsTab(tab)
     setSettingsOpen(true)
   }
-  // ⌘, opens Settings — the macOS convention. Fires everywhere (typing targets and the terminal
-  // included) and is reserved in paneShortcuts, so it can never be rebound or shadowed.
-  onMount(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if (!(e.metaKey || e.ctrlKey) || e.altKey || e.shiftKey || e.key !== ',') return
-      e.preventDefault()
-      openSettings()
-    }
-    window.addEventListener('keydown', onKey)
-    onCleanup(() => window.removeEventListener('keydown', onKey))
-  })
   // The terminal drawer belongs to a task, not the app: it's shown only in the Task view (a Source
   // browse like Pull requests has no terminal) and its open/closed state is tracked per task, so
   // switching tabs swaps it. `termOpen` reflects the active task's state within the Task view.
@@ -76,27 +65,65 @@ export default function App() {
     if (id) setTerminalOpen(id, !isTerminalOpen(id))
   }
 
-  // ⌘⇧⏎ is a size control for the terminal drawer, directioned by focus: pressed while the terminal
-  // is focused it grows (opens → maximizes → back to partial); pressed from any other pane (editor,
-  // notes, …) it minimizes a step (maximized → partial → hidden). Capture phase so it wins over
-  // Monaco/xterm before they can swallow ⏎. Fires app-wide but only acts inside the Task view.
+  // Shell-owned commands are registered once; the single dispatcher below owns the only global
+  // keydown listener. Maximize is focus-directed and never enters persisted TaskLayout state.
   onMount(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if (!(e.metaKey || e.ctrlKey) || !e.shiftKey || e.altKey || e.key !== 'Enter') return
-      const id = activeTaskId()
-      if (!inTaskView() || !id) return
-      e.preventDefault()
-      const inTerm = isTerminalTarget(e.target) || isTerminalTarget(document.activeElement)
-      if (inTerm) {
-        setTerminalMax(id, !isTerminalMax(id)) // terminal focused ⇒ toggle fill-the-pane
-      } else if (isTerminalMax(id)) {
-        setTerminalMax(id, false) // minimize: full → partial
-      } else if (isTerminalOpen(id)) {
-        setTerminalOpen(id, false) // minimize: partial → hidden
-      }
-    }
-    window.addEventListener('keydown', onKey, true)
-    onCleanup(() => window.removeEventListener('keydown', onKey, true))
+    const commands = registerCommands([
+      { id: 'core.settings.open', title: 'Open settings', category: 'navigation', run: () => openSettings() },
+      {
+        id: 'core.surface.toggle-maximize', title: 'Toggle focused surface maximize', category: 'pane',
+        when: inTaskView,
+        run: () => {
+          const taskId = activeTaskId()
+          if (!taskId) return
+          const inTerminal = isTerminalTarget(document.activeElement)
+          if (inTerminal) {
+            setMaximizedPane(taskId, null)
+            setTerminalMax(taskId, !isTerminalMax(taskId))
+          } else if (focusedPane(taskId)) {
+            setTerminalMax(taskId, false)
+            toggleFocusedPaneMax(taskId)
+          } else if (isTerminalMax(taskId)) {
+            setTerminalMax(taskId, false)
+          } else if (isTerminalOpen(taskId)) {
+            setTerminalOpen(taskId, false)
+          }
+        },
+      },
+    ])
+    const bindings = registerKeybindings([
+      { id: 'core.settings.open', command: 'core.settings.open', description: 'Open settings', category: 'Global', defaultChord: 'meta+,', when: 'global' },
+      { id: 'core.surface.toggle-maximize', command: 'core.surface.toggle-maximize', description: 'Toggle focused pane or terminal maximize', category: 'Panes', defaultChord: 'meta+shift+enter', when: 'task' },
+    ])
+    onCleanup(() => { bindings.dispose(); commands.dispose() })
+  })
+
+  onMount(() => {
+    const offDirty = registerWillHandler('task:archive', 'Changes', ({ taskId }) => {
+      const status = taskStatus(taskId)
+      return status?.dirty
+        ? { id: `dirty:${taskId}`, feature: 'Changes', message: `${status.dirtyCount ?? 0} uncommitted files`, severity: 'danger' }
+        : null
+    })
+    const offSessions = registerWillHandler('task:archive', 'Terminal', ({ taskId }) => {
+      const active = sessions().filter((session) => session.taskId === taskId && session.status === 'running')
+      return active.length
+        ? { id: `sessions:${taskId}`, feature: 'Terminal', message: `${active.length} active session${active.length === 1 ? '' : 's'}`, severity: 'warn' }
+        : null
+    })
+    const offQuit = registerWillHandler('app:quit', 'Terminal', () => {
+      const active = sessions().filter((session) => session.status === 'running')
+      return active.length
+        ? { id: 'sessions:all', feature: 'Terminal', message: `${active.length} active session${active.length === 1 ? '' : 's'}`, severity: 'warn' }
+        : null
+    })
+    onCleanup(() => { offQuit(); offSessions(); offDirty() })
+  })
+  onMount(() => {
+    const off = window.acorn?.onWillQuit?.(() => confirmWillEvent({
+      kind: 'app:quit', payload: {}, title: 'Quit acorn', actionLabel: 'Quit',
+    }))
+    if (off) onCleanup(off)
   })
 
   // Track terminal sessions globally (independent of the drawer) so the tab rail and the topbar
@@ -105,7 +132,7 @@ export default function App() {
   onMount(() => {
     if (!capabilities().terminal) return
     onCleanup(initSessions())
-    onCleanup(initTaskStatuses())
+    onCleanup(startClientPollers())
     onCleanup(initWorkflowNotices())
   })
 
@@ -178,6 +205,18 @@ export default function App() {
     setActiveTaskId(saved && list.some((t) => t.id === saved) ? saved : list[0].id)
   })
   const activeTask = () => tasks.data?.find((w) => w.id === activeTaskId()) ?? null
+  const slotContext = (): UiSlotContext => ({
+    taskActive: inTaskView(),
+    terminalOpen: termOpen(),
+    toggleTerminal: toggleTerm,
+    openSettings,
+    selectTask: (taskId) => {
+      const task = tasks.data?.find((candidate) => candidate.id === taskId)
+      if (!task) return
+      activateTaskSignals(task)
+      navigate(pathForTask(task))
+    },
+  })
 
   // Apply the saved theme. When following system, swap between the chosen light/dark
   // themes on the OS preference (and re-apply live when it changes).
@@ -221,6 +260,12 @@ export default function App() {
   // task view was saved as '') and each task's last-used pane. `restored` then gates the persist
   // effects below so they don't clobber the saved values with startup defaults.
   const [restored, setRestored] = createSignal(false)
+  const persistPref = (key: string, value: string) => {
+    void setPref(key, value).catch((error) => {
+      if (key === 'notices') return console.error('[prefs:notices]', error)
+      pushBackgroundError(activeTaskId() ?? '', `Could not save ${key}`, error instanceof Error ? error.message : String(error))
+    })
+  }
   createEffect(() => {
     if (prefs.data === undefined || restored()) return
     setRestored(true)
@@ -242,31 +287,31 @@ export default function App() {
   // it avoids a write→refetch loop.
   createEffect(() => {
     if (restored() && params.owner && params.repo) {
-      void setPref('last_path', `/${params.owner}/${params.repo}${params.number ? `/${params.number}` : ''}`)
+      persistPref('last_path', `/${params.owner}/${params.repo}${params.number ? `/${params.number}` : ''}`)
     }
   })
   createEffect(() => {
-    if (restored()) void setPref('last_source', selectedSource() ?? '')
+    if (restored()) persistPref('last_source', selectedSource() ?? '')
   })
   createEffect(() => {
     const id = activeTaskId()
-    if (restored() && id) void setPref('last_task', id)
+    if (restored() && id) persistPref('last_task', id)
   })
   createEffect(() => {
     const layouts = taskLayouts()
-    if (restored()) void setPref('task_layouts', JSON.stringify(layouts))
+    if (restored()) persistPref('task_layouts', JSON.stringify(layouts))
   })
   createEffect(() => {
     void notices()
-    if (restored()) void setPref('notices', serializeNotices())
+    if (restored()) persistPref('notices', serializeNotices())
   })
   createEffect(() => {
     void editorStateByTask()
-    if (restored()) void setPref('editor_open_files', serializeEditorState())
+    if (restored()) persistPref('editor_open_files', serializeEditorState())
   })
   createEffect(() => {
     const f = prFilters()
-    if (restored()) void setPref('pr_filters', JSON.stringify(f))
+    if (restored()) persistPref('pr_filters', JSON.stringify(f))
   })
 
   // Left-pane collapse, persisted via the `left_collapsed` pref. Seed the local signal from prefs
@@ -409,19 +454,7 @@ export default function App() {
           </Show>
         </div>
         <div class="topbar-side topbar-end">
-          <NotificationBell
-            onSelectTask={(taskId) => {
-              const t = tasks.data?.find((x) => x.id === taskId)
-              if (!t) return
-              activateTaskSignals(t)
-              navigate(pathForTask(t))
-            }}
-          />
-          <Show when={capabilities().terminal && inTaskView()}>
-            <button type="button" class="theme-toggle" title="Terminal" aria-pressed={termOpen()} onClick={toggleTerm}>
-              ▣
-            </button>
-          </Show>
+          <SlotHost slot="topbar.right" context={slotContext()} />
           <Show
             when={me.data}
             fallback={
@@ -510,7 +543,8 @@ export default function App() {
           />
         </Match>
       </Switch>
-      <Shortcuts onOpenShortcuts={() => openSettings('shortcuts')} />
+      <KeybindingDispatcher prefs={prefs.data ?? {}} taskActive={inTaskView()} focusedPane={focusedPane(activeTaskId())} />
+      <WillConfirmationHost />
       <Show when={settingsOpen()}>
         <SettingsModal initialTab={settingsTab()} onPermissions={permissions} onClose={() => setSettingsOpen(false)} />
       </Show>
@@ -520,9 +554,7 @@ export default function App() {
       <Show when={termOpen()}>
         <TerminalPanel onClose={() => { const id = activeTaskId(); if (id) setTerminalOpen(id, false) }} task={activeTask()} />
       </Show>
-      <CommandPalette />
-      <FilePalette />
-      <WorkspacePalette />
+      <SlotHost slot="overlay" context={slotContext()} />
     </div>
     <RailTips />
     </div>

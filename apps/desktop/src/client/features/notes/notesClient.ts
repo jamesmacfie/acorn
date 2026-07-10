@@ -1,5 +1,3 @@
-import { createSignal } from 'solid-js'
-
 // The renderer's notes surface (docs/notes-and-memory.md). Was the `window.acorn.notes` preload bridge;
 // now loopback HTTP (Phase 3). Backed by the main-process NotesStore, so it 503s in dev:node. Note
 // shapes are canonical in shared/notes.ts (main's NotesStore imports the same types) — re-exported
@@ -7,6 +5,7 @@ import { createSignal } from 'solid-js'
 import { noteIncludedRoute, noteRoute, notesListRoute } from '../../../shared/api'
 import { readJson, writeJson } from '../../apiClient'
 import type { Note, NoteKind, NoteLocation, NoteScope, NoteSummary } from '../../../shared/notes'
+import { openPane } from '../../registries/clientEvents'
 export type { Note, NoteAuthor, NoteKind, NoteLocation, NoteScope, NoteSummary } from '../../../shared/notes'
 
 export type NotesApi = {
@@ -33,9 +32,5 @@ const api: NotesApi = {
 
 export const notesApi = (): NotesApi => api
 
-// Cross-pane request (docs/next 11 §E): the Context pane's per-note "Edit" opens the Notes pane and
-// asks it to load that slug in editable state. NotesPane consumes the signal on mount/change, clears it.
-const [noteToOpen, setNoteToOpen] = createSignal<{ slug: string; scope: NoteScope } | null>(null)
-export { noteToOpen }
-export const requestNoteOpen = (slug: string, scope: NoteScope = 'workspace') => setNoteToOpen({ slug, scope })
-export const clearNoteOpen = () => setNoteToOpen(null)
+export const requestNoteOpen = (taskId: string, slug: string, scope: NoteScope = 'workspace') =>
+  openPane(taskId, 'notes', { kind: 'notes:open', slug, scope })

@@ -6,9 +6,12 @@ import { setPref } from '../../mutations'
 import { terminalApi } from './terminalClient'
 import { onClosePaneWithin } from '../../lib/onClosePaneWithin'
 import { isTerminalMax } from '../tasks/tasks'
-import { activeTerminal, clearTerminalFocus, pendingTerminalFocus, rememberActiveTerminal, refreshSessions, sessions } from './sessions'
+import { activeTerminal, rememberActiveTerminal, refreshSessions, sessions } from './sessions'
 import TerminalSurface from './TerminalSurface'
 import type { TerminalProfile, TerminalSession } from '../../../shared/terminal'
+import { registerCommands } from '../../registries/commands'
+import { registerKeybindings } from '../../registries/keybindings'
+import { clientEvents, consumeTerminalFocusIntent } from '../../registries/clientEvents'
 import './terminal.css'
 
 // vNext Phase 2: a bottom drawer of persistent local sessions. The "+" opens a profile menu
@@ -92,48 +95,59 @@ export default function TerminalPanel(props: { onClose: () => void; task: Task |
   const focusActiveSurface = () =>
     requestAnimationFrame(() => drawerRef?.querySelector<HTMLTextAreaElement>('.xterm-helper-textarea')?.focus())
 
-  // The command palette creates a terminal and requests focus on it (it can't reach activeId here).
-  // Switch to it once it shows up in this task's strip, then focus explicitly — closing the palette
-  // returns focus elsewhere, so the keyed remount's own focus isn't enough on its own.
-  createEffect(() => {
-    const want = pendingTerminalFocus()
-    if (!want || !visibleSessions().some((s) => s.id === want)) return
-    setActiveId(want)
-    clearTerminalFocus()
+  const applyTerminalFocus = (sessionId: string) => {
+    if (!visibleSessions().some((session) => session.id === sessionId)) return
+    setActiveId(sessionId)
     focusActiveSurface()
+  }
+  onMount(() => {
+    const off = clientEvents.on('presentation:terminal-focus', ({ taskId, sessionId }) => {
+      if (taskId === ws()?.id) applyTerminalFocus(sessionId)
+    })
+    onCleanup(off)
+  })
+  createEffect(() => {
+    const taskId = ws()?.id
+    if (!taskId) return
+    const sessionId = consumeTerminalFocusIntent(taskId)
+    if (sessionId) applyTerminalFocus(sessionId)
   })
 
-  // ⌘/Ctrl+Shift+1–9 focuses the Nth terminal in this task's strip; ⌘/Ctrl+Shift+[ / ] steps to the
-  // previous / next tab (wrapping). Works from anywhere (e.g. the editor) as long as the drawer is
-  // open — this component only exists while it is, so we never auto-open it. Scoped to the active
-  // task via visibleSessions. Matches on e.code — with Shift held the digit/bracket keys report
-  // shifted glyphs (!@#…, {}), not '1'–'9'/'['/']'. TaskView's ⌘1–9 task-jump bails on Shift, so the
-  // two never collide. Focus is explicit (not just via remount) so re-selecting the already-active
-  // tab still pulls focus off whatever else had it; rAF lets a tab switch remount the surface first.
+  const focusTerminalAt = (index: number) => {
+    const session = visibleSessions()[index]
+    if (!session) return
+    setActiveId(session.id)
+    focusActiveSurface()
+  }
+  const stepTerminal = (step: -1 | 1) => {
+    const visible = visibleSessions()
+    if (!visible.length) return
+    const current = visible.findIndex((session) => session.id === activeId())
+    focusTerminalAt((Math.max(current, 0) + step + visible.length) % visible.length)
+  }
   onMount(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if (!(e.metaKey || e.ctrlKey) || !e.shiftKey || e.altKey) return
-      const vis = visibleSessions()
-      if (e.code === 'BracketLeft' || e.code === 'BracketRight') {
-        if (vis.length === 0) return
-        e.preventDefault()
-        const cur = vis.findIndex((s) => s.id === activeId())
-        const step = e.code === 'BracketRight' ? 1 : -1
-        const next = vis[(Math.max(cur, 0) + step + vis.length) % vis.length]
-        setActiveId(next.id)
-        focusActiveSurface()
-        return
-      }
-      const m = /^Digit([1-9])$/.exec(e.code)
-      if (!m) return
-      const s = vis[Number(m[1]) - 1]
-      if (!s) return
-      e.preventDefault()
-      setActiveId(s.id)
-      focusActiveSurface()
-    }
-    window.addEventListener('keydown', onKey)
-    onCleanup(() => window.removeEventListener('keydown', onKey))
+    const numbered = Array.from({ length: 9 }, (_, index) => ({
+      id: `terminal.focus.${index + 1}`,
+      title: `Focus terminal ${index + 1}`,
+      category: 'terminal' as const,
+      when: () => visibleSessions().length > index,
+      run: () => focusTerminalAt(index),
+    }))
+    const commands = registerCommands([
+      ...numbered,
+      { id: 'terminal.focus.previous', title: 'Focus previous terminal', category: 'terminal', run: () => stepTerminal(-1) },
+      { id: 'terminal.focus.next', title: 'Focus next terminal', category: 'terminal', run: () => stepTerminal(1) },
+    ])
+    const bindings = registerKeybindings([
+      ...numbered.map((command, index) => ({
+        id: command.id, command: command.id, description: command.title, category: 'Terminal',
+        defaultChord: `meta+shift+${index + 1}`, when: 'task' as const,
+        active: () => visibleSessions().length > index,
+      })),
+      { id: 'terminal.focus.previous', command: 'terminal.focus.previous', description: 'Focus previous terminal', category: 'Terminal', defaultChord: 'meta+shift+[', when: 'task' },
+      { id: 'terminal.focus.next', command: 'terminal.focus.next', description: 'Focus next terminal', category: 'Terminal', defaultChord: 'meta+shift+]', when: 'task' },
+    ])
+    onCleanup(() => { bindings.dispose(); commands.dispose() })
   })
 
   const activeSession = createMemo(() => sessions().find((s) => s.id === activeId()) ?? null)

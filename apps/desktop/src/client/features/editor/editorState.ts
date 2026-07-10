@@ -2,6 +2,7 @@
 // flags, active file — persisted to the 'editor_open_files' pref so relaunch restores the tabs
 // (dirty resets: content isn't persisted). Pure list ops + a thin signal store, like tasks.ts.
 import { createSignal } from 'solid-js'
+import { openPane } from '../../registries/clientEvents'
 
 export type OpenFile = { path: string; ephemeral: boolean; dirty: boolean }
 
@@ -61,17 +62,8 @@ export const editorSetDirty = (taskId: string, path: string, dirty: boolean): vo
   update(taskId, (s) => ({ ...s, files: setFileDirty(s.files, path, dirty) }))
 export const editorActivate = (taskId: string, path: string): void => update(taskId, (s) => ({ ...s, active: path }))
 
-// One-shot "scroll the editor to this line" request (mirrors requestTerminalFocus in
-// terminal/sessions.ts). The Search pane opens a file via editorOpen then requests a reveal here;
-// EditorPane consumes it once the model is shown and clears it. Set before show() finishes its
-// async read — EditorPane picks it up either in show() or (for an already-open file) via an effect.
-const [pendingEditorReveal, setPendingEditorReveal] = createSignal<{ taskId: string; path: string; line: number } | null>(null)
-export { pendingEditorReveal }
 export const requestEditorReveal = (taskId: string, path: string, line: number): void => {
-  setPendingEditorReveal({ taskId, path, line })
-}
-export const clearEditorReveal = (): void => {
-  setPendingEditorReveal(null)
+  openPane(taskId, 'editor', { kind: 'editor:reveal', path, line }, 'add')
 }
 
 // --- Persistence (prefs 'editor_open_files') ---

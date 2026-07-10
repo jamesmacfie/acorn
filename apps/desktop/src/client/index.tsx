@@ -1,5 +1,6 @@
 /* @refresh reload */
 import { render } from 'solid-js/web'
+import './registerClientContributions'
 import { QueryClient, QueryCache, MutationCache } from '@tanstack/solid-query'
 import { PersistQueryClientProvider } from '@tanstack/solid-query-persist-client'
 import { createAsyncStoragePersister } from '@tanstack/query-async-storage-persister'

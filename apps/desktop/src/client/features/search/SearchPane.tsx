@@ -1,7 +1,6 @@
 import { createMemo, createResource, createSignal, For, Show } from 'solid-js'
 import type { Task } from '../../queries'
 import { debounce } from '../../autosave'
-import { dispatchLayout } from '../tasks/tasks'
 import { editorOpen, requestEditorReveal } from '../editor/editorState'
 import { findInFiles, type SearchHit } from './searchClient'
 import './search.css'
@@ -37,7 +36,6 @@ export default function SearchPane(props: { task: Task }) {
   const totalHits = createMemo(() => (results()?.files ?? []).reduce((n, f) => n + f.hits.length, 0))
 
   function openHit(path: string, line: number) {
-    dispatchLayout(props.task.id, { type: 'add', pane: 'editor' }) // open the editor beside Search
     editorOpen(props.task.id, path, true) // ephemeral preview tab, like a tree click
     requestEditorReveal(props.task.id, path, line)
   }

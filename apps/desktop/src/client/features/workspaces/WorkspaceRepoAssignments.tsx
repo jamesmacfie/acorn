@@ -27,6 +27,7 @@ export default function WorkspaceRepoAssignments() {
   const [paths, setPaths] = createSignal<Record<string, string>>({}) // "owner/name" → on-disk path
   const [newName, setNewName] = createSignal('')
   const [busy, setBusy] = createSignal(false)
+  const [pathError, setPathError] = createSignal('')
 
   const refresh = () =>
     Promise.all([qc.invalidateQueries({ queryKey: workspacesKey }), qc.invalidateQueries({ queryKey: workspaceAssignmentsKey })])
@@ -63,7 +64,8 @@ export default function WorkspaceRepoAssignments() {
     const picked = await api.repoPath.pick()
     if (!picked) return
     const res = await api.repoPath.set(owner, name, picked)
-    if (!res.ok) return window.alert(res.reason)
+    if (!res.ok) return setPathError(res.reason)
+    setPathError('')
     setPaths((p) => ({ ...p, [`${owner}/${name}`]: res.repoPath.path }))
   }
   async function addWorkspace(e: Event) {
@@ -86,6 +88,7 @@ export default function WorkspaceRepoAssignments() {
         A workspace is a named group of repositories. Assign each repo to a workspace
         {api ? ', and optionally point it at where the code lives on disk.' : '.'} Hide a repo with the eye toggle.
       </p>
+      <Show when={pathError()}><div class="action-error" role="alert">{pathError()}</div></Show>
 
       <form class="integration-key-row onboarding-newrow" onSubmit={addWorkspace}>
         <input

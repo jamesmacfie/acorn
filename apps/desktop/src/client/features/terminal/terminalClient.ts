@@ -108,6 +108,8 @@ declare global {
       platform?: string
       // Cmd/Ctrl+W → close the focused pane. Returns an unsubscribe.
       onClosePane?: (cb: () => void) => () => void
+      // App quit lifecycle concern collection. Returns an unsubscribe.
+      onWillQuit?: (cb: () => boolean | Promise<boolean>) => () => void
       terminal?: TerminalStreamBridge
       browser?: {
         bind(taskId: string, webContentsId: number): Promise<boolean>

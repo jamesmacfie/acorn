@@ -3,7 +3,7 @@
 // task's pane layout. Signals-only, like ../terminal/sessions.ts. The terminal drawer + topbar key
 // off activeTaskId.
 import { createSignal } from 'solid-js'
-import { applyLayoutAction, defaultLayout, type LayoutAction, type TaskLayout } from './layout'
+import { applyLayoutAction, defaultLayout, type LayoutAction, type PaneId, type TaskLayout } from './layout'
 
 export type { PaneId, TaskLayout } from './layout'
 
@@ -43,6 +43,8 @@ export function dispatchLayout(taskId: string, action: LayoutAction): void {
     const next = applyLayoutAction(cur, action)
     return next === cur ? prev : { ...prev, [taskId]: next }
   })
+  if (action.type === 'show') setMaximizedPane(taskId, null)
+  if (action.type === 'close' && maximizedPane(taskId) === action.pane) setMaximizedPane(taskId, null)
 }
 export const dispatchActiveLayout = (action: LayoutAction): void => {
   const id = activeTaskId()
@@ -89,6 +91,30 @@ export function setTerminalMax(taskId: string, max: boolean): void {
     else next.delete(taskId)
     return next
   })
+}
+
+// Core-owned focused pane and session-only maximize state. Pane content never mutates these
+// directly: the host's paneFocus directive marks focus on pointer/focusin, and commands read it.
+const [focusedPanes, setFocusedPanes] = createSignal<Record<string, PaneId | undefined>>({})
+export const focusedPane = (taskId: string | null | undefined): PaneId | undefined => (taskId ? focusedPanes()[taskId] : undefined)
+export function setFocusedPane(taskId: string, pane: PaneId): void {
+  setFocusedPanes((current) => (current[taskId] === pane ? current : { ...current, [taskId]: pane }))
+}
+
+const [maximizedPanes, setMaximizedPanes] = createSignal<Record<string, PaneId | undefined>>({})
+export const maximizedPane = (taskId: string | null | undefined): PaneId | undefined => (taskId ? maximizedPanes()[taskId] : undefined)
+export function setMaximizedPane(taskId: string, pane: PaneId | null): void {
+  setMaximizedPanes((current) => {
+    if ((current[taskId] ?? null) === pane) return current
+    const next = { ...current }
+    if (pane) next[taskId] = pane
+    else delete next[taskId]
+    return next
+  })
+}
+export function toggleFocusedPaneMax(taskId: string): void {
+  const pane = focusedPane(taskId)
+  if (pane) setMaximizedPane(taskId, maximizedPane(taskId) === pane ? null : pane)
 }
 
 export { activeTaskId, setActiveTaskId, selectedSource, setSelectedSource, taskLayouts }

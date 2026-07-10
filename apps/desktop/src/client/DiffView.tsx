@@ -2,13 +2,15 @@ import { createEffect, createMemo, createSignal, For, on, onCleanup, onMount, Sh
 import { createQuery, useQueryClient } from '@tanstack/solid-query'
 import { useParams, useSearchParams } from '@solidjs/router'
 import { filesKey } from '../shared/api'
-import { fetchFilePatches, fileBlobOptions, filePatchKey, filesOptions, mentionsOptions, prefsKey, prefsOptions, pullDetailOptions, pullKey, type PullFile, type Thread } from './queries'
+import { fetchFilePatches, fileBlobOptions, filePatchKey, filesOptions, mentionsOptions, prefsKey, prefsOptions, pullDetailOptions, pullKey, type PullFile, type Task, type Thread } from './queries'
 import { addReviewComment, replyReview, resolveThread, setPref } from './mutations'
 import { getHighlighter } from './shiki'
-import { FILE_SCROLL_EVENT, routeKey as makeRouteKey, type FileScrollDetail } from './fileNavigation'
+import { routeKey as makeRouteKey } from './fileNavigation'
 import { DiffLine, NonCodeRow, SplitCell, type LineComposerController, type ThreadCollapseController } from './features/diff/DiffRows'
 import { collectMatches, type FindHighlight } from './features/diff/find'
-import { isTypingTarget } from './lib/isTypingTarget'
+import { registerCommands } from './registries/commands'
+import { registerKeybindings } from './registries/keybindings'
+import { clientEvents } from './registries/clientEvents'
 import { createDiffHydrator } from './features/diff/hydration'
 import { readDraft, writeDraft } from './features/comments/draftState'
 import { createDiffMeasureSchedulers, createDiffVirtualizer } from './features/diff/virtualization'
@@ -57,27 +59,30 @@ type PullRoute = {
 const HIGHLIGHT_MAX_PATCH_CHARS = 120_000
 const HIGHLIGHT_MAX_PATCH_LINES = 2_000
 
-export default function DiffView() {
-  const params = useParams()
+export default function DiffView(props: { task?: Task } = {}) {
+  const params = props.task ? null : useParams()
   const route = createMemo<PullRoute | null>(() => {
-    if (!params.owner || !params.repo || !params.number) return null
+    const owner = props.task?.repoOwner ?? params?.owner
+    const repo = props.task?.repoName ?? params?.repo
+    const number = props.task?.pullNumber != null ? String(props.task.pullNumber) : params?.number
+    if (!owner || !repo || !number) return null
     return {
-      owner: params.owner,
-      repo: params.repo,
-      number: params.number,
-      key: makeRouteKey(params.owner, params.repo, params.number),
+      owner,
+      repo,
+      number,
+      key: makeRouteKey(owner, repo, number),
     }
   })
 
   return (
     <Show when={route()} keyed fallback={<p class="placeholder">Select a PR.</p>}>
-      {(r) => <DiffForPull route={r} />}
+      {(r) => <DiffForPull route={r} router={!props.task} />}
     </Show>
   )
 }
 
-function DiffForPull(props: { route: PullRoute }) {
-  const [searchParams] = useSearchParams()
+function DiffForPull(props: { route: PullRoute; router: boolean }) {
+  const searchParams = props.router ? useSearchParams()[0] : {}
   const queryClient = useQueryClient()
   const owner = props.route.owner
   const repo = props.route.repo
@@ -280,17 +285,15 @@ function DiffForPull(props: { route: PullRoute }) {
     }
   })
   onMount(() => {
-    const onFindKey = (e: KeyboardEvent) => {
-      if (!(e.metaKey || e.ctrlKey) || e.shiftKey || e.altKey) return
-      if (e.key.toLowerCase() !== 'f') return
-      // Leave ⌘F to whatever owns text entry (the editor's Monaco find, notes, textareas). The diff
-      // rows aren't typing targets, so viewing the diff still opens this find.
-      if (isTypingTarget(e.target) && e.target !== findInput) return
-      e.preventDefault()
-      openFind()
-    }
-    window.addEventListener('keydown', onFindKey)
-    onCleanup(() => window.removeEventListener('keydown', onFindKey))
+    const commands = registerCommands([
+      { id: 'github.diff.find', title: 'Find in diff', category: 'navigation', run: openFind },
+    ])
+    const bindings = registerKeybindings([{
+      id: 'github.diff.find', command: 'github.diff.find', description: 'Find in diff', category: 'Pull requests',
+      defaultChord: 'meta+f', when: props.router ? 'typing-exempt' : 'pane',
+      ...(props.router ? {} : { pane: 'pr' }),
+    }])
+    onCleanup(() => { bindings.dispose(); commands.dispose() })
   })
 
   const shouldMeasureRow = (row: Row) => row.kind === 'thread' || isCodeRow(row)
@@ -448,14 +451,12 @@ function DiffForPull(props: { route: PullRoute }) {
   }
 
   onMount(() => {
-    const onFileScroll = (event: Event) => {
-      const detail = (event as CustomEvent<FileScrollDetail>).detail
+    const off = clientEvents.on('presentation:file-scroll', (detail) => {
       if (!detail || detail.routeKey !== props.route.key) return
       lastTarget = ''
       scrollToFile(detail.path, true)
-    }
-    window.addEventListener(FILE_SCROLL_EVENT, onFileScroll)
-    onCleanup(() => window.removeEventListener(FILE_SCROLL_EVENT, onFileScroll))
+    })
+    onCleanup(off)
   })
 
   // Scroll to the file named in `?file=` once summaries have created the file headers. Loading that

@@ -6,6 +6,8 @@ import { workspacesKey } from '../../queries'
 import { deleteWorkspace, renameWorkspace, setWorkspaceColor, setWorkspaceDbUrlScript, setWorkspaceDevRestartScript, setWorkspaceDevScript, setWorkspaceIcon, setWorkspacePreview, setWorkspaceSetupScript, setWorkspaceSetupTrigger, setWorkspaceTeardownScript } from '../../mutations'
 import type { PreviewMode, SetupTrigger, Workspace } from '../../../shared/api'
 import { resolveWorkspaceColor, WORKSPACE_COLORS } from '../../../shared/workspaceIdentity'
+import { confirmWillEvent } from '../../registries/willPhase'
+import { clientEvents } from '../../registries/clientEvents'
 
 // Settings → per-workspace page: rename, the worktree setup script, and (non-default) delete.
 // The setup script is a shell command run once when a task's git worktree is first created
@@ -109,11 +111,20 @@ export default function WorkspaceSettings(props: { workspace: Workspace; onDelet
   onCleanup(() => { debScript.flush(); debTeardown.flush(); debDev.flush(); debDevRestart.flush(); debPreview.flush(); debDbUrl.flush() })
 
   const remove = async () => {
-    if (!window.confirm(`Delete workspace “${props.workspace.name}”? Its repos move back to Default.`)) return
+    const confirmed = await confirmWillEvent({
+      kind: 'workspace:remove',
+      payload: { workspaceId: props.workspace.id, name: props.workspace.name },
+      title: 'Delete workspace',
+      actionLabel: 'Delete workspace',
+      alwaysConfirm: true,
+      concerns: [{ id: `workspace:${props.workspace.id}`, feature: 'Workspaces', message: 'Its repositories move back to Default', severity: 'danger' }],
+    })
+    if (!confirmed) return
     setBusy(true)
     try {
       await deleteWorkspace(props.workspace.id)
       await refresh()
+      clientEvents.emit('runtime:workspace-removed', { workspaceId: props.workspace.id })
       props.onDeleted()
     } finally {
       setBusy(false)

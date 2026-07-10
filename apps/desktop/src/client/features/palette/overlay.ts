@@ -1,4 +1,6 @@
 import { createEffect, createSignal, onCleanup, onMount, type Accessor } from 'solid-js'
+import { commandRegistry } from '../../registries/commands'
+import { keybindingRegistry } from '../../registries/keybindings'
 
 // Shared keyboard plumbing for the three overlay palettes (⌘K command palette, ⌘P file palette,
 // `/` changed-file finder): one window keydown listener, open/query/selection signals,
@@ -18,6 +20,8 @@ export type OverlayPalette = {
   /** Close the overlay and clear query + selection. Also the backdrop-click handler. */
   close: () => void
   setInputRef: (el: HTMLInputElement) => void
+  /** Local overlay navigation handler; attach to the dialog root. */
+  onKeyDown: (event: KeyboardEvent) => void
 }
 
 // Only one overlay open at a time: opening one dismisses whichever other is open. Module-scoped
@@ -25,16 +29,17 @@ export type OverlayPalette = {
 let activeClose: (() => void) | null = null
 
 export function createOverlayPalette(opts: {
+  /** Stable command/keybinding id for the overlay toggle. Omit for programmatic-only overlays. */
+  id?: string
+  title?: string
+  toggleChord?: string
+  active?: () => boolean
   /** Current result-list length; ↑/↓ clamp to it. */
   count: () => number
   /** Invoke the item at the selected index (Enter / row click paths look items up themselves). */
   onPick: (index: number) => void
-  /** Open/close trigger chord (e.g. ⌘K). Consumed with preventDefault; toggles the overlay. */
-  isToggle?: (e: KeyboardEvent) => boolean
   /** Runs when the overlay opens (e.g. kick resource refetches). */
   onOpen?: () => void
-  /** Keydowns while the overlay is CLOSED that weren't the toggle — for extra bare-key shortcuts. */
-  onClosedKey?: (e: KeyboardEvent) => void
 }): OverlayPalette {
   const [open, setOpen] = createSignal(false)
   const [query, setQuerySignal] = createSignal('')
@@ -69,21 +74,8 @@ export function createOverlayPalette(opts: {
     setSel(0)
   }
 
-  const onKey = (e: KeyboardEvent) => {
-    if (opts.isToggle?.(e)) {
-      e.preventDefault()
-      // Capture-phase + stopPropagation so the chord beats Monaco's keybinding service, which
-      // otherwise swallows ⌘K (chord prefix) and ⌘L (expand line selection) while the editor is
-      // focused and the palette would never open. ⌘P is unbound in Monaco but harmless to stop too.
-      e.stopPropagation()
-      if (open()) close()
-      else show()
-      return
-    }
-    if (!open()) {
-      opts.onClosedKey?.(e)
-      return
-    }
+  const onKeyDown = (e: KeyboardEvent) => {
+    if (!open()) return
     // Open overlay: the input owns typing; only list-navigation keys are intercepted.
     if (e.key === 'Escape') {
       e.preventDefault()
@@ -100,9 +92,26 @@ export function createOverlayPalette(opts: {
     }
   }
 
-  // Capture phase: intercept toggle chords before Monaco's editor-scoped keydown handler (see onKey).
-  onMount(() => window.addEventListener('keydown', onKey, { capture: true }))
-  onCleanup(() => window.removeEventListener('keydown', onKey, { capture: true }))
+  onMount(() => {
+    if (!opts.id || !opts.toggleChord) return
+    const command = commandRegistry.register({
+      id: `overlay.${opts.id}.toggle`,
+      title: opts.title ?? `Toggle ${opts.id}`,
+      category: 'navigation',
+      when: opts.active,
+      run: () => open() ? close() : show(),
+    })
+    const binding = keybindingRegistry.register({
+      id: `overlay.${opts.id}.toggle`,
+      command: `overlay.${opts.id}.toggle`,
+      description: opts.title ?? `Toggle ${opts.id}`,
+      category: 'Global',
+      defaultChord: opts.toggleChord,
+      when: 'global',
+      active: opts.active,
+    })
+    onCleanup(() => { binding.dispose(); command.dispose() })
+  })
 
   // Keep the selection in range when the list shrinks under it (data refetch narrows results).
   createEffect(() => {
@@ -121,5 +130,6 @@ export function createOverlayPalette(opts: {
     setInputRef: (el) => {
       inputRef = el
     },
+    onKeyDown,
   }
 }

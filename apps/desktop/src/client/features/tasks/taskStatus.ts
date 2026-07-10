@@ -6,13 +6,14 @@
 import { createSignal } from 'solid-js'
 import { terminalApi } from '../terminal/terminalClient'
 import type { TaskStatus } from '../../../shared/terminal'
+import type { PollerContribution } from '../../registries/pollers'
 
 const [statuses, setStatuses] = createSignal<Record<string, TaskStatus>>({})
 export { statuses }
 
 export const taskStatus = (id: string): TaskStatus | undefined => statuses()[id]
 
-async function refresh(): Promise<void> {
+export async function refreshTaskStatuses(): Promise<void> {
   const api = terminalApi()
   if (!api) return
   const list = await api.task.statuses()
@@ -20,14 +21,10 @@ async function refresh(): Promise<void> {
 }
 
 // Start polling; returns an unsubscribe. No-op when the terminal bridge is absent (web build).
-export function initTaskStatuses(): () => void {
-  const api = terminalApi()
-  if (!api) return () => {}
-  void refresh()
-  const off = api.onStatus(() => void refresh())
-  const timer = setInterval(() => void refresh(), 5000)
-  return () => {
-    off()
-    clearInterval(timer)
-  }
+export const taskStatusPollerContribution: PollerContribution = {
+  id: 'tasks.worktree-status',
+  intervalMs: 5000,
+  requires: 'desktop',
+  run: refreshTaskStatuses,
+  subscribe: (refresh) => terminalApi()?.onStatus(refresh) ?? (() => {}),
 }
