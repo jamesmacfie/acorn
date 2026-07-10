@@ -4,6 +4,7 @@ import type { Task } from '../../queries'
 import type { TerminalProfile } from '../../../shared/terminal'
 import { refreshSessions, sessions } from '../terminal/sessions'
 import { terminalApi, type WorkflowStepRow } from '../terminal/terminalClient'
+import { workflowApi } from './workflowClient'
 import { setTerminalOpen } from '../tasks/tasks'
 import { buildRoster, resumeCommandFor, stepFeed, type RosterRow } from './model'
 import './agents-panel.css'
@@ -33,8 +34,8 @@ export default function AgentsPanel(props: { task: Task; onClose: () => void }) 
     () => props.task.id,
     async (taskId) => {
       if (!api) return { runs: [], steps: [] as WorkflowStepRow[] }
-      const runs = await api.workflow.runs(taskId)
-      const steps = (await Promise.all(runs.map((r) => api.workflow.steps(r.id)))).flat()
+      const runs = await workflowApi.runs(taskId)
+      const steps = (await Promise.all(runs.map((r) => workflowApi.steps(r.id)))).flat()
       return { runs, steps }
     },
     { initialValue: { runs: [], steps: [] } },
@@ -78,7 +79,7 @@ export default function AgentsPanel(props: { task: Task; onClose: () => void }) 
 
   async function resolveGate(row: RosterRow, approved: boolean) {
     if (!api || row.kind !== 'step') return
-    await api.workflow.gate(row.step.runId, row.step.id, approved)
+    await workflowApi.gate(row.step.runId, row.step.id, approved)
     await refetch()
   }
 

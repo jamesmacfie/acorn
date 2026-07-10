@@ -5,6 +5,8 @@ import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { createApp } from '../server/index'
 import { makeBindings, type RuntimeBindings } from './bindings'
+import { wireServerBridges } from './serverBridges'
+import { attachWsHub } from './wsHub'
 
 const here = dirname(fileURLToPath(import.meta.url))
 // Resolve packaged paths from this module, never process.cwd() — the app launches from Finder.
@@ -22,6 +24,11 @@ export const ACORN_PORT = Number(process.env.ACORN_PORT) || 4317
 // BEFORE the listener accepts requests (review §2 boot-order fix). Resolves once listening so
 // callers can safely loadURL the origin.
 export function startListener(runtime: RuntimeBindings): Promise<ServerType> {
+  // Pure-Node domain bridges (search/editor/git/database): wired here so BOTH the Electron
+  // composition root and the dev:node entry install them (docs/next Phase 3 §6). The stateful
+  // bridges are wired separately in main/bootstrap.ts, before this is reached under Electron.
+  wireServerBridges(runtime.DB)
+
   const app = createApp()
 
   // Serve the built SPA, and fall back to the shell only for non-API/auth navigations — so
@@ -56,6 +63,14 @@ export function startListener(runtime: RuntimeBindings): Promise<ServerType> {
       console.log(`acorn server on http://127.0.0.1:${info.port}`)
       server.off('error', reject) // listening — later runtime errors are not listen failures
       resolveServer(server)
+    })
+    // The one authenticated WebSocket (Phase 3 slice 6) shares this loopback listener via its
+    // 'upgrade' event; the hub re-checks Host + Origin + session cookie before the handshake.
+    attachWsHub(server as unknown as import('node:http').Server, {
+      encKey: runtime.SESSION_ENC_KEY,
+      internalToken: runtime.INTERNAL_TOKEN,
+      allowedHost,
+      origin: `http://${allowedHost}`,
     })
     server.once('error', reject)
   })

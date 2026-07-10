@@ -18,6 +18,7 @@ import PreviewPane, { evictPreviewWebview } from '../preview/PreviewPane'
 import { workspaceForRepo } from '../workspaces/activeWorkspace'
 import { refreshSessions } from '../terminal/sessions'
 import { terminalApi } from '../terminal/terminalClient'
+import { runApi } from './runClient'
 import { dispatchLayout, layoutForTask, recipeBrowserUrl, setActiveTaskId, setSelectedSource } from './tasks'
 import { activateTaskSignals, pathForTask } from './activate'
 import { defaultLayout, type LayoutAction, type PaneId } from './layout'
@@ -71,7 +72,7 @@ export default function TaskView(props: {
     () => props.task.id,
     async (id) => {
       if (!api) return []
-      const res = await api.run.targets(id)
+      const res = await runApi.targets(id)
       return 'targets' in res ? res.targets : []
     },
   )
@@ -80,7 +81,7 @@ export default function TaskView(props: {
   // terminal session in the worktree, so the drawer shows its output.
   async function toggleTarget(id: string, running: boolean) {
     if (!api) return
-    const res = running ? await api.run.stop(props.task.id, id) : await api.run.start(props.task.id, id)
+    const res = running ? await runApi.stop(props.task.id, id) : await runApi.start(props.task.id, id)
     if (!res.ok && res.reason) window.alert(res.reason)
     await refreshSessions()
     await refetchTargets()
@@ -118,7 +119,7 @@ export default function TaskView(props: {
   // re-resolved when target status changes (a url_command needs the instance up).
   const [runUrl] = createResource(
     () => ({ id: props.task.id, running: (runTargets() ?? []).map((t) => `${t.id}:${t.running}`).join(',') }),
-    async (src) => (api ? ((await api.run.defaultUrl(src.id)) ?? null) : null),
+    async (src) => (api ? ((await runApi.defaultUrl(src.id)) ?? null) : null),
   )
   const previewUrl = () => {
     // A layout recipe's browser=run:<id> resolution wins for this session (docs/next 13 §C).

@@ -12,6 +12,7 @@ import { formatFileReference, sendReferenceToAgent } from '../agent/reference'
 import { taskStatus } from '../tasks/taskStatus'
 import { agentSessionsFor } from '../terminal/sessions'
 import { terminalApi } from '../terminal/terminalClient'
+import { localGitApi } from './localGitClient'
 import { changeKey, groupChanges, pickSelected, toPullFile } from './model'
 import './changes.css'
 
@@ -25,7 +26,7 @@ export default function ChangesPane(props: { task: Task }) {
 
   const [changes, { refetch }] = createResource(
     () => props.task.id,
-    async (id) => (api ? await api.local.changes(id) : []),
+    async (id) => (api ? await localGitApi.changes(id) : []),
     { initialValue: [] },
   )
   // The rail's dirty poll is the refresh signal — when the worktree's change count moves, re-list.
@@ -52,7 +53,7 @@ export default function ChangesPane(props: { task: Task }) {
     },
     async (src): Promise<Row[]> => {
       if (!api) return []
-      const res = await api.local.diff(src.taskId, src.sel.path, src.sel.staged ? 'staged' : 'unstaged')
+      const res = await localGitApi.diff(src.taskId, src.sel.path, src.sel.staged ? 'staged' : 'unstaged')
       if ('error' in res) return []
       const file = toPullFile(src.sel, res.patch)
       // Whole-file view: the patch carries full context (server -U1e6), so drop the expand gaps and
@@ -114,17 +115,17 @@ export default function ChangesPane(props: { task: Task }) {
   async function discard(path: string, untracked: boolean) {
     if (!api) return
     if (!window.confirm(`Discard changes to ${path}? This cannot be undone.`)) return
-    await gitAction(() => api.local.discard(props.task.id, path, untracked))
+    await gitAction(() => localGitApi.discard(props.task.id, path, untracked))
   }
   // Bulk toolbar actions (docs/panes.md): whole working tree at once. Discard-all is destructive → confirm.
   async function discardAll() {
     if (!api) return
     if (!window.confirm('Discard ALL changes, including untracked files? This cannot be undone.')) return
-    await gitAction(() => api.local.discardAll(props.task.id))
+    await gitAction(() => localGitApi.discardAll(props.task.id))
   }
   async function commit() {
     if (!api || !commitMsg().trim()) return
-    const res = await api.local.commit(props.task.id, commitMsg())
+    const res = await localGitApi.commit(props.task.id, commitMsg())
     if (!res.ok) return window.alert(res.reason ?? 'Commit failed.')
     setCommitMsg('')
     await refetch()
@@ -137,7 +138,7 @@ export default function ChangesPane(props: { task: Task }) {
     if (!api || pushing()) return
     setPushing(true)
     setPushMsg('')
-    const res = await api.local.push(props.task.id)
+    const res = await localGitApi.push(props.task.id)
     setPushing(false)
     if (res.ok) setPushMsg('Pushed')
     else window.alert(res.reason ?? 'Push failed.')
@@ -167,8 +168,8 @@ export default function ChangesPane(props: { task: Task }) {
         <span>Changes (uncommitted)</span>
         <Show when={groups().staged.length || groups().unstaged.length}>
           <span class="changes-toolbar">
-            <button type="button" class="changes-to-agent" disabled={!groups().unstaged.length} data-tip="Stage all" data-tip-sub="git add -A" onClick={() => api && void gitAction(() => api.local.stageAll(props.task.id))}>++</button>
-            <button type="button" class="changes-to-agent" disabled={!groups().staged.length} data-tip="Unstage all" data-tip-sub="git reset" onClick={() => api && void gitAction(() => api.local.unstageAll(props.task.id))}>−−</button>
+            <button type="button" class="changes-to-agent" disabled={!groups().unstaged.length} data-tip="Stage all" data-tip-sub="git add -A" onClick={() => api && void gitAction(() => localGitApi.stageAll(props.task.id))}>++</button>
+            <button type="button" class="changes-to-agent" disabled={!groups().staged.length} data-tip="Unstage all" data-tip-sub="git reset" onClick={() => api && void gitAction(() => localGitApi.unstageAll(props.task.id))}>−−</button>
             <button type="button" class="changes-to-agent" data-tip="Discard all" data-tip-sub="Reset tracked + remove untracked — cannot be undone" onClick={() => void discardAll()}>↺</button>
           </span>
         </Show>
@@ -216,12 +217,12 @@ export default function ChangesPane(props: { task: Task }) {
                           when={c.staged}
                           fallback={
                             <>
-                              <button type="button" class="changes-to-agent" data-tip="Stage file" data-tip-sub="git add" onClick={() => api && void gitAction(() => api.local.stage(props.task.id, c.path))}>+</button>
+                              <button type="button" class="changes-to-agent" data-tip="Stage file" data-tip-sub="git add" onClick={() => api && void gitAction(() => localGitApi.stage(props.task.id, c.path))}>+</button>
                               <button type="button" class="changes-to-agent" data-tip="Discard changes" data-tip-sub="Restore this file — cannot be undone" onClick={() => void discard(c.path, c.status === 'untracked')}>↺</button>
                             </>
                           }
                         >
-                          <button type="button" class="changes-to-agent" data-tip="Unstage file" data-tip-sub="git restore --staged" onClick={() => api && void gitAction(() => api.local.unstage(props.task.id, c.path))}>−</button>
+                          <button type="button" class="changes-to-agent" data-tip="Unstage file" data-tip-sub="git restore --staged" onClick={() => api && void gitAction(() => localGitApi.unstage(props.task.id, c.path))}>−</button>
                         </Show>
                         <button
                           type="button"

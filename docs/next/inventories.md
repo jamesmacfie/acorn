@@ -12,41 +12,54 @@ prose elsewhere in docs/next, this file wins.
 
 ---
 
-## 1. The IPC surface (Phase 3 consumes this)
+## 1. The IPC surface (Phase 3 consumes this) — **✓ COMPLETE**
 
 **Totals: 67 `ipcMain.handle` channels + 3 `ipcMain.on` channels + 4 push
 channels.** Classification: 65 req/resp (→ HTTP routes), 3 stream + 1 dynamic
 push (→ the WebSocket), 2 Electron-isms + 2 window-targeted pings (stay IPC).
 
+**Phase 3 done:** all 65 req/resp channels are typed HTTP routes behind main-process bridges
+(`server/bridge.ts`); all 4 stream/push channels ride one authenticated WebSocket at `/ws`
+(`main/wsHub.ts`). The preload residue is exactly §1c. See per-domain tick-offs below and
+[electron.md §12](../electron.md) for the transport + `dev:node` capability map.
+
 ### 1a. Request/response channels by domain (→ HTTP routes)
 
 | Domain | Channels (all in `main/`) | Count |
 | --- | --- | --- |
-| database (`database.ts:140-264`) | `db:connect` `db:tables` `db:columns` `db:rows` `db:query` `db:update` `db:insert` `db:delete` `db:disconnect` | 9 |
-| local-git (`localGitIpc.ts:16-68`) | `local:changes` `local:diff` `local:blob` `local:stage` `local:unstage` `local:discard` `local:commit` `local:stageAll` `local:unstageAll` `local:discardAll` `local:push` | 11 |
-| editor (`localGitIpc.ts:73-105`) | `editor:root` `editor:list` `editor:files` `editor:read` `editor:write` | 5 |
-| knowledge (`knowledgeIpc.ts:172-258`) | `memory:list` `memory:search` `memory:add` `memory:proposals` `memory:proposal:resolve` `notes:list` `notes:read` `notes:create` `notes:write` `notes:setIncluded` `notes:remove` | 11 |
-| run (`runIpc.ts:50-54`) | `run:targets` `run:start` `run:stop` `run:status` `run:defaultUrl` | 5 |
-| search (`searchIpc.ts:70`) | `search:findInFiles` | 1 |
-| workflow (`workflowWiring.ts:126-143`) | `workflow:defs` `workflow:start` `workflow:runs` `workflow:steps` `workflow:gate` | 5 |
-| terminal control (`terminal.ts:433-623`) | `term:list` `term:profiles` `term:create` `term:sendToAgent` `term:kill` `term:interrupt` `term:remove` `term:resize` `term:previewUrl` `term:repoPath:get` `term:repoPath:set` `term:repoPath:runTargets` `term:task:statuses` `term:task:onCreated` `term:task:useCheckout` `term:task:archive` `mcp:inspect` `mcp:createStarter` | 18 |
+| ~~database (`database.ts:140-264`)~~ **✓ Phase 3** | → `/api/tasks/:id/database/*` (`DatabaseBridge` in `main/database.ts`; transport test `database.test.ts`; SQL/pool invariants = live pass, no test DB) | 9 |
+| ~~local-git (`localGitIpc.ts:16-68`)~~ **✓ Phase 3** | → `/api/tasks/:id/local/*` (`LocalGitBridge` in `main/localGit.ts`; real-worktree test `localGit.test.ts`) | 11 |
+| ~~editor (`localGitIpc.ts:73-105`)~~ **✓ Phase 3** | → `GET/PUT /api/tasks/:id/editor/{root,list,files,read,file}` (`routes/editor.ts`, `EditorBridge` in `main/editor.ts`; real-worktree security tests `editor.test.ts`) | 5 |
+| ~~knowledge (`knowledgeIpc.ts:172-258`)~~ **✓ Phase 3** | → `/api/memory*` + `/api/tasks/:id/memory` + `/api/workspaces/:wsId/notes*` (`KnowledgeBridge`; tests `knowledge.test.ts`) | 11 |
+| ~~run (`runIpc.ts:50-54`)~~ **✓ Phase 3** | → the harness `RunBridge` routes `/api/tasks/:id/run[/:target/*]` + new `/run/default-url` (`runClient.ts`; tests `run.test.ts`) | 5 |
+| ~~search (`searchIpc.ts:70`)~~ **✓ Phase 3** | `search:findInFiles` → `POST /api/tasks/:id/search` (`routes/search.ts`, `SearchBridge`; tests `search.test.ts`) | 1 |
+| ~~workflow (`workflowWiring.ts:126-143`)~~ **✓ Phase 3** (notice push → WS in slice 6) | → `/api/tasks/:id/workflows[/runs]` + `/api/workflows/runs/:runId/{steps,gate}` (`WorkflowBridge`, `workflowClient.ts`; tests `workflow.test.ts`) | 5 |
+| ~~terminal control (`terminal.ts:433-623`)~~ **✓ Phase 3** | → `TerminalBridge` at `/api/terminal/*` + `/api/tasks/:id/{archive,preview-url,on-created,use-checkout,mcp}`; hybrid `terminalApi()` (control=HTTP, streams=bridge); mcp→`mcpClient.ts`; tests `terminal.test.ts` | 18 |
 
-### 1b. Stream channels (→ the WebSocket)
+### 1b. Stream channels (→ the WebSocket) — **✓ Phase 3 slice 6**
 
-| Channel | Kind | Today |
+All five now ride ONE authenticated WebSocket at `/ws` (`shared/ws.ts` kind-tagged frames;
+`main/wsHub.ts` hub with upgrade auth = Host + exact-Origin + session cookie / internal token, else
+403; `client/features/terminal/wsClient.ts` reconnecting client). PTY output is coalesced onto a
+~16 ms tick (`terminal.ts` `queueOutput`/`flushOutput`); attach replay (ready → ring) is pushed
+synchronously before any live frame so replay-before-live is deterministic. Headless auth + ordering
++ routing tests in `main/wsHub.test.ts`.
+
+| Channel | Frame | Replaces |
 | --- | --- | --- |
-| `term:input` | `ipcMain.on` — keystrokes into a PTY | `terminal.ts:634` |
-| `term:attach` / `term:detach` | `ipcMain.on` — subscribe/unsubscribe + ring replay | `terminal.ts:641,655` |
-| `term:out:${id}` | dynamic per-session push (`ServerMsg` frames) | `terminal.ts:113,645-646` |
-| `term:status` | push ping, no payload (session status changed) | `notify.ts:7` |
-| `workflow:notice` | push `{taskId, kind, title}` | `notify.ts:13` |
+| `term:input` | `{channel:'term:input', id, data}` | `ipcMain.on('term:input')` |
+| `term:attach` / `term:detach` | `{channel:'term:attach'|'term:detach', id}` | `ipcMain.on('term:attach'|'term:detach')` |
+| `term:out` | `{channel:'term:out', id, msg: ServerMsg}` (coalesced) | per-session `term:out:${id}` push |
+| `term:status` | `{channel:'term:status'}` | `notify.ts` push |
+| `workflow:notice` | `{channel:'workflow:notice', notice}` | `notify.ts` push |
+| `workflow:step:event` | reserved, wired unpopulated (agent-runtime §3.2) | — |
 
 WS framing must carry: `term:out` frames (coalesced ~16 ms), `term:input`,
 attach/detach as messages or routes, the `term:status` + `workflow:notice`
 pings, and (designed in from day one, populated later) `workflow:step:event`
 live-tail frames ([agent-runtime.md](./agent-runtime.md) §3.2).
 
-### 1c. Electron-ism residue (stays IPC, never HTTP — [security.md](./security.md) §3)
+### 1c. Electron-ism residue (stays IPC, never HTTP — [security.md](./security.md) §3) — **✓ Phase 3: preload is now exactly these three + `desktop`/`platform` probes**
 
 | Channel | Why it stays |
 | --- | --- |
@@ -54,15 +67,17 @@ live-tail frames ([agent-runtime.md](./agent-runtime.md) §3.2).
 | `term:repoPath:pick` (`terminal.ts:535`) | native `dialog.showOpenDialog` |
 | `acorn:close-pane` (`electron.ts:108`) | main→focused-window ping for ⌘W |
 
-### 1d. What Phase 3 deletes when done
+### 1d. What Phase 3 deletes when done — **✓ done**
 
-Preload namespaces on `window.acorn` (all of `preload.ts` except §1c):
-`terminal` (+nested `repoPath`/`run`/`local`/`task`/`workflow`), `browser`
-(keep), `mcp`, `memory`, `notes`, `editor`, `search`, `database`. Client
-hand-declared interfaces: `terminalClient.ts` (also declares the `Window.acorn`
-global incl. inline browser/mcp), `editorClient.ts`, `searchClient.ts`,
-`notesClient.ts`, `memoryClient.ts`, `databaseClient.ts`;
-`capabilities.ts` shrinks to probing the residue + the HTTP health check.
+Preload namespaces removed from `window.acorn`: `terminal`'s req/resp + stream methods (only
+`repoPath.pick` remains), `mcp`, `memory`, `notes`, `editor`, `search`, `database`, `run`,
+`workflow` (the notice push is a WS frame now). `browser.bind` + `onClosePane` + `desktop`/`platform`
+kept (§1c). The client accessors were rewritten to HTTP/WS rather than deleted (they keep their
+call-site shape): `terminalClient.ts` is now a hybrid (HTTP control + WS streams) and declares the
+slimmed `Window.acorn` global (only `terminal.repoPath.pick` + `browser.bind`); `editorClient.ts` /
+`searchClient.ts` / `notesClient.ts` / `memoryClient.ts` / `databaseClient.ts` call routes; new
+`runClient.ts` / `workflowClient.ts` / `localGitClient.ts` / `mcpClient.ts` / `wsClient.ts` added.
+`capabilities.ts` still probes the residual `terminal` marker (+ `desktop`).
 
 ---
 

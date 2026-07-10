@@ -33,6 +33,9 @@ export type RunBridge = {
   stop(taskId: string, targetId: string): Promise<unknown>
   restart(taskId: string, targetId: string): Promise<unknown>
   status(taskId: string, targetId: string): Promise<unknown>
+  // The default target's URL for the browser/preview home (Phase 3: was run:defaultUrl). Renderer
+  // surface only; the MCP tools never call it.
+  defaultUrl(taskId: string): Promise<string | undefined>
 }
 
 // Drivable browser (docs/panes.md): CDP over the task's preview webview.
@@ -148,6 +151,8 @@ export const harness = new Hono<AppEnv>()
     )
   })
   .get('/:id/run', (c) => respond(c, bridges.run, (b) => b.targets(c.req.param('id'))))
+  // Static 'default-url' before the ':target' routes so it can't be shadowed by a target id.
+  .get('/:id/run/default-url', (c) => respond(c, bridges.run, async (b) => ({ url: (await b.defaultUrl(c.req.param('id'))) ?? null })))
   .post('/:id/run/:target/start', (c) => respond(c, bridges.run, (b) => b.start(c.req.param('id'), c.req.param('target'))))
   .post('/:id/run/:target/stop', (c) => respond(c, bridges.run, (b) => b.stop(c.req.param('id'), c.req.param('target'))))
   .post('/:id/run/:target/restart', (c) => respond(c, bridges.run, (b) => b.restart(c.req.param('id'), c.req.param('target'))))

@@ -41,6 +41,7 @@
     "shiki": "^4.2.0",
     "smol-toml": "^1.7.0",
     "solid-js": "^1.9.13",
+    "ws": "^8.21.0",
     "zod": "^4.4.3"
   },
   "devDependencies": {
@@ -49,6 +50,7 @@
     "@types/diff": "^8.0.0",
     "@types/node": "^26.0.0",
     "@types/pg": "^8.20.0",
+    "@types/ws": "^8.5.13",
     "drizzle-kit": "^0.31.10",
     "electron": "^42.5.0",
     "electron-builder": "^26.15.3",

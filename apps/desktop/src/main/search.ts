@@ -1,12 +1,13 @@
-// Find-in-files IPC (docs/panes.md): project-wide text search over the task's worktree, backed by
+// Find-in-files (docs/panes.md): project-wide text search over the task's worktree, backed by
 // ripgrep. Keyed by taskId → taskRoot (the taskId is the capability; the renderer never hands us a
 // path — rg runs with cwd:root and searches `.`), mirroring editor:files in localGitIpc.ts.
-import { ipcMain, type IpcMainInvokeEvent } from 'electron'
+// Exposed as the SearchBridge (server/routes/search.ts); no longer an IPC channel (Phase 3).
 import { execFile } from 'node:child_process'
 import { promisify } from 'node:util'
 import { rgPath } from '@vscode/ripgrep'
+import type { SearchBridge, SearchOpts } from '../server/routes/search'
 import type { AppDatabase } from '../server/db'
-import type { FileHits, SearchOpts, SearchResult } from '../shared/search'
+import type { FileHits, SearchResult } from '../shared/search'
 import { taskRoot } from './taskWorktree'
 
 const MAX_TOTAL_HITS = 2000 // ponytail: fixed cap; the pane shows "truncated". Raise if it bites.
@@ -66,29 +67,29 @@ export function parseRgJson(stdout: string): SearchResult {
   return { files: files.filter((f) => f.hits.length), truncated }
 }
 
-export function registerSearchIpc(db: AppDatabase): void {
-  ipcMain.handle(
-    'search:findInFiles',
-    async (_e: IpcMainInvokeEvent, p: { taskId: string; query: string; opts?: SearchOpts }): Promise<SearchResult> => {
-      const root = await taskRoot(db, p?.taskId)
-      if (!root || !p?.query) return { files: [], truncated: false }
-      const opts = p.opts ?? {}
-      // --json: robust structured output (no path:line:text colon ambiguity). rg already honours
-      // .gitignore and skips binary/hidden — the same set editor:files offers. --no-config so a
-      // user's RIPGREP_CONFIG_PATH can't change the flags we depend on.
-      const args = ['--json', '--no-config']
-      if (!opts.regex) args.push('--fixed-strings')
-      if (!opts.caseSensitive) args.push('--ignore-case')
-      if (opts.wholeWord) args.push('--word-regexp')
-      // The trailing `.` is REQUIRED: with no path arg and stdin not a TTY (execFile pipes it), rg
-      // blocks reading stdin forever and only dies at the timeout. `.` = search cwd (the worktree).
-      args.push('--', p.query, '.')
-      const { stdout } = await promisify(execFile)(rgPath, args, {
-        cwd: root,
-        timeout: 10_000,
-        maxBuffer: 32 * 1024 * 1024,
-      }).catch(() => ({ stdout: '' })) // rg exits 1 on no-match / 2 on bad regex → empty result
-      return parseRgJson(stdout)
-    },
-  )
+// Run ripgrep over the task's worktree. Unknown task / unmapped repo → empty result (the pane just
+// shows no hits), never an error — the taskId is the capability and a stale one is benign.
+export async function searchInFiles(db: AppDatabase, taskId: string, query: string, opts: SearchOpts): Promise<SearchResult> {
+  const root = await taskRoot(db, taskId)
+  if (!root || !query) return { files: [], truncated: false }
+  // --json: robust structured output (no path:line:text colon ambiguity). rg already honours
+  // .gitignore and skips binary/hidden — the same set editor:files offers. --no-config so a
+  // user's RIPGREP_CONFIG_PATH can't change the flags we depend on.
+  const args = ['--json', '--no-config']
+  if (!opts.regex) args.push('--fixed-strings')
+  if (!opts.caseSensitive) args.push('--ignore-case')
+  if (opts.wholeWord) args.push('--word-regexp')
+  // The trailing `.` is REQUIRED: with no path arg and stdin not a TTY (execFile pipes it), rg
+  // blocks reading stdin forever and only dies at the timeout. `.` = search cwd (the worktree).
+  args.push('--', query, '.')
+  const { stdout } = await promisify(execFile)(rgPath, args, {
+    cwd: root,
+    timeout: 10_000,
+    maxBuffer: 32 * 1024 * 1024,
+  }).catch(() => ({ stdout: '' })) // rg exits 1 on no-match / 2 on bad regex → empty result
+  return parseRgJson(stdout)
 }
+
+export const searchBridge = (db: AppDatabase): SearchBridge => ({
+  findInFiles: (taskId, query, opts) => searchInFiles(db, taskId, query, opts),
+})

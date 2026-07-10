@@ -1,7 +1,6 @@
-// The run-target IPC surface (preload group `terminal.run`), split out of terminal.ts: builds the
-// RuntimeService over the session engine's glue and registers the run:* handlers. The service
-// itself stays dependency-injected (runtime.ts) so it's unit-testable under plain Node.
-import { ipcMain, type IpcMainInvokeEvent } from 'electron'
+// Builds the RuntimeService over the session engine's glue. Run targets are exposed as the harness
+// RunBridge over HTTP (server/routes/harness.ts) — Phase 3 removed the run:* IPC channels. The
+// service stays dependency-injected (runtime.ts) so it's unit-testable under plain Node.
 import { execFile } from 'node:child_process'
 import { promisify } from 'node:util'
 import type { AppDatabase } from '../server/db'
@@ -44,12 +43,4 @@ export function createRuntimeService(db: AppDatabase, glue: RunSessionGlue): Run
     killSession: glue.killSession,
     runScript,
   })
-}
-
-export function registerRunIpc(runtime: RuntimeService): void {
-  ipcMain.handle('run:targets', (_e: IpcMainInvokeEvent, taskId: string) => runtime.targets(String(taskId)))
-  ipcMain.handle('run:start', (_e: IpcMainInvokeEvent, p: { taskId: string; targetId: string }) => runtime.start(String(p?.taskId), String(p?.targetId)))
-  ipcMain.handle('run:stop', (_e: IpcMainInvokeEvent, p: { taskId: string; targetId: string }) => runtime.stop(String(p?.taskId), String(p?.targetId)))
-  ipcMain.handle('run:status', (_e: IpcMainInvokeEvent, p: { taskId: string; targetId: string }) => runtime.status(String(p?.taskId), String(p?.targetId)))
-  ipcMain.handle('run:defaultUrl', (_e: IpcMainInvokeEvent, taskId: string) => runtime.defaultUrl(String(taskId)))
 }

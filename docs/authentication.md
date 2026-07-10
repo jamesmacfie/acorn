@@ -138,6 +138,15 @@ can therefore read local mirrors and app-state, but any route that would call
 GitHub live fails with `401 reauth` (empty bearer). See
 [api-reference](./api-reference.md#middleware--auth) and [mcp](./mcp.md).
 
+## WebSocket upgrade auth (`/ws`)
+
+The single stream socket (Phase 3, [electron §12](./electron.md)) reuses the same identity model at
+the HTTP upgrade, checked in `main/wsHub.ts` **before** the handshake completes: the loopback
+**Host** guard, an **exact-Origin** match, and a valid **session cookie** — or the
+**`x-acorn-internal`** token (the loopback MCP caller, which carries no cookie/Origin). Any failure
+returns `403` and the socket is destroyed. Same cookie, same token, same single-user machine as the
+HTTP surface — no new credential kind.
+
 ## `GET /api/me`
 
 Returns **public fields only**:

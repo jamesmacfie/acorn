@@ -1,12 +1,12 @@
-// Database pane IPC (docs/pg.md): a per-task Postgres connection for browsing + editing the
+// Database pane backing (docs/pg.md): a per-task Postgres connection for browsing + editing the
 // task's dev database. Mirrors the local-git/editor surfaces — the taskId is the capability, and
-// everything is re-derived from the DB per call. Local-only, so IPC not HTTP.
+// everything is re-derived from the DB per call. Was the `db:*` IPC channels; now the
+// DatabaseBridge behind the HTTP routes in server/routes/database.ts (Phase 3). Pure-Node (pg).
 //
 // SQL-injection posture: values are ALWAYS parameterized ($1…). Identifiers (schema/table/column
 // names) can't be parameterized, so every identifier used in generated SQL is validated against
 // the live introspected schema (assertTable / assertColumns) and double-quoted (qid). Arbitrary SQL
-// from the editor (db:query) runs verbatim — it's the user's own DB and writes are wanted.
-import { ipcMain, type IpcMainInvokeEvent } from 'electron'
+// from the editor (query) runs verbatim — it's the user's own DB and writes are wanted.
 import { execFile } from 'node:child_process'
 import { readFile } from 'node:fs/promises'
 import { join } from 'node:path'
@@ -14,6 +14,7 @@ import { promisify } from 'node:util'
 import pg from 'pg'
 import type { QueryResult, QueryResultRow } from 'pg'
 import type { AppDatabase } from '../server/db'
+import type { DatabaseBridge } from '../server/routes/database'
 import type { DbCell, DbColumn, DbConnectResult, DbColumnsResult, DbPk, DbQueryResult, DbResultSet, DbRowsResult, DbTablesResult, DbWriteResult } from '../shared/database'
 import { loadTask, taskRoot, workspaceConfigRow } from './taskWorktree'
 
@@ -144,138 +145,140 @@ export async function endDbPools(): Promise<void> {
   }
 }
 
-export function registerDatabaseIpc(db: AppDatabase): void {
-  // Connect: resolve the URL on demand, (re)build the pool, confirm reachability. Never persists the URL.
-  ipcMain.handle('db:connect', async (_e: IpcMainInvokeEvent, taskId: string): Promise<DbConnectResult> => {
-    try {
-      const url = await resolveDbUrl(db, taskId)
-      if (!url) return { ok: false, error: 'No database found. Set a connection script in Workspace Settings, or add DATABASE_URL to the worktree .env.' }
-      await pools.get(taskId)?.pool.end().catch(() => {})
-      const pool = new Pool({ connectionString: url, max: 4, connectionTimeoutMillis: 8_000 })
-      pool.on('error', () => {}) // idle-client errors shouldn't crash main
-      const res = await pool.query<{ database: string }>('SELECT current_database() AS database')
-      const database = res.rows[0]?.database ?? ''
-      pools.set(taskId, { pool, url, database })
-      return { ok: true, database }
-    } catch (e) {
-      return { ok: false, error: errText(e) }
-    }
-  })
+export function databaseBridge(db: AppDatabase): DatabaseBridge {
+  return {
+    // Connect: resolve the URL on demand, (re)build the pool, confirm reachability. Never persists the URL.
+    connect: async (taskId): Promise<DbConnectResult> => {
+      try {
+        const url = await resolveDbUrl(db, taskId)
+        if (!url) return { ok: false, error: 'No database found. Set a connection script in Workspace Settings, or add DATABASE_URL to the worktree .env.' }
+        await pools.get(taskId)?.pool.end().catch(() => {})
+        const pool = new Pool({ connectionString: url, max: 4, connectionTimeoutMillis: 8_000 })
+        pool.on('error', () => {}) // idle-client errors shouldn't crash main
+        const res = await pool.query<{ database: string }>('SELECT current_database() AS database')
+        const database = res.rows[0]?.database ?? ''
+        pools.set(taskId, { pool, url, database })
+        return { ok: true, database }
+      } catch (e) {
+        return { ok: false, error: errText(e) }
+      }
+    },
 
-  ipcMain.handle('db:tables', async (_e: IpcMainInvokeEvent, taskId: string): Promise<DbTablesResult> => {
-    const pool = getPool(taskId)
-    if (!pool) return { error: 'Not connected.' }
-    try {
-      return { tables: await listTables(pool) }
-    } catch (e) {
-      return { error: errText(e) }
-    }
-  })
+    tables: async (taskId): Promise<DbTablesResult> => {
+      const pool = getPool(taskId)
+      if (!pool) return { error: 'Not connected.' }
+      try {
+        return { tables: await listTables(pool) }
+      } catch (e) {
+        return { error: errText(e) }
+      }
+    },
 
-  ipcMain.handle('db:columns', async (_e: IpcMainInvokeEvent, p: { taskId: string; schema: string; name: string }): Promise<DbColumnsResult> => {
-    const pool = getPool(p?.taskId)
-    if (!pool) return { error: 'Not connected.' }
-    try {
-      const t = await assertTable(pool, p.schema, p.name)
-      return { columns: await tableColumns(pool, t.schema, t.name) }
-    } catch (e) {
-      return { error: errText(e) }
-    }
-  })
+    columns: async (taskId, schema, name): Promise<DbColumnsResult> => {
+      const pool = getPool(taskId)
+      if (!pool) return { error: 'Not connected.' }
+      try {
+        const t = await assertTable(pool, schema, name)
+        return { columns: await tableColumns(pool, t.schema, t.name) }
+      } catch (e) {
+        return { error: errText(e) }
+      }
+    },
 
-  // Browse a table: first page ordered by PK (if any), capped at ROW_CAP, plus the total row count.
-  ipcMain.handle('db:rows', async (_e: IpcMainInvokeEvent, p: { taskId: string; schema: string; name: string; offset?: number }): Promise<DbRowsResult> => {
-    const pool = getPool(p?.taskId)
-    if (!pool) return { error: 'Not connected.' }
-    try {
-      const t = await assertTable(pool, p.schema, p.name)
-      const cols = await tableColumns(pool, t.schema, t.name)
-      const pkCols = cols.filter((c) => c.isPk).map((c) => c.name)
-      const rel = `${qid(t.schema)}.${qid(t.name)}`
-      const order = pkCols.length ? ` ORDER BY ${pkCols.map(qid).join(', ')}` : ''
-      const offset = Number.isFinite(p.offset) && p.offset! > 0 ? Math.floor(p.offset!) : 0
-      const res = await pool.query(`SELECT * FROM ${rel}${order} LIMIT $1 OFFSET $2`, [ROW_CAP, offset])
-      // ponytail: exact count(*); swap to a pg_class estimate if it drags on huge tables.
-      const cnt = await pool.query<{ n: string }>(`SELECT count(*) AS n FROM ${rel}`)
-      return { ...toResultSet(res), total: Number(cnt.rows[0]?.n ?? 0) }
-    } catch (e) {
-      return { error: errText(e) }
-    }
-  })
+    // Browse a table: first page ordered by PK (if any), capped at ROW_CAP, plus the total row count.
+    rows: async (taskId, schema, name, offset): Promise<DbRowsResult> => {
+      const pool = getPool(taskId)
+      if (!pool) return { error: 'Not connected.' }
+      try {
+        const t = await assertTable(pool, schema, name)
+        const cols = await tableColumns(pool, t.schema, t.name)
+        const pkCols = cols.filter((c) => c.isPk).map((c) => c.name)
+        const rel = `${qid(t.schema)}.${qid(t.name)}`
+        const order = pkCols.length ? ` ORDER BY ${pkCols.map(qid).join(', ')}` : ''
+        const off = Number.isFinite(offset) && offset! > 0 ? Math.floor(offset!) : 0
+        const res = await pool.query(`SELECT * FROM ${rel}${order} LIMIT $1 OFFSET $2`, [ROW_CAP, off])
+        // ponytail: exact count(*); swap to a pg_class estimate if it drags on huge tables.
+        const cnt = await pool.query<{ n: string }>(`SELECT count(*) AS n FROM ${rel}`)
+        return { ...toResultSet(res), total: Number(cnt.rows[0]?.n ?? 0) }
+      } catch (e) {
+        return { error: errText(e) }
+      }
+    },
 
-  // Arbitrary SQL from the Monaco editor — runs verbatim (writes wanted). Timed for the footer.
-  ipcMain.handle('db:query', async (_e: IpcMainInvokeEvent, p: { taskId: string; sql: string }): Promise<DbQueryResult> => {
-    const pool = getPool(p?.taskId)
-    if (!pool) return { error: 'Not connected.' }
-    if (typeof p.sql !== 'string' || !p.sql.trim()) return { error: 'Empty query.' }
-    const started = process.hrtime.bigint()
-    try {
-      const res = await pool.query(p.sql)
-      const ms = Number(process.hrtime.bigint() - started) / 1e6
-      // A multi-statement string yields an array; report the last result set (psql-like).
-      const last = Array.isArray(res) ? res[res.length - 1] : res
-      return { ...toResultSet(last as QueryResult<QueryResultRow>), ms: Math.round(ms) }
-    } catch (e) {
-      return { error: errText(e) }
-    }
-  })
+    // Arbitrary SQL from the Monaco editor — runs verbatim (writes wanted). Timed for the footer.
+    query: async (taskId, sql): Promise<DbQueryResult> => {
+      const pool = getPool(taskId)
+      if (!pool) return { error: 'Not connected.' }
+      if (typeof sql !== 'string' || !sql.trim()) return { error: 'Empty query.' }
+      const started = process.hrtime.bigint()
+      try {
+        const res = await pool.query(sql)
+        const ms = Number(process.hrtime.bigint() - started) / 1e6
+        // A multi-statement string yields an array; report the last result set (psql-like).
+        const last = Array.isArray(res) ? res[res.length - 1] : res
+        return { ...toResultSet(last as QueryResult<QueryResultRow>), ms: Math.round(ms) }
+      } catch (e) {
+        return { error: errText(e) }
+      }
+    },
 
-  // Row edits happen in the detail panel (docs/pg.md): update one column, insert a row, or
-  // delete by PK. All identifiers validated; all values parameterized.
-  ipcMain.handle('db:update', async (_e: IpcMainInvokeEvent, p: { taskId: string; schema: string; name: string; column: string; value: DbCell; pk: DbPk }): Promise<DbWriteResult> => {
-    const pool = getPool(p?.taskId)
-    if (!pool) return { ok: false, error: 'Not connected.' }
-    try {
-      const t = await assertTable(pool, p.schema, p.name)
-      const pkCols = Object.keys(p.pk)
-      if (!pkCols.length) return { ok: false, error: 'This table has no primary key — editing is disabled.' }
-      await assertColumns(pool, t.schema, t.name, [p.column, ...pkCols])
-      const where = pkCols.map((c, i) => `${qid(c)} = $${i + 2}`).join(' AND ')
-      const res = await pool.query(`UPDATE ${qid(t.schema)}.${qid(t.name)} SET ${qid(p.column)} = $1 WHERE ${where}`, [p.value, ...pkCols.map((c) => p.pk[c])])
-      return { ok: true, rowCount: res.rowCount ?? 0 }
-    } catch (e) {
-      return { ok: false, error: errText(e) }
-    }
-  })
+    // Row edits happen in the detail panel (docs/pg.md): update one column, insert a row, or
+    // delete by PK. All identifiers validated; all values parameterized.
+    update: async (taskId, schema, name, column, value, pk): Promise<DbWriteResult> => {
+      const pool = getPool(taskId)
+      if (!pool) return { ok: false, error: 'Not connected.' }
+      try {
+        const t = await assertTable(pool, schema, name)
+        const pkCols = Object.keys(pk)
+        if (!pkCols.length) return { ok: false, error: 'This table has no primary key — editing is disabled.' }
+        await assertColumns(pool, t.schema, t.name, [column, ...pkCols])
+        const where = pkCols.map((c, i) => `${qid(c)} = $${i + 2}`).join(' AND ')
+        const res = await pool.query(`UPDATE ${qid(t.schema)}.${qid(t.name)} SET ${qid(column)} = $1 WHERE ${where}`, [value, ...pkCols.map((c) => pk[c])])
+        return { ok: true, rowCount: res.rowCount ?? 0 }
+      } catch (e) {
+        return { ok: false, error: errText(e) }
+      }
+    },
 
-  ipcMain.handle('db:insert', async (_e: IpcMainInvokeEvent, p: { taskId: string; schema: string; name: string; values: Record<string, DbCell> }): Promise<DbWriteResult> => {
-    const pool = getPool(p?.taskId)
-    if (!pool) return { ok: false, error: 'Not connected.' }
-    try {
-      const t = await assertTable(pool, p.schema, p.name)
-      const cols = Object.keys(p.values)
-      if (!cols.length) return { ok: false, error: 'No values to insert.' }
-      await assertColumns(pool, t.schema, t.name, cols)
-      const placeholders = cols.map((_, i) => `$${i + 1}`).join(', ')
-      const res = await pool.query(`INSERT INTO ${qid(t.schema)}.${qid(t.name)} (${cols.map(qid).join(', ')}) VALUES (${placeholders})`, cols.map((c) => p.values[c]))
-      return { ok: true, rowCount: res.rowCount ?? 0 }
-    } catch (e) {
-      return { ok: false, error: errText(e) }
-    }
-  })
+    insert: async (taskId, schema, name, values): Promise<DbWriteResult> => {
+      const pool = getPool(taskId)
+      if (!pool) return { ok: false, error: 'Not connected.' }
+      try {
+        const t = await assertTable(pool, schema, name)
+        const cols = Object.keys(values)
+        if (!cols.length) return { ok: false, error: 'No values to insert.' }
+        await assertColumns(pool, t.schema, t.name, cols)
+        const placeholders = cols.map((_, i) => `$${i + 1}`).join(', ')
+        const res = await pool.query(`INSERT INTO ${qid(t.schema)}.${qid(t.name)} (${cols.map(qid).join(', ')}) VALUES (${placeholders})`, cols.map((c) => values[c]))
+        return { ok: true, rowCount: res.rowCount ?? 0 }
+      } catch (e) {
+        return { ok: false, error: errText(e) }
+      }
+    },
 
-  ipcMain.handle('db:delete', async (_e: IpcMainInvokeEvent, p: { taskId: string; schema: string; name: string; pk: DbPk }): Promise<DbWriteResult> => {
-    const pool = getPool(p?.taskId)
-    if (!pool) return { ok: false, error: 'Not connected.' }
-    try {
-      const t = await assertTable(pool, p.schema, p.name)
-      const pkCols = Object.keys(p.pk)
-      if (!pkCols.length) return { ok: false, error: 'This table has no primary key — delete is disabled.' }
-      await assertColumns(pool, t.schema, t.name, pkCols)
-      const where = pkCols.map((c, i) => `${qid(c)} = $${i + 1}`).join(' AND ')
-      const res = await pool.query(`DELETE FROM ${qid(t.schema)}.${qid(t.name)} WHERE ${where}`, pkCols.map((c) => p.pk[c]))
-      return { ok: true, rowCount: res.rowCount ?? 0 }
-    } catch (e) {
-      return { ok: false, error: errText(e) }
-    }
-  })
+    remove: async (taskId, schema, name, pk): Promise<DbWriteResult> => {
+      const pool = getPool(taskId)
+      if (!pool) return { ok: false, error: 'Not connected.' }
+      try {
+        const t = await assertTable(pool, schema, name)
+        const pkCols = Object.keys(pk)
+        if (!pkCols.length) return { ok: false, error: 'This table has no primary key — delete is disabled.' }
+        await assertColumns(pool, t.schema, t.name, pkCols)
+        const where = pkCols.map((c, i) => `${qid(c)} = $${i + 1}`).join(' AND ')
+        const res = await pool.query(`DELETE FROM ${qid(t.schema)}.${qid(t.name)} WHERE ${where}`, pkCols.map((c) => pk[c]))
+        return { ok: true, rowCount: res.rowCount ?? 0 }
+      } catch (e) {
+        return { ok: false, error: errText(e) }
+      }
+    },
 
-  ipcMain.handle('db:disconnect', async (_e: IpcMainInvokeEvent, taskId: string): Promise<{ ok: true }> => {
-    const entry = pools.get(taskId)
-    if (entry) {
-      pools.delete(taskId)
-      await entry.pool.end().catch(() => {})
-    }
-    return { ok: true }
-  })
+    disconnect: async (taskId): Promise<{ ok: true }> => {
+      const entry = pools.get(taskId)
+      if (entry) {
+        pools.delete(taskId)
+        await entry.pool.end().catch(() => {})
+      }
+      return { ok: true }
+    },
+  }
 }

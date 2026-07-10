@@ -1,8 +1,8 @@
-// The notes + memory IPC surfaces (preload groups `notes` and `memory`), the context-assembler
-// seams, the launch-time memory injector and the memory auto-generation trigger — split out of
-// terminal.ts (docs/notes-and-memory.md). registerKnowledgeIpc returns the shared stores/closures
-// the harness bridges and workflow wiring reuse.
-import { ipcMain, type IpcMainInvokeEvent } from 'electron'
+// The notes + memory surfaces (the renderer's KnowledgeBridge over HTTP + the context-assembler
+// seams), the launch-time memory injector and the memory auto-generation trigger — split out of
+// terminal.ts (docs/notes-and-memory.md). registerKnowledgeIpc still constructs and returns the shared
+// stores/closures the harness bridges and workflow wiring reuse; Phase 3 moved the `memory:*` /
+// `notes:*` IPC channels to the KnowledgeBridge (server/routes/knowledge.ts).
 import { execFile } from 'node:child_process'
 import { existsSync } from 'node:fs'
 import { homedir } from 'node:os'
@@ -11,6 +11,7 @@ import { promisify } from 'node:util'
 import { eq } from 'drizzle-orm'
 import type { AppDatabase } from '../server/db'
 import { schema } from '../server/db'
+import { setKnowledgeBridge } from '../server/routes/knowledge'
 import { setContextMemorySource, setContextNotesSource } from '../server/routes/taskContext'
 import { buildHeadlessArgv, runHeadless } from './headless'
 import { formatMemoryInjection, listMemories, memoryIndexSlice, memorySources, MEMORY_TYPES, reconcileMemories, searchMemories, writeMemoryFile, type MemoryType } from './memory'
@@ -167,35 +168,33 @@ export function registerKnowledgeIpc(db: AppDatabase, dataRoot: string, deps: Kn
     }
   }
 
-  // --- memory IPC ---
-
-  ipcMain.handle('memory:list', (_e: IpcMainInvokeEvent, p: { repo?: string }) =>
-    guard(async () => {
-      await reconciled()
-      return listMemories(db, { repo: p?.repo ?? null })
-    }),
-  )
-  ipcMain.handle('memory:search', (_e: IpcMainInvokeEvent, p: { query: string; repo?: string; type?: MemoryType }) =>
-    guard(async () => {
-      await reconciled()
-      return searchMemories(db, String(p?.query ?? ''), { repo: p?.repo ?? null, type: p?.type })
-    }),
-  )
-  // Manual add (12 P1): repo scope writes into the TASK'S WORKTREE (reviewed via its PR — never the
-  // user's primary checkout); private scope into ~/.acorn/memory.
-  ipcMain.handle(
-    'memory:add',
-    (_e: IpcMainInvokeEvent, p: { taskId: string; scope: 'repo' | 'private'; name: string; description: string; type: MemoryType; body: string }) =>
+  // The renderer's notes + memory surface, exposed as the KnowledgeBridge behind the HTTP routes
+  // (server/routes/knowledge.ts). Distinct from the harness memory/notes bridges (the MCP agent
+  // surface); this is the human-facing pane. guard() keeps the `| { error }` contract the clients
+  // union on. Backed by the same stores, so it 503s under dev:node.
+  setKnowledgeBridge({
+    memoryList: (repo) =>
       guard(async () => {
-        const type: MemoryType = MEMORY_TYPES.includes(p?.type) ? p.type : 'reference'
+        await reconciled()
+        return listMemories(db, { repo: repo ?? null })
+      }),
+    memorySearch: (query, repo, type) =>
+      guard(async () => {
+        await reconciled()
+        return searchMemories(db, query, { repo: repo ?? null, type: MEMORY_TYPES.includes(type as MemoryType) ? (type as MemoryType) : undefined })
+      }),
+    // Manual add (12 P1): repo scope writes into the TASK'S WORKTREE (reviewed via its PR — never
+    // the user's primary checkout); private scope into ~/.acorn/memory.
+    memoryAdd: (taskId, p) =>
+      guard(async () => {
+        const type: MemoryType = MEMORY_TYPES.includes(p.type as MemoryType) ? (p.type as MemoryType) : 'reference'
+        const t = await loadTask(db, taskId)
         let dir: string
         if (p.scope === 'private') dir = join(homedir(), '.acorn', 'memory')
         else {
-          const t = await loadTask(db, p.taskId)
           if (!t?.worktreePath || !isDir(t.worktreePath)) throw new Error('Repo-scoped memory needs the task worktree (open a terminal first).')
           dir = join(t.worktreePath, '.acorn', 'memory')
         }
-        const t = await loadTask(db, p.taskId)
         let commitSha: string | null = null
         if (t?.worktreePath && isDir(t.worktreePath)) {
           try {
@@ -206,61 +205,50 @@ export function registerKnowledgeIpc(db: AppDatabase, dataRoot: string, deps: Kn
           }
         }
         const res = await writeMemoryFile(dir, {
-          name: String(p.name ?? '').trim(),
-          description: String(p.description ?? '').trim(),
+          name: p.name.trim(),
+          description: p.description.trim(),
           type,
           originSessionId: null,
           commitSha,
           supersededBy: null,
           createdAt: Date.now(),
-          body: String(p.body ?? ''),
+          body: p.body,
         })
         await reconciled()
         return res
       }),
-  )
-
-  // The human gate over auto-generated proposals (docs/next 12 P3).
-  ipcMain.handle('memory:proposals', async (_e: IpcMainInvokeEvent, taskId?: string) => {
-    const pending = await proposals.list('pending')
-    return taskId ? pending.filter((p) => p.taskId === taskId) : pending
-  })
-  ipcMain.handle(
-    'memory:proposal:resolve',
-    async (_e: IpcMainInvokeEvent, p: { id: string; approved: boolean; edited?: { name: string; type: MemoryType; description: string; body: string } }) => {
-      if (!p?.approved) return rejectProposal(proposals, String(p?.id))
-      const proposal = await proposals.get(String(p.id))
+    // The human gate over auto-generated proposals (docs/next 12 P3).
+    memoryProposals: async (taskId) => {
+      const pending = await proposals.list('pending')
+      return taskId ? pending.filter((p) => p.taskId === taskId) : pending
+    },
+    memoryResolveProposal: async (id, approved, edited) => {
+      if (!approved) return rejectProposal(proposals, id)
+      const proposal = await proposals.get(id)
       if (!proposal) return { ok: false, reason: 'Proposal not found.' }
       const t = await loadTask(db, proposal.taskId)
-      return acceptProposal(proposals, proposal.id, t?.worktreePath ?? null, reconciled, p.edited)
+      return acceptProposal(proposals, proposal.id, t?.worktreePath ?? null, reconciled, edited as { name: string; type: MemoryType; description: string; body: string } | undefined)
     },
-  )
-
-  // --- notes IPC ---
-
-  ipcMain.handle('notes:list', (_e: IpcMainInvokeEvent, workspaceId: string) => guard(() => notesStore.list(String(workspaceId))))
-  ipcMain.handle('notes:read', (_e: IpcMainInvokeEvent, p: { workspaceId: string; slug: string }) => guard(() => notesStore.read(p.workspaceId, p.slug)))
-  ipcMain.handle('notes:create', (_e: IpcMainInvokeEvent, p: { workspaceId: string; title: string; kind?: NoteKind }) =>
-    guard(() => notesStore.create(p.workspaceId, String(p.title ?? ''), { kind: p.kind })),
-  )
-  ipcMain.handle('notes:write', (_e: IpcMainInvokeEvent, p: { workspaceId: string; slug: string; body: string }) =>
-    guard(async () => {
-      await notesStore.write(p.workspaceId, p.slug, String(p.body ?? ''))
-      return { ok: true }
-    }),
-  )
-  ipcMain.handle('notes:setIncluded', (_e: IpcMainInvokeEvent, p: { workspaceId: string; slug: string; included: boolean }) =>
-    guard(async () => {
-      await notesStore.setIncluded(p.workspaceId, p.slug, !!p.included)
-      return { ok: true }
-    }),
-  )
-  ipcMain.handle('notes:remove', (_e: IpcMainInvokeEvent, p: { workspaceId: string; slug: string }) =>
-    guard(async () => {
-      await notesStore.remove(p.workspaceId, p.slug)
-      return { ok: true }
-    }),
-  )
+    // --- notes ---
+    notesList: (workspaceId) => guard(() => notesStore.list(workspaceId)),
+    notesRead: (workspaceId, slug) => guard(() => notesStore.read(workspaceId, slug)),
+    notesCreate: (workspaceId, title, kind) => guard(() => notesStore.create(workspaceId, title, { kind: kind as NoteKind | undefined })),
+    notesWrite: (workspaceId, slug, body) =>
+      guard(async () => {
+        await notesStore.write(workspaceId, slug, body)
+        return { ok: true }
+      }),
+    notesSetIncluded: (workspaceId, slug, included) =>
+      guard(async () => {
+        await notesStore.setIncluded(workspaceId, slug, included)
+        return { ok: true }
+      }),
+    notesRemove: (workspaceId, slug) =>
+      guard(async () => {
+        await notesStore.remove(workspaceId, slug)
+        return { ok: true }
+      }),
+  })
 
   return { notesStore, proposals, reconciled, memoryInjector, memoryReviewTrigger }
 }

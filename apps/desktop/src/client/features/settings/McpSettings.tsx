@@ -1,29 +1,27 @@
 import { createResource, createSignal, For, Show } from 'solid-js'
 import type { McpServerSummary } from '../../../shared/mcp'
 import { activeTaskId } from '../tasks/tasks'
+import { mcpApi } from './mcpClient'
 
 // Settings → MCP (docs/mcp.md): a read-only inspector over the MCP config files the agents in
 // this task's worktree would load (plus ~/.claude.json). Secrets arrive already masked from main.
 export default function McpSettings() {
-  const api = () => window.acorn?.mcp ?? null
   const [msg, setMsg] = createSignal('')
   const taskId = () => activeTaskId()
 
   const [configs, { refetch }] = createResource(
     () => taskId() ?? 'no-task',
     async () => {
-      const a = api()
-      if (!a) return []
-      return a.inspect(taskId() ?? '')
+      const id = taskId()
+      return id ? mcpApi.inspect(id) : []
     },
     { initialValue: [] },
   )
 
   async function createStarter() {
-    const a = api()
     const id = taskId()
-    if (!a || !id) return setMsg('Open a task first.')
-    const res = await a.createStarter(id)
+    if (!id) return setMsg('Open a task first.')
+    const res = await mcpApi.createStarter(id)
     setMsg(res.ok ? 'Created .mcp.json in the worktree.' : (res.reason ?? 'Could not create.'))
     await refetch()
   }

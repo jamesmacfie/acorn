@@ -589,3 +589,44 @@ surfaces, and it imports no other product domain — the composition root inject
 exports (`sendToAgent`, `terminalRunGlue`, `reconcileTmux`, `disposeTerminal`). Boot/reconcile/teardown
 timing marks are logged as `[boot] <label> +Nms` lines (performance §3.1).
 
+## 12. Transport (Phase 3): loopback HTTP + one WebSocket + a thin IPC residue
+
+`docs/next` Phase 3 collapsed the three transport stories into one. The renderer↔main contract is now:
+
+- **Request/response → loopback HTTP.** Every former `ipcMain.handle` domain (search, editor, run,
+  workflow, local-git, database, knowledge/notes+memory, terminal control, MCP inspect) is a typed
+  route under `/api/*` in `server/routes/*`. Route builders + response types live in
+  `shared/api.ts`; clients call through `readJson`/`writeJson`. Domain logic stays in the main
+  process behind a **bridge** — a route holds a `bridgeSlot`, the main side fills it at boot
+  (`server/bridge.ts` `viaBridge` → 503 `bridge-unavailable` when unfilled). Pure-Node bridges
+  (search/editor/local-git/database) are wired in `main/serverBridges.ts` from *inside*
+  `startListener`, so they work under both Electron and `dev:node`. Bodies that write files, spawn
+  processes, or execute SQL are zod-validated with malformed-body tests.
+- **Streams → one authenticated WebSocket** at `/ws` (`shared/ws.ts`, `main/wsHub.ts`,
+  `client/features/terminal/wsClient.ts`). Kind-tagged frames carry `term:out` (PTY output,
+  coalesced to ~16 ms), `term:input`, attach/detach, the `term:status` + `workflow:notice` pings,
+  and a reserved `workflow:step:event`. Attach replays `ready` + the ring buffer synchronously
+  before any live frame (deterministic replay-before-live). The upgrade is authorized on the shared
+  loopback listener: Host guard + exact-Origin + a valid session cookie, or the internal token for
+  the loopback MCP caller — anything else is a 403 before the handshake.
+- **IPC residue (`preload.ts`) — only true Electron capabilities:** `browser:bind` (a raw
+  `webContents` id → CDP handle), `term:repoPath:pick` (`dialog.showOpenDialog`), and the
+  `acorn:close-pane` main→window ⌘W ping, plus the `desktop`/`platform` probes. Nothing
+  request/response or streamable remains on IPC.
+
+### Capability map (`dev:node` / plain browser)
+
+`dev:node` runs the Hono app under plain Node with no Electron and no PTY engine. It does not crash;
+surfaces degrade by whether their bridge is pure-Node or engine-backed:
+
+| Surface | `dev:node` | Why |
+| --- | --- | --- |
+| PR review, workspaces, tasks, integrations, prefs | ✅ works | server-only (DB + GitHub), never needed IPC |
+| search, editor, local-git, database | ✅ works | pure-Node bridges wired in `startListener` |
+| terminal drawer, agents, run targets, workflows, MCP inspect | ⛔ 503 | need the main-process PTY/runtime engine (wired only in `bootstrap.ts`) |
+| PTY streams + `workflow:notice` (WebSocket) | ⚠️ connects, no data | the socket authorizes, but no engine registers stream handlers |
+| folder picker, drivable browser, ⌘W | ⛔ absent | true Electron capabilities (no `window.acorn` bridge) |
+
+Client surfaces that need the engine key off `capabilities().terminal` (the residual
+`window.acorn.terminal` marker) and hide or show a reason when it's absent.
+

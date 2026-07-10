@@ -67,6 +67,7 @@ export function wireHarnessBridges({ db, notesStore, proposals, runtime, reconci
     stop: (taskId, targetId) => runtime.stop(taskId, targetId),
     restart: (taskId, targetId) => runtime.restart(taskId, targetId),
     status: (taskId, targetId) => runtime.status(taskId, targetId),
+    defaultUrl: (taskId) => runtime.defaultUrl(taskId),
   })
 
   // Drivable browser (docs/panes.md): CDP over the bound preview webview; a missing binding is a

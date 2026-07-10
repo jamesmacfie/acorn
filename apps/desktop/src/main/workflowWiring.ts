@@ -1,8 +1,8 @@
 // Workflow wiring (docs/next 14 P2–P5), split out of terminal.ts: constructs the main-process
 // WorkflowRunner over the fake-able headless runner with its real deps — handoff notes, the
-// loopback context assembler, a re-derived checks-green policy, gate/run-done notices — and
-// registers the workflow:* IPC surface (preload group `terminal.workflow`).
-import { ipcMain, type IpcMainInvokeEvent } from 'electron'
+// loopback context assembler, a re-derived checks-green policy, gate/run-done notices — and wires
+// the WorkflowBridge behind the HTTP routes (server/routes/workflow.ts). The gate/run-done notice
+// PUSH still rides IPC (notify.ts) until the WebSocket lands (Phase 3 slice 6).
 import { randomUUID } from 'node:crypto'
 import { homedir } from 'node:os'
 import { and, eq, max } from 'drizzle-orm'
@@ -10,6 +10,7 @@ import { dedupeBranch, slugifyBranch } from '../shared/branch'
 import { formatContextBlock } from '../shared/contextBlock'
 import type { AppDatabase } from '../server/db'
 import { schema } from '../server/db'
+import { setWorkflowBridge } from '../server/routes/workflow'
 import { buildHeadlessArgv, runHeadless } from './headless'
 import type { NotesStore } from './notes'
 import { broadcastStatus, broadcastWorkflowNotice } from './notify'
@@ -125,31 +126,32 @@ export async function registerWorkflowIpc(db: AppDatabase, { runtime, notesStore
     },
   })
 
-  // Declared workflows for a task (docs/next 14 P5): `.acorn/workflows/*.toml` from the
-  // worktree/checkout + ~/.acorn, parse/cycle errors surfaced as palette rows (13 §B).
-  ipcMain.handle('workflow:defs', async (_e: IpcMainInvokeEvent, taskId: string) => {
-    const t = await loadTask(db, String(taskId))
-    if (!t) return { workflows: [], errors: [] }
-    const mapped = await getRepoPath(db, t.repoOwner, t.repoName)
-    const repoDir = t.worktreePath && isDir(t.worktreePath) ? t.worktreePath : mapped?.path && isDir(mapped.path) ? mapped.path : null
-    return loadWorkflowFiles(repoDir, homedir())
+  setWorkflowBridge({
+    // Declared workflows for a task (docs/next 14 P5): `.acorn/workflows/*.toml` from the
+    // worktree/checkout + ~/.acorn, parse/cycle errors surfaced as palette rows (13 §B).
+    defs: async (taskId) => {
+      const t = await loadTask(db, taskId)
+      if (!t) return { workflows: [], errors: [] }
+      const mapped = await getRepoPath(db, t.repoOwner, t.repoName)
+      const repoDir = t.worktreePath && isDir(t.worktreePath) ? t.worktreePath : mapped?.path && isDir(mapped.path) ? mapped.path : null
+      return loadWorkflowFiles(repoDir, homedir())
+    },
+    start: async (taskId, def) => {
+      await reconciled // don't start a run the restart sweep would immediately re-queue
+      return { runId: await workflowRunner.start(taskId, def as WorkflowDef) }
+    },
+    runs: async (taskId) => {
+      const rows = await db.select().from(schema.workflowRuns).where(eq(schema.workflowRuns.taskId, taskId))
+      return rows.sort((a, b) => b.createdAt - a.createdAt)
+    },
+    steps: (runId) => workflowRunner.steps(runId),
+    gate: async (runId, stepId, approved) => {
+      await reconciled // an approval resumes a step the restart sweep could otherwise clobber
+      await workflowRunner.resolveGate(runId, stepId, approved)
+      return { ok: true }
+    },
   })
 
-  ipcMain.handle('workflow:start', async (_e: IpcMainInvokeEvent, p: { taskId: string; def: WorkflowDef }) => {
-    if (typeof p?.taskId !== 'string' || !p.def?.name || !Array.isArray(p.def.steps)) return { error: 'bad_request' }
-    await reconciled // don't start a run the restart sweep would immediately re-queue
-    return { runId: await workflowRunner.start(p.taskId, p.def) }
-  })
-  ipcMain.handle('workflow:runs', async (_e: IpcMainInvokeEvent, taskId: string) => {
-    const rows = await db.select().from(schema.workflowRuns).where(eq(schema.workflowRuns.taskId, String(taskId)))
-    return rows.sort((a, b) => b.createdAt - a.createdAt)
-  })
-  ipcMain.handle('workflow:steps', (_e: IpcMainInvokeEvent, runId: string) => workflowRunner.steps(String(runId)))
-  ipcMain.handle('workflow:gate', async (_e: IpcMainInvokeEvent, p: { runId: string; stepId: string; approved: boolean }) => {
-    await reconciled // an approval resumes a step the restart sweep could otherwise clobber
-    await workflowRunner.resolveGate(String(p?.runId), String(p?.stepId), !!p?.approved)
-    return { ok: true }
-  })
   // Note: workflowRunner.reconcile() (resume/fail-cleanly across app restarts, 14 §checkpoint) is
   // NOT run here — the composition root drives it in its coordinated reconcile() step, off the
   // paint-critical path (review §2, performance §3.6).

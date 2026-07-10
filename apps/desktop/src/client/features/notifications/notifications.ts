@@ -5,6 +5,7 @@
 // (the main process no longer fires them).
 import { createSignal } from 'solid-js'
 import type { TerminalSession } from '../../../shared/terminal'
+import { wsOnNotice } from '../terminal/wsClient'
 
 export type NoticeKind = 'finished' | 'needs-input' | 'exited' | 'error' | 'gate' | 'run-done'
 
@@ -110,12 +111,10 @@ export function shouldToast(
   return true
 }
 
-// Workflow notices (docs/next 14, docs/terminal-and-agents.md): main broadcasts gate/run-done events; they land in the same
-// bell + toast gate. Returns unsubscribe; noop off-desktop.
+// Workflow notices (docs/next 14, docs/terminal-and-agents.md): main broadcasts gate/run-done events over the stream
+// WebSocket (Phase 3 slice 6); they land in the same bell + toast gate. Returns unsubscribe.
 export function initWorkflowNotices(): () => void {
-  const wf = window.acorn?.terminal?.workflow
-  if (!wf) return () => {}
-  return wf.onNotice((n) => {
+  return wsOnNotice((n) => {
     const at = Date.now()
     pushNotice({ taskId: n.taskId, kind: n.kind, title: n.title, at })
     if (typeof Notification !== 'undefined' && shouldToast({ taskId: n.taskId, kind: n.kind, at }, { focused: document.hasFocus(), lastToastAt })) {
