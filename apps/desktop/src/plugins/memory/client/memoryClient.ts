@@ -1,5 +1,5 @@
-// The renderer's memory surface (docs/next 12). Was the `window.acorn.memory` preload bridge; now
-// loopback HTTP (Phase 3). Backed by the main-process memory index, so it 503s in dev:node.
+// The renderer's memory surface (docs/notes-and-memory.md). Was the `window.acorn.memory` preload bridge; now
+// loopback HTTP. Backed by the main-process memory index, so it 503s in dev:node.
 import { memoryAddRoute, memoryListRoute, memoryProposalsRoute, memoryResolveProposalRoute, memorySearchRoute } from '../../../core/shared/api'
 import { readJson, writeJson } from '../../../core/client/apiClient'
 

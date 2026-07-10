@@ -133,13 +133,13 @@ by side inside the slot (`TaskView.tsx:252`):
   review threads (reply/resolve), gap expansion, and viewed-marking. The diff rendering pipeline is
   documented in full in [diff-rendering.md](./diff-rendering.md).
 
-Source: `PullDetail.tsx`, `DiffView.tsx`, `features/pullDetail/`, `features/diff/`.
+Source: `apps/desktop/src/plugins/github/client/{pullDetail,diff}/`.
 
 ### `changes` — local working-tree review
 
 A PR-style "Files changed" view over the task worktree's **uncommitted** changes
-(`features/changes/ChangesPane.tsx`). It reuses the same diff pipeline as `pr`, but fed by local git
-IPC (`local.changes` / `local.diff`) instead of GitHub patches; the whole-file view (`-U1e6`) drops
+(`plugins/changes/client/ChangesPane.tsx`). It reuses the same diff pipeline as `pr`, but is fed by
+task-scoped local-git HTTP routes instead of GitHub patches; the whole-file view (`-U1e6`) drops
 expand-gaps and hunk headers so every line shows with +/- highlights. It refreshes on the rail's
 dirty-poll signal (`taskStatus`). Needs a worktree, so it is terminal-flag territory (see
 [terminal-and-agents.md](./terminal-and-agents.md)).
@@ -155,7 +155,7 @@ Interactions:
 - **→ agent** on a file, or **⌥-click** a line, drops a `path[:line]` reference into the agent
   composer (`sendReferenceToAgent`).
 
-Source: `features/changes/ChangesPane.tsx`, `features/changes/model.ts`, `shared/reviewPrompt.ts`.
+Source: `apps/desktop/src/plugins/changes/{client,main,server,shared}/`.
 
 ### `notes` — markdown notes
 
@@ -206,8 +206,8 @@ Source: `features/editor/EditorPane.tsx`, `features/editor/editorState.ts`,
 
 ### `search` — find in files
 
-Project-wide text search over the task's worktree, backed by **ripgrep** in the main process
-(`search:findInFiles` IPC). Substring search by default with case / whole-word / regex toggles;
+Project-wide text search over the task's worktree, backed by **ripgrep** in the main process and a
+task-scoped HTTP route. Substring search by default with case / whole-word / regex toggles;
 keystrokes are debounced so a ripgrep isn't spawned per character. Results group hits by file;
 clicking a hit opens the file in the **Editor pane beside this one**, scrolled to the match line
 (`editorOpen` + `requestEditorReveal`).
@@ -219,8 +219,8 @@ Source: `features/search/SearchPane.tsx`, `features/search/searchClient.ts`.
 A native Postgres pane, Postico-shaped: a searchable virtualized table list, a row grid with a
 detail panel that edits/inserts/deletes, and a Monaco SQL editor with a results grid. The
 connection is per-task, resolved on demand (workspace `dbUrlScript` → `.env` `DATABASE_URL` →
-`process.env`) and never persisted; one `pg.Pool` per task lives in main, spoken to over `db:*`
-IPC. Full detail: [pg.md](./pg.md).
+`process.env`) and never persisted; one `pg.Pool` per task lives in main behind task-scoped HTTP
+routes. Full detail: [pg.md](./pg.md).
 
 Source: `features/database/DatabasePane.tsx`, `features/database/ResultGrid.tsx`,
 `features/database/databaseClient.ts`, `main/database.ts`.
@@ -248,25 +248,24 @@ Source: `features/integrations/RollbarPane.tsx`.
 
 ### `preview` — browser preview (agent-drivable)
 
-A live `<webview>` onto the workspace's / run-target's resolved URL, wrapped in browser chrome —
+A main-owned `WebContentsView` onto the workspace's / run-target's resolved URL, wrapped in browser chrome —
 back / forward / stop-reload / home + an editable URL bar + a loading spinner
-(`features/preview/PreviewPane.tsx`, its own feature folder like every other pane body). The home
+(`plugins/preview/client/PreviewPane.tsx`). The home
 URL (`previewUrl()` in `TaskView.tsx`) resolves in priority order: a layout recipe's
 `browser=run:<id>` resolution → the default run target's resolved URL → the legacy per-workspace
-preview config (url / port / script mode) → the dev-server port. One `<webview>` is kept per task
-so page/scroll/form state survives pane and task switches (`previewWebviews`); archiving a task
-evicts its entry (`evictPreviewWebview`, called by every archive path) so dead webviews don't
-accumulate over a session. The main process's `will-attach-webview` guard keeps it to http(s).
+preview config (url / port / script mode) → the dev-server port. One native view is kept per task
+so page/scroll/form state survives pane and task switches; archiving a task evicts its view.
+Navigation is restricted to `http(s)`.
 Preview needs a resolvable URL (a configured run target / workspace preview), so it only does its
 full job on desktop.
 
-**Agent driving is a capability of this same pane**, not a separate `browser` pane: when the
-webview reaches `dom-ready`, `PreviewPane` binds its `webContents` id to the main process
-(`window.acorn.browser.bind`) so an agent can drive it over CDP via the MCP `browser_*` tools
+**Agent driving is a capability of this same pane**, not a separate `browser` pane. The main process
+owns the view and binds CDP internally, so no `webContents` id crosses into the renderer. Agents use
+the MCP `browser_*` tools
 (`browser_navigate`, `browser_click`, `browser_snapshot`, …) — see [mcp.md](./mcp.md). One webview
 surface, two entry points (human chrome vs. agent driving).
 
-Source: `features/preview/PreviewPane.tsx`, `src/core/mcp/server.ts`.
+Source: `apps/desktop/src/plugins/preview/{client,main}/`, `apps/desktop/src/core/mcp/server.ts`.
 
 ---
 
@@ -290,7 +289,7 @@ and can resume a step as a raw TUI in the terminal drawer. It is a toggle, not a
 detail in [terminal-and-agents.md](./terminal-and-agents.md).
 
 > **Maturity:** the terminal drawer, agent sessions, run targets, and workflows are desktop-only —
-> always on when the preload bridge is present (`capabilities()`, `features/capabilities.ts`; the
+> always on when the native terminal capability is present (`capabilities()`, `core/client/capabilities.ts`; the
 > old `acorn:term` flag is gone). Panes that depend on a worktree or an agent (`changes`, `editor`,
 > `context`'s send, `notes`' agent groups, `preview` targets, the Agents panel) therefore only do
 > their full job on desktop; in a plain browser session (`dev:node`) the bridge is absent and they
@@ -303,12 +302,11 @@ detail in [terminal-and-agents.md](./terminal-and-agents.md).
 - Task view & switcher: `apps/desktop/src/core/client/tasks/TaskView.tsx`
 - Pane shortcuts: `apps/desktop/src/core/client/tasks/paneShortcuts.ts`
 - Recipes: `apps/desktop/src/plugins/terminal/client/recipes.ts`
-- Pane bodies: `apps/desktop/src/client/features/{pullDetail,diff,changes,notes,context,editor,integrations,memory,preview,agents,checks}/`
+- Pane bodies: `apps/desktop/src/plugins/*/client/`; the shell/host lives in
+  `apps/desktop/src/core/client/tasks/`
 
 See also: [frontend.md](./frontend.md) · [diff-rendering.md](./diff-rendering.md) ·
 [command-palette-and-shortcuts.md](./command-palette-and-shortcuts.md) ·
 [notes-and-memory.md](./notes-and-memory.md) · [terminal-and-agents.md](./terminal-and-agents.md) ·
 [integrations.md](./integrations.md) · [mcp.md](./mcp.md) ·
 [workspaces-and-tasks.md](./workspaces-and-tasks.md)
-</content>
-</invoke>

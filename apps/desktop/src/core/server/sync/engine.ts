@@ -1,7 +1,7 @@
 import { trackBackgroundRefresh } from '../background'
 import { RATE_LIMIT_BACKOFF_MS } from './policy'
 
-// The single serve-then-revalidate engine (review.md §1c, recommendation #2). Every mirrored-read
+// The single serve-then-revalidate engine (docs/caching.md). Every mirrored-read
 // route used to hand-roll the same four-branch cache flow (fresh / stale / cold / not-modified)
 // with slightly different cold detection, TTLs, and dedupe — this owns the flow once so routes read
 // as domain-mapping plus `serveThenRevalidate`.
@@ -9,7 +9,7 @@ import { RATE_LIMIT_BACKOFF_MS } from './policy'
 // The engine owns *when* to serve, refresh, dedupe, and back off. The caller owns *what* a resource
 // is: `read` reports the cached data + its freshness, `refresh` performs the (atomic) mirror write.
 // The engine never touches the caller's store — so the freshness backend is opaque (sync_state for
-// GitHub lists, per-row `fetchedAt` for provider items) and Phase 7 can add provider resources
+// GitHub lists, per-row `fetchedAt` for provider items), so providers can add resources
 // without changing anything here. ETag/304 handling stays inside the caller's `refresh` for the
 // same reason: it is specific to the sync_state ETag store, not universal to the flow.
 

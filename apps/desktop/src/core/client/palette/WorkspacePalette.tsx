@@ -7,7 +7,7 @@ import { fuzzyScore } from './model'
 import { createOverlayPalette } from './overlay'
 import './palette.css'
 
-// ⌘L workspace switcher: fuzzy-jump between workspaces (docs/workspaces). Mirrors the topbar
+// ⌘L workspace switcher: fuzzy-jump between workspaces (docs/workspaces-and-tasks.md). Mirrors the topbar
 // WorkspacePicker's onSelect — picking a workspace navigates to its first repo (active workspace is
 // derived from the current repo, so no extra state). Reuses the shared palette shell like FilePalette.
 export default function WorkspacePalette() {

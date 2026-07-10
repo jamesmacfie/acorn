@@ -78,6 +78,10 @@ describe('wsHub auth', () => {
     expect(ws.readyState).toBe(WebSocket.OPEN)
     ws.close()
   })
+
+  it('rejects a wrong internal token when no valid browser session is present', async () => {
+    await expect(open({ host, 'x-acorn-internal': `${INTERNAL}-wrong` })).rejects.toThrow(/403/)
+  })
 })
 
 describe('wsHub streaming', () => {

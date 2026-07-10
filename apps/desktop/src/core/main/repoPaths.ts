@@ -18,7 +18,7 @@ export async function getRepoPath(db: AppDatabase, owner: string, repo: string):
   return row ? { owner: row.owner, repo: row.repo, path: row.path, runTargets: row.runTargets } : null
 }
 
-// Persist the per-repo run-target list (docs/next 13 §A — the DB fallback below a committed
+// Persist the per-repo run-target list (docs/workflows.md §2 — the DB fallback below a committed
 // .acorn/config.toml). Accepts a JSON RunTarget[] string; blank clears. Shape-validated here so a
 // bad save is rejected with a reason instead of surfacing later as a config error row.
 export async function setRunTargets(db: AppDatabase, owner: string, repo: string, json: string): Promise<RepoPathResult> {
@@ -55,7 +55,7 @@ export function remoteMatches(remotes: string, owner: string, repo: string): boo
 }
 const escapeRe = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 
-// Validate then persist a checkout for owner/repo (vNext §9 step 3): absolute existing dir, has a
+// Validate then persist a checkout for owner/repo (docs/workspaces-and-tasks.md): absolute existing dir, has a
 // .git entry (dir or worktree file), and a GitHub remote matching owner/repo.
 export async function setRepoPath(db: AppDatabase, owner: string, repo: string, path: string): Promise<RepoPathResult> {
   if (!isAbsolute(path)) return { ok: false, reason: 'Path must be absolute.' }

@@ -5,7 +5,7 @@ import type { AppEnv } from '../../../../core/server/middleware/auth'
 import { requireUser } from '../../../../core/server/middleware/requireUser'
 import { search, setSearchBridge, type SearchOpts } from './search'
 
-// Route-test convention for a bridge-backed domain (Phase 3): fake the bridge (no real ripgrep),
+// Route-test convention for a bridge-backed domain: fake the bridge (no real ripgrep),
 // mount the router, and exercise auth + body validation + the bridge-unavailable 503. The rg
 // parsing itself is unit-tested in main/search.test.ts.
 

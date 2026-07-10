@@ -5,13 +5,11 @@ persistent local shell/agent sessions scoped to the active task, and the right-r
 watches them. This describes what is in code today. (The historical design record, `vNext.md`, has
 been removed — see git history for the original rationale.)
 
-> **Maturity — read this first.** This entire surface is **desktop-only and always on** (the old
-> `acorn:term` localStorage flag is deleted). It requires the preload bridge: in the Electron app
-> the drawer, the Agents toggle, and `window.acorn.terminal` are present; in a plain browser
-> (`dev:node`) the bridge accessor (`terminalApi()`) returns `null` and consumers show nothing
-> (`capabilities()`, `apps/desktop/src/core/client/capabilities.ts`). The **workflow** engine
-> reachable through this surface is in progress (see [workflows.md](./workflows.md)); the terminal +
-> interactive agent sessions themselves are functional.
+> **Availability.** This surface is **desktop-only and always on** (the old `acorn:term`
+> localStorage flag is deleted). In Electron the native terminal capability is present; in a plain
+> browser (`dev:node`) `terminalApi()` returns `null` and consumers show a degraded state
+> (`capabilities()`, `apps/desktop/src/core/client/capabilities.ts`). The workflow runtime is
+> implemented with deliberate limits documented in [workflows.md](./workflows.md).
 
 ## 1. Overview
 
@@ -34,12 +32,11 @@ that mirrors the app tokens and follows the theme live.
 ## 2. Sessions & persistence
 
 The wire contract is defined once in `apps/desktop/src/core/shared/terminal.ts` (`TerminalSession`,
-`CreateOpts`, `ServerMsg`) and imported by main, preload, and renderer — it holds only what crosses
-IPC, never node-pty types. The main process owns the PTYs: `main/terminal.ts` is the session
-engine + `term:*` IPC and the composer (`registerTerminalIpc`), with the other IPC surfaces split
-per preload group — `main/localGitIpc.ts` (local git + editor), `main/runIpc.ts` (run targets),
-`main/knowledgeIpc.ts` (notes/memory), `main/workflowWiring.ts` (workflows) — over the shared
-task/worktree resolution in `main/taskWorktree.ts` and renderer broadcasts in `main/notify.ts`.
+`CreateOpts`, `ServerMsg`) and imported by main, server, and renderer; it never exposes `node-pty`
+types. The main process owns PTYs in `plugins/terminal/main/terminal.ts`. Request/response control
+travels through authenticated loopback HTTP routes, while PTY output/input, status, and workflow
+events use the single WebSocket. The preload retains only the native folder picker used to map a
+repository checkout.
 
 ### Two backends
 
@@ -80,7 +77,7 @@ renderer on attach. Nothing is written to disk or the DB.
 
 ### The renderer session store
 
-`terminal/sessions.ts` is a single lifted store (signals-only, like `tabs/tabs.ts`) so the rail and
+`plugins/terminal/client/sessions.ts` is a single lifted store so the rail and
 topbar can read live session state even when the drawer is closed:
 
 - `initSessions()` (called once in App) pulls the list, then subscribes to the **single** `onStatus`
@@ -116,7 +113,7 @@ A `Portal`-rendered `<aside class="terminal-drawer">`, one per active task.
 
 ### `TerminalSurface.tsx`
 
-One xterm bound to one live session over IPC. Keyed by session id in the parent, so switching tabs
+One xterm bound to one live session over the authenticated WebSocket. Keyed by session id in the parent, so switching tabs
 unmounts this component (detach, PTY keeps running) and remounts a fresh xterm that **replays the ring
 buffer**. Local scrollback beyond the 256 KiB ring is lost on a tab switch (marked `ponytail:`). It
 attaches via `api.attach`, writes keystrokes with `api.write`, and reports resizes with `api.resize`
@@ -125,14 +122,14 @@ newline) instead of the `\r` that would submit.
 
 ## 4. Profiles & worktrees
 
-### Profiles (`main/agentProfiles/`, `main/profiles.ts`)
+### Profiles (`core/main/agentProfiles/`, `core/main/profiles.ts`)
 
 Profiles are registry contributions. Each declares command, backend preference, MCP registration,
 headless argv, resume argv, stream parsing, and an optional tool-free one-shot structured argv. The
 built-ins are `shell`, `claude-code`, `codex`, and `aider`; unsupported capabilities are absent
 instead of inferred from profile ids. `profileAvailable` checks `which`; shell is always available.
 
-### Worktrees (`main/worktrees.ts`, `resolveTaskCwd` in `main/taskWorktree.ts`)
+### Worktrees (`core/main/worktrees.ts`, `resolveTaskCwd` in `core/main/taskWorktree.ts`)
 
 The task's git worktree is created **lazily on the first terminal** (Flow C). The renderer passes the
 base checkout as `opts.cwd`; main derives the worktree from it via `ensureWorktree`, persists
@@ -229,37 +226,32 @@ submits with a trailing `\r`; `after-ready` is queued and flushed on the next bu
 (`agentSender.onIdle`); `draft` inserts the text without submitting, letting the user finish the
 thought. Queued sends are cleared if the session exits.
 
-## 8. The preload / IPC contract
+## 8. Transport and native residue
 
-`window.acorn.terminal` (`main/preload.ts`) is a narrow, validated capability surface — the renderer
-never sees raw `ipcRenderer`. Every payload is re-validated at `ipcMain` in the owning module (the
-renderer is the less-trusted side; cols/rows are clamped, repo idents and paths are guarded against
-traversal). The typed accessor is `terminalApi()` in `terminal/terminalClient.ts` (returns `null`
-off-desktop).
+`terminalApi()` in `plugins/terminal/client/terminalClient.ts` composes three transports and returns
+`null` off-desktop:
 
-| Group | Methods |
+| Transport | Operations |
 | --- | --- |
-| Sessions | `list`, `profiles`, `create`, `kill`, `interrupt`, `remove`, `resize`, `write`, `sendToAgent`, `onStatus`, `attach` |
-| Repo path | `repoPath.{get,set,pick,runConfig,runTargets}` |
-| Run targets | `run.{targets,start,stop,status,defaultUrl}` — see [workflows.md](./workflows.md) |
-| Local git | `local.{changes,diff,blob,stage,unstage,discard,commit,push}` — feeds the Changes pane ([panes.md](./panes.md)) |
-| Task | `task.{archive,onCreated,statuses}` — guarded archive/teardown + live worktree dirty/missing status |
-| Workflow | `workflow.{defs,start,runs,steps,gate,onNotice}` — see [workflows.md](./workflows.md) |
-| Preview | `previewUrl` — resolve a workspace's browser-preview URL by running its script in the worktree |
+| Loopback HTTP | List/create/control sessions; profiles; repo mappings; task lifecycle/status; run targets; workflow commands; send-to-agent. Bodies are validated and task paths are re-derived in main. |
+| WebSocket | PTY attach/input/output, session status edges, workflow notices, and live step events. `attach` returns an unsubscribe that detaches without killing the PTY. |
+| Preload IPC | `repoPath.pick()` only—the native `dialog.showOpenDialog` capability. Raw `ipcRenderer` is never exposed. |
 
-Output streams over a per-session channel (`term:out:<id>`) as `ServerMsg` (`ready | output | exit |
-error`); `attach` subscribes and returns an unsubscribe that detaches without killing the PTY.
+Preview `WebContentsView` operations use their own narrow preload surface because view ownership,
+bounds, and navigation are Electron capabilities; agent browser tools remain server-projected.
 
 ## Source
 
-- Renderer terminal: `apps/desktop/src/client/features/terminal/{TerminalPanel,TerminalSurface}.tsx`,
+- Renderer terminal: `apps/desktop/src/plugins/terminal/client/{TerminalPanel,TerminalSurface}.tsx`,
   `sessions.ts`, `terminalClient.ts`, `theme.ts`
-- Renderer agents: `apps/desktop/src/client/features/agents/{AgentsPanel.tsx,model.ts}`,
+- Renderer agents: `apps/desktop/src/plugins/agents/client/{AgentsPanel.tsx,model.ts}`,
   `apps/desktop/src/core/client/agent/reference.ts`
-- Flag + panel wiring: `apps/desktop/src/core/client/App.tsx:39`,
+- Capability + panel wiring: `apps/desktop/src/core/client/capabilities.ts`,
   `apps/desktop/src/core/client/tasks/TaskView.tsx`
 - Wire contract & vocabulary: `apps/desktop/src/core/shared/terminal.ts`
-- Main process: `apps/desktop/src/main/{terminal.ts,taskWorktree.ts,localGitIpc.ts,runIpc.ts,knowledgeIpc.ts,workflowWiring.ts,harnessWiring.ts,notify.ts,terminalUtils.ts,profiles.ts,worktrees.ts,headless.ts,preload.ts}`
+- Terminal engine: `apps/desktop/src/plugins/terminal/main/`; worktrees, profiles, headless execution,
+  preload and notifications: `apps/desktop/src/core/main/`; cross-feature wiring:
+  `apps/desktop/src/app/main/`
 - Schema: `apps/desktop/src/core/server/db/schema.ts` (`terminal_sessions`, `workflow_runs`, `workflow_steps`)
 
 ## See also

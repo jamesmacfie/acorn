@@ -1,8 +1,8 @@
-// Headless step runner (docs/next 14 P1) — the single biggest new workflow capability: run an
+// Headless step runner (docs/workflows.md) — the single biggest new workflow capability: run an
 // agent CLI to COMPLETION in a worktree and capture a structured result, modeled on the
 // term:previewUrl capture (run + timeout + parse). Interactive sessions stay spawnOne's job.
 //
-// Argv templates per profile (the vNext §7 seam revived). Flags VERIFIED against the CLIs
+// Argv templates per profile (the docs/workflows.md seam revived). Flags VERIFIED against the CLIs
 // installed on this machine (2026-07-03) — the design doc's names were re-checked per the plan:
 //   claude: -p --output-format stream-json --verbose --json-schema <schema> --model <m>
 //           --permission-mode <mode>  (+ --resume <session_id> for continuity)

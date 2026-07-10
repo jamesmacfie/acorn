@@ -6,7 +6,7 @@ import type { AppEnv } from '../../../../core/server/middleware/auth'
 import { respondError } from '../../../../core/server/respond'
 
 // Find-in-files (docs/panes.md): project-wide text search over the task's worktree via ripgrep.
-// Was the `search:findInFiles` IPC channel (inventories §1a). The taskId in the path is the
+// Was the `search:findInFiles` IPC channel. The taskId in the path is the
 // capability — the renderer never hands us a worktree path; the bridge re-derives it from the DB
 // and runs rg with cwd:root. Server-backed and pure-Node, so it works in dev:node too.
 
@@ -19,7 +19,7 @@ export type SearchOpts = { caseSensitive: boolean; wholeWord: boolean; regex: bo
 export const searchBridgeSlot = bridgeSlot<SearchBridge>()
 export const setSearchBridge = searchBridgeSlot.set
 
-// Search spawns a process, so the body is validated (Phase 3 §1: bodies that spawn processes get a
+// Search spawns a process, so the body is validated (the privileged-boundary contract: bodies that spawn processes get a
 // zod schema + a malformed-body test). Unknown keys are stripped, toggles default to off.
 const searchBody = z.object({
   query: z.string().min(1),

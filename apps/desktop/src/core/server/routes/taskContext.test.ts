@@ -13,7 +13,7 @@ vi.mock('../db', async (importOriginal) => {
   return { ...actual, getDb: vi.fn() }
 })
 
-describe('GET /api/tasks/:id/context (docs/next 11 §C)', () => {
+describe('GET /api/tasks/:id/context (docs/agent-tools.md §4)', () => {
   let t: TestDb
   let app: Hono<AppEnv>
   let notesSource: ContextNotesSource

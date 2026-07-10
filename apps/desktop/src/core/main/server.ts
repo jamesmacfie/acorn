@@ -23,12 +23,12 @@ export const ACORN_PORT = Number(process.env.ACORN_PORT) || 4317
 
 // Start the loopback HTTP listener over an already-built runtime. Split from startServer so the
 // composition root (main/bootstrap.ts) can wire the harness/context bridges into the route modules
-// BEFORE the listener accepts requests (review §2 boot-order fix). Resolves once listening so
+// BEFORE the listener accepts requests (composition-root ownership boot-order fix). Resolves once listening so
 // callers can safely loadURL the origin.
 export function startListener(runtime: RuntimeBindings): Promise<ServerType> {
   // Every bridge (pure-Node domain bridges AND the stateful harness/context bridges) is installed by
   // the composition root (app/main/bootstrap.ts under Electron, app/server/devNode.ts under dev:node)
-  // BEFORE this is called — core no longer imports plugin bridge wiring (docs/next Phase 10).
+  // BEFORE this is called — core no longer imports plugin bridge wiring (docs/plugins.md).
   const app = createApp()
 
   // Serve the built SPA, and fall back to the shell only for non-API/auth navigations — so
@@ -64,7 +64,7 @@ export function startListener(runtime: RuntimeBindings): Promise<ServerType> {
       server.off('error', reject) // listening — later runtime errors are not listen failures
       resolveServer(server)
     })
-    // The one authenticated WebSocket (Phase 3 slice 6) shares this loopback listener via its
+    // The one authenticated WebSocket (the WebSocket transport) shares this loopback listener via its
     // 'upgrade' event; the hub re-checks Host + Origin + session cookie before the handshake.
     attachWsHub(server as unknown as import('node:http').Server, {
       encKey: runtime.SESSION_ENC_KEY,

@@ -1,7 +1,10 @@
 # Security model — the loopback surface after the transport collapse
 
+> The loopback protections are shipped; [security.md](../security.md) is authoritative for current
+> behavior. This file remains for future principal kinds, relays, webhooks, and control channels.
+
 **Status:** design constraints · **Date:** 2026-07-07 · **Companions:**
-[implementation.md](./implementation.md) Phases 3–4, [review.md](./review.md)
+the completed implementation plan Phases 3–4, the completed architecture review
 (auth strengths), [extensibility.md](./extensibility.md) tenet 8,
 [contribution-points.md](./contribution-points.md) §4.8/§4.12,
 [integrations.md](./integrations.md) (provider-specific rules, §8 here)
@@ -69,7 +72,7 @@ verify step, whatever else it achieved:
    maps to `reauth` and the client bounces to login; the SAML SSO,
    rate-limit, forbidden, and private-repo-not-found foldings keep their
    current machine codes. Phase 0's `ApiError` sweep standardizes the
-   envelope *shape*, never this vocabulary ([feature-parity.md](./feature-parity.md) §16).
+   envelope *shape*, never this vocabulary ([features.md](../features.md) §16).
 10. **The GitHub OAuth permissions re-request stays a settings feature** —
     distinct from the new agent-tool permissions page ([ux.md](./ux.md) §3);
     the new page must not replace the OAuth scope flow.
@@ -152,7 +155,7 @@ change re-asks with a diff. Two sharp edges the implementation must respect:
 ## 6. Secrets posture (unchanged, restated)
 
 - Dev secrets in `apps/desktop/.env` (gitignored); the packaged-build keychain
-  work uses Electron `safeStorage`, not keytar (review.md technology choice #4).
+  work uses Electron `safeStorage`, not keytar (the completed architecture review technology choice #4).
 - `SESSION_ENC_KEY` is the root secret (sessions + integration tokens at
   rest); it must be exactly 64 hex chars and `session.ts` rejects anything
   else. **It has moved to `safeStorage` first (Phase 9 C, `main/sessionKeyStore.ts`):**
@@ -164,13 +167,13 @@ change re-asks with a diff. Two sharp edges the implementation must respect:
   silently create a second identity, invalidating every session and stored
   provider token at once. `GITHUB_CLIENT_*` still need the environment in a
   packaged build until their keychain path lands.
-- The observability log (implementation.md ongoing tracks) must never log
+- The observability log (the completed implementation plan ongoing tracks) must never log
   request bodies or headers wholesale — tokens ride in both. Log route +
   status + timing, not payloads.
 
 ## 7. Verification
 
-Security assertions are cheap route tests ([testing.md](./testing.md) §2):
+Security assertions are cheap route tests ([testing.md](../testing.md) §2):
 unauthenticated request → 401 for every migrated route (one parameterized
 test over the route table); WS upgrade without cookie / with wrong Origin →
 403; harness route without `INTERNAL_TOKEN` → 401; a `run_*` tool against an
@@ -178,7 +181,7 @@ unacknowledged config → needs-trust error. The security-sensitive Phase 3
 domains carry more: path-traversal / symlink-escape / missing-worktree /
 stale-buffer tests for editor/git/search, and SQL-surface tests for the
 database routes (identifier validation, never-persisted connection URL) —
-[feature-parity.md](./feature-parity.md) §7/§14. Add them in the same PR as
+[features.md](../features.md) §7/§14. Add them in the same PR as
 the surface they cover — a security property without a test regresses
 silently.
 

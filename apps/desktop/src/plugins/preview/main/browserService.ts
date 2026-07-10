@@ -1,7 +1,7 @@
 // Drivable browser — the CDP service (docs/panes.md): drives the task's EXISTING preview
 // WebContentsView via webContents.debugger. One driver per task; refs come from the last snapshot
 // (browserAuto.ts owns the pure transforms). Commands originate from main/agent only — never from
-// page script (vNext §11 posture); navigation stays http(s)-only like the preview navigation guard.
+// page script (docs/security.md posture); navigation stays http(s)-only like the preview navigation guard.
 import type { WebContents } from 'electron'
 import { buildAxTree, isAllowedBrowserUrl, isBenignNavError, renderAxTree, resolveRef, type AxSnapshot } from './browserAuto'
 

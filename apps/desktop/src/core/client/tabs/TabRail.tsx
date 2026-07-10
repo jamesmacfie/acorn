@@ -25,7 +25,7 @@ import { completeTaskArchive } from '../tasks/archiveLifecycle'
 import { sourceRegistry } from '../registries/sources'
 import './tabrail.css'
 
-// The Tasks zone of the left rail (docs/workspaces). Rows are real Task entities (not path
+// The Tasks zone of the left rail (docs/workspaces-and-tasks.md). Rows are real Task entities (not path
 // bookmarks). Clicking a row makes it active and navigates to its repo/PR; clicking the active row
 // opens a popover to rename or archive it. ponytail: create/rename use a small modal reusing the
 // shared .overlay shell. (Electron's BrowserWindow has no window.prompt, so we can't shortcut.)
@@ -94,7 +94,7 @@ export default function TabRail() {
     return applyRailOrder(scoped, railOrder())
   }
 
-  // Sources: GitHub always; Linear/Rollbar when connected (docs/workspaces 04, docs/integrations.md).
+  // Sources: GitHub always; Linear/Rollbar when connected (docs/workspaces-and-tasks.md, docs/integrations.md).
   // Selecting one fills the main area with that source's browse view.
   const sources = () => availableSources(integrations.data?.integrations)
   function selectSource(id: SourceId) {
@@ -169,26 +169,31 @@ export default function TabRail() {
 
   async function submitDraft(e: Event) {
     e.preventDefault()
+    setDraftErr('')
     const d = draft()
     const value = text().trim()
     if (!d || !value) return setDraft(null)
-    if (d.mode === 'new') {
-      const [owner, repo] = newRepo().split('/')
-      if (!owner || !repo) return setDraft(null)
-      // Current-checkout task: main adopts the checkout's real branch; the seed branch is only the
-      // fallback when the desktop bridge is absent. Otherwise cut a worktree on the derived branch.
-      const branch = useCheckout() ? effectiveBranch() || 'HEAD' : effectiveBranch()
-      if (!branch) return
-      const seed = { origin: 'local' as const, repoOwner: owner, repoName: repo, branch, title: value }
-      const w = useCheckout() ? await createCheckoutTask(seed) : await createTask(seed)
-      await invalidate()
-      activateTaskSignals(w, { pane: 'pr' }) // fresh local task → start on the PR/default pane
-      navigate(pathForTask(w))
-    } else if (value !== d.w.title) {
-      await renameTask(d.w.id, value)
-      await invalidate()
+    try {
+      if (d.mode === 'new') {
+        const [owner, repo] = newRepo().split('/')
+        if (!owner || !repo) return setDraft(null)
+        // Current-checkout task: main adopts the checkout's real branch; the seed branch is only the
+        // fallback when the desktop bridge is absent. Otherwise cut a worktree on the derived branch.
+        const branch = useCheckout() ? effectiveBranch() || 'HEAD' : effectiveBranch()
+        if (!branch) return
+        const seed = { origin: 'local' as const, repoOwner: owner, repoName: repo, branch, title: value }
+        const w = useCheckout() ? await createCheckoutTask(seed) : await createTask(seed)
+        await invalidate()
+        activateTaskSignals(w, { pane: 'pr' }) // fresh local task → start on the PR/default pane
+        navigate(pathForTask(w))
+      } else if (value !== d.w.title) {
+        await renameTask(d.w.id, value)
+        await invalidate()
+      }
+      setDraft(null)
+    } catch (error) {
+      setDraftErr(error instanceof Error ? error.message : 'Could not save the task.')
     }
-    setDraft(null)
   }
 
   // Archive confirm/error use the same modal shell as create/rename (Electron has no window.prompt/
@@ -197,6 +202,7 @@ export default function TabRail() {
   // refuses while sessions run or the worktree is dirty); the plain HTTP flip exists only for the
   // bridge-absent browser dev build (capabilities()).
   const [archiveErr, setArchiveErr] = createSignal('')
+  const [draftErr, setDraftErr] = createSignal('')
 
   async function openArchive(w: Task) {
     setMenuId(null)
@@ -358,6 +364,7 @@ export default function TabRail() {
                   </label>
                 </Show>
                 <form class="integration-key-row" style={{ 'flex-direction': 'column', 'align-items': 'stretch', gap: '6px' }} onSubmit={submitDraft}>
+                  <Show when={draftErr()}><div class="action-error" role="alert">{draftErr()}</div></Show>
                   <input
                     class="integration-key-input"
                     type="text"

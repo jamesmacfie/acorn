@@ -19,7 +19,7 @@ const candidate = (over: Partial<MemoryCandidate>): MemoryCandidate => ({
   ...over,
 })
 
-describe('verifyCandidates (the 3 checks, docs/next 12 P3)', () => {
+describe('verifyCandidates (the 3 checks, docs/notes-and-memory.md)', () => {
   const ctx = {
     fileExists: (p: string) => p === 'src/auth/login.ts',
     existingIds: new Set([contentHashId('known-memory', 'body', 'desc')]),
@@ -45,7 +45,7 @@ describe('verifyCandidates (the 3 checks, docs/next 12 P3)', () => {
   })
 })
 
-describe('the pipeline over the fake agent + real proposal store (docs/next 12 P3)', () => {
+describe('the pipeline over the fake agent + real proposal store (docs/notes-and-memory.md)', () => {
   let dir: string
   let worktree: string
   let store: MemoryProposalStore

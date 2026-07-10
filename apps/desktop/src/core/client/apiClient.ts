@@ -4,10 +4,12 @@ import type { ApiError as ApiErrorBody } from '../shared/api'
 // (e.g. index.tsx's 401 → reauth bounce) instead of pattern-matching message text.
 export class ApiError extends Error {
   readonly status: number
-  constructor(message: string, status: number) {
+  readonly code?: string
+  constructor(message: string, status: number, code?: string) {
     super(message)
     this.name = 'ApiError'
     this.status = status
+    this.code = code
   }
 }
 
@@ -16,7 +18,10 @@ type ReadOptions = { nullOn401?: boolean; signal?: AbortSignal }
 export async function readJson<T>(url: string, options: ReadOptions = {}): Promise<T> {
   const res = await fetch(url, { signal: options.signal })
   if (options.nullOn401 && res.status === 401) return null as T
-  if (!res.ok) throw new ApiError(`${url} ${res.status}`, res.status)
+  if (!res.ok) {
+    const body = (await res.json().catch(() => ({}))) as Partial<ApiErrorBody>
+    throw new ApiError(body.detail?.join('\n') || body.error || `${url} ${res.status}`, res.status, body.error)
+  }
   return res.json()
 }
 
@@ -32,6 +37,10 @@ type ErrorFallback = string | ((res: Response) => string)
 
 export async function writeJson<T>(url: string, init: RequestInit, fallback: ErrorFallback = (res) => `${res.status}`): Promise<T> {
   const res = await fetch(url, init)
-  if (!res.ok) throw new ApiError(await apiError(res, typeof fallback === 'function' ? fallback(res) : fallback), res.status)
+  if (!res.ok) {
+    const body = (await res.json().catch(() => ({}))) as Partial<ApiErrorBody>
+    const message = body.detail?.join('\n') || body.error || (typeof fallback === 'function' ? fallback(res) : fallback)
+    throw new ApiError(message, res.status, body.error)
+  }
   return res.json()
 }

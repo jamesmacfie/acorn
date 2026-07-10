@@ -12,7 +12,7 @@ import { makeTestDb, type TestDb } from '../../../../core/server/routes/testDb'
 import { editor, setEditorBridge } from './editor'
 
 // Editor is a write/read boundary confined to the worktree, so its route test runs against a REAL
-// worktree (Phase 3 §3 / security §7): path traversal, symlink escape, missing worktree. The path
+// worktree (the filesystem-containment contract): path traversal, symlink escape, missing worktree. The path
 // confinement lives in taskWorktree.resolveInRoot; exercising it end-to-end is the point.
 
 const req = (url: string, method = 'GET', body?: unknown) =>

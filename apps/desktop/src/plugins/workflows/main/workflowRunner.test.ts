@@ -12,7 +12,7 @@ const FAKE_AGENT = resolve(dirname(fileURLToPath(import.meta.url)), '../../../..
 
 // Real fake-agent steps over a real DB + a real NotesStore: the handoff substrate is exercised,
 // not stubbed. Only policy/checks/notify are test doubles.
-describe('WorkflowRunner (docs/next 14 P2)', () => {
+describe('WorkflowRunner (docs/workflows.md)', () => {
   let t: TestDb
   let dir: string
   let notes: NotesStore
@@ -114,7 +114,7 @@ describe('WorkflowRunner (docs/next 14 P2)', () => {
     expect(steps[1].status).toBe('pending') // never started
   })
 
-  it('human gate pauses the run (no further transitions) until the approve IPC; reject fails cleanly', async () => {
+  it('human gate pauses the run until an approval command; rejection fails cleanly', async () => {
     const d = deps()
     const runner = new WorkflowRunner(t.db, d)
     const def: WorkflowDef = {
@@ -326,7 +326,7 @@ describe('WorkflowRunner (docs/next 14 P2)', () => {
     expect(joined2.failures).toBe(1)
   }, 30_000)
 
-  it("requires_run: the runner starts the target and hands its URL to the step (docs/next 13/14)", async () => {
+  it("requires_run: the runner starts the target and hands its URL to the step (docs/workflows.md)", async () => {
     const d = deps()
     d.startRunTarget = vi.fn(async () => ({ ok: true, url: 'http://localhost:8080' }))
     const runner = new WorkflowRunner(t.db, d)

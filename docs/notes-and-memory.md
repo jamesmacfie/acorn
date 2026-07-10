@@ -25,9 +25,8 @@ The rule of thumb: a note is *"what I'm thinking on this task"*; a memory
 is *"how this repo works."* Notes are meant to be thrown away; the valuable distillate is promoted into
 memory, where it is reviewed exactly like code (via the PR that carries the file).
 
-The notes design shipped in full and was distilled into this doc; the unbuilt parts of the memory
-design are listed under "Maturity" below. The paragraphs below describe **what exists in code
-today**.
+The paragraphs below describe the shipped system. Periodic consolidation and richer decay handling
+remain intentionally outside the current runtime.
 
 ## Notes
 
@@ -54,9 +53,9 @@ Each note carries an `author` (`user | agent | workflow`) and a `kind`
 
 ### The Notes pane
 
-`apps/desktop/src/plugins/notes/client/NotesPane.tsx` — a layout pane (`PaneId` `notes`) reached
-through the preload bridge `window.acorn.notes` (`notesApi()`), so it needs the desktop app and an
-active workspace; it renders an empty-state fallback otherwise (`NotesPane.tsx:114`). Layout:
+`apps/desktop/src/plugins/notes/client/NotesPane.tsx` — a layout pane (`PaneId` `notes`) whose client
+uses task/workspace-scoped HTTP routes. The backing file store is main-process-owned, so those routes
+return a clean `503 bridge-unavailable` under `dev:node`. Layout:
 
 - A left list grouping **Task notes**, workspace user/agent notes, and **Global notes**; task context
   merges those scopes in task → workspace → global order.
@@ -140,9 +139,8 @@ in-flight and dropped on completion.
 
 Memory has no pane of its own; its UI is the **MemoryTray** component
 (`apps/desktop/src/plugins/memory/client/MemoryTray.tsx`), hosted by the **Context pane**
-(`ContextPane.tsx` keeps context assembly/send as its one job and renders the tray below it),
-reached through the preload bridge `window.acorn.memory` (`memoryApi()`,
-`apps/desktop/src/plugins/memory/client/memoryClient.ts`). Two surfaces:
+(`ContextPane.tsx` keeps context assembly/send as its one job and renders the tray below it). The
+client in `apps/desktop/src/plugins/memory/client/memoryClient.ts` calls loopback HTTP. Two surfaces:
 
 1. **Memory proposals — the human gate.** Pending proposals are listed with an editable
    description and **Accept / Reject** buttons; a proposal's structural verification `flags` (e.g.
@@ -161,17 +159,17 @@ reached through the preload bridge `window.acorn.memory` (`memoryApi()`,
    committed)` vs `private (~/.acorn)`), one-line description, and body. Writes directly on the
    human's behalf (no gate — the human *is* the gate).
 
-Agents reach memory over the same harness routes, keyed by task id (`harness.ts:72-98`):
+Agents reach memory through projected agent tools, keyed by task id:
 
-| Route | Bridge method | MCP tool |
+| Capability | Behavior | MCP tool |
 | --- | --- | --- |
-| `GET /:id/memory?q=…` | `memorySearch` (FTS5 ranked) | `memory_search` |
-| `GET /:id/memory` | `memoryList` (index: name + description) | `memory_list` |
-| `GET /:id/memory/:name` | `memoryGet` (full body + path) | `memory_get` |
-| `POST /:id/memory/propose` | `memoryPropose` | `memory_write` |
+| Search | FTS5-ranked recall | `memory_search` |
+| List | Index: name + description | `memory_list` |
+| Get | Full body + path | `memory_get` |
+| Propose | File a human-gated proposal | `memory_write` |
 
 Note the asymmetry: agent reads are direct, but the **only write path an agent has is `propose`**
-(the `/memory/propose` route in `harness.ts` and the `memory_write` tool in `mcp/server.ts`). `memory_write` is documented to the agent as "a human
+(the projected `memory_write` tool). `memory_write` is documented to the agent as "a human
 reviews before it lands — nothing is written directly." A silent agent write does not exist.
 
 ### Auto-generation — the task-boundary memory-review pass
@@ -230,13 +228,12 @@ feature. In a repo/worktree it holds `config.toml` (run targets, editor — see
 team-shared, while acorn's own local state lives under `apps/desktop/.acorn/` (gitignored: the client
 query cache, blob cache, and workspace notes).
 
-## Maturity
+## Availability and limits
 
-- **Write paths need the main process.** The harness routes delegate through the per-domain
-  `NotesBridge`/`MemoryBridge` sub-bridges injected by `main/harnessWiring.ts`. Without them — e.g.
+- **File-backed paths need the main process.** Human-facing HTTP routes delegate through an injected
+  `KnowledgeBridge`. Without it — e.g.
   `dev:node` running just the Hono server with no Electron — every route degrades to a clean **503**
-  (`bridge-unavailable`) rather than erroring. The notes/memory UIs likewise need the preload bridges
-  (`window.acorn.notes` / `.memory`), so they are desktop-only.
+  (`bridge-unavailable`) rather than crashing.
 - **The full proposal loop is implemented** — the human gate (Accept/Reject, manual add,
   `memory_write` = propose) *and* the automatic generation of proposals at task boundaries: the
   agent-session-end hook fires the headless memory-review pass over the diff + transcript
@@ -255,12 +252,12 @@ query cache, blob cache, and workspace notes).
   `apps/desktop/src/plugins/memory/main/memory.ts` (memory files + derived index + `MEMORY.md`),
   `apps/desktop/src/plugins/memory/main/memoryProposals.ts` (proposal JSON store),
   `apps/desktop/src/plugins/memory/main/memoryGen.ts` (auto-generation + accept/reject verdicts; trigger + the
-  notes/memory IPC wired in `main/knowledgeIpc.ts`)
-- Harness routes: `apps/desktop/src/core/server/routes/harness.ts`
-- Notes UI + bridge: `apps/desktop/src/client/features/notes/{NotesPane.tsx,notesClient.ts}`
-- Memory UI: `apps/desktop/src/client/features/memory/{MemoryTray.tsx,memoryClient.ts}`, hosted by
-  `apps/desktop/src/client/features/context/{ContextPane.tsx,model.ts}`
-- Assembly: `apps/desktop/src/shared/{api.ts,contextBlock.ts}`
+  knowledge bridge wired in `apps/desktop/src/plugins/memory/main/knowledgeIpc.ts`)
+- Human-facing routes: `apps/desktop/src/plugins/memory/server/routes/knowledge.ts`
+- Notes UI: `apps/desktop/src/plugins/notes/client/{NotesPane.tsx,notesClient.ts}`
+- Memory UI: `apps/desktop/src/plugins/memory/client/{MemoryTray.tsx,memoryClient.ts}`, hosted by
+  `apps/desktop/src/plugins/context/client/{ContextPane.tsx,model.ts}`
+- Assembly: `apps/desktop/src/core/shared/{api.ts,contextBlock.ts}`
 - MCP tools: `apps/desktop/src/core/mcp/server.ts`
 
 See also: [panes.md](./panes.md) (Context / Notes / Changes panes),

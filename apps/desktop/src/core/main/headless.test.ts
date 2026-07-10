@@ -7,7 +7,7 @@ import { buildHeadlessArgv, parseStreamJson, runHeadless } from './headless'
 
 const FAKE_AGENT = resolve(dirname(fileURLToPath(import.meta.url)), '../../../test/fixtures/fake-agent.sh')
 
-describe('argv templates (docs/next 14 — flags verified against installed CLIs)', () => {
+describe('argv templates (docs/workflows.md — flags verified against installed CLIs)', () => {
   it('claude-code: -p stream-json with permission pre-approval, model, inline schema, resume', () => {
     const argv = buildHeadlessArgv('claude-code', 'claude', {
       prompt: 'Review the change.',

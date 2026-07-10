@@ -80,8 +80,10 @@ open. Every pane has an overridable single-key shortcut (Settings → Shortcuts)
 | `notes` | Workspace / global markdown scratchpad |
 | `context` | What an assembled agent "send" will include |
 | `editor` | In-app code editor over the worktree |
-| `preview` | Live `<webview>` preview of the running app, with browser chrome (agent-drivable over CDP) |
+| `preview` | Kept-alive `WebContentsView` preview of the running app, with browser chrome and agent CDP tools |
 | `linear` / `rollbar` | The linked issue panel(s) |
+| `database` | Task-scoped PostgreSQL browser/editor |
+| `search` | Ripgrep-backed worktree search |
 
 The switcher also hosts **run targets** (one ▶ per configured target — they run as terminal
 sessions, acorn allocates no ports), the **Agents** toggle, and the **Terminal** toggle.
@@ -106,7 +108,7 @@ one.
 
 The right-rail **Agents panel** is the roster + launcher + activity feed for agent sessions, and
 "agent working" status flows back to the TabRail (spinner) and the topbar. All of this is
-desktop-only — always on when the preload bridge is present (`capabilities()`,
+desktop-only — always on when the native terminal capability is present (`capabilities()`,
 `apps/desktop/src/core/client/capabilities.ts`); the old `acorn:term` flag is gone. Bridge-absent
 (a plain browser via `dev:node`) is the degraded mode.
 
@@ -144,12 +146,13 @@ launched outside acorn. Configure in **Settings → MCP**.
 
 → [mcp.md](./mcp.md)
 
-## Workflows *(in progress, desktop-only)*
+## Workflows *(desktop-only)*
 
 Composable multi-agent orchestration: committed `.acorn/workflows` run as multi-step agent
-sequences. The engine has real scaffolding today — schema (`workflow_runs` / `workflow_steps`),
-harness run/gate routes, a read-only **WorkflowsSettings** inspector, and command-palette entries —
-but it is not a finished orchestrator. Treat it as in-progress.
+sequences. The durable runtime supports registry-backed step kinds, profiles and policies; explicit
+joins and conditional branches; named-output templates; per-run tool ceilings; bounded fan-out;
+cancellation; human/policy gates; live step events; run-scoped handoffs; and app-open triggers.
+Definitions remain file-authored, and execution advances only while the app is open.
 
 → [workflows.md](./workflows.md)
 
@@ -192,30 +195,27 @@ Reached from the account menu. A left tab rail:
 
 ---
 
-## Maturity
+## Availability
 
 Be aware of what's real today:
 
 - **Shipped, default-on:** GitHub PR review (list / detail / diff / write actions), Workspaces,
   Tasks, the TabRail, panes, local-changes review, notifications, integrations (Linear live,
   Rollbar), settings, command palette, and the file finder.
-- **Desktop-only (bridge-gated, always on):** the terminal drawer, agent sessions, run targets,
-  and workflows — available whenever the Electron preload bridge is present (`capabilities()`);
+- **Desktop-only (capability-gated, always on):** the terminal drawer, agent sessions, run targets,
+  and workflows — available whenever the Electron terminal capability is present (`capabilities()`);
   the `acorn:term` localStorage flag has been deleted.
-- **In progress:** the workflow engine — scaffolding exists (schema, routes, inspector, palette),
-  but it is not a finished orchestrator.
-- **Design-stage (not shipped):** future proposals live in `docs/next/` (the architecture review,
-  the plugin-platform design, and its implementation guide) — the features above describe what
-  exists in code today.
+- **Deliberate workflow limits:** no GUI workflow authoring, daemon/background runner, general DAG,
+  cost budgeting, or recovery graph. See [workflows.md](./workflows.md).
 
 ## Source
 
-- Client shell: `apps/desktop/src/core/client/App.tsx`; capabilities: `client/features/capabilities.ts`
-- TabRail: `apps/desktop/src/client/features/tabs/{TabRail.tsx,sources.ts,railOrder.ts}`
-- Task view + panes: `apps/desktop/src/client/features/tasks/{TaskView.tsx,layout.ts}`
+- Client shell: `apps/desktop/src/core/client/App.tsx`; capabilities: `core/client/capabilities.ts`
+- TabRail: `apps/desktop/src/core/client/tabs/{TabRail.tsx,sources.ts,railOrder.ts}`
+- Task view + panes: `apps/desktop/src/core/client/tasks/{TaskView.tsx,layout.ts}`
 - Write actions: `apps/desktop/src/plugins/github/client/mutations.ts`
-- Palette / shortcuts: `apps/desktop/src/core/client/palette/model.ts`, `client/Shortcuts.tsx`
-- Settings: `apps/desktop/src/client/features/settings/` (SettingsModal is pure tab chrome; each tab body is its own component)
+- Palette / shortcuts: `apps/desktop/src/core/client/palette/model.ts`, `core/client/Shortcuts.tsx`
+- Settings shell: `apps/desktop/src/core/client/settings/`; contributed pages live with plugins
 - MCP server: `apps/desktop/src/core/mcp/server.ts`
 
 See also: [architecture-overview.md](./architecture-overview.md) ·

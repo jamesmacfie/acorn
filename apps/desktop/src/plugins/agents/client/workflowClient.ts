@@ -1,6 +1,6 @@
-// Workflow control over loopback HTTP (Phase 3): was `window.acorn.terminal.workflow`'s
+// Workflow control over loopback HTTP: was `window.acorn.terminal.workflow`'s
 // defs/start/runs/steps/gate. The `onNotice` push stays on the terminal bridge until the WebSocket
-// lands (slice 6). Needs the main-process WorkflowRunner, so it 503s in dev:node (desktop-only).
+// lands (the WebSocket transport). Needs the main-process WorkflowRunner, so it 503s in dev:node (desktop-only).
 import {
   workflowCancelRoute,
   workflowDefsRoute,
@@ -13,6 +13,7 @@ import {
 } from '../../../core/shared/api'
 import { readJson, writeJson } from '../../../core/client/apiClient'
 import type { WorkflowDefSummary, WorkflowRunRow, WorkflowStepRow } from '../../terminal/client/terminalClient'
+import { openRepoConfigTrust } from '../../../core/client/configTrust/configTrust'
 
 export type { WorkflowDefSummary, WorkflowRunRow, WorkflowStepRow } from '../../terminal/client/terminalClient'
 
@@ -34,12 +35,15 @@ export const workflowApi = {
   pollTriggers: () => writeJson<{ started: number; errors: string[] }>(workflowTriggerPollRoute, { method: 'POST' }),
   // Keeps the {runId?, error?} contract the palette expects — a thrown HTTP error becomes {error}.
   start: async (taskId: string, def: unknown): Promise<{ runId?: string; error?: string }> => {
+    const execute = () => writeJson<{ runId?: string; error?: string }>(workflowStartRoute(taskId), {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ def }),
+    })
     try {
-      return await writeJson<{ runId?: string }>(workflowStartRoute(taskId), {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ def }),
-      })
+      const result = await execute()
+      if (result.error === 'needs-trust') openRepoConfigTrust(taskId, execute)
+      return result
     } catch (e) {
       return { error: e instanceof Error ? e.message : 'Failed to start workflow.' }
     }

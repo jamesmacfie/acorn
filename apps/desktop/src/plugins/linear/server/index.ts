@@ -29,7 +29,7 @@ export async function linearData<T>(res: Response): Promise<T> {
 export const VIEWER_QUERY = `query { viewer { name organization { name } } }`
 export type Viewer = { viewer: { name: string; organization: { name: string } } }
 
-// Projects in the workspace, for the per-repo project picker (docs/workspaces — Linear source).
+// Projects in the workspace, for the per-repo project picker (docs/workspaces-and-tasks.md — Linear source).
 export const PROJECTS_QUERY = `query { projects(first: 250) { nodes { id name } } }`
 export type LinearProjectNode = { id: string; name: string }
 

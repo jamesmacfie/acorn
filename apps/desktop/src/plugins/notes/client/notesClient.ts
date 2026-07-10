@@ -1,5 +1,5 @@
 // The renderer's notes surface (docs/notes-and-memory.md). Was the `window.acorn.notes` preload bridge;
-// now loopback HTTP (Phase 3). Backed by the main-process NotesStore, so it 503s in dev:node. Note
+// now loopback HTTP. Backed by the main-process NotesStore, so it 503s in dev:node. Note
 // shapes are canonical in shared/notes.ts (main's NotesStore imports the same types) — re-exported
 // here so existing feature imports keep working.
 import { noteIncludedRoute, noteRoute, notesListRoute } from '../../../core/shared/api'

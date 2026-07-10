@@ -6,7 +6,7 @@ import { prefsOptions } from '../queries'
 import { saveJsonPref } from './savePref'
 import { PrefKeys } from '../persistence/prefKeys'
 
-// Settings → Agent tools (docs/agent-tools.md, ux §3): the permission surface over the agent-tool
+// Settings → Agent tools (docs/agent-tools.md): the permission surface over the agent-tool
 // registry. Tools are grouped by risk tier (read → write → execute); a tier toggle and per-tool
 // toggles persist as ONE prefs slice. Turning a tier or tool off removes it from every projection
 // (MCP tools/list AND a direct harness call) — the manifest re-reads these on each fetch.

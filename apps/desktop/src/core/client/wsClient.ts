@@ -1,4 +1,4 @@
-// The renderer end of the one authenticated stream socket (docs/next Phase 3 slice 6). Replaces the
+// The renderer end of the one authenticated stream socket (docs/electron.md §12). Replaces the
 // per-session `window.acorn.terminal.attach/write/onStatus` + `workflow.onNotice` IPC. One lazily-
 // opened WebSocket, same-origin so the session cookie rides the upgrade automatically; it
 // reconnects and re-attaches live subscriptions, and fans kind-tagged frames out to local callers.
@@ -6,7 +6,7 @@ import type { ServerMsg } from '../shared/terminal'
 import { WS_PATH, type WsClientFrame, type WsServerFrame } from '../shared/ws'
 
 type OutputCb = (m: ServerMsg) => void
-type NoticeCb = (n: { taskId: string; kind: 'gate' | 'run-done'; title: string }) => void
+type NoticeCb = (n: { taskId: string; kind: 'gate' | 'run-done' | 'repo-config-trust'; title: string; action?: 'review-config' }) => void
 type StepEventCb = (event: { runId: string; stepId: string; event: unknown }) => void
 
 const outputSubs = new Map<string, Set<OutputCb>>() // sessionId → local subscribers

@@ -10,8 +10,8 @@ and [electron](./electron.md).
 > migrated to Electron. Some inline code comments still say "the Worker" / "D1 / KV" — read those as
 > "the local server" / "local SQLite" / "the on-disk blob dir".
 
-> **Phase 3 (transport collapse):** the renderer↔main IPC channels are now HTTP routes + one
-> WebSocket, not `ipcMain` handlers. New route families: `/api/tasks/:id/{search,editor/*,local/*,
+> **Transport:** renderer request/response uses HTTP routes and live streams use one
+> WebSocket. Route families include `/api/tasks/:id/{search,editor/*,local/*,
 > database/*}`, `/api/terminal/*` + `/api/tasks/:id/{archive,preview-url,on-created,use-checkout,
 > mcp}`, `/api/tasks/:id/workflows` + `/api/workflows/runs/:runId/*`, `/api/memory*` +
 > `/api/workspaces/:wsId/notes*`, `/api/tasks/:id/notes*`, and the `RunBridge` at `/api/tasks/:id/run/*`. Each is
@@ -41,8 +41,8 @@ Every `/api/*` route runs through three middlewares before the handler, in this 
    It rejects any request with no resolved principal → `401 { error: 'unauthenticated' }`. Routes
    no longer carry inline session guards; handlers read the identity via `getUser(c)` (safe because
    the gate guarantees a principal). Gating on the principal, not on "a cookie is present," keeps a
-   future authorized external caller a new `kind` rather than a per-route change
-   ([docs/next/security.md](./next/security.md) §9.1).
+   future authorized external caller a new `kind` rather than a per-route change. See
+   [security.md](./security.md).
 
 `/auth/*` routes bypass this chain (they establish the session) and are unauthenticated by
 construction — they mount *before* the `/api/*` middlewares. See
@@ -731,7 +731,8 @@ the `error` values below are the stable machine codes, and `detail` (when presen
 
 - Route mount map: `apps/desktop/src/core/server/index.ts`
 - Middleware: `apps/desktop/src/core/server/middleware/auth.ts`
-- Routes: `apps/desktop/src/server/routes/*`
+- Core routes: `apps/desktop/src/core/server/routes/*`; plugin routes:
+  `apps/desktop/src/plugins/*/server/routes/*`
 - Shared contract: `apps/desktop/src/core/shared/api.ts` (+ `api.test.ts`)
 
 **See also:** [authentication](./authentication.md) · [data-layer](./data-layer.md) ·

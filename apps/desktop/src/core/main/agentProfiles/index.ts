@@ -3,7 +3,7 @@ import type { AgentProfileContribution } from './types'
 
 // The agent-profile registry (core). The claude/codex/aider profile plugins are registered by the
 // composition root (app/main/agentProfiles.ts) — core owns the registry and the default-profile
-// policy, not the set of profile plugins, so a fourth profile touches zero core files (docs/next §9).
+// policy, not the set of profile plugins, so a fourth profile touches zero core files (docs/plugins.md).
 class AgentProfileRegistry {
   readonly #profiles = new Map<string, AgentProfileContribution>()
 

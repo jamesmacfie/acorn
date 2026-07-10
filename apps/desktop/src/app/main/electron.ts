@@ -1,5 +1,5 @@
 import { app, BrowserWindow, dialog, ipcMain, shell } from 'electron'
-import { join } from 'node:path'
+import { join, resolve } from 'node:path'
 import { bootstrap } from './bootstrap'
 import { resolveSessionKey } from '../../core/main/sessionKeyStore'
 import { ACORN_PORT, devDataDir } from '../../core/main/server'
@@ -10,7 +10,10 @@ const PRELOAD = join(import.meta.dirname, '../preload/index.cjs')
 // Writable app-data root (DB, blobs, worktrees, notes). Packaged builds must not write next to the
 // module (that's the read-only asar) — use the OS-standard userData dir. Dev keeps the repo-local
 // apps/desktop/.acorn so a checkout's data stays with the checkout.
-const dataDir = app.isPackaged ? app.getPath('userData') : devDataDir
+const e2e = process.env.ACORN_E2E === '1'
+const dataDir = e2e && process.env.ACORN_E2E_DATA_DIR
+  ? resolve(process.env.ACORN_E2E_DATA_DIR)
+  : app.isPackaged ? app.getPath('userData') : devDataDir
 
 // Dev: load secrets from .env. Packaged builds have no .env (this no-ops); SESSION_ENC_KEY then
 // falls through to safeStorage (resolveSessionKey, in whenReady below). GITHUB_CLIENT_* still need
@@ -88,7 +91,7 @@ function hardenNavigation(win: BrowserWindow) {
     void shell.openExternal(url)
     return { action: 'deny' }
   })
-  // The browser-preview pane is now a main-owned WebContentsView (previewService.ts, Phase 9 A), not
+  // The browser-preview pane is now a main-owned WebContentsView (previewService.ts), not
   // a <webview> guest — its http(s)-only navigation guard lives per-view there, so no
   // will-attach-webview handler here anymore.
 }
@@ -119,7 +122,7 @@ async function createMainWindow() {
     }
   })
   win.once('ready-to-show', () => win.show())
-  await win.loadURL(ORIGIN)
+  await win.loadURL(e2e ? `${ORIGIN}/auth/test-login` : ORIGIN)
   return win
 }
 
@@ -127,7 +130,7 @@ app.whenReady().then(async () => {
   // One call into the composition root: it migrates, constructs services, installs bridges, starts
   // the loopback listener, then creates the window (main/bootstrap.ts owns the order + teardown).
   try {
-    resolveSessionKey(dataDir) // safeStorage-backed SESSION_ENC_KEY (Phase 9 C) before any binding reads it
+    resolveSessionKey(dataDir) // safeStorage-backed SESSION_ENC_KEY before any binding reads it
     mainWindow = await bootstrap({ dataDir, origin: ORIGIN, createWindow: createMainWindow })
   } catch (e) {
     // Boot is all-or-nothing: a failure here (migration, EADDRINUSE on the pinned port, …) means no

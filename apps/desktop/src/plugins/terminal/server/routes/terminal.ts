@@ -8,10 +8,9 @@ import { respondError } from '../../../../core/server/respond'
 
 // Terminal control (docs/terminal-and-agents.md): the request/response half of the terminal engine —
 // list/create/kill/resize sessions, repo-path mapping, task lifecycle (archive/useCheckout/onCreated),
-// preview-url + the MCP config inspector. Was the `term:*` / `mcp:*` IPC channels (inventories §1a).
-// The STREAM half (term:input/attach/detach/out, term:status) is the WebSocket hub (main/wsHub.ts);
-// `browser:bind` + `term:repoPath:pick` stay IPC forever (Electron-capability residue, §1c). Backed
-// by the PTY engine in the main process, so it 503s under dev:node.
+// preview-url + the MCP config inspector. Streams use the WebSocket hub; only the native folder
+// picker remains on the terminal preload bridge. Backed by the PTY engine in the main process, so
+// these routes return 503 under dev:node.
 
 export type SendSubmit = 'now' | 'after-ready' | 'draft'
 export type TerminalBridge = {
@@ -39,7 +38,7 @@ export const terminalBridgeSlot = bridgeSlot<TerminalBridge>()
 export const setTerminalBridge = terminalBridgeSlot.set
 
 // create spawns a PTY; resize/send/repo-path/preview/archive touch processes or persisted state —
-// all get validated bodies (Phase 3 §1). CreateOpts is passed through (the engine re-derives cwd
+// all get validated bodies (the privileged-boundary contract). CreateOpts is passed through (the engine re-derives cwd
 // from taskId); we only assert the shape the engine relies on.
 const createBody = z
   .object({

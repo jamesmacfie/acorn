@@ -4,8 +4,8 @@ import { bridgeSlot, viaBridge } from '../../../../core/server/bridge'
 import type { AppEnv } from '../../../../core/server/middleware/auth'
 import { respondError } from '../../../../core/server/respond'
 
-// Editor pane (docs/workspaces): read/write/list files on the task's worktree. Was the `editor:*`
-// IPC channels (inventories §1a); now task-scoped HTTP behind the EditorBridge (main/editor.ts).
+// Editor pane (docs/workspaces-and-tasks.md): read/write/list files on the task's worktree. Was the `editor:*`
+// IPC channels; now task-scoped HTTP behind the EditorBridge (main/editor.ts).
 // The bridge confines every relative path to the worktree root, so traversal/symlink escapes are
 // rejected (403) and an unmapped repo is a 404 — see server/routes/editor.test.ts.
 
@@ -22,7 +22,7 @@ export type EditorBridge = {
 export const editorBridgeSlot = bridgeSlot<EditorBridge>()
 export const setEditorBridge = editorBridgeSlot.set
 
-// Write touches the filesystem, so the body is validated (Phase 3 §1).
+// Write touches the filesystem, so the body is validated (the privileged-boundary contract).
 const writeBody = z.object({ path: z.string().min(1), content: z.string() })
 
 export const editor = new Hono<AppEnv>()

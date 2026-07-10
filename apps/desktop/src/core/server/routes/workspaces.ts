@@ -9,7 +9,7 @@ import type { PreviewMode, SetupTrigger, Workspace, WorkspaceProject, WorkspaceP
 import { isValidWorkspaceColor, isValidWorkspaceIcon, parseWorkspaceIcon, serializeWorkspaceIcon } from '../../shared/workspaceIdentity'
 import { getConnection } from '../integrations/connections'
 
-// Workspaces (docs/workspaces): named GROUPS of repos — the top-level unit. Machine-scoped (no
+// Workspaces (docs/workspaces-and-tasks.md): named GROUPS of repos — the top-level unit. Machine-scoped (no
 // user_id) like tasks / repo_paths, but auth-gated. A repo belongs to exactly one workspace
 // (workspace_repos PK is (owner, repo)); the `Default` workspace is the catch-all.
 

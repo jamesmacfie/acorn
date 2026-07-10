@@ -89,7 +89,7 @@ export type Compare = { aheadBy: number; files: PullFile[]; commits: CompareComm
 // Full head-blob body, fetched on demand to expand unchanged context around diff hunks.
 export type FileBlob = { text: string }
 
-// --- Integrations: multi-row per provider (docs/workspaces 04). GitHub appears as a synthesized
+// --- Integrations: multi-row per provider (docs/workspaces-and-tasks.md). GitHub appears as a synthesized
 // entry (id 'github') so it reads as "just another integration", but it's the identity root — its
 // token is the session cookie, not a stored row. ---
 export type IntegrationProvider = string
@@ -121,7 +121,7 @@ export type LinearIssueDetail = LinearIssueSummary & { id: string; description: 
 export type LinearCommentRequest = { body: string; parentId?: string }
 export type LinearIssuesRequest = { identifiers: string[] }
 export type LinearIssuesResponse = { issues: LinearIssueSummary[] }
-// Linear projects + project-scoped issue browse (docs/workspaces — Linear source per repo). Each
+// Linear projects + project-scoped issue browse (docs/workspaces-and-tasks.md — Linear source per repo). Each
 // project carries which connection it came from, so the picker can span multiple Linear integrations.
 export type LinearProject = { integrationId: string; integrationLabel: string; id: string; name: string }
 export type LinearProjectsResponse = { projects: LinearProject[] }
@@ -147,7 +147,7 @@ export const rollbarItemRoute = (integrationId: string, identifier: string) =>
 export const rollbarItemsKey = ['rollbar-items'] as const
 export const rollbarItemKey = (integrationId: string, identifier: string) => ['rollbar-item', integrationId, identifier] as const
 
-// --- Workspaces: named groups of repos (docs/workspaces). The top-level unit. ---
+// --- Workspaces: named groups of repos (docs/workspaces-and-tasks.md). The top-level unit. ---
 export type WorkspaceRepo = { owner: string; name: string; sort: number }
 // When the worktree setup script runs: 'off' never, 'created' eagerly when the task is created,
 // 'terminal' lazily when its terminal first opens (the default). null is treated as 'terminal'.
@@ -182,11 +182,11 @@ export type WorkspaceSeed = { name: string }
 // Per-repo assignment for the onboarding modal: which workspace a repo is in + whether it's hidden.
 export type RepoAssignment = { owner: string; name: string; workspaceId: string; ignored: boolean }
 
-// --- Tasks: the single-repo unit of work (docs/workspaces/03). Rail rows. ---
+// --- Tasks: the single-repo unit of work (docs/workspaces-and-tasks.md/03). Rail rows. ---
 // connectionId pins the link to a specific credential. providerId is stamped by core from that row.
 export type TaskLink = { connectionId: string; providerId: string; identifier: string; ref?: ExternalRef }
 export type TaskLinkSeed = { connectionId: string; identifier: string; ref?: Omit<ExternalRef, 'providerId' | 'connectionId'>; providerId?: string }
-// A workspace's linked external projects (docs/workspaces 04) — (integrationId, externalId) pairs.
+// A workspace's linked external projects (docs/workspaces-and-tasks.md) — (integrationId, externalId) pairs.
 export type WorkspaceProject = { integrationId: string; externalId: string }
 export type WorkspaceProjectsResponse = { projects: WorkspaceProject[] }
 export type Task = {
@@ -199,12 +199,12 @@ export type Task = {
   worktreePath: string | null
   pullNumber: number | null
   status: 'active' | 'archived' | 'cancelled'
-  parentId: string | null // task tree (docs/next 14 P4): fan-out children point at their root
+  parentId: string | null // task tree (docs/workflows.md): fan-out children point at their root
   sort: number
   links: TaskLink[]
 }
 // The non-derived columns a new task needs, plus initial links. One create path for every
-// Source (docs/workspaces/04). title is optional — the server seeds one from origin if absent.
+// Source (docs/workspaces-and-tasks.md/04). title is optional — the server seeds one from origin if absent.
 export type TaskSeed = {
   title?: string
   origin: Task['origin']
@@ -215,7 +215,7 @@ export type TaskSeed = {
   links?: TaskLinkSeed[]
 }
 
-// Assembled task context (docs/next 11 §C): section contributions serialize their renderer
+// Assembled task context (docs/agent-tools.md §4): section contributions serialize their renderer
 // metadata and compact projection beside the compatibility fields used by focused tools.
 export type TaskContextInclude = string
 export type ContextBudget = {
@@ -269,10 +269,10 @@ export type AgentToolCatalogEntry = { name: string; description: string; risk: T
 export const rendererAgentToolRoute = (taskId: string, name: string) => `/api/tasks/${taskId}/renderer-tools/${encodeURIComponent(name)}`
 
 // Find-in-files (docs/panes.md): POST because it spawns ripgrep and the query is arbitrary body,
-// not a path segment. Was the `search:findInFiles` IPC channel (Phase 3).
+// not a path segment. Was the `search:findInFiles` IPC channel.
 export const searchRoute = (taskId: string) => `/api/tasks/${taskId}/search`
 
-// Editor pane (docs/workspaces): read/write/list worktree files. Was the `editor:*` IPC channels.
+// Editor pane (docs/workspaces-and-tasks.md): read/write/list worktree files. Was the `editor:*` IPC channels.
 // relPath rides a query param so a nested path never collides with the route segments.
 export type EditorEntry = { name: string; dir: boolean }
 export type EditorWriteResult = { ok: boolean; reason?: string }
@@ -282,16 +282,25 @@ export const editorListRoute = (taskId: string, relPath: string) => `/api/tasks/
 export const editorReadRoute = (taskId: string, relPath: string) => `/api/tasks/${taskId}/editor/read?path=${encodeURIComponent(relPath)}`
 export const editorWriteRoute = (taskId: string) => `/api/tasks/${taskId}/editor/file`
 
-// Run targets (docs/next 13 §A): the renderer shares the RunBridge routes the MCP run tools use
-// (server/routes/harness.ts). Was the `run:*` IPC channels (Phase 3).
+// Run targets (docs/workflows.md §2): the renderer shares the RunBridge routes the MCP run tools use
+// (server/routes/harness.ts). Was the `run:*` IPC channels.
 export const runTargetsRoute = (taskId: string) => `/api/tasks/${taskId}/run`
 export const runDefaultUrlRoute = (taskId: string) => `/api/tasks/${taskId}/run/default-url`
 export const runStartRoute = (taskId: string, targetId: string) => `/api/tasks/${taskId}/run/${encodeURIComponent(targetId)}/start`
 export const runStopRoute = (taskId: string, targetId: string) => `/api/tasks/${taskId}/run/${encodeURIComponent(targetId)}/stop`
 export const runStatusRoute = (taskId: string, targetId: string) => `/api/tasks/${taskId}/run/${encodeURIComponent(targetId)}/status`
 
-// Workflow control (docs/next 14): task-scoped defs/start/runs, run-scoped steps/gate. Was the
-// `workflow:{defs,start,runs,steps,gate}` IPC channels (Phase 3). The notice push stays IPC until WS.
+export type RepoConfigTrustReview = {
+  taskId: string
+  repo: string | null
+  trusted: boolean
+  current: { hash: string; text: string; files: Array<{ path: string; content: string }> } | null
+  previous: { hash: string; text: string; ackedAt: number } | null
+}
+export const repoConfigTrustRoute = (taskId: string) => `/api/tasks/${taskId}/config-trust`
+
+// Workflow control (docs/workflows.md): task-scoped defs/start/runs and run-scoped steps/gates.
+// Commands use HTTP; workflow notices and step events use the shared WebSocket.
 export const workflowDefsRoute = (taskId: string) => `/api/tasks/${taskId}/workflows`
 export const workflowStartRoute = (taskId: string) => `/api/tasks/${taskId}/workflows`
 export const workflowRunsRoute = (taskId: string) => `/api/tasks/${taskId}/workflows/runs`
@@ -302,7 +311,7 @@ export const workflowKillRoute = (runId: string) => `/api/workflows/runs/${runId
 export const workflowTriggerPollRoute = '/api/workflows/triggers/poll'
 
 // Local-changes review (docs/panes.md): working-tree status/diff/blob + stage/commit/discard/push.
-// Was the `local:*` IPC channels (Phase 3).
+// Was the `local:*` IPC channels.
 export const localChangesRoute = (taskId: string) => `/api/tasks/${taskId}/local/changes`
 export const localDiffRoute = (taskId: string, path: string, scope: 'unstaged' | 'staged') =>
   `/api/tasks/${taskId}/local/diff?path=${encodeURIComponent(path)}&scope=${scope}`
@@ -311,7 +320,7 @@ export const localBlobRoute = (taskId: string, path: string, ref?: string) =>
 export const localActionRoute = (taskId: string, action: 'stage' | 'unstage' | 'discard' | 'commit' | 'stage-all' | 'unstage-all' | 'discard-all' | 'push') =>
   `/api/tasks/${taskId}/local/${action}`
 
-// Database pane (docs/pg.md): per-task Postgres browse/edit. Was the `db:*` IPC channels (Phase 3).
+// Database pane (docs/pg.md): per-task Postgres browse/edit. Was the `db:*` IPC channels.
 export const databaseTablesRoute = (taskId: string) => `/api/tasks/${taskId}/database/tables`
 export const databaseColumnsRoute = (taskId: string, schema: string, name: string) =>
   `/api/tasks/${taskId}/database/columns?schema=${encodeURIComponent(schema)}&name=${encodeURIComponent(name)}`
@@ -320,7 +329,7 @@ export const databaseRowsRoute = (taskId: string, schema: string, name: string, 
 export const databaseActionRoute = (taskId: string, action: 'connect' | 'disconnect' | 'query' | 'update' | 'insert' | 'delete') =>
   `/api/tasks/${taskId}/database/${action}`
 
-// Notes + memory pane (docs/notes-and-memory.md, docs/next 12). Was the `memory:*` / `notes:*` IPC (Phase 3).
+// Notes + memory pane (docs/notes-and-memory.md). These routes replaced the old feature-specific IPC surface.
 export const memoryListRoute = (repo?: string) => `/api/memory${repo ? `?repo=${encodeURIComponent(repo)}` : ''}`
 export const memorySearchRoute = (query: string, repo?: string, type?: string) =>
   `/api/memory/search?q=${encodeURIComponent(query)}${repo ? `&repo=${encodeURIComponent(repo)}` : ''}${type ? `&type=${encodeURIComponent(type)}` : ''}`
@@ -336,9 +345,8 @@ export const notesListRoute = (location: NoteLocation) =>
 export const noteRoute = (location: NoteLocation, slug: string) => `${notesListRoute(location)}/${encodeURIComponent(slug)}`
 export const noteIncludedRoute = (location: NoteLocation, slug: string) => `${noteRoute(location, slug)}/included`
 
-// Terminal control (docs/terminal-and-agents.md): the req/resp half of the engine. Was the `term:*` / `mcp:*`
-// IPC channels (Phase 3). The stream half (input/attach/out/status) is the WebSocket (slice 6);
-// `browser:bind` + `term:repoPath:pick` stay IPC (Electron residue).
+// Terminal control (docs/terminal-and-agents.md): request/response routes for the main-process
+// engine. Input/output/status use the WebSocket; only the native folder picker stays on preload IPC.
 export const terminalSessionsRoute = '/api/terminal/sessions'
 export const terminalProfilesRoute = '/api/terminal/profiles'
 export const terminalTaskStatusesRoute = '/api/terminal/task-statuses'

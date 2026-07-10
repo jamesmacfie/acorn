@@ -7,7 +7,8 @@ its state model.
 
 ## Overview
 
-The client is a SolidJS single-page app under `apps/desktop/src/client/`. It is served as static
+The client is a SolidJS single-page app composed from `apps/desktop/src/core/client/`,
+`apps/desktop/src/plugins/*/client/`, and `apps/desktop/src/app/client/`. It is served as static
 assets by the in-process Hono server (running in the Electron main process on
 `http://127.0.0.1:4317`) and talks to that same origin over cookie-authenticated `fetch` — the
 GitHub token never reaches the browser (see [authentication.md](./authentication.md)).
@@ -72,7 +73,7 @@ theme, and lays out a left `TabRail` beside a topbar + a main-area `Switch`:
 │ task │        [ PullList | PullDetail | DiffView ]                     │
 │  +   │        or /new → [ CreatePullForm | ComparePreview ]           │
 └──────┴───────────────────────────────────────────────────────────────┘
-            terminal drawer (bottom, per-task, flagged) ─┘
+            terminal drawer (bottom, per-task, desktop-only) ─┘
 ```
 
 The left `TabRail` (see [workspaces-and-tasks.md](./workspaces-and-tasks.md)) holds the source
@@ -196,11 +197,11 @@ prefs). They export getters + mutators in the codebase's single-writer style:
 
 | Module | Owns |
 | --- | --- |
-| `features/tasks/tasks.ts` | `selectedSource`, `activeTaskId`, and per-task `taskLayouts` (all layout transitions go through `dispatchLayout` → the pure `applyLayoutAction` reducer); plus per-task terminal-open and recipe-browser-URL state. |
-| `features/terminal/sessions.ts` | The live terminal-session list + a single `onStatus` subscription, so the rail/topbar can show agent-working activity even with the drawer closed. |
-| `features/tasks/taskStatus.ts` | Live worktree status per task (dirty count / `missing`), 5s-polled + `onStatus` edges. |
-| `features/notifications/notifications.ts` | The bounded in-memory notice ring (mirrored to the `notices` pref) + pure edge detection over session snapshots. |
-| `features/editor/editorState.ts` | Open-file tabs per task (mirrored to `editor_open_files`). |
+| `core/client/tasks/tasks.ts` | `selectedSource`, `activeTaskId`, and per-task `taskLayouts` (all layout transitions go through `dispatchLayout` → the pure `applyLayoutAction` reducer); plus per-task terminal-open and recipe-browser-URL state. |
+| `plugins/terminal/client/sessions.ts` | The live terminal-session list + a single `onStatus` subscription, so the rail/topbar can show agent-working activity even with the drawer closed. |
+| `core/client/tasks/taskStatus.ts` | Live worktree status per task (dirty count / `missing`), 5s-polled + `onStatus` edges. |
+| `core/client/notifications/notifications.ts` | The bounded in-memory notice ring (mirrored to the `notices` pref) + pure edge detection over session snapshots. |
+| `plugins/editor/client/editorState.ts` | Open-file tabs per task (mirrored to `editor:open-files:<taskId>`). |
 
 These are initialised once in `App`'s `onMount` (`initSessions`/`initTaskStatuses`/
 `initWorkflowNotices`), each a no-op when the terminal bridge is absent, so they naturally show
@@ -217,34 +218,31 @@ notes | context | database | search`. One pure reducer `applyLayoutAction` owns 
 [panes.md](./panes.md). (`ponytail:` a flat row, not a layout tree — open-what-you-want side by
 side is enough.)
 
-## Desktop IPC bridges (`window.acorn.*`)
+## Client transport and desktop capabilities
 
-The Electron preload (`apps/desktop/src/core/main/preload.ts`) exposes a **narrow** capability surface
-on `window.acorn` via `contextBridge` — never raw `ipcRenderer`. Each feature has a typed accessor
-that returns the bridge or `null`, so consumers degrade gracefully on a non-desktop build:
+Normal renderer requests use the same-origin HTTP API, and live terminal/workflow events use one
+authenticated WebSocket. Search, editor, local changes, database, notes, memory, terminal control,
+run targets, workflows, and MCP settings do not have feature-specific preload APIs.
 
-| Accessor | Bridge | Purpose |
-| --- | --- | --- |
-| `terminalApi()` — `features/terminal/terminalClient.ts` | `window.acorn.terminal` | PTY sessions, profiles, run targets, local-changes review, guarded task archive/teardown, `sendToAgent`, workflow calls, status/output subscriptions. |
-| `memoryApi()` — `features/memory/memoryClient.ts` | `window.acorn.memory` | Committed `.acorn/memory` files + FTS search + proposal gate. |
-| `notesApi()` — `features/notes/notesClient.ts` | `window.acorn.notes` | Workspace `.md` notes CRUD. |
-| `editorApi()` — `features/editor/editorClient.ts` | `window.acorn.editor` | Read/list/write files on the task's worktree (Monaco pane). |
-| `window.acorn.mcp` | — | MCP config inspector + register/unregister acorn's own MCP server. |
-| `window.acorn.browser` | — | Bind a task's preview webview for CDP driving. |
+The Electron preload (`apps/desktop/src/core/main/preload.ts`) exposes only operations that truly
+need Electron:
 
-`window.acorn.desktop` (plus `platform`, `onClosePane`) marks the desktop build. Everything above is
-`null` on a web build. Availability is answered in one place: `capabilities()`
-(`features/capabilities.ts`) reports `{ desktop, terminal }` from bridge presence — the terminal
-surface (drawer, agent sessions, run targets, workflows) is **always on when the bridge exists**
-(the old `acorn:term` localStorage flag is gone); bridge-absent (a plain browser via `dev:node`)
-is the degraded mode. The typed accessors above remain the way to *invoke* the bridge. See
-[terminal-and-agents.md](./terminal-and-agents.md) and [mcp.md](./mcp.md).
+- desktop/platform markers and the close-pane/quit lifecycle callbacks;
+- the native repository folder picker;
+- preview `WebContentsView` lifecycle, bounds, navigation, and chrome-state events.
+
+`capabilities()` (`apps/desktop/src/core/client/capabilities.ts`) reports `{ desktop, terminal }`
+from that surface. The terminal drawer, agents, run targets, and workflows are available whenever
+the desktop terminal capability exists; `dev:node` remains a deliberate degraded mode for features
+whose main-process bridge is unavailable.
 
 ## Source
 
-Key files: `apps/desktop/src/client/{index.tsx,App.tsx,apiClient.ts,queries.ts,mutations.ts,prefetch.ts}`,
-`features/tabs/TabRail.tsx`, `features/tasks/{tasks.ts,layout.ts,activate.ts,TaskView.tsx}`, and the
-signal stores under `features/{terminal,notifications,editor}/`.
+Key files: `apps/desktop/src/app/client/index.tsx`,
+`apps/desktop/src/core/client/{App.tsx,apiClient.ts,queries.ts}`,
+`apps/desktop/src/core/client/tabs/TabRail.tsx`,
+`apps/desktop/src/core/client/tasks/{tasks.ts,layout.ts,activate.ts,TaskView.tsx}`, and feature-owned
+client code under `apps/desktop/src/plugins/*/client/`.
 
 See also: [panes.md](./panes.md) (the pane catalog), [workspaces-and-tasks.md](./workspaces-and-tasks.md)
 (the rail + task model), [diff-rendering.md](./diff-rendering.md), [caching.md](./caching.md),
@@ -253,7 +251,7 @@ See also: [panes.md](./panes.md) (the pane catalog), [workspaces-and-tasks.md](.
 
 ## Notes on shared plumbing
 
-- Task activation lives once in `features/tasks/activate.ts`: `activateTaskSignals(t, { pane? })`
+- Task activation lives once in `core/client/tasks/activate.ts`: `activateTaskSignals(t, { pane? })`
   (rail rows, ⌘1–9, the new-task flow, browse promotes, the notification bell, the palette) plus
   `pathForTask`. The optional `pane` forces a pane (promotes land on their provider pane);
   otherwise the saved layout is restored and only the first activation picks a default.
@@ -264,5 +262,3 @@ See also: [panes.md](./panes.md) (the pane catalog), [workspaces-and-tasks.md](.
 - API failures are typed: `apiClient.ts` throws `ApiError` (message + HTTP `status`); the auth
   bounce in `index.tsx` is structural (`err instanceof ApiError && err.status === 401`), not
   message-text matching.
-</content>
-</invoke>

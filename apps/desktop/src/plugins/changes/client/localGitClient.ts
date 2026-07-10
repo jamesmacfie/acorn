@@ -1,4 +1,4 @@
-// Local-changes review over loopback HTTP (Phase 3): was `window.acorn.terminal.local`. Pure-Node
+// Local-changes review over loopback HTTP: was `window.acorn.terminal.local`. Pure-Node
 // on the server, so it works in a plain browser (dev:node) too.
 import { localActionRoute, localBlobRoute, localChangesRoute, localDiffRoute } from '../../../core/shared/api'
 import { readJson, writeJson } from '../../../core/client/apiClient'

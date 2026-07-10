@@ -3,7 +3,7 @@
 // server.ts), so BOTH the Electron composition root and the plain-Node dev:node entry install them
 // and these routes work in either. The stateful, boot-constructed bridges (harness: notes/memory/
 // run/browser; terminal; workflow) are wired separately in main/bootstrap.ts and stay 503 under
-// dev:node. See docs/next Phase 3 §6 (capability map).
+// dev:node. See docs/electron.md §12 (capability map).
 import type { AppDatabase } from '../../core/server/db'
 import { setDatabaseBridge } from '../../plugins/database/server/routes/database'
 import { setEditorBridge } from '../../plugins/editor/server/routes/editor'

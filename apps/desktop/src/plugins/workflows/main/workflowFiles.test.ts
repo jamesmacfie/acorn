@@ -5,7 +5,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { loadWorkflowFiles } from './workflowFiles'
 import { normalizePersistedWorkflow } from './workflowValidation'
 
-describe('workflow files (docs/next 14 P5)', () => {
+describe('workflow files (docs/workflows.md)', () => {
   let dir: string
   let repoDir: string
   let userDir: string

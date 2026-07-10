@@ -85,7 +85,7 @@ optional jump. The serialized `TaskContext.sections` drives both the renderer tr
 
 - **`memory_write` proposes only.** No tool, plugin or provider writes accepted memory. Accepted
   memory stays human-gated and file-backed — the `memory_write` handler calls the proposal store, and
-  the human review gate is the sole writer. See [memory.md](./next/memory.md), [notes-and-memory.md](./notes-and-memory.md).
+  the human review gate is the sole writer. See [notes-and-memory.md](./notes-and-memory.md).
 - **Notes provenance is single-sourced.** Agent writes stamp `author: agent` + the agent session id
   through the same location-aware `NotesStore` the UI writes through. Agent writes default to
   `notes/task/<taskId>/`; callers can explicitly choose workspace/global scope.

@@ -30,7 +30,7 @@ are the same app: one origin, one database, one window.
 
 The Electron main process boots through one composition root
 (`apps/desktop/src/app/main/bootstrap.ts`, called once from `electron.ts`): it
-migrates the DB, constructs the domain services, installs their bridges/IPC,
+migrates the DB, constructs domain services, installs bridge-backed capabilities,
 then starts a single Hono app (`apps/desktop/src/core/server/index.ts`, a
 `createApp()` factory) under `@hono/node-server` on `http://127.0.0.1:4317` (the
 port is pinned for a stable browser-storage origin; `ACORN_PORT` in the
@@ -77,8 +77,8 @@ The UI is organised as a three-level hierarchy plus two docked surfaces.
 Workspace ("Runn", "Acorn")            ← group of repos, picked in the top bar
   └─ Task (repo + branch + worktree)   ← unit of work, a row in the left TabRail
        ├─ Panes (flat left→right row)  ← pr · changes · notes · editor · preview · …
-       ├─ Terminal drawer (bottom)     ← persistent shell / agent sessions   [flagged]
-       └─ Agents panel (right rail)    ← agent roster + launcher + activity   [flagged]
+       ├─ Terminal drawer (bottom)     ← persistent shell / agent sessions   [desktop]
+       └─ Agents panel (right rail)    ← agent roster + launcher + activity   [desktop]
 ```
 
 - **Workspace** — a named *group of repos*, the top-level unit picked in the top
@@ -106,7 +106,7 @@ Workspace ("Runn", "Acorn")            ← group of repos, picked in the top bar
 Tasks, the TabRail, panes, notifications, integrations (Linear live, Rollbar),
 settings, the command palette, and the file finder are shipped and default-on.
 The **terminal drawer, agent sessions, run targets, and workflows** are
-desktop-only and always on when the Electron preload bridge is present
+desktop-only and always on when the Electron terminal capability is present
 (`capabilities()`, `apps/desktop/src/core/client/capabilities.ts` — the old
 `acorn:term` localStorage flag has been deleted). The workflow engine is a
 registry-backed durable runtime with explicit branching/joins, profile adapters,
@@ -222,7 +222,8 @@ in the Electron main process (`apps/desktop/src/plugins/terminal/main/terminal.t
 startup); they share the single SQLite connection rather than opening a second.
 
 Agents get task-scoped context through the **acorn MCP server**
-(`apps/desktop/src/core/mcp/server.ts`) over loopback. Because a spawned server holds
+(`apps/desktop/src/core/mcp/server.ts`) over loopback. The stdio MCP proxy runs as a spawned child
+process and calls the running app rather than opening the database itself. Because it holds
 no session cookie, the main process mints a per-run `INTERNAL_TOKEN` and injects
 it (with the other `ACORN_*` env vars) into each task session, so the agent's MCP
 calls authenticate back to the machine's single user. Through that channel the
@@ -235,7 +236,8 @@ sessions.
 This section is a map, not the manual — see
 [terminal-and-agents.md](./terminal-and-agents.md), [mcp.md](./mcp.md),
 [notes-and-memory.md](./notes-and-memory.md), and [workflows.md](./workflows.md)
-for the detail. All of it is desktop-only (bridge-gated, always on).
+for the detail. Interactive sessions and workflows are desktop-only; the HTTP-backed agent-tool
+projection itself is transport-neutral.
 
 ## What acorn deliberately does not have
 
@@ -244,9 +246,8 @@ for the detail. All of it is desktop-only (bridge-gated, always on).
 - **No server-side session store** — the session lives entirely in an encrypted
   cookie, decrypted per request.
 - **No GitHub token in the browser** — only public profile fields cross the wire.
-- **No second backend** — one in-process Hono server is the whole backend; the
-  MCP server and terminal service run in the same main process against the same
-  DB.
+- **No second application backend** — one in-process Hono server owns data and domain operations;
+  the stdio MCP child is a thin proxy into that server, and the terminal service is main-owned.
 - **Single machine, single user** — no multi-tenancy, no shared storage to
   protect; locally-owned tables are machine-scoped accordingly.
 
@@ -256,6 +257,7 @@ for the detail. All of it is desktop-only (bridge-gated, always on).
 
 - [architecture-overview](./architecture-overview.md) — this doc: the one-server
   model, the two kinds of state, the three cache layers, the data flow.
+- [plugins](./plugins.md) — the core/plugin/app boundaries and contribution registries.
 - [data-layer](./data-layer.md) — the Drizzle + SQLite schema table-by-table,
   mirror vs app-state, scoping, staleness bookkeeping, migrations.
 - [state](./state.md) — durability tiers, scopes, the ordered restore pipeline,
@@ -269,8 +271,7 @@ for the detail. All of it is desktop-only (bridge-gated, always on).
 
 **Features & panes**
 
-- [features](./features.md) — the feature map: what ships, what's flagged, what's
-  designed.
+- [features](./features.md) — the shipped feature map and desktop capability limits.
 - [frontend](./frontend.md) — the SolidJS app, routing, panes, and the shared
   TanStack Query definitions.
 - [workspaces-and-tasks](./workspaces-and-tasks.md) — the Workspace/Task model,
@@ -284,7 +285,7 @@ for the detail. All of it is desktop-only (bridge-gated, always on).
 - [ui-design](./ui-design.md) — layout, theming, and the monospace/flat design
   language.
 - [pg](./pg.md) — the Database pane: a native Postgres viewer/editor over
-  per-task IPC connections.
+  task-scoped HTTP routes and main-process pools.
 
 **Agents & automation**
 
@@ -307,12 +308,6 @@ for the detail. All of it is desktop-only (bridge-gated, always on).
   OAuth callback setup, local SQLite/blob state, the ABI gotcha.
 - [authentication](./authentication.md) — GitHub OAuth web flow, the encrypted
   stateless session cookie, CSRF protections, the 401 → reauth bounce.
-
-**Future work** — [docs/next/](./next/) holds what has *not* been built yet:
-[review.md](./next/review.md) (the critical architecture review),
-[extensibility.md](./next/extensibility.md) (the plugin-platform design it
-motivates, split across three files — see [docs/next/README.md](./next/README.md)),
-and [implementation.md](./next/implementation.md) (the staged guide
-for building it). The root docs above describe what exists in code today;
-superseded design records (the old `vNext.md`, `docs/workspaces/`) have been
-removed — see git history for the original rationale.
+- [security](./security.md) — loopback threat model, authentication boundaries,
+  filesystem containment, secret handling, and tool permissions.
+- [testing](./testing.md) — test suites, architecture checks, and validation commands.

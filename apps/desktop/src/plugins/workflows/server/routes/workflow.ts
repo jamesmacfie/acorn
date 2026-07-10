@@ -4,10 +4,9 @@ import { bridgeSlot, viaBridge } from '../../../../core/server/bridge'
 import type { AppEnv } from '../../../../core/server/middleware/auth'
 import { respondError } from '../../../../core/server/respond'
 
-// Workflow control (docs/next 14): declared workflows for a task, start a run, list runs/steps,
-// resolve a human gate. Was the `workflow:{defs,start,runs,steps,gate}` IPC channels (inventories
-// §1a). The `workflow:notice` push stream stays IPC until the WebSocket lands (slice 6). Needs the
-// main-process WorkflowRunner, so it 503s under dev:node (desktop-only — capability map §6).
+// Workflow control (docs/workflows.md): declared workflows for a task, start a run, list runs/steps,
+// resolve a human gate. Commands use HTTP while notices and live events use the shared WebSocket.
+// The routes need the main-process WorkflowRunner, so they return 503 under dev:node.
 
 export type WorkflowBridge = {
   defs(taskId: string): Promise<unknown> // { workflows, errors }
@@ -23,7 +22,7 @@ export type WorkflowBridge = {
 export const workflowBridgeSlot = bridgeSlot<WorkflowBridge>()
 export const setWorkflowBridge = workflowBridgeSlot.set
 
-// start executes an agent CLI, gate resumes one — both get validated bodies (Phase 3 §1). The def
+// start executes an agent CLI, gate resumes one — both get validated bodies (the privileged-boundary contract). The def
 // shape is validated structurally (name + steps[]); the runner re-checks the rest.
 const startBody = z.object({ def: z.object({ name: z.string().min(1), steps: z.array(z.unknown()) }).passthrough() })
 const gateBody = z.object({ stepId: z.string().min(1), approved: z.boolean() })

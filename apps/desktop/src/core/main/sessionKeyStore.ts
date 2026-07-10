@@ -3,7 +3,7 @@ import { chmodSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'n
 import { randomBytes } from 'node:crypto'
 import { dirname, join } from 'node:path'
 
-// Migration C (docs/next Phase 9): SESSION_ENC_KEY via Electron safeStorage, not keytar. safeStorage
+// Migration C (docs/electron.md): SESSION_ENC_KEY via Electron safeStorage, not keytar. safeStorage
 // is built in (no native rebuild) and encrypts against the OS keychain. This is the FIRST secret to
 // move; integration tokens ride the same key at rest (session.ts encryptSecret), so losing it logs
 // everyone out AND strands every stored provider token — hence the deliberate throw-not-regenerate

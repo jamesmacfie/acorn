@@ -6,7 +6,7 @@ import { respondError } from './respond'
 // handle the server layer doesn't own — a PTY engine, git, ripgrep, a pg pool, the worktree
 // resolver. The route holds a slot; the composition root (main/bootstrap.ts) or the server bridge
 // wiring (main/serverBridges.ts) fills it at boot. dev:node leaves the Electron-only bridges null,
-// so those routes answer a clean 503 instead of crashing (docs/next Phase 3 §6 capability map).
+// so those routes answer a clean 503 instead of crashing (docs/electron.md §12 capability map).
 // This is the same seam server/routes/harness.ts pioneered, generalized so every migrated IPC
 // domain shares one shape.
 

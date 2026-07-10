@@ -175,11 +175,11 @@ export const unignoreRepo = (owner: string, name: string) => post<{ ok: true }>(
 // Hide or show every repo at once (onboarding master toggle).
 export const setAllReposIgnored = (ignored: boolean) => post<{ ok: true }>(workspaceIgnoreAllRoute, { ignored })
 // Replace a workspace's linked external projects — (integrationId, externalId) pairs across any
-// number of integrations (docs/workspaces 04).
+// number of integrations (docs/workspaces-and-tasks.md).
 export const setWorkspaceProjects = async (workspaceId: string, projects: WorkspaceProject[]) =>
   writeJson<{ ok: true }>(workspaceProjectsRoute(workspaceId), { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ projects }) }, (res) => `workspace-projects ${res.status}`)
 
-// Tasks (docs/workspaces). Create from a seed; rename/archive via PATCH. Callers invalidate
+// Tasks (docs/workspaces-and-tasks.md). Create from a seed; rename/archive via PATCH. Callers invalidate
 // tasksKey after.
 export const createTask = async (seed: TaskSeed) => {
   const task = await post<Task>(tasksRoute, seed)
@@ -204,7 +204,7 @@ export const deleteReviewNote = (taskId: string, noteId: string) =>
   writeJson<{ ok: true }>(reviewNoteRoute(taskId, noteId), { method: 'DELETE' })
 export const markReviewNotesSent = (taskId: string, ids: string[]) => post<{ ok: true }>(reviewNotesSentRoute(taskId), { ids })
 
-// Grow/shrink a task's links after creation (docs/next 11 §A). Callers invalidate tasksKey after.
+// Grow/shrink a task's links after creation (docs/workspaces-and-tasks.md). Callers invalidate tasksKey after.
 export const addTaskLink = (id: string, link: TaskLinkSeed) => post<{ ok: boolean }>(taskLinksRoute(id), link)
 export const removeTaskLink = (id: string, ref: Pick<TaskLink, 'connectionId' | 'identifier'>) =>
   writeJson<{ ok: boolean }>(taskLinksRoute(id), {

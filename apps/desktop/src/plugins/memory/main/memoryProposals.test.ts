@@ -4,7 +4,7 @@ import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { MemoryProposalStore } from './memoryProposals'
 
-describe('memory proposals (docs/next 12 — the human gate)', () => {
+describe('memory proposals (docs/notes-and-memory.md — the human gate)', () => {
   let dir: string
   let store: MemoryProposalStore
   let memoryDir: string

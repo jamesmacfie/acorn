@@ -4,9 +4,8 @@ acorn is keyboard-driven. This doc covers the four overlays — the **command pa
 **file finder** (⌘P), the **workspace switcher** (⌘L), and the in-PR **changed-file finder** (`/`) — plus the full global shortcut
 table, the Task-view **pane shortcuts**, and the **Settings → Shortcuts** tab where the pane bindings
 are edited. Every overlay reuses the same flat `.overlay` shell (`docs/ui-design.md`) and the shared
-`createOverlayPalette` hook (`features/palette/overlay.ts`): one `window` keydown listener per
-overlay, open/query/selection signals, ↑/↓ (clamped) / Enter / Esc handling, focus-on-open, and
-backdrop click-to-close. There is no central dispatcher.
+`createOverlayPalette` hook (`core/client/palette/overlay.ts`) for dialog-scoped navigation. Global
+shortcuts are declarative keybinding contributions dispatched by one `KeybindingDispatcher`.
 
 ## 1. Command palette (⌘K)
 
@@ -38,9 +37,7 @@ workspace, then Go-to-task) are placed last deliberately. See `model.ts:23` for 
 
 - **New terminal** — `api.create({ taskId, profileId: 'shell' })`, then opens the drawer.
 - **Show / Hide terminal drawer** — toggles `isTerminalOpen(taskId)`.
-- **Show pane: `<label>`** — one row per `PaneId` in the canonical order (`pr, changes, notes,
-  context, editor, preview, browser, linear, rollbar` — `PANE_ORDER`, exported next to
-  `PANE_LABELS` from `features/tasks/layout.ts`), dispatching a layout `show`.
+- **Show pane: `<label>`** — one row per available pane contribution, dispatching a layout `show`.
 - **Close pane: `<label>`** — only for panes currently open, and only when **more than one** pane is
   open (closing the last pane is a no-op the reducer guards anyway).
 - **Archive task** — guarded teardown via `api.task.archive` behind a `window.confirm`.
@@ -59,9 +56,9 @@ workspace, then Go-to-task) are placed last deliberately. See `model.ts:23` for 
 - `run`, `workflow`, `layout`, and the remaining actions (`new-terminal`, `toggle-terminal`,
   `archive`) — need both an active task **and** the terminal API (`if (!taskId || !api) return`).
 
-**Bridge gating.** The run/layout/workflow rows come from `terminalApi()` resources
-(`api.run.targets`, `api.workflow.defs`). The terminal API only exists when the desktop preload
-bridge is present (`capabilities()`, `features/capabilities.ts`), so in a plain browser (`dev:node`)
+**Capability gating.** Run/layout/workflow rows come from HTTP clients backed by main-process
+services. The terminal API only exists when the desktop terminal capability is present
+(`capabilities()`, `core/client/capabilities.ts`), so in a plain browser (`dev:node`)
 those three kinds are simply absent and the palette shows only pane/task/archive actions. See
 `docs/terminal-and-agents.md` and `docs/workflows.md`.
 
@@ -97,8 +94,8 @@ The palette's `window` listener comes from `createOverlayPalette`:
 
 `FilePalette.tsx` is a fuzzy **go-to-file** across the active task's git worktree. Monaco has no
 built-in file finder (that's a VS Code workbench feature, not the editor core), so this reuses the
-same palette shell and `fuzzyScore` over `git ls-files` (fetched via `editorApi().files(taskId)`
-over IPC).
+same palette shell and `fuzzyScore` over `git ls-files` (fetched through the task-scoped editor HTTP
+client).
 
 - Requires an active task; ⌘P is a no-op with no task selected.
 - Empty query lists the first `MAX_ROWS = 100` files; a query fuzzy-ranks and caps to 100
@@ -112,7 +109,7 @@ over IPC).
 
 ## 2b. Workspace switcher (⌘L)
 
-`WorkspacePalette.tsx` is a fuzzy switcher over workspaces (`docs/workspaces`), reusing the same
+`WorkspacePalette.tsx` is a fuzzy switcher over workspaces ([workspaces-and-tasks.md](./workspaces-and-tasks.md)), reusing the same
 palette shell and `fuzzyScore` over workspace names (fetched via `workspacesOptions`). It mirrors the
 topbar `WorkspacePicker`: picking a workspace navigates to its **first repo** (the active workspace is
 *derived* from the current repo, so there is no separate active-workspace state), defaulting the
@@ -165,21 +162,21 @@ Plus one that isn't in the table because it's owned by the Electron main process
 
 ### Ownership
 
-Shortcuts are deliberately scattered to the component that owns the relevant state — there is no
-global keymap:
+Feature components register commands and keybindings when they mount. The core registry resolves
+user overrides, scope, availability, and conflicts; one dispatcher executes the matching command:
 
 | Key(s) | Owner |
 | --- | --- |
-| `⌘1–9` | `TabRail.tsx:103` — jumps to the Nth **visible** task (workspace-scoped + rail order). |
-| `j / k` | `PullList` — next/previous PR. Left untouched by `Shortcuts.tsx` on purpose. |
-| `⌘K` | `CommandPalette.tsx` (standalone). |
-| `⌘P` | `FilePalette.tsx` (standalone). |
-| `/`, `[`, `]`, `c`, `?`, `Esc` | `Shortcuts.tsx` — the finder overlay + file cycling + create-PR + open-help. |
+| `⌘1–9` | TabRail task-navigation contributions. |
+| `j / k` | Pull-list navigation contributions. |
+| `⌘K` | Command-palette contribution. |
+| `⌘P` | File-palette contribution. |
+| `/`, `[`, `]`, `c`, `?` | `Shortcuts.tsx` command/keybinding contributions. |
 | `⌘W / Ctrl+W` | Main process `before-input-event` (`electron.ts:98`) → IPC `acorn:close-pane`. |
 
 ### Typing & modifier rules
 
-`Shortcuts.tsx` enforces two rules for its bare-key shortcuts:
+The keybinding dispatcher enforces scope and typing rules:
 
 - **All shortcuts except `Esc` are ignored while typing.** The shared `isTypingTarget` guard
   (`client/lib/isTypingTarget.ts`, also used by TaskView's pane shortcuts) covers form fields
@@ -204,7 +201,7 @@ active terminal tab respectively. If neither owns focus, nothing closes (this is
 
 ## 4. Pane shortcuts (Task view)
 
-`apps/desktop/src/core/client/tasks/paneShortcuts.ts` defines **⌘⇧-chords** that switch panes
+Pane contributions expose **⌘⇧-chords** that switch panes
 inside the Task view. Most dispatch a layout `show`; `agents` and `terminal` are toggles, not layout
 panes. Plain ⌘<letter> collides too readily with the OS/browser/Monaco, so the switcher lives on the
 shifted layer. Defaults (`PANE_SHORTCUT_DEFAULTS`):
@@ -227,11 +224,10 @@ Linear/Rollbar links.
 
 ### Overriding & reserved chords
 
-Bindings are overridable via the `pane_shortcuts` pref — a JSON `Record<PaneAction, chord>` edited in
-Settings → Shortcuts. `paneKeys()` merges overrides over defaults; `paneKeymap()` builds the reverse
-chord→action map (first definition wins on a collision). Each override value is a canonical chord
-token (modifiers in fixed order + base key, e.g. `meta+shift+e`); a legacy bare letter is upgraded to
-`meta+<letter>`.
+Bindings are overridable via the `keybindings` prefs slice edited in Settings → Shortcuts. Legacy
+`pane_shortcuts` values are read as a compatibility layer. Each value is a canonical chord token
+(modifiers in fixed order + base key, e.g. `meta+shift+e`); conflicts leave the later binding
+unbound instead of stealing an existing chord.
 
 Chords the app already owns globally are **reserved** and can't be reassigned to a pane
 (`RESERVED_CHORDS`, `paneShortcuts.ts`):
@@ -242,29 +238,23 @@ Chords the app already owns globally are **reserved** and can't be reassigned to
 
 ## 5. Settings → Shortcuts tab
 
-Opened by pressing `?` anywhere (`Shortcuts.tsx` calls `onOpenShortcuts`, which `App.tsx:443` wires
-to `openSettings('shortcuts')`). The tab (`SettingsModal.tsx:209`) has two sections:
-
-- **Panes** — an editable list of `PANE_SHORTCUT_DEFAULTS`. Each row is a read-only input; click it,
-  then press a key. `captureKey` (`SettingsModal.tsx:63`) rejects non-single keys, rejects
-  `RESERVED_KEYS` ("… is reserved by a global shortcut"), and rejects collisions with another pane
-  ("… is already used by <label>"), then persists an override diff into `pane_shortcuts`. A **Reset
-  panes to defaults** button writes `{}`.
-- **Global** — the `SHORTCUTS` array rendered read-only as a reference (the global keys aren't
-  rebindable).
+Opened by pressing `?` anywhere. `ShortcutsSettings.tsx` derives grouped rows directly from the
+keybinding registry. Every contributed binding is editable: click its chord and press a replacement.
+Conflicts are rejected without displacing the existing command; each row can reset to its default,
+and **Reset all to defaults** clears both the current and legacy override slices.
 
 The pane-switcher tooltip in the Task view shows the *effective* key (override or default) so it
 always matches what's bound.
 
 ---
 
-**Source:** `apps/desktop/src/client/features/palette/{model.ts,overlay.ts,CommandPalette.tsx,FilePalette.tsx}`
+**Source:** `apps/desktop/src/core/client/palette/{model.ts,overlay.ts,CommandPalette.tsx,FilePalette.tsx}`
 · `apps/desktop/src/core/client/Shortcuts.tsx` · `apps/desktop/src/plugins/github/client/changedFiles.ts` ·
 `apps/desktop/src/core/client/lib/isTypingTarget.ts` ·
 `apps/desktop/src/core/client/tasks/paneShortcuts.ts`
 · `apps/desktop/src/core/client/tabs/TabRail.tsx` ·
 `apps/desktop/src/core/client/settings/SettingsModal.tsx` · main-process close-pane
-`apps/desktop/src/main/{electron.ts,preload.ts}`.
+`apps/desktop/src/{app/main/electron.ts,core/main/preload.ts}`.
 
 **See also:** [frontend.md](./frontend.md) · [panes.md](./panes.md) ·
 [workflows.md](./workflows.md) (run targets / layout recipes) ·

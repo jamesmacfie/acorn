@@ -8,7 +8,7 @@ import { workspaceForRepo } from '../../../core/client/workspaces/activeWorkspac
 import { activateTaskSignals } from '../../../core/client/tasks/activate'
 import { sourceRegistry, type SourceContribution } from '../../../core/client/registries/sources'
 
-// The Linear Source browse (docs/workspaces 04). Linear projects are linked at the WORKSPACE level
+// The Linear Source browse (docs/workspaces-and-tasks.md). Linear projects are linked at the WORKSPACE level
 // and may span several connected Linear workspaces; each linked project is an (integrationId,
 // externalId) pair. Issues are scoped to the workspace's linked projects; clicking one promotes it
 // to a task on the current repo, tagged with the ticket + its owning integration.

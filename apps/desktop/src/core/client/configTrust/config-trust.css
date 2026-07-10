@@ -1,0 +1,7 @@
+.config-trust-dialog { width: min(760px, calc(100vw - 32px)); max-height: min(760px, calc(100vh - 32px)); }
+.config-trust-body { overflow: auto; }
+.config-trust-file h3 { margin: 16px 0 6px; font-size: 12px; }
+.config-trust-file pre, .config-trust-diff { margin: 0; padding: 12px; overflow: auto; border-radius: 6px; background: var(--surface-sunken, #111); font: 12px/1.5 ui-monospace, monospace; white-space: pre-wrap; }
+.config-trust-diff span { display: inline; }
+.config-trust-diff .added { color: var(--success-fg, #8dd49b); background: color-mix(in srgb, var(--success-fg, #2d8a44) 15%, transparent); }
+.config-trust-diff .removed { color: var(--danger-fg, #ff9a9a); background: color-mix(in srgb, var(--danger-fg, #b33) 15%, transparent); }

@@ -1,5 +1,8 @@
 # Contribution point catalog (§4)
 
+> Most contribution points are shipped; [plugins.md](../plugins.md) is the current contributor
+> guide. This catalog remains for forward extension constraints and anticipated additive surfaces.
+
 **Status:** design proposal · **Date:** 2026-07-07 · **Part of:** the
 [extensibility.md](./extensibility.md) design (this file is §4 of that design;
 section numbers are preserved so citations like "§4.8" resolve here). Core
@@ -24,15 +27,15 @@ type ClientCapabilityRequirement =
 ```
 
 The core capability registry consumes that field to keep degraded browser mode
-explicit ([feature-parity.md](./feature-parity.md) §17): server-backed
+explicit ([features.md](../features.md) §17): server-backed
 contributions stay usable in `dev:node`, desktop-only contributions hide or
 render inert with a visible reason, and no contribution directly probes
-`window.acorn` to decide whether it exists. [implementation.md](./implementation.md)
+`window.acorn` to decide whether it exists. the completed implementation plan
 Phases 3 and 5 land the probe and make registry renderers consume it.
 
 **Index — every point, where it lands:**
 
-| § | Point | Registry lives in | Lands in ([implementation.md](./implementation.md)) |
+| § | Point | Registry lives in | Lands in (the completed implementation plan) |
 | --- | --- | --- | --- |
 | 4.1 | Panes | client | Phase 5 |
 | 4.2 | Sources | client | Phase 7 |
@@ -90,9 +93,9 @@ pane's PullDetail/DiffView read `useParams()` and require global navigation
 plugin's pane resolves owner/repo/number from `task` itself.
 
 The full pane contract (what a pane may and may not do — no router reads, pure
-model + thin view, error containment, the [ui-state.md](./ui-state.md) §3
+model + thin view, error containment, the [state.md](../state.md) §3
 reaction rules) is enforced by the conformance suite
-([testing.md](./testing.md) §4), not by review comments.
+([testing.md](../testing.md) §4), not by review comments.
 
 **Pane content is keyboard-navigable by default** — this is a pane obligation,
 not an opt-in flag (a flag for a mandatory default is speculative, and an
@@ -105,7 +108,7 @@ composing the kit's focus primitives rather than hand-rolling `tabindex`/ARIA
 The carve-out is the same as the chord system's: `keepAlive`/webview panes and
 editor/terminal surfaces own their internal focus (Monaco, xterm), and the
 default applies *around* them, not inside. The conformance suite asserts
-keyboard reachability and focus-marks-surface ([testing.md](./testing.md) §4).
+keyboard reachability and focus-marks-surface ([testing.md](../testing.md) §4).
 
 `keepAlive: 'dom'` is the honest generalization of the preview pane's
 body-parented webview: the core owns an off-tree layer keyed by (pane, task) and
@@ -234,7 +237,7 @@ ctx.routes.mount('/api/linear', linearRouter)        // namespaced by convention
 Server plugin parts mount routers exactly as `server/index.ts:31-58` does today
 — that mechanism is fine; it just moves from one hand-edited file into plugin
 activation. The core enforces the two things convention currently carries:
-authenticated-by-default (a `requireUser` wrapper — review.md #6, implementation
+authenticated-by-default (a `requireUser` wrapper — the completed architecture review #6, implementation
 Phase 0) and the shared error envelope (`ApiError` + `respondError`, same
 phase). The `/api/repos` fan-in of 11 routers becomes internal structure of the
 github plugin.
@@ -306,7 +309,7 @@ Current context assembly has product semantics beyond "iterate sections"
   section. **Notes include bodies and slugs** so the tray can jump to the
   Notes pane (`jump`). The notes section **assembles across the active task's
   three scopes** — `task/<taskId>` + `<workspaceId>` + `global`
-  ([feature-parity.md](./feature-parity.md) §10 `NoteLocation`) — so a sibling
+  ([features.md](../features.md) §10 `NoteLocation`) — so a sibling
   task's PR/handoff notes are absent by storage location, not by soft filter.
 - **Sections declare their own size posture.** The invisible global slice in
   `knowledgeIpc` (2,000 chars × first 10 notes) already caused the workflow
@@ -347,13 +350,13 @@ One declaration; the core projects it three ways:
 This collapses the five-edit-site pipeline (preload → knowledgeIpc → harness
 route → bridge → MCP tool) into one object, and structurally prevents the
 semantic forks the current channels have already grown (agent-vs-UI note
-creation differing in frontmatter/provenance — review.md §1d): there is one
+creation differing in frontmatter/provenance — the completed architecture review §1d): there is one
 handler, and provenance (`author`, `sessionId`) comes from `scope`, supplied by
 the channel.
 
 For the notes tools specifically, `scope: 'task'` is the *execution* scope (the handler receives
 `{ taskId, worktreePath, sessionId }`); the *note target* is a `NoteScope`
-([feature-parity.md](./feature-parity.md) §10) that **defaults to `task`** and is overridable to
+([features.md](../features.md) §10) that **defaults to `task`** and is overridable to
 `workspace`/`global` via an explicit `input` field. So `notes_append`/`notes_write` land in the
 current task's `notes/task/<taskId>/` unless asked otherwise — both provenance and target scope
 come from the declaration, which closes the note-creation fork completely and is the structural fix
@@ -408,7 +411,7 @@ rule, ext §9 for the future seam).
 
 The core sync engine owns the four-branch serve/revalidate/cold state machine,
 `sync_state` bookkeeping, background-refresh tracking, and rate-limit backoff —
-in one place instead of five divergent copies (review.md §1c; implementation
+in one place instead of five divergent copies (the completed architecture review §1c; implementation
 Phase 2 extracts the engine, Phase 7 expresses providers as descriptors). The
 github plugin registers pulls/detail/files/repos descriptors; linear and
 rollbar register theirs. TTL constants live on the descriptor: the caching
@@ -504,7 +507,7 @@ plugin can extend the TOML without editing `runConfig.ts`. "As-is" is a
 contract, not a mood — the exact layer precedence, parse-error surfacing,
 `[layout.<id>]` recipes, `copy = [...]` semantics, setup/archive triggers, and
 preview home-URL priority are pinned in
-[feature-parity.md](./feature-parity.md) §3.
+[features.md](../features.md) §3.
 
 One correction while here (tenet 8): the repo layer of this merge is
 *repo-authored executable config* — run targets and workflow steps are shell
@@ -527,7 +530,7 @@ and exempt. (Threat analysis: [security.md](./security.md) §4; dialog UX:
   `NoticeKind` union and `KIND_GLYPH`; anyone can `ctx.notices.push(...)`. Edge
   detection (`detectEdges`) stays in the terminal plugin; workflow notices in the
   workflows plugin. Notices are also the app's one background-error surface
-  ([ui-state.md](./ui-state.md) §3 rule 1) — a failed background write is a
+  ([state.md](../state.md) §3 rule 1) — a failed background write is a
   notice, not an `alert` and not silence. The registry owns the full notice
   contract *(parity §15)*, because the semantics are product-visible:
   **identity** (kind + task association + dedupe key — pushing twice is one
@@ -572,7 +575,7 @@ interface IntegrationProviderContribution {
 The one contribution that says "this plugin is an integration provider" — the
 descriptor every other integration-related registration (source, pane, context
 section, settings page, content link, agent tool) is validated against at
-activation. It subsumes review.md #7's minimal `Provider` interface
+activation. It subsumes the completed architecture review #7's minimal `Provider` interface
 (`validate`/`fetchItems`/`fetchDetail`/`toIssue` live inside
 `connection`/`resources`/`codec`). Replaces: the hardcoded provider metadata
 in `IntegrationsSettings.tsx`, the per-provider if-else in `integrations.ts`,

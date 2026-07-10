@@ -3,7 +3,7 @@ import { activeTaskId } from '../../../core/client/tasks/tasks'
 import { terminalApi } from '../../terminal/client/terminalClient'
 import { workflowApi } from '../../agents/client/workflowClient'
 
-// Settings → Workflows (docs/next 14): a read-only inspector over the committed/user workflow
+// Settings → Workflows (docs/workflows.md): a read-only inspector over the committed/user workflow
 // definitions the active task's worktree would load (`.acorn/workflows/*.toml` + ~/.acorn), plus
 // any parse errors (the 13 §B DX rule — malformed files surface, never silently vanish). Mirrors
 // McpSettings: task-scoped via activeTaskId, reuses the existing workflow:defs IPC as-is. Launch a

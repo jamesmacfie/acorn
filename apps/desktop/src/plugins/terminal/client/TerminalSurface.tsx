@@ -5,7 +5,7 @@ import '@xterm/xterm/css/xterm.css'
 import { terminalApi } from './terminalClient'
 import { baseTheme, isAppDark, monoFont, watchTheme, xtermTheme } from './theme'
 
-// One xterm bound to one live session over IPC (vNext §5). Keyed by session id in the parent, so
+// One xterm bound to one live session over WebSocket (docs/terminal-and-agents.md). Keyed by session id in the parent, so
 // switching tabs unmounts this (detach, keep PTY running) and remounts a fresh xterm that replays
 // the ring buffer. ponytail: local scrollback beyond the ring is lost on tab switch — fine for now.
 export default function TerminalSurface(props: { sessionId: string; onExit?: (exitCode: number | null) => void }) {

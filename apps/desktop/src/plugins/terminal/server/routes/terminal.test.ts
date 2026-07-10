@@ -4,9 +4,9 @@ import type { AppEnv } from '../../../../core/server/middleware/auth'
 import { requireUser } from '../../../../core/server/middleware/requireUser'
 import { setTerminalBridge, terminal, type TerminalBridge } from './terminal'
 
-// Transport contract for terminal control (Phase 3 slice 5): routing + auth + body validation +
-// bridge-unavailable. The engine behaviour (PTY spawn, worktree/session lifecycle) is covered by
-// main/*.test.ts and the live/smoke pass; the STREAM half is the WebSocket (slice 6).
+// Transport contract for terminal control: routing, auth, body validation, and clean
+// bridge-unavailable degradation. PTY/worktree behavior is covered by main tests; streaming is
+// covered at the WebSocket boundary.
 
 const req = (url: string, method = 'GET', body?: unknown) =>
   new Request(`http://acorn.test${url}`, {

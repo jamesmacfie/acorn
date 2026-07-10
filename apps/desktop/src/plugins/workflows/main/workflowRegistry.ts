@@ -1,4 +1,4 @@
-import type { PolicyEvaluator, StepHandler, WorkflowTriggerContribution } from './workflowContracts'
+import type { PolicyEvaluator, StepHandler, StepKindContribution, StepValidator, WorkflowTriggerContribution } from './workflowContracts'
 
 class NamedRegistry<T> {
   readonly #entries = new Map<string, T>()
@@ -23,15 +23,19 @@ class NamedRegistry<T> {
   values(): T[] {
     return [...this.#entries.values()]
   }
+
+  entries(): Array<[string, T]> {
+    return [...this.#entries.entries()]
+  }
 }
 
 export class WorkflowContributionRegistry {
-  readonly stepKinds = new NamedRegistry<StepHandler>('workflow step kind')
+  readonly stepKinds = new NamedRegistry<StepKindContribution>('workflow step kind')
   readonly policies = new NamedRegistry<PolicyEvaluator>('workflow policy')
   readonly triggers = new NamedRegistry<WorkflowTriggerContribution>('workflow trigger')
 
-  registerStepKind(id: string, handler: StepHandler): () => void {
-    return this.stepKinds.register(id, handler)
+  registerStepKind(id: string, handler: StepHandler, validate?: StepValidator): () => void {
+    return this.stepKinds.register(id, { handler, validate })
   }
 
   registerPolicy(id: string, evaluator: PolicyEvaluator): () => void {
@@ -42,4 +46,3 @@ export class WorkflowContributionRegistry {
     return this.triggers.register(trigger.id, trigger)
   }
 }
-

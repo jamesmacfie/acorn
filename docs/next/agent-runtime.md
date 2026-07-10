@@ -1,9 +1,13 @@
 # Agent runtime — corrections and ceilings
 
+> The runtime described here is shipped. This file remains for deferred typed recovery actions,
+> cross-task visibility, and the rationale behind deliberate workflow ceilings. See
+> [workflows.md](../workflows.md) for current behavior.
+
 **Status:** findings + design corrections · **Date:** 2026-07-07 (rev. 2026-07-08) ·
-**Companions:** [review.md](./review.md) §1e,
+**Companions:** the completed architecture review §1e,
 [contribution-points.md](./contribution-points.md) §4.8/§4.10/§4.11,
-[implementation.md](./implementation.md) Phase 8 + ongoing tracks, [ux.md](./ux.md) §6 (cancel +
+the completed implementation plan Phase 8 + ongoing tracks, [ux.md](./ux.md) §6 (cancel +
 live-tail UX), [agent-runtime-influences.md](./agent-runtime-influences.md) (the agentfield study
 these corrections were pressure-tested against)
 
@@ -37,7 +41,7 @@ One boundary up front: these are *additions* on top of the existing PTY/session 
 already rely on — tmux persistence vs `node-pty` death-with-app, ring-buffer-only replay (no
 output on disk), Shift+Enter newline, the three `sendToAgent` modes with bracketed-paste
 wrapping, the shared agent-state vocabulary, edge-driven notices/unread, ⌘W focus containment.
-Those are pinned in [feature-parity.md](./feature-parity.md) §9; nothing in this doc relaxes
+Those are pinned in [features.md](../features.md) §9; nothing in this doc relaxes
 them, and the WS/profile refactors (Phases 3 and 8) re-verify them.
 
 ---
@@ -54,7 +58,7 @@ them, and the WS/profile refactors (Phases 3 and 8) re-verify them.
   --permission-mode dontAsk` / `codex exec --json` (`headless.ts:30-56`), 10-minute timeout with
   process-group SIGKILL (`headless.ts:109,122-130`), stdout parsed for the last `result` event
   (`headless.ts:79-98`). Only claude-code and codex have headless modes; shell/aider return null.
-- **Persistence is exemplary** (review.md already credits it): every step's
+- **Persistence is exemplary** (the completed architecture review already credits it): every step's
   `inputsJson`/`resultJson` (last 100 stream events)/`structuredJson`/`sessionId`/`costUsd` land
   in `workflow_steps` (`db/schema.ts:460-481`); `reconcile()` resets orphaned `running` steps to
   `pending` on boot (`workflowRunner.ts:152-161`).
@@ -79,7 +83,7 @@ compounding consequences:
    and the context filter shares any note *without* an `originTaskId` across tasks
    (`knowledgeIpc.ts:74-76`). So two tasks on the same repo read each other's workflow handoffs.
    The future-state fix is structural: **task** is a first-class note scope with its own storage
-   home (`notes/task/<taskId>/`, [feature-parity.md](./feature-parity.md) §10 `NoteLocation`), so
+   home (`notes/task/<taskId>/`, [features.md](../features.md) §10 `NoteLocation`), so
    agent/handoff writes default there and can't reach a sibling task regardless of `originTaskId`.
 3. **Silent truncation kills the mechanism:** the assembler slices each note body to 2,000 chars
    and takes only the first 10 notes (`knowledgeIpc.ts:78-80`). Once the shared note outgrows
@@ -97,7 +101,7 @@ This is best understood as **realising the scopes the substrate was missing**, n
 agentfield's memory fabric distinguishes global / session / actor / **run** scopes; the future-state
 acorn substrate spans global (memory files), workspace/repo (notes), and **task** (notes' own
 `notes/task/<taskId>/` home) — and the per-run slug is the *run* refinement *inside* task scope, not
-a fourth peer ([feature-parity.md](./feature-parity.md) §10 `NoteLocation`;
+a fourth peer ([features.md](../features.md) §10 `NoteLocation`;
 [agent-runtime-influences.md](./agent-runtime-influences.md) §3G).
 
 ### 2.2 Session resume is plumbed and never used
@@ -381,7 +385,7 @@ unbuilt, in the spirit of §6.4: [self-improvement.md](./self-improvement.md).
 
 Four capabilities the study surfaced as in-scope. Each rides an existing contribution point —
 none is a core special case ([agent-runtime-influences.md](./agent-runtime-influences.md) §4 has
-the full plugin-fit mapping). Sequenced in [implementation.md](./implementation.md) Phase 8 /
+the full plugin-fit mapping). Sequenced in the completed implementation plan Phase 8 /
 ongoing tracks.
 
 ### 6.1 The `decide`/branch step kind — conditional routing on a cheap tier

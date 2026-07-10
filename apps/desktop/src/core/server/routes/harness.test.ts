@@ -9,7 +9,7 @@ const USER: SessionUser = { token: '', login: 'local', name: '', avatar: '', sco
 const INTERNAL: Principal = { kind: 'internal', user: USER }
 
 // The run bridge is the last harness domain (notes/memory/browser moved to the agent-tool registry
-// in Phase 4). This proves the shared auth gate + error envelope over what remains.
+// in the agent-tool registry). This proves the shared auth gate + error envelope over what remains.
 const app = (principal: Principal | null) => new Hono<AppEnv>().use('/api/*', ...testGate(principal)).route('/api/tasks', harness)
 
 const req = (principal: Principal | null, method: string, path: string) =>

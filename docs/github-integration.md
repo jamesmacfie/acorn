@@ -2,7 +2,7 @@
 
 All GitHub access goes through two thin clients in
 `apps/desktop/src/plugins/github/server/index.ts`. The route handlers
-(`apps/desktop/src/server/routes/`) call these, mirror the result into the local
+(`apps/desktop/src/plugins/github/server/routes/`) call these, mirror the result into the local
 SQLite read-model, and return a public projection. The browser never talks to GitHub directly and
 never holds the token (see [authentication](./authentication.md)).
 
@@ -32,7 +32,7 @@ export const ghGraphQL = (token, query, variables) =>
   })
 ```
 
-These deliberately stay in `apps/desktop/src/server/` rather than being promoted to
+These deliberately stay in `apps/desktop/src/plugins/github/server/` rather than being promoted to
 a shared package until a third consumer justifies it.
 
 Two calls deliberately bypass the clients: the OAuth code→token exchange
@@ -160,4 +160,3 @@ The client layers optimistic updates / invalidation on top. See
   a deliberate, kept decision (documented at the fold): GitHub itself 404s
   repos you can't see, so the UI gets one "can't get there" state and acorn
   doesn't confirm that a private repo exists.
-

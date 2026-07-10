@@ -126,7 +126,7 @@ export const pulls = new Hono<AppEnv>().get('/:owner/:repo/pulls', async (c) => 
       fetchedAt: now,
     }))
 
-    // Flow B (docs/workspaces 02): a local-first task inherits a PR once one is opened for its
+    // Flow B (docs/workspaces-and-tasks.md): a local-first task inherits a PR once one is opened for its
     // branch. Match no-pullNumber active tasks for this repo against the just-fetched headRefs.
     // Machine-scoped table (no userId); keyed by owner/repo name. Cheap: few tasks, runs only
     // on a real list refresh (not 304s).

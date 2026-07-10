@@ -4,12 +4,12 @@ How acorn launches a task's app (**run targets**) and orchestrates multi-step, m
 (**workflows**). These are two related layers: a run target is the simplest unit (a command acorn can
 start/stop/reach), and a workflow is the composable multi-step machine that consumes those units.
 
-> **Maturity — read this first.** Everything on this page is **desktop-only** — it needs the
-> preload bridge, so it's always on in the Electron app and absent in a plain browser
+> **Availability.** Everything on this page is **desktop-only** — it needs the main-process
+> terminal/worktree services, so it is available in Electron and absent in a plain browser
 > (`capabilities()`, `apps/desktop/src/core/client/capabilities.ts`).
 > Two different maturities live here:
 > - **Run targets + layout recipes are implemented and working** (config reader, runtime service,
->   IPC, MCP tools, palette, recipes).
+>   HTTP/WS client, MCP tools, palette, recipes).
 > - **The workflow runtime is implemented**: registry-backed step kinds/policies/profiles, explicit
 >   joins, named-output templating, `decide` branches, tool ceilings, bounded fan-out, cancellation,
 >   live step events, and app-open triggers all run through the durable checkpoint engine. It still
@@ -19,7 +19,7 @@ start/stop/reach), and a workflow is the composable multi-step machine that cons
 
 ## 1. Overview
 
-Two related ideas, both flag-gated:
+Two related, desktop-capability-gated ideas:
 
 - **Run targets** — the answer to *"how does this task's app run?"* acorn allocates **no ports** and
   assumes no single launch shape. A docker-compose stack, `pnpm dev`, a custom `./scripts/dev.sh`, or
@@ -95,9 +95,9 @@ with **one ▶/■ per target**. `start` is idempotent for an already-running in
 
 ### The harness endpoints
 
-The client bridge is `window.acorn.terminal.run.*`
-(`apps/desktop/src/plugins/terminal/client/terminalClient.ts:27-40`), backed by IPC (`run:targets`,
-`run:start`, `run:stop`, `run:status`, `run:defaultUrl`) into the `RuntimeService`.
+The renderer client is `apps/desktop/src/plugins/terminal/client/runClient.ts`. It calls the
+loopback HTTP routes below; the routes delegate to the main-process `RuntimeService` through the
+injected `RunBridge`.
 
 The **loopback HTTP surface** the MCP server calls lives on the harness router
 (`apps/desktop/src/core/server/routes/harness.ts`):
@@ -139,9 +139,9 @@ today. (A `ratio` key in the file is tolerated but not parsed — panes split eq
 
 ## 4. Workflows
 
-A workflow is a small enforced state machine of named steps, run by the main process, persisted every
-transition so a run survives an app restart. This section describes **what the schema and runner
-encode**; treat the loops/fan-out as young in-progress code, not a proven orchestrator.
+A workflow is an enforced state machine of named steps, run by the main process and persisted on
+every transition so a run survives an app restart. The engine is intentionally bounded: it is not a
+general DAG scheduler or a background daemon.
 
 ### The data model
 
@@ -191,7 +191,7 @@ PRD-style step can emit a task list and spawn N children, each on its own branch
 - **`structuredJson` is the edge currency.** Branching, joining, and fan-out read a step's structured
   output (a JSON field), never free text.
 - **Gates are enforced in the main process, not in prompts.** A `gate-human` step pauses the run until
-  the approve IPC; a `gate-policy` step **re-derives** its verdict in main and ignores whatever the
+  the approve HTTP call; a `gate-policy` step **re-derives** its verdict in main and ignores whatever the
   step claimed (e.g. the `checks-green` policy polls the `checks` mirror —
   `apps/desktop/src/plugins/terminal/main/terminal.ts:957-964`). This is roboco's "enforce outside the agent" lesson.
 - **Handoff is run-scoped.** A step's result is appended to the task note
@@ -239,17 +239,17 @@ control. `reconcile` requeues interrupted running rows and completes interrupted
 | Settings inspector | `features/settings/WorkflowsSettings.tsx` | **read-only** list of the committed/user workflow defs the active task would load + parse errors; a viewer, not a launcher |
 | Agents panel | `features/agents/AgentsPanel.tsx` | push-refetches transitions, renders a live tail and quiet-step hint, approves gates, cancels runs/kills steps, and uses the profile-projected resume command |
 
-Gate/run-done notices are broadcast to the renderer bell via the `workflow:notice` IPC channel
-(`terminal.ts:909-912`).
+Gate/run-done notices and live step events are broadcast to the renderer over the authenticated
+WebSocket and feed the same notification bell as agent-state edges.
 
 ---
 
-## 5. What exists today vs planned
+## 5. Shipped scope and deliberate limits
 
 **Implemented and working (desktop-only):**
 
 - **Run targets** end-to-end: the layered config reader (`runConfig.ts`), the `RuntimeService`
-  (`runtime.ts`), IPC + client bridge, `Run:`/`Stop:` palette entries, the MCP `run_*` tools, and the
+  (`runtime.ts`), HTTP/WS client, `Run:`/`Stop:` palette entries, the MCP `run_*` tools, and the
   harness `/:id/run*` HTTP surface.
 - **Layout recipes** (`recipes.ts`) surfaced as `Layout:` palette entries.
 - The **workflow schema** (`workflow_runs` + `workflow_steps`).
@@ -258,7 +258,7 @@ Gate/run-done notices are broadcast to the renderer bell via the `workflow:notic
   palette launch, the **`terminalClient` workflow bridge**, and the **Agents-panel** surfacing of
   workflow steps and gates.
 
-**Implemented in the Phase 8 runtime:** step/policy/profile/trigger registries; explicit joins;
+The runtime includes step/policy/profile/trigger registries; explicit joins;
 `decide` plus named-output templates; per-run/step tool ceilings; bounded concurrency/turns/fan-out;
 engine-owned cancellation; run-scoped handoffs and terminal memory review; push status/live events;
 and visibility-paused, app-open trigger evaluation.
@@ -282,17 +282,18 @@ saved-prompt/skills-as-steps polish, and acorn-as-a-Linear-agent-host.
   `:248-270` (`repo_paths.runTargets`), `:282-283` (`workspaces.devScript`/`devRestartScript`),
   `:351` (`tasks.parentId`)
 - Run targets: `apps/desktop/src/plugins/terminal/main/runConfig.ts`, `apps/desktop/src/plugins/terminal/main/runtime.ts`,
-  IPC in `apps/desktop/src/plugins/terminal/main/runIpc.ts`, wire shapes in `apps/desktop/src/core/shared/terminal.ts`
+  bridge injection in `apps/desktop/src/plugins/terminal/main/runIpc.ts`, wire shapes in `apps/desktop/src/core/shared/terminal.ts`
   (canonical `RunTargetInfo`/`RunStatus`)
 - Workflow engine: `apps/desktop/src/plugins/workflows/main/workflowRunner.ts`, `apps/desktop/src/core/main/headless.ts`,
-  `apps/desktop/src/plugins/workflows/main/workflowFiles.ts`, wiring + `workflow:*` IPC in
+  `apps/desktop/src/plugins/workflows/main/workflowFiles.ts`, composition wiring in
   `apps/desktop/src/app/main/workflowWiring.ts`
 - Harness routes: `apps/desktop/src/core/server/routes/harness.ts`
-- Client: `apps/desktop/src/client/features/palette/{model.ts,CommandPalette.tsx}`,
-  `.../features/tasks/recipes.ts`, `.../features/terminal/terminalClient.ts`,
-  `.../features/settings/WorkflowsSettings.tsx`, `.../features/agents/AgentsPanel.tsx`
+- Client: `apps/desktop/src/core/client/palette/{model.ts,CommandPalette.tsx}`,
+  `apps/desktop/src/plugins/terminal/client/{recipes.ts,runClient.ts,terminalClient.ts}`,
+  `apps/desktop/src/plugins/workflows/client/WorkflowsSettings.tsx`, and
+  `apps/desktop/src/plugins/agents/client/AgentsPanel.tsx`
 - MCP tools: `apps/desktop/src/core/mcp/server.ts:233-251`
-- Flag: `apps/desktop/src/core/client/App.tsx:39`
+- Capability gate: `apps/desktop/src/core/client/capabilities.ts`
 
 ## See also
 

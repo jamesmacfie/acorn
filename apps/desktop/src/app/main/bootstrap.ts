@@ -1,4 +1,4 @@
-// The main-process composition root (review §2, docs/next Phase 1). One explicit place that owns
+// The main-process composition root (docs/plugins.md). One explicit place owns
 // construction ORDER and LIFECYCLE — every domain module keeps its own behaviour. The ordered
 // phases are visible top-to-bottom here and reversible in one disposal chain:
 //
@@ -6,7 +6,7 @@
 //   → reconcile durable state (off the paint-critical path) → dispose in reverse on quit
 //
 // The listener starts only AFTER the harness/context bridges are installed, closing the boot-order
-// window where /api/tasks/:id/notes 503'd and /context returned empty (review §2). terminal.ts is
+// window where /api/tasks/:id/notes returned 503 and /context was empty. terminal.ts is
 // no longer the accidental main() — it is just the PTY engine, wired from here.
 import { app, type BrowserWindow } from 'electron'
 import type { ServerType } from '@hono/node-server'
@@ -27,8 +27,10 @@ import { endDbPools } from '../../plugins/database/main/database'
 import { disposeTerminal, reconcileTmux, registerTerminalIpc, sendToAgent, terminalRunGlue } from '../../plugins/terminal/main/terminal'
 import { seedTaskNotes } from '../../plugins/notes/main/seedTaskNotes'
 import { reconcileWorktrees, setWorktreesRoot } from '../../core/main/taskWorktree'
+import { wireConfigTrust } from './configTrustWiring'
+import { logStorageFootprint } from '../../core/main/storageFootprint'
 
-// Boot/reconcile/teardown timing marks (performance §3.1): hrtime deltas from boot start, logged as
+// Boot/reconcile/teardown timing marks (docs/electron.md §11): hrtime deltas from boot start, logged as
 // greppable one-liners. "no telemetry, no dashboards; a log you can grep."
 function bootTimer(): (label: string) => void {
   const t0 = process.hrtime.bigint()
@@ -49,7 +51,7 @@ export async function bootstrap({ dataDir, origin, createWindow }: BootstrapOpti
   const mark = bootTimer()
 
   // Teardown is registered FIRST and is idempotent, so a boot that throws part-way can still dispose
-  // whatever was constructed (Phase 1 acceptance: partial boot still disposes).
+  // whatever was constructed (the lifecycle invariant: partial boot still disposes).
   let server: ServerType | null = null
   let disposePreview: (() => void) | null = null
   let disposed = false
@@ -94,7 +96,7 @@ export async function bootstrap({ dataDir, origin, createWindow }: BootstrapOpti
   const reconciled = new Promise<void>((r) => (reconcileDone = r))
 
   // 1. Migrate + construct the DB/runtime bindings. openDb runs migrations synchronously, so the
-  //    schema is ready before the listener serves any request (performance §3.6).
+  //    schema is ready before the listener serves any request (docs/electron.md §11).
   const runtime = makeRuntime(dataDir)
   const db = runtime.DB
   mark('migrate')
@@ -107,12 +109,13 @@ export async function bootstrap({ dataDir, origin, createWindow }: BootstrapOpti
   //       engine's exported sendToAgent (one-way dep); its memory/notes closures feed back into the
   //       engine at registerTerminalIpc. All setter-injection happens here, before the listener.
   const knowledge = registerKnowledgeIpc(db, dataDir, { sendToAgent })
+  wireConfigTrust(db)
 
   const runtimeSvc = createRuntimeService(db, terminalRunGlue(db))
-  // run targets are the harness RunBridge (wired below) — HTTP now, no separate run:* IPC (Phase 3).
+  // run targets are the harness RunBridge (wired below) — HTTP now, no separate run:* IPC.
 
   // Run keeps a dedicated bridge for its renderer routes; every other agent capability (notes,
-  // memory, browser, git, context reads, run_* tools) is the agent-tool registry (Phase 4).
+  // memory, browser, git, context reads, run_* tools) is the agent-tool registry (the agent-tool registry).
   wireRunBridge(runtimeSvc)
   wireContextSections({ db, notesStore: knowledge.notesStore, reconciled: knowledge.reconciled })
   wireAgentTools({ db, notesStore: knowledge.notesStore, proposals: knowledge.proposals, runtime: runtimeSvc, reconciled: knowledge.reconciled })
@@ -135,22 +138,23 @@ export async function bootstrap({ dataDir, origin, createWindow }: BootstrapOpti
     seedTaskNotes: (task) => seedTaskNotes(db, knowledge.notesStore, internalApiEnv, task),
     reconciled,
   })
-  disposePreview = registerPreviewIpc() // main-owned browser-preview WebContentsView surface (Phase 9 A)
+  disposePreview = registerPreviewIpc() // main-owned browser-preview WebContentsView surface
   mark('install')
 
   // 4. Start the loopback listener — only now that every bridge is installed.
   server = await startListener(runtime)
   mark('listener-up')
 
-  // 5. Create the window as soon as the listener is up (performance §3.6 boot policy).
+  // 5. Create the window as soon as the listener is up (docs/electron.md §11 boot policy).
   const win = await createWindow()
   mark('window')
 
   // 6. Reconcile durable state AFTER the window, off the paint-critical path. The sessions/worktrees
-  //    it recovers are not needed to paint the shell (performance §3.6). The steps are independent —
+  //    it recovers are not needed to paint the shell (docs/electron.md §11). The steps are independent —
   //    each gets its own try/catch so one failure can't skip the others (a tmux error must not
   //    leave interrupted workflow runs stuck 'running' forever).
   void (async () => {
+    void logStorageFootprint(db, dataDir).catch((error) => console.warn('[storage] footprint failed:', error))
     try {
       await reconcileTmux(db)
       mark('reconcile.tmux')

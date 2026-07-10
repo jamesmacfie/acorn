@@ -1,5 +1,5 @@
-// Renderer broadcasts shared by the main-process surfaces (split out of terminal.ts). Since Phase 3
-// slice 6 these ride the one authenticated WebSocket (main/wsHub.ts), not per-window IPC — a
+// Renderer broadcasts shared by the main-process surfaces (split out of terminal.ts). These
+// the WebSocket transport these ride the one authenticated WebSocket (main/wsHub.ts), not per-window IPC — a
 // no-op when no socket is connected (dev:node, tests), same "no consumer → no-op" idea as before.
 import { wsBroadcast } from './wsHub'
 
@@ -9,10 +9,18 @@ export function broadcastStatus(): void {
   wsBroadcast({ channel: 'term:status' })
 }
 
-// Workflow gate / run-done notices for the renderer bell (docs/next 14 P3); the memory-proposal
+// Workflow gate / run-done notices for the renderer bell (docs/workflows.md); the memory-proposal
 // gate reuses the same channel.
 export function broadcastWorkflowNotice(taskId: string, kind: 'gate' | 'run-done', title: string): void {
   wsBroadcast({ channel: 'workflow:notice', notice: { taskId, kind, title } })
+  broadcastStatus()
+}
+
+export function broadcastRepoConfigTrustNotice(taskId: string): void {
+  wsBroadcast({
+    channel: 'workflow:notice',
+    notice: { taskId, kind: 'repo-config-trust', title: 'Repo configuration needs review', action: 'review-config' },
+  })
   broadcastStatus()
 }
 

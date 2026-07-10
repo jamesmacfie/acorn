@@ -1,4 +1,4 @@
-// Rail selection state (docs/workspaces). The task *list* is a TanStack query (tasksOptions); this
+// Rail selection state (docs/workspaces-and-tasks.md). The task *list* is a TanStack query (tasksOptions); this
 // module tracks what the rail has selected — a Source browse view or an active task — plus each
 // task's pane layout. Signals-only, like ../terminal/sessions.ts. The terminal drawer + topbar key
 // off activeTaskId.
@@ -8,7 +8,7 @@ import { sourceRegistry } from '../registries/sources'
 
 export type { PaneId, TaskLayout } from './layout'
 
-// Which browse Source is selected, or null when a task is the active view (docs/workspaces 04).
+// Which browse Source is selected, or null when a task is the active view (docs/workspaces-and-tasks.md).
 // Known core ids stay typed for contributions and UI construction. The live selection deliberately
 // accepts an unknown string so a temporarily missing plugin source remains inert and round-trips
 // through persistence until the user explicitly selects another source.
@@ -69,7 +69,7 @@ export function hydrateTaskLayout(taskId: string, layout: TaskLayout): void {
   setTaskLayouts((current) => (current[taskId] ? current : { ...current, [taskId]: layout }))
 }
 
-// Recipe-resolved browser home URLs (docs/next 13 §C): a layout recipe points the browser pane at
+// Recipe-resolved browser home URLs (docs/workflows.md §3): a layout recipe points the browser pane at
 // a run target's resolved URL. Session-only view state, per task.
 const [recipeBrowserUrls, setRecipeBrowserUrls] = createSignal<Record<string, string>>({})
 export const recipeBrowserUrl = (taskId: string): string | undefined => recipeBrowserUrls()[taskId]

@@ -1,4 +1,4 @@
-// Memory system (docs/next 12 P1): markdown files are TRUTH — `<checkout>/.acorn/memory/*.md`
+// Memory system (docs/notes-and-memory.md): markdown files are TRUTH — `<checkout>/.acorn/memory/*.md`
 // (repo scope, committed, PR-reviewed) and `~/.acorn/memory/*.md` (operator-private) — with a
 // MEMORY.md index per dir. SQLite (`memories` + `memories_fts`) is a DERIVED index, reconciled on
 // change from every active worktree + the primary checkout: ids are content hashes so the same
@@ -238,7 +238,7 @@ export async function memoryIndexSlice(db: AppDatabase, repo: string, cap = 30):
   return rows.slice(0, cap).map((r) => ({ name: r.name, description: r.description }))
 }
 
-// Launch injection block (docs/next 12 P2, the push half): the MEMORY.md index slice (cheap,
+// Launch injection block (docs/notes-and-memory.md, the push half): the MEMORY.md index slice (cheap,
 // always-safe) plus the repo-scoped feedback/convention BODIES (the rules an agent must never
 // miss). Caps keep it compact — injection is recall for the high-value slice; MCP search is
 // recall for the long tail.

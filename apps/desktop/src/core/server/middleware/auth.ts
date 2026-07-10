@@ -8,7 +8,7 @@ export type SessionUser = SessionData
 // The authenticated caller, resolved from whichever credential is present. Routes gate on
 // "a principal exists" (via requireUser), never on "a cookie is present" — so a future
 // authorized external caller is a new `kind` here + one branch in authMiddleware, not a
-// re-touch of every route. See docs/next/security.md §9.1.
+// re-touch of every route. See docs/security.md §9.1.
 // ponytail: kind + identity is the seam §9.1 needs now; a capability set is added when a
 // third principal kind (external caller) actually lands, not before.
 export type PrincipalKind = 'user' | 'internal'

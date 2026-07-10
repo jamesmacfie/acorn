@@ -3,15 +3,14 @@ import { dirname, join, relative, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
 
-// Architecture boundary enforcement for the Phase 10 core/plugins/app foldering (docs/next
-// extensibility §6, phase-10-foldering §5). This is the import rule that makes the boundary real
-// for future contributors, not just true at the moment of the move.
+// Architecture boundary enforcement for the core/plugins/app layout (docs/plugins.md). This makes
+// the boundary executable for future contributors instead of leaving it as a convention.
 //
 // HARD invariants (must be zero — the plugin model's guarantees):
 //   - nothing in core/ or plugins/ imports app/ (the composition root is a leaf; app imports them)
 //   - the client↔node process boundary holds (renderer never imports server/main, and vice versa)
 //
-// TARGET invariants (must reach zero before Phase 10 can be called complete):
+// TARGET invariants for continued decoupling:
 //   - core imports no plugin implementation
 //   - plugins import no other plugin's internals
 //
@@ -19,9 +18,9 @@ import { describe, expect, it } from 'vitest'
 // directly instead of through the pane/command/capability/state registries the earlier phases
 // created). These are the "earlier seam not yet adopted" couplings; the move surfaced them. The
 // baseline is a SHRINKING ledger: the test fails on any NEW coupling, and fails if a listed one is
-// removed without deleting its baseline entry — so the list can only go down. Phase 10 remains
-// paused while this ledger is non-empty; each edge needs capability/registry adoption or a corrected
-// ownership boundary, not an exemption disguised as completion.
+// removed without deleting its baseline entry — so the list can only go down. Each edge should be
+// replaced with capability/registry adoption or a corrected ownership boundary, not another
+// exemption.
 //
 // Test files are exempt from every rule: tests legitimately compose across layers.
 

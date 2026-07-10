@@ -1,4 +1,4 @@
-/* Command palette (docs/next 13 §D): flat, square, 1px borders per docs/ui-design.md. */
+/* Command palette (docs/command-palette-and-shortcuts.md): flat, square, 1px borders per docs/ui-design.md. */
 .overlay.palette { width: min(560px, 90vw); padding: 0; }
 .palette-input {
   width: 100%;

@@ -7,9 +7,9 @@
 > whose main process starts that server and loads the loopback origin. **Cloudflare/wrangler is fully
 > removed** — Electron is the only runtime. The **v2 terminal (§8) has since shipped**: node-pty
 > sessions run in the main process (`src/plugins/terminal/main/terminal.ts`, desktop-only and always on — see
-> [terminal-and-agents.md](./terminal-and-agents.md)). The remaining Phase 3 items are **optional
-> enhancements, not migration work**: OS-keychain secrets and GitHub device flow (drop
-> `client_secret`). This doc is the full change inventory and the record of a clean, phased
+> [terminal-and-agents.md](./terminal-and-agents.md)). `SESSION_ENC_KEY` now uses `safeStorage`;
+> GitHub device flow (dropping `client_secret`) remains an optional distribution enhancement, not
+> migration work. This doc is the full change inventory and the record of a clean, phased
 > transition off Cloudflare Workers to a local Electron app — read it for the *why* behind the
 > current runtime shape; [architecture-overview.md](./architecture-overview.md) describes what
 > exists today.
@@ -456,7 +456,8 @@ in-between (see §7). Then delete decisively:
 
 To keep the transition calm, note how much does **not** move:
 
-- The SolidJS product UI (`src/client/**`) — router, TanStack Query, IndexedDB persistence, Shiki,
+- The SolidJS product UI (`src/core/client/**`, `src/plugins/*/client/**`, `src/app/client/**`) —
+  router, TanStack Query, IndexedDB persistence, Shiki,
   all panels. It just loads from `http://127.0.0.1:<port>` instead of the Worker. The exception is
   the boot-time service-worker unregister in `src/app/client/index.tsx` (§4h).
 - All 16 route modules' business logic and the Hono routing in `index.ts` (now a `createApp()` factory).
@@ -509,7 +510,7 @@ outstanding packaged-build secret gap.)
 
 **Phase 3 — Desktop-native cleanups + features.** Caching simplification (§5) **✅ done**. The
 **v2 terminal** (§8) **✅ shipped** — node-pty sessions in the main process, desktop-only and always
-on. Still planned: optional keychain auth and GitHub device flow (drop `client_secret`).
+on. Still optional for broader distribution: GitHub device flow (drop `client_secret`).
 
 Each phase is independently shippable and Phase 0–1 are reversible (Cloudflare config still there
 until Phase 2). That's the clean transition.
@@ -522,8 +523,8 @@ has since been **built** (`src/plugins/terminal/main/terminal.ts`, registered fr
 desktop-only and always on):
 
 - node-pty runs **in the Electron main process**. No separate daemon, no `ws` server, no Vite proxy.
-- Renderer (xterm.js) ↔ main over **Electron IPC** (`term:*` channels exposed through the
-  `src/core/main/preload.ts` bridge), instead of `ws://localhost:5173/term`.
+- Renderer request/response uses the loopback HTTP API; xterm input/output and status use the one
+  authenticated WebSocket. Preload IPC is limited to native capabilities.
 - tmux-backed persistence applies for surviving an app restart; surviving a *window* reload is
   automatic since the PTY lives in main.
 - The `@electron/rebuild` step from §4c covers node-pty's native build (`electron:rebuild` rebuilds
@@ -577,7 +578,7 @@ top-to-bottom in that file:
 ```text
 migrate (openDb runs migrations)
   → construct domain services (knowledge, runtime, workflow, …)
-  → install bridges + IPC (all set*Bridge / register*Ipc calls)
+  → install bridges and native capability handlers
   → start loopback listener (startListener — only now do requests get served)
   → create window (electron.ts supplies createWindow; bootstrap owns when)
   → reconcile durable state (tmux resurrect, worktree prune, workflow resume) off the paint path
@@ -587,27 +588,26 @@ migrate (openDb runs migrations)
 Two invariants this closes (review §2): the listener starts **after** every harness/context bridge
 is installed — no more boot-order window where `/api/tasks/:id/notes` 503s — and there is now a
 logged `will-quit` teardown (registered first, idempotent, tolerant of a partial boot). `terminal.ts`
-is no longer the accidental `main()`: it is the PTY engine plus its own `term:*/mcp:*/browser:*`
-surfaces, and it imports no other product domain — the composition root injects what it needs
+is no longer the accidental `main()`: it is the PTY engine, and the composition root injects what it needs
 (`memoryInjector`, `memoryReviewTrigger`, `seedTaskNotes`, `internalApiEnv`) and consumes what it
 exports (`sendToAgent`, `terminalRunGlue`, `reconcileTmux`, `disposeTerminal`). Boot/reconcile/teardown
 timing marks are logged as `[boot] <label> +Nms` lines (performance §3.1).
 
-## 12. Transport (Phase 3): loopback HTTP + one WebSocket + a thin IPC residue
+## 12. Current transport: loopback HTTP + one WebSocket + a thin IPC residue
 
-`docs/next` Phase 3 collapsed the three transport stories into one. The renderer↔main contract is now:
+The renderer↔main contract is:
 
 - **Request/response → loopback HTTP.** Every former `ipcMain.handle` domain (search, editor, run,
   workflow, local-git, database, knowledge/notes+memory, terminal control, MCP inspect) is a typed
-  route under `/api/*` in `server/routes/*`. Route builders + response types live in
-  `shared/api.ts`; clients call through `readJson`/`writeJson`. Domain logic stays in the main
+  route under `/api/*` in `core/server/routes/*` or `plugins/*/server/routes/*`. Route builders +
+  response types live in `core/shared/api.ts`; clients call through `readJson`/`writeJson`. Domain logic stays in the main
   process behind a **bridge** — a route holds a `bridgeSlot`, the main side fills it at boot
-  (`server/bridge.ts` `viaBridge` → 503 `bridge-unavailable` when unfilled). Pure-Node bridges
-  (search/editor/local-git/database) are wired in `main/serverBridges.ts` from *inside*
-  `startListener`, so they work under both Electron and `dev:node`. Bodies that write files, spawn
+  (`core/server/bridge.ts` `viaBridge` → 503 `bridge-unavailable` when unfilled). Pure-Node bridges
+  (search/editor/local-git/database) are wired by the Electron and `dev:node` composition entries.
+  Bodies that write files, spawn
   processes, or execute SQL are zod-validated with malformed-body tests.
-- **Streams → one authenticated WebSocket** at `/ws` (`shared/ws.ts`, `main/wsHub.ts`,
-  `client/features/terminal/wsClient.ts`). Kind-tagged frames carry `term:out` (PTY output,
+- **Streams → one authenticated WebSocket** at `/ws` (`core/shared/ws.ts`, `core/main/wsHub.ts`,
+  `core/client/wsClient.ts`). Kind-tagged frames carry `term:out` (PTY output,
   coalesced to ~16 ms), `term:input`, attach/detach, the `term:status` + `workflow:notice` pings,
   and a reserved `workflow:step:event`. Attach replays `ready` + the ring buffer synchronously
   before any live frame (deterministic replay-before-live). The upgrade is authorized on the shared
@@ -619,7 +619,7 @@ timing marks are logged as `[boot] <label> +Nms` lines (performance §3.1).
   `desktop`/`platform` probes. Nothing request/response or streamable remains on IPC. (The old
   `browser:bind` handle is gone — with the preview main-owned, the CDP driver binds inside main when
   the view is created, so no `webContents` id ever crosses the bridge.)
-- **Browser preview — main-owned `WebContentsView` (Phase 9 A):** one kept-alive view per task,
+- **Browser preview — main-owned `WebContentsView`:** one kept-alive view per task,
   parented to the window's `contentView` and positioned by the renderer over the pane's host rect
   (`previewService.ts` + `PreviewPane.tsx`). Replaces the deprecated `<webview>` tag: surviving
   pane/task switches is the view's natural behaviour, not a DOM-reparenting hack. http(s)-only /

@@ -1,7 +1,7 @@
 // Database pane backing (docs/pg.md): a per-task Postgres connection for browsing + editing the
 // task's dev database. Mirrors the local-git/editor surfaces — the taskId is the capability, and
 // everything is re-derived from the DB per call. Was the `db:*` IPC channels; now the
-// DatabaseBridge behind the HTTP routes in server/routes/database.ts (Phase 3). Pure-Node (pg).
+// DatabaseBridge behind the HTTP routes in server/routes/database.ts. Pure-Node (pg).
 //
 // SQL-injection posture: values are ALWAYS parameterized ($1…). Identifiers (schema/table/column
 // names) can't be parameterized, so every identifier used in generated SQL is validated against
@@ -136,7 +136,7 @@ async function assertColumns(pool: InstanceType<typeof Pool>, schema: string, na
   return meta
 }
 
-// Shutdown disposal (review §2): end every open pg pool so quit doesn't leak connections. Called
+// Shutdown disposal (composition-root ownership): end every open pg pool so quit doesn't leak connections. Called
 // by the composition root's reverse-order teardown. Idempotent — an empty map is a no-op.
 export async function endDbPools(): Promise<void> {
   for (const [taskId, { pool }] of pools) {

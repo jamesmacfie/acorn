@@ -16,7 +16,7 @@ import { resolveRepoForUser } from './repoMirror'
 // parallel REST calls (REST can't be aliased). Per-PR TTL skip means already-fresh PRs cost no
 // GitHub calls. Reuses the same mirror tables/logic as the single-PR routes (prMirror.ts).
 //
-// Deliberately NOT on the serve-then-revalidate engine (inventories.md §2d): this is a multi-item
+// Deliberately NOT on the serve-then-revalidate engine (docs/caching.md): this is a multi-item
 // prefetch that always blocks and never serves-then-revalidates (there is no single response
 // resource to hand back stale). It shares the engine's TTL (PULLS_STALE_AFTER_MS) but owns its own
 // per-item freshness gate below.

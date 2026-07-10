@@ -2,7 +2,8 @@
 
 acorn's visual language is deliberately minimal and information-dense: a flat, monospaced, three-pane shell where every pixel of chrome earns its place. There are no shadows except on floating popovers, no gradients, no rounded panes — just 1px dividers, square panes, and a small set of muted greys with two semantic accents (green for additions, red for deletions). The aim is a tool that disappears so the review can foreground.
 
-The SPA imports `apps/desktop/src/core/client/styles.css` at boot. That file is now a manifest of feature-owned stylesheets under `apps/desktop/src/client/styles/`:
+The SPA imports `apps/desktop/src/core/client/styles.css` at boot. That file is a manifest of
+shell-owned stylesheets under `apps/desktop/src/core/client/styles/`:
 
 - `tokens-layout.css` — design tokens, reset, shell grid, pane containment.
 - `pull-list.css` — PR tabs, filters, and virtualized list rows.
@@ -14,7 +15,10 @@ The SPA imports `apps/desktop/src/core/client/styles.css` at boot. That file is 
 - `integrations-panel.css` — settings integration cards.
 - `copy.css` — shared prose/markdown copy styles.
 
-Feature modules under `features/` co-locate their stylesheet next to the component and import it directly (e.g. `features/tabs/tabrail.css`, `features/palette/palette.css`, `features/tasks/task-view.css`, `features/terminal/terminal.css`), so the manifest covers only the classic shell. Vite still emits one client CSS asset, so the split changes ownership and reviewability without adding render-blocking files.
+Feature modules co-locate their stylesheet next to the component and import it directly (for
+example `core/client/tabs/tabrail.css`, `core/client/palette/palette.css`, and
+`plugins/terminal/client/terminal.css`), so the manifest covers only the shell. Vite still emits one
+client CSS asset, so the split changes ownership without adding render-blocking files.
 
 ## Principles
 
@@ -122,4 +126,3 @@ The top bar is a `1fr auto 1fr` grid: a left cluster (collapse toggle + workspac
 - **Floating surfaces** — the repo picker popover, account menu, and keyboard overlays — are the only elements with elevation, using `box-shadow` with `--shadow-popover` over a `--border-strong` outline.
 - **Diff lines** colour by state: insert rows take `--add-bg` with a green `+` marker, delete rows `--del-bg` with a red `−`; word-level changes layer the stronger `--*-word-bg` over the line. Hunk headers sit on `--hunk-bg`.
 - **Status semantics** reuse the diff palette: open PR state and passing checks use `--add-marker`, closed/failing use `--del-marker`, pending/draft use `--warn`.
-

@@ -1,4 +1,4 @@
-// The single authenticated WebSocket hub (docs/next Phase 3 slice 6): one socket on the loopback
+// The single authenticated WebSocket hub (docs/electron.md §12): one socket on the loopback
 // origin carries every live stream (shared/ws.ts). It lives in main because the streams it serves
 // belong to the PTY engine; terminal.ts registers the stream handlers, notify.ts broadcasts the
 // pings through it. Attached to the @hono/node-server http.Server's 'upgrade' event so it shares

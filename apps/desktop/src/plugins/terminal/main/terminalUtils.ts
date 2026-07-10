@@ -8,7 +8,7 @@ export const RING_CAP = 256 * 1024 // bytes of recent output kept per session, r
 // Keep only the last RING_CAP bytes of output for replay on attach.
 export const trimRing = (ring: string): string => (ring.length > RING_CAP ? ring.slice(ring.length - RING_CAP) : ring)
 
-// Sanitize cols/rows from the (less-trusted) renderer to a sane integer (vNext §5, §11).
+// Sanitize cols/rows from the (less-trusted) renderer to a sane integer (docs/security.md).
 export const clampDim = (n: unknown, fallback: number): number =>
   Number.isInteger(n) && (n as number) >= 1 && (n as number) <= 2000 ? (n as number) : fallback
 
@@ -26,7 +26,7 @@ export const tmuxAttachArgs = (name: string) => ['attach', '-t', name]
 export const parseTmuxSessions = (stdout: string): Set<string> =>
   new Set(stdout.split('\n').map((l) => l.trim()).filter((l) => l.startsWith(TMUX_PREFIX)))
 
-// Idle = a running agent whose PTY has produced no output for `idleMs` (vNext §3 activity
+// Idle = a running agent whose PTY has produced no output for `idleMs` (docs/terminal-and-agents.md activity
 // indicators). Backend-agnostic: silence, not transcript-scraping. Shells never count as idle —
 // "waiting for input" is only meaningful for an agent.
 export const IDLE_MS = 10_000
@@ -38,25 +38,25 @@ export const computeIdle = (
   idleMs = IDLE_MS,
 ): boolean => kind === 'agent' && status === 'running' && now - lastActivityAt >= idleMs
 
-// Resolve a profile's backend preference against whether tmux is actually installed (vNext §13.4):
+// Resolve a profile's backend preference against whether tmux is actually installed (docs/terminal-and-agents.md):
 // 'tmux' degrades to 'node-pty' when tmux is missing, so durable mode is simply unavailable.
 export const resolveBackend = (preference: 'node-pty' | 'tmux', tmuxAvailable: boolean): 'node-pty' | 'tmux' =>
   preference === 'tmux' && tmuxAvailable ? 'tmux' : 'node-pty'
 
-// PR worktree directory name (vNext §9): `<owner>-<repo>-pr-<number>` under the worktrees root.
+// PR worktree directory name (docs/workspaces-and-tasks.md): `<owner>-<repo>-pr-<number>` under the worktrees root.
 export const worktreeDirName = (owner: string, repo: string, number: number | string) => `${owner}-${repo}-pr-${number}`
 
 // The filesystem/DNS-safe branch slug (docs/terminal-and-agents.md): shared by the worktree dir name and the
 // ACORN_TASK_SLUG env var — the isolation handle for parallel tasks (compose -p, derived names).
 export const branchSlug = (branch: string) => branch.replace(/[^A-Za-z0-9._-]/g, '-')
 
-// Workspace worktree directory name (docs/workspaces 05): keyed by branch, since a workspace is
+// Workspace worktree directory name (docs/workspaces-and-tasks.md): keyed by branch, since a workspace is
 // branch-first (local-first workspaces have no PR number). The branch slug replaces any char that
 // isn't filesystem-safe (`feat/login` → `feat-login`); isContainedPath still guards the result.
 export const worktreeBranchDirName = (owner: string, repo: string, branch: string) =>
   `${owner}-${repo}-${branchSlug(branch)}`
 
-// Guard repo identifiers before they reach a filesystem path (vNext §5/§11: validate every IPC
+// Guard repo identifiers before they reach a filesystem path (docs/terminal-and-agents.md: validate every IPC
 // payload at the boundary). Allow only GitHub-legal chars and forbid a leading dot, so `..`, `/`,
 // and absolute/relative traversal can't escape the worktrees root.
 export const isValidRepoIdent = (s: string): boolean => /^[A-Za-z0-9._-]+$/.test(s) && !s.startsWith('.')
@@ -72,7 +72,7 @@ export const isContainedPath = (root: string, candidate: string): boolean => {
 // A checkout is dirty when `git status --porcelain` prints anything.
 export const isDirty = (porcelain: string): boolean => porcelain.trim().length > 0
 
-// Controlled child environment (vNext §11): preserve the few vars a shell needs, never copy
+// Controlled child environment (docs/security.md): preserve the few vars a shell needs, never copy
 // SESSION_ENC_KEY / GITHUB_CLIENT_SECRET (or anything else) into the child.
 export function childEnv(env: NodeJS.ProcessEnv = process.env): Record<string, string> {
   const out: Record<string, string> = {}
@@ -132,7 +132,7 @@ export function wrapBracketedPaste(text: string): string {
 // drizzle types and testable under plain Node.
 export type SessionTaskInfo = { repoOwner: string; repoName: string; branch: string; title: string }
 
-// Environment for every task-scoped session and lifecycle script (docs/terminal-and-agents.md, docs/next 11): the childEnv
+// Environment for every task-scoped session and lifecycle script (docs/terminal-and-agents.md, docs/agent-tools.md §4): the childEnv
 // whitelist (never secrets), plus the ACORN_* identity vars agents / MCP / setup / teardown scripts
 // key off. Caller-supplied opts.env still wins — it's spread last.
 export function buildSessionEnv(opts: {

@@ -34,14 +34,14 @@ browser storage and OAuth callback stay stable. The OAuth flow requests the scop
 ## 2. Configure local secrets — `apps/desktop/.env`
 
 Dev secrets live in `apps/desktop/.env`, loaded by the Electron main process (`process.loadEnvFile`)
-and by `dev:node`. Packaged builds will read them from the OS keychain (planned — see
-[electron.md](./electron.md) §4b).
+and by `dev:node`. Packaged Electron builds use `safeStorage` for `SESSION_ENC_KEY`; the GitHub OAuth
+client ID and secret still come from the environment.
 
 ```bash
 cp apps/desktop/.env.example apps/desktop/.env
 ```
 
-Generate the session encryption key. `SESSION_ENC_KEY` must be **exactly 64 hex characters**
+For `dev:node`, generate the session encryption key. `SESSION_ENC_KEY` must be **exactly 64 hex characters**
 (32 bytes / 256-bit) — it is the key for the AES-256-GCM (JWE `dir`) session cookie, and
 `src/core/server/session.ts` rejects anything not matching `^[0-9a-fA-F]{64}$`:
 
@@ -54,7 +54,7 @@ Then fill `apps/desktop/.env`:
 ```
 GITHUB_CLIENT_ID=<from your OAuth App>
 GITHUB_CLIENT_SECRET=<from your OAuth App>
-SESSION_ENC_KEY=<the 64-hex-char openssl output>
+SESSION_ENC_KEY=<the 64-hex-char openssl output; optional for Electron, required by dev:node>
 ```
 
 `.env` is gitignored — **never commit it**.
@@ -81,7 +81,7 @@ The Electron window opens on `http://127.0.0.1:4317`; log in with GitHub.
 > (`SESSION_COOKIE` in `session.ts`); no action needed.
 
 > **Desktop-only features.** The terminal drawer, agent sessions, run targets, and workflows are
-> always on in the Electron app; they require the preload bridge, so they're simply absent in a
+> always on in the Electron app; they require main-process capabilities, so they're absent in a
 > plain browser via `dev:node` (`capabilities()` in `apps/desktop/src/core/client/capabilities.ts`).
 
 ## Local data — `apps/desktop/.acorn/`
@@ -128,7 +128,7 @@ A wrong-ABI better-sqlite3 no longer dies with a bare `NODE_MODULE_VERSION` stac
 (`src/core/main/bindings.ts`) catches the native load error and rethrows naming the right rebuild
 script for the runtime you're in.
 
-> **`node:sqlite` spike (docs/next Phase 9 B) — parked.** The built-in `node:sqlite` handles FTS5
+> **Why acorn still uses `better-sqlite3`.** A `node:sqlite` spike confirmed FTS5
 > (porter) and transactions fine under the bundled Node, but Drizzle ships **no** `node:sqlite`
 > driver (even latest 0.45.2 — only better-sqlite3/bun/durable/expo/op/proxy), so adopting it means
 > the generic `sqlite-proxy` driver or dropping Drizzle. And `node-pty` keeps the dual-ABI rebuild
@@ -163,7 +163,6 @@ pnpm --filter @acorn/desktop db:migrate
 
 For packaging the app into a `.dmg`/`.zip`, see [Packaging](../README.md#packaging-macos) in the
 root README and [electron.md](./electron.md) §4i. Packaged builds resolve their data root to
-`app.getPath('userData')` (dev keeps the repo-local `.acorn/`); the remaining packaged-build gap is
-secrets — there is no `.env` in a packaged app and OS-keychain storage is planned but not built, so
-`.env` stays the dev-only source of secrets.
-
+`app.getPath('userData')` (dev keeps the repo-local `.acorn/`). `SESSION_ENC_KEY` is generated or
+migrated into `safeStorage`; packaged launches still need GitHub OAuth client credentials in the
+environment.

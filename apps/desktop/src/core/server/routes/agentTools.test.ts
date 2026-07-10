@@ -14,7 +14,7 @@ vi.mock('../db', async (importOriginal) => {
   return { ...actual, getDb: vi.fn() }
 })
 
-// One fixture registry drives BOTH projections' tests (Phase 4 acceptance: "covered by table-driven
+// One fixture registry drives BOTH projections' tests (the agent-tool registry acceptance: "covered by table-driven
 // tests from the same contribution fixture"). The MCP projection is proven in mcp/server.test.ts;
 // this is the harness HTTP projection over the identical shapes.
 const calls: { name: string; args: unknown; taskId: string; session?: string }[] = []

@@ -1,5 +1,5 @@
 import { DEFAULT_PROFILE_ID } from '../../../core/main/agentProfiles'
-import type { WorkflowDef, WorkflowStepDef } from './workflowContracts'
+import type { StepValidationContext, WorkflowDef, WorkflowStepDef } from './workflowContracts'
 import { intersectToolCeilings, narrowsToolCeiling } from './workflowTools'
 
 const TEMPLATE_RE = /\$\{steps\.([^}]+)\.output\}/g
@@ -11,6 +11,7 @@ export type WorkflowValidationCatalog = {
   profiles: ReadonlySet<string>
   // Profiles with a one-shot structured (aiArgv) mode — the only ones `decide` can run on.
   structuredProfiles: ReadonlySet<string>
+  validateStepKind?: (kind: string, step: WorkflowStepDef, context: StepValidationContext) => string[]
 }
 
 export class WorkflowValidationError extends Error {
@@ -69,28 +70,7 @@ export function validateWorkflow(def: WorkflowDef, catalog: WorkflowValidationCa
     if (step.childStep?.profileId && !catalog.profiles.has(step.childStep.profileId)) {
       errors.push(`${label} child names unknown profile '${step.childStep.profileId}'`)
     }
-    if (kind === 'gate-policy') {
-      if (!step.policy) errors.push(`${label} has no policy`)
-      else if (!catalog.policies.has(step.policy)) errors.push(`${label} names unknown policy '${step.policy}'`)
-    }
-    if (kind === 'join') {
-      if (!step.joins) errors.push(`${label} must declare joins`)
-      else {
-        const targetIndex = indexes.get(step.joins)
-        if (targetIndex == null) errors.push(`${label} has dangling join '${step.joins}'`)
-        else if (targetIndex >= index || (stepAt(step.joins)?.kind ?? 'agent') !== 'fan-out') {
-          errors.push(`${label} joins '${step.joins}', which is not a preceding fan-out`)
-        }
-      }
-    }
-    if (kind === 'decide') {
-      if (!step.branches || !Object.keys(step.branches).length) errors.push(`${label} has no branches`)
-      for (const [verdict, target] of Object.entries(step.branches ?? {})) {
-        const targetIndex = indexes.get(target)
-        if (targetIndex == null) errors.push(`${label} branch '${verdict}' has invalid target '${target}'`)
-        else if (targetIndex <= index) errors.push(`${label} branch '${verdict}' has backward target '${target}'`)
-      }
-    }
+    errors.push(...(catalog.validateStepKind?.(kind, step, { label, index, indexes, stepAt, policies: catalog.policies }) ?? []))
     for (const expression of [...invalidTemplateExpressions(step.prompt), ...invalidTemplateExpressions(step.childStep?.prompt)]) {
       errors.push(`${label} has invalid template expression '${expression}'`)
     }

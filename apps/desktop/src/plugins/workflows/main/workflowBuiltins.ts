@@ -3,7 +3,7 @@ import type { AppDatabase } from '../../../core/server/db'
 import { schema } from '../../../core/server/db'
 import type { HeadlessResult } from '../../../core/main/headless'
 import { DEFAULT_PROFILE_ID } from '../../../core/main/agentProfiles'
-import type { StepHandler, StepHandlerContext, StepHandlerOutcome, WorkflowStepDef, WorkflowStepRow } from './workflowContracts'
+import type { StepHandler, StepHandlerContext, StepHandlerOutcome, StepValidator, WorkflowStepDef, WorkflowStepRow } from './workflowContracts'
 import type { WorkflowContributionRegistry } from './workflowRegistry'
 import type { RunnerDeps, RunStepOptions } from './workflowRunner'
 import { intersectToolCeilings } from './workflowTools'
@@ -16,6 +16,31 @@ export const MAX_FAN_OUT_TASKS = 12
 // workflowFiles' default validation catalog reuses them.
 export const BUILTIN_STEP_KINDS = ['agent', 'gate-human', 'gate-policy', 'ci-loop', 'fan-out', 'join', 'decide'] as const
 export const BUILTIN_POLICIES = ['checks-green'] as const
+
+export const BUILTIN_STEP_VALIDATORS: Partial<Record<(typeof BUILTIN_STEP_KINDS)[number], StepValidator>> = {
+  'gate-policy': (step, { label, policies }) => {
+    if (!step.policy) return [`${label} has no policy`]
+    return policies.has(step.policy) ? [] : [`${label} names unknown policy '${step.policy}'`]
+  },
+  join: (step, { label, index, indexes, stepAt }) => {
+    if (!step.joins) return [`${label} must declare joins`]
+    const targetIndex = indexes.get(step.joins)
+    if (targetIndex == null) return [`${label} has dangling join '${step.joins}'`]
+    return targetIndex >= index || (stepAt(step.joins)?.kind ?? 'agent') !== 'fan-out'
+      ? [`${label} joins '${step.joins}', which is not a preceding fan-out`]
+      : []
+  },
+  decide: (step, { label, index, indexes }) => {
+    const errors: string[] = []
+    if (!step.branches || !Object.keys(step.branches).length) errors.push(`${label} has no branches`)
+    for (const [verdict, target] of Object.entries(step.branches ?? {})) {
+      const targetIndex = indexes.get(target)
+      if (targetIndex == null) errors.push(`${label} branch '${verdict}' has invalid target '${target}'`)
+      else if (targetIndex <= index) errors.push(`${label} branch '${verdict}' has backward target '${target}'`)
+    }
+    return errors
+  },
+}
 
 type BuiltinServices = {
   db: AppDatabase
@@ -62,7 +87,7 @@ export function registerBuiltinWorkflowContributions(registry: WorkflowContribut
     join: runJoin,
     decide: runDecision,
   }
-  for (const kind of BUILTIN_STEP_KINDS) registry.registerStepKind(kind, stepKinds[kind])
+  for (const kind of BUILTIN_STEP_KINDS) registry.registerStepKind(kind, stepKinds[kind], BUILTIN_STEP_VALIDATORS[kind])
 
   async function runAgent(ctx: StepHandlerContext): Promise<StepHandlerOutcome> {
     let prompt = ctx.renderedPrompt

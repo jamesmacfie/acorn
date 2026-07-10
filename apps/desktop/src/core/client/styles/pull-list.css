@@ -64,7 +64,7 @@
   text-align: right;
   font-variant-numeric: tabular-nums;
 }
-/* "Open as workspace" affordance — hidden until the row is hovered/focused (docs/workspaces P3). */
+/* "Open as workspace" affordance — hidden until the row is hovered/focused (docs/workspaces-and-tasks.md). */
 .pr-ws-btn {
   flex: none;
   opacity: 0;

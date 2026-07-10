@@ -33,6 +33,17 @@ function timingSafeEqual(a: string, b: string): boolean {
 }
 
 export const auth = new Hono<{ Bindings: Env }>()
+  // Playwright-Electron smoke seam. It is unreachable unless the process was explicitly launched
+  // in E2E mode; production builds return 404 and keep the normal OAuth flow as the only login.
+  .get('/test-login', async (c) => {
+    if (process.env.ACORN_E2E !== '1') return c.notFound()
+    const sealed = await sealSession(
+      { token: 'e2e-token', login: 'e2e', name: 'E2E User', avatar: '', scopes: [] },
+      c.env.SESSION_ENC_KEY,
+    )
+    setCookie(c, SESSION_COOKIE, sealed, { httpOnly: true, sameSite: 'Lax', path: '/', maxAge: SESSION_TTL_SECONDS })
+    return c.redirect('/')
+  })
   .get('/login', async (c) => {
     const state = crypto.randomUUID()
     // CSRF: remember the state for 5 min (one-time use, consumed on callback) AND bind it to
@@ -92,7 +103,7 @@ export const auth = new Hono<{ Bindings: Env }>()
 
     // Fetch the profile for the UI header. GitHub is the identity provider, so this login-time
     // /user call is core auth infra — kept inline (like the token exchange above) rather than
-    // depending on the github plugin's API client, so auth stays core (docs/next extensibility §8.1).
+    // depending on the github plugin's API client, so auth stays core (docs/plugins.md).
     const userRes = await fetch('https://api.github.com/user', {
       headers: { Authorization: `Bearer ${token}`, Accept: 'application/vnd.github+json', 'User-Agent': 'acorn' },
     })

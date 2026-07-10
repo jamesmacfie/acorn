@@ -11,7 +11,7 @@ import { clientEvents } from '../registries/clientEvents'
 
 // Settings → per-workspace page: rename, the worktree setup script, and (non-default) delete.
 // The setup script is a shell command run once when a task's git worktree is first created
-// (docs/workspaces P5) — it shows as the first terminal tab. Blank clears it.
+// (docs/workspaces-and-tasks.md) — it shows as the first terminal tab. Blank clears it.
 export default function WorkspaceSettings(props: { workspace: Workspace; onDeleted: () => void }) {
   const qc = useQueryClient()
   const [name, setName] = createSignal(props.workspace.name)
@@ -236,7 +236,7 @@ export default function WorkspaceSettings(props: { workspace: Workspace; onDelet
         <span class="settings-label">Database connection script</span>
         <span class="muted settings-hint">
           Optional. A shell command run in a task's worktree that prints a Postgres connection URL for the
-          Database pane (docs/pg.md). Blank means auto-detect from <code>DATABASE_URL</code> in the
+          Database pane. Blank means auto-detect from <code>DATABASE_URL</code> in the
           worktree <code>.env</code> or the environment. Use this for setups auto-detect can't read, e.g.
           <code>bin/rails runner 'puts ActiveRecord::Base.connection_db_config.url'</code>.
         </span>
@@ -342,7 +342,7 @@ export default function WorkspaceSettings(props: { workspace: Workspace; onDelet
         <div class="settings-field">
           <span class="settings-label">Run targets (per repo)</span>
           <span class="muted settings-hint">
-            Named commands run in a task's worktree (docs/next 13): JSON array of {'{'}"id", "command", "stop"?, "url"?, "urlCommand"?, "default"?{'}'}. A committed <code>.acorn/config.toml</code> overrides these.
+            Named commands run in a task's worktree: JSON array of {'{'}"id", "command", "stop"?, "url"?, "urlCommand"?, "default"?{'}'}. A committed <code>.acorn/config.toml</code> overrides these.
           </span>
           <For each={props.workspace.repos ?? []}>
             {(r) => <RepoRunTargets owner={r.owner} name={r.name} />}
@@ -361,8 +361,8 @@ export default function WorkspaceSettings(props: { workspace: Workspace; onDelet
   )
 }
 
-// Per-repo run-target JSON editor (docs/next 13 §A) — the DB fallback surface, edited at the
-// workspace level like the worktree scripts. Desktop-only (rides the terminal IPC bridge).
+// Per-repo run-target JSON editor (docs/workflows.md §2) — the DB fallback surface, edited at the
+// workspace level like the worktree scripts. Desktop-only because it uses the main-process runtime.
 function RepoRunTargets(props: { owner: string; name: string }) {
   const api = terminalApi()
   const [row, { refetch }] = createResource(

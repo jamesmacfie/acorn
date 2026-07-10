@@ -6,7 +6,7 @@ import type { AppEnv, SessionUser } from './auth'
 // The single authentication gate for /api routes. Mounted once in createApp() over `/api/*`
 // (after csrf + authMiddleware), it replaces the per-route inline guards. It gates on the
 // resolved principal — either credential kind passes — so internal-token callers (empty
-// GitHub token) work exactly as cookie callers do. See docs/next/security.md §3, §9.1.
+// GitHub token) work exactly as cookie callers do. See docs/security.md §3, §9.1.
 export const requireUser = createMiddleware<AppEnv>(async (c, next) => {
   if (!c.get('principal')) return respondError(c, 401, 'unauthenticated')
   await next()

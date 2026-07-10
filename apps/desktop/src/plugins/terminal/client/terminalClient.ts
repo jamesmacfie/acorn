@@ -1,4 +1,4 @@
-// Typed accessor for the preload's `window.acorn.terminal` bridge (vNext §5). The global is declared
+// Typed accessor for the preload's `window.acorn.terminal` bridge (docs/terminal-and-agents.md). The global is declared
 // here so anything importing it (App's flag check, TerminalPanel) sees the same shape.
 import type { ArchiveOpts, ArchiveResult, CreateOpts, RepoPath, RepoPathResult, ServerMsg, TerminalProfile, TerminalSession, TaskStatus } from '../../../core/shared/terminal'
 import {
@@ -44,15 +44,14 @@ export type TerminalApi = {
     useCheckout(id: string): Promise<{ worktreePath: string; branch: string } | null>
     statuses(): Promise<TaskStatus[]>
   }
-  // Workflows (docs/next 14): defs/start/runs/steps/gate moved to HTTP (workflowClient.ts) in
-  // Phase 3; only the gate/run-done notice PUSH stays on the bridge until the WebSocket lands.
+  // Workflow commands use workflowClient's HTTP routes; notices and live step events use WebSocket.
   workflow: {
-    onNotice(cb: (n: { taskId: string; kind: 'gate' | 'run-done'; title: string }) => void): () => void
+    onNotice(cb: (n: { taskId: string; kind: 'gate' | 'run-done' | 'repo-config-trust'; title: string; action?: 'review-config' }) => void): () => void
     onStepEvent(cb: (event: { runId: string; stepId: string; event: unknown }) => void): () => void
   }
 }
 
-// A committed/user workflow definition as loadWorkflowFiles returns it (docs/next 14 P5): what the
+// A committed/user workflow definition as loadWorkflowFiles returns it (docs/workflows.md): what the
 // palette launches and the settings inspector lists. `source` is the layer it was found in.
 export type WorkflowDefSummary = {
   id: string
@@ -62,7 +61,7 @@ export type WorkflowDefSummary = {
   steps: { name: string; kind?: string }[]
 }
 
-// Renderer-side projections of the workflow rows (docs/next 14).
+// Renderer-side projections of the workflow rows (docs/workflows.md).
 export type WorkflowRunRow = {
   id: string
   taskId: string
@@ -94,7 +93,7 @@ export type WorkflowStepRow = {
   resumeCommand?: string | null
 }
 
-// What the preload `window.acorn.terminal` bridge exposes AFTER Phase 3: only the native folder
+// The preload `window.acorn.terminal` bridge exposes only the native folder
 // picker — a true Electron capability (dialog.showOpenDialog) that can't be HTTP. Its presence is
 // also how the renderer detects desktop mode (terminalApi() → null without it). All request/response
 // verbs are HTTP; all streams (PTY input/output/status, workflow notices) are the WebSocket
@@ -116,7 +115,7 @@ declare global {
       // App quit lifecycle concern collection. Returns an unsubscribe.
       onWillQuit?: (cb: () => boolean | Promise<boolean>) => () => void
       terminal?: TerminalStreamBridge
-      // Browser-preview surface (Phase 9 A): drive the task's main-owned WebContentsView.
+      // Browser-preview surface: drive the task's main-owned WebContentsView.
       preview?: {
         ensure(taskId: string, url: string): Promise<boolean>
         setBounds(taskId: string, rect: { x: number; y: number; width: number; height: number }): void
@@ -136,9 +135,8 @@ const post = <T>(url: string, body?: unknown) =>
 const put = <T>(url: string, body: unknown) =>
   writeJson<T>(url, { method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) })
 
-// The renderer's terminal client is a HYBRID (Phase 3): request/response verbs hit the loopback
-// HTTP routes (server/routes/terminal.ts); the stream verbs (write/attach/onStatus), the native
-// picker, and the workflow-notice push ride the residual preload bridge. Returns null off-desktop
+// The renderer's terminal client composes loopback HTTP for commands, WebSocket for streams, and
+// the residual preload bridge for the native folder picker. Returns null off-desktop
 // (no bridge) exactly as before, so every consumer's `if (!api)` desktop guard is unchanged.
 export const terminalApi = (): TerminalApi | null => {
   const bridge = window.acorn?.terminal

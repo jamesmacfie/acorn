@@ -1,6 +1,9 @@
 # acorn as a plugin platform
 
-**Status:** design proposal · **Date:** 2026-07-07 · **Companion:** [review.md](./review.md)
+> The plugin-oriented architecture is shipped; [plugins.md](../plugins.md) describes current code.
+> This design remains for its forward-looking surfaces and architectural rationale.
+
+**Status:** design proposal · **Date:** 2026-07-07 · **Companion:** the completed architecture review
 
 This doc answers one question: *if everything in acorn were a plugin modifying an
 extendable core, what would that core be, what extension points would it expose,
@@ -12,7 +15,7 @@ entries, context contributions, lifecycle obligations). The parity map in §7
 shows every current feature has a *home*: expressed as a plugin over the
 contribution points, or explicitly kept in core with a reason. The
 *behaviour-level* proof obligation is
-[feature-parity.md](./feature-parity.md) — one checkbox per shipped behaviour.
+[features.md](../features.md) — one checkbox per shipped behaviour.
 
 > **This design spans four files** (split for navigability; section numbers are
 > stable across the set, so a citation like "§4.8" is unambiguous):
@@ -30,7 +33,7 @@ contribution points, or explicitly kept in core with a reason. The
 >   *(integrations §N)*.
 >
 > The build order that turns this design into shipped code is
-> [implementation.md](./implementation.md); this doc is the *target*, that doc
+> the completed implementation plan; this doc is the *target*, that doc
 > is the *route*.
 
 ---
@@ -51,7 +54,7 @@ contribution points, or explicitly kept in core with a reason. The
    fragments coordinated by convention. The plugin unit is the *feature*, not the
    process.
 4. **Declare an agent capability once.** Today one agent verb costs five edit
-   sites (preload, IPC, harness route, bridge, MCP tool — review.md §1d). In the
+   sites (preload, IPC, harness route, bridge, MCP tool — the completed architecture review §1d). In the
    plugin model a tool is declared once and the core *projects* it to MCP, to a
    harness HTTP route, and (optionally) to a typed renderer client.
 5. **Trusted, in-tree, compiled-in.** This is an architecture for *this* codebase,
@@ -103,7 +106,7 @@ deliberately boring: identity, storage, process plumbing, and empty UI sockets.
 - **The data layer**: the TanStack Query client, IndexedDB persistence, the
   `readJson`/`writeJson` client, and the **prefs service** (namespaced key-value
   with hydrate-once/persist semantics — the ordered startup-restore pipeline from
-  review.md §4 becomes a core service plugins register slices into, instead of
+  the completed architecture review §4 becomes a core service plugins register slices into, instead of
   effects hand-ordered in App.tsx). Persisted plugin state goes through
   versioned descriptors/codecs (state §5.1a), not raw `writeJson`.
 - **Registries + the event bus** (§3).
@@ -116,7 +119,7 @@ deliberately boring: identity, storage, process plumbing, and empty UI sockets.
   CSRF/host-guard middleware, the Drizzle/SQLite connection, migrations, the
   prefs routes, and the **sync engine** — the serve-then-revalidate state machine
   (TTL + ETag + atomic delete-then-insert via `db.batch`) extracted once (this is
-  review.md recommendation #2, promoted to a core service that source plugins
+  the completed architecture review recommendation #2, promoted to a core service that source plugins
   configure with resource descriptors, §4.9).
 - The **harness gateway**: tool-route projection, `INTERNAL_TOKEN` auth, the
   single `respond()` error envelope.
@@ -125,7 +128,7 @@ deliberately boring: identity, storage, process plumbing, and empty UI sockets.
 
 ### 2.3 Main-process core
 
-- A real **composition root** (review.md §2): builds the DB, constructs core
+- A real **composition root** (the completed architecture review §2): builds the DB, constructs core
   services, activates plugin `main` parts in dependency order, wires the harness,
   *then* starts the HTTP listener; owns `will-quit` teardown by disposing
   everything it activated, and runs each plugin's registered `reconcile()` on
@@ -136,7 +139,7 @@ deliberately boring: identity, storage, process plumbing, and empty UI sockets.
 - **The worktree service**: `taskWorktree.ts` unchanged — the taskId-as-capability
   model (`resolveTaskCwd`/`resolveInRoot`) is already the best boundary in the
   codebase and becomes the core primitive every plugin gets file access through.
-- **The transport**: per [implementation.md](./implementation.md) decision 1,
+- **The transport**: per the completed implementation plan decision 1,
   the request/response surface between renderer and main collapses onto the
   loopback HTTP server (typed through `shared/api.ts`), with one WebSocket for
   PTY/step streams and a *minimal* hand-typed IPC residue for true Electron-isms
@@ -199,7 +202,7 @@ internals; cross-plugin extension happens through contribution points the
 **Contract:** `activate()` only registers. No I/O, no network, no filesystem —
 first real work happens on first use or first poll tick (§5.2). This is what
 keeps activation cheap as plugins multiply, and it is testable: the plugin
-conformance suite ([testing.md](./testing.md) §4) asserts it.
+conformance suite ([testing.md](../testing.md) §4) asserts it.
 
 ### 3.2 Activation & lifecycle
 
@@ -262,7 +265,7 @@ delivers a consistent frame around inconsistent content:
    (already theme-contributed, §4.13) plus the small widget set every pane
    currently re-invents — list rows, badges, empty states, section headers,
    toolbars, tooltip, and the `QueryGate` loading/error primitive
-   ([ui-state.md](./ui-state.md) §2.5). Today the shared layer is a handful of
+   ([state.md](../state.md) §2.5). Today the shared layer is a handful of
    loose components (`CopyButton`, `UserAvatar`, `Picker`) and consistency is
    single-author discipline; under plugins it must be structural. Plugin
    components compose core primitives and consume core tokens. CSS follows the
@@ -334,9 +337,9 @@ delivers a consistent frame around inconsistent content:
    `diff/model.ts`, `palette/model.ts` — *is* the intra-pane composability
    story, and the contract new panes are held to: logic in a testable model
    module, the component a thin reactive view over it. This is also the Solid
-   mitigation review.md's technology section leans on. The companion rules for
+   mitigation the completed architecture review's technology section leans on. The companion rules for
    how contributed UI *reacts* — failure surfaces, latest-wins refreshes,
-   derive-don't-effect — are [ui-state.md](./ui-state.md) §3 and bind equally.
+   derive-don't-effect — are [state.md](../state.md) §3 and bind equally.
 
 ---
 
@@ -412,7 +415,7 @@ open design question; ⚠ = named hard part (§8).
 > "Settings modal (all pages)") and a row here can pass review while a small
 > contract at a join is dropped. The fine-grained proof obligation —
 > per-behaviour checkboxes with owners and verification methods — is
-> **[feature-parity.md](./feature-parity.md)**; the changeover doesn't begin
+> **[features.md](../features.md)**; the changeover doesn't begin
 > until every row there is owned or explicitly struck as a non-goal.
 
 | Current feature | Plugin | Points used | |
@@ -463,7 +466,7 @@ hard parts below are resolved as described.
 
 **8.1 The github plugin is enormous.** ~60% of the server and the two largest
 client components land in one plugin. That is fine — plugin ≠ small — but it
-means the plugin model alone doesn't fix review.md's DiffView/PullDetail
+means the plugin model alone doesn't fix the completed architecture review's DiffView/PullDetail
 concern-fusion; that decomposition is internal to the github plugin and still
 worth doing. The test of the architecture is not github's size but whether
 *linear* stays small (it does: ~6 contributions) and whether github can be
@@ -477,7 +480,7 @@ overlays, and eviction. This is genuinely intricate (the current implementation
 is subtle for good reasons) but it is *one* plugin's requirement generalized —
 and centralizing it is still better than the module-level `previewWebviews` Map
 with three manual eviction call sites. The `WebContentsView` migration
-([implementation.md](./implementation.md) Phase 9) changes the mechanics —
+(the completed implementation plan Phase 9) changes the mechanics —
 main-owned, bounds-managed — but not the contract: whichever of the two lands
 second gets simpler.
 
@@ -487,7 +490,7 @@ workspace restore must precede task activation, which must precede pane focus;
 (`restore: 'workspace' | 'view' | 'panes'`) rather than pretending slices are
 order-free — otherwise the plugin model just re-scatters today's App.tsx race
 into fifteen plugins. This is the single riskiest piece of core to build; do it
-first and port slices one at a time. ([implementation.md](./implementation.md)
+first and port slices one at a time. (the completed implementation plan
 Phase 6 is this, as its own phase, gated on the smoke suite.)
 
 **8.4 Typing without closed unions.** `PaneId` as a union gives exhaustiveness
@@ -538,7 +541,7 @@ declared rules:
   declared parent column** ([performance.md](./performance.md) §3.5) from the
   registry — one declaration, three artifacts — instead of a comment saying
   "remember to extend this". Task-scoped **note files** (`notes/task/<taskId>/`,
-  [feature-parity.md](./feature-parity.md) §10) are the filesystem parallel: they
+  [features.md](../features.md) §10) are the filesystem parallel: they
   are files, not a scoped SQLite table (unlike `review_notes`), so their cleanup
   rides the same task-deletion cascade as a side effect, not a foreign key.
 - **Workspace config gets a table.** §4.6's workspace config contributions land
@@ -566,7 +569,7 @@ declared rules:
     strings normalize to null, port-mode preview values are validated,
     `setupScriptTrigger` is validated against `'off' | 'created' |
     'terminal'` (null → `'terminal'`), and the existing error codes survive
-    (§16 of [feature-parity.md](./feature-parity.md) — standardize shape,
+    (§16 of [features.md](../features.md) — standardize shape,
     keep vocabulary).
   - **Workspace deletion clears `workspace_config` rows** alongside
     `workspace_projects` — derived from the declared parent lineage above,
@@ -582,25 +585,25 @@ declared rules:
 ## 9. Getting there (order of operations)
 
 This is a direction, not a rewrite. Each step is independently shippable and
-most are already recommended in review.md for non-plugin reasons.
-**[implementation.md](./implementation.md) is the authoritative build order** —
+most are already recommended in the completed architecture review for non-plugin reasons.
+**the completed implementation plan is the authoritative build order** —
 it resequences these steps, resolves the alternatives, and adds gates; the
 mapping is noted per step below.
 
-1. **Registries in place, same code** — pane registry (review.md #5), command
+1. **Registries in place, same code** — pane registry (the completed architecture review #5), command
    registry, keybinding registry, settings-page registry. Hardcoded ladders
    become registry iteration; features still statically imported. This alone
    delivers most of the extensibility win. *(→ implementation Phase 5.)*
-2. **The event bus + composition root** (review.md #4) — kill the global-setter
+2. **The event bus + composition root** (the completed architecture review #4) — kill the global-setter
    wiring, the boot race, the manual eviction trio; add `will-quit`.
    *(→ implementation Phases 1 and 5.)*
-3. **The typed IPC bus** (review.md #3) — *superseded*: implementation.md
+3. **The typed IPC bus** (the completed architecture review #3) — *superseded*: the completed implementation plan
    decision 1 collapses the transport onto loopback HTTP + WS instead
    (Phase 3); the typed bus is the fallback only if that stalls.
 4. **Agent-tool projection** (§4.8) — collapse harness/MCP/IPC into one
    declaration; port notes/memory/run/browser tools onto it.
    *(→ implementation Phase 4.)*
-5. **The sync engine** (review.md #2) — extract, then express github/linear/
+5. **The sync engine** (the completed architecture review #2) — extract, then express github/linear/
    rollbar reads as descriptors. *(→ implementation Phases 2 and 7.)*
 6. **The restore pipeline** (§8.3) — phased core service; port App.tsx effects
    slice by slice. *(→ implementation Phase 6.)*
@@ -640,7 +643,7 @@ later. Neither is planned; both stay purely additive if the seams below hold.
 - **A dynamic loader** — §9 step 8 above.
 - **An external-control principal** — a CLI, an external agent, or a companion
   tool authorized to drive acorn over the loopback surface the transport
-  collapse already builds ([implementation.md](./implementation.md) Phase 3).
+  collapse already builds (the completed implementation plan Phase 3).
   This is *not* a new API: after Phase 3 the whole control surface is loopback
   HTTP behind one guard, so enabling an authorized non-browser caller reduces to
   the guard recognizing a new principal kind — provided the auth guard is

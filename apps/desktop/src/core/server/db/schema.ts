@@ -47,7 +47,10 @@ export const pullRequests = sqliteTable(
     // Staleness is fetchedAt + a route constant; the list ETag lives in sync_state (no per-row home).
     fetchedAt: integer('fetched_at').notNull(),
   },
-  (t) => [primaryKey({ columns: [t.userId, t.repoId, t.number] })],
+  (t) => [
+    primaryKey({ columns: [t.userId, t.repoId, t.number] }),
+    index('pull_requests_user_repo_state_updated_idx').on(t.userId, t.repoId, t.state, t.updatedAt),
+  ],
 )
 
 // --- PR-detail children: mirrored together from the GraphQL composite, replaced wholesale on
@@ -228,7 +231,7 @@ export const prefs = sqliteTable(
   (t) => [primaryKey({ columns: [t.userId, t.key] })],
 )
 
-// Per-user third-party credentials. First-class, MULTI-ROW per provider (docs/workspaces 04): a
+// Per-user third-party credentials. First-class, MULTI-ROW per provider (docs/workspaces-and-tasks.md): a
 // user can connect several Linears / Rollbars, so the key is an opaque `id`, not (userId, provider).
 // `label` disambiguates them in the UI ("Linear – work"). authRef is ENCRYPTED at rest (JWE via
 // SESSION_ENC_KEY, see session.ts encryptSecret) and never leaves the server — same posture as the
@@ -252,7 +255,7 @@ export const integrations = sqliteTable('integrations', {
   updatedAt: integer('updated_at').notNull(),
 })
 
-// Local checkout for a GitHub repo (vNext §7, §9). Machine-scoped, NOT user-scoped: it describes
+// Local checkout for a GitHub repo (docs/workspaces-and-tasks.md). Machine-scoped, NOT user-scoped: it describes
 // *this machine's* filesystem, so there's no userId — the terminal service in the Electron main
 // process reads it outside any GitHub user context. PK is (owner, repo).
 export const repoPaths = sqliteTable(
@@ -262,7 +265,7 @@ export const repoPaths = sqliteTable(
     repo: text('repo').notNull(),
     githubRepoId: integer('github_repo_id'),
     path: text('path').notNull(),
-    // Named run targets (docs/next 13 §A): JSON RunTarget[] — the DB fallback below a committed
+    // Named run targets (docs/workflows.md §2): JSON RunTarget[] — the DB fallback below a committed
     // .acorn/config.toml (parsed by main/runConfig.ts legacyRunTargets). The legacy scalar
     // run_command/dev_port columns were folded into this JSON by migration 0017 and dropped in 0018.
     runTargets: text('run_targets'),
@@ -275,7 +278,22 @@ export const repoPaths = sqliteTable(
   (t) => [primaryKey({ columns: [t.owner, t.repo] })],
 )
 
-// A Workspace is a named GROUP of repos (docs/workspaces) — "Runn", "Acorn". The top-level unit
+// Machine-scoped acknowledgement of repo-authored executable configuration. The hash identifies
+// the exact committed config snapshot; retaining that snapshot lets the next prompt show a diff.
+// Multiple hashes are kept as a small audit trail and make changing back to a previously approved
+// config trusted without another prompt.
+export const configAcks = sqliteTable(
+  'config_acks',
+  {
+    repo: text('repo').notNull(), // owner/name
+    hash: text('hash').notNull(), // sha256 of the repo config/workflow snapshot
+    snapshot: text('snapshot').notNull(), // verbatim grouped source shown to the user
+    ackedAt: integer('acked_at').notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.repo, t.hash] }), index('config_acks_repo_acked_idx').on(t.repo, t.ackedAt)],
+)
+
+// A Workspace is a named GROUP of repos (docs/workspaces-and-tasks.md) — "Runn", "Acorn". The top-level unit
 // the user selects in the top bar. Machine-scoped like repo_paths / tasks (single-user machine).
 // A repo belongs to exactly one workspace (partition) — see workspaceRepos.
 export const workspaces = sqliteTable('workspaces', {
@@ -311,7 +329,7 @@ export const workspaceRepos = sqliteTable(
   (t) => [primaryKey({ columns: [t.repoOwner, t.repoName] })],
 )
 
-// Repos the user has chosen to hide from workspaces (docs/workspaces). Ignoring only inserts a
+// Repos the user has chosen to hide from workspaces (docs/workspaces-and-tasks.md). Ignoring only inserts a
 // row here — the repo KEEPS its workspace_repos membership; readers filter it out of the
 // selector/rail/scoping (workspaces.ts ignoredRepoSet). The onboarding modal still lists it,
 // greyed under its workspace, so it can be un-ignored in place. Bootstrap skips ignored repos so
@@ -329,7 +347,7 @@ export const ignoredRepos = sqliteTable(
 // External projects (Linear/Rollbar/…) linked to a workspace. One project → many repos falls out of
 // the workspace grouping (the project backs every repo in the workspace). `integrationId` records
 // WHICH connection the project belongs to, so a workspace can link projects across several
-// integrations (docs/workspaces 04). Provider-agnostic — generalizes the old
+// integrations (docs/workspaces-and-tasks.md). Provider-agnostic — generalizes the old
 // `workspace_linear_projects` / per-repo prefs key `linear:projects:{owner}/{repo}`.
 export const workspaceProjects = sqliteTable(
   'workspace_projects',
@@ -342,7 +360,7 @@ export const workspaceProjects = sqliteTable(
   (t) => [primaryKey({ columns: [t.workspaceId, t.integrationId, t.externalId] })],
 )
 
-// A Task is the single-repo unit of work (docs/workspaces/03-data-model.md): a repo + branch +
+// A Task is the single-repo unit of work (docs/workspaces-and-tasks.md/03-data-model.md): a repo + branch +
 // optional worktree + optional linked PR + its panes/terminals. Shown as a row in the rail. Its
 // parent Workspace is derived via workspaceRepos on (repoOwner, repoName). Machine-scoped — it owns
 // a local worktree, so no user_id.
@@ -356,7 +374,7 @@ export const tasks = sqliteTable('tasks', {
   worktreePath: text('worktree_path'), // null until a terminal is first opened (Flow C)
   pullNumber: integer('pull_number'), // null for local-first until a PR is inherited (Flow B)
   status: text('status').notNull(), // 'active' | 'archived' | 'cancelled' (workflow child task)
-  parentId: text('parent_id'), // task tree (docs/next 14 P4): set on fan-out children; null = root
+  parentId: text('parent_id'), // task tree (docs/workflows.md): set on fan-out children; null = root
   sort: integer('sort').notNull().default(0), // rail ordering, like pinned_repos.sort
   createdAt: integer('created_at').notNull(),
   updatedAt: integer('updated_at').notNull(),
@@ -398,7 +416,7 @@ export const reviewNotes = sqliteTable('review_notes', {
   createdAt: integer('created_at').notNull(),
 })
 
-// Memory index (docs/next 12): markdown files are the TRUTH (<worktree>/.acorn/memory committed,
+// Memory index (docs/notes-and-memory.md): markdown files are the TRUTH (<worktree>/.acorn/memory committed,
 // ~/.acorn/memory private); this table is a derived index reconciled on change from all active
 // worktrees + primary checkouts. id = content hash (idempotent across N checkouts); conflicts on
 // (scope, repo, name) resolve newest-updatedAt. Machine-scoped. The companion FTS5 virtual table
@@ -422,33 +440,37 @@ export const memories = sqliteTable('memories', {
   accessCount: integer('access_count').notNull().default(0),
 })
 
-// Durable terminal sessions (vNext §7). Machine-scoped like repo_paths. We persist ONLY tmux-backed
+// Durable terminal sessions (docs/workflows.md). Machine-scoped like repo_paths. We persist ONLY tmux-backed
 // sessions: tmux outlives an app restart, so on startup the service reconciles these rows against
 // `tmux list-sessions` and re-attaches the survivors. node-pty sessions die with the process and
-// live only in the in-memory map. No terminal output is ever stored (vNext §8). ponytail: a §7
+// live only in the in-memory map. No terminal output is ever stored (docs/terminal-and-agents.md). ponytail: a §7
 // subset — no pid / last_attached_at (we re-derive liveness from tmux, not a stored pid).
-// Bound to a task (docs/workspaces/03): repo / branch / PR are derived through the
+// Bound to a task (docs/workspaces-and-tasks.md/03): repo / branch / PR are derived through the
 // taskId → tasks join, so the loose repo_owner / repo_name / pull_number columns are gone.
-export const terminalSessions = sqliteTable('terminal_sessions', {
-  id: text('id').primaryKey(),
-  title: text('title').notNull(),
-  kind: text('kind').notNull(), // shell | agent
-  profileId: text('profile_id').notNull(),
-  backend: text('backend').notNull(), // node-pty | tmux (only tmux rows are persisted)
-  status: text('status').notNull(), // running | exited
-  cwd: text('cwd').notNull(),
-  taskId: text('task_id').notNull(), // → tasks.id
-  command: text('command').notNull(),
-  argvJson: text('argv_json').notNull().default('[]'),
-  tmuxSession: text('tmux_session'),
-  cols: integer('cols').notNull(),
-  rows: integer('rows').notNull(),
-  createdAt: integer('created_at').notNull(),
-  exitedAt: integer('exited_at'),
-  exitCode: integer('exit_code'),
-})
+export const terminalSessions = sqliteTable(
+  'terminal_sessions',
+  {
+    id: text('id').primaryKey(),
+    title: text('title').notNull(),
+    kind: text('kind').notNull(), // shell | agent
+    profileId: text('profile_id').notNull(),
+    backend: text('backend').notNull(), // node-pty | tmux (only tmux rows are persisted)
+    status: text('status').notNull(), // running | exited
+    cwd: text('cwd').notNull(),
+    taskId: text('task_id').notNull(), // → tasks.id
+    command: text('command').notNull(),
+    argvJson: text('argv_json').notNull().default('[]'),
+    tmuxSession: text('tmux_session'),
+    cols: integer('cols').notNull(),
+    rows: integer('rows').notNull(),
+    createdAt: integer('created_at').notNull(),
+    exitedAt: integer('exited_at'),
+    exitCode: integer('exit_code'),
+  },
+  (t) => [index('terminal_sessions_task_idx').on(t.taskId)],
+)
 
-// Workflow runs (docs/next 14 P2): the durable checkpoint for the main-process state machine —
+// Workflow runs (docs/workflows.md): the durable checkpoint for the main-process state machine —
 // every transition is persisted so a run survives an app restart (LangGraph-style checkpoint = the
 // rows; reconciliation mirrors the tmux pattern). Machine-scoped like tasks.
 export const workflowRuns = sqliteTable(

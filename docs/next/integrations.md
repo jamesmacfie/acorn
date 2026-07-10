@@ -1,16 +1,20 @@
 # Integration providers — the contract
 
+> The provider contract is shipped; [integrations.md](../integrations.md) is authoritative for
+> current code. This file remains for OAuth refresh, webhooks, dynamic uninstall, and multi-secret
+> provider design.
+
 **Status:** design contract · **Date:** 2026-07-07 · **Companions:**
 [contribution-points.md](./contribution-points.md) §4.2/§4.6/§4.7/§4.9/§4.14,
-[extensibility.md](./extensibility.md) §8.5, [implementation.md](./implementation.md)
-Phase 7 + data-model track, [feature-parity.md](./feature-parity.md) §6,
-[security.md](./security.md) §8, [testing.md](./testing.md) §2.6/§4
+[extensibility.md](./extensibility.md) §8.5, the completed implementation plan
+Phase 7 + data-model track, [features.md](../features.md) §6,
+[security.md](./security.md) §8, [testing.md](../testing.md) §2.6/§4
 
 Citations elsewhere in the set use *(integrations §N)*.
 
 Integration behaviour was previously distributed across six docs as scattered
 notes — a source contribution here, a context-staleness rule there, a
-`Provider` interface sketch in review.md. That was enough to prove Linear and
+`Provider` interface sketch in the completed architecture review. That was enough to prove Linear and
 Rollbar have homes; it was not enough to build the next provider against. This
 doc is the single normative contract: what an integration provider *is*, what
 it must declare, and what core does with the declarations.
@@ -687,7 +691,7 @@ Budgets live on the descriptor so they are greppable data like the TTLs
 
 ## 18. Conformance suite
 
-Rides the plugin conformance suite ([testing.md](./testing.md) §4),
+Rides the plugin conformance suite ([testing.md](../testing.md) §4),
 table-driven off the provider descriptor — the goal is not mocking upstream
 APIs but proving every provider obeys the app contract. For each registered
 provider:

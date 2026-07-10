@@ -1,4 +1,4 @@
-// Canonical note shapes (docs/next/feature-parity.md §10), shared across the process boundary:
+// Canonical note shapes (docs/notes-and-memory.md), shared across the process boundary:
 // main/notes.ts (the store) and client/features/notes/notesClient.ts both import from here, so the
 // two sides can't drift. Kinds are scratch|plan|finding|handoff ONLY — anchored annotations are
 // review_notes rows (README decision 16), never note kinds.

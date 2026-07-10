@@ -1,4 +1,4 @@
-// Layered run/config source (docs/next 13 §B) — the merged run-target config plus lifecycle
+// Layered run/config source (docs/workflows.md §2) — the merged run-target config plus lifecycle
 // scripts/copy/layouts: ./.acorn/config.toml (committed, team-shared) → ~/.acorn/config.toml
 // (personal defaults) → DB columns (fallback only). Returns a typed, validated config PLUS
 // structured parse errors — a broken file is surfaced (palette row, 13 §B), never silently
@@ -34,6 +34,9 @@ export type RepoConfig = {
   copy: string[]
   layouts: LayoutRecipe[]
   errors: ConfigError[]
+  // Resolved target ids whose winning layer is the committed repo config. Execution uses this
+  // provenance to apply the trust gate without penalising user/DB-authored targets.
+  repoTargetIds: string[]
 }
 
 // The DB columns the file layers override. The `dev` run button comes from the per-workspace dev
@@ -214,5 +217,6 @@ export function loadRepoConfig(repoDir: string | null, userConfigDir: string | n
     copy: repo?.copy ?? user?.copy ?? [],
     layouts: [...layouts.values()],
     errors,
+    repoTargetIds: [...(repo?.run.keys() ?? [])],
   }
 }
