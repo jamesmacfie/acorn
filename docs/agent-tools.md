@@ -3,7 +3,7 @@
 Every agent capability — read the task context, read/write notes, search/propose memory, read git,
 drive the preview browser, control run targets — is declared **once** as an `AgentToolContribution`
 and **projected** to each surface that needs it. The registry
-(`apps/desktop/src/server/agentTools/registry.ts`) is the single source of truth for a tool's name,
+(`apps/desktop/src/core/server/agentTools/registry.ts`) is the single source of truth for a tool's name,
 description, input schema, risk tier, availability and handler. Adding a tool is one contribution
 object, not edits spread across MCP code, a harness route, preload and settings.
 
@@ -31,7 +31,7 @@ A handler returns **domain data or throws a `ToolError`** (`not_found` / `bad_re
 It never knows which surface invoked it — if a handler inspects the caller's surface, the boundary is
 wrong. `ctx` carries only invocation-scoped identity (`taskId`, resolved `userLogin`, and the agent
 `sessionId` used to stamp write provenance); every domain dependency is closed over when the
-registry is built in the main process (`apps/desktop/src/main/agentToolsWiring.ts`).
+registry is built in the main process (`apps/desktop/src/app/main/agentToolsWiring.ts`).
 
 ## 2. Projections
 
@@ -39,8 +39,8 @@ The contribution is projected to three surfaces plus a permission filter:
 
 | Projection | Where | How |
 | --- | --- | --- |
-| **MCP** | `apps/desktop/src/mcp/server.ts` | The MCP process is a generic proxy: it fetches `GET /api/tasks/:id/tools` (the manifest) and serves `tools/list`, then proxies each `tools/call` to `POST /api/tasks/:id/tools/:name`. It holds no tool definitions. |
-| **Harness HTTP** | `apps/desktop/src/server/routes/agentTools.ts` | `GET /:id/tools` and `POST /:id/tools/:name` require the internal principal. Schemas use the MCP SDK's draft-07 projection; calls validate with the contribution's Zod schema. |
+| **MCP** | `apps/desktop/src/core/mcp/server.ts` | The MCP process is a generic proxy: it fetches `GET /api/tasks/:id/tools` (the manifest) and serves `tools/list`, then proxies each `tools/call` to `POST /api/tasks/:id/tools/:name`. It holds no tool definitions. |
+| **Harness HTTP** | `apps/desktop/src/core/server/routes/agentTools.ts` | `GET /:id/tools` and `POST /:id/tools/:name` require the internal principal. Schemas use the MCP SDK's draft-07 projection; calls validate with the contribution's Zod schema. |
 | **Renderer** | `POST /:id/renderer-tools/:name` | Cookie-authenticated, and returns `404` unless the contribution opts in with `exposeToRenderer`. `client/agentToolsClient.ts` is the thin client. |
 | **Permissions** | prefs slice + `isToolPermitted` | Applied uniformly by every projection (below). |
 
@@ -71,7 +71,7 @@ disabled.
 ## 4. Context sections
 
 `task_context` (and the push-path context block and the context pane) all derive from ONE section
-registry, `apps/desktop/src/server/agentTools/contextSections.ts`. Each section (`pr`, `issues`,
+registry, `apps/desktop/src/core/server/agentTools/contextSections.ts`. Each section (`pr`, `issues`,
 `notes`, `memory`) declares its label, default, enforced budget, assembler, compact formatter and
 optional jump. The serialized `TaskContext.sections` drives both the renderer tray and
 `formatContextBlock`, so neither keeps an id-specific switch. Product semantics live in one place:
@@ -95,19 +95,19 @@ optional jump. The serialized `TaskContext.sections` drives both the renderer tr
 
 ## 6. Adding a tool
 
-Add one `AgentToolContribution` to the array in `apps/desktop/src/main/agentToolsWiring.ts` (close
+Add one `AgentToolContribution` to the array in `apps/desktop/src/app/main/agentToolsWiring.ts` (close
 over whatever dep it needs). It appears in the MCP manifest, the harness route, the permissions page
 and the catalog automatically. No other file changes.
 
 ## Source
 
-- Registry + permission filter: `apps/desktop/src/server/agentTools/registry.ts`
-- Contributions (handlers, deps): `apps/desktop/src/main/agentToolsWiring.ts`
-- Harness HTTP projection: `apps/desktop/src/server/routes/agentTools.ts`
-- Thin renderer client: `apps/desktop/src/client/agentToolsClient.ts`
-- MCP projection: `apps/desktop/src/mcp/server.ts` (client: `src/mcp/api.ts`)
-- Context sections: `apps/desktop/src/server/agentTools/contextSections.ts`, wired by `apps/desktop/src/main/contextSectionsWiring.ts`
-- Permissions UI: `apps/desktop/src/client/features/settings/AgentToolsSettings.tsx`
+- Registry + permission filter: `apps/desktop/src/core/server/agentTools/registry.ts`
+- Contributions (handlers, deps): `apps/desktop/src/app/main/agentToolsWiring.ts`
+- Harness HTTP projection: `apps/desktop/src/core/server/routes/agentTools.ts`
+- Thin renderer client: `apps/desktop/src/core/client/agentToolsClient.ts`
+- MCP projection: `apps/desktop/src/core/mcp/server.ts` (client: `src/core/mcp/api.ts`)
+- Context sections: `apps/desktop/src/core/server/agentTools/contextSections.ts`, wired by `apps/desktop/src/app/main/contextSectionsWiring.ts`
+- Permissions UI: `apps/desktop/src/core/client/settings/AgentToolsSettings.tsx`
 
 See also: [mcp.md](./mcp.md) · [notes-and-memory.md](./notes-and-memory.md) ·
 [api-reference.md](./api-reference.md)

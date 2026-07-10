@@ -22,7 +22,7 @@ below). Configs/prefs that still name unknown pane ids are tolerated: `isPaneId`
 wherever layouts are parsed (`normalizeLayout`, `recipeToLayout`).
 
 There is **no split-tree** — panes open side by side in equal-width slots, nothing more.
-`apps/desktop/src/client/features/tasks/layout.ts:4` marks this as a deliberate simplification
+`apps/desktop/src/core/client/tasks/layout.ts:4` marks this as a deliberate simplification
 (`ponytail: a flat panes[] row, not a LayoutNode tree`).
 
 ### The reducer
@@ -266,7 +266,7 @@ webview reaches `dom-ready`, `PreviewPane` binds its `webContents` id to the mai
 (`browser_navigate`, `browser_click`, `browser_snapshot`, …) — see [mcp.md](./mcp.md). One webview
 surface, two entry points (human chrome vs. agent driving).
 
-Source: `features/preview/PreviewPane.tsx`, `src/mcp/server.ts`.
+Source: `features/preview/PreviewPane.tsx`, `src/core/mcp/server.ts`.
 
 ---
 
@@ -298,11 +298,11 @@ detail in [terminal-and-agents.md](./terminal-and-agents.md).
 
 ## Source
 
-- Model & reducer: `apps/desktop/src/client/features/tasks/layout.ts`
-- Layout state / dispatch / persistence: `apps/desktop/src/client/features/tasks/tasks.ts`
-- Task view & switcher: `apps/desktop/src/client/features/tasks/TaskView.tsx`
-- Pane shortcuts: `apps/desktop/src/client/features/tasks/paneShortcuts.ts`
-- Recipes: `apps/desktop/src/client/features/tasks/recipes.ts`
+- Model & reducer: `apps/desktop/src/core/client/tasks/layout.ts`
+- Layout state / dispatch / persistence: `apps/desktop/src/core/client/tasks/tasks.ts`
+- Task view & switcher: `apps/desktop/src/core/client/tasks/TaskView.tsx`
+- Pane shortcuts: `apps/desktop/src/core/client/tasks/paneShortcuts.ts`
+- Recipes: `apps/desktop/src/plugins/terminal/client/recipes.ts`
 - Pane bodies: `apps/desktop/src/client/features/{pullDetail,diff,changes,notes,context,editor,integrations,memory,preview,agents,checks}/`
 
 See also: [frontend.md](./frontend.md) · [diff-rendering.md](./diff-rendering.md) ·

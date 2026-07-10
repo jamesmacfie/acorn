@@ -10,7 +10,7 @@ backdrop click-to-close. There is no central dispatcher.
 
 ## 1. Command palette (⌘K)
 
-The palette is split into a **pure model** (`apps/desktop/src/client/features/palette/model.ts`, unit
+The palette is split into a **pure model** (`apps/desktop/src/core/client/palette/model.ts`, unit
 tested) and a **thin overlay** (`CommandPalette.tsx`) that is glue over it. The model does two things:
 compose the item list from data sources, and fuzzy-filter it against the query.
 
@@ -204,7 +204,7 @@ active terminal tab respectively. If neither owns focus, nothing closes (this is
 
 ## 4. Pane shortcuts (Task view)
 
-`apps/desktop/src/client/features/tasks/paneShortcuts.ts` defines **⌘⇧-chords** that switch panes
+`apps/desktop/src/core/client/tasks/paneShortcuts.ts` defines **⌘⇧-chords** that switch panes
 inside the Task view. Most dispatch a layout `show`; `agents` and `terminal` are toggles, not layout
 panes. Plain ⌘<letter> collides too readily with the OS/browser/Monaco, so the switcher lives on the
 shifted layer. Defaults (`PANE_SHORTCUT_DEFAULTS`):
@@ -259,11 +259,11 @@ always matches what's bound.
 ---
 
 **Source:** `apps/desktop/src/client/features/palette/{model.ts,overlay.ts,CommandPalette.tsx,FilePalette.tsx}`
-· `apps/desktop/src/client/Shortcuts.tsx` · `apps/desktop/src/client/changedFiles.ts` ·
-`apps/desktop/src/client/lib/isTypingTarget.ts` ·
-`apps/desktop/src/client/features/tasks/paneShortcuts.ts`
-· `apps/desktop/src/client/features/tabs/TabRail.tsx` ·
-`apps/desktop/src/client/features/settings/SettingsModal.tsx` · main-process close-pane
+· `apps/desktop/src/core/client/Shortcuts.tsx` · `apps/desktop/src/plugins/github/client/changedFiles.ts` ·
+`apps/desktop/src/core/client/lib/isTypingTarget.ts` ·
+`apps/desktop/src/core/client/tasks/paneShortcuts.ts`
+· `apps/desktop/src/core/client/tabs/TabRail.tsx` ·
+`apps/desktop/src/core/client/settings/SettingsModal.tsx` · main-process close-pane
 `apps/desktop/src/main/{electron.ts,preload.ts}`.
 
 **See also:** [frontend.md](./frontend.md) · [panes.md](./panes.md) ·

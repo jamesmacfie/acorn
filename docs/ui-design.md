@@ -2,7 +2,7 @@
 
 acorn's visual language is deliberately minimal and information-dense: a flat, monospaced, three-pane shell where every pixel of chrome earns its place. There are no shadows except on floating popovers, no gradients, no rounded panes — just 1px dividers, square panes, and a small set of muted greys with two semantic accents (green for additions, red for deletions). The aim is a tool that disappears so the review can foreground.
 
-The SPA imports `apps/desktop/src/client/styles.css` at boot. That file is now a manifest of feature-owned stylesheets under `apps/desktop/src/client/styles/`:
+The SPA imports `apps/desktop/src/core/client/styles.css` at boot. That file is now a manifest of feature-owned stylesheets under `apps/desktop/src/client/styles/`:
 
 - `tokens-layout.css` — design tokens, reset, shell grid, pane containment.
 - `pull-list.css` — PR tabs, filters, and virtualized list rows.

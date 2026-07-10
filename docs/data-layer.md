@@ -20,8 +20,8 @@ The schema is three classes of table:
   worktrees, tasks, terminals, notes, memory). No `userId` — they exist outside any GitHub user
   context. acorn owns them.
 
-Source: `apps/desktop/src/server/db/schema.ts` (fully commented — the source of truth for every
-column), `apps/desktop/src/server/db/index.ts`, `apps/desktop/src/server/db/resourceKeys.ts`,
+Source: `apps/desktop/src/core/server/db/schema.ts` (fully commented — the source of truth for every
+column), `apps/desktop/src/core/server/db/index.ts`, `apps/desktop/src/core/server/db/resourceKeys.ts`,
 `apps/desktop/migrations/`.
 
 ## Drizzle client
@@ -31,7 +31,7 @@ export const getDb = (env: Env): AppDatabase => env.DB
 ```
 
 `env.DB` is the better-sqlite3 Drizzle client, built once at startup in
-`apps/desktop/src/main/bindings.ts` (with an emulated `.batch()`, since better-sqlite3 has no native
+`apps/desktop/src/core/main/bindings.ts` (with an emulated `.batch()`, since better-sqlite3 has no native
 batch — see [electron.md](./electron.md) §4c). `getDb(env)` just hands it back; routes import it
 directly.
 
@@ -376,7 +376,7 @@ Drizzle relationship.
 
 Durable terminal sessions. PK opaque `id`. Machine-scoped. **Desktop-only** — the terminal drawer
 requires the preload bridge and is always on in the Electron app (`capabilities()`,
-`apps/desktop/src/client/features/capabilities.ts`).
+`apps/desktop/src/core/client/capabilities.ts`).
 Only **tmux-backed** sessions are persisted (tmux outlives an app restart; node-pty sessions die with
 the process and live only in the in-memory map). No terminal output is ever stored. Bound to a task —
 repo/branch/PR are derived through the `taskId → tasks` join.
@@ -451,8 +451,8 @@ Steps carry a first-class working context (`worktreePath`); structured output is
 
 There are no foreign-key constraints in SQLite here — relationships are by convention (shared key
 columns) and enforced in application code (e.g. `cascadeDeleteIntegration` in
-`src/server/db/cascade.ts` for disconnecting an integration). Accordingly `openDb`
-(`src/main/bindings.ts`) sets no `foreign_keys` pragma — with no declared `references()` it would
+`src/core/server/db/cascade.ts` for disconnecting an integration). Accordingly `openDb`
+(`src/core/main/bindings.ts`) sets no `foreign_keys` pragma — with no declared `references()` it would
 be a no-op implying enforcement this doc explicitly says doesn't exist. The important joins:
 
 **GitHub mirror hierarchy.** `repos (userId, id)` ← `pull_requests (userId, repoId, number)` ← the
@@ -474,7 +474,7 @@ repos(userId, id)
 `pr_files.sha` is the immutability key into the on-disk BLOBS cache — the patch body lives there,
 never in the row (the old always-null `pr_files.patch` column is dropped).
 
-**`sync_state` resource keys** (`apps/desktop/src/server/db/resourceKeys.ts`) gate the collections
+**`sync_state` resource keys** (`apps/desktop/src/core/server/db/resourceKeys.ts`) gate the collections
 that have no natural per-row freshness home:
 
 | Key | Builder | Gates |
@@ -569,7 +569,7 @@ Exact TTL values and the ETag/304 flow are in [caching](./caching.md).
 `pr_files` rows carry only file metadata and the blob `sha`. The actual patch/file bodies —
 immutable, addressable by sha — live in the on-disk `BLOBS` directory
 (`apps/desktop/.acorn/blobs/`), not in SQLite, under two key prefixes owned by
-`src/server/blobs.ts`: `patch:<sha>` (written by `routes/prMirror.ts`) and `filebody:<sha>` for
+`src/core/server/blobs.ts`: `patch:<sha>` (written by `routes/prMirror.ts`) and `filebody:<sha>` for
 full file bodies (`routes/pullBlob.ts`). This keeps
 the DB small and lets identical blobs across PRs share one cached body. (The old
 `if (!repoRow.private)` public/private guard around blob caching has been **removed** — every body
@@ -583,7 +583,7 @@ connects to a database.
 ```ts
 export default defineConfig({
   dialect: 'sqlite',
-  schema: './src/server/db/schema.ts',
+  schema: './src/core/server/db/schema.ts',
   out: './migrations',
 })
 ```
@@ -591,7 +591,7 @@ export default defineConfig({
 Workflow:
 
 ```bash
-# 1. edit apps/desktop/src/server/db/schema.ts
+# 1. edit apps/desktop/src/core/server/db/schema.ts
 pnpm --filter @acorn/desktop db:generate   # drizzle-kit generate → new SQL in apps/desktop/migrations/
 pnpm --filter @acorn/desktop db:migrate    # tsx scripts/migrate.ts → apply (also runs on app startup)
 ```
@@ -600,7 +600,7 @@ After changing the **bindings** shape, update the hand-written `Env` in `apps/de
 
 Migrations live in `apps/desktop/migrations/` (`0000_*.sql` … `0015_*.sql` at time of writing, plus a
 `meta/` snapshot dir) and are applied by `drizzle-orm/better-sqlite3/migrator` — automatically on app
-startup (`openDb` in `apps/desktop/src/main/bindings.ts`) and via `db:migrate`.
+startup (`openDb` in `apps/desktop/src/core/main/bindings.ts`) and via `db:migrate`.
 
 **Gotchas:**
 

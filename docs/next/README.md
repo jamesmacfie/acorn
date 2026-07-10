@@ -1,5 +1,8 @@
 # docs/next — the next version
 
+**Status:** active migration record · **Phase 10:** paused pending zero cross-feature boundary
+violations, parity verification, and documentation graduation.
+
 Design and execution docs for acorn's next major iteration: opening every
 extension seam, collapsing the transport, and making the app a plugin platform
 — while staying shippable at every step. The goals, in order: **maintainable,

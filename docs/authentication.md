@@ -11,10 +11,10 @@ server exchanges the OAuth code for an access token and seals it into an
 encrypted cookie. **The token never reaches the browser** — only public profile fields
 do.
 
-Source: `apps/desktop/src/server/routes/auth.ts`,
-`apps/desktop/src/server/session.ts`,
-`apps/desktop/src/server/middleware/auth.ts`,
-`apps/desktop/src/server/routes/me.ts`.
+Source: `apps/desktop/src/core/server/routes/auth.ts`,
+`apps/desktop/src/core/server/session.ts`,
+`apps/desktop/src/core/server/middleware/auth.ts`,
+`apps/desktop/src/core/server/routes/me.ts`.
 
 ## OAuth web flow
 
@@ -128,7 +128,7 @@ apply; that branch has been removed.
 The acorn MCP server calls the API over loopback and holds no browser cookie.
 It authenticates with the **`x-acorn-internal: <INTERNAL_TOKEN>`** header
 instead. `INTERNAL_TOKEN` is a fresh `randomUUID()` minted per app run in
-`apps/desktop/src/main/bindings.ts` and injected into task terminal sessions as
+`apps/desktop/src/core/main/bindings.ts` and injected into task terminal sessions as
 `ACORN_API_TOKEN`, so agent-spawned processes inherit it.
 
 `internalUser` (`middleware/auth.ts`) resolves the identity as the machine's
@@ -176,7 +176,7 @@ A revoked or expired GitHub token surfaces as a `401` / `reauth` /
 Query error handler matches that and bounces to the OAuth login:
 
 ```ts
-// apps/desktop/src/client/index.tsx
+// apps/desktop/src/app/client/index.tsx
 const onError = (err: unknown) => {
   const msg = err instanceof Error ? err.message : ''
   if (/\b401\b|reauth|unauthenticated/.test(msg))
