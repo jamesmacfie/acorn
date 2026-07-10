@@ -17,14 +17,15 @@ export default function FilePalette() {
   const api = editorApi()
 
   const palette = createOverlayPalette({
+    id: 'files',
+    title: 'Go to file',
+    toggleChord: 'meta+p',
+    active: () => !!activeTaskId(),
     count: () => matches().length,
     onPick: (index) => {
       const path = matches()[index]
       if (path) pick(path)
     },
-    // Monaco binds no ⌘P, so the keydown reaches window; preventDefault blocks the browser print
-    // dialog. A no-op (no consume) with no active task.
-    isToggle: (e) => (e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'p' && !!activeTaskId(),
   })
 
   const [files] = createResource(
@@ -55,7 +56,7 @@ export default function FilePalette() {
   return (
     <Show when={palette.open()}>
       <div class="overlay-backdrop" onClick={palette.close}>
-        <div class="overlay palette" role="dialog" aria-modal="true" onClick={(e) => e.stopPropagation()}>
+        <div class="overlay palette" role="dialog" aria-modal="true" onKeyDown={palette.onKeyDown} onClick={(e) => e.stopPropagation()}>
           <input
             ref={palette.setInputRef}
             class="palette-input"

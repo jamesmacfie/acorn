@@ -11,7 +11,8 @@ import { workspaceForRepo } from './features/workspaces/activeWorkspace'
 import { createTask } from './mutations'
 import { scanLinearRefs } from './features/integrations/scanLinearRefs'
 import { activateTaskSignals } from './features/tasks/activate'
-import { isTypingTarget } from './lib/isTypingTarget'
+import { registerCommands } from './registries/commands'
+import { registerKeybindings } from './registries/keybindings'
 
 // Left-pane PR list for the routed repo. Access checks live on the server; this pane only needs
 // route params before it can ask for the repo's PRs. The list is virtualized in its own scroll
@@ -55,19 +56,24 @@ export default function PullList() {
   // Client-side text filter over the loaded tab (title / author / #number).
   const shown = createMemo(() => filterPulls(list(), filter()))
 
-  // j/k move to the next/prev PR in the list (docs/ui-design.md keyboard nav). Ignore while typing.
-  const onKey = (e: KeyboardEvent) => {
-    if (e.key !== 'j' && e.key !== 'k') return
-    if (isTypingTarget(e.target)) return
+  const moveSelection = (direction: 1 | -1) => {
     const list = shown()
     if (!list.length) return
     const i = list.findIndex((p) => String(p.number) === params.number)
-    const next = e.key === 'j' ? Math.min((i < 0 ? -1 : i) + 1, list.length - 1) : Math.max((i < 0 ? 1 : i) - 1, 0)
-    e.preventDefault()
+    const next = direction === 1 ? Math.min((i < 0 ? -1 : i) + 1, list.length - 1) : Math.max((i < 0 ? 1 : i) - 1, 0)
     navigate(`/${params.owner}/${params.repo}/${list[next].number}`)
   }
-  onMount(() => window.addEventListener('keydown', onKey))
-  onCleanup(() => window.removeEventListener('keydown', onKey))
+  onMount(() => {
+    const commands = registerCommands([
+      { id: 'github.pull.next', title: 'Next pull request', category: 'navigation', run: () => moveSelection(1) },
+      { id: 'github.pull.previous', title: 'Previous pull request', category: 'navigation', run: () => moveSelection(-1) },
+    ])
+    const bindings = registerKeybindings([
+      { id: 'github.pull.next', command: 'github.pull.next', description: 'Next pull request', category: 'Pull requests', defaultChord: 'j', when: 'typing-exempt' },
+      { id: 'github.pull.previous', command: 'github.pull.previous', description: 'Previous pull request', category: 'Pull requests', defaultChord: 'k', when: 'typing-exempt' },
+    ])
+    onCleanup(() => { bindings.dispose(); commands.dispose() })
+  })
 
   // Flow A (docs/workspaces 02): promote a PR into a task. origin github-pr, branch = headRef,
   // pullNumber. Linear ids are seeded from a warmed detail body if we have one (best-effort — the

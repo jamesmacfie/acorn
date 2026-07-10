@@ -15,13 +15,14 @@ export default function WorkspacePalette() {
   const workspaces = createQuery(() => workspacesOptions(true))
 
   const palette = createOverlayPalette({
+    id: 'workspaces',
+    title: 'Switch workspace',
+    toggleChord: 'meta+l',
     count: () => matches().length,
     onPick: (index) => {
       const w = matches()[index]
       if (w) pick(w)
     },
-    // ⌘L (browser address-bar focus, meaningless in Electron) — preventDefault in the hook blocks it.
-    isToggle: (e) => (e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'l',
   })
 
   const matches = createMemo<Workspace[]>(() => {
@@ -48,7 +49,7 @@ export default function WorkspacePalette() {
   return (
     <Show when={palette.open()}>
       <div class="overlay-backdrop" onClick={palette.close}>
-        <div class="overlay palette" role="dialog" aria-modal="true" onClick={(e) => e.stopPropagation()}>
+        <div class="overlay palette" role="dialog" aria-modal="true" onKeyDown={palette.onKeyDown} onClick={(e) => e.stopPropagation()}>
           <input
             ref={palette.setInputRef}
             class="palette-input"

@@ -7,7 +7,6 @@ import { applyRailOrder, isPinned, moveTask, parseRailOrder, pinTask, serializeR
 import { checksState } from '../../displayMeta'
 import { activeTaskId, selectedSource, setActiveTaskId, setSelectedSource, type SourceId } from '../tasks/tasks'
 import { activateTaskSignals, pathForTask } from '../tasks/activate'
-import { evictPreviewWebview } from '../preview/PreviewPane'
 import { capabilities } from '../capabilities'
 import { availableSources } from './sources'
 import { taskStatus } from '../tasks/taskStatus'
@@ -17,6 +16,10 @@ import { workspaceForRepo } from '../workspaces/activeWorkspace'
 import { resolveWorkspaceColor } from '../../../shared/workspaceIdentity'
 import { dedupeBranch, slugifyBranch } from '../../../shared/branch'
 import { terminalApi } from '../terminal/terminalClient'
+import { registerCommands } from '../../registries/commands'
+import { registerKeybindings } from '../../registries/keybindings'
+import { clientEvents } from '../../registries/clientEvents'
+import { confirmWillEvent } from '../../registries/willPhase'
 import './tabrail.css'
 
 // The Tasks zone of the left rail (docs/workspaces). Rows are real Task entities (not path
@@ -107,41 +110,42 @@ export default function TabRail() {
     navigate(pathForTask(w))
   }
 
-  // ⌘1–9 / Ctrl1–9: jump to the Nth task in the rail (docs/command-palette-and-shortcuts.md). Mirrors browser-tab
-  // switching; the order is exactly what's rendered (workspace-scoped + rail order). ⌘0 selects the
-  // GitHub source (the left rail's browse view). A meta/ctrl combo, so it's safe even while typing.
   onMount(() => {
-    const onKey = (e: KeyboardEvent) => {
-      // ⌘⇧N: new task in the active workspace — same flow as the rail's + button.
-      if ((e.metaKey || e.ctrlKey) && e.shiftKey && !e.altKey && e.code === 'KeyN') {
-        e.preventDefault()
-        openNew()
-        return
-      }
-      if (!(e.metaKey || e.ctrlKey) || e.altKey || e.shiftKey) return
-      if (e.key === '0') {
-        e.preventDefault()
+    const numbered = Array.from({ length: 9 }, (_, index) => ({
+      id: `task.activate.${index + 1}`,
+      title: `Activate task ${index + 1}`,
+      category: 'navigation' as const,
+      when: () => visibleTasks().length > index,
+      run: () => {
+        const task = visibleTasks()[index]
+        if (!task) return
         setMenuId(null)
-        setSelectedSource('github')
-        return
-      }
-      if (e.key < '1' || e.key > '9') return
-      const t = visibleTasks()[Number(e.key) - 1]
-      if (!t) return
-      e.preventDefault()
-      setMenuId(null)
-      activateTaskSignals(t)
-      navigate(pathForTask(t))
-    }
-    window.addEventListener('keydown', onKey)
-    onCleanup(() => window.removeEventListener('keydown', onKey))
+        activateTaskSignals(task)
+        navigate(pathForTask(task))
+      },
+    }))
+    const commands = registerCommands([
+      { id: 'task.create', title: 'New task', category: 'task', palette: true, run: openNew },
+      { id: 'source.github.open', title: 'Go to GitHub in the left rail', category: 'navigation', run: () => { setMenuId(null); setSelectedSource('github') } },
+      ...numbered,
+    ])
+    const bindings = registerKeybindings([
+      { id: 'task.create', command: 'task.create', description: 'New task', category: 'Tasks', defaultChord: 'meta+shift+n', when: 'global' },
+      { id: 'source.github.open', command: 'source.github.open', description: 'Go to GitHub in the left rail', category: 'Tasks', defaultChord: 'meta+0', when: 'global' },
+      ...numbered.map((command, index) => ({
+        id: command.id, command: command.id, description: command.title, category: 'Tasks',
+        defaultChord: `meta+${index + 1}`, when: 'global' as const,
+        active: () => visibleTasks().length > index,
+      })),
+    ])
+    onCleanup(() => { bindings.dispose(); commands.dispose() })
   })
 
   function openNew() {
     setMenuId(null)
     const repos = activeWorkspace()?.repos ?? []
     if (!repos.length) {
-      window.alert('This workspace has no repos yet. Add one in the workspace setup first.')
+      setArchiveErr('This workspace has no repos yet. Add one in the workspace setup first.')
       return
     }
     // Default the repo to the current one if it's in this workspace, else the first.
@@ -190,26 +194,25 @@ export default function TabRail() {
   // ALWAYS runs through the guarded main-process teardown (main decides "no worktree → plain flip",
   // refuses while sessions run or the worktree is dirty); the plain HTTP flip exists only for the
   // bridge-absent browser dev build (capabilities()).
-  const [archiving, setArchiving] = createSignal<Task | null>(null)
   const [archiveErr, setArchiveErr] = createSignal('')
 
-  function openArchive(w: Task) {
+  async function openArchive(w: Task) {
     setMenuId(null)
     setArchiveErr('')
-    setArchiving(w)
+    const confirmed = await confirmWillEvent({
+      kind: 'task:archive', payload: { taskId: w.id }, title: 'Archive task', actionLabel: 'Archive task',
+    })
+    if (confirmed) await archive(w)
   }
 
-  async function confirmArchive() {
-    const w = archiving()
-    if (!w) return
+  async function archive(w: Task) {
     if (capabilities().terminal) {
       const res = await terminalApi()!.task.archive(w.id)
       if (!res.ok) return setArchiveErr(res.output ? `${res.reason}\n${res.output}` : res.reason)
     } else {
       await archiveTask(w.id)
     }
-    evictPreviewWebview(w.id) // drop the archived task's kept-alive <webview>
-    setArchiving(null)
+    clientEvents.emit('runtime:task-archived', { taskId: w.id })
     if (activeTaskId() === w.id) {
       setActiveTaskId(null)
       setSelectedSource('github') // archived the active task → fall back to the GitHub browse
@@ -332,25 +335,7 @@ export default function TabRail() {
       <button type="button" class="tabrail-add" data-tip="New task" data-tip-sub="Start a task on a new branch" aria-label="New task" onClick={openNew}>
         +
       </button>
-      <Show when={archiving()}>
-        {(w) => (
-          <div class="overlay-backdrop" onClick={() => setArchiving(null)}>
-            <div class="overlay" role="dialog" aria-modal="true" onClick={(e) => e.stopPropagation()}>
-              <div class="overlay-title">Archive task</div>
-              <div class="overlay-body">
-                <p class="muted">Archive “{w().title}” and remove it from the rail?</p>
-                <Show when={archiveErr()}>
-                  <div class="action-error" style={{ 'white-space': 'pre-wrap' }}>{archiveErr()}</div>
-                </Show>
-                <div class="close-actions">
-                  <button type="button" class="overlay-btn" onClick={() => setArchiving(null)}>Cancel</button>
-                  <button type="button" class="overlay-btn close-confirm" onClick={() => void confirmArchive()}>Archive</button>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-      </Show>
+      <Show when={archiveErr()}><div class="tabrail-action-error action-error" role="alert">{archiveErr()}</div></Show>
       <Show when={draft()}>
         {(d) => (
           <div class="overlay-backdrop" onClick={() => setDraft(null)}>

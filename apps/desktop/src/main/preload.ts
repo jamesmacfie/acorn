@@ -12,6 +12,13 @@ contextBridge.exposeInMainWorld('acorn', {
     ipcRenderer.on('acorn:close-pane', listener)
     return () => ipcRenderer.removeListener('acorn:close-pane', listener)
   },
+  onWillQuit: (cb: () => boolean | Promise<boolean>) => {
+    const listener = () => {
+      void Promise.resolve(cb()).then((approved) => ipcRenderer.send('acorn:quit-response', approved)).catch(() => ipcRenderer.send('acorn:quit-response', false))
+    }
+    ipcRenderer.on('acorn:will-quit', listener)
+    return () => ipcRenderer.removeListener('acorn:will-quit', listener)
+  },
   // The terminal residue after Phase 3: ONLY the native folder picker (dialog.showOpenDialog — a
   // true Electron capability, and the renderer's desktop-mode marker). Every request/response verb
   // is HTTP; every stream (PTY input/output/status, workflow notices) is the WebSocket (wsClient.ts).

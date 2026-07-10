@@ -39,6 +39,12 @@
   padding: var(--pane-pad);
 }
 .overlay-body .muted { margin: 0; }
+.will-concerns { display: flex; flex-direction: column; gap: 8px; margin: 0 0 16px; padding: 0; list-style: none; }
+.will-concerns li { display: grid; grid-template-columns: auto 1fr auto; gap: 8px; align-items: baseline; }
+.will-concerns li[data-severity='danger'] { color: var(--del-marker); }
+.query-gate-loading, .query-gate-error { padding: var(--pane-pad); color: var(--text-muted); }
+.query-gate-error { display: flex; align-items: center; gap: 8px; color: var(--del-marker); }
+.ui-form-field { display: flex; flex-direction: column; gap: 5px; }
 
 /* Standard modal button — same look as the app's action buttons (.pr-actions button etc.). */
 .overlay-btn {

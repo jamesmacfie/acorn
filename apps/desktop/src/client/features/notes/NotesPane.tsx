@@ -1,8 +1,9 @@
-import { createEffect, createResource, createSignal, For, onCleanup, Show } from 'solid-js'
+import { createEffect, createResource, createSignal, For, onCleanup, onMount, Show } from 'solid-js'
 import type { Task, Workspace } from '../../queries'
 import { debounce } from '../../autosave'
 import { renderMarkdown } from '../integrations/markdown'
-import { clearNoteOpen, notesApi, noteToOpen, type NoteLocation, type NoteScope, type NoteSummary } from './notesClient'
+import { notesApi, type NoteLocation, type NoteScope, type NoteSummary } from './notesClient'
+import { clientEvents, consumePaneIntent, type PaneIntent } from '../../registries/clientEvents'
 import './notes.css'
 
 // The Notes pane (docs/notes-and-memory.md): .md notes at task, workspace and global scopes. They
@@ -25,6 +26,8 @@ export default function NotesPane(props: { task: Task; workspace: Workspace | nu
   const [showTask, setShowTask] = createSignal(true)
   const [showAgent, setShowAgent] = createSignal(true)
   const [showGlobal, setShowGlobal] = createSignal(true)
+  const [actionError, setActionError] = createSignal('')
+  const [deleteArmed, setDeleteArmed] = createSignal('')
 
   const [taskList, { refetch: refetchTask }] = createResource(
     () => props.task.id,
@@ -66,21 +69,26 @@ export default function NotesPane(props: { task: Task; workspace: Workspace | nu
   const scheduleSave = debounce(() => void save(), 1500)
   onCleanup(() => scheduleSave.flush())
 
-  // Consume the Context pane's declared note jump, including its owning storage scope.
-  createEffect(() => {
-    const target = noteToOpen()
-    if (!target || !api || (target.scope === 'workspace' && !wsId())) return
+  const applyIntent = (intent: PaneIntent | undefined) => {
+    if (!intent || intent.kind !== 'notes:open' || !api || (intent.scope === 'workspace' && !wsId())) return
     setPreview(false)
-    void open(target.scope, target.slug)
-    clearNoteOpen()
+    void open(intent.scope, intent.slug)
+  }
+  onMount(() => {
+    const off = clientEvents.on('presentation:pane-intent', ({ taskId, paneId, intent }) => {
+      if (taskId === props.task.id && paneId === 'notes') applyIntent(intent)
+    })
+    onCleanup(off)
   })
+  createEffect(() => applyIntent(consumePaneIntent(props.task.id, 'notes')))
 
   async function open(scope: NoteScope, slug: string) {
     const location = locationFor(scope)
     if (!api || !location) return
     scheduleSave.flush() // persist the note we're leaving before loading the next
     const res = await api.read(location, slug)
-    if ('error' in res) return window.alert(res.error)
+    if ('error' in res) return setActionError(res.error)
+    setActionError('')
     setSelected({ scope, slug })
     setBody(res.body)
   }
@@ -90,7 +98,8 @@ export default function NotesPane(props: { task: Task; workspace: Workspace | nu
     const location = sel && locationFor(sel.scope)
     if (!api || !sel || !location) return
     const res = await api.write(location, sel.slug, body())
-    if ('error' in res) return window.alert(res.error)
+    if ('error' in res) return setActionError(res.error)
+    setActionError('')
   }
 
   async function create() {
@@ -98,7 +107,8 @@ export default function NotesPane(props: { task: Task; workspace: Workspace | nu
     const location = locationFor(scope)
     if (!api || !location || !newTitle().trim()) return
     const res = await api.create(location, newTitle().trim()) // humans create scratch only
-    if ('error' in res) return window.alert(res.error)
+    if ('error' in res) return setActionError(res.error)
+    setActionError('')
     setNewTitle('')
     await refetchScope(scope)
     await open(scope, res.slug)
@@ -108,26 +118,36 @@ export default function NotesPane(props: { task: Task; workspace: Workspace | nu
     const location = locationFor(scope)
     if (!api || !location) return
     const res = await api.setIncluded(location, slug, included)
-    if ('error' in res) return window.alert(res.error)
+    if ('error' in res) return setActionError(res.error)
+    setActionError('')
     await refetchScope(scope)
   }
 
   async function remove(scope: NoteScope, slug: string) {
     const location = locationFor(scope)
     if (!api || !location) return
-    if (!window.confirm(`Delete note “${slug}”?`)) return
+    const key = `${scope}:${slug}`
+    if (deleteArmed() !== key) {
+      setDeleteArmed(key)
+      setActionError(`Click delete again to remove “${slug}”.`)
+      return
+    }
+    setDeleteArmed('')
+    setActionError('')
     if (isActive(scope, slug)) {
       scheduleSave.cancel() // don't resurrect the note we're deleting
       setSelected(null)
       setBody('')
     }
-    await api.remove(location, slug)
+    const result = await api.remove(location, slug)
+    if ('error' in result) return setActionError(result.error)
     await refetchScope(scope)
   }
 
   return (
     <section class="pane notes-pane">
       <div class="section-header">Notes — {props.workspace?.name ?? 'workspace'}</div>
+      <Show when={actionError()}><div class="action-error" role="alert">{actionError()}</div></Show>
       <Show when={api} fallback={<div class="editor-empty muted">Notes need the desktop app.</div>}>
         <div class="notes-body">
           <div class="notes-list">

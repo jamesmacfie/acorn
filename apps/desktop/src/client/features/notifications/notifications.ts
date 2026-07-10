@@ -6,8 +6,9 @@
 import { createSignal } from 'solid-js'
 import type { TerminalSession } from '../../../shared/terminal'
 import { wsOnNotice } from '../terminal/wsClient'
+import { noticeKindContribution } from '../../registries/notices'
 
-export type NoticeKind = 'finished' | 'needs-input' | 'exited' | 'error' | 'gate' | 'run-done'
+export type NoticeKind = string
 
 export type Notice = {
   id: string
@@ -102,6 +103,7 @@ export function shouldToast(
   notice: Pick<Notice, 'taskId' | 'kind' | 'at'>,
   opts: { focused: boolean; lastToastAt: Map<string, number>; cooldownMs?: number },
 ): boolean {
+  if (noticeKindContribution(notice.kind)?.toast === false) return false
   if (opts.focused) return false
   const key = `${notice.taskId}:${notice.kind}`
   const last = opts.lastToastAt.get(key)
@@ -109,6 +111,10 @@ export function shouldToast(
   if (last != null && notice.at - last < cooldown) return false
   opts.lastToastAt.set(key, notice.at)
   return true
+}
+
+export function pushBackgroundError(taskId: string, title: string, detail?: string): Notice {
+  return pushNotice({ taskId, kind: 'background-error', title, detail, at: Date.now() })
 }
 
 // Workflow notices (docs/next 14, docs/terminal-and-agents.md): main broadcasts gate/run-done events over the stream

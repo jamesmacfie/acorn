@@ -1,15 +1,7 @@
 import { createSignal, For, onCleanup, onMount, Show } from 'solid-js'
-import { markAllRead, markRead, notices, unreadCount, type Notice } from './notifications'
+import { markAllRead, markRead, notices, unreadCount } from './notifications'
+import { noticeKindContribution } from '../../registries/notices'
 import './notifications.css'
-
-const KIND_GLYPH: Record<Notice['kind'], string> = {
-  finished: '●',
-  'needs-input': '‼',
-  exited: '○',
-  error: '✕',
-  gate: '⛔',
-  'run-done': '▸',
-}
 
 const relTime = (at: number): string => {
   const s = Math.max(0, Math.round((Date.now() - at) / 1000))
@@ -58,8 +50,8 @@ export default function NotificationBell(props: { onSelectTask: (taskId: string)
                       props.onSelectTask(n.taskId)
                     }}
                   >
-                    <span class="notify-glyph" classList={{ 'notify-warn': n.kind === 'needs-input' || n.kind === 'error' || n.kind === 'gate' }}>
-                      {KIND_GLYPH[n.kind]}
+                    <span class="notify-glyph" classList={{ 'notify-warn': noticeKindContribution(n.kind)?.severity !== 'info' }}>
+                      {noticeKindContribution(n.kind)?.glyph ?? '•'}
                     </span>
                     <span class="notify-title">{n.title}</span>
                     <Show when={n.detail}><span class="notify-detail muted">{n.detail}</span></Show>

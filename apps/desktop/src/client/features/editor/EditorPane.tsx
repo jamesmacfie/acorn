@@ -7,7 +7,8 @@ import { editorApi, type EditorEntry } from './editorClient'
 import { formatFileReference, sendReferenceToAgent } from '../agent/reference'
 import { isAppDark, token, watchTheme } from '../terminal/theme'
 import { onClosePaneWithin } from '../../lib/onClosePaneWithin'
-import { activeFile, clearEditorReveal, editorActivate, editorClose, editorOpen, editorPromote, editorSetDirty, openFiles, pendingEditorReveal } from './editorState'
+import { activeFile, editorActivate, editorClose, editorOpen, editorPromote, editorSetDirty, openFiles } from './editorState'
+import { clientEvents, consumePaneIntent, type PaneIntent } from '../../registries/clientEvents'
 import './editor.css'
 
 // Minimal filename → Monaco language id. Anything unmapped falls back to plaintext (still editable,
@@ -56,6 +57,7 @@ export default function EditorPane(props: { task: Task }) {
   const api = editorApi()
   const [root, setRoot] = createSignal<string | null | undefined>(undefined) // undefined = loading
   const [saveErr, setSaveErr] = createSignal('')
+  const [pendingReveal, setPendingReveal] = createSignal<{ path: string; line: number } | null>(null)
 
   let host: HTMLDivElement | undefined
   let editor: monaco.editor.IStandaloneCodeEditor | undefined
@@ -154,14 +156,27 @@ export default function EditorPane(props: { task: Task }) {
   // Consume a pending find-in-files reveal for the just-shown file: scroll to the match line and put
   // the cursor there. One-shot — cleared once applied so it doesn't re-fire on the next tab switch.
   function maybeReveal(relPath: string) {
-    const r = pendingEditorReveal()
-    if (!editor || !r || r.taskId !== props.task.id || r.path !== relPath) return
+    const r = pendingReveal()
+    if (!editor || !r || r.path !== relPath) return
     const line = Math.max(1, r.line)
     editor.revealLineInCenter(line)
     editor.setPosition({ lineNumber: line, column: 1 })
     editor.focus()
-    clearEditorReveal()
+    setPendingReveal(null)
   }
+
+  const applyPaneIntent = (intent: PaneIntent | undefined) => {
+    if (!intent || intent.kind !== 'editor:reveal') return
+    setPendingReveal({ path: intent.path, line: intent.line })
+    if (currentPath === intent.path) maybeReveal(intent.path)
+  }
+  onMount(() => {
+    const off = clientEvents.on('presentation:pane-intent', ({ taskId, paneId, intent }) => {
+      if (taskId === props.task.id && paneId === 'editor') applyPaneIntent(intent)
+    })
+    onCleanup(off)
+  })
+  createEffect(() => applyPaneIntent(consumePaneIntent(props.task.id, 'editor')))
 
   function openPath(relPath: string, ephemeral: boolean) {
     editorOpen(props.task.id, relPath, ephemeral) // the active() effect swaps the surface
@@ -217,14 +232,6 @@ export default function EditorPane(props: { task: Task }) {
     }, { defer: true }),
   )
 
-  // A reveal request for the file that's ALREADY current: show() won't re-run (editorOpen didn't
-  // change active), so apply it here. The show() path covers the case where the file has to load.
-  createEffect(
-    on(pendingEditorReveal, (r) => {
-      if (r && currentPath && r.taskId === props.task.id && r.path === currentPath) maybeReveal(currentPath)
-    }, { defer: true }),
-  )
-
   return (
     <section ref={paneRef} class="pane editor-pane" style={{ 'grid-column': '1 / 3' }}>
       <Show when={root() !== undefined} fallback={<div class="editor-empty muted">Loading…</div>}>
@@ -264,7 +271,8 @@ export default function EditorPane(props: { task: Task }) {
                         const sel = editor?.getSelection()
                         const ref = sel && !sel.isEmpty() ? formatFileReference(p, sel.startLineNumber, sel.endLineNumber) : formatFileReference(p)
                         void sendReferenceToAgent(props.task.id, ref).then((r) => {
-                          if (!r.ok && r.reason) window.alert(r.reason)
+                          if (!r.ok && r.reason) setSaveErr(r.reason)
+                          else setSaveErr('')
                         })
                       }}
                     >→ agent</button>

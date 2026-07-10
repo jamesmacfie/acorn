@@ -6,7 +6,7 @@ import { checksState, FAILED_STATUSES, fileStatusMeta, formatRelativeTime, summa
 import { requestFileScroll, routeKey } from './fileNavigation'
 import Picker from './Picker'
 import CopyButton from './CopyButton'
-import { integrationsOptions, linearIssuesOptions, mentionsOptions, pullDetailOptions, pullPrefixKey, pullsPrefixKey, repoLabelsOptions, reposOptions, type Label } from './queries'
+import { integrationsOptions, linearIssuesOptions, mentionsOptions, pullDetailOptions, pullPrefixKey, pullsPrefixKey, repoLabelsOptions, reposOptions, type Label, type Task } from './queries'
 import MentionTextarea from './MentionTextarea'
 import { addComment, addLabel, closePr, disableAutoMerge, enableAutoMerge, mergePr, removeLabel, removeReviewer, reopenPr, rerunFailed, requestReviewer, setDraft, setViewed, submitReview } from './mutations'
 import { UserAvatar } from './UserAvatar'
@@ -51,20 +51,22 @@ const rememberOpen = (key: string) => (el: HTMLDetailsElement) => {
 
 // Mid (Navigator) pane: PR header + description + changed-files + checks + conversation.
 // Bodies are GitHub-sanitized bodyHTML, rendered via innerHTML (docs/ui-design.md).
-export default function PullDetail() {
-  const params = useParams()
+export default function PullDetail(props: { task?: Task } = {}) {
+  // A contributed pane is task-scoped and must render without a Router. The route-owned browse
+  // surface still uses params, so only acquire router context for that variant.
+  const params = props.task ? null : useParams()
   const qc = useQueryClient()
   const repos = createQuery(() => reposOptions(true))
-  const repoKnown = () => !!repos.data?.some((r) => r.owner === params.owner && r.name === params.repo)
-  const o = () => params.owner ?? ''
-  const r = () => params.repo ?? ''
-  const n = () => params.number ?? ''
-  const hasRepoParams = () => !!params.owner && !!params.repo
-  const hasPullParams = () => hasRepoParams() && !!params.number
+  const o = () => props.task?.repoOwner ?? params?.owner ?? ''
+  const r = () => props.task?.repoName ?? params?.repo ?? ''
+  const n = () => (props.task?.pullNumber != null ? String(props.task.pullNumber) : params?.number ?? '')
+  const repoKnown = () => !!repos.data?.some((repo) => repo.owner === o() && repo.name === r())
+  const hasRepoParams = () => !!o() && !!r()
+  const hasPullParams = () => hasRepoParams() && !!n()
   const detail = createQuery(() => pullDetailOptions(o(), r(), n(), hasPullParams()))
   // Changed files + `?file=` selection via the shared hook, so the finder, [ / ] cycling, and
   // this file list all agree on one file order/source.
-  const changedFiles = useChangedFiles(() => (hasPullParams() ? { owner: o(), repo: r(), number: n() } : null))
+  const changedFiles = useChangedFiles(() => (hasPullParams() ? { owner: o(), repo: r(), number: n() } : null), { router: !props.task })
   const mentionsQuery = createQuery(() => mentionsOptions(o(), r(), hasRepoParams()))
   const repoLabels = createQuery(() => repoLabelsOptions(o(), r(), hasRepoParams()))
   const mentionsList = () => mentionsQuery.data ?? []
@@ -172,7 +174,7 @@ export default function PullDetail() {
   }
 
   return (
-    <Show when={params.number} fallback={<p class="placeholder">Select a PR.</p>}>
+    <Show when={n()} fallback={<p class="placeholder">Select a PR.</p>}>
       <Show when={repoKnown() || !repos.data} fallback={<p class="placeholder">Not found.</p>}>
       <Show when={detail.data?.pull} fallback={<p class="placeholder">{detail.isError ? 'Not found.' : 'Loading…'}</p>}>
         {(pull) => (

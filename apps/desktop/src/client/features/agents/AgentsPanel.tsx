@@ -29,6 +29,7 @@ export default function AgentsPanel(props: { task: Task; onClose: () => void }) 
   const api = terminalApi()
   const [selected, setSelected] = createSignal<string | null>(null)
   const [launcherOpen, setLauncherOpen] = createSignal(false)
+  const [actionError, setActionError] = createSignal('')
 
   const [workflowData, { refetch }] = createResource(
     () => props.task.id,
@@ -71,7 +72,8 @@ export default function AgentsPanel(props: { task: Task; onClose: () => void }) 
       return
     }
     const resume = resumeCommandFor(row.step)
-    if (!resume) return window.alert('This step has no resumable session.')
+    if (!resume) return setActionError('This step has no resumable session.')
+    setActionError('')
     await api.create({ taskId: props.task.id, profileId: row.step.profileId ?? 'claude-code', command: resume, title: `⏎ ${row.step.name}` })
     await refreshSessions()
     setTerminalOpen(props.task.id, true)
@@ -91,6 +93,7 @@ export default function AgentsPanel(props: { task: Task; onClose: () => void }) 
           <button type="button" class="overlay-btn" onClick={() => setLauncherOpen(!launcherOpen())}>+ New agent</button>
           <button type="button" class="agents-close" title="Close" onClick={props.onClose}>✕</button>
         </div>
+        <Show when={actionError()}><div class="action-error" role="alert">{actionError()}</div></Show>
         <Show when={launcherOpen()}>
           <div class="agents-launcher">
             <For each={profiles() ?? []}>
@@ -174,4 +177,3 @@ export default function AgentsPanel(props: { task: Task; onClose: () => void }) 
     </Portal>
   )
 }
-

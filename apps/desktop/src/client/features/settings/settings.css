@@ -127,3 +127,6 @@
 .mcp-server-status.mcp-invalid { color: var(--del-marker); }
 .mcp-server-cmd { max-width: 40ch; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; font-family: var(--font-mono); }
 .mcp-server-env { font-family: var(--font-mono); }
+.shortcut-reset { margin-left: 8px; padding: 0; border: 0; background: none; color: var(--text-faint); cursor: pointer; font: inherit; font-size: var(--fs-sm); }
+.shortcut-reset:hover { color: var(--text); text-decoration: underline; }
+.shortcut-conflict { border-color: var(--del-marker); }

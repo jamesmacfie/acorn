@@ -155,6 +155,7 @@
 .close-check input { accent-color: var(--accent); cursor: pointer; }
 .close-actions { display: flex; justify-content: flex-end; gap: 10px; }
 .close-confirm { color: var(--del-marker); border-color: var(--del-marker); }
+.task-run-error { position: absolute; left: 12px; bottom: 12px; z-index: 15; max-width: min(620px, 70vw); display: flex; align-items: center; gap: 8px; padding: 8px 10px; background: var(--bg); border: 1px solid var(--del-marker); }
 
 /* Linear Source browse (LinearBrowse.tsx): a thin list of linked tickets. */
 .linear-browse { display: flex; flex-direction: column; overflow: hidden; }
@@ -206,23 +207,26 @@
   white-space: nowrap;
 }
 
-/* Layout: an equal-width flex row of open panes + the fixed switcher rail (above). A slot divides
-   from the next with a rule; ⌘/ctrl-click a switcher icon adds a pane to the right. */
+/* Registry-driven flat pane row. Relative weights are persisted by pane id; dividers own the gap
+   so resize remains a two-neighbour operation. */
 .panes.panes-workspace.task-layout,
 .app.left-collapsed .panes.panes-workspace.task-layout {
   display: flex;
 }
-.task-slot { position: relative; flex: 1 1 0; display: flex; min-width: 0; min-height: 0; overflow: hidden; }
-.task-slot + .task-slot { border-left: 1px solid var(--border); }
+.task-pane-row { flex: 1 1 auto; display: flex; min-width: 0; min-height: 0; overflow-x: auto; overflow-y: hidden; }
+.task-pane-row.maximized { overflow: hidden; }
+.task-slot { position: relative; flex: 1 1 0; display: flex; min-height: 0; overflow: hidden; outline: none; }
+.task-slot:focus-visible { box-shadow: inset 0 0 0 1px var(--accent); }
 .task-slot > .pane { flex: 1; min-width: 0; }
-.task-slot-pr > .pane-mid { flex: 0 0 clamp(280px, 20vw, 430px); }
-.task-slot-pr > .pane-right { flex: 1; }
+.pr-pane-grid { flex: 1; display: flex; min-width: 0; min-height: 0; }
+.pr-pane-grid > .pane-mid { flex: 0 0 clamp(280px, 20vw, 430px); }
+.pr-pane-grid > .pane-right { flex: 1; min-width: 0; }
+.pane-divider { position: relative; z-index: 6; flex: 0 0 5px; margin: 0 -2px; cursor: col-resize; touch-action: none; outline: none; }
+.pane-divider::after { content: ''; position: absolute; inset: 0 2px; background: var(--border); }
+.pane-divider:hover::after, .pane-divider:focus-visible::after { background: var(--accent); }
+.pane-slot-actions { position: absolute; top: 4px; right: 4px; z-index: 7; display: flex; gap: 2px; }
 /* Close button, top-right of each slot (only rendered when more than one pane is open). */
-.pane-close-btn {
-  position: absolute;
-  top: 4px;
-  right: 4px;
-  z-index: 5;
+.pane-close-btn, .pane-pin-btn {
   width: 22px;
   height: 22px;
   padding: 0;
@@ -239,6 +243,9 @@
   cursor: pointer;
 }
 .pane-close-btn:hover { opacity: 1; background: var(--bg-hover); color: var(--del-marker); }
+.pane-pin-btn:hover, .pane-pin-btn.active { opacity: 1; background: var(--bg-hover); color: var(--accent); }
+.contribution-failed { align-items: center; justify-content: center; gap: 8px; }
+.contribution-unavailable { flex: 1; }
 
 /* Rollbar pane + browse (docs/integrations.md). */
 .rollbar-pane { display: flex; flex-direction: column; overflow-y: auto; }

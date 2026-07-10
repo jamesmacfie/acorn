@@ -1,4 +1,4 @@
-import { app, BrowserWindow, dialog, shell } from 'electron'
+import { app, BrowserWindow, dialog, ipcMain, shell } from 'electron'
 import { join } from 'node:path'
 import { bootstrap } from './bootstrap'
 import { ACORN_PORT, devDataDir } from './server'
@@ -25,6 +25,26 @@ try {
 if (!app.requestSingleInstanceLock()) app.quit()
 
 let mainWindow: BrowserWindow | null = null
+let quitApproved = false
+let quitPromptPending = false
+
+// Renderer will-phase: Cmd-Q asks the client event service to collect concerns, then replies. Once
+// approved, app.quit() re-enters with the guard open and bootstrap's ordered will-quit disposal runs.
+app.on('before-quit', (event) => {
+  if (quitApproved) return
+  const win = mainWindow
+  if (!win || win.isDestroyed()) return
+  event.preventDefault()
+  if (quitPromptPending) return
+  quitPromptPending = true
+  win.webContents.send('acorn:will-quit')
+})
+ipcMain.on('acorn:quit-response', (_event, approved: boolean) => {
+  quitPromptPending = false
+  if (!approved) return
+  quitApproved = true
+  app.quit()
+})
 
 // The renderer logs in by navigating to /auth/login, which 302s to github.com. The main window
 // is locked to the loopback origin, so we intercept that and run the whole OAuth dance in a

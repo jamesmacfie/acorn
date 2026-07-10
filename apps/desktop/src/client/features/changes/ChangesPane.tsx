@@ -23,6 +23,8 @@ import './changes.css'
 export default function ChangesPane(props: { task: Task }) {
   const api = terminalApi()
   const [selectedKey, setSelectedKey] = createSignal<string | null>(null)
+  const [actionError, setActionError] = createSignal('')
+  const [discardArmed, setDiscardArmed] = createSignal('')
 
   const [changes, { refetch }] = createResource(
     () => props.task.id,
@@ -69,7 +71,8 @@ export default function ChangesPane(props: { task: Task }) {
   // "Add file/line to agent" (docs/panes.md): drop a path[:line] draft into the agent composer.
   async function sendRef(ref: string) {
     const res = await sendReferenceToAgent(props.task.id, ref)
-    if (!res.ok && res.reason) window.alert(res.reason)
+    if (!res.ok && res.reason) setActionError(res.reason)
+    else setActionError('')
   }
 
   // Review notes (docs/panes.md): inline annotations on the local diff. Created via the shared
@@ -109,24 +112,37 @@ export default function ChangesPane(props: { task: Task }) {
   const [commitMsg, setCommitMsg] = createSignal('')
   async function gitAction(fn: () => Promise<{ ok: boolean; reason?: string }>) {
     const res = await fn()
-    if (!res.ok && res.reason) window.alert(res.reason)
+    if (!res.ok && res.reason) setActionError(res.reason)
+    else setActionError('')
     await refetch()
   }
   async function discard(path: string, untracked: boolean) {
     if (!api) return
-    if (!window.confirm(`Discard changes to ${path}? This cannot be undone.`)) return
+    const key = `file:${path}`
+    if (discardArmed() !== key) {
+      setDiscardArmed(key)
+      setActionError(`Click discard again to permanently discard changes to ${path}.`)
+      return
+    }
+    setDiscardArmed('')
     await gitAction(() => localGitApi.discard(props.task.id, path, untracked))
   }
   // Bulk toolbar actions (docs/panes.md): whole working tree at once. Discard-all is destructive → confirm.
   async function discardAll() {
     if (!api) return
-    if (!window.confirm('Discard ALL changes, including untracked files? This cannot be undone.')) return
+    if (discardArmed() !== 'all') {
+      setDiscardArmed('all')
+      setActionError('Click discard all again to permanently discard all changes, including untracked files.')
+      return
+    }
+    setDiscardArmed('')
     await gitAction(() => localGitApi.discardAll(props.task.id))
   }
   async function commit() {
     if (!api || !commitMsg().trim()) return
     const res = await localGitApi.commit(props.task.id, commitMsg())
-    if (!res.ok) return window.alert(res.reason ?? 'Commit failed.')
+    if (!res.ok) return setActionError(res.reason ?? 'Commit failed.')
+    setActionError('')
     setCommitMsg('')
     await refetch()
   }
@@ -141,7 +157,7 @@ export default function ChangesPane(props: { task: Task }) {
     const res = await localGitApi.push(props.task.id)
     setPushing(false)
     if (res.ok) setPushMsg('Pushed')
-    else window.alert(res.reason ?? 'Push failed.')
+    else setActionError(res.reason ?? 'Push failed.')
   }
 
   const notesForRow = (r: CodeRow): ReviewNote[] => {
@@ -187,6 +203,7 @@ export default function ChangesPane(props: { task: Task }) {
         <Show when={sendMsg()}>
           <span class="muted">{sendMsg()}</span>
         </Show>
+        <Show when={actionError()}><span class="action-error" role="alert">{actionError()}</span></Show>
       </div>
       <div class="changes-body">
         <div class="changes-list">

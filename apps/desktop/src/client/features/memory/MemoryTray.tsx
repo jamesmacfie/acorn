@@ -16,6 +16,7 @@ export default function MemoryTray(props: { task: Task; onChanged: () => void })
     { initialValue: [] },
   )
   const [propEdits, setPropEdits] = createSignal<Record<string, string>>({})
+  const [proposalError, setProposalError] = createSignal('')
 
   async function resolveProposal(id: string, approved: boolean) {
     const m = memoryApi()
@@ -27,7 +28,8 @@ export default function MemoryTray(props: { task: Task; onChanged: () => void })
       approved,
       approved && p && editedDesc && editedDesc !== p.description ? { name: p.name, type: p.type, description: editedDesc, body: p.body } : undefined,
     )
-    if (!res.ok && res.reason) window.alert(res.reason)
+    if (!res.ok && res.reason) setProposalError(res.reason)
+    else setProposalError('')
     await refetchProposals()
     props.onChanged()
   }
@@ -62,6 +64,7 @@ export default function MemoryTray(props: { task: Task; onChanged: () => void })
 
   return (
     <>
+      <Show when={proposalError()}><div class="action-error" role="alert">{proposalError()}</div></Show>
       <Show when={(proposals() ?? []).length}>
         <div class="context-tray-proposals">
           <span class="muted">Memory proposals (auto-generated — review before they land):</span>

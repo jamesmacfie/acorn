@@ -1,17 +1,20 @@
-// value → label for the Appearance theme pickers. Must list exactly the themes
-// styles/tokens-layout.css defines ('light' is the :root default; every other value has a
-// `:root[data-theme="…"]` block) — themes.test.ts guards the two against drifting.
-export const THEMES: [string, string][] = [
-  ['light', 'Light'],
-  ['dark', 'Dark'],
-  ['solarized-light', 'Solarized Light'],
-  ['solarized-dark', 'Solarized Dark'],
-  ['monokai', 'Monokai'],
-  ['nord', 'Nord'],
-  ['catppuccin-latte', 'Catppuccin Latte'],
-  ['catppuccin-frappe', 'Catppuccin Frappé'],
-  ['catppuccin-macchiato', 'Catppuccin Macchiato'],
-  ['catppuccin-mocha', 'Catppuccin Mocha'],
-  ['one-dark', 'One Dark'],
-  ['dracula', 'Dracula'],
+import { themeContributions, themeRegistry, type ThemeContribution } from '../../registries/themes'
+
+const builtInThemes: ThemeContribution[] = [
+  { id: 'light', label: 'Light' },
+  { id: 'dark', label: 'Dark' },
+  { id: 'solarized-light', label: 'Solarized Light' },
+  { id: 'solarized-dark', label: 'Solarized Dark' },
+  { id: 'monokai', label: 'Monokai' },
+  { id: 'nord', label: 'Nord' },
+  { id: 'catppuccin-latte', label: 'Catppuccin Latte' },
+  { id: 'catppuccin-frappe', label: 'Catppuccin Frappé' },
+  { id: 'catppuccin-macchiato', label: 'Catppuccin Macchiato' },
+  { id: 'catppuccin-mocha', label: 'Catppuccin Mocha' },
+  { id: 'one-dark', label: 'One Dark' },
+  { id: 'dracula', label: 'Dracula' },
 ]
+
+if (!themeRegistry.entries().length) for (const theme of builtInThemes) themeRegistry.register(theme)
+
+export const THEMES: [string, string][] = themeContributions().map((theme) => [theme.id, theme.label])

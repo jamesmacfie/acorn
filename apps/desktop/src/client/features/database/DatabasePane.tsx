@@ -49,6 +49,7 @@ export default function DatabasePane(props: { task: Task }) {
   const [activeRow, setActiveRow] = createSignal<number | null>(null)
   const [inserting, setInserting] = createSignal(false)
   const [busy, setBusy] = createSignal(false)
+  const [deleteArmed, setDeleteArmed] = createSignal(false)
 
   let editorHost: HTMLDivElement | undefined
   let editor: monaco.editor.IStandaloneCodeEditor | undefined
@@ -256,7 +257,7 @@ export default function DatabasePane(props: { task: Task }) {
             table={resultTable()}
             meta={columns()}
             busy={busy()}
-            onClose={() => setActiveRow(null)}
+            onClose={() => { setActiveRow(null); setDeleteArmed(false) }}
             onSave={async (edits) => {
               const t = resultTable()
               if (!t || !api) return
@@ -277,7 +278,12 @@ export default function DatabasePane(props: { task: Task }) {
             onDelete={async () => {
               const t = resultTable()
               if (!t || !api) return
-              if (!window.confirm('Delete this row?')) return
+              if (!deleteArmed()) {
+                setDeleteArmed(true)
+                setError('Click Delete again to permanently remove this row.')
+                return
+              }
+              setDeleteArmed(false)
               const pkMeta = columns().filter((c) => c.isPk)
               const pk = Object.fromEntries(pkMeta.map((c) => [c.name, result()!.rows[activeRow()!][result()!.columns.indexOf(c.name)]]))
               setBusy(true)
