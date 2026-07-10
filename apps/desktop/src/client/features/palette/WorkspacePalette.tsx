@@ -49,7 +49,7 @@ export default function WorkspacePalette() {
   return (
     <Show when={palette.open()}>
       <div class="overlay-backdrop" onClick={palette.close}>
-        <div class="overlay palette" role="dialog" aria-modal="true" onKeyDown={palette.onKeyDown} onClick={(e) => e.stopPropagation()}>
+        <div class="overlay palette" role="dialog" aria-modal="true" onKeyDown={palette.onKeyDown} onMouseDown={palette.onDialogMouseDown} onClick={(e) => e.stopPropagation()}>
           <input
             ref={palette.setInputRef}
             class="palette-input"

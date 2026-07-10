@@ -2,8 +2,8 @@ import { createEffect, createMemo, createSignal, For, on, onCleanup, onMount, Sh
 import { createQuery, useQueryClient } from '@tanstack/solid-query'
 import { useParams, useSearchParams } from '@solidjs/router'
 import { filesKey } from '../shared/api'
-import { fetchFilePatches, fileBlobOptions, filePatchKey, filesOptions, mentionsOptions, prefsKey, prefsOptions, pullDetailOptions, pullKey, type PullFile, type Task, type Thread } from './queries'
-import { addReviewComment, replyReview, resolveThread, setPref } from './mutations'
+import { fetchFilePatches, fileBlobOptions, filePatchKey, filesOptions, mentionsOptions, prefsOptions, pullDetailOptions, pullKey, type PullFile, type Task, type Thread } from './queries'
+import { addReviewComment, replyReview, resolveThread } from './mutations'
 import { getHighlighter } from './shiki'
 import { routeKey as makeRouteKey } from './fileNavigation'
 import { DiffLine, NonCodeRow, SplitCell, type LineComposerController, type ThreadCollapseController } from './features/diff/DiffRows'
@@ -36,6 +36,8 @@ import {
   type TokenizeLine,
   type ViewMode,
 } from './features/diff/model'
+import { savePref } from './features/settings/savePref'
+import { PrefKeys } from './persistence/prefKeys'
 
 // Right (Diff) pane: render EVERY changed file's diff stacked one after another in a single
 // virtualized list (docs/diff-rendering.md, docs/ui-design.md). Each file opens with a header row;
@@ -96,10 +98,9 @@ function DiffForPull(props: { route: PullRoute; router: boolean }) {
   const headSha = () => detail.data?.pull?.headSha ?? null
   let lastTarget = ''
 
-  const viewMode = (): ViewMode => (prefs.data?.diff_view === 'split' ? 'split' : 'unified')
+  const viewMode = (): ViewMode => (prefs.data?.[PrefKeys.diffView] === 'split' ? 'split' : 'unified')
   const setViewMode = async (mode: ViewMode) => {
-    await setPref('diff_view', mode)
-    queryClient.invalidateQueries({ queryKey: prefsKey })
+    await savePref(queryClient, PrefKeys.diffView, mode)
   }
 
   const invalidate = () => queryClient.invalidateQueries({ queryKey: pullKey(owner, repo, number) })

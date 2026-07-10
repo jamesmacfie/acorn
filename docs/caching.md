@@ -14,7 +14,7 @@ scope and lifetime. The whole design follows one principle:
 | --- | --- | --- | --- |
 | SQLite mirror | Local server / SQLite | Per user | All GitHub projections (repos, PRs, files, reviews, comments, checks, labels, threads) plus external issues (Linear, Rollbar → `issues`) |
 | `BLOBS` cache | Local server / on-disk | Per device | Immutable patch bodies + full file bodies keyed by blob SHA |
-| IndexedDB | Browser | Per user / device | TanStack Query cache (last API responses) |
+| IndexedDB | Browser | Per user / device | Filtered TanStack Query cache (last API responses, excluding file bodies/patches) |
 
 See [data-layer](./data-layer.md) for the schema behind layer 1. Layer 3
 (the IndexedDB-persisted TanStack Query cache, below) powers offline browsing
@@ -204,8 +204,11 @@ defaultOptions: { queries: { refetchOnWindowFocus: true, gcTime: 1000 * 60 * 60 
 - **`refetchOnWindowFocus: true`** — refocusing the tab revalidates, keeping the
   serve-then-revalidate feel on the client.
 
-The persister stores under key `acorn-cache` with `maxAge` 24h. On render the
-app shows the last persisted data instantly, then refetches.
+The persister stores under key `acorn-cache` with `maxAge` 24h and a 2-second write throttle.
+It keeps TanStack's successful-query-only dehydration gate; pending Promises and failed queries are
+never serialized. `persistence/queryPersistence.ts` additionally excludes immutable file bodies and
+every patch-bearing files query because those payloads are reconstructable from the loopback API and
+on-disk blob cache. On render the app shows the remaining last-known data instantly, then refetches.
 
 This cache is **per-user and private**. On logout the app wipes it
 (`window.addEventListener('acorn:logout', () => void clear())`) so the next
@@ -221,4 +224,3 @@ All three layers are now local to one machine and one user, so the old
 - The `BLOBS` cache is an on-disk dir private to your machine — it caches all
   bodies by sha, public or private (the public-only guard is gone from the code).
 - IndexedDB is per-device and per-user, and is cleared on logout.
-

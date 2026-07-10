@@ -9,6 +9,7 @@ import { clear, del, get, set } from 'idb-keyval'
 import App from './App'
 import { ApiError } from './apiClient'
 import './styles.css'
+import { shouldPersistQuery } from './persistence/queryPersistence'
 
 // A revoked/expired token surfaces as a 401 from any read or write → bounce to the OAuth login
 // (docs/authentication.md). Structural: every API failure is an ApiError carrying the response
@@ -32,12 +33,20 @@ const queryClient = new QueryClient({
 const persister = createAsyncStoragePersister({
   storage: { getItem: get, setItem: set, removeItem: del },
   key: 'acorn-cache',
+  throttleTime: 2_000,
 })
 const noop = () => null
 
 render(
   () => (
-    <PersistQueryClientProvider client={queryClient} persistOptions={{ persister, maxAge: 1000 * 60 * 60 * 24 }}>
+    <PersistQueryClientProvider
+      client={queryClient}
+      persistOptions={{
+        persister,
+        maxAge: 1000 * 60 * 60 * 24,
+        dehydrateOptions: { shouldDehydrateQuery: shouldPersistQuery },
+      }}
+    >
       <Router root={App}>
         <Route path="/" component={noop} />
         <Route path="/:owner/:repo" component={noop} />

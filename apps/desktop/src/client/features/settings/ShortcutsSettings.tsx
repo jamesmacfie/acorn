@@ -9,7 +9,8 @@ import {
   resolveKeybindings,
   type KeybindingContribution,
 } from '../../registries/keybindings'
-import { savePref } from './savePref'
+import { saveJsonPref } from './savePref'
+import { PrefKeys } from '../../persistence/prefKeys'
 
 export default function ShortcutsSettings() {
   const queryClient = useQueryClient()
@@ -19,8 +20,8 @@ export default function ShortcutsSettings() {
   const categories = createMemo(() => [...new Set(resolved().map((binding) => binding.category))])
 
   const saveOverride = async (binding: KeybindingContribution, chord: string) => {
-    const overrides = readKeybindingOverrides(prefs.data?.keybindings)
-    await savePref(queryClient, 'keybindings', JSON.stringify({ ...overrides, [binding.id]: chord }))
+    const overrides = readKeybindingOverrides(prefs.data?.[PrefKeys.keybindings])
+    await saveJsonPref(queryClient, PrefKeys.keybindings, { ...overrides, [binding.id]: chord })
   }
 
   const captureKey = (binding: KeybindingContribution, event: KeyboardEvent) => {
@@ -77,8 +78,8 @@ export default function ShortcutsSettings() {
           class="overlay-btn"
           onClick={() => {
             setError('')
-            void savePref(queryClient, 'keybindings', '{}')
-            void savePref(queryClient, 'pane_shortcuts', '{}')
+            void saveJsonPref(queryClient, PrefKeys.keybindings, {})
+            void saveJsonPref(queryClient, PrefKeys.paneShortcuts, {})
           }}
         >Reset all to defaults</button>
       </div>

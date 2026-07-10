@@ -31,4 +31,17 @@ export function hydratePrFilters(json: string | undefined): void {
   }
 }
 
+export function hydratePrFilter(workspaceId: string, filter: PrFilter): void {
+  setPrFilters((current) => (current[workspaceId] ? current : { ...current, [workspaceId]: filter }))
+}
+
+export function evictPrFilter(workspaceId: string): void {
+  setPrFilters((current) => {
+    if (!(workspaceId in current)) return current
+    const next = { ...current }
+    delete next[workspaceId]
+    return next
+  })
+}
+
 export { prFilters }

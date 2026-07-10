@@ -42,7 +42,7 @@ export function nextActive(list: OpenFile[], closed: string, current: string | n
 }
 
 // --- Signal store ---
-type TaskEditorState = { files: OpenFile[]; active: string | null }
+export type TaskEditorState = { files: OpenFile[]; active: string | null }
 const [byTask, setByTask] = createSignal<Record<string, TaskEditorState>>({})
 
 const stateFor = (taskId: string): TaskEditorState => byTask()[taskId] ?? { files: [], active: null }
@@ -61,6 +61,15 @@ export const editorClose = (taskId: string, path: string): void =>
 export const editorSetDirty = (taskId: string, path: string, dirty: boolean): void =>
   update(taskId, (s) => ({ ...s, files: setFileDirty(s.files, path, dirty) }))
 export const editorActivate = (taskId: string, path: string): void => update(taskId, (s) => ({ ...s, active: path }))
+
+export function evictEditorState(taskId: string): void {
+  setByTask((current) => {
+    if (!(taskId in current)) return current
+    const next = { ...current }
+    delete next[taskId]
+    return next
+  })
+}
 
 export const requestEditorReveal = (taskId: string, path: string, line: number): void => {
   openPane(taskId, 'editor', { kind: 'editor:reveal', path, line }, 'add')
@@ -94,6 +103,10 @@ export function hydrateEditorState(json: string | undefined): void {
   } catch {
     // malformed blob → fresh
   }
+}
+
+export function hydrateTaskEditorState(taskId: string, state: TaskEditorState): void {
+  setByTask((current) => (current[taskId]?.files.length ? current : { ...current, [taskId]: state }))
 }
 
 export { byTask as editorStateByTask }

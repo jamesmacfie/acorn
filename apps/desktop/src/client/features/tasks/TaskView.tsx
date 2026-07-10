@@ -16,8 +16,8 @@ import { activateTaskSignals, pathForTask } from './activate'
 import { formatChord } from './paneShortcuts'
 import { taskStatus } from './taskStatus'
 import TaskPaneHost from './TaskPaneHost'
-import { clientEvents } from '../../registries/clientEvents'
 import { confirmWillEvent } from '../../registries/willPhase'
+import { completeTaskArchive } from './archiveLifecycle'
 import './task-view.css'
 
 export default function TaskView(props: {
@@ -159,9 +159,10 @@ export default function TaskView(props: {
   })
 
   async function confirmClose(skipTeardown = false) {
+    const archivedTaskId = props.task.id
     const next = nextTask()
     if (api) {
-      const result = await api.task.archive(props.task.id, {
+      const result = await api.task.archive(archivedTaskId, {
         deleteWorktree: true, force: true, skipTeardown,
       })
       if (!result.ok) {
@@ -170,17 +171,18 @@ export default function TaskView(props: {
         return
       }
     } else {
-      await archiveTask(props.task.id)
+      await archiveTask(archivedTaskId)
     }
-    clientEvents.emit('runtime:task-archived', { taskId: props.task.id })
-    if (next) {
-      activateTaskSignals(next)
-      navigate(pathForTask(next))
-    } else {
-      setSelectedSource('github')
-      setActiveTaskId(null)
-      navigate('/')
-    }
+    completeTaskArchive(archivedTaskId, () => {
+      if (next) {
+        activateTaskSignals(next)
+        navigate(pathForTask(next))
+      } else {
+        setSelectedSource('github')
+        setActiveTaskId(null)
+        navigate('/')
+      }
+    })
     await queryClient.invalidateQueries({ queryKey: tasksKey })
   }
 

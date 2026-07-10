@@ -8,22 +8,26 @@ import { applyLayoutAction, defaultLayout, type LayoutAction, type PaneId, type 
 export type { PaneId, TaskLayout } from './layout'
 
 // Which browse Source is selected, or null when a task is the active view (docs/workspaces 04).
-// The id list is the one source of truth — isSourceId validates persisted values (last_source)
-// against it so a new source can't be forgotten in the restore path.
+// Known core ids stay typed for contributions and UI construction. The live selection deliberately
+// accepts an unknown string so a temporarily missing plugin source remains inert and round-trips
+// through persistence until the user explicitly selects another source.
 export const SOURCE_IDS = ['github', 'linear', 'rollbar'] as const
 export type SourceId = (typeof SOURCE_IDS)[number]
 export const isSourceId = (v: unknown): v is SourceId => typeof v === 'string' && (SOURCE_IDS as readonly string[]).includes(v)
-const [selectedSource, setSelectedSource] = createSignal<SourceId | null>('github')
+const [selectedSource, setSelectedSource] = createSignal<string | null>('github')
 
 // Per-workspace memory of the last view — a rail source (browse) or a task — so switching workspaces
 // returns you to exactly what you were looking at rather than always jumping back to GitHub.
 // Session-only (not persisted); first-load restore is handled by the last_source/last_task prefs.
-export type WorkspaceView = { source: SourceId } | { taskId: string }
+export type WorkspaceView = { source: string } | { taskId: string }
 const viewByWorkspace = new Map<string, WorkspaceView>()
 export const rememberWorkspaceView = (workspaceId: string, view: WorkspaceView): void => {
   viewByWorkspace.set(workspaceId, view)
 }
 export const workspaceView = (workspaceId: string): WorkspaceView | undefined => viewByWorkspace.get(workspaceId)
+export const evictWorkspaceView = (workspaceId: string): void => {
+  viewByWorkspace.delete(workspaceId)
+}
 
 // The active task (its terminals scope to this; its view shows when no Source is selected).
 const [activeTaskId, setActiveTaskId] = createSignal<string | null>(null)
@@ -43,8 +47,14 @@ export function dispatchLayout(taskId: string, action: LayoutAction): void {
     const next = applyLayoutAction(cur, action)
     return next === cur ? prev : { ...prev, [taskId]: next }
   })
-  if (action.type === 'show') setMaximizedPane(taskId, null)
-  if (action.type === 'close' && maximizedPane(taskId) === action.pane) setMaximizedPane(taskId, null)
+  const nextLayout = layoutForTask(taskId) ?? defaultLayout()
+  const focused = focusedPane(taskId)
+  const maximized = maximizedPane(taskId)
+  // Focus/maximize are session state, but their ids must always belong to the durable layout.
+  // Keep that invariant here at the layout's single write boundary so close, show, and replace
+  // transitions cannot leave commands or rendering pointed at a pane that no longer exists.
+  if (focused && !nextLayout.panes.includes(focused)) clearFocusedPane(taskId, focused)
+  if (action.type === 'show' || (maximized && !nextLayout.panes.includes(maximized))) setMaximizedPane(taskId, null)
 }
 export const dispatchActiveLayout = (action: LayoutAction): void => {
   const id = activeTaskId()
@@ -54,6 +64,9 @@ export const dispatchActiveLayout = (action: LayoutAction): void => {
 // Seed from persisted prefs at startup without clobbering any layout the user changed pre-hydration.
 export function hydrateTaskLayouts(map: Record<string, TaskLayout>): void {
   setTaskLayouts((p) => ({ ...map, ...p }))
+}
+export function hydrateTaskLayout(taskId: string, layout: TaskLayout): void {
+  setTaskLayouts((current) => (current[taskId] ? current : { ...current, [taskId]: layout }))
 }
 
 // Recipe-resolved browser home URLs (docs/next 13 §C): a layout recipe points the browser pane at
@@ -100,6 +113,14 @@ export const focusedPane = (taskId: string | null | undefined): PaneId | undefin
 export function setFocusedPane(taskId: string, pane: PaneId): void {
   setFocusedPanes((current) => (current[taskId] === pane ? current : { ...current, [taskId]: pane }))
 }
+function clearFocusedPane(taskId: string, pane?: PaneId): void {
+  setFocusedPanes((current) => {
+    if (!(taskId in current) || (pane && current[taskId] !== pane)) return current
+    const next = { ...current }
+    delete next[taskId]
+    return next
+  })
+}
 
 const [maximizedPanes, setMaximizedPanes] = createSignal<Record<string, PaneId | undefined>>({})
 export const maximizedPane = (taskId: string | null | undefined): PaneId | undefined => (taskId ? maximizedPanes()[taskId] : undefined)
@@ -114,7 +135,54 @@ export function setMaximizedPane(taskId: string, pane: PaneId | null): void {
 }
 export function toggleFocusedPaneMax(taskId: string): void {
   const pane = focusedPane(taskId)
-  if (pane) setMaximizedPane(taskId, maximizedPane(taskId) === pane ? null : pane)
+  if (!pane) return
+  if (!(layoutForTask(taskId) ?? defaultLayout()).panes.includes(pane)) {
+    clearFocusedPane(taskId, pane)
+    setMaximizedPane(taskId, null)
+    return
+  }
+  setMaximizedPane(taskId, maximizedPane(taskId) === pane ? null : pane)
+}
+
+// Lifecycle eviction is called by the event-bus subscriber in persistence/scopedEviction.ts.
+// T3 layout removal also causes the descriptor persister to write a scoped tombstone.
+export function evictTaskState(taskId: string): void {
+  setTaskLayouts((current) => {
+    if (!(taskId in current)) return current
+    const next = { ...current }
+    delete next[taskId]
+    return next
+  })
+  setRecipeBrowserUrls((current) => {
+    if (!(taskId in current)) return current
+    const next = { ...current }
+    delete next[taskId]
+    return next
+  })
+  setTerminalOpenTasks((current) => {
+    if (!current.has(taskId)) return current
+    const next = new Set(current)
+    next.delete(taskId)
+    return next
+  })
+  setTerminalMaxTasks((current) => {
+    if (!current.has(taskId)) return current
+    const next = new Set(current)
+    next.delete(taskId)
+    return next
+  })
+  setFocusedPanes((current) => {
+    if (!(taskId in current)) return current
+    const next = { ...current }
+    delete next[taskId]
+    return next
+  })
+  setMaximizedPanes((current) => {
+    if (!(taskId in current)) return current
+    const next = { ...current }
+    delete next[taskId]
+    return next
+  })
 }
 
 export { activeTaskId, setActiveTaskId, selectedSource, setSelectedSource, taskLayouts }

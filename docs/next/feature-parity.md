@@ -76,7 +76,7 @@ pass over create/ignore/delete/promote/archive.
   selected-workspace URL/state dimension. Plugin source browsing must preserve
   this derivation — especially Linear project browsing and Rollbar task
   promotion, which navigate across repos.
-- [ ] **`rail_order` is view state, deliberately separate from `tasks.sort`**
+- [x] **`rail_order` is view state, deliberately separate from `tasks.sort`**
   (`railOrder.ts` — sort once derived dev-server ports). Phase 6 keeps
   `tasks.sort` as the server-side seed and `rail_order` as the user's
   arrangement, including the pin partition behaviour (pinned tasks order
@@ -179,7 +179,7 @@ part of its contract — test them individually):
   let **re-selecting an already-active file scroll again**. Whatever replaces
   the `FILE_SCROLL_EVENT` mailbox (`openPane(id, intent)` or the event bus —
   Phase 5) must preserve "same target still acts".
-- [ ] PullDetail's collapsible-section state lives in `localStorage`
+- [x] PullDetail's collapsible-section state lives in `localStorage`
   (`PullDetail.tsx:42-49`), outside the prefs model — as do comment drafts
   (`comments/draftState.ts`). Phase 6's audit classifies each as T3/T4 or
   deliberately leaves it in localStorage; either is fine, but it is a recorded

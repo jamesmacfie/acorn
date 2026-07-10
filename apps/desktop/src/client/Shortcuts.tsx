@@ -7,10 +7,9 @@ import type { PullFile } from './queries'
 import { registerCommands } from './registries/commands'
 import { registerKeybindings } from './registries/keybindings'
 
-// Global keyboard shortcuts + the file finder. Mounted once in App. Owns a single window
-// keydown listener (via the shared createOverlayPalette hook). PullList owns j/k (next/prev PR) —
-// those keys are deliberately untouched here. All shortcuts except Escape are ignored while focus
-// is in a typing target (form fields and contentEditable surfaces).
+// Global keyboard shortcuts + the file finder. Mounted once in App. PullList owns j/k (next/prev
+// PR) — those keys are deliberately untouched here. Global shortcut dispatch lives in the command
+// registry; the open finder handles its own dialog-scoped navigation.
 // The finder is local; the shortcut *reference* now lives in Settings → Shortcuts, so `?` opens
 // that tab (via onOpenShortcuts) rather than a local help overlay.
 
@@ -95,7 +94,7 @@ export default function Shortcuts(props: { onOpenShortcuts: () => void }) {
   return (
     <Show when={finder.open()}>
       <div class="overlay-backdrop" onClick={finder.close}>
-        <div class="overlay" role="dialog" aria-modal="true" onKeyDown={finder.onKeyDown} onClick={(e) => e.stopPropagation()}>
+        <div class="overlay" role="dialog" aria-modal="true" onKeyDown={finder.onKeyDown} onMouseDown={finder.onDialogMouseDown} onClick={(e) => e.stopPropagation()}>
           <input
             ref={finder.setInputRef}
             class="finder-input"

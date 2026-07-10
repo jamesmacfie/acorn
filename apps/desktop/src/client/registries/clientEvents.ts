@@ -6,6 +6,7 @@ export type PaneIntent =
   | { kind: 'editor:reveal'; path: string; line: number }
 
 export type ClientEventMap = {
+  'boot:restored': { phases: ('workspace' | 'view' | 'panes')[] }
   'presentation:pane-intent': { taskId: string; paneId: string; intent: PaneIntent }
   'presentation:terminal-focus': { taskId: string; sessionId: string }
   'presentation:file-scroll': { routeKey: string; path: string }
@@ -65,4 +66,10 @@ export function consumeTerminalFocusIntent(taskId: string): string | undefined {
   const sessionId = pendingTerminalFocus.get(taskId)
   pendingTerminalFocus.delete(taskId)
   return sessionId
+}
+
+export function evictPendingIntents(taskId: string): void {
+  const prefix = `${taskId}:`
+  for (const key of pendingPaneIntents.keys()) if (key.startsWith(prefix)) pendingPaneIntents.delete(key)
+  pendingTerminalFocus.delete(taskId)
 }

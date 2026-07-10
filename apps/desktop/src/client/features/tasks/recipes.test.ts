@@ -1,5 +1,16 @@
-import { describe, expect, it, vi } from 'vitest'
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 import { invokeLayoutRecipe, recipeToLayout, type RecipeServices } from './recipes'
+import { paneRegistry } from '../../registries/panes'
+
+const paneRegistrations: { dispose(): void }[] = []
+beforeAll(() => {
+  for (const [id, order] of [['pr', 1], ['changes', 2]] as const) {
+    paneRegistrations.push(paneRegistry.register({
+      id, order, label: id, glyph: id, component: () => null,
+    }))
+  }
+})
+afterAll(() => paneRegistrations.splice(0).forEach((registration) => registration.dispose()))
 
 const stubSvc = (overrides: Partial<RecipeServices> = {}): RecipeServices => ({
   setLayout: vi.fn(),

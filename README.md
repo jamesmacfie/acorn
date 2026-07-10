@@ -142,6 +142,7 @@ Detailed docs live in [`docs/`](./docs). Start with the architecture overview.
 - [architecture-overview.md](./docs/architecture-overview.md) — the keystone: one-server design, the
   lazy read-model mirror, the three cache layers, the product model, and the doc index.
 - [data-layer.md](./docs/data-layer.md) — the full SQLite schema table-by-table (mirror vs app-state).
+- [state.md](./docs/state.md) — state tiers/scopes, startup restore descriptors, and scoped eviction.
 - [api-reference.md](./docs/api-reference.md) — every `/auth/*` and `/api/*` route.
 - [caching.md](./docs/caching.md) — the three cache layers and their policies.
 - [github-integration.md](./docs/github-integration.md) — the REST + GraphQL clients and write actions.

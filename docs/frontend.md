@@ -17,7 +17,7 @@ State is deliberately split three ways, with no other store:
 | Kind | Home | Survives reload? |
 | --- | --- | --- |
 | Server data (PRs, repos, tasks, workspaces, Linear/Rollbar) | [TanStack Query](./caching.md) cache | Yes — persisted to IndexedDB |
-| Transient UI (popovers, filters, drag, active task) | module-level / component SolidJS signals | No |
+| Transient UI (popovers, drag, focus/maximize, active terminal) | module-level / component SolidJS signals | No |
 | Durable view state (last repo, layouts, theme, shortcuts) | server-persisted `prefs` (the `/api/prefs` key/value store) | Yes — round-trips through GitHub-scoped SQLite |
 
 ## Entry point (`index.tsx`)
@@ -27,9 +27,10 @@ State is deliberately split three ways, with no other store:
 - Constructs a **single** `QueryClient` with `refetchOnWindowFocus: true` and `gcTime: 24h`. The
   long `gcTime` is required so persisted entries outlive a session and survive reload
   (`apps/desktop/src/client/index.tsx:21`).
-- Wraps the tree in `PersistQueryClientProvider`, persisting the whole cache to **IndexedDB** via
-  `idb-keyval` under key `acorn-cache` (`maxAge` 24h). This gives instant render from last-known
-  data and offline browsing of recently-seen PRs (`index.tsx:30`).
+- Wraps the tree in `PersistQueryClientProvider`, persisting the bounded cache to **IndexedDB** via
+  `idb-keyval` under key `acorn-cache` (`maxAge` 24h, 2s write throttle). File bodies and
+  patch-bearing queries are excluded because the loopback API/on-disk blob cache reconstructs them;
+  TanStack's successful-query-only gate also excludes pending and failed queries.
 - A global `QueryCache`/`MutationCache` `onError` bounces to `/auth/login?return_to=…` whenever an
   error message matches `/\b401\b|reauth|unauthenticated/` — a revoked/expired token surfaces as a
   401 from any read or write. The `me` query returns `null` on 401 (the valid logged-out state) so
@@ -109,6 +110,10 @@ route, and are reused by the rail rows, ⌘1–9, and the palette's Go-to-task. 
 (`SettingsModal`, `OnboardingModal`, `TerminalPanel`, `CommandPalette`, `FilePalette`) and the
 global `Shortcuts` handler are mounted after the switch, independent of the active mode.
 
+`TaskView` is keyed by `activeTaskId`: switching or archiving a task disposes the old task-owned
+component scope before the replacement mounts. The archive lifecycle event then performs final
+T3/T4 eviction after component cleanup has published any last session-only view state.
+
 ### Login gate + theme
 
 `LoginGate` shows the bare `Acorn` mark while auth is unknown (initial load / cache restore) to
@@ -116,40 +121,39 @@ avoid a redirect flash, then bounces to GitHub OAuth once settled-logged-out —
 explicitly logged out (`sessionStorage['acorn:loggedout']`), in which case it holds and offers a
 manual Login (else GitHub silently re-auths and logout is a no-op) (`App.tsx:269`, `464`).
 
-Theme is applied by a `createEffect` writing `document.documentElement.dataset.theme`
-(`App.tsx:119`). When `theme_follow_system` is on it swaps the chosen `theme_light`/`theme_dark`
+Theme is applied by the startup-state service writing `document.documentElement.dataset.theme`.
+When `theme_follow_system` is on it swaps the chosen `theme_light`/`theme_dark`
 on the OS `prefers-color-scheme` and re-applies live on change; otherwise it uses the fixed `theme`
 pref.
 
 ## Session restore
 
-`App` treats `prefs` (the `/api/prefs` map) as the durable view layer. It **hydrates once** — a
-`restored` signal gates the write-back effects so startup defaults never clobber saved values
-(`App.tsx:158`) — then writes each slice back in its own `createEffect` when that slice changes.
-The restore is careful about ordering: it waits for `useIsRestoring()` (the IndexedDB rehydrate)
-and for `prefs.data` before navigating, so it doesn't flash the first repo before the saved one or
-drop a gated query mid-restore (`App.tsx:143`).
+`persistence/startupRestore.ts` treats `prefs` as the durable view layer. Registered descriptors
+hydrate in `workspace → view → panes` order, emit `boot:restored`, then arm throttled persistence.
+The service waits for `useIsRestoring()`, prefs, repos, and tasks before navigation, so startup
+defaults cannot clobber saved state or drop a gated query mid-restore. Descriptors registered by
+lazy plugins after boot hydrate before their own persistence is armed. See [state.md](./state.md).
 
-Prefs that make up a restored session (written from `App` unless noted):
+Core prefs and scoped slices that make up a restored session:
 
 | Pref key | Restores | Writer |
 | --- | --- | --- |
-| `last_path` | The `/:owner/:repo[/:number]` that reopens on relaunch. | `App` |
-| `last_source` | The selected browse source (`''` = a task view was active). | `App` |
-| `last_task` | Which task is focused. | `App` |
-| `task_layouts` | Each task's pane row (`Record<taskId, TaskLayout>`; legacy `task_panes` migrated on hydrate). | `App` |
+| `last_path` | The `/:owner/:repo[/:number]` that reopens on relaunch. | shell descriptor |
+| `last_source` | The selected browse source (`''` = a task view was active). | shell descriptor |
+| `last_task` | Which task is focused. | shell descriptor |
+| `core:task-layouts:<taskId>` | A task's pane row; legacy `task_layouts` / `task_panes` migrate on hydrate. | layout descriptor |
 | `rail_order` | Task rail pin-to-top + drag order. | `TabRail` |
-| `left_collapsed` | Left-pane collapse (`'1'`/`'0'`). | `App` (topbar toggle) |
+| `left_collapsed` | Left-pane collapse (`'1'`/`'0'`). | shell descriptor |
 | `theme`, `theme_follow_system`, `theme_light`, `theme_dark` | Theme selection + follow-system. | `AppearanceSettings` |
 | `pane_shortcuts` | Per-pane keyboard-shortcut overrides (JSON). | `ShortcutsSettings` |
 | `term_rail_default` | Default terminal profile for a new task's rail. | `TerminalSettings` |
 | `term_height` | Terminal drawer height. | `TerminalPanel` |
-| `notices` | The last ~50 notification-centre notices (bounded ring). | `App` |
-| `editor_open_files` | Open-file tabs per task (content not persisted; dirty resets). | `App` |
+| `notices` | The last ~50 notification-centre notices (bounded ring). | notice descriptor |
+| `editor:open-files:<taskId>` | Open-file tabs per task (content not persisted; dirty resets). | editor descriptor |
 | `onboarded` | Whether the onboarding modal has been dismissed. | `OnboardingModal` |
 
-Write-back deliberately **does not** invalidate `prefsKey` — these keys are read once at startup, so
-skipping invalidation avoids a write→refetch loop (`App.tsx:176`).
+Every write goes through `savePref`: the shared `prefsKey` cache updates optimistically, server
+writes serialize per key, and failures roll back and surface as notices.
 
 ## State management
 
@@ -180,7 +184,8 @@ bodies are deliberately **not** warmed — they stay intent-driven in `DiffView`
 
 ### IndexedDB persistence
 
-The whole query cache is mirrored to IndexedDB (see entry point). Consumers must gate first mount on
+The filtered query cache is mirrored to IndexedDB (see entry point); file bodies and patches are
+excluded, and writes are throttled. Consumers must gate first mount on
 `useIsRestoring()` — mounting a gated query mid-restore can drop its fetch as the `enabled` flip
 races the restore boundary (this is why `App`'s repo-redirect waits on `isRestoring()`).
 
@@ -254,8 +259,8 @@ See also: [panes.md](./panes.md) (the pane catalog), [workspaces-and-tasks.md](.
   otherwise the saved layout is restored and only the first activation picks a default.
 - Layout state has no single-pane shim: all pane transitions go through
   `dispatchLayout(taskId, action)` / `layoutForTask(taskId)` with an explicit task id.
-- `last_source` restore validates against the `SourceId` union in one place (`isSourceId`,
-  `features/tasks/tasks.ts`), so every source — including Rollbar — restores correctly.
+- `last_source` keeps unknown contribution ids inert and round-trippable. A temporarily missing
+  provider therefore does not destroy the user's selection; choosing another source replaces it.
 - API failures are typed: `apiClient.ts` throws `ApiError` (message + HTTP `status`); the auth
   bounce in `index.tsx` is structural (`err instanceof ApiError && err.status === 401`), not
   message-text matching.

@@ -3,8 +3,8 @@ import { createQuery, useIsRestoring, useQueryClient } from '@tanstack/solid-que
 import { useMatch, useNavigate, useParams } from '@solidjs/router'
 import { clear } from 'idb-keyval'
 import { readJson } from './apiClient'
-import { meKey, meOptions, pinsOptions, prefsKey, prefsOptions, pullPrefixKey, pullsKey, pullsRoute, pullsPrefixKey, reposKey, reposOptions, reposRefreshRoute, tasksOptions, workspacesKey, workspacesOptions, type Pull } from './queries'
-import { bootstrapWorkspaces, setPref } from './mutations'
+import { meKey, meOptions, pinsOptions, prefsOptions, pullPrefixKey, pullsKey, pullsRoute, pullsPrefixKey, reposKey, reposOptions, reposRefreshRoute, tasksOptions, workspacesKey, workspacesOptions, type Pull } from './queries'
+import { bootstrapWorkspaces } from './mutations'
 import RepoPicker from './RepoPicker'
 import WorkspacePicker from './WorkspacePicker'
 import OnboardingModal from './features/workspaces/OnboardingModal'
@@ -17,16 +17,13 @@ import DiffView from './DiffView'
 import AccountMenu from './AccountMenu'
 import SettingsModal from './features/settings/SettingsModal'
 import TerminalPanel from './features/terminal/TerminalPanel'
-import { hydrateNotices, initWorkflowNotices, notices, pushBackgroundError, serializeNotices } from './features/notifications/notifications'
-import { editorStateByTask, hydrateEditorState, serializeEditorState } from './features/editor/editorState'
-import { hydratePrFilters, prFilters } from './features/pullList/filterState'
+import { initWorkflowNotices } from './features/notifications/notifications'
 import { initSessions, sessions } from './features/terminal/sessions'
 import TabRail from './features/tabs/TabRail'
 import RailTips from './features/tooltip/RailTips'
-import { activeTaskId, focusedPane, hydrateTaskLayouts, isSourceId, isTerminalMax, isTerminalOpen, maximizedPane, rememberWorkspaceView, selectedSource, setActiveTaskId, setMaximizedPane, setSelectedSource, setTerminalMax, setTerminalOpen, taskLayouts, toggleFocusedPaneMax, workspaceView } from './features/tasks/tasks'
+import { activeTaskId, focusedPane, isTerminalMax, isTerminalOpen, maximizedPane, rememberWorkspaceView, selectedSource, setMaximizedPane, setSelectedSource, setTerminalMax, setTerminalOpen, toggleFocusedPaneMax, workspaceView } from './features/tasks/tasks'
 import { isTerminalTarget } from './lib/isTypingTarget'
 import { activateTaskSignals, pathForTask } from './features/tasks/activate'
-import { parseTaskLayouts } from './features/tasks/layout'
 import { taskStatus } from './features/tasks/taskStatus'
 import { capabilities } from './features/capabilities'
 import TaskView from './features/tasks/TaskView'
@@ -38,6 +35,8 @@ import { KeybindingDispatcher, registerKeybindings } from './registries/keybindi
 import { confirmWillEvent, registerWillHandler, WillConfirmationHost } from './registries/willPhase'
 import { startClientPollers } from './registries/pollers'
 import { SlotHost, type UiSlotContext } from './registries/uiSlots'
+import { createAppStartupRestore } from './persistence/appStartup'
+import { PrefKeys } from './persistence/prefKeys'
 
 // Layout root (Router root): top bar + three panes. Panes are params-driven — PullList (left)
 // and PullDetail (mid) read useParams() directly; routes exist only to populate params.
@@ -142,6 +141,19 @@ export default function App() {
   const pins = createQuery(() => pinsOptions(!!me.data))
   const tasks = createQuery(() => tasksOptions(!!me.data))
   const workspaces = createQuery(() => workspacesOptions(!!me.data))
+  const [collapsed, setCollapsed] = createSignal(false)
+
+  createAppStartupRestore({
+    queryClient,
+    prefs: () => prefs.data,
+    cacheRestoring: isRestoring,
+    repos: () => repos.data,
+    tasks: () => tasks.data,
+    params,
+    navigate,
+    collapsed,
+    setCollapsed,
+  })
 
   // First-run bootstrap (idempotent): ensure a Default workspace exists and every mirrored repo is
   // assigned to a workspace, so the top selector + repo scoping always have data. Runs once the
@@ -168,8 +180,8 @@ export default function App() {
   // Remember the last view per workspace (a rail source or a task) so switching workspaces returns
   // you to exactly what you were looking at, not always GitHub. On each real workspace change: record
   // the view we're leaving, then restore the one we're entering (default GitHub). `defer` skips the
-  // startup null→workspace resolution so the persisted `last_source`/`last_task` restore below still
-  // wins on first load; the `prevWs` guard likewise leaves that first entry untouched.
+  // startup null→workspace resolution so the persisted-state pipeline's `last_source`/`last_task`
+  // restore still wins on first load; the `prevWs` guard likewise leaves that first entry untouched.
   createEffect(
     on(activeWorkspace, (ws, prevWs) => {
       if (prevWs) {
@@ -194,16 +206,6 @@ export default function App() {
     }, { defer: true }),
   )
 
-  // Focus a task once the list loads (no navigation — selecting a row in the rail is what
-  // navigates). The terminal drawer + topbar badge key off this. Prefer the task focused last
-  // session (persisted below), falling back to the first row; wait for prefs so we don't flash the
-  // wrong one first.
-  createEffect(() => {
-    const list = tasks.data
-    if (!list?.length || activeTaskId() || prefs.data === undefined) return
-    const saved = prefs.data.last_task
-    setActiveTaskId(saved && list.some((t) => t.id === saved) ? saved : list[0].id)
-  })
   const activeTask = () => tasks.data?.find((w) => w.id === activeTaskId()) ?? null
   const slotContext = (): UiSlotContext => ({
     taskActive: inTaskView(),
@@ -218,117 +220,7 @@ export default function App() {
     },
   })
 
-  // Apply the saved theme. When following system, swap between the chosen light/dark
-  // themes on the OS preference (and re-apply live when it changes).
-  createEffect(() => {
-    if (prefs.data === undefined) return
-    const follow = (prefs.data.theme_follow_system ?? (prefs.data.theme ? 'false' : 'true')) === 'true'
-    if (!follow) {
-      document.documentElement.dataset.theme = prefs.data.theme ?? 'light'
-      return
-    }
-    const light = prefs.data.theme_light ?? 'light'
-    const dark = prefs.data.theme_dark ?? 'dark'
-    const mq = matchMedia('(prefers-color-scheme: dark)')
-    const apply = () => {
-      document.documentElement.dataset.theme = mq.matches ? dark : light
-    }
-    apply()
-    mq.addEventListener('change', apply)
-    onCleanup(() => mq.removeEventListener('change', apply))
-  })
-
-  // Open the repo used last session once the list loads and no repo is in the URL (falling back to
-  // the first repo). Electron always boots at the origin root, so this is what restores the
-  // workspace/repo — the active workspace is derived from the repo. Wait for the persisted cache to
-  // finish restoring — mounting PullList mid-restore drops its gated pulls fetch (the enabled flip
-  // races the isRestoring boundary), so the list never populates — and for prefs, so we don't flash
-  // the first repo before the saved one.
-  createEffect(() => {
-    if (isRestoring() || prefs.data === undefined) return
-    const list = repos.data
-    if (!list?.length || params.owner) return
-    // The saved path carries the PR number too (e.g. /owner/repo/123), so a PR task/detail reopens
-    // on the right pull. Validate its repo still exists before honouring it.
-    const saved = prefs.data.last_path
-    const [, sOwner, sRepo] = saved?.split('/') ?? []
-    const ok = saved && list.some((r) => r.owner === sOwner && r.name === sRepo)
-    navigate(ok ? saved : `/${list[0].owner}/${list[0].name}`, { replace: true })
-  })
-
-  // Restore the rest of last session's view once, after prefs load: which Source was selected (a
-  // task view was saved as '') and each task's last-used pane. `restored` then gates the persist
-  // effects below so they don't clobber the saved values with startup defaults.
-  const [restored, setRestored] = createSignal(false)
-  const persistPref = (key: string, value: string) => {
-    void setPref(key, value).catch((error) => {
-      if (key === 'notices') return console.error('[prefs:notices]', error)
-      pushBackgroundError(activeTaskId() ?? '', `Could not save ${key}`, error instanceof Error ? error.message : String(error))
-    })
-  }
-  createEffect(() => {
-    if (prefs.data === undefined || restored()) return
-    setRestored(true)
-    const src = prefs.data.last_source
-    if (src === '') setSelectedSource(null)
-    else if (isSourceId(src)) setSelectedSource(src) // validated against the SourceId union in one place
-    try {
-      hydrateTaskLayouts(parseTaskLayouts(prefs.data.task_layouts, prefs.data.task_panes))
-    } catch {
-      /* ignore malformed pane map */
-    }
-    hydrateNotices(prefs.data.notices)
-    hydrateEditorState(prefs.data.editor_open_files)
-    hydratePrFilters(prefs.data.pr_filters)
-  })
-
-  // Persist the current view so a relaunch reopens it. Separate effects so each writes only when its
-  // own slice changes. No prefsKey invalidation — these keys are read once at startup, and skipping
-  // it avoids a write→refetch loop.
-  createEffect(() => {
-    if (restored() && params.owner && params.repo) {
-      persistPref('last_path', `/${params.owner}/${params.repo}${params.number ? `/${params.number}` : ''}`)
-    }
-  })
-  createEffect(() => {
-    if (restored()) persistPref('last_source', selectedSource() ?? '')
-  })
-  createEffect(() => {
-    const id = activeTaskId()
-    if (restored() && id) persistPref('last_task', id)
-  })
-  createEffect(() => {
-    const layouts = taskLayouts()
-    if (restored()) persistPref('task_layouts', JSON.stringify(layouts))
-  })
-  createEffect(() => {
-    void notices()
-    if (restored()) persistPref('notices', serializeNotices())
-  })
-  createEffect(() => {
-    void editorStateByTask()
-    if (restored()) persistPref('editor_open_files', serializeEditorState())
-  })
-  createEffect(() => {
-    const f = prFilters()
-    if (restored()) persistPref('pr_filters', JSON.stringify(f))
-  })
-
-  // Left-pane collapse, persisted via the `left_collapsed` pref. Seed the local signal from prefs
-  // once it loads (and the user hasn't toggled since), so reloads restore the saved state.
-  const [collapsed, setCollapsed] = createSignal(false)
-  const [touched, setTouched] = createSignal(false)
-  createEffect(() => {
-    const v = prefs.data?.left_collapsed
-    if (v !== undefined && !touched()) setCollapsed(v === '1')
-  })
-  const toggleCollapsed = async () => {
-    const next = !collapsed()
-    setTouched(true)
-    setCollapsed(next)
-    await setPref('left_collapsed', next ? '1' : '0')
-    queryClient.invalidateQueries({ queryKey: prefsKey })
-  }
+  const toggleCollapsed = () => setCollapsed((value) => !value)
 
   const selected = () => (params.owner && params.repo ? `${params.owner}/${params.repo}` : '')
   // Create-PR mode: the static /:owner/:repo/new route (outranks the :number param route).
@@ -532,15 +424,19 @@ export default function App() {
           <RollbarBrowse />
         </Match>
         <Match when={!selectedSource() && activeTask()}>
-          {/* Read the stable activeTask() signal, not the <Match> accessor: binding TaskView to the
-              accessor makes its memos re-run and read a stale value the instant selectedSource flips
-              (before the Switch disposes this branch) — "Stale read from <Match>". */}
-          <TaskView
-            task={activeTask()!}
-            terminalOpen={termOpen()}
-            onToggleTerminal={() => void toggleTerm()}
-            onOpenTerminal={() => { if (!termOpen()) void toggleTerm() }}
-          />
+          {/* Key the task surface by id so changing tasks disposes the old task scope before the new
+              one mounts. Read activeTask directly rather than a Match accessor, which can go stale
+              while this branch is being disposed. */}
+          <Show keyed when={activeTaskId()}>
+            {(_taskId) => (
+              <TaskView
+                task={activeTask()!}
+                terminalOpen={termOpen()}
+                onToggleTerminal={() => void toggleTerm()}
+                onOpenTerminal={() => { if (!termOpen()) void toggleTerm() }}
+              />
+            )}
+          </Show>
         </Match>
       </Switch>
       <KeybindingDispatcher prefs={prefs.data ?? {}} taskActive={inTaskView()} focusedPane={focusedPane(activeTaskId())} />
@@ -548,7 +444,7 @@ export default function App() {
       <Show when={settingsOpen()}>
         <SettingsModal initialTab={settingsTab()} onPermissions={permissions} onClose={() => setSettingsOpen(false)} />
       </Show>
-      <Show when={!onboardingDismissed() && !!me.data && prefs.data !== undefined && prefs.data?.onboarded !== '1' && (workspaces.data?.length ?? 0) > 0}>
+      <Show when={!onboardingDismissed() && !!me.data && prefs.data !== undefined && prefs.data?.[PrefKeys.onboarded] !== '1' && (workspaces.data?.length ?? 0) > 0}>
         <OnboardingModal onClose={() => setOnboardingDismissed(true)} />
       </Show>
       <Show when={termOpen()}>

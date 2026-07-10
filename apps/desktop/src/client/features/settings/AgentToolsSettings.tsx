@@ -1,9 +1,10 @@
 import { createEffect, createMemo, For, Show } from 'solid-js'
 import { createQuery, useQueryClient } from '@tanstack/solid-query'
-import { agentToolsCatalogRoute, AGENT_TOOLS_PERMS_PREF_KEY, type AgentToolCatalogEntry, type ToolRisk } from '../../../shared/api'
+import { agentToolsCatalogRoute, type AgentToolCatalogEntry, type ToolRisk } from '../../../shared/api'
 import { readJson } from '../../apiClient'
 import { prefsOptions } from '../../queries'
-import { savePref } from './savePref'
+import { saveJsonPref } from './savePref'
+import { PrefKeys } from '../../persistence/prefKeys'
 
 // Settings → Agent tools (docs/agent-tools.md, ux §3): the permission surface over the agent-tool
 // registry. Tools are grouped by risk tier (read → write → execute); a tier toggle and per-tool
@@ -26,7 +27,7 @@ export default function AgentToolsSettings() {
   }))
 
   const perms = createMemo<ToolPerms>(() => {
-    const raw = prefs.data?.[AGENT_TOOLS_PERMS_PREF_KEY]
+    const raw = prefs.data?.[PrefKeys.agentToolPermissions]
     if (!raw) return {}
     try {
       return JSON.parse(raw) as ToolPerms
@@ -38,7 +39,7 @@ export default function AgentToolsSettings() {
   const tierOn = (risk: ToolRisk) => (risk === 'read' ? true : (perms().tiers?.[risk] ?? true))
   const toolOn = (t: AgentToolCatalogEntry) => perms().tools?.[t.name] ?? tierOn(t.risk)
 
-  const write = (next: ToolPerms) => savePref(qc, AGENT_TOOLS_PERMS_PREF_KEY, JSON.stringify(next))
+  const write = (next: ToolPerms) => saveJsonPref(qc, PrefKeys.agentToolPermissions, next)
   const setTier = (risk: ToolRisk, on: boolean) => {
     const names = new Set(toolsFor(risk).map((tool) => tool.name))
     const tools = Object.fromEntries(Object.entries(perms().tools ?? {}).filter(([name]) => !names.has(name)))

@@ -64,6 +64,9 @@ export function hydrateNotices(json: string | undefined): void {
     // malformed blob → start fresh
   }
 }
+export function hydrateNoticeValues(restored: Notice[]): void {
+  setNotices((prev) => capNotices([...prev, ...restored.filter((candidate) => !prev.some((notice) => notice.id === candidate.id))]))
+}
 export const serializeNotices = (): string => JSON.stringify(notices())
 
 // --- Pure edge detection (docs/terminal-and-agents.md): compare consecutive session snapshots. Edges are

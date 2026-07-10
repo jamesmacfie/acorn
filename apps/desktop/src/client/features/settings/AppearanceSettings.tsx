@@ -3,6 +3,7 @@ import { createQuery, useQueryClient } from '@tanstack/solid-query'
 import { prefsOptions } from '../../queries'
 import { savePref } from './savePref'
 import { THEMES } from './themes'
+import { PrefKeys } from '../../persistence/prefKeys'
 
 // Settings → Appearance: follow-system toggle plus theme picker(s). When following the OS, the
 // user picks one theme per OS mode (App.tsx swaps them live on the media query); otherwise a
@@ -11,10 +12,10 @@ export default function AppearanceSettings() {
   const qc = useQueryClient()
   const prefs = createQuery(() => prefsOptions(true))
   // Default to following the OS until the user has explicitly picked a theme.
-  const followSystem = () => (prefs.data?.theme_follow_system ?? (prefs.data?.theme ? 'false' : 'true')) === 'true'
-  const theme = () => prefs.data?.theme ?? 'light'
-  const lightTheme = () => prefs.data?.theme_light ?? 'light'
-  const darkTheme = () => prefs.data?.theme_dark ?? 'dark'
+  const followSystem = () => (prefs.data?.[PrefKeys.themeFollowSystem] ?? (prefs.data?.[PrefKeys.theme] ? 'false' : 'true')) === 'true'
+  const theme = () => prefs.data?.[PrefKeys.theme] ?? 'light'
+  const lightTheme = () => prefs.data?.[PrefKeys.themeLight] ?? 'light'
+  const darkTheme = () => prefs.data?.[PrefKeys.themeDark] ?? 'dark'
 
   return (
     <>
@@ -22,7 +23,7 @@ export default function AppearanceSettings() {
         <input
           type="checkbox"
           checked={followSystem()}
-          onChange={(e) => void savePref(qc, 'theme_follow_system', e.currentTarget.checked ? 'true' : 'false')}
+          onChange={(e) => void savePref(qc, PrefKeys.themeFollowSystem, e.currentTarget.checked ? 'true' : 'false')}
         />
         <span class="settings-label">Follow system light/dark setting</span>
       </label>
@@ -34,7 +35,7 @@ export default function AppearanceSettings() {
             <select
               class="integration-key-input"
               value={theme()}
-              onChange={(e) => void savePref(qc, 'theme', e.currentTarget.value)}
+              onChange={(e) => void savePref(qc, PrefKeys.theme, e.currentTarget.value)}
             >
               <For each={THEMES}>{([value, label]) => <option value={value}>{label}</option>}</For>
             </select>
@@ -46,7 +47,7 @@ export default function AppearanceSettings() {
           <select
             class="integration-key-input"
             value={lightTheme()}
-            onChange={(e) => void savePref(qc, 'theme_light', e.currentTarget.value)}
+            onChange={(e) => void savePref(qc, PrefKeys.themeLight, e.currentTarget.value)}
           >
             <For each={THEMES}>{([value, label]) => <option value={value}>{label}</option>}</For>
           </select>
@@ -56,7 +57,7 @@ export default function AppearanceSettings() {
           <select
             class="integration-key-input"
             value={darkTheme()}
-            onChange={(e) => void savePref(qc, 'theme_dark', e.currentTarget.value)}
+            onChange={(e) => void savePref(qc, PrefKeys.themeDark, e.currentTarget.value)}
           >
             <For each={THEMES}>{([value, label]) => <option value={value}>{label}</option>}</For>
           </select>

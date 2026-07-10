@@ -35,6 +35,9 @@ export const activeTerminal = (taskId: string): string | undefined => activeByTa
 export const rememberActiveTerminal = (taskId: string, sessionId: string): void => {
   activeByTask.set(taskId, sessionId)
 }
+export const evictActiveTerminal = (taskId: string): void => {
+  activeByTask.delete(taskId)
+}
 
 export const requestTerminalFocus = (taskId: string, sessionId: string): void => requestTerminalFocusIntent(taskId, sessionId)
 

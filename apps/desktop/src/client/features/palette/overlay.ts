@@ -2,10 +2,10 @@ import { createEffect, createSignal, onCleanup, onMount, type Accessor } from 's
 import { commandRegistry } from '../../registries/commands'
 import { keybindingRegistry } from '../../registries/keybindings'
 
-// Shared keyboard plumbing for the three overlay palettes (⌘K command palette, ⌘P file palette,
-// `/` changed-file finder): one window keydown listener, open/query/selection signals,
-// ↑/↓ (clamped) / Enter / Esc handling, and focus-on-open. The overlay markup stays in each
-// component — this is a hook returning the shared signals/handlers, not a framework.
+// Shared interaction plumbing for the overlay palettes (⌘K command palette, ⌘P file palette,
+// `/` changed-file finder): open/query/selection signals, local ↑/↓ (clamped) / Enter / Esc
+// handling, and input focus ownership. The overlay markup stays in each component — this is a
+// hook returning the shared signals/handlers, not a framework.
 
 export type OverlayPalette = {
   open: Accessor<boolean>
@@ -22,6 +22,8 @@ export type OverlayPalette = {
   setInputRef: (el: HTMLInputElement) => void
   /** Local overlay navigation handler; attach to the dialog root. */
   onKeyDown: (event: KeyboardEvent) => void
+  /** Keep clicks inside the dialog from dropping keyboard ownership to the document body. */
+  onDialogMouseDown: (event: MouseEvent) => void
 }
 
 // Only one overlay open at a time: opening one dismisses whichever other is open. Module-scoped
@@ -92,6 +94,14 @@ export function createOverlayPalette(opts: {
     }
   }
 
+  const onDialogMouseDown = (event: MouseEvent) => {
+    // Preserve native caret placement and text selection in the input itself. Palette chrome,
+    // empty-state rows, and result buttons should leave typing/navigation owned by the input.
+    if (event.target === inputRef) return
+    event.preventDefault()
+    inputRef?.focus()
+  }
+
   onMount(() => {
     if (!opts.id || !opts.toggleChord) return
     const command = commandRegistry.register({
@@ -131,5 +141,6 @@ export function createOverlayPalette(opts: {
       inputRef = el
     },
     onKeyDown,
+    onDialogMouseDown,
   }
 }
