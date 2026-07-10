@@ -141,6 +141,13 @@
       "when": 1783308226808,
       "tag": "0019_mighty_yellow_claw",
       "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "6",
+      "when": 1783671031697,
+      "tag": "0020_sloppy_tusk",
+      "breakpoints": true
     }
   ]
 }

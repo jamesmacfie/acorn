@@ -3,14 +3,16 @@
 // Pure — unit tested; TabRail is the consumer.
 import type { Integration } from '../../../shared/api'
 import type { SourceId } from '../tasks/tasks'
+import { sourceRegistry } from '../../registries/sources'
 
 export type SourceEntry = { id: SourceId; glyph: string; label: string }
 
 export function availableSources(integrations: Integration[] | undefined): SourceEntry[] {
-  const has = (provider: string) => (integrations ?? []).some((i) => i.provider === provider && i.connected)
+  const has = (providerId: string, capability?: string) => (integrations ?? []).some(
+    (i) => i.providerId === providerId && i.status !== 'disabled' && i.status !== 'needs-auth' && (!capability || i.capabilities[capability] === 'available'),
+  )
   return [
     { id: 'github', glyph: '◇', label: 'GitHub' },
-    ...(has('linear') ? [{ id: 'linear' as const, glyph: '◷', label: 'Linear' }] : []),
-    ...(has('rollbar') ? [{ id: 'rollbar' as const, glyph: '◍', label: 'Rollbar' }] : []),
+    ...sourceRegistry.entries().filter((source) => has(source.providerId, source.requiredCapability)).map(({ id, glyph, label }) => ({ id, glyph, label })),
   ]
 }

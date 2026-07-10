@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { buildCommentsBody } from './seedTaskNotes'
+import { buildCommentsBody, linearIssueSeedUrl } from './seedTaskNotes'
 
 describe('buildCommentsBody', () => {
   it('renders reviews, top-level comments (time-ordered) and threads with replies', () => {
@@ -27,5 +27,10 @@ describe('buildCommentsBody', () => {
 
   it('returns empty string when there is nothing to say', () => {
     expect(buildCommentsBody({ pull: null, reviews: [], comments: [], threads: [] })).toBe('')
+  })
+
+  it('keeps the linked Linear connection in note-seeding reads', () => {
+    expect(linearIssueSeedUrl('http://127.0.0.1:1234', { integrationId: 'work/team', identifier: 'ENG-42' }))
+      .toBe('http://127.0.0.1:1234/api/linear/issues/ENG-42?refresh=1&integration=work%2Fteam')
   })
 })

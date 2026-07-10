@@ -1,125 +1,65 @@
-import { and, eq } from 'drizzle-orm'
 import { Hono } from 'hono'
 import type { RollbarItem, RollbarItemsResponse } from '../../shared/api'
-import { getDb, schema } from '../db'
+import { getDb } from '../db'
+import { listProviderConnections } from '../integrations/connections'
+import { runProviderResource } from '../integrations/resourceRuntime'
+import type { RollbarResourceInput, RollbarResourceOutput } from '../integrations/providers/rollbar'
 import type { AppEnv } from '../middleware/auth'
 import { getUser } from '../middleware/requireUser'
 import { respondError } from '../respond'
-import { itemByCounterPath, itemsPath, levelName, rollbarData, rollbarFetch, type RollbarApiItem } from '../rollbar'
-import { decryptSecret } from '../session'
-import { ROLLBAR_ITEMS_STALE_AFTER_MS } from '../sync/policy'
 
-// /api/rollbar — the Rollbar Source's reads (docs/integrations.md): recent items per connection + one
-// item's detail, cached into the generic `issues` table (provider 'rollbar', identifier = the
-// visible counter) with serve-then-revalidate — ZERO new schema, the litmus test the Source
-// contract was built for.
-
-// TTL centralized in server/sync/policy.ts. This route keeps its own per-item freshness + fan-out
-// across connections with partial results, so it does NOT use the serve-then-revalidate wrapper
-// (inventories.md §2d) — it is a multi-connection blocking read, not serve-then-revalidate.
 const PROVIDER = 'rollbar'
+const RESOURCE = 'rollbar.items'
 
-type IntegrationRow = typeof schema.integrations.$inferSelect
+const respondResult = <T>(
+  c: Parameters<typeof respondError>[0],
+  result: Awaited<ReturnType<typeof runProviderResource<RollbarResourceInput, T>>>,
+) => (result.ok ? c.json(result.value) : respondError(c, result.failure.status, result.failure.error, result.failure.detail))
 
-const rollbarRows = (c: { env: Env }, userId: string): Promise<IntegrationRow[]> =>
-  getDb(c.env)
-    .select()
-    .from(schema.integrations)
-    .where(and(eq(schema.integrations.userId, userId), eq(schema.integrations.provider, PROVIDER)))
-
-const toItem = (integrationId: string, raw: RollbarApiItem) =>
-  ({
-    integrationId,
-    identifier: String(raw.counter),
-    title: raw.title,
-    level: levelName(raw.level),
-    environment: raw.environment,
-    status: raw.status,
-    totalOccurrences: raw.total_occurrences,
-    firstOccurrenceAt: raw.first_occurrence_timestamp ? raw.first_occurrence_timestamp * 1000 : null,
-    lastOccurrenceAt: raw.last_occurrence_timestamp ? raw.last_occurrence_timestamp * 1000 : null,
-  }) satisfies RollbarItem
-
-async function cacheItem(c: { env: Env }, userId: string, item: RollbarItem, now: number): Promise<void> {
-  await getDb(c.env)
-    .insert(schema.issues)
-    .values({ userId, integrationId: item.integrationId, provider: PROVIDER, identifier: item.identifier, data: JSON.stringify(item), fetchedAt: now })
-    .onConflictDoUpdate({
-      target: [schema.issues.userId, schema.issues.integrationId, schema.issues.identifier],
-      set: { data: JSON.stringify(item), fetchedAt: now },
-    })
-}
-
+// Provider-owned HTTP surface. Core mounts this router through the integration-provider registry;
+// reads execute the descriptor's mirrored-resource callbacks through the Phase-2 sync runtime.
 export const rollbar = new Hono<AppEnv>()
-  // Recent active items across every connected Rollbar project; each cached into `issues`.
   .get('/items', async (c) => {
     const user = getUser(c)
-    const rows = await rollbarRows(c, user.login)
-    if (!rows.length) return respondError(c, 403, 'rollbar_not_connected')
     const db = getDb(c.env)
-    const now = Date.now()
-    const out: RollbarItem[] = []
-    for (const row of rows) {
-      // Serve-then-revalidate: fresh cached items for this connection short-circuit the API call.
-      const cached = await db
-        .select()
-        .from(schema.issues)
-        .where(and(eq(schema.issues.userId, user.login), eq(schema.issues.integrationId, row.id), eq(schema.issues.provider, PROVIDER)))
-      const freshEnough = cached.length > 0 && cached.every((r) => r.fetchedAt + ROLLBAR_ITEMS_STALE_AFTER_MS > now)
-      if (freshEnough) {
-        out.push(...cached.map((r) => JSON.parse(r.data) as RollbarItem))
-        continue
+    const connections = await listProviderConnections(db, user.login, PROVIDER)
+    if (!connections.length) return respondError(c, 403, 'provider_not_connected')
+
+    const items: RollbarItem[] = []
+    let hadSuccess = false
+    let firstFailure: { status: 401 | 403 | 404 | 429 | 502; error: string; detail?: string[] } | null = null
+    for (const connection of connections) {
+      const result = await runProviderResource<RollbarResourceInput, RollbarResourceOutput>({
+        db,
+        userId: user.login,
+        encryptionKey: c.env.SESSION_ENC_KEY,
+        providerId: PROVIDER,
+        connectionId: connection.id,
+        resourceId: RESOURCE,
+        input: { kind: 'list' },
+      })
+      if (result.ok) {
+        hadSuccess = true
+        items.push(...(result.value as RollbarItem[]))
       }
-      const token = await decryptSecret(row.accessToken, c.env.SESSION_ENC_KEY)
-      if (!token) continue
-      // Track what this connection already contributed: a fetch can fail AFTER some items were
-      // pushed, and the stale-cache fallback below must not emit those items a second time.
-      const pushed = new Set<string>()
-      try {
-        const res = await rollbarFetch(token, itemsPath)
-        const { items } = await rollbarData<{ items: RollbarApiItem[] }>(res)
-        for (const raw of items) {
-          const item = toItem(row.id, raw)
-          out.push(item)
-          pushed.add(item.identifier)
-          await cacheItem(c, user.login, item, now)
-        }
-      } catch {
-        // A failing connection degrades to its cache — minus whatever the fetch already pushed.
-        out.push(...cached.filter((r) => !pushed.has(r.identifier)).map((r) => JSON.parse(r.data) as RollbarItem))
-      }
+      else firstFailure ??= result.failure
     }
-    out.sort((a, b) => (b.lastOccurrenceAt ?? 0) - (a.lastOccurrenceAt ?? 0))
-    return c.json({ items: out } satisfies RollbarItemsResponse)
+    if (!hadSuccess && firstFailure) return respondError(c, firstFailure.status, firstFailure.error, firstFailure.detail)
+    items.sort((a, b) => (b.lastOccurrenceAt ?? 0) - (a.lastOccurrenceAt ?? 0))
+    return c.json({ items } satisfies RollbarItemsResponse)
   })
-  // One item's detail (?integration=<id>) — the provider pane resolves task_links through this.
   .get('/items/:identifier', async (c) => {
+    const connectionId = c.req.query('integration')
+    if (!connectionId) return respondError(c, 400, 'bad_request')
     const user = getUser(c)
-    const identifier = c.req.param('identifier')
-    const integrationId = c.req.query('integration')
-    if (!integrationId) return respondError(c, 400, 'bad_request')
-    const rows = await rollbarRows(c, user.login)
-    const row = rows.find((r) => r.id === integrationId)
-    if (!row) return respondError(c, 403, 'rollbar_not_connected')
-    const db = getDb(c.env)
-    const now = Date.now()
-    const cached = (
-      await db
-        .select()
-        .from(schema.issues)
-        .where(and(eq(schema.issues.userId, user.login), eq(schema.issues.integrationId, integrationId), eq(schema.issues.identifier, identifier)))
-    )[0]
-    if (cached && cached.fetchedAt + ROLLBAR_ITEMS_STALE_AFTER_MS > now) return c.json(JSON.parse(cached.data) as RollbarItem)
-    const token = await decryptSecret(row.accessToken, c.env.SESSION_ENC_KEY)
-    if (!token) return respondError(c, 403, 'rollbar_not_connected')
-    try {
-      const res = await rollbarFetch(token, itemByCounterPath(identifier))
-      const raw = await rollbarData<RollbarApiItem>(res)
-      const item = toItem(integrationId, raw)
-      await cacheItem(c, user.login, item, now)
-      return c.json(item)
-    } catch {
-      if (cached) return c.json(JSON.parse(cached.data) as RollbarItem) // stale beats nothing
-      return respondError(c, 404, 'not_found')
-    }
+    const result = await runProviderResource<RollbarResourceInput, RollbarItem>({
+      db: getDb(c.env),
+      userId: user.login,
+      encryptionKey: c.env.SESSION_ENC_KEY,
+      providerId: PROVIDER,
+      connectionId,
+      resourceId: RESOURCE,
+      input: { kind: 'detail', identifier: c.req.param('identifier') },
+    })
+    return respondResult(c, result)
   })

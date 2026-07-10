@@ -4,6 +4,7 @@
 // off activeTaskId.
 import { createSignal } from 'solid-js'
 import { applyLayoutAction, defaultLayout, type LayoutAction, type PaneId, type TaskLayout } from './layout'
+import { sourceRegistry } from '../../registries/sources'
 
 export type { PaneId, TaskLayout } from './layout'
 
@@ -11,9 +12,8 @@ export type { PaneId, TaskLayout } from './layout'
 // Known core ids stay typed for contributions and UI construction. The live selection deliberately
 // accepts an unknown string so a temporarily missing plugin source remains inert and round-trips
 // through persistence until the user explicitly selects another source.
-export const SOURCE_IDS = ['github', 'linear', 'rollbar'] as const
-export type SourceId = (typeof SOURCE_IDS)[number]
-export const isSourceId = (v: unknown): v is SourceId => typeof v === 'string' && (SOURCE_IDS as readonly string[]).includes(v)
+export type SourceId = string
+export const isSourceId = (v: unknown): v is SourceId => typeof v === 'string' && (v === 'github' || !!sourceRegistry.get(v))
 const [selectedSource, setSelectedSource] = createSignal<string | null>('github')
 
 // Per-workspace memory of the last view — a rail source (browse) or a task — so switching workspaces

@@ -2,10 +2,11 @@ import { createSignal, For, Show } from 'solid-js'
 import { useNavigate, useParams } from '@solidjs/router'
 import { createQuery, useQueryClient } from '@tanstack/solid-query'
 import { linearProjectsOptions, tasksKey, workspaceProjectsKey, workspaceProjectsOptions, workspaceLinearIssuesOptions, workspacesOptions } from '../../queries'
-import { createTask, setWorkspaceProjects } from '../../mutations'
+import { setWorkspaceProjects } from '../../mutations'
 import type { LinearProjectIssue, WorkspaceProject } from '../../../shared/api'
 import { workspaceForRepo } from '../workspaces/activeWorkspace'
 import { activateTaskSignals } from './activate'
+import { sourceRegistry, type SourceContribution } from '../../registries/sources'
 
 // The Linear Source browse (docs/workspaces 04). Linear projects are linked at the WORKSPACE level
 // and may span several connected Linear workspaces; each linked project is an (integrationId,
@@ -52,15 +53,11 @@ export default function LinearBrowse() {
   async function promote(it: LinearProjectIssue) {
     const { owner, repo } = params
     if (!owner || !repo) return
-    const branch = it.branchName || it.identifier.toLowerCase()
-    const w = await createTask({
-      origin: 'linear',
-      repoOwner: owner,
-      repoName: repo,
-      branch,
-      title: `${it.identifier} ${it.title}`,
-      links: [{ integrationId: it.integrationId, provider: 'linear', identifier: it.identifier }],
-    })
+    const promotion = (sourceRegistry.get('linear') as SourceContribution<LinearProjectIssue>).promotion
+    const context = { owner, repo }
+    if (!promotion.canPromote(it, context)) return
+    const w = await promotion.create(await promotion.prepare(it, context))
+    await promotion.afterCreate?.(w, it, context)
     await qc.invalidateQueries({ queryKey: tasksKey })
     activateTaskSignals(w, { pane: 'linear' }) // a promoted ticket lands on its Linear pane
     navigate(`/${owner}/${repo}`)

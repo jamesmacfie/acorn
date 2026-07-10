@@ -22,6 +22,7 @@ import { confirmWillEvent } from '../../registries/willPhase'
 import { saveJsonPref } from '../settings/savePref'
 import { PrefKeys } from '../../persistence/prefKeys'
 import { completeTaskArchive } from '../tasks/archiveLifecycle'
+import { sourceRegistry } from '../../registries/sources'
 import './tabrail.css'
 
 // The Tasks zone of the left rail (docs/workspaces). Rows are real Task entities (not path
@@ -30,7 +31,7 @@ import './tabrail.css'
 // shared .overlay shell. (Electron's BrowserWindow has no window.prompt, so we can't shortcut.)
 
 // Origin → glyph; cosmetic, replaces the old cycled icon.
-const ORIGIN_GLYPH: Record<Task['origin'], string> = { 'github-pr': '⌥', linear: '◷', rollbar: '◍', local: '●' }
+const originGlyph = (origin: string) => ({ 'github-pr': '⌥', local: '●' })[origin] ?? sourceRegistry.get(origin)?.glyph ?? '●'
 
 type Draft = { mode: 'new' } | { mode: 'rename'; w: Task }
 
@@ -287,7 +288,7 @@ export default function TabRail() {
                 aria-label={w.title}
                 onClick={() => onRowClick(w)}
               >
-                {wsGlyph() ?? ORIGIN_GLYPH[w.origin] ?? '●'}
+                {wsGlyph() ?? originGlyph(w.origin)}
               </button>
               <Show when={w.pullNumber != null && checks().length}>
                 <span class={`tabrail-checks checks-dot checks-dot-${checksState(checks())}`} title="PR checks" />

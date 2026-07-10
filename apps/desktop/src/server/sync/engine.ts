@@ -58,12 +58,12 @@ const dedupe = (key: string, refresh: () => Promise<RefreshResult>): Promise<Ref
 // retention sweep is warranted only if the resource key space ever grows without bound.
 const backoffUntil = new Map<string, number>()
 
-const scheduleBackgroundRefresh = (key: string, refresh: () => Promise<RefreshResult>): void => {
+const scheduleBackgroundRefresh = (key: string, refresh: () => Promise<RefreshResult>, backoffMs: number): void => {
   if (Date.now() < (backoffUntil.get(key) ?? 0)) return // backed off — keep serving stale, skip the doomed call
   trackBackgroundRefresh(
     key,
     dedupe(key, refresh).then((r) => {
-      if (!r.ok && r.failure.status === 429) backoffUntil.set(key, Date.now() + RATE_LIMIT_BACKOFF_MS)
+      if (!r.ok && r.failure.status === 429) backoffUntil.set(key, Date.now() + backoffMs)
     }),
   )
 }
@@ -74,6 +74,7 @@ export async function serveThenRevalidate<T>(opts: {
   resource: string // opaque, caller-defined
   userId: string // scopes the in-flight dedupe / backoff key — mirrors are per-user, so flow state must be too
   ttlMs: number
+  backoffMs?: number
   force?: boolean // bypass cache and block on a fresh refresh (e.g. ?force=true)
   read: () => Promise<Cached<T> | null>
   refresh: () => Promise<RefreshResult>
@@ -84,7 +85,7 @@ export async function serveThenRevalidate<T>(opts: {
 
   // Fresh, or stale: serve the cache. Stale also kicks a background revalidate (deduped, backoff-aware).
   if (cached && decision !== 'cold') {
-    if (decision === 'stale') scheduleBackgroundRefresh(key, opts.refresh)
+    if (decision === 'stale') scheduleBackgroundRefresh(key, opts.refresh, opts.backoffMs ?? RATE_LIMIT_BACKOFF_MS)
     return { ok: true, value: cached.data }
   }
 

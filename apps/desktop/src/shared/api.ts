@@ -1,4 +1,12 @@
 import type { NoteLocation } from './notes'
+import type {
+  ExternalRef,
+  IntegrationAuthKind,
+  IntegrationConnectionStatus,
+  ProviderAccountRef,
+  ProviderErrorCode,
+  PublicIntegrationProvider,
+} from './integrations'
 
 // The one error envelope every /api route returns. `error` is a stable machine code
 // (see docs/api-reference.md §error-codes); `detail` carries human/upstream prose.
@@ -84,17 +92,25 @@ export type FileBlob = { text: string }
 // --- Integrations: multi-row per provider (docs/workspaces 04). GitHub appears as a synthesized
 // entry (id 'github') so it reads as "just another integration", but it's the identity root — its
 // token is the session cookie, not a stored row. ---
-export type IntegrationProvider = 'github' | 'linear' | 'rollbar'
+export type IntegrationProvider = string
 export type Integration = {
   id: string // 'github' for the synthesized entry; opaque uuid otherwise
-  provider: IntegrationProvider
+  providerId: IntegrationProvider
   label: string
-  connected: boolean
-  workspace?: string // provider-specific display hint (e.g. Linear org name), from meta
+  status: IntegrationConnectionStatus
+  authKind: IntegrationAuthKind
+  account: ProviderAccountRef | null
+  scopes: string[]
+  capabilities: Record<string, 'available' | 'missing-scope' | 'degraded'>
+  createdAt: number
+  updatedAt: number
+  lastValidatedAt?: number
+  lastError?: ProviderErrorCode
 }
-export type IntegrationsResponse = { integrations: Integration[] }
-// Connect a provider by pasting a token; server validates + encrypts it, returns the new row.
-export type ConnectIntegrationRequest = { provider: Exclude<IntegrationProvider, 'github'>; token: string }
+export type IntegrationsResponse = { providers: PublicIntegrationProvider[]; integrations: Integration[] }
+// Credential values are write-only: the response contains only the normalized connection summary.
+export type ConnectIntegrationRequest = { providerId: IntegrationProvider; credentials: Record<string, string> }
+export type RotateIntegrationRequest = { credentials: Record<string, string> }
 export type LinearIssueState = { name: string; type: string; color: string } | null
 export type LinearIssueSummary = { identifier: string; title: string; url: string; state: LinearIssueState; assignee: string | null }
 export type LinearComment = { id: string; author: string | null; body: string; createdAt: number | null; parentId: string | null }
@@ -167,15 +183,16 @@ export type WorkspaceSeed = { name: string }
 export type RepoAssignment = { owner: string; name: string; workspaceId: string; ignored: boolean }
 
 // --- Tasks: the single-repo unit of work (docs/workspaces/03). Rail rows. ---
-// integrationId pins the link to a specific connection; provider is denormalized for filtering.
-export type TaskLink = { integrationId: string; provider: string; identifier: string }
+// connectionId pins the link to a specific credential. providerId is stamped by core from that row.
+export type TaskLink = { connectionId: string; providerId: string; identifier: string; ref?: ExternalRef }
+export type TaskLinkSeed = { connectionId: string; identifier: string; ref?: Omit<ExternalRef, 'providerId' | 'connectionId'>; providerId?: string }
 // A workspace's linked external projects (docs/workspaces 04) — (integrationId, externalId) pairs.
 export type WorkspaceProject = { integrationId: string; externalId: string }
 export type WorkspaceProjectsResponse = { projects: WorkspaceProject[] }
 export type Task = {
   id: string
   title: string
-  origin: 'github-pr' | 'linear' | 'rollbar' | 'local'
+  origin: string
   repoOwner: string
   repoName: string
   branch: string
@@ -195,7 +212,7 @@ export type TaskSeed = {
   repoName: string
   branch: string
   pullNumber?: number
-  links?: TaskLink[]
+  links?: TaskLinkSeed[]
 }
 
 // Assembled task context (docs/next 11 §C): section contributions serialize their renderer
@@ -206,7 +223,12 @@ export type ContextBudget = {
   maxBytesPerItem?: number
   overflow: 'truncate-tail' | 'index-only' | 'omit-with-marker'
 }
-export type ContextPaneIntent = { pane: string; itemId?: string; noteScope?: 'global' | 'workspace' | 'task' }
+export type ContextPaneIntent = {
+  pane: string
+  itemId?: string
+  noteScope?: 'global' | 'workspace' | 'task'
+  ref?: ExternalRef
+}
 export type ContextItem = {
   id: string
   kind: string
@@ -396,12 +418,16 @@ export const reviewNotesSentRoute = (taskId: string) => `/api/tasks/${taskId}/re
 export const reviewNotesKey = (taskId: string) => ['review-notes', taskId] as const
 export const integrationsRoute = '/api/integrations'
 export const integrationRoute = (id: string) => `/api/integrations/${id}`
+export const integrationTestRoute = (id: string) => `/api/integrations/${id}/test`
 export const linearIssuesRoute = '/api/linear/issues'
 export const linearProjectsRoute = '/api/linear/projects'
 export const linearProjectIssuesRoute = (integrationId: string, projectIds: string[]) =>
   `/api/linear/project-issues?integration=${encodeURIComponent(integrationId)}&ids=${encodeURIComponent(projectIds.join(','))}`
-export const linearIssueRoute = (identifier: string) => `/api/linear/issues/${encodeURIComponent(identifier)}?refresh=1`
-export const linearCommentsRoute = (identifier: string) => `/api/linear/issues/${encodeURIComponent(identifier)}/comments`
+const connectionQuery = (connectionId?: string) => (connectionId ? `&integration=${encodeURIComponent(connectionId)}` : '')
+export const linearIssueRoute = (identifier: string, connectionId?: string) =>
+  `/api/linear/issues/${encodeURIComponent(identifier)}?refresh=1${connectionQuery(connectionId)}`
+export const linearCommentsRoute = (identifier: string, connectionId?: string) =>
+  `/api/linear/issues/${encodeURIComponent(identifier)}/comments${connectionId ? `?integration=${encodeURIComponent(connectionId)}` : ''}`
 
 export const meKey = ['me'] as const
 export const reposKey = ['repos'] as const
@@ -430,13 +456,12 @@ export const tasksKey = ['tasks'] as const
 export const mentionsKey = (owner: string, repo: string) => ['mentions', owner, repo] as const
 export const runJobsKey = (owner: string, repo: string, runId: number) => ['run-jobs', owner, repo, runId] as const
 export const jobLogKey = (owner: string, repo: string, jobId: number) => ['job-log', owner, repo, jobId] as const
-// 'v2' suffix: the bare ['integrations'] key held the old IntegrationsStatus shape ({ linear }),
-// which may still be in a user's persisted IndexedDB cache — restoring it under the new shape
-// ({ integrations: [] }) would poison reads (.integrations is undefined). Distinct key sidesteps the
-// stale entry (same fix as workspacesKey/closedPullsKey).
-export const integrationsKey = ['integrations', 'v2'] as const
+// v3 adds descriptor metadata and normalized connection summaries. A distinct key prevents a
+// persisted v2 `{ provider, connected }` row from hiding registry-driven sources/settings.
+export const integrationsKey = ['integrations', 'v3'] as const
 export const linearIssuesKey = (identifiers: string[]) => ['linear-issues', ...[...identifiers].sort()] as const
 export const linearProjectsKey = ['linear-projects'] as const
 export const linearProjectIssuesKey = (integrationId: string, projectIds: string[]) =>
   ['linear-project-issues', integrationId, ...[...projectIds].sort()] as const
-export const linearIssueKey = (identifier: string) => ['linear-issue', identifier] as const
+export const linearIssueKey = (identifier: string, connectionId?: string) =>
+  ['linear-issue', connectionId ?? 'unscoped', identifier] as const

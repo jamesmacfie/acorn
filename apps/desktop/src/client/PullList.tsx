@@ -90,9 +90,9 @@ export default function PullList() {
     // sole Linear connection when there's exactly one; with 0 or 2+ we can't disambiguate cheaply, so
     // skip seeding (the Linear pane still resolves bare ids server-side across connections).
     const integrations = await queryClient.ensureQueryData(integrationsOptions(true)).catch(() => null)
-    const linears = (integrations?.integrations ?? []).filter((i) => i.provider === 'linear' && i.connected)
+    const linears = (integrations?.integrations ?? []).filter((i) => i.providerId === 'linear' && i.status === 'connected')
     const soleLinear = linears.length === 1 ? linears[0].id : null
-    const links = soleLinear ? scanLinearRefs([detail?.pull?.body]).map((r) => ({ integrationId: soleLinear, provider: 'linear', identifier: r.identifier })) : []
+    const links = soleLinear ? scanLinearRefs([detail?.pull?.body]).map((r) => ({ connectionId: soleLinear, identifier: r.identifier, ref: { displayId: r.identifier, url: r.url } })) : []
     const w = await createTask({ origin: 'github-pr', repoOwner: owner, repoName: repo, branch: pr.headRef, pullNumber: pr.number, links })
     await queryClient.invalidateQueries({ queryKey: tasksKey })
     activateTaskSignals(w, { pane: 'pr' })

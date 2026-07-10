@@ -21,7 +21,7 @@ export function activateTaskSignals(t: Task, options?: { pane?: PaneId }): void 
   // First open: a PR-less task with a Linear link starts on 'linear'; everything else on 'pr'
   // (also the reducer's default, but seeding it keeps the persisted layout explicit).
   if (layoutForTask(t.id) == null) {
-    const hasLinear = t.links.some((l) => l.provider === 'linear')
+    const hasLinear = t.links.some((l) => l.providerId === 'linear')
     dispatchLayout(t.id, { type: 'show', pane: !t.pullNumber && hasLinear ? 'linear' : 'pr' })
   }
 }

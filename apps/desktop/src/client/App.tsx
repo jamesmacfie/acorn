@@ -1,6 +1,7 @@
 import { createEffect, createSignal, Match, on, onCleanup, onMount, Show, Switch, untrack } from 'solid-js'
 import { createQuery, useIsRestoring, useQueryClient } from '@tanstack/solid-query'
 import { useMatch, useNavigate, useParams } from '@solidjs/router'
+import { Dynamic } from 'solid-js/web'
 import { clear } from 'idb-keyval'
 import { readJson } from './apiClient'
 import { meKey, meOptions, pinsOptions, prefsOptions, pullPrefixKey, pullsKey, pullsRoute, pullsPrefixKey, reposKey, reposOptions, reposRefreshRoute, tasksOptions, workspacesKey, workspacesOptions, type Pull } from './queries'
@@ -27,8 +28,6 @@ import { activateTaskSignals, pathForTask } from './features/tasks/activate'
 import { taskStatus } from './features/tasks/taskStatus'
 import { capabilities } from './features/capabilities'
 import TaskView from './features/tasks/TaskView'
-import LinearBrowse from './features/tasks/LinearBrowse'
-import RollbarBrowse from './features/tasks/RollbarBrowse'
 import Acorn from './Acorn'
 import { registerCommands } from './registries/commands'
 import { KeybindingDispatcher, registerKeybindings } from './registries/keybindings'
@@ -37,6 +36,7 @@ import { startClientPollers } from './registries/pollers'
 import { SlotHost, type UiSlotContext } from './registries/uiSlots'
 import { createAppStartupRestore } from './persistence/appStartup'
 import { PrefKeys } from './persistence/prefKeys'
+import { sourceRegistry } from './registries/sources'
 
 // Layout root (Router root): top bar + three panes. Panes are params-driven — PullList (left)
 // and PullDetail (mid) read useParams() directly; routes exist only to populate params.
@@ -417,11 +417,8 @@ export default function App() {
           </Show>
         }
       >
-        <Match when={selectedSource() === 'linear'}>
-          <LinearBrowse />
-        </Match>
-        <Match when={selectedSource() === 'rollbar'}>
-          <RollbarBrowse />
+        <Match when={sourceRegistry.get(selectedSource() ?? '')?.component}>
+          {(component) => <Dynamic component={component()} />}
         </Match>
         <Match when={!selectedSource() && activeTask()}>
           {/* Key the task surface by id so changing tasks disposes the old task scope before the new

@@ -89,7 +89,13 @@ describe('GET /api/tasks/:id/context (docs/next 11 §C)', () => {
         integrationId: 'lin1',
         provider: 'linear',
         identifier: 'ENG-42',
-        data: JSON.stringify({ title: 'Login crashes for SSO users', state: { name: 'In Progress' } }),
+        data: JSON.stringify({
+          identifier: 'ENG-42',
+          title: 'Login crashes for SSO users',
+          url: 'https://linear.app/acme/issue/ENG-42',
+          state: { name: 'In Progress', type: 'started', color: '#55f' },
+          assignee: null,
+        }),
         fetchedAt: now,
       },
     ])
@@ -124,7 +130,7 @@ describe('GET /api/tasks/:id/context (docs/next 11 §C)', () => {
     })
     expect(ctx.issues).toEqual([
       { provider: 'linear', identifier: 'ENG-42', title: 'Login crashes for SSO users', detail: 'In Progress', cache: 'present' },
-      { provider: 'rollbar', identifier: '142', title: '142', detail: '', cache: 'missing' },
+      { provider: 'rollbar', identifier: '142', title: '142', detail: 'Cache: missing', cache: 'missing' },
     ])
     expect(ctx.sections.map((section) => section.id)).toEqual(['pr', 'issues', 'notes', 'memory'])
     expect(ctx.sections.find((section) => section.id === 'issues')?.absent?.reason).toBe('missing-cache')

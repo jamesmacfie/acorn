@@ -1,5 +1,6 @@
-import { createResource, createSignal, For, Show } from 'solid-js'
+import { createResource, createSignal, For, onCleanup, onMount, Show } from 'solid-js'
 import { readJson } from '../../apiClient'
+import { clientEvents, consumePaneIntent } from '../../registries/clientEvents'
 import { rollbarItemRoute, type RollbarItem, type Task, type TaskLink } from '../../../shared/api'
 
 const fmt = (at: number | null): string => (at ? new Date(at).toLocaleString() : '—')
@@ -8,19 +9,32 @@ const fmt = (at: number | null): string => (at ? new Date(at).toLocaleString() :
 // task_links → the /api/rollbar detail route (which serves the `issues` cache). A chip strip
 // switches between several linked items, mirroring the Linear panel's shape.
 export default function RollbarPane(props: { task: Task }) {
-  const links = () => props.task.links.filter((l) => l.provider === 'rollbar')
+  const links = () => props.task.links.filter((l) => l.providerId === 'rollbar')
+  const linkKey = (link: Pick<TaskLink, 'connectionId' | 'identifier'>) => `${link.connectionId}:${link.identifier}`
   const [picked, setPicked] = createSignal<string | null>(null)
-  const current = (): TaskLink | undefined => links().find((l) => l.identifier === picked()) ?? links()[0]
+  const applyIntent = (intent: ReturnType<typeof consumePaneIntent>) => {
+    if (intent?.kind === 'integration:show-ref' && intent.ref.providerId === 'rollbar') {
+      setPicked(linkKey({ connectionId: intent.ref.connectionId, identifier: intent.ref.displayId }))
+    }
+  }
+  onMount(() => {
+    applyIntent(consumePaneIntent(props.task.id, 'rollbar'))
+    const dispose = clientEvents.on('presentation:pane-intent', ({ taskId, paneId, intent }) => {
+      if (taskId === props.task.id && paneId === 'rollbar') applyIntent(intent)
+    })
+    onCleanup(dispose)
+  })
+  const current = (): TaskLink | undefined => links().find((link) => linkKey(link) === picked()) ?? links()[0]
 
   const [item] = createResource(
     () => {
       const link = current()
-      return link ? `${link.integrationId}:${link.identifier}` : null
+      return link ? `${link.connectionId}:${link.identifier}` : null
     },
     async () => {
       const link = current()
       if (!link) return null
-      return readJson<RollbarItem>(rollbarItemRoute(link.integrationId, link.identifier)).catch(() => null)
+      return readJson<RollbarItem>(rollbarItemRoute(link.connectionId, link.identifier)).catch(() => null)
     },
   )
 
@@ -32,7 +46,7 @@ export default function RollbarPane(props: { task: Task }) {
           <div class="rollbar-chips">
             <For each={links()}>
               {(l) => (
-                <button type="button" class="rollbar-chip" classList={{ active: current()?.identifier === l.identifier }} onClick={() => setPicked(l.identifier)}>
+                <button type="button" class="rollbar-chip" classList={{ active: current() ? linkKey(current()!) === linkKey(l) : false }} onClick={() => setPicked(linkKey(l))}>
                   #{l.identifier}
                 </button>
               )}

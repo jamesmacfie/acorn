@@ -4,7 +4,13 @@ import { getDb, schema } from '../db'
 import type { AppEnv } from '../middleware/auth'
 import { respondError } from '../respond'
 import { Hono } from 'hono'
-import type { Task, TaskLink, TaskSeed } from '../../shared/api'
+import type { Task, TaskLink, TaskLinkSeed, TaskSeed } from '../../shared/api'
+import type { ExternalRef } from '../../shared/integrations'
+import { externalRefForConnection, getConnection } from '../integrations/connections'
+import { ProviderOperationError } from '../integrations/types'
+import { getUser } from '../middleware/requireUser'
+import '../integrations/providers'
+import { integrationProviderRegistry } from '../integrations/registry'
 
 // Tasks (docs/workspaces): the single-repo unit of work. Machine-scoped like repo_paths /
 // terminal_sessions — no user_id — but still auth-gated (it's a logged-in app). CRUD: create /
@@ -30,6 +36,44 @@ function rowToTask(row: Row, links: TaskLink[]): Task {
   }
 }
 
+type LinkInput = Partial<TaskLinkSeed> & { integrationId?: string; provider?: string }
+
+const parseLinkInput = (input: LinkInput): { connectionId: string; identifier: string; ref?: Partial<ExternalRef>; claimedProviderId?: string } | null => {
+  const connectionId = input.connectionId ?? input.integrationId
+  if (!connectionId || !input.identifier) return null
+  return { connectionId, identifier: input.identifier, ref: input.ref, claimedProviderId: input.providerId ?? input.provider }
+}
+
+const rowLink = (row: typeof schema.taskLinks.$inferSelect): TaskLink => {
+  let ref: ExternalRef | undefined
+  try {
+    const fallback = { providerId: row.provider, connectionId: row.integrationId, displayId: row.identifier }
+    ref = row.refJson
+      ? integrationProviderRegistry.get(row.provider)?.externalIds.parse(JSON.parse(row.refJson), fallback) ?? undefined
+      : undefined
+  } catch {
+    ref = undefined
+  }
+  return { connectionId: row.integrationId, providerId: row.provider, identifier: row.identifier, ref }
+}
+
+async function stampedLink(db: ReturnType<typeof getDb>, userId: string, input: LinkInput) {
+  const parsed = parseLinkInput(input)
+  if (!parsed) throw new ProviderOperationError('provider_bad_config', 400)
+  const connection = await getConnection(db, userId, parsed.connectionId)
+  if (!connection) throw new ProviderOperationError('provider_not_connected', 403)
+  if (parsed.claimedProviderId && parsed.claimedProviderId !== connection.provider) {
+    throw new ProviderOperationError('provider_bad_config', 400)
+  }
+  const ref = externalRefForConnection(connection, parsed.identifier, parsed.ref)
+  return {
+    connectionId: connection.id,
+    providerId: connection.provider,
+    identifier: parsed.identifier,
+    ref,
+  } satisfies TaskLink
+}
+
 export const tasks = new Hono<AppEnv>()
   .get('/', async (c) => {
     const db = getDb(c.env)
@@ -40,7 +84,7 @@ export const tasks = new Hono<AppEnv>()
     const byTask = new Map<string, TaskLink[]>()
     for (const l of linkRows) {
       const list = byTask.get(l.taskId) ?? []
-      list.push({ integrationId: l.integrationId, provider: l.provider, identifier: l.identifier })
+      list.push(rowLink(l))
       byTask.set(l.taskId, list)
     }
     return c.json(rows.map((r) => rowToTask(r, byTask.get(r.id) ?? [])))
@@ -49,6 +93,15 @@ export const tasks = new Hono<AppEnv>()
     const seed = (await c.req.json().catch(() => ({}))) as Partial<TaskSeed>
     if (!seed.origin || !seed.repoOwner || !seed.repoName || !seed.branch) return respondError(c, 400, 'bad_request')
     const db = getDb(c.env)
+    const user = getUser(c)
+    const linkInputs = Array.isArray(seed.links) ? (seed.links as LinkInput[]) : []
+    let links: TaskLink[]
+    try {
+      links = await Promise.all(linkInputs.map((link) => stampedLink(db, user.login, link)))
+    } catch (error) {
+      if (error instanceof ProviderOperationError) return respondError(c, error.status, error.code)
+      throw error
+    }
     const [{ value }] = await db.select({ value: max(schema.tasks.sort) }).from(schema.tasks)
     const now = Date.now()
     const id = randomUUID()
@@ -69,11 +122,10 @@ export const tasks = new Hono<AppEnv>()
       updatedAt: now,
       archivedAt: null,
     })
-    const links = (seed.links ?? []).filter((l) => l.integrationId && l.provider && l.identifier)
     if (links.length) {
       await db
         .insert(schema.taskLinks)
-        .values(links.map((l) => ({ taskId: id, integrationId: l.integrationId, provider: l.provider, identifier: l.identifier, createdAt: now })))
+        .values(links.map((l) => ({ taskId: id, integrationId: l.connectionId, provider: l.providerId, identifier: l.identifier, refJson: l.ref ? JSON.stringify(l.ref) : null, createdAt: now })))
         .onConflictDoNothing()
     }
     return c.json(
@@ -103,28 +155,35 @@ export const tasks = new Hono<AppEnv>()
   // create-time insert above — same onConflictDoNothing, so a duplicate add is a no-op.
   .post('/:id/links', async (c) => {
     const id = c.req.param('id')
-    const body = (await c.req.json().catch(() => ({}))) as Partial<TaskLink>
-    if (!body.integrationId || !body.provider || !body.identifier) return respondError(c, 400, 'bad_request')
+    const body = (await c.req.json().catch(() => ({}))) as LinkInput
     const db = getDb(c.env)
     const [t] = await db.select().from(schema.tasks).where(eq(schema.tasks.id, id))
     if (!t) return respondError(c, 404, 'not_found')
+    let link: TaskLink
+    try {
+      link = await stampedLink(db, getUser(c).login, body)
+    } catch (error) {
+      if (error instanceof ProviderOperationError) return respondError(c, error.status, error.code)
+      throw error
+    }
     await db
       .insert(schema.taskLinks)
-      .values({ taskId: id, integrationId: body.integrationId, provider: body.provider, identifier: body.identifier, createdAt: Date.now() })
+      .values({ taskId: id, integrationId: link.connectionId, provider: link.providerId, identifier: link.identifier, refJson: link.ref ? JSON.stringify(link.ref) : null, createdAt: Date.now() })
       .onConflictDoNothing()
     return c.json({ ok: true })
   })
   .delete('/:id/links', async (c) => {
     const id = c.req.param('id')
-    const body = (await c.req.json().catch(() => ({}))) as Partial<Pick<TaskLink, 'integrationId' | 'identifier'>>
-    if (!body.integrationId || !body.identifier) return respondError(c, 400, 'bad_request')
+    const body = (await c.req.json().catch(() => ({}))) as Partial<Pick<TaskLink, 'connectionId' | 'identifier'>> & { integrationId?: string }
+    const connectionId = body.connectionId ?? body.integrationId
+    if (!connectionId || !body.identifier) return respondError(c, 400, 'bad_request')
     const db = getDb(c.env)
     await db
       .delete(schema.taskLinks)
       .where(
         and(
           eq(schema.taskLinks.taskId, id),
-          eq(schema.taskLinks.integrationId, body.integrationId),
+          eq(schema.taskLinks.integrationId, connectionId),
           eq(schema.taskLinks.identifier, body.identifier),
         ),
       )

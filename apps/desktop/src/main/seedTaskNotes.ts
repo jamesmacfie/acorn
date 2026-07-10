@@ -22,6 +22,9 @@ type PrComposite = {
 }
 type LinearDetail = { identifier: string; title?: string; description?: string | null }
 
+export const linearIssueSeedUrl = (base: string, link: { integrationId: string; identifier: string }) =>
+  `${base}/api/linear/issues/${encodeURIComponent(link.identifier)}?refresh=1&integration=${encodeURIComponent(link.integrationId)}`
+
 const byCreated = (a: PrComment, b: PrComment) => (a.createdAt ?? 0) - (b.createdAt ?? 0)
 
 // The PR conversation as one note body: review verdicts, then top-level comments, then inline
@@ -82,7 +85,7 @@ export async function seedTaskNotes(db: AppDatabase, notesStore: NotesStore, int
   const links = await db.select().from(schema.taskLinks).where(eq(schema.taskLinks.taskId, task.id))
   for (const link of links.filter((l) => l.provider === 'linear')) {
     // refresh=1 forces a live refetch so the description is current at seed time.
-    const issue = await fetchJson<LinearDetail>(`${base}/api/linear/issues/${encodeURIComponent(link.identifier)}?refresh=1`, token)
+    const issue = await fetchJson<LinearDetail>(linearIssueSeedUrl(base, link), token)
     if (issue) await seed(`${issue.identifier}: ${issue.title ?? ''}`.trim(), issue.description?.trim() || '_(no description)_')
   }
 }

@@ -11,6 +11,7 @@ import {
   linearCommentsRoute,
   integrationsRoute,
   integrationRoute,
+  integrationTestRoute,
   pinsRoute,
   prefsRoute,
   pullRoute,
@@ -23,6 +24,7 @@ import {
   taskRoute,
   tasksRoute,
   type TaskLink,
+  type TaskLinkSeed,
   type PreviewMode,
   type SetupTrigger,
   type Task,
@@ -70,17 +72,23 @@ export const submitReview = (o: string, r: string, n: string, event: string, bod
 
 export const addLabel = (o: string, r: string, n: string, name: string) => post(pullRoute(o, r, n, 'labels'), { name })
 
-// Connect an integration by pasting a token (server validates + encrypts it, returns the new row).
-// Throws 'invalid_key' on rejection. Multiple connections per provider are allowed.
-export const connectIntegration = (provider: ConnectIntegrationRequest['provider'], token: string) =>
-  post<{ integration: Integration }>(integrationsRoute, { provider, token } satisfies ConnectIntegrationRequest)
+// Provider descriptors define write-only credential fields; core validates, encrypts, and stores.
+export const connectIntegration = (providerId: string, credentials: Record<string, string>) =>
+  post<{ integration: Integration }>(integrationsRoute, { providerId, credentials } satisfies ConnectIntegrationRequest)
+export const rotateIntegration = (id: string, credentials: Record<string, string>) =>
+  writeJson<{ integration: Integration }>(integrationRoute(id), {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ credentials }),
+  })
+export const testIntegration = (id: string) => post<{ integration: Integration }>(integrationTestRoute(id))
 export const deleteIntegration = async (id: string) => {
   const res = await fetch(integrationRoute(id), { method: 'DELETE' })
   if (!res.ok) throw new ApiError(await apiError(res, `${res.status}`), res.status)
 }
 // Add a comment / threaded reply to a Linear ticket; caller refetches the issue after.
-export const postLinearComment = (identifier: string, body: string, parentId?: string) =>
-  post<{ ok: true }>(linearCommentsRoute(identifier), { body, parentId } satisfies LinearCommentRequest)
+export const postLinearComment = (identifier: string, body: string, parentId?: string, connectionId?: string) =>
+  post<{ ok: true }>(linearCommentsRoute(identifier, connectionId), { body, parentId } satisfies LinearCommentRequest)
 export const removeLabel = async (o: string, r: string, n: string, name: string) => {
   const res = await fetch(pullRoute(o, r, n, 'labels'), {
     method: 'DELETE',
@@ -197,8 +205,8 @@ export const deleteReviewNote = (taskId: string, noteId: string) =>
 export const markReviewNotesSent = (taskId: string, ids: string[]) => post<{ ok: true }>(reviewNotesSentRoute(taskId), { ids })
 
 // Grow/shrink a task's links after creation (docs/next 11 §A). Callers invalidate tasksKey after.
-export const addTaskLink = (id: string, link: TaskLink) => post<{ ok: boolean }>(taskLinksRoute(id), link)
-export const removeTaskLink = (id: string, ref: Pick<TaskLink, 'integrationId' | 'identifier'>) =>
+export const addTaskLink = (id: string, link: TaskLinkSeed) => post<{ ok: boolean }>(taskLinksRoute(id), link)
+export const removeTaskLink = (id: string, ref: Pick<TaskLink, 'connectionId' | 'identifier'>) =>
   writeJson<{ ok: boolean }>(taskLinksRoute(id), {
     method: 'DELETE',
     headers: { 'Content-Type': 'application/json' },

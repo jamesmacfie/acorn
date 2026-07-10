@@ -280,12 +280,14 @@ stores it encrypted (`encryptSecret`) — **App-state** otherwise.
 
 | Method | Path | Purpose | Body |
 | --- | --- | --- | --- |
-| `GET` | `/api/integrations` | List integrations (synthesized `github` + connected rows). | → `{ integrations: Integration[] }` |
-| `POST` | `/api/integrations` | Connect Linear or Rollbar by pasting a token; validated + encrypted. | `{ provider, token }` → `{ integration }` |
-| `DELETE` | `/api/integrations/:id` | Disconnect; cascades its workspace-project links, cached issues, and task links → `204`. | — |
+| `GET` | `/api/integrations` | Public provider catalog plus synthesized/stored connection summaries. | → `{ providers, integrations }` |
+| `POST` | `/api/integrations` | Descriptor-driven validate/normalize/encrypt/store. | `{ providerId, credentials }` → `{ integration }` |
+| `PUT` | `/api/integrations/:id` | Rotate credentials while preserving connection identity and linked state. | `{ credentials }` |
+| `POST` | `/api/integrations/:id/test` | Test health and update connection status. | — |
+| `PATCH` | `/api/integrations/:id` | Disable/re-enable without deleting linked state. | `{ disabled }` |
+| `DELETE` | `/api/integrations/:id` | Disconnect; cascades workspace bindings, cached issues, and task links → `204`. | — |
 
-Errors: `400 bad_request` (missing token), `400 unsupported_provider`, `400 invalid_key` (token
-failed provider validation), `400 cannot_disconnect_github`. See [integrations](./integrations.md).
+Errors use the generic `provider_*` taxonomy listed below. See [integrations](./integrations.md).
 
 ---
 
@@ -301,11 +303,11 @@ an explicit `?integration=<id>`.
 | `GET` | `/api/linear/projects` | Projects across every connected Linear, each tagged with its connection. | → `{ projects: LinearProject[] }` |
 | `GET` | `/api/linear/project-issues` | Active issues for project ids within one connection. | `?integration=<id>&ids=a,b` |
 | `POST` | `/api/linear/issues` | Batch enrichment for referenced tickets → summaries (STR, cached). | `{ identifiers: string[] }` → `{ issues }` |
-| `GET` | `/api/linear/issues/:identifier` | Full detail for the side panel. | `?refresh=1` forces refetch |
-| `POST` | `/api/linear/issues/:identifier/comments` | Add a comment (or threaded reply via `parentId`). | `{ body, parentId? }` |
+| `GET` | `/api/linear/issues/:identifier` | Full detail for the side panel. | `?refresh=1`; task-scoped reads also pass `&integration=<connectionId>` |
+| `POST` | `/api/linear/issues/:identifier/comments` | Add a comment (or threaded reply via `parentId`). | `?integration=<connectionId>` for task links; `{ body, parentId? }` |
 
-Errors: `403 linear_not_connected` (no connection / bad key), `404 not_found`, `400 bad_request`,
-`502 comment_failed`; upstream errors surface the Linear status.
+Errors: `provider_not_connected`, `provider_needs_auth`, `provider_resource_not_found`,
+`provider_unavailable`, plus `bad_request` for malformed comment bodies.
 
 ---
 
@@ -320,7 +322,8 @@ cached into `issues` (provider `rollbar`, identifier = the visible counter) with
 | `GET` | `/api/rollbar/items` | Recent active items across every connected Rollbar project, cached. | — |
 | `GET` | `/api/rollbar/items/:identifier` | One item's detail. | `?integration=<id>` (required) |
 
-Errors: `403 rollbar_not_connected`, `400 bad_request` (missing `integration`), `404 not_found`.
+Errors: `provider_not_connected`, `provider_needs_auth`, `provider_resource_not_found`,
+`provider_unavailable`, plus `bad_request` for a missing `integration` parameter.
 
 ---
 
@@ -681,21 +684,21 @@ the `error` values below are the stable machine codes, and `detail` (when presen
 | Code | Error | Meaning |
 | --- | --- | --- |
 | `400` | `bad_number`, `bad_request`, `bad_numbers`, `bad_files_mode`, `bad_paths`, `too_many_paths`, `empty_body`, `empty_name`, `empty_login`, `body_required` | Malformed request |
-| `400` | `unsupported_provider`, `invalid_key`, `cannot_disconnect_github`, `cannot_delete_default` | Integration / workspace guardrails |
+| `400` | `provider_bad_config`, `provider_secret_unreadable`, `cannot_delete_default` | Provider configuration / workspace guardrails |
 | `401` | `unauthenticated` | No / invalid session cookie (and no valid internal token) |
 | `401` | `reauth` | GitHub returned `401` — token revoked/expired; client bounces to `/auth/login` |
-| `403` | `linear_not_connected`, `rollbar_not_connected` | No connected provider / bad stored key |
+| `401`/`403` | `provider_not_connected`, `provider_needs_auth`, `provider_missing_scope` | Provider connection/capability state |
 | `403` | `forbidden` | GitHub `403` (insufficient scope/permission, e.g. rerun-failed-jobs) |
 | `403` | `sso` | GitHub `403` requiring SAML SSO authorization (`x-github-sso` header) |
 | `403` | (auth) `invalid state` | OAuth state mismatch/consumed (`/auth/callback`) |
-| `404` | `repo_not_found`, `pull_not_found`, `not_found` | Resource not in this user's mirror / not on the provider. Mirror-backed reads try a live repo fetch before 404ing (and fold a plain GitHub `403` into `repo_not_found`); PR writes check the mirror only |
+| `404` | `repo_not_found`, `pull_not_found`, `not_found`, `provider_resource_not_found`, `provider_resource_deleted` | Resource not in the local mirror / not on the provider |
 | `409` | `merge_failed` | Not mergeable (GitHub 405) or head moved (409) |
 | `409` | `node_id_unknown`, `head_sha_unknown` | Mirror lacks node id / head sha — open the PR first |
 | `422` | `auto_merge_not_allowed`, `validation_failed` | GraphQL/REST validation refusal (auto-merge, create PR). Create-PR puts GitHub's verbatim 422 prose in `detail` |
 | `429` | `rate_limited` | GitHub primary/secondary rate limit |
 | `502` | `github_unavailable` | Any other non-OK GitHub response (incl. GraphQL mutation errors) |
 | `502` | `graphql` (`detail: string[]`) | Composite/batch GraphQL query returned errors |
-| `502` | `comment_failed` | Linear `commentCreate` did not succeed |
+| `403`/`429`/`502` | `provider_resource_forbidden`, `provider_rate_limited`, `provider_unavailable` | Provider resource or upstream failure |
 | `500` | `failed` (message in `detail`) | Harness route whose bridge call threw an unclassified error |
 | `500` | `internal` (message in `detail`) | Any route that threw an uncaught error — the app-level `onError` backstop |
 | `503` | `bridge-unavailable` | Harness `/api/tasks/:id/{notes,memory,run,browser}` with no main-process bridge (e.g. `dev:node`) |
