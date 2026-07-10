@@ -18,6 +18,7 @@ import { wireRunBridge } from './harnessWiring'
 import { wireAgentTools } from './agentToolsWiring'
 import { wireContextSections } from './contextSectionsWiring'
 import { registerWorkflowIpc } from './workflowWiring'
+import { registerPreviewIpc } from './previewService'
 import { endDbPools } from './database'
 import { disposeTerminal, reconcileTmux, registerTerminalIpc, sendToAgent, terminalRunGlue } from './terminal'
 import { seedTaskNotes } from './seedTaskNotes'
@@ -46,6 +47,7 @@ export async function bootstrap({ dataDir, origin, createWindow }: BootstrapOpti
   // Teardown is registered FIRST and is idempotent, so a boot that throws part-way can still dispose
   // whatever was constructed (Phase 1 acceptance: partial boot still disposes).
   let server: ServerType | null = null
+  let disposePreview: (() => void) | null = null
   let disposed = false
   const dispose = async () => {
     if (disposed) return
@@ -54,6 +56,11 @@ export async function bootstrap({ dataDir, origin, createWindow }: BootstrapOpti
       server?.close() // stop accepting loopback requests (constructed last → disposed first)
     } catch (e) {
       console.warn('[boot] server close failed:', e)
+    }
+    try {
+      disposePreview?.() // detach + close every preview WebContentsView
+    } catch (e) {
+      console.warn('[boot] disposePreview failed:', e)
     }
     try {
       disposeTerminal() // clear the engine idle-watch interval
@@ -122,6 +129,7 @@ export async function bootstrap({ dataDir, origin, createWindow }: BootstrapOpti
     seedTaskNotes: (task) => seedTaskNotes(db, knowledge.notesStore, internalApiEnv, task),
     reconciled,
   })
+  disposePreview = registerPreviewIpc() // main-owned browser-preview WebContentsView surface (Phase 9 A)
   mark('install')
 
   // 4. Start the loopback listener — only now that every bridge is installed.

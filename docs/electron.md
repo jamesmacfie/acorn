@@ -211,8 +211,11 @@ export type AppBindings = RuntimeBindings & Partial<HttpBindings>
   check is plenty; no persistence wanted. ~15 lines implementing `.get/.put/.delete`.
 - **`BLOBS`** — immutable public blob/patch bodies keyed by sha. Back it with a cache dir
   (`app.getPath('userData')/blobs/<sha>`), `.get` = read file, `.put` = write file. ~20 lines.
-- **secrets** — read from `.env` in dev and from user config / OS keychain in packaged builds.
-  Inject once at bootstrap; never bake `GITHUB_CLIENT_SECRET` or `SESSION_ENC_KEY` into the bundle.
+- **secrets** — read from `.env` in dev. `SESSION_ENC_KEY` falls through to Electron `safeStorage`
+  in a packaged build (Phase 9 C, `sessionKeyStore.ts`): env always wins and is persisted as the
+  env-only migration path; otherwise a fresh data root mints once. An existing `acorn.sqlite` with
+  neither source fails closed instead of changing identity. `GITHUB_CLIENT_*` still come from the environment. Inject once at
+  bootstrap; never bake `GITHUB_CLIENT_SECRET` or `SESSION_ENC_KEY` into the bundle.
 
 The KV shim only needs the handful of methods actually called (`get`, `put` with optional
 `expirationTtl`, `delete`) — not the full KV surface.
@@ -500,8 +503,9 @@ added `electron-builder.yml` (mac dmg/zip, `asarUnpack` the native `.node`, migr
 updated `CLAUDE.md`. Verified: `pnpm lint`, 88/88 tests, `pnpm build`, and `pnpm dev` boots clean.
 **Still not verified:** a packaged `.dmg` from `pnpm dist`. (The old blocker is gone: the data
 root now resolves to `app.getPath('userData')` when packaged — §4c — so nothing tries to write
-inside the read-only asar. Keychain secrets remain the outstanding packaged-build gap: packaged
-builds have no `.env`, and keychain storage is planned-but-not-built.)
+inside the read-only asar. `SESSION_ENC_KEY` now self-provisions via `safeStorage` (Phase 9 C), so a
+packaged build with no `.env` still keeps sessions across relaunch; `GITHUB_CLIENT_*` remain the
+outstanding packaged-build secret gap.)
 
 **Phase 3 — Desktop-native cleanups + features.** Caching simplification (§5) **✅ done**. The
 **v2 terminal** (§8) **✅ shipped** — node-pty sessions in the main process, desktop-only and always
@@ -609,10 +613,21 @@ timing marks are logged as `[boot] <label> +Nms` lines (performance §3.1).
   before any live frame (deterministic replay-before-live). The upgrade is authorized on the shared
   loopback listener: Host guard + exact-Origin + a valid session cookie, or the internal token for
   the loopback MCP caller — anything else is a 403 before the handshake.
-- **IPC residue (`preload.ts`) — only true Electron capabilities:** `browser:bind` (a raw
-  `webContents` id → CDP handle), `term:repoPath:pick` (`dialog.showOpenDialog`), and the
-  `acorn:close-pane` main→window ⌘W ping, plus the `desktop`/`platform` probes. Nothing
-  request/response or streamable remains on IPC.
+- **IPC residue (`preload.ts`) — only true Electron capabilities:** the `preview:*` browser-preview
+  channels (drive a main-owned `WebContentsView` per task — see below), `term:repoPath:pick`
+  (`dialog.showOpenDialog`), and the `acorn:close-pane` main→window ⌘W ping, plus the
+  `desktop`/`platform` probes. Nothing request/response or streamable remains on IPC. (The old
+  `browser:bind` handle is gone — with the preview main-owned, the CDP driver binds inside main when
+  the view is created, so no `webContents` id ever crosses the bridge.)
+- **Browser preview — main-owned `WebContentsView` (Phase 9 A):** one kept-alive view per task,
+  parented to the window's `contentView` and positioned by the renderer over the pane's host rect
+  (`previewService.ts` + `PreviewPane.tsx`). Replaces the deprecated `<webview>` tag: surviving
+  pane/task switches is the view's natural behaviour, not a DOM-reparenting hack. http(s)-only /
+  no-userinfo navigation is enforced per-view (`isAllowedPreviewUrl`), replacing the old
+  `will-attach-webview` guard. A native view always paints above web content, so the renderer hides
+  it when an overlay covers the pane. The main-owned record also retains the resolved home URL and
+  owning window: a changed home reconciles on remount, and closing the window closes/unbinds every
+  child view before macOS can create a replacement window.
 
 ### Capability map (`dev:node` / plain browser)
 
@@ -629,4 +644,3 @@ surfaces degrade by whether their bridge is pure-Node or engine-backed:
 
 Client surfaces that need the engine key off `capabilities().terminal` (the residual
 `window.acorn.terminal` marker) and hide or show a reason when it's absent.
-

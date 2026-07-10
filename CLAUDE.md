@@ -64,8 +64,10 @@ pnpm workspace + Turborepo; all app code is in `apps/desktop`.
   update the hand-written `Env` in `apps/desktop/src/env.d.ts`. (Drizzle quirk: a `NOT NULL` column on a
   populated table emits a table-rebuild migration whose `INSERT … SELECT` copy must be trimmed by
   hand — see [docs/local-development.md](./docs/local-development.md).)
-- **Secrets** live in `apps/desktop/.env` (gitignored) in dev — never commit them; packaged builds read
-  from the OS keychain (planned, Phase 3). `SESSION_ENC_KEY` must be **exactly 64 hex chars**
+- **Secrets** live in `apps/desktop/.env` (gitignored) in dev — never commit them. `SESSION_ENC_KEY`
+  self-provisions via Electron `safeStorage` in packaged builds (`main/sessionKeyStore.ts`); an env
+  key wins and is migrated into safeStorage, while an existing DB with neither key fails closed;
+  `GITHUB_CLIENT_*` still need the environment. `SESSION_ENC_KEY` must be **exactly 64 hex chars**
   (`openssl rand -hex 32`); `session.ts` rejects anything else. It also encrypts integration tokens
   at rest (e.g. Linear) via `encryptSecret`/`decryptSecret`, so it stays even if the cookie does not.
 - **better-sqlite3 ABI:** `better-sqlite3`/`node-pty` are native — a compiled `.node` matches *one*

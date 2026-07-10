@@ -128,6 +128,12 @@ A wrong-ABI better-sqlite3 no longer dies with a bare `NODE_MODULE_VERSION` stac
 (`src/main/bindings.ts`) catches the native load error and rethrows naming the right rebuild
 script for the runtime you're in.
 
+> **`node:sqlite` spike (docs/next Phase 9 B) — parked.** The built-in `node:sqlite` handles FTS5
+> (porter) and transactions fine under the bundled Node, but Drizzle ships **no** `node:sqlite`
+> driver (even latest 0.45.2 — only better-sqlite3/bun/durable/expo/op/proxy), so adopting it means
+> the generic `sqlite-proxy` driver or dropping Drizzle. And `node-pty` keeps the dual-ABI rebuild
+> alive regardless, so the payoff is halved. **Both native deps still need the ABI dance above.**
+
 ## Database migrations
 
 The schema lives in `apps/desktop/src/server/db/schema.ts` (Drizzle, SQLite dialect). To change it:

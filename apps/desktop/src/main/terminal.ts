@@ -1,5 +1,4 @@
-import { dialog, ipcMain, webContents, type IpcMainInvokeEvent } from 'electron'
-import { bindBrowserContents } from './browserService'
+import { dialog, ipcMain } from 'electron'
 import { spawn, type IPty } from 'node-pty'
 import { execFile, execFileSync } from 'node:child_process'
 import { randomUUID } from 'node:crypto'
@@ -615,16 +614,6 @@ export function registerTerminalIpc(db: AppDatabase, worktreesDir: string, deps:
   })
 
   // --- IPC residue (§1c): true Electron capabilities that never become HTTP ---
-
-  // The renderer binds each task's preview webview after creation (dom-ready) so main can drive it.
-  // Takes a raw webContents id — a capability handle, so it stays IPC (HTTP would hand out CDP).
-  ipcMain.handle('browser:bind', (_e: IpcMainInvokeEvent, p: { taskId: string; webContentsId: number }) => {
-    if (typeof p?.taskId !== 'string' || typeof p?.webContentsId !== 'number') return false
-    const contents = webContents.fromId(p.webContentsId)
-    if (!contents) return false
-    bindBrowserContents(p.taskId, contents)
-    return true
-  })
 
   // Native folder picker for the onboarding repo-mapping flow. Returns the chosen path or null.
   ipcMain.handle('term:repoPath:pick', async (): Promise<string | null> => {

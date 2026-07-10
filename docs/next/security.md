@@ -155,7 +155,15 @@ change re-asks with a diff. Two sharp edges the implementation must respect:
   work uses Electron `safeStorage`, not keytar (review.md technology choice #4).
 - `SESSION_ENC_KEY` is the root secret (sessions + integration tokens at
   rest); it must be exactly 64 hex chars and `session.ts` rejects anything
-  else. When `safeStorage` lands, this key moves there first.
+  else. **It has moved to `safeStorage` first (Phase 9 C, `main/sessionKeyStore.ts`):**
+  env (`.env` / real env) always wins and is persisted as the migration path;
+  otherwise a fresh data root mints once and persists it keychain-encrypted
+  (`session.key`, mode 0600). An existing `acorn.sqlite` with neither source
+  fails closed and asks for the original env key rather than changing identity.
+  A decrypt failure on an existing key is fatal on purpose — regenerating would
+  silently create a second identity, invalidating every session and stored
+  provider token at once. `GITHUB_CLIENT_*` still need the environment in a
+  packaged build until their keychain path lands.
 - The observability log (implementation.md ongoing tracks) must never log
   request bodies or headers wholesale — tokens ride in both. Log route +
   status + timing, not payloads.
