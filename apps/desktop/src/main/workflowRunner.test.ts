@@ -18,6 +18,7 @@ describe('WorkflowRunner (docs/next 14 P2)', () => {
   let notes: NotesStore
   const stepInputs: Record<string, string> = {}
   let structuredByStep: Record<string, string>
+  let handoffSlug: string | null
 
   const deps = (): RunnerDeps => ({
     runStep: async (_taskId, def, opts) => {
@@ -32,9 +33,12 @@ describe('WorkflowRunner (docs/next 14 P2)', () => {
         },
       })
     },
-    writeHandoff: async (taskId, stepName, body) => notes.append({ scope: 'task', taskId }, 'workflow-handoffs', `## ${stepName}\n${body}\n`, { author: 'workflow' }),
+    writeHandoff: async (taskId, runId, stepName, body) => {
+      handoffSlug = `workflow-handoffs-${runId}`
+      await notes.append({ scope: 'task', taskId }, handoffSlug, `## ${stepName}\n${body}\n`, { author: 'workflow' })
+    },
     assembleContext: async () => {
-      const note = await notes.read({ scope: 'task', taskId: 'task1' }, 'workflow-handoffs').catch(() => null)
+      const note = handoffSlug ? await notes.read({ scope: 'task', taskId: 'task1' }, handoffSlug).catch(() => null) : null
       return note ? `# Context\n\n## Notes\n${note.body}` : ''
     },
     evaluatePolicy: vi.fn(async () => ({ pass: true })),
@@ -47,6 +51,7 @@ describe('WorkflowRunner (docs/next 14 P2)', () => {
     dir = mkdtempSync(join(tmpdir(), 'acorn-wf-'))
     notes = new NotesStore(join(dir, 'notes'))
     structuredByStep = {}
+    handoffSlug = null
     for (const k of Object.keys(stepInputs)) delete stepInputs[k]
   })
 
@@ -91,7 +96,7 @@ describe('WorkflowRunner (docs/next 14 P2)', () => {
     expect(steps[0].costUsd).toBeCloseTo(0.0123)
 
     // The handoff note exists (author: workflow) and appeared in review's assembled input.
-    const handoff = await notes.read({ scope: 'task', taskId: 'task1' }, 'workflow-handoffs')
+    const handoff = await notes.read({ scope: 'task', taskId: 'task1' }, `workflow-handoffs-${runId}`)
     expect(handoff.author).toBe('workflow')
     expect(handoff.body).toContain('guarded the null token')
     expect(stepInputs.review).toContain('guarded the null token')
@@ -154,6 +159,7 @@ describe('WorkflowRunner (docs/next 14 P2)', () => {
     const runId = await runner.start('task1', {
       name: 'auto',
       posture: 'autonomous',
+      tools: { maxRisk: 'read' },
       steps: [
         { name: 'gate', kind: 'gate-human' },
         { name: 'policy', kind: 'gate-policy', policy: 'checks-green' },
@@ -279,7 +285,7 @@ describe('WorkflowRunner (docs/next 14 P2)', () => {
       name: 'parallel-review',
       steps: [
         { name: 'plan', kind: 'fan-out', prompt: 'Split the work.', schema: { type: 'object' }, childStep: { name: 'review', prompt: 'Review this slice.', schema: { type: 'object' } } },
-        { name: 'aggregate', kind: 'join' },
+        { name: 'aggregate', kind: 'join', joins: 'plan' },
       ],
     }
 
@@ -339,6 +345,123 @@ describe('WorkflowRunner (docs/next 14 P2)', () => {
     const runner2 = new WorkflowRunner(t.db, d2)
     const runId2 = await runner2.start('task1', { name: 'e2e2', steps: [{ name: 'verify', prompt: 'x', requiresRun: 'dev' }] })
     expect((await waitDone(runner2, runId2)).status).toBe('failed')
+  })
+
+  it('decide renders a named prior output, selects a forward branch, and skips the other target', async () => {
+    structuredByStep = {
+      plan: '{"recommendation":"fix"}',
+      route: '{"verdict":"fix"}',
+    }
+    const runner = new WorkflowRunner(t.db, deps())
+    const runId = await runner.start('task1', {
+      name: 'branch',
+      steps: [
+        { name: 'plan', prompt: 'Plan.', schema: { type: 'object' } },
+        { name: 'route', kind: 'decide', prompt: 'Route this: ${steps.plan.output}', branches: { ship: 'ship', fix: 'fix', default: 'fix' } },
+        { name: 'ship', prompt: 'Ship.' },
+        { name: 'fix', prompt: 'Fix.' },
+      ],
+    })
+    expect((await waitDone(runner, runId)).status).toBe('done')
+    const rows = await runner.steps(runId)
+    expect(rows.map((row) => [row.name, row.status])).toEqual([
+      ['plan', 'done'],
+      ['route', 'done'],
+      ['ship', 'skipped'],
+      ['fix', 'done'],
+    ])
+    expect(stepInputs.route).toContain('"recommendation":"fix"')
+  })
+
+  it('an unmatched decide verdict fails unless a default branch exists', async () => {
+    structuredByStep = { route: '{"verdict":"unknown"}' }
+    const runner = new WorkflowRunner(t.db, deps())
+    const runId = await runner.start('task1', {
+      name: 'unmatched',
+      steps: [
+        { name: 'route', kind: 'decide', branches: { yes: 'yes' } },
+        { name: 'yes' },
+      ],
+    })
+    const run = await waitDone(runner, runId)
+    expect(run.status).toBe('failed')
+    expect(run.error).toContain('unmatched verdict')
+  })
+
+  it('cancel-run aborts every fan-out child, marks descendants cancelled, and cascades to child tasks', async () => {
+    const d = deps()
+    const cancelledTasks: string[] = []
+    let child = 0
+    d.createChildTask = async () => `cancel-child-${++child}`
+    d.cancelChildTask = async (taskId) => void cancelledTasks.push(taskId)
+    d.runStep = async (taskId, def, opts) => {
+      if (def.kind === 'fan-out') {
+        return {
+          status: 'ok',
+          exitCode: 0,
+          capture: {
+            result: 'planned',
+            structuredOutput: { tasks: [{ title: 'one', branch: 'one' }, { title: 'two', branch: 'two' }] },
+            sessionId: null,
+            costUsd: null,
+            events: [],
+          },
+          stderrTail: '',
+        }
+      }
+      return new Promise((resolve) => {
+        opts.signal?.addEventListener(
+          'abort',
+          () =>
+            resolve({
+              status: 'cancelled',
+              exitCode: null,
+              capture: { result: null, structuredOutput: null, sessionId: null, costUsd: null, events: [] },
+              stderrTail: `cancelled ${taskId}`,
+            }),
+          { once: true },
+        )
+      })
+    }
+    const runner = new WorkflowRunner(t.db, d)
+    const runId = await runner.start('task1', {
+      name: 'cancel-tree',
+      steps: [
+        { name: 'plan', kind: 'fan-out', childStep: { name: 'build' } },
+        { name: 'join', kind: 'join', joins: 'plan' },
+      ],
+    })
+    const deadline = Date.now() + 5000
+    for (;;) {
+      const children = (await runner.steps(runId)).filter((row) => row.parentStepId != null)
+      if (children.length === 2 && children.every((row) => row.status === 'running')) break
+      if (Date.now() > deadline) throw new Error('children did not start')
+      await new Promise((resolve) => setTimeout(resolve, 10))
+    }
+    await runner.cancelRun(runId)
+    expect((await runner.run(runId))?.status).toBe('cancelled')
+    const rows = await runner.steps(runId)
+    expect(rows.filter((row) => row.parentStepId != null).every((row) => row.status === 'cancelled')).toBe(true)
+    expect(cancelledTasks.sort()).toEqual(['cancel-child-1', 'cancel-child-2'])
+  })
+
+  it('registered step kinds, policies, and triggers execute without core ladders and persist trigger ids', async () => {
+    const runner = new WorkflowRunner(t.db, deps())
+    runner.contributions.registerStepKind('custom', async () => ({ status: 'done', result: { custom: true } }))
+    runner.contributions.registerPolicy('always', async () => ({ pass: true }))
+    runner.registerTrigger({
+      id: 'source.pr-opened',
+      evaluate: async () => [
+        {
+          taskId: 'task1',
+          workflow: { name: 'triggered', steps: [{ name: 'custom', kind: 'custom' }, { name: 'policy', kind: 'gate-policy', policy: 'always' }] },
+        },
+      ],
+    })
+    expect(await runner.pollTriggers()).toEqual({ started: 1, errors: [] })
+    const [run] = await t.db.select().from((await import('../server/db')).schema.workflowRuns)
+    expect(run.trigger).toBe('source.pr-opened')
+    expect((await waitDone(runner, run.id)).status).toBe('done')
   })
 
   it('kill-and-reconstruct over the same DB mid-run → resumes from the persisted step', async () => {

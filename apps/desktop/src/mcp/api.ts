@@ -7,6 +7,7 @@ const API_TOKEN = process.env.ACORN_API_TOKEN ?? ''
 // The agent session id (provenance): stamped on notes/memory writes server-side. Transport
 // metadata, never a tool arg — sent on every call so the harness can attribute writes.
 const SESSION_ID = process.env.ACORN_SESSION_ID ?? ''
+const TOOL_CEILING = process.env.ACORN_TOOL_CEILING ?? ''
 
 export type ApiResult = { ok: true; data: unknown } | { ok: false; kind: 'acorn-not-running' | 'api-error'; detail: string }
 
@@ -17,6 +18,7 @@ async function apiCall(path: string, init?: RequestInit): Promise<ApiResult> {
       headers: {
         'x-acorn-internal': API_TOKEN,
         ...(SESSION_ID ? { 'x-acorn-session-id': SESSION_ID } : {}),
+        ...(TOOL_CEILING ? { 'x-acorn-tool-ceiling': TOOL_CEILING } : {}),
         ...(init?.body ? { 'content-type': 'application/json' } : {}),
         ...(init?.headers ?? {}),
       },

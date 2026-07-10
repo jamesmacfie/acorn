@@ -281,7 +281,7 @@ notice (background) per [ui-state.md](./ui-state.md) §3 rule 1.
 
 ### 3h. Polling sites (perf §3.2 pauses these; `ctx.poll` later subsumes)
 
-`taskStatus.ts:28` (5 s), `AgentsPanel.tsx:45` (3 s), `queries.ts:120`
+`taskStatus.ts:28` (5 s), `triggerPoller.ts` (30 s, visibility-paused), `queries.ts:120`
 (60 s `refetchInterval`), `index.tsx:26` (`refetchOnWindowFocus: true`
 global), plus main's idle watch (`terminal.ts:242-254`, 3 s — main-side, not
 visibility-pausable, but boundable).

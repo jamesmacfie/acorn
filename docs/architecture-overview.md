@@ -108,9 +108,9 @@ settings, the command palette, and the file finder are shipped and default-on.
 The **terminal drawer, agent sessions, run targets, and workflows** are
 desktop-only and always on when the Electron preload bridge is present
 (`capabilities()`, `apps/desktop/src/client/features/capabilities.ts` — the old
-`acorn:term` localStorage flag has been deleted). The workflow engine
-has real scaffolding (schema, harness routes, a read-only inspector) but is in
-progress, not a finished orchestrator. See
+`acorn:term` localStorage flag has been deleted). The workflow engine is a
+registry-backed durable runtime with explicit branching/joins, profile adapters,
+tool ceilings, cancellation, and app-open triggers; authoring remains file-only. See
 [workspaces-and-tasks.md](./workspaces-and-tasks.md), [panes.md](./panes.md), and
 [terminal-and-agents.md](./terminal-and-agents.md).
 
@@ -294,8 +294,8 @@ for the detail. All of it is desktop-only (bridge-gated, always on).
   agents over loopback.
 - [notes-and-memory](./notes-and-memory.md) — review notes, the memory index, and
   the reviewer→agent handoff.
-- [workflows](./workflows.md) — the workflow engine scaffolding: runs, steps, and
-  gates (in progress, flagged).
+- [workflows](./workflows.md) — durable runs/steps, registries, branches, gates,
+  tool ceilings, cancellation, and triggers.
 - [integrations](./integrations.md) — third-party sources (Linear, Rollbar):
   connect/status, caching, and how they seed tasks.
 

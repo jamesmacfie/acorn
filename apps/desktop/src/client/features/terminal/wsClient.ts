@@ -7,10 +7,12 @@ import { WS_PATH, type WsClientFrame, type WsServerFrame } from '../../../shared
 
 type OutputCb = (m: ServerMsg) => void
 type NoticeCb = (n: { taskId: string; kind: 'gate' | 'run-done'; title: string }) => void
+type StepEventCb = (event: { runId: string; stepId: string; event: unknown }) => void
 
 const outputSubs = new Map<string, Set<OutputCb>>() // sessionId → local subscribers
 const statusSubs = new Set<() => void>()
 const noticeSubs = new Set<NoticeCb>()
+const stepEventSubs = new Set<StepEventCb>()
 const outbox: WsClientFrame[] = [] // frames queued while the socket isn't OPEN
 
 let ws: WebSocket | null = null
@@ -46,6 +48,7 @@ function connect(): void {
     if (frame.channel === 'term:out') outputSubs.get(frame.id)?.forEach((cb) => cb(frame.msg))
     else if (frame.channel === 'term:status') statusSubs.forEach((cb) => cb())
     else if (frame.channel === 'workflow:notice') noticeSubs.forEach((cb) => cb(frame.notice))
+    else if (frame.channel === 'workflow:step:event') stepEventSubs.forEach((cb) => cb(frame))
   }
   const drop = () => {
     if (ws === sock) ws = null
@@ -60,7 +63,7 @@ function scheduleReconnect(): void {
   // ponytail: fixed 1s backoff; enough for a hardened loopback listener that only drops on quit.
   reconnectTimer = setTimeout(() => {
     reconnectTimer = null
-    if (outputSubs.size || statusSubs.size || noticeSubs.size) connect()
+    if (outputSubs.size || statusSubs.size || noticeSubs.size || stepEventSubs.size) connect()
   }, 1000)
 }
 
@@ -102,4 +105,10 @@ export function wsOnNotice(cb: NoticeCb): () => void {
   noticeSubs.add(cb)
   connect()
   return () => void noticeSubs.delete(cb)
+}
+
+export function wsOnWorkflowStepEvent(cb: StepEventCb): () => void {
+  stepEventSubs.add(cb)
+  connect()
+  return () => void stepEventSubs.delete(cb)
 }

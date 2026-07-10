@@ -14,6 +14,7 @@ import { getDb, schema } from '../db'
 import type { AppEnv } from '../middleware/auth'
 import { getUser } from '../middleware/requireUser'
 import { respondError } from '../respond'
+import { decodeToolCeiling, isToolWithinCeiling, type ToolCeiling } from '../../shared/workflow'
 
 const STATUS: Record<ToolError['kind'], 404 | 400 | 500> = { not_found: 404, bad_request: 400, failed: 500 }
 type AvailabilityCache = Map<NonNullable<AgentToolContribution['when']>, Promise<boolean>>
@@ -29,6 +30,11 @@ async function loadPerms(c: Context<AppEnv>) {
 
 function toolContext(c: Context<AppEnv>): ToolContext {
   return { taskId: c.req.param('id')!, userLogin: getUser(c).login, sessionId: c.req.header('x-acorn-session-id') }
+}
+
+function workflowCeiling(c: Context<AppEnv>): ToolCeiling | undefined {
+  const raw = c.req.header('x-acorn-tool-ceiling')
+  return raw ? (decodeToolCeiling(raw) ?? { allow: [] }) : undefined
 }
 
 async function available(tool: AgentToolContribution, ctx: ToolContext, cache: AvailabilityCache): Promise<boolean> {
@@ -58,7 +64,7 @@ async function invoke(c: Context<AppEnv>, opts: { renderer: boolean }): Promise<
   const tool = registry.find((candidate) => candidate.name === c.req.param('name'))
   if (!tool || (opts.renderer && !tool.exposeToRenderer)) return respondError(c, 404, 'not_found')
   const perms = await loadPerms(c)
-  if (!isToolPermitted(tool, perms)) return respondError(c, 404, 'not_found')
+  if (!isToolPermitted(tool, perms) || !isToolWithinCeiling(tool, workflowCeiling(c))) return respondError(c, 404, 'not_found')
   const ctx = toolContext(c)
   if (!(await available(tool, ctx, new Map()))) return respondError(c, 404, 'not_found')
   const parsed = tool.input.safeParse(await c.req.json().catch(() => ({})))
@@ -81,9 +87,10 @@ export const agentTools = new Hono<AppEnv>()
     const perms = await loadPerms(c)
     const ctx = toolContext(c)
     const availability: AvailabilityCache = new Map()
+    const ceiling = workflowCeiling(c)
     const tools = []
     for (const tool of registry) {
-      if (!isToolPermitted(tool, perms) || !(await available(tool, ctx, availability))) continue
+      if (!isToolPermitted(tool, perms) || !isToolWithinCeiling(tool, ceiling) || !(await available(tool, ctx, availability))) continue
       tools.push({ name: tool.name, description: tool.description, risk: tool.risk, inputSchema: mcpInputSchema(tool.input) })
     }
     return c.json({ tools })

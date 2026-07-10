@@ -1,6 +1,6 @@
 # Phase 8 — Workflow and profile registries
 
-**Status:** planned · **Depends on:** Phase 5; Phase 4 for tool ceilings ·
+**Status:** implemented 2026-07-10 · **Depends on:** Phase 5; Phase 4 for tool ceilings ·
 **Primary docs:** [agent-runtime](../agent-runtime.md),
 [contribution-points](../contribution-points.md) §4.10 and §4.11.
 

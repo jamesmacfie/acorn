@@ -10,13 +10,10 @@ start/stop/reach), and a workflow is the composable multi-step machine that cons
 > Two different maturities live here:
 > - **Run targets + layout recipes are implemented and working** (config reader, runtime service,
 >   IPC, MCP tools, palette, recipes).
-> - **The workflow engine has real, wired scaffolding** (schema, a main-process `WorkflowRunner`, a
->   headless step runner, a `.acorn/workflows` loader, a read-only settings inspector, palette
->   launch, an Agents-panel viewer) but is **young and in progress** — it drives real agent CLIs,
->   depends on capabilities that are still being fleshed out (context assembly, notes handoff), has
->   **no GUI authoring**, and its loops run **only while the app is open** (no daemon). Do not read
->   this as a finished orchestrator — anything marked **design** below is intent, not a shipped
->   guarantee.
+> - **The workflow runtime is implemented**: registry-backed step kinds/policies/profiles, explicit
+>   joins, named-output templating, `decide` branches, tool ceilings, bounded fan-out, cancellation,
+>   live step events, and app-open triggers all run through the durable checkpoint engine. It still
+>   has **no GUI authoring**, and runs/triggers advance **only while the app is open** (no daemon).
 
 ---
 
@@ -157,7 +154,7 @@ run:
 | --- | --- |
 | `taskId` | → `tasks.id` — the worktree/agent scope the run executes in |
 | `name` | the workflow's name |
-| `status` | `running` \| `gated` \| `done` \| `failed` \| `safety-rail` |
+| `status` | `running` \| `gated` \| `cancelling` \| `done` \| `failed` \| `safety-rail` \| `cancelled` |
 | `posture` | `gated` (default) \| `autonomous` |
 | `trigger` | how it started (default `manual`) |
 | `defJson` | the `WorkflowDef` this run executes, **frozen at start** |
@@ -168,10 +165,10 @@ run:
 | Column | Meaning |
 | --- | --- |
 | `runId` / `idx` | parent run + sequence position |
-| `kind` | `agent` \| `gate-human` \| `gate-policy` \| `ci-loop` \| `fan-out` \| `join` |
-| `mode` | `headless` (default) \| `interactive` |
+| `kind` | registry id; built-ins are `agent`, `gate-human`, `gate-policy`, `ci-loop`, `fan-out`, `join`, `decide` |
+| `mode` | `headless` (default) \| `ai` \| `interactive` |
 | `profileId` / `model` | which agent CLI and model — lets a workflow build with one model, review with another |
-| `status` | `pending` \| `running` \| `waiting-gate` \| `done` \| `failed` \| `skipped` |
+| `status` | `pending` \| `running` \| `waiting-gate` \| `done` \| `failed` \| `skipped` \| `safety-rail` \| `cancelled` |
 | `worktreePath` | **first-class working context** — a step in the wrong cwd is a whole bug class |
 | `inputsJson` | the assembled context bundle handed to the step |
 | `resultJson` | the captured `HeadlessResult` (sans events) |
@@ -197,10 +194,17 @@ PRD-style step can emit a task list and spawn N children, each on its own branch
   the approve IPC; a `gate-policy` step **re-derives** its verdict in main and ignores whatever the
   step claimed (e.g. the `checks-green` policy polls the `checks` mirror —
   `apps/desktop/src/main/terminal.ts:957-964`). This is roboco's "enforce outside the agent" lesson.
-- **Handoff is via the shared substrate.** A step's result is appended as a `workflow-handoffs` note
-  (author `workflow`, `terminal.ts:943-946`) and the next step's input bundle — assembled over
-  loopback from `/api/tasks/:id/context` (`terminal.ts:947-955`) — includes it. No chat-scrollback
-  dependency. See [notes-and-memory.md](./notes-and-memory.md).
+- **Handoff is run-scoped.** A step's result is appended to the task note
+  `workflow-handoffs-<runId>`. Workflow context assembly includes human notes plus only that run's
+  handoff note; a terminal run flips it to `included: false` but retains it for audit. Explicit
+  named edges use `${steps.<name>.output}`. No chat-scrollback dependency.
+- **Execution behavior is declarative.** `WorkflowContributionRegistry` holds step handlers, policy
+  evaluators, and trigger predicates. Handlers return outcomes; `WorkflowRunner` alone persists
+  top-level transitions and owns reconcile/cancellation.
+- **Agent profiles are contributions.** Command/backend choice, MCP registration, headless/resume
+  argv, one-shot structured argv, and stream parsing live together under `main/agentProfiles/`.
+- **Capability only narrows.** `[tools]` and `[steps.tools]` allowlists/risk ceilings intersect;
+  the MCP projection then intersects that result with global per-tool/user permissions.
 - **Safety rails are first-class terminal states.** Hitting a `ci-loop` `maxIterations` bound is a
   `safety-rail` status, not a `failed` — a thrashing loop is the only real failure.
 - **Runs are the checkpoint.** `WorkflowRunner.reconcile()` (`terminal.ts:1027`) resumes or
@@ -212,26 +216,28 @@ PRD-style step can emit a task list and spawn N children, each on its own branch
 
 Committed `.acorn/workflows/*.toml`, layered repo → user like `config.toml` (`workflowFiles.ts`). A
 step body can reference another workflow (`workflow = "<id>"`, one level of nesting to start; cycles
-rejected with a surfaced error). Malformed files become visible error rows.
+rejected with a surfaced error). Malformed files become visible error rows. New files must use
+`joins = "<fan-out-step>"`; the old nearest-preceding-fan-out rule is gone. A `decide` step declares
+`[steps.branches]`, and prompts can reference an earlier successful output with
+`${steps.<name>.output}`. Unknown kinds/profiles/policies, dangling joins, backward/unknown branch
+targets, invalid templates, and widening tool ceilings fail before execution.
 
 ### The runner
 
-`WorkflowRunner` (`apps/desktop/src/main/workflowRunner.ts`) implements the state machine with
-dependency injection (fakeable in tests): `start` freezes the def and persists rows; `tick` advances;
-`executeStep` runs a headless agent step; `runFanOut`/`runJoin`/`runCiLoop` handle the parallel and
-loop kinds; `resolveGate` handles the human gate; `reconcile` recovers on restart. It is wired with
-live deps in `terminal.ts:926-` (real headless runner, handoff notes, the loopback context assembler,
-the re-derived `checks-green` policy, gate/run-done notices, `requires_run` target startup, and child-
-task creation for fan-out).
+`WorkflowRunner` (`apps/desktop/src/main/workflowRunner.ts`) owns the checkpoint state machine;
+`workflowBuiltins.ts` registers current handlers without a kind ladder. A four-slot semaphore bounds
+headless work, CI loops have a hard turn cap, and fan-out has a task ceiling. `cancelRun` aborts every
+active handler/process and marks the descendant step tree cancelled; `killStep` provides the scoped
+control. `reconcile` requeues interrupted running rows and completes interrupted cancellation.
 
 ### Client surfaces
 
 | Surface | File | What it does |
 | --- | --- | --- |
-| Bridge | `terminalClient.ts:60-68` | `workflow.defs/start/runs/steps/gate` + `onNotice` on `window.acorn.terminal` |
+| HTTP + WS client | `workflowClient.ts`, `terminalClient.ts` | defs/start/runs/steps/gate/cancel/kill/trigger-poll over HTTP; notices, status, and live step events over WS |
 | Palette launch | `model.ts:28`, `CommandPalette.tsx:114-119` | `Workflow: <name>` rows; selecting one calls `workflow.start` |
 | Settings inspector | `features/settings/WorkflowsSettings.tsx` | **read-only** list of the committed/user workflow defs the active task would load + parse errors; a viewer, not a launcher |
-| Agents panel | `features/agents/AgentsPanel.tsx:36-81` | polls `workflow.runs`/`steps`, folds steps into the roster, renders gate prompts, and offers "open in terminal" (`--resume <sessionId>`) for any step with a session |
+| Agents panel | `features/agents/AgentsPanel.tsx` | push-refetches transitions, renders a live tail and quiet-step hint, approves gates, cancels runs/kills steps, and uses the profile-projected resume command |
 
 Gate/run-done notices are broadcast to the renderer bell via the `workflow:notice` IPC channel
 (`terminal.ts:909-912`).
@@ -252,27 +258,14 @@ Gate/run-done notices are broadcast to the renderer bell via the `workflow:notic
   palette launch, the **`terminalClient` workflow bridge**, and the **Agents-panel** surfacing of
   workflow steps and gates.
 
-**In progress / young (real code, but not a finished orchestrator):** the workflow runner is early.
-Fan-out/join, the CI-fix loop, and autonomous posture exist in `workflowRunner.ts` but lean on
-capabilities still being fleshed out (context assembly, notes handoff, the agent CLIs' headless
-modes), and there is **no GUI workflow builder** — you author in files. Loops run only while the app
-is open. Treat autonomous, multi-agent runs as experimental.
+**Implemented in the Phase 8 runtime:** step/policy/profile/trigger registries; explicit joins;
+`decide` plus named-output templates; per-run/step tool ceilings; bounded concurrency/turns/fan-out;
+engine-owned cancellation; run-scoped handoffs and terminal memory review; push status/live events;
+and visibility-paused, app-open trigger evaluation.
 
-**Design-stage (not built), with a sharpened shape** — see
-[docs/next/agent-runtime.md](./next/agent-runtime.md) and its rationale doc
-[agent-runtime-influences.md](./next/agent-runtime-influences.md) (a design study of
-[agentfield](https://agentfield.ai)):
-
-- **cancel-tree** — stop a run and cascade to fan-out children (steps + child tasks); no way to
-  stop anything exists today;
-- a **`decide`/branch step kind** — cheap one-shot structured routing (conditional branching),
-  vs today's linear + fan-out/join only, with `${steps.<name>.output}` templating for named edges;
-- **per-run tool allowlists / risk ceilings** — an autonomous run declares which agent tools its
-  steps may use;
-- **triggers** — start a run from something acorn already observes (a PR opened, checks red) or a
-  while-app-open schedule, riding the poll scheduler (the shippable slice of "Pulse");
-- **concurrency ceilings** — a `MAX_CONCURRENT_HEADLESS` semaphore, per-step turn caps, and a
-  fan-out depth cap.
+**Still intentionally limited:** no GUI workflow builder, no daemon, no general DAG/dataflow
+engine, no cost budgeting, and no typed recovery/retry graph. `decide` is a single tool-free
+structured call; sub-workflows stay statically expanded; join stays all-or-nothing.
 
 **Deliberate non-goals** (what the design studied in agentfield and rejected): no control plane
 or agent fleet, **no daemon / background execution** (the runner ticks only while the app is
@@ -309,4 +302,3 @@ saved-prompt/skills-as-steps polish, and acorn-as-a-Linear-agent-host.
 - [panes.md](./panes.md) — the pane model layout recipes arrange
 - [command-palette-and-shortcuts.md](./command-palette-and-shortcuts.md) — the `⌘K` palette surface
 - [data-layer.md](./data-layer.md) — the SQLite schema and app-state tables
-

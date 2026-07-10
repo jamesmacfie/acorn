@@ -29,6 +29,9 @@ const fake = (over: Partial<WorkflowBridge> = {}): WorkflowBridge => ({
   runs: async () => [],
   steps: async () => [],
   gate: async () => ({ ok: true }),
+  cancel: async () => ({ ok: true }),
+  kill: async () => ({ ok: true }),
+  pollTriggers: async () => ({ started: 0, errors: [] }),
   ...over,
 })
 
@@ -54,12 +57,29 @@ describe('workflow routes', () => {
     expect(gated).toEqual({ runId: 'run1', stepId: 'step1', approved: true })
   })
 
+  it('cancels runs, kills steps, and polls app-open triggers', async () => {
+    const calls: string[] = []
+    setWorkflowBridge(
+      fake({
+        cancel: async (runId) => (calls.push(`cancel:${runId}`), { ok: true }),
+        kill: async (runId, stepId) => (calls.push(`kill:${runId}:${stepId}`), { ok: true }),
+        pollTriggers: async () => ({ started: 2, errors: [] }),
+      }),
+    )
+    const app = authed()
+    expect((await app.fetch(req('/api/workflows/runs/run1/cancel', 'POST'), {} as Env)).status).toBe(200)
+    expect((await app.fetch(req('/api/workflows/runs/run1/kill', 'POST', { stepId: 'step1' }), {} as Env)).status).toBe(200)
+    expect(await (await app.fetch(req('/api/workflows/triggers/poll', 'POST'), {} as Env)).json()).toEqual({ started: 2, errors: [] })
+    expect(calls).toEqual(['cancel:run1', 'kill:run1:step1'])
+  })
+
   it('400s a malformed start (no name/steps) and gate (missing approved)', async () => {
     setWorkflowBridge(fake())
     const app = authed()
     expect((await app.fetch(req('/api/tasks/task1/workflows', 'POST', { def: { name: 'W' } }), {} as Env)).status).toBe(400)
     expect((await app.fetch(req('/api/tasks/task1/workflows', 'POST', {}), {} as Env)).status).toBe(400)
     expect((await app.fetch(req('/api/workflows/runs/run1/gate', 'POST', { stepId: 'x' }), {} as Env)).status).toBe(400)
+    expect((await app.fetch(req('/api/workflows/runs/run1/kill', 'POST', {}), {} as Env)).status).toBe(400)
   })
 
   it('401s without a principal; 503s without a bridge', async () => {

@@ -241,7 +241,7 @@ inventory for the Context pane, while an omitted include uses contribution defau
 | Method | Path | Purpose | Params |
 | --- | --- | --- | --- |
 | `GET` | `/api/tasks/:id/repo-info` | Repo facts for the MCP `repo_info` tool: `{ owner, name, defaultBranch, branch, worktreePath }`. | — |
-| `GET` | `/api/tasks/:id/context` | Assembled `TaskContext` and projected sections. | `?include=<section ids>`; `*` means all; omitted uses registry defaults |
+| `GET` | `/api/tasks/:id/context` | Assembled `TaskContext` and projected sections. | `?include=<section ids>`; internal workflow assembly also passes `workflowRunId` to exclude other runs' handoffs |
 
 `404 not_found` when the task id is unknown.
 
@@ -268,6 +268,22 @@ indistinguishable `404 not_found` responses.
 
 The remaining `/run/*` rows are renderer routes backed by `RunBridge`; agent-facing run/browser,
 notes, memory, context, and git verbs go through `/tools/:name`.
+
+### Workflow control — `apps/desktop/src/server/routes/workflow.ts`
+
+The desktop main process installs the durable runner behind this bridge. Definitions and controls
+use HTTP; live notices, status pings, and step events use the authenticated WebSocket.
+
+| Method | Path | Purpose |
+| --- | --- | --- |
+| `GET` | `/api/tasks/:id/workflows` | Load validated repo/user workflow definitions plus named parse errors. |
+| `POST` | `/api/tasks/:id/workflows` | Validate and start `{ def }`; returns `{ runId }` or a named validation error. |
+| `GET` | `/api/tasks/:id/workflows/runs` | List durable runs for a task. |
+| `GET` | `/api/workflows/runs/:runId/steps` | List top-level/fan-out step rows with a profile-projected resume command when available. |
+| `POST` | `/api/workflows/runs/:runId/gate` | Resolve a waiting human gate with `{ stepId, approved }`. |
+| `POST` | `/api/workflows/runs/:runId/cancel` | Cancel the run tree and abort active handlers. |
+| `POST` | `/api/workflows/runs/:runId/kill` | Kill one running step with `{ stepId }`. |
+| `POST` | `/api/workflows/triggers/poll` | Evaluate registered trigger predicates on the app-open client poll tick. |
 
 ---
 

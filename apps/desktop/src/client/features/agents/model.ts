@@ -80,11 +80,10 @@ export function stepFeed(step: WorkflowStepRow): { items: FeedItem[]; costUsd: n
 
 // Open-in-terminal (15 P2): the resume command for a step's captured session id, per profile —
 // the same seam the headless argv templates use. Runs through the drawer's $SHELL -lc path.
-export function resumeCommandFor(step: { profileId: string | null; sessionId: string | null }): string | null {
+export function resumeCommandFor(step: { profileId: string | null; sessionId: string | null; resumeCommand?: string | null }): string | null {
   if (!step.sessionId) return null
   if (/[^A-Za-z0-9_-]/.test(step.sessionId)) return null // session ids are opaque tokens; never shell metachars
-  if (step.profileId === 'codex') return `codex resume ${step.sessionId}`
-  return `claude --resume ${step.sessionId}`
+  return typeof step.resumeCommand === 'string' ? step.resumeCommand : null
 }
 
 // --- Roster (15 §panel): PTY sessions + workflow steps for one task, merged + ordered:
@@ -94,7 +93,15 @@ export type RosterRow =
   | { kind: 'step'; id: string; title: string; state: AgentState; step: WorkflowStepRow; run: WorkflowRunRow | undefined; gate: boolean }
 
 const stepState = (s: WorkflowStepRow): AgentState =>
-  s.status === 'running' ? 'working' : s.status === 'waiting-gate' ? 'blocked' : s.status === 'done' ? 'done' : s.status === 'failed' ? 'blocked' : 'unknown'
+  s.status === 'running'
+    ? 'working'
+    : s.status === 'waiting-gate'
+      ? 'blocked'
+      : s.status === 'done' || s.status === 'cancelled' || s.status === 'skipped'
+        ? 'done'
+        : s.status === 'failed' || s.status === 'safety-rail'
+          ? 'blocked'
+          : 'unknown'
 
 const urgency = (state: AgentState): number => (state === 'blocked' || state === 'permission' ? 0 : state === 'working' || state === 'starting' ? 1 : 2)
 

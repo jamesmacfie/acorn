@@ -10,97 +10,29 @@
 // Agent CLIs are NEVER invoked in tests — the committed test/fixtures/fake-agent.sh stands in,
 // wired through this same argv-template path.
 import { spawn } from 'node:child_process'
-import { mkdtempSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { lineDelimitedJsonAdapter, parseStreamJson } from './agentProfiles/streamJson'
+import type { HeadlessArgv, HeadlessCapture, HeadlessOpts, StreamEvent, StreamJsonAdapter } from './agentProfiles'
+import { requireProfile } from './profiles'
 
 export type HeadlessMode = 'interactive' | 'headless'
 
-export type HeadlessArgv = { file: string; args: string[] }
-
-export type HeadlessOpts = {
-  prompt: string
-  model?: string
-  schema?: object // JSON schema for structured output
-  resumeSessionId?: string
-}
+export type { HeadlessArgv, HeadlessCapture, HeadlessOpts, StreamEvent }
 
 // Build the non-interactive invocation for a profile. `command` is injectable so tests route the
 // same template through the fake agent script.
 export function buildHeadlessArgv(profileId: string, command: string, opts: HeadlessOpts): HeadlessArgv | null {
-  if (profileId === 'claude-code') {
-    return {
-      file: command,
-      args: [
-        ...(opts.resumeSessionId ? ['--resume', opts.resumeSessionId] : []),
-        '-p',
-        '--output-format',
-        'stream-json',
-        '--verbose', // stream-json in -p mode requires it
-        '--permission-mode',
-        'dontAsk', // pre-authorized so a headless step never blocks (14 §crux)
-        ...(opts.model ? ['--model', opts.model] : []),
-        ...(opts.schema ? ['--json-schema', JSON.stringify(opts.schema)] : []),
-        opts.prompt,
-      ],
-    }
-  }
-  if (profileId === 'codex') {
-    const schemaFile = opts.schema ? materializeSchema(opts.schema) : null
-    return {
-      file: command,
-      args: ['exec', '--json', ...(opts.model ? ['-m', opts.model] : []), ...(schemaFile ? ['--output-schema', schemaFile] : []), opts.prompt],
-    }
-  }
-  return null // shells/aider have no headless mode
-}
-
-// codex takes --output-schema as a file path; write the schema to a tmp file.
-function materializeSchema(schema: object): string {
-  const dir = mkdtempSync(join(tmpdir(), 'acorn-schema-'))
-  const file = join(dir, 'schema.json')
-  writeFileSync(file, JSON.stringify(schema), 'utf8')
-  return file
+  return requireProfile(profileId).headlessArgv?.(command, opts) ?? null
 }
 
 // --- Stream-json parsing (pure). claude's -p stream: one JSON object per line; the final
 // `type: "result"` event carries result/session_id/cost and (with --json-schema) the structured
 // output. Unknown lines are kept as raw events — the Agents-panel feed (15) renders them.
-export type StreamEvent = Record<string, unknown> & { type?: string }
-
-export type HeadlessCapture = {
-  result: string | null
-  structuredOutput: unknown | null
-  sessionId: string | null
-  costUsd: number | null
-  events: StreamEvent[]
-}
-
-export function parseStreamJson(stdout: string): HeadlessCapture {
-  const events: StreamEvent[] = []
-  for (const line of stdout.split('\n')) {
-    const trimmed = line.trim()
-    if (!trimmed) continue
-    try {
-      events.push(JSON.parse(trimmed) as StreamEvent)
-    } catch {
-      // non-JSON noise (progress bars etc.) — not an event
-    }
-  }
-  const resultEvent = [...events].reverse().find((e) => e.type === 'result')
-  return {
-    result: typeof resultEvent?.result === 'string' ? resultEvent.result : null,
-    structuredOutput: resultEvent && 'structured_output' in resultEvent ? (resultEvent.structured_output ?? null) : null,
-    sessionId: typeof resultEvent?.session_id === 'string' ? resultEvent.session_id : null,
-    costUsd: typeof resultEvent?.total_cost_usd === 'number' ? resultEvent.total_cost_usd : typeof resultEvent?.cost_usd === 'number' ? resultEvent.cost_usd : null,
-    events,
-  }
-}
+export { parseStreamJson }
 
 // --- The runner ---
 
 export type HeadlessResult = {
-  status: 'ok' | 'error' | 'timeout' | 'malformed'
+  status: 'ok' | 'error' | 'timeout' | 'malformed' | 'cancelled'
   exitCode: number | null
   capture: HeadlessCapture
   stderrTail: string
@@ -110,34 +42,68 @@ export const HEADLESS_TIMEOUT_MS = 10 * 60 * 1000
 
 export function runHeadless(
   argv: HeadlessArgv,
-  opts: { cwd: string; env: Record<string, string>; timeoutMs?: number },
+  opts: { cwd: string; env: Record<string, string>; timeoutMs?: number; signal?: AbortSignal; onEvent?: (event: StreamEvent) => void; adapter?: StreamJsonAdapter },
 ): Promise<HeadlessResult> {
   return new Promise((resolve) => {
+    const adapter = opts.adapter ?? lineDelimitedJsonAdapter
     // detached → own process group, so the timeout kill reaps grandchildren too (a hung agent's
     // own children would otherwise hold the stdio pipes open and stall the 'close' event).
     const child = spawn(argv.file, argv.args, { cwd: opts.cwd, env: opts.env, stdio: ['ignore', 'pipe', 'pipe'], detached: true })
     let stdout = ''
+    let lineBuffer = ''
     let stderr = ''
     let timedOut = false
-    const timer = setTimeout(() => {
-      timedOut = true
+    let cancelled = false
+    let settled = false
+    const kill = () => {
       try {
         if (child.pid) process.kill(-child.pid, 'SIGKILL')
         else child.kill('SIGKILL')
       } catch {
         child.kill('SIGKILL')
       }
+    }
+    const timer = setTimeout(() => {
+      timedOut = true
+      kill()
     }, opts.timeoutMs ?? HEADLESS_TIMEOUT_MS)
-    child.stdout.on('data', (c: Buffer) => (stdout += c.toString()))
+    const abort = () => {
+      cancelled = true
+      kill()
+    }
+    if (opts.signal?.aborted) abort()
+    else opts.signal?.addEventListener('abort', abort, { once: true })
+    child.stdout.on('data', (c: Buffer) => {
+      const chunk = c.toString()
+      stdout += chunk
+      lineBuffer += chunk
+      const lines = lineBuffer.split('\n')
+      lineBuffer = lines.pop() ?? ''
+      for (const line of lines) {
+        const event = adapter.parseLine(line)
+        if (event) opts.onEvent?.(event)
+      }
+    })
     child.stderr.on('data', (c: Buffer) => (stderr += c.toString()))
     child.on('error', (err) => {
+      if (settled) return
+      settled = true
       clearTimeout(timer)
-      resolve({ status: 'error', exitCode: null, capture: parseStreamJson(''), stderrTail: err.message })
+      opts.signal?.removeEventListener('abort', abort)
+      resolve({ status: cancelled ? 'cancelled' : 'error', exitCode: null, capture: adapter.parse(''), stderrTail: err.message })
     })
     child.on('close', (exitCode) => {
+      if (settled) return
+      settled = true
       clearTimeout(timer)
-      const capture = parseStreamJson(stdout)
+      opts.signal?.removeEventListener('abort', abort)
+      if (lineBuffer) {
+        const event = adapter.parseLine(lineBuffer)
+        if (event) opts.onEvent?.(event)
+      }
+      const capture = adapter.parse(stdout)
       const stderrTail = stderr.slice(-2000)
+      if (cancelled) return resolve({ status: 'cancelled', exitCode, capture, stderrTail })
       if (timedOut) return resolve({ status: 'timeout', exitCode, capture, stderrTail })
       if (exitCode !== 0) return resolve({ status: 'error', exitCode, capture, stderrTail })
       // Exit 0 but no result event → the output is unusable for edges: a typed error, not a guess.

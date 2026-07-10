@@ -125,13 +125,12 @@ newline) instead of the `\r` that would submit.
 
 ## 4. Profiles & worktrees
 
-### Profiles (`main/profiles.ts`)
+### Profiles (`main/agentProfiles/`, `main/profiles.ts`)
 
-`BUILTIN_PROFILES` are hard-coded (a user-editable table is a later enhancement): `shell` (command
-`$SHELL`, node-pty), `claude-code` (`claude`, tmux), `codex` (`codex`, tmux), `aider` (`aider`,
-tmux). Every profile has `transport: 'pty'` — the universal xterm↔PTY transport is the only one
-implemented; structured transports are a deliberately-unbuilt seam. `profileAvailable`
-checks `which` (macOS-only, so `which` is fine); the shell is always available.
+Profiles are registry contributions. Each declares command, backend preference, MCP registration,
+headless argv, resume argv, stream parsing, and an optional tool-free one-shot structured argv. The
+built-ins are `shell`, `claude-code`, `codex`, and `aider`; unsupported capabilities are absent
+instead of inferred from profile ids. `profileAvailable` checks `which`; shell is always available.
 
 ### Worktrees (`main/worktrees.ts`, `resolveTaskCwd` in `main/taskWorktree.ts`)
 
@@ -160,6 +159,7 @@ PATH, SHELL, LANG, LC_ALL, USER, LOGNAME, TMPDIR, TERM — **never** `SESSION_EN
 | `ACORN_TASK_TITLE` | The task title |
 | `ACORN_SESSION_ID` | This session's id — used for `author: agent` provenance on MCP notes/memory writes |
 | `ACORN_API_URL` / `ACORN_API_TOKEN` | The loopback URL + token for the in-process API, so an agent's MCP server can call back |
+| `ACORN_TOOL_CEILING` | Workflow-only encoded allowlist/risk cap, forwarded by MCP and intersected with user permissions |
 
 `ACORN_TASK_ID` is the keystone: the acorn MCP server reads it to scope every task-aware tool (see
 [mcp.md](./mcp.md)). When an **agent** profile spawns, its acorn MCP server is auto-registered with
@@ -194,7 +194,9 @@ Each transport emits only the subset it can detect:
 ## 6. The Agents panel (`agents/AgentsPanel.tsx` + `agents/model.ts`)
 
 One right-rail overlay, toggled from the task view. `model.ts` holds the pure, unit-tested mappers;
-`AgentsPanel.tsx` is thin glue. It refreshes on session-status pings plus a 3s tick while open.
+`AgentsPanel.tsx` is thin glue. Workflow transitions refetch on WS status pings; parsed headless
+events arrive live on `workflow:step:event`. Running steps expose kill-step and cancel-run actions,
+and a quiet step shows a no-output hint after 30 seconds.
 
 - **Roster** (`buildRoster`) merges the task's live PTY sessions with its workflow steps into one
   ordered list: **needs-you first** (`blocked` / `waiting-gate`), then active (`working`/`starting`),
@@ -267,4 +269,3 @@ error`); `attach` subscribes and returns an unsubscribe that detaches without ki
 - [panes.md](./panes.md) — the Changes/Editor/Context panes that feed send-to-agent
 - [workspaces-and-tasks.md](./workspaces-and-tasks.md) — tasks, worktrees, and archive/teardown
 - [frontend.md](./frontend.md) — the notification centre driven by session edge-detection
-

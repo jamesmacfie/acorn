@@ -42,7 +42,7 @@ and its phase files win. Update the design doc in the same PR.
 | 5 | [Client registries](./implementation/phase-05-client-registries.md) | Open client extension seams: panes, commands, keybindings, settings, events, UI slots, notices. | Startup restore descriptors, provider UI contributions, workflow/profile UI. | ✅ |
 | 6 | [Startup restore pipeline](./implementation/phase-06-startup-restore-pipeline.md) | Replace effect-order startup state with ordered persisted-state descriptors. | Stable plugin-owned persisted state and scoped eviction. | ✅ |
 | 7 | [Integration providers and source contributions](./implementation/phase-07-integration-providers.md) | Express Linear/Rollbar through the provider contract before a third provider exists. | Zero-core-file provider additions and provider-owned source/context/link surfaces. | ✅ |
-| 8 | [Workflow and profile registries](./implementation/phase-08-workflow-profile-registries.md) | Make step kinds, policies, profiles, tool ceilings, cancellation, and triggers declarative. | Workflow extensibility and runtime control surfaces. | |
+| 8 | [Workflow and profile registries](./implementation/phase-08-workflow-profile-registries.md) | Make step kinds, policies, profiles, tool ceilings, cancellation, and triggers declarative. | Workflow extensibility and runtime control surfaces. | ✅ |
 | 9 | [Platform migrations](./implementation/phase-09-platform-migrations.md) | Opportunistic platform shifts: WebContentsView, node:sqlite spike, safeStorage path. | Cleaner platform layer before final foldering. | |
 | 10 | [Foldering](./implementation/phase-10-foldering.md) | Move into `core/` + `plugins/` only after the seams exist. | Completion of the plugin-platform architecture. | |
 

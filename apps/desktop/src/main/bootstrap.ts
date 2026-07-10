@@ -106,7 +106,13 @@ export async function bootstrap({ dataDir, origin, createWindow }: BootstrapOpti
   wireContextSections({ db, notesStore: knowledge.notesStore, reconciled: knowledge.reconciled })
   wireAgentTools({ db, notesStore: knowledge.notesStore, proposals: knowledge.proposals, runtime: runtimeSvc, reconciled: knowledge.reconciled })
 
-  const workflowRunner = await registerWorkflowIpc(db, { runtime: runtimeSvc, notesStore: knowledge.notesStore, internalApiEnv, reconciled })
+  const workflowRunner = await registerWorkflowIpc(db, {
+    runtime: runtimeSvc,
+    notesStore: knowledge.notesStore,
+    internalApiEnv,
+    reconciled,
+    memoryReviewTrigger: knowledge.memoryReviewTrigger,
+  })
   // search, editor, local-git, and database are HTTP routes wired via wireServerBridges().
 
   registerTerminalIpc(db, worktreesDir, {

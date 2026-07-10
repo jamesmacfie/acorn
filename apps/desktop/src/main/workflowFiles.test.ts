@@ -3,6 +3,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { loadWorkflowFiles } from './workflowFiles'
+import { normalizePersistedWorkflow } from './workflowValidation'
 
 describe('workflow files (docs/next 14 P5)', () => {
   let dir: string
@@ -44,6 +45,7 @@ prompt = "Build this slice."
 [[steps]]
 name = "aggregate"
 kind = "join"
+joins = "plan"
 
 [[steps]]
 name = "e2e"
@@ -82,6 +84,7 @@ max_iterations = 3
     expect(wf.steps[0].model).toBe('opus')
     expect(wf.steps[0].schema).toEqual({ type: 'object' })
     expect(wf.steps[0].childStep?.prompt).toBe('Build this slice.')
+    expect(wf.steps[1].joins).toBe('plan')
     expect(wf.steps[2].requiresRun).toBe('dev')
     expect(wf.steps[5].maxIterations).toBe(3)
   })
@@ -145,5 +148,107 @@ workflow = "self"
     expect(workflows).toEqual([])
     expect(errors.some((e) => e.message.includes('cyclic'))).toBe(true)
     expect(errors.filter((e) => e.message.includes('cyclic')).length).toBeGreaterThanOrEqual(2)
+  })
+
+  it('fails early with named join, branch, template, and tool-ceiling errors', () => {
+    writeWf(repoDir, 'bad-join', `
+[[steps]]
+name = "join"
+kind = "join"
+joins = "missing-plan"
+`)
+    writeWf(repoDir, 'bad-branch', `
+[[steps]]
+name = "earlier"
+[[steps]]
+name = "route"
+kind = "decide"
+[steps.branches]
+yes = "earlier"
+no = "missing"
+`)
+    writeWf(repoDir, 'bad-template', `
+[[steps]]
+name = "first"
+prompt = "\${steps.later.output}"
+[[steps]]
+name = "later"
+`)
+    writeWf(repoDir, 'wide-tools', `
+name = "wide"
+[tools]
+allow = ["read_tool"]
+[[steps]]
+name = "build"
+[steps.tools]
+allow = ["read_tool", "write_tool"]
+`)
+
+    const { workflows, errors } = loadWorkflowFiles(repoDir, null)
+    expect(workflows).toEqual([])
+    const messages = errors.map((error) => error.message).join('\n')
+    expect(messages).toContain("dangling join 'missing-plan'")
+    expect(messages).toContain("backward target 'earlier'")
+    expect(messages).toContain("invalid target 'missing'")
+    expect(messages).toContain("forward template reference 'later'")
+    expect(messages).toContain('tool ceiling widens the workflow ceiling')
+  })
+
+  it('parses decide branches, output templates, explicit joins, and inherited tool ceilings', () => {
+    writeWf(repoDir, 'phase-8', `
+name = "phase 8"
+[tools]
+max_risk = "write"
+allow = ["read_tool", "write_tool"]
+
+[[steps]]
+name = "plan"
+kind = "fan-out"
+prompt = "Plan"
+
+[[steps]]
+name = "join"
+kind = "join"
+joins = "plan"
+
+[[steps]]
+name = "route"
+kind = "decide"
+prompt = "Choose from \${steps.join.output}"
+[steps.branches]
+ship = "ship"
+default = "revise"
+
+[[steps]]
+name = "ship"
+[steps.tools]
+max_risk = "read"
+
+[[steps]]
+name = "revise"
+`)
+    const { workflows, errors } = loadWorkflowFiles(repoDir, null)
+    expect(errors).toEqual([])
+    expect(workflows[0]).toMatchObject({
+      tools: { allow: ['read_tool', 'write_tool'], maxRisk: 'write' },
+      steps: [
+        { name: 'plan', kind: 'fan-out' },
+        { name: 'join', joins: 'plan' },
+        { name: 'route', branches: { ship: 'ship', default: 'revise' } },
+        { name: 'ship', tools: { maxRisk: 'read' } },
+        { name: 'revise' },
+      ],
+    })
+  })
+
+  it('read-normalizes a frozen pre-Phase-8 implicit join without weakening new-file validation', () => {
+    const normalized = normalizePersistedWorkflow({
+      name: 'legacy',
+      steps: [
+        { name: 'plan', kind: 'fan-out' },
+        { name: 'join', kind: 'join' },
+      ],
+    })
+    expect(normalized.steps[1].joins).toBe('plan')
   })
 })

@@ -101,6 +101,13 @@ describe('runHeadless against the committed fake agent (no real CLIs)', () => {
     expect(res.status).toBe('timeout')
   }, 10_000)
 
+  it('abort kills the process group and reports cancellation', async () => {
+    const controller = new AbortController()
+    const pending = runHeadless(argv(), { cwd, env: env('hang'), signal: controller.signal })
+    setTimeout(() => controller.abort(), 100)
+    expect((await pending).status).toBe('cancelled')
+  }, 10_000)
+
   it('malformed output → typed error, never a guess', async () => {
     const res = await runHeadless(argv(), { cwd, env: env('malformed') })
     expect(res.status).toBe('malformed')

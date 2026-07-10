@@ -10,7 +10,7 @@ import { integrationProviderRegistry } from '../integrations/registry'
 import type { ExternalRef } from '../../shared/integrations'
 
 type TaskRow = typeof schema.tasks.$inferSelect
-type AssembleArgs = { db: AppDatabase; userLogin: string; task: TaskRow; repo: string }
+type AssembleArgs = { db: AppDatabase; userLogin: string; task: TaskRow; repo: string; workflowRunId?: string }
 type ContextDraft = {
   items: ContextItem[]
   legacy?: Partial<Pick<TaskContext, 'pr' | 'issues' | 'notes' | 'memory'>>
@@ -181,8 +181,11 @@ export function buildContextSections(sources: { notes: ContextNotesSource; memor
       label: 'Notes',
       defaultIncluded: true,
       budget: { maxItems: 10, maxBytesPerItem: 2_000, overflow: 'truncate-tail' },
-      async assemble({ task, repo }) {
-        const notes = await sources.notes(task.id, repo)
+      async assemble({ task, repo, workflowRunId }) {
+        const allNotes = await sources.notes(task.id, repo)
+        const notes = workflowRunId
+          ? allNotes.filter((note) => !note.slug.startsWith('workflow-handoffs-') || note.slug === `workflow-handoffs-${workflowRunId}`)
+          : allNotes
         return {
           items: notes.map((note) => ({ id: `${note.scope}:${note.slug}`, kind: note.kind, label: note.title, body: note.body, details: [note.scope] })),
           legacy: { notes: notes.map((note) => ({ slug: note.slug, scope: note.scope, title: note.title, body: note.body })) },
@@ -234,7 +237,13 @@ export function parseInclude(raw: string | undefined): Set<string> {
   return new Set(registry.map((section) => section.id).filter((id) => tokens.has(id)))
 }
 
-export async function assembleContext(db: AppDatabase, userLogin: string, taskId: string, include: Set<string>): Promise<TaskContext | null> {
+export async function assembleContext(
+  db: AppDatabase,
+  userLogin: string,
+  taskId: string,
+  include: Set<string>,
+  opts: { workflowRunId?: string } = {},
+): Promise<TaskContext | null> {
   const [task] = await db.select().from(schema.tasks).where(eq(schema.tasks.id, taskId))
   if (!task) return null
   const repo = `${task.repoOwner}/${task.repoName}`
@@ -247,7 +256,7 @@ export async function assembleContext(db: AppDatabase, userLogin: string, taskId
   }
   for (const contribution of registry) {
     if (!include.has(contribution.id)) continue
-    const draft = await contribution.assemble({ db, userLogin, task, repo })
+    const draft = await contribution.assemble({ db, userLogin, task, repo, workflowRunId: opts.workflowRunId })
     const budgeted = applyBudget(draft.items, contribution.budget)
     const legacy = budgetLegacy(draft.legacy, contribution.budget)
     if (legacy) Object.assign(ctx, legacy)
