@@ -3,7 +3,7 @@
 // Loads a data: page with a button + input, then drives it through the REAL CDP path
 // (webContents.debugger): snapshot → fill → click → console assert. Exit code = pass/fail.
 // Uses no native modules, so it needs no ABI rebuild. The BrowserDriver logic itself lives in
-// src/main/browserService.ts; this script inlines the same CDP sequence against a raw webContents
+// plugins/preview/main/browserService.ts; this script inlines the same CDP sequence against a raw webContents
 // to prove the protocol path end-to-end without importing TS.
 const { app, BrowserWindow } = require('electron')
 const assert = require('node:assert')

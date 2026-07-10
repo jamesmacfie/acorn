@@ -45,31 +45,38 @@ The Electron main process starts the Hono server on `http://127.0.0.1:4317` and 
 
 pnpm workspace + Turborepo. All app code lives in `apps/desktop` (`@acorn/desktop`).
 
+The source is foldered into a **plugin platform**: `core/` (the platform, imports no plugin),
+`plugins/<name>/` (one folder per feature), and `app/` (the composition root, the only layer that
+imports plugins). Each layer is split by process (`client` / `server` / `main` / `mcp` / `shared`).
+Import rules are enforced by `src/core/boundaries.test.ts`.
+
 ```
 apps/desktop/
 ├── src/
-│   ├── main/           # Electron main + Node bootstrap
-│   │   ├── electron.ts #   window, navigation guards, OAuth window
-│   │   ├── server.ts   #   @hono/node-server + static / SPA fallback
-│   │   ├── bindings.ts #   DB + on-disk BLOBS + in-mem OAUTH_STATE + secrets
-│   │   └── preload.ts  #   narrow sandboxed window.acorn.* bridge
-│   ├── client/         # SolidJS SPA — TabRail, WorkspacePicker, TaskView + panes,
-│   │   │               #   PR review (PullList/PullDetail/DiffView), terminal drawer,
-│   │   │               #   command palette, settings. See features/*.
-│   ├── shared/         # typed API contracts, route builders, query keys, terminal wire protocol
-│   ├── mcp/            # the acorn MCP server (stdio) exposing task context to agents
-│   ├── env.d.ts        # hand-written global Env (binding contract)
-│   └── server/         # Hono app
-│       ├── index.ts    # createApp() factory / route mounting
-│       ├── routes/     # auth, me, pins, prefs, workspaces, tasks, review-notes, taskContext,
-│       │               #   harness, integrations, linear, rollbar, repos, pulls, prActions, …
-│       ├── middleware/
-│       ├── github/     # REST + GraphQL clients
-│       ├── linear/     # Linear GraphQL client
-│       ├── rollbar/    # Rollbar REST client
-│       ├── db/         # Drizzle schema + SQLite access
-│       └── session.ts  # AES-256-GCM / JWE session cookie + at-rest secret encryption
-├── migrations/         # Drizzle-generated SQLite migrations
+│   ├── core/               # the platform — never imports a plugin
+│   │   ├── client/         #   shell, registries, persistence, layout, palettes, tabs,
+│   │   │                   #   tasks/workspaces, settings framework, WS client
+│   │   ├── server/         #   createApp() factory, session/auth/csrf middleware, sync engine,
+│   │   │                   #   route + integration-provider registries, Drizzle db/
+│   │   ├── main/           #   PTY/worktree primitives, bindings, server listener, MCP register
+│   │   ├── mcp/            #   the acorn MCP server (stdio) — tool projection
+│   │   └── shared/         #   cross-process contracts (api, ws, terminal/notes/workflow protocols)
+│   ├── plugins/            # one folder per feature (client/server/main parts as needed)
+│   │   ├── github/         #   PR review (PullList/PullDetail/DiffView), mirror, checks, create-PR
+│   │   ├── linear/  rollbar/#   integration providers + browse/pane
+│   │   ├── editor/  changes/#   editor + file finder · working-tree review + review notes
+│   │   ├── notes/  memory/  #   notes pane + scopes · memory tray + proposals
+│   │   ├── context/ preview/#   context tray · browser preview (WebContentsView) + browser_* tools
+│   │   ├── database/ terminal/# pg browse · terminal drawer + run targets
+│   │   ├── agents/ workflows/# agent roster · TOML workflows + runner
+│   │   ├── profiles-{claude,codex,aider}/  onboarding/
+│   │   └── …
+│   ├── app/                # composition root — the ONLY layer that imports plugins
+│   │   ├── main/           #   bootstrap.ts (boot order), electron.ts entry, activation modules
+│   │   ├── server/         #   providers.ts, routes.ts (register into core registries), devNode.ts
+│   │   └── client/         #   index.tsx renderer entry + contribution activation
+│   └── env.d.ts            # hand-written global Env (binding contract)
+├── migrations/             # Drizzle-generated SQLite migrations
 ├── electron.vite.config.ts
 └── electron-builder.yml
 ```

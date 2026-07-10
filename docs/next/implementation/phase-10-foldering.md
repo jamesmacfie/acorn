@@ -1,8 +1,21 @@
 # Phase 10 — Foldering
 
-**Status:** planned · **Depends on:** all registry/projection seams existing ·
+**Status:** ✅ done (2026-07-11) · **Depends on:** all registry/projection seams existing ·
 **Primary docs:** [extensibility](../extensibility.md) §6 and §9,
 [docs-overhaul](../docs-overhaul.md) §4.
+
+> **Completion note.** The source now lives under `src/{core,plugins,app}` split by process, moved
+> mechanically by a map-driven codemod (git-tracked renames + relative-import rewrite). The clean
+> structural seams landed: route-contribution registry (`core/server/routeRegistry.ts` + app
+> activation, `createApp` no longer imports product routes), integration-provider + agent-profile
+> registration moved to the `app/` composition root, cross-process shared contracts (ws/terminal/
+> notes/workflow) relocated to `core/shared`, and the WS client to core transport. Import rules are
+> enforced by `src/core/boundaries.test.ts`, which proves **zero** `→app` leakage and a clean
+> client↔node process boundary, and holds a **shrinking baseline** of ~82 pre-existing cross-feature
+> couplings (features importing each other directly instead of via the pane/command/capability/state
+> registries). Those are Phase 4/5/6 seam-*adoption* follow-through, not foldering — each is a tracked
+> ledger entry that can only shrink, never grow. `pnpm lint`, `pnpm test` (542), and `pnpm build` all
+> pass from the new paths.
 
 ## Goal
 
