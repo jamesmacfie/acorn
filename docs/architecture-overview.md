@@ -258,6 +258,8 @@ for the detail. All of it is desktop-only (bridge-gated, always on).
   model, the two kinds of state, the three cache layers, the data flow.
 - [data-layer](./data-layer.md) — the Drizzle + SQLite schema table-by-table,
   mirror vs app-state, scoping, staleness bookkeeping, migrations.
+- [state](./state.md) — durability tiers, scopes, the ordered restore pipeline,
+  persisted-state descriptors, failure handling, and lifecycle eviction.
 - [caching](./caching.md) — the three cache layers and their exact policies
   (TTLs, ETag revalidation, on-disk blobs, IndexedDB persistence).
 - [api-reference](./api-reference.md) — every route: method, path, params,
@@ -314,4 +316,3 @@ and [implementation.md](./next/implementation.md) (the staged guide
 for building it). The root docs above describe what exists in code today;
 superseded design records (the old `vNext.md`, `docs/workspaces/`) have been
 removed — see git history for the original rationale.
-

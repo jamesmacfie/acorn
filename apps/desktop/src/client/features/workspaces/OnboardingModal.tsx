@@ -1,7 +1,6 @@
 import { useQueryClient } from '@tanstack/solid-query'
-import { prefsKey } from '../../queries'
-import { setPref } from '../../mutations'
 import WorkspaceRepoAssignments from './WorkspaceRepoAssignments'
+import { saveOnboardingCompletion } from './onboardingCompletion'
 import './onboarding.css'
 
 // First-run workspace setup (docs/workspaces). The bootstrap already put every repo in a Default
@@ -11,9 +10,7 @@ import './onboarding.css'
 export default function OnboardingModal(props: { onClose: () => void }) {
   const qc = useQueryClient()
   async function done() {
-    await setPref('onboarded', '1')
-    await qc.invalidateQueries({ queryKey: prefsKey })
-    props.onClose()
+    await saveOnboardingCompletion(qc, props.onClose)
   }
 
   return (

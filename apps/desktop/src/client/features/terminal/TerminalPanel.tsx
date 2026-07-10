@@ -1,8 +1,7 @@
 import { createEffect, createMemo, createSignal, For, onCleanup, onMount, Show } from 'solid-js'
 import { Portal } from 'solid-js/web'
-import { createQuery } from '@tanstack/solid-query'
+import { createQuery, useQueryClient } from '@tanstack/solid-query'
 import { prefsOptions, type Task } from '../../queries'
-import { setPref } from '../../mutations'
 import { terminalApi } from './terminalClient'
 import { onClosePaneWithin } from '../../lib/onClosePaneWithin'
 import { isTerminalMax } from '../tasks/tasks'
@@ -12,6 +11,8 @@ import type { TerminalProfile, TerminalSession } from '../../../shared/terminal'
 import { registerCommands } from '../../registries/commands'
 import { registerKeybindings } from '../../registries/keybindings'
 import { clientEvents, consumeTerminalFocusIntent } from '../../registries/clientEvents'
+import { savePref } from '../settings/savePref'
+import { PrefKeys } from '../../persistence/prefKeys'
 import './terminal.css'
 
 // vNext Phase 2: a bottom drawer of persistent local sessions. The "+" opens a profile menu
@@ -21,6 +22,7 @@ import './terminal.css'
 // visible terminals.
 export default function TerminalPanel(props: { onClose: () => void; task: Task | null }) {
   const api = terminalApi()
+  const queryClient = useQueryClient()
   const ws = () => props.task
   const prefs = createQuery(() => prefsOptions(true))
 
@@ -68,7 +70,7 @@ export default function TerminalPanel(props: { onClose: () => void; task: Task |
     // Set the loader flag up front so we never flash the "No sessions" empty state.
     // ponytail: relies on the prefs query being warm by now — App loads it at startup. If it isn't,
     // we just open empty, which is the safe fallback.
-    const def = prefs.data?.term_rail_default
+    const def = prefs.data?.[PrefKeys.terminalRailDefault]
     const willAutoLaunch = !!def && def !== 'empty' && !!ws()
     if (willAutoLaunch) setLaunching(true)
     setProfiles(await api.profiles())
@@ -160,7 +162,7 @@ export default function TerminalPanel(props: { onClose: () => void; task: Task |
   const [height, setHeight] = createSignal(360)
   let seeded = false
   createEffect(() => {
-    const saved = Number(prefs.data?.term_height)
+    const saved = Number(prefs.data?.[PrefKeys.terminalHeight])
     if (!seeded && Number.isFinite(saved) && saved > 0) {
       setHeight(saved)
       seeded = true
@@ -180,7 +182,7 @@ export default function TerminalPanel(props: { onClose: () => void; task: Task |
     const onUp = () => {
       window.removeEventListener('pointermove', onMove)
       window.removeEventListener('pointerup', onUp)
-      void setPref('term_height', String(Math.round(height())))
+      void savePref(queryClient, PrefKeys.terminalHeight, String(Math.round(height())))
     }
     window.addEventListener('pointermove', onMove)
     window.addEventListener('pointerup', onUp)

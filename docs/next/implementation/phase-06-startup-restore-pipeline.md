@@ -1,7 +1,8 @@
 # Phase 6 — Startup restore pipeline
 
-**Status:** planned · **Depends on:** Phase 5 event bus preferred · **Gated by:**
-smoke S2 and restore performance baseline · **Primary docs:**
+**Status:** implemented; automated suite/build pass, manual S2 and baseline comparison pending ·
+**Depends on:** Phase 5 event bus preferred · **Gated by:** smoke S2 and restore performance
+baseline · **Primary docs:**
 [state-and-policies](../state-and-policies.md) §5.1,
 [inventories](../inventories.md) §3a and §3c, [performance](../performance.md)
 §3.4.

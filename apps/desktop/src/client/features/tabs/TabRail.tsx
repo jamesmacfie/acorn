@@ -1,9 +1,9 @@
 import { createSignal, For, onCleanup, onMount, Show } from 'solid-js'
 import { useNavigate, useParams } from '@solidjs/router'
 import { createQuery, useQueryClient } from '@tanstack/solid-query'
-import { integrationsOptions, prefsKey, prefsOptions, pullDetailOptions, tasksKey, tasksOptions, workspacesOptions, type Task } from '../../queries'
-import { archiveTask, createCheckoutTask, createTask, renameTask, setPref } from '../../mutations'
-import { applyRailOrder, isPinned, moveTask, parseRailOrder, pinTask, serializeRailOrder, unpinTask, type RailOrder } from './railOrder'
+import { integrationsOptions, prefsOptions, pullDetailOptions, tasksKey, tasksOptions, workspacesOptions, type Task } from '../../queries'
+import { archiveTask, createCheckoutTask, createTask, renameTask } from '../../mutations'
+import { applyRailOrder, isPinned, moveTask, parseRailOrder, pinTask, unpinTask, type RailOrder } from './railOrder'
 import { checksState } from '../../displayMeta'
 import { activeTaskId, selectedSource, setActiveTaskId, setSelectedSource, type SourceId } from '../tasks/tasks'
 import { activateTaskSignals, pathForTask } from '../tasks/activate'
@@ -18,8 +18,10 @@ import { dedupeBranch, slugifyBranch } from '../../../shared/branch'
 import { terminalApi } from '../terminal/terminalClient'
 import { registerCommands } from '../../registries/commands'
 import { registerKeybindings } from '../../registries/keybindings'
-import { clientEvents } from '../../registries/clientEvents'
 import { confirmWillEvent } from '../../registries/willPhase'
+import { saveJsonPref } from '../settings/savePref'
+import { PrefKeys } from '../../persistence/prefKeys'
+import { completeTaskArchive } from '../tasks/archiveLifecycle'
 import './tabrail.css'
 
 // The Tasks zone of the left rail (docs/workspaces). Rows are real Task entities (not path
@@ -45,10 +47,9 @@ export default function TabRail() {
 
   // Rail order (docs/panes.md): pin-to-top + drag-reorder in a dedicated pref — never
   // tasks.sort. The pure model lives in railOrder.ts.
-  const railOrder = () => parseRailOrder(prefs.data?.rail_order)
+  const railOrder = () => parseRailOrder(prefs.data?.[PrefKeys.railOrder])
   const saveOrder = async (o: RailOrder) => {
-    await setPref('rail_order', serializeRailOrder(o))
-    await queryClient.invalidateQueries({ queryKey: prefsKey })
+    await saveJsonPref(queryClient, PrefKeys.railOrder, o)
   }
   async function onDrop(targetId: string | null) {
     const id = dragId()
@@ -212,11 +213,12 @@ export default function TabRail() {
     } else {
       await archiveTask(w.id)
     }
-    clientEvents.emit('runtime:task-archived', { taskId: w.id })
-    if (activeTaskId() === w.id) {
-      setActiveTaskId(null)
-      setSelectedSource('github') // archived the active task → fall back to the GitHub browse
-    }
+    completeTaskArchive(w.id, () => {
+      if (activeTaskId() === w.id) {
+        setActiveTaskId(null)
+        setSelectedSource('github') // archived the active task → fall back to the GitHub browse
+      }
+    })
     await invalidate()
   }
 

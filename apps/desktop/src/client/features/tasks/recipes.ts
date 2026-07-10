@@ -2,6 +2,7 @@
 // its named run target in the drawer, and points the browser pane at a target's resolved URL
 // (`browser = "run:<id>"`). Pure executor over injected services — unit tested with stubs; the
 // palette wires the real runtime/layout/browser glue.
+import { paneContribution } from '../../registries/panes'
 import { isPaneId, type TaskLayout } from './layout'
 
 export type RecipeSpec = {
@@ -23,7 +24,7 @@ export type RecipeServices = {
 // dropped (configs may name ids we no longer model); none valid → null. Panes split equally —
 // main's parser dropped the old `ratio` key and this type followed.
 export function recipeToLayout(recipe: RecipeSpec): TaskLayout | null {
-  const panes = [...new Set(recipe.panes.filter(isPaneId))]
+  const panes = [...new Set(recipe.panes.filter((id) => isPaneId(id) && !!paneContribution(id)))]
   if (!panes.length) return null
   return { panes }
 }

@@ -17,6 +17,10 @@ import { pollerRegistry } from './registries/pollers'
 import { taskStatusPollerContribution } from './features/tasks/taskStatus'
 import { uiSlotRegistry } from './registries/uiSlots'
 import { shellSlotContributions } from './features/shell/slotContributions'
+import { persistedStateRegistry } from './persistence/persistedState'
+import { persistedFeatureSlices } from './persistence/stateSlices'
+import { directPreferenceSlices } from './persistence/preferenceSlices'
+import { activateScopedStateEviction } from './persistence/scopedEviction'
 
 const panes = [
   prPaneContribution,
@@ -37,3 +41,5 @@ activatePreviewEvents()
 for (const kind of noticeKindContributions) noticeKindRegistry.register(kind)
 pollerRegistry.register(taskStatusPollerContribution)
 for (const contribution of shellSlotContributions) uiSlotRegistry.register(contribution)
+for (const slice of [...persistedFeatureSlices, ...directPreferenceSlices]) persistedStateRegistry.register(slice)
+activateScopedStateEviction()

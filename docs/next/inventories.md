@@ -182,17 +182,18 @@ sites!), `prContext`, `prCreate`, `prMirror`, `pullBlob`, `pullDetail`,
 
 ## 3. The client surface (Phases 5–6 consume this)
 
-### 3a. Pref keys (Phase 6 — the `PrefKeys` const and the tier audit)
+### 3a. Pref keys (Phase 6 — the `PrefKeys` const and the tier audit) — **✓ COMPLETE**
 
-**20 keys.** Startup-restore keys (hydrated by the one-shot block or boot-time
-effects in `App.tsx:174-238`): `theme_follow_system`, `theme`, `theme_light`,
+**21 direct/compatibility keys plus 3 canonical scoped-key bases.** All are centralized in
+`client/persistence/prefKeys.ts` and classified in
+[`docs/state.md`](../state.md). Startup-restore keys (hydrated by ordered descriptors):
+`theme_follow_system`, `theme`, `theme_light`,
 `theme_dark`, `last_task`, `last_path`, `last_source`, `task_layouts`,
 `task_panes` (legacy read-only fallback), `notices`, `editor_open_files`,
-`pr_filters`, `left_collapsed` (reactive seed; also the one persist effect
-that *does* invalidate `prefsKey` — `App.tsx:285` — the protocol
-contradiction Phase 6 unifies). Reactive-read keys (no restore phase):
-`pane_shortcuts`, `diff_view`, `rail_order`, `term_rail_default`,
-`term_height`, `onboarded`.
+`pr_filters`, `left_collapsed`. Reactive-read keys: `keybindings`, `pane_shortcuts`,
+`diff_view`, `rail_order`, `term_rail_default`, `term_height`, `onboarded`, and
+`agentTools.perms`. Scoped canonical keys derive from the descriptor key and scope id; the four
+aggregate keys remain migration inputs. All writes now use the optimistic `savePref` protocol.
 
 ### 3b. Keydown listeners (Phase 5 — the dispatcher collapses these)
 
@@ -209,20 +210,21 @@ TabRail ⌘digit bails on Shift so TerminalPanel can own ⌘⇧digit; overlay us
 capture to pre-empt Monaco — the registry must reproduce both semantics
 (capture-phase pre-emption and modifier-disambiguation), not just the table.
 
-### 3c. Module-scope keyed collections (Phase 6 — eviction subscribers)
+### 3c. Module-scope keyed collections (Phase 6 — eviction subscribers) — **✓ COMPLETE**
 
-No archive eviction today except `previewWebviews`:
+Task archive and workspace removal now flow through `clientEvents` into owner-provided eviction
+operations (`persistence/scopedEviction.ts`); `previewWebviews` retains its feature-owned subscriber:
 
 | Collection | Where | Key | Eviction today |
 | --- | --- | --- | --- |
-| `viewByWorkspace` | `tasks.ts:22` | workspace | none |
-| `taskLayouts` | `tasks.ts:35` | task | none |
-| `recipeBrowserUrls` | `tasks.ts:59` | task | none |
-| `terminalOpenTasks` / `terminalMaxTasks` | `tasks.ts:67/82` | task | toggle-only |
-| `activeByTask` | `sessions.ts:32` | task | none |
-| `editorStateByTask` | `editorState.ts:45` | task | none (persisted) |
-| `prFilters` | `filterState.ts:9` | workspace | none (persisted) |
-| `viewStates` (Monaco) | `EditorPane.tsx:26` | `task:path` | none |
+| `viewByWorkspace` | `tasks.ts` | workspace | `runtime:workspace-removed` |
+| `taskLayouts` | `tasks.ts` | task | `runtime:task-archived` + persisted tombstone |
+| `recipeBrowserUrls` | `tasks.ts` | task | `runtime:task-archived` |
+| `terminalOpenTasks` / `terminalMaxTasks` | `tasks.ts` | task | `runtime:task-archived` |
+| `activeByTask` | `sessions.ts` | task | `runtime:task-archived` |
+| `editorStateByTask` | `editorState.ts` | task | `runtime:task-archived` + persisted tombstone |
+| `prFilters` | `filterState.ts` | workspace | `runtime:workspace-removed` + persisted tombstone |
+| `viewStates` (Monaco) | `EditorPane.tsx` | `task:path` | `runtime:task-archived` prefix eviction |
 | `previewWebviews` | `PreviewPane.tsx:28` | task | manual, 3 call sites |
 | `statuses` | `taskStatus.ts:10` | task | self-prunes per poll |
 

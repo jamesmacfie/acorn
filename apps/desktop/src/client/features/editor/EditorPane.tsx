@@ -9,6 +9,7 @@ import { isAppDark, token, watchTheme } from '../terminal/theme'
 import { onClosePaneWithin } from '../../lib/onClosePaneWithin'
 import { activeFile, editorActivate, editorClose, editorOpen, editorPromote, editorSetDirty, openFiles } from './editorState'
 import { clientEvents, consumePaneIntent, type PaneIntent } from '../../registries/clientEvents'
+import { editorViewState, rememberEditorViewState } from './editorViewState'
 import './editor.css'
 
 // Minimal filename → Monaco language id. Anything unmapped falls back to plaintext (still editable,
@@ -20,12 +21,6 @@ const EXT_LANG: Record<string, string> = {
   sh: 'shell', bash: 'shell', yml: 'yaml', yaml: 'yaml', sql: 'sql', toml: 'ini', ini: 'ini',
 }
 const langFor = (name: string): string => EXT_LANG[name.split('.').pop()?.toLowerCase() ?? ''] ?? 'plaintext'
-
-// Scroll + cursor + selection per file, keyed `${taskId}:${path}`. Module-level so it survives the
-// pane unmounting on task/workspace switch — you return to the same spot. Session-only (content
-// isn't persisted, so restoring scroll after relaunch would be against a possibly-changed file).
-const viewStates = new Map<string, monaco.editor.ICodeEditorViewState>()
-const viewKey = (taskId: string, path: string): string => `${taskId}:${path}`
 
 // Monaco (like xterm) ignores CSS custom properties, so it gets an explicit theme: base vs/vs-dark
 // supplies the syntax colours, chrome colours come from the live app tokens (tokens-layout.css) —
@@ -55,6 +50,7 @@ function applyMonacoTheme() {
 // (the agent and the human share the worktree).
 export default function EditorPane(props: { task: Task }) {
   const api = editorApi()
+  const taskId = props.task.id
   const [root, setRoot] = createSignal<string | null | undefined>(undefined) // undefined = loading
   const [saveErr, setSaveErr] = createSignal('')
   const [pendingReveal, setPendingReveal] = createSignal<{ path: string; line: number } | null>(null)
@@ -69,8 +65,9 @@ export default function EditorPane(props: { task: Task }) {
   const models = new Map<string, monaco.editor.ITextModel>()
   const savedVersion = new Map<string, number>() // alternativeVersionId at last load/save
 
-  const files = () => openFiles(props.task.id)
-  const active = () => activeFile(props.task.id)
+  const files = () => openFiles(taskId)
+  const active = () => activeFile(taskId)
+  let disposed = false
 
   // Cmd/Ctrl+W closes the active file tab when focus is inside this pane.
   let paneRef: HTMLElement | undefined
@@ -86,13 +83,14 @@ export default function EditorPane(props: { task: Task }) {
   const saveViewState = () => {
     if (editor && currentPath) {
       const vs = editor.saveViewState()
-      if (vs) viewStates.set(viewKey(props.task.id, currentPath), vs)
+      if (vs) rememberEditorViewState(taskId, currentPath, vs)
     }
   }
 
   onMount(() => {
     onCleanup(() => {
       saveViewState() // pane unmounting (task/workspace switch) — remember where we were
+      disposed = true
       scheduleSave.flush()
       stopTheme?.()
       for (const m of models.values()) m.dispose()
@@ -102,7 +100,8 @@ export default function EditorPane(props: { task: Task }) {
     })
     void (async () => {
       if (!api) return setRoot(null)
-      const r = await api.root(props.task.id)
+      const r = await api.root(taskId)
+      if (disposed) return
       setRoot(r) // renders the host div synchronously when truthy
       if (!r || !host) return
       applyMonacoTheme()
@@ -121,16 +120,18 @@ export default function EditorPane(props: { task: Task }) {
     })()
   })
 
-  async function modelFor(relPath: string): Promise<monaco.editor.ITextModel> {
+  async function modelFor(relPath: string): Promise<monaco.editor.ITextModel | null> {
+    if (disposed) return null
     let model = models.get(relPath)
     if (model) return model
-    const content = (await api?.read(props.task.id, relPath).catch(() => '')) ?? ''
+    const content = (await api?.read(taskId, relPath).catch(() => '')) ?? ''
+    if (disposed) return null
     model = monaco.editor.createModel(content, langFor(relPath))
     savedVersion.set(relPath, model.getAlternativeVersionId())
     model.onDidChangeContent(() => {
       // Dirty derives from the version id vs the last saved one — undo back to saved clears it.
       const dirty = model!.getAlternativeVersionId() !== savedVersion.get(relPath)
-      editorSetDirty(props.task.id, relPath, dirty)
+      editorSetDirty(taskId, relPath, dirty)
       if (dirty) scheduleSave(relPath)
     })
     models.set(relPath, model)
@@ -144,12 +145,13 @@ export default function EditorPane(props: { task: Task }) {
     saveViewState() // remember the outgoing file's scroll/cursor before we swap models
     setSaveErr('')
     const model = await modelFor(relPath)
+    if (disposed || !editor || !model) return
     currentPath = relPath
     editor.setModel(model)
-    const vs = viewStates.get(viewKey(props.task.id, relPath))
+    const vs = editorViewState(taskId, relPath)
     if (vs) editor.restoreViewState(vs)
     editor.updateOptions({ readOnly: false })
-    editorActivate(props.task.id, relPath)
+    editorActivate(taskId, relPath)
     maybeReveal(relPath)
   }
 
@@ -171,32 +173,34 @@ export default function EditorPane(props: { task: Task }) {
     if (currentPath === intent.path) maybeReveal(intent.path)
   }
   onMount(() => {
-    const off = clientEvents.on('presentation:pane-intent', ({ taskId, paneId, intent }) => {
-      if (taskId === props.task.id && paneId === 'editor') applyPaneIntent(intent)
+    const off = clientEvents.on('presentation:pane-intent', ({ taskId: targetTaskId, paneId, intent }) => {
+      if (targetTaskId === taskId && paneId === 'editor') applyPaneIntent(intent)
     })
     onCleanup(off)
   })
-  createEffect(() => applyPaneIntent(consumePaneIntent(props.task.id, 'editor')))
+  createEffect(() => applyPaneIntent(consumePaneIntent(taskId, 'editor')))
 
   function openPath(relPath: string, ephemeral: boolean) {
-    editorOpen(props.task.id, relPath, ephemeral) // the active() effect swaps the surface
+    editorOpen(taskId, relPath, ephemeral) // the active() effect swaps the surface
   }
 
   async function save(p: string | null = currentPath) {
     const model = p ? models.get(p) : undefined
     if (!api || !p || !model) return
     const version = model.getAlternativeVersionId() // snapshot: the value we're about to write
-    const res = await api.write(props.task.id, p, model.getValue())
+    const res = await api.write(taskId, p, model.getValue())
+    if (disposed) return
     if (!res.ok) return setSaveErr(res.reason ?? 'Save failed')
     savedVersion.set(p, version)
     // Still-dirty if the user typed more during the async write.
-    editorSetDirty(props.task.id, p, model.getAlternativeVersionId() !== version)
+    editorSetDirty(taskId, p, model.getAlternativeVersionId() !== version)
   }
 
   async function close(relPath: string) {
     scheduleSave.cancel()
     await save(relPath) // autosave: persist before we discard the model
-    editorClose(props.task.id, relPath) // active() moves to the neighbour; the effect swaps the surface
+    if (disposed) return
+    editorClose(taskId, relPath) // active() moves to the neighbour; the effect swaps the surface
     models.get(relPath)?.dispose()
     models.delete(relPath)
     savedVersion.delete(relPath)
@@ -210,11 +214,11 @@ export default function EditorPane(props: { task: Task }) {
     if (!api || !p || !model) return
     const file = files().find((x) => x.path === p)
     if (file?.dirty) return
-    const disk = await api.read(props.task.id, p).catch(() => null)
-    if (disk != null && disk !== model.getValue()) {
+    const disk = await api.read(taskId, p).catch(() => null)
+    if (!disposed && disk != null && disk !== model.getValue()) {
       model.setValue(disk)
       savedVersion.set(p, model.getAlternativeVersionId())
-      editorSetDirty(props.task.id, p, false)
+      editorSetDirty(taskId, p, false)
     }
   }
 
@@ -238,7 +242,7 @@ export default function EditorPane(props: { task: Task }) {
         <Show when={root()} fallback={<div class="editor-empty muted">Open a terminal first to map this repo's checkout.</div>}>
           <div class="editor-layout">
             <div class="editor-tree">
-              <Tree taskId={props.task.id} relPath="" onOpen={(p) => openPath(p, true)} openPath={active()} />
+              <Tree taskId={taskId} relPath="" onOpen={(p) => openPath(p, true)} openPath={active()} />
             </div>
             <div class="editor-main">
               <div class="editor-tabs">
@@ -250,7 +254,7 @@ export default function EditorPane(props: { task: Task }) {
                         class="editor-tab-name"
                         title={file.path}
                         onClick={() => void show(file.path)}
-                        onDblClick={() => editorPromote(props.task.id, file.path)}
+                        onDblClick={() => editorPromote(taskId, file.path)}
                       >
                         {file.path.split('/').pop()}
                         {file.dirty ? ' ●' : ''}
@@ -270,7 +274,7 @@ export default function EditorPane(props: { task: Task }) {
                         if (!p) return
                         const sel = editor?.getSelection()
                         const ref = sel && !sel.isEmpty() ? formatFileReference(p, sel.startLineNumber, sel.endLineNumber) : formatFileReference(p)
-                        void sendReferenceToAgent(props.task.id, ref).then((r) => {
+                        void sendReferenceToAgent(taskId, ref).then((r) => {
                           if (!r.ok && r.reason) setSaveErr(r.reason)
                           else setSaveErr('')
                         })
