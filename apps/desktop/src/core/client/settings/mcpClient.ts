@@ -1,4 +1,4 @@
-// MCP config inspector (docs/mcp.md) over loopback HTTP (Phase 3): was `window.acorn.mcp`. Reads
+// MCP config inspector (docs/mcp.md) over loopback HTTP: was `window.acorn.mcp`. Reads
 // the known candidate files, parsed + secret-masked in main. Backed by the terminal engine's
 // worktree resolution, so it 503s in dev:node.
 import { taskMcpRoute, taskMcpStarterRoute } from '../../shared/api'

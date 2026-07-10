@@ -1,4 +1,4 @@
-/* Context pane (docs/next 11 §E): a right-rail layout pane listing what an assembled send includes. */
+/* Context pane (docs/agent-tools.md §4): a right-rail layout pane listing what an assembled send includes. */
 .context-pane { display: flex; flex-direction: column; min-height: 0; }
 .context-tray-head { display: flex; align-items: center; gap: 8px; }
 .context-tray-msg { margin-left: auto; }
@@ -63,10 +63,10 @@
 .context-tray-detail-body { font-size: var(--fs-sm); color: var(--text-muted); white-space: pre-wrap; word-break: break-word; }
 .context-tray-files { margin: 0; padding-left: 16px; font-family: var(--font-mono); font-size: var(--fs-xs, 11px); color: var(--text-muted); }
 
-/* Inline add-memory form (docs/next 12 P1). */
+/* Inline add-memory form (docs/notes-and-memory.md). */
 .context-tray-memform { display: flex; flex-direction: column; gap: 6px; margin-top: 6px; padding-top: 6px; border-top: 1px solid var(--border); }
 
-/* Auto-generated memory proposals (docs/next 12 P3 — the human gate; MemoryTray.tsx). */
+/* Auto-generated memory proposals (docs/notes-and-memory.md — the human gate; MemoryTray.tsx). */
 .context-tray-proposals { display: flex; flex-direction: column; gap: 4px; margin-top: 6px; padding-top: 6px; border-top: 1px solid var(--border); font-size: var(--fs-sm); }
 .context-tray-proposal { display: flex; align-items: center; gap: 8px; }
 .context-tray-proposal-desc { flex: 1; min-width: 0; }

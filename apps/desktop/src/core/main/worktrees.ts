@@ -7,7 +7,7 @@ import { isContainedPath, isDirty, worktreeBranchDirName } from '../../plugins/t
 
 const exec = promisify(execFile)
 
-// Workspace worktrees (docs/workspaces 05): a workspace edits its branch in an isolated git
+// Workspace worktrees (docs/workspaces-and-tasks.md): a workspace edits its branch in an isolated git
 // worktree instead of dirtying the main checkout, and we get a clean cleanup affordance. Worktrees
 // live under the app data dir, keyed by branch. All git runs in the *main checkout* (it owns the
 // .git the worktree links to). execFile with arg arrays — no shell; owner/repo are validated
@@ -50,7 +50,7 @@ export async function resolveBaseRef(checkout: string, preferred?: string | null
 const isValidBranch = (branch: string): boolean => !branch.startsWith('-') && /^[A-Za-z0-9._/-]+$/.test(branch)
 
 // `created` distinguishes a fresh `git worktree add` from reuse of an existing dir — the caller
-// runs the workspace setup script only on the fresh path (docs/workspaces P5).
+// runs the workspace setup script only on the fresh path (docs/workspaces-and-tasks.md).
 type EnsureWorktreeResult = { ok: true; path: string; created: boolean } | { ok: false; reason: string }
 
 export async function ensureWorktree(
@@ -65,7 +65,7 @@ export async function ensureWorktree(
   if (!isValidBranch(branch)) return { ok: false, reason: 'Invalid branch name.' }
   const path = join(worktreesRoot, worktreeBranchDirName(owner, repo, branch))
   // Defense in depth: never operate on a path that escaped the worktrees root (handler validates
-  // identifiers too, vNext §11).
+  // identifiers too, docs/security.md).
   if (!isContainedPath(worktreesRoot, path)) return { ok: false, reason: 'Invalid worktree path.' }
   if (existsSync(path)) return { ok: true, path, created: false } // reuse
 
@@ -109,7 +109,7 @@ export async function ensureWorktree(
   return { ok: true, path, created: true }
 }
 
-// Files-to-copy (docs/next 13 §A `copy`): carry gitignored files (.env.local, …) from the source
+// Files-to-copy (docs/workflows.md §2): carry gitignored files (.env.local, …) from the source
 // checkout into a freshly-created worktree without a setup script. Repo-relative paths only
 // (absolute / traversal entries are rejected), missing sources warn, existing targets are never
 // overwritten. Best-effort: a bad entry never fails worktree creation.
@@ -155,7 +155,7 @@ export async function worktreeDirty(path: string): Promise<boolean> {
   }
 }
 
-// Dirty flag + changed-file count for the live rail/footer markers (docs/workspaces 02/05).
+// Dirty flag + changed-file count for the live rail/footer markers (docs/workspaces-and-tasks.md/05).
 export async function worktreePorcelain(path: string): Promise<{ dirty: boolean; count: number }> {
   try {
     const { stdout } = await exec('git', ['-C', path, 'status', '--porcelain'], { timeout: 10_000 })

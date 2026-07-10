@@ -21,7 +21,7 @@ import './palette.css'
 type RunSources = { targets: RunTargetInfo[]; errors: { source: string; message: string }[]; layouts: RecipeSpec[] }
 const EMPTY_RUN_SOURCES: RunSources = { targets: [], errors: [], layouts: [] }
 
-// ⌘K command palette (docs/next 13 §D): fuzzy search over run targets, built-in actions, and
+// ⌘K command palette (docs/command-palette-and-shortcuts.md): fuzzy search over run targets, built-in actions, and
 // config parse-error rows (13 §B — a broken .acorn/config.toml is visible, not silent). Thin glue
 // over the pure model; keyboard/overlay plumbing comes from the shared createOverlayPalette hook.
 export default function CommandPalette() {
@@ -53,7 +53,7 @@ export default function CommandPalette() {
     () => (palette.open() ? activeTaskId() : null),
     async (id) => (id && api ? await runApi.targets(id) : null),
   )
-  // Committed workflows for the task (docs/next 14 P5); their parse/cycle errors join the rows.
+  // Committed workflows for the task (docs/workflows.md); their parse/cycle errors join the rows.
   const [wfData, { refetch: refetchWf }] = createResource(
     () => (palette.open() ? activeTaskId() : null),
     async (id) => (id && api ? await workflowApi.defs(id) : null),
@@ -142,7 +142,7 @@ export default function CommandPalette() {
       return
     }
     if (item.kind === 'layout') {
-      // Layout recipe (docs/next 13 §C): seed panes, auto-start the named target, resolve the
+      // Layout recipe (docs/workflows.md §3): seed panes, auto-start the named target, resolve the
       // browser URL — all through the pure executor.
       const recipe = runInfo().layouts.find((r) => `layout:${r.id}` === item.id)
       if (!recipe) return

@@ -1,7 +1,7 @@
 // Find-in-files (docs/panes.md): project-wide text search over the task's worktree, backed by
 // ripgrep. Keyed by taskId → taskRoot (the taskId is the capability; the renderer never hands us a
 // path — rg runs with cwd:root and searches `.`), mirroring editor:files in localGitIpc.ts.
-// Exposed as the SearchBridge (server/routes/search.ts); no longer an IPC channel (Phase 3).
+// Exposed as the SearchBridge (server/routes/search.ts); no longer an IPC channel.
 import { execFile } from 'node:child_process'
 import { promisify } from 'node:util'
 import { rgPath } from '@vscode/ripgrep'

@@ -5,7 +5,7 @@ import { createWorkspace, ignoreRepo, setAllReposIgnored, setRepoWorkspace, unig
 import { terminalApi } from '../../../plugins/terminal/client/terminalClient'
 import './onboarding.css'
 
-// The repo→workspace mapping body (docs/workspaces): create named workspaces, assign each repo to
+// The repo→workspace mapping body (docs/workspaces-and-tasks.md): create named workspaces, assign each repo to
 // one (partition), hide repos with the eye toggle, and (desktop) point each repo at its on-disk
 // checkout via the native folder picker. Changes apply immediately. Shared by the first-run
 // OnboardingModal and the Settings → Workspaces tab, so it renders no overlay/footer of its own.

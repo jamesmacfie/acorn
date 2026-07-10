@@ -1,9 +1,9 @@
-// The agent-tool registry (docs/next Phase 4, docs/agent-tools.md): each agent capability is
+// The agent-tool registry (docs/agent-tools.md, docs/agent-tools.md): each agent capability is
 // declared ONCE as an AgentToolContribution, then PROJECTED to every surface — the MCP server
 // (mcp/server.ts fetches the manifest and proxies calls), the harness HTTP route
 // (server/routes/agentTools.ts) and, when `exposeToRenderer` is set, a renderer client. A handler
 // returns domain data or throws a ToolError; the projections translate to their own envelopes. A
-// handler that inspects which surface invoked it is a boundary bug (Phase 4 guardrail).
+// handler that inspects which surface invoked it is a boundary bug (the agent-tool registry guardrail).
 //
 // Contributions are BUILT in the main process with their domain deps closed over (notes store,
 // memory index, runtime service, browser driver, localDiff) and installed via setAgentTools —
@@ -41,7 +41,7 @@ export type AgentToolContribution = {
 // A handler throws ToolError to classify a domain failure; anything else it throws is 'failed'.
 export class ToolError extends Error {
   constructor(
-    public readonly kind: 'not_found' | 'bad_request' | 'failed',
+    public readonly kind: 'not_found' | 'bad_request' | 'needs-trust' | 'failed',
     message: string,
   ) {
     super(message)
@@ -49,11 +49,11 @@ export class ToolError extends Error {
   }
 }
 
-// ─── Permission tiers (security §4, ux §3) ──────────────────────────────────────────────────────
+// ─── Permission tiers (docs/security.md) ──────────────────────────────────────────────────────
 // Per-tier and per-tool toggles persisted as ONE prefs slice (prefs key `agentTools.perms`). A
 // per-tool toggle wins over its tier; both default to on. Consulted by every projection so turning
-// a tier off removes those tools from tools/list AND rejects a direct harness call (Phase 4:
-// permissions apply before workflow/profile ceilings — Phase 8 can only narrow further).
+// a tier off removes those tools from tools/list AND rejects a direct harness call (the agent-tool registry:
+// permissions apply before workflow/profile ceilings — workflow/profile ceilings can only narrow further).
 export const TOOL_PERMS_PREF_KEY = AGENT_TOOLS_PERMS_PREF_KEY
 
 export type ToolPerms = {

@@ -1,5 +1,5 @@
-// Browser-preview surface (docs/panes.md, Phase 9 A): a main-owned WebContentsView per task, not a
-// renderer <webview>. The <webview> tag is on Electron's deprecation trajectory (review.md #2) and
+// Browser-preview surface (docs/panes.md): a main-owned WebContentsView per task, not a
+// renderer <webview>. The <webview> tag is on Electron's deprecation trajectory and
 // forced the old body-parented floating layer — a DOM-embedded guest is reloaded whenever it leaves
 // and re-enters the DOM, so surviving pane switches was a hack. A WebContentsView is main-owned and
 // bounds-managed: surviving pane/task switches is its natural behaviour. The renderer drives it over

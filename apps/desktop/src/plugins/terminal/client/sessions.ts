@@ -6,18 +6,19 @@ import { terminalApi } from './terminalClient'
 import { trackSessionEdges } from '../../../core/client/notifications/notifications'
 import type { TerminalSession } from '../../../core/shared/terminal'
 import { requestTerminalFocusIntent } from '../../../core/client/registries/clientEvents'
+import { latestOnly } from '../../../core/client/lib/latestOnly'
 
 const [sessions, setSessions] = createSignal<TerminalSession[]>([])
 export { sessions }
 
-export async function refreshSessions(): Promise<void> {
-  const api = terminalApi()
-  if (!api) return
-  const next = await api.list()
-  // Notification centre (docs/terminal-and-agents.md): edge-detect against the previous snapshot on every refresh.
-  trackSessionEdges(sessions(), next)
-  setSessions(next)
-}
+export const refreshSessions = latestOnly(
+  async () => terminalApi()?.list() ?? [],
+  (next) => {
+    // Notification centre: compare against the last committed snapshot, never a stale request.
+    trackSessionEdges(sessions(), next)
+    setSessions(next)
+  },
+)
 
 // Pull once then track main-process idle/exit broadcasts. Returns an unsubscribe; a noop when the
 // terminal bridge is absent (web build / flag off), so consumers naturally show nothing.
@@ -50,7 +51,7 @@ export function agentSessionsFor(taskId: string | null): TerminalSession[] {
     .sort((a, b) => b.createdAt - a.createdAt)
 }
 
-// Agents actively working in a task (docs/workspaces). "Working" = a running agent that
+// Agents actively working in a task (docs/workspaces-and-tasks.md). "Working" = a running agent that
 // isn't idle. Keys off taskId, not the URL — the rail's per-task spinner and the topbar
 // badge both read this.
 export function workingCountFor(taskId: string | null): number {

@@ -1,4 +1,4 @@
-// Memory auto-generation (docs/next 12 P3): the harness dividend — acorn owns the task boundary,
+// Memory auto-generation (docs/notes-and-memory.md): the harness dividend — acorn owns the task boundary,
 // so extraction fires deterministically at task completion (agent session end / archive), runs a
 // HEADLESS memory-review step (fake agent in tests), passes a cheap verify (referenced files
 // exist, duplicate content-hash, contradiction flag), and files PROPOSALS through the human gate

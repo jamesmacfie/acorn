@@ -15,10 +15,10 @@ import { savePref } from '../../../core/client/settings/savePref'
 import { PrefKeys } from '../../../core/client/persistence/prefKeys'
 import './terminal.css'
 
-// vNext Phase 2: a bottom drawer of persistent local sessions. The "+" opens a profile menu
+// Bottom drawer of persistent local sessions. The "+" opens a profile menu
 // (Shell / Claude Code / Codex / Aider, disabled when not on PATH); agents start in the active
-// task's mapped checkout (prompting for the path if unmapped — §9) on a durable tmux backend.
-// docs/workspaces: sessions are scoped to the active task, not the URL — switching tasks swaps the
+// task's mapped checkout (prompting for the path if unmapped) on a durable tmux backend.
+// Sessions are scoped to the active task, not the URL — switching tasks swaps the
 // visible terminals.
 export default function TerminalPanel(props: { onClose: () => void; task: Task | null }) {
   const api = terminalApi()
@@ -40,7 +40,7 @@ export default function TerminalPanel(props: { onClose: () => void; task: Task |
   const [pathInput, setPathInput] = createSignal('')
   const [pathError, setPathError] = createSignal<string | null>(null)
 
-  // Scope the strip to the active task (docs/workspaces). A session opened in task A
+  // Scope the strip to the active task (docs/workspaces-and-tasks.md). A session opened in task A
   // never shows under B, regardless of the URL.
   const visibleSessions = createMemo(() => {
     const id = ws()?.id
@@ -196,7 +196,7 @@ export default function TerminalPanel(props: { onClose: () => void; task: Task |
   }
 
   // Spawn into the active task. `checkout` is the base repo path; the main process derives the
-  // task's lazy worktree from it and cwds the session there (docs/workspaces Flow C).
+  // task's lazy worktree from it and cwds the session there (docs/workspaces-and-tasks.md).
   async function spawn(profileId: string, checkout: string | undefined, owner?: string, repo?: string, number?: string) {
     const taskId = ws()?.id
     if (!api || !taskId) return
@@ -216,7 +216,7 @@ export default function TerminalPanel(props: { onClose: () => void; task: Task |
   }
 
   // Launch a profile in the active task's repo checkout, prompting for the local path the
-  // first time we see this repo (validated in main before we spawn). docs/workspaces: context
+  // first time we see this repo (validated in main before we spawn). docs/workspaces-and-tasks.md: context
   // comes from the task, not the URL; the worktree is created lazily in main (Flow C).
   async function startProfile(profileId: string) {
     setMenuOpen(false)

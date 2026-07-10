@@ -5,7 +5,7 @@ import { randomUUID } from 'node:crypto'
 import { promisify } from 'node:util'
 import { existsSync } from 'node:fs'
 import { readFile, writeFile } from 'node:fs/promises'
-import { dirname, isAbsolute, resolve } from 'node:path'
+import { dirname, resolve } from 'node:path'
 import { homedir } from 'node:os'
 import { eq } from 'drizzle-orm'
 import type { AppDatabase } from '../../../core/server/db'
@@ -41,6 +41,7 @@ import {
   copyConfiguredFiles,
   isDir,
   loadTask,
+  rendererBaseCheckout,
   resolveTaskCwd,
   taskContext,
   taskRoot,
@@ -49,31 +50,30 @@ import {
 } from '../../../core/main/taskWorktree'
 import { currentBranch, ensureWorktree } from '../../../core/main/worktrees'
 
-// vNext Phase 2: PTYs live in the main process. Sessions run on one of two backends —
+// PTYs live in the main process. Sessions run on one of two backends:
 //  - node-pty: spawn the command directly. Survives a window reload (PTY is in main), not an app
 //    restart. In-memory only.
 //  - tmux: a detached `tmux` session drives the command; a PTY attaches to it. Survives an app
 //    restart (the tmux daemon is separate) and can be attached from a real terminal. Persisted to
 //    SQLite so startup can reconcile rows against `tmux list-sessions` and re-attach survivors.
-// Terminal output is never persisted (vNext §8).
+// Terminal output is never persisted (docs/terminal-and-agents.md).
 //
-// This module is the SESSION ENGINE + the `term:*`/`mcp:*` IPC surfaces; the other surfaces live
-// in their own modules (localGitIpc / runIpc / knowledgeIpc / workflowWiring / harnessWiring,
-// docs/terminal-and-agents.md) and registerTerminalIpc at the bottom composes them.
+// This module is the session engine. HTTP bridges and WebSocket handlers are installed at the
+// bottom; cross-feature wiring stays in the app composition root.
 
 type Session = {
   meta: TerminalSession
   pty: IPty
   ring: string
-  subscribers: Set<StreamSink> // WebSocket outlets (Phase 3 slice 6); was Electron WebContents
+  subscribers: Set<StreamSink> // WebSocket outlets (the WebSocket transport); was Electron WebContents
   lastActivityAt: number
-  // PTY output coalescing (performance §3.3): buffer bytes and flush one 'output' frame per ~16ms
+  // PTY output coalescing (docs/electron.md §12): buffer bytes and flush one 'output' frame per ~16ms
   // tick instead of one per PTY chunk, so a busy TUI doesn't spam a frame per keystroke-echo.
   pendingOut: string
   flushTimer: ReturnType<typeof setTimeout> | null
 }
 
-// ~16ms ≈ one frame at 60fps; the busy-TUI coalescing target (performance §3.3).
+// ~16ms ≈ one frame at 60fps; the busy-TUI coalescing target (docs/electron.md §12).
 const OUTPUT_COALESCE_MS = 16
 
 const sessions = new Map<string, Session>()
@@ -88,17 +88,17 @@ const agentSender = new AgentSender((id) => {
 
 // Queue a text block into an agent session on its idle edge (knowledgeIpc's memory injector calls
 // this). Exported so the composition root can hand it to knowledge without knowledge importing the
-// terminal engine — the dependency points one way (review §2).
+// terminal engine — the dependency points one way (composition-root ownership).
 export function sendToAgent(sessionId: string, text: string, submit: SendSubmit): void {
   void agentSender.send(sessionId, text, submit)
 }
 
-// The cross-domain hooks the composition root injects at boot (review §2: setter-injection stays,
+// The cross-domain hooks the composition root injects at boot (composition-root ownership: setter-injection stays,
 // installation moves to one place). Held as nullable module state only because the handlers close
 // over module scope — TerminalIpcDeps requires all of them, so registerTerminalIpc sets every one
 // before any session can spawn.
-// - memoryInjector: push the repo-memory block into a fresh agent session (docs/next 12 P2).
-// - memoryReviewTrigger: fire the auto-generation pass when an agent session exits (docs/next 12 P3).
+// - memoryInjector: push the repo-memory block into a fresh agent session (docs/notes-and-memory.md).
+// - memoryReviewTrigger: fire the auto-generation pass when an agent session exits (docs/notes-and-memory.md).
 // - seedNotes: snapshot PR/ticket context into curatable notes on task creation (docs/notes-and-memory.md).
 // - internalApiEnv: loopback API access (ACORN_API_URL/ACORN_API_TOKEN) inherited by session env.
 // - bootReconciled: the composition root's reconcile pass — archive awaits it (see the handler).
@@ -154,7 +154,7 @@ function appendRing(s: Session, data: string) {
 
 function ensureTmuxSession(name: string, cwd: string, command: string, env: Record<string, string>) {
   // tmux runs the command argument through the user's shell, so a full "pnpm dev" line works; env
-  // (e.g. PORT) is inherited by that shell (docs/workspaces P5).
+  // (e.g. PORT) is inherited by that shell (docs/workspaces-and-tasks.md).
   execFileSync('tmux', tmuxNewSessionArgs(name, cwd, command), { env, stdio: 'ignore' })
   // ponytail: hide tmux's own status bar — we render our own tab strip, so it's just noise
   execFileSync('tmux', ['set-option', '-t', name, 'status', 'off'], { env, stdio: 'ignore' })
@@ -259,7 +259,7 @@ function wireSession(db: AppDatabase, meta: TerminalSession, pty: IPty): Session
     agentSender.clear(s.meta.id) // queued sends can never fire now
     emit(s, { type: 'exit', exitCode, signal: signal != null ? String(signal) : null })
     if (s.meta.backend === 'tmux') void markExited(db, s.meta.id, exitCode)
-    // Task-completion trigger (docs/next 12 P3): an agent session ending is the extraction moment.
+    // Task-completion trigger (docs/notes-and-memory.md): an agent session ending is the extraction moment.
     if (s.meta.kind === 'agent' && s.meta.title !== 'Teardown') void memoryReviewTrigger?.(s.meta.taskId, s.ring.slice(-10_000))
     broadcastStatus()
   })
@@ -267,8 +267,8 @@ function wireSession(db: AppDatabase, meta: TerminalSession, pty: IPty): Session
 }
 
 // One timer flips running agents to idle after enough output silence, notifying once per transition
-// (vNext §3). The busy→idle edge lives here; the idle→busy edge lives in onData above. The handle is
-// held so the composition root can clear it on quit (review §2 — it used to leak).
+// (docs/terminal-and-agents.md). The busy→idle edge lives here; the idle→busy edge lives in onData above. The handle is
+// held so the composition root can clear it on quit (composition-root ownership — it used to leak).
 let idleWatch: ReturnType<typeof setInterval> | null = null
 function startIdleWatch() {
   if (idleWatch) return // registered once; a second boot must not stack a second timer
@@ -298,8 +298,8 @@ async function maybeRunSetup(db: AppDatabase, t: TaskRow, cwd: string, ctx: Pick
 
 async function create(db: AppDatabase, opts: CreateOpts): Promise<TerminalSession> {
   // The renderer passes the base checkout as opts.cwd (validated at the boundary); the worktree is
-  // derived from it. Lazy worktree on first terminal, reused after (docs/workspaces Flow C).
-  const baseCheckout = opts.cwd && isAbsolute(opts.cwd) && isDir(opts.cwd) ? opts.cwd : undefined
+  // derived from it. Lazy worktree on first terminal, reused after (docs/workspaces-and-tasks.md).
+  const baseCheckout = rendererBaseCheckout(opts.cwd)
   const t = await loadTask(db, opts.taskId)
   const ctx = taskContext(t)
   const { cwd, isWorktree, created } = await resolveTaskCwd(db, t, baseCheckout)
@@ -320,11 +320,11 @@ async function spawnOne(
   task?: TaskRow,
 ): Promise<TerminalSession> {
   const profile = getProfile(opts.profileId)
-  // Dev-server pane (docs/workspaces P5): a command override runs via the user's shell with env
+  // Dev-server pane (docs/workspaces-and-tasks.md): a command override runs via the user's shell with env
   // merged in; otherwise the profile's binary. resolveCommand stays the path for shells/agents.
   const command = opts.command?.trim() || resolveCommand(profile)
   const id = randomUUID()
-  // Every task-scoped session carries the ACORN_* identity vars (docs/terminal-and-agents.md, docs/next 11) plus its own
+  // Every task-scoped session carries the ACORN_* identity vars (docs/terminal-and-agents.md, docs/agent-tools.md §4) plus its own
   // session id — MCP notes/memory writes use it for `author: agent` provenance (docs/notes-and-memory.md).
   const env = buildSessionEnv({
     taskId: opts.taskId,
@@ -375,7 +375,7 @@ async function spawnOne(
     pty = spawn(command, [], { name: 'xterm-256color', cols, rows, cwd, env })
   }
   wireSession(db, meta, pty)
-  // A fresh AGENT session gets the repo-memory block queued for its idle edge (docs/next 12 P2).
+  // A fresh AGENT session gets the repo-memory block queued for its idle edge (docs/notes-and-memory.md).
   if (profile.kind === 'agent') void memoryInjector?.(opts.taskId, id)
   return meta
 }
@@ -393,8 +393,8 @@ function killSession(s: Session) {
 }
 
 // On startup, re-attach tmux sessions that are still alive and drop DB rows whose tmux is gone
-// (vNext §12: app restart rediscovers tmux sessions). Run by the composition root's coordinated
-// reconcile() step, off the paint-critical path (review §2, performance §3.6).
+// (docs/terminal-and-agents.md: app restart rediscovers tmux sessions). Run by the composition root's coordinated
+// reconcile() step, off the paint-critical path (composition-root ownership, docs/electron.md §11).
 export async function reconcileTmux(db: AppDatabase) {
   let rows: (typeof schema.terminalSessions.$inferSelect)[]
   try {
@@ -411,7 +411,7 @@ export async function reconcileTmux(db: AppDatabase) {
     try {
       if (row.backend === 'tmux' && row.tmuxSession && alive.has(row.tmuxSession)) {
         const task = await loadTask(db, row.taskId)
-        // isWorktree is derived, not persisted (docs/workspaces 03): tasks.worktreePath is the truth,
+        // isWorktree is derived, not persisted (docs/workspaces-and-tasks.md): tasks.worktreePath is the truth,
         // so recompute it here so a session that survives an app restart keeps its worktree affordance.
         const isWorktree = !!task?.worktreePath && resolve(row.cwd) === resolve(task.worktreePath)
         wireSession(db, rowToMeta(row, taskContext(task), isWorktree), attachTmuxPty(row.tmuxSession, row.cols, row.rows))
@@ -431,7 +431,7 @@ export async function reconcileTmux(db: AppDatabase) {
 
 // The session-engine glue the run-target service (runIpc) needs: spawn a target's command as a
 // terminal session in the task worktree, and observe/kill it. Exported so the composition root can
-// build the RuntimeService without this engine importing the run domain (review §2 — the run
+// build the RuntimeService without this engine importing the run domain (composition-root ownership — the run
 // service depends on the engine, not the reverse).
 export function terminalRunGlue(db: AppDatabase): RunSessionGlue {
   return {
@@ -452,7 +452,7 @@ export function terminalRunGlue(db: AppDatabase): RunSessionGlue {
 
 // The cross-domain hooks the composition root injects when it registers this engine. They break the
 // knowledge↔terminal cycle: knowledge is built with the engine's exported sendToAgent, and its
-// memory/notes closures come back in here — so the engine never imports knowledge (review §2).
+// memory/notes closures come back in here — so the engine never imports knowledge (composition-root ownership).
 export type TerminalIpcDeps = {
   internalApiEnv: Record<string, string>
   memoryInjector: (taskId: string, sessionId: string) => Promise<void>
@@ -463,7 +463,7 @@ export type TerminalIpcDeps = {
   reconciled: Promise<void>
 }
 
-// Clear the engine's own background work on quit (review §2). Idempotent — safe to call after a
+// Clear the engine's own background work on quit (composition-root ownership). Idempotent — safe to call after a
 // partial boot that never started the idle-watch.
 export function disposeTerminal(): void {
   if (idleWatch) {
@@ -473,9 +473,9 @@ export function disposeTerminal(): void {
 }
 
 // Registered once at app start by the composition root (main/bootstrap.ts). Every payload is
-// validated here — the renderer is the less-trusted side (vNext §5, §11). Exited sessions linger
-// until explicitly removed (term:remove). This is the PTY engine + its own term:*/mcp:*/browser:*
-// surfaces only; the other domains are wired by the composition root.
+// validated here because the renderer is the less-trusted side (docs/terminal-and-agents.md).
+// Exited sessions linger until explicitly removed. Cross-feature domains are wired by the
+// composition root.
 export function registerTerminalIpc(db: AppDatabase, worktreesDir: string, deps: TerminalIpcDeps): void {
   internalApiEnv = deps.internalApiEnv
   memoryInjector = deps.memoryInjector
@@ -484,10 +484,10 @@ export function registerTerminalIpc(db: AppDatabase, worktreesDir: string, deps:
   bootReconciled = deps.reconciled
 
   // The request/response half of the terminal engine, exposed as the TerminalBridge behind the HTTP
-  // routes (server/routes/terminal.ts) — Phase 3 replaced the term:*/mcp:* req/resp IPC channels.
+  // routes (server/routes/terminal.ts).
   // The STREAM half (term:input/attach/detach + the term:out push, term:status) is the WebSocket
-  // hub (setStreamHandlers below); browser:bind + term:repoPath:pick stay IPC as Electron residue
-  // (§1c). The bridge closes over the engine internals (sessions map, agentSender, …).
+  // hub (setStreamHandlers below). The native repo picker is registered separately through preload.
+  // The bridge closes over the engine internals (sessions map, agentSender, …).
   setTerminalBridge({
     list: async () => [...sessions.values()].map((s) => s.meta),
     profiles: async () => listProfiles(),
@@ -613,7 +613,7 @@ export function registerTerminalIpc(db: AppDatabase, worktreesDir: string, deps:
     },
   })
 
-  // --- IPC residue (§1c): true Electron capabilities that never become HTTP ---
+  // --- IPC residue: true Electron capabilities that never become HTTP ---
 
   // Native folder picker for the onboarding repo-mapping flow. Returns the chosen path or null.
   ipcMain.handle('term:repoPath:pick', async (): Promise<string | null> => {
@@ -665,7 +665,7 @@ export function registerTerminalIpc(db: AppDatabase, worktreesDir: string, deps:
     })
   }
 
-  // The STREAM half (Phase 3 slice 6): the terminal engine's PTY input/output + attach/detach now
+  // The STREAM half (the WebSocket transport): the terminal engine's PTY input/output + attach/detach now
   // ride the one authenticated WebSocket (main/wsHub.ts) instead of per-session IPC channels. The
   // hub routes client frames here and hands each attachment a sink to fan output to.
   setStreamHandlers({
@@ -674,7 +674,7 @@ export function registerTerminalIpc(db: AppDatabase, worktreesDir: string, deps:
       if (s && s.meta.status === 'running' && typeof data === 'string') s.pty.write(data)
     },
     // attach = subscribe + replay. The subscription is an attachment, not the session itself:
-    // detaching / reloading never kills the PTY or the tmux session (vNext §5). Replay is pushed
+    // detaching / reloading never kills the PTY or the tmux session (docs/terminal-and-agents.md). Replay is pushed
     // synchronously here (ready → ring), BEFORE the sink is fed any live frame, so the WebSocket's
     // replay-before-live ordering is deterministic even under a busy PTY.
     attach: (id, sink) => {

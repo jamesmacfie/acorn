@@ -11,7 +11,7 @@ import { ProviderOperationError } from '../integrations/types'
 import { getUser } from '../middleware/requireUser'
 import { integrationProviderRegistry } from '../integrations/registry'
 
-// Tasks (docs/workspaces): the single-repo unit of work. Machine-scoped like repo_paths /
+// Tasks (docs/workspaces-and-tasks.md): the single-repo unit of work. Machine-scoped like repo_paths /
 // terminal_sessions — no user_id — but still auth-gated (it's a logged-in app). CRUD: create /
 // list-active / rename / archive. Worktree teardown on archive is the main process's job (it owns
 // git/fs); this route only flips the status.
@@ -149,7 +149,7 @@ export const tasks = new Hono<AppEnv>()
     await db.update(schema.tasks).set(patch).where(eq(schema.tasks.id, id))
     return c.json({ id, ...patch })
   })
-  // Links grow/shrink after creation (docs/next 11 §A): the write path that turns "a task frozen
+  // Links grow/shrink after creation (docs/workspaces-and-tasks.md): the write path that turns "a task frozen
   // with its birth links" into "a task that accumulates context as work unfolds". Mirrors the
   // create-time insert above — same onConflictDoNothing, so a duplicate add is a no-op.
   .post('/:id/links', async (c) => {

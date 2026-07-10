@@ -68,8 +68,9 @@ browser-preview pane resolves its URL. All are nullable (blank ⇒ `null` ⇒ "n
 The `PATCH /api/workspaces/:id` route validates these: `setupScriptTrigger` must be one of the three
 values, `previewMode` one of the three modes, and — importantly — a `port` preview value must be a bare
 1–65535 port so a crafted value (e.g. `@evil.com`) can't redirect the preview webview to another host
-(`apps/desktop/src/core/server/routes/workspaces.ts:112`). Terminal/agent/run-target behaviour that consumes
-these scripts is desktop-only — it needs the preload bridge (see [Lifecycle](#lifecycle-note)).
+(`apps/desktop/src/core/server/routes/workspaces.ts`). Terminal/agent/run-target behaviour that consumes
+these scripts is desktop-only — it needs the main-process worktree capability (see
+[Lifecycle](#lifecycle-note)).
 
 ### The Default workspace & bootstrap
 
@@ -305,8 +306,9 @@ Endpoints (full detail in [`api-reference.md`](./api-reference.md); all auth-gat
 
 ## Lifecycle note
 
-Terminal-driven lifecycle is desktop-only (it needs the preload bridge — `capabilities()`, always on
-when present; the old `acorn:term` flag is gone). The CRUD above works without it.
+Terminal-driven lifecycle is desktop-only (it needs the main-process worktree capability —
+`capabilities()`, always on when present; the old `acorn:term` flag is gone). The CRUD above works
+without it.
 
 - **Worktree creation is lazy** (Flow C): `tasks.worktreePath` stays null until a terminal is first
   opened for the task, at which point the main process creates the git worktree and (per the workspace's
@@ -316,7 +318,7 @@ when present; the old `acorn:term` flag is gone). The CRUD above works without i
   the worktree (`terminalApi().task.archive`; main decides "no worktree → plain flip"). The rail's
   confirm/error dialog is the same modal shell as create/rename (no `window.confirm`/`alert`), and the
   plain HTTP status flip exists only for the bridge-absent browser dev build. Archiving also evicts the
-  task's kept-alive preview `<webview>` (`evictPreviewWebview`).
+  task's kept-alive preview `WebContentsView`.
 - **Archive keeps the row.** `status` flips to `archived` and `archivedAt` is stamped; the row survives
   for history and teardown audit. Only `active` tasks appear in the rail.
 
@@ -324,16 +326,14 @@ when present; the old `acorn:term` flag is gone). The CRUD above works without i
 
 ## Source
 
-Client: `apps/desktop/src/client/features/tabs/{TabRail.tsx,railOrder.ts,sources.ts}`,
-`apps/desktop/src/client/features/tasks/{tasks.ts,activate.ts,taskStatus.ts,LinearBrowse.tsx,RollbarBrowse.tsx}`,
-`apps/desktop/src/client/features/workspaces/{OnboardingModal.tsx,WorkspaceRepoAssignments.tsx,activeWorkspace.ts}`.
-Server: `apps/desktop/src/server/routes/{workspaces.ts,tasks.ts}`, PR inheritance in
+Client shell: `apps/desktop/src/core/client/{tabs,tasks,workspaces}/`; provider browse views and
+onboarding live under `apps/desktop/src/plugins/{linear,rollbar,onboarding}/client/`.
+Server: `apps/desktop/src/core/server/routes/{workspaces.ts,tasks.ts}`, PR inheritance in
 `apps/desktop/src/plugins/github/server/routes/pulls.ts:142`.
-Shared: `apps/desktop/src/shared/{workspaceIdentity.ts,branch.ts}`. Schema:
+Shared: `apps/desktop/src/core/shared/{workspaceIdentity.ts,branch.ts}`. Schema:
 `apps/desktop/src/core/server/db/schema.ts`.
 
 **See also:** [`panes.md`](./panes.md) (the Task view surfaces) ·
 [`terminal-and-agents.md`](./terminal-and-agents.md) (worktrees, sessions, run targets) ·
 [`integrations.md`](./integrations.md) (Linear/Rollbar connections) ·
-[`data-layer.md`](./data-layer.md) · [`api-reference.md`](./api-reference.md) ·
-[`workspaces/`](./workspaces/) (design history).
+[`data-layer.md`](./data-layer.md) · [`api-reference.md`](./api-reference.md).

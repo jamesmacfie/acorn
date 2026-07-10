@@ -2,6 +2,7 @@ import { createSignal, For, onCleanup, onMount, Show } from 'solid-js'
 import { markAllRead, markRead, notices, unreadCount } from './notifications'
 import { noticeKindContribution } from '../registries/notices'
 import './notifications.css'
+import { openRepoConfigTrust } from '../configTrust/configTrust'
 
 const relTime = (at: number): string => {
   const s = Math.max(0, Math.round((Date.now() - at) / 1000))
@@ -48,6 +49,7 @@ export default function NotificationBell(props: { onSelectTask: (taskId: string)
                       markRead(n.id)
                       setOpen(false)
                       props.onSelectTask(n.taskId)
+                      if (n.action === 'review-config') openRepoConfigTrust(n.taskId)
                     }}
                   >
                     <span class="notify-glyph" classList={{ 'notify-warn': noticeKindContribution(n.kind)?.severity !== 'info' }}>

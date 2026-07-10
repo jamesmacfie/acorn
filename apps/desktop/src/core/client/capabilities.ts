@@ -1,5 +1,5 @@
-// What the hosting environment provides (docs/features.md, docs/electron.md §capability-map). After
-// Phase 3 the preload is a thin residue (native folder picker + browser:bind + the ⌘W ping); the
+// What the hosting environment provides (docs/features.md, docs/electron.md §capability-map). The
+// preload is a thin residue (native folder picker, preview view controls, lifecycle callbacks); the
 // data surface is loopback HTTP + one WebSocket, so most panes work in a plain browser (`dev:node`)
 // too. `desktop` still marks the Electron build; `terminal` marks that the main-process engine is
 // present — the surfaces that genuinely need it (terminal drawer, agents, run targets, workflows,

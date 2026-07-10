@@ -4,7 +4,7 @@ import { memoryApi, type MemoryType } from './memoryClient'
 
 const MEMORY_TYPE_OPTIONS: MemoryType[] = ['convention', 'architecture', 'decision', 'fix', 'reference', 'feedback', 'task', 'user']
 
-// The memory surfaces of the Context pane (docs/next 12), extracted so the pane keeps one job
+// The memory surfaces of the Context pane (docs/notes-and-memory.md), extracted so the pane keeps one job
 // (context assembly/send): the human gate over auto-generated proposals — accept (with an optional
 // description edit) writes to the task worktree + index, reject leaves no trace — and the manual
 // "+ memory" form (repo scope → the task worktree, lands via its PR; private scope →
@@ -83,7 +83,7 @@ export default function MemoryTray(props: { task: Task; onChanged: () => void })
                   <button type="button" class="overlay-btn" onClick={() => void resolveProposal(p.id, true)}>Accept</button>
                   <button type="button" class="overlay-btn" onClick={() => void resolveProposal(p.id, false)}>Reject</button>
                 </div>
-                {/* Verification flags (structural `flags`, docs/next 12): shown as warning badges
+                {/* Verification flags (structural `flags`, docs/notes-and-memory.md): shown as warning badges
                     beside the proposal, never folded into the description text. */}
                 <Show when={p.flags.length}>
                   <div class="context-tray-proposal-flags">

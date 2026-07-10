@@ -1,7 +1,7 @@
 import { contextBridge, ipcRenderer } from 'electron'
 
 // Narrow capability surface (docs/electron.md §4g): expose only a desktop marker and the validated
-// terminal channels (vNext §5) — never raw ipcRenderer.
+// terminal channels (docs/terminal-and-agents.md) — never raw ipcRenderer.
 contextBridge.exposeInMainWorld('acorn', {
   desktop: true,
   platform: process.platform,
@@ -19,7 +19,7 @@ contextBridge.exposeInMainWorld('acorn', {
     ipcRenderer.on('acorn:will-quit', listener)
     return () => ipcRenderer.removeListener('acorn:will-quit', listener)
   },
-  // The terminal residue after Phase 3: ONLY the native folder picker (dialog.showOpenDialog — a
+  // The terminal residue now: ONLY the native folder picker (dialog.showOpenDialog — a
   // true Electron capability, and the renderer's desktop-mode marker). Every request/response verb
   // is HTTP; every stream (PTY input/output/status, workflow notices) is the WebSocket (wsClient.ts).
   terminal: {
@@ -28,7 +28,7 @@ contextBridge.exposeInMainWorld('acorn', {
       pick: () => ipcRenderer.invoke('term:repoPath:pick'),
     },
   },
-  // Browser-preview surface (docs/panes.md, Phase 9 A): a main-owned WebContentsView per task. The
+  // Browser-preview surface (docs/panes.md): a main-owned WebContentsView per task. The
   // renderer drives lifecycle/chrome over IPC and positions the native view over the pane's host rect;
   // main pushes chrome state (loading, url, back/forward) back via onEvent. Agent CDP driving binds
   // inside main when the view is created, so no webContents id ever crosses this bridge.

@@ -1,4 +1,4 @@
-// Command palette model (docs/next 13 §D): pure item-source composition + fuzzy filter, unit
+// Command palette model (docs/command-palette-and-shortcuts.md): pure item-source composition + fuzzy filter, unit
 // tested; the ⌘K overlay component is thin glue over this.
 
 export type PaletteItem =

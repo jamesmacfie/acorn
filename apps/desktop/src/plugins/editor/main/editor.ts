@@ -1,6 +1,6 @@
-// Monaco editor pane backing (docs/workspaces): read/write/list files on the task's worktree.
-// Was the `editor:*` IPC channels (inventories §1a); now the EditorBridge behind the HTTP routes
-// in server/routes/editor.ts (Phase 3). The taskId is the capability — every call re-derives the
+// Monaco editor pane backing (docs/workspaces-and-tasks.md): read/write/list files on the task's worktree.
+// Was the `editor:*` IPC channels; now the EditorBridge behind the HTTP routes
+// in server/routes/editor.ts. The taskId is the capability — every call re-derives the
 // worktree root from the DB and confines the renderer-supplied relative path with resolveInRoot,
 // so a traversal (`../`) or a symlink pointing outside the worktree is rejected. Pure-Node, so it
 // works in dev:node too; wired in main/serverBridges.ts.

@@ -1,4 +1,4 @@
-// Layout recipes (docs/next 13 §C): a [layout.<id>] config block seeds a TaskLayout, auto-starts
+// Layout recipes (docs/workflows.md §3): a [layout.<id>] config block seeds a TaskLayout, auto-starts
 // its named run target in the drawer, and points the browser pane at a target's resolved URL
 // (`browser = "run:<id>"`). Pure executor over injected services — unit tested with stubs; the
 // palette wires the real runtime/layout/browser glue.

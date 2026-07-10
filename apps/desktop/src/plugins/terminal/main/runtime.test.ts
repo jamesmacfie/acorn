@@ -134,4 +134,18 @@ describe('RuntimeService over real processes', () => {
     const svc = new RuntimeService(deps)
     expect(await svc.defaultUrl('t1')).toBe('http://localhost:8080')
   })
+
+  it('authorizes only targets whose winning layer is repo-authored', async () => {
+    targets = [{ id: 'repo', command: 'true' }, { id: 'user', command: 'true' }]
+    const authorized: string[] = []
+    const svc = new RuntimeService({
+      ...deps,
+      loadTargets: async () => ({ targets, cwd: dir, repoTargetIds: ['repo'] }),
+      authorizeRepoConfig: async (taskId) => { authorized.push(taskId) },
+    })
+    await svc.start('t1', 'user')
+    expect(authorized).toEqual([])
+    await svc.start('t1', 'repo')
+    expect(authorized).toEqual(['t1'])
+  })
 })

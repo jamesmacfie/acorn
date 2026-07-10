@@ -6,7 +6,7 @@ import type { AppEnv } from '../../../../core/server/middleware/auth'
 import { respondError } from '../../../../core/server/respond'
 
 // Local-changes review (docs/panes.md): the ChangesPane's working-tree status/diff/blob reads and
-// stage/commit/discard/push actions. Was the `local:*` IPC channels (inventories §1a); now task-
+// stage/commit/discard/push actions. Was the `local:*` IPC channels; now task-
 // scoped HTTP behind the LocalGitBridge (main/localGit.ts). Pure-Node → works in dev:node.
 
 export type LocalScope = 'unstaged' | 'staged'

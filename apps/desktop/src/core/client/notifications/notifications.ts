@@ -18,6 +18,7 @@ export type Notice = {
   detail?: string
   at: number
   read: boolean
+  action?: 'review-config'
 }
 
 export const NOTICE_CAP = 50
@@ -120,12 +121,12 @@ export function pushBackgroundError(taskId: string, title: string, detail?: stri
   return pushNotice({ taskId, kind: 'background-error', title, detail, at: Date.now() })
 }
 
-// Workflow notices (docs/next 14, docs/terminal-and-agents.md): main broadcasts gate/run-done events over the stream
-// WebSocket (Phase 3 slice 6); they land in the same bell + toast gate. Returns unsubscribe.
+// Workflow notices (docs/workflows.md, docs/terminal-and-agents.md): main broadcasts gate/run-done events over the stream
+// WebSocket (the WebSocket transport); they land in the same bell + toast gate. Returns unsubscribe.
 export function initWorkflowNotices(): () => void {
   return wsOnNotice((n) => {
     const at = Date.now()
-    pushNotice({ taskId: n.taskId, kind: n.kind, title: n.title, at })
+    pushNotice({ taskId: n.taskId, kind: n.kind, title: n.title, detail: n.action === 'review-config' ? 'Review & trust' : undefined, action: n.action, at })
     if (typeof Notification !== 'undefined' && shouldToast({ taskId: n.taskId, kind: n.kind, at }, { focused: document.hasFocus(), lastToastAt })) {
       try {
         new Notification(n.title)

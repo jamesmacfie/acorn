@@ -4,6 +4,6 @@ import { defineConfig } from 'drizzle-kit'
 // the local SQLite DB by `pnpm db:migrate` (scripts/migrate.ts) and on app startup (openDb).
 export default defineConfig({
   dialect: 'sqlite',
-  schema: './src/server/db/schema.ts',
+  schema: './src/core/server/db/schema.ts',
   out: './migrations',
 })

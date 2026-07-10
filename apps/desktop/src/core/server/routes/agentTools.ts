@@ -16,7 +16,7 @@ import { getUser } from '../middleware/requireUser'
 import { respondError } from '../respond'
 import { decodeToolCeiling, isToolWithinCeiling, type ToolCeiling } from '../../shared/workflow'
 
-const STATUS: Record<ToolError['kind'], 404 | 400 | 500> = { not_found: 404, bad_request: 400, failed: 500 }
+const STATUS: Record<ToolError['kind'], 404 | 400 | 409 | 500> = { not_found: 404, bad_request: 400, 'needs-trust': 409, failed: 500 }
 type AvailabilityCache = Map<NonNullable<AgentToolContribution['when']>, Promise<boolean>>
 
 async function loadPerms(c: Context<AppEnv>) {

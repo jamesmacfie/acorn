@@ -5,7 +5,7 @@ import { requireUser } from '../../../../core/server/middleware/requireUser'
 import { workflow, setWorkflowBridge, type WorkflowBridge } from './workflow'
 
 // Workflow start/gate execute an agent step, so the route test proves body validation + auth +
-// the bridge-unavailable 503 (Phase 3 §1). The runner logic is tested in main/workflowRunner.test.ts.
+// the bridge-unavailable 503 (the privileged-boundary contract). The runner logic is tested in main/workflowRunner.test.ts.
 
 const req = (url: string, method = 'GET', body?: unknown) =>
   new Request(`http://acorn.test${url}`, {

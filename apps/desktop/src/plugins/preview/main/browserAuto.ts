@@ -91,7 +91,7 @@ export const isBenignNavError = (err: unknown): boolean => {
 
 export const isAllowedBrowserUrl = (url: string): boolean => /^https?:\/\//i.test(url)
 
-// The preview surface (WebContentsView, Phase 9 A) carries the old will-attach-webview restriction
+// The preview surface (WebContentsView) carries the old will-attach-webview restriction
 // byte-for-byte: http(s) only AND no userinfo in the authority, so a configured preview URL like
 // `http://localhost@evil.com` can't disguise a foreign host as localhost.
 export const isAllowedPreviewUrl = (url: string): boolean => /^https?:\/\/[^@/?#]+(?::\d+)?(\/|$|\?|#)/.test(url)

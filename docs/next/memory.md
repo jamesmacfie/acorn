@@ -1,5 +1,8 @@
 # Memory in the next architecture
 
+> The core memory contract is shipped; [notes-and-memory.md](../notes-and-memory.md) is authoritative
+> for current behavior. This addendum remains for consolidation, decay, and possible future scopes.
+
 **Status:** design contract - addendum to [notes-and-memory.md](../notes-and-memory.md) for the
 plugin-platform work.
 **Companions:** [contribution-points.md](./contribution-points.md) §4.7/§4.8,
@@ -52,7 +55,7 @@ Current Acorn scopes are enough if they are named precisely:
 | `task` | notes/review notes, not memory — task notes have their own durable home `notes/task/<taskId>/` | only this task (deleted with it) | active plan, findings, handoff text, seeded PR/ticket notes |
 
 Notes' own scope model (`global`/`workspace`/`task`, with `run` a refinement inside task) is the
-canonical `NoteScope`/`NoteLocation` contract in [feature-parity.md](./feature-parity.md) §10 —
+canonical `NoteScope`/`NoteLocation` contract in [features.md](../features.md) §10 —
 the `run` and `task` rows above are its memory-side view.
 
 Do not add a plugin-specific durable memory scope. Plugin-specific data belongs in plugin T1/T2

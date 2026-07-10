@@ -1,4 +1,4 @@
-// GitHub PR list filter state, kept per workspace (docs/workspaces). The open/closed tab and the
+// GitHub PR list filter state, kept per workspace (docs/workspaces-and-tasks.md). The open/closed tab and the
 // free-text query are remembered per workspace id and persisted to the `pr_filters` pref (App.tsx),
 // so returning to a workspace restores its last filter. Signals-only, like ../tasks/tasks.ts.
 import { createSignal } from 'solid-js'

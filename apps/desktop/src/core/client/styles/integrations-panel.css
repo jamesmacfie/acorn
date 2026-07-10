@@ -29,7 +29,7 @@
   font-weight: 600;
   color: var(--text);
 }
-/* Ticket switcher when a workspace links several Linear tickets (docs/workspaces). */
+/* Ticket switcher when a workspace links several Linear tickets (docs/workspaces-and-tasks.md). */
 .integrations-panel-tabs {
   display: flex;
   flex-wrap: wrap;

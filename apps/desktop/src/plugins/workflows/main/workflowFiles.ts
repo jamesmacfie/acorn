@@ -1,4 +1,4 @@
-// Workflow files (docs/next 14 P5 / 13): declarative, committed `.acorn/workflows/*.toml`,
+// Workflow files (docs/workflows.md / 13): declarative, committed `.acorn/workflows/*.toml`,
 // layered repo → user like config.toml (repo wins by id). A step may reference another workflow
 // (`workflow = "<id>"`) — expanded inline, ONE level of nesting to start, cycles rejected with a
 // surfaced error (never a hang). Malformed files become error rows (the 13 §B DX rule), never
@@ -7,7 +7,7 @@ import { existsSync, readdirSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { parse as parseToml } from 'smol-toml'
 import { agentProfileRegistry } from '../../../core/main/agentProfiles'
-import { BUILTIN_POLICIES, BUILTIN_STEP_KINDS } from './workflowBuiltins'
+import { BUILTIN_POLICIES, BUILTIN_STEP_KINDS, BUILTIN_STEP_VALIDATORS } from './workflowBuiltins'
 import type { ToolCeiling, ToolRisk, WorkflowDef, WorkflowStepDef } from './workflowContracts'
 import { validateWorkflow, type WorkflowValidationCatalog } from './workflowValidation'
 
@@ -19,6 +19,7 @@ const defaultCatalog = (): WorkflowValidationCatalog => ({
   policies: new Set<string>(BUILTIN_POLICIES),
   profiles: new Set(agentProfileRegistry.list().map((profile) => profile.id)),
   structuredProfiles: new Set(agentProfileRegistry.list().filter((profile) => profile.aiArgv).map((profile) => profile.id)),
+  validateStepKind: (kind, step, context) => BUILTIN_STEP_VALIDATORS[kind as (typeof BUILTIN_STEP_KINDS)[number]]?.(step, context) ?? [],
 })
 
 const str = (v: unknown): string | undefined => (typeof v === 'string' && v.trim() ? v.trim() : undefined)

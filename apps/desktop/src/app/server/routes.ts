@@ -1,7 +1,7 @@
 // App-layer activation: register every plugin-owned HTTP router into the core route registry.
 // This is the ONE place allowed to import both core and plugin server parts — the composition root
 // imports it before createApp() runs, so core/server/index.ts never names a product route module
-// (docs/next Phase 10 §4). Adding a plugin route is a one-line edit here, not a core edit.
+// (docs/plugins.md). Adding a plugin route is a one-line edit here, not a core edit.
 import { registerRoute } from '../../core/server/routeRegistry'
 import { actions } from '../../plugins/github/server/routes/actions'
 import { prActions } from '../../plugins/github/server/routes/prActions'

@@ -5,8 +5,8 @@ import { bridgeSlot, viaBridge } from '../../../../core/server/bridge'
 import type { AppEnv } from '../../../../core/server/middleware/auth'
 import { respondError } from '../../../../core/server/respond'
 
-// Notes + memory (docs/notes-and-memory.md, docs/next 12): the renderer's knowledge surface — was the
-// `memory:*` and `notes:*` IPC channels (inventories §1a). Distinct from the harness memory/notes
+// Notes + memory (docs/notes-and-memory.md): the renderer's knowledge surface — was the
+// `memory:*` and `notes:*` IPC channels. Distinct from the harness memory/notes
 // bridges (the MCP agent surface): this is the human-facing pane (manual add, the proposal gate,
 // note CRUD + inclusion). Backed by the same NotesStore + memory index in the main process, so it
 // 503s under dev:node. Mounted at /api to carry both /memory* and /workspaces/:wsId/notes* paths.
@@ -28,7 +28,7 @@ export type KnowledgeBridge = {
 export const knowledgeBridgeSlot = bridgeSlot<KnowledgeBridge>()
 export const setKnowledgeBridge = knowledgeBridgeSlot.set
 
-// Everything that writes a memory file / note gets a validated body (Phase 3 §1).
+// Everything that writes a memory file / note gets a validated body (the privileged-boundary contract).
 const editedShape = z.object({ name: z.string(), type: z.string(), description: z.string(), body: z.string() })
 const addBody = z.object({ scope: z.enum(['repo', 'private']), name: z.string(), description: z.string(), type: z.string(), body: z.string() })
 const resolveBody = z.object({ approved: z.boolean(), edited: editedShape.optional() })

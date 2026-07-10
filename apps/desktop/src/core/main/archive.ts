@@ -1,4 +1,4 @@
-// Task archive orchestration (docs/workspaces 05 + docs/terminal-and-agents.md). Extracted from the IPC
+// Task archive orchestration (docs/workspaces-and-tasks.md + docs/terminal-and-agents.md). Extracted from the IPC
 // handler so the lifecycle ordering — guard → teardown script (while the worktree still exists) →
 // stop sessions → remove worktree → mark archived — is testable under plain Node against a real
 // temp git repo. Electron/PTY concerns (the live session map, drawer streaming) are injected.

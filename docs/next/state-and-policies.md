@@ -1,5 +1,8 @@
 # Core services, state, and runtime policies (§5)
 
+> Current state ownership is documented in [state.md](../state.md). This design remains for policy
+> seams that future dashboards, background consumers, or plugins may need.
+
 **Status:** design proposal · **Date:** 2026-07-07 · **Part of:** the
 [extensibility.md](./extensibility.md) design (this file is §5 of that design;
 section numbers are preserved so citations like "§5.1" resolve here). The
@@ -9,7 +12,7 @@ contribution-point catalog is [contribution-points.md](./contribution-points.md)
 This file covers where state *lives* and how the composed system *behaves*.
 The companion rules for how state changes *propagate and fail* at runtime —
 mutation failure surfaces, latest-wins refreshes, derive-don't-effect — are
-[ui-state.md](./ui-state.md) and bind contributed UI equally.
+[state.md](../state.md) and bind contributed UI equally.
 
 ---
 
@@ -33,7 +36,7 @@ The other half of the contract — what `ctx` hands a plugin:
 | `ctx.gh` | `server/github` clients | the REST/GraphQL clients + `ghError` taxonomy, exposed to server plugin parts (github plugin is its main user; others may read rate-limit state) |
 
 (An earlier draft listed `ctx.ipc`, a typed channel bus. Superseded by the
-transport collapse — [implementation.md](./implementation.md) decision 1: a
+transport collapse — the completed implementation plan decision 1: a
 plugin's request/response surface is server routes; streams ride the shared
 WebSocket; the tiny Electron-ism residue is core-owned and not a plugin API.)
 
@@ -133,7 +136,7 @@ Events notify; they do not carry state. And the query cache is the *only*
 client-side copy of T1/T2 server data — copying query results into signals
 creates a second writer and is the one move this model bans outright. (The
 `touched()`-guarded form seed is the sanctioned exception —
-[ui-state.md](./ui-state.md) §1.)
+[state.md](../state.md) §1.)
 
 Parity check against today's inventory: `selectedSource`/`activeTaskId` → core
 app-scope T4; `taskLayouts` → core T3, task-scoped (and stays T3 as it grows
@@ -173,7 +176,7 @@ interface PersistedStateSlice<T> {
 Core owns the storage mechanics: derive the persisted key from
 `slice.key + scope id`, hydrate in restore-phase order, arm persistence after
 `boot:restored`, throttle writes, and surface failures as notices
-([ui-state.md](./ui-state.md) §3). A plugin owns only its descriptor and the
+([state.md](../state.md) §3). A plugin owns only its descriptor and the
 typed reducer/actions that produce the slice value.
 
 **Schema rules:**
@@ -315,7 +318,7 @@ lands, the preservation stance is explicit. **Never deleted automatically:**
   unassigned) — and repo path mappings;
 - global and workspace notes, accepted memory files, and pending memory
   proposals (**task-scoped notes are the exception** — `notes/task/<taskId>/`
-  is removed with its task, [feature-parity.md](./feature-parity.md) §10);
+  is removed with its task, [features.md](../features.md) §10);
 - user-created review notes, until an explicit archive/retention policy says
   otherwise;
 - integration rows, unless the user disconnects.

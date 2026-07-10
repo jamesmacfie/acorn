@@ -1,8 +1,11 @@
 # UX — the new surfaces the plan introduces, specified once
 
+> Implemented surfaces are documented with their features. This file remains for deferred pane
+> management and additive UX constraints that have not shipped.
+
 **Status:** design decisions · **Date:** 2026-07-07 · **Companions:**
-[implementation.md](./implementation.md) Phases 4–5,
-[ui-state.md](./ui-state.md), [security.md](./security.md),
+the completed implementation plan Phases 4–5,
+[state.md](../state.md), [security.md](./security.md),
 [agent-runtime.md](./agent-runtime.md) §3
 
 The implementation plan is architecture-heavy and it introduces real
@@ -42,7 +45,7 @@ dialog. Rules:
   list (log line, no UI stall). The dialog never shows a spinner.
 - The hardcoded close-task dialog in `TaskView.tsx` and the `confirm()` calls
   in `CommandPalette.tsx:198` / `TabRail`'s archive path become this dialog;
-  the six `window.confirm` sites ([inventories.md](./inventories.md) §3g) are
+  the six `window.confirm` sites (the completed implementation inventory §3g) are
   the candidate list, each converting only when its owning feature registers
   a will-handler.
 
@@ -112,7 +115,7 @@ three UX decisions:
   currently false render dimmed, not hidden (discoverability beats precision
   here).
 
-## 5. Errors the user can see (Phase 5, rules from ui-state.md §3)
+## 5. Errors the user can see (Phase 5, rules from [state.md](../state.md) §3)
 
 The four dialects (inline signals, `window.alert` ×19, console, silence)
 become two:
@@ -125,7 +128,7 @@ become two:
   (autosave clobber refusal, workflow failure). Notices name the action and
   offer retry where the mutation is idempotent.
 - `window.alert`/`window.confirm` are banned after Phase 5 (lint-greppable;
-  the 25 current sites are [inventories.md](./inventories.md) §3g). Confirms
+  the 25 current sites are the completed implementation inventory §3g). Confirms
   become the will-phase dialog (§1) or an inline two-step (click → confirm
   button state) for small in-pane destructions like note deletion.
 - **Loading/error states**: `QueryGate` renders three states consistently —
@@ -240,7 +243,7 @@ measurable ([performance.md](./performance.md) §2):
   on Esc. This extends to *pane content*, not just shell surfaces — every
   pane's focusable content is reachable and operable by keyboard by default
   (§4.1 pane contract), verified by the conformance suite
-  ([testing.md](./testing.md) §4). "By default" only holds because the build
+  ([testing.md](../testing.md) §4). "By default" only holds because the build
   fails when a pane isn't navigable, not because contributors remember.
 - **Pane switch ≤ one frame; task switch ≤ 100 ms** — registries add lookup
   indirection, not render weight.

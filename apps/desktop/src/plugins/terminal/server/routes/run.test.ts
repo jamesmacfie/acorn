@@ -4,7 +4,7 @@ import type { AppEnv } from '../../../../core/server/middleware/auth'
 import { requireUser } from '../../../../core/server/middleware/requireUser'
 import { harness, setRunBridge, type RunBridge } from '../../../../core/server/routes/harness'
 
-// The renderer's run surface reuses the harness RunBridge routes (Phase 3). This proves the
+// The renderer's run surface reuses the harness RunBridge routes. This proves the
 // renderer-facing verbs — targets/start/stop/status + the new default-url — and auth/503.
 
 const req = (url: string, method = 'GET') => new Request(`http://acorn.test${url}`, { method })

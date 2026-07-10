@@ -1,4 +1,4 @@
-// Builds the agent-tool registry (docs/agent-tools.md, docs/next Phase 4): every agent capability
+// Builds the agent-tool registry (docs/agent-tools.md, docs/agent-tools.md): every agent capability
 // as ONE AgentToolContribution, with its domain dep closed over. Installed via setAgentTools, so the
 // server route (GET/POST /api/tasks/:id/tools) and the MCP server (which fetches the manifest and
 // proxies calls) both project from this one list. Replaces the notes/memory/browser harness bridges
@@ -7,7 +7,7 @@
 //
 // Provenance: notes/memory writes stamp author: agent + the agent session id (ctx.sessionId, from
 // the x-acorn-session-id header). memory_write is PROPOSE-only — the human gate is the sole writer
-// of accepted memory (Phase 4 invariant; docs/memory.md §1).
+// of accepted memory (the agent-tool registry invariant; docs/notes-and-memory.md §1).
 import { and, eq } from 'drizzle-orm'
 import { z } from 'zod'
 import { assembleContext, parseInclude } from '../../core/server/agentTools/contextSections'
@@ -22,6 +22,8 @@ import type { MemoryProposalStore } from '../../plugins/memory/main/memoryPropos
 import type { NotesStore } from '../../plugins/notes/main/notes'
 import type { RuntimeService } from '../../plugins/terminal/main/runtime'
 import { loadTask, repoFor, workspaceIdFor } from '../../core/main/taskWorktree'
+import { isRepoConfigTrustError } from '../../core/main/repoConfigTrust'
+import { broadcastRepoConfigTrustNotice } from '../../core/main/notify'
 
 export type AgentToolsDeps = {
   db: AppDatabase
@@ -55,6 +57,15 @@ async function noteLocationFor(db: AppDatabase, taskId: string, scope: NoteScope
 export function buildAgentTools(deps: AgentToolsDeps): AgentToolContribution[] {
   const { db, notesStore, proposals, runtime, reconciled } = deps
   const empty = z.object({})
+  const executeRun = async <T>(taskId: string, execute: () => Promise<T>): Promise<T> => {
+    try {
+      return await execute()
+    } catch (error) {
+      if (!isRepoConfigTrustError(error)) throw error
+      broadcastRepoConfigTrustNotice(taskId)
+      throw new ToolError('needs-trust', 'Repo configuration must be reviewed and trusted before it can run.')
+    }
+  }
 
   // The context-read tools compose from the shared section registry (contextSections.ts). Its
   // notes/memory seams are filled once, in knowledgeIpc — the /context route and these tools read
@@ -377,7 +388,7 @@ export function buildAgentTools(deps: AgentToolsDeps): AgentToolContribution[] {
       exposeToRenderer: true,
       when: hasRunTargets,
       whenDescription: 'Only available in tasks with run targets.',
-      handler: (a, ctx) => runtime.start(ctx.taskId, (a as { id: string }).id),
+      handler: (a, ctx) => executeRun(ctx.taskId, () => runtime.start(ctx.taskId, (a as { id: string }).id)),
     },
     {
       name: 'run_stop',
@@ -399,7 +410,7 @@ export function buildAgentTools(deps: AgentToolsDeps): AgentToolContribution[] {
       exposeToRenderer: true,
       when: hasRunTargets,
       whenDescription: 'Only available in tasks with run targets.',
-      handler: (a, ctx) => runtime.restart(ctx.taskId, (a as { id: string }).id),
+      handler: (a, ctx) => executeRun(ctx.taskId, () => runtime.restart(ctx.taskId, (a as { id: string }).id)),
     },
     {
       name: 'run_status',

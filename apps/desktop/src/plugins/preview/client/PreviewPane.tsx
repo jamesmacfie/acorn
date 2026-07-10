@@ -1,7 +1,7 @@
 import { createEffect, createSignal, onCleanup, onMount, Show } from 'solid-js'
 import { clientEvents } from '../../../core/client/registries/clientEvents'
 
-// The browser-preview pane (docs/panes.md, Phase 9 A): browser chrome (back/forward/stop-reload/home
+// The browser-preview pane (docs/panes.md): browser chrome (back/forward/stop-reload/home
 // + an editable URL bar + a loading spinner) over a per-task, MAIN-owned WebContentsView. `props.url`
 // is the resolved "home" (run target / workspace preview — TaskView computes the priority chain).
 // The native view lives in the main process (previewService.ts) and is positioned over this pane's

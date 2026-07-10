@@ -1,4 +1,4 @@
-// Memory proposals (docs/next 12, docs/mcp.md): agent memory_write NEVER lands silently — it files a
+// Memory proposals (docs/notes-and-memory.md, docs/mcp.md): agent memory_write NEVER lands silently — it files a
 // proposal here, and the human gate (accept/edit/reject, 6.6) is the only path that writes a
 // memory .md. Proposals are JSON files under <dataDir>/memory-proposals/ — visible, greppable,
 // crash-safe, no schema.

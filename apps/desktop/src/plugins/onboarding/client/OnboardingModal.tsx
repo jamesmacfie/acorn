@@ -3,7 +3,7 @@ import WorkspaceRepoAssignments from '../../../core/client/workspaces/WorkspaceR
 import { saveOnboardingCompletion } from './onboardingCompletion'
 import '../../../core/client/workspaces/onboarding.css'
 
-// First-run workspace setup (docs/workspaces). The bootstrap already put every repo in a Default
+// First-run workspace setup (docs/workspaces-and-tasks.md). The bootstrap already put every repo in a Default
 // workspace; the shared mapping body re-groups them and (on desktop) maps on-disk checkouts.
 // "Done" records the onboarded pref so the modal doesn't reappear. Re-opening the mapping later
 // happens via Settings → Workspaces, not here.

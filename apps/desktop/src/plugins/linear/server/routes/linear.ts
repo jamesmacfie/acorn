@@ -34,7 +34,7 @@ import type { LinearIssueDetail, LinearIssuesRequest, LinearIssuesResponse, Line
 
 // TTL centralized in server/sync/policy.ts. Linear's reads fan out across all connected
 // integrations with partial results and per-item (`issues.fetchedAt`) freshness, so they do NOT use
-// the serve-then-revalidate wrapper (inventories.md §2d) — the engine owns single-resource flow,
+// the serve-then-revalidate wrapper (docs/caching.md) — the engine owns single-resource flow,
 // this owns multi-connection resolution.
 const PROVIDER = 'linear'
 const ISSUES_TTL_MS = linearProvider.resources.find((resource) => resource.id === 'linear.issues')!.ttlMs
@@ -78,7 +78,7 @@ async function resolveIssues(
 // Provider CRUD (connect/disconnect) lives in routes/integrations.ts.
 export const linear = new Hono<AppEnv>()
   // Projects across every connected Linear integration, each tagged with its connection so the
-  // picker can span multiple Linears (docs/workspaces 04). A failing connection is skipped.
+  // picker can span multiple Linears (docs/workspaces-and-tasks.md). A failing connection is skipped.
   .get('/projects', async (c) => {
     const user = getUser(c)
     const connections = await linearConnections(c, user.login)

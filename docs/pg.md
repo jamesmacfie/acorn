@@ -30,8 +30,8 @@ Settings alongside the dev/setup scripts. It handles setups auto-detect can't re
 
 ## Architecture
 
-- **IPC, not Hono** — mirrors `acorn.editor` / `acorn.local` (request/response via
-  `ipcRenderer.invoke`), how every worktree-backed pane already talks to main. No streaming.
+- **Task-scoped HTTP** — renderer requests hit `/api/tasks/:id/database/*`; route handlers delegate
+  through an injected main-process bridge. No streaming.
 - **`pg` (node-postgres)** — not a native module (no better-sqlite3-style ABI dance). One `pg.Pool`
   per task, cached `Map<taskId, { pool, url }>`; `pool.end()` on disconnect/reconnect.
 - **Pane is client-only** — panes aren't DB rows, so this is just a new `PaneId`. The only migration
@@ -43,29 +43,29 @@ Settings alongside the dev/setup scripts. It handles setups auto-detect can't re
   schema and double-quoted. Arbitrary SQL from the editor runs verbatim (it's the user's own DB;
   writes are wanted).
 
-### IPC surface (`db:*`, all keyed by `taskId`)
+### HTTP surface (all keyed by `taskId`)
 
-| Channel | Returns |
+| Route suffix | Returns |
 | --- | --- |
-| `db:connect` | resolve URL → Pool → `SELECT current_database()` → `{ ok, database }` or `{ error }` |
-| `db:tables` | non-system tables → `{ schema, name }[]` |
-| `db:columns` | columns + PK columns for a table (drives editing) |
-| `db:rows` | `SELECT * FROM "s"."t" ORDER BY <pk> LIMIT $1 OFFSET $2` → `{ columns, rows, total }` |
-| `db:query` | arbitrary SQL → `{ columns, rows, rowCount, command }` or `{ error }` |
-| `db:update` / `db:insert` / `db:delete` | parameterized DML, identifiers validated |
-| `db:disconnect` | `pool.end()`, drop from map |
+| `POST /connect` | resolve URL → Pool → `SELECT current_database()` → `{ ok, database }` or `{ error }` |
+| `GET /tables` | non-system tables → `{ schema, name }[]` |
+| `GET /columns` | columns + PK columns for a table (drives editing) |
+| `GET /rows` | `SELECT * FROM "s"."t" ORDER BY <pk> LIMIT $1 OFFSET $2` → `{ columns, rows, total }` |
+| `POST /query` | arbitrary SQL → `{ columns, rows, rowCount, command }` or `{ error }` |
+| `POST /update`, `/insert`, `/delete` | parameterized DML, identifiers validated |
+| `POST /disconnect` | `pool.end()`, drop from map |
 
 Cell values are normalized in main (objects → JSON, dates → ISO) so the grid renders uniformly;
 `null` stays distinct for `NULL` styling.
 
 ## Where the code lives
 
-Main process: `apps/desktop/src/plugins/database/main/database.ts` (IPC + pool cache + `resolveDbUrl`), registered
-from `main/terminal.ts`, exposed via `main/preload.ts`. Wire types: `shared/database.ts`.
-Client: `apps/desktop/src/client/features/database/{databaseClient.ts,DatabasePane.tsx,ResultGrid.tsx,database.css}`,
-wired into the pane system in `client/features/tasks/{layout.ts,TaskView.tsx,paneShortcuts.ts}`.
-The `workspaces.dbUrlScript` column lives in `server/db/schema.ts`, edited via
-`client/features/settings/WorkspaceSettings.tsx` → `server/routes/workspaces.ts`.
+Main process: `apps/desktop/src/plugins/database/main/database.ts` (pool cache + `resolveDbUrl`).
+HTTP routes: `apps/desktop/src/plugins/database/server/routes/database.ts`; wire types:
+`apps/desktop/src/plugins/database/shared/database.ts`. Client:
+`apps/desktop/src/plugins/database/client/`. The `workspaces.dbUrlScript` column lives in
+`apps/desktop/src/core/server/db/schema.ts`, edited via
+`core/client/settings/WorkspaceSettings.tsx` → `core/server/routes/workspaces.ts`.
 
 ## Smoke test
 

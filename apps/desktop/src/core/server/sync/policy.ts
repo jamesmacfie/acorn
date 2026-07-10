@@ -1,7 +1,7 @@
 // Central cache-policy TTLs (docs/caching.md). One greppable home for every serve-then-revalidate
 // staleness window; the sync engine (server/sync/engine.ts) owns the *flow*, this owns the *numbers*.
-// ponytail: do not tune here in Phase 2 — values are carried over verbatim from the old per-route
-// constants (inventories.md §2d). Tuning is a later, deliberate change.
+// ponytail: values preserve the established per-route behavior. Tune them only as an explicit
+// product/performance change, not incidentally while editing the engine.
 
 export const PULLS_STALE_AFTER_MS = 45_000 // PR list + PR detail + PR files — "fast-changing"
 export const REPOS_STALE_AFTER_MS = 300_000 // repo metadata — "slow-changing"

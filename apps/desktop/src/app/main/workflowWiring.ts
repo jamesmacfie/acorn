@@ -1,4 +1,4 @@
-// Workflow wiring (docs/next 14 P2–P5), split out of terminal.ts: constructs the main-process
+// Workflow wiring (docs/workflows.md), split out of terminal.ts: constructs the main-process
 // WorkflowRunner over the fake-able headless runner with its real deps — handoff notes, the
 // loopback context assembler, a re-derived checks-green policy, gate/run-done notices — and wires
 // the WorkflowBridge behind the HTTP routes (server/routes/workflow.ts). Gate/run-done notices,
@@ -24,6 +24,8 @@ import { loadWorkflowFiles } from '../../plugins/workflows/main/workflowFiles'
 import { WorkflowRunner, type WorkflowDef } from '../../plugins/workflows/main/workflowRunner'
 import { encodeToolCeiling } from '../../plugins/workflows/main/workflowTools'
 import { WorkflowValidationError } from '../../plugins/workflows/main/workflowValidation'
+import { assertRepoConfigTrusted, isRepoConfigTrustError } from '../../core/main/repoConfigTrust'
+import { broadcastRepoConfigTrustNotice } from '../../core/main/notify'
 
 export type WorkflowWiringDeps = {
   runtime: RuntimeService
@@ -151,10 +153,11 @@ export async function registerWorkflowIpc(
       await db.update(schema.tasks).set({ status: 'cancelled', updatedAt: Date.now() }).where(eq(schema.tasks.id, taskId))
       broadcastStatus()
     },
+    authorizeRepoConfig: (taskId) => assertRepoConfigTrusted(db, taskId),
   })
 
   setWorkflowBridge({
-    // Declared workflows for a task (docs/next 14 P5): `.acorn/workflows/*.toml` from the
+    // Declared workflows for a task (docs/workflows.md): `.acorn/workflows/*.toml` from the
     // worktree/checkout + ~/.acorn, parse/cycle errors surfaced as palette rows (13 §B).
     defs: async (taskId) => {
       const t = await loadTask(db, taskId)
@@ -168,6 +171,10 @@ export async function registerWorkflowIpc(
       try {
         return { runId: await workflowRunner.start(taskId, def as WorkflowDef) }
       } catch (error) {
+        if (isRepoConfigTrustError(error)) {
+          broadcastRepoConfigTrustNotice(taskId)
+          return { error: 'needs-trust' }
+        }
         return { error: error instanceof WorkflowValidationError ? error.message : 'Failed to start workflow.' }
       }
     },
@@ -203,6 +210,6 @@ export async function registerWorkflowIpc(
 
   // Note: workflowRunner.reconcile() (resume/fail-cleanly across app restarts, 14 §checkpoint) is
   // NOT run here — the composition root drives it in its coordinated reconcile() step, off the
-  // paint-critical path (review §2, performance §3.6).
+  // paint-critical path (composition-root ownership, docs/electron.md §11).
   return workflowRunner
 }

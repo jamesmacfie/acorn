@@ -1,8 +1,8 @@
-/* Workspace view (docs/workspaces P4): PR-review (Navigator + Diff) or an empty state, plus a thin
+/* Workspace view (docs/workspaces-and-tasks.md): PR-review (Navigator + Diff) or an empty state, plus a thin
    pane-switcher rail on the right. Mirrors the .panes grid but with the switcher as a 3rd column.
    `.panes.panes-workspace` (specificity 0,2,0) so it reliably beats the base `.panes` 3-col rule —
    otherwise the switcher falls into a 1fr track (huge right gap) and the Navigator widens. */
-/* Wrap so a status footer can sit below the panes (docs/workspaces 02). */
+/* Wrap so a status footer can sit below the panes (docs/workspaces-and-tasks.md). */
 /* Reserve room for the terminal drawer when it's open (--term-drawer-h, set by TerminalPanel) so
    the panes + footer shrink to sit above it — the drawer is a fixed overlay and would otherwise
    cover the bottom of the panes and their scrollbars. */
@@ -196,7 +196,7 @@
 }
 .linear-project-picker input { accent-color: var(--accent); cursor: pointer; }
 
-/* Run-target buttons (docs/next 13 §A): one ▶ per named target, id shown under the glyph. */
+/* Run-target buttons (docs/workflows.md §2): one ▶ per named target, id shown under the glyph. */
 .pane-switch-run { flex-direction: column; gap: 1px; }
 .pane-switch-run-id {
   font-size: 8px;

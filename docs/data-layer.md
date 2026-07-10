@@ -207,7 +207,7 @@ disambiguates them in the UI ("Linear – work").
 ### Group 3 — App-state tables, machine-scoped (no userId)
 
 These describe the local machine and the user's work on it. No `userId` (single-user machine). acorn
-is the source of truth. Several belong to flag-gated or design-stage features — noted per table.
+is the source of truth. Several are desktop-capability-gated, as noted per table.
 
 #### `repo_paths`
 
@@ -244,6 +244,20 @@ top bar (see [workspaces-and-tasks](./workspaces-and-tasks.md)). PK opaque `id`.
 | `icon` | text | JSON `WorkspaceIcon` (`emoji`/`lucide`/`github`); null → derived default |
 | `color` | text | preset token key or 6-hex; null → derived from name hash |
 | `createdAt`, `updatedAt` | integer | epoch ms |
+
+There is intentionally no generic `workspace_config` key/value table. Typed workspace fields remain
+the validated fallback layer, while shareable extensible configuration lives in
+`.acorn/config.toml` and personal defaults in `~/.acorn/config.toml`. This keeps executable config
+reviewable in files and avoids moving typed contracts into an unstructured row store. Revisit only
+if a contribution needs workspace-scoped values that cannot be represented by the file layers or a
+provider-owned typed config codec.
+
+#### `config_acks`
+
+Machine-scoped acknowledgements for repo-authored executable configuration. The composite key is
+`(repo, hash)`; `snapshot` retains the exact approved source for the next changed-config diff and
+`ackedAt` provides the latest approved baseline. This is deliberately narrower than a general
+workspace configuration table.
 
 #### `workspace_repos`
 
@@ -375,7 +389,7 @@ Drizzle relationship.
 #### `terminal_sessions`
 
 Durable terminal sessions. PK opaque `id`. Machine-scoped. **Desktop-only** — the terminal drawer
-requires the preload bridge and is always on in the Electron app (`capabilities()`,
+requires the main-process terminal capability and is always on in the Electron app (`capabilities()`,
 `apps/desktop/src/core/client/capabilities.ts`).
 Only **tmux-backed** sessions are persisted (tmux outlives an app restart; node-pty sessions die with
 the process and live only in the in-memory map). No terminal output is ever stored. Bound to a task —
@@ -401,10 +415,9 @@ repo/branch/PR are derived through the `taskId → tasks` join.
 #### `workflow_runs`
 
 The durable checkpoint for the main-process workflow state machine — every transition is persisted so
-a run survives an app restart. PK opaque `id`. Machine-scoped. **Design-stage / in progress**: real
-scaffolding exists (schema, `run_*`/gate harness routes, read-only WorkflowsSettings inspector,
-palette entries) but there is no finished orchestrator; gated with the terminal flag. See
-[workflows](./workflows.md).
+a run survives an app restart. PK opaque `id`. Machine-scoped. The registry-backed runtime supports
+gates, joins, branching, bounded fan-out, cancellation, tool ceilings, and reconciliation; it is
+desktop-capability-gated. See [workflows](./workflows.md).
 
 | Column | Type | Note |
 | --- | --- | --- |

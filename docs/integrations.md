@@ -5,7 +5,7 @@ contributions. Core owns connection storage, lifecycle, link integrity, and cach
 providers own authentication policy, cached-data codecs, context formatting, reference discovery,
 mutations, capabilities, and operating budgets.
 
-The implementation lives under `apps/desktop/src/server/integrations/`. Public cross-process types
+The implementation lives under `apps/desktop/src/core/server/integrations/`. Public cross-process types
 live in `apps/desktop/src/core/shared/integrations.ts`; client source, pane, and link contributions live in
 `apps/desktop/src/app/client/providerContributions.tsx`.
 
@@ -66,7 +66,7 @@ derived/provider-owned rows. Accepted memory is outside this cascade.
 Live fan-out uses `forEachConnection`; it filters disabled/needs-auth rows and decrypts only in the
 server process. Mirrored reads use `runProviderResource` instead: core resolves the stored
 connection, reads cache before credentials, suppresses outbound work for disabled/needs-auth rows,
-then projects the descriptor through the Phase-2 sync engine. This is why reauthentication can
+then projects the descriptor through the shared sync engine. This is why reauthentication can
 still serve stale linked detail without leaking one account's cache or backoff state into another.
 
 ## External references and link integrity
@@ -177,7 +177,7 @@ repo/branch prompting, and `+task` attachment.
 
 ## Conformance and adding a provider
 
-`server/integrations/conformance.test.ts` iterates the registry. A provider is automatically checked
+`core/server/integrations/conformance.test.ts` iterates the registry. A provider is automatically checked
 for public-secret hygiene, capability obligations, cache migration/malformed behavior,
 summary-over-detail preservation, degradation formatting, positive budgets, and the no-accepted-
 memory-write invariant. Route tests separately cover connection-derived link ids and exact lifecycle
@@ -185,14 +185,15 @@ row behavior.
 
 A Sentry-style dry run adds only provider-owned modules and registrations:
 
-1. `server/integrations/providers/sentry.ts`—server descriptor, executable resources, connection
+1. `plugins/sentry/server/provider.ts`—server descriptor, executable resources, connection
    hooks, codec, formatter, resolver, mutations, budgets, and conformance fixtures.
-2. `server/routes/sentry.ts`—provider-owned HTTP router, registered by the activation list.
-3. `client/features/integrations/SentryPane.tsx`—provider pane.
-4. `client/features/tasks/SentryBrowse.tsx`—source browse/promotion UI.
+2. `plugins/sentry/server/routes/sentry.ts`—provider-owned HTTP router, registered by the activation list.
+3. `plugins/sentry/client/SentryPane.tsx`—provider pane.
+4. `plugins/sentry/client/SentryBrowse.tsx`—source browse/promotion UI.
 5. One entry in the server built-in provider activation list and one client provider contribution.
 6. Provider-specific parity tests and documentation.
 
 No route switch, settings list, source switch, task-link writer, context formatter, schema change,
-or conformance-test logic is required. A provider needing repo-scoped bindings, OAuth refresh,
-webhooks, or multiple secrets uses the named deferred seams documented in `docs/next/integrations.md`.
+or conformance-test logic is required. OAuth refresh, webhooks/background ingestion, dynamic
+uninstall, and multi-secret credentials are intentionally deferred until a provider requires them;
+new work must extend the connection/resource contracts rather than bypass them.

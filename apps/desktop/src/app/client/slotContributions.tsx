@@ -4,8 +4,10 @@ import CommandPalette from '../../core/client/palette/CommandPalette'
 import FilePalette from '../../core/client/palette/FilePalette'
 import WorkspacePalette from '../../core/client/palette/WorkspacePalette'
 import Shortcuts from '../../core/client/Shortcuts'
+import ConfigTrustDialog from '../../core/client/configTrust/ConfigTrustDialog'
 
 export const shellSlotContributions: UiSlotContribution[] = [
+  { id: 'security.config-trust', slot: 'overlay', order: 5, component: () => <ConfigTrustDialog /> },
   {
     id: 'notifications.bell', slot: 'topbar.right', order: 10,
     component: (props) => <NotificationBell onSelectTask={props.context.selectTask} />,

@@ -1,0 +1,73 @@
+# Security model
+
+acorn is a local, single-user Electron application, but its loopback server and renderer are still
+separate trust boundaries. The security posture is defense in depth: bind locally, authenticate
+every API route, validate inputs again at the privileged boundary, and never expose general Node or
+Electron capabilities to the renderer.
+
+## Loopback server
+
+- The listener binds `127.0.0.1`, not all interfaces.
+- A Host-header guard accepts only the configured `127.0.0.1:<port>` origin, limiting DNS-rebinding
+  attacks.
+- `/auth/*` is public because it establishes the session. Every `/api/*` request passes `csrf()`,
+  `authMiddleware`, and `requireUser` before core or contributed routers run.
+- Browser callers use the encrypted, HTTP-only, same-site session cookie. Internal MCP callers use
+  the per-app-run `INTERNAL_TOKEN`; the token maps to the machine user but carries no GitHub token.
+- The WebSocket upgrade rechecks Host, Origin, and either the session cookie or internal token.
+
+## Renderer and Electron
+
+The window uses context isolation and a sandboxed preload; raw `ipcRenderer` is never exposed.
+Normal data and commands use authenticated HTTP, and streams use the authenticated WebSocket.
+Preload IPC is reserved for native capabilities: close/quit lifecycle, the folder picker, and the
+main-owned preview `WebContentsView`.
+
+Unexpected navigation and window creation are blocked or opened externally by the main process.
+Preview navigation is restricted to `http(s)`, and its `webContents` identifier never crosses to the
+renderer. Browser automation binds inside main and is exposed to agents through permission-checked
+tools.
+
+## Secrets and sessions
+
+- GitHub access tokens stay inside the encrypted session cookie and server bindings; public user
+  responses never include them.
+- Integration credentials are encrypted at rest with `SESSION_ENC_KEY` and are never returned to
+  the renderer after submission.
+- Electron stores `SESSION_ENC_KEY` through `safeStorage`. An explicit environment value wins and
+  can recover or migrate an existing identity. Decryption failure is fatal rather than silently
+  minting a replacement that would strand sessions and provider tokens.
+- Child processes receive a controlled environment. GitHub and session secrets are not inherited;
+  task identity and the short-lived internal API token are injected explicitly.
+
+## Filesystem, processes, and database
+
+Task-scoped file operations re-derive the worktree root from `taskId`, reject traversal and symlink
+escapes, and validate request bodies before reaching main-process bridges. Process-spawning routes
+validate their inputs and use the task worktree as the capability boundary.
+
+The Postgres pane never persists connection URLs. Generated DML parameterizes values and validates
+identifiers against the live schema before quoting them; the SQL editor intentionally executes the
+user's verbatim SQL against the user's development database.
+
+## Agent tools and workflows
+
+Every agent tool declares a risk (`read`, `write`, or `execute`). Global tier/per-tool permissions
+filter both discovery and direct calls. Workflow and profile ceilings can only narrow that set, never
+widen it. Agent memory writes create human-gated proposals; they cannot silently modify accepted
+memory.
+
+## Repo-authored configuration
+
+Committed `.acorn/config.toml` and `.acorn/workflows/*.toml` are remote-authored executable input.
+Before a repo-owned run target or workflow can start, acorn hashes the verbatim repo configuration
+snapshot and requires an explicit review. A machine-scoped `config_acks` row records the repo and
+hash; a changed snapshot shows a diff and requires a new acknowledgement. User-level and database
+fallback configuration remain usable while the repo layer is untrusted. Agent-triggered attempts
+fail immediately with the stable `needs-trust` code and add a “Review & trust” notification; they
+are never silently resumed after approval.
+
+Security-relevant source: `core/main/server.ts`, `core/main/preload.ts`,
+`core/main/sessionKeyStore.ts`, `core/main/repoConfigTrust.ts`, `core/server/index.ts`,
+`core/server/middleware/`, `core/server/agentTools/`, and feature route validators under
+`plugins/*/server/routes/`.

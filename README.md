@@ -181,4 +181,3 @@ Detailed docs live in [`docs/`](./docs). Start with the architecture overview.
 - [local-development.md](./docs/local-development.md) — full local setup & dev workflow.
 - [testing.md](./docs/testing.md) — test suites, boundary checks, and focused validation.
 - [security.md](./docs/security.md) — the loopback threat model and security invariants.
-</content>

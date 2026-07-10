@@ -73,6 +73,15 @@ export type StepHandlerOutcome =
   | { status: 'cancelled'; error?: string }
 
 export type StepHandler = (ctx: StepHandlerContext) => Promise<StepHandlerOutcome>
+export type StepValidationContext = {
+  label: string
+  index: number
+  indexes: ReadonlyMap<string, number>
+  stepAt(name: string): WorkflowStepDef | undefined
+  policies: ReadonlySet<string>
+}
+export type StepValidator = (step: WorkflowStepDef, context: StepValidationContext) => string[]
+export type StepKindContribution = { handler: StepHandler; validate?: StepValidator }
 export type PolicyEvaluator = (taskId: string) => Promise<{ pass: boolean; detail?: string }>
 
 export type WorkflowTriggerMatch = {

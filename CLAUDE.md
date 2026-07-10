@@ -1,14 +1,13 @@
 # CLAUDE.md — acorn
 
-A GitHub pull-request review tool: a **local macOS Electron app**. A SolidJS SPA is served by an
+A **local macOS agent workspace** with first-class GitHub pull-request review. A SolidJS SPA is served by an
 in-process Hono server (`@hono/node-server`) running in the Electron main process, backed by a
 local SQLite read-model mirror of GitHub data (better-sqlite3 + Drizzle), an on-disk blob cache,
 and IndexedDB client persistence.
 
 > **For architecture/domain detail, read [docs/architecture-overview.md](./docs/architecture-overview.md) first.**
 > For the Cloudflare-Workers→Electron migration history and rationale, see
-> [docs/electron.md](./docs/electron.md). Some topic docs below still describe Workers specifics and
-> are being updated.
+> [docs/electron.md](./docs/electron.md); current topic docs describe the shipped Electron runtime.
 
 ## Architecture (one local server in Electron)
 

@@ -6,10 +6,6 @@ import { gh, ghError } from '..'
 import type { RefreshResult, RouteFailure, RouteResult } from '../../../../core/server/sync/engine'
 import type { Repo } from '../../../../core/shared/api'
 
-// Failure/result taxonomy now lives with the sync engine (the shared flow layer); re-exported here
-// so the pulls / pullDetail / pullFiles / prMirror routes keep importing it from repoMirror.
-export type { RouteFailure, RouteResult } from '../../../../core/server/sync/engine'
-
 type Db = ReturnType<typeof getDb>
 type GitHubFetcher = (token: string, path: string, init?: RequestInit) => Promise<Response>
 

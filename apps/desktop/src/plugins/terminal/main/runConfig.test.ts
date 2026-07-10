@@ -4,7 +4,7 @@ import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { legacyRunTargets, loadRepoConfig } from './runConfig'
 
-describe('loadRepoConfig (docs/next 13 §B)', () => {
+describe('loadRepoConfig (docs/workflows.md §2)', () => {
   let dir: string
   let repoDir: string
   let userDir: string

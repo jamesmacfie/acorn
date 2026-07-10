@@ -1,4 +1,4 @@
-// The one authenticated WebSocket that carries every live stream (docs/next Phase 3 slice 6):
+// The one authenticated WebSocket that carries every live stream (docs/electron.md §12):
 // terminal PTY output/input + attach/detach, session-status pings, workflow notices, and (reserved,
 // wired but unpopulated) workflow step events. One socket on the loopback origin at WS_PATH.
 //
@@ -20,5 +20,5 @@ export type WsClientFrame =
 export type WsServerFrame =
   | { channel: 'term:out'; id: string; msg: ServerMsg }
   | { channel: 'term:status' }
-  | { channel: 'workflow:notice'; notice: { taskId: string; kind: 'gate' | 'run-done'; title: string } }
+  | { channel: 'workflow:notice'; notice: { taskId: string; kind: 'gate' | 'run-done' | 'repo-config-trust'; title: string; action?: 'review-config' } }
   | { channel: 'workflow:step:event'; runId: string; stepId: string; event: unknown }

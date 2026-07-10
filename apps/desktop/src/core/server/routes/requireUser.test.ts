@@ -6,7 +6,7 @@ import { createApp } from '../index'
 // unauthenticated request to any of these must 401 with the ApiError envelope — before routing,
 // before any handler. This table is the mount contract: a router added outside `/api/*` (or a
 // public hole) would not appear here and would silently escape the gate, so keep it exhaustive.
-// (docs/next/security.md §3, §7 · docs/next/feature-parity.md §16)
+// (docs/security.md §3, §7 · docs/security.md)
 const PROTECTED_PATHS: [string, string][] = [
   ['GET', '/api/me'],
   ['GET', '/api/pins'],

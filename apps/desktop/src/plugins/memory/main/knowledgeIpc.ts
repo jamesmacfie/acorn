@@ -1,7 +1,7 @@
 // The notes + memory surfaces (the renderer's KnowledgeBridge over HTTP + the context-assembler
 // seams), the launch-time memory injector and the memory auto-generation trigger — split out of
 // terminal.ts (docs/notes-and-memory.md). registerKnowledgeIpc still constructs and returns the shared
-// stores/closures the harness bridges and workflow wiring reuse; Phase 3 moved the `memory:*` /
+// stores/closures the harness bridges and workflow wiring reuse; HTTP routing moved the `memory:*` /
 // `notes:*` IPC channels to the KnowledgeBridge (server/routes/knowledge.ts).
 import { execFile } from 'node:child_process'
 import { existsSync } from 'node:fs'
@@ -33,10 +33,10 @@ export type Knowledge = {
   // Reconcile the derived SQLite memory index from every live source dir (cheap at this scale) —
   // call before any read.
   reconciled(): Promise<void>
-  // Push the memory block into a fresh agent session (docs/next 12 P2). Best-effort — a session
+  // Push the memory block into a fresh agent session (docs/notes-and-memory.md). Best-effort — a session
   // must never fail to launch over memory.
   memoryInjector(taskId: string, sessionId: string): Promise<void>
-  // Memory auto-generation trigger (docs/next 12 P3): fired when an agent session for a task
+  // Memory auto-generation trigger (docs/notes-and-memory.md): fired when an agent session for a task
   // exits, with that session's ring tail as the transcript input.
   memoryReviewTrigger(taskId: string, transcriptTail: string): Promise<void>
 }
@@ -64,7 +64,7 @@ export function registerKnowledgeIpc(db: AppDatabase, dataRoot: string, deps: Kn
     }
   }
 
-  // Memory (docs/next 12 P1): files are truth; the SQLite index reconciles from every active
+  // Memory (docs/notes-and-memory.md): files are truth; the SQLite index reconciles from every active
   // worktree + primary checkout + the private home dir before each read (cheap at this scale).
   const buildMemorySources = async () => {
     const active = (await db.select().from(schema.tasks).where(eq(schema.tasks.status, 'active')))
@@ -76,7 +76,7 @@ export function registerKnowledgeIpc(db: AppDatabase, dataRoot: string, deps: Kn
   const reconciled = async () => reconcileMemories(db, await buildMemorySources())
 
   const memoryInjector = async (taskId: string, sessionId: string) => {
-    // Launch injection (docs/next 12 P2): MEMORY.md index slice + repo feedback/convention bodies,
+    // Launch injection (docs/notes-and-memory.md): MEMORY.md index slice + repo feedback/convention bodies,
     // queued 'after-ready' so it lands as the agent's first prompt once it settles.
     try {
       const t = await loadTask(db, taskId)
@@ -92,7 +92,7 @@ export function registerKnowledgeIpc(db: AppDatabase, dataRoot: string, deps: Kn
     }
   }
 
-  // Memory auto-generation (docs/next 12 P3): the task-completion trigger. Fired on agent session
+  // Memory auto-generation (docs/notes-and-memory.md): the task-completion trigger. Fired on agent session
   // end (and best-effort at archive) while the worktree is still alive; proposals flow through the
   // human gate — nothing lands without an accept. Verification flags ride the proposal's `flags`
   // field (structural), never folded into the description.
@@ -190,7 +190,7 @@ export function registerKnowledgeIpc(db: AppDatabase, dataRoot: string, deps: Kn
         await reconciled()
         return res
       }),
-    // The human gate over auto-generated proposals (docs/next 12 P3).
+    // The human gate over auto-generated proposals (docs/notes-and-memory.md).
     memoryProposals: async (taskId) => {
       const pending = await proposals.list('pending')
       return taskId ? pending.filter((p) => p.taskId === taskId) : pending

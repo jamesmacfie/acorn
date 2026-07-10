@@ -8,4 +8,5 @@ export const noticeKindContributions: NoticeKindContribution[] = [
   { id: 'gate', glyph: '⛔', severity: 'warn', toast: true },
   { id: 'run-done', glyph: '▸', severity: 'info', toast: true },
   { id: 'background-error', glyph: '⚠', severity: 'danger', toast: false },
+  { id: 'repo-config-trust', glyph: '⚠', severity: 'warn', toast: true },
 ]

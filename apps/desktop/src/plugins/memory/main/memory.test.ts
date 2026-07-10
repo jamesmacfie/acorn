@@ -28,7 +28,7 @@ const mem = (over: Partial<MemoryFile>): MemoryFile => ({
   ...over,
 })
 
-describe('memory frontmatter round-trip (docs/next 12 — the Claude Code convention)', () => {
+describe('memory frontmatter round-trip (docs/notes-and-memory.md — the Claude Code convention)', () => {
   it('serialize → parse preserves the convention fields incl. nested metadata', () => {
     const m = mem({})
     const parsed = parseMemory(serializeMemory(m), 'fallback')

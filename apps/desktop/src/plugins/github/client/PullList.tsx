@@ -75,7 +75,7 @@ export default function PullList() {
     onCleanup(() => { bindings.dispose(); commands.dispose() })
   })
 
-  // Flow A (docs/workspaces 02): promote a PR into a task. origin github-pr, branch = headRef,
+  // Flow A (docs/workspaces-and-tasks.md): promote a PR into a task. origin github-pr, branch = headRef,
   // pullNumber. Linear ids are seeded from a warmed detail body if we have one (best-effort — the
   // Linear pane that consumes them is P4); otherwise none. Then activate + navigate to the PR.
   async function openAsTask(e: Event, pr: Pull) {

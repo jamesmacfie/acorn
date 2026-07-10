@@ -1,9 +1,12 @@
 # Workflow runtime — what we borrowed from agentfield (and what we left)
 
+> The adopted runtime decisions are shipped. This study remains as rationale for rejected
+> control-plane machinery and the deferred typed-recovery outcome contract.
+
 **Status:** design rationale + adopted decisions · **Date:** 2026-07-08 · **Companions:**
 [agent-runtime.md](./agent-runtime.md) (the runtime corrections this doc extends),
 [contribution-points.md](./contribution-points.md) §4.8/§4.10/§4.11,
-[state-and-policies.md](./state-and-policies.md) §5.2, [implementation.md](./implementation.md)
+[state-and-policies.md](./state-and-policies.md) §5.2, the completed implementation plan
 Phase 8
 
 This doc records a design study: we read **agentfield** (agentfield.ai — an open-source
@@ -235,7 +238,7 @@ source-contributed trigger touches **zero** core files.
 
 ## 5. Where this lands in the build
 
-Per [implementation.md](./implementation.md): the near-term items thread into **Phase 8**
+Per the completed implementation plan: the near-term items thread into **Phase 8**
 (workflow & profile registries) / the ongoing tracks — the `decide`/branch step kind +
 templating (D), the per-run tool allowlist/risk ceiling (C), cancel-tree (B), and
 triggers via `ctx.poll` (E). Concurrency governance (A) stays a design-docs refinement in

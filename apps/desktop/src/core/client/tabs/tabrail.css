@@ -32,7 +32,7 @@
   pointer-events: none;
 }
 
-/* Live status markers (docs/workspaces 02): PR checks dot (top-right) + dirty/repair (bottom-right). */
+/* Live status markers (docs/workspaces-and-tasks.md): PR checks dot (top-right) + dirty/repair (bottom-right). */
 .tabrail-checks {
   position: absolute;
   top: 6px;
@@ -73,7 +73,7 @@
   border-left-color: var(--accent);
 }
 
-/* Sources zone (docs/workspaces P4): fixed browse entry points above the workspace roster. */
+/* Sources zone (docs/workspaces-and-tasks.md): fixed browse entry points above the workspace roster. */
 .tabrail-zone { flex: none; }
 .tabrail-source { font-size: var(--fs-md); }
 .tabrail-sep {

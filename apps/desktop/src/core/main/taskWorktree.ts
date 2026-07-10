@@ -1,10 +1,10 @@
-// Task → checkout/worktree resolution shared by every main-process IPC surface (sessions,
+// Task → checkout/worktree resolution shared by every privileged main-process surface (sessions,
 // local-git, run, workflow, knowledge). Split out of terminal.ts (docs/terminal-and-agents.md):
 // the taskId — never a renderer-supplied absolute path — is the capability; everything here
 // re-derives paths from the DB per call.
 import { existsSync, realpathSync, statSync } from 'node:fs'
 import { homedir } from 'node:os'
-import { dirname, resolve, sep } from 'node:path'
+import { dirname, isAbsolute, resolve, sep } from 'node:path'
 import { and, eq } from 'drizzle-orm'
 import type { AppDatabase } from '../server/db'
 import { schema } from '../server/db'
@@ -13,7 +13,7 @@ import { loadRepoConfig, type LayoutRecipe, type RunTarget } from '../../plugins
 import { getRepoPath } from './repoPaths'
 import { copyWorktreeFiles, ensureWorktree, worktreePorcelain } from './worktrees'
 
-// Set once by registerTerminalIpc — where workspace worktrees are created (docs/workspaces 05).
+// Set once by registerTerminalIpc — where workspace worktrees are created (docs/workspaces-and-tasks.md).
 let worktreesRoot = ''
 export const setWorktreesRoot = (dir: string): void => {
   worktreesRoot = dir
@@ -27,6 +27,11 @@ export const isDir = (p: string): boolean => {
     return false
   }
 }
+
+// The only renderer-supplied absolute path accepted by terminal creation is a base-checkout
+// candidate. Keep its narrow validation named and tested at the privileged boundary.
+export const rendererBaseCheckout = (cwd: string | undefined): string | undefined =>
+  cwd && isAbsolute(cwd) && isDir(cwd) ? cwd : undefined
 
 export type TaskRow = typeof schema.tasks.$inferSelect
 
@@ -42,7 +47,7 @@ export const baseRefPref = async (db: AppDatabase, owner: string, repo: string):
   return row?.value ?? null
 }
 
-// Live worktree status for every active task that has a worktree (docs/workspaces 02/05):
+// Live worktree status for every active task that has a worktree (docs/workspaces-and-tasks.md/05):
 // dirty + changed-file count via git, and `missing` when the dir vanished (removed outside acorn).
 export async function computeTaskStatuses(db: AppDatabase): Promise<TaskStatus[]> {
   const rows = (await db.select().from(schema.tasks).where(eq(schema.tasks.status, 'active'))).filter((w) => w.worktreePath)
@@ -56,7 +61,7 @@ export async function computeTaskStatuses(db: AppDatabase): Promise<TaskStatus[]
   )
 }
 
-// Startup reconciliation (docs/workspaces 05): flag any persisted worktree whose directory is gone
+// Startup reconciliation (docs/workspaces-and-tasks.md): flag any persisted worktree whose directory is gone
 // (manual rm) as needing repair. The rail/footer surface `missing` live; this just logs at boot.
 export async function reconcileWorktrees(db: AppDatabase): Promise<void> {
   try {
@@ -68,7 +73,7 @@ export async function reconcileWorktrees(db: AppDatabase): Promise<void> {
 }
 
 // Repo / branch / PR context for a session, derived through the taskId → tasks join
-// (docs/workspaces 03). The session row no longer denormalizes repo/pull; this is the single read.
+// (docs/workspaces-and-tasks.md). The session row no longer denormalizes repo/pull; this is the single read.
 export function taskContext(t: TaskRow | undefined): Pick<TerminalSession, 'repo' | 'pull'> {
   if (!t) return {}
   return {
@@ -77,7 +82,7 @@ export function taskContext(t: TaskRow | undefined): Pick<TerminalSession, 'repo
   }
 }
 
-// Lazy worktree on first terminal (Flow C, docs/workspaces 05). Reuse the task's worktree if
+// Lazy worktree on first terminal (Flow C, docs/workspaces-and-tasks.md). Reuse the task's worktree if
 // it's set and still on disk; otherwise create one from the base checkout, keyed by branch, and
 // persist worktreePath on the task. Returns the cwd + whether it's an isolated worktree. On
 // any failure (no checkout mapped, git error) it degrades to the base checkout so the terminal
@@ -129,7 +134,7 @@ export function resolveInRoot(root: string, relPath: string): string | null {
   }
 }
 
-// The setup script + when-to-run configured on the workspace that owns this repo (docs/workspaces
+// The setup script + when-to-run configured on the workspace that owns this repo (docs/workspaces-and-tasks.md
 // P5). trigger: 'off' never runs, 'created' pre-creates the worktree at task creation, 'terminal'
 // (the default; null coalesces to it) runs lazily on first terminal. The script itself runs once,
 // whenever the worktree is first created — see maybeRunSetup (terminal.ts).
@@ -147,7 +152,7 @@ export async function workspaceSetup(db: AppDatabase, owner: string, repo: strin
   return { script: ws?.setupScript ?? null, trigger: (ws?.trigger as SetupTrigger) || 'terminal' }
 }
 
-// Files-to-copy on a fresh worktree (docs/next 13 §A `copy`): read the config from the SOURCE
+// Files-to-copy on a fresh worktree (docs/workflows.md §2): read the config from the SOURCE
 // checkout (the entries are usually gitignored, so only it has them) and copy each into the new
 // worktree. Best-effort — warnings are logged, never thrown.
 export async function copyConfiguredFiles(db: AppDatabase, t: TaskRow, checkout: string, worktreePath: string): Promise<void> {
@@ -163,7 +168,7 @@ export async function copyConfiguredFiles(db: AppDatabase, t: TaskRow, checkout:
 }
 
 // Workspace-level config columns for a repo (preview + scripts) — the DB fallback layer that
-// loadRepoConfig merges below any committed .acorn/config.toml (docs/next 13 §B).
+// loadRepoConfig merges below any committed .acorn/config.toml (docs/workflows.md §2).
 export async function workspaceConfigRow(db: AppDatabase, owner: string, repo: string) {
   const [wr] = await db
     .select({ workspaceId: schema.workspaceRepos.workspaceId })
@@ -193,7 +198,7 @@ export async function repoFor(db: AppDatabase, taskId: string): Promise<string> 
 export async function taskRunConfig(
   db: AppDatabase,
   taskId: string,
-): Promise<{ targets: RunTarget[]; cwd: string; errors: { source: string; message: string }[]; layouts: LayoutRecipe[] } | { error: string }> {
+): Promise<{ targets: RunTarget[]; cwd: string; errors: { source: string; message: string }[]; layouts: LayoutRecipe[]; repoTargetIds: string[] } | { error: string }> {
   const t = await loadTask(db, taskId)
   if (!t) return { error: 'Task not found.' }
   const mapped = await getRepoPath(db, t.repoOwner, t.repoName)
@@ -208,5 +213,5 @@ export async function taskRunConfig(
     devRestartScript: ws?.devRestartScript,
     runTargetsJson: mapped?.runTargets,
   })
-  return { targets: cfg.runTargets, cwd, errors: cfg.errors, layouts: cfg.layouts }
+  return { targets: cfg.runTargets, cwd, errors: cfg.errors, layouts: cfg.layouts, repoTargetIds: cfg.repoTargetIds }
 }

@@ -23,7 +23,7 @@ export default function LinearIssuePanel(props: {
   onClose: () => void
   onContentClick: (e: MouseEvent) => void
   // When a task links several Linear tickets, the panel shows a chip strip to switch between
-  // them (docs/workspaces). Omitted by the single-ticket PR-detail caller.
+  // them (docs/workspaces-and-tasks.md). Omitted by the single-ticket PR-detail caller.
   targets?: LinearIssueTarget[]
   onSelectTarget?: (target: LinearIssueTarget) => void
   variant?: 'overlay' | 'pane'

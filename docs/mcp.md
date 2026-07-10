@@ -77,9 +77,9 @@ rather than throwing keeps those sessions clean.
 ## 3. Tool catalog
 
 The catalog, contribution shape, risk tiers and permissions all live in
-**[agent-tools.md](./agent-tools.md)** — the registry (`apps/desktop/src/server/agentTools`) is the
+**[agent-tools.md](./agent-tools.md)** — the registry (`apps/desktop/src/core/server/agentTools`) is the
 single source of truth, and the MCP `tools/list` is derived from it. This doc no longer duplicates
-the per-tool table; a stale copy here would be exactly the hand-synced ladder Phase 4 removed.
+the per-tool table; duplicating it here would create a hand-synced ladder.
 
 ## 4. Registration & inspection — Settings → MCP
 
@@ -98,15 +98,10 @@ value whose key looks like a credential (`*_TOKEN`/`*_KEY`/`*_SECRET`/…) or wh
 known prefix (`sk-`, `ghp_`, `xox…`), keeping keys intact so the user sees *what* is configured
 without leaking the value (`apps/desktop/src/core/shared/mcp.ts:16-29`).
 
-**Register / unregister buttons** register or remove acorn's own server with `claude` or `codex`
-through the agent's CLI on explicit user action. Registration is **reuse-first** and remove-then-add
-(idempotent); it never writes into config files directly (`apps/desktop/src/core/main/mcpRegister.ts:55-71`).
-In normal use the server is auto-registered whenever a Claude Code / Codex terminal launches
-(`spawnOne` in `apps/desktop/src/plugins/terminal/main/terminal.ts`); these buttons re-register or remove it manually.
-
-Everything crosses the `window.acorn.mcp` bridge (`apps/desktop/src/core/main/preload.ts:106-112`):
-`inspect(taskId)`, `createStarter(taskId)` (seeds a starter `.mcp.json`), `register(flavour)`,
-`unregister(flavour)`.
+The inspector and **Create `.mcp.json`** action use task-scoped loopback HTTP routes. In normal use
+acorn's own server is auto-registered whenever a Claude Code / Codex terminal launches, via the
+agent's CLI and the idempotent launcher in `apps/desktop/src/core/main/mcpRegister.ts`. To opt out,
+remove the registration with the corresponding agent CLI.
 
 ## 5. Maturity & operational notes
 
@@ -131,7 +126,7 @@ Everything crosses the `window.acorn.mcp` bridge (`apps/desktop/src/core/main/pr
 
 - MCP proxy server: `apps/desktop/src/core/mcp/server.ts` (entry: `src/core/mcp/main.ts`, loopback
   client: `src/core/mcp/api.ts`)
-- Tool registry + projection: `apps/desktop/src/server/agentTools/`,
+- Tool registry + projection: `apps/desktop/src/core/server/agentTools/`,
   `apps/desktop/src/core/server/routes/agentTools.ts` (contributions wired by
   `apps/desktop/src/app/main/agentToolsWiring.ts`) — see [agent-tools.md](./agent-tools.md)
 - Run renderer routes + context: `apps/desktop/src/core/server/routes/harness.ts`,
@@ -140,10 +135,8 @@ Everything crosses the `window.acorn.mcp` bridge (`apps/desktop/src/core/main/pr
 - Config parser + secret masking: `apps/desktop/src/core/shared/mcp.ts`
 - Registration launcher: `apps/desktop/src/core/main/mcpRegister.ts`
 - Direct-git tools: `apps/desktop/src/plugins/changes/main/localDiff.ts`
-- Settings UI + bridge: `apps/desktop/src/core/client/settings/McpSettings.tsx`,
-  `apps/desktop/src/core/main/preload.ts`
+- Settings UI + HTTP client: `apps/desktop/src/core/client/settings/{McpSettings.tsx,mcpClient.ts}`
 
 See also: [terminal-and-agents.md](./terminal-and-agents.md) ·
 [notes-and-memory.md](./notes-and-memory.md) · [api-reference.md](./api-reference.md) ·
 [workflows.md](./workflows.md) · [workspaces-and-tasks.md](./workspaces-and-tasks.md)
-

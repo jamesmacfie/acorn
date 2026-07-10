@@ -1,7 +1,7 @@
 // Local-changes review backing (docs/panes.md): working-tree status / per-file patch / blob read
 // + stage/commit/discard/push over the task's worktree. Was the `local:*` IPC channels (preload
 // group `terminal.local`); now the LocalGitBridge behind the HTTP routes in server/routes/localGit.ts
-// (Phase 3). The taskId is the capability; relative paths are validated inside localDiff.ts. Pure-
+//. The taskId is the capability; relative paths are validated inside localDiff.ts. Pure-
 // Node, so it works in dev:node too; wired in main/serverBridges.ts.
 import type { LocalGitBridge } from '../server/routes/localGit'
 import type { AppDatabase } from '../../../core/server/db'

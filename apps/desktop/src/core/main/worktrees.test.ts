@@ -75,7 +75,7 @@ describe('worktree base-ref precedence (docs/terminal-and-agents.md)', () => {
     if (res.ok) expect(git(res.path, 'rev-parse', 'HEAD').trim()).toBe(mainSha)
   })
 
-  describe('copyWorktreeFiles (docs/next 13 §A copy)', () => {
+  describe('copyWorktreeFiles (docs/workflows.md §2 copy)', () => {
     it('copies a gitignored file into the worktree, creating parents', async () => {
       writeFileSync(join(checkout, '.env.local'), 'SECRET=1')
       mkdirSync(join(checkout, 'config'), { recursive: true })

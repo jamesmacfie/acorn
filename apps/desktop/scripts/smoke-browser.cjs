@@ -1,5 +1,5 @@
-// Drivable-browser smoke (docs/next 08 validation): run under Electron —
-//   npx electron scripts/smoke-browser.cjs
+// Drivable-browser smoke (docs/testing.md): run under Electron —
+//   pnpm exec electron scripts/smoke-browser.cjs
 // Loads a data: page with a button + input, then drives it through the REAL CDP path
 // (webContents.debugger): snapshot → fill → click → console assert. Exit code = pass/fail.
 // Uses no native modules, so it needs no ABI rebuild. The BrowserDriver logic itself lives in

@@ -49,6 +49,7 @@ export type RunnerDeps = {
   startRunTarget?(taskId: string, targetId: string): Promise<{ ok: boolean; url?: string }>
   createChildTask?(parentTaskId: string, seed: FanOutTaskSeed): Promise<string>
   cancelChildTask?(taskId: string): Promise<void>
+  authorizeRepoConfig?(taskId: string): Promise<void>
 }
 
 const TERMINAL_RUN = new Set(['done', 'failed', 'safety-rail', 'cancelled'])
@@ -87,6 +88,7 @@ export class WorkflowRunner {
       policies: new Set(this.contributions.policies.ids()),
       profiles: new Set(agentProfileRegistry.list().map((profile) => profile.id)),
       structuredProfiles: new Set(agentProfileRegistry.list().filter((profile) => profile.aiArgv).map((profile) => profile.id)),
+      validateStepKind: (kind, step, context) => this.contributions.stepKinds.get(kind)?.validate?.(step, context) ?? [],
     }
   }
 
@@ -115,6 +117,7 @@ export class WorkflowRunner {
   }
 
   async start(taskId: string, def: WorkflowDef, opts?: { trigger?: string }): Promise<string> {
+    if ((def as WorkflowDef & { source?: string }).source === 'repo') await this.deps.authorizeRepoConfig?.(taskId)
     this.validate(def)
     const runId = randomUUID()
     const at = now()
@@ -253,7 +256,7 @@ export class WorkflowRunner {
     workflow: WorkflowDef,
     rows: WorkflowStepRow[],
   ): Promise<'continue' | 'stop'> {
-    const handler = this.contributions.stepKinds.get(def.kind ?? 'agent')
+    const handler = this.contributions.stepKinds.get(def.kind ?? 'agent')?.handler
     if (!handler) {
       await this.finishRun(run, 'failed', `Step '${def.name}' has unknown kind '${def.kind}'.`)
       return 'stop'

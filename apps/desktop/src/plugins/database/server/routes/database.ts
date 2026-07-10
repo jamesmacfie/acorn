@@ -6,7 +6,7 @@ import type { AppEnv } from '../../../../core/server/middleware/auth'
 import { respondError } from '../../../../core/server/respond'
 
 // Database pane (docs/pg.md): per-task Postgres browse + edit. Was the `db:*` IPC channels
-// (inventories §1a); now task-scoped HTTP behind the DatabaseBridge (main/database.ts). The
+//; now task-scoped HTTP behind the DatabaseBridge (main/database.ts). The
 // connection URL is resolved server-side per connect and never persisted; identifiers in generated
 // SQL are validated against the live schema; every value is parameterized. Needs a reachable pg —
 // 503 when the bridge isn't wired (dev:node with no DB).
@@ -26,7 +26,7 @@ export type DatabaseBridge = {
 export const databaseBridgeSlot = bridgeSlot<DatabaseBridge>()
 export const setDatabaseBridge = databaseBridgeSlot.set
 
-// Everything that reaches SQL is validated (Phase 3 §1). DbCell is string | null on the wire.
+// Everything that reaches SQL is validated (the privileged-boundary contract). DbCell is string | null on the wire.
 const cell = z.union([z.string(), z.null()])
 const queryBody = z.object({ sql: z.string().min(1) })
 const updateBody = z.object({ schema: z.string(), name: z.string(), column: z.string(), value: cell, pk: z.record(z.string(), cell) })

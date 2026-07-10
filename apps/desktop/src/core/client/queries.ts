@@ -118,6 +118,7 @@ export const pullsOptions = (owner: string, repo: string, state: 'open' | 'close
   queryKey: pullsKey(owner, repo, state),
   enabled,
   refetchInterval: 60_000,
+  refetchIntervalInBackground: false,
   queryFn: async ({ signal }: QueryContext): Promise<Pull[]> => readJson<Pull[]>(pullsRoute(owner, repo, state), { signal }),
 })
 
@@ -150,7 +151,7 @@ export const pinsOptions = (enabled: boolean) => ({
   queryFn: async ({ signal }: QueryContext): Promise<number[]> => readJson<number[]>(pinsRoute, { signal }),
 })
 
-// Active tasks for the rail (docs/workspaces). Source of truth is us; refetch on focus
+// Active tasks for the rail (docs/workspaces-and-tasks.md). Source of truth is us; refetch on focus
 // keeps the dirty/PR-inherited markers fresh as the mirror syncs.
 export const tasksOptions = (enabled: boolean) => ({
   queryKey: tasksKey,
@@ -165,7 +166,7 @@ export const workspacesOptions = (enabled: boolean) => ({
   queryFn: async ({ signal }: QueryContext): Promise<Workspace[]> => readJson<Workspace[]>(workspacesRoute, { signal }),
 })
 
-// Per-repo workspace assignment + hidden flag, for the onboarding modal (docs/workspaces).
+// Per-repo workspace assignment + hidden flag, for the onboarding modal (docs/workspaces-and-tasks.md).
 export { workspaceAssignmentsKey } from '../shared/api'
 export type { RepoAssignment } from '../shared/api'
 export const assignmentsOptions = (enabled: boolean) => ({
@@ -174,7 +175,7 @@ export const assignmentsOptions = (enabled: boolean) => ({
   queryFn: async ({ signal }: QueryContext): Promise<RepoAssignment[]> => readJson<RepoAssignment[]>(workspaceAssignmentsRoute, { signal }),
 })
 
-// External projects linked to a workspace (docs/workspaces 04): (integrationId, externalId) pairs
+// External projects linked to a workspace (docs/workspaces-and-tasks.md): (integrationId, externalId) pairs
 // spanning any number of integrations. One project → many repos via the workspace grouping.
 export const workspaceProjectsKey = (id: string) => ['workspace-projects', id] as const
 export const workspaceProjectsOptions = (workspaceId: string | null, enabled: boolean) => ({
