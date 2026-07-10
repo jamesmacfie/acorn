@@ -6,6 +6,8 @@ import { tasksKey, tasksOptions, workspacesOptions } from '../../queries'
 import { workspaceForRepo } from '../workspaces/activeWorkspace'
 import { refreshSessions, requestTerminalFocus } from '../terminal/sessions'
 import { terminalApi } from '../terminal/terminalClient'
+import { runApi } from '../tasks/runClient'
+import { workflowApi } from '../agents/workflowClient'
 import { activeLayout, activeTaskId, dispatchActiveLayout, dispatchLayout, isTerminalOpen, setRecipeBrowserUrl, setTerminalOpen } from '../tasks/tasks'
 import { activateTaskSignals, pathForTask } from '../tasks/activate'
 import { evictPreviewWebview } from '../preview/PreviewPane'
@@ -48,12 +50,12 @@ export default function CommandPalette() {
 
   const [runData, { refetch }] = createResource(
     () => (palette.open() ? activeTaskId() : null),
-    async (id) => (id && api ? await api.run.targets(id) : null),
+    async (id) => (id && api ? await runApi.targets(id) : null),
   )
   // Committed workflows for the task (docs/next 14 P5); their parse/cycle errors join the rows.
   const [wfData, { refetch: refetchWf }] = createResource(
     () => (palette.open() ? activeTaskId() : null),
-    async (id) => (id && api ? await api.workflow.defs(id) : null),
+    async (id) => (id && api ? await workflowApi.defs(id) : null),
   )
   const runInfo = createMemo<RunSources>(() => {
     const data = runData()
@@ -138,9 +140,9 @@ export default function CommandPalette() {
     if (!taskId || !api) return
     if (item.kind === 'run') {
       const targetId = item.id.slice('run:'.length)
-      if (item.running) await api.run.stop(taskId, targetId)
+      if (item.running) await runApi.stop(taskId, targetId)
       else {
-        await api.run.start(taskId, targetId)
+        await runApi.start(taskId, targetId)
         setTerminalOpen(taskId, true)
       }
       await refreshSessions()
@@ -149,7 +151,7 @@ export default function CommandPalette() {
     if (item.kind === 'workflow') {
       const wf = wfData()?.workflows.find((w) => `workflow:${w.id}` === item.id)
       if (!wf) return
-      const res = await api.workflow.start(taskId, wf)
+      const res = await workflowApi.start(taskId, wf)
       if (res.error) window.alert(res.error)
       return
     }
@@ -160,8 +162,8 @@ export default function CommandPalette() {
       if (!recipe) return
       const res = await invokeLayoutRecipe(taskId, recipe, {
         setLayout: (tid, layout) => dispatchLayout(tid, { type: 'replace', layout }),
-        startTarget: (tid, targetId) => api.run.start(tid, targetId),
-        targetUrl: async (tid, targetId) => (await api.run.status(tid, targetId)).url,
+        startTarget: (tid, targetId) => runApi.start(tid, targetId),
+        targetUrl: async (tid, targetId) => (await runApi.status(tid, targetId)).url,
         setBrowserUrl: setRecipeBrowserUrl,
         openTerminal: (tid) => setTerminalOpen(tid, true),
       })

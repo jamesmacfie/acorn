@@ -20,8 +20,15 @@ import { pullsBatch } from './routes/pullsBatch'
 import { mentions } from './routes/mentions'
 import { repos } from './routes/repos'
 import { repoLabels } from './routes/repoLabels'
+import { database } from './routes/database'
+import { editor } from './routes/editor'
+import { knowledge } from './routes/knowledge'
+import { localGit } from './routes/localGit'
 import { reviewNotes } from './routes/reviewNotes'
 import { rollbar } from './routes/rollbar'
+import { search } from './routes/search'
+import { terminal } from './routes/terminal'
+import { workflow } from './routes/workflow'
 import { harness } from './routes/harness'
 import { taskContext } from './routes/taskContext'
 import { workspaces } from './routes/workspaces'
@@ -47,7 +54,14 @@ export function createApp() {
     .route('/api/tasks', tasks)
     .route('/api/tasks', reviewNotes) // /:id/review-notes — local inline notes (docs/panes.md)
     .route('/api/tasks', taskContext) // /:id/context — the assembled task context (docs/next 11 §C)
+    .route('/api/tasks', search) // /:id/search — find-in-files over the worktree (docs/panes.md)
+    .route('/api/tasks', editor) // /:id/editor/* — read/write/list worktree files (docs/workspaces)
+    .route('/api/tasks', localGit) // /:id/local/* — working-tree review + stage/commit (docs/panes.md)
+    .route('/api/tasks', database) // /:id/database/* — per-task Postgres browse/edit (docs/pg.md)
     .route('/api/tasks', harness) // /:id/notes|memory|run — the MCP feature-tool surface (docs/mcp.md)
+    .route('/api', workflow) // /tasks/:id/workflows + /workflows/runs/:runId/* — workflow control (docs/next 14)
+    .route('/api', knowledge) // /memory* + /workspaces/:wsId/notes* — the notes/memory pane surface (docs/notes-and-memory.md)
+    .route('/api', terminal) // /terminal/* + /tasks/:id/{archive,preview-url,mcp,…} — terminal control (docs/terminal-and-agents.md)
     .route('/api/integrations', integrations) // connect/disconnect/status for third-party providers
     .route('/api/linear', linear) // Linear issues referenced from a PR (read, cached per-user)
     .route('/api/rollbar', rollbar) // Rollbar items browse + detail, cached into `issues` (docs/integrations.md)

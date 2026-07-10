@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { parseRgJson } from './searchIpc'
+import { parseRgJson } from './search'
 
 // A `rg --json` line for a match. Mirrors the real event shape (see searchIpc.ts RgEvent).
 const begin = (path: string) => JSON.stringify({ type: 'begin', data: { path: { text: path } } })

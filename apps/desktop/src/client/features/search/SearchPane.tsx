@@ -3,7 +3,7 @@ import type { Task } from '../../queries'
 import { debounce } from '../../autosave'
 import { dispatchLayout } from '../tasks/tasks'
 import { editorOpen, requestEditorReveal } from '../editor/editorState'
-import { searchApi, type SearchHit } from './searchClient'
+import { findInFiles, type SearchHit } from './searchClient'
 import './search.css'
 
 // Find-in-files pane (docs/panes.md): project-wide text search over the task's worktree via
@@ -11,7 +11,6 @@ import './search.css'
 // Clicking a hit opens the file in the Editor pane (beside this one) scrolled to the match line —
 // editorOpen swaps the tab, requestEditorReveal tells EditorPane which line to reveal.
 export default function SearchPane(props: { task: Task }) {
-  const api = searchApi()
   const [query, setQuery] = createSignal('')
   const [debounced, setDebounced] = createSignal('')
   const [caseSensitive, setCaseSensitive] = createSignal(false)
@@ -29,10 +28,10 @@ export default function SearchPane(props: { task: Task }) {
   const [results] = createResource(
     () => {
       const q = debounced().trim()
-      if (!q || !api) return null
+      if (!q) return null
       return { taskId: props.task.id, q, opts: { caseSensitive: caseSensitive(), wholeWord: wholeWord(), regex: regex() } }
     },
-    async (src) => (await api?.findInFiles(src.taskId, src.q, src.opts)) ?? { files: [], truncated: false },
+    (src) => findInFiles(src.taskId, src.q, src.opts),
   )
 
   const totalHits = createMemo(() => (results()?.files ?? []).reduce((n, f) => n + f.hits.length, 0))

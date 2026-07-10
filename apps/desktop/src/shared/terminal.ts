@@ -117,7 +117,8 @@ export type LocalChange = {
   deletions: number | null
 }
 
-// Pushed from main to a subscribed renderer over `term:out:<id>` (see preload `attach`).
+// Pushed from main to a subscribed renderer inside a `term:out` WebSocket frame (shared/ws.ts;
+// wsHub → wsClient). Was per-session IPC (`term:out:<id>`) before Phase 3 slice 6.
 export type ServerMsg =
   | { type: 'ready'; session: TerminalSession; replayed: boolean }
   | { type: 'output'; data: string }

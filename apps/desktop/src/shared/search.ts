@@ -1,7 +1,6 @@
-// Shared types for the find-in-files feature (docs/panes.md): the Search pane calls
-// `window.acorn.search.findInFiles` → the `search:findInFiles` IPC handler (searchIpc.ts), which
-// runs ripgrep against the task's worktree. Types live here so main + renderer stay in lockstep,
-// like shared/terminal.ts.
+// Shared types for the find-in-files feature (docs/panes.md): the Search pane POSTs to the
+// searchRoute (server/routes/search.ts), whose SearchBridge (main/search.ts) runs ripgrep against
+// the task's worktree. Types live here so main + renderer stay in lockstep, like shared/terminal.ts.
 
 export type SearchOpts = {
   caseSensitive?: boolean

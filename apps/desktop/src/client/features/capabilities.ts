@@ -1,12 +1,13 @@
-// What the hosting environment provides (docs/features.md). The desktop (Electron) build injects
-// the `window.acorn` preload bridge; a plain browser session (`pnpm --filter @acorn/desktop
-// dev:node`) has none, so every terminal-backed surface degrades to its bridge-absent fallback.
-// This is THE capability check — the old `acorn:term` localStorage flag is gone: the terminal
-// underpins shipped features and is always on when the bridge exists. Consumers that *invoke* the
-// bridge still use the typed accessors (terminalApi() etc.); this answers "is it available?".
+// What the hosting environment provides (docs/features.md, docs/electron.md §capability-map). After
+// Phase 3 the preload is a thin residue (native folder picker + browser:bind + the ⌘W ping); the
+// data surface is loopback HTTP + one WebSocket, so most panes work in a plain browser (`dev:node`)
+// too. `desktop` still marks the Electron build; `terminal` marks that the main-process engine is
+// present — the surfaces that genuinely need it (terminal drawer, agents, run targets, workflows,
+// the PTY streams) key off it and degrade with a visible reason where it's absent. Consumers that
+// *invoke* the bridge use the typed accessors (terminalApi() etc.); this answers "is it available?".
 export type Capabilities = {
   desktop: boolean // preload bridge present (Electron renderer)
-  terminal: boolean // terminal/worktree service available (drawer, agents, run targets, workflows)
+  terminal: boolean // main-process terminal/worktree engine available (drawer, agents, run targets, workflows, PTY streams)
 }
 
 export const capabilities = (): Capabilities => ({

@@ -13,12 +13,10 @@ import type { ServerType } from '@hono/node-server'
 import { join } from 'node:path'
 import { makeRuntime, startListener } from './server'
 import { registerKnowledgeIpc } from './knowledgeIpc'
-import { createRuntimeService, registerRunIpc } from './runIpc'
+import { createRuntimeService } from './runIpc'
 import { wireHarnessBridges } from './harnessWiring'
 import { registerWorkflowIpc } from './workflowWiring'
-import { registerLocalGitIpc } from './localGitIpc'
-import { registerSearchIpc } from './searchIpc'
-import { registerDatabaseIpc, endDbPools } from './database'
+import { endDbPools } from './database'
 import { disposeTerminal, reconcileTmux, registerTerminalIpc, sendToAgent, terminalRunGlue } from './terminal'
 import { seedTaskNotes } from './seedTaskNotes'
 import { reconcileWorktrees, setWorktreesRoot } from './taskWorktree'
@@ -98,14 +96,12 @@ export async function bootstrap({ dataDir, origin, createWindow }: BootstrapOpti
   const knowledge = registerKnowledgeIpc(db, dataDir, { sendToAgent })
 
   const runtimeSvc = createRuntimeService(db, terminalRunGlue(db))
-  registerRunIpc(runtimeSvc)
+  // run targets are the harness RunBridge (wired below) — HTTP now, no separate run:* IPC (Phase 3).
 
   wireHarnessBridges({ db, notesStore: knowledge.notesStore, proposals: knowledge.proposals, runtime: runtimeSvc, reconciled: knowledge.reconciled })
 
   const workflowRunner = await registerWorkflowIpc(db, { runtime: runtimeSvc, notesStore: knowledge.notesStore, internalApiEnv, reconciled })
-  registerLocalGitIpc(db)
-  registerSearchIpc(db) // Find-in-files (docs/panes.md): ripgrep over the task's worktree.
-  registerDatabaseIpc(db) // Database pane (docs/pg.md): per-task Postgres browse/edit over IPC.
+  // search, editor, local-git, and database are HTTP routes wired via wireServerBridges().
 
   registerTerminalIpc(db, worktreesDir, {
     internalApiEnv,

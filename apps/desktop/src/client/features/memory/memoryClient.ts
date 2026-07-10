@@ -1,5 +1,8 @@
-// Typed accessor for the preload's `window.acorn.memory` bridge (docs/next 12). The Window global
-// is declared once in terminalClient.ts.
+// The renderer's memory surface (docs/next 12). Was the `window.acorn.memory` preload bridge; now
+// loopback HTTP (Phase 3). Backed by the main-process memory index, so it 503s in dev:node.
+import { memoryAddRoute, memoryListRoute, memoryProposalsRoute, memoryResolveProposalRoute, memorySearchRoute } from '../../../shared/api'
+import { readJson, writeJson } from '../../apiClient'
+
 export type MemoryType = 'convention' | 'architecture' | 'decision' | 'fix' | 'reference' | 'feedback' | 'task' | 'user'
 
 export type MemoryRow = {
@@ -42,4 +45,15 @@ export type MemoryApi = {
   resolveProposal(id: string, approved: boolean, edited?: { name: string; type: MemoryType; description: string; body: string }): Promise<{ ok: boolean; reason?: string }>
 }
 
-export const memoryApi = (): MemoryApi | null => window.acorn?.memory ?? null
+const post = <T>(url: string, body?: unknown) =>
+  writeJson<T>(url, { method: 'POST', headers: body === undefined ? undefined : { 'content-type': 'application/json' }, body: body === undefined ? undefined : JSON.stringify(body) })
+
+const api: MemoryApi = {
+  list: (repo) => readJson<MemoryRow[] | { error: string }>(memoryListRoute(repo)),
+  search: (query, repo, type) => readJson<(MemoryRow & { rank: number })[] | { error: string }>(memorySearchRoute(query, repo, type)),
+  add: (p) => post<{ path: string } | { error: string }>(memoryAddRoute(p.taskId), { scope: p.scope, name: p.name, description: p.description, type: p.type, body: p.body }),
+  proposals: (taskId) => readJson<MemoryProposalRow[]>(memoryProposalsRoute(taskId)),
+  resolveProposal: (id, approved, edited) => post<{ ok: boolean; reason?: string }>(memoryResolveProposalRoute(id), { approved, edited }),
+}
+
+export const memoryApi = (): MemoryApi => api

@@ -1,11 +1,16 @@
-// Typed accessor for the preload's `window.acorn.search` bridge — project-wide find-in-files over
-// the active task's worktree via ripgrep. Mirrors editorClient.ts.
+// Find-in-files over the active task's worktree via ripgrep. Was the `window.acorn.search` preload
+// bridge; now a loopback HTTP route (Phase 3), so it works in a plain browser (dev:node) too — no
+// desktop bridge required.
+import { searchRoute } from '../../../shared/api'
+import { writeJson } from '../../apiClient'
 import type { SearchOpts, SearchResult } from '../../../shared/search'
 
 export type { FileHits, SearchHit, SearchOpts, SearchResult } from '../../../shared/search'
 
-export type SearchApi = {
-  findInFiles(taskId: string, query: string, opts: SearchOpts): Promise<SearchResult>
+export function findInFiles(taskId: string, query: string, opts: SearchOpts): Promise<SearchResult> {
+  return writeJson<SearchResult>(searchRoute(taskId), {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ query, opts }),
+  })
 }
-
-export const searchApi = (): SearchApi | null => window.acorn?.search ?? null

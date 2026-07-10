@@ -210,6 +210,85 @@ export type TaskContext = {
 export const taskContextRoute = (id: string, include?: TaskContextInclude[]) =>
   `/api/tasks/${id}/context${include?.length ? `?include=${include.join(',')}` : ''}`
 
+// Find-in-files (docs/panes.md): POST because it spawns ripgrep and the query is arbitrary body,
+// not a path segment. Was the `search:findInFiles` IPC channel (Phase 3).
+export const searchRoute = (taskId: string) => `/api/tasks/${taskId}/search`
+
+// Editor pane (docs/workspaces): read/write/list worktree files. Was the `editor:*` IPC channels.
+// relPath rides a query param so a nested path never collides with the route segments.
+export type EditorEntry = { name: string; dir: boolean }
+export type EditorWriteResult = { ok: boolean; reason?: string }
+export const editorRootRoute = (taskId: string) => `/api/tasks/${taskId}/editor/root`
+export const editorFilesRoute = (taskId: string) => `/api/tasks/${taskId}/editor/files`
+export const editorListRoute = (taskId: string, relPath: string) => `/api/tasks/${taskId}/editor/list?path=${encodeURIComponent(relPath)}`
+export const editorReadRoute = (taskId: string, relPath: string) => `/api/tasks/${taskId}/editor/read?path=${encodeURIComponent(relPath)}`
+export const editorWriteRoute = (taskId: string) => `/api/tasks/${taskId}/editor/file`
+
+// Run targets (docs/next 13 §A): the renderer shares the RunBridge routes the MCP run tools use
+// (server/routes/harness.ts). Was the `run:*` IPC channels (Phase 3).
+export const runTargetsRoute = (taskId: string) => `/api/tasks/${taskId}/run`
+export const runDefaultUrlRoute = (taskId: string) => `/api/tasks/${taskId}/run/default-url`
+export const runStartRoute = (taskId: string, targetId: string) => `/api/tasks/${taskId}/run/${encodeURIComponent(targetId)}/start`
+export const runStopRoute = (taskId: string, targetId: string) => `/api/tasks/${taskId}/run/${encodeURIComponent(targetId)}/stop`
+export const runStatusRoute = (taskId: string, targetId: string) => `/api/tasks/${taskId}/run/${encodeURIComponent(targetId)}/status`
+
+// Workflow control (docs/next 14): task-scoped defs/start/runs, run-scoped steps/gate. Was the
+// `workflow:{defs,start,runs,steps,gate}` IPC channels (Phase 3). The notice push stays IPC until WS.
+export const workflowDefsRoute = (taskId: string) => `/api/tasks/${taskId}/workflows`
+export const workflowStartRoute = (taskId: string) => `/api/tasks/${taskId}/workflows`
+export const workflowRunsRoute = (taskId: string) => `/api/tasks/${taskId}/workflows/runs`
+export const workflowStepsRoute = (runId: string) => `/api/workflows/runs/${runId}/steps`
+export const workflowGateRoute = (runId: string) => `/api/workflows/runs/${runId}/gate`
+
+// Local-changes review (docs/panes.md): working-tree status/diff/blob + stage/commit/discard/push.
+// Was the `local:*` IPC channels (Phase 3).
+export const localChangesRoute = (taskId: string) => `/api/tasks/${taskId}/local/changes`
+export const localDiffRoute = (taskId: string, path: string, scope: 'unstaged' | 'staged') =>
+  `/api/tasks/${taskId}/local/diff?path=${encodeURIComponent(path)}&scope=${scope}`
+export const localBlobRoute = (taskId: string, path: string, ref?: string) =>
+  `/api/tasks/${taskId}/local/blob?path=${encodeURIComponent(path)}${ref ? `&ref=${encodeURIComponent(ref)}` : ''}`
+export const localActionRoute = (taskId: string, action: 'stage' | 'unstage' | 'discard' | 'commit' | 'stage-all' | 'unstage-all' | 'discard-all' | 'push') =>
+  `/api/tasks/${taskId}/local/${action}`
+
+// Database pane (docs/pg.md): per-task Postgres browse/edit. Was the `db:*` IPC channels (Phase 3).
+export const databaseTablesRoute = (taskId: string) => `/api/tasks/${taskId}/database/tables`
+export const databaseColumnsRoute = (taskId: string, schema: string, name: string) =>
+  `/api/tasks/${taskId}/database/columns?schema=${encodeURIComponent(schema)}&name=${encodeURIComponent(name)}`
+export const databaseRowsRoute = (taskId: string, schema: string, name: string, offset?: number) =>
+  `/api/tasks/${taskId}/database/rows?schema=${encodeURIComponent(schema)}&name=${encodeURIComponent(name)}${offset ? `&offset=${offset}` : ''}`
+export const databaseActionRoute = (taskId: string, action: 'connect' | 'disconnect' | 'query' | 'update' | 'insert' | 'delete') =>
+  `/api/tasks/${taskId}/database/${action}`
+
+// Notes + memory pane (docs/notes-and-memory.md, docs/next 12). Was the `memory:*` / `notes:*` IPC (Phase 3).
+export const memoryListRoute = (repo?: string) => `/api/memory${repo ? `?repo=${encodeURIComponent(repo)}` : ''}`
+export const memorySearchRoute = (query: string, repo?: string, type?: string) =>
+  `/api/memory/search?q=${encodeURIComponent(query)}${repo ? `&repo=${encodeURIComponent(repo)}` : ''}${type ? `&type=${encodeURIComponent(type)}` : ''}`
+export const memoryAddRoute = (taskId: string) => `/api/tasks/${taskId}/memory`
+export const memoryProposalsRoute = (taskId?: string) => `/api/memory/proposals${taskId ? `?task=${encodeURIComponent(taskId)}` : ''}`
+export const memoryResolveProposalRoute = (id: string) => `/api/memory/proposals/${encodeURIComponent(id)}/resolve`
+export const notesListRoute = (workspaceId: string) => `/api/workspaces/${encodeURIComponent(workspaceId)}/notes`
+export const noteRoute = (workspaceId: string, slug: string) => `/api/workspaces/${encodeURIComponent(workspaceId)}/notes/${encodeURIComponent(slug)}`
+export const noteIncludedRoute = (workspaceId: string, slug: string) => `${noteRoute(workspaceId, slug)}/included`
+
+// Terminal control (docs/terminal-and-agents.md): the req/resp half of the engine. Was the `term:*` / `mcp:*`
+// IPC channels (Phase 3). The stream half (input/attach/out/status) is the WebSocket (slice 6);
+// `browser:bind` + `term:repoPath:pick` stay IPC (Electron residue).
+export const terminalSessionsRoute = '/api/terminal/sessions'
+export const terminalProfilesRoute = '/api/terminal/profiles'
+export const terminalTaskStatusesRoute = '/api/terminal/task-statuses'
+export const terminalSessionActionRoute = (sid: string, action: 'kill' | 'interrupt' | 'remove' | 'resize' | 'send') =>
+  `/api/terminal/sessions/${encodeURIComponent(sid)}/${action}`
+export const terminalRepoPathRoute = (owner: string, repo: string) =>
+  `/api/terminal/repo-path?owner=${encodeURIComponent(owner)}&repo=${encodeURIComponent(repo)}`
+export const terminalRepoPathSetRoute = '/api/terminal/repo-path'
+export const terminalRepoPathRunTargetsRoute = '/api/terminal/repo-path/run-targets'
+export const taskArchiveRoute = (id: string) => `/api/tasks/${id}/archive`
+export const taskPreviewUrlRoute = (id: string) => `/api/tasks/${id}/preview-url`
+export const taskOnCreatedRoute = (id: string) => `/api/tasks/${id}/on-created`
+export const taskUseCheckoutRoute = (id: string) => `/api/tasks/${id}/use-checkout`
+export const taskMcpRoute = (id: string) => `/api/tasks/${id}/mcp`
+export const taskMcpStarterRoute = (id: string) => `/api/tasks/${id}/mcp/starter`
+
 // Local review notes (docs/panes.md): inline annotations on uncommitted changes, acorn-owned.
 export type ReviewNote = {
   id: string

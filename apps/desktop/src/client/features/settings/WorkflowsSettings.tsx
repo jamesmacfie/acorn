@@ -1,6 +1,7 @@
 import { createResource, For, Show } from 'solid-js'
 import { activeTaskId } from '../tasks/tasks'
 import { terminalApi } from '../terminal/terminalClient'
+import { workflowApi } from '../agents/workflowClient'
 
 // Settings → Workflows (docs/next 14): a read-only inspector over the committed/user workflow
 // definitions the active task's worktree would load (`.acorn/workflows/*.toml` + ~/.acorn), plus
@@ -16,7 +17,7 @@ export default function WorkflowsSettings() {
       const api = terminalApi()
       const id = taskId()
       if (!api || !id) return { workflows: [], errors: [] }
-      return api.workflow.defs(id)
+      return workflowApi.defs(id)
     },
     { initialValue: { workflows: [], errors: [] } },
   )

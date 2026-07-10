@@ -1,4 +1,4 @@
-import { dialog, ipcMain, webContents, type IpcMainInvokeEvent, type WebContents } from 'electron'
+import { dialog, ipcMain, webContents, type IpcMainInvokeEvent } from 'electron'
 import { bindBrowserContents } from './browserService'
 import { spawn, type IPty } from 'node-pty'
 import { execFile, execFileSync } from 'node:child_process'
@@ -11,6 +11,8 @@ import { homedir } from 'node:os'
 import { eq } from 'drizzle-orm'
 import type { AppDatabase } from '../server/db'
 import { schema } from '../server/db'
+import { setTerminalBridge } from '../server/routes/terminal'
+import { setStreamHandlers, type StreamSink } from './wsHub'
 import type { ArchiveOpts, ArchiveResult, CreateOpts, ServerMsg, TerminalSession } from '../shared/terminal'
 import { AgentSender, type SendSubmit } from './agentSend'
 import { archiveTask, TEARDOWN_TIMEOUT_MS } from './archive'
@@ -64,9 +66,16 @@ type Session = {
   meta: TerminalSession
   pty: IPty
   ring: string
-  subscribers: Set<WebContents>
+  subscribers: Set<StreamSink> // WebSocket outlets (Phase 3 slice 6); was Electron WebContents
   lastActivityAt: number
+  // PTY output coalescing (performance §3.3): buffer bytes and flush one 'output' frame per ~16ms
+  // tick instead of one per PTY chunk, so a busy TUI doesn't spam a frame per keystroke-echo.
+  pendingOut: string
+  flushTimer: ReturnType<typeof setTimeout> | null
 }
+
+// ~16ms ≈ one frame at 60fps; the busy-TUI coalescing target (performance §3.3).
+const OUTPUT_COALESCE_MS = 16
 
 const sessions = new Map<string, Session>()
 
@@ -100,18 +109,41 @@ let seedNotes: ((task: TaskRow) => Promise<void>) | null = null
 let internalApiEnv: Record<string, string> = {}
 let bootReconciled: Promise<void> = Promise.resolve()
 
-const channel = (id: string) => `term:out:${id}`
-
 // PTY-tier AgentState (docs/terminal-and-agents.md): shells stay 'unknown'; agents flip working/idle with the
 // silence detector ('blocked' lands with the prompt-pattern scan).
 const ptyState = (kind: 'shell' | 'agent', status: 'running' | 'exited', idle: boolean): TerminalSession['agentState'] =>
   kind !== 'agent' ? 'unknown' : status !== 'running' ? 'done' : idle ? 'idle' : 'working'
 
-function emit(s: Session, msg: ServerMsg) {
-  for (const wc of s.subscribers) {
-    if (wc.isDestroyed()) s.subscribers.delete(wc)
-    else wc.send(channel(s.meta.id), msg)
+// Raw fan-out to this session's WebSocket sinks.
+function sendMsg(s: Session, msg: ServerMsg) {
+  for (const sink of s.subscribers) sink(msg)
+}
+
+// Flush any coalesced PTY output as one 'output' frame. Called on the ~16ms tick, and eagerly
+// before any non-output frame (exit) or a new attach's replay so ordering stays exact.
+function flushOutput(s: Session) {
+  if (s.flushTimer) {
+    clearTimeout(s.flushTimer)
+    s.flushTimer = null
   }
+  if (!s.pendingOut) return
+  const data = s.pendingOut
+  s.pendingOut = ''
+  sendMsg(s, { type: 'output', data })
+}
+
+// Non-output frames flush pending output first (exit must not overtake buffered bytes).
+function emit(s: Session, msg: ServerMsg) {
+  flushOutput(s)
+  sendMsg(s, msg)
+}
+
+// Buffer PTY output; the ring is appended immediately (replay is always current) while the wire
+// frame is coalesced onto the next tick.
+function queueOutput(s: Session, data: string) {
+  appendRing(s, data)
+  s.pendingOut += data
+  if (!s.flushTimer) s.flushTimer = setTimeout(() => flushOutput(s), OUTPUT_COALESCE_MS)
 }
 
 function appendRing(s: Session, data: string) {
@@ -209,7 +241,7 @@ function rowToMeta(row: typeof schema.terminalSessions.$inferSelect, ctx: Pick<T
 // --- session lifecycle ---
 
 function wireSession(db: AppDatabase, meta: TerminalSession, pty: IPty): Session {
-  const s: Session = { meta, pty, ring: '', subscribers: new Set(), lastActivityAt: Date.now() }
+  const s: Session = { meta, pty, ring: '', subscribers: new Set(), lastActivityAt: Date.now(), pendingOut: '', flushTimer: null }
   sessions.set(meta.id, s)
   pty.onData((data) => {
     s.lastActivityAt = Date.now()
@@ -218,8 +250,7 @@ function wireSession(db: AppDatabase, meta: TerminalSession, pty: IPty): Session
       s.meta.agentState = ptyState(s.meta.kind, s.meta.status, false)
       broadcastStatus()
     }
-    appendRing(s, data)
-    emit(s, { type: 'output', data })
+    queueOutput(s, data) // append to ring now; coalesce the wire frame onto the ~16ms tick
   })
   pty.onExit(({ exitCode, signal }) => {
     s.meta.status = 'exited'
@@ -456,36 +487,140 @@ export function registerTerminalIpc(db: AppDatabase, worktreesDir: string, deps:
   seedNotes = deps.seedTaskNotes
   bootReconciled = deps.reconciled
 
-  // MCP config inspector (docs/mcp.md): read ONLY the known candidate files (worktree
-  // .mcp.json / .cursor/mcp.json, ~/.claude.json), parse + MASK IN MAIN — raw secrets never cross
-  // to the renderer. Read-only; acorn never launches these servers.
-  ipcMain.handle('mcp:inspect', async (_e: IpcMainInvokeEvent, taskId: string): Promise<{ file: string; servers: McpServerSummary[] }[]> => {
-    const root = typeof taskId === 'string' && taskId ? await taskRoot(db, taskId) : null
-    const out: { file: string; servers: McpServerSummary[] }[] = []
-    for (const candidate of MCP_CANDIDATES) {
-      const base = candidate.root === 'home' ? homedir() : root
-      if (!base) continue
-      const file = resolve(base, candidate.rel)
+  // The request/response half of the terminal engine, exposed as the TerminalBridge behind the HTTP
+  // routes (server/routes/terminal.ts) — Phase 3 replaced the term:*/mcp:* req/resp IPC channels.
+  // The STREAM half (term:input/attach/detach + the term:out push, term:status) is the WebSocket
+  // hub (setStreamHandlers below); browser:bind + term:repoPath:pick stay IPC as Electron residue
+  // (§1c). The bridge closes over the engine internals (sessions map, agentSender, …).
+  setTerminalBridge({
+    list: async () => [...sessions.values()].map((s) => s.meta),
+    profiles: async () => listProfiles(),
+    create: (opts) => create(db, opts ?? ({} as CreateOpts)),
+    // sendToAgent (docs/panes.md): bracketed paste into an agent session's PTY with a submit mode.
+    sendToAgent: async (sessionId, text, submit) => {
+      if (!sessionId || !text) return { ok: false, reason: 'Invalid payload.' }
+      return agentSender.send(sessionId, text, submit)
+    },
+    kill: async (id) => {
+      const s = sessions.get(id)
+      if (!s) return false
+      killSession(s)
+      return true
+    },
+    interrupt: async (id) => {
+      const s = sessions.get(id)
+      if (!s || s.meta.status !== 'running') return false
+      s.pty.write('\x03') // Ctrl-C to the foreground process
+      return true
+    },
+    // Close a session in one shot: kill it if still running, then drop it.
+    remove: async (id) => {
+      const s = sessions.get(id)
+      if (!s) return false
+      if (s.meta.status === 'running') killSession(s)
+      sessions.delete(id)
+      if (s.meta.backend === 'tmux') await deleteRow(db, id)
+      return true
+    },
+    resize: async (id, cols, rows) => {
+      const s = sessions.get(id)
+      if (!s) return false
+      const c = clampDim(cols, s.meta.cols)
+      const r = clampDim(rows, s.meta.rows)
+      s.meta.cols = c
+      s.meta.rows = r
+      if (s.meta.status === 'running') s.pty.resize(c, r)
+      return true
+    },
+    taskStatuses: () => computeTaskStatuses(db),
+    repoPathGet: (owner, repo) => getRepoPath(db, owner, repo),
+    repoPathSet: (owner, repo, path) => setRepoPath(db, owner, repo, path),
+    repoPathRunTargets: (owner, repo, runTargets) => setRunTargets(db, owner, repo, typeof runTargets === 'string' ? runTargets : ''),
+    // Browser-preview 'script' mode (WorkspaceSettings): run the configured shell command in the
+    // task's worktree and use its stdout (last non-empty line, trimmed) as the preview URL. Keyed
+    // by taskId so the renderer never supplies a path; a short timeout guards a hung script.
+    previewUrl: async (taskId, rawScript) => {
+      const script = rawScript?.trim()
+      if (!script) return { ok: false, reason: 'no script configured' }
+      const cwd = await taskRoot(db, taskId)
+      if (!cwd) return { ok: false, reason: 'no worktree yet — open a terminal first' }
       try {
-        const text = await readFile(file, 'utf8')
-        out.push({ file, servers: inspectMcpConfig(text) })
-      } catch {
-        // absent file → not listed
+        const { stdout } = await promisify(execFile)('/bin/sh', ['-c', script], { cwd, timeout: 10_000 })
+        const url = stdout.split('\n').map((l) => l.trim()).filter(Boolean).pop()
+        return url ? { ok: true, url } : { ok: false, reason: 'script produced no output' }
+      } catch (err) {
+        return { ok: false, reason: err instanceof Error ? err.message : 'script failed' }
       }
-    }
-    return out
+    },
+    // Notified by the client right after a task is created. If its workspace runs the setup script on
+    // task creation (trigger 'created') and the repo checkout is mapped, eagerly create the worktree
+    // and run the script now (as a background "Setup" tab). Other triggers no-op here and are handled
+    // lazily by create(). Best-effort: a missing checkout defers to first terminal.
+    onCreated: async (id) => {
+      if (!id) return
+      const t = await loadTask(db, id)
+      if (!t) return
+      // Snapshot PR/ticket context into curatable notes (docs/notes-and-memory.md). Best-effort and
+      // independent of worktree setup — runs even when there's no setup script / the worktree exists.
+      await seedNotes?.(t).catch((e) => console.warn('[notes] seed failed:', e))
+      if (t.worktreePath && isDir(t.worktreePath)) return
+      const { script, trigger } = await workspaceSetup(db, t.repoOwner, t.repoName)
+      if (trigger !== 'created' || !script?.trim()) return
+      const mapped = await getRepoPath(db, t.repoOwner, t.repoName)
+      if (!mapped || !isDir(mapped.path)) return
+      const wt = await ensureWorktree(worktreesDir, mapped.path, t.repoOwner, t.repoName, t.branch, t.pullNumber, await baseRefPref(db, t.repoOwner, t.repoName))
+      if (!wt.ok || !wt.created) return
+      await db.update(schema.tasks).set({ worktreePath: wt.path, updatedAt: Date.now() }).where(eq(schema.tasks.id, t.id))
+      await copyConfiguredFiles(db, t, mapped.path, wt.path)
+      await maybeRunSetup(db, t, wt.path, taskContext(t))
+      broadcastStatus() // rail/footer pick up the new worktree; panel re-lists to show the Setup tab
+    },
+    // "New task here": point a task at the mapped checkout itself instead of an isolated worktree, and
+    // adopt the checkout's current branch. worktreePath === checkout is the marker every guard keys off.
+    // taskId is the capability — the path is re-derived from the DB. null if no checkout is mapped.
+    useCheckout: async (id) => {
+      if (!id) return null
+      const t = await loadTask(db, id)
+      if (!t) return null
+      const mapped = await getRepoPath(db, t.repoOwner, t.repoName)
+      if (!mapped || !isDir(mapped.path)) return null
+      const branch = (await currentBranch(mapped.path)) || t.branch // detached HEAD → keep the seed branch
+      await db.update(schema.tasks).set({ worktreePath: mapped.path, branch, updatedAt: Date.now() }).where(eq(schema.tasks.id, t.id))
+      broadcastStatus() // rail/footer pick up the borrowed checkout
+      return { worktreePath: mapped.path, branch }
+    },
+    archive: (id, opts) => archiveOne(id, opts),
+    // MCP config inspector (docs/mcp.md): read ONLY the known candidate files, parse + MASK IN MAIN
+    // — raw secrets never cross to the renderer. Read-only; acorn never launches these servers.
+    mcpInspect: async (taskId) => {
+      const root = taskId ? await taskRoot(db, taskId) : null
+      const out: { file: string; servers: McpServerSummary[] }[] = []
+      for (const candidate of MCP_CANDIDATES) {
+        const base = candidate.root === 'home' ? homedir() : root
+        if (!base) continue
+        const file = resolve(base, candidate.rel)
+        try {
+          out.push({ file, servers: inspectMcpConfig(await readFile(file, 'utf8')) })
+        } catch {
+          // absent file → not listed
+        }
+      }
+      return out
+    },
+    mcpCreateStarter: async (taskId) => {
+      const root = await taskRoot(db, taskId)
+      if (!root) return { ok: false, reason: 'No worktree yet — open a terminal first.' }
+      const file = resolve(root, '.mcp.json')
+      if (existsSync(file)) return { ok: false, reason: '.mcp.json already exists.' }
+      await writeFile(file, STARTER_MCP_JSON, 'utf8')
+      return { ok: true }
+    },
   })
 
-  ipcMain.handle('mcp:createStarter', async (_e: IpcMainInvokeEvent, taskId: string): Promise<{ ok: boolean; reason?: string }> => {
-    const root = await taskRoot(db, taskId)
-    if (!root) return { ok: false, reason: 'No worktree yet — open a terminal first.' }
-    const file = resolve(root, '.mcp.json')
-    if (existsSync(file)) return { ok: false, reason: '.mcp.json already exists.' }
-    await writeFile(file, STARTER_MCP_JSON, 'utf8')
-    return { ok: true }
-  })
+  // --- IPC residue (§1c): true Electron capabilities that never become HTTP ---
 
   // The renderer binds each task's preview webview after creation (dom-ready) so main can drive it.
+  // Takes a raw webContents id — a capability handle, so it stays IPC (HTTP would hand out CDP).
   ipcMain.handle('browser:bind', (_e: IpcMainInvokeEvent, p: { taskId: string; webContentsId: number }) => {
     if (typeof p?.taskId !== 'string' || typeof p?.webContentsId !== 'number') return false
     const contents = webContents.fromId(p.webContentsId)
@@ -494,132 +629,23 @@ export function registerTerminalIpc(db: AppDatabase, worktreesDir: string, deps:
     return true
   })
 
-  ipcMain.handle('term:repoPath:runTargets', (_e: IpcMainInvokeEvent, p: { owner: string; repo: string; runTargets: string }) =>
-    setRunTargets(db, p.owner, p.repo, typeof p.runTargets === 'string' ? p.runTargets : ''),
-  )
-
-  ipcMain.handle('term:list', () => [...sessions.values()].map((s) => s.meta))
-
-  ipcMain.handle('term:profiles', () => listProfiles())
-
-  ipcMain.handle('term:create', (_e: IpcMainInvokeEvent, opts: CreateOpts) => create(db, opts ?? {}))
-
-  // sendToAgent (docs/panes.md): bracketed paste into an agent session's PTY with a submit mode.
-  ipcMain.handle('term:sendToAgent', (_e: IpcMainInvokeEvent, p: { sessionId: string; text: string; submit: SendSubmit }) => {
-    if (typeof p?.sessionId !== 'string' || typeof p?.text !== 'string' || !p.text) return { ok: false, reason: 'Invalid payload.' }
-    const submit: SendSubmit = p.submit === 'now' || p.submit === 'after-ready' || p.submit === 'draft' ? p.submit : 'draft'
-    return agentSender.send(p.sessionId, p.text, submit)
-  })
-
-  ipcMain.handle('term:kill', (_e: IpcMainInvokeEvent, id: string) => {
-    const s = sessions.get(id)
-    if (!s) return false
-    killSession(s)
-    return true
-  })
-
-  ipcMain.handle('term:interrupt', (_e: IpcMainInvokeEvent, id: string) => {
-    const s = sessions.get(id)
-    if (!s || s.meta.status !== 'running') return false
-    s.pty.write('\x03') // Ctrl-C to the foreground process
-    return true
-  })
-
-  // Close a session in one shot: kill it if still running, then drop it.
-  ipcMain.handle('term:remove', async (_e: IpcMainInvokeEvent, id: string) => {
-    const s = sessions.get(id)
-    if (!s) return false
-    if (s.meta.status === 'running') killSession(s)
-    sessions.delete(id)
-    if (s.meta.backend === 'tmux') await deleteRow(db, id)
-    return true
-  })
-
-  ipcMain.handle('term:repoPath:get', (_e: IpcMainInvokeEvent, p: { owner: string; repo: string }) =>
-    getRepoPath(db, p.owner, p.repo),
-  )
-
-  ipcMain.handle('term:repoPath:set', (_e: IpcMainInvokeEvent, p: { owner: string; repo: string; path: string }) =>
-    setRepoPath(db, p.owner, p.repo, p.path),
-  )
-
-  // Browser-preview 'script' mode (WorkspaceSettings): run the configured shell command in the
-  // task's worktree and use its stdout (last non-empty line, trimmed) as the preview URL. Keyed by
-  // taskId so the renderer never supplies a path; a short timeout guards a hung script.
-  ipcMain.handle('term:previewUrl', async (_e: IpcMainInvokeEvent, p: { taskId: string; script: string }): Promise<{ ok: boolean; url?: string; reason?: string }> => {
-    const script = p.script?.trim()
-    if (!script) return { ok: false, reason: 'no script configured' }
-    const cwd = await taskRoot(db, p.taskId)
-    if (!cwd) return { ok: false, reason: 'no worktree yet — open a terminal first' }
-    try {
-      const { stdout } = await promisify(execFile)('/bin/sh', ['-c', script], { cwd, timeout: 10_000 })
-      const url = stdout.split('\n').map((l) => l.trim()).filter(Boolean).pop()
-      return url ? { ok: true, url } : { ok: false, reason: 'script produced no output' }
-    } catch (err) {
-      return { ok: false, reason: err instanceof Error ? err.message : 'script failed' }
-    }
-  })
-
   // Native folder picker for the onboarding repo-mapping flow. Returns the chosen path or null.
   ipcMain.handle('term:repoPath:pick', async (): Promise<string | null> => {
     const res = await dialog.showOpenDialog({ properties: ['openDirectory'] })
     return res.canceled || !res.filePaths[0] ? null : res.filePaths[0]
   })
 
-  // Live worktree statuses (dirty / missing) for the rail + footer markers (docs/workspaces 02/05).
-  ipcMain.handle('term:task:statuses', () => computeTaskStatuses(db))
-
-  // Notified by the client right after a task is created. If its workspace runs the setup script on
-  // task creation (trigger 'created') and the repo checkout is mapped, eagerly create the worktree
-  // and run the script now (as a background "Setup" tab). Other triggers ('terminal'/'off') no-op
-  // here and are handled lazily by create(). Best-effort: a missing checkout defers to first terminal.
-  ipcMain.handle('term:task:onCreated', async (_e: IpcMainInvokeEvent, id: string): Promise<void> => {
-    if (typeof id !== 'string' || !id) return
-    const t = await loadTask(db, id)
-    if (!t) return
-    // Snapshot PR/ticket context into curatable notes (docs/notes-and-memory.md). Best-effort and
-    // independent of worktree setup — runs even when there's no setup script / the worktree exists.
-    await seedNotes?.(t).catch((e) => console.warn('[notes] seed failed:', e))
-    if (t.worktreePath && isDir(t.worktreePath)) return
-    const { script, trigger } = await workspaceSetup(db, t.repoOwner, t.repoName)
-    if (trigger !== 'created' || !script?.trim()) return
-    const mapped = await getRepoPath(db, t.repoOwner, t.repoName)
-    if (!mapped || !isDir(mapped.path)) return
-    const wt = await ensureWorktree(worktreesDir, mapped.path, t.repoOwner, t.repoName, t.branch, t.pullNumber, await baseRefPref(db, t.repoOwner, t.repoName))
-    if (!wt.ok || !wt.created) return
-    await db.update(schema.tasks).set({ worktreePath: wt.path, updatedAt: Date.now() }).where(eq(schema.tasks.id, t.id))
-    await copyConfiguredFiles(db, t, mapped.path, wt.path)
-    await maybeRunSetup(db, t, wt.path, taskContext(t))
-    broadcastStatus() // rail/footer pick up the new worktree; panel re-lists to show the Setup tab
-  })
-
-  // "New task here": point a task at the mapped checkout itself instead of an isolated worktree, and
-  // adopt the checkout's current branch. worktreePath === checkout is the marker every guard keys off
-  // (resolveTaskCwd reuses it as-is; archive skips removeWorktree for it). taskId is the capability —
-  // the path is re-derived from the DB here, never renderer-supplied. Returns the corrected fields so
-  // the renderer can patch its Task; null if no checkout is mapped (caller falls back to a worktree).
-  ipcMain.handle('term:task:useCheckout', async (_e: IpcMainInvokeEvent, id: string): Promise<{ worktreePath: string; branch: string } | null> => {
-    if (typeof id !== 'string' || !id) return null
-    const t = await loadTask(db, id)
-    if (!t) return null
-    const mapped = await getRepoPath(db, t.repoOwner, t.repoName)
-    if (!mapped || !isDir(mapped.path)) return null
-    const branch = (await currentBranch(mapped.path)) || t.branch // detached HEAD → keep the seed branch
-    await db.update(schema.tasks).set({ worktreePath: mapped.path, branch, updatedAt: Date.now() }).where(eq(schema.tasks.id, t.id))
-    broadcastStatus() // rail/footer pick up the borrowed checkout
-    return { worktreePath: mapped.path, branch }
-  })
-
   // Archive orchestration lives in archive.ts (guard → teardown → stop sessions → remove worktree →
-  // mark archived, docs/terminal-and-agents.md); this handler just injects the live-session + drawer glue. The ONLY
-  // path allowed to tear a worktree down, and never automatic.
-  ipcMain.handle('term:task:archive', async (_e: IpcMainInvokeEvent, id: string, opts?: ArchiveOpts): Promise<ArchiveResult> => {
-    if (typeof id !== 'string' || !id) return { ok: false, reason: 'Invalid task.' }
+  // mark archived, docs/terminal-and-agents.md); this injects the live-session + drawer glue. The ONLY path
+  // allowed to tear a worktree down, and never automatic. A closure (not a bridge inline) so the
+  // TerminalBridge.archive stays a one-liner.
+  async function archiveOne(id: string, opts: ArchiveOpts): Promise<ArchiveResult> {
+    if (!id) return { ok: false, reason: 'Invalid task.' }
     // Archive right after relaunch must wait for tmux reconcile: before it, the sessions map is
     // empty, so the running-session guard passes vacuously, killRunning kills nothing, and the
     // task's live tmux session would survive (and be re-attached) past its deleted worktree.
     await bootReconciled
-    return archiveTask(db, id, opts ?? {}, {
+    return archiveTask(db, id, opts, {
       isDir,
       runningCount: (taskId) => [...sessions.values()].filter((s) => s.meta.taskId === taskId && s.meta.status === 'running').length,
       killRunning: (taskId) => {
@@ -651,42 +677,36 @@ export function registerTerminalIpc(db: AppDatabase, worktreesDir: string, deps:
         })
       },
     })
-  })
+  }
 
-  ipcMain.handle('term:resize', (_e: IpcMainInvokeEvent, p: { id: string; cols: number; rows: number }) => {
-    const s = sessions.get(p?.id)
-    if (!s) return false
-    const cols = clampDim(p.cols, s.meta.cols)
-    const rows = clampDim(p.rows, s.meta.rows)
-    s.meta.cols = cols
-    s.meta.rows = rows
-    if (s.meta.status === 'running') s.pty.resize(cols, rows)
-    return true
-  })
-
-  ipcMain.on('term:input', (_e, p: { id: string; data: string }) => {
-    const s = sessions.get(p?.id)
-    if (s && s.meta.status === 'running' && typeof p.data === 'string') s.pty.write(p.data)
-  })
-
-  // attach = subscribe + replay. The renderer's subscription is an attachment, not the session
-  // itself: detaching / reloading never kills the PTY or the tmux session (vNext §5).
-  ipcMain.on('term:attach', (e, id: string) => {
-    const s = sessions.get(id)
-    if (!s) return
-    s.subscribers.add(e.sender)
-    e.sender.send(channel(id), { type: 'ready', session: s.meta, replayed: s.ring.length > 0 } satisfies ServerMsg)
-    if (s.ring) e.sender.send(channel(id), { type: 'output', data: s.ring } satisfies ServerMsg)
-    // The ring is a raw byte window, not a screen: for a cursor-addressed TUI (Claude/Codex) the
-    // replay is lossy and corrupts. Nudge the app to repaint from live state over it with Ctrl-L.
-    // ponytail: Ctrl-L repaint; the proper fix is a headless-emulator serialize (docs note), add
-    // when a non-repainting TUI still garbles.
-    if (s.ring && s.meta.kind === 'agent' && s.meta.status === 'running') s.pty.write('\x0c')
-    e.sender.once('destroyed', () => s.subscribers.delete(e.sender))
-  })
-
-  ipcMain.on('term:detach', (e, id: string) => {
-    sessions.get(id)?.subscribers.delete(e.sender)
+  // The STREAM half (Phase 3 slice 6): the terminal engine's PTY input/output + attach/detach now
+  // ride the one authenticated WebSocket (main/wsHub.ts) instead of per-session IPC channels. The
+  // hub routes client frames here and hands each attachment a sink to fan output to.
+  setStreamHandlers({
+    input: (id, data) => {
+      const s = sessions.get(id)
+      if (s && s.meta.status === 'running' && typeof data === 'string') s.pty.write(data)
+    },
+    // attach = subscribe + replay. The subscription is an attachment, not the session itself:
+    // detaching / reloading never kills the PTY or the tmux session (vNext §5). Replay is pushed
+    // synchronously here (ready → ring), BEFORE the sink is fed any live frame, so the WebSocket's
+    // replay-before-live ordering is deterministic even under a busy PTY.
+    attach: (id, sink) => {
+      const s = sessions.get(id)
+      if (!s) return
+      flushOutput(s) // drain buffered output to existing subs first; the new sink gets it via the ring
+      s.subscribers.add(sink)
+      sink({ type: 'ready', session: s.meta, replayed: s.ring.length > 0 })
+      if (s.ring) sink({ type: 'output', data: s.ring })
+      // The ring is a raw byte window, not a screen: for a cursor-addressed TUI (Claude/Codex) the
+      // replay is lossy and corrupts. Nudge the app to repaint from live state over it with Ctrl-L.
+      // ponytail: Ctrl-L repaint; the proper fix is a headless-emulator serialize (docs note), add
+      // when a non-repainting TUI still garbles.
+      if (s.ring && s.meta.kind === 'agent' && s.meta.status === 'running') s.pty.write('\x0c')
+    },
+    detach: (id, sink) => {
+      sessions.get(id)?.subscribers.delete(sink)
+    },
   })
 
   // Durable-state reconciliation (reconcileTmux) is driven by the composition root's reconcile()

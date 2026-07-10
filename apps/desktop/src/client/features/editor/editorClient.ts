@@ -1,17 +1,31 @@
-// Typed accessor for the preload's `window.acorn.editor` bridge — reads/writes files on the active
-// task's worktree over IPC. Mirrors terminalClient.ts.
+// Reads/writes files on the active task's worktree. Was the `window.acorn.editor` preload bridge;
+// now loopback HTTP routes (Phase 3), so the editor works in a plain browser (dev:node) too. The
+// accessor shape is unchanged so consumers keep their null-tolerant call sites; it just never
+// returns null now that the surface is server-backed.
+import { editorFilesRoute, editorListRoute, editorReadRoute, editorRootRoute, editorWriteRoute, type EditorEntry, type EditorWriteResult } from '../../../shared/api'
+import { readJson, writeJson } from '../../apiClient'
 
-export type EditorEntry = { name: string; dir: boolean }
+export type { EditorEntry } from '../../../shared/api'
 
 export type EditorApi = {
-  // The worktree root for a task (created lazily), or null if the repo has no mapped checkout yet.
   root(taskId: string): Promise<string | null>
-  // Directory entries under root+relPath (relPath '' = root). `.git`/`node_modules` filtered out.
   list(taskId: string, relPath: string): Promise<EditorEntry[]>
-  // Flat, gitignore-aware file list for ⌘P quick-open (git ls-files).
   files(taskId: string): Promise<string[]>
   read(taskId: string, relPath: string): Promise<string>
-  write(taskId: string, relPath: string, content: string): Promise<{ ok: boolean; reason?: string }>
+  write(taskId: string, relPath: string, content: string): Promise<EditorWriteResult>
 }
 
-export const editorApi = (): EditorApi | null => window.acorn?.editor ?? null
+const api: EditorApi = {
+  root: (taskId) => readJson<{ root: string | null }>(editorRootRoute(taskId)).then((r) => r.root),
+  list: (taskId, relPath) => readJson<EditorEntry[]>(editorListRoute(taskId, relPath)),
+  files: (taskId) => readJson<string[]>(editorFilesRoute(taskId)),
+  read: (taskId, relPath) => readJson<{ text: string }>(editorReadRoute(taskId, relPath)).then((r) => r.text),
+  write: (taskId, relPath, content) =>
+    writeJson<EditorWriteResult>(editorWriteRoute(taskId), {
+      method: 'PUT',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ path: relPath, content }),
+    }),
+}
+
+export const editorApi = (): EditorApi => api

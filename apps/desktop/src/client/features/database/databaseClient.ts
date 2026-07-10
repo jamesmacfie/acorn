@@ -1,15 +1,9 @@
-// Typed accessor for the preload's `window.acorn.database` bridge — a per-task Postgres connection
-// (docs/pg.md), resolved on demand from the worktree and never persisted. Mirrors editorClient.ts.
-import type {
-  DbCell,
-  DbColumnsResult,
-  DbConnectResult,
-  DbPk,
-  DbQueryResult,
-  DbRowsResult,
-  DbTablesResult,
-  DbWriteResult,
-} from '../../../shared/database'
+// Per-task Postgres browse/edit (docs/pg.md). Was the `window.acorn.database` preload bridge; now
+// loopback HTTP routes (Phase 3). The connection URL is resolved server-side and never persisted.
+// The accessor shape is unchanged so DatabasePane keeps its call sites; it just never returns null.
+import { databaseActionRoute, databaseColumnsRoute, databaseRowsRoute, databaseTablesRoute } from '../../../shared/api'
+import { readJson, writeJson } from '../../apiClient'
+import type { DbCell, DbColumnsResult, DbConnectResult, DbPk, DbQueryResult, DbRowsResult, DbTablesResult, DbWriteResult } from '../../../shared/database'
 
 export type DatabaseApi = {
   connect(taskId: string): Promise<DbConnectResult>
@@ -23,4 +17,19 @@ export type DatabaseApi = {
   remove(taskId: string, schema: string, name: string, pk: DbPk): Promise<DbWriteResult>
 }
 
-export const databaseApi = (): DatabaseApi | null => window.acorn?.database ?? null
+const post = <T>(url: string, body?: unknown) =>
+  writeJson<T>(url, { method: 'POST', headers: body === undefined ? undefined : { 'content-type': 'application/json' }, body: body === undefined ? undefined : JSON.stringify(body) })
+
+const api: DatabaseApi = {
+  connect: (taskId) => post<DbConnectResult>(databaseActionRoute(taskId, 'connect')),
+  disconnect: (taskId) => post<{ ok: true }>(databaseActionRoute(taskId, 'disconnect')),
+  tables: (taskId) => readJson<DbTablesResult>(databaseTablesRoute(taskId)),
+  columns: (taskId, schema, name) => readJson<DbColumnsResult>(databaseColumnsRoute(taskId, schema, name)),
+  rows: (taskId, schema, name, offset) => readJson<DbRowsResult>(databaseRowsRoute(taskId, schema, name, offset)),
+  query: (taskId, sql) => post<DbQueryResult>(databaseActionRoute(taskId, 'query'), { sql }),
+  update: (taskId, schema, name, column, value, pk) => post<DbWriteResult>(databaseActionRoute(taskId, 'update'), { schema, name, column, value, pk }),
+  insert: (taskId, schema, name, values) => post<DbWriteResult>(databaseActionRoute(taskId, 'insert'), { schema, name, values }),
+  remove: (taskId, schema, name, pk) => post<DbWriteResult>(databaseActionRoute(taskId, 'delete'), { schema, name, pk }),
+}
+
+export const databaseApi = (): DatabaseApi => api

@@ -10,6 +10,16 @@ and [electron](./electron.md).
 > migrated to Electron. Some inline code comments still say "the Worker" / "D1 / KV" — read those as
 > "the local server" / "local SQLite" / "the on-disk blob dir".
 
+> **Phase 3 (transport collapse):** the renderer↔main IPC channels are now HTTP routes + one
+> WebSocket, not `ipcMain` handlers. New route families: `/api/tasks/:id/{search,editor/*,local/*,
+> database/*}`, `/api/terminal/*` + `/api/tasks/:id/{archive,preview-url,on-created,use-checkout,
+> mcp}`, `/api/tasks/:id/workflows` + `/api/workflows/runs/:runId/*`, `/api/memory*` +
+> `/api/workspaces/:wsId/notes*`, and the harness `RunBridge` at `/api/tasks/:id/run/*`. Each is
+> backed by a main-process **bridge** (`server/bridge.ts`; 503 `bridge-unavailable` when unwired).
+> Live streams (PTY output/input, session status, workflow notices) ride one authenticated
+> WebSocket at `/ws` — see [electron.md §12](./electron.md) for the transport + `dev:node`
+> capability map.
+
 ## Middleware & auth
 
 Every `/api/*` route runs through three middlewares before the handler, in this exact order
