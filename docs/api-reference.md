@@ -14,7 +14,7 @@ and [electron](./electron.md).
 > WebSocket, not `ipcMain` handlers. New route families: `/api/tasks/:id/{search,editor/*,local/*,
 > database/*}`, `/api/terminal/*` + `/api/tasks/:id/{archive,preview-url,on-created,use-checkout,
 > mcp}`, `/api/tasks/:id/workflows` + `/api/workflows/runs/:runId/*`, `/api/memory*` +
-> `/api/workspaces/:wsId/notes*`, and the harness `RunBridge` at `/api/tasks/:id/run/*`. Each is
+> `/api/workspaces/:wsId/notes*`, `/api/tasks/:id/notes*`, and the `RunBridge` at `/api/tasks/:id/run/*`. Each is
 > backed by a main-process **bridge** (`server/bridge.ts`; 503 `bridge-unavailable` when unwired).
 > Live streams (PTY output/input, session status, workflow notices) ride one authenticated
 > WebSocket at `/ws` — see [electron.md §12](./electron.md) for the transport + `dev:node`
@@ -234,59 +234,40 @@ send loop: create (unsent) → deliver → `POST /sent` stamps `sentAt` → an e
 ### Task context — `apps/desktop/src/server/routes/taskContext.ts`
 
 The context assembler — never a live GitHub call, so the agent sees the same picture as the UI.
-The PR and linked issues come from the **Mirror**; the `notes` / `memory` slices come from
-injectable sources (`setContextNotesSource` / `setContextMemorySource`, wired to the main-process
-stores) and default to `[]` when nothing is injected (e.g. `dev:node`).
+The contribution registry assembles PR/issues from the **Mirror** and notes/memory from main-process
+stores. The response carries serialized section metadata/items/compact text; `include=*` returns the
+inventory for the Context pane, while an omitted include uses contribution defaults.
 
 | Method | Path | Purpose | Params |
 | --- | --- | --- | --- |
 | `GET` | `/api/tasks/:id/repo-info` | Repo facts for the MCP `repo_info` tool: `{ owner, name, defaultBranch, branch, worktreePath }`. | — |
-| `GET` | `/api/tasks/:id/context` | Assembled `TaskContext` — scalar PR (from the mirror), linked issues, notes, memory index. | `?include=pr,issues,notes,memory` (default all) |
+| `GET` | `/api/tasks/:id/context` | Assembled `TaskContext` and projected sections. | `?include=<section ids>`; `*` means all; omitted uses registry defaults |
 
 `404 not_found` when the task id is unknown.
 
-### Harness / MCP feature-tool surface — `apps/desktop/src/server/routes/harness.ts`
+### Agent-tool projection — `apps/desktop/src/server/routes/agentTools.ts`
 
-The loopback surface the **acorn MCP server** calls (typically with the `x-acorn-internal` token).
-Every handler proxies to one of four main-process sub-bridges — `NotesBridge` / `MemoryBridge` /
-`RunBridge` / `BrowserBridge` — wired independently by `apps/desktop/src/main/harnessWiring.ts`
-(notes store, memory index, run-target runtime, drivable preview browser). When a bridge is absent
-— e.g. `dev:node` with no Electron — the route degrades to **`503 { error: 'bridge-unavailable' }`**.
-A bridge that throws maps its failure kind to the `error` **code** (`not_found` → `404`,
-`bad_request` → `400`, otherwise `failed` → `500`) with the message in `detail` — the former body
-`kind` discriminator is gone (all bodies are `ApiError`). These are gated by the terminal/agents
-feature flag in the UI and are **Bridge**-sourced. Cross-link
-[mcp](./mcp.md), [notes-and-memory](./notes-and-memory.md), [terminal-and-agents](./terminal-and-agents.md),
-[workflows](./workflows.md).
+The registry is installed by the main-process composition root. MCP/harness paths require the
+per-run internal principal; renderer projection is a separate cookie-authenticated opt-in path.
+Missing registries return `503 bridge-unavailable`; hidden, unavailable, or non-renderer tools are
+indistinguishable `404 not_found` responses.
 
 | Method | Path | Purpose | Body / params |
 | --- | --- | --- | --- |
-| `GET` | `/api/tasks/:id/notes` | List the task's notes. | — |
-| `GET` | `/api/tasks/:id/notes/:slug` | Read one note (`404` if missing when bridge is up). | — |
-| `PUT` | `/api/tasks/:id/notes/:slug` | Write/overwrite a note. | `{ body, sessionId? }` |
-| `POST` | `/api/tasks/:id/notes/:slug/append` | Append to a note. | `{ text, sessionId? }` |
-| `GET` | `/api/tasks/:id/memory` | List memory, or search it. | `?q=` (search), `?type=` |
-| `GET` | `/api/tasks/:id/memory/:name` | Get one memory entry (`404` if none). | — |
-| `POST` | `/api/tasks/:id/memory/propose` | Propose a memory write through the human gate (never a silent write). → `{ ok: true, proposal }` | `{ name, type, description, body?, sessionId? }` |
+| `GET` | `/api/tasks/:id/tools` | Available MCP manifest with draft-07 input schemas. | internal token |
+| `POST` | `/api/tasks/:id/tools/:name` | Validate and invoke an agent tool. | contribution-owned JSON; internal token |
+| `POST` | `/api/tasks/:id/renderer-tools/:name` | Invoke an `exposeToRenderer` contribution. | contribution-owned JSON; session cookie |
+| `GET` | `/api/agent-tools` | Static name/description/risk/availability catalog for Settings. | session cookie |
+| `GET/POST` | `/api/tasks/:id/notes[/:slug]` | Task-scoped renderer note CRUD; PUT/DELETE and `/included` also apply. | note body/title/included shape |
+| `GET/POST` | `/api/workspaces/:wsId/notes[/:slug]` | Workspace note CRUD; reserved `wsId=global` addresses global notes. | note body/title/included shape |
 | `GET` | `/api/tasks/:id/run` | List run targets for the task. | — |
 | `POST` | `/api/tasks/:id/run/:target/start` | Start a run target. | — |
 | `POST` | `/api/tasks/:id/run/:target/stop` | Stop a run target. | — |
 | `POST` | `/api/tasks/:id/run/:target/restart` | Restart a run target. | — |
 | `GET` | `/api/tasks/:id/run/:target/status` | Run-target status. | — |
-| `POST` | `/api/tasks/:id/browser/navigate` | Drive the preview webview to a URL (CDP). | `{ url }` |
-| `GET` | `/api/tasks/:id/browser/snapshot` | Accessibility snapshot of the preview. | — |
-| `POST` | `/api/tasks/:id/browser/click` | Click a snapshot ref. | `{ ref }` |
-| `POST` | `/api/tasks/:id/browser/fill` | Fill a snapshot ref. | `{ ref, text }` |
-| `GET` | `/api/tasks/:id/browser/screenshot` | Screenshot the preview. | — |
-| `GET` | `/api/tasks/:id/browser/console` | Preview console output. | — |
 
-`400 bad_request` on missing body fields; `503 { error: 'bridge-unavailable' }` whenever the bridge
-is absent. Bridge-up failures are **typed**: a bridge may throw `HarnessError` with a kind
-(`not_found` → `404`, `bad_request` → `400`, `failed` → `500`); untyped throws map to the route's
-declared default (`not_found` for notes read, `bad_request` for memory propose, otherwise
-`failed`/`500`). The failure kind becomes the `ApiError` **`error` code** and the message rides in
-`detail` (`{ error: 'not_found', detail: [<message>] }`) — a domain error no longer reads as
-service-unavailable, and there is no body-level `kind`.
+The remaining `/run/*` rows are renderer routes backed by `RunBridge`; agent-facing run/browser,
+notes, memory, context, and git verbs go through `/tools/:name`.
 
 ---
 
@@ -740,4 +721,3 @@ the `error` values below are the stable machine codes, and `detail` (when presen
 [notes-and-memory](./notes-and-memory.md) · [architecture-overview](./architecture-overview.md)
 
 ---
-

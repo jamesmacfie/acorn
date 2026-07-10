@@ -12,7 +12,6 @@ import { eq } from 'drizzle-orm'
 import type { AppDatabase } from '../server/db'
 import { schema } from '../server/db'
 import { setKnowledgeBridge } from '../server/routes/knowledge'
-import { setContextMemorySource, setContextNotesSource } from '../server/routes/taskContext'
 import { buildHeadlessArgv, runHeadless } from './headless'
 import { formatMemoryInjection, listMemories, memoryIndexSlice, memorySources, MEMORY_TYPES, reconcileMemories, searchMemories, writeMemoryFile, type MemoryType } from './memory'
 import { acceptProposal, generateMemoryProposals, rejectProposal } from './memoryGen'
@@ -65,24 +64,6 @@ export function registerKnowledgeIpc(db: AppDatabase, dataRoot: string, deps: Kn
     }
   }
 
-  // Fill the context assembler's notes seam (docs/notes-and-memory.md / docs/next 11 §C): the task's workspace notes
-  // ride TaskContext.notes. Newest first, capped — the push block stays compact.
-  setContextNotesSource(async (taskId) => {
-    const t = await loadTask(db, taskId)
-    if (!t) return []
-    const ws = await workspaceConfigRow(db, t.repoOwner, t.repoName)
-    if (!ws) return []
-    // Skip deselected notes and other tasks' seeded notes (originTaskId auto-scopes PR/ticket notes
-    // to the task they were seeded for; hand-written notes have no originTaskId and are shared).
-    const list = (await notesStore.list(ws.id)).filter((n) => n.included && (!n.originTaskId || n.originTaskId === taskId))
-    const out: { slug: string; title: string; body: string }[] = []
-    for (const summary of list.slice(0, 10)) {
-      const note = await notesStore.read(ws.id, summary.slug).catch(() => null)
-      if (note) out.push({ slug: summary.slug, title: `${note.title} (${note.kind})`, body: note.body.slice(0, 2000) })
-    }
-    return out
-  })
-
   // Memory (docs/next 12 P1): files are truth; the SQLite index reconciles from every active
   // worktree + primary checkout + the private home dir before each read (cheap at this scale).
   const buildMemorySources = async () => {
@@ -110,14 +91,6 @@ export function registerKnowledgeIpc(db: AppDatabase, dataRoot: string, deps: Kn
       // memory injection is best-effort — never blocks a session launch
     }
   }
-
-  // Fill the assembler's memory seam (docs/next 12 P2 / 11 §C): the repo-scoped index slice.
-  setContextMemorySource(async (taskId) => {
-    const t = await loadTask(db, taskId)
-    if (!t) return []
-    await reconciled()
-    return memoryIndexSlice(db, `${t.repoOwner}/${t.repoName}`)
-  })
 
   // Memory auto-generation (docs/next 12 P3): the task-completion trigger. Fired on agent session
   // end (and best-effort at archive) while the worktree is still alive; proposals flow through the
@@ -230,22 +203,22 @@ export function registerKnowledgeIpc(db: AppDatabase, dataRoot: string, deps: Kn
       return acceptProposal(proposals, proposal.id, t?.worktreePath ?? null, reconciled, edited as { name: string; type: MemoryType; description: string; body: string } | undefined)
     },
     // --- notes ---
-    notesList: (workspaceId) => guard(() => notesStore.list(workspaceId)),
-    notesRead: (workspaceId, slug) => guard(() => notesStore.read(workspaceId, slug)),
-    notesCreate: (workspaceId, title, kind) => guard(() => notesStore.create(workspaceId, title, { kind: kind as NoteKind | undefined })),
-    notesWrite: (workspaceId, slug, body) =>
+    notesList: (location) => guard(() => notesStore.list(location)),
+    notesRead: (location, slug) => guard(() => notesStore.read(location, slug)),
+    notesCreate: (location, title, kind) => guard(() => notesStore.create(location, title, { kind: kind as NoteKind | undefined })),
+    notesWrite: (location, slug, body) =>
       guard(async () => {
-        await notesStore.write(workspaceId, slug, body)
+        await notesStore.write(location, slug, body)
         return { ok: true }
       }),
-    notesSetIncluded: (workspaceId, slug, included) =>
+    notesSetIncluded: (location, slug, included) =>
       guard(async () => {
-        await notesStore.setIncluded(workspaceId, slug, included)
+        await notesStore.setIncluded(location, slug, included)
         return { ok: true }
       }),
-    notesRemove: (workspaceId, slug) =>
+    notesRemove: (location, slug) =>
       guard(async () => {
-        await notesStore.remove(workspaceId, slug)
+        await notesStore.remove(location, slug)
         return { ok: true }
       }),
   })

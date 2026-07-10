@@ -2,75 +2,84 @@ import { createEffect, createResource, createSignal, For, onCleanup, Show } from
 import type { Task, Workspace } from '../../queries'
 import { debounce } from '../../autosave'
 import { renderMarkdown } from '../integrations/markdown'
-import { clearNoteOpen, GLOBAL_NOTES_ID, notesApi, noteToOpen, type NoteScope, type NoteSummary } from './notesClient'
+import { clearNoteOpen, notesApi, noteToOpen, type NoteLocation, type NoteScope, type NoteSummary } from './notesClient'
 import './notes.css'
 
-// The Notes pane (docs/notes-and-memory.md): .md notes at two SCOPES — this workspace (shared by every
-// task/worktree in the group) and GLOBAL (shared across all workspaces). Both render here, grouped
-// so the distinction is visible; you pick the scope when creating. List + textarea editor + the
+// The Notes pane (docs/notes-and-memory.md): .md notes at task, workspace and global scopes. They
+// render grouped so the storage boundary is visible; task is the safe default for new notes. List + textarea editor + the
 // existing sanitized markdown preview. ponytail: textarea over TipTap; a richer editor only if
 // users live in it. Humans only ever create `scratch` notes here; plan/finding/handoff are written
-// by agents/workflows (workspace scope) and surface in the collapsible "Agent notes" group.
+// by agents/workflows and surface in their owning scope.
 type Selected = { scope: NoteScope; slug: string }
 
 export default function NotesPane(props: { task: Task; workspace: Workspace | null }) {
   const api = notesApi()
   const wsId = () => props.workspace?.id ?? null
-  // The store key for a scope: the workspace's own id, or the reserved global key.
-  const keyFor = (scope: NoteScope) => (scope === 'global' ? GLOBAL_NOTES_ID : wsId())
+  const locationFor = (scope: NoteScope): NoteLocation | null =>
+    scope === 'task' ? { scope, taskId: props.task.id } : scope === 'global' ? { scope } : wsId() ? { scope, workspaceId: wsId()! } : null
   const [selected, setSelected] = createSignal<Selected | null>(null)
   const [body, setBody] = createSignal('')
   const [preview, setPreview] = createSignal(false)
   const [newTitle, setNewTitle] = createSignal('')
-  const [newScope, setNewScope] = createSignal<NoteScope>('workspace')
+  const [newScope, setNewScope] = createSignal<NoteScope>('task')
+  const [showTask, setShowTask] = createSignal(true)
   const [showAgent, setShowAgent] = createSignal(true)
   const [showGlobal, setShowGlobal] = createSignal(true)
 
+  const [taskList, { refetch: refetchTask }] = createResource(
+    () => props.task.id,
+    async (taskId) => {
+      const res = await api.list({ scope: 'task', taskId })
+      return 'error' in res ? [] : res
+    },
+    { initialValue: [] },
+  )
   const [wsList, { refetch: refetchWs }] = createResource(
     () => wsId(),
     async (id) => {
       if (!api || !id) return [] as NoteSummary[]
-      const res = await api.list(id)
+      const res = await api.list({ scope: 'workspace', workspaceId: id })
       return 'error' in res ? [] : res
     },
     { initialValue: [] },
   )
   // Global notes don't depend on the workspace; keyed on a constant so they load once and refetch.
   const [globalList, { refetch: refetchGlobal }] = createResource(
-    () => (api ? GLOBAL_NOTES_ID : null),
-    async (id) => {
-      const res = await api!.list(id)
+    () => (api ? true : null),
+    async () => {
+      const res = await api!.list({ scope: 'global' })
       return 'error' in res ? [] : res
     },
     { initialValue: [] },
   )
 
+  const taskNotes = () => taskList() ?? []
   const userNotes = () => (wsList() ?? []).filter((n) => n.author === 'user')
   const agentNotes = () => (wsList() ?? []).filter((n) => n.author !== 'user')
   const globalNotes = () => globalList() ?? []
 
   const isActive = (scope: NoteScope, slug: string) => selected()?.scope === scope && selected()?.slug === slug
-  const refetchScope = (scope: NoteScope) => (scope === 'global' ? refetchGlobal() : refetchWs())
+  const refetchScope = (scope: NoteScope) => (scope === 'task' ? refetchTask() : scope === 'global' ? refetchGlobal() : refetchWs())
 
   // Autosave (no Save button): debounce while typing, flush on blur and before we switch away.
   // save() reads selected()+body() at fire time, so flush before mutating selected on a note switch.
   const scheduleSave = debounce(() => void save(), 1500)
   onCleanup(() => scheduleSave.flush())
 
-  // Consume the Context pane's "Edit note" jump: open the requested (workspace) slug editable, once.
+  // Consume the Context pane's declared note jump, including its owning storage scope.
   createEffect(() => {
-    const slug = noteToOpen()
-    if (!slug || !api || !wsId()) return
+    const target = noteToOpen()
+    if (!target || !api || (target.scope === 'workspace' && !wsId())) return
     setPreview(false)
-    void open('workspace', slug)
+    void open(target.scope, target.slug)
     clearNoteOpen()
   })
 
   async function open(scope: NoteScope, slug: string) {
-    const id = keyFor(scope)
-    if (!api || !id) return
+    const location = locationFor(scope)
+    if (!api || !location) return
     scheduleSave.flush() // persist the note we're leaving before loading the next
-    const res = await api.read(id, slug)
+    const res = await api.read(location, slug)
     if ('error' in res) return window.alert(res.error)
     setSelected({ scope, slug })
     setBody(res.body)
@@ -78,55 +87,73 @@ export default function NotesPane(props: { task: Task; workspace: Workspace | nu
 
   async function save() {
     const sel = selected()
-    const id = sel && keyFor(sel.scope)
-    if (!api || !sel || !id) return
-    const res = await api.write(id, sel.slug, body())
+    const location = sel && locationFor(sel.scope)
+    if (!api || !sel || !location) return
+    const res = await api.write(location, sel.slug, body())
     if ('error' in res) return window.alert(res.error)
   }
 
   async function create() {
     const scope = newScope()
-    const id = keyFor(scope)
-    if (!api || !id || !newTitle().trim()) return
-    const res = await api.create(id, newTitle().trim()) // humans create scratch only
+    const location = locationFor(scope)
+    if (!api || !location || !newTitle().trim()) return
+    const res = await api.create(location, newTitle().trim()) // humans create scratch only
     if ('error' in res) return window.alert(res.error)
     setNewTitle('')
     await refetchScope(scope)
     await open(scope, res.slug)
   }
 
-  // Select/deselect whether a workspace note is fed to the agent as context (docs/notes-and-memory.md).
-  async function toggleIncluded(slug: string, included: boolean) {
-    const id = wsId()
-    if (!api || !id) return
-    const res = await api.setIncluded(id, slug, included)
+  async function toggleIncluded(scope: NoteScope, slug: string, included: boolean) {
+    const location = locationFor(scope)
+    if (!api || !location) return
+    const res = await api.setIncluded(location, slug, included)
     if ('error' in res) return window.alert(res.error)
-    await refetchWs()
+    await refetchScope(scope)
   }
 
   async function remove(scope: NoteScope, slug: string) {
-    const id = keyFor(scope)
-    if (!api || !id) return
+    const location = locationFor(scope)
+    if (!api || !location) return
     if (!window.confirm(`Delete note “${slug}”?`)) return
     if (isActive(scope, slug)) {
       scheduleSave.cancel() // don't resurrect the note we're deleting
       setSelected(null)
       setBody('')
     }
-    await api.remove(id, slug)
+    await api.remove(location, slug)
     await refetchScope(scope)
   }
 
   return (
     <section class="pane notes-pane">
       <div class="section-header">Notes — {props.workspace?.name ?? 'workspace'}</div>
-      <Show when={api && wsId()} fallback={<div class="editor-empty muted">Notes need the desktop app and a workspace.</div>}>
+      <Show when={api} fallback={<div class="editor-empty muted">Notes need the desktop app.</div>}>
         <div class="notes-body">
           <div class="notes-list">
+            <Show when={taskNotes().length > 0}>
+              <button type="button" class="notes-group-header" onClick={() => setShowTask(!showTask())}>
+                {showTask() ? '▾' : '▸'} Task notes ({taskNotes().length})
+              </button>
+              <Show when={showTask()}>
+                <For each={taskNotes()}>
+                  {(n) => (
+                    <div class="notes-row-wrap">
+                      <input type="checkbox" class="notes-row-include" title={n.included ? 'Included in agent context' : 'Excluded from agent context'} checked={n.included} onChange={(e) => void toggleIncluded('task', n.slug, e.currentTarget.checked)} />
+                      <button type="button" class="notes-row" classList={{ active: isActive('task', n.slug) }} title={`${n.kind} · task-scoped`} onClick={() => void open('task', n.slug)}>
+                        <span class="notes-row-kind">{n.kind}</span>
+                        <span class="notes-row-title">{n.title}</span>
+                      </button>
+                      <button type="button" class="notes-row-delete" title="Delete note" onClick={() => void remove('task', n.slug)}>✕</button>
+                    </div>
+                  )}
+                </For>
+              </Show>
+            </Show>
             <For each={userNotes()}>
               {(n) => (
                 <div class="notes-row-wrap">
-                  <input type="checkbox" class="notes-row-include" title={n.included ? 'Included in agent context' : 'Excluded from agent context'} checked={n.included} onChange={(e) => void toggleIncluded(n.slug, e.currentTarget.checked)} />
+                  <input type="checkbox" class="notes-row-include" title={n.included ? 'Included in agent context' : 'Excluded from agent context'} checked={n.included} onChange={(e) => void toggleIncluded('workspace', n.slug, e.currentTarget.checked)} />
                   <button type="button" class="notes-row" classList={{ active: isActive('workspace', n.slug) }} onClick={() => void open('workspace', n.slug)}>
                     <span class="notes-row-title">{n.title}</span>
                   </button>
@@ -161,7 +188,7 @@ export default function NotesPane(props: { task: Task; workspace: Workspace | nu
                   <For each={agentNotes()}>
                     {(n) => (
                       <div class="notes-row-wrap">
-                        <input type="checkbox" class="notes-row-include" title={n.included ? 'Included in agent context' : 'Excluded from agent context'} checked={n.included} onChange={(e) => void toggleIncluded(n.slug, e.currentTarget.checked)} />
+                        <input type="checkbox" class="notes-row-include" title={n.included ? 'Included in agent context' : 'Excluded from agent context'} checked={n.included} onChange={(e) => void toggleIncluded('workspace', n.slug, e.currentTarget.checked)} />
                         <button type="button" class="notes-row" classList={{ active: isActive('workspace', n.slug) }} title={`${n.kind} · by ${n.author}`} onClick={() => void open('workspace', n.slug)}>
                           <span class="notes-row-kind">{n.kind}</span>
                           <span class="notes-row-title">{n.title}</span>
@@ -181,7 +208,8 @@ export default function NotesPane(props: { task: Task; workspace: Workspace | nu
                 }}
               >
                 <select class="notes-scope-select" value={newScope()} onChange={(e) => setNewScope(e.currentTarget.value as NoteScope)} title="Note scope">
-                  <option value="workspace">This workspace</option>
+                  <option value="task">This task</option>
+                  <option value="workspace" disabled={!wsId()}>This workspace</option>
                   <option value="global">Global</option>
                 </select>
                 <input class="integration-key-input" type="text" placeholder="New note title" value={newTitle()} onInput={(e) => setNewTitle(e.currentTarget.value)} />
@@ -197,6 +225,9 @@ export default function NotesPane(props: { task: Task; workspace: Workspace | nu
                     <span class="notes-file">
                       <Show when={sel().scope === 'global'}>
                         <span class="notes-row-scope" title="Global note">🌐 </span>
+                      </Show>
+                      <Show when={sel().scope === 'task'}>
+                        <span class="notes-row-scope" title="Task note">◆ </span>
                       </Show>
                       {sel().slug}.md
                     </span>

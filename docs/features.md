@@ -127,8 +127,8 @@ Connect / disconnect in **Settings → Integrations**; tokens are encrypted at r
 
 ## Notes & memory
 
-**Markdown notes** live at two scopes — the workspace (shared by every task in the group) and
-global (shared across all workspaces) — edited in the Notes pane, written by agents via the MCP
+**Markdown notes** live at task (the safe default), workspace, and global scopes — edited in the
+Notes pane and written by agents via the MCP
 `notes_*` tools. Alongside them sits a **memory system** — durable, searchable facts an agent can
 write and recall across sessions (FTS5 full-text search, MCP `memory_*` tools).
 
@@ -223,4 +223,3 @@ See also: [architecture-overview.md](./architecture-overview.md) ·
 [terminal-and-agents.md](./terminal-and-agents.md) · [integrations.md](./integrations.md) ·
 [notes-and-memory.md](./notes-and-memory.md) · [mcp.md](./mcp.md) · [workflows.md](./workflows.md) ·
 [command-palette-and-shortcuts.md](./command-palette-and-shortcuts.md)
-

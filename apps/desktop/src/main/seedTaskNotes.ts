@@ -1,4 +1,4 @@
-// Seed workspace notes from a task's PR + linked tickets at creation (docs/notes-and-memory.md).
+// Seed task notes from a task's PR + linked tickets at creation (docs/notes-and-memory.md).
 // When a task is promoted from a GitHub PR we snapshot its context into discrete, user-curatable
 // notes — one for the PR description, one for the comment/review thread, one per linked Linear
 // ticket — each tagged with the task id so the context assembler scopes them to this task alone.
@@ -8,7 +8,7 @@ import { eq } from 'drizzle-orm'
 import type { AppDatabase } from '../server/db'
 import { schema } from '../server/db'
 import type { NotesStore } from './notes'
-import { workspaceConfigRow, type TaskRow } from './taskWorktree'
+import type { TaskRow } from './taskWorktree'
 
 // The slices of the mirror composites we render into notes (bodies are sanitized bodyHTML / markdown).
 type PrComment = { author: string | null; body: string | null; createdAt: number | null }
@@ -56,20 +56,18 @@ async function fetchJson<T>(url: string, token: string): Promise<T | null> {
   }
 }
 
-// Seed the PR + ticket notes for a freshly created task. Silent no-op when there's no PR/links,
-// no workspace, or the task was already seeded.
+// Seed the PR + ticket notes for a freshly created task. Silent no-op when there's no PR/links or
+// the task was already seeded.
 export async function seedTaskNotes(db: AppDatabase, notesStore: NotesStore, internalApiEnv: Record<string, string>, task: TaskRow): Promise<void> {
   const base = internalApiEnv.ACORN_API_URL
   const token = internalApiEnv.ACORN_API_TOKEN ?? ''
   if (!base) return
-  const ws = await workspaceConfigRow(db, task.repoOwner, task.repoName)
-  if (!ws) return
-
   // Idempotency: if any note already belongs to this task, we've seeded it before — bail.
-  const existing = await notesStore.list(ws.id)
+  const location = { scope: 'task' as const, taskId: task.id }
+  const existing = await notesStore.list(location)
   if (existing.some((n) => n.originTaskId === task.id)) return
 
-  const seed = (title: string, body: string) => notesStore.create(ws.id, title, { author: 'user', kind: 'scratch', originTaskId: task.id, included: true, body })
+  const seed = (title: string, body: string) => notesStore.create(location, title, { author: 'user', kind: 'scratch', originTaskId: task.id, included: true, body })
 
   if (task.pullNumber != null) {
     // pullDetail refreshes the mirror on staleness before returning the composite (serve-then-revalidate).
