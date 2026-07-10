@@ -29,9 +29,9 @@ are the same app: one origin, one database, one window.
 ## One local server, one origin
 
 The Electron main process boots through one composition root
-(`apps/desktop/src/main/bootstrap.ts`, called once from `electron.ts`): it
+(`apps/desktop/src/app/main/bootstrap.ts`, called once from `electron.ts`): it
 migrates the DB, constructs the domain services, installs their bridges/IPC,
-then starts a single Hono app (`apps/desktop/src/server/index.ts`, a
+then starts a single Hono app (`apps/desktop/src/core/server/index.ts`, a
 `createApp()` factory) under `@hono/node-server` on `http://127.0.0.1:4317` (the
 port is pinned for a stable browser-storage origin; `ACORN_PORT` in the
 environment overrides it), and points a hardened `BrowserWindow` at that origin.
@@ -44,7 +44,7 @@ origin:
 - the `/api/*` JSON API, and
 - the `/auth/*` OAuth flow.
 
-Routing lives in `apps/desktop/src/main/server.ts`: a static-file middleware
+Routing lives in `apps/desktop/src/core/main/server.ts`: a static-file middleware
 serves the built assets, and a `notFound` handler returns 404s for unmatched
 `/api/*` and `/auth/*` but falls back to `index.html` for other paths so the
 client router can handle deep links (`/:owner/:repo/:number`). A loopback Host
@@ -63,7 +63,7 @@ cookie — no CORS, no bearer tokens in the browser, no token storage on the cli
 at all. See [authentication](./authentication.md).
 
 The HTTP API contract is mirrored into shared TypeScript, not a runtime RPC
-client. `apps/desktop/src/shared/api.ts` owns response types, route builders, and
+client. `apps/desktop/src/core/shared/api.ts` owns response types, route builders, and
 query-key factories that the SPA consumes through plain same-origin `fetch`.
 That keeps the route and cache contracts typed without adding client bundle
 weight or extra per-request abstraction. See
@@ -94,7 +94,7 @@ Workspace ("Runn", "Acorn")            ← group of repos, picked in the top bar
   it was renamed; Workspace now means the group.)
 - **Pane** — a surface inside the Task view. `PaneId` is one of `pr | linear |
   rollbar | preview | editor | changes | notes | context | database | search`
-  (`apps/desktop/src/client/features/tasks/layout.ts`). A task's layout is a flat
+  (`apps/desktop/src/core/client/tasks/layout.ts`). A task's layout is a flat
   left→right row of open panes (`TaskLayout = { panes: PaneId[] }`); one pure
   reducer `applyLayoutAction` owns every transition (`show` = single pane, `add`
   = open beside via ⌘/Ctrl-click, `close`, `replace`).
@@ -107,7 +107,7 @@ Tasks, the TabRail, panes, notifications, integrations (Linear live, Rollbar),
 settings, the command palette, and the file finder are shipped and default-on.
 The **terminal drawer, agent sessions, run targets, and workflows** are
 desktop-only and always on when the Electron preload bridge is present
-(`capabilities()`, `apps/desktop/src/client/features/capabilities.ts` — the old
+(`capabilities()`, `apps/desktop/src/core/client/capabilities.ts` — the old
 `acorn:term` localStorage flag has been deleted). The workflow engine is a
 registry-backed durable runtime with explicit branching/joins, profile adapters,
 tool ceilings, cancellation, and app-open triggers; authoring remains file-only. See
@@ -218,11 +218,11 @@ so a read inside the TTL window reflects the change. See
 When a task first needs a working tree, acorn creates a **git worktree per task**
 under `apps/desktop/.acorn/worktrees/`, so several agents can work different
 branches of the same repo without colliding. **Agent sessions** are PTYs managed
-in the Electron main process (`apps/desktop/src/main/terminal.ts`, registered at
+in the Electron main process (`apps/desktop/src/plugins/terminal/main/terminal.ts`, registered at
 startup); they share the single SQLite connection rather than opening a second.
 
 Agents get task-scoped context through the **acorn MCP server**
-(`apps/desktop/src/mcp/server.ts`) over loopback. Because a spawned server holds
+(`apps/desktop/src/core/mcp/server.ts`) over loopback. Because a spawned server holds
 no session cookie, the main process mints a per-run `INTERNAL_TOKEN` and injects
 it (with the other `ACORN_*` env vars) into each task session, so the agent's MCP
 calls authenticate back to the machine's single user. Through that channel the

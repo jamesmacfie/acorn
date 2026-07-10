@@ -116,7 +116,7 @@ The engine never touches the caller's store. ETag/304 handling stays inside each
 caller's `refresh()` because it's specific to the `sync_state` ETag store, not
 universal to the flow — a `304` is just a successful (data-preserving) refresh
 from the engine's point of view. Background refreshes go through
-`trackBackgroundRefresh` (`src/server/background.ts`); tests settle them via
+`trackBackgroundRefresh` (`src/core/server/background.ts`); tests settle them via
 `settleBackground()`.
 
 **Not on the engine** (deliberately, see `inventories.md` §2d): `pullsBatch.ts`
@@ -147,7 +147,7 @@ How the 200 path rewrites the mirror differs per resource:
   `routes/prMirror.ts`: delete-then-insert in one `db.batch`.
 
 Inserts are chunked by column count (`chunkRowsByColumnBudget`,
-`src/server/db/batch.ts`) to keep each statement under a conservative
+`src/core/server/db/batch.ts`) to keep each statement under a conservative
 100-bound-parameter budget (`MAX_BOUND_PARAMS`) — better-sqlite3 allows far
 more (32k+), but small statements stay predictable. `pr_files` inserts one row
 per statement.
@@ -159,11 +159,11 @@ expanding unchanged context around diff hunks), keyed by the file's blob `sha`.
 It's a local directory — `<dataDir>/blobs/`, where the data root is
 `app.getPath('userData')` in packaged builds and the repo-local
 `apps/desktop/.acorn/` in dev (`main/electron.ts` / `devDataDir` in
-`src/main/server.ts`) — one file per key, implemented by `diskBlobCache`
-(the typed `BlobCache { get, put }`) in `src/main/bindings.ts`
+`src/core/main/server.ts`) — one file per key, implemented by `diskBlobCache`
+(the typed `BlobCache { get, put }`) in `src/core/main/bindings.ts`
 (non-filename-safe chars are sanitized to `_`, so `patch:<sha>` lands on disk
 as `patch_<sha>`). Immutable content means no TTL and no delete. Both key
-formats live in one shared module, `src/server/blobs.ts`:
+formats live in one shared module, `src/core/server/blobs.ts`:
 
 ```ts
 export const patchBlobKey = (sha: string) => `patch:${sha}`       // prMirror.ts — patch bodies
@@ -192,7 +192,7 @@ guard has been removed from `pullBlob.ts`/`prMirror.ts` — see
 ## Layer 3 — Client IndexedDB (TanStack Query persistence)
 
 The SPA uses TanStack Query as a stale-while-revalidate cache and persists it to
-IndexedDB via `idb-keyval`. From `apps/desktop/src/client/index.tsx`:
+IndexedDB via `idb-keyval`. From `apps/desktop/src/app/client/index.tsx`:
 
 ```ts
 defaultOptions: { queries: { refetchOnWindowFocus: true, gcTime: 1000 * 60 * 60 * 24 } }

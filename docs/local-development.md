@@ -26,7 +26,7 @@ A GitHub OAuth App allows exactly **one** callback URL, so the desktop app wants
   form (GitHub treats it as distinct from `localhost`).
 - Copy the **Client ID** and generate a **Client Secret**.
 
-The app origin is pinned to port `4317` (`ACORN_PORT` in `apps/desktop/src/main/server.ts`; an
+The app origin is pinned to port `4317` (`ACORN_PORT` in `apps/desktop/src/core/main/server.ts`; an
 `ACORN_PORT` environment variable overrides it, at the cost of a fresh IndexedDB origin) so the
 browser storage and OAuth callback stay stable. The OAuth flow requests the scopes
 `repo read:org read:user`.
@@ -43,7 +43,7 @@ cp apps/desktop/.env.example apps/desktop/.env
 
 Generate the session encryption key. `SESSION_ENC_KEY` must be **exactly 64 hex characters**
 (32 bytes / 256-bit) — it is the key for the AES-256-GCM (JWE `dir`) session cookie, and
-`src/server/session.ts` rejects anything not matching `^[0-9a-fA-F]{64}$`:
+`src/core/server/session.ts` rejects anything not matching `^[0-9a-fA-F]{64}$`:
 
 ```bash
 openssl rand -hex 32
@@ -82,7 +82,7 @@ The Electron window opens on `http://127.0.0.1:4317`; log in with GitHub.
 
 > **Desktop-only features.** The terminal drawer, agent sessions, run targets, and workflows are
 > always on in the Electron app; they require the preload bridge, so they're simply absent in a
-> plain browser via `dev:node` (`capabilities()` in `apps/desktop/src/client/features/capabilities.ts`).
+> plain browser via `dev:node` (`capabilities()` in `apps/desktop/src/core/client/capabilities.ts`).
 
 ## Local data — `apps/desktop/.acorn/`
 
@@ -125,7 +125,7 @@ Run from the repo root via Turborepo, or per-package with `--filter @acorn/deskt
 (`node:rebuild`) — after either, run `electron:rebuild` again before `pnpm dev`. `db:migrate`
 targets `apps/desktop/.acorn/acorn.sqlite` by default; set `ACORN_DB_PATH` to point it elsewhere.
 A wrong-ABI better-sqlite3 no longer dies with a bare `NODE_MODULE_VERSION` stack: `openDb`
-(`src/main/bindings.ts`) catches the native load error and rethrows naming the right rebuild
+(`src/core/main/bindings.ts`) catches the native load error and rethrows naming the right rebuild
 script for the runtime you're in.
 
 > **`node:sqlite` spike (docs/next Phase 9 B) — parked.** The built-in `node:sqlite` handles FTS5
@@ -136,10 +136,10 @@ script for the runtime you're in.
 
 ## Database migrations
 
-The schema lives in `apps/desktop/src/server/db/schema.ts` (Drizzle, SQLite dialect). To change it:
+The schema lives in `apps/desktop/src/core/server/db/schema.ts` (Drizzle, SQLite dialect). To change it:
 
 ```bash
-# 1. Edit src/server/db/schema.ts
+# 1. Edit src/core/server/db/schema.ts
 
 # 2. Generate the SQL migration into apps/desktop/migrations/
 pnpm --filter @acorn/desktop db:generate

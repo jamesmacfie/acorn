@@ -12,7 +12,7 @@ removed — see git history for the rationale and alternatives considered.)
 | **Workspace** | A named group of repositories ("Runn", "Acorn"). The top-level unit picked in the top bar. Carries identity (colour + icon) and per-workspace scripts + browser-preview config. | A repo belongs to **exactly one** workspace (a partition). The active workspace is **derived** from the current repo — there is no URL/routing dimension and nothing stores "the selected workspace". | `workspaces` |
 | **Task** | The single-repo unit of work: repo + branch + optional git worktree + optional linked PR + its panes/terminals. Shown as a row in the left **TabRail**. | Bound to one repo; its parent workspace is derived through `workspace_repos` on `(repoOwner, repoName)`. | `tasks` |
 
-Selecting a workspace is not stored — it is inferred. `workspaceForRepo` (`apps/desktop/src/client/features/workspaces/activeWorkspace.ts:6`) returns whichever workspace contains the current repo, and switching workspace simply means navigating to one of its repos.
+Selecting a workspace is not stored — it is inferred. `workspaceForRepo` (`apps/desktop/src/core/client/workspaces/activeWorkspace.ts:6`) returns whichever workspace contains the current repo, and switching workspace simply means navigating to one of its repos.
 
 ### Terminology note (old docs vs. today)
 
@@ -36,7 +36,7 @@ When reading anything from that era (old commits, the removed design docs), ment
 
 Every workspace has a colour and an icon, both with deterministic derived defaults so a workspace looks
 distinct before the user ever picks anything. The helpers are pure and shared between the Hono routes
-and the renderer (`apps/desktop/src/shared/workspaceIdentity.ts`).
+and the renderer (`apps/desktop/src/core/shared/workspaceIdentity.ts`).
 
 - **Colour** (`workspaces.color`): a preset token key (`green`, `blue`, `purple`, `orange`, `red`,
   `teal`, `magenta`, `gray`) or a 6-hex value (with or without `#`). `null` → derived from a hash of
@@ -68,14 +68,14 @@ browser-preview pane resolves its URL. All are nullable (blank ⇒ `null` ⇒ "n
 The `PATCH /api/workspaces/:id` route validates these: `setupScriptTrigger` must be one of the three
 values, `previewMode` one of the three modes, and — importantly — a `port` preview value must be a bare
 1–65535 port so a crafted value (e.g. `@evil.com`) can't redirect the preview webview to another host
-(`apps/desktop/src/server/routes/workspaces.ts:112`). Terminal/agent/run-target behaviour that consumes
+(`apps/desktop/src/core/server/routes/workspaces.ts:112`). Terminal/agent/run-target behaviour that consumes
 these scripts is desktop-only — it needs the preload bridge (see [Lifecycle](#lifecycle-note)).
 
 ### The Default workspace & bootstrap
 
 On first login a single **Default** workspace (`isDefault = true`) is created and every mirrored repo
 not already assigned (and not ignored) is placed in it. This is `POST /api/workspaces/bootstrap`
-(`apps/desktop/src/server/routes/workspaces.ts:60`) — **idempotent**: it re-runs safely, skipping repos
+(`apps/desktop/src/core/server/routes/workspaces.ts:60`) — **idempotent**: it re-runs safely, skipping repos
 already mapped or ignored, so an ignored repo never silently reappears in Default. `ensureDefault`
 lazily creates the Default row if it is missing.
 
@@ -85,7 +85,7 @@ drops its external-project links; the Default workspace itself cannot be deleted
 ### Onboarding & repo assignment
 
 The repo→workspace mapping UI is a single shared body, `WorkspaceRepoAssignments`
-(`apps/desktop/src/client/features/workspaces/WorkspaceRepoAssignments.tsx`), rendered both by the
+(`apps/desktop/src/core/client/workspaces/WorkspaceRepoAssignments.tsx`), rendered both by the
 first-run `OnboardingModal` and by Settings → Workspaces. It lets you:
 
 - **Create** workspaces inline (name field → `POST /api/workspaces`).
@@ -127,7 +127,7 @@ source). The Linear browse pane's project picker is the primary writer (see
 ### The data (`tasks`)
 
 A Task is machine-scoped (it owns a local worktree) — no `user_id`. Its parent workspace is derived, not
-stored. Columns (`apps/desktop/src/server/db/schema.ts:341`):
+stored. Columns (`apps/desktop/src/core/server/db/schema.ts:341`):
 
 | Column | Meaning |
 | --- | --- |
@@ -145,7 +145,7 @@ stored. Columns (`apps/desktop/src/server/db/schema.ts:341`):
 
 `GET /api/tasks` returns only `active` tasks, ordered by `sort`, each with its `task_links`. Task titles
 are seeded server-side when omitted: `#<pr> <repo>` when a PR number is present, else `<repo> · <branch>`
-(`apps/desktop/src/server/routes/tasks.ts:56`).
+(`apps/desktop/src/core/server/routes/tasks.ts:56`).
 
 ### How tasks are created
 
@@ -160,7 +160,7 @@ optional `title`, `pullNumber`, `links`):
 - **Local-first** (`origin: local`) — the "New task" (`+`) button in the rail. Opens a small modal
   (Electron's `BrowserWindow` has no `window.prompt`) that picks a repo from the active workspace and a
   branch. The branch defaults to a de-duped slug of the title (`slugifyBranch` + `dedupeBranch`,
-  `apps/desktop/src/shared/branch.ts`) until the user edits the branch field, then their value wins
+  `apps/desktop/src/core/shared/branch.ts`) until the user edits the branch field, then their value wins
   (`TabRail.tsx:62`).
 
 ### External links (`task_links`)
@@ -178,7 +178,7 @@ rather than creating a new one (`RollbarBrowse.tsx:68`).
 A local-first task (no `pullNumber`) **adopts a PR** once one is opened for its branch. On a real PR-list
 refresh (not a 304), the pulls route builds a `branchName → number` map from the just-mirrored PRs and,
 for every active no-`pullNumber` task in that repo, sets `pullNumber` when its branch matches
-(`apps/desktop/src/server/routes/pulls.ts:142`). No webhook, no polling loop — it piggybacks on the
+(`apps/desktop/src/plugins/github/server/routes/pulls.ts:142`). No webhook, no polling loop — it piggybacks on the
 normal mirror sync. After inheritance the task's PR pane and checks light up automatically.
 
 (The complementary flows: **Flow A** = task born from an existing PR; **Flow C** = the worktree is
@@ -188,11 +188,11 @@ created lazily on first terminal — see [Lifecycle](#lifecycle-note).)
 
 ## The TabRail
 
-The left rail (`apps/desktop/src/client/features/tabs/TabRail.tsx`) has two zones separated by a rule:
+The left rail (`apps/desktop/src/core/client/tabs/TabRail.tsx`) has two zones separated by a rule:
 
 1. **Sources** (top) — browse entry points. GitHub is always present; Linear and Rollbar appear only
    when a connected integration of that provider exists (`availableSources`,
-   `apps/desktop/src/client/features/tabs/sources.ts`). Selecting a Source fills the main area with that
+   `apps/desktop/src/core/client/tabs/sources.ts`). Selecting a Source fills the main area with that
    provider's browse view and clears the active task.
 2. **Tasks** (below) — one row per active Task, **scoped to the active workspace**: tasks whose repo
    isn't in the current workspace are hidden, so switching workspace swaps the roster (`TabRail.tsx:75`).
@@ -216,7 +216,7 @@ Each Task row carries live status glyphs:
 Pin-to-top and drag-reorder are **view state**, persisted in a dedicated `rail_order` pref — never
 `tasks.sort` (the source note: sort once derived dev-server ports; even though ports moved off sort,
 reordering stays out of it on principle). The pure, unit-tested model is
-`apps/desktop/src/client/features/tabs/railOrder.ts`:
+`apps/desktop/src/core/client/tabs/railOrder.ts`:
 
 ```
 RailOrder = { pinned: string[]; order: string[] }
@@ -230,7 +230,7 @@ serializes the result back to the pref and invalidates. Cross-partition drags ad
 ### Interaction
 
 - **Click** a row → make it active and navigate to its repo/PR (`pathForTask`,
-  `apps/desktop/src/client/features/tasks/activate.ts:6`). Activation restores the task's last-used
+  `apps/desktop/src/core/client/tasks/activate.ts:6`). Activation restores the task's last-used
   pane, or picks a default (`pr`, else `linear` if a Linear link exists) the first time.
 - **Click the active row** → open a popover with **Pin/Unpin**, **Rename**, **Archive**.
 - **⌘1–9 / Ctrl+1–9** → jump to the Nth *visible* task (exactly what's rendered — workspace-scoped +
@@ -239,7 +239,7 @@ serializes the result back to the pref and invalidates. Cross-partition drags ad
 
 ### Per-task worktree status polling
 
-`taskStatus.ts` (`apps/desktop/src/client/features/tasks/taskStatus.ts`) holds a signal of
+`taskStatus.ts` (`apps/desktop/src/core/client/tasks/taskStatus.ts`) holds a signal of
 `TaskStatus` per task (`dirty`, `dirtyCount`, `missing`), refreshed from the terminal bridge on a 5s
 interval plus on `onStatus` edges. It is a no-op on the web build (no terminal bridge). The 5s poll is a
 deliberate `ponytail` simplification — cheap over a handful of worktrees; tighten to a watcher only if it
@@ -251,12 +251,12 @@ ever matters.
 
 A Source browse view lists a provider's items and **promotes** one to a Task.
 
-- **LinearBrowse** (`apps/desktop/src/client/features/tasks/LinearBrowse.tsx`) — Linear projects are
+- **LinearBrowse** (`apps/desktop/src/plugins/linear/client/LinearBrowse.tsx`) — Linear projects are
   linked at the **workspace** level (see `workspace_projects`) and may span several connected Linear
   workspaces. The pane shows issues across the active workspace's linked projects, with a "Projects"
   picker that reads/writes those links. Clicking an issue promotes it to a `linear`-origin task on the
   *current repo*, tagged with the ticket + its owning integration, and switches to the `linear` pane.
-- **RollbarBrowse** (`apps/desktop/src/client/features/tasks/RollbarBrowse.tsx`) — recent error items
+- **RollbarBrowse** (`apps/desktop/src/plugins/rollbar/client/RollbarBrowse.tsx`) — recent error items
   across connected projects. An error has no inherent repo/branch, so "open as task" prompts for both
   (branch defaults to a slug of the title). Alternatively "＋task" attaches the error to the currently
   active task as a new `task_link` (its most common flow).
@@ -268,7 +268,7 @@ See [`integrations.md`](./integrations.md) for the provider connections themselv
 ## Data model & API summary
 
 Tables (full detail in [`data-layer.md`](./data-layer.md), schema at
-`apps/desktop/src/server/db/schema.ts`):
+`apps/desktop/src/core/server/db/schema.ts`):
 
 | Table | Role |
 | --- | --- |
@@ -328,9 +328,9 @@ Client: `apps/desktop/src/client/features/tabs/{TabRail.tsx,railOrder.ts,sources
 `apps/desktop/src/client/features/tasks/{tasks.ts,activate.ts,taskStatus.ts,LinearBrowse.tsx,RollbarBrowse.tsx}`,
 `apps/desktop/src/client/features/workspaces/{OnboardingModal.tsx,WorkspaceRepoAssignments.tsx,activeWorkspace.ts}`.
 Server: `apps/desktop/src/server/routes/{workspaces.ts,tasks.ts}`, PR inheritance in
-`apps/desktop/src/server/routes/pulls.ts:142`.
+`apps/desktop/src/plugins/github/server/routes/pulls.ts:142`.
 Shared: `apps/desktop/src/shared/{workspaceIdentity.ts,branch.ts}`. Schema:
-`apps/desktop/src/server/db/schema.ts`.
+`apps/desktop/src/core/server/db/schema.ts`.
 
 **See also:** [`panes.md`](./panes.md) (the Task view surfaces) ·
 [`terminal-and-agents.md`](./terminal-and-agents.md) (worktrees, sessions, run targets) ·

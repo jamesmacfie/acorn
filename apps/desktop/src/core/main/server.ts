@@ -5,15 +5,18 @@ import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { createApp } from '../server/index'
 import { makeBindings, type RuntimeBindings } from './bindings'
+import { resolveServerPaths } from './serverPaths'
 import { attachWsHub } from './wsHub'
 
 const here = dirname(fileURLToPath(import.meta.url))
-// Resolve packaged paths from this module, never process.cwd() — the app launches from Finder.
-const clientDir = resolve(here, '../../dist/client')
+// Resolve from the desktop package root, never process.cwd() or a fixed module depth: source-mode
+// dev:node runs this file under src/core/main while electron-vite bundles it under out/main.
+const serverPaths = resolveServerPaths(here)
+const clientDir = serverPaths.clientDir
 // DEV data root: the repo-local apps/desktop/.acorn (gitignored). Only valid while running from a
 // checkout — a packaged app's module dir is the read-only asar, so electron.ts passes an
 // app.getPath('userData') root into bootstrap() instead when app.isPackaged.
-export const devDataDir = resolve(here, '../../.acorn')
+export const devDataDir = serverPaths.devDataDir
 const indexHtml = readFileSync(resolve(clientDir, 'index.html'), 'utf8')
 
 export const ACORN_PORT = Number(process.env.ACORN_PORT) || 4317

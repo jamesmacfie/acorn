@@ -28,11 +28,12 @@ and IndexedDB client persistence.
 
 ## Repo map
 
-pnpm workspace + Turborepo; all app code is in `apps/desktop`. Since Phase 10 (docs/next) the source
-is foldered into `core/` + `plugins/` + `app/`, each split by process (`client` / `server` / `main`
-/ `mcp` / `shared`). Import rules are enforced by `src/core/boundaries.test.ts`.
+pnpm workspace + Turborepo; all app code is in `apps/desktop`. Source is organised into `core/` +
+`plugins/` + `app/`, each split by runtime (`client` / `server` / `main` / `mcp` / `shared`). Hard
+app/process boundaries and a shrinking ledger of legacy cross-feature coupling are enforced by
+`src/core/boundaries.test.ts`.
 
-- `apps/desktop/src/core/` — the platform, never imports a plugin. `client/` (shell, registries,
+- `apps/desktop/src/core/` — platform-owned contracts and services. `client/` (shell, registries,
   persistence, layout, prefs, palettes, tabs, tasks/workspaces, settings framework, WS client),
   `server/` (`createApp` factory, session/auth/csrf middleware, sync engine, route + integration-
   provider registries, Drizzle `db/`), `main/` (PTY/worktree primitives, bindings, server listener,
@@ -41,8 +42,9 @@ is foldered into `core/` + `plugins/` + `app/`, each split by process (`client` 
 - `apps/desktop/src/plugins/<name>/` — one folder per in-tree feature (github, linear, rollbar,
   editor, changes, notes, memory, context, preview, database, terminal, agents, workflows,
   profiles-{claude,codex,aider}, onboarding), each with `client`/`server`/`main` parts as needed. A
-  plugin may import `core/` and cross-plugin contribution points, never another plugin's internals.
-- `apps/desktop/src/app/` — the composition root, the ONLY layer that imports plugins: `main/`
+  plugin may import `core/` and cross-plugin contribution points. Existing direct cross-feature
+  imports are explicitly baselined and must not grow.
+- `apps/desktop/src/app/` — the composition root and contribution activation layer: `main/`
   (`bootstrap.ts` boot order, `electron.ts` entry, activation modules), `server/` (`providers.ts`,
   `routes.ts` register plugin contributions into core registries; `devNode.ts` is the `dev:node`
   entry), `client/` (`index.tsx` renderer entry + contribution activation).
@@ -52,8 +54,7 @@ is foldered into `core/` + `plugins/` + `app/`, each split by process (`client` 
   [docs/github-integration.md](./docs/github-integration.md), [docs/data-layer.md](./docs/data-layer.md),
   [docs/caching.md](./docs/caching.md). (Some still cite pre-foldering paths; the tree above is authoritative.)
 - `apps/desktop/migrations/` — Drizzle-generated SQLite migrations (applied on startup + via `db:migrate`).
-- `docs/` — all topic docs; pick the relevant one per the links above. `docs/next/` is the design
-  history for this plugin-platform version (no longer an active build guide).
+- `docs/` — current architecture, feature, operations, and contributor documentation.
 
 ## Key commands
 

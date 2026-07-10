@@ -6,8 +6,8 @@ providers own authentication policy, cached-data codecs, context formatting, ref
 mutations, capabilities, and operating budgets.
 
 The implementation lives under `apps/desktop/src/server/integrations/`. Public cross-process types
-live in `apps/desktop/src/shared/integrations.ts`; client source, pane, and link contributions live in
-`apps/desktop/src/client/features/integrations/providerContributions.tsx`.
+live in `apps/desktop/src/core/shared/integrations.ts`; client source, pane, and link contributions live in
+`apps/desktop/src/app/client/providerContributions.tsx`.
 
 ## Provider descriptor and registry
 

@@ -60,7 +60,7 @@ Cell values are normalized in main (objects → JSON, dates → ISO) so the grid
 
 ## Where the code lives
 
-Main process: `apps/desktop/src/main/database.ts` (IPC + pool cache + `resolveDbUrl`), registered
+Main process: `apps/desktop/src/plugins/database/main/database.ts` (IPC + pool cache + `resolveDbUrl`), registered
 from `main/terminal.ts`, exposed via `main/preload.ts`. Wire types: `shared/database.ts`.
 Client: `apps/desktop/src/client/features/database/{databaseClient.ts,DatabasePane.tsx,ResultGrid.tsx,database.css}`,
 wired into the pane system in `client/features/tasks/{layout.ts,TaskView.tsx,paneShortcuts.ts}`.

@@ -18,7 +18,7 @@ with GitHub and you get:
   optional PR) from a PR, a Linear ticket, a Rollbar error, or from scratch. Tasks live in a left rail.
 - **Panes** — a task view composes panes side by side: PR review, local-changes review, editor, notes,
   context, browser preview, Linear, and Rollbar.
-- **Terminals & agents** *(behind a flag)* — persistent shell/agent sessions in the task's worktree, an
+- **Terminals & agents** — persistent shell/agent sessions in the task's worktree, an
   Agents panel with a live activity feed, and an MCP server that hands agents the task's context.
 
 The Electron main process starts the Hono server on `http://127.0.0.1:4317` and points a hardened
@@ -45,15 +45,16 @@ The Electron main process starts the Hono server on `http://127.0.0.1:4317` and 
 
 pnpm workspace + Turborepo. All app code lives in `apps/desktop` (`@acorn/desktop`).
 
-The source is foldered into a **plugin platform**: `core/` (the platform, imports no plugin),
-`plugins/<name>/` (one folder per feature), and `app/` (the composition root, the only layer that
-imports plugins). Each layer is split by process (`client` / `server` / `main` / `mcp` / `shared`).
-Import rules are enforced by `src/core/boundaries.test.ts`.
+The source is organised as a **plugin-oriented platform**: `core/` owns platform contracts and
+services, `plugins/<name>/` owns product features, and `app/` composes the shipped application.
+Each layer is split by runtime (`client` / `server` / `main` / `mcp` / `shared`). Import-boundary
+tests prevent app-layer and cross-runtime leakage and keep the explicitly baselined legacy
+cross-feature dependencies from growing.
 
 ```
 apps/desktop/
 ├── src/
-│   ├── core/               # the platform — never imports a plugin
+│   ├── core/               # platform contracts and services
 │   │   ├── client/         #   shell, registries, persistence, layout, palettes, tabs,
 │   │   │                   #   tasks/workspaces, settings framework, WS client
 │   │   ├── server/         #   createApp() factory, session/auth/csrf middleware, sync engine,
@@ -71,7 +72,7 @@ apps/desktop/
 │   │   ├── agents/ workflows/# agent roster · TOML workflows + runner
 │   │   ├── profiles-{claude,codex,aider}/  onboarding/
 │   │   └── …
-│   ├── app/                # composition root — the ONLY layer that imports plugins
+│   ├── app/                # composition root and contribution activation
 │   │   ├── main/           #   bootstrap.ts (boot order), electron.ts entry, activation modules
 │   │   ├── server/         #   providers.ts, routes.ts (register into core registries), devNode.ts
 │   │   └── client/         #   index.tsx renderer entry + contribution activation
@@ -91,11 +92,10 @@ Prerequisites: Node ≥ 20, pnpm 11 (`corepack enable`), and a GitHub OAuth App 
 not `localhost`).
 
 ```bash
-# 1. Secrets — create apps/desktop/.env with:
+# 1. GitHub OAuth — create apps/desktop/.env with:
 #    GITHUB_CLIENT_ID=...
 #    GITHUB_CLIENT_SECRET=...
-#    SESSION_ENC_KEY=...   (exactly 64 hex chars)
-openssl rand -hex 32
+#    SESSION_ENC_KEY=...   (optional for Electron; required by dev:node)
 
 # 2. Install
 pnpm install
@@ -108,8 +108,8 @@ pnpm dev
 ```
 
 The window opens on `http://127.0.0.1:4317`; log in with GitHub. Migrations apply automatically on
-startup. The terminal/agents surface is desktop-only and behind a flag — enable it in DevTools with
-`localStorage.setItem('acorn:term','1')` then reload.
+startup. On a fresh Electron data root, acorn creates `SESSION_ENC_KEY` and stores it through
+Electron `safeStorage`; an explicit environment value remains the recovery and `dev:node` path.
 
 > **better-sqlite3 ABI:** the native module builds for one ABI at a time. `pnpm dev` (Electron) needs
 > the Electron ABI (`electron:rebuild`); `dev:node` / `db:migrate` (plain Node) need the Node ABI
@@ -136,8 +136,8 @@ pnpm --filter @acorn/desktop dist   # → apps/desktop/release/*.dmg and *.zip
 
 For personal use the build is ad-hoc signed. To distribute the `.dmg` to other machines, add a
 Developer ID identity + notarization in `apps/desktop/electron-builder.yml` (otherwise Gatekeeper
-blocks it). Secrets are read from `apps/desktop/.env` in dev; packaged builds will read from the OS
-keychain (planned — see [docs/electron.md](./docs/electron.md)). Since a GitHub OAuth App allows only
+blocks it). `SESSION_ENC_KEY` uses `safeStorage`; packaged builds still require
+`GITHUB_CLIENT_ID`/`GITHUB_CLIENT_SECRET` in the environment. Since a GitHub OAuth App allows only
 one callback URL, use a dedicated OAuth App for the desktop build.
 
 ## Documentation
@@ -148,6 +148,7 @@ Detailed docs live in [`docs/`](./docs). Start with the architecture overview.
 
 - [architecture-overview.md](./docs/architecture-overview.md) — the keystone: one-server design, the
   lazy read-model mirror, the three cache layers, the product model, and the doc index.
+- [plugins.md](./docs/plugins.md) — plugin boundaries, contribution registries, and adding features.
 - [data-layer.md](./docs/data-layer.md) — the full SQLite schema table-by-table (mirror vs app-state).
 - [state.md](./docs/state.md) — state tiers/scopes, startup restore descriptors, and scoped eviction.
 - [api-reference.md](./docs/api-reference.md) — every `/auth/*` and `/api/*` route.
@@ -173,12 +174,11 @@ Detailed docs live in [`docs/`](./docs). Start with the architecture overview.
 - [terminal-and-agents.md](./docs/terminal-and-agents.md) — the terminal drawer, agent sessions, and monitoring.
 - [mcp.md](./docs/mcp.md) — the acorn MCP server and its task-scoped tools.
 - [notes-and-memory.md](./docs/notes-and-memory.md) — the notes and memory systems.
-- [workflows.md](./docs/workflows.md) — run targets and the (in-progress) workflow engine.
+- [workflows.md](./docs/workflows.md) — run targets and the durable workflow engine.
 
 **Setup & reference**
 
 - [local-development.md](./docs/local-development.md) — full local setup & dev workflow.
-
-Future work lives in [`docs/next/`](./docs/next): the architecture review, the plugin-platform
-design, and the staged implementation guide for building it.
+- [testing.md](./docs/testing.md) — test suites, boundary checks, and focused validation.
+- [security.md](./docs/security.md) — the loopback threat model and security invariants.
 </content>

@@ -9,7 +9,7 @@ been removed — see git history for the original rationale.)
 > `acorn:term` localStorage flag is deleted). It requires the preload bridge: in the Electron app
 > the drawer, the Agents toggle, and `window.acorn.terminal` are present; in a plain browser
 > (`dev:node`) the bridge accessor (`terminalApi()`) returns `null` and consumers show nothing
-> (`capabilities()`, `apps/desktop/src/client/features/capabilities.ts`). The **workflow** engine
+> (`capabilities()`, `apps/desktop/src/core/client/capabilities.ts`). The **workflow** engine
 > reachable through this surface is in progress (see [workflows.md](./workflows.md)); the terminal +
 > interactive agent sessions themselves are functional.
 
@@ -33,7 +33,7 @@ that mirrors the app tokens and follows the theme live.
 
 ## 2. Sessions & persistence
 
-The wire contract is defined once in `apps/desktop/src/shared/terminal.ts` (`TerminalSession`,
+The wire contract is defined once in `apps/desktop/src/core/shared/terminal.ts` (`TerminalSession`,
 `CreateOpts`, `ServerMsg`) and imported by main, preload, and renderer — it holds only what crosses
 IPC, never node-pty types. The main process owns the PTYs: `main/terminal.ts` is the session
 engine + `term:*` IPC and the composer (`registerTerminalIpc`), with the other IPC surfaces split
@@ -255,12 +255,12 @@ error`); `attach` subscribes and returns an unsubscribe that detaches without ki
 - Renderer terminal: `apps/desktop/src/client/features/terminal/{TerminalPanel,TerminalSurface}.tsx`,
   `sessions.ts`, `terminalClient.ts`, `theme.ts`
 - Renderer agents: `apps/desktop/src/client/features/agents/{AgentsPanel.tsx,model.ts}`,
-  `apps/desktop/src/client/features/agent/reference.ts`
-- Flag + panel wiring: `apps/desktop/src/client/App.tsx:39`,
-  `apps/desktop/src/client/features/tasks/TaskView.tsx`
-- Wire contract & vocabulary: `apps/desktop/src/shared/terminal.ts`
+  `apps/desktop/src/core/client/agent/reference.ts`
+- Flag + panel wiring: `apps/desktop/src/core/client/App.tsx:39`,
+  `apps/desktop/src/core/client/tasks/TaskView.tsx`
+- Wire contract & vocabulary: `apps/desktop/src/core/shared/terminal.ts`
 - Main process: `apps/desktop/src/main/{terminal.ts,taskWorktree.ts,localGitIpc.ts,runIpc.ts,knowledgeIpc.ts,workflowWiring.ts,harnessWiring.ts,notify.ts,terminalUtils.ts,profiles.ts,worktrees.ts,headless.ts,preload.ts}`
-- Schema: `apps/desktop/src/server/db/schema.ts` (`terminal_sessions`, `workflow_runs`, `workflow_steps`)
+- Schema: `apps/desktop/src/core/server/db/schema.ts` (`terminal_sessions`, `workflow_runs`, `workflow_steps`)
 
 ## See also
 

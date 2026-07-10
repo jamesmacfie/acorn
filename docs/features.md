@@ -69,7 +69,7 @@ tasks are created on a fresh branch (slugged from the title) via the rail's `+` 
 
 Inside a task, the view is a flat left→right row of open **panes** (one pure reducer,
 `applyLayoutAction`, owns every transition in
-`apps/desktop/src/client/features/tasks/layout.ts`). A switcher click **shows** a single pane;
+`apps/desktop/src/core/client/tasks/layout.ts`). A switcher click **shows** a single pane;
 ⌘/Ctrl-click **opens one beside** the others; each slot gets a close button when more than one is
 open. Every pane has an overridable single-key shortcut (Settings → Shortcuts).
 
@@ -107,7 +107,7 @@ one.
 The right-rail **Agents panel** is the roster + launcher + activity feed for agent sessions, and
 "agent working" status flows back to the TabRail (spinner) and the topbar. All of this is
 desktop-only — always on when the preload bridge is present (`capabilities()`,
-`apps/desktop/src/client/features/capabilities.ts`); the old `acorn:term` flag is gone. Bridge-absent
+`apps/desktop/src/core/client/capabilities.ts`); the old `acorn:term` flag is gone. Bridge-absent
 (a plain browser via `dev:node`) is the degraded mode.
 
 → [terminal-and-agents.md](./terminal-and-agents.md)
@@ -136,7 +136,7 @@ write and recall across sessions (FTS5 full-text search, MCP `memory_*` tools).
 
 ## MCP
 
-acorn ships a stdio **MCP server** (`apps/desktop/src/mcp/server.ts`) that exposes the current
+acorn ships a stdio **MCP server** (`apps/desktop/src/core/mcp/server.ts`) that exposes the current
 task's context to any agent launched from it — task/PR context, changed files, local diffs, git log,
 repo info, linked issues, notes, memory, run targets, and browser driving. Tools loopback into the
 running app's Hono API (never their own DB), and return structured "no active task" results when
@@ -210,13 +210,13 @@ Be aware of what's real today:
 
 ## Source
 
-- Client shell: `apps/desktop/src/client/App.tsx`; capabilities: `client/features/capabilities.ts`
+- Client shell: `apps/desktop/src/core/client/App.tsx`; capabilities: `client/features/capabilities.ts`
 - TabRail: `apps/desktop/src/client/features/tabs/{TabRail.tsx,sources.ts,railOrder.ts}`
 - Task view + panes: `apps/desktop/src/client/features/tasks/{TaskView.tsx,layout.ts}`
-- Write actions: `apps/desktop/src/client/mutations.ts`
-- Palette / shortcuts: `apps/desktop/src/client/features/palette/model.ts`, `client/Shortcuts.tsx`
+- Write actions: `apps/desktop/src/plugins/github/client/mutations.ts`
+- Palette / shortcuts: `apps/desktop/src/core/client/palette/model.ts`, `client/Shortcuts.tsx`
 - Settings: `apps/desktop/src/client/features/settings/` (SettingsModal is pure tab chrome; each tab body is its own component)
-- MCP server: `apps/desktop/src/mcp/server.ts`
+- MCP server: `apps/desktop/src/core/mcp/server.ts`
 
 See also: [architecture-overview.md](./architecture-overview.md) ·
 [workspaces-and-tasks.md](./workspaces-and-tasks.md) · [panes.md](./panes.md) ·

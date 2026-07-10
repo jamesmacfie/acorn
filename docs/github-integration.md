@@ -1,7 +1,7 @@
 # GitHub Integration
 
 All GitHub access goes through two thin clients in
-`apps/desktop/src/server/github/index.ts`. The route handlers
+`apps/desktop/src/plugins/github/server/index.ts`. The route handlers
 (`apps/desktop/src/server/routes/`) call these, mirror the result into the local
 SQLite read-model, and return a public projection. The browser never talks to GitHub directly and
 never holds the token (see [authentication](./authentication.md)).

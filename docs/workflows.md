@@ -6,7 +6,7 @@ start/stop/reach), and a workflow is the composable multi-step machine that cons
 
 > **Maturity — read this first.** Everything on this page is **desktop-only** — it needs the
 > preload bridge, so it's always on in the Electron app and absent in a plain browser
-> (`capabilities()`, `apps/desktop/src/client/features/capabilities.ts`).
+> (`capabilities()`, `apps/desktop/src/core/client/capabilities.ts`).
 > Two different maturities live here:
 > - **Run targets + layout recipes are implemented and working** (config reader, runtime service,
 >   IPC, MCP tools, palette, recipes).
@@ -42,18 +42,18 @@ Run targets are the simplest (one-shot) end of the same spectrum workflows exten
 A run target is a **command + optional `stop` + at most one of `url` / `url_command`**. There is no
 `kind` enum: a long-running target is one whose process stays alive (a terminal session, the ▶
 behaviour); a one-shot exits. The presence of `url`/`url_command`/`stop` tells acorn everything it
-needs. The renderer shape is `RunTargetInfo` (`apps/desktop/src/shared/terminal.ts:88`); status is
+needs. The renderer shape is `RunTargetInfo` (`apps/desktop/src/core/shared/terminal.ts:88`); status is
 `RunStatus = { running, url?, exitCode? }` (`:98`).
 
 acorn **allocates no ports**. Isolation across parallel tasks is the *script's* job, informed by the
 stable identity env acorn injects into every session — notably **`ACORN_TASK_SLUG`**
-(`apps/desktop/src/main/terminalUtils.ts:153`), the branch-derived handle a compose target namespaces
+(`apps/desktop/src/plugins/terminal/main/terminalUtils.ts:153`), the branch-derived handle a compose target namespaces
 with (`docker compose -p acorn-$ACORN_TASK_SLUG …`) or a dev script uses to pick a free port and
 report it back via `url_command`.
 
 ### Where targets are configured
 
-Three layers, highest precedence first (`loadRepoConfig`, `apps/desktop/src/main/runConfig.ts` —
+Three layers, highest precedence first (`loadRepoConfig`, `apps/desktop/src/plugins/terminal/main/runConfig.ts` —
 the canonical layering comment lives at its merge point):
 
 | Layer | Source | Notes |
@@ -68,13 +68,13 @@ today, surfacing malformed files as visible error rows rather than silently drop
 
 Per-workspace scripts on the `workspaces` table also feed targets: `devScript` maps to a `dev` run
 target, and `devRestartScript`, when set, is what `run_restart` runs instead of stop+start
-(`apps/desktop/src/server/db/schema.ts:282-283`). The DB fallback JSON lives on
+(`apps/desktop/src/core/server/db/schema.ts:282-283`). The DB fallback JSON lives on
 `repo_paths.runTargets` (`schema.ts:262`).
 
 ### How targets run
 
 The **`RuntimeService`** in the main process owns run-target instances per task
-(`apps/desktop/src/main/runtime.ts:51`). An instance is *just a terminal session in the task's
+(`apps/desktop/src/plugins/terminal/main/runtime.ts:51`). An instance is *just a terminal session in the task's
 worktree*, so `running` derives from the session map, and reachability comes from the target's `url`
 (fixed) or `url_command` (run-a-command-and-parse-stdout — the same shape as `term:previewUrl`;
 `parseUrlOutput`/`resolveTargetUrl`, `runtime.ts:29-47`). Each target shows in the terminal drawer
@@ -83,11 +83,11 @@ with **one ▶/■ per target**. `start` is idempotent for an already-running in
 ### Who consumes run targets
 
 - **Command palette** — `Run: <id>` / `Stop: <id>` rows (toggling on `running`) come from
-  `composeItems` (`apps/desktop/src/client/features/palette/model.ts:26`); `CommandPalette.tsx`
+  `composeItems` (`apps/desktop/src/core/client/palette/model.ts:26`); `CommandPalette.tsx`
   calls `api.run.start` / `api.run.stop`.
 - **Layout recipes** — auto-start a target and point the browser at its URL (§3).
 - **MCP `run_*` tools** — `run_targets`, `run_start`, `run_stop`, `run_restart`, `run_status`
-  (`apps/desktop/src/mcp/server.ts:233-251`), so an agent can bring a stack up, learn where it
+  (`apps/desktop/src/core/mcp/server.ts:233-251`), so an agent can bring a stack up, learn where it
   listens (`{ running, url? }`), drive the browser at it, and tear it down — without knowing whether
   it's compose or pnpm. See [mcp.md](./mcp.md).
 - **Workflow steps** — a step's `requires_run` starts the target and hands its resolved URL to the
@@ -96,11 +96,11 @@ with **one ▶/■ per target**. `start` is idempotent for an already-running in
 ### The harness endpoints
 
 The client bridge is `window.acorn.terminal.run.*`
-(`apps/desktop/src/client/features/terminal/terminalClient.ts:27-40`), backed by IPC (`run:targets`,
+(`apps/desktop/src/plugins/terminal/client/terminalClient.ts:27-40`), backed by IPC (`run:targets`,
 `run:start`, `run:stop`, `run:status`, `run:defaultUrl`) into the `RuntimeService`.
 
 The **loopback HTTP surface** the MCP server calls lives on the harness router
-(`apps/desktop/src/server/routes/harness.ts`):
+(`apps/desktop/src/core/server/routes/harness.ts`):
 
 | Route | Effect |
 | --- | --- |
@@ -122,7 +122,7 @@ degrades to a clean `503 bridge-unavailable` (bridge-up domain failures map to t
 A `[layout.<id>]` config block ties panes ([`03`]/[panes.md](./panes.md)) to run targets. It seeds a
 `TaskLayout`, auto-starts a named run target in the drawer, and points the browser pane at that
 target's resolved URL. The pure executor is `invokeLayoutRecipe`
-(`apps/desktop/src/client/features/tasks/recipes.ts:31`):
+(`apps/desktop/src/plugins/terminal/client/recipes.ts:31`):
 
 1. `recipeToLayout` validates `panes` against `PaneId` (unknown/duplicate panes dropped; none valid →
    the recipe fails).
@@ -147,7 +147,7 @@ encode**; treat the loops/fan-out as young in-progress code, not a proven orches
 
 Two machine-scoped tables (no `user_id`, like `tasks`).
 
-**`workflow_runs`** (`apps/desktop/src/server/db/schema.ts:445-456`) — the durable checkpoint for the
+**`workflow_runs`** (`apps/desktop/src/core/server/db/schema.ts:445-456`) — the durable checkpoint for the
 run:
 
 | Column | Meaning |
@@ -184,7 +184,7 @@ PRD-style step can emit a task list and spawn N children, each on its own branch
 ### The design principles it encodes
 
 - **The composable unit is a headless step** that captures a structured result. The headless runner
-  (`apps/desktop/src/main/headless.ts`) runs an agent CLI to completion in a worktree and captures
+  (`apps/desktop/src/core/main/headless.ts`) runs an agent CLI to completion in a worktree and captures
   `{ result, structuredOutput, sessionId, costUsd }` — modeled on the `term:previewUrl` capture. It
   drives real CLIs (`claude -p --output-format stream-json --json-schema …`, `codex exec
   --output-schema …`); tests use a committed `fake-agent.sh` through the same argv-template path.
@@ -193,7 +193,7 @@ PRD-style step can emit a task list and spawn N children, each on its own branch
 - **Gates are enforced in the main process, not in prompts.** A `gate-human` step pauses the run until
   the approve IPC; a `gate-policy` step **re-derives** its verdict in main and ignores whatever the
   step claimed (e.g. the `checks-green` policy polls the `checks` mirror —
-  `apps/desktop/src/main/terminal.ts:957-964`). This is roboco's "enforce outside the agent" lesson.
+  `apps/desktop/src/plugins/terminal/main/terminal.ts:957-964`). This is roboco's "enforce outside the agent" lesson.
 - **Handoff is run-scoped.** A step's result is appended to the task note
   `workflow-handoffs-<runId>`. Workflow context assembly includes human notes plus only that run's
   handoff note; a terminal run flips it to `included: false` but retains it for audit. Explicit
@@ -224,7 +224,7 @@ targets, invalid templates, and widening tool ceilings fail before execution.
 
 ### The runner
 
-`WorkflowRunner` (`apps/desktop/src/main/workflowRunner.ts`) owns the checkpoint state machine;
+`WorkflowRunner` (`apps/desktop/src/plugins/workflows/main/workflowRunner.ts`) owns the checkpoint state machine;
 `workflowBuiltins.ts` registers current handlers without a kind ladder. A four-slot semaphore bounds
 headless work, CI loops have a hard turn cap, and fan-out has a task ceiling. `cancelRun` aborts every
 active handler/process and marks the descendant step tree cancelled; `killStep` provides the scoped
@@ -278,21 +278,21 @@ saved-prompt/skills-as-steps polish, and acorn-as-a-Linear-agent-host.
 
 ## Source
 
-- Schema: `apps/desktop/src/server/db/schema.ts:445-481` (`workflow_runs`, `workflow_steps`),
+- Schema: `apps/desktop/src/core/server/db/schema.ts:445-481` (`workflow_runs`, `workflow_steps`),
   `:248-270` (`repo_paths.runTargets`), `:282-283` (`workspaces.devScript`/`devRestartScript`),
   `:351` (`tasks.parentId`)
-- Run targets: `apps/desktop/src/main/runConfig.ts`, `apps/desktop/src/main/runtime.ts`,
-  IPC in `apps/desktop/src/main/runIpc.ts`, wire shapes in `apps/desktop/src/shared/terminal.ts`
+- Run targets: `apps/desktop/src/plugins/terminal/main/runConfig.ts`, `apps/desktop/src/plugins/terminal/main/runtime.ts`,
+  IPC in `apps/desktop/src/plugins/terminal/main/runIpc.ts`, wire shapes in `apps/desktop/src/core/shared/terminal.ts`
   (canonical `RunTargetInfo`/`RunStatus`)
-- Workflow engine: `apps/desktop/src/main/workflowRunner.ts`, `apps/desktop/src/main/headless.ts`,
-  `apps/desktop/src/main/workflowFiles.ts`, wiring + `workflow:*` IPC in
-  `apps/desktop/src/main/workflowWiring.ts`
-- Harness routes: `apps/desktop/src/server/routes/harness.ts`
+- Workflow engine: `apps/desktop/src/plugins/workflows/main/workflowRunner.ts`, `apps/desktop/src/core/main/headless.ts`,
+  `apps/desktop/src/plugins/workflows/main/workflowFiles.ts`, wiring + `workflow:*` IPC in
+  `apps/desktop/src/app/main/workflowWiring.ts`
+- Harness routes: `apps/desktop/src/core/server/routes/harness.ts`
 - Client: `apps/desktop/src/client/features/palette/{model.ts,CommandPalette.tsx}`,
   `.../features/tasks/recipes.ts`, `.../features/terminal/terminalClient.ts`,
   `.../features/settings/WorkflowsSettings.tsx`, `.../features/agents/AgentsPanel.tsx`
-- MCP tools: `apps/desktop/src/mcp/server.ts:233-251`
-- Flag: `apps/desktop/src/client/App.tsx:39`
+- MCP tools: `apps/desktop/src/core/mcp/server.ts:233-251`
+- Flag: `apps/desktop/src/core/client/App.tsx:39`
 
 ## See also
 

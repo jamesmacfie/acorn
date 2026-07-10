@@ -8,12 +8,27 @@ import type { AppEnv } from './middleware/auth'
 // hand-written table used; distinct sub-paths mean registration order is not load-bearing.
 export type RouteContribution = { prefix: string; router: Hono<AppEnv>; note?: string }
 
-const contributions: RouteContribution[] = []
+export class RouteRegistry {
+  readonly #contributions: RouteContribution[] = []
+
+  register(contribution: RouteContribution): void {
+    if (contribution.prefix !== '/api' && !contribution.prefix.startsWith('/api/')) {
+      throw new Error(`Plugin route prefix must stay inside the authenticated /api namespace: '${contribution.prefix}'.`)
+    }
+    this.#contributions.push(contribution)
+  }
+
+  list(): readonly RouteContribution[] {
+    return this.#contributions
+  }
+}
+
+const registry = new RouteRegistry()
 
 export function registerRoute(contribution: RouteContribution): void {
-  contributions.push(contribution)
+  registry.register(contribution)
 }
 
 export function pluginRouteContributions(): readonly RouteContribution[] {
-  return contributions
+  return registry.list()
 }

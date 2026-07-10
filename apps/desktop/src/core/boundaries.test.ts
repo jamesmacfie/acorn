@@ -11,12 +11,17 @@ import { describe, expect, it } from 'vitest'
 //   - nothing in core/ or plugins/ imports app/ (the composition root is a leaf; app imports them)
 //   - the client↔node process boundary holds (renderer never imports server/main, and vice versa)
 //
-// BASELINED debt (cross-feature coupling that predates foldering — features importing each other
+// TARGET invariants (must reach zero before Phase 10 can be called complete):
+//   - core imports no plugin implementation
+//   - plugins import no other plugin's internals
+//
+// BASELINED debt toward those target invariants (cross-feature coupling that predates foldering — features importing each other
 // directly instead of through the pane/command/capability/state registries the earlier phases
 // created). These are the "earlier seam not yet adopted" couplings; the move surfaced them. The
 // baseline is a SHRINKING ledger: the test fails on any NEW coupling, and fails if a listed one is
-// removed without deleting its baseline entry — so the list can only go down. Each is a candidate
-// for capability/registry adoption (Phase 4/5/6 follow-through), tracked, not hidden.
+// removed without deleting its baseline entry — so the list can only go down. Phase 10 remains
+// paused while this ledger is non-empty; each edge needs capability/registry adoption or a corrected
+// ownership boundary, not an exemption disguised as completion.
 //
 // Test files are exempt from every rule: tests legitimately compose across layers.
 

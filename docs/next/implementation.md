@@ -1,7 +1,8 @@
 # Implementation guide — summary
 
-**Status:** execution plan · **Audience:** developers and agents implementing
-`docs/next`.
+**Status:** active execution plan · **Audience:** developers and agents implementing `docs/next`.
+Phase 10 is paused at its acceptance gate; the filesystem move has landed, but the boundary,
+parity, and documentation completion criteria remain open.
 
 This is the hub for the next-version implementation. It is deliberately short:
 the comprehensive instructions now live in one phase file per phase under
@@ -44,7 +45,7 @@ and its phase files win. Update the design doc in the same PR.
 | 7 | [Integration providers and source contributions](./implementation/phase-07-integration-providers.md) | Express Linear/Rollbar through the provider contract before a third provider exists. | Zero-core-file provider additions and provider-owned source/context/link surfaces. | ✅ |
 | 8 | [Workflow and profile registries](./implementation/phase-08-workflow-profile-registries.md) | Make step kinds, policies, profiles, tool ceilings, cancellation, and triggers declarative. | Workflow extensibility and runtime control surfaces. | ✅ |
 | 9 | [Platform migrations](./implementation/phase-09-platform-migrations.md) | Opportunistic platform shifts: WebContentsView, node:sqlite spike, safeStorage path. | Cleaner platform layer before final foldering. | ◐ A impl (live verify pending) · B parked · C ✅ |
-| 10 | [Foldering](./implementation/phase-10-foldering.md) | Move into `core/` + `plugins/` only after the seams exist. | Completion of the plugin-platform architecture. | ✅ (2026-07-11) — move + route/provider/profile seams + boundary test; remaining cross-feature coupling baselined in `boundaries.test.ts` |
+| 10 | [Foldering](./implementation/phase-10-foldering.md) | Move into `core/` + `plugins/` only after the seams exist. | Completion of the plugin-platform architecture. | ⏸ paused — filesystem/composition move landed; 82 boundary edges, 106 unchecked parity rows, and docs graduation remain |
 
 ## Completion Definition
 

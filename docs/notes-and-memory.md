@@ -54,7 +54,7 @@ Each note carries an `author` (`user | agent | workflow`) and a `kind`
 
 ### The Notes pane
 
-`apps/desktop/src/client/features/notes/NotesPane.tsx` — a layout pane (`PaneId` `notes`) reached
+`apps/desktop/src/plugins/notes/client/NotesPane.tsx` — a layout pane (`PaneId` `notes`) reached
 through the preload bridge `window.acorn.notes` (`notesApi()`), so it needs the desktop app and an
 active workspace; it renders an empty-state fallback otherwise (`NotesPane.tsx:114`). Layout:
 
@@ -71,7 +71,7 @@ that `NotesPane` consumes on mount to open that slug editable (`notesClient.ts:2
 
 ### Agent access — the harness endpoints and MCP tools
 
-Agents reach notes over the **loopback harness routes** (`apps/desktop/src/server/routes/harness.ts`),
+Agents reach notes over the **loopback harness routes** (`apps/desktop/src/core/server/routes/harness.ts`),
 which are keyed by **task id** (the store resolves task → workspace internally). The routes delegate to
 the main-process `NotesStore` through the injected `HarnessBridge` (`harness.ts:10-36`):
 
@@ -82,7 +82,7 @@ the main-process `NotesStore` through the injected `HarnessBridge` (`harness.ts:
 | `PUT /:id/notes/:slug` | `notesWrite` | `notes_write` |
 | `POST /:id/notes/:slug/append` | `notesAppend` | `notes_append` |
 
-The MCP tools (the notes block in `apps/desktop/src/mcp/server.ts`) call these routes with the inherited
+The MCP tools (the notes block in `apps/desktop/src/core/mcp/server.ts`) call these routes with the inherited
 `ACORN_SESSION_ID`, so agent writes are **stamped server-side** with `author: agent` + the session id
 for provenance. `notes_write` replaces a body (creating the note if missing); `notes_append` adds to
 it (findings, plans, handoffs). Files remain the source of truth — the MCP tools and the UI edit the
@@ -139,24 +139,24 @@ in-flight and dropped on completion.
 ## The memory UI — the MemoryTray, inside the Context pane
 
 Memory has no pane of its own; its UI is the **MemoryTray** component
-(`apps/desktop/src/client/features/memory/MemoryTray.tsx`), hosted by the **Context pane**
+(`apps/desktop/src/plugins/memory/client/MemoryTray.tsx`), hosted by the **Context pane**
 (`ContextPane.tsx` keeps context assembly/send as its one job and renders the tray below it),
 reached through the preload bridge `window.acorn.memory` (`memoryApi()`,
-`apps/desktop/src/client/features/memory/memoryClient.ts`). Two surfaces:
+`apps/desktop/src/plugins/memory/client/memoryClient.ts`). Two surfaces:
 
 1. **Memory proposals — the human gate.** Pending proposals are listed with an editable
    description and **Accept / Reject** buttons; a proposal's structural verification `flags` (e.g.
    a contradiction) render as **warning badges under the row**, separate from the description.
    Accept writes the memory file into the task worktree's `.acorn/memory/` and reconciles the
    index (repo scope lands via the PR — `acceptProposal`,
-   `apps/desktop/src/main/memoryGen.ts:137-161`); reject leaves no trace. This is the
+   `apps/desktop/src/plugins/memory/main/memoryGen.ts:137-161`); reject leaves no trace. This is the
    countermeasure to "LLM rewriting corrupts ground truth" — a human always sees the memory
    before it lands.
 
    Proposals arrive from two sources and land in one store: an agent's `memory_write` (the MCP
    propose path) and the **auto-generation pass** (below). The store is JSON files under
    `apps/desktop/.acorn/memory-proposals/` — visible, greppable, crash-safe, no schema
-   (`MemoryProposalStore`, `apps/desktop/src/main/memoryProposals.ts`).
+   (`MemoryProposalStore`, `apps/desktop/src/plugins/memory/main/memoryProposals.ts`).
 2. **Manual "+ memory"**: a form with name (kebab-cased), type, scope (`repo (worktree,
    committed)` vs `private (~/.acorn)`), one-line description, and body. Writes directly on the
    human's behalf (no gate — the human *is* the gate).
@@ -176,8 +176,8 @@ reviews before it lands — nothing is written directly." A silent agent write d
 
 ### Auto-generation — the task-boundary memory-review pass
 
-Implemented in `apps/desktop/src/main/memoryGen.ts`, triggered from `memoryReviewTrigger`
-(`apps/desktop/src/main/knowledgeIpc.ts`): when an agent session ends (and best-effort at archive),
+Implemented in `apps/desktop/src/plugins/memory/main/memoryGen.ts`, triggered from `memoryReviewTrigger`
+(`apps/desktop/src/plugins/memory/main/knowledgeIpc.ts`): when an agent session ends (and best-effort at archive),
 while the worktree is still alive, acorn runs a **headless memory-review step** — the same headless
 runner workflows use (`claude -p --json-schema …`; it uses the first installed headless-capable
 agent profile — claude-code, then codex (`memoryReviewProfile`) — else it silently skips) — over
@@ -201,19 +201,19 @@ task lifecycle (`knowledgeIpc.ts`).
 ## How this feeds agents
 
 Notes and the memory index are folded into the task's **assembled context**
-(`apps/desktop/src/shared/api.ts:198-207`, `TaskContext`), which has two consumers — plus a third
+(`apps/desktop/src/core/shared/api.ts:198-207`, `TaskContext`), which has two consumers — plus a third
 path for memory alone:
 
 - **Push** — the Context pane's **"Assemble & send → agent"** button. The human ticks include
   checkboxes (`pr`/`issues`/`notes`/`memory`; memory is opt-in by default —
   `context/model.ts:9`), the client fetches the curated context, renders it with
-  `formatContextBlock` (`apps/desktop/src/shared/contextBlock.ts`), and delivers it to the running
+  `formatContextBlock` (`apps/desktop/src/core/shared/contextBlock.ts`), and delivers it to the running
   agent session gated on the idle edge (`ContextPane.tsx:104-113`).
 - **Pull** — the MCP `task_context` tool (`mcp/server.ts`) returns the same assembled bundle,
   including notes and the repo memory *index*.
 - **Inject at launch** — when an agent terminal session starts, the repo's memory index slice is
   formatted and injected into the session (`memoryIndexSlice` + `formatMemoryInjection`, wired in
-  `apps/desktop/src/main/knowledgeIpc.ts`), so an agent knows what memory exists before it asks.
+  `apps/desktop/src/plugins/memory/main/knowledgeIpc.ts`), so an agent knows what memory exists before it asks.
   The per-directory `MEMORY.md` (one line per memory) serves the same index role for agents reading
   files directly (`memory.ts:106`).
 
@@ -247,21 +247,21 @@ query cache, blob cache, and workspace notes).
 
 ## Source
 
-- Schema: `apps/desktop/src/server/db/schema.ts` (`memories` + `memories_fts` in migration `0011`;
+- Schema: `apps/desktop/src/core/server/db/schema.ts` (`memories` + `memories_fts` in migration `0011`;
   `review_notes` for the separate anchored store)
-- Shared note shapes: `apps/desktop/src/shared/notes.ts` (canonical `Note`/`NoteSummary` +
+- Shared note shapes: `apps/desktop/src/core/shared/notes.ts` (canonical `Note`/`NoteSummary` +
   author/kind unions, imported by main and client)
-- Stores (main process): `apps/desktop/src/main/notes.ts` (`NotesStore` — the `.md` files),
-  `apps/desktop/src/main/memory.ts` (memory files + derived index + `MEMORY.md`),
-  `apps/desktop/src/main/memoryProposals.ts` (proposal JSON store),
-  `apps/desktop/src/main/memoryGen.ts` (auto-generation + accept/reject verdicts; trigger + the
+- Stores (main process): `apps/desktop/src/plugins/notes/main/notes.ts` (`NotesStore` — the `.md` files),
+  `apps/desktop/src/plugins/memory/main/memory.ts` (memory files + derived index + `MEMORY.md`),
+  `apps/desktop/src/plugins/memory/main/memoryProposals.ts` (proposal JSON store),
+  `apps/desktop/src/plugins/memory/main/memoryGen.ts` (auto-generation + accept/reject verdicts; trigger + the
   notes/memory IPC wired in `main/knowledgeIpc.ts`)
-- Harness routes: `apps/desktop/src/server/routes/harness.ts`
+- Harness routes: `apps/desktop/src/core/server/routes/harness.ts`
 - Notes UI + bridge: `apps/desktop/src/client/features/notes/{NotesPane.tsx,notesClient.ts}`
 - Memory UI: `apps/desktop/src/client/features/memory/{MemoryTray.tsx,memoryClient.ts}`, hosted by
   `apps/desktop/src/client/features/context/{ContextPane.tsx,model.ts}`
 - Assembly: `apps/desktop/src/shared/{api.ts,contextBlock.ts}`
-- MCP tools: `apps/desktop/src/mcp/server.ts`
+- MCP tools: `apps/desktop/src/core/mcp/server.ts`
 
 See also: [panes.md](./panes.md) (Context / Notes / Changes panes),
 [mcp.md](./mcp.md), [workspaces-and-tasks.md](./workspaces-and-tasks.md),

@@ -26,7 +26,7 @@ State is deliberately split three ways, with no other store:
 
 - Constructs a **single** `QueryClient` with `refetchOnWindowFocus: true` and `gcTime: 24h`. The
   long `gcTime` is required so persisted entries outlive a session and survive reload
-  (`apps/desktop/src/client/index.tsx:21`).
+  (`apps/desktop/src/app/client/index.tsx:21`).
 - Wraps the tree in `PersistQueryClientProvider`, persisting the bounded cache to **IndexedDB** via
   `idb-keyval` under key `acorn-cache` (`maxAge` 24h, 2s write throttle). File bodies and
   patch-bearing queries are excluded because the loopback API/on-disk blob cache reconstructs them;
@@ -219,7 +219,7 @@ side is enough.)
 
 ## Desktop IPC bridges (`window.acorn.*`)
 
-The Electron preload (`apps/desktop/src/main/preload.ts`) exposes a **narrow** capability surface
+The Electron preload (`apps/desktop/src/core/main/preload.ts`) exposes a **narrow** capability surface
 on `window.acorn` via `contextBridge` — never raw `ipcRenderer`. Each feature has a typed accessor
 that returns the bridge or `null`, so consumers degrade gracefully on a non-desktop build:
 
