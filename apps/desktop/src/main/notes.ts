@@ -8,7 +8,7 @@
 import { mkdirSync } from 'node:fs'
 import { readdir, readFile, rename, stat, unlink, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
-import type { Note, NoteAuthor, NoteKind, NoteSummary } from '../shared/notes'
+import type { Note, NoteAuthor, NoteKind, NoteLocation, NoteSummary } from '../shared/notes'
 
 // Canonical wire shapes live in shared/notes.ts (imported by the client too); re-exported here so
 // main-side callers keep one import point.
@@ -84,16 +84,17 @@ export function parseNote(text: string, slug: string): { meta: NoteMeta; body: s
 export class NotesStore {
   constructor(private root: string) {}
 
-  private dirFor(workspaceId: string): string {
-    if (!isValidDirKey(workspaceId)) throw new Error('Invalid workspace id.')
-    const dir = join(this.root, workspaceId)
+  private dirFor(location: NoteLocation): string {
+    const key = location.scope === 'global' ? 'global' : location.scope === 'workspace' ? location.workspaceId : location.taskId
+    if (!isValidDirKey(key)) throw new Error(`Invalid ${location.scope} id.`)
+    const dir = location.scope === 'task' ? join(this.root, 'task', key) : join(this.root, key)
     mkdirSync(dir, { recursive: true })
     return dir
   }
 
-  private fileFor(workspaceId: string, slug: string): string {
+  private fileFor(location: NoteLocation, slug: string): string {
     if (!isValidSlug(slug)) throw new Error('Invalid note slug.')
-    return join(this.dirFor(workspaceId), `${slug}.md`)
+    return join(this.dirFor(location), `${slug}.md`)
   }
 
   // Atomic write: temp + rename, so a crash never leaves a partial note.
@@ -108,8 +109,8 @@ export class NotesStore {
     }
   }
 
-  async list(workspaceId: string): Promise<NoteSummary[]> {
-    const dir = this.dirFor(workspaceId)
+  async list(location: NoteLocation): Promise<NoteSummary[]> {
+    const dir = this.dirFor(location)
     const entries = await readdir(dir).catch(() => [] as string[])
     const out: NoteSummary[] = []
     for (const name of entries) {
@@ -128,15 +129,15 @@ export class NotesStore {
     return out.sort((a, b) => b.updatedAt - a.updatedAt)
   }
 
-  async read(workspaceId: string, slug: string): Promise<Note> {
-    const text = await readFile(this.fileFor(workspaceId, slug), 'utf8')
+  async read(location: NoteLocation, slug: string): Promise<Note> {
+    const text = await readFile(this.fileFor(location, slug), 'utf8')
     const { meta, body } = parseNote(text, slug)
     return { slug, body, ...meta }
   }
 
-  async create(workspaceId: string, title: string, opts?: { author?: NoteAuthor; kind?: NoteKind; originSessionId?: string; originTaskId?: string; included?: boolean; body?: string }): Promise<{ slug: string }> {
+  async create(location: NoteLocation, title: string, opts?: { author?: NoteAuthor; kind?: NoteKind; originSessionId?: string; originTaskId?: string; included?: boolean; body?: string }): Promise<{ slug: string }> {
     const base = slugifyTitle(title)
-    const existing = new Set((await this.list(workspaceId)).map((n) => n.slug))
+    const existing = new Set((await this.list(location)).map((n) => n.slug))
     let slug = base
     for (let i = 2; existing.has(slug); i++) slug = `${base}-${i}`
     const meta: NoteMeta = {
@@ -144,33 +145,43 @@ export class NotesStore {
       author: opts?.author ?? 'user',
       kind: opts?.kind ?? 'scratch',
       originSessionId: opts?.originSessionId ?? null,
-      originTaskId: opts?.originTaskId ?? null,
+      originTaskId: opts?.originTaskId ?? (location.scope === 'task' ? location.taskId : null),
       included: opts?.included ?? true,
       createdAt: Date.now(),
     }
-    await this.atomicWrite(this.fileFor(workspaceId, slug), serializeNote(meta, opts?.body ?? ''))
+    await this.atomicWrite(this.fileFor(location, slug), serializeNote(meta, opts?.body ?? ''))
     return { slug }
   }
 
-  // Replace the body, preserving frontmatter (an edit never changes provenance).
-  async write(workspaceId: string, slug: string, body: string): Promise<void> {
-    const file = this.fileFor(workspaceId, slug)
+  // Replace the body. Human edits preserve provenance; tool callers explicitly stamp their writer.
+  async write(
+    location: NoteLocation,
+    slug: string,
+    body: string,
+    writer?: { author: NoteAuthor; originSessionId?: string; originTaskId?: string },
+  ): Promise<void> {
+    const file = this.fileFor(location, slug)
     const { meta } = parseNote(await readFile(file, 'utf8').catch(() => ''), slug)
     if (!meta.createdAt) meta.createdAt = Date.now()
+    if (writer) {
+      meta.author = writer.author
+      meta.originSessionId = writer.originSessionId ?? null
+      meta.originTaskId = writer.originTaskId ?? (location.scope === 'task' ? location.taskId : meta.originTaskId)
+    }
     await this.atomicWrite(file, serializeNote(meta, body))
   }
 
   // Toggle whether a note is fed to the agent as context (Notes-pane select/deselect). Preserves body.
-  async setIncluded(workspaceId: string, slug: string, included: boolean): Promise<void> {
-    const file = this.fileFor(workspaceId, slug)
+  async setIncluded(location: NoteLocation, slug: string, included: boolean): Promise<void> {
+    const file = this.fileFor(location, slug)
     const { meta, body } = parseNote(await readFile(file, 'utf8'), slug)
     meta.included = included
     await this.atomicWrite(file, serializeNote(meta, body))
   }
 
   // Append (agents logging findings). Missing note → created with the writer's identity.
-  async append(workspaceId: string, slug: string, text: string, opts?: { author?: NoteAuthor; originSessionId?: string }): Promise<void> {
-    const file = this.fileFor(workspaceId, slug)
+  async append(location: NoteLocation, slug: string, text: string, opts?: { author?: NoteAuthor; originSessionId?: string; originTaskId?: string }): Promise<void> {
+    const file = this.fileFor(location, slug)
     const existing = await readFile(file, 'utf8').catch(() => null)
     if (existing == null) {
       const meta: NoteMeta = {
@@ -178,18 +189,25 @@ export class NotesStore {
         author: opts?.author ?? 'user',
         kind: 'finding',
         originSessionId: opts?.originSessionId ?? null,
-        originTaskId: null,
+        originTaskId: opts?.originTaskId ?? (location.scope === 'task' ? location.taskId : null),
         included: true,
         createdAt: Date.now(),
       }
       await this.atomicWrite(file, serializeNote(meta, text.endsWith('\n') ? text : `${text}\n`))
       return
     }
-    const sep = existing.endsWith('\n') ? '' : '\n'
-    await this.atomicWrite(file, `${existing}${sep}${text.endsWith('\n') ? text : `${text}\n`}`)
+    const parsed = parseNote(existing, slug)
+    if (opts?.author) {
+      parsed.meta.author = opts.author
+      parsed.meta.originSessionId = opts.originSessionId ?? null
+      parsed.meta.originTaskId = opts.originTaskId ?? (location.scope === 'task' ? location.taskId : parsed.meta.originTaskId)
+    }
+    const sep = parsed.body.endsWith('\n') || !parsed.body ? '' : '\n'
+    const body = `${parsed.body}${sep}${text.endsWith('\n') ? text : `${text}\n`}`
+    await this.atomicWrite(file, serializeNote(parsed.meta, body))
   }
 
-  async remove(workspaceId: string, slug: string): Promise<void> {
-    await unlink(this.fileFor(workspaceId, slug)).catch(() => {})
+  async remove(location: NoteLocation, slug: string): Promise<void> {
+    await unlink(this.fileFor(location, slug)).catch(() => {})
   }
 }

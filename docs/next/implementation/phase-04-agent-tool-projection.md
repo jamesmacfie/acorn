@@ -1,6 +1,6 @@
 # Phase 4 — Agent-tool projection
 
-**Status:** planned · **Depends on:** Phases 1 and 3 · **Primary docs:**
+**Status:** complete · **Depends on:** Phases 1 and 3 · **Primary docs:**
 [contribution-points](../contribution-points.md) §4.7 and §4.8,
 [memory](../memory.md), [security](../security.md) §4,
 [ux](../ux.md) §3.
@@ -150,8 +150,8 @@ surface invoked it, the boundary is wrong.
   declared.
 - MCP, harness HTTP, and renderer projections are covered by table-driven tests
   from the same contribution fixture.
-- Tool names and schemas remain byte-identical unless a PR explicitly opts into
-  a breaking change.
+- Tool names and schemas remain byte-identical except the documented additive optional `scope`
+  field on notes tools required by §4.8; the common schema projection itself remains draft-07 compatible.
 - `run_*` tools appear when a repo gains run targets mid-session.
 - Permissions page lists every tool by risk tier.
 - Toggling a tier/tool off removes it from `tools/list`.

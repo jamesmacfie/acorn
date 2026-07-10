@@ -159,14 +159,14 @@ Source: `features/changes/ChangesPane.tsx`, `features/changes/model.ts`, `shared
 
 ### `notes` — markdown notes
 
-`.md` notes at two scopes (`features/notes/NotesPane.tsx`): **this workspace** (shared by every task in
-the group) and **Global** (shared across all workspaces), rendered together and grouped so the
-distinction is visible; you pick the scope when creating. A list + textarea editor with a
+`.md` notes at three scopes (`features/notes/NotesPane.tsx`): **this task**, **this workspace**, and
+**Global**, rendered together and grouped so the storage boundary is visible; task is the default
+when creating. A list + textarea editor with a
 preview/edit toggle (sanitized markdown) and **autosave** (debounced, flush on blur and note-switch —
 no Save button). `ponytail: textarea over TipTap`.
 
 Humans only ever create `scratch` notes here; `plan` / `finding` / `handoff` notes are written by
-agents and workflows (workspace scope) and surface under a collapsible **Agent notes** group with
+agents and workflows (task scope by default) and surface with
 author (`🤖`/`⚙`) and kind badges. The Context pane's "Edit note" jump opens a slug here in editable
 state (`requestNoteOpen` → `noteToOpen`). See [notes-and-memory.md](./notes-and-memory.md).
 

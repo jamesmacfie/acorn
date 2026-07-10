@@ -30,6 +30,7 @@ import { search } from './routes/search'
 import { terminal } from './routes/terminal'
 import { workflow } from './routes/workflow'
 import { harness } from './routes/harness'
+import { agentTools, agentToolsCatalog } from './routes/agentTools'
 import { taskContext } from './routes/taskContext'
 import { workspaces } from './routes/workspaces'
 import { tasks } from './routes/tasks'
@@ -58,7 +59,9 @@ export function createApp() {
     .route('/api/tasks', editor) // /:id/editor/* — read/write/list worktree files (docs/workspaces)
     .route('/api/tasks', localGit) // /:id/local/* — working-tree review + stage/commit (docs/panes.md)
     .route('/api/tasks', database) // /:id/database/* — per-task Postgres browse/edit (docs/pg.md)
-    .route('/api/tasks', harness) // /:id/notes|memory|run — the MCP feature-tool surface (docs/mcp.md)
+    .route('/api/tasks', harness) // /:id/run — the renderer's run-target surface (docs/next 13 §A)
+    .route('/api/tasks', agentTools) // /:id/tools + /:id/tools/:name — the agent-tool registry projection (docs/agent-tools.md)
+    .route('/api/agent-tools', agentToolsCatalog) // static tool catalog for the permissions settings page
     .route('/api', workflow) // /tasks/:id/workflows + /workflows/runs/:runId/* — workflow control (docs/next 14)
     .route('/api', knowledge) // /memory* + /workspaces/:wsId/notes* — the notes/memory pane surface (docs/notes-and-memory.md)
     .route('/api', terminal) // /terminal/* + /tasks/:id/{archive,preview-url,mcp,…} — terminal control (docs/terminal-and-agents.md)

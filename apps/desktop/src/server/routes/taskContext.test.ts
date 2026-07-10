@@ -3,7 +3,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { TaskContext } from '../../shared/api'
 import { getDb, schema } from '../db'
 import type { AppEnv } from '../middleware/auth'
-import { setContextMemorySource, setContextNotesSource, taskContext } from './taskContext'
+import { buildContextSections, setContextSections, type ContextMemorySource, type ContextNotesSource } from '../agentTools/contextSections'
+import { taskContext } from './taskContext'
 import { makeTestDb, type TestDb } from './testDb'
 
 vi.mock('../db', async (importOriginal) => {
@@ -14,9 +15,14 @@ vi.mock('../db', async (importOriginal) => {
 describe('GET /api/tasks/:id/context (docs/next 11 §C)', () => {
   let t: TestDb
   let app: Hono<AppEnv>
+  let notesSource: ContextNotesSource
+  let memorySource: ContextMemorySource
 
   beforeEach(async () => {
     t = makeTestDb()
+    notesSource = async () => []
+    memorySource = async () => []
+    setContextSections(buildContextSections({ notes: (...args) => notesSource(...args), memory: (...args) => memorySource(...args) }))
     vi.mocked(getDb).mockReturnValue(t.db)
     app = new Hono<AppEnv>()
     app.use('/api/*', async (c, next) => {
@@ -90,12 +96,11 @@ describe('GET /api/tasks/:id/context (docs/next 11 §C)', () => {
   })
 
   afterEach(() => {
-    setContextNotesSource(async () => [])
-    setContextMemorySource(async () => [])
+    setContextSections(buildContextSections({ notes: async () => [], memory: async () => [] }))
     t.cleanup()
   })
 
-  const fetchCtx = async (qs = ''): Promise<TaskContext> => {
+  const fetchCtx = async (qs = '?include=*'): Promise<TaskContext> => {
     const res = await app.fetch(new Request(`http://acorn.test/api/tasks/task1/context${qs}`), {} as Env)
     expect(res.status).toBe(200)
     return res.json()
@@ -118,9 +123,11 @@ describe('GET /api/tasks/:id/context (docs/next 11 §C)', () => {
       changedFiles: ['src/auth/login.ts', 'src/auth/token.ts'],
     })
     expect(ctx.issues).toEqual([
-      { provider: 'linear', identifier: 'ENG-42', title: 'Login crashes for SSO users', detail: 'In Progress' },
-      { provider: 'rollbar', identifier: '142', title: '142', detail: '' }, // uncached link → identifier only
+      { provider: 'linear', identifier: 'ENG-42', title: 'Login crashes for SSO users', detail: 'In Progress', cache: 'present' },
+      { provider: 'rollbar', identifier: '142', title: '142', detail: '', cache: 'missing' },
     ])
+    expect(ctx.sections.map((section) => section.id)).toEqual(['pr', 'issues', 'notes', 'memory'])
+    expect(ctx.sections.find((section) => section.id === 'issues')?.absent?.reason).toBe('missing-cache')
     expect(ctx.notes).toEqual([])
     expect(ctx.memory).toEqual([])
   })
@@ -135,10 +142,10 @@ describe('GET /api/tasks/:id/context (docs/next 11 §C)', () => {
   })
 
   it('composes the M4 seams when sources are registered', async () => {
-    setContextNotesSource(async () => [{ title: 'plan', body: 'do the thing' }])
-    setContextMemorySource(async () => [{ name: 'auth-conventions', description: 'how auth flows work' }])
+    notesSource = async () => [{ slug: 'plan', scope: 'task', title: 'plan', kind: 'plan', body: 'do the thing' }]
+    memorySource = async () => [{ name: 'auth-conventions', description: 'how auth flows work' }]
     const ctx = await fetchCtx()
-    expect(ctx.notes).toEqual([{ title: 'plan', body: 'do the thing' }])
+    expect(ctx.notes).toEqual([{ slug: 'plan', scope: 'task', title: 'plan', body: 'do the thing' }])
     expect(ctx.memory).toEqual([{ name: 'auth-conventions', description: 'how auth flows work' }])
   })
 
@@ -150,18 +157,19 @@ describe('GET /api/tasks/:id/context (docs/next 11 §C)', () => {
     const dir = mkdtempSync(join(tmpdir(), 'acorn-ctx-notes-'))
     try {
       const store = new NotesStore(dir)
-      await store.create('ws1', 'eng-42 plan', { kind: 'plan', body: 'Guard the null token first.\n' })
-      await store.create('ws1', 'handoff', { kind: 'handoff', author: 'agent', body: 'Left the redirect for next session.\n' })
+      const location = { scope: 'task' as const, taskId: 'task1' }
+      await store.create(location, 'eng-42 plan', { kind: 'plan', body: 'Guard the null token first.\n' })
+      await store.create(location, 'handoff', { kind: 'handoff', author: 'agent', body: 'Left the redirect for next session.\n' })
       // The same wiring shape terminal.ts registers: task → workspace → notes list + bodies.
-      setContextNotesSource(async () => {
-        const list = await store.list('ws1')
-        const out: { title: string; body: string }[] = []
+      notesSource = async () => {
+        const list = await store.list(location)
+        const out: Awaited<ReturnType<ContextNotesSource>> = []
         for (const s of list) {
-          const n = await store.read('ws1', s.slug)
-          out.push({ title: `${n.title} (${n.kind})`, body: n.body })
+          const n = await store.read(location, s.slug)
+          out.push({ slug: s.slug, scope: 'task', title: `${n.title} (${n.kind})`, kind: n.kind, body: n.body })
         }
         return out
-      })
+      }
       const ctx = await fetchCtx()
       expect(ctx.notes.map((n) => n.title).sort()).toEqual(['eng-42 plan (plan)', 'handoff (handoff)'])
       expect(ctx.notes.find((n) => n.title.startsWith('eng-42'))?.body).toContain('Guard the null token')
@@ -170,6 +178,15 @@ describe('GET /api/tasks/:id/context (docs/next 11 §C)', () => {
     } finally {
       rmSync(dir, { recursive: true, force: true })
     }
+  })
+
+  it('uses contribution defaults and enforces the declared note budget', async () => {
+    notesSource = async () => Array.from({ length: 12 }, (_, index) => ({ slug: `n-${index}`, scope: 'task', title: `N${index}`, kind: 'plan', body: 'x'.repeat(2_100) }))
+    const ctx = await fetchCtx('')
+    expect(ctx.sections.map((section) => section.id)).toEqual(['notes'])
+    expect(ctx.sections[0].items).toHaveLength(10)
+    expect(ctx.sections[0].omitted).toBe(2)
+    expect(ctx.sections[0].items[0].body?.endsWith('…')).toBe(true)
   })
 
   it('404s an unknown task', async () => {

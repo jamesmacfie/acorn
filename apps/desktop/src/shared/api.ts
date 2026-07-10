@@ -1,3 +1,5 @@
+import type { NoteLocation } from './notes'
+
 // The one error envelope every /api route returns. `error` is a stable machine code
 // (see docs/api-reference.md §error-codes); `detail` carries human/upstream prose.
 export type ApiError = { error: string; detail?: string[] }
@@ -196,19 +198,53 @@ export type TaskSeed = {
   links?: TaskLink[]
 }
 
-// Assembled task context (docs/next 11 §C): everything attached to a task, composed once and
-// consumed by both push (formatContextBlock → sendToAgent) and pull (MCP task_context).
-export type TaskContextInclude = 'pr' | 'issues' | 'notes' | 'memory'
+// Assembled task context (docs/next 11 §C): section contributions serialize their renderer
+// metadata and compact projection beside the compatibility fields used by focused tools.
+export type TaskContextInclude = string
+export type ContextBudget = {
+  maxItems?: number
+  maxBytesPerItem?: number
+  overflow: 'truncate-tail' | 'index-only' | 'omit-with-marker'
+}
+export type ContextPaneIntent = { pane: string; itemId?: string; noteScope?: 'global' | 'workspace' | 'task' }
+export type ContextItem = {
+  id: string
+  kind: string
+  label: string
+  body?: string
+  details?: string[]
+  jump?: ContextPaneIntent
+}
+export type ContextSectionResult = {
+  id: string
+  label: string
+  defaultIncluded: boolean
+  budget: ContextBudget
+  items: ContextItem[]
+  compact: string
+  omitted: number
+  absent?: { reason: 'missing-cache'; detail: string }
+}
 export type TaskContext = {
   task: { id: string; title: string; repo: string; branch: string; worktreePath: string | null; pullNumber: number | null }
+  sections: ContextSectionResult[]
   pr?: { number: number; title: string; body: string | null; changedFiles: string[] }
-  issues: { provider: string; identifier: string; title: string; detail: string }[]
-  notes: { slug?: string; title: string; body: string }[] // slug: client-only, lets the Context pane jump to the note in the Notes pane
+  issues: { provider: string; identifier: string; title: string; detail: string; cache: 'present' | 'missing' }[]
+  notes: { slug?: string; scope?: 'global' | 'workspace' | 'task'; title: string; body: string }[]
 
   memory: { name: string; description: string }[]
 }
-export const taskContextRoute = (id: string, include?: TaskContextInclude[]) =>
-  `/api/tasks/${id}/context${include?.length ? `?include=${include.join(',')}` : ''}`
+export const taskContextRoute = (id: string, include?: TaskContextInclude[] | 'all') =>
+  `/api/tasks/${id}/context${include === 'all' ? '?include=*' : include?.length ? `?include=${include.join(',')}` : ''}`
+
+// Agent tools (docs/agent-tools.md): the registry projects to the harness HTTP surface below and to
+// the MCP server. The permissions page reads the static catalog and persists per-tier/per-tool
+// toggles as ONE prefs slice under this key (JSON `{ tiers?, tools? }`).
+export type ToolRisk = 'read' | 'write' | 'execute'
+export const AGENT_TOOLS_PERMS_PREF_KEY = 'agentTools.perms'
+export const agentToolsCatalogRoute = '/api/agent-tools'
+export type AgentToolCatalogEntry = { name: string; description: string; risk: ToolRisk; availability?: string }
+export const rendererAgentToolRoute = (taskId: string, name: string) => `/api/tasks/${taskId}/renderer-tools/${encodeURIComponent(name)}`
 
 // Find-in-files (docs/panes.md): POST because it spawns ripgrep and the query is arbitrary body,
 // not a path segment. Was the `search:findInFiles` IPC channel (Phase 3).
@@ -266,9 +302,14 @@ export const memorySearchRoute = (query: string, repo?: string, type?: string) =
 export const memoryAddRoute = (taskId: string) => `/api/tasks/${taskId}/memory`
 export const memoryProposalsRoute = (taskId?: string) => `/api/memory/proposals${taskId ? `?task=${encodeURIComponent(taskId)}` : ''}`
 export const memoryResolveProposalRoute = (id: string) => `/api/memory/proposals/${encodeURIComponent(id)}/resolve`
-export const notesListRoute = (workspaceId: string) => `/api/workspaces/${encodeURIComponent(workspaceId)}/notes`
-export const noteRoute = (workspaceId: string, slug: string) => `/api/workspaces/${encodeURIComponent(workspaceId)}/notes/${encodeURIComponent(slug)}`
-export const noteIncludedRoute = (workspaceId: string, slug: string) => `${noteRoute(workspaceId, slug)}/included`
+// Existing workspace/global URLs stay stable; task scope adds its reserved subtree without moving
+// persisted files. `global` remains the reserved workspace-key URL for compatibility.
+export const notesListRoute = (location: NoteLocation) =>
+  location.scope === 'task'
+    ? `/api/tasks/${encodeURIComponent(location.taskId)}/notes`
+    : `/api/workspaces/${encodeURIComponent(location.scope === 'global' ? 'global' : location.workspaceId)}/notes`
+export const noteRoute = (location: NoteLocation, slug: string) => `${notesListRoute(location)}/${encodeURIComponent(slug)}`
+export const noteIncludedRoute = (location: NoteLocation, slug: string) => `${noteRoute(location, slug)}/included`
 
 // Terminal control (docs/terminal-and-agents.md): the req/resp half of the engine. Was the `term:*` / `mcp:*`
 // IPC channels (Phase 3). The stream half (input/attach/out/status) is the WebSocket (slice 6);

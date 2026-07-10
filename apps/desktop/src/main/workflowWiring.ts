@@ -17,7 +17,7 @@ import { broadcastStatus, broadcastWorkflowNotice } from './notify'
 import { getProfile, resolveCommand } from './profiles'
 import { getRepoPath } from './repoPaths'
 import type { RuntimeService } from './runtime'
-import { isDir, loadTask, resolveTaskCwd, workspaceIdFor } from './taskWorktree'
+import { isDir, loadTask, resolveTaskCwd } from './taskWorktree'
 import { buildSessionEnv } from './terminalUtils'
 import { loadWorkflowFiles } from './workflowFiles'
 import { WorkflowRunner, type WorkflowDef } from './workflowRunner'
@@ -66,8 +66,7 @@ export async function registerWorkflowIpc(db: AppDatabase, { runtime, notesStore
       return runHeadless(argv, { cwd, env })
     },
     writeHandoff: async (taskId, stepName, body) => {
-      const ws = await workspaceIdFor(db, taskId).catch(() => null)
-      if (ws) await notesStore.append(ws, 'workflow-handoffs', `## ${stepName}\n${body}\n`, { author: 'workflow' })
+      await notesStore.append({ scope: 'task', taskId }, 'workflow-handoffs', `## ${stepName}\n${body}\n`, { author: 'workflow', originTaskId: taskId })
     },
     assembleContext: async (taskId) => {
       try {

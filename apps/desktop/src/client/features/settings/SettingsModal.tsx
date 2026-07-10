@@ -5,6 +5,7 @@ import WorkspaceRepoAssignments from '../workspaces/WorkspaceRepoAssignments'
 import IntegrationsSettings from '../integrations/IntegrationsSettings'
 import WorkspaceSettings from './WorkspaceSettings'
 import McpSettings from './McpSettings'
+import AgentToolsSettings from './AgentToolsSettings'
 import WorkflowsSettings from './WorkflowsSettings'
 import AppearanceSettings from './AppearanceSettings'
 import TerminalSettings from './TerminalSettings'
@@ -24,6 +25,7 @@ export default function SettingsModal(props: { onClose: () => void; initialTab?:
     ['appearance', 'Appearance'],
     ['integrations', 'Integrations'],
     ['mcp', 'MCP'],
+    ['agent-tools', 'Agent tools'],
     ['workflows', 'Workflows'],
     ['terminal', 'Terminal'],
     ['shortcuts', 'Shortcuts'],
@@ -83,6 +85,10 @@ export default function SettingsModal(props: { onClose: () => void; initialTab?:
             <Match when={tab() === 'mcp'}>
               <div class="overlay-title">MCP</div>
               <McpSettings />
+            </Match>
+            <Match when={tab() === 'agent-tools'}>
+              <div class="overlay-title">Agent tools</div>
+              <AgentToolsSettings />
             </Match>
             <Match when={tab() === 'workflows'}>
               <div class="overlay-title">Workflows</div>

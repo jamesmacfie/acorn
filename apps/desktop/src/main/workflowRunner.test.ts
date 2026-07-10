@@ -32,9 +32,9 @@ describe('WorkflowRunner (docs/next 14 P2)', () => {
         },
       })
     },
-    writeHandoff: async (_taskId, stepName, body) => notes.append('ws1', 'workflow-handoffs', `## ${stepName}\n${body}\n`, { author: 'workflow' }),
+    writeHandoff: async (taskId, stepName, body) => notes.append({ scope: 'task', taskId }, 'workflow-handoffs', `## ${stepName}\n${body}\n`, { author: 'workflow' }),
     assembleContext: async () => {
-      const note = await notes.read('ws1', 'workflow-handoffs').catch(() => null)
+      const note = await notes.read({ scope: 'task', taskId: 'task1' }, 'workflow-handoffs').catch(() => null)
       return note ? `# Context\n\n## Notes\n${note.body}` : ''
     },
     evaluatePolicy: vi.fn(async () => ({ pass: true })),
@@ -91,7 +91,7 @@ describe('WorkflowRunner (docs/next 14 P2)', () => {
     expect(steps[0].costUsd).toBeCloseTo(0.0123)
 
     // The handoff note exists (author: workflow) and appeared in review's assembled input.
-    const handoff = await notes.read('ws1', 'workflow-handoffs')
+    const handoff = await notes.read({ scope: 'task', taskId: 'task1' }, 'workflow-handoffs')
     expect(handoff.author).toBe('workflow')
     expect(handoff.body).toContain('guarded the null token')
     expect(stepInputs.review).toContain('guarded the null token')

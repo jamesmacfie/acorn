@@ -33,17 +33,18 @@ today**.
 
 ### Where they live
 
-Notes are markdown files on disk under `apps/desktop/.acorn/notes/<workspaceId>/<slug>.md`
-(gitignored). They come at two **scopes** (`apps/desktop/src/client/features/notes/notesClient.ts:11`):
+Notes are gitignored markdown files under `apps/desktop/.acorn/notes/`. They have three first-class
+locations, represented by the shared `NoteLocation` union:
 
-| Scope | Store key | Shared by |
+| Scope | Directory | Shared by |
 | --- | --- | --- |
-| `workspace` | the workspace's uuid | every task/worktree in that workspace group |
-| `global` | the reserved key `'global'` (`notesClient.ts:12`) | every workspace |
+| `task` | `task/<taskId>/` | only the owning task; default for agents/workflows and new human notes |
+| `workspace` | `<workspaceId>/` | every task/worktree in that workspace group |
+| `global` | `global/` | every workspace |
 
-Workspace notes are keyed by the *workspace*, not the task — so all tasks in the "Runn" group see the
-same note set. The reserved `'global'` key can never collide with a real workspace uuid, so global
-notes need no schema change — just a well-known key.
+Existing workspace/global directories remain in place. The reserved `task/` subtree cannot collide
+with workspace UUIDs, so adding task scope requires no data migration. `originTaskId` is provenance,
+not the isolation mechanism.
 
 ### Kinds and authors
 
@@ -57,10 +58,9 @@ Each note carries an `author` (`user | agent | workflow`) and a `kind`
 through the preload bridge `window.acorn.notes` (`notesApi()`), so it needs the desktop app and an
 active workspace; it renders an empty-state fallback otherwise (`NotesPane.tsx:114`). Layout:
 
-- A left list grouping **user notes** first, then a collapsible **Global notes** group (🌐), then a
-  collapsible **Agent notes** group showing each note's `kind` and author glyph (🤖 agent / ⚙ workflow)
-  — `NotesPane.tsx:117-164`. Agent/workflow notes are read-only distinct from human scratch.
-- A create form with a scope selector (This workspace / Global) and a title — humans create `scratch`
+- A left list grouping **Task notes**, workspace user/agent notes, and **Global notes**; task context
+  merges those scopes in task → workspace → global order.
+- A create form with a scope selector (This task / This workspace / Global) and a title — humans create `scratch`
   only (`NotesPane.tsx:87`, `create()`).
 - A right editor: a plain `<textarea>` with an **Edit/Preview** toggle that renders sanitized markdown
   (`ponytail:` textarea over a rich editor — `NotesPane.tsx:11`). No Save button: **autosave** debounces
@@ -266,4 +266,3 @@ query cache, blob cache, and workspace notes).
 See also: [panes.md](./panes.md) (Context / Notes / Changes panes),
 [mcp.md](./mcp.md), [workspaces-and-tasks.md](./workspaces-and-tasks.md),
 [data-layer.md](./data-layer.md), [workflows.md](./workflows.md).
-

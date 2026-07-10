@@ -44,6 +44,7 @@ describe('note frontmatter round-trip (docs/notes-and-memory.md)', () => {
 describe('NotesStore over a temp dir', () => {
   let dir: string
   let store: NotesStore
+  const workspace = { scope: 'workspace' as const, workspaceId: 'ws1' }
 
   beforeEach(() => {
     dir = mkdtempSync(join(tmpdir(), 'acorn-notes-'))
@@ -52,53 +53,63 @@ describe('NotesStore over a temp dir', () => {
   afterEach(() => rmSync(dir, { recursive: true, force: true }))
 
   it('create/list/read/write/append round-trip with de-duped slugs', async () => {
-    const a = await store.create('ws1', 'Agent conventions', { kind: 'plan' })
+    const a = await store.create(workspace, 'Agent conventions', { kind: 'plan' })
     expect(a.slug).toBe('agent-conventions')
-    const b = await store.create('ws1', 'Agent conventions')
+    const b = await store.create(workspace, 'Agent conventions')
     expect(b.slug).toBe('agent-conventions-2')
 
-    await store.write('ws1', a.slug, '- Prefer spawn_blocking for git.\n')
-    await store.append('ws1', a.slug, 'Done: guarded null token.', { author: 'agent', originSessionId: 'sess-9' })
-    const note = await store.read('ws1', a.slug)
+    await store.write(workspace, a.slug, '- Prefer spawn_blocking for git.\n')
+    await store.append(workspace, a.slug, 'Done: guarded null token.', { author: 'agent', originSessionId: 'sess-9' })
+    const note = await store.read(workspace, a.slug)
     expect(note.kind).toBe('plan') // write/append preserve frontmatter
     expect(note.body).toBe('- Prefer spawn_blocking for git.\nDone: guarded null token.\n')
 
-    const list = await store.list('ws1')
+    const list = await store.list(workspace)
     expect(list.map((n) => n.slug).sort()).toEqual(['agent-conventions', 'agent-conventions-2'])
     // A human could edit this by hand: plain frontmatter + markdown.
     expect(readFileSync(join(dir, 'ws1', 'agent-conventions.md'), 'utf8')).toContain('kind: plan')
   })
 
   it('setIncluded toggles the context flag, preserving body + provenance', async () => {
-    const { slug } = await store.create('ws1', 'Seeded PR', { originTaskId: 'task-1', body: 'pr body' })
-    expect((await store.read('ws1', slug)).included).toBe(true) // seeded → included by default
-    await store.setIncluded('ws1', slug, false)
-    const note = await store.read('ws1', slug)
+    const { slug } = await store.create(workspace, 'Seeded PR', { originTaskId: 'task-1', body: 'pr body' })
+    expect((await store.read(workspace, slug)).included).toBe(true) // seeded → included by default
+    await store.setIncluded(workspace, slug, false)
+    const note = await store.read(workspace, slug)
     expect(note.included).toBe(false)
     expect(note.body).toBe('pr body')
     expect(note.originTaskId).toBe('task-1')
-    expect((await store.list('ws1')).find((n) => n.slug === slug)?.included).toBe(false)
+    expect((await store.list(workspace)).find((n) => n.slug === slug)?.included).toBe(false)
   })
 
   it('append creates a missing note with the writer identity (agent findings)', async () => {
-    await store.append('ws1', 'findings', 'learned a thing', { author: 'agent', originSessionId: 'sess-1' })
-    const note = await store.read('ws1', 'findings')
+    await store.append({ scope: 'task', taskId: 'task-1' }, 'findings', 'learned a thing', { author: 'agent', originSessionId: 'sess-1' })
+    const note = await store.read({ scope: 'task', taskId: 'task-1' }, 'findings')
     expect(note.author).toBe('agent')
     expect(note.kind).toBe('finding')
     expect(note.originSessionId).toBe('sess-1')
+    expect(note.originTaskId).toBe('task-1')
+    expect(readFileSync(join(dir, 'task', 'task-1', 'findings.md'), 'utf8')).toContain('originTaskId: task-1')
+  })
+
+  it('tool writes stamp their writer while human edits preserve existing provenance', async () => {
+    await store.create(workspace, 'shared', { author: 'user', body: 'old' })
+    await store.write(workspace, 'shared', 'agent edit', { author: 'agent', originSessionId: 's1', originTaskId: 't1' })
+    expect(await store.read(workspace, 'shared')).toMatchObject({ author: 'agent', originSessionId: 's1', originTaskId: 't1' })
+    await store.write(workspace, 'shared', 'human edit')
+    expect(await store.read(workspace, 'shared')).toMatchObject({ author: 'agent', originSessionId: 's1', originTaskId: 't1' })
   })
 
   it('atomicity: a failed write leaves no partial file behind', async () => {
-    await store.create('ws1', 'safe')
+    await store.create(workspace, 'safe')
     const before = readFileSync(join(dir, 'ws1', 'safe.md'), 'utf8')
     vi.mocked(rename).mockRejectedValueOnce(new Error('disk full'))
-    await expect(store.write('ws1', 'safe', 'new body')).rejects.toThrow('disk full')
+    await expect(store.write(workspace, 'safe', 'new body')).rejects.toThrow('disk full')
     expect(readFileSync(join(dir, 'ws1', 'safe.md'), 'utf8')).toBe(before) // original intact
     expect(readdirSync(join(dir, 'ws1')).filter((f) => f.includes('.tmp'))).toEqual([]) // temp cleaned
   })
 
   it('rejects traversal slugs and workspace ids at the boundary', async () => {
-    await expect(store.read('ws1', '../evil')).rejects.toThrow('Invalid note slug')
-    await expect(store.read('../ws', 'x')).rejects.toThrow('Invalid workspace id')
+    await expect(store.read(workspace, '../evil')).rejects.toThrow('Invalid note slug')
+    await expect(store.read({ scope: 'workspace', workspaceId: '../ws' }, 'x')).rejects.toThrow('Invalid workspace id')
   })
 })

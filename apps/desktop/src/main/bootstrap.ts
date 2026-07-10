@@ -14,7 +14,9 @@ import { join } from 'node:path'
 import { makeRuntime, startListener } from './server'
 import { registerKnowledgeIpc } from './knowledgeIpc'
 import { createRuntimeService } from './runIpc'
-import { wireHarnessBridges } from './harnessWiring'
+import { wireRunBridge } from './harnessWiring'
+import { wireAgentTools } from './agentToolsWiring'
+import { wireContextSections } from './contextSectionsWiring'
 import { registerWorkflowIpc } from './workflowWiring'
 import { endDbPools } from './database'
 import { disposeTerminal, reconcileTmux, registerTerminalIpc, sendToAgent, terminalRunGlue } from './terminal'
@@ -98,7 +100,11 @@ export async function bootstrap({ dataDir, origin, createWindow }: BootstrapOpti
   const runtimeSvc = createRuntimeService(db, terminalRunGlue(db))
   // run targets are the harness RunBridge (wired below) — HTTP now, no separate run:* IPC (Phase 3).
 
-  wireHarnessBridges({ db, notesStore: knowledge.notesStore, proposals: knowledge.proposals, runtime: runtimeSvc, reconciled: knowledge.reconciled })
+  // Run keeps a dedicated bridge for its renderer routes; every other agent capability (notes,
+  // memory, browser, git, context reads, run_* tools) is the agent-tool registry (Phase 4).
+  wireRunBridge(runtimeSvc)
+  wireContextSections({ db, notesStore: knowledge.notesStore, reconciled: knowledge.reconciled })
+  wireAgentTools({ db, notesStore: knowledge.notesStore, proposals: knowledge.proposals, runtime: runtimeSvc, reconciled: knowledge.reconciled })
 
   const workflowRunner = await registerWorkflowIpc(db, { runtime: runtimeSvc, notesStore: knowledge.notesStore, internalApiEnv, reconciled })
   // search, editor, local-git, and database are HTTP routes wired via wireServerBridges().
