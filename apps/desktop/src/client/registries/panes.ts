@@ -7,6 +7,7 @@ export type PaneId = string
 
 export type PaneContribution = {
   id: PaneId
+  providerId?: string
   label: string
   glyph: string
   description?: string

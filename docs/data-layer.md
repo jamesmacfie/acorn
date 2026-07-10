@@ -142,9 +142,9 @@ revalidate by TTL.
 | --- | --- | --- |
 | `userId` | text | scope |
 | `integrationId` | text | → `integrations.id` — keying by connection stops the same identifier fetched via two connections from colliding |
-| `provider` | text | `linear` \| `rollbar` (denormalized from the integration) |
+| `provider` | text | registered provider id, denormalized from the integration |
 | `identifier` | text | e.g. `ENG-123` |
-| `data` | text | JSON issue detail — a single blob so a provider's shape can evolve without migrations |
+| `data` | text | provider-codec-owned, versioned `CachedExternalItem` JSON; summary refreshes preserve detail |
 | `fetchedAt` | integer | epoch ms; TTL base (Linear: 10 min, `routes/linear.ts`; Rollbar: 2 min, `routes/rollbar.ts` — see [caching](./caching.md)) |
 
 ### Group 2 — App-state tables, GitHub-scoped (per-user)
@@ -191,11 +191,14 @@ disambiguates them in the UI ("Linear – work").
 | --- | --- | --- |
 | `id` | text (PK) | opaque uuid |
 | `userId` | text | owner |
-| `provider` | text | `linear` \| `rollbar` |
+| `provider` | text | registered provider id (`linear`, `rollbar`, …) |
 | `label` | text | user-facing name, seeded from the provider (workspace/org) |
-| `accessToken` | text | **encrypted at rest** (JWE via `SESSION_ENC_KEY`, `session.ts` `encryptSecret`); never leaves the server — same posture as the GitHub token |
-| `meta` | text | optional JSON (e.g. `{ workspace }`, base url, org id) |
-| `createdAt` | integer | epoch ms |
+| `accessToken` | text | mapped as `authRef`; **encrypted at rest** and never returned |
+| `authKind`, `status` | text | core connection lifecycle |
+| `account`, `scopes`, `capabilities` | text | provider-normalized JSON safe for public summaries |
+| `config` | text | provider-codec-owned non-secret JSON |
+| `lastValidatedAt`, `lastError` | integer / text | health state |
+| `createdAt`, `updatedAt` | integer | epoch ms |
 
 > GitHub itself is **not** stored here: it is the identity root (its token is the session cookie,
 > `userId` derives from it). It only *appears* as a synthesized entry in the integrations list
@@ -311,8 +314,9 @@ so a link resolves straight to cached detail.
 | --- | --- | --- |
 | `taskId` | text | → `tasks.id` |
 | `integrationId` | text | → `integrations.id` — pins the item to one connection |
-| `provider` | text | `linear` \| `rollbar` (denormalized) |
+| `provider` | text | registered provider id, stamped from the connection by core |
 | `identifier` | text | `ENG-42` \| rollbar item id |
+| `refJson` | text | nullable complete `ExternalRef` for providers needing external ids or locators |
 | `createdAt` | integer | epoch ms |
 
 #### `review_notes`
@@ -478,6 +482,7 @@ that have no natural per-row freshness home:
 | `pulls:<repoId>:<open\|closed>` | `pullsResource` | a PR-list page for a repo/state |
 | `pr:<repoId>:<number>` | `prResource` | one PR's whole detail composite (all children above) |
 | `files:<repoId>:<number>` | `filesResource` | the PR's changed-files list |
+| `provider:<providerId>:<connectionId>:<resource>:<scope>` | provider descriptor `key` | provider collections, including an empty Rollbar item list |
 
 **Workspace ↔ repos ↔ path.** A workspace groups repos; the local checkout is stored separately and
 joined by owner/name:
@@ -542,8 +547,10 @@ backs freshness varies:
   GraphQL PR-detail and REST files are TTL-only (no usable ETag). Mutations bust
   the relevant row to force a refetch. TTL is a `policy.ts` constant, not a column
   (the old write-only `staleAfter`/`etag` columns are dropped).
-- **TTL only** (`issues`): Linear/Rollbar serve-then-revalidate by the `issues`
-  row's own `fetchedAt` age; no ETag, not `sync_state`.
+- **Provider resources** (`issues` + optional `sync_state`): item detail uses each issue row's
+  `fetchedAt`; a provider collection with no natural row when empty (Rollbar's item list) uses an
+  opaque connection-scoped `sync_state` key. Disconnect removes both the issue rows and matching
+  provider sync keys.
 
 The `fetchedAt` columns on `repos`/`pull_requests` remain the prune key for the
 atomic mirror rewrites and a pre-ETag fallback for the repos list.
@@ -615,4 +622,3 @@ startup (`openDb` in `apps/desktop/src/main/bindings.ts`) and via `db:migrate`.
 [notes-and-memory](./notes-and-memory.md) · [workflows](./workflows.md) ·
 [terminal-and-agents](./terminal-and-agents.md) · [electron](./electron.md) ·
 [local-development](./local-development.md)
-

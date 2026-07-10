@@ -4,6 +4,10 @@ import type { ContextBudget, ContextItem, ContextSectionResult, TaskContext } fr
 import type { NoteScope } from '../../shared/notes'
 import type { AppDatabase } from '../db'
 import { schema } from '../db'
+import { parseCached } from '../integrations/codec'
+import '../integrations/providers'
+import { integrationProviderRegistry } from '../integrations/registry'
+import type { ExternalRef } from '../../shared/integrations'
 
 type TaskRow = typeof schema.tasks.$inferSelect
 type AssembleArgs = { db: AppDatabase; userLogin: string; task: TaskRow; repo: string }
@@ -124,39 +128,43 @@ export function buildContextSections(sources: { notes: ContextNotesSource; memor
       defaultIncluded: false,
       budget: { maxItems: 50, maxBytesPerItem: 1_000, overflow: 'omit-with-marker' },
       async assemble({ db, userLogin, task }) {
-        const links = await db.select().from(schema.taskLinks).where(eq(schema.taskLinks.taskId, task.id)).orderBy(schema.taskLinks.createdAt)
+        const links = (await db.select().from(schema.taskLinks).where(eq(schema.taskLinks.taskId, task.id))).sort(
+          (a, b) => a.provider.localeCompare(b.provider) || a.createdAt - b.createdAt,
+        )
         const issues: TaskContext['issues'] = []
+        const items: ContextItem[] = []
+        const providerCounts = new Map<string, number>()
         let missing = 0
         for (const link of links) {
+          const provider = integrationProviderRegistry.get(link.provider)
+          const count = providerCounts.get(link.provider) ?? 0
+          if (count >= (provider?.budgets.maxContextItems ?? 50)) continue
+          providerCounts.set(link.provider, count + 1)
+          let ref: ExternalRef = { providerId: link.provider, connectionId: link.integrationId, displayId: link.identifier }
+          try {
+            if (link.refJson) ref = provider?.externalIds.parse(JSON.parse(link.refJson), ref) ?? ref
+          } catch {
+            // Invalid refs degrade to the identifier-only fallback below.
+          }
           const [row] = await db
             .select()
             .from(schema.issues)
             .where(and(eq(schema.issues.userId, userLogin), eq(schema.issues.integrationId, link.integrationId), eq(schema.issues.identifier, link.identifier)))
-          let title = link.identifier
-          let detail = ''
-          let cache: 'present' | 'missing' = row ? 'present' : 'missing'
-          if (row) {
-            try {
-              const data = JSON.parse(row.data) as { title?: string; state?: { name?: string }; status?: string; level?: string }
-              if (typeof data.title === 'string' && data.title) title = data.title
-              detail = data.state?.name ?? data.status ?? data.level ?? ''
-            } catch {
-              // Malformed cached data is explicit below, like a missing cache row.
-              missing++
-              cache = 'missing'
-            }
-          } else {
-            missing++
+          const parsed = row && provider?.codec ? parseCached(provider.codec, row.data, ref) : null
+          const state = !row ? 'missing' : !parsed?.ok ? 'malformed' : parsed.value.deletedAt ? 'deleted' : row.fetchedAt + (provider?.resources[0]?.ttlMs ?? 0) < Date.now() ? 'stale' : 'fresh'
+          if (state === 'missing' || state === 'malformed') missing++
+          const item = provider?.taskContext?.summarize(ref, parsed?.ok ? parsed.value : null, state) ?? {
+            id: `${link.provider}:${link.integrationId}:${link.identifier}`,
+            kind: link.provider,
+            label: link.identifier,
+            details: [`Cache: ${state}`],
           }
-          issues.push({ provider: link.provider, identifier: link.identifier, title, detail, cache })
+          items.push(item)
+          const title = item.label.includes(' — ') ? item.label.slice(item.label.indexOf(' — ') + 3) : link.identifier
+          issues.push({ provider: link.provider, identifier: link.identifier, title, detail: item.details?.[0] ?? '', cache: parsed?.ok ? 'present' : 'missing' })
         }
         return {
-          items: issues.map((issue) => ({
-            id: `${issue.provider}:${issue.identifier}`,
-            kind: issue.provider,
-            label: `${issue.identifier} — ${issue.title}`,
-            details: [issue.detail, issue.cache === 'missing' ? 'Cached provider detail is unavailable.' : ''].filter(Boolean),
-          })),
+          items,
           legacy: { issues },
           absent: missing ? { reason: 'missing-cache', detail: `${missing} linked item${missing === 1 ? '' : 's'} missing cached provider detail.` } : undefined,
         }

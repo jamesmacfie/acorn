@@ -1,12 +1,12 @@
 import { Hono } from 'hono'
 import { csrf } from 'hono/csrf'
 import { authMiddleware, type AppEnv } from './middleware/auth'
+import { integrationProviderRoutes } from './integrations/providerRoutes'
 import { requireUser } from './middleware/requireUser'
 import { onServerError } from './respond'
 import { actions } from './routes/actions'
 import { auth } from './routes/auth'
 import { integrations } from './routes/integrations'
-import { linear } from './routes/linear'
 import { me } from './routes/me'
 import { pins } from './routes/pins'
 import { prActions } from './routes/prActions'
@@ -25,7 +25,6 @@ import { editor } from './routes/editor'
 import { knowledge } from './routes/knowledge'
 import { localGit } from './routes/localGit'
 import { reviewNotes } from './routes/reviewNotes'
-import { rollbar } from './routes/rollbar'
 import { search } from './routes/search'
 import { terminal } from './routes/terminal'
 import { workflow } from './routes/workflow'
@@ -66,8 +65,7 @@ export function createApp() {
     .route('/api', knowledge) // /memory* + /workspaces/:wsId/notes* — the notes/memory pane surface (docs/notes-and-memory.md)
     .route('/api', terminal) // /terminal/* + /tasks/:id/{archive,preview-url,mcp,…} — terminal control (docs/terminal-and-agents.md)
     .route('/api/integrations', integrations) // connect/disconnect/status for third-party providers
-    .route('/api/linear', linear) // Linear issues referenced from a PR (read, cached per-user)
-    .route('/api/rollbar', rollbar) // Rollbar items browse + detail, cached into `issues` (docs/integrations.md)
+    .route('/api', integrationProviderRoutes) // provider-owned routes projected from the integration registry
     .route('/api/repos', repos)
     .route('/api/repos', repoLabels) // /:owner/:repo/labels — repo label choices for the PR picker
     .route('/api/repos', pulls) // repo-scoped sub-resources, e.g. /:owner/:repo/pulls

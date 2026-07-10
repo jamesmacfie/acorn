@@ -6,7 +6,7 @@ import { rollbarItemsRoute, type RollbarItem, type RollbarItemsResponse } from '
 import { dedupeBranch, slugifyBranch } from '../../../shared/branch'
 import { tasksKey, tasksOptions } from '../../queries'
 import { createQuery } from '@tanstack/solid-query'
-import { addTaskLink, createTask } from '../../mutations'
+import { sourceRegistry, type SourceContribution } from '../../registries/sources'
 import { activeTaskId } from './tasks'
 import { activateTaskSignals } from './activate'
 
@@ -49,14 +49,11 @@ export default function RollbarBrowse() {
     const item = promoting()
     const [owner, repo] = repoPick().split('/')
     if (!item || !owner || !repo || !branch().trim()) return
-    const w = await createTask({
-      origin: 'rollbar',
-      repoOwner: owner,
-      repoName: repo,
-      branch: slugifyBranch(branch()),
-      title: item.title.slice(0, 120),
-      links: [{ integrationId: item.integrationId, provider: 'rollbar', identifier: item.identifier }],
-    })
+    const promotion = (sourceRegistry.get('rollbar') as SourceContribution<RollbarItem>).promotion
+    const context = { owner, repo, branch: branch(), existingBranches: (tasks.data ?? []).map((task) => task.branch) }
+    if (!promotion.canPromote(item, context)) return
+    const w = await promotion.create(await promotion.prepare(item, context))
+    await promotion.afterCreate?.(w, item, context)
     await qc.invalidateQueries({ queryKey: tasksKey })
     setPromoting(null)
     activateTaskSignals(w, { pane: 'rollbar' }) // a promoted error lands on its Rollbar pane
@@ -68,7 +65,9 @@ export default function RollbarBrowse() {
     const taskId = activeTaskId()
     setAttachMessage('')
     if (!taskId) return setAttachMessage('No active task — open one first, or use “open as task”.')
-    await addTaskLink(taskId, { integrationId: item.integrationId, provider: 'rollbar', identifier: item.identifier })
+    const promotion = (sourceRegistry.get('rollbar') as SourceContribution<RollbarItem>).promotion
+    if (!promotion.attachToCurrentTask) return setAttachMessage('This source cannot attach items to an existing task.')
+    await promotion.attachToCurrentTask(taskId, item)
     await qc.invalidateQueries({ queryKey: tasksKey })
     setAttachMessage('Attached to the current task.')
   }

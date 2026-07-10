@@ -392,9 +392,9 @@ build; keep the shape self-describing.
 interface MirroredResource<Row> {
   id: string                        // 'github.pulls', 'linear.issues'
   ttlMs: number                     // today: 45s / 300s / 600s / 120s, centralized at last
-  etag?: boolean
-  fetch: (key, prior: SyncState) => Fetched<Row> | NotModified
-  persist: (tx, key, rows: Row[]) => void      // atomic delete-then-insert inside db.batch
+  key: (connectionId, input) => string
+  read: (ctx, input) => Cached<Row> | null
+  refresh: (ctxWithSecret, input) => RefreshResult
 }
 ```
 

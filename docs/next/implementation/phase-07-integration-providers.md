@@ -1,6 +1,6 @@
 # Phase 7 — Integration providers and source contributions
 
-**Status:** planned · **Depends on:** Phase 2; benefits from Phases 4 and 5 ·
+**Status:** complete · **Depends on:** Phase 2; benefits from Phases 4 and 5 ·
 **Primary docs:** [integrations](../integrations.md),
 [contribution-points](../contribution-points.md) §4.2 and §4.14,
 [memory](../memory.md).
@@ -176,6 +176,18 @@ for `connectionId` where account/workspace scope matters.
   - Rollbar stale-cache fallback, counter-string identity, and current-task
     `+task` promotion.
 - Sentry dry-run file list proves no core edits.
+
+## Completion Evidence
+
+- Provider-owned HTTP routers are projected once from the provider activation registry; the server
+  composition root contains no Linear/Rollbar route imports or switches.
+- Linear and Rollbar mirrored resources implement descriptor `key`/`read`/`refresh` callbacks and
+  run through core sync, concurrency, cache-size, context, batch, and backoff budgets.
+- Task-owned Linear/Rollbar references keep `connectionId` through panes, context jumps, detail
+  reads, query keys, and mutations; unscoped Linear text alone uses deterministic first-hit order.
+- Reauth-required linked items serve codec-validated stale cache without an outbound request.
+- Linear/Rollbar route parity, provider promotion, budget scheduling, codec, lifecycle, link
+  integrity, markdown, and content-link tests are green.
 
 ## References
 

@@ -223,26 +223,29 @@ stamped provider ids, lifecycle, capability obligations — is the separate
 integration conformance suite, [integrations.md](./integrations.md) §18;
 this section is only the behaviours the generic contract doesn't express.)
 
+Implemented by `routes/linear.test.ts`, `routes/rollbar.test.ts`, provider promotion tests, markdown
+tests, and the descriptor conformance suite.
+
 **Linear:**
 
-- [ ] Multi-connection identifier resolution is **first-hit-wins for bare
+- [x] Multi-connection identifier resolution is **first-hit-wins for bare
   IDs**; project browsing carries an explicit `integrationId`.
-- [ ] **Project links are workspace-scoped, not repo-scoped**; one workspace
+- [x] **Project links are workspace-scoped, not repo-scoped**; one workspace
   may link projects from several Linear connections.
-- [ ] Project browse lists **active issues only**; branch defaults use
+- [x] Project browse lists **active issues only**; branch defaults use
   `LinearProjectIssue.branchName` where present (feeding §2's branch ladder).
-- [ ] `POST /issues/:identifier/comments` supports **threaded replies via
+- [x] `POST /issues/:identifier/comments` supports **threaded replies via
   `parentId`**.
-- [ ] Markdown rendering stays **XSS-safe with validated links** (a security
+- [x] Markdown rendering stays **XSS-safe with validated links** (a security
   behaviour, not a rendering nicety).
-- [ ] PR linkification scans **`linear.app` URLs only** (see §4).
+- [x] PR linkification scans **`linear.app` URLs only** (see §4).
 
 **Rollbar:**
 
-- [ ] Recent items are cached into the generic `issues` table, and **stale
+- [x] Recent items are cached into the generic `issues` table, and **stale
   cached rows beat nothing** when a live call fails.
-- [ ] Item identity is the **visible counter string**, not an internal id.
-- [ ] Promotion prompts for repo and branch; **attaching to the current task
+- [x] Item identity is the **visible counter string**, not an internal id.
+- [x] Promotion prompts for repo and branch; **attaching to the current task
   via `+task` is a core flow**, not an optional nicety.
 
 ## §7 Database pane contract

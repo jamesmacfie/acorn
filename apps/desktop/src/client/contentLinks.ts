@@ -10,6 +10,7 @@ export type InAppTarget =
 
 export type ContentLinkContribution = {
   id: string
+  providerId?: string
   parse: (href: string) => InAppTarget | null
 }
 
@@ -22,14 +23,16 @@ const GH_REPO_RE = /^https?:\/\/github\.com\/([^/?#]+)\/([^/?#]+)\/?(?:[?#].*)?$
 // already won't match GH_REPO_RE, but these two-ish reserved roots could look like an owner).
 const GH_RESERVED = new Set(['orgs', 'sponsors', 'settings', 'notifications', 'marketplace', 'explore', 'topics', 'about'])
 
-const builtInContentLinks: ContentLinkContribution[] = [
-  {
-    id: 'linear.issue',
-    parse: (href) => {
-      const match = LINEAR_ISSUE_RE.exec(href)
-      return match ? { kind: 'linear', identifier: match[1].toUpperCase() } : null
-    },
+export const linearContentLinkContribution: ContentLinkContribution = {
+  id: 'linear.issue',
+  providerId: 'linear',
+  parse: (href) => {
+    const match = LINEAR_ISSUE_RE.exec(href)
+    return match ? { kind: 'linear', identifier: match[1].toUpperCase() } : null
   },
+}
+
+const builtInContentLinks: ContentLinkContribution[] = [
   {
     id: 'github.pull-request',
     parse: (href) => {

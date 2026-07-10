@@ -7,6 +7,7 @@ import { agentSessionsFor } from '../terminal/sessions'
 import { terminalApi } from '../terminal/terminalClient'
 import MemoryTray from '../memory/MemoryTray'
 import { requestNoteOpen } from '../notes/notesClient'
+import { openPane } from '../../registries/clientEvents'
 import { selectionFromContext, selectionToInclude, traySummary, type TraySelection } from './model'
 import './context-tray.css'
 
@@ -40,8 +41,21 @@ export default function ContextPane(props: { task: Task }) {
     })
 
   function followJump(item: ContextItem) {
-    if (item.jump?.pane !== 'notes' || !item.jump.itemId || !item.jump.noteScope) return
-    requestNoteOpen(props.task.id, item.jump.itemId, item.jump.noteScope)
+    if (!item.jump?.itemId) return
+    if (item.jump.pane === 'notes' && item.jump.noteScope) {
+      requestNoteOpen(props.task.id, item.jump.itemId, item.jump.noteScope)
+      return
+    }
+    if (item.jump.ref) {
+      openPane(props.task.id, item.jump.pane, { kind: 'integration:show-ref', ref: item.jump.ref })
+      return
+    }
+    const link = props.task.links.find((candidate) => candidate.providerId === item.jump!.pane && candidate.identifier === item.jump!.itemId)
+    if (!link) return
+    openPane(props.task.id, item.jump.pane, {
+      kind: 'integration:show-ref',
+      ref: link.ref ?? { providerId: link.providerId, connectionId: link.connectionId, displayId: link.identifier },
+    })
   }
 
   async function assembleAndSend() {

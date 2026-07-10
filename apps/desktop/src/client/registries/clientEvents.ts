@@ -1,9 +1,11 @@
 import { dispatchLayout } from '../features/tasks/tasks'
 import type { NoteScope } from '../../shared/notes'
+import type { ExternalRef } from '../../shared/integrations'
 
 export type PaneIntent =
   | { kind: 'notes:open'; slug: string; scope: NoteScope }
   | { kind: 'editor:reveal'; path: string; line: number }
+  | { kind: 'integration:show-ref'; ref: ExternalRef }
 
 export type ClientEventMap = {
   'boot:restored': { phases: ('workspace' | 'view' | 'panes')[] }

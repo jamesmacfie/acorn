@@ -6,6 +6,7 @@ import type { AppEnv } from '../middleware/auth'
 import { rollbarFetch } from '../rollbar'
 import { encryptSecret } from '../session'
 import { ROLLBAR_ITEMS_STALE_AFTER_MS } from '../sync/policy'
+import { settleBackground } from '../background'
 import { integrations } from './integrations'
 import { rollbar } from './rollbar'
 import { makeTestDb, type TestDb } from './testDb'
@@ -54,7 +55,10 @@ describe('Rollbar source (docs/integrations.md — zero schema changes)', () => 
     app.route('/api/rollbar', rollbar)
   })
 
-  afterEach(() => t.cleanup())
+  afterEach(async () => {
+    await settleBackground()
+    t.cleanup()
+  })
 
   const env = () => ({ SESSION_ENC_KEY: ENC_KEY }) as unknown as Env
 
@@ -79,8 +83,15 @@ describe('Rollbar source (docs/integrations.md — zero schema changes)', () => 
     const [row] = await t.db.select().from(schema.integrations)
     expect(row.id).toBe(id)
     expect(row.provider).toBe('rollbar')
-    expect(row.accessToken).not.toContain('read-token') // encryptSecret, never plaintext
-    expect(JSON.parse(row.meta ?? '{}')).toEqual({ project: 'acme-api', projectId: 7 })
+    expect(row.authRef).not.toContain('read-token') // encryptSecret, never plaintext
+    expect(JSON.parse(row.config)).toEqual({ projectId: '7' })
+    expect(JSON.parse(row.account ?? '{}')).toEqual({ id: '7', label: 'acme-api', type: 'project' })
+
+    const listed = await app.fetch(new Request('http://acorn.test/api/integrations'), env())
+    const body = await listed.text()
+    expect(body).not.toContain('read-token')
+    expect(body).not.toContain(row.authRef)
+    expect(JSON.parse(body).providers.map((provider: { id: string }) => provider.id)).toEqual(['github', 'linear', 'rollbar'])
   })
 
   it('invalid token → clean 4xx', async () => {
@@ -93,8 +104,8 @@ describe('Rollbar source (docs/integrations.md — zero schema changes)', () => 
       }),
       env(),
     )
-    expect(res.status).toBe(400)
-    expect(await res.json()).toEqual({ error: 'invalid_key' })
+    expect(res.status).toBe(401)
+    expect(await res.json()).toEqual({ error: 'provider_needs_auth' })
   })
 
   it('items list caches into `issues` with TTL (second call serves the cache)', async () => {
@@ -144,8 +155,59 @@ describe('Rollbar source (docs/integrations.md — zero schema changes)', () => 
     expect((await res2.json()) as RollbarItem).toMatchObject({ identifier: '142' })
   })
 
+  it('serves stale detail cache while reauthentication is required', async () => {
+    const integrationId = await connect()
+    vi.mocked(rollbarFetch).mockResolvedValueOnce(rollbarJson(API_ITEM))
+    await app.fetch(new Request(`http://acorn.test/api/rollbar/items/142?integration=${integrationId}`), env())
+    await settleBackground()
+    await t.db.update(schema.integrations).set({ status: 'needs-auth' })
+    await t.db.update(schema.issues).set({ fetchedAt: 1 })
+    const calls = vi.mocked(rollbarFetch).mock.calls.length
+
+    const response = await app.fetch(new Request(`http://acorn.test/api/rollbar/items/142?integration=${integrationId}`), env())
+
+    expect(response.status).toBe(200)
+    expect((await response.json()) as RollbarItem).toMatchObject({ identifier: '142' })
+    expect(vi.mocked(rollbarFetch).mock.calls).toHaveLength(calls)
+  })
+
   it('not connected → 403', async () => {
     expect((await app.fetch(new Request('http://acorn.test/api/rollbar/items'), env())).status).toBe(403)
+  })
+
+  it('disable and credential rotation preserve identity/linked state; disconnect performs the core cascade', async () => {
+    const integrationId = await connect()
+    const now = Date.now()
+    await t.db.insert(schema.issues).values({
+      userId: 'james', integrationId, provider: 'rollbar', identifier: '142', data: JSON.stringify(API_ITEM), fetchedAt: now,
+    })
+    await t.db.insert(schema.taskLinks).values({ taskId: 'task-1', integrationId, provider: 'rollbar', identifier: '142', createdAt: now })
+    await t.db.insert(schema.workspaceProjects).values({ workspaceId: 'workspace-1', integrationId, externalId: '7', createdAt: now })
+    await t.db.insert(schema.syncState).values({ userId: 'james', resource: `provider:rollbar:${integrationId}:items:list`, fetchedAt: now })
+
+    const disabled = await app.fetch(new Request(`http://acorn.test/api/integrations/${integrationId}`, {
+      method: 'PATCH', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ disabled: true }),
+    }), env())
+    expect(disabled.status).toBe(200)
+    expect((await t.db.select().from(schema.taskLinks))).toHaveLength(1)
+    expect((await t.db.select().from(schema.issues))).toHaveLength(1)
+
+    vi.mocked(rollbarFetch).mockResolvedValueOnce(rollbarJson({ id: 7, name: 'acme-api' }))
+    const rotated = await app.fetch(new Request(`http://acorn.test/api/integrations/${integrationId}`, {
+      method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ credentials: { token: 'replacement-token' } }),
+    }), env())
+    expect(rotated.status).toBe(200)
+    expect(((await rotated.json()) as { integration: { id: string } }).integration.id).toBe(integrationId)
+    expect((await t.db.select().from(schema.taskLinks))).toHaveLength(1)
+    expect((await t.db.select().from(schema.issues))).toHaveLength(1)
+
+    const disconnected = await app.fetch(new Request(`http://acorn.test/api/integrations/${integrationId}`, { method: 'DELETE' }), env())
+    expect(disconnected.status).toBe(204)
+    expect(await t.db.select().from(schema.integrations)).toEqual([])
+    expect(await t.db.select().from(schema.taskLinks)).toEqual([])
+    expect(await t.db.select().from(schema.issues)).toEqual([])
+    expect(await t.db.select().from(schema.workspaceProjects)).toEqual([])
+    expect(await t.db.select().from(schema.syncState)).toEqual([])
   })
 })
 

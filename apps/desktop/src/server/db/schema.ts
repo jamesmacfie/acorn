@@ -230,18 +230,26 @@ export const prefs = sqliteTable(
 
 // Per-user third-party credentials. First-class, MULTI-ROW per provider (docs/workspaces 04): a
 // user can connect several Linears / Rollbars, so the key is an opaque `id`, not (userId, provider).
-// `label` disambiguates them in the UI ("Linear – work"). accessToken is ENCRYPTED at rest (JWE via
+// `label` disambiguates them in the UI ("Linear – work"). authRef is ENCRYPTED at rest (JWE via
 // SESSION_ENC_KEY, see session.ts encryptSecret) and never leaves the server — same posture as the
 // GitHub token. GitHub itself is NOT stored here: it's the identity root (its token is the session
 // cookie, userId is derived from it); it only *appears* as a synthesized entry in the list endpoint.
 export const integrations = sqliteTable('integrations', {
   id: text('id').primaryKey(), // opaque uuid
   userId: text('user_id').notNull(),
-  provider: text('provider').notNull(), // 'linear' | 'rollbar'
+  provider: text('provider').notNull(), // registered provider id ('linear', 'rollbar', ...)
   label: text('label').notNull(), // user-facing name, seeded from the provider (e.g. workspace/org)
-  accessToken: text('access_token').notNull(),
-  meta: text('meta'), // optional JSON (e.g. { workspace }, base url, org id)
+  authRef: text('access_token').notNull(), // encrypted secret material; physical name retained for migration compatibility
+  authKind: text('auth_kind').notNull().default('api-key'),
+  account: text('account'), // JSON ProviderAccountRef; core renders but never interprets provider ids
+  scopes: text('scopes').notNull().default('[]'), // JSON string[] resolved during validation
+  capabilities: text('capabilities').notNull().default('{}'), // JSON Record<string, CapabilityState>
+  config: text('config').notNull().default('{}'), // provider-codec-owned, non-secret configuration
+  status: text('status').notNull().default('connected'),
+  lastValidatedAt: integer('last_validated_at'),
+  lastError: text('last_error'),
   createdAt: integer('created_at').notNull(),
+  updatedAt: integer('updated_at').notNull(),
 })
 
 // Local checkout for a GitHub repo (vNext §7, §9). Machine-scoped, NOT user-scoped: it describes
@@ -366,6 +374,7 @@ export const taskLinks = sqliteTable(
     integrationId: text('integration_id').notNull(), // → integrations.id
     provider: text('provider').notNull(), // 'linear' | 'rollbar' (denormalized from the integration)
     identifier: text('identifier').notNull(), // 'ENG-42' | rollbar item id
+    refJson: text('ref_json'), // complete ExternalRef for providers whose locator needs more scope
     createdAt: integer('created_at').notNull(),
   },
   (t) => [primaryKey({ columns: [t.taskId, t.integrationId, t.identifier] })],

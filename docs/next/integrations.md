@@ -331,6 +331,11 @@ its own tier's store, never a neighbour's.
 Mirrored-resource descriptors *(points §4.9)* give providers the sync engine;
 this section adds the invariants the engine cannot infer.
 
+Phase 7 makes those descriptors executable: an opaque per-connection `key`, a codec-backed `read`,
+and an upstream `refresh` callback are projected through core's sync and request-budget runtime.
+Provider-owned HTTP routers are projected from the same activation registry, so a new provider adds
+a route module and registration without editing the server composition root.
+
 **The summary/detail invariant: a list fetch must never clobber detail.**
 Linear already encodes this subtly — batch summaries preserve prior
 `description`, `comments`, `activity`; Rollbar's list and detail share one

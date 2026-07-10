@@ -1,6 +1,6 @@
 import { paneRegistry } from './registries/panes'
 import { prPaneContribution } from './features/pullDetail/PrPane'
-import { linearPaneContribution, rollbarPaneContribution } from './features/integrations/taskPaneContributions'
+import { clientIntegrationProviders, registerIntegrationProvider } from './features/integrations/providerContributions'
 import { changesPaneContribution } from './features/changes/paneContribution'
 import { notesPaneContribution } from './features/notes/NotesTaskPane'
 import { contextPaneContribution } from './features/context/paneContribution'
@@ -31,11 +31,10 @@ const panes = [
   searchPaneContribution,
   databasePaneContribution,
   previewPaneContribution,
-  linearPaneContribution,
-  rollbarPaneContribution,
 ]
 
 for (const pane of panes) paneRegistry.register(pane)
+for (const provider of clientIntegrationProviders) registerIntegrationProvider(provider)
 for (const page of settingsPageContributions) settingsRegistry.register(page)
 activatePreviewEvents()
 for (const kind of noticeKindContributions) noticeKindRegistry.register(kind)

@@ -6,6 +6,9 @@ import { linearIssueKey, linearIssueOptions, type LinearComment } from '../../qu
 import { postLinearComment } from '../../mutations'
 import { renderMarkdown } from './markdown'
 
+export type LinearIssueTarget = { identifier: string; connectionId?: string }
+const targetKey = (target: LinearIssueTarget) => `${target.connectionId ?? 'unscoped'}:${target.identifier}`
+
 // Glyph per activity kind (Linear-style compact feed). State changes are tinted by the new state.
 const ACTIVITY_GLYPH: Record<string, string> = { created: '✦', state: '◐', assignee: '○', label: '▣', title: '✎' }
 
@@ -16,17 +19,17 @@ const ACTIVITY_GLYPH: Record<string, string> = { created: '✦', state: '◐', a
 // Bodies are raw markdown (renderMarkdown → sanitized HTML). Activity Log replays the issue
 // history; comments are threaded with an inline reply box (GitHub-style), plus a bottom composer.
 export default function LinearIssuePanel(props: {
-  identifier: string
+  target: LinearIssueTarget
   onClose: () => void
   onContentClick: (e: MouseEvent) => void
   // When a task links several Linear tickets, the panel shows a chip strip to switch between
   // them (docs/workspaces). Omitted by the single-ticket PR-detail caller.
-  identifiers?: string[]
-  onSelectIdentifier?: (id: string) => void
+  targets?: LinearIssueTarget[]
+  onSelectTarget?: (target: LinearIssueTarget) => void
   variant?: 'overlay' | 'pane'
 }) {
   const qc = useQueryClient()
-  const issue = createQuery(() => linearIssueOptions(props.identifier, true))
+  const issue = createQuery(() => linearIssueOptions(props.target.identifier, true, props.target.connectionId))
 
   const [draft, setDraft] = createSignal('')
   const [replyingId, setReplyingId] = createSignal<string | null>(null)
@@ -50,11 +53,11 @@ export default function LinearIssuePanel(props: {
     setPosting(true)
     setPostError('')
     try {
-      await postLinearComment(props.identifier, text, parentId)
+      await postLinearComment(props.target.identifier, text, parentId, props.target.connectionId)
       setDraft('')
       setReplyDraft('')
       setReplyingId(null)
-      await qc.invalidateQueries({ queryKey: linearIssueKey(props.identifier) })
+      await qc.invalidateQueries({ queryKey: linearIssueKey(props.target.identifier, props.target.connectionId) })
     } catch (e) {
       setPostError((e as Error).message || 'Failed to add comment.')
     } finally {
@@ -116,17 +119,17 @@ export default function LinearIssuePanel(props: {
   // Chip strip + scrolling detail body, shared verbatim by both variants (only one renders —
   // `variant` is fixed per call site).
   const tabs = () => (
-    <Show when={(props.identifiers?.length ?? 0) > 1}>
+    <Show when={(props.targets?.length ?? 0) > 1}>
       <div class="integrations-panel-tabs">
-        <For each={props.identifiers}>
-          {(id) => (
+        <For each={props.targets}>
+          {(target) => (
             <button
               type="button"
               class="integrations-panel-tab"
-              classList={{ active: id === props.identifier }}
-              onClick={() => props.onSelectIdentifier?.(id)}
+              classList={{ active: targetKey(target) === targetKey(props.target) }}
+              onClick={() => props.onSelectTarget?.(target)}
             >
-              {id}
+              {target.identifier}
             </button>
           )}
         </For>
@@ -208,7 +211,7 @@ export default function LinearIssuePanel(props: {
           <div class="integrations-panel-backdrop" onClick={props.onClose} />
           <aside class="integrations-panel">
             <header class="integrations-panel-head">
-              <span class="integrations-panel-title">{props.identifier}</span>
+              <span class="integrations-panel-title">{props.target.identifier}</span>
               <Show when={issue.data?.url}>
                 {(url) => (
                   <a class="integrations-panel-link muted" href={url()} target="_blank" rel="noreferrer">
@@ -228,7 +231,7 @@ export default function LinearIssuePanel(props: {
     >
       <section class="pane linear-pane">
         <div class="section-header">
-          <span>Linear · {props.identifier}</span>
+          <span>Linear · {props.target.identifier}</span>
           <Show when={issue.data?.url}>
             {(url) => (
               <a class="integrations-panel-link muted" style={{ 'text-align': 'right' }} href={url()} target="_blank" rel="noreferrer">

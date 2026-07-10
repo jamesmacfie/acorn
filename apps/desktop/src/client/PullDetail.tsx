@@ -85,7 +85,7 @@ export default function PullDetail(props: { task?: Task } = {}) {
     return scanLinearRefs(texts)
   })
   const integrations = createQuery(() => integrationsOptions(linearRefs().length > 0))
-  const linearConnected = () => (integrations.data?.integrations ?? []).some((i) => i.provider === 'linear' && i.connected)
+  const linearConnected = () => (integrations.data?.integrations ?? []).some((i) => i.providerId === 'linear' && i.status === 'connected')
   const linearIssues = createQuery(() => linearIssuesOptions(linearRefs().map((rf) => rf.identifier), linearRefs().length > 0 && linearConnected()))
   const linearSummary = createMemo(() => new Map((linearIssues.data?.issues ?? []).map((i) => [i.identifier, i])))
   const [openIssue, setOpenIssue] = createSignal<string | null>(null)
@@ -508,7 +508,7 @@ export default function PullDetail(props: { task?: Task } = {}) {
               {(c) => <ChecksPanel owner={o()} repo={r()} runId={c().runId} jobName={c().name} onClose={() => setOpenCheck(null)} />}
             </Show>
             <Show when={openIssue()}>
-              {(id) => <LinearIssuePanel identifier={id()} onClose={() => setOpenIssue(null)} onContentClick={onContentClick} />}
+              {(id) => <LinearIssuePanel target={{ identifier: id() }} onClose={() => setOpenIssue(null)} onContentClick={onContentClick} />}
             </Show>
           </>
         )}

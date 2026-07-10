@@ -1,5 +1,12 @@
-import { describe, expect, it } from 'vitest'
-import { parseInAppTarget, splitLinearIds } from './contentLinks'
+import { afterAll, beforeAll, describe, expect, it } from 'vitest'
+import { contentLinkRegistry, linearContentLinkContribution, parseInAppTarget, splitLinearIds } from './contentLinks'
+
+let dispose: (() => void) | undefined
+beforeAll(() => {
+  const registered = contentLinkRegistry.register(linearContentLinkContribution)
+  dispose = () => registered.dispose()
+})
+afterAll(() => dispose?.())
 
 describe('parseInAppTarget', () => {
   it('recognises Linear issue links', () => {

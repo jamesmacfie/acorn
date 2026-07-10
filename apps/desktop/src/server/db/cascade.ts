@@ -1,4 +1,4 @@
-import { and, eq } from 'drizzle-orm'
+import { and, eq, like } from 'drizzle-orm'
 import * as schema from './schema'
 import type { AppDatabase } from './index'
 
@@ -9,6 +9,7 @@ export const cascadeDeleteIntegration = async (db: AppDatabase, userId: string, 
   await db.batch([
     db.delete(schema.workspaceProjects).where(eq(schema.workspaceProjects.integrationId, id)),
     db.delete(schema.issues).where(and(eq(schema.issues.userId, userId), eq(schema.issues.integrationId, id))),
+    db.delete(schema.syncState).where(and(eq(schema.syncState.userId, userId), like(schema.syncState.resource, `provider:%:${id}:%`))),
     db.delete(schema.taskLinks).where(eq(schema.taskLinks.integrationId, id)),
     db.delete(schema.integrations).where(and(eq(schema.integrations.id, id), eq(schema.integrations.userId, userId))),
   ])

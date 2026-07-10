@@ -7,6 +7,7 @@ import { getUser } from '../middleware/requireUser'
 import { respondError } from '../respond'
 import type { PreviewMode, SetupTrigger, Workspace, WorkspaceProject, WorkspaceProjectsResponse, WorkspaceRepo, WorkspaceSeed } from '../../shared/api'
 import { isValidWorkspaceColor, isValidWorkspaceIcon, parseWorkspaceIcon, serializeWorkspaceIcon } from '../../shared/workspaceIdentity'
+import { getConnection } from '../integrations/connections'
 
 // Workspaces (docs/workspaces): named GROUPS of repos — the top-level unit. Machine-scoped (no
 // user_id) like tasks / repo_paths, but auth-gated. A repo belongs to exactly one workspace
@@ -217,6 +218,10 @@ export const workspaces = new Hono<AppEnv>()
     const body = (await c.req.json().catch(() => ({}))) as { projects?: WorkspaceProject[] }
     const projects = (body.projects ?? []).filter((p) => p && typeof p.integrationId === 'string' && typeof p.externalId === 'string' && p.integrationId && p.externalId)
     const db = getDb(c.env)
+    const user = getUser(c)
+    for (const project of projects) {
+      if (!(await getConnection(db, user.login, project.integrationId))) return respondError(c, 403, 'provider_not_connected')
+    }
     const now = Date.now()
     // Replace the whole set (composite key ⇒ simplest correct: clear then insert). ponytail.
     await db.delete(schema.workspaceProjects).where(eq(schema.workspaceProjects.workspaceId, id))

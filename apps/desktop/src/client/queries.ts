@@ -326,10 +326,11 @@ export const workspaceLinearIssuesOptions = (selection: WorkspaceProject[], enab
 
 // Full ticket detail for the side panel. refetchOnMount:'always' + staleTime 0 → opening the panel
 // re-fetches (the route's ?refresh=1 forces a fresh Linear read and updates the cache).
-export const linearIssueOptions = (identifier: string, enabled: boolean) => ({
-  queryKey: linearIssueKey(identifier),
+export const linearIssueOptions = (identifier: string, enabled: boolean, connectionId?: string) => ({
+  queryKey: linearIssueKey(identifier, connectionId),
   enabled,
   staleTime: 0,
   refetchOnMount: 'always' as const,
-  queryFn: async ({ signal }: QueryContext): Promise<LinearIssueDetail> => readJson<LinearIssueDetail>(linearIssueRoute(identifier), { signal }),
+  queryFn: async ({ signal }: QueryContext): Promise<LinearIssueDetail> =>
+    readJson<LinearIssueDetail>(linearIssueRoute(identifier, connectionId), { signal }),
 })
