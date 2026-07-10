@@ -12,14 +12,15 @@ and IndexedDB client persistence.
 
 ## Architecture (one local server in Electron)
 
-- The Electron main process (`apps/desktop/src/main/electron.ts`) builds the runtime bindings, starts
-  the Hono app (`apps/desktop/src/server/index.ts`, a `createApp()` factory) under `@hono/node-server`
-  on `http://127.0.0.1:4317`, and points a hardened `BrowserWindow` at that origin. The server
-  serves `/api/*` + `/auth/*` and falls back to the SPA shell `index.html` for other navigations.
+- The Electron main entry (`apps/desktop/src/app/main/electron.ts`) calls the composition root
+  (`src/app/main/bootstrap.ts`), which builds the runtime bindings and starts the Hono app
+  (`src/core/server/index.ts`, a `createApp()` factory) under `@hono/node-server` on
+  `http://127.0.0.1:4317`, then points a hardened `BrowserWindow` at that origin. The server serves
+  `/api/*` + `/auth/*` and falls back to the SPA shell `index.html` for other navigations.
 - Data: GitHub → local SQLite (via Drizzle, `better-sqlite3`) read-model mirror with ETag/TTL
   serve-then-revalidate; an on-disk dir caches immutable public blob/patch bodies by SHA; IndexedDB
   persists the client query cache. Local data lives under `apps/desktop/.acorn/` (gitignored).
-- Bindings: `apps/desktop/src/main/bindings.ts` builds the object routes read via `c.env` (DB,
+- Bindings: `apps/desktop/src/core/main/bindings.ts` builds the object routes read via `c.env` (DB,
   in-memory `OAUTH_STATE`, on-disk `BLOBS`, secrets). The global `Env` type is hand-written in
   `apps/desktop/src/env.d.ts`.
 - Session: AES-256-GCM (JWE `dir`) encrypted cookie via `jose` (`session.ts`); the GitHub token
@@ -27,21 +28,32 @@ and IndexedDB client persistence.
 
 ## Repo map
 
-pnpm workspace + Turborepo; all app code is in `apps/desktop`.
+pnpm workspace + Turborepo; all app code is in `apps/desktop`. Since Phase 10 (docs/next) the source
+is foldered into `core/` + `plugins/` + `app/`, each split by process (`client` / `server` / `main`
+/ `mcp` / `shared`). Import rules are enforced by `src/core/boundaries.test.ts`.
 
-- `apps/desktop/src/client/` — SolidJS SPA (router, TanStack Query, Shiki diffs, PullList /
-  PullDetail / DiffView / RepoPicker, shortcuts). Detail: [docs/frontend.md](./docs/frontend.md),
-  [docs/diff-rendering.md](./docs/diff-rendering.md), [docs/ui-design.md](./docs/ui-design.md).
-- `apps/desktop/src/main/` — Electron main process + Node bootstrap: `electron.ts` (window, guards,
-  OAuth window), `server.ts` (`@hono/node-server` + static/SPA), `bindings.ts` (DB/KV/secrets),
-  `preload.ts`. Detail: [docs/electron.md](./docs/electron.md).
-- `apps/desktop/src/server/` — Hono app: `routes/`, `middleware/`, `github/`, `db/` (Drizzle
-  schema), `session.ts`. Detail: [docs/api-reference.md](./docs/api-reference.md),
-  [docs/authentication.md](./docs/authentication.md),
-  [docs/github-integration.md](./docs/github-integration.md),
-  [docs/data-layer.md](./docs/data-layer.md), [docs/caching.md](./docs/caching.md).
+- `apps/desktop/src/core/` — the platform, never imports a plugin. `client/` (shell, registries,
+  persistence, layout, prefs, palettes, tabs, tasks/workspaces, settings framework, WS client),
+  `server/` (`createApp` factory, session/auth/csrf middleware, sync engine, route + integration-
+  provider registries, Drizzle `db/`), `main/` (PTY/worktree primitives, bindings, server listener,
+  MCP registration, agent-profile registry), `mcp/` (stdio skeleton + tool projection), `shared/`
+  (cross-process contracts: api, ws, terminal/notes/workflow protocols).
+- `apps/desktop/src/plugins/<name>/` — one folder per in-tree feature (github, linear, rollbar,
+  editor, changes, notes, memory, context, preview, database, terminal, agents, workflows,
+  profiles-{claude,codex,aider}, onboarding), each with `client`/`server`/`main` parts as needed. A
+  plugin may import `core/` and cross-plugin contribution points, never another plugin's internals.
+- `apps/desktop/src/app/` — the composition root, the ONLY layer that imports plugins: `main/`
+  (`bootstrap.ts` boot order, `electron.ts` entry, activation modules), `server/` (`providers.ts`,
+  `routes.ts` register plugin contributions into core registries; `devNode.ts` is the `dev:node`
+  entry), `client/` (`index.tsx` renderer entry + contribution activation).
+- Detail docs: [docs/frontend.md](./docs/frontend.md), [docs/diff-rendering.md](./docs/diff-rendering.md),
+  [docs/ui-design.md](./docs/ui-design.md), [docs/electron.md](./docs/electron.md),
+  [docs/api-reference.md](./docs/api-reference.md), [docs/authentication.md](./docs/authentication.md),
+  [docs/github-integration.md](./docs/github-integration.md), [docs/data-layer.md](./docs/data-layer.md),
+  [docs/caching.md](./docs/caching.md). (Some still cite pre-foldering paths; the tree above is authoritative.)
 - `apps/desktop/migrations/` — Drizzle-generated SQLite migrations (applied on startup + via `db:migrate`).
-- `docs/` — all topic docs; pick the relevant one per the links above.
+- `docs/` — all topic docs; pick the relevant one per the links above. `docs/next/` is the design
+  history for this plugin-platform version (no longer an active build guide).
 
 ## Key commands
 
@@ -59,7 +71,7 @@ pnpm workspace + Turborepo; all app code is in `apps/desktop`.
 ## Conventions & gotchas
 
 - **TypeScript strict; no `any`.** Match existing patterns and naming.
-- **Schema change workflow:** edit `apps/desktop/src/server/db/schema.ts` → `db:generate` →
+- **Schema change workflow:** edit `apps/desktop/src/core/server/db/schema.ts` → `db:generate` →
   `db:migrate` (or just launch — `openDb` migrates on startup). After changing the bindings shape,
   update the hand-written `Env` in `apps/desktop/src/env.d.ts`. (Drizzle quirk: a `NOT NULL` column on a
   populated table emits a table-rebuild migration whose `INSERT … SELECT` copy must be trimmed by

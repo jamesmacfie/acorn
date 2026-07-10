@@ -21,8 +21,8 @@ export default defineConfig({
         external: externalizeBareImports,
         // `mcp` is the acorn MCP server (docs/next 06 B) — launched by agents via
         // ELECTRON_RUN_AS_NODE=1 <electron> out/main/mcp.js, not by the app itself. The input is
-        // the dedicated entry module (src/mcp/main.ts) that imports and calls main().
-        input: { index: resolve(__dirname, 'src/main/electron.ts'), mcp: resolve(__dirname, 'src/mcp/main.ts') },
+        // the dedicated entry module (src/core/mcp/main.ts) that imports and calls main().
+        input: { index: resolve(__dirname, 'src/app/main/electron.ts'), mcp: resolve(__dirname, 'src/core/mcp/main.ts') },
         output: { entryFileNames: '[name].js', format: 'es' },
       },
     },
@@ -33,7 +33,7 @@ export default defineConfig({
       outDir: 'out/preload',
       rollupOptions: {
         external: externalizeBareImports,
-        input: { index: resolve(__dirname, 'src/main/preload.ts') },
+        input: { index: resolve(__dirname, 'src/core/main/preload.ts') },
         // Sandboxed preloads must be CommonJS — emit .cjs (main references ../preload/index.cjs).
         output: { entryFileNames: 'index.cjs', format: 'cjs' },
       },

@@ -6,6 +6,9 @@ export default defineConfig({
   test: {
     environment: 'node',
     include: ['src/**/*.test.ts'],
+    // Register built-in providers/profiles into the core registries before each test file, mirroring
+    // what the app composition roots do at boot (docs/next Phase 10 foldering).
+    setupFiles: ['./test/registerContributions.ts'],
     // Temp-git-repo tests must not inherit the user's global git config (hooks, fsmonitor,
     // templates) — it makes them slow and flaky under parallel workers.
     env: {

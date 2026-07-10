@@ -16,7 +16,7 @@ asarUnpack:
   - node_modules/better-sqlite3/**
   - node_modules/@vscode/ripgrep/**
 # Drizzle migrations are read at runtime; ship them as resources so process.resourcesPath/migrations
-# resolves (see migrationsFolder in src/main/bindings.ts).
+# resolves (see migrationsFolder in src/core/main/bindings.ts).
 extraResources:
   - from: migrations
     to: migrations

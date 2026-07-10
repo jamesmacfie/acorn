@@ -5,7 +5,7 @@
   "main": "out/main/index.js",
   "scripts": {
     "dev": "electron-vite build && electron-vite preview",
-    "dev:node": "node --import tsx --watch --env-file=.env src/main/server.ts",
+    "dev:node": "node --import tsx --watch --env-file=.env src/app/server/devNode.ts",
     "build": "electron-vite build",
     "dist": "electron-vite build && electron-builder --mac",
     "electron:dev": "electron-vite dev",
