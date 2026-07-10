@@ -17,6 +17,7 @@ removed; current behavior is documented in the parent [`docs/`](../) tree.
 | [contribution-points.md](./contribution-points.md) | Forward extension constraints and examples for future contributors |
 | [state-and-policies.md](./state-and-policies.md) | Policy seams that become relevant as new background or dashboard consumers arrive |
 | [security.md](./security.md) | Constraints for future principal kinds, relays, webhooks, and control channels |
+| [api/](./api/) | Bearer-authenticated public HTTP automation API design, schemas, plugin contract, command catalog, and implementation plan |
 
 Shipped contracts belong in durable docs such as [plugins.md](../plugins.md),
 [integrations.md](../integrations.md), [state.md](../state.md), [security.md](../security.md),
