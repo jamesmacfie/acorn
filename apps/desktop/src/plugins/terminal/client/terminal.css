@@ -4,7 +4,7 @@
      not over either. The terminal only shows in the Task view, where the right rail is present. */
   left: var(--tabrail-w);
   right: var(--tabrail-w);
-  bottom: 0;
+  bottom: var(--task-footer-h);
   min-height: 160px;
   display: flex;
   flex-direction: column;
