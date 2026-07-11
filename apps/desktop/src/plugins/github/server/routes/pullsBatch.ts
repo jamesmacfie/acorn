@@ -98,7 +98,7 @@ query Batch($owner: String!, $repo: String!, ${varDecls}) {
     await Promise.all(
       fetched.map((r, i) => {
         if (r.status !== 'fulfilled' || !r.value.ok) return undefined
-        return mirrorFiles(c.env, db, { userId, repoId, number: staleFiles[i]! }, r.value.value)
+        return mirrorFiles(c.env.BLOBS, db, { userId, repoId, number: staleFiles[i]! }, r.value.value)
       }),
     )
   }

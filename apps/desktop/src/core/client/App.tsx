@@ -4,7 +4,7 @@ import { useMatch, useNavigate, useParams } from '@solidjs/router'
 import { Dynamic } from 'solid-js/web'
 import { clear } from 'idb-keyval'
 import { readJson } from './apiClient'
-import { meKey, meOptions, pinsOptions, prefsOptions, pullPrefixKey, pullsKey, pullsRoute, pullsPrefixKey, reposKey, reposOptions, reposRefreshRoute, tasksOptions, workspacesKey, workspacesOptions, type Pull } from './queries'
+import { filesKey, forceRefreshPull, meKey, meOptions, pinsOptions, prefsOptions, pullKey, pullsKey, pullsRoute, pullsPrefixKey, reposKey, reposOptions, reposRefreshRoute, tasksOptions, workspacesKey, workspacesOptions, type Pull } from './queries'
 import { bootstrapWorkspaces } from '../../plugins/github/client/mutations'
 import RepoPicker from '../../plugins/github/client/RepoPicker'
 import WorkspacePicker from './ui/WorkspacePicker'
@@ -260,15 +260,19 @@ export default function App() {
   async function refreshCurrentPull() {
     if (!params.owner || !params.repo || !params.number) return
     setRefreshingPull(true)
-    await Promise.all([
-      queryClient.invalidateQueries({ queryKey: pullPrefixKey(params.owner, params.repo) }),
-      queryClient.invalidateQueries({ queryKey: pullsPrefixKey(params.owner, params.repo) }),
-      queryClient.invalidateQueries({ queryKey: ['files', params.owner, params.repo, params.number] }),
-      // Linked Linear tickets (list enrichment + any open detail) — refetch their status too.
-      queryClient.invalidateQueries({ queryKey: ['linear-issues'] }),
-      queryClient.invalidateQueries({ queryKey: ['linear-issue'] }),
-    ])
-    setRefreshingPull(false)
+    try {
+      const { detail, files } = await forceRefreshPull(params.owner, params.repo, params.number)
+      queryClient.setQueryData(pullKey(params.owner, params.repo, params.number), detail)
+      queryClient.setQueryData(filesKey(params.owner, params.repo, params.number), files)
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: pullsPrefixKey(params.owner, params.repo) }),
+        // Linked Linear tickets (list enrichment + any open detail) — refetch their status too.
+        queryClient.invalidateQueries({ queryKey: ['linear-issues'] }),
+        queryClient.invalidateQueries({ queryKey: ['linear-issue'] }),
+      ])
+    } finally {
+      setRefreshingPull(false)
+    }
   }
 
   // Logged out: no chrome, just the mark — bounce straight to GitHub OAuth. While auth is still

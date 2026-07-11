@@ -71,11 +71,18 @@ const handleFilesRead = async (c: Context<AppEnv>, options: { summaryOnly?: bool
   const refresh = async (): Promise<RefreshResult> => {
     const files = await fetchFiles(user.token, owner, repo, number)
     if (!files.ok) return files
-    await mirrorFiles(c.env, db, key, files.value)
+    await mirrorFiles(c.env.BLOBS, db, key, files.value)
     return { ok: true }
   }
 
-  const result = await serveThenRevalidate({ resource, userId, ttlMs: PULLS_STALE_AFTER_MS, read, refresh })
+  const result = await serveThenRevalidate({
+    resource,
+    userId,
+    ttlMs: PULLS_STALE_AFTER_MS,
+    force: c.req.query('force') === 'true',
+    read,
+    refresh,
+  })
   if (!result.ok) return respondError(c, result.failure.status, result.failure.error, result.failure.detail)
   return c.json(result.value)
 }

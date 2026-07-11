@@ -125,11 +125,12 @@ stale), and the Linear/Rollbar reads (multi-connection fan-out with partial
 results and per-item freshness). They share the engine's TTLs from `policy.ts`
 but own their own flow.
 
-Two explicit invalidation paths bypass the TTL: `POST /api/repos/refresh` zeroes
+Explicit forced paths bypass the TTL: `POST /api/repos/refresh` zeroes
 both the repo rows' and the repos `sync_state` row's `fetchedAt` (the ETag is
 kept so the refetch can still `304`), and PR mutations bust the PR's
 `sync_state` row (`bustPrSync` in `routes/prContext.ts`) so the next read
-refetches.
+refetches. Internal PR detail/files reads accept `?force=true`; the public GitHub plugin's
+write-scoped refresh POSTs invoke the same open-list, detail, and file mirror operations directly.
 
 How the 200 path rewrites the mirror differs per resource:
 

@@ -15,7 +15,7 @@ describe('GitHubPublicService', () => {
     blobs = new Map([['patch:abc', '@@ -1 +1 @@'], ['filebody:xyz', 'file contents']])
     svc = new GitHubPublicService({
       db: t.db,
-      blobs: { get: async (k) => blobs.get(k) ?? null },
+      blobs: { get: async (k) => blobs.get(k) ?? null, put: async (k, value) => { blobs.set(k, value) } },
       resolveToken: async () => 'gho_token',
     })
     await t.db.insert(schema.repos).values({ userId: USER, id: 100, owner: 'acme', name: 'web', private: false, defaultBranch: 'main', pushedAt: 2000, fetchedAt: 1 })
@@ -64,8 +64,18 @@ describe('GitHubPublicService', () => {
   })
 
   it('424s a mutation when no GitHub credential is stored', async () => {
-    const noCred = new GitHubPublicService({ db: t.db, blobs: { get: async () => null }, resolveToken: async () => null })
+    const noCred = new GitHubPublicService({
+      db: t.db,
+      blobs: { get: async () => null, put: async () => undefined },
+      resolveToken: async () => null,
+    })
     await expect(noCred.comment(USER, 'acme', 'web', 5, 'hi')).rejects.toMatchObject({ code: 'upstream_reauthentication_required' })
+    await expect(noCred.refreshPulls(USER, 'acme', 'web')).rejects.toMatchObject({ code: 'upstream_reauthentication_required' })
+  })
+
+  it('does not report repository refresh success when GitHub rejects the credential', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => new Response('bad creds', { status: 401 })))
+    await expect(svc.refreshRepos(USER)).rejects.toMatchObject({ code: 'upstream_reauthentication_required', status: 424 })
   })
 
   it('toggles local "viewed" state without an upstream call', async () => {

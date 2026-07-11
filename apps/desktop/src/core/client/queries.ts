@@ -80,6 +80,7 @@ import {
 } from '../shared/api'
 
 export {
+  filesKey,
   filePatchKey,
   fileSummariesKey,
   integrationsKey,
@@ -137,6 +138,18 @@ export const pullDetailOptions = (owner: string, repo: string, number: string, e
   enabled,
   queryFn: async ({ signal }: QueryContext): Promise<PullDetail> => readJson<PullDetail>(pullRoute(owner, repo, number), { signal }),
 })
+
+export const forceRefreshPull = async (
+  owner: string,
+  repo: string,
+  number: string,
+): Promise<{ detail: PullDetail; files: PullFile[] }> => {
+  const [detail, files] = await Promise.all([
+    readJson<PullDetail>(`${pullRoute(owner, repo, number)}?force=true`),
+    readJson<PullFile[]>(`${pullRoute(owner, repo, number, 'files')}?force=true`),
+  ])
+  return { detail, files }
+}
 
 export const repoLabelsOptions = (owner: string, repo: string, enabled: boolean) => ({
   queryKey: repoLabelsKey(owner, repo),

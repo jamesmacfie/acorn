@@ -421,6 +421,8 @@ A GitHub `304` on the open path is handled internally (re-serves the mirror); th
 
 `apps/desktop/src/plugins/github/server/routes/pullDetail.ts`. The composite read (GraphQL; **Mirror**, ~45 s TTL,
 **TTL-only** — no ETag). Mirror logic shared with the batch route (`prMirror.ts`).
+`?force=true` bypasses even a fresh cache entry, blocks on GitHub, and returns the newly mirrored
+composite; the UI's explicit PR refresh uses this path.
 
 ```ts
 200 → PullDetail
@@ -463,6 +465,8 @@ cached on-disk by blob SHA (see [caching](./caching.md)); merges in per-user `vi
 Query params: `?summary=1` omits patch bodies (metadata only); `?path=<p>` returns just that file
 (with patch — `summary` is ignored when `path` is given). `400 bad_number`,
 `401 unauthenticated|reauth`, `404 repo_not_found`, `502 github_unavailable`.
+`?force=true` bypasses the freshness gate and blocks until changed-file metadata and available patch
+bodies have been fetched and mirrored.
 
 ### `POST .../files/patches`
 

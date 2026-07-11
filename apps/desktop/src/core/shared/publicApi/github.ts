@@ -97,6 +97,7 @@ export const PullParams = RepoParams.extend({ number: z.coerce.number().int().po
 
 export const PullsQuerySchema = PageQuerySchema.extend({ state: z.enum(['open', 'closed']).default('open') })
 export const PullFilesQuerySchema = PageQuerySchema.extend({ includePatch: z.enum(['true', 'false']).default('false') })
+export const PullRefreshResultSchema = z.strictObject({ refreshed: z.literal(true) })
 
 export const MergeMethodSchema = z.enum(['merge', 'squash', 'rebase'])
 export const CreatePullSchema = z.strictObject({

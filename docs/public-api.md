@@ -124,6 +124,12 @@ event channels and commands are core-declared. Contributions are assembled in
 operation/route ids, strict-object schemas, the mutating-⇒-`write`-scope rule, plugin-relative paths)
 so a malformed contribution cannot mount.
 
+The GitHub plugin's PR reads remain mirror-only. Write-scoped automation can synchronously refresh
+the first 100 open PRs for a repository with
+`POST /api/v1/plugins/github/repos/:owner/:repo/pulls/refresh`, or refresh one PR's composite detail
+and changed files with `POST /api/v1/plugins/github/repos/:owner/:repo/pulls/:number/refresh`.
+Both return `{ data: { refreshed: true }, requestId }`; callers then use the normal read endpoints.
+
 ## WebSocket events (`/api/v1/ws`)
 
 A separate bearer-authenticated socket (`core/main/publicApi/wsHub.ts`), attached to the automation

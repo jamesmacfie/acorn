@@ -1,15 +1,15 @@
-import { and, desc, eq, isNull, lt, ne, sql } from 'drizzle-orm'
+import { and, desc, eq } from 'drizzle-orm'
 import { Hono } from 'hono'
 import { getDb, schema } from '../../../../core/server/db'
-import { chunkRowsByColumnBudget } from '../../../../core/server/db/batch'
 import { pullsResource } from '../../../../core/server/db/resourceKeys'
 import { gh, ghError } from '..'
 import type { ClosedPullsPage, Pull } from '../../../../core/shared/api'
 import type { AppEnv } from '../../../../core/server/middleware/auth'
 import { getUser } from '../../../../core/server/middleware/requireUser'
 import { respondError } from '../../../../core/server/respond'
-import { type Cached, type RefreshResult, serveThenRevalidate } from '../../../../core/server/sync/engine'
+import { type Cached, serveThenRevalidate } from '../../../../core/server/sync/engine'
 import { PULLS_STALE_AFTER_MS } from '../../../../core/server/sync/policy'
+import { refreshOpenPulls } from './pullRefresh'
 import { resolveRepoForUser } from './repoMirror'
 
 // PR list for a repo (docs/caching.md serve-then-revalidate, via server/sync/engine.ts). PR data is
@@ -61,11 +61,12 @@ export const pulls = new Hono<AppEnv>().get('/:owner/:repo/pulls', async (c) => 
     return c.json({ pulls: body.map(ghToPublic), nextPage: hasNext ? page + 1 : null } satisfies ClosedPullsPage)
   }
 
-  const resource = pullsResource(repoId, state)
-
-  // Partition open vs closed within the shared table so the two tabs don't clobber each other.
-  const stateFilter = state === 'open' ? eq(schema.pullRequests.state, 'open') : ne(schema.pullRequests.state, 'open')
-  const scope = and(eq(schema.pullRequests.userId, userId), eq(schema.pullRequests.repoId, repoId), stateFilter)
+  const resource = pullsResource(repoId, 'open')
+  const scope = and(
+    eq(schema.pullRequests.userId, userId),
+    eq(schema.pullRequests.repoId, repoId),
+    eq(schema.pullRequests.state, 'open'),
+  )
 
   const readRows = () =>
     db.select().from(schema.pullRequests).where(scope).orderBy(desc(schema.pullRequests.updatedAt))
@@ -81,112 +82,7 @@ export const pulls = new Hono<AppEnv>().get('/:owner/:repo/pulls', async (c) => 
     return { data: await readPublicRows(), fetchedAt: sync.fetchedAt }
   }
 
-  const refresh = async (): Promise<RefreshResult> => {
-    const sync = await readSync()
-    const res = await gh(user.token, `/repos/${owner}/${repo}/pulls?state=${state}&sort=updated&direction=desc&per_page=100`, {
-      headers: sync?.etag ? { 'If-None-Match': sync.etag } : {},
-    })
-
-    const now = Date.now()
-
-    // 304 Not Modified → mirror is still valid; just bump freshness (free, no rate cost).
-    if (res.status === 304) {
-      await db
-        .insert(schema.syncState)
-        .values({ userId, resource, etag: sync?.etag ?? null, fetchedAt: now })
-        .onConflictDoUpdate({
-          target: [schema.syncState.userId, schema.syncState.resource],
-          set: { fetchedAt: now },
-        })
-      return { ok: true }
-    }
-
-    // 304 handled above; auth, rate-limit, SSO, and upstream failures all map here.
-    const err = ghError(res)
-    if (err) return { ok: false, failure: err }
-
-    const etag = res.headers.get('etag')
-    const body = (await res.json()) as GitHubPull[]
-    const rows = body.map((p) => ({
-      userId,
-      repoId,
-      number: p.number,
-      nodeId: p.node_id,
-      state: p.state,
-      draft: p.draft,
-      title: p.title,
-      headRef: p.head?.ref ?? null,
-      baseRef: p.base?.ref ?? null,
-      author: p.user?.login ?? null,
-      updatedAt: p.updated_at ? Date.parse(p.updated_at) : null,
-      // Not in the conflict `set` (detail route owns it), but must be a row key: Drizzle binds a
-      // param for an omitted NOT NULL-default column, which would desync chunkRowsByColumnBudget's
-      // per-row param count and overflow the statement's bound-parameter budget (db/batch.ts).
-      autoMergeEnabled: false,
-      fetchedAt: now,
-    }))
-
-    // Flow B (docs/workspaces-and-tasks.md): a local-first task inherits a PR once one is opened for its
-    // branch. Match no-pullNumber active tasks for this repo against the just-fetched headRefs.
-    // Machine-scoped table (no userId); keyed by owner/repo name. Cheap: few tasks, runs only
-    // on a real list refresh (not 304s).
-    const branchToPull = new Map<string, number>()
-    for (const p of body) if (p.head?.ref) branchToPull.set(p.head.ref, p.number)
-    const taskRows = branchToPull.size
-      ? await db
-          .select()
-          .from(schema.tasks)
-          .where(
-            and(
-              eq(schema.tasks.repoOwner, owner),
-              eq(schema.tasks.repoName, repo),
-              eq(schema.tasks.status, 'active'),
-              isNull(schema.tasks.pullNumber),
-            ),
-          )
-      : []
-    const taskUpdates = taskRows.flatMap((w) => {
-      const num = branchToPull.get(w.branch)
-      return num != null ? [db.update(schema.tasks).set({ pullNumber: num, updatedAt: now }).where(eq(schema.tasks.id, w.id))] : []
-    })
-
-    // Full-list refresh, atomic (one transaction like refreshRepos/mirrorPr): upsert list-level
-    // fields (preserving detail fields like body fetched by the GraphQL detail route), prune rows
-    // no longer in the list, apply Flow B task updates, and bump sync_state — all or nothing, so
-    // a mid-refresh failure leaves the previous mirror + stale sync intact and the next request
-    // retries.
-    await db.batch([
-      db
-        .insert(schema.syncState)
-        .values({ userId, resource, etag, fetchedAt: now })
-        .onConflictDoUpdate({
-          target: [schema.syncState.userId, schema.syncState.resource],
-          set: { etag, fetchedAt: now },
-        }),
-      ...chunkRowsByColumnBudget(rows).map((part) =>
-        db.insert(schema.pullRequests).values(part).onConflictDoUpdate({
-          target: [schema.pullRequests.userId, schema.pullRequests.repoId, schema.pullRequests.number],
-          set: {
-            nodeId: sql`excluded.node_id`,
-            state: sql`excluded.state`,
-            draft: sql`excluded.draft`,
-            title: sql`excluded.title`,
-            headRef: sql`excluded.head_ref`,
-            baseRef: sql`excluded.base_ref`,
-            author: sql`excluded.author`,
-            updatedAt: sql`excluded.updated_at`,
-            fetchedAt: sql`excluded.fetched_at`,
-          },
-        }),
-      ),
-      db.delete(schema.pullRequests).where(and(scope, lt(schema.pullRequests.fetchedAt, now))),
-      ...taskUpdates,
-    ])
-
-    // The engine re-reads the mirror after a cold refresh (not the write-shaped `rows`), so the
-    // detail-route-owned mergeable/mergeStateStatus the list upsert preserves rides along.
-    return { ok: true }
-  }
+  const refresh = () => refreshOpenPulls(user.token, db, { userId, repoId, owner, repo })
 
   const result = await serveThenRevalidate({
     resource,

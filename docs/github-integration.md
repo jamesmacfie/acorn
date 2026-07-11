@@ -124,6 +124,14 @@ The client layers optimistic updates / invalidation on top. See
 [api-reference](./api-reference.md) for request/response shapes and
 [frontend](./frontend.md) for the mutation wiring.
 
+### Explicit PR refreshes
+
+The cookie-authenticated UI and bearer-authenticated automation API share the same mirror refresh
+operations. The UI uses forced internal detail/files reads; the public API exposes write-scoped POST
+operations for one repository's open list or one PR's composite plus files. Single-PR refresh fetches
+both upstream representations before starting mirror writes, while open-list refresh preserves ETag
+`304` handling, atomic pruning/upsert, and local-task PR-number backfill.
+
 ## ETags and rate limits
 
 - **ETags** are acorn's main rate-limit defense. The **PR-list** and **repos-list**
