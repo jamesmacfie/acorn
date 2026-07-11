@@ -28,11 +28,27 @@ export default function LinearBrowse() {
 
   // Project picker — lists projects across every connected Linear, tagged by connection.
   const [pickerOpen, setPickerOpen] = createSignal(false)
+  const [pickerOpening, setPickerOpening] = createSignal(false)
+  const [pickerError, setPickerError] = createSignal('')
   const projects = createQuery(() => linearProjectsOptions(pickerOpen()))
   const [checked, setChecked] = createSignal<Set<string>>(new Set())
-  function openPicker() {
-    setChecked(new Set(selected().map(projKey)))
-    setPickerOpen(true)
+  async function openPicker() {
+    if (pickerOpening()) return
+    setPickerError('')
+    setPickerOpening(true)
+    try {
+      // The picker must make its empty-state decision from a live Linear read, not the
+      // five-minute client cache. Manual refetch works while the query is disabled.
+      const result = await projects.refetch()
+      if (result.isError) {
+        setPickerError('Could not refresh Linear projects. Check the connection and try again.')
+        return
+      }
+      setChecked(new Set(selected().map(projKey)))
+      setPickerOpen(true)
+    } finally {
+      setPickerOpening(false)
+    }
   }
   function toggle(key: string) {
     const s = new Set(checked())
@@ -69,11 +85,12 @@ export default function LinearBrowse() {
         <div class="section-header">
           Linear{ws() ? ` · ${ws()!.name}` : ''}
           <Show when={wsId()}>
-            <button type="button" class="new-pr-btn" title="Choose Linear projects for this workspace" onClick={openPicker}>
-              Projects{selected().length ? ` (${selected().length})` : ''}
+            <button type="button" class="new-pr-btn" title="Choose Linear projects for this workspace" disabled={pickerOpening()} onClick={() => void openPicker()}>
+              {pickerOpening() ? 'Refreshing…' : `Projects${selected().length ? ` (${selected().length})` : ''}`}
             </button>
           </Show>
         </div>
+        <Show when={pickerError()}><div class="action-error" role="alert">{pickerError()}</div></Show>
 
         <Show when={wsId()} fallback={<p class="placeholder">Select a workspace to browse its Linear issues.</p>}>
           <Show
@@ -81,7 +98,9 @@ export default function LinearBrowse() {
             fallback={
               <div class="workspace-empty-inner">
                 <p class="muted">No Linear projects linked to {ws()?.name}.</p>
-                <button type="button" class="overlay-btn" onClick={openPicker}>Choose projects</button>
+                <button type="button" class="overlay-btn" disabled={pickerOpening()} onClick={() => void openPicker()}>
+                  {pickerOpening() ? 'Refreshing projects…' : 'Choose projects'}
+                </button>
               </div>
             }
           >

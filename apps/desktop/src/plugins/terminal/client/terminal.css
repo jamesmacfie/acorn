@@ -228,6 +228,11 @@
   flex: 1;
   min-height: 0;
   width: 100%;
+}
+/* FitAddon subtracts padding from xterm's element, not from its parent host. Keep the visual inset
+   here so the fitted row count leaves room for it instead of clipping the final terminal row. */
+.terminal-surface > .xterm {
+  height: 100%;
   padding: 4px 6px;
 }
 .terminal-empty {
