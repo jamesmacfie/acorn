@@ -1,20 +1,15 @@
 import { Hono } from 'hono'
-import type { RollbarItem, RollbarItemsResponse } from '../../../../core/shared/api'
+import type { RollbarItemDetail, RollbarItemsResponse, RollbarItemSummary } from '../../../../core/shared/api'
 import { getDb } from '../../../../core/server/db'
 import { listProviderConnections } from '../../../../core/server/integrations/connections'
 import { runProviderResource } from '../../../../core/server/integrations/resourceRuntime'
-import type { RollbarResourceInput, RollbarResourceOutput } from '../provider'
+import type { RollbarListResult, RollbarResourceInput } from '../provider'
 import type { AppEnv } from '../../../../core/server/middleware/auth'
 import { getUser } from '../../../../core/server/middleware/requireUser'
 import { respondError } from '../../../../core/server/respond'
 
 const PROVIDER = 'rollbar'
 const RESOURCE = 'rollbar.items'
-
-const respondResult = <T>(
-  c: Parameters<typeof respondError>[0],
-  result: Awaited<ReturnType<typeof runProviderResource<RollbarResourceInput, T>>>,
-) => (result.ok ? c.json(result.value) : respondError(c, result.failure.status, result.failure.error, result.failure.detail))
 
 // Provider-owned HTTP surface. Core mounts this router through the integration-provider registry;
 // reads execute the descriptor's mirrored-resource callbacks through the Phase-2 sync runtime.
@@ -25,11 +20,12 @@ export const rollbar = new Hono<AppEnv>()
     const connections = await listProviderConnections(db, user.login, PROVIDER)
     if (!connections.length) return respondError(c, 403, 'provider_not_connected')
 
-    const items: RollbarItem[] = []
-    let hadSuccess = false
-    let firstFailure: { status: 401 | 403 | 404 | 429 | 502; error: string; detail?: string[] } | null = null
+    const items: RollbarItemSummary[] = []
+    const failures: RollbarItemsResponse['failures'] = []
+    const cappedIntegrationIds: string[] = []
+    // Partial success is honest: one connection failing must not erase another's items.
     for (const connection of connections) {
-      const result = await runProviderResource<RollbarResourceInput, RollbarResourceOutput>({
+      const result = await runProviderResource<RollbarResourceInput, RollbarListResult>({
         db,
         userId: user.login,
         encryptionKey: c.env.SESSION_ENC_KEY,
@@ -39,20 +35,22 @@ export const rollbar = new Hono<AppEnv>()
         input: { kind: 'list' },
       })
       if (result.ok) {
-        hadSuccess = true
-        items.push(...(result.value as RollbarItem[]))
-      }
-      else firstFailure ??= result.failure
+        items.push(...result.value.items)
+        if (result.value.capped) cappedIntegrationIds.push(connection.id)
+      } else failures.push({ integrationId: connection.id, code: result.failure.error })
     }
-    if (!hadSuccess && firstFailure) return respondError(c, firstFailure.status, firstFailure.error, firstFailure.detail)
+    // Only a total wash (no connection succeeded) is a hard error.
+    if (!items.length && failures.length && failures.length === connections.length) {
+      return respondError(c, 502, failures[0].code)
+    }
     items.sort((a, b) => (b.lastOccurrenceAt ?? 0) - (a.lastOccurrenceAt ?? 0))
-    return c.json({ items } satisfies RollbarItemsResponse)
+    return c.json({ items, failures, cappedIntegrationIds } satisfies RollbarItemsResponse)
   })
   .get('/items/:identifier', async (c) => {
     const connectionId = c.req.query('integration')
     if (!connectionId) return respondError(c, 400, 'bad_request')
     const user = getUser(c)
-    const result = await runProviderResource<RollbarResourceInput, RollbarItem>({
+    const result = await runProviderResource<RollbarResourceInput, RollbarItemDetail>({
       db: getDb(c.env),
       userId: user.login,
       encryptionKey: c.env.SESSION_ENC_KEY,
@@ -60,6 +58,7 @@ export const rollbar = new Hono<AppEnv>()
       connectionId,
       resourceId: RESOURCE,
       input: { kind: 'detail', identifier: c.req.param('identifier') },
+      force: c.req.query('refresh') === 'true', // explicit user refresh bypasses the TTL
     })
-    return respondResult(c, result)
+    return result.ok ? c.json(result.value) : respondError(c, result.failure.status, result.failure.error, result.failure.detail)
   })

@@ -335,12 +335,21 @@ Errors: `provider_not_connected`, `provider_needs_auth`, `provider_resource_not_
 
 `apps/desktop/src/plugins/rollbar/server/routes/rollbar.ts`. The Rollbar Source's reads (**Provider** — live REST),
 cached into `issues` (provider `rollbar`, identifier = the visible counter) with serve-then-revalidate
-(2-min TTL). A failing connection degrades to its cache.
+(2-min TTL). List and detail are separate typed contracts with **independent freshness**: the list gates
+on the `sync_state` list-fetch time, the detail on the envelope's `detailFetchedAt`. A failing connection
+degrades to its cache. The active list paginates up to `budgets.maxPages` (3 × 100 = 300 items); a
+connection returning the full cap is reported in `cappedIntegrationIds`.
+
+`GET /items` returns `{ items: RollbarItemSummary[], failures: [{ integrationId, code }], cappedIntegrationIds: [] }`
+— partial success is preserved; a hard error is returned only when **no** connection succeeds. `GET /items/:identifier`
+returns a `RollbarItemDetail`: the summary plus the normalized, privacy-allowlisted latest occurrence
+(exception/message, stack frames, safe request/runtime/person context — never raw payload). `?refresh=true`
+forces a fresh upstream read past the TTL.
 
 | Method | Path | Purpose | Params |
 | --- | --- | --- | --- |
-| `GET` | `/api/rollbar/items` | Recent active items across every connected Rollbar project, cached. | — |
-| `GET` | `/api/rollbar/items/:identifier` | One item's detail. | `?integration=<id>` (required) |
+| `GET` | `/api/rollbar/items` | Active items across every connected Rollbar project (partial success + capped metadata), cached. | — |
+| `GET` | `/api/rollbar/items/:identifier` | One item's detail + normalized latest occurrence. | `?integration=<id>` (required), `?refresh=true` (optional) |
 
 Errors: `provider_not_connected`, `provider_needs_auth`, `provider_resource_not_found`,
 `provider_unavailable`, plus `bad_request` for a missing `integration` parameter.

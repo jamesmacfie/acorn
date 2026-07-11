@@ -1,4 +1,4 @@
-import type { LinearProjectIssue, RollbarItem, TaskSeed } from '../../shared/api'
+import type { LinearProjectIssue, RollbarItemSummary, TaskSeed } from '../../shared/api'
 import { dedupeBranch, slugifyBranch } from '../../shared/branch'
 import type { SourcePromotionContext } from '../registries/sources'
 
@@ -11,7 +11,7 @@ export const prepareLinearPromotion = (item: LinearProjectIssue, context: Source
   links: [{ connectionId: item.integrationId, identifier: item.identifier, ref: { displayId: item.identifier, url: item.url } }],
 })
 
-export const prepareRollbarPromotion = (item: RollbarItem, context: SourcePromotionContext): TaskSeed => ({
+export const prepareRollbarPromotion = (item: RollbarItemSummary, context: SourcePromotionContext): TaskSeed => ({
   origin: 'rollbar',
   repoOwner: context.owner,
   repoName: context.repo,
@@ -20,5 +20,7 @@ export const prepareRollbarPromotion = (item: RollbarItem, context: SourcePromot
     context.existingBranches ?? [],
   ),
   title: item.title.slice(0, 120),
-  links: [{ connectionId: item.integrationId, identifier: item.identifier, ref: { displayId: item.identifier } }],
+  // Retain the canonical system id on the link so detail fetches skip counter resolution (legacy
+  // counter-only links still resolve — see server/provider.ts).
+  links: [{ connectionId: item.integrationId, identifier: item.identifier, ref: { displayId: item.identifier, ...(item.itemId ? { externalId: item.itemId } : {}) } }],
 })

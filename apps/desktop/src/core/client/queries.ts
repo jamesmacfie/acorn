@@ -24,6 +24,12 @@ import {
   linearProjectsKey,
   linearProjectsRoute,
   linearProjectIssuesRoute,
+  rollbarItemKey,
+  rollbarItemRoute,
+  rollbarItemsKey,
+  rollbarItemsRoute,
+  type RollbarItemDetail,
+  type RollbarItemsResponse,
   workspaceProjectsRoute,
   workspaceAssignmentsRoute,
   workspaceAssignmentsKey,
@@ -347,4 +353,26 @@ export const linearIssueOptions = (identifier: string, enabled: boolean, connect
   refetchOnMount: 'always' as const,
   queryFn: async ({ signal }: QueryContext): Promise<LinearIssueDetail> =>
     readJson<LinearIssueDetail>(linearIssueRoute(identifier, connectionId), { signal }),
+})
+
+// Active Rollbar items across every connected project. The server serves the mirror (2-min TTL) and
+// revalidates in the background; the browse renders partial-success/capped state from the envelope.
+export const rollbarItemsOptions = (enabled: boolean) => ({
+  queryKey: rollbarItemsKey,
+  enabled,
+  staleTime: 30 * 1000,
+  refetchOnMount: 'always' as const,
+  queryFn: async ({ signal }: QueryContext): Promise<RollbarItemsResponse> =>
+    readJson<RollbarItemsResponse>(rollbarItemsRoute, { signal }),
+})
+
+// One item's normalized detail (header/facts + latest occurrence). Mirrors linearIssueOptions:
+// staleTime 0 + refetchOnMount 'always' so opening the panel re-reads; `refresh` forces past the TTL.
+export const rollbarItemOptions = (integrationId: string, identifier: string, enabled: boolean, refresh = false) => ({
+  queryKey: rollbarItemKey(integrationId, identifier),
+  enabled,
+  staleTime: 0,
+  refetchOnMount: 'always' as const,
+  queryFn: async ({ signal }: QueryContext): Promise<RollbarItemDetail> =>
+    readJson<RollbarItemDetail>(rollbarItemRoute(integrationId, identifier, refresh), { signal }),
 })

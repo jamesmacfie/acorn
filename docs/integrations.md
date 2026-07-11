@@ -172,8 +172,15 @@ GitHub's identity/session-specific `reauth`, `sso`, and `rate_limited` vocabular
 
 Linear preserves multi-connection first-hit-wins bare-id resolution, explicit-connection project
 browse, workspace-scoped project links, active-only issues, suggested branch defaults, threaded
-comments, and XSS-safe markdown. Rollbar preserves visible counter identity, stale-cache fallback,
-repo/branch prompting, and `+task` attachment.
+comments, and XSS-safe markdown. Rollbar is a two-column master/detail Source: an active-item list
+(paginated to 300, filterable locally by project/level/environment/counter) beside a reusable
+`RollbarItemPanel` detail — the same component the task pane mounts — showing triage facts plus a
+normalized, privacy-allowlisted latest occurrence (stack frames + safe context, never raw payload;
+see [security.md](./security.md)). Summary and detail are separate typed contracts with independent
+freshness ([caching.md](./caching.md)). Row selection, repo/branch task promotion (`+ ws`, which
+focuses an existing task instead of duplicating), and attach-to-current-task are distinct actions.
+Links retain the canonical system item id; legacy counter-only links still resolve. Read-only in P1:
+no Rollbar mutations, no write scope.
 
 ## Conformance and adding a provider
 

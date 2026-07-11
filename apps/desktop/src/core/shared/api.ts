@@ -128,10 +128,14 @@ export type LinearProjectsResponse = { projects: LinearProject[] }
 export type LinearProjectIssue = LinearIssueSummary & { integrationId: string; branchName: string | null }
 export type LinearProjectIssuesResponse = { issues: LinearProjectIssue[] }
 
-// --- Rollbar (docs/integrations.md): deduped error items, cached into `issues` — zero new schema. ---
-export type RollbarItem = {
+// --- Rollbar (docs/integrations.md): deduped error items mirrored into `issues`. ---
+// The list row (summary) and the detail differ: detail adds a normalized, privacy-safe view of the
+// latest occurrence. Raw upstream occurrence JSON never crosses this boundary (see docs/security.md).
+export type RollbarItemSummary = {
   integrationId: string
-  identifier: string // the visible item counter ('142')
+  integrationLabel: string
+  identifier: string // the project-visible counter ('142')
+  itemId: string // system-wide item id, a string at Acorn boundaries ('' when a legacy row predates it)
   title: string
   level: string
   environment: string
@@ -139,11 +143,55 @@ export type RollbarItem = {
   totalOccurrences: number
   firstOccurrenceAt: number | null
   lastOccurrenceAt: number | null
+  framework?: string
 }
-export type RollbarItemsResponse = { items: RollbarItem[] }
+
+export type RollbarStackFrame = {
+  filename: string
+  line: number | null
+  column: number | null
+  method: string | null
+  code: Array<{ line: number; text: string }>
+  inProject: boolean | null
+}
+
+export type RollbarOccurrenceDetail = {
+  id: string
+  occurredAt: number | null
+  uuid: string | null
+  kind: 'trace' | 'trace-chain' | 'message' | 'crash-report' | 'unknown'
+  exceptionClass: string | null
+  message: string | null
+  frames: RollbarStackFrame[]
+  request: { method: string | null; url: string | null } | null
+  context: string | null
+  codeVersion: string | null
+  platform: string | null
+  language: string | null
+  framework: string | null
+  server: { host: string | null; branch: string | null } | null
+  person: { id: string | null; username: string | null; email: string | null } | null
+  notifier: { name: string | null; version: string | null } | null
+  truncated: boolean
+}
+
+export type RollbarItemDetail = RollbarItemSummary & {
+  resolvedInVersion: string | null
+  assignedTo: string | null
+  url: string | null
+  latestOccurrence: RollbarOccurrenceDetail | null
+}
+
+// List responses admit partial success: a connection can fail or return the capped set while others
+// succeed. The UI must not turn a transport/auth failure into "no active items".
+export type RollbarItemsResponse = {
+  items: RollbarItemSummary[]
+  failures: Array<{ integrationId: string; code: string }>
+  cappedIntegrationIds: string[]
+}
 export const rollbarItemsRoute = '/api/rollbar/items'
-export const rollbarItemRoute = (integrationId: string, identifier: string) =>
-  `/api/rollbar/items/${encodeURIComponent(identifier)}?integration=${encodeURIComponent(integrationId)}`
+export const rollbarItemRoute = (integrationId: string, identifier: string, refresh = false) =>
+  `/api/rollbar/items/${encodeURIComponent(identifier)}?integration=${encodeURIComponent(integrationId)}${refresh ? '&refresh=true' : ''}`
 export const rollbarItemsKey = ['rollbar-items'] as const
 export const rollbarItemKey = (integrationId: string, identifier: string) => ['rollbar-item', integrationId, identifier] as const
 

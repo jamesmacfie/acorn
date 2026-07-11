@@ -239,12 +239,16 @@ Source: `features/integrations/LinearIssuePanel.tsx`.
 
 ### `rollbar` — Rollbar error(s)
 
-The task's linked Rollbar error(s) (`features/integrations/RollbarPane.tsx`): resolves `task_links` →
-the `/api/rollbar` detail route and shows level, title, status, environment, occurrence count, and
-first/last-seen. A **chip strip** switches between several linked items (mirroring the Linear panel).
-See [integrations.md](./integrations.md).
+The task's linked Rollbar error(s). `RollbarPane.tsx` is a thin selection wrapper (with a **chip strip**
+for several linked items) over `RollbarItemPanel.tsx` — the **same** detail component the Rollbar Source
+browse mounts, analogous to `LinearIssuePanel`. It resolves `task_links` → the `/api/rollbar` detail
+route and shows triage facts (level, status, environment, occurrence count, first/last-seen, resolved
+version + assignment when present) plus the **latest occurrence**: exception/message, stack frames with
+bounded code context, and safe request/runtime/server/person context. Raw occurrence JSON is never
+rendered; a truncation note appears when Acorn's size/privacy caps fired. Manual **Refresh** forces past
+the server TTL. See [integrations.md](./integrations.md) and [security.md](./security.md).
 
-Source: `features/integrations/RollbarPane.tsx`.
+Source: `plugins/rollbar/client/RollbarPane.tsx` + `RollbarItemPanel.tsx`.
 
 ### `preview` — browser preview (agent-drivable)
 
