@@ -169,6 +169,13 @@
       "when": 1783724020216,
       "tag": "0023_modern_crystal",
       "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "6",
+      "when": 1783756097209,
+      "tag": "0024_powerful_rachel_grey",
+      "breakpoints": true
     }
   ]
 }

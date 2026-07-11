@@ -536,6 +536,25 @@ export const issues = sqliteTable(
   (t) => [primaryKey({ columns: [t.userId, t.integrationId, t.identifier] })],
 )
 
+// Provider-owned child resources for an external issue. A Rollbar item, for example, has an
+// independently-fresh occurrence list and individually-fetched occurrence details. Keeping those
+// payloads out of `issues.data` prevents one large occurrence from evicting the item summary and
+// gives the provider-resource runtime a natural freshness row per lazy tab/read.
+export const issueResources = sqliteTable(
+  'issue_resources',
+  {
+    userId: text('user_id').notNull(),
+    integrationId: text('integration_id').notNull(),
+    provider: text('provider').notNull(),
+    issueIdentifier: text('issue_identifier').notNull(),
+    resource: text('resource').notNull(),
+    identifier: text('identifier').notNull(),
+    data: text('data').notNull(),
+    fetchedAt: integer('fetched_at').notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.userId, t.integrationId, t.issueIdentifier, t.resource, t.identifier] })],
+)
+
 // --- Public automation API (docs/public-api.md). Machine-scoped auth for the bearer-authenticated
 // /api/v1 listener; distinct from the browser session cookie. ---
 

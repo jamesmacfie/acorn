@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { CAPS, normalizeItemDetail, normalizeOccurrence, normalizeSummary } from './normalize'
+import { CAPS, composeItemDetail, normalizeItemMetadata, normalizeOccurrence, normalizeSummary } from './normalize'
 import type { RollbarApiInstance } from './'
 import { CRASH_INSTANCE, ITEM, MESSAGE_INSTANCE, SPARSE_ITEM, TRACE_CHAIN_INSTANCE, TRACE_INSTANCE, UNKNOWN_INSTANCE } from './__fixtures__/occurrences'
 
@@ -11,7 +11,10 @@ describe('rollbar normalizer', () => {
 
   it('summary maps counter/id and unix-seconds → ms', () => {
     const s = normalizeSummary('conn-1', 'Rollbar · acme', ITEM)
-    expect(s).toMatchObject({ integrationId: 'conn-1', integrationLabel: 'Rollbar · acme', identifier: '142', itemId: '999', framework: 'node' })
+    expect(s).toMatchObject({
+      integrationId: 'conn-1', integrationLabel: 'Rollbar · acme', identifier: '142', itemId: '999',
+      url: 'https://rollbar.com/item/999/', framework: 'node',
+    })
     expect(s.firstOccurrenceAt).toBe(1_700_000_000_000)
   })
 
@@ -21,9 +24,10 @@ describe('rollbar normalizer', () => {
     expect(s.framework).toBeUndefined()
   })
 
-  it('trace: exception + ordered frames + bounded code context', () => {
+  it('canonical data envelope: exception + ordered frames + bounded code context', () => {
     const occ = normalizeOccurrence(TRACE_INSTANCE)
     expect(occ.kind).toBe('trace')
+    expect(occ.url).toBe('https://rollbar.com/occurrence/uuid/?uuid=aaaa-bbbb')
     expect(occ.exceptionClass).toBe('TypeError')
     expect(occ.frames.map((f) => f.filename)).toEqual(['auth/session.ts', 'api/login.ts'])
     expect(occ.frames[0].inProject).toBe(true)
@@ -33,6 +37,7 @@ describe('rollbar normalizer', () => {
   })
 
   it('trace-chain keeps inner+outer, message uses body, crash/unknown degrade', () => {
+    // These fixtures retain the legacy `occurrence` alias, proving both envelopes normalize.
     expect(normalizeOccurrence(TRACE_CHAIN_INSTANCE).kind).toBe('trace-chain')
     expect(normalizeOccurrence(TRACE_CHAIN_INSTANCE).frames).toHaveLength(2)
     expect(normalizeOccurrence(MESSAGE_INSTANCE)).toMatchObject({ kind: 'message', message: 'disk almost full' })
@@ -68,10 +73,10 @@ describe('rollbar normalizer', () => {
     expect(occ.message).toBe('abc')
   })
 
-  it('detail carries item-level fields and omits url (no verified web link)', () => {
+  it('detail carries the stable Rollbar item permalink', () => {
     const summary = normalizeSummary('c', 'L', ITEM)
-    const detail = normalizeItemDetail(summary, ITEM, normalizeOccurrence(TRACE_INSTANCE))
-    expect(detail).toMatchObject({ identifier: '142', resolvedInVersion: null, assignedTo: null, url: null })
+    const detail = composeItemDetail(normalizeItemMetadata(summary, ITEM), normalizeOccurrence(TRACE_INSTANCE))
+    expect(detail).toMatchObject({ identifier: '142', resolvedInVersion: null, assignedTo: null, url: 'https://rollbar.com/item/999/' })
     expect(detail.latestOccurrence?.exceptionClass).toBe('TypeError')
   })
 
@@ -81,7 +86,7 @@ describe('rollbar normalizer', () => {
       id: 1,
       occurrence: { person: { email: 'a@b.test' }, body: { trace: { exception: { class: 'E', message: 'm' }, frames } } },
     }
-    const detail = normalizeItemDetail(normalizeSummary('c', 'L', ITEM), ITEM, normalizeOccurrence(inst))
+    const detail = composeItemDetail(normalizeItemMetadata(normalizeSummary('c', 'L', ITEM), ITEM), normalizeOccurrence(inst))
     expect(Buffer.byteLength(JSON.stringify(detail.latestOccurrence), 'utf8')).toBeLessThanOrEqual(CAPS.maxDetailBytes)
     expect(detail.latestOccurrence?.person?.email).toBeNull()
     expect(detail.latestOccurrence?.truncated).toBe(true)

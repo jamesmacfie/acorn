@@ -25,6 +25,8 @@ import {
   rerunFailedRoute,
   pinsKey,
   prefsKey,
+  rollbarItemsForConnectionsRoute,
+  rollbarItemsKey,
 } from './api'
 
 describe('shared API contract helpers', () => {
@@ -44,6 +46,8 @@ describe('shared API contract helpers', () => {
     expect(pullRoute('octo', 'repo', '12', 'review-comments/99/replies')).toBe('/api/repos/octo/repo/pulls/12/review-comments/99/replies')
     expect(resolveThreadRoute('octo', 'repo', '12', 'THREAD/id')).toBe('/api/repos/octo/repo/pulls/12/threads/THREAD%2Fid/resolve')
     expect(rerunFailedRoute('octo', 'repo', 123)).toBe('/api/repos/octo/repo/actions/123/rerun')
+    expect(rollbarItemsForConnectionsRoute(['rollbar-b', 'rollbar-a', 'rollbar-b']))
+      .toBe('/api/rollbar/items?integrations=rollbar-a%2Crollbar-b')
   })
 
   it('preserves query key shapes for cache compatibility', () => {
@@ -59,5 +63,7 @@ describe('shared API contract helpers', () => {
     expect(filePatchKey('octo', 'repo', '12', 'src/app.ts')).toEqual(['files', 'octo', 'repo', '12', 'patch', 'src/app.ts'])
     expect(pinsKey).toEqual(['pins'])
     expect(prefsKey).toEqual(['prefs'])
+    expect(rollbarItemsKey(['rollbar-b', 'rollbar-a', 'rollbar-b']))
+      .toEqual(['rollbar-items', 'connections', 'rollbar-a', 'rollbar-b'])
   })
 })

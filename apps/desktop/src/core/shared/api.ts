@@ -136,6 +136,7 @@ export type RollbarItemSummary = {
   integrationLabel: string
   identifier: string // the project-visible counter ('142')
   itemId: string // system-wide item id, a string at Acorn boundaries ('' when a legacy row predates it)
+  url: string | null // Rollbar's account-independent item permalink
   title: string
   level: string
   environment: string
@@ -159,6 +160,7 @@ export type RollbarOccurrenceDetail = {
   id: string
   occurredAt: number | null
   uuid: string | null
+  url: string | null // UUID redirect; null only when an upstream occurrence omitted its UUID
   kind: 'trace' | 'trace-chain' | 'message' | 'crash-report' | 'unknown'
   exceptionClass: string | null
   message: string | null
@@ -175,10 +177,24 @@ export type RollbarOccurrenceDetail = {
   truncated: boolean
 }
 
-export type RollbarItemDetail = RollbarItemSummary & {
+export type RollbarItemMetadata = RollbarItemSummary & {
   resolvedInVersion: string | null
   assignedTo: string | null
-  url: string | null
+}
+
+export type RollbarOccurrenceSummary = Pick<
+  RollbarOccurrenceDetail,
+  'id' | 'occurredAt' | 'uuid' | 'url' | 'kind' | 'exceptionClass' | 'message'
+>
+
+export type RollbarOccurrencesResponse = {
+  occurrences: RollbarOccurrenceSummary[]
+  capped: boolean
+}
+
+// Compatibility composite for the public automation API. The desktop pane uses the independently
+// cached metadata / occurrence-list / occurrence-detail routes below so inactive tabs do no work.
+export type RollbarItemDetail = RollbarItemMetadata & {
   latestOccurrence: RollbarOccurrenceDetail | null
 }
 
@@ -190,10 +206,23 @@ export type RollbarItemsResponse = {
   cappedIntegrationIds: string[]
 }
 export const rollbarItemsRoute = '/api/rollbar/items'
+export const rollbarItemsForConnectionsRoute = (integrationIds: readonly string[]) =>
+  `${rollbarItemsRoute}?integrations=${encodeURIComponent([...new Set(integrationIds)].sort().join(','))}`
 export const rollbarItemRoute = (integrationId: string, identifier: string, refresh = false) =>
   `/api/rollbar/items/${encodeURIComponent(identifier)}?integration=${encodeURIComponent(integrationId)}${refresh ? '&refresh=true' : ''}`
-export const rollbarItemsKey = ['rollbar-items'] as const
+export const rollbarItemMetadataRoute = (integrationId: string, identifier: string, refresh = false) =>
+  `/api/rollbar/items/${encodeURIComponent(identifier)}/detail?integration=${encodeURIComponent(integrationId)}${refresh ? '&refresh=true' : ''}`
+export const rollbarOccurrencesRoute = (integrationId: string, identifier: string, refresh = false) =>
+  `/api/rollbar/items/${encodeURIComponent(identifier)}/occurrences?integration=${encodeURIComponent(integrationId)}${refresh ? '&refresh=true' : ''}`
+export const rollbarOccurrenceRoute = (integrationId: string, identifier: string, occurrenceId: string, refresh = false) =>
+  `/api/rollbar/items/${encodeURIComponent(identifier)}/occurrences/${encodeURIComponent(occurrenceId)}?integration=${encodeURIComponent(integrationId)}${refresh ? '&refresh=true' : ''}`
+export const rollbarItemsKey = (integrationIds: readonly string[]) =>
+  ['rollbar-items', 'connections', ...[...new Set(integrationIds)].sort()] as const
 export const rollbarItemKey = (integrationId: string, identifier: string) => ['rollbar-item', integrationId, identifier] as const
+export const rollbarItemMetadataKey = (integrationId: string, identifier: string) => ['rollbar-item-metadata', integrationId, identifier] as const
+export const rollbarOccurrencesKey = (integrationId: string, identifier: string) => ['rollbar-occurrences', integrationId, identifier] as const
+export const rollbarOccurrenceKey = (integrationId: string, identifier: string, occurrenceId: string) =>
+  ['rollbar-occurrence', integrationId, identifier, occurrenceId] as const
 
 // --- Workspaces: named groups of repos (docs/workspaces-and-tasks.md). The top-level unit. ---
 export type WorkspaceRepo = { owner: string; name: string; sort: number }

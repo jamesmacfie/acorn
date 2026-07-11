@@ -25,11 +25,20 @@ import {
   linearProjectsRoute,
   linearProjectIssuesRoute,
   rollbarItemKey,
+  rollbarItemMetadataKey,
+  rollbarItemMetadataRoute,
   rollbarItemRoute,
   rollbarItemsKey,
-  rollbarItemsRoute,
+  rollbarItemsForConnectionsRoute,
+  rollbarOccurrenceKey,
+  rollbarOccurrenceRoute,
+  rollbarOccurrencesKey,
+  rollbarOccurrencesRoute,
   type RollbarItemDetail,
+  type RollbarItemMetadata,
   type RollbarItemsResponse,
+  type RollbarOccurrenceDetail,
+  type RollbarOccurrencesResponse,
   workspaceProjectsRoute,
   workspaceAssignmentsRoute,
   workspaceAssignmentsKey,
@@ -355,15 +364,15 @@ export const linearIssueOptions = (identifier: string, enabled: boolean, connect
     readJson<LinearIssueDetail>(linearIssueRoute(identifier, connectionId), { signal }),
 })
 
-// Active Rollbar items across every connected project. The server serves the mirror (2-min TTL) and
-// revalidates in the background; the browse renders partial-success/capped state from the envelope.
-export const rollbarItemsOptions = (enabled: boolean) => ({
-  queryKey: rollbarItemsKey,
-  enabled,
+// Active Rollbar items for the projects mapped to the routed workspace. The server serves each
+// connection's mirror (2-min TTL); the selection is part of the persisted client cache identity.
+export const rollbarItemsOptions = (integrationIds: readonly string[], enabled: boolean) => ({
+  queryKey: rollbarItemsKey(integrationIds),
+  enabled: enabled && integrationIds.length > 0,
   staleTime: 30 * 1000,
   refetchOnMount: 'always' as const,
   queryFn: async ({ signal }: QueryContext): Promise<RollbarItemsResponse> =>
-    readJson<RollbarItemsResponse>(rollbarItemsRoute, { signal }),
+    readJson<RollbarItemsResponse>(rollbarItemsForConnectionsRoute(integrationIds), { signal }),
 })
 
 // One item's normalized detail (header/facts + latest occurrence). Mirrors linearIssueOptions:
@@ -375,4 +384,34 @@ export const rollbarItemOptions = (integrationId: string, identifier: string, en
   refetchOnMount: 'always' as const,
   queryFn: async ({ signal }: QueryContext): Promise<RollbarItemDetail> =>
     readJson<RollbarItemDetail>(rollbarItemRoute(integrationId, identifier, refresh), { signal }),
+})
+
+export const rollbarItemMetadataOptions = (integrationId: string, identifier: string, enabled: boolean, refresh = false) => ({
+  queryKey: rollbarItemMetadataKey(integrationId, identifier),
+  enabled,
+  staleTime: 30 * 1000,
+  queryFn: async ({ signal }: QueryContext): Promise<RollbarItemMetadata> =>
+    readJson<RollbarItemMetadata>(rollbarItemMetadataRoute(integrationId, identifier, refresh), { signal }),
+})
+
+export const rollbarOccurrencesOptions = (integrationId: string, identifier: string, enabled: boolean, refresh = false) => ({
+  queryKey: rollbarOccurrencesKey(integrationId, identifier),
+  enabled,
+  staleTime: 30 * 1000,
+  queryFn: async ({ signal }: QueryContext): Promise<RollbarOccurrencesResponse> =>
+    readJson<RollbarOccurrencesResponse>(rollbarOccurrencesRoute(integrationId, identifier, refresh), { signal }),
+})
+
+export const rollbarOccurrenceOptions = (
+  integrationId: string,
+  identifier: string,
+  occurrenceId: string,
+  enabled: boolean,
+  refresh = false,
+) => ({
+  queryKey: rollbarOccurrenceKey(integrationId, identifier, occurrenceId),
+  enabled,
+  staleTime: 5 * 60 * 1000,
+  queryFn: async ({ signal }: QueryContext): Promise<RollbarOccurrenceDetail> =>
+    readJson<RollbarOccurrenceDetail>(rollbarOccurrenceRoute(integrationId, identifier, occurrenceId, refresh), { signal }),
 })

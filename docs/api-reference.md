@@ -335,8 +335,9 @@ Errors: `provider_not_connected`, `provider_needs_auth`, `provider_resource_not_
 
 `apps/desktop/src/plugins/rollbar/server/routes/rollbar.ts`. The Rollbar Source's reads (**Provider** — live REST),
 cached into `issues` (provider `rollbar`, identifier = the visible counter) with serve-then-revalidate
-(2-min TTL). List and detail are separate typed contracts with **independent freshness**: the list gates
-on the `sync_state` list-fetch time, the detail on the envelope's `detailFetchedAt`. A failing connection
+(2-min TTL). List, metadata, occurrence history, and occurrence detail are separate typed contracts with
+**independent freshness**: the list gates on `sync_state`, item metadata on the issue envelope's
+`detailFetchedAt`, and occurrence resources on `issue_resources`. A failing connection
 degrades to its cache. The active list paginates up to `budgets.maxPages` (3 × 100 = 300 items); a
 connection returning the full cap is reported in `cappedIntegrationIds`.
 
@@ -344,12 +345,17 @@ connection returning the full cap is reported in `cappedIntegrationIds`.
 — partial success is preserved; a hard error is returned only when **no** connection succeeds. `GET /items/:identifier`
 returns a `RollbarItemDetail`: the summary plus the normalized, privacy-allowlisted latest occurrence
 (exception/message, stack frames, safe request/runtime/person context — never raw payload). `?refresh=true`
-forces a fresh upstream read past the TTL.
+forces a fresh upstream read past the TTL. Item summaries carry an account-independent Rollbar item
+permalink as `url`; occurrence summaries/details carry a nullable Rollbar UUID redirect as `url`
+(null only when upstream omitted the occurrence UUID).
 
 | Method | Path | Purpose | Params |
 | --- | --- | --- | --- |
-| `GET` | `/api/rollbar/items` | Active items across every connected Rollbar project (partial success + capped metadata), cached. | — |
-| `GET` | `/api/rollbar/items/:identifier` | One item's detail + normalized latest occurrence. | `?integration=<id>` (required), `?refresh=true` (optional) |
+| `GET` | `/api/rollbar/items` | Active items across selected connected Rollbar projects (partial success + capped metadata), cached. | `?integrations=<comma-separated connection ids>` (optional; omitted means all) |
+| `GET` | `/api/rollbar/items/:identifier` | Compatibility composite: item metadata + normalized latest occurrence. | `?integration=<id>` (required), `?refresh=true` (optional) |
+| `GET` | `/api/rollbar/items/:identifier/detail` | Canonical item metadata; does not fetch occurrence data. | `?integration=<id>` (required), `?refresh=true` (optional) |
+| `GET` | `/api/rollbar/items/:identifier/occurrences` | The 50 most recent occurrence summaries, newest first. | `?integration=<id>` (required), `?refresh=true` (optional) |
+| `GET` | `/api/rollbar/items/:identifier/occurrences/:occurrenceId` | One privacy-normalized occurrence diagnostic. | `?integration=<id>` (required), `?refresh=true` (optional) |
 
 Errors: `provider_not_connected`, `provider_needs_auth`, `provider_resource_not_found`,
 `provider_unavailable`, plus `bad_request` for a missing `integration` parameter.

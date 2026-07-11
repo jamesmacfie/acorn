@@ -6,8 +6,25 @@ import { PublicApiError, type ErrorCode } from '../../../core/shared/publicApi/e
 import { PageSchema } from '../../../core/shared/publicApi/primitives'
 import { RollbarItemDetailSchema, RollbarItemQuerySchema, RollbarItemsQuerySchema, RollbarItemSummarySchema } from '../../../core/shared/publicApi/rollbar'
 import { defineEndpoint, type PluginApiContribution } from '../../../core/server/publicApi/defineEndpoint'
-import type { RollbarItemDetail, RollbarItemSummary } from '../../../core/shared/api'
-import type { RollbarListResult, RollbarResourceInput } from './provider'
+import type {
+  RollbarItemDetail,
+  RollbarItemMetadata,
+  RollbarItemSummary,
+  RollbarOccurrenceDetail,
+  RollbarOccurrencesResponse,
+} from '../../../core/shared/api'
+import {
+  ROLLBAR_ITEMS_RESOURCE,
+  type RollbarListResult,
+  type RollbarResourceInput,
+} from './provider'
+import {
+  ROLLBAR_OCCURRENCES_RESOURCE,
+  ROLLBAR_OCCURRENCE_RESOURCE,
+  type RollbarOccurrenceInput,
+  type RollbarOccurrencesInput,
+} from './occurrenceResources'
+import { composeItemDetail } from './normalize'
 
 // Rollbar provider public API (docs/public-api.md). Base /plugins/rollbar. Reads go through the
 // shared provider-resource runtime (credential decrypt + mirror + budgets), so the public and
@@ -15,7 +32,7 @@ import type { RollbarListResult, RollbarResourceInput } from './provider'
 
 const PLUGIN = 'rollbar'
 const PROVIDER = 'rollbar'
-const RESOURCE = 'rollbar.items'
+const RESOURCE = ROLLBAR_ITEMS_RESOURCE
 
 function providerFailure(status: number, error: string): PublicApiError {
   const byStatus: Record<number, ErrorCode> = { 401: 'upstream_reauthentication_required', 403: 'operation_forbidden', 404: 'not_found', 429: 'upstream_rate_limited', 502: 'provider_unavailable' }
@@ -72,7 +89,7 @@ export function buildRollbarPublicApi(db: AppDatabase, encKey: string): PluginAp
         query: RollbarItemQuerySchema,
         response: RollbarItemDetailSchema,
         handler: async (ctx, { params, query }) => {
-          const res = await runProviderResource<RollbarResourceInput, RollbarItemDetail>({
+          const metadata = await runProviderResource<RollbarResourceInput, RollbarItemMetadata>({
             db,
             userId: ctx.actor.principalId,
             encryptionKey: encKey,
@@ -82,8 +99,24 @@ export function buildRollbarPublicApi(db: AppDatabase, encKey: string): PluginAp
             input: { kind: 'detail', identifier: params.identifier },
             force: query.refresh === 'true', // honor the documented refresh flag (previously parsed, ignored)
           })
-          if (!res.ok) throw providerFailure(res.failure.status, res.failure.error)
-          return res.value
+          if (!metadata.ok) throw providerFailure(metadata.failure.status, metadata.failure.error)
+
+          let latestOccurrence: RollbarOccurrenceDetail | null = null
+          const occurrences = await runProviderResource<RollbarOccurrencesInput, RollbarOccurrencesResponse>({
+            db, userId: ctx.actor.principalId, encryptionKey: encKey, providerId: PROVIDER,
+            connectionId: query.connectionId, resourceId: ROLLBAR_OCCURRENCES_RESOURCE,
+            input: { identifier: params.identifier }, force: query.refresh === 'true',
+          })
+          const latest = occurrences.ok ? occurrences.value.occurrences[0] : undefined
+          if (latest) {
+            const occurrence = await runProviderResource<RollbarOccurrenceInput, RollbarOccurrenceDetail>({
+              db, userId: ctx.actor.principalId, encryptionKey: encKey, providerId: PROVIDER,
+              connectionId: query.connectionId, resourceId: ROLLBAR_OCCURRENCE_RESOURCE,
+              input: { identifier: params.identifier, occurrenceId: latest.id }, force: query.refresh === 'true',
+            })
+            if (occurrence.ok) latestOccurrence = occurrence.value
+          }
+          return composeItemDetail(metadata.value, latestOccurrence) satisfies RollbarItemDetail
         },
       }),
     ],

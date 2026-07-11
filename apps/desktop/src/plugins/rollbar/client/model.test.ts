@@ -4,6 +4,7 @@ import { emptyRollbarFilter, filterRollbarItems, rollbarFacets, sortRollbarItems
 
 const item = (over: Partial<RollbarItemSummary>): RollbarItemSummary => ({
   integrationId: 'c1', integrationLabel: 'Rollbar · api', identifier: '1', itemId: 'i1', title: 'boom',
+  url: 'https://rollbar.com/item/i1/',
   level: 'error', environment: 'prod', status: 'active', totalOccurrences: 1, firstOccurrenceAt: null, lastOccurrenceAt: null,
   ...over,
 })

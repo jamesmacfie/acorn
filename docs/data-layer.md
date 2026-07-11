@@ -147,6 +147,14 @@ revalidate by TTL.
 | `data` | text | provider-codec-owned, versioned `CachedExternalItem` JSON; summary refreshes preserve detail |
 | `fetchedAt` | integer | epoch ms; TTL base (Linear: 10 min, `routes/linear.ts`; Rollbar: 2 min, `routes/rollbar.ts` — see [caching](./caching.md)) |
 
+#### `issue_resources`
+
+Provider-owned child-resource mirror for an external issue. PK
+`(userId, integrationId, issueIdentifier, resource, identifier)`. Rollbar uses it for an item's
+occurrence list and each independently-loaded normalized occurrence. `data` is resource-specific JSON;
+`fetchedAt` is that child resource's TTL base. Keeping child payloads outside `issues.data` prevents a
+large occurrence from evicting the item summary and lets inactive UI tabs remain cold.
+
 ### Group 2 — App-state tables, GitHub-scoped (per-user)
 
 acorn owns these. No mirror, no TTL — they survive mirror re-syncs. Keyed by `userId`.
