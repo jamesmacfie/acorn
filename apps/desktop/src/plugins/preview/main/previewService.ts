@@ -82,6 +82,44 @@ function evict(taskId: string): void {
   }
 }
 
+// --- Task-id-addressed controller for the public API (docs/next/api/plugin-api.md §12). Operates on
+// the existing preview record for a task; never accepts/returns a raw webContents id or CDP handle.
+// A bounds/show/hide-free surface — those stay renderer-owned. ---
+
+export function previewCurrentUrl(taskId: string): string | null {
+  const r = previews.get(taskId)
+  return r && !r.view.webContents.isDestroyed() ? r.view.webContents.getURL() : null
+}
+
+export function previewLoadUrl(taskId: string, url: string): boolean {
+  const r = previews.get(taskId)
+  if (!r || !isAllowedPreviewUrl(url)) return false
+  void r.view.webContents.loadURL(url)
+  return true
+}
+
+export function previewNavigate(taskId: string, action: 'back' | 'forward' | 'reload' | 'stop'): boolean {
+  const wc = previews.get(taskId)?.view.webContents
+  if (!wc) return false
+  if (action === 'back' && wc.navigationHistory.canGoBack()) wc.navigationHistory.goBack()
+  else if (action === 'forward' && wc.navigationHistory.canGoForward()) wc.navigationHistory.goForward()
+  else if (action === 'reload') wc.reload()
+  else if (action === 'stop') wc.stop()
+  return true
+}
+
+export function previewNavState(taskId: string): { url: string; canGoBack: boolean; canGoForward: boolean; loading: boolean } | null {
+  const wc = previews.get(taskId)?.view.webContents
+  if (!wc || wc.isDestroyed()) return null
+  return { url: wc.getURL(), canGoBack: wc.navigationHistory.canGoBack(), canGoForward: wc.navigationHistory.canGoForward(), loading: wc.isLoading() }
+}
+
+export function previewEvictTask(taskId: string): boolean {
+  if (!previews.has(taskId)) return false
+  evict(taskId)
+  return true
+}
+
 // Registered by the composition root (bootstrap.ts). Returns a disposer that drops every view.
 export function registerPreviewIpc(): () => void {
   const winOf = (e: IpcMainInvokeEvent | IpcMainEvent) => BrowserWindow.fromWebContents(e.sender)

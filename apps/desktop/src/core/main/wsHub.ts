@@ -25,8 +25,15 @@ export type StreamHandlers = {
 
 let handlers: StreamHandlers | null = null
 export const setStreamHandlers = (h: StreamHandlers | null): void => void (handlers = h)
+// The public WS hub reuses the same engine stream handlers to serve terminal.attach/input/output.
+export const getStreamHandlers = (): StreamHandlers | null => handlers
 
-type Conn = { ws: WebSocket; sinks: Map<string, StreamSink> }
+// The UI control broker (docs/next/api §3.4). Set by the composition root; the renderer's ui:*
+// frames route to it and it sends ui:command frames back over this socket.
+let broker: import('./publicApi/uiControlBroker').UiControlBroker | null = null
+export const setUiBroker = (b: import('./publicApi/uiControlBroker').UiControlBroker | null): void => void (broker = b)
+
+type Conn = { ws: WebSocket; sinks: Map<string, StreamSink>; windowId?: string }
 const conns = new Set<Conn>()
 
 function sendFrame(ws: WebSocket, frame: WsServerFrame): void {
@@ -77,6 +84,20 @@ function onConnect(ws: WebSocket): void {
     } catch {
       return // non-JSON noise — ignore defensively
     }
+    // UI control broker frames (renderer registration + command results). Independent of stream handlers.
+    if (frame.channel === 'ui:register') {
+      conn.windowId = frame.windowId
+      broker?.register(frame.windowId, frame.primary, frame.snapshot, (cmd) => sendFrame(ws, cmd))
+      return
+    }
+    if (frame.channel === 'ui:state') {
+      broker?.updateState(frame.windowId, frame.snapshot)
+      return
+    }
+    if (frame.channel === 'ui:command-result') {
+      broker?.resolveResult(frame)
+      return
+    }
     if (!handlers) return
     if (frame.channel === 'term:input') {
       if (typeof frame.id === 'string' && typeof frame.data === 'string') handlers.input(frame.id, frame.data)
@@ -96,6 +117,7 @@ function onConnect(ws: WebSocket): void {
   const cleanup = () => {
     for (const [id, sink] of conn.sinks) handlers?.detach(id, sink)
     conn.sinks.clear()
+    if (conn.windowId) broker?.disconnect(conn.windowId)
     conns.delete(conn)
   }
   ws.on('close', cleanup)

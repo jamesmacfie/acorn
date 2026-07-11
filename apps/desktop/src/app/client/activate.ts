@@ -22,6 +22,7 @@ import { persistedStateRegistry } from '../../core/client/persistence/persistedS
 import { persistedFeatureSlices } from '../../core/client/persistence/stateSlices'
 import { directPreferenceSlices } from '../../core/client/persistence/preferenceSlices'
 import { activateScopedStateEviction } from '../../core/client/persistence/scopedEviction'
+import { activateUiControl } from '../../core/client/publicApi/uiControlClient'
 
 const panes = [
   prPaneContribution,
@@ -44,3 +45,6 @@ pollerRegistry.register(workflowTriggerPollerContribution)
 for (const contribution of shellSlotContributions) uiSlotRegistry.register(contribution)
 for (const slice of [...persistedFeatureSlices, ...directPreferenceSlices]) persistedStateRegistry.register(slice)
 activateScopedStateEviction()
+// Register this window with the public UI control broker (docs/next/api/commands-and-ui.md §4) so
+// presentation commands from the automation API can drive it. No-op until a public client connects.
+activateUiControl()

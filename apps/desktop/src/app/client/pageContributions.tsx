@@ -9,6 +9,7 @@ import AppearanceSettings from '../../core/client/settings/AppearanceSettings'
 import TerminalSettings from '../../plugins/terminal/client/TerminalSettings'
 import ShortcutsSettings from '../../core/client/settings/ShortcutsSettings'
 import PermissionsSettings from '../../core/client/settings/PermissionsSettings'
+import ApiSettings from '../../core/client/settings/ApiSettings'
 
 export const settingsPageContributions: SettingsContribution[] = [
   {
@@ -32,4 +33,5 @@ export const settingsPageContributions: SettingsContribution[] = [
     id: 'permissions', label: 'Permissions', group: 'general', order: 80,
     component: (props) => <PermissionsSettings onPermissions={props.context.onPermissions} />,
   },
+  { id: 'api', label: 'API', group: 'general', order: 90, requires: 'desktop', component: () => <ApiSettings /> },
 ]

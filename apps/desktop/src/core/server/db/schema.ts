@@ -1,4 +1,4 @@
-import { index, integer, primaryKey, real, sqliteTable, text } from 'drizzle-orm/sqlite-core'
+import { blob, index, integer, primaryKey, real, sqliteTable, text } from 'drizzle-orm/sqlite-core'
 
 // The read-model mirror + app-state schema (docs/data-layer.md). Mirror tables are cached,
 // revalidated projections of GitHub data; app-state tables (prefs, pins, viewed files) are the
@@ -534,4 +534,81 @@ export const issues = sqliteTable(
     fetchedAt: integer('fetched_at').notNull(),
   },
   (t) => [primaryKey({ columns: [t.userId, t.integrationId, t.identifier] })],
+)
+
+// --- Public automation API (docs/next/api). Machine-scoped auth for the bearer-authenticated
+// /api/v1 listener; distinct from the browser session cookie. ---
+
+// Bearer API tokens (docs/next/api/authentication.md §3). The raw token is shown once at creation;
+// only SHA-256(secret) is stored. userId links the bearer to the OAuth account at issuance (login
+// switch semantics), not a tenancy boundary.
+export const apiTokens = sqliteTable(
+  'api_tokens',
+  {
+    id: text('id').primaryKey(), // opaque uuid, also the token-id segment of the bearer
+    userId: text('user_id').notNull(),
+    name: text('name').notNull(),
+    tokenPrefix: text('token_prefix').notNull(), // short display prefix (never the secret)
+    secretHash: blob('secret_hash', { mode: 'buffer' }).notNull(), // 32-byte SHA-256(secret)
+    canWrite: integer('can_write', { mode: 'boolean' }).notNull().default(false),
+    createdAt: integer('created_at').notNull(),
+    lastUsedAt: integer('last_used_at'), // throttled: at most once per token per 5 minutes
+    expiresAt: integer('expires_at'),
+    revokedAt: integer('revoked_at'), // idempotent revocation stamp
+  },
+  (t) => [index('api_tokens_user_created_idx').on(t.userId, t.createdAt), index('api_tokens_active_idx').on(t.id, t.revokedAt)],
+)
+
+// Encrypted upstream identity (docs/next/api/authentication.md §7). Persisted on every successful
+// GitHub /auth/callback so a bearer request (which carries no cookie) can still call GitHub. The
+// access token is JWE-encrypted with SESSION_ENC_KEY (session.ts encryptSecret).
+export const oauthAccounts = sqliteTable('oauth_accounts', {
+  userId: text('user_id').primaryKey(),
+  provider: text('provider').notNull(), // v1: 'github'
+  encryptedAccessToken: text('encrypted_access_token').notNull(),
+  login: text('login').notNull(),
+  name: text('name').notNull(),
+  avatar: text('avatar').notNull(),
+  scopesJson: text('scopes_json').notNull(), // JSON string[]
+  updatedAt: integer('updated_at').notNull(),
+})
+
+// Idempotency replay store (docs/next/api/protocol.md §7). A retried mutation with the same
+// (token, operation, key) + request hash returns the stored response; a different hash is a
+// 409 idempotency_conflict. Rows expire after 24h and are swept by a maintenance path.
+export const apiIdempotency = sqliteTable(
+  'api_idempotency',
+  {
+    tokenId: text('token_id').notNull(),
+    operationId: text('operation_id').notNull(),
+    key: text('key').notNull(),
+    requestHash: text('request_hash').notNull(), // sha256 of method+path+body
+    responseStatus: integer('response_status').notNull(),
+    responseBody: text('response_body').notNull(),
+    createdAt: integer('created_at').notNull(),
+    expiresAt: integer('expires_at').notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.tokenId, t.operationId, t.key] }), index('api_idempotency_expiry_idx').on(t.expiresAt)],
+)
+
+// Captured command executions (docs/next/api/terminal-git-files.md §4). Terminal-plugin-owned but
+// the migration lives in the one app migration set. Bounded stdout/stderr so an HTTP client can
+// reconnect after an app restart; a 24h record with capped output.
+export const commandExecutions = sqliteTable(
+  'command_executions',
+  {
+    id: text('id').primaryKey(),
+    taskId: text('task_id').notNull(), // → tasks.id
+    status: text('status').notNull(), // queued | running | succeeded | failed | cancelled | timed-out
+    stdout: text('stdout').notNull().default(''),
+    stderr: text('stderr').notNull().default(''),
+    outputTruncated: integer('output_truncated', { mode: 'boolean' }).notNull().default(false),
+    exitCode: integer('exit_code'),
+    signal: text('signal'),
+    timeoutMs: integer('timeout_ms').notNull(),
+    createdAt: integer('created_at').notNull(),
+    startedAt: integer('started_at'),
+    completedAt: integer('completed_at'),
+  },
+  (t) => [index('command_executions_task_created_idx').on(t.taskId, t.createdAt), index('command_executions_status_idx').on(t.status)],
 )

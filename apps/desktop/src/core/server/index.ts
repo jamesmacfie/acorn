@@ -5,6 +5,8 @@ import { buildIntegrationProviderRoutes } from './integrations/providerRoutes'
 import { requireUser } from './middleware/requireUser'
 import { onServerError } from './respond'
 import { pluginRouteContributions } from './routeRegistry'
+import { apiSettings } from './routes/apiSettings'
+import { apiTokens } from './routes/apiTokens'
 import { auth } from './routes/auth'
 import { integrations } from './routes/integrations'
 import { me } from './routes/me'
@@ -33,6 +35,8 @@ export function createApp() {
     .use('/api/*', authMiddleware) // resolve ctx.principal from cookie or internal token
     .use('/api/*', requireUser) // single 401 gate over the protected router table
     .route('/api/me', me)
+    .route('/api/api-tokens', apiTokens) // cookie-auth admin of public API bearer tokens (docs/next/api)
+    .route('/api/settings/api', apiSettings) // cookie-auth view of the machine API listener settings
     .route('/api/pins', pins)
     .route('/api/prefs', prefs)
     .route('/api/workspaces', workspaces)

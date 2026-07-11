@@ -110,13 +110,30 @@ export const auth = new Hono<{ Bindings: Env }>()
     if (!userRes.ok) return c.redirect('/auth/login')
     const user = (await userRes.json()) as { login: string; name: string | null; avatar_url: string }
 
+    const scopes = tokenJson.scope ? tokenJson.scope.split(',').map((s) => s.trim()).filter(Boolean) : []
+
+    // Persist the GitHub credential encrypted at rest so bearer API tokens (which carry no cookie)
+    // can call GitHub on this user's behalf (docs/next/api/authentication.md §7). Best-effort — a
+    // storage failure must not block the browser login itself.
+    try {
+      await c.env.OAUTH_ACCOUNTS.upsertGithub({
+        login: user.login,
+        accessToken: token,
+        name: user.name ?? user.login,
+        avatar: user.avatar_url,
+        scopes,
+      })
+    } catch (e) {
+      console.warn('[auth] oauth_accounts upsert failed:', e)
+    }
+
     const sealed = await sealSession(
       {
         token,
         login: user.login,
         name: user.name ?? user.login,
         avatar: user.avatar_url,
-        scopes: tokenJson.scope ? tokenJson.scope.split(',').map((s) => s.trim()).filter(Boolean) : [],
+        scopes,
       },
       c.env.SESSION_ENC_KEY,
     )
