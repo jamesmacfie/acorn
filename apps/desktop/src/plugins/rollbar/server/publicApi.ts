@@ -4,20 +4,19 @@ import { listProviderConnections } from '../../../core/server/integrations/conne
 import { runProviderResource } from '../../../core/server/integrations/resourceRuntime'
 import { PublicApiError, type ErrorCode } from '../../../core/shared/publicApi/errors'
 import { PageSchema } from '../../../core/shared/publicApi/primitives'
-import { RollbarItemQuerySchema, RollbarItemSchema, RollbarItemsQuerySchema } from '../../../core/shared/publicApi/rollbar'
+import { RollbarItemDetailSchema, RollbarItemQuerySchema, RollbarItemsQuerySchema, RollbarItemSummarySchema } from '../../../core/shared/publicApi/rollbar'
 import { defineEndpoint, type PluginApiContribution } from '../../../core/server/publicApi/defineEndpoint'
-import type { RollbarItem } from '../../../core/shared/api'
-import type { RollbarResourceInput } from './provider'
+import type { RollbarItemDetail, RollbarItemSummary } from '../../../core/shared/api'
+import type { RollbarListResult, RollbarResourceInput } from './provider'
 
-// Rollbar provider public API (docs/public-api.md). Base /plugins/rollbar. Reads go
-// through the shared provider-resource runtime (credential decrypt + mirror + budgets), so the
-// public and internal surfaces share one implementation.
+// Rollbar provider public API (docs/public-api.md). Base /plugins/rollbar. Reads go through the
+// shared provider-resource runtime (credential decrypt + mirror + budgets), so the public and
+// internal surfaces share one implementation.
 
 const PLUGIN = 'rollbar'
 const PROVIDER = 'rollbar'
 const RESOURCE = 'rollbar.items'
 
-// Map an upstream provider failure onto the public error vocabulary (events/plugin-api §8 posture).
 function providerFailure(status: number, error: string): PublicApiError {
   const byStatus: Record<number, ErrorCode> = { 401: 'upstream_reauthentication_required', 403: 'operation_forbidden', 404: 'not_found', 429: 'upstream_rate_limited', 502: 'provider_unavailable' }
   return new PublicApiError(byStatus[status] ?? 'provider_unavailable', error)
@@ -25,7 +24,7 @@ function providerFailure(status: number, error: string): PublicApiError {
 
 export function buildRollbarPublicApi(db: AppDatabase, encKey: string): PluginApiContribution {
   const listOne = (userId: string, connectionId: string) =>
-    runProviderResource<RollbarResourceInput, RollbarItem[]>({ db, userId, encryptionKey: encKey, providerId: PROVIDER, connectionId, resourceId: RESOURCE, input: { kind: 'list' } })
+    runProviderResource<RollbarResourceInput, RollbarListResult>({ db, userId, encryptionKey: encKey, providerId: PROVIDER, connectionId, resourceId: RESOURCE, input: { kind: 'list' } })
 
   return {
     pluginId: PLUGIN,
@@ -39,20 +38,20 @@ export function buildRollbarPublicApi(db: AppDatabase, encKey: string): PluginAp
         risk: 'read',
         summary: 'List Rollbar items',
         query: RollbarItemsQuerySchema,
-        response: PageSchema(RollbarItemSchema),
+        response: PageSchema(RollbarItemSummarySchema),
         handler: async (ctx, { query }) => {
           const connections = query.connectionId
             ? [{ id: query.connectionId }]
             : await listProviderConnections(db, ctx.actor.principalId, PROVIDER)
           if (!connections.length) throw new PublicApiError('provider_unavailable', 'No Rollbar connection')
-          const items: RollbarItem[] = []
+          const items: RollbarItemSummary[] = []
           let firstFailure: PublicApiError | null = null
           let hadSuccess = false
           for (const conn of connections) {
             const res = await listOne(ctx.actor.principalId, conn.id)
             if (res.ok) {
               hadSuccess = true
-              items.push(...(res.value as RollbarItem[]))
+              items.push(...res.value.items)
             } else firstFailure ??= providerFailure(res.failure.status, res.failure.error)
           }
           if (!hadSuccess && firstFailure) throw firstFailure
@@ -71,9 +70,9 @@ export function buildRollbarPublicApi(db: AppDatabase, encKey: string): PluginAp
         summary: 'Get a Rollbar item',
         params: z.strictObject({ identifier: z.string().min(1).max(256) }),
         query: RollbarItemQuerySchema,
-        response: RollbarItemSchema,
+        response: RollbarItemDetailSchema,
         handler: async (ctx, { params, query }) => {
-          const res = await runProviderResource<RollbarResourceInput, RollbarItem>({
+          const res = await runProviderResource<RollbarResourceInput, RollbarItemDetail>({
             db,
             userId: ctx.actor.principalId,
             encryptionKey: encKey,
@@ -81,6 +80,7 @@ export function buildRollbarPublicApi(db: AppDatabase, encKey: string): PluginAp
             connectionId: query.connectionId,
             resourceId: RESOURCE,
             input: { kind: 'detail', identifier: params.identifier },
+            force: query.refresh === 'true', // honor the documented refresh flag (previously parsed, ignored)
           })
           if (!res.ok) throw providerFailure(res.failure.status, res.failure.error)
           return res.value

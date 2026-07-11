@@ -1,20 +1,19 @@
-import { createResource, createSignal, For, onCleanup, onMount, Show } from 'solid-js'
-import { readJson } from '../../../core/client/apiClient'
+import { createMemo, createSignal, onCleanup, onMount, Show } from 'solid-js'
 import { clientEvents, consumePaneIntent } from '../../../core/client/registries/clientEvents'
-import { rollbarItemRoute, type RollbarItem, type Task, type TaskLink } from '../../../core/shared/api'
+import type { Task } from '../../../core/shared/api'
+import RollbarItemPanel, { type RollbarTarget } from './RollbarItemPanel'
 
-const fmt = (at: number | null): string => (at ? new Date(at).toLocaleString() : '—')
-
-// The Rollbar provider pane (docs/integrations.md / docs/panes.md): the task's linked errors, resolved
-// task_links → the /api/rollbar detail route (which serves the `issues` cache). A chip strip
-// switches between several linked items, mirroring the Linear panel's shape.
+// The Rollbar task pane (docs/panes.md): a thin selection wrapper over the shared RollbarItemPanel —
+// the same detail component the Source browse mounts. A chip strip switches between several linked
+// items; pane-intent lands selection on the requested (connection, counter), mirroring the Linear pane.
 export default function RollbarPane(props: { task: Task }) {
-  const links = () => props.task.links.filter((l) => l.providerId === 'rollbar')
-  const linkKey = (link: Pick<TaskLink, 'connectionId' | 'identifier'>) => `${link.connectionId}:${link.identifier}`
+  const links = createMemo(() => props.task.links.filter((l) => l.providerId === 'rollbar'))
+  const targets = (): RollbarTarget[] => links().map((l) => ({ connectionId: l.connectionId, identifier: l.identifier }))
+  const targetKey = (t: RollbarTarget) => `${t.connectionId}:${t.identifier}`
   const [picked, setPicked] = createSignal<string | null>(null)
   const applyIntent = (intent: ReturnType<typeof consumePaneIntent>) => {
     if (intent?.kind === 'integration:show-ref' && intent.ref.providerId === 'rollbar') {
-      setPicked(linkKey({ connectionId: intent.ref.connectionId, identifier: intent.ref.displayId }))
+      setPicked(targetKey({ connectionId: intent.ref.connectionId, identifier: intent.ref.displayId }))
     }
   }
   onMount(() => {
@@ -24,60 +23,18 @@ export default function RollbarPane(props: { task: Task }) {
     })
     onCleanup(dispose)
   })
-  const current = (): TaskLink | undefined => links().find((link) => linkKey(link) === picked()) ?? links()[0]
-
-  const [item] = createResource(
-    () => {
-      const link = current()
-      return link ? `${link.connectionId}:${link.identifier}` : null
-    },
-    async () => {
-      const link = current()
-      if (!link) return null
-      return readJson<RollbarItem>(rollbarItemRoute(link.connectionId, link.identifier)).catch(() => null)
-    },
-  )
+  const selected = () => targets().find((t) => targetKey(t) === picked()) ?? targets()[0]
 
   return (
-    <section class="pane rollbar-pane">
-      <div class="section-header">Rollbar</div>
-      <Show when={links().length} fallback={<p class="placeholder">No Rollbar errors linked to this task.</p>}>
-        <Show when={links().length > 1}>
-          <div class="rollbar-chips">
-            <For each={links()}>
-              {(l) => (
-                <button type="button" class="rollbar-chip" classList={{ active: current() ? linkKey(current()!) === linkKey(l) : false }} onClick={() => setPicked(linkKey(l))}>
-                  #{l.identifier}
-                </button>
-              )}
-            </For>
-          </div>
-        </Show>
-        <Show when={item()} fallback={<p class="placeholder">{item.loading ? 'Loading…' : 'Could not load this item (connection removed?).'}</p>}>
-          {(it) => (
-            <div class="rollbar-detail">
-              <h3 class="rollbar-title">
-                <span class="rollbar-level" data-level={it().level}>✗ {it().level}</span> {it().title}
-              </h3>
-              <dl class="rollbar-facts">
-                <dt>Item</dt>
-                <dd>#{it().identifier}</dd>
-                <dt>Status</dt>
-                <dd>{it().status}</dd>
-                <dt>Environment</dt>
-                <dd>{it().environment}</dd>
-                <dt>Occurrences</dt>
-                <dd>×{it().totalOccurrences}</dd>
-                <dt>First seen</dt>
-                <dd>{fmt(it().firstOccurrenceAt)}</dd>
-                <dt>Last seen</dt>
-                <dd>{fmt(it().lastOccurrenceAt)}</dd>
-              </dl>
-              <p class="muted">Open a terminal/agent to fix it — the link rides the assembled context (11).</p>
-            </div>
-          )}
-        </Show>
-      </Show>
-    </section>
+    <Show when={selected()} fallback={<section class="pane rollbar-panel"><div class="section-header">Rollbar</div><p class="placeholder">No Rollbar errors linked to this task.</p></section>}>
+      {(target) => (
+        <RollbarItemPanel
+          variant="pane"
+          target={target()}
+          targets={targets()}
+          onSelectTarget={(t) => setPicked(targetKey(t))}
+        />
+      )}
+    </Show>
   )
 }

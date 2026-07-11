@@ -39,6 +39,17 @@ Every serve-then-revalidate TTL lives in **one** greppable module,
 | Linear issues | `LINEAR_ISSUES_STALE_AFTER_MS` | `600_000` ms (10 min) — tickets move slowly; the panel forces fresh with `?refresh=1` |
 | Rollbar items | `ROLLBAR_ITEMS_STALE_AFTER_MS` | `120_000` ms (2 min) — errors move fast |
 
+Rollbar splits freshness in two: the **active list** gates on its `sync_state`
+list-fetch time, while an item's **detail** gates on the envelope's own
+`detailFetchedAt`. A list refresh restamps every current-list summary's
+`listFetchedAt` (a detail write preserves it), and the list read returns only
+rows carrying the current list time — so a detail fetch never makes an item
+"appear" in the list, a list refresh never makes a stale detail look fresh, and
+resolved-but-linked items keep their cached detail offline without polluting the
+list. Absent items are not deleted. The active list paginates up to
+`budgets.maxPages` (300 items); at the cap the UI says "300 most recent" rather
+than implying completeness.
+
 A row/collection is fresh when `fetchedAt + <TTL> > Date.now()`. Repos, the PR
 list, PR detail and PR files gate on the matching `sync_state` row; external
 issues (Linear/Rollbar) gate on the `issues` row's own `fetchedAt`. The engine

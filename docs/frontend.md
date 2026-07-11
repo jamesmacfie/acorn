@@ -99,7 +99,7 @@ The main-area `<Switch>` (`App.tsx:370`) selects exactly one view from two signa
 | Condition | View | Notes |
 | --- | --- | --- |
 | `selectedSource() === 'linear'` | `LinearBrowse` | Linear ticket browse (integration live). |
-| `selectedSource() === 'rollbar'` | `RollbarBrowse` | Rollbar error browse. |
+| `selectedSource() === 'rollbar'` | `RollbarBrowse` | Rollbar error browse — two-column master/detail (list + reusable `RollbarItemPanel`), TanStack Query-backed via `rollbarItemsOptions`/`rollbarItemOptions`. |
 | no source **and** an active task | `TaskView` | The task's pane row + per-task terminal drawer. |
 | fallback (github source) | classic 3-pane PR browser | `PullList` / `PullDetail` / `DiffView`, or on `/new` a `CreatePullForm` + `ComparePreview`, or the `Acorn` mark when no repo is routed. |
 

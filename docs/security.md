@@ -56,6 +56,21 @@ tools.
 - Child processes receive a controlled environment. GitHub and session secrets are not inherited;
   task identity and the short-lived internal API token are injected explicitly.
 
+## External occurrence data (Rollbar)
+
+Rollbar occurrence payloads can carry secrets and personal data even when an SDK scrubbed common
+keys, so Acorn applies its **own** allowlist in `plugins/rollbar/server/normalize.ts` before anything
+is persisted or rendered. Only a fixed set of normalized fields survive — exception class/message,
+stack frames with bounded code context, request method+URL, application context, code version,
+platform/language/framework, server host/branch, notifier name/version, and a minimal person id/
+username/email. Everything else is dropped at the boundary: raw request headers, cookies, query
+values, request/response bodies, user IP, locals/arguments, arbitrary `custom`/`extra`, telemetry,
+and raw crash reports. There is no generic JSON viewer. Every string is control-char-stripped and
+byte-capped; traces, frames, and total detail size are bounded so the normalized detail stays well
+below the 256 KB cache ceiling, and `truncated: true` surfaces when a cap fired. Email is the most
+sensitive field and is dropped first under size pressure. Raw occurrence JSON is never cached, logged,
+or sent to the renderer; tests use synthetic fixtures only.
+
 ## Filesystem, processes, and database
 
 Task-scoped file operations re-derive the worktree root from `taskId`, reject traversal and symlink

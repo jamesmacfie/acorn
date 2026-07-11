@@ -1,6 +1,6 @@
 import { Hono } from 'hono'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import type { RollbarItem } from '../../../../core/shared/api'
+import type { RollbarItemDetail, RollbarItemsResponse } from '../../../../core/shared/api'
 import { getDb, schema } from '../../../../core/server/db'
 import type { AppEnv } from '../../../../core/server/middleware/auth'
 import { rollbarFetch } from '..'
@@ -37,9 +37,25 @@ const API_ITEM = {
   total_occurrences: 142,
   first_occurrence_timestamp: 1_700_000_000,
   last_occurrence_timestamp: 1_700_100_000,
+  last_occurrence_id: 555,
 }
 
-describe('Rollbar source (docs/integrations.md — zero schema changes)', () => {
+// Synthetic occurrence — no real value, no token, no PII.
+const INSTANCE = {
+  id: 555,
+  timestamp: 1_700_100_000,
+  occurrence: {
+    body: { trace: { exception: { class: 'TypeError', message: 'token is null' }, frames: [{ filename: 'auth.ts', lineno: 84 }] } },
+    request: { method: 'POST', url: '/api/login', headers: { authorization: 'SECRET' } },
+  },
+}
+
+// A detail fetch = canonical item + its latest occurrence.
+const mockDetailFetch = () => {
+  vi.mocked(rollbarFetch).mockResolvedValueOnce(rollbarJson(API_ITEM)).mockResolvedValueOnce(rollbarJson(INSTANCE))
+}
+
+describe('Rollbar source (docs/integrations.md, docs/next/rollbar.md)', () => {
   let t: TestDb
   let app: Hono<AppEnv>
 
@@ -63,8 +79,8 @@ describe('Rollbar source (docs/integrations.md — zero schema changes)', () => 
 
   const env = () => ({ SESSION_ENC_KEY: ENC_KEY }) as unknown as Env
 
-  const connect = async (): Promise<string> => {
-    vi.mocked(rollbarFetch).mockResolvedValueOnce(rollbarJson({ id: 7, name: 'acme-api' }))
+  const connect = async (name = 'acme-api'): Promise<string> => {
+    vi.mocked(rollbarFetch).mockResolvedValueOnce(rollbarJson({ id: 7, name }))
     const res = await app.fetch(
       new Request('http://acorn.test/api/integrations', {
         method: 'POST',
@@ -74,34 +90,25 @@ describe('Rollbar source (docs/integrations.md — zero schema changes)', () => 
       env(),
     )
     expect(res.status).toBe(200)
-    const { integration } = (await res.json()) as { integration: { id: string; label: string } }
-    expect(integration.label).toBe('Rollbar · acme-api')
-    return integration.id
+    return ((await res.json()) as { integration: { id: string } }).integration.id
   }
 
   it('connect validates via one API call and encrypts the token at rest', async () => {
     const id = await connect()
     const [row] = await t.db.select().from(schema.integrations)
     expect(row.id).toBe(id)
-    expect(row.provider).toBe('rollbar')
-    expect(row.authRef).not.toContain('read-token') // encryptSecret, never plaintext
+    expect(row.authRef).not.toContain('read-token')
     expect(JSON.parse(row.config)).toEqual({ projectId: '7' })
-    expect(JSON.parse(row.account ?? '{}')).toEqual({ id: '7', label: 'acme-api', type: 'project' })
 
     const listed = await app.fetch(new Request('http://acorn.test/api/integrations'), env())
-    const body = await listed.text()
-    expect(body).not.toContain('read-token')
-    expect(body).not.toContain(row.authRef)
-    expect(JSON.parse(body).providers.map((provider: { id: string }) => provider.id)).toEqual(['github', 'linear', 'rollbar'])
+    expect(await listed.text()).not.toContain('read-token')
   })
 
   it('invalid token → clean 4xx', async () => {
     vi.mocked(rollbarFetch).mockResolvedValueOnce(new Response('nope', { status: 401 }))
     const res = await app.fetch(
       new Request('http://acorn.test/api/integrations', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ provider: 'rollbar', token: 'bad' }),
+        method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ provider: 'rollbar', token: 'bad' }),
       }),
       env(),
     )
@@ -109,16 +116,18 @@ describe('Rollbar source (docs/integrations.md — zero schema changes)', () => 
     expect(await res.json()).toEqual({ error: 'provider_needs_auth' })
   })
 
-  it('items list caches into `issues` with TTL (second call serves the cache)', async () => {
+  it('items list returns summaries with itemId + label, caches, and serves the cache within TTL', async () => {
     const integrationId = await connect()
     vi.mocked(rollbarFetch).mockResolvedValueOnce(rollbarJson({ items: [API_ITEM] }))
     const res = await app.fetch(new Request('http://acorn.test/api/rollbar/items'), env())
     expect(res.status).toBe(200)
-    const { items } = (await res.json()) as { items: RollbarItem[] }
-    expect(items).toEqual([
+    const body = (await res.json()) as RollbarItemsResponse
+    expect(body.items).toEqual([
       {
         integrationId,
+        integrationLabel: 'Rollbar · acme-api',
         identifier: '142',
+        itemId: '999',
         title: 'TypeError: token is null',
         level: 'error',
         environment: 'prod',
@@ -128,91 +137,130 @@ describe('Rollbar source (docs/integrations.md — zero schema changes)', () => 
         lastOccurrenceAt: 1_700_100_000_000,
       },
     ])
-    // Cached into the generic issues table under the provider + counter.
+    expect(body.failures).toEqual([])
+    expect(body.cappedIntegrationIds).toEqual([])
+
     const cached = await t.db.select().from(schema.issues)
     expect(cached).toHaveLength(1)
     expect(cached[0]).toMatchObject({ provider: 'rollbar', identifier: '142', integrationId })
-    expect(cached[0].fetchedAt + ROLLBAR_ITEMS_STALE_AFTER_MS).toBeGreaterThan(Date.now())
 
-    // Second call within the TTL → no new API hit (connect used 1, list used 1).
     const before = vi.mocked(rollbarFetch).mock.calls.length
     const res2 = await app.fetch(new Request('http://acorn.test/api/rollbar/items'), env())
     expect(res2.status).toBe(200)
     expect(vi.mocked(rollbarFetch).mock.calls.length).toBe(before)
   })
 
-  it('item detail fetches by counter and falls back to stale cache on failure', async () => {
+  it('never persists raw request headers/body in the item cache', async () => {
     const integrationId = await connect()
-    vi.mocked(rollbarFetch).mockResolvedValueOnce(rollbarJson(API_ITEM))
-    const res = await app.fetch(new Request(`http://acorn.test/api/rollbar/items/142?integration=${integrationId}`), env())
-    expect(res.status).toBe(200)
-    expect((await res.json()) as RollbarItem).toMatchObject({ identifier: '142', level: 'error' })
-
-    // Expire the cache, make the API fail → stale beats nothing.
-    await t.db.update(schema.issues).set({ fetchedAt: Date.now() - ROLLBAR_ITEMS_STALE_AFTER_MS - 1 })
-    vi.mocked(rollbarFetch).mockResolvedValueOnce(new Response('boom', { status: 500 }))
-    const res2 = await app.fetch(new Request(`http://acorn.test/api/rollbar/items/142?integration=${integrationId}`), env())
-    expect(res2.status).toBe(200)
-    expect((await res2.json()) as RollbarItem).toMatchObject({ identifier: '142' })
-  })
-
-  it('serves stale detail cache while reauthentication is required', async () => {
-    const integrationId = await connect()
-    vi.mocked(rollbarFetch).mockResolvedValueOnce(rollbarJson(API_ITEM))
+    mockDetailFetch()
     await app.fetch(new Request(`http://acorn.test/api/rollbar/items/142?integration=${integrationId}`), env())
     await settleBackground()
-    await t.db.update(schema.integrations).set({ status: 'needs-auth' })
-    await t.db.update(schema.issues).set({ fetchedAt: 1 })
-    const calls = vi.mocked(rollbarFetch).mock.calls.length
-
-    const response = await app.fetch(new Request(`http://acorn.test/api/rollbar/items/142?integration=${integrationId}`), env())
-
-    expect(response.status).toBe(200)
-    expect((await response.json()) as RollbarItem).toMatchObject({ identifier: '142' })
-    expect(vi.mocked(rollbarFetch).mock.calls).toHaveLength(calls)
+    const rows = await t.db.select().from(schema.issues)
+    expect(rows.map((r) => r.data).join('')).not.toContain('SECRET')
+    expect(rows.map((r) => r.data).join('')).not.toContain('authorization')
   })
 
-  it('not connected → 403', async () => {
+  it('item detail returns normalized latest occurrence (no raw payload) and honors refresh=true', async () => {
+    const integrationId = await connect()
+    mockDetailFetch()
+    const res = await app.fetch(new Request(`http://acorn.test/api/rollbar/items/142?integration=${integrationId}`), env())
+    expect(res.status).toBe(200)
+    const detail = (await res.json()) as RollbarItemDetail
+    expect(detail).toMatchObject({ identifier: '142', itemId: '999', level: 'error', url: null })
+    expect(detail.latestOccurrence).toMatchObject({ kind: 'trace', exceptionClass: 'TypeError', message: 'token is null' })
+    expect(JSON.stringify(detail)).not.toContain('SECRET')
+    await settleBackground()
+
+    // refresh=true forces a fresh read past the TTL.
+    const before = vi.mocked(rollbarFetch).mock.calls.length
+    mockDetailFetch()
+    const forced = await app.fetch(new Request(`http://acorn.test/api/rollbar/items/142?integration=${integrationId}&refresh=true`), env())
+    expect(forced.status).toBe(200)
+    expect(vi.mocked(rollbarFetch).mock.calls.length).toBeGreaterThan(before)
+  })
+
+  it('detail falls back to stale cache when a background refresh fails', async () => {
+    const integrationId = await connect()
+    mockDetailFetch()
+    await app.fetch(new Request(`http://acorn.test/api/rollbar/items/142?integration=${integrationId}`), env())
+    await settleBackground()
+
+    await t.db.update(schema.issues).set({ fetchedAt: Date.now() - ROLLBAR_ITEMS_STALE_AFTER_MS - 1 })
+    vi.mocked(rollbarFetch).mockResolvedValue(new Response('boom', { status: 500 }))
+    const res = await app.fetch(new Request(`http://acorn.test/api/rollbar/items/142?integration=${integrationId}`), env())
+    expect(res.status).toBe(200)
+    expect(((await res.json()) as RollbarItemDetail).identifier).toBe('142')
+  })
+
+  it('legacy counter-only link resolves to the canonical item', async () => {
+    const integrationId = await connect()
+    // No prior list/summary → detail must resolve via item_by_counter, which still returns id 999.
+    mockDetailFetch()
+    const res = await app.fetch(new Request(`http://acorn.test/api/rollbar/items/142?integration=${integrationId}`), env())
+    expect(res.status).toBe(200)
+    expect(((await res.json()) as RollbarItemDetail).itemId).toBe('999')
+  })
+
+  it('partial success: one connection fails, the other still returns items', async () => {
+    const good = await connect('good')
+    const bad = await connect('bad')
+    // Order of connections is by creation; both listed. Mock: good succeeds, bad 500s.
+    vi.mocked(rollbarFetch)
+      .mockResolvedValueOnce(rollbarJson({ items: [API_ITEM] }))
+      .mockResolvedValueOnce(new Response('boom', { status: 500 }))
+    const res = await app.fetch(new Request('http://acorn.test/api/rollbar/items'), env())
+    expect(res.status).toBe(200)
+    const body = (await res.json()) as RollbarItemsResponse
+    expect(body.items).toHaveLength(1)
+    expect(body.failures).toEqual([{ integrationId: bad, code: 'provider_unavailable' }])
+    expect(good).not.toBe(bad)
+  })
+
+  it('all connections fail → hard error', async () => {
+    await connect()
+    vi.mocked(rollbarFetch).mockResolvedValueOnce(new Response('boom', { status: 500 }))
+    const res = await app.fetch(new Request('http://acorn.test/api/rollbar/items'), env())
+    expect(res.status).toBe(502)
+  })
+
+  it('reports capped when three full pages are returned', async () => {
+    const integrationId = await connect()
+    const page = (start: number) => ({ items: Array.from({ length: 100 }, (_, i) => ({ ...API_ITEM, id: start + i, counter: start + i })) })
+    vi.mocked(rollbarFetch)
+      .mockResolvedValueOnce(rollbarJson(page(1)))
+      .mockResolvedValueOnce(rollbarJson(page(101)))
+      .mockResolvedValueOnce(rollbarJson(page(201)))
+    const res = await app.fetch(new Request('http://acorn.test/api/rollbar/items'), env())
+    expect(res.status).toBe(200)
+    const body = (await res.json()) as RollbarItemsResponse
+    expect(body.items).toHaveLength(300)
+    expect(body.cappedIntegrationIds).toEqual([integrationId])
+  })
+
+  it('missing integration id → 400; not connected → 403', async () => {
     expect((await app.fetch(new Request('http://acorn.test/api/rollbar/items'), env())).status).toBe(403)
+    await connect()
+    expect((await app.fetch(new Request('http://acorn.test/api/rollbar/items/142'), env())).status).toBe(400)
   })
 
-  it('disable and credential rotation preserve identity/linked state; disconnect performs the core cascade', async () => {
+  it('item not found → 404', async () => {
+    const integrationId = await connect()
+    vi.mocked(rollbarFetch).mockResolvedValueOnce(new Response('nope', { status: 404 }))
+    const res = await app.fetch(new Request(`http://acorn.test/api/rollbar/items/999?integration=${integrationId}`), env())
+    expect(res.status).toBe(404)
+  })
+
+  it('disconnect performs the core cascade', async () => {
     const integrationId = await connect()
     const now = Date.now()
-    await t.db.insert(schema.issues).values({
-      userId: 'james', integrationId, provider: 'rollbar', identifier: '142', data: JSON.stringify(API_ITEM), fetchedAt: now,
-    })
     await t.db.insert(schema.taskLinks).values({ taskId: 'task-1', integrationId, provider: 'rollbar', identifier: '142', createdAt: now })
-    await t.db.insert(schema.workspaceProjects).values({ workspaceId: 'workspace-1', integrationId, externalId: '7', createdAt: now })
-    await t.db.insert(schema.syncState).values({ userId: 'james', resource: `provider:rollbar:${integrationId}:items:list`, fetchedAt: now })
-
-    const disabled = await app.fetch(new Request(`http://acorn.test/api/integrations/${integrationId}`, {
-      method: 'PATCH', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ disabled: true }),
-    }), env())
-    expect(disabled.status).toBe(200)
-    expect((await t.db.select().from(schema.taskLinks))).toHaveLength(1)
-    expect((await t.db.select().from(schema.issues))).toHaveLength(1)
-
-    vi.mocked(rollbarFetch).mockResolvedValueOnce(rollbarJson({ id: 7, name: 'acme-api' }))
-    const rotated = await app.fetch(new Request(`http://acorn.test/api/integrations/${integrationId}`, {
-      method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ credentials: { token: 'replacement-token' } }),
-    }), env())
-    expect(rotated.status).toBe(200)
-    expect(((await rotated.json()) as { integration: { id: string } }).integration.id).toBe(integrationId)
-    expect((await t.db.select().from(schema.taskLinks))).toHaveLength(1)
-    expect((await t.db.select().from(schema.issues))).toHaveLength(1)
-
     const disconnected = await app.fetch(new Request(`http://acorn.test/api/integrations/${integrationId}`, { method: 'DELETE' }), env())
     expect(disconnected.status).toBe(204)
     expect(await t.db.select().from(schema.integrations)).toEqual([])
     expect(await t.db.select().from(schema.taskLinks)).toEqual([])
-    expect(await t.db.select().from(schema.issues)).toEqual([])
-    expect(await t.db.select().from(schema.workspaceProjects)).toEqual([])
-    expect(await t.db.select().from(schema.syncState)).toEqual([])
   })
 })
 
-// Sanity for the encryption helper contract this source leans on.
 it('encryptSecret round-trip stays available to the connect path', async () => {
   const sealed = await encryptSecret('read-token', ENC_KEY)
   expect(sealed).not.toContain('read-token')

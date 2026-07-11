@@ -1,0 +1,125 @@
+/* Rollbar Source browse + item panel (docs/integrations.md, docs/ui-design.md). Feature-owned: no
+   dependency on .linear-browse-* classes. Uses shared tokens; flat 1px separators, compact mono
+   metadata, no card grid. */
+
+.panes.rollbar-browse-panes {
+  grid-template-columns: clamp(320px, 28vw, 420px) minmax(0, 1fr);
+}
+/* The shell's generic collapsed rule declares the GitHub three-track grid; Rollbar has two tracks. */
+.app.left-collapsed .panes.rollbar-browse-panes { grid-template-columns: minmax(0, 1fr); }
+
+.rollbar-browse { display: flex; flex-direction: column; overflow: hidden; }
+
+.rollbar-filters { display: flex; gap: 6px; padding: 6px var(--pane-pad); border-bottom: 1px solid var(--border); flex-wrap: wrap; }
+.rollbar-filters input,
+.rollbar-filters select {
+  font: inherit;
+  font-size: var(--fs-sm);
+  color: var(--text);
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 2px 6px;
+}
+.rollbar-search { flex: 1; min-width: 120px; }
+
+.rollbar-capped { padding: 4px var(--pane-pad); font-size: var(--fs-sm); color: var(--text-muted); border-bottom: 1px solid var(--border); }
+
+.rollbar-list { list-style: none; margin: 0; padding: 0; overflow-y: auto; }
+.rollbar-row {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  font: inherit;
+  text-align: left;
+  color: inherit;
+  background: transparent;
+  border: 0;
+  border-bottom: 1px solid var(--border);
+  border-left: 3px solid transparent;
+  cursor: pointer;
+}
+.rollbar-row.active { background: var(--bg-selected); border-left-color: var(--accent); }
+.rollbar-row:hover { background: var(--bg-hover); }
+.rollbar-row:focus-visible { outline: 1px solid var(--accent); outline-offset: -1px; }
+.rollbar-row-title { flex: 1; min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.rollbar-row-conn { flex: none; font-size: var(--fs-sm); }
+.rollbar-row-meta { flex: none; font-size: var(--fs-sm); font-variant-numeric: tabular-nums; }
+.rollbar-ws-btn {
+  flex: none;
+  opacity: 0;
+  font: inherit;
+  font-size: var(--fs-sm);
+  color: var(--text-muted);
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 0 6px;
+  cursor: pointer;
+}
+.rollbar-row:hover .rollbar-ws-btn,
+.rollbar-row:focus-within .rollbar-ws-btn { opacity: 1; }
+.rollbar-ws-btn:hover { background: var(--bg); color: var(--text); border-color: var(--border-strong); }
+
+.rollbar-browse-detail > .rollbar-panel { flex: 1; min-width: 0; min-height: 0; display: flex; flex-direction: column; border-right: 0; overflow: hidden; }
+
+/* Item panel (RollbarItemPanel.tsx) — shared by the detail column and the task pane. */
+.rollbar-panel { display: flex; flex-direction: column; overflow: hidden; }
+.rollbar-panel-head { display: flex; align-items: center; gap: 8px; }
+.rollbar-panel-title-line { display: flex; align-items: center; gap: 8px; min-width: 0; flex: 1; }
+.rollbar-panel-name { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.rollbar-panel-body { flex: 1; min-height: 0; overflow-y: auto; padding: 4px var(--pane-pad) 12px; }
+
+.rollbar-level { color: var(--del-marker); font-family: var(--font-mono); font-size: var(--fs-sm); flex: none; }
+.rollbar-level[data-level='warning'] { color: var(--warn); }
+.rollbar-level[data-level='info'],
+.rollbar-level[data-level='debug'] { color: var(--text-muted); }
+
+.rollbar-title { font-size: var(--fs-lg); font-weight: 600; margin: 8px 0; overflow-wrap: anywhere; }
+.rollbar-facts { display: grid; grid-template-columns: auto 1fr; gap: 4px 14px; font-size: var(--fs-sm); margin: 10px 0; }
+.rollbar-facts dt { color: var(--text-muted); }
+.rollbar-facts dd { margin: 0; font-family: var(--font-mono); overflow-wrap: anywhere; }
+.rollbar-context { margin-top: 12px; }
+
+.rollbar-section-head { font-size: var(--fs-sm); font-weight: 600; margin: 14px 0 6px; color: var(--text-muted); }
+.rollbar-exception { font-family: var(--font-mono); font-size: var(--fs-sm); overflow-wrap: anywhere; margin: 0 0 8px; }
+.rollbar-exception-class { color: var(--del-marker); }
+
+.rollbar-frames { list-style: none; margin: 0; padding: 0; }
+.rollbar-frame { border-left: 2px solid var(--border); padding: 4px 0 4px 8px; margin-bottom: 6px; }
+.rollbar-frame-app { border-left-color: var(--accent); }
+.rollbar-frame-loc { font-family: var(--font-mono); font-size: var(--fs-sm); overflow-wrap: anywhere; }
+.rollbar-frame-file { color: var(--text); }
+.rollbar-frame-method { color: var(--text-muted); }
+.rollbar-frame-code {
+  margin: 4px 0 0;
+  font-family: var(--font-mono);
+  font-size: var(--fs-sm);
+  color: var(--text-muted);
+  background: var(--bg);
+  border-radius: var(--radius);
+  padding: 4px 6px;
+  overflow-x: auto;
+  white-space: pre;
+}
+.rollbar-frame-code .rollbar-code-anchor { color: var(--text); }
+.rollbar-code-ln { display: inline-block; width: 3.5ch; color: var(--text-faint); user-select: none; }
+
+.rollbar-truncated { margin-top: 8px; }
+
+.rollbar-actions { display: flex; align-items: center; gap: 8px; margin-top: 16px; flex-wrap: wrap; }
+
+.rollbar-chips { display: flex; gap: 6px; padding: 6px var(--pane-pad) 0; flex-wrap: wrap; }
+.rollbar-chip {
+  font: inherit;
+  font-size: var(--fs-sm);
+  font-family: var(--font-mono);
+  padding: 2px 8px;
+  color: var(--text-muted);
+  background: var(--bg);
+  border: 1px solid var(--border-strong);
+  cursor: pointer;
+}
+.rollbar-chip.active { color: var(--text); background: var(--bg-selected); }

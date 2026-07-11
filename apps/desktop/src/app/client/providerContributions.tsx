@@ -6,7 +6,7 @@ import LinearBrowse from '../../plugins/linear/client/LinearBrowse'
 import RollbarBrowse from '../../plugins/rollbar/client/RollbarBrowse'
 import { linearPaneContribution, rollbarPaneContribution } from './taskPaneContributions'
 import { contentLinkRegistry, linearContentLinkContribution, type ContentLinkContribution } from '../../plugins/github/client/contentLinks'
-import type { LinearProjectIssue, RollbarItem } from '../../core/shared/api'
+import type { LinearProjectIssue, RollbarItemSummary } from '../../core/shared/api'
 import { addTaskLink, createTask } from '../../plugins/github/client/mutations'
 import { prepareLinearPromotion, prepareRollbarPromotion } from '../../core/client/integrations/providerPromotion'
 
@@ -51,11 +51,15 @@ export const clientIntegrationProviders: readonly ClientIntegrationProviderContr
     source: {
       id: 'rollbar', providerId: 'rollbar', glyph: '◍', label: 'Rollbar', component: RollbarBrowse, defaultPane: 'rollbar', requiredCapability: 'browse',
       promotion: {
-        canPromote: (_item: RollbarItem, context) => !!context.owner && !!context.repo && !!context.branch?.trim(),
+        canPromote: (_item: RollbarItemSummary, context) => !!context.owner && !!context.repo && !!context.branch?.trim(),
         prepare: prepareRollbarPromotion,
         create: createTask,
-        attachToCurrentTask: (taskId: string, item: RollbarItem) =>
-          addTaskLink(taskId, { connectionId: item.integrationId, identifier: item.identifier, ref: { displayId: item.identifier } }).then(() => undefined),
+        attachToCurrentTask: (taskId: string, item: RollbarItemSummary) =>
+          addTaskLink(taskId, {
+            connectionId: item.integrationId,
+            identifier: item.identifier,
+            ref: { displayId: item.identifier, ...(item.itemId ? { externalId: item.itemId } : {}) },
+          }).then(() => undefined),
       },
     },
     pane: rollbarPaneContribution,

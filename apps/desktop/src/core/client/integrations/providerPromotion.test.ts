@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import type { LinearProjectIssue, RollbarItem } from '../../shared/api'
+import type { LinearProjectIssue, RollbarItemSummary } from '../../shared/api'
 import { prepareLinearPromotion, prepareRollbarPromotion } from './providerPromotion'
 
 describe('provider-owned source promotion', () => {
@@ -15,13 +15,14 @@ describe('provider-owned source promotion', () => {
   })
 
   it('normalizes the chosen Rollbar branch and keeps the visible counter identity', () => {
-    const item: RollbarItem = {
-      integrationId: 'rollbar-api', identifier: '142', title: 'Token is null', level: 'error', environment: 'prod',
+    const item: RollbarItemSummary = {
+      integrationId: 'rollbar-api', integrationLabel: 'Rollbar · api', identifier: '142', itemId: '999',
+      title: 'Token is null', level: 'error', environment: 'prod',
       status: 'active', totalOccurrences: 3, firstOccurrenceAt: 1, lastOccurrenceAt: 2,
     }
     expect(prepareRollbarPromotion(item, { owner: 'acme', repo: 'widget', branch: 'Fix Token 142' })).toMatchObject({
       origin: 'rollbar', repoOwner: 'acme', repoName: 'widget', branch: 'fix-token-142',
-      links: [{ connectionId: 'rollbar-api', identifier: '142' }],
+      links: [{ connectionId: 'rollbar-api', identifier: '142', ref: { displayId: '142', externalId: '999' } }],
     })
   })
 })

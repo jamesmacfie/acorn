@@ -1,17 +1,22 @@
-import { and, eq, notInArray } from 'drizzle-orm'
-import type { RollbarItem } from '../../../core/shared/api'
+import { and, eq } from 'drizzle-orm'
+import type { RollbarItemDetail, RollbarItemSummary, RollbarOccurrenceDetail } from '../../../core/shared/api'
 import type { ExternalRef } from '../../../core/shared/integrations'
 import { schema } from '../../../core/server/db'
 import {
+  instancePath,
   itemByCounterPath,
+  itemByIdPath,
+  itemInstancesPath,
   itemsPath,
-  levelName,
   projectPath,
   rollbarData,
   rollbarFetch,
+  type RollbarApiInstance,
+  type RollbarApiInstancesPage,
   type RollbarApiItem,
   type RollbarProject,
 } from './'
+import { normalizeItemDetail, normalizeOccurrence, normalizeSummary } from './normalize'
 import { encodeCached, isRecord, parseCached } from '../../../core/server/integrations/codec'
 import {
   ProviderOperationError,
@@ -19,89 +24,163 @@ import {
   type CachedItemCodec,
   type CodecResult,
   type MirroredResourceContribution,
+  type ProviderResourceRefreshContext,
 } from '../../../core/server/integrations/types'
+import type { RouteFailure } from '../../../core/server/sync/engine'
 import { defaultBudgets, externalIdsFor, publicProvider } from '../../../core/server/integrations/providers/shared'
 
-type RollbarValidated = { project: RollbarProject; secret: string }
-type RollbarCached = CachedExternalItem<RollbarItem, RollbarItem>
-export type RollbarResourceInput = { kind: 'list' } | { kind: 'detail'; identifier: string }
-export type RollbarResourceOutput = RollbarItem[] | RollbarItem
+const ROLLBAR_PER_PAGE = 100
 
-const validItem = (value: unknown): value is RollbarItem =>
+type RollbarValidated = { project: RollbarProject; secret: string }
+type RollbarCached = CachedExternalItem<RollbarItemSummary, RollbarItemDetail>
+export type RollbarResourceInput = { kind: 'list' } | { kind: 'detail'; identifier: string }
+export type RollbarListResult = { items: RollbarItemSummary[]; capped: boolean }
+export type RollbarResourceOutput = RollbarListResult | RollbarItemDetail
+
+const isSummary = (value: unknown): value is RollbarItemSummary =>
   isRecord(value) && typeof value.integrationId === 'string' && typeof value.identifier === 'string' && typeof value.title === 'string'
+const isDetail = (value: unknown): value is RollbarItemDetail => isSummary(value) && 'latestOccurrence' in value
+
+// Widen an old (pre-itemId) summary/legacy row into the v2 summary. itemId/label are unknown for
+// legacy rows — left blank; a detail fetch resolves the real id via the counter, and the list refresh
+// restamps label. Migrated rows never carry the current listFetchedAt, so they stay out of the list.
+function widen(o: Record<string, unknown>): RollbarItemSummary {
+  return {
+    integrationId: String(o.integrationId ?? ''),
+    integrationLabel: typeof o.integrationLabel === 'string' ? o.integrationLabel : '',
+    identifier: String(o.identifier ?? ''),
+    itemId: typeof o.itemId === 'string' ? o.itemId : '',
+    title: String(o.title ?? ''),
+    level: String(o.level ?? ''),
+    environment: String(o.environment ?? ''),
+    status: String(o.status ?? ''),
+    totalOccurrences: typeof o.totalOccurrences === 'number' ? o.totalOccurrences : 0,
+    firstOccurrenceAt: typeof o.firstOccurrenceAt === 'number' ? o.firstOccurrenceAt : null,
+    lastOccurrenceAt: typeof o.lastOccurrenceAt === 'number' ? o.lastOccurrenceAt : null,
+    ...(typeof o.framework === 'string' ? { framework: o.framework } : {}),
+  }
+}
 
 function parseRollbar(raw: unknown, ref: ExternalRef): CodecResult<RollbarCached> {
-  if (isRecord(raw) && raw.schemaVersion === 1 && validItem(raw.summary)) {
+  if (isRecord(raw) && raw.schemaVersion === 2 && isSummary(raw.summary)) {
     return {
       ok: true,
       migrated: false,
       value: {
         ref: isRecord(raw.ref) ? (raw.ref as ExternalRef) : ref,
         summary: raw.summary,
-        detail: validItem(raw.detail) ? raw.detail : undefined,
+        detail: isDetail(raw.detail) ? raw.detail : undefined,
         listFetchedAt: typeof raw.listFetchedAt === 'number' ? raw.listFetchedAt : undefined,
         detailFetchedAt: typeof raw.detailFetchedAt === 'number' ? raw.detailFetchedAt : undefined,
-        schemaVersion: 1,
+        schemaVersion: 2,
         deletedAt: typeof raw.deletedAt === 'number' ? raw.deletedAt : undefined,
         truncated: raw.truncated === true,
       },
     }
   }
-  if (validItem(raw)) return { ok: true, migrated: true, value: { ref, summary: raw, detail: raw, schemaVersion: 1 } }
+  // v1 envelope (summary/detail both the old RollbarItem shape): keep list membership, drop the old
+  // detail — it lacked the occurrence, so a detail fetch repopulates it.
+  if (isRecord(raw) && raw.schemaVersion === 1 && isRecord(raw.summary)) {
+    return { ok: true, migrated: true, value: { ref, summary: widen(raw.summary), listFetchedAt: typeof raw.listFetchedAt === 'number' ? raw.listFetchedAt : undefined, schemaVersion: 2 } }
+  }
+  // Legacy bare RollbarItem row.
+  if (isRecord(raw) && typeof raw.identifier === 'string' && typeof raw.title === 'string') {
+    return { ok: true, migrated: true, value: { ref, summary: widen(raw), schemaVersion: 2 } }
+  }
   return { ok: false, error: 'invalid_rollbar_cache' }
 }
 
-const rollbarCodec: CachedItemCodec<RollbarItem, RollbarItem, RollbarItem> = {
-  schemaVersion: 1,
+const summaryOf = (detail: RollbarItemDetail): RollbarItemSummary => {
+  const { resolvedInVersion: _r, assignedTo: _a, url: _u, latestOccurrence: _l, ...summary } = detail
+  return summary
+}
+
+const rollbarCodec: CachedItemCodec<RollbarItemSummary, RollbarItemDetail, RollbarItemSummary> = {
+  schemaVersion: 2,
   parse: parseRollbar,
+  // List refresh: new summary wins, existing detail + its freshness are preserved (docs/caching.md).
   mergeSummary(existing, ref, summary, fetchedAt) {
-    return { ref, summary, detail: existing?.detail, detailFetchedAt: existing?.detailFetchedAt, listFetchedAt: fetchedAt, schemaVersion: 1 }
+    return { ref, summary, detail: existing?.detail, detailFetchedAt: existing?.detailFetchedAt, listFetchedAt: fetchedAt, truncated: existing?.truncated, schemaVersion: 2 }
   },
+  // Detail refresh sets its own detailFetchedAt; the caller re-applies the preserved listFetchedAt.
   withDetail(ref, summary, detail, fetchedAt) {
-    return { ref, summary, detail, listFetchedAt: fetchedAt, detailFetchedAt: fetchedAt, schemaVersion: 1 }
+    return { ref, summary, detail, detailFetchedAt: fetchedAt, schemaVersion: 2 }
   },
-  // Rollbar list and detail currently share one public shape; the newest summary wins.
   toPublic: (item) => item.summary,
   summary: (item) => item.summary,
 }
 
-export const rollbarItemFromApi = (integrationId: string, raw: RollbarApiItem): RollbarItem => ({
-  integrationId,
-  identifier: String(raw.counter),
-  title: raw.title,
-  level: levelName(raw.level),
-  environment: raw.environment,
-  status: raw.status,
-  totalOccurrences: raw.total_occurrences,
-  firstOccurrenceAt: raw.first_occurrence_timestamp ? raw.first_occurrence_timestamp * 1000 : null,
-  lastOccurrenceAt: raw.last_occurrence_timestamp ? raw.last_occurrence_timestamp * 1000 : null,
-})
-
 const resourceKey = (connectionId: string, input: RollbarResourceInput) =>
   `provider:rollbar:${connectionId}:items:${input.kind === 'list' ? 'list' : input.identifier}`
 
-async function persistItem(
-  context: Parameters<MirroredResourceContribution<RollbarResourceInput, RollbarResourceOutput>['refresh']>[0],
-  item: RollbarItem,
-  detail: boolean,
-): Promise<void> {
-  const ref = { providerId: 'rollbar', connectionId: item.integrationId, displayId: item.identifier }
-  const [previous] = await context.db
+const issueRow = (context: Pick<RefreshCtx, 'db' | 'userId'>, integrationId: string, identifier: string) =>
+  context.db
     .select()
     .from(schema.issues)
-    .where(and(eq(schema.issues.userId, context.userId), eq(schema.issues.integrationId, item.integrationId), eq(schema.issues.identifier, item.identifier)))
-  const parsed = previous ? parseCached(rollbarCodec, previous.data, ref) : null
-  const cached = detail
-    ? rollbarCodec.withDetail(ref, item, item, context.now)
-    : rollbarCodec.mergeSummary(parsed?.ok ? parsed.value : null, ref, item, context.now)
+    .where(and(eq(schema.issues.userId, context.userId), eq(schema.issues.integrationId, integrationId), eq(schema.issues.identifier, identifier)))
+
+type RefreshCtx = ProviderResourceRefreshContext
+
+async function upsertIssue(context: RefreshCtx, summary: RollbarItemSummary, cached: RollbarCached): Promise<void> {
   const data = encodeCached(cached, context.limits.maxCachedItemBytes)
   await context.db
     .insert(schema.issues)
-    .values({ userId: context.userId, integrationId: item.integrationId, provider: 'rollbar', identifier: item.identifier, data, fetchedAt: context.now })
+    .values({ userId: context.userId, integrationId: summary.integrationId, provider: 'rollbar', identifier: summary.identifier, data, fetchedAt: context.now })
     .onConflictDoUpdate({
       target: [schema.issues.userId, schema.issues.integrationId, schema.issues.identifier],
       set: { data, fetchedAt: context.now },
     })
+}
+
+function refForSummary(summary: RollbarItemSummary): ExternalRef {
+  return { providerId: 'rollbar', connectionId: summary.integrationId, displayId: summary.identifier, ...(summary.itemId ? { externalId: summary.itemId } : {}) }
+}
+
+async function persistSummary(context: RefreshCtx, summary: RollbarItemSummary): Promise<void> {
+  const ref = refForSummary(summary)
+  const [previous] = await issueRow(context, summary.integrationId, summary.identifier)
+  const parsed = previous ? parseCached(rollbarCodec, previous.data, ref) : null
+  await upsertIssue(context, summary, rollbarCodec.mergeSummary(parsed?.ok ? parsed.value : null, ref, summary, context.now))
+}
+
+async function persistDetail(context: RefreshCtx, detail: RollbarItemDetail): Promise<void> {
+  const summary = summaryOf(detail)
+  const ref = { ...refForSummary(summary), ...(detail.url ? { url: detail.url } : {}) }
+  const [previous] = await issueRow(context, detail.integrationId, detail.identifier)
+  const parsed = previous ? parseCached(rollbarCodec, previous.data, ref) : null
+  const base = rollbarCodec.withDetail(ref, summary, detail, context.now)
+  // Detail write must NOT touch list membership (docs/caching.md): preserve the existing listFetchedAt.
+  await upsertIssue(context, summary, { ...base, listFetchedAt: parsed?.ok ? parsed.value.listFetchedAt : undefined, truncated: detail.latestOccurrence?.truncated ?? false })
+}
+
+const failFor = (response: Response): RouteFailure | null => {
+  if (response.status === 401 || response.status === 403) return { error: 'provider_needs_auth', status: 401 }
+  if (response.status === 429) return { error: 'provider_rate_limited', status: 429 }
+  if (response.status === 404) return { error: 'provider_resource_not_found', status: 404 }
+  if (!response.ok) return { error: 'provider_unavailable', status: 502 }
+  return null
+}
+
+// Latest occurrence for a canonical item. Soft-fails to null (item is still useful without it), but
+// never persists the raw occurrence — normalizeOccurrence applies the allowlist first.
+async function fetchLatestOccurrence(secret: string, item: RollbarApiItem): Promise<RollbarOccurrenceDetail | null> {
+  try {
+    const occId = item.last_occurrence_id != null ? String(item.last_occurrence_id) : null
+    let instance: RollbarApiInstance | null = null
+    if (!occId) {
+      const page = await rollbarFetch(secret, itemInstancesPath(String(item.id), 1))
+      if (!page.ok) return null
+      instance = (await rollbarData<RollbarApiInstancesPage>(page)).instances?.[0] ?? null
+    }
+    const id = occId ?? (instance?.id != null ? String(instance.id) : null)
+    if (id && !(instance && isRecord(instance.occurrence))) {
+      const single = await rollbarFetch(secret, instancePath(id))
+      if (single.ok) instance = await rollbarData<RollbarApiInstance>(single)
+    }
+    return instance ? normalizeOccurrence(instance) : null
+  } catch {
+    return null
+  }
 }
 
 const rollbarItemsResource: MirroredResourceContribution<RollbarResourceInput, RollbarResourceOutput> = {
@@ -111,19 +190,13 @@ const rollbarItemsResource: MirroredResourceContribution<RollbarResourceInput, R
   key: resourceKey,
   async read(context, input) {
     if (input.kind === 'detail') {
-      const [row] = await context.db
-        .select()
-        .from(schema.issues)
-        .where(and(
-          eq(schema.issues.userId, context.userId),
-          eq(schema.issues.integrationId, context.connection.id),
-          eq(schema.issues.identifier, input.identifier),
-        ))
+      const [row] = await issueRow(context, context.connection.id, input.identifier)
       if (!row) return null
-      const parsed = parseCached(rollbarCodec, row.data, {
-        providerId: 'rollbar', connectionId: context.connection.id, displayId: input.identifier,
-      })
-      return parsed.ok ? { data: rollbarCodec.toPublic(parsed.value), fetchedAt: row.fetchedAt } : null
+      const parsed = parseCached(rollbarCodec, row.data, { providerId: 'rollbar', connectionId: context.connection.id, displayId: input.identifier })
+      // Only a real detail read counts as cached; its freshness is detailFetchedAt (never the list's).
+      return parsed.ok && parsed.value.detail && parsed.value.detailFetchedAt != null
+        ? { data: parsed.value.detail, fetchedAt: parsed.value.detailFetchedAt }
+        : null
     }
 
     const key = resourceKey(context.connection.id, input)
@@ -135,49 +208,65 @@ const rollbarItemsResource: MirroredResourceContribution<RollbarResourceInput, R
         eq(schema.issues.provider, 'rollbar'),
       )),
     ])
+    const listAt = state[0]?.fetchedAt ?? null
+    if (listAt == null) return null // never listed → cold, force a refresh
+    // Current membership is exact: only rows stamped with THIS list's fetch time (docs/caching.md).
     const items = rows.flatMap((row) => {
-      const parsed = parseCached(rollbarCodec, row.data, {
-        providerId: 'rollbar', connectionId: row.integrationId, displayId: row.identifier,
-      })
-      return parsed.ok ? [rollbarCodec.toPublic(parsed.value)] : []
+      const parsed = parseCached(rollbarCodec, row.data, { providerId: 'rollbar', connectionId: row.integrationId, displayId: row.identifier })
+      return parsed.ok && parsed.value.listFetchedAt === listAt ? [parsed.value.summary] : []
     })
-    const fetchedAt = state[0]?.fetchedAt ?? (rows.length ? Math.min(...rows.map((row) => row.fetchedAt)) : null)
-    return fetchedAt == null ? null : { data: items, fetchedAt }
+    return { data: { items, capped: items.length >= context.limits.maxPages * ROLLBAR_PER_PAGE }, fetchedAt: listAt }
   },
   async refresh(context, input) {
+    const label = context.connection.label
     try {
-      const response = await rollbarFetch(context.secret, input.kind === 'list' ? itemsPath : itemByCounterPath(input.identifier))
-      if (response.status === 401 || response.status === 403) return { ok: false, failure: { error: 'provider_needs_auth', status: 401 } }
-      if (response.status === 429) return { ok: false, failure: { error: 'provider_rate_limited', status: 429 } }
-      if (response.status === 404) return { ok: false, failure: { error: 'provider_resource_not_found', status: 404 } }
-      if (!response.ok) return { ok: false, failure: { error: 'provider_unavailable', status: 502 } }
-
       if (input.kind === 'detail') {
-        const item = rollbarItemFromApi(context.connection.id, await rollbarData<RollbarApiItem>(response))
-        await persistItem(context, item, true)
+        const [row] = await issueRow(context, context.connection.id, input.identifier)
+        const cachedItemId = row
+          ? (() => {
+              const p = parseCached(rollbarCodec, row.data, { providerId: 'rollbar', connectionId: context.connection.id, displayId: input.identifier })
+              return p.ok && p.value.summary.itemId ? p.value.summary.itemId : null
+            })()
+          : null
+        // Prefer the known system id; fall back to counter resolution for legacy links.
+        const itemRes = await rollbarFetch(context.secret, cachedItemId ? itemByIdPath(cachedItemId) : itemByCounterPath(input.identifier))
+        const failure = failFor(itemRes)
+        if (failure) return { ok: false, failure }
+        const apiItem = await rollbarData<RollbarApiItem>(itemRes)
+        const summary = normalizeSummary(context.connection.id, label, apiItem)
+        const occurrence = await fetchLatestOccurrence(context.secret, apiItem)
+        await persistDetail(context, normalizeItemDetail(summary, apiItem, occurrence))
         return { ok: true }
       }
 
-      const { items: rawItems } = await rollbarData<{ items: RollbarApiItem[] }>(response)
-      const items = rawItems.map((raw) => rollbarItemFromApi(context.connection.id, raw))
-      for (const item of items) await persistItem(context, item, false)
-      const identifiers = items.map((item) => item.identifier)
-      const owned = and(
-        eq(schema.issues.userId, context.userId),
-        eq(schema.issues.integrationId, context.connection.id),
-        eq(schema.issues.provider, 'rollbar'),
-      )
-      await context.db.delete(schema.issues).where(identifiers.length ? and(owned, notInArray(schema.issues.identifier, identifiers)) : owned)
-      const key = resourceKey(context.connection.id, input)
+      const summaries: RollbarItemSummary[] = []
+      for (let page = 1; page <= context.limits.maxPages; page++) {
+        const response = await rollbarFetch(context.secret, itemsPath(page))
+        const failure = failFor(response)
+        if (failure) return { ok: false, failure }
+        const raw = (await rollbarData<{ items?: RollbarApiItem[] }>(response)).items ?? []
+        for (const item of raw) summaries.push(normalizeSummary(context.connection.id, label, item))
+        if (raw.length < ROLLBAR_PER_PAGE) break
+      }
+      // Restamp every current-list summary with this refresh's time (mergeSummary keeps detail).
+      // Absent rows are NOT deleted — they may still be linked to a task; they simply drop out of the
+      // list because they no longer carry the current listFetchedAt.
+      for (const summary of summaries) await persistSummary(context, summary)
       await context.db
         .insert(schema.syncState)
-        .values({ userId: context.userId, resource: key, fetchedAt: context.now })
+        .values({ userId: context.userId, resource: resourceKey(context.connection.id, input), fetchedAt: context.now })
         .onConflictDoUpdate({ target: [schema.syncState.userId, schema.syncState.resource], set: { fetchedAt: context.now } })
       return { ok: true }
     } catch {
       return { ok: false, failure: { error: 'provider_unavailable', status: 502 } }
     }
   },
+}
+
+const CONFORMANCE_SUMMARY: RollbarItemSummary = {
+  integrationId: 'rollbar-test', integrationLabel: 'Rollbar · acme', identifier: '142', itemId: '999',
+  title: 'TypeError updated', level: 'error', environment: 'prod', status: 'active', totalOccurrences: 4,
+  firstOccurrenceAt: 1, lastOccurrenceAt: 3,
 }
 
 export const rollbarProvider = publicProvider({
@@ -258,17 +347,19 @@ export const rollbarProvider = publicProvider({
   memory: { linkedItems: true, mutations: [], triggers: [], summarize: 'context-formatter', acceptedWrites: false },
   conformance: {
     ref: { providerId: 'rollbar', connectionId: 'rollbar-test', displayId: '142' },
+    // Legacy bare RollbarItem row (pre-itemId) — must migrate.
     legacyCache: {
       integrationId: 'rollbar-test', identifier: '142', title: 'TypeError', level: 'error', environment: 'prod',
       status: 'active', totalOccurrences: 3, firstOccurrenceAt: 1, lastOccurrenceAt: 2,
-    } satisfies RollbarItem,
-    summary: {
-      integrationId: 'rollbar-test', identifier: '142', title: 'TypeError updated', level: 'error', environment: 'prod',
-      status: 'active', totalOccurrences: 4, firstOccurrenceAt: 1, lastOccurrenceAt: 3,
-    } satisfies RollbarItem,
+    },
+    summary: CONFORMANCE_SUMMARY,
     detail: {
-      integrationId: 'rollbar-test', identifier: '142', title: 'TypeError', level: 'error', environment: 'prod',
-      status: 'active', totalOccurrences: 3, firstOccurrenceAt: 1, lastOccurrenceAt: 2,
-    } satisfies RollbarItem,
+      ...CONFORMANCE_SUMMARY, resolvedInVersion: null, assignedTo: null, url: null,
+      latestOccurrence: {
+        id: '555', occurredAt: 3, uuid: null, kind: 'trace', exceptionClass: 'TypeError', message: 'token is null',
+        frames: [], request: null, context: null, codeVersion: null, platform: null, language: null, framework: null,
+        server: null, person: null, notifier: null, truncated: false,
+      },
+    } satisfies RollbarItemDetail,
   },
 })
