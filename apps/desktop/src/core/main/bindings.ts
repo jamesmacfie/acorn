@@ -7,6 +7,9 @@ import { fileURLToPath } from 'node:url'
 import { drizzle } from 'drizzle-orm/better-sqlite3'
 import { migrate } from 'drizzle-orm/better-sqlite3/migrator'
 import { type AppDatabase, schema } from '../server/db'
+import { OauthAccountService } from '../server/publicApi/oauthAccountService'
+import { TokenService } from '../server/publicApi/tokenService'
+import { UiControlBroker } from './publicApi/uiControlBroker'
 
 // The runtime object the routes read via c.env (typed as the global Env in env.d.ts). Built once
 // at startup and handed to the Hono app at the single app.fetch() seam in main/server.ts.
@@ -21,6 +24,14 @@ export type RuntimeBindings = {
   // (docs/mcp.md). Injected into task session env (ACORN_API_TOKEN) so agent-spawned servers
   // inherit it; auth middleware maps it to the machine's single user.
   INTERNAL_TOKEN: string
+  // Public automation API services (docs/next/api). Singletons so the internal admin routes (4317),
+  // the public listener, and the WS hub share one TokenService instance — revocation listeners must
+  // survive across requests.
+  API_TOKENS: TokenService
+  OAUTH_ACCOUNTS: OauthAccountService
+  // UI control broker (docs/next/api §3.4): one control connection per renderer window on the 4317
+  // socket; the public command dispatch crosses presentation commands through it.
+  UI_BROKER: UiControlBroker
 }
 
 // One-time OAuth CSRF states (docs/authentication.md): /auth/login issues a state, /auth/callback
@@ -143,13 +154,18 @@ export function makeBindings({ dbPath, blobsDir }: BindingsOptions): RuntimeBind
     if (!value) throw new Error(`Missing required env var ${name} (set it in .env or the environment)`)
     return value
   }
+  const db = openDb(dbPath)
+  const encKey = secret('SESSION_ENC_KEY')
   return {
-    DB: openDb(dbPath),
+    DB: db,
     OAUTH_STATE: oauthStateStore(),
     BLOBS: diskBlobCache(blobsDir),
-    SESSION_ENC_KEY: secret('SESSION_ENC_KEY'),
+    SESSION_ENC_KEY: encKey,
     GITHUB_CLIENT_ID: secret('GITHUB_CLIENT_ID'),
     GITHUB_CLIENT_SECRET: secret('GITHUB_CLIENT_SECRET'),
     INTERNAL_TOKEN: randomUUID(),
+    API_TOKENS: new TokenService(db),
+    OAUTH_ACCOUNTS: new OauthAccountService(db, encKey),
+    UI_BROKER: new UiControlBroker(),
   }
 }

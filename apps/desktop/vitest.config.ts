@@ -5,7 +5,7 @@ import { defineConfig } from 'vitest/config'
 export default defineConfig({
   test: {
     environment: 'node',
-    include: ['src/**/*.test.ts'],
+    include: ['src/**/*.test.ts', 'test/**/*.test.ts'],
     // Register built-in providers/profiles into the core registries before each test file, mirroring
     // what the app composition roots do at boot (docs/plugins.md foldering).
     setupFiles: ['./test/registerContributions.ts'],

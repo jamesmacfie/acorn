@@ -15,6 +15,15 @@ const noticeSubs = new Set<NoticeCb>()
 const stepEventSubs = new Set<StepEventCb>()
 const outbox: WsClientFrame[] = [] // frames queued while the socket isn't OPEN
 
+// UI control broker (docs/next/api/commands-and-ui.md §4): the renderer registers a window, reports
+// state snapshots, and executes ui:command frames the main broker forwards from public callers.
+export type UiCommandResult =
+  | { ok: true; result: unknown; revision: number }
+  | { ok: false; error: { code: string; message: string; details?: unknown }; revision: number }
+type UiCommandHandler = (commandId: string, input: unknown, expectedRevision?: number) => Promise<UiCommandResult>
+let uiHandler: UiCommandHandler | null = null
+let uiRegistration: { windowId: string; primary: boolean; snapshot: unknown } | null = null
+
 let ws: WebSocket | null = null
 let reconnectTimer: ReturnType<typeof setTimeout> | null = null
 
@@ -36,6 +45,8 @@ function connect(): void {
     // Re-attach every live subscription so a reconnect (or a reload) re-subscribes the PTY and
     // replays its ring — the server treats attach as idempotent per connection.
     for (const id of outputSubs.keys()) sock.send(JSON.stringify({ channel: 'term:attach', id } satisfies WsClientFrame))
+    // Re-register the UI control window on reconnect so the broker regains its control connection.
+    if (uiRegistration) sock.send(JSON.stringify({ channel: 'ui:register', ...uiRegistration } satisfies WsClientFrame))
     for (const frame of outbox.splice(0)) sock.send(JSON.stringify(frame))
   }
   sock.onmessage = (e) => {
@@ -49,6 +60,16 @@ function connect(): void {
     else if (frame.channel === 'term:status') statusSubs.forEach((cb) => cb())
     else if (frame.channel === 'workflow:notice') noticeSubs.forEach((cb) => cb(frame.notice))
     else if (frame.channel === 'workflow:step:event') stepEventSubs.forEach((cb) => cb(frame))
+    else if (frame.channel === 'ui:command') {
+      const handler = uiHandler
+      if (!handler) return
+      const { requestId } = frame
+      void handler(frame.commandId, frame.input, frame.expectedRevision)
+        .then((r) => rawSend(r.ok
+          ? { channel: 'ui:command-result', requestId, ok: true, result: r.result, revision: r.revision }
+          : { channel: 'ui:command-result', requestId, ok: false, error: r.error, revision: r.revision }))
+        .catch((e) => rawSend({ channel: 'ui:command-result', requestId, ok: false, error: { code: 'internal_error', message: e instanceof Error ? e.message : 'command failed' }, revision: uiRegistration ? (uiRegistration.snapshot as { revision?: number })?.revision ?? 0 : 0 }))
+    }
   }
   const drop = () => {
     if (ws === sock) ws = null
@@ -111,4 +132,23 @@ export function wsOnWorkflowStepEvent(cb: StepEventCb): () => void {
   stepEventSubs.add(cb)
   connect()
   return () => void stepEventSubs.delete(cb)
+}
+
+// Register this window as the UI control connection and handle incoming ui:command frames. `handler`
+// maps a public command id + input to a reducer action and returns the result + new revision. The
+// app calls this after startup restore with an initial snapshot; wsSendUiState pushes updates.
+export function wsRegisterUi(windowId: string, primary: boolean, snapshot: unknown, handler: UiCommandHandler): () => void {
+  uiHandler = handler
+  uiRegistration = { windowId, primary, snapshot }
+  connect()
+  rawSend({ channel: 'ui:register', windowId, primary, snapshot })
+  return () => {
+    uiHandler = null
+    uiRegistration = null
+  }
+}
+
+export function wsSendUiState(windowId: string, snapshot: unknown): void {
+  if (uiRegistration) uiRegistration = { ...uiRegistration, snapshot }
+  rawSend({ channel: 'ui:state', windowId, snapshot })
 }

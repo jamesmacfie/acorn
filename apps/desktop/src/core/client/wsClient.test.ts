@@ -67,4 +67,25 @@ describe('wsClient', () => {
     expect(statuses).toEqual([1])
     expect(notices).toEqual(['repo-config-trust'])
   })
+
+  it('registers the UI control window and answers ui:command frames', async () => {
+    const client = await import('./wsClient')
+    const calls: { commandId: string; input: unknown }[] = []
+    client.wsRegisterUi('win-1', true, { revision: 0 }, async (commandId, input) => {
+      calls.push({ commandId, input })
+      return { ok: true, result: { changed: true }, revision: 1 }
+    })
+    const socket = FakeWebSocket.instances[0]
+    socket.open()
+    // ui:register is sent on open
+    expect(socket.sent.map((v) => JSON.parse(v))).toContainEqual({ channel: 'ui:register', windowId: 'win-1', primary: true, snapshot: { revision: 0 } })
+
+    socket.message({ channel: 'ui:command', requestId: 'r1', windowId: 'win-1', commandId: 'core.pane.show', input: { paneId: 'pr' } })
+    await Promise.resolve()
+    expect(calls).toEqual([{ commandId: 'core.pane.show', input: { paneId: 'pr' } }])
+    expect(socket.sent.map((v) => JSON.parse(v))).toContainEqual({ channel: 'ui:command-result', requestId: 'r1', ok: true, result: { changed: true }, revision: 1 })
+
+    client.wsSendUiState('win-1', { revision: 2 })
+    expect(socket.sent.map((v) => JSON.parse(v))).toContainEqual({ channel: 'ui:state', windowId: 'win-1', snapshot: { revision: 2 } })
+  })
 })

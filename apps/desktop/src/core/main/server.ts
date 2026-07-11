@@ -6,7 +6,7 @@ import { fileURLToPath } from 'node:url'
 import { createApp } from '../server/index'
 import { makeBindings, type RuntimeBindings } from './bindings'
 import { resolveServerPaths } from './serverPaths'
-import { attachWsHub } from './wsHub'
+import { attachWsHub, setUiBroker } from './wsHub'
 
 const here = dirname(fileURLToPath(import.meta.url))
 // Resolve from the desktop package root, never process.cwd() or a fixed module depth: source-mode
@@ -66,6 +66,7 @@ export function startListener(runtime: RuntimeBindings): Promise<ServerType> {
     })
     // The one authenticated WebSocket (the WebSocket transport) shares this loopback listener via its
     // 'upgrade' event; the hub re-checks Host + Origin + session cookie before the handshake.
+    setUiBroker(runtime.UI_BROKER) // route the renderer's ui:* frames to the broker
     attachWsHub(server as unknown as import('node:http').Server, {
       encKey: runtime.SESSION_ENC_KEY,
       internalToken: runtime.INTERNAL_TOKEN,

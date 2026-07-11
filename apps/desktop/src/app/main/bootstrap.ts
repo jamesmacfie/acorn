@@ -15,6 +15,10 @@ import '../server/providers' // register built-in integration providers into the
 import '../server/routes' // register plugin-owned HTTP routers into the core route registry before createApp() runs
 import './agentProfiles' // register the built-in agent-profile plugins into the core registry
 import { makeRuntime, startListener } from '../../core/main/server'
+import { AutomationApiServer } from '../../core/main/publicApi/server'
+import { ApiSettingsStore } from '../../core/main/publicApi/settingsStore'
+import { buildPublicApiContributions } from '../server/publicApi'
+import { setApiSettingsController } from '../../core/server/routes/apiSettings'
 import { wireServerBridges } from './serverBridges'
 import { registerKnowledgeIpc } from '../../plugins/memory/main/knowledgeIpc'
 import { createRuntimeService } from '../../plugins/terminal/main/runIpc'
@@ -49,15 +53,22 @@ export type BootstrapOptions = {
 
 export async function bootstrap({ dataDir, origin, createWindow }: BootstrapOptions): Promise<BrowserWindow> {
   const mark = bootTimer()
+  const startedAt = Date.now()
 
   // Teardown is registered FIRST and is idempotent, so a boot that throws part-way can still dispose
   // whatever was constructed (the lifecycle invariant: partial boot still disposes).
   let server: ServerType | null = null
+  let apiServer: AutomationApiServer | null = null
   let disposePreview: (() => void) | null = null
   let disposed = false
   const dispose = async () => {
     if (disposed) return
     disposed = true
+    try {
+      await apiServer?.stop() // stop the public automation listener first (docs/next/api §6)
+    } catch (e) {
+      console.warn('[boot] automation API close failed:', e)
+    }
     try {
       server?.close() // stop accepting loopback requests (constructed last → disposed first)
     } catch (e) {
@@ -94,6 +105,8 @@ export async function bootstrap({ dataDir, origin, createWindow }: BootstrapOpti
   // starting a run the workflow sweep would re-queue. Always resolved, even on reconcile failure.
   let reconcileDone!: () => void
   const reconciled = new Promise<void>((r) => (reconcileDone = r))
+  // Mirrors `reconciled` as a synchronous flag for the public API /health readiness field.
+  let reconcileComplete = false
 
   // 1. Migrate + construct the DB/runtime bindings. openDb runs migrations synchronously, so the
   //    schema is ready before the listener serves any request (docs/electron.md §11).
@@ -145,6 +158,55 @@ export async function bootstrap({ dataDir, origin, createWindow }: BootstrapOpti
   server = await startListener(runtime)
   mark('listener-up')
 
+  // 4b. Start the public automation API listener (docs/next/api). Disabled by default; it binds only
+  //     when settings/env enable it. Constructed after DB/services, before the window. A bind failure
+  //     is logged and does not block the app.
+  apiServer = new AutomationApiServer({
+    settingsStore: new ApiSettingsStore(dataDir),
+    bindings: runtime,
+    tokens: runtime.API_TOKENS,
+    version: app.getVersion(),
+    contributions: buildPublicApiContributions({
+      db,
+      encKey: runtime.SESSION_ENC_KEY,
+      blobs: runtime.BLOBS,
+      resolveGithubToken: (userId) => runtime.OAUTH_ACCOUNTS.resolveGithubToken(userId),
+      notesStore: knowledge.notesStore,
+      memoryProposals: knowledge.proposals,
+      memoryReconcile: knowledge.reconciled,
+      workflowRunner,
+    }),
+    runtime: {
+      version: app.getVersion(),
+      startedAt,
+      desktop: true,
+      reconciliationComplete: () => reconcileComplete,
+      rendererConnected: () => runtime.UI_BROKER.rendererConnected,
+      terminalAvailable: () => true,
+      worktreesAvailable: () => true,
+      pluginCapabilities: () => [
+        { id: 'notes', available: true },
+        { id: 'changes', available: true },
+        { id: 'editor', available: true },
+        { id: 'memory', available: true },
+        { id: 'database', available: true },
+        { id: 'workflows', available: true },
+        { id: 'rollbar', available: true },
+        { id: 'linear', available: true },
+        { id: 'terminal', available: true },
+        { id: 'github', available: true },
+        { id: 'preview', available: true },
+      ],
+    },
+  })
+  setApiSettingsController(apiServer) // let the cookie-auth Settings page read/patch listener settings
+  try {
+    await apiServer.start()
+    mark('automation-api')
+  } catch (e) {
+    console.warn('[boot] automation API failed to start:', e)
+  }
+
   // 5. Create the window as soon as the listener is up (docs/electron.md §11 boot policy).
   const win = await createWindow()
   mark('window')
@@ -173,6 +235,7 @@ export async function bootstrap({ dataDir, origin, createWindow }: BootstrapOpti
     } catch (e) {
       console.warn('[boot] reconcile workflow failed:', e)
     }
+    reconcileComplete = true
     reconcileDone()
   })()
 
