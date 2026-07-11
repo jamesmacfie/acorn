@@ -4,13 +4,13 @@ import { A, useNavigate, useParams } from '@solidjs/router'
 import { createVirtualizer } from '@tanstack/solid-virtual'
 import { checksState, formatRelativeTime } from './displayMeta'
 import { prefetchOpenPulls, schedulePullSummaryPrefetch } from './prefetch'
-import { closedPullsInfiniteOptions, integrationsOptions, pullDetailOptions, pullsOptions, reposOptions, tasksKey, workspacesOptions, type Pull } from '../../../core/client/queries'
+import { closedPullsInfiniteOptions, integrationsOptions, pullDetailOptions, pullsOptions, reposOptions, tasksKey, tasksOptions, workspacesOptions, type Pull, type Task } from '../../../core/client/queries'
 import { filterPulls } from './pullList/model'
 import { prFilterFor, setPrFilter } from './pullList/filterState'
 import { workspaceForRepo } from '../../../core/client/workspaces/activeWorkspace'
 import { createTask } from './mutations'
 import { scanLinearRefs } from '../../linear/client/scanLinearRefs'
-import { activateTaskSignals } from '../../../core/client/tasks/activate'
+import { activateTaskSignals, pathForTask } from '../../../core/client/tasks/activate'
 import { registerCommands } from '../../../core/client/registries/commands'
 import { registerKeybindings } from '../../../core/client/registries/keybindings'
 
@@ -83,6 +83,13 @@ export default function PullList() {
     e.stopPropagation()
     const { owner, repo } = params
     if (!owner || !repo || !pr.headRef) return
+    // If a task for this PR already exists, focus it instead of creating a duplicate.
+    const existing = (await queryClient.ensureQueryData(tasksOptions(true)).catch(() => [] as Task[]))
+      .find((t) => t.status === 'active' && t.origin === 'github-pr' && t.repoOwner === owner && t.repoName === repo && t.pullNumber === pr.number)
+    if (existing) {
+      activateTaskSignals(existing, { pane: 'pr' })
+      return navigate(pathForTask(existing))
+    }
     // Fetch the detail (cached if warm) so the body is present, then seed a task_link for EVERY
     // Linear ticket the PR references — a PR can resolve several, and the task links them all.
     const detail = await queryClient.ensureQueryData(pullDetailOptions(owner, repo, String(pr.number), true)).catch(() => undefined)

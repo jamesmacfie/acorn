@@ -1,18 +1,20 @@
-import { createSignal, For, Show } from 'solid-js'
+import { createEffect, createSignal, For, on, Show } from 'solid-js'
 import { useNavigate, useParams } from '@solidjs/router'
 import { createQuery, useQueryClient } from '@tanstack/solid-query'
-import { linearProjectsOptions, tasksKey, workspaceProjectsKey, workspaceProjectsOptions, workspaceLinearIssuesOptions, workspacesOptions } from '../../../core/client/queries'
+import { linearProjectsOptions, tasksKey, tasksOptions, workspaceProjectsKey, workspaceProjectsOptions, workspaceLinearIssuesOptions, workspacesOptions } from '../../../core/client/queries'
 import { setWorkspaceProjects } from '../../github/client/mutations'
-import type { LinearProjectIssue, WorkspaceProject } from '../../../core/shared/api'
+import type { LinearProjectIssue, Task, WorkspaceProject } from '../../../core/shared/api'
 import { workspaceForRepo } from '../../../core/client/workspaces/activeWorkspace'
-import { activateTaskSignals } from '../../../core/client/tasks/activate'
+import { activateTaskSignals, pathForTask } from '../../../core/client/tasks/activate'
 import { sourceRegistry, type SourceContribution } from '../../../core/client/registries/sources'
+import LinearIssuePanel from './LinearIssuePanel'
 
 // The Linear Source browse (docs/workspaces-and-tasks.md). Linear projects are linked at the WORKSPACE level
 // and may span several connected Linear workspaces; each linked project is an (integrationId,
-// externalId) pair. Issues are scoped to the workspace's linked projects; clicking one promotes it
-// to a task on the current repo, tagged with the ticket + its owning integration.
+// externalId) pair. Issues are scoped to the workspace's linked projects; selecting one opens its
+// detail, while the row's explicit action promotes it to a task on the current repo.
 const projKey = (p: WorkspaceProject) => `${p.integrationId}:${p.externalId}`
+const issueKey = (issue: LinearProjectIssue) => `${issue.integrationId}:${issue.identifier}`
 
 export default function LinearBrowse() {
   const navigate = useNavigate()
@@ -23,8 +25,22 @@ export default function LinearBrowse() {
   const wsId = () => ws()?.id ?? null
 
   const linked = createQuery(() => workspaceProjectsOptions(wsId(), true))
-  const selected = () => linked.data?.projects ?? []
-  const issues = createQuery(() => workspaceLinearIssuesOptions(selected(), selected().length > 0))
+  const linkedProjects = () => linked.data?.projects ?? []
+  const issues = createQuery(() => workspaceLinearIssuesOptions(linkedProjects(), linkedProjects().length > 0))
+  const [selectedIssue, setSelectedIssue] = createSignal<LinearProjectIssue | null>(null)
+  const isSelected = (issue: LinearProjectIssue) => {
+    const selected = selectedIssue()
+    return selected !== null && issueKey(selected) === issueKey(issue)
+  }
+
+  // ponytail: local selection signal, add a route param only if issues need deep-linking.
+  // The source component survives repo navigation, so explicitly keep this session-only selection
+  // scoped to the routed repo rather than showing an issue from the workspace we just left.
+  createEffect(on(
+    () => `${params.owner ?? ''}/${params.repo ?? ''}`,
+    () => setSelectedIssue(null),
+    { defer: true },
+  ))
 
   // Project picker — lists projects across every connected Linear, tagged by connection.
   const [pickerOpen, setPickerOpen] = createSignal(false)
@@ -44,7 +60,7 @@ export default function LinearBrowse() {
         setPickerError('Could not refresh Linear projects. Check the connection and try again.')
         return
       }
-      setChecked(new Set(selected().map(projKey)))
+      setChecked(new Set(linkedProjects().map(projKey)))
       setPickerOpen(true)
     } finally {
       setPickerOpening(false)
@@ -69,6 +85,13 @@ export default function LinearBrowse() {
   async function promote(it: LinearProjectIssue) {
     const { owner, repo } = params
     if (!owner || !repo) return
+    // If a task for this ticket already exists, focus it instead of creating a duplicate.
+    const existing = (await qc.ensureQueryData(tasksOptions(true)).catch(() => [] as Task[]))
+      .find((t) => t.status === 'active' && t.links.some((l) => l.providerId === 'linear' && l.connectionId === it.integrationId && l.identifier === it.identifier))
+    if (existing) {
+      activateTaskSignals(existing, { pane: 'linear' })
+      return navigate(pathForTask(existing))
+    }
     const promotion = (sourceRegistry.get('linear') as SourceContribution<LinearProjectIssue>).promotion
     const context = { owner, repo }
     if (!promotion.canPromote(it, context)) return
@@ -80,13 +103,13 @@ export default function LinearBrowse() {
   }
 
   return (
-    <main class="panes panes-empty">
-      <section class="pane linear-browse">
+    <main class="panes linear-browse-panes">
+      <section class="pane pane-left linear-browse">
         <div class="section-header">
           Linear{ws() ? ` · ${ws()!.name}` : ''}
           <Show when={wsId()}>
             <button type="button" class="new-pr-btn" title="Choose Linear projects for this workspace" disabled={pickerOpening()} onClick={() => void openPicker()}>
-              {pickerOpening() ? 'Refreshing…' : `Projects${selected().length ? ` (${selected().length})` : ''}`}
+              {pickerOpening() ? 'Refreshing…' : `Projects${linkedProjects().length ? ` (${linkedProjects().length})` : ''}`}
             </button>
           </Show>
         </div>
@@ -94,7 +117,7 @@ export default function LinearBrowse() {
 
         <Show when={wsId()} fallback={<p class="placeholder">Select a workspace to browse its Linear issues.</p>}>
           <Show
-            when={selected().length}
+            when={linkedProjects().length}
             fallback={
               <div class="workspace-empty-inner">
                 <p class="muted">No Linear projects linked to {ws()?.name}.</p>
@@ -110,11 +133,35 @@ export default function LinearBrowse() {
                   <For each={issues.data?.issues ?? []}>
                     {(it) => (
                       <li>
-                        <button type="button" class="linear-browse-row" title="Open as task" onClick={() => void promote(it)}>
+                        <div
+                          class="linear-browse-row"
+                          classList={{ active: isSelected(it) }}
+                          role="button"
+                          tabindex="0"
+                          aria-pressed={isSelected(it)}
+                          onClick={() => setSelectedIssue(it)}
+                          onKeyDown={(event) => {
+                            if (event.target !== event.currentTarget || (event.key !== 'Enter' && event.key !== ' ')) return
+                            event.preventDefault()
+                            setSelectedIssue(it)
+                          }}
+                        >
                           <span class="linear-browse-id">{it.identifier}</span>
                           <span class="linear-browse-title">{it.title}</span>
                           <Show when={it.state}>{(s) => <span class="linear-browse-state" style={{ '--state-color': s().color }}>{s().name}</span>}</Show>
-                        </button>
+                          <button
+                            type="button"
+                            class="linear-browse-ws-btn"
+                            title="Open as task"
+                            onClick={(event) => {
+                              event.preventDefault()
+                              event.stopPropagation()
+                              void promote(it)
+                            }}
+                          >
+                            + ws
+                          </button>
+                        </div>
                       </li>
                     )}
                   </For>
@@ -122,6 +169,22 @@ export default function LinearBrowse() {
               </Show>
             </Show>
           </Show>
+        </Show>
+      </section>
+
+      <section class="pane pane-right linear-browse-detail">
+        <Show
+          when={selectedIssue()}
+          fallback={<div class="pane-empty"><p class="placeholder">Select an issue.</p></div>}
+        >
+          {(selected) => (
+            <LinearIssuePanel
+              variant="pane"
+              target={{ identifier: selected().identifier, connectionId: selected().integrationId }}
+              onClose={() => setSelectedIssue(null)}
+              onContentClick={() => {}}
+            />
+          )}
         </Show>
       </section>
 

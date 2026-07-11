@@ -164,7 +164,13 @@
 .close-confirm { color: var(--del-marker); border-color: var(--del-marker); }
 .task-run-error { position: absolute; left: 12px; bottom: 12px; z-index: 15; max-width: min(620px, 70vw); display: flex; align-items: center; gap: 8px; padding: 8px 10px; background: var(--bg); border: 1px solid var(--del-marker); }
 
-/* Linear Source browse (LinearBrowse.tsx): a thin list of linked tickets. */
+/* Linear Source browse (LinearBrowse.tsx): linked-ticket master/detail. */
+.panes.linear-browse-panes {
+  grid-template-columns: clamp(320px, 28vw, 420px) minmax(0, 1fr);
+}
+/* The shell's generic collapsed rule declares the GitHub three-track grid. Linear has only two
+   tracks, so let its remaining detail pane occupy the viewport when the master list is hidden. */
+.app.left-collapsed .panes.linear-browse-panes { grid-template-columns: minmax(0, 1fr); }
 .linear-browse { display: flex; flex-direction: column; overflow: hidden; }
 .linear-browse-list { list-style: none; margin: 0; padding: 0; overflow-y: auto; }
 .linear-browse-row {
@@ -179,15 +185,42 @@
   background: transparent;
   border: 0;
   border-bottom: 1px solid var(--border);
+  border-left: 3px solid transparent;
   cursor: pointer;
 }
+.linear-browse-row.active { background: var(--bg-selected); border-left-color: var(--accent); }
 .linear-browse-row:hover { background: var(--bg-hover); }
+.linear-browse-row:focus-visible { outline: 1px solid var(--accent); outline-offset: -1px; }
 .linear-browse-id { flex: none; color: var(--text-muted); font-variant-numeric: tabular-nums; }
 .linear-browse-title { flex: 1; min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
 .linear-browse-state {
   flex: none;
   font-size: var(--fs-sm);
   color: var(--state-color, var(--text-muted));
+}
+.linear-browse-ws-btn {
+  flex: none;
+  opacity: 0;
+  font: inherit;
+  font-size: var(--fs-sm);
+  color: var(--text-muted);
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 0 6px;
+  cursor: pointer;
+}
+.linear-browse-row:hover .linear-browse-ws-btn,
+.linear-browse-row:focus-within .linear-browse-ws-btn { opacity: 1; }
+.linear-browse-ws-btn:hover { background: var(--bg); color: var(--text); border-color: var(--border-strong); }
+.linear-browse-detail > .linear-pane {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  border-right: 0;
+  overflow: hidden;
 }
 
 /* Linear project picker (modal). */
