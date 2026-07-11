@@ -29,7 +29,7 @@ import { NO_CONTENT, defineEndpoint, defineEvent, type EventContribution, type P
 import type { TaskService } from './services/taskService'
 import type { WorkspaceService } from './services/workspaceService'
 
-// Required core event channels (docs/next/api/events.md §5). Payloads are the resource shapes or a
+// Required core event channels (docs/public-api.md). Payloads are the resource shapes or a
 // `{ id }` for deletions; kept as z.unknown() at the channel declaration (the endpoint publishes the
 // concrete object).
 const CORE_EVENTS: EventContribution[] = [
@@ -43,7 +43,7 @@ const CORE_EVENTS: EventContribution[] = [
   'core.task.restored',
 ].map((channel) => defineEvent({ pluginId: 'core', channel, description: channel, schema: z.unknown(), scope: 'read' }))
 
-// Core resource endpoints (docs/next/api/core-api.md §5–§8). Thin adapters over WorkspaceService /
+// Core resource endpoints (docs/public-api.md). Thin adapters over WorkspaceService /
 // TaskService; pinned repos are mapped owner/name ↔ GitHub repo id via the mirror.
 //
 // ponytail: list endpoints return the full bounded set with nextCursor:null. Opaque cursor

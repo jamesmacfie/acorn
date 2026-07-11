@@ -4,7 +4,7 @@ import { PublicApiError } from '../../../core/shared/publicApi/errors'
 import { getRunBridge } from '../../../core/server/routes/harness'
 import { defineEndpoint, type PluginApiContribution } from '../../../core/server/publicApi/defineEndpoint'
 
-// Run targets (docs/next/api/terminal-git-files.md §6). Base /plugins/terminal/tasks/:taskId/run-targets.
+// Run targets (docs/public-api.md). Base /plugins/terminal/tasks/:taskId/run-targets.
 // Reuses the harness RunBridge (merged config + DB targets, config-trust gate, run reconciliation).
 // ponytail: run results pass through as z.unknown() — the bridge's internal shapes aren't modeled as
 // strict schemas yet; the endpoints, auth, scope, and trust gating are all in place.

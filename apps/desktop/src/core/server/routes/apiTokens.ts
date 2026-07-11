@@ -5,7 +5,7 @@ import type { AppEnv } from '../middleware/auth'
 import { getUser } from '../middleware/requireUser'
 import { respondError } from '../respond'
 
-// Cookie-authenticated administration of public API bearer tokens (docs/next/api/authentication.md
+// Cookie-authenticated administration of public API bearer tokens (docs/public-api.md
 // §4). Mounted on the internal 4317 app under the existing csrf + auth gate — NOT on the public
 // listener. A bearer token cannot mint or revoke tokens; issuance stays an interactive ceremony.
 

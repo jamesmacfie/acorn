@@ -15,7 +15,7 @@ import type {
 import { gh, ghError, ghGraphQL } from '.'
 import { refreshRepos } from './routes/repoMirror'
 
-// GitHub public service (docs/next/api/plugin-api.md §4–§5). Reads project the local mirror tables
+// GitHub public service (docs/public-api.md). Reads project the local mirror tables
 // (Acorn's stable projection, never raw GitHub). Mutations resolve the encrypted OAuth credential
 // and call GitHub; an invalid upstream token is 424 (not 401 — the Acorn bearer is still valid).
 

@@ -1,7 +1,7 @@
 import { z } from 'zod'
 import { UnixMillisSchema } from './primitives'
 
-// Integration connection lifecycle public schemas (docs/next/api/plugin-api.md §6). Credentials are
+// Integration connection lifecycle public schemas (docs/public-api.md). Credentials are
 // write-only and never appear in responses. status/authKind/lastError are server-controlled opaque
 // strings (kept as strings so a new provider value can't 500 a response-contract check).
 

@@ -1,7 +1,7 @@
 import { z } from 'zod'
 import { RelativePathSchema } from './primitives'
 
-// Changes (git) plugin public schemas (docs/next/api/terminal-git-files.md §7–§8). All operations
+// Changes (git) plugin public schemas (docs/public-api.md). All operations
 // are confined to the task's worktree; relative paths are validated here and again in the service.
 
 export const LocalChangeSchema = z.strictObject({

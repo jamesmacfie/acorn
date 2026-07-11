@@ -4,7 +4,7 @@ import type { AppDatabase } from '../db'
 import { schema } from '../db'
 import type { ApiScopes } from '../../shared/publicApi/primitives'
 
-// Bearer token issue / parse / verify / revoke (docs/next/api/authentication.md §1, §5, §6). The
+// Bearer token issue / parse / verify / revoke (docs/public-api.md). The
 // raw token is shown once; only SHA-256(secret) is stored. A 256-bit random secret makes offline
 // hash guessing infeasible, so no password/reversible encryption is layered on.
 

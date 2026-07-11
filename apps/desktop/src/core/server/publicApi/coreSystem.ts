@@ -11,7 +11,7 @@ import {
 import { defineEndpoint, type PluginApiContribution } from './defineEndpoint'
 import type { RegistrySnapshot } from './registry'
 
-// Core system + discovery + settings endpoints (docs/next/api/core-api.md §2, §3). Registered under
+// Core system + discovery + settings endpoints (docs/public-api.md). Registered under
 // pluginId 'core' before the registry freezes. Runtime-dependent values (readiness, renderer
 // connection, listener rebind) come from injected providers so this module stays main-agnostic.
 

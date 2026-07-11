@@ -12,7 +12,7 @@ import { WorkspaceService } from '../../src/core/server/publicApi/services/works
 import { TokenService } from '../../src/core/server/publicApi/tokenService'
 import { makeTestDb, type TestDb } from '../../src/core/server/routes/testDb'
 
-// Public API test harness (docs/next/api/implementation-plan.md §1). Builds a fully-wired
+// Public API test harness (docs/public-api.md). Builds a fully-wired
 // automation app over a temp DB with fake runtime/settings — no Electron. Used by the conformance
 // suite and endpoint tests.
 

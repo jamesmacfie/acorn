@@ -1,7 +1,7 @@
 import { z } from 'zod'
 import { IdSchema, UnixMillisSchema } from './primitives'
 
-// Typed command contract (docs/next/api/commands-and-ui.md §2, §3, §5). Public commands are static,
+// Typed command contract (docs/public-api.md). Public commands are static,
 // schema-first contributions; presentation commands run through the UI control broker (renderer).
 
 export const CommandCategorySchema = z.enum(['navigation', 'workspace', 'task', 'pane', 'terminal', 'editor', 'action'])
@@ -45,7 +45,7 @@ export const CommandListQuerySchema = z.strictObject({
   target: z.enum(['renderer', 'service']).optional(),
 })
 
-// Presentation snapshot (docs/next/api/core-api.md §9). Reported by the renderer to the broker.
+// Presentation snapshot (docs/public-api.md). Reported by the renderer to the broker.
 export const PaneLayoutSchema = z.strictObject({
   panes: z.array(z.string().min(1).max(200)).min(1).max(32),
   weights: z.record(z.string(), z.number().positive()).optional(),

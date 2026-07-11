@@ -36,7 +36,7 @@ import {
 import { NO_CONTENT, defineEndpoint, type PluginApiContribution } from '../../../core/server/publicApi/defineEndpoint'
 import type { GitHubPublicService } from './publicService'
 
-// GitHub plugin public API (docs/next/api/plugin-api.md §5). Base /plugins/github. Reads project the
+// GitHub plugin public API (docs/public-api.md). Base /plugins/github. Reads project the
 // local mirror; the core mutations (create PR, merge, comment, close, reopen) call GitHub with the
 // stored credential. The remaining mutation catalog (reviews, labels, auto-merge, reviewers, viewed,
 // Actions rerun) is not yet wired.

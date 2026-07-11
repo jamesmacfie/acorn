@@ -82,7 +82,7 @@ function evict(taskId: string): void {
   }
 }
 
-// --- Task-id-addressed controller for the public API (docs/next/api/plugin-api.md §12). Operates on
+// --- Task-id-addressed controller for the public API (docs/public-api.md). Operates on
 // the existing preview record for a task; never accepts/returns a raw webContents id or CDP handle.
 // A bounds/show/hide-free surface — those stay renderer-owned. ---
 

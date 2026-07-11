@@ -32,6 +32,11 @@ Run commands from the repository root unless noted otherwise.
   local login and isolated temporary data; the seam returns 404 outside `ACORN_E2E=1`.
 - Workflow tests use the committed fake agent through the real argv/template path and cover gates,
   joins, fan-out, branching, cancellation, reconciliation, and tool ceilings.
+- Public API tests live beside the code under `core/{server,main,client}/publicApi/*.test.ts` — token
+  grammar/hash/scope/revocation, settings-store atomicity/override, registry freeze invariants,
+  idempotency replay, envelopes/auth-gating, and the WebSocket hub — plus the cookie-authed
+  management routes (`routes/apiTokens.test.ts`, `routes/apiSettings.test.ts`). See
+  [public-api.md](./public-api.md).
 
 ## Adding tests
 

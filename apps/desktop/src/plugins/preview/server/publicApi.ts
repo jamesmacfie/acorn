@@ -15,7 +15,7 @@ import {
 import { NO_CONTENT, defineEndpoint, type PluginApiContribution } from '../../../core/server/publicApi/defineEndpoint'
 import { previewCurrentUrl, previewEvictTask, previewLoadUrl, previewNavState, previewNavigate } from '../main/previewService'
 
-// Preview plugin public API (docs/next/api/plugin-api.md §12). Base /plugins/preview/tasks/:taskId.
+// Preview plugin public API (docs/public-api.md). Base /plugins/preview/tasks/:taskId.
 // Electron-only (WebContentsView): configuration + resolve-url are computed server-side from the
 // workspace preview settings; url/navigation/evict act on the task's live preview view (409 when no
 // view exists — presentation is renderer-owned).

@@ -1,6 +1,6 @@
 import { z } from 'zod'
 
-// Error envelope + status vocabulary for /api/v1 (docs/next/api/protocol.md §5). Every non-2xx
+// Error envelope + status vocabulary for /api/v1 (docs/public-api.md). Every non-2xx
 // response is built from PublicApiError so the wire shape is exactly ErrorResponseSchema.
 
 export const ValidationIssueSchema = z.strictObject({

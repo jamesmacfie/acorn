@@ -19,7 +19,7 @@ import { EventBus } from './eventBus'
 import { attachPublicWsHub, type PublicWsHub } from './wsHub'
 import { ApiSettingsStore } from './settingsStore'
 
-// AutomationApiServer (docs/next/api/architecture.md §3.1): the main-owned lifecycle for the public
+// AutomationApiServer (docs/public-api.md): the main-owned lifecycle for the public
 // loopback listener. It binds exactly 127.0.0.1:<port>, enforces the Host header before Hono, and
 // rebinds transactionally when the port changes (start new → persist → stop old).
 

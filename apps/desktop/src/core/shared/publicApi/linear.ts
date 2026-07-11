@@ -1,7 +1,7 @@
 import { z } from 'zod'
 import { IdSchema, PageQuerySchema, UnixMillisSchema } from './primitives'
 
-// Linear provider public schemas (docs/next/api/plugin-api.md §7).
+// Linear provider public schemas (docs/public-api.md).
 
 export const LinearStateSchema = z.strictObject({ name: z.string(), type: z.string(), color: z.string() }).nullable()
 

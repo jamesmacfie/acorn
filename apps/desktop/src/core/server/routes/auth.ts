@@ -113,7 +113,7 @@ export const auth = new Hono<{ Bindings: Env }>()
     const scopes = tokenJson.scope ? tokenJson.scope.split(',').map((s) => s.trim()).filter(Boolean) : []
 
     // Persist the GitHub credential encrypted at rest so bearer API tokens (which carry no cookie)
-    // can call GitHub on this user's behalf (docs/next/api/authentication.md §7). Best-effort — a
+    // can call GitHub on this user's behalf (docs/public-api.md). Best-effort — a
     // storage failure must not block the browser login itself.
     try {
       await c.env.OAUTH_ACCOUNTS.upsertGithub({

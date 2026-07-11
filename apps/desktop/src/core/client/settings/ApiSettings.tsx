@@ -2,7 +2,7 @@ import { createSignal, For, Show } from 'solid-js'
 import { createQuery, useQueryClient } from '@tanstack/solid-query'
 import { readJson, writeJson } from '../apiClient'
 
-// Settings → API (docs/next/api/authentication.md §4, implementation-plan.md Phase 9). Manages the
+// Settings → API (docs/public-api.md, implementation-plan.md Phase 9). Manages the
 // public automation API: enable/port for the loopback listener and bearer-token issuance/revocation.
 // Tokens are cookie-authenticated admin (a bearer can never mint tokens); the raw token is shown once.
 

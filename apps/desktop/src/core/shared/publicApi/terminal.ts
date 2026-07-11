@@ -1,7 +1,7 @@
 import { z } from 'zod'
 import { IdSchema, OwnerSchema, PageQuerySchema, RepoNameSchema, UnixMillisSchema } from './primitives'
 
-// Terminal plugin public schemas (docs/next/api/terminal-git-files.md §2, §4). This file covers the
+// Terminal plugin public schemas (docs/public-api.md). This file covers the
 // captured-execution resource + profiles. Interactive sessions + streaming are a separate surface.
 
 export const EnvironmentSchema = z
@@ -39,7 +39,7 @@ export const TerminalProfileSchema = z.strictObject({
   tmuxMissing: z.boolean().optional(),
 })
 
-// Interactive terminal sessions (docs/next/api/terminal-git-files.md §2, §3).
+// Interactive terminal sessions (docs/public-api.md).
 export const AgentStateSchema = z.enum(['starting', 'working', 'waiting', 'idle', 'blocked', 'permission', 'done', 'unknown'])
 
 export const TerminalSessionSchema = z.strictObject({
@@ -123,7 +123,7 @@ export const WorktreeStatusSchema = z.strictObject({
 
 export const WorktreeRemoveQuerySchema = z.strictObject({ force: z.enum(['true', 'false']).default('false') })
 
-// Local checkout mapping + run targets (docs/next/api/terminal-git-files.md §5, §6).
+// Local checkout mapping + run targets (docs/public-api.md).
 export const RunTargetSchema = z.strictObject({
   id: z.string().min(1).max(100),
   command: z.string().min(1).max(100_000),

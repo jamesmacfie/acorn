@@ -7,7 +7,7 @@ import { PublicApiError } from '../../../core/shared/publicApi/errors'
 import type { z } from 'zod'
 import type { WorktreeStatusSchema } from '../../../core/shared/publicApi/terminal'
 
-// WorktreeService (docs/next/api/terminal-git-files.md §5). Task-scoped worktree status + lazy
+// WorktreeService (docs/public-api.md). Task-scoped worktree status + lazy
 // create/adopt/remove, reusing the same resolveTaskCwd/removeWorktree primitives as the UI. The
 // taskId is the capability; no caller-supplied path is accepted.
 

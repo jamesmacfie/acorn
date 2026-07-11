@@ -14,7 +14,7 @@ import type {
 import type { WorkflowDef } from './workflowContracts'
 import { loadWorkflowFiles } from './workflowFiles'
 
-// WorkflowService (docs/next/api/plugin-api.md §11). Public runs start by registered definitionId
+// WorkflowService (docs/public-api.md). Public runs start by registered definitionId
 // (never a submitted graph, so file validation/trust can't be bypassed). Reads parse the durable
 // JSON columns into typed values.
 

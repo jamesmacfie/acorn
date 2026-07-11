@@ -10,7 +10,7 @@ import { getMemory, listMemories, searchMemories, writeMemoryFile, type MemoryTy
 import { acceptProposal, rejectProposal } from './memoryGen'
 import type { MemoryProposalStore } from './memoryProposals'
 
-// MemoryService (docs/next/api/plugin-api.md §10). Read side is the derived SQLite index; the write
+// MemoryService (docs/public-api.md). Read side is the derived SQLite index; the write
 // side reuses the existing memory-file writer + proposal gate machinery so the public surface can't
 // bypass reconciliation. Injected with the knowledge store's proposal store + reconcile closure.
 

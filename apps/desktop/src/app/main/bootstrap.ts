@@ -65,7 +65,7 @@ export async function bootstrap({ dataDir, origin, createWindow }: BootstrapOpti
     if (disposed) return
     disposed = true
     try {
-      await apiServer?.stop() // stop the public automation listener first (docs/next/api §6)
+      await apiServer?.stop() // stop the public automation listener first (docs/public-api.md)
     } catch (e) {
       console.warn('[boot] automation API close failed:', e)
     }
@@ -158,7 +158,7 @@ export async function bootstrap({ dataDir, origin, createWindow }: BootstrapOpti
   server = await startListener(runtime)
   mark('listener-up')
 
-  // 4b. Start the public automation API listener (docs/next/api). Disabled by default; it binds only
+  // 4b. Start the public automation API listener (docs/public-api.md). Disabled by default; it binds only
   //     when settings/env enable it. Constructed after DB/services, before the window. A bind failure
   //     is logged and does not block the app.
   apiServer = new AutomationApiServer({

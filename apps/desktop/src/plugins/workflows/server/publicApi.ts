@@ -11,7 +11,7 @@ import {
 import { defineEndpoint, type PluginApiContribution } from '../../../core/server/publicApi/defineEndpoint'
 import type { WorkflowService } from '../main/workflowService'
 
-// Workflows plugin public API (docs/next/api/plugin-api.md §11). Base /plugins/workflows.
+// Workflows plugin public API (docs/public-api.md). Base /plugins/workflows.
 // Runs start by definitionId only. /triggers/evaluate is intentionally not exposed in v1 (no
 // standalone trigger-poller service to reuse yet — see the plugin docs).
 

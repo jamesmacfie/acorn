@@ -1,7 +1,7 @@
 import { z } from 'zod'
 import { IdSchema, PageQuerySchema, UnixMillisSchema } from './primitives'
 
-// Workflows plugin public schemas (docs/next/api/plugin-api.md §11). Runs/steps parse the durable
+// Workflows plugin public schemas (docs/public-api.md). Runs/steps parse the durable
 // JSON columns into typed values — never raw JSON strings.
 
 const RunStatus = z.enum(['running', 'gated', 'cancelling', 'done', 'failed', 'safety-rail', 'cancelled'])

@@ -12,7 +12,7 @@ import { dataResponse, errorResponse, noContentResponse, toPublicApiError } from
 import type { TokenService } from './tokenService'
 import { validateRequest, validateResponse } from './validate'
 
-// createAutomationApp — the public /api/v1 Hono app (docs/next/api/architecture.md §3.1). It has no
+// createAutomationApp — the public /api/v1 Hono app (docs/public-api.md). It has no
 // static files, OAuth, cookies, SPA fallback, or internal-token access: bearer → scope → validated
 // route table → standard error backstop. The registry snapshot is already frozen.
 

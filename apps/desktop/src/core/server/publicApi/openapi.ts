@@ -3,7 +3,7 @@ import { ErrorResponseSchema } from '../../shared/publicApi/errors'
 import type { AnyEndpoint } from './defineEndpoint'
 import type { RegistrySnapshot } from './registry'
 
-// Generate an OpenAPI 3.1 document from the frozen registry (docs/next/api/protocol.md §2). A thin
+// Generate an OpenAPI 3.1 document from the frozen registry (docs/public-api.md). A thin
 // generator over Zod 4's native z.toJSONSchema keeps the registry — not an OpenAPI-specific Hono
 // class — the product abstraction (implementation-plan.md Phase 0 §5).
 

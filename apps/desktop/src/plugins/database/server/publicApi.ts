@@ -18,7 +18,7 @@ import {
 import { NO_CONTENT, defineEndpoint, type PluginApiContribution } from '../../../core/server/publicApi/defineEndpoint'
 import type { DatabaseBridge } from './routes/database'
 
-// Database plugin public API (docs/next/api/plugin-api.md §13). Base /plugins/database/tasks/:taskId.
+// Database plugin public API (docs/public-api.md). Base /plugins/database/tasks/:taskId.
 // The bridge returns {error}/{ok:false} unions; here they become non-2xx domain errors. The
 // connection URL never leaves the server — only the database name is returned.
 

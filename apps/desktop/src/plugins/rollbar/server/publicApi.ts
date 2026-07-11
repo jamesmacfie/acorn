@@ -9,7 +9,7 @@ import { defineEndpoint, type PluginApiContribution } from '../../../core/server
 import type { RollbarItem } from '../../../core/shared/api'
 import type { RollbarResourceInput } from './provider'
 
-// Rollbar provider public API (docs/next/api/plugin-api.md §7). Base /plugins/rollbar. Reads go
+// Rollbar provider public API (docs/public-api.md). Base /plugins/rollbar. Reads go
 // through the shared provider-resource runtime (credential decrypt + mirror + budgets), so the
 // public and internal surfaces share one implementation.
 

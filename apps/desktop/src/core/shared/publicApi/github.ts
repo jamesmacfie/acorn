@@ -1,7 +1,7 @@
 import { z } from 'zod'
 import { BranchSchema, OwnerSchema, PageQuerySchema, RelativePathSchema, RepoNameSchema, UnixMillisSchema } from './primitives'
 
-// GitHub plugin public schemas (docs/next/api/plugin-api.md §4–§5). Acorn's stable projection of
+// GitHub plugin public schemas (docs/public-api.md). Acorn's stable projection of
 // mirrored GitHub data — never raw GitHub payloads.
 
 export const RepoSchema = z.strictObject({

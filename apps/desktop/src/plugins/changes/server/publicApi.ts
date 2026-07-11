@@ -15,7 +15,7 @@ import {
 import { defineEndpoint, type PluginApiContribution } from '../../../core/server/publicApi/defineEndpoint'
 import type { LocalGitService } from '../main/localGitService'
 
-// Changes (git) plugin public API (docs/next/api/terminal-git-files.md §7–§8). Base
+// Changes (git) plugin public API (docs/public-api.md). Base
 // /plugins/changes/tasks/:taskId/git. Thin adapters over LocalGitService.
 
 const PLUGIN = 'changes'

@@ -1,6 +1,6 @@
 import { z } from 'zod'
 
-// Shared strict primitives for the public /api/v1 surface (docs/next/api/protocol.md §3). Every
+// Shared strict primitives for the public /api/v1 surface (docs/public-api.md). Every
 // public object schema is a z.strictObject; strings/arrays/ints carry explicit bounds. Types are
 // always inferred from the schema, never declared separately.
 
@@ -23,7 +23,7 @@ export const PortSchema = z.number().int().min(1024).max(65535)
 export const EmptySchema = z.strictObject({})
 
 // A token is either read-only or read+write. write is never issued without read; a bare ['write'],
-// duplicates, or a different order are invalid (docs/next/api/authentication.md §2).
+// duplicates, or a different order are invalid (docs/public-api.md).
 export const ApiScopeSchema = z.enum(['read', 'write'])
 export const ApiScopesSchema = z.union([
   z.tuple([z.literal('read')]),
@@ -43,10 +43,10 @@ export const PageSchema = <T extends z.ZodTypeAny>(item: T) =>
     nextCursor: z.string().nullable(),
   })
 
-// X-Request-Id grammar (docs/next/api/protocol.md §6).
+// X-Request-Id grammar (docs/public-api.md).
 export const RequestIdSchema = z.string().regex(/^[A-Za-z0-9._:-]{1,128}$/)
 
-// Idempotency-Key grammar (docs/next/api/protocol.md §7): 1–128 printable ASCII, no surrounding
+// Idempotency-Key grammar (docs/public-api.md): 1–128 printable ASCII, no surrounding
 // whitespace.
 export const IdempotencyKeySchema = z
   .string()

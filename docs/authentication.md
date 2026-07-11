@@ -11,6 +11,10 @@ server exchanges the OAuth code for an access token and seals it into an
 encrypted cookie. **The token never reaches the browser** — only public profile fields
 do.
 
+> This doc covers the **internal** UI credentials (session cookie + loopback internal token). The
+> optional **public automation API** is a separate transport with its own bearer tokens — see
+> [API tokens](#api-tokens-public-automation-api) below and [public-api.md](./public-api.md).
+
 Source: `apps/desktop/src/core/server/routes/auth.ts`,
 `apps/desktop/src/core/server/session.ts`,
 `apps/desktop/src/core/server/middleware/auth.ts`,
@@ -138,6 +142,28 @@ can therefore read local mirrors and app-state, but any route that would call
 GitHub live fails with `401 reauth` (empty bearer). See
 [api-reference](./api-reference.md#middleware--auth) and [mcp](./mcp.md).
 
+## API tokens (public automation API)
+
+The optional [public automation API](./public-api.md) does not use the cookie or the internal token —
+it authenticates with **bearer API tokens** on its own loopback listener. This is a distinct principal
+kind (`api-token`) that never reaches the internal `/api/*` middleware.
+
+- **Format** `acorn_v1_<uuid>_<43-char base64url secret>`; only `SHA-256(secret)` is stored in
+  `api_tokens`, and the raw token is shown once. `TokenService.authenticate` (`core/server/publicApi/
+  tokenService.ts`) verifies with a constant-time hash compare and collapses every failure (missing /
+  malformed / unknown / expired / revoked / wrong-secret) to one `401` so it is not a token-status
+  oracle.
+- **Scopes** `read` or `read + write`; revocation is immediate and also closes the token's live
+  WebSockets.
+- **Issuance/revocation** are **cookie-authenticated** internal operations (`/api/api-tokens`,
+  `core/server/routes/apiTokens.ts`); a bearer cannot mint bearers.
+
+Because a bearer request carries no session cookie, the GitHub credential it needs for upstream calls
+is stored separately: **`/auth/callback` upserts the GitHub identity + token into `oauth_accounts`,
+encrypted at rest with `SESSION_ENC_KEY`** (via `encryptSecret`, the same mechanism as integration
+credentials). The public GitHub plugin resolves that credential for `api-token` principals. See
+[public-api.md](./public-api.md).
+
 ## WebSocket upgrade auth (`/ws`)
 
 The single stream socket (Phase 3, [electron §12](./electron.md)) reuses the same identity model at
@@ -145,7 +171,8 @@ the HTTP upgrade, checked in `main/wsHub.ts` **before** the handshake completes:
 **Host** guard, an **exact-Origin** match, and a valid **session cookie** — or the
 **`x-acorn-internal`** token (the loopback MCP caller, which carries no cookie/Origin). Any failure
 returns `403` and the socket is destroyed. Same cookie, same token, same single-user machine as the
-HTTP surface — no new credential kind.
+HTTP surface — no new credential kind. (The public API's WebSocket at `/api/v1/ws` is a separate,
+bearer-authenticated socket on the public listener — see [public-api.md](./public-api.md).)
 
 ## `GET /api/me`
 

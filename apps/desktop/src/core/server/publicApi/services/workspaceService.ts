@@ -16,7 +16,7 @@ import type {
   WorkspaceIconSchema,
 } from '../../../shared/publicApi/resources'
 
-// WorkspaceService (docs/next/api/implementation-plan.md Phase 4). The DB-level workspace domain
+// WorkspaceService (docs/public-api.md Phase 4). The DB-level workspace domain
 // shared by the public API. Returns the public Workspace shape (with timestamps). Behavior mirrors
 // core/server/routes/workspaces.ts so the two surfaces cannot drift.
 

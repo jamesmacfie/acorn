@@ -24,12 +24,12 @@ export type RuntimeBindings = {
   // (docs/mcp.md). Injected into task session env (ACORN_API_TOKEN) so agent-spawned servers
   // inherit it; auth middleware maps it to the machine's single user.
   INTERNAL_TOKEN: string
-  // Public automation API services (docs/next/api). Singletons so the internal admin routes (4317),
+  // Public automation API services (docs/public-api.md). Singletons so the internal admin routes (4317),
   // the public listener, and the WS hub share one TokenService instance — revocation listeners must
   // survive across requests.
   API_TOKENS: TokenService
   OAUTH_ACCOUNTS: OauthAccountService
-  // UI control broker (docs/next/api §3.4): one control connection per renderer window on the 4317
+  // UI control broker (docs/public-api.md): one control connection per renderer window on the 4317
   // socket; the public command dispatch crosses presentation commands through it.
   UI_BROKER: UiControlBroker
 }

@@ -20,7 +20,7 @@ import {
   type GitActionResult,
 } from './localDiff'
 
-// LocalGitService (docs/next/api/terminal-git-files.md §7–§8). The public git surface over a task's
+// LocalGitService (docs/public-api.md). The public git surface over a task's
 // confined worktree, built on the same pure functions the internal ChangesPane routes use — no
 // duplicated git logic. Every op resolves the worktree server-side; the caller never supplies a cwd.
 

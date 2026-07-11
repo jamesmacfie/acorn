@@ -60,7 +60,10 @@ cache, and per-task `worktrees/` — lives under one data root:
 
 Because the API and the app share an origin, the session is a plain same-origin
 cookie — no CORS, no bearer tokens in the browser, no token storage on the client
-at all. See [authentication](./authentication.md).
+at all. See [authentication](./authentication.md). (A separate, opt-in
+[public automation API](./public-api.md) runs a second `127.0.0.1` listener on
+its own port with bearer-token auth; it is disabled by default and does not
+change the SPA origin.)
 
 The HTTP API contract is mirrored into shared TypeScript, not a runtime RPC
 client. `apps/desktop/src/core/shared/api.ts` owns response types, route builders, and
@@ -150,6 +153,7 @@ These back the product model above and the agent spine:
 | Review | `review_notes` (inline notes on uncommitted changes), `viewed_files` |
 | Agents / memory | `memories` (+ `memories_fts` FTS5), `terminal_sessions` |
 | Automation | `workflow_runs`, `workflow_steps` |
+| Public API | `api_tokens`, `oauth_accounts`, `api_idempotency` (bearer automation API) |
 | Prefs / misc | `prefs`, `pinned_repos`, `integrations`, `repo_paths` |
 
 Locally-owned entities that own an on-disk artefact (a worktree, a memory file, a
@@ -310,4 +314,6 @@ projection itself is transport-neutral.
   stateless session cookie, CSRF protections, the 401 → reauth bounce.
 - [security](./security.md) — loopback threat model, authentication boundaries,
   filesystem containment, secret handling, and tool permissions.
+- [public-api](./public-api.md) — the opt-in bearer-authenticated HTTP + WebSocket
+  automation API: dedicated listener, token model, schema-first endpoints, OpenAPI.
 - [testing](./testing.md) — test suites, architecture checks, and validation commands.

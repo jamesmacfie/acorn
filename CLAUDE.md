@@ -49,7 +49,8 @@ app/process boundaries and a shrinking ledger of legacy cross-feature coupling a
   entry), `client/` (`index.tsx` renderer entry + contribution activation).
 - Detail docs: [docs/frontend.md](./docs/frontend.md), [docs/diff-rendering.md](./docs/diff-rendering.md),
   [docs/ui-design.md](./docs/ui-design.md), [docs/electron.md](./docs/electron.md),
-  [docs/api-reference.md](./docs/api-reference.md), [docs/authentication.md](./docs/authentication.md),
+  [docs/api-reference.md](./docs/api-reference.md), [docs/public-api.md](./docs/public-api.md),
+  [docs/authentication.md](./docs/authentication.md),
   [docs/github-integration.md](./docs/github-integration.md), [docs/data-layer.md](./docs/data-layer.md),
   [docs/caching.md](./docs/caching.md). (Some still cite pre-foldering paths; the tree above is authoritative.)
 - `apps/desktop/migrations/` — Drizzle-generated SQLite migrations (applied on startup + via `db:migrate`).

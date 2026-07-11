@@ -1,6 +1,6 @@
 import { z } from 'zod'
 
-// Preview plugin public schemas (docs/next/api/plugin-api.md §12). Never exposes a raw webContents
+// Preview plugin public schemas (docs/public-api.md). Never exposes a raw webContents
 // id, CDP handle, or bounds — those stay renderer-owned.
 
 export const PreviewConfigurationSchema = z.strictObject({

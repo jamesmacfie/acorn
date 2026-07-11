@@ -1,7 +1,7 @@
 import { z } from 'zod'
 import { ApiScopesSchema, IdSchema, PortSchema, UnixMillisSchema } from './primitives'
 
-// Core system + discovery + settings schemas (docs/next/api/core-api.md §2, §3). Shared so client
+// Core system + discovery + settings schemas (docs/public-api.md). Shared so client
 // tooling and tests infer the same types.
 
 export const HealthSchema = z.strictObject({

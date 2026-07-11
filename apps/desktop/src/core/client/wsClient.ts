@@ -15,7 +15,7 @@ const noticeSubs = new Set<NoticeCb>()
 const stepEventSubs = new Set<StepEventCb>()
 const outbox: WsClientFrame[] = [] // frames queued while the socket isn't OPEN
 
-// UI control broker (docs/next/api/commands-and-ui.md §4): the renderer registers a window, reports
+// UI control broker (docs/public-api.md): the renderer registers a window, reports
 // state snapshots, and executes ui:command frames the main broker forwards from public callers.
 export type UiCommandResult =
   | { ok: true; result: unknown; revision: number }

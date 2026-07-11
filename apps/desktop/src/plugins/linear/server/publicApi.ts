@@ -13,7 +13,7 @@ import {
 import { defineEndpoint, type PluginApiContribution } from '../../../core/server/publicApi/defineEndpoint'
 import type { LinearService } from './linearService'
 
-// Linear provider public API (docs/next/api/plugin-api.md §7). Base /plugins/linear.
+// Linear provider public API (docs/public-api.md). Base /plugins/linear.
 
 const PLUGIN = 'linear'
 

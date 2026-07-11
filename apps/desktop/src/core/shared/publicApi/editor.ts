@@ -1,7 +1,7 @@
 import { z } from 'zod'
 import { RelativePathSchema } from './primitives'
 
-// Editor + search plugin public schemas (docs/next/api/terminal-git-files.md §9–§10). All paths are
+// Editor + search plugin public schemas (docs/public-api.md). All paths are
 // worktree-relative and confined server-side.
 
 export const FileEntrySchema = z.strictObject({

@@ -1,6 +1,6 @@
 import { z } from 'zod'
 
-// Database plugin public schemas (docs/next/api/plugin-api.md §13). The connection URL stays
+// Database plugin public schemas (docs/public-api.md). The connection URL stays
 // server-only; only the database name is ever returned. Every SQL query is write-scoped.
 
 export const DbCellSchema = z.string().nullable()
