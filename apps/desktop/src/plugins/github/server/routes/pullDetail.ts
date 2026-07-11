@@ -3,13 +3,13 @@ import { Hono } from 'hono'
 import type { PullDetail } from '../../../../core/shared/api'
 import { getDb, schema } from '../../../../core/server/db'
 import { prResource } from '../../../../core/server/db/resourceKeys'
-import { ghGraphQL, ghGraphQLResult } from '..'
 import type { AppEnv } from '../../../../core/server/middleware/auth'
 import { getUser } from '../../../../core/server/middleware/requireUser'
 import { respondError } from '../../../../core/server/respond'
-import { type Cached, type RefreshResult, serveThenRevalidate } from '../../../../core/server/sync/engine'
+import { type Cached, serveThenRevalidate } from '../../../../core/server/sync/engine'
 import { PULLS_STALE_AFTER_MS } from '../../../../core/server/sync/policy'
-import { mirrorPr, PR_FRAGMENT, readComposite, type GqlPull } from './prMirror'
+import { readComposite } from './prMirror'
+import { refreshPullDetail } from './pullRefresh'
 import { resolveRepoForUser } from './repoMirror'
 
 // PR detail — the composite GraphQL read (docs/github-integration.md), the primary read for the
@@ -17,13 +17,6 @@ import { resolveRepoForUser } from './repoMirror'
 // freshness is a TTL gate in sync_state (`pr:<repoId>:<number>`); the mirror tables are the
 // cache. The mirror logic is shared with the batch route — see prMirror.ts. Files live in
 // pr_files, owned by /files.
-const COMPOSITE_QUERY = `
-query PR($owner: String!, $repo: String!, $number: Int!) {
-  repository(owner: $owner, name: $repo) {
-    pullRequest(number: $number) { ...PrFields }
-  }
-}${PR_FRAGMENT}`
-
 export const pullDetail = new Hono<AppEnv>().get('/:owner/:repo/pulls/:number', async (c) => {
   const user = getUser(c)
 
@@ -54,25 +47,16 @@ export const pullDetail = new Hono<AppEnv>().get('/:owner/:repo/pulls/:number', 
     return { data: composite, fetchedAt: sync.fetchedAt }
   }
 
-  const refresh = async (): Promise<RefreshResult> => {
-    const res = await ghGraphQL(user.token, COMPOSITE_QUERY, { owner, repo, number })
-    const result = await ghGraphQLResult<{ repository?: { pullRequest?: GqlPull | null } }>(res)
-    if (!result.ok) {
-      // A GraphQL error (200 + errors, data null) must not masquerade as a 404 — surface it.
-      if (result.kind === 'graphql') {
-        console.error('pullDetail GraphQL errors', JSON.stringify(result.messages))
-        return { ok: false, failure: { error: 'graphql', status: 502, detail: result.messages } }
-      }
-      return { ok: false, failure: result.failure }
-    }
-    const pr = result.data?.repository?.pullRequest
-    if (!pr) return { ok: false, failure: { error: 'pull_not_found', status: 404 } }
+  const refresh = () => refreshPullDetail(user.token, db, { userId, repoId, owner, repo, number })
 
-    await mirrorPr(db, key, pr, Date.now())
-    return { ok: true }
-  }
-
-  const result = await serveThenRevalidate({ resource, userId, ttlMs: PULLS_STALE_AFTER_MS, read, refresh })
+  const result = await serveThenRevalidate({
+    resource,
+    userId,
+    ttlMs: PULLS_STALE_AFTER_MS,
+    force: c.req.query('force') === 'true',
+    read,
+    refresh,
+  })
   if (!result.ok) return respondError(c, result.failure.status, result.failure.error, result.failure.detail)
   return c.json(result.value)
 })

@@ -177,6 +177,47 @@ describe('pull files stale-while-revalidate', () => {
     await settleBackground()
   })
 
+  it('force=true blocks on a refresh even when file metadata is fresh', async () => {
+    const fileRow = {
+      userId: 'james',
+      repoId: 19847,
+      number: 12,
+      path: 'src/app.ts',
+      status: 'modified',
+      additions: 3,
+      deletions: 1,
+      sha: 'abc123',
+    }
+    const freshSync = { userId: 'james', resource: 'files:19847:12', etag: null, fetchedAt: Date.now() }
+    const db = makePullFilesDb([
+      [{ id: 19847 }],
+      [freshSync],
+      [fileRow],
+      [],
+      [freshSync],
+      [fileRow],
+      [],
+    ])
+    vi.mocked(getDb).mockReturnValue(db)
+    vi.mocked(gh).mockResolvedValueOnce(
+      responseJson([{ filename: 'src/app.ts', status: 'modified', additions: 3, deletions: 1, sha: 'abc123', patch: '@@' }]),
+    )
+
+    const app = new Hono<AppEnv>()
+    app.use('/api/*', async (c, next) => {
+      c.set('principal', { kind: 'user', user: { token: 'token', login: 'james', name: '', avatar: '', scopes: [] } })
+      await next()
+    })
+    app.route('/api/repos', pullFiles)
+    const response = await app.fetch(
+      new Request('http://acorn.test/api/repos/Runn-Fast/runn/pulls/12/files?force=true'),
+      { BLOBS: { get: vi.fn(async () => '@@'), put: vi.fn(async () => undefined) } } as unknown as Env,
+    )
+
+    expect(response.status).toBe(200)
+    expect(gh).toHaveBeenCalledWith('token', '/repos/Runn-Fast/runn/pulls/12/files?per_page=100')
+  })
+
   it('returns stale requested patches in request order and refreshes in the background', async () => {
     const rowA = {
       userId: 'james',

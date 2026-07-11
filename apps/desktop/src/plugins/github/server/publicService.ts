@@ -1,6 +1,7 @@
 import { type AnyColumn, and, eq, inArray } from 'drizzle-orm'
 import type { z } from 'zod'
 import { type AppDatabase, schema } from '../../../core/server/db'
+import type { RefreshResult, RouteFailure } from '../../../core/server/sync/engine'
 import { PublicApiError } from '../../../core/shared/publicApi/errors'
 import type {
   ActionJobsSchema,
@@ -13,7 +14,9 @@ import type {
   RepoSchema,
 } from '../../../core/shared/publicApi/github'
 import { gh, ghError, ghGraphQL } from '.'
-import { refreshRepos } from './routes/repoMirror'
+import { refreshOpenPulls, refreshPullWithFiles, type PullRefreshKey } from './routes/pullRefresh'
+import { refreshRepos, resolveRepoForUser } from './routes/repoMirror'
+import type { PatchBlobStore } from './routes/prMirror'
 
 // GitHub public service (docs/public-api.md). Reads project the local mirror tables
 // (Acorn's stable projection, never raw GitHub). Mutations resolve the encrypted OAuth credential
@@ -27,7 +30,7 @@ type Comment = z.infer<typeof CommentSchema>
 
 export type GitHubPublicDeps = {
   db: AppDatabase
-  blobs: { get(key: string): Promise<string | null> }
+  blobs: PatchBlobStore
   resolveToken: (userId: string) => Promise<string | null>
 }
 
@@ -37,6 +40,15 @@ function upstreamError(status: number, message: string): PublicApiError {
   if (status === 429) return new PublicApiError('upstream_rate_limited', message)
   if (status === 403) return new PublicApiError('operation_forbidden', message)
   return new PublicApiError('provider_unavailable', message)
+}
+
+function refreshError(failure: RouteFailure): PublicApiError {
+  if (failure.status === 404) return new PublicApiError('not_found', failure.error === 'pull_not_found' ? 'Pull request not found' : 'Repository not found')
+  return upstreamError(failure.status, `GitHub refresh failed: ${failure.error}`)
+}
+
+function requireRefreshSuccess(result: RefreshResult): void {
+  if (!result.ok) throw refreshError(result.failure)
 }
 
 export class GitHubPublicService {
@@ -166,6 +178,13 @@ export class GitHubPublicService {
     const token = await this.deps.resolveToken(userId)
     if (!token) throw new PublicApiError('upstream_reauthentication_required', 'No stored GitHub credential; reauthenticate in Acorn', { details: { provider: 'github' } })
     return token
+  }
+
+  private async refreshKey(userId: string, owner: string, repo: string): Promise<{ token: string; key: PullRefreshKey }> {
+    const token = await this.token(userId)
+    const resolved = await resolveRepoForUser(this.deps.db, token, userId, owner, repo)
+    if (!resolved.ok) throw refreshError(resolved.failure)
+    return { token, key: { userId, repoId: resolved.value.repoId, owner, repo } }
   }
 
   private async ghJson<T>(userId: string, path: string, init?: RequestInit): Promise<T> {
@@ -310,11 +329,24 @@ export class GitHubPublicService {
   async refreshRepos(userId: string): Promise<Repo[]> {
     const token = await this.token(userId)
     try {
-      await refreshRepos(token, this.deps.db, userId)
+      requireRefreshSuccess(await refreshRepos(token, this.deps.db, userId))
     } catch (e) {
+      if (e instanceof PublicApiError) throw e
       throw upstreamError(500, e instanceof Error ? e.message : 'repo refresh failed')
     }
     return this.repos(userId)
+  }
+
+  async refreshPulls(userId: string, owner: string, repo: string): Promise<{ refreshed: true }> {
+    const { token, key } = await this.refreshKey(userId, owner, repo)
+    requireRefreshSuccess(await refreshOpenPulls(token, this.deps.db, key))
+    return { refreshed: true }
+  }
+
+  async refreshPull(userId: string, owner: string, repo: string, number: number): Promise<{ refreshed: true }> {
+    const { token, key } = await this.refreshKey(userId, owner, repo)
+    requireRefreshSuccess(await refreshPullWithFiles(token, this.deps.db, this.deps.blobs, { ...key, number }))
+    return { refreshed: true }
   }
 
   async branches(userId: string, owner: string, repo: string): Promise<{ name: string }[]> {

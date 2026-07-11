@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { closedPullsInfiniteOptions, compareOptions, fetchFilePatches, filePatchOptions, fileSummariesOptions, filesOptions, meOptions, reposOptions } from './queries'
+import { closedPullsInfiniteOptions, compareOptions, fetchFilePatches, filePatchOptions, fileSummariesOptions, filesOptions, forceRefreshPull, meOptions, reposOptions } from './queries'
 
 const jsonResponse = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), {
@@ -51,6 +51,16 @@ describe('client query options', () => {
 
     expect(fetchMock).toHaveBeenNthCalledWith(1, '/api/repos/acorn/web/compare?base=main&head=feature', { signal })
     expect(fetchMock).toHaveBeenNthCalledWith(2, '/api/repos/acorn/web/pulls/42/files', { signal })
+  })
+
+  it('force-refreshes PR detail and changed files together', async () => {
+    const detail = { pull: null, labels: [], reviews: [], requestedReviewers: [], comments: [], commits: [], checks: [], threads: [] }
+    const fetchMock = vi.fn().mockResolvedValueOnce(jsonResponse(detail)).mockResolvedValueOnce(jsonResponse([]))
+    vi.stubGlobal('fetch', fetchMock)
+
+    await expect(forceRefreshPull('acorn', 'web', '42')).resolves.toEqual({ detail, files: [] })
+    expect(fetchMock).toHaveBeenNthCalledWith(1, '/api/repos/acorn/web/pulls/42?force=true', {})
+    expect(fetchMock).toHaveBeenNthCalledWith(2, '/api/repos/acorn/web/pulls/42/files?force=true', {})
   })
 
   it('fetches file summaries and a single patch through distinct cache entries', async () => {

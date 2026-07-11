@@ -36,7 +36,7 @@ import { buildWorkflowsPublicApi } from '../../plugins/workflows/server/publicAp
 export type PublicApiPluginDeps = {
   db: AppDatabase
   encKey: string
-  blobs: { get(key: string): Promise<string | null> }
+  blobs: { get(key: string): Promise<string | null>; put(key: string, value: string): Promise<void> }
   resolveGithubToken: (userId: string) => Promise<string | null>
   notesStore: NotesStore
   memoryProposals: MemoryProposalStore

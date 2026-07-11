@@ -305,9 +305,11 @@ export const fetchFiles = async (token: string, owner: string, repo: string, num
 // Re-mirror one PR's files: patch bodies → on-disk BLOBS by immutable sha (deduped, cached
 // forever — see server/blobs.ts); only the metadata rows go to the DB. Bodies resolve back from
 // BLOBS on read.
-export const mirrorFiles = async (env: Env, db: Db, key: PrKey, body: GitHubFile[]) => {
+export type PatchBlobStore = Pick<Env['BLOBS'], 'get' | 'put'>
+
+export const mirrorFiles = async (blobs: PatchBlobStore, db: Db, key: PrKey, body: GitHubFile[]) => {
   const now = Date.now()
-  await Promise.all(body.filter((f) => f.patch != null).map((f) => env.BLOBS.put(patchBlobKey(f.sha), f.patch as string)))
+  await Promise.all(body.filter((f) => f.patch != null).map((f) => blobs.put(patchBlobKey(f.sha), f.patch as string)))
   const rows = body.map((f) => ({
     ...key,
     path: f.filename,
