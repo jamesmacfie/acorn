@@ -21,7 +21,7 @@ export type RunBridge = {
 
 const bridges: { run: RunBridge | null } = { run: null }
 export const setRunBridge = (b: RunBridge | null): void => void (bridges.run = b)
-// Accessor for the public terminal plugin's run-target endpoints (docs/next/api §6).
+// Accessor for the public terminal plugin's run-target endpoints (docs/public-api.md).
 export const getRunBridge = (): RunBridge | null => bridges.run
 
 // ─── Typed errors (docs/api-reference.md): domain failures are NOT 503s ─────────────────────────

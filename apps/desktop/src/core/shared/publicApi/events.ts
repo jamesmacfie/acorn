@@ -1,7 +1,7 @@
 import { z } from 'zod'
 import { IdSchema, UnixMillisSchema } from './primitives'
 
-// Public WebSocket protocol (docs/next/api/events.md §2–§8). Strict frames; unknown types/fields
+// Public WebSocket protocol (docs/public-api.md). Strict frames; unknown types/fields
 // produce a correlated error frame. This is distinct from the internal renderer socket.
 
 export const ClientBaseSchema = z.strictObject({

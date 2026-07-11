@@ -24,7 +24,7 @@ function publicSession(s: TerminalSession): Record<string, unknown> {
   }
 }
 
-// Public bearer WebSocket hub (docs/next/api/events.md). Attached to the automation listener's
+// Public bearer WebSocket hub (docs/public-api.md). Attached to the automation listener's
 // 'upgrade' event so it shares the loopback listener + Host guard. Distinct from the internal
 // renderer socket. Connections are indexed by token id so revocation closes them synchronously.
 

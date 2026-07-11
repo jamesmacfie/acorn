@@ -536,10 +536,10 @@ export const issues = sqliteTable(
   (t) => [primaryKey({ columns: [t.userId, t.integrationId, t.identifier] })],
 )
 
-// --- Public automation API (docs/next/api). Machine-scoped auth for the bearer-authenticated
+// --- Public automation API (docs/public-api.md). Machine-scoped auth for the bearer-authenticated
 // /api/v1 listener; distinct from the browser session cookie. ---
 
-// Bearer API tokens (docs/next/api/authentication.md §3). The raw token is shown once at creation;
+// Bearer API tokens (docs/public-api.md). The raw token is shown once at creation;
 // only SHA-256(secret) is stored. userId links the bearer to the OAuth account at issuance (login
 // switch semantics), not a tenancy boundary.
 export const apiTokens = sqliteTable(
@@ -559,7 +559,7 @@ export const apiTokens = sqliteTable(
   (t) => [index('api_tokens_user_created_idx').on(t.userId, t.createdAt), index('api_tokens_active_idx').on(t.id, t.revokedAt)],
 )
 
-// Encrypted upstream identity (docs/next/api/authentication.md §7). Persisted on every successful
+// Encrypted upstream identity (docs/public-api.md). Persisted on every successful
 // GitHub /auth/callback so a bearer request (which carries no cookie) can still call GitHub. The
 // access token is JWE-encrypted with SESSION_ENC_KEY (session.ts encryptSecret).
 export const oauthAccounts = sqliteTable('oauth_accounts', {
@@ -573,7 +573,7 @@ export const oauthAccounts = sqliteTable('oauth_accounts', {
   updatedAt: integer('updated_at').notNull(),
 })
 
-// Idempotency replay store (docs/next/api/protocol.md §7). A retried mutation with the same
+// Idempotency replay store (docs/public-api.md). A retried mutation with the same
 // (token, operation, key) + request hash returns the stored response; a different hash is a
 // 409 idempotency_conflict. Rows expire after 24h and are swept by a maintenance path.
 export const apiIdempotency = sqliteTable(
@@ -591,7 +591,7 @@ export const apiIdempotency = sqliteTable(
   (t) => [primaryKey({ columns: [t.tokenId, t.operationId, t.key] }), index('api_idempotency_expiry_idx').on(t.expiresAt)],
 )
 
-// Captured command executions (docs/next/api/terminal-git-files.md §4). Terminal-plugin-owned but
+// Captured command executions (docs/public-api.md). Terminal-plugin-owned but
 // the migration lives in the one app migration set. Bounded stdout/stderr so an HTTP client can
 // reconnect after an app restart; a 24h record with capped output.
 export const commandExecutions = sqliteTable(

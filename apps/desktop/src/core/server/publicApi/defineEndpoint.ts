@@ -2,7 +2,7 @@ import type { z } from 'zod'
 import type { ApiScope, ApiScopes } from '../../shared/publicApi/primitives'
 import type { ApiTokenPrincipal } from './tokenService'
 
-// Schema-first endpoint/command/event contracts for the public API (docs/next/api/plugin-api.md §2,
+// Schema-first endpoint/command/event contracts for the public API (docs/public-api.md,
 // protocol.md §2). Handlers are thin: they validate nothing themselves and call an application
 // service. Types are inferred from the Zod schemas, never declared and asserted.
 
@@ -117,7 +117,7 @@ export function defineEndpoint<
   return def as unknown as AnyEndpoint
 }
 
-// ---- Events (docs/next/api/events.md §5) ----
+// ---- Events (docs/public-api.md) ----
 
 export type EventContribution = {
   pluginId: string
@@ -135,7 +135,7 @@ export function defineEvent(def: EventContribution): EventContribution {
 
 export type CommandCategory = 'navigation' | 'workspace' | 'task' | 'pane' | 'terminal' | 'editor' | 'action'
 
-// A typed command contribution (docs/next/api/commands-and-ui.md §2). Presentation commands are
+// A typed command contribution (docs/public-api.md). Presentation commands are
 // 'renderer'-target and run through the UI control broker; 'service'-target commands run inline.
 export type CommandContribution = {
   id: string

@@ -24,7 +24,7 @@ import {
 import { NO_CONTENT, defineEndpoint, type PluginApiContribution } from './defineEndpoint'
 import type { Integration } from '../../shared/api'
 
-// Core integration connection lifecycle (docs/next/api/plugin-api.md §6). Connections are core
+// Core integration connection lifecycle (docs/public-api.md). Connections are core
 // resources because core encrypts credentials; provider plugins only validate and use them.
 // Reuses the existing connections service so the public and internal surfaces can't drift.
 

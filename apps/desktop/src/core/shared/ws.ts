@@ -10,7 +10,7 @@ import type { ServerMsg } from './terminal'
 export const WS_PATH = '/ws'
 
 // Renderer → server. Keystrokes into a PTY and attach/detach (subscribe + ring replay); plus the
-// UI-control-broker registration/state/result frames (docs/next/api/commands-and-ui.md §4).
+// UI-control-broker registration/state/result frames (docs/public-api.md).
 export type WsClientFrame =
   | { channel: 'term:input'; id: string; data: string }
   | { channel: 'term:attach'; id: string }

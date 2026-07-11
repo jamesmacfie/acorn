@@ -1,7 +1,7 @@
 import { z } from 'zod'
 import { IdSchema, PageQuerySchema, UnixMillisSchema } from './primitives'
 
-// Memory plugin public schemas (docs/next/api/plugin-api.md §10).
+// Memory plugin public schemas (docs/public-api.md).
 
 export const MemorySummarySchema = z.strictObject({
   id: z.string(),

@@ -3,7 +3,7 @@ import { and, eq } from 'drizzle-orm'
 import type { AppDatabase } from '../db'
 import { schema } from '../db'
 
-// Idempotency replay (docs/next/api/protocol.md §7). Stores (tokenId, operationId, key) → request
+// Idempotency replay (docs/public-api.md). Stores (tokenId, operationId, key) → request
 // hash + response for 24h. Same request replays the stored response; a different request under the
 // same key is a conflict. 5xx responses are never cached.
 

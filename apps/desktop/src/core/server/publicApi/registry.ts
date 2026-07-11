@@ -1,7 +1,7 @@
 import type { z } from 'zod'
 import type { AnyEndpoint, CommandContribution, EventContribution, HttpMethod, PluginApiContribution } from './defineEndpoint'
 
-// The AutomationApiRegistry (docs/next/api/architecture.md §3.2). Contributions register during
+// The AutomationApiRegistry (docs/public-api.md). Contributions register during
 // composition; freeze() returns an immutable snapshot that the app + OpenAPI + conformance tests
 // read. Invalid contributions cannot freeze — the invariants in plugin-api.md §3 are enforced here,
 // not per-route.

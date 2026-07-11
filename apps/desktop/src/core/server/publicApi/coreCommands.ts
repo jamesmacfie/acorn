@@ -12,7 +12,7 @@ import {
 import { defineCommand, defineEndpoint, type CommandCategory, type CommandContribution, type PluginApiContribution, type PublicOperationContext } from './defineEndpoint'
 import type { RegistrySnapshot } from './registry'
 
-// Core typed commands + discovery/invocation (docs/next/api/commands-and-ui.md §3, §6). The registry
+// Core typed commands + discovery/invocation (docs/public-api.md). The registry
 // + discovery is fully server-side; invoking a presentation ('renderer') command needs the live UI
 // control broker. Until the broker + renderer registration land, renderer commands return
 // 409 ui_unavailable — discovery still works and the contract is stable.

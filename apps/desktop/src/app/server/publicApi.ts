@@ -28,7 +28,7 @@ import { buildRunTargetsContribution } from '../../plugins/terminal/server/runTa
 import { WorkflowService, type WorkflowRunnerLike } from '../../plugins/workflows/main/workflowService'
 import { buildWorkflowsPublicApi } from '../../plugins/workflows/server/publicApi'
 
-// Composition leaf for built-in public API plugin contributions (docs/next/api/implementation-plan.md
+// Composition leaf for built-in public API plugin contributions (docs/public-api.md
 // §1). The main composition root constructs the plugin services and calls this to assemble the
 // contribution list handed to AutomationApiServer. Core owns the registry/transport; plugins own
 // their resources.

@@ -3,7 +3,7 @@ import { z } from 'zod'
 import { ERROR_STATUS, type ErrorResponse, PublicApiError, type ValidationIssue } from '../../shared/publicApi/errors'
 import type { PublicAppEnv } from './context'
 
-// Success + error envelope construction (docs/next/api/protocol.md §5). The single place that turns
+// Success + error envelope construction (docs/public-api.md). The single place that turns
 // a domain result or a PublicApiError into a wire response, so the shape is uniform everywhere.
 
 export const DataResponseSchema = <T extends z.ZodTypeAny>(data: T) =>

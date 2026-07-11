@@ -35,7 +35,7 @@ export function createApp() {
     .use('/api/*', authMiddleware) // resolve ctx.principal from cookie or internal token
     .use('/api/*', requireUser) // single 401 gate over the protected router table
     .route('/api/me', me)
-    .route('/api/api-tokens', apiTokens) // cookie-auth admin of public API bearer tokens (docs/next/api)
+    .route('/api/api-tokens', apiTokens) // cookie-auth admin of public API bearer tokens (docs/public-api.md)
     .route('/api/settings/api', apiSettings) // cookie-auth view of the machine API listener settings
     .route('/api/pins', pins)
     .route('/api/prefs', prefs)

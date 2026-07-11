@@ -7,7 +7,7 @@ import { NO_CONTENT, defineEndpoint, type AnyEndpoint, type PluginApiContributio
 import type { NoteKind, NoteLocation } from '../../../core/shared/notes'
 import type { NotesStore } from '../main/notes'
 
-// Notes plugin public API (docs/next/api/plugin-api.md §10). One collection per scope
+// Notes plugin public API (docs/public-api.md). One collection per scope
 // (global / workspace / task). `version` is sha256(body) for optimistic writes. The NotesStore is
 // injected by the composition root, so this adapter has no filesystem knowledge of its own.
 

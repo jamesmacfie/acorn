@@ -1,10 +1,14 @@
 # API Reference
 
-The server's complete HTTP surface. One Hono app (`apps/desktop/src/core/server/index.ts`, a
-`createApp()` factory) serves both `/auth/*` and `/api/*`, hosted in-process by `@hono/node-server`
-on `http://127.0.0.1:4317`. The Electron main process (`apps/desktop/src/core/main/server.ts`) wraps it
-with static-asset serving + SPA fallback. See [architecture-overview](./architecture-overview.md)
-and [electron](./electron.md).
+The server's complete **internal** HTTP surface — the cookie-authenticated `/api/*` transport the SPA
+uses. One Hono app (`apps/desktop/src/core/server/index.ts`, a `createApp()` factory) serves both
+`/auth/*` and `/api/*`, hosted in-process by `@hono/node-server` on `http://127.0.0.1:4317`. The
+Electron main process (`apps/desktop/src/core/main/server.ts`) wraps it with static-asset serving +
+SPA fallback. See [architecture-overview](./architecture-overview.md) and [electron](./electron.md).
+
+> **Not the public API.** The opt-in bearer-authenticated **automation API** (`/api/v1`, a separate
+> loopback listener) is documented in [public-api.md](./public-api.md). This doc is the internal,
+> same-origin, cookie/CSRF surface only.
 
 > **History:** acorn began as a Cloudflare Worker; the HTTP surface carried over unchanged when it
 > migrated to Electron. Some inline code comments still say "the Worker" / "D1 / KV" — read those as

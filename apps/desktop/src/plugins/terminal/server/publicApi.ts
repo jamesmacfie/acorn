@@ -29,7 +29,7 @@ import type { TerminalProfilesService } from '../main/profilesService'
 import type { TerminalSessionService } from '../main/sessionService'
 import type { WorktreeService } from '../main/worktreeService'
 
-// Terminal plugin public API (docs/next/api/terminal-git-files.md §4–§5). Base /plugins/terminal.
+// Terminal plugin public API (docs/public-api.md). Base /plugins/terminal.
 // Captured executions + worktree lifecycle. Interactive sessions + PTY streaming and run-targets are
 // a separate, still-to-land surface.
 

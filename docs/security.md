@@ -16,6 +16,22 @@ Electron capabilities to the renderer.
   the per-app-run `INTERNAL_TOKEN`; the token maps to the machine user but carries no GitHub token.
 - The WebSocket upgrade rechecks Host, Origin, and either the session cookie or internal token.
 
+## Public automation API
+
+The optional [public automation API](./public-api.md) is a **separate loopback listener** (its own
+port, `127.0.0.1`-only, Host-guarded before Hono) so its port is independent of the SPA origin. It is
+**disabled by default** and exposes nothing until a token is minted.
+
+- Every route and the WebSocket upgrade require a **bearer token**; the public app rejects cookie and
+  internal-token auth. Tokens are stored only as `SHA-256(secret)`, shown once, and revocable with
+  immediate effect (next HTTP call `401`; live sockets closed).
+- Two scopes only: `read` and `read + write`. **A `write` token can run arbitrary commands, edit
+  files, and mutate Git/GitHub as the local user** — the Settings page states this explicitly, and it
+  is the single highest-impact capability in the app. Loopback-only bind, show-once random secret, no
+  request-body/command logging, and immediate revocation are the mitigations.
+- Token issuance is a cookie-authenticated interactive ceremony; a bearer cannot mint bearers. The
+  GitHub credential a bearer needs is stored encrypted in `oauth_accounts` (never returned).
+
 ## Renderer and Electron
 
 The window uses context isolation and a sandboxed preload; raw `ipcRenderer` is never exposed.
@@ -69,5 +85,5 @@ are never silently resumed after approval.
 
 Security-relevant source: `core/main/server.ts`, `core/main/preload.ts`,
 `core/main/sessionKeyStore.ts`, `core/main/repoConfigTrust.ts`, `core/server/index.ts`,
-`core/server/middleware/`, `core/server/agentTools/`, and feature route validators under
-`plugins/*/server/routes/`.
+`core/server/middleware/`, `core/server/agentTools/`, feature route validators under
+`plugins/*/server/routes/`, and the public API under `core/{server,main}/publicApi/`.

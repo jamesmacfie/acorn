@@ -1,7 +1,7 @@
 import { z } from 'zod'
 import { BranchSchema, IdSchema, OwnerSchema, PageQuerySchema, RelativePathSchema, RepoNameSchema, UnixMillisSchema } from './primitives'
 
-// Core resource schemas (docs/next/api/core-api.md §1, §5–§8). Workspaces, tasks, links, repository
+// Core resource schemas (docs/public-api.md). Workspaces, tasks, links, repository
 // assignments, and pinned repositories.
 
 export const WorkspaceIconSchema = z.discriminatedUnion('kind', [

@@ -14,7 +14,7 @@ import {
 import { defineEndpoint, type PluginApiContribution } from '../../../core/server/publicApi/defineEndpoint'
 import type { MemoryService } from '../main/memoryService'
 
-// Memory plugin public API (docs/next/api/plugin-api.md §10). Base /plugins/memory.
+// Memory plugin public API (docs/public-api.md). Base /plugins/memory.
 
 const PLUGIN = 'memory'
 

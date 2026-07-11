@@ -4,7 +4,7 @@ import { getRepoPath, setRepoPath, setRunTargets } from '../../../core/main/repo
 import { PublicApiError } from '../../../core/shared/publicApi/errors'
 import type { RepoPathSchema, RunTargetSchema } from '../../../core/shared/publicApi/terminal'
 
-// Repository checkout mapping + run targets (docs/next/api/terminal-git-files.md §5, §6). Reuses the
+// Repository checkout mapping + run targets (docs/public-api.md). Reuses the
 // repoPaths store: setRepoPath validates that the path is a Git checkout of the named remote repo.
 
 type RepoPath = z.infer<typeof RepoPathSchema>

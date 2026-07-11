@@ -3,7 +3,7 @@ import { join } from 'node:path'
 import { z } from 'zod'
 import { PortSchema } from '../../shared/publicApi/primitives'
 
-// Machine-scoped bootstrap settings for the public listener (docs/next/api/core-api.md §3). Stored
+// Machine-scoped bootstrap settings for the public listener (docs/public-api.md). Stored
 // as an atomic JSON file under the data root because the port must be known before any GitHub user
 // is logged in and before the listener starts. Never a GitHub-user pref.
 

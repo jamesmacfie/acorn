@@ -7,7 +7,7 @@ import { taskRoot } from '../../../core/main/taskWorktree'
 import { PublicApiError } from '../../../core/shared/publicApi/errors'
 import type { CreateExecutionSchema, ExecutionSchema } from '../../../core/shared/publicApi/terminal'
 
-// Captured command executions (docs/next/api/terminal-git-files.md §4). A bounded, queryable command
+// Captured command executions (docs/public-api.md). A bounded, queryable command
 // result for headless automation. Runs a shell-shaped command in the task's confined worktree with
 // a timeout + output cap; Acorn secrets are stripped from the inherited environment (§1).
 

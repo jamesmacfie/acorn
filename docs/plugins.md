@@ -32,7 +32,8 @@ an edge requires removing its baseline entry.
 | Commands / keybindings | `core/client/registries/{commands,keybindings}.tsx` | `app/client/activate.ts` |
 | Settings pages | `core/client/registries/settings.ts` | `app/client/pageContributions.tsx` |
 | UI slots, notices, pollers, themes | `core/client/registries/` | `app/client/activate.ts` |
-| HTTP routes | `core/server/routeRegistry.ts` | `app/server/routes.ts` |
+| HTTP routes (internal) | `core/server/routeRegistry.ts` | `app/server/routes.ts` |
+| Public API endpoints | `core/server/publicApi/` (schema-first `PluginApiContribution`) | `app/server/publicApi.ts` |
 | Integration providers | `core/server/integrations/registry.ts` | `app/server/providers.ts` |
 | Agent tools and context | `core/server/agentTools/` | `app/main/{agentToolsWiring,contextSectionsWiring}.ts` |
 | Agent profiles | `core/main/agentProfiles/` | `app/main/agentProfiles.ts` |
@@ -42,6 +43,11 @@ Registries reject duplicate identifiers. Server route contributions must stay un
 the core app applies CSRF, principal resolution, and `requireUser` before mounting contributed
 routers. Main-process services are injected before the listener accepts requests, so a route either
 has its capability or returns the standard `bridge-unavailable` error.
+
+A plugin may also contribute to the opt-in [public automation API](./public-api.md): a schema-first
+`PluginApiContribution` mounted under `/api/v1/plugins/<pluginId>`, whose Zod schemas are validated at
+runtime and generate OpenAPI. The registry `freeze()` enforces namespace, scope, and strict-schema
+invariants, so a malformed contribution cannot mount. See `plugins/<name>/server/publicApi.ts`.
 
 ## Adding a feature
 

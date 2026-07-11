@@ -11,7 +11,7 @@ import {
 } from '../tasks/tasks'
 import type { LayoutAction, PaneId } from '../tasks/layout'
 
-// UI control client (docs/next/api/commands-and-ui.md §2, §4). The renderer half of the broker: it
+// UI control client (docs/public-api.md). The renderer half of the broker: it
 // registers this window, maps public command ids + input to the existing layout/task reducers, and
 // reports presentation snapshots. Presentation state stays owned by the reducers — this is only the
 // crossing. Commands not yet mapped return command_unavailable (their reducer wiring is additive).

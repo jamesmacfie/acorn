@@ -17,7 +17,7 @@ import type {
   TaskStatusSchema,
 } from '../../../shared/publicApi/resources'
 
-// TaskService (docs/next/api/implementation-plan.md Phase 4). DB-level task domain returning the
+// TaskService (docs/public-api.md Phase 4). DB-level task domain returning the
 // public Task shape. Worktree creation, accurate status, and archive teardown live in the main
 // process; they are reached through an optional injected hook so this service stays runnable
 // headlessly (lazy-worktree creation + simple archive always work).

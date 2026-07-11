@@ -1,7 +1,7 @@
 import { z } from 'zod'
 import { UnixMillisSchema } from './primitives'
 
-// Notes plugin public schemas (docs/next/api/plugin-api.md §10). `version` is a content hash used
+// Notes plugin public schemas (docs/public-api.md). `version` is a content hash used
 // for optimistic writes.
 
 export const NoteSummarySchema = z.strictObject({

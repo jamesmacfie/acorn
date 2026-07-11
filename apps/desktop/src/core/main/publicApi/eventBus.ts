@@ -1,6 +1,6 @@
 import type { EventPublisher } from '../../server/publicApi/defineEndpoint'
 
-// Typed in-process event bus + bounded replay ring (docs/next/api/events.md §4). Endpoint handlers
+// Typed in-process event bus + bounded replay ring (docs/public-api.md). Endpoint handlers
 // publish through the EventPublisher after a commit; the public WS hub subscribes and replays.
 // Sequence is monotonic within one app run.
 

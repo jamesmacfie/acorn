@@ -33,7 +33,7 @@ import { buildWorkflowsPublicApi } from '../../src/plugins/workflows/server/publ
 import { makeTestDb, type TestDb } from '../../src/core/server/routes/testDb'
 import { fillPath, makeHarness, type Harness } from './harness'
 
-// Shared conformance suite (docs/next/api/implementation-plan.md §12 "Route conformance"). Cases are
+// Shared conformance suite (docs/public-api.md "Route conformance"). Cases are
 // generated from the frozen registry, so every endpoint — core and every built-in plugin — is
 // exercised for auth-gating, scope, and OpenAPI presence without a bespoke test.
 

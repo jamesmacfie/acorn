@@ -5,7 +5,7 @@ import { RequestIdSchema } from '../../shared/publicApi/primitives'
 import type { PublicAppEnv } from './context'
 import type { TokenService } from './tokenService'
 
-// Public request middleware (docs/next/api/authentication.md §5, §8). Order: request id → Host
+// Public request middleware (docs/public-api.md). Order: request id → Host
 // guard → bearer. All three run before any endpoint handler.
 
 const WWW_AUTH_INVALID = 'Bearer realm="acorn", error="invalid_token"'

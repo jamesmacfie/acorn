@@ -24,7 +24,7 @@ import {
 import { linearNodeToDetail, linearProvider, linearSummaryOf } from './provider'
 import type { LinearIssueDetail } from '../../../core/shared/api'
 
-// LinearService (docs/next/api/plugin-api.md §7). Reuses the internal route's GraphQL helpers +
+// LinearService (docs/public-api.md). Reuses the internal route's GraphQL helpers +
 // provider runtime so the public and internal surfaces share one implementation. A bare identifier
 // is resolved across all connected Linear workspaces (first hit wins).
 

@@ -1,7 +1,7 @@
 import { z } from 'zod'
 import { IdSchema, PageQuerySchema, UnixMillisSchema } from './primitives'
 
-// Rollbar provider public schemas (docs/next/api/plugin-api.md §7). Read-only — the shipped Rollbar
+// Rollbar provider public schemas (docs/public-api.md). Read-only — the shipped Rollbar
 // pane has no write action, so none is invented for v1.
 
 export const RollbarItemSchema = z.strictObject({

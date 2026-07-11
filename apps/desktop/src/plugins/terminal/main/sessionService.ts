@@ -12,7 +12,7 @@ import type {
 } from '../../../core/shared/publicApi/terminal'
 import { terminalBridgeSlot } from '../server/routes/terminal'
 
-// Interactive terminal sessions (docs/next/api/terminal-git-files.md §3). Thin adapter over the
+// Interactive terminal sessions (docs/public-api.md). Thin adapter over the
 // engine's TerminalBridge (the same one the internal routes use). Raw commands are never exposed —
 // only the profile/title label. Streaming stays on the WebSocket; this is the resource surface.
 

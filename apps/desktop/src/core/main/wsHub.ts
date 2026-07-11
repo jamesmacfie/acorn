@@ -28,7 +28,7 @@ export const setStreamHandlers = (h: StreamHandlers | null): void => void (handl
 // The public WS hub reuses the same engine stream handlers to serve terminal.attach/input/output.
 export const getStreamHandlers = (): StreamHandlers | null => handlers
 
-// The UI control broker (docs/next/api §3.4). Set by the composition root; the renderer's ui:*
+// The UI control broker (docs/public-api.md). Set by the composition root; the renderer's ui:*
 // frames route to it and it sends ui:command frames back over this socket.
 let broker: import('./publicApi/uiControlBroker').UiControlBroker | null = null
 export const setUiBroker = (b: import('./publicApi/uiControlBroker').UiControlBroker | null): void => void (broker = b)

@@ -5,7 +5,7 @@ import type { CommandResultSchema } from '../../shared/publicApi/commands'
 import type { WsServerFrame } from '../../shared/ws'
 import type { UiControlBroker as UiControlBrokerContract } from '../../server/publicApi/coreCommands'
 
-// UI control broker (docs/next/api/architecture.md §3.4, commands-and-ui.md §4). One control
+// UI control broker (docs/public-api.md, commands-and-ui.md §4). One control
 // connection per window on the internal 4317 socket. The renderer registers after startup restore
 // and reports a serializable snapshot; presentation commands cross here to the live renderer and
 // their acknowledgements come back correlated by requestId. Not a second state store — the renderer
