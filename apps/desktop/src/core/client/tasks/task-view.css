@@ -2,13 +2,14 @@
    pane-switcher rail on the right. Mirrors the .panes grid but with the switcher as a 3rd column.
    `.panes.panes-workspace` (specificity 0,2,0) so it reliably beats the base `.panes` 3-col rule —
    otherwise the switcher falls into a 1fr track (huge right gap) and the Navigator widens. */
-/* Wrap so a status footer can sit below the panes (docs/workspaces-and-tasks.md). */
-/* Reserve room for the terminal drawer when it's open (--term-drawer-h, set by TerminalPanel) so
-   the panes + footer shrink to sit above it — the drawer is a fixed overlay and would otherwise
-   cover the bottom of the panes and their scrollbars. */
+/* Wrap so a status footer can sit below the terminal drawer (docs/workspaces-and-tasks.md). */
+/* Reserve room for the fixed status footer plus the terminal drawer when it's open
+   (--term-drawer-h, set by TerminalPanel). The panes shrink above both docked surfaces, keeping
+   their scrollbars visible. */
 /* padding-right reserves the full-height .pane-switcher (fixed, right:0); padding-bottom reserves the
-   terminal drawer. Both rails/overlays are position:fixed, so content shrinks via padding, not flow. */
-.workspace-wrap { display: flex; flex-direction: column; min-height: 0; height: 100%; padding-right: var(--tabrail-w); padding-bottom: var(--term-drawer-h, 0px); }
+   terminal drawer and footer. Both rails/overlays are position:fixed, so content shrinks via padding,
+   not flow. */
+.workspace-wrap { display: flex; flex-direction: column; min-height: 0; height: 100%; padding-right: var(--tabrail-w); padding-bottom: calc(var(--term-drawer-h, 0px) + var(--task-footer-h)); }
 .panes.panes-workspace {
   flex: 1;
   min-height: 0;
@@ -22,9 +23,15 @@
   grid-template-columns: clamp(360px, 23vw, 430px) minmax(0, 1fr) auto;
 }
 
-/* Worktree status line under the panes: path + dirty/clean/needs-repair. */
+/* Worktree status line is the bottom-most dock: path + dirty/clean/needs-repair. Keeping it fixed
+   lets the independently portalled terminal drawer sit immediately above it. */
 .workspace-footer {
-  flex: none;
+  position: fixed;
+  left: var(--tabrail-w);
+  right: var(--tabrail-w);
+  bottom: 0;
+  z-index: 51;
+  height: var(--task-footer-h);
   display: flex;
   align-items: center;
   gap: 14px;

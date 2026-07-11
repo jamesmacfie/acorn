@@ -3,7 +3,7 @@
   position: fixed;
   top: var(--topbar-h, 40px);
   right: 0;
-  bottom: var(--term-drawer-h, 0px);
+  bottom: calc(var(--term-drawer-h, 0px) + var(--task-footer-h));
   z-index: 30;
   width: min(380px, 90vw);
   display: flex;

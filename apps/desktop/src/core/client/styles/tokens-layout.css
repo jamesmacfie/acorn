@@ -21,6 +21,7 @@
   --topbar-h: 48px;
   --pane-head-h: 48px;
   --tabrail-w: 52px;
+  --task-footer-h: 27px;
   --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
   --dur-short: 150ms;
 }
