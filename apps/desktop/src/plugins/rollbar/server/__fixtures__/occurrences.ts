@@ -32,7 +32,7 @@ export const SPARSE_ITEM = {
 export const TRACE_INSTANCE: RollbarApiInstance = {
   id: 555,
   timestamp: 1_700_100_000,
-  occurrence: {
+  data: {
     uuid: 'aaaa-bbbb',
     context: 'auth#login',
     code_version: 'aabbcc1',

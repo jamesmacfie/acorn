@@ -9,8 +9,10 @@
 
 import type {
   RollbarItemDetail,
+  RollbarItemMetadata,
   RollbarItemSummary,
   RollbarOccurrenceDetail,
+  RollbarOccurrenceSummary,
   RollbarStackFrame,
 } from '../../../core/shared/api'
 import { levelName, type RollbarApiInstance, type RollbarApiItem } from './'
@@ -46,6 +48,11 @@ const asMillis = (value: unknown): number | null => {
   return n > 1e12 ? Math.round(n) : Math.round(n * 1000)
 }
 const asString = (value: unknown): string | null => (value == null ? null : cleanString(String(value)))
+
+export const rollbarItemUrl = (itemId: string): string | null =>
+  itemId ? `https://rollbar.com/item/${encodeURIComponent(itemId)}/` : null
+export const rollbarOccurrenceUrl = (uuid: string | null): string | null =>
+  uuid ? `https://rollbar.com/occurrence/uuid/?uuid=${encodeURIComponent(uuid)}` : null
 
 // One frame → { filename, line, column, method, code, inProject }. Rollbar supplies the offending
 // line as `code` and surrounding lines under `context.pre` / `context.post`; we keep a small window.
@@ -89,7 +96,7 @@ const readException = (raw: unknown): Exception => {
 // Normalize one occurrence body into the allowlisted detail. `truncated` is set when any cap fired,
 // so the UI can say "omitted by Acorn" rather than implying upstream absence.
 export function normalizeOccurrence(instance: RollbarApiInstance): RollbarOccurrenceDetail {
-  const occurrence = isRecord(instance.occurrence) ? instance.occurrence : {}
+  const occurrence = isRecord(instance.data) ? instance.data : isRecord(instance.occurrence) ? instance.occurrence : {}
   const body = isRecord(occurrence.body) ? occurrence.body : {}
   let truncated = false
 
@@ -134,10 +141,12 @@ export function normalizeOccurrence(instance: RollbarApiInstance): RollbarOccurr
   const person = isRecord(occurrence.person) ? occurrence.person : null
   const notifier = isRecord(occurrence.notifier) ? occurrence.notifier : null
 
+  const uuid = asString(occurrence.uuid)
   return {
     id: asString(instance.id) ?? '',
     occurredAt: asMillis(instance.timestamp) ?? asMillis(occurrence.timestamp),
-    uuid: asString(occurrence.uuid),
+    uuid,
+    url: rollbarOccurrenceUrl(uuid),
     kind,
     exceptionClass: exception.class,
     message: exception.message ?? messageBody,
@@ -157,6 +166,18 @@ export function normalizeOccurrence(instance: RollbarApiInstance): RollbarOccurr
   }
 }
 
+export function occurrenceSummary(detail: RollbarOccurrenceDetail): RollbarOccurrenceSummary {
+  return {
+    id: detail.id,
+    occurredAt: detail.occurredAt,
+    uuid: detail.uuid,
+    url: detail.url,
+    kind: detail.kind,
+    exceptionClass: detail.exceptionClass,
+    message: detail.message,
+  }
+}
+
 // Build the item summary row from a list/canonical item response.
 export function normalizeSummary(integrationId: string, integrationLabel: string, raw: RollbarApiItem): RollbarItemSummary {
   return {
@@ -164,6 +185,7 @@ export function normalizeSummary(integrationId: string, integrationLabel: string
     integrationLabel,
     identifier: String(raw.counter),
     itemId: String(raw.id),
+    url: rollbarItemUrl(String(raw.id)),
     title: cleanString(raw.title) ?? '(untitled)',
     level: levelName(raw.level),
     environment: asString(raw.environment) ?? '',
@@ -177,9 +199,21 @@ export function normalizeSummary(integrationId: string, integrationLabel: string
 
 // Assemble the full detail. If the normalized detail somehow still exceeds the byte target (huge
 // frames), drop the most sensitive field first (email), then progressively trim frames.
-export function normalizeItemDetail(
+export function normalizeItemMetadata(
   summary: RollbarItemSummary,
   item: RollbarApiItem,
+): RollbarItemMetadata {
+  return {
+    ...summary,
+    resolvedInVersion: asString(item.resolved_in_version),
+    assignedTo: asString(item.assigned_user_id),
+  }
+}
+
+// The public API retains its original composite response. Desktop reads use the independently
+// cached metadata and occurrence resources instead.
+export function composeItemDetail(
+  metadata: RollbarItemMetadata,
   occurrence: RollbarOccurrenceDetail | null,
 ): RollbarItemDetail {
   let latest = occurrence
@@ -200,10 +234,7 @@ export function normalizeItemDetail(
     }
   }
   return {
-    ...summary,
-    resolvedInVersion: asString(item.resolved_in_version),
-    assignedTo: asString(item.assigned_user_id),
-    url: null, // no reliable web URL from the documented read endpoints — omit rather than guess.
+    ...metadata,
     latestOccurrence: latest,
   }
 }

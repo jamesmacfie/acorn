@@ -10,6 +10,7 @@ export const RollbarItemSummarySchema = z.strictObject({
   integrationLabel: z.string(),
   identifier: z.string(),
   itemId: z.string(),
+  url: z.string().url().nullable(),
   title: z.string(),
   level: z.string(),
   environment: z.string(),
@@ -33,6 +34,7 @@ const RollbarOccurrenceDetailSchema = z.strictObject({
   id: z.string(),
   occurredAt: UnixMillisSchema.nullable(),
   uuid: z.string().nullable(),
+  url: z.string().url().nullable(),
   kind: z.enum(['trace', 'trace-chain', 'message', 'crash-report', 'unknown']),
   exceptionClass: z.string().nullable(),
   message: z.string().nullable(),
@@ -52,7 +54,6 @@ const RollbarOccurrenceDetailSchema = z.strictObject({
 export const RollbarItemDetailSchema = RollbarItemSummarySchema.extend({
   resolvedInVersion: z.string().nullable(),
   assignedTo: z.string().nullable(),
-  url: z.string().nullable(),
   latestOccurrence: RollbarOccurrenceDetailSchema.nullable(),
 })
 

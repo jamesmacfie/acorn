@@ -154,7 +154,6 @@ const BASELINE_PLUGIN_TO_PLUGIN = [
   'plugins/github/client/PullDetail.tsx => plugins/linear/client/scanLinearRefs.ts',
   'plugins/github/client/PullList.tsx => plugins/linear/client/scanLinearRefs.ts',
   'plugins/github/client/mutations.ts => plugins/terminal/client/terminalClient.ts',
-  'plugins/linear/client/LinearBrowse.tsx => plugins/github/client/mutations.ts',
   'plugins/linear/client/LinearIssuePanel.tsx => plugins/github/client/displayMeta.ts',
   'plugins/linear/client/LinearIssuePanel.tsx => plugins/github/client/mutations.ts',
   'plugins/memory/main/knowledgeIpc.ts => plugins/notes/main/notes.ts',

@@ -1,28 +1,37 @@
-import { createSignal, For, Show, type JSX } from 'solid-js'
+import { createEffect, createSignal, For, on, Show, type JSX } from 'solid-js'
 import { createQuery, useQueryClient } from '@tanstack/solid-query'
 import { readJson } from '../../../core/client/apiClient'
-import { rollbarItemOptions } from '../../../core/client/queries'
-import { rollbarItemKey, rollbarItemRoute, type RollbarItemDetail, type RollbarItemSummary, type RollbarOccurrenceDetail } from '../../../core/shared/api'
+import {
+  rollbarItemMetadataOptions,
+  rollbarOccurrenceOptions,
+  rollbarOccurrencesOptions,
+} from '../../../core/client/queries'
+import {
+  rollbarItemMetadataKey,
+  rollbarItemMetadataRoute,
+  rollbarOccurrenceKey,
+  rollbarOccurrenceRoute,
+  rollbarOccurrencesKey,
+  rollbarOccurrencesRoute,
+  type RollbarItemMetadata,
+  type RollbarItemSummary,
+  type RollbarOccurrenceDetail,
+  type RollbarOccurrencesResponse,
+} from '../../../core/shared/api'
+import RollbarOccurrenceView from './RollbarOccurrenceView'
 import './rollbar.css'
 
 export type RollbarTarget = { connectionId: string; identifier: string }
-const targetKey = (t: RollbarTarget) => `${t.connectionId}:${t.identifier}`
-const fmtAbs = (at: number | null): string => (at ? new Date(at).toLocaleString() : '—')
-// Local relative-time (avoids coupling to the github plugin). '' when unknown, so callers can Show-gate.
-const relAge = (at: number | null): string => {
-  if (!at) return ''
-  const s = Math.max(0, Math.round((Date.now() - at) / 1000))
-  if (s < 60) return `${s}s ago`
-  if (s < 3600) return `${Math.round(s / 60)}m ago`
-  if (s < 86400) return `${Math.round(s / 3600)}h ago`
-  return `${Math.round(s / 86400)}d ago`
-}
+type RollbarPanelTab = 'summary' | 'details' | 'occurrences'
 
-// One Rollbar item's normalized detail, shared by the Source detail column and the task pane
-// (docs/panes.md), analogous to LinearIssuePanel. The header/triage facts render immediately from
-// the list summary; the latest occurrence (privacy-normalized server-side — never raw JSON) streams
-// in from rollbarItemOptions. `actions` is a caller-owned slot: the browse passes attach/open-task
-// buttons, the task pane passes none. Refresh forces past the server TTL.
+const TABS: Array<{ id: RollbarPanelTab; label: string }> = [
+  { id: 'summary', label: 'Summary' },
+  { id: 'details', label: 'Details' },
+  { id: 'occurrences', label: 'Occurrences' },
+]
+const targetKey = (target: RollbarTarget) => `${target.connectionId}:${target.identifier}`
+const fmtAbs = (at: number | null): string => (at ? new Date(at).toLocaleString() : '—')
+
 export default function RollbarItemPanel(props: {
   target: RollbarTarget
   summary?: RollbarItemSummary
@@ -32,29 +41,68 @@ export default function RollbarItemPanel(props: {
   actions?: JSX.Element
 }) {
   const qc = useQueryClient()
-  const query = createQuery(() => rollbarItemOptions(props.target.connectionId, props.target.identifier, true))
+  const [tab, setTab] = createSignal<RollbarPanelTab>('summary')
+  const [selectedOccurrenceId, setSelectedOccurrenceId] = createSignal<string | null>(null)
   const [refreshing, setRefreshing] = createSignal(false)
+  const [refreshError, setRefreshError] = createSignal('')
 
-  // Prefer freshly-loaded detail; fall back to the passed list summary so the header never blanks.
-  const facts = (): RollbarItemSummary | undefined => query.data ?? props.summary
-  const detail = (): RollbarItemDetail | undefined => query.data
-  const occurrence = (): RollbarOccurrenceDetail | null | undefined => query.data?.latestOccurrence
+  createEffect(on(() => targetKey(props.target), () => {
+    setTab('summary')
+    setSelectedOccurrenceId(null)
+  }, { defer: true }))
 
-  async function refresh() {
+  // Browse supplies a list summary, so selection is instant. A task-pane target has no summary in
+  // its task link; only that case activates metadata for the default Summary tab.
+  const metadata = createQuery(() => rollbarItemMetadataOptions(
+    props.target.connectionId,
+    props.target.identifier,
+    tab() === 'details' || (tab() === 'summary' && !props.summary),
+  ))
+  const occurrences = createQuery(() => rollbarOccurrencesOptions(
+    props.target.connectionId,
+    props.target.identifier,
+    tab() === 'occurrences',
+  ))
+  const occurrence = createQuery(() => rollbarOccurrenceOptions(
+    props.target.connectionId,
+    props.target.identifier,
+    selectedOccurrenceId() ?? '',
+    tab() === 'occurrences' && selectedOccurrenceId() !== null,
+  ))
+
+  const facts = (): RollbarItemSummary | undefined => metadata.data ?? props.summary
+
+  async function refreshActiveTab() {
     if (refreshing()) return
     setRefreshing(true)
+    setRefreshError('')
     try {
-      const fresh = await readJson<RollbarItemDetail>(rollbarItemRoute(props.target.connectionId, props.target.identifier, true))
-      qc.setQueryData(rollbarItemKey(props.target.connectionId, props.target.identifier), fresh)
+      if (tab() === 'occurrences' && selectedOccurrenceId()) {
+        const id = selectedOccurrenceId()!
+        const fresh = await readJson<RollbarOccurrenceDetail>(rollbarOccurrenceRoute(props.target.connectionId, props.target.identifier, id, true))
+        qc.setQueryData(rollbarOccurrenceKey(props.target.connectionId, props.target.identifier, id), fresh)
+      } else if (tab() === 'occurrences') {
+        const fresh = await readJson<RollbarOccurrencesResponse>(rollbarOccurrencesRoute(props.target.connectionId, props.target.identifier, true))
+        qc.setQueryData(rollbarOccurrencesKey(props.target.connectionId, props.target.identifier), fresh)
+      } else {
+        const fresh = await readJson<RollbarItemMetadata>(rollbarItemMetadataRoute(props.target.connectionId, props.target.identifier, true))
+        qc.setQueryData(rollbarItemMetadataKey(props.target.connectionId, props.target.identifier), fresh)
+      }
     } catch {
-      // Leave the stale detail in place; the error note below covers the failed revalidation.
+      setRefreshError('Could not refresh this tab. Showing the last cached result when available.')
     } finally {
       setRefreshing(false)
     }
   }
 
-  const kindLabel: Record<RollbarOccurrenceDetail['kind'], string> = {
-    trace: 'Exception', 'trace-chain': 'Exception chain', message: 'Message', 'crash-report': 'Crash report', unknown: 'Occurrence',
+  function onTabKeyDown(event: KeyboardEvent) {
+    if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return
+    event.preventDefault()
+    const current = TABS.findIndex((candidate) => candidate.id === tab())
+    const offset = event.key === 'ArrowRight' ? 1 : -1
+    const next = TABS[(current + offset + TABS.length) % TABS.length]
+    setTab(next.id)
+    document.getElementById(`rollbar-tab-${next.id}`)?.focus()
   }
 
   return (
@@ -62,107 +110,136 @@ export default function RollbarItemPanel(props: {
       <div class="section-header rollbar-panel-head">
         <span class="rollbar-panel-title-line">
           <span class="rollbar-level" data-level={facts()?.level}>✗ {facts()?.level ?? 'rollbar'}</span>
-          <span class="rollbar-panel-name">{facts() ? `${facts()!.integrationLabel} · #${facts()!.identifier}` : `#${props.target.identifier}`}</span>
+          <span class="rollbar-panel-name">
+            <Show when={facts()} fallback={`#${props.target.identifier}`}>
+              {(item) => (
+                <>{item().integrationLabel} · <Show when={item().url} fallback={`#${item().identifier}`}>
+                  {(url) => <a class="rollbar-external-id" href={url()} target="_blank" rel="noreferrer">#{item().identifier}</a>}
+                </Show></>
+              )}
+            </Show>
+          </span>
         </span>
-        <button type="button" class="new-pr-btn" disabled={refreshing()} onClick={() => void refresh()}>{refreshing() ? 'Refreshing…' : 'Refresh'}</button>
+        <button type="button" class="new-pr-btn" disabled={refreshing()} onClick={() => void refreshActiveTab()}>{refreshing() ? 'Refreshing…' : 'Refresh tab'}</button>
       </div>
 
       <Show when={(props.targets?.length ?? 0) > 1}>
         <div class="rollbar-chips">
-          <For each={props.targets}>
-            {(t) => (
-              <button type="button" class="rollbar-chip" classList={{ active: targetKey(t) === targetKey(props.target) }} onClick={() => props.onSelectTarget?.(t)}>
-                #{t.identifier}
-              </button>
-            )}
-          </For>
+          <For each={props.targets}>{(target) => (
+            <button type="button" class="rollbar-chip" classList={{ active: targetKey(target) === targetKey(props.target) }} onClick={() => props.onSelectTarget?.(target)}>
+              #{target.identifier}
+            </button>
+          )}</For>
         </div>
       </Show>
 
+      <div class="rollbar-tabs" role="tablist" aria-label="Rollbar item sections" onKeyDown={onTabKeyDown}>
+        <For each={TABS}>{(candidate) => (
+          <button
+            id={`rollbar-tab-${candidate.id}`}
+            type="button"
+            role="tab"
+            aria-selected={tab() === candidate.id}
+            aria-controls={`rollbar-panel-${candidate.id}`}
+            tabindex={tab() === candidate.id ? 0 : -1}
+            class="rollbar-tab"
+            classList={{ active: tab() === candidate.id }}
+            onClick={() => setTab(candidate.id)}
+          >
+            {candidate.label}
+            <Show when={candidate.id === 'occurrences' && facts()}>{(item) => <span class="rollbar-tab-count">{item().totalOccurrences}</span>}</Show>
+          </button>
+        )}</For>
+      </div>
+      <Show when={refreshError()}><div class="action-error rollbar-refresh-error" role="alert">{refreshError()}</div></Show>
+
       <div class="rollbar-panel-body">
-        <Show when={facts()} fallback={<p class="placeholder">{query.isLoading ? 'Loading…' : 'Could not load this item.'}</p>}>
-          {(f) => (
-            <>
-              <h2 class="rollbar-title">{f().title}</h2>
-              <dl class="rollbar-facts">
-                <dt>Level</dt><dd>{f().level}</dd>
-                <dt>Status</dt><dd>{f().status}</dd>
-                <dt>Environment</dt><dd>{f().environment}</dd>
-                <dt>Occurrences</dt><dd>×{f().totalOccurrences}</dd>
-                <dt>First seen</dt><dd>{fmtAbs(f().firstOccurrenceAt)}</dd>
-                <dt>Last seen</dt><dd>{fmtAbs(f().lastOccurrenceAt)}</dd>
-                <Show when={detail()?.resolvedInVersion}>{(v) => (<><dt>Resolved in</dt><dd>{v()}</dd></>)}</Show>
-                <Show when={detail()?.assignedTo}>{(a) => (<><dt>Assigned</dt><dd>{a()}</dd></>)}</Show>
-              </dl>
+        <Show when={tab() === 'summary'}>
+          <div id="rollbar-panel-summary" role="tabpanel" aria-labelledby="rollbar-tab-summary" class="rollbar-tab-panel">
+            <Show when={facts()} fallback={<p class="placeholder">{metadata.isLoading ? 'Loading summary…' : 'Could not load this item.'}</p>}>
+              {(item) => (
+                <>
+                  <h2 class="rollbar-title">{item().title}</h2>
+                  <div class="rollbar-summary-line">
+                    <span class="rollbar-level" data-level={item().level}>{item().level}</span>
+                    <span>{item().status}</span>
+                    <span>{item().environment || 'No environment'}</span>
+                  </div>
+                  <dl class="rollbar-summary-stats">
+                    <div><dt>Occurrences</dt><dd>{item().totalOccurrences.toLocaleString()}</dd></div>
+                    <div><dt>First seen</dt><dd>{fmtAbs(item().firstOccurrenceAt)}</dd></div>
+                    <div><dt>Last seen</dt><dd>{fmtAbs(item().lastOccurrenceAt)}</dd></div>
+                  </dl>
+                  <Show when={metadata.isError}><p class="action-error" role="alert">Could not refresh this item’s summary.</p></Show>
+                </>
+              )}
+            </Show>
+          </div>
+        </Show>
 
-              <Show when={query.isError && !detail()}>
-                <p class="action-error" role="alert">Couldn't load the latest occurrence (auth, rate limit, or upstream error).</p>
+        <Show when={tab() === 'details'}>
+          <div id="rollbar-panel-details" role="tabpanel" aria-labelledby="rollbar-tab-details" class="rollbar-tab-panel">
+            <Show when={metadata.data} fallback={<p class="placeholder">{metadata.isError ? 'Could not load item details.' : 'Loading item details…'}</p>}>
+              {(item) => (
+                <>
+                  <h2 class="rollbar-title">{item().title}</h2>
+                  <dl class="rollbar-facts rollbar-detail-facts">
+                    <dt>Project</dt><dd>{item().integrationLabel}</dd>
+                    <dt>Counter</dt><dd>#{item().identifier}</dd>
+                    <dt>Item ID</dt><dd>{item().itemId}</dd>
+                    <dt>Level</dt><dd>{item().level}</dd>
+                    <dt>Status</dt><dd>{item().status}</dd>
+                    <dt>Environment</dt><dd>{item().environment || '—'}</dd>
+                    <dt>Framework</dt><dd>{item().framework ?? '—'}</dd>
+                    <dt>Resolved in</dt><dd>{item().resolvedInVersion ?? '—'}</dd>
+                    <dt>Assigned</dt><dd>{item().assignedTo ?? '—'}</dd>
+                    <dt>First seen</dt><dd>{fmtAbs(item().firstOccurrenceAt)}</dd>
+                    <dt>Last seen</dt><dd>{fmtAbs(item().lastOccurrenceAt)}</dd>
+                  </dl>
+                </>
+              )}
+            </Show>
+          </div>
+        </Show>
+
+        <Show when={tab() === 'occurrences'}>
+          <div id="rollbar-panel-occurrences" role="tabpanel" aria-labelledby="rollbar-tab-occurrences" class="rollbar-tab-panel rollbar-occurrences-workbench">
+            <div class="rollbar-occurrence-list">
+              <Show when={occurrences.data} fallback={<p class="placeholder">{occurrences.isError ? 'Could not load occurrences.' : 'Loading occurrences…'}</p>}>
+                {(result) => (
+                  <>
+                    <For each={result().occurrences} fallback={<p class="placeholder">No occurrences are available.</p>}>
+                      {(item) => (
+                        <button
+                          type="button"
+                          class="rollbar-occurrence-row"
+                          classList={{ active: selectedOccurrenceId() === item.id }}
+                          aria-pressed={selectedOccurrenceId() === item.id}
+                          onClick={() => setSelectedOccurrenceId(item.id)}
+                        >
+                          <span class="rollbar-occurrence-time">{fmtAbs(item.occurredAt)}</span>
+                          <span class="muted">#{item.id}</span>
+                          <span class="rollbar-occurrence-message">{item.exceptionClass || item.message || item.kind}</span>
+                        </button>
+                      )}
+                    </For>
+                    <Show when={result().capped}><p class="rollbar-capped">Showing the 50 most recent occurrences.</p></Show>
+                  </>
+                )}
               </Show>
-              <Show when={query.isError && detail()}>
-                <p class="muted" role="status">Showing cached detail — latest refresh failed.</p>
-              </Show>
-
-              <Show when={detail()} fallback={<Show when={!query.isError}><p class="muted">Loading latest occurrence…</p></Show>}>
-                <Show when={occurrence()} fallback={<p class="muted">No occurrence detail available for this item.</p>}>
-                  {(occ) => (
-                    <>
-                      <h3 class="rollbar-section-head">
-                        Latest occurrence · {kindLabel[occ().kind]}
-                        <Show when={relAge(occ().occurredAt)}>{(age) => <span class="muted"> · {age()}</span>}</Show>
-                      </h3>
-                      <Show when={occ().exceptionClass || occ().message}>
-                        <p class="rollbar-exception">
-                          <Show when={occ().exceptionClass}>{(cls) => <span class="rollbar-exception-class">{cls()}: </span>}</Show>
-                          {occ().message}
-                        </p>
-                      </Show>
-
-                      <Show when={occ().frames.length}>
-                        <ul class="rollbar-frames">
-                          <For each={occ().frames}>
-                            {(frame) => (
-                              <li class="rollbar-frame" classList={{ 'rollbar-frame-app': frame.inProject === true }}>
-                                <div class="rollbar-frame-loc">
-                                  <span class="rollbar-frame-file">{frame.filename}</span>
-                                  <Show when={frame.line != null}><span class="muted">:{frame.line}{frame.column != null ? `:${frame.column}` : ''}</span></Show>
-                                  <Show when={frame.method}>{(m) => <span class="rollbar-frame-method"> {m()}</span>}</Show>
-                                </div>
-                                <Show when={frame.code.length}>
-                                  <pre class="rollbar-frame-code"><For each={frame.code}>{(c) => <div classList={{ 'rollbar-code-anchor': c.line === frame.line }}><span class="rollbar-code-ln">{c.line}</span>{c.text}</div>}</For></pre>
-                                </Show>
-                              </li>
-                            )}
-                          </For>
-                        </ul>
-                      </Show>
-
-                      <dl class="rollbar-facts rollbar-context">
-                        <Show when={occ().request}>{(r) => (<><dt>Request</dt><dd>{[r().method, r().url].filter(Boolean).join(' ') || '—'}</dd></>)}</Show>
-                        <Show when={occ().context}>{(ctx) => (<><dt>Context</dt><dd>{ctx()}</dd></>)}</Show>
-                        <Show when={occ().codeVersion}>{(v) => (<><dt>Version</dt><dd>{v()}</dd></>)}</Show>
-                        <Show when={occ().language || occ().platform || occ().framework}>
-                          <dt>Runtime</dt><dd>{[occ().language, occ().platform, occ().framework].filter(Boolean).join(' · ')}</dd>
-                        </Show>
-                        <Show when={occ().server}>{(s) => (<Show when={s().host || s().branch}><dt>Server</dt><dd>{[s().host, s().branch].filter(Boolean).join(' · ')}</dd></Show>)}</Show>
-                        <Show when={occ().person}>{(p) => (<Show when={p().id || p().username || p().email}><dt>Person</dt><dd>{p().username || p().id || p().email}</dd></Show>)}</Show>
-                        <Show when={occ().notifier}>{(n) => (<Show when={n().name}><dt>Notifier</dt><dd>{[n().name, n().version].filter(Boolean).join(' ')}</dd></Show>)}</Show>
-                      </dl>
-
-                      <Show when={occ().truncated}>
-                        <p class="muted rollbar-truncated">Some occurrence data was omitted by Acorn's size/privacy caps.</p>
-                      </Show>
-                    </>
-                  )}
+            </div>
+            <div class="rollbar-occurrence-view">
+              <Show when={selectedOccurrenceId()} fallback={<div class="pane-empty"><p class="placeholder">Select an occurrence to load its diagnostic detail.</p></div>}>
+                <Show when={occurrence.data} fallback={<p class="placeholder">{occurrence.isError ? 'Could not load this occurrence.' : 'Loading occurrence detail…'}</p>}>
+                  {(data) => <RollbarOccurrenceView occurrence={data()} />}
                 </Show>
               </Show>
-
-              <Show when={props.actions}>
-                <div class="rollbar-actions">{props.actions}</div>
-              </Show>
-            </>
-          )}
+            </div>
+          </div>
         </Show>
       </div>
+
+      <Show when={props.actions}><div class="rollbar-actions">{props.actions}</div></Show>
     </section>
   )
 }

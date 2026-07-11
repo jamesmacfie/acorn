@@ -17,6 +17,7 @@ describe('provider-owned source promotion', () => {
   it('normalizes the chosen Rollbar branch and keeps the visible counter identity', () => {
     const item: RollbarItemSummary = {
       integrationId: 'rollbar-api', integrationLabel: 'Rollbar · api', identifier: '142', itemId: '999',
+      url: 'https://rollbar.com/item/999/',
       title: 'Token is null', level: 'error', environment: 'prod',
       status: 'active', totalOccurrences: 3, firstOccurrenceAt: 1, lastOccurrenceAt: 2,
     }

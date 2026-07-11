@@ -39,11 +39,13 @@ export type RollbarApiItem = {
   assigned_user_id?: number | string | null
 }
 
-// GET /instance/:id → { result: { id, occurrence, ... } }. The occurrence body is the notifier
-// payload; only the allowlisted fields below are read, never persisted wholesale.
+// GET /instance/:id and /item/:id/instances expose the notifier payload as `data`. `occurrence` is
+// retained as a compatibility alias for older fixtures/variants. Only allowlisted fields are read;
+// neither upstream object is ever persisted wholesale.
 export type RollbarApiInstance = {
   id?: number | string
   timestamp?: number | null
+  data?: Record<string, unknown> | null
   occurrence?: Record<string, unknown> | null
 }
 
@@ -57,5 +59,6 @@ export const projectPath = '/project'
 export const itemsPath = (page: number) => `/items?status=active&page=${page}`
 export const itemByCounterPath = (counter: string) => `/item_by_counter/${encodeURIComponent(counter)}`
 export const itemByIdPath = (itemId: string) => `/item/${encodeURIComponent(itemId)}`
-export const itemInstancesPath = (itemId: string, limit: number) => `/item/${encodeURIComponent(itemId)}/instances?limit=${limit}`
+export const itemInstancesPath = (itemId: string, limit: number) =>
+  `/item/${encodeURIComponent(itemId)}/instances?limit=${limit}`
 export const instancePath = (occurrenceId: string) => `/instance/${encodeURIComponent(occurrenceId)}`

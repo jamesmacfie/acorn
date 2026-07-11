@@ -1,12 +1,13 @@
 import { createEffect, createSignal, For, on, Show } from 'solid-js'
 import { useNavigate, useParams } from '@solidjs/router'
 import { createQuery, useQueryClient } from '@tanstack/solid-query'
-import { linearProjectsOptions, tasksKey, tasksOptions, workspaceProjectsKey, workspaceProjectsOptions, workspaceLinearIssuesOptions, workspacesOptions } from '../../../core/client/queries'
-import { setWorkspaceProjects } from '../../github/client/mutations'
+import { integrationsOptions, linearProjectsOptions, tasksKey, tasksOptions, workspaceProjectsKey, workspaceProjectsOptions, workspaceLinearIssuesOptions, workspacesOptions } from '../../../core/client/queries'
+import { setWorkspaceProjects } from '../../../core/client/workspaces/mutations'
 import type { LinearProjectIssue, Task, WorkspaceProject } from '../../../core/shared/api'
 import { workspaceForRepo } from '../../../core/client/workspaces/activeWorkspace'
 import { activateTaskSignals, pathForTask } from '../../../core/client/tasks/activate'
 import { sourceRegistry, type SourceContribution } from '../../../core/client/registries/sources'
+import { replaceWorkspaceProjectsForProvider, workspaceProjectsForProvider } from '../../../core/client/integrations/workspaceProjects'
 import LinearIssuePanel from './LinearIssuePanel'
 
 // The Linear Source browse (docs/workspaces-and-tasks.md). Linear projects are linked at the WORKSPACE level
@@ -25,7 +26,10 @@ export default function LinearBrowse() {
   const wsId = () => ws()?.id ?? null
 
   const linked = createQuery(() => workspaceProjectsOptions(wsId(), true))
-  const linkedProjects = () => linked.data?.projects ?? []
+  const integrations = createQuery(() => integrationsOptions(true))
+  const allLinkedProjects = () => linked.data?.projects ?? []
+  const connections = () => integrations.data?.integrations ?? []
+  const linkedProjects = () => workspaceProjectsForProvider(allLinkedProjects(), connections(), 'linear')
   const issues = createQuery(() => workspaceLinearIssuesOptions(linkedProjects(), linkedProjects().length > 0))
   const [selectedIssue, setSelectedIssue] = createSignal<LinearProjectIssue | null>(null)
   const isSelected = (issue: LinearProjectIssue) => {
@@ -55,8 +59,8 @@ export default function LinearBrowse() {
     try {
       // The picker must make its empty-state decision from a live Linear read, not the
       // five-minute client cache. Manual refetch works while the query is disabled.
-      const result = await projects.refetch()
-      if (result.isError) {
+      const [projectResult, integrationResult] = await Promise.all([projects.refetch(), integrations.refetch()])
+      if (projectResult.isError || integrationResult.isError) {
         setPickerError('Could not refresh Linear projects. Check the connection and try again.')
         return
       }
@@ -77,7 +81,7 @@ export default function LinearBrowse() {
     const chosen = (projects.data?.projects ?? [])
       .filter((p) => checked().has(`${p.integrationId}:${p.id}`))
       .map((p) => ({ integrationId: p.integrationId, externalId: p.id }))
-    await setWorkspaceProjects(id, chosen)
+    await setWorkspaceProjects(id, replaceWorkspaceProjectsForProvider(allLinkedProjects(), connections(), 'linear', chosen))
     await qc.invalidateQueries({ queryKey: workspaceProjectsKey(id) })
     setPickerOpen(false)
   }

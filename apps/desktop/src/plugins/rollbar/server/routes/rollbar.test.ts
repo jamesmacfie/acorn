@@ -1,6 +1,12 @@
 import { Hono } from 'hono'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import type { RollbarItemDetail, RollbarItemsResponse } from '../../../../core/shared/api'
+import type {
+  RollbarItemDetail,
+  RollbarItemMetadata,
+  RollbarItemsResponse,
+  RollbarOccurrenceDetail,
+  RollbarOccurrencesResponse,
+} from '../../../../core/shared/api'
 import { getDb, schema } from '../../../../core/server/db'
 import type { AppEnv } from '../../../../core/server/middleware/auth'
 import { rollbarFetch } from '..'
@@ -44,15 +50,19 @@ const API_ITEM = {
 const INSTANCE = {
   id: 555,
   timestamp: 1_700_100_000,
-  occurrence: {
+  data: {
     body: { trace: { exception: { class: 'TypeError', message: 'token is null' }, frames: [{ filename: 'auth.ts', lineno: 84 }] } },
+    uuid: 'aaaa-bbbb',
     request: { method: 'POST', url: '/api/login', headers: { authorization: 'SECRET' } },
   },
 }
 
-// A detail fetch = canonical item + its latest occurrence.
+// Compatibility item fetch = canonical item + occurrence list + selected occurrence detail.
 const mockDetailFetch = () => {
-  vi.mocked(rollbarFetch).mockResolvedValueOnce(rollbarJson(API_ITEM)).mockResolvedValueOnce(rollbarJson(INSTANCE))
+  vi.mocked(rollbarFetch)
+    .mockResolvedValueOnce(rollbarJson(API_ITEM))
+    .mockResolvedValueOnce(rollbarJson({ instances: [INSTANCE] }))
+    .mockResolvedValueOnce(rollbarJson(INSTANCE))
 }
 
 describe('Rollbar source (docs/integrations.md, docs/next/rollbar.md)', () => {
@@ -128,6 +138,7 @@ describe('Rollbar source (docs/integrations.md, docs/next/rollbar.md)', () => {
         integrationLabel: 'Rollbar · acme-api',
         identifier: '142',
         itemId: '999',
+        url: 'https://rollbar.com/item/999/',
         title: 'TypeError: token is null',
         level: 'error',
         environment: 'prod',
@@ -156,8 +167,10 @@ describe('Rollbar source (docs/integrations.md, docs/next/rollbar.md)', () => {
     await app.fetch(new Request(`http://acorn.test/api/rollbar/items/142?integration=${integrationId}`), env())
     await settleBackground()
     const rows = await t.db.select().from(schema.issues)
-    expect(rows.map((r) => r.data).join('')).not.toContain('SECRET')
-    expect(rows.map((r) => r.data).join('')).not.toContain('authorization')
+    const children = await t.db.select().from(schema.issueResources)
+    const cached = [...rows.map((r) => r.data), ...children.map((r) => r.data)].join('')
+    expect(cached).not.toContain('SECRET')
+    expect(cached).not.toContain('authorization')
   })
 
   it('item detail returns normalized latest occurrence (no raw payload) and honors refresh=true', async () => {
@@ -166,8 +179,11 @@ describe('Rollbar source (docs/integrations.md, docs/next/rollbar.md)', () => {
     const res = await app.fetch(new Request(`http://acorn.test/api/rollbar/items/142?integration=${integrationId}`), env())
     expect(res.status).toBe(200)
     const detail = (await res.json()) as RollbarItemDetail
-    expect(detail).toMatchObject({ identifier: '142', itemId: '999', level: 'error', url: null })
-    expect(detail.latestOccurrence).toMatchObject({ kind: 'trace', exceptionClass: 'TypeError', message: 'token is null' })
+    expect(detail).toMatchObject({ identifier: '142', itemId: '999', level: 'error', url: 'https://rollbar.com/item/999/' })
+    expect(detail.latestOccurrence).toMatchObject({
+      kind: 'trace', exceptionClass: 'TypeError', message: 'token is null',
+      url: 'https://rollbar.com/occurrence/uuid/?uuid=aaaa-bbbb',
+    })
     expect(JSON.stringify(detail)).not.toContain('SECRET')
     await settleBackground()
 
@@ -177,6 +193,70 @@ describe('Rollbar source (docs/integrations.md, docs/next/rollbar.md)', () => {
     const forced = await app.fetch(new Request(`http://acorn.test/api/rollbar/items/142?integration=${integrationId}&refresh=true`), env())
     expect(forced.status).toBe(200)
     expect(vi.mocked(rollbarFetch).mock.calls.length).toBeGreaterThan(before)
+  })
+
+  it('loads item metadata without fetching occurrences', async () => {
+    const integrationId = await connect()
+    vi.mocked(rollbarFetch).mockResolvedValueOnce(rollbarJson(API_ITEM))
+    const res = await app.fetch(new Request(`http://acorn.test/api/rollbar/items/142/detail?integration=${integrationId}`), env())
+    expect(res.status).toBe(200)
+    const detail = (await res.json()) as RollbarItemMetadata
+    expect(detail).toMatchObject({ identifier: '142', itemId: '999', resolvedInVersion: null })
+    expect('latestOccurrence' in detail).toBe(false)
+    expect(vi.mocked(rollbarFetch)).toHaveBeenCalledTimes(2) // connect + canonical item only
+  })
+
+  it('loads and caches occurrence history independently from occurrence detail', async () => {
+    const integrationId = await connect()
+    vi.mocked(rollbarFetch).mockResolvedValueOnce(rollbarJson(API_ITEM))
+    await app.fetch(new Request(`http://acorn.test/api/rollbar/items/142/detail?integration=${integrationId}`), env())
+
+    vi.mocked(rollbarFetch).mockResolvedValueOnce(rollbarJson({ instances: [INSTANCE] }))
+    const listRes = await app.fetch(new Request(`http://acorn.test/api/rollbar/items/142/occurrences?integration=${integrationId}`), env())
+    expect(listRes.status).toBe(200)
+    const list = (await listRes.json()) as RollbarOccurrencesResponse
+    expect(list).toMatchObject({
+      capped: false,
+      occurrences: [{ id: '555', kind: 'trace', exceptionClass: 'TypeError', url: 'https://rollbar.com/occurrence/uuid/?uuid=aaaa-bbbb' }],
+    })
+    const afterList = vi.mocked(rollbarFetch).mock.calls.length
+
+    // Reopening the tab within the TTL serves the child-resource mirror.
+    await app.fetch(new Request(`http://acorn.test/api/rollbar/items/142/occurrences?integration=${integrationId}`), env())
+    expect(vi.mocked(rollbarFetch)).toHaveBeenCalledTimes(afterList)
+
+    vi.mocked(rollbarFetch).mockResolvedValueOnce(rollbarJson(INSTANCE))
+    const occurrenceRes = await app.fetch(new Request(`http://acorn.test/api/rollbar/items/142/occurrences/555?integration=${integrationId}`), env())
+    expect(occurrenceRes.status).toBe(200)
+    const occurrence = (await occurrenceRes.json()) as RollbarOccurrenceDetail
+    expect(occurrence).toMatchObject({
+      id: '555', exceptionClass: 'TypeError', message: 'token is null',
+      url: 'https://rollbar.com/occurrence/uuid/?uuid=aaaa-bbbb',
+    })
+    expect(JSON.stringify(occurrence)).not.toContain('SECRET')
+    expect(await t.db.select().from(schema.issueResources)).toHaveLength(2)
+  })
+
+  it('invalidates child-cache rows produced before the canonical data envelope fix', async () => {
+    const integrationId = await connect()
+    vi.mocked(rollbarFetch).mockResolvedValueOnce(rollbarJson(API_ITEM))
+    await app.fetch(new Request(`http://acorn.test/api/rollbar/items/142/detail?integration=${integrationId}`), env())
+
+    vi.mocked(rollbarFetch).mockResolvedValueOnce(rollbarJson({ instances: [INSTANCE] }))
+    await app.fetch(new Request(`http://acorn.test/api/rollbar/items/142/occurrences?integration=${integrationId}`), env())
+    const [cached] = await t.db.select().from(schema.issueResources)
+    const envelope = JSON.parse(cached.data) as { value: RollbarOccurrencesResponse }
+    // v1 child rows stored the public value directly and may contain an `unknown` normalization.
+    await t.db.update(schema.issueResources).set({ data: JSON.stringify(envelope.value) })
+
+    const before = vi.mocked(rollbarFetch).mock.calls.length
+    vi.mocked(rollbarFetch).mockResolvedValueOnce(rollbarJson({ instances: [INSTANCE] }))
+    const refreshed = await app.fetch(new Request(`http://acorn.test/api/rollbar/items/142/occurrences?integration=${integrationId}`), env())
+    expect(refreshed.status).toBe(200)
+    expect(vi.mocked(rollbarFetch).mock.calls.length - before).toBe(1)
+    expect((await refreshed.json()) as RollbarOccurrencesResponse).toMatchObject({
+      occurrences: [{ kind: 'trace', exceptionClass: 'TypeError' }],
+    })
   })
 
   it('detail falls back to stale cache when a background refresh fails', async () => {
@@ -212,8 +292,27 @@ describe('Rollbar source (docs/integrations.md, docs/next/rollbar.md)', () => {
     expect(res.status).toBe(200)
     const body = (await res.json()) as RollbarItemsResponse
     expect(body.items).toHaveLength(1)
-    expect(body.failures).toEqual([{ integrationId: bad, code: 'provider_unavailable' }])
+    expect(body.failures).toHaveLength(1)
+    expect(body.failures[0]).toMatchObject({ code: 'provider_unavailable' })
+    expect(body.failures[0].integrationId).not.toBe(body.items[0].integrationId)
     expect(good).not.toBe(bad)
+  })
+
+  it('scopes list reads to the Rollbar projects mapped by the client', async () => {
+    const first = await connect('first')
+    const second = await connect('second')
+    const before = vi.mocked(rollbarFetch).mock.calls.length
+    vi.mocked(rollbarFetch).mockResolvedValueOnce(rollbarJson({ items: [API_ITEM] }))
+
+    const res = await app.fetch(new Request(
+      `http://acorn.test/api/rollbar/items?integrations=${encodeURIComponent(second)}`,
+    ), env())
+    expect(res.status).toBe(200)
+    const body = (await res.json()) as RollbarItemsResponse
+    expect(body.items).toHaveLength(1)
+    expect(body.items[0].integrationId).toBe(second)
+    expect(body.items[0].integrationId).not.toBe(first)
+    expect(vi.mocked(rollbarFetch).mock.calls.length - before).toBe(1)
   })
 
   it('all connections fail → hard error', async () => {
@@ -258,6 +357,7 @@ describe('Rollbar source (docs/integrations.md, docs/next/rollbar.md)', () => {
     expect(disconnected.status).toBe(204)
     expect(await t.db.select().from(schema.integrations)).toEqual([])
     expect(await t.db.select().from(schema.taskLinks)).toEqual([])
+    expect(await t.db.select().from(schema.issueResources)).toEqual([])
   })
 })
 

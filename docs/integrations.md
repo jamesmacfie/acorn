@@ -172,15 +172,26 @@ GitHub's identity/session-specific `reauth`, `sso`, and `rate_limited` vocabular
 
 Linear preserves multi-connection first-hit-wins bare-id resolution, explicit-connection project
 browse, workspace-scoped project links, active-only issues, suggested branch defaults, threaded
-comments, and XSS-safe markdown. Rollbar is a two-column master/detail Source: an active-item list
-(paginated to 300, filterable locally by project/level/environment/counter) beside a reusable
-`RollbarItemPanel` detail — the same component the task pane mounts — showing triage facts plus a
-normalized, privacy-allowlisted latest occurrence (stack frames + safe context, never raw payload;
-see [security.md](./security.md)). Summary and detail are separate typed contracts with independent
-freshness ([caching.md](./caching.md)). Row selection, repo/branch task promotion (`+ ws`, which
+comments, and XSS-safe markdown. Rollbar is a two-column master/detail Source: a workspace-scoped
+active-item list (mapped Rollbar connections only; paginated to 300 and filterable locally by
+project/level/environment/counter) beside a reusable
+`RollbarItemPanel` detail — the same component the task pane mounts — with Summary, Details, and
+Occurrences tabs. Summary reuses the selected list row, item metadata loads only when needed, the
+occurrence list loads only when its tab opens, and a normalized privacy-allowlisted diagnostic
+(stack frames + safe context, never raw payload) loads only after its occurrence is selected; see
+[security.md](./security.md). Every resource has an independent server mirror and persisted TanStack
+Query key ([caching.md](./caching.md)). Row selection, mapped-repo/branch task promotion (`+ ws`, which
 focuses an existing task instead of duplicating), and attach-to-current-task are distinct actions.
-Links retain the canonical system item id; legacy counter-only links still resolve. Read-only in P1:
+The item counter links through Rollbar's account-independent item permalink (system item ID), while
+an occurrence counter links through Rollbar's documented UUID redirect; both URLs are normalized
+server-side and cached with their resource. Links retain the canonical system item id; legacy
+counter-only links still resolve. Read-only in P1:
 no Rollbar mutations, no write scope.
+
+Rollbar instance endpoints place the notifier payload under `result.data` (`data.body.trace`,
+`data.body.trace_chain`, or `data.body.message`); `id` and `timestamp` remain result-level siblings.
+The upstream type retains `occurrence` only as a compatibility alias. Normalization always happens
+before caching, and the raw `data` object never crosses the server boundary.
 
 ## Conformance and adding a provider
 

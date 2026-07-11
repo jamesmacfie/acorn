@@ -118,8 +118,9 @@ old `workspace_linear_projects` table into a provider-agnostic store.
 
 Read/write via `GET`/`PUT /api/workspaces/:id/projects`. The `PUT` replaces the whole set
 (clear-then-insert — the simplest correct approach for a composite key; marked `ponytail` in the
-source). The Linear browse pane's project picker is the primary writer (see
-[Sources & browse](#sources--browse)).
+source). Linear and Rollbar each expose a project picker; their client-domain replacement helper
+updates only that provider's slice before writing the combined set, so one picker cannot erase the
+other provider's links (see [Sources & browse](#sources--browse)).
 
 ---
 
@@ -257,10 +258,11 @@ A Source browse view lists a provider's items and **promotes** one to a Task.
   workspaces. The pane shows issues across the active workspace's linked projects, with a "Projects"
   picker that reads/writes those links. Clicking an issue promotes it to a `linear`-origin task on the
   *current repo*, tagged with the ticket + its owning integration, and switches to the `linear` pane.
-- **RollbarBrowse** (`apps/desktop/src/plugins/rollbar/client/RollbarBrowse.tsx`) — recent error items
-  across connected projects. An error has no inherent repo/branch, so "open as task" prompts for both
-  (branch defaults to a slug of the title). Alternatively "＋task" attaches the error to the currently
-  active task as a new `task_link` (its most common flow).
+- **RollbarBrowse** (`apps/desktop/src/plugins/rollbar/client/RollbarBrowse.tsx`) — Rollbar connections
+  represent projects and are linked to the active workspace through the same `workspace_projects`
+  model. Only mapped projects are read and shown. "Open as task" uses the currently routed repo from
+  that mapping and prompts only for the branch (defaulting to a slug of the title). Alternatively
+  "＋task" attaches the error to the currently active task as a new `task_link`.
 
 See [`integrations.md`](./integrations.md) for the provider connections themselves.
 

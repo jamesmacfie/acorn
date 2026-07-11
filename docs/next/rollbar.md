@@ -27,12 +27,13 @@
   Durable contracts are captured in `docs/{integrations,panes,caching,security,api-reference,frontend}.md`.
 - **⚠️ Not done — needs a live Rollbar project:** Phase 0's **live** contract spike and the manual
   visual/interaction QA (§"Manual visual and interaction QA") were NOT run — no Rollbar credentials
-  were available. Upstream shapes (`last_occurrence_id`, instance `occurrence.body` layout, `in_app`,
+  were available. Upstream shapes (`last_occurrence_id`, instance `data.body` layout, `in_app`,
   `context.pre/post`, `resolved_in_version`, `assigned_user_id`) were authored from Rollbar's public
   API docs, not verified against real payloads. The normalizer treats every field as possibly absent
   or mistyped and degrades gracefully, but field-name accuracy must be confirmed against a live
-  project before this proposal is removed from `docs/next/`. `RollbarItemDetail.url` is deliberately
-  always `null` (no verified web-URL contract).
+  project before this proposal is removed from `docs/next/`. Web navigation does not depend on
+  account/project slugs: items use Rollbar's global item permalink and occurrences use its documented
+  UUID redirect.
 - **Original status:** proposed; API research and codebase survey complete
 - **Priority:** P1
 - **Effort:** L (several days, including the API contract spike, fixtures, tests, and visual QA)
@@ -228,14 +229,15 @@ The spike must answer these questions before implementation continues:
   read the redirect location/item id explicitly?
 - Which item response field reliably identifies the latest occurrence?
 - What are the exact response envelopes for instance lists and instance detail?
-- Which project/item fields, if any, provide a stable browser URL? Do not construct an “Open in
-  Rollbar” URL from guessed account/project slugs.
+- Item navigation uses the system-wide item ID at `https://rollbar.com/item/:itemId/`; occurrence
+  navigation uses Rollbar's documented `/occurrence/uuid/?uuid=...` redirect. Neither path derives
+  account or project slugs from the display label.
 - How are `trace`, `trace_chain`, `message`, and crash-report bodies represented in actual payloads?
 - Which fields indicate in-project frames, code context, telemetry, session id, and replay id?
 - Are assignment and resolved-version fields consistently present or plan-dependent?
 
-If a stable Rollbar web URL cannot be established from a returned field or a verified project/account
-slug contract, omit the external link in P1. A missing link is better than a plausible but broken URL.
+If an occurrence omits its UUID, return `url: null` and omit that occurrence's link. Do not guess a
+slug-based URL.
 
 ## Target user experience
 
@@ -332,6 +334,7 @@ export type RollbarItemSummary = {
   integrationLabel: string
   identifier: string       // project-visible counter
   itemId: string           // system-wide id, represented as string at Acorn boundaries
+  url: string | null       // account-independent item permalink
   title: string
   level: string
   environment: string
@@ -355,6 +358,7 @@ export type RollbarOccurrenceDetail = {
   id: string
   occurredAt: number | null
   uuid: string | null
+  url: string | null       // UUID redirect; null when UUID is absent
   kind: 'trace' | 'trace-chain' | 'message' | 'crash-report' | 'unknown'
   exceptionClass: string | null
   message: string | null
@@ -374,7 +378,6 @@ export type RollbarOccurrenceDetail = {
 export type RollbarItemDetail = RollbarItemSummary & {
   resolvedInVersion: string | null
   assignedTo: string | null
-  url: string | null
   latestOccurrence: RollbarOccurrenceDetail | null
 }
 
@@ -706,7 +709,7 @@ Stop and report instead of improvising if:
 - response variation cannot be represented without exposing untyped upstream objects to the client;
 - correct P1 list membership requires adding a general query-page cache table (that is a P2 design
   decision, not an incidental migration);
-- a Rollbar web URL would have to be guessed;
+- a Rollbar web URL would have to be guessed beyond the verified item-ID and occurrence-UUID redirects;
 - a requested P1 action requires write or account scope;
 - implementation requires bypassing `runProviderResource`, storing another plaintext token, or
   putting provider secrets in renderer state;
