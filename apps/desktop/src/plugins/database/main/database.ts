@@ -60,8 +60,9 @@ async function resolveDbUrl(db: AppDatabase, taskId: string): Promise<string | n
   if (script && root) {
     try {
       const { stdout } = await exec('bash', ['-lc', script], { cwd: root, timeout: 15_000, maxBuffer: 1 << 20 })
-      // Scripts may echo noise before the URL — take the last non-empty line.
-      const line = stdout.split('\n').map((l) => l.trim()).filter(Boolean).pop()
+      // Scripts may echo noise before the URL — strip ANSI escapes (some CLIs emit them even when
+      // piped) and take the last non-empty line.
+      const line = stdout.replace(/\x1b(?:\[[0-9;]*[A-Za-z]|\(B)/g, '').split('\n').map((l) => l.trim()).filter(Boolean).pop()
       if (line) return line
     } catch {
       // fall through to auto-detect
