@@ -11,6 +11,7 @@ export default function TaskPaneHost(props: {
   task: Task
   extraButtons?: JSX.Element
   onCloseTask: () => void
+  closing?: boolean // archive/teardown in flight → the close button shows a spinner
   shortcutFor?: (id: string) => string | null | undefined
 }) {
   const layout = () => layoutForTask(props.task.id) ?? defaultLayout()
@@ -183,7 +184,17 @@ export default function TaskPaneHost(props: {
           )}
         </For>
         {props.extraButtons}
-        <button type="button" class="pane-switch-btn pane-switch-close" data-tip="Close task" aria-label="Close task" onClick={props.onCloseTask}>✕</button>
+        {/* Not `disabled` while closing — disabled buttons swallow the mouseover the tooltip needs. */}
+        <button
+          type="button"
+          class="pane-switch-btn pane-switch-close"
+          data-tip={props.closing ? 'Removing…' : 'Close task'}
+          aria-label={props.closing ? 'Removing task' : 'Close task'}
+          aria-busy={props.closing || undefined}
+          onClick={() => { if (!props.closing) props.onCloseTask() }}
+        >
+          {props.closing ? <span class="spin">⠿</span> : '✕'}
+        </button>
       </nav>
     </>
   )
