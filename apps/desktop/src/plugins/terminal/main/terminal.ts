@@ -36,19 +36,18 @@ import { launcherSpec, resolveMcpEntry, serverName } from '../../../core/main/mc
 import { broadcastStatus } from '../../../core/main/notify'
 import type { RunSessionGlue } from './runIpc'
 import {
-  baseRefPref,
   computeTaskStatuses,
-  copyConfiguredFiles,
   isDir,
   loadTask,
   rendererBaseCheckout,
   resolveTaskCwd,
+  setOnWorktreeCreated,
   taskContext,
   taskRoot,
   workspaceSetup,
   type TaskRow,
 } from '../../../core/main/taskWorktree'
-import { currentBranch, ensureWorktree } from '../../../core/main/worktrees'
+import { currentBranch } from '../../../core/main/worktrees'
 
 // PTYs live in the main process. Sessions run on one of two backends:
 //  - node-pty: spawn the command directly. Survives a window reload (PTY is in main), not an app
@@ -288,26 +287,25 @@ function startIdleWatch() {
 }
 
 // Run the workspace setup script as a "Setup" session in the freshly-created worktree, unless it's
-// blank or disabled ('off'). Called whenever a worktree is first created (create() on first
-// terminal, or onCreated at task creation). Ordered before the requested session so it's tab #1.
-async function maybeRunSetup(db: AppDatabase, t: TaskRow, cwd: string, ctx: Pick<TerminalSession, 'repo' | 'pull'>): Promise<void> {
+// blank or disabled ('off'). Registered as the taskWorktree onWorktreeCreated hook, so it fires
+// exactly once no matter which path creates the worktree (first terminal, editor/changes pane,
+// onCreated eager pre-create, run config, workflows). Ordered before any requested session so a
+// setup spawned from create() is tab #1.
+async function maybeRunSetup(db: AppDatabase, t: TaskRow, cwd: string): Promise<void> {
   const { script, trigger } = await workspaceSetup(db, t.repoOwner, t.repoName)
   if (trigger === 'off' || !script?.trim()) return
-  await spawnOne(db, { taskId: t.id, command: script, title: 'Setup' }, cwd, true, ctx, t)
+  await spawnOne(db, { taskId: t.id, command: script, title: 'Setup' }, cwd, true, taskContext(t), t)
+  broadcastStatus() // panel re-lists to show the Setup tab even when no other spawn follows
 }
 
 async function create(db: AppDatabase, opts: CreateOpts): Promise<TerminalSession> {
   // The renderer passes the base checkout as opts.cwd (validated at the boundary); the worktree is
   // derived from it. Lazy worktree on first terminal, reused after (docs/workspaces-and-tasks.md).
+  // A first-ever worktree fires the onWorktreeCreated hook inside resolveTaskCwd → maybeRunSetup.
   const baseCheckout = rendererBaseCheckout(opts.cwd)
   const t = await loadTask(db, opts.taskId)
-  const ctx = taskContext(t)
-  const { cwd, isWorktree, created } = await resolveTaskCwd(db, t, baseCheckout)
-  // First-ever worktree for this task → run the setup script (unless 'off') as tab #1 before the
-  // requested session (which stays focused). Runs once because `created` is only true on the single
-  // worktree add; if it already ran at task creation ('created' trigger), created is false here.
-  if (created && t) await maybeRunSetup(db, t, cwd, ctx)
-  return spawnOne(db, opts, cwd, isWorktree, ctx, t)
+  const { cwd, isWorktree } = await resolveTaskCwd(db, t, baseCheckout)
+  return spawnOne(db, opts, cwd, isWorktree, taskContext(t), t)
 }
 
 // Build the session meta, spawn the PTY (tmux or node-pty) in the already-resolved cwd, and wire it.
@@ -483,6 +481,10 @@ export function registerTerminalIpc(db: AppDatabase, worktreesDir: string, deps:
   seedNotes = deps.seedTaskNotes
   bootReconciled = deps.reconciled
 
+  // Every worktree creation funnels through resolveTaskCwd; this hook makes the setup script run
+  // regardless of which surface (terminal, pane, workflow) created the worktree.
+  setOnWorktreeCreated((t, cwd) => maybeRunSetup(db, t, cwd))
+
   // The request/response half of the terminal engine, exposed as the TerminalBridge behind the HTTP
   // routes (server/routes/terminal.ts).
   // The STREAM half (term:input/attach/detach + the term:out push, term:status) is the WebSocket
@@ -550,26 +552,25 @@ export function registerTerminalIpc(db: AppDatabase, worktreesDir: string, deps:
     },
     // Notified by the client right after a task is created. If its workspace runs the setup script on
     // task creation (trigger 'created') and the repo checkout is mapped, eagerly create the worktree
-    // and run the script now (as a background "Setup" tab). Other triggers no-op here and are handled
-    // lazily by create(). Best-effort: a missing checkout defers to first terminal.
+    // now — resolveTaskCwd's onWorktreeCreated hook runs the script (as a background "Setup" tab).
+    // Other triggers no-op here and are handled lazily by whichever surface touches the task first.
+    // Best-effort: a missing checkout defers to first use.
     onCreated: async (id) => {
       if (!id) return
-      const t = await loadTask(db, id)
+      let t = await loadTask(db, id)
       if (!t) return
       // Snapshot PR/ticket context into curatable notes (docs/notes-and-memory.md). Best-effort and
       // independent of worktree setup — runs even when there's no setup script / the worktree exists.
       await seedNotes?.(t).catch((e) => console.warn('[notes] seed failed:', e))
-      if (t.worktreePath && isDir(t.worktreePath)) return
       const { script, trigger } = await workspaceSetup(db, t.repoOwner, t.repoName)
       if (trigger !== 'created' || !script?.trim()) return
+      // Re-read after the seedNotes await — a pane may have created the worktree meanwhile.
+      t = await loadTask(db, id)
+      if (!t || (t.worktreePath && isDir(t.worktreePath))) return
       const mapped = await getRepoPath(db, t.repoOwner, t.repoName)
       if (!mapped || !isDir(mapped.path)) return
-      const wt = await ensureWorktree(worktreesDir, mapped.path, t.repoOwner, t.repoName, t.branch, t.pullNumber, await baseRefPref(db, t.repoOwner, t.repoName))
-      if (!wt.ok || !wt.created) return
-      await db.update(schema.tasks).set({ worktreePath: wt.path, updatedAt: Date.now() }).where(eq(schema.tasks.id, t.id))
-      await copyConfiguredFiles(db, t, mapped.path, wt.path)
-      await maybeRunSetup(db, t, wt.path, taskContext(t))
-      broadcastStatus() // rail/footer pick up the new worktree; panel re-lists to show the Setup tab
+      await resolveTaskCwd(db, t, mapped.path)
+      broadcastStatus() // rail/footer pick up the new worktree
     },
     // "New task here": point a task at the mapped checkout itself instead of an isolated worktree, and
     // adopt the checkout's current branch. worktreePath === checkout is the marker every guard keys off.
