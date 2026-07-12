@@ -28,7 +28,7 @@ import { wireContextSections } from './contextSectionsWiring'
 import { registerWorkflowIpc } from './workflowWiring'
 import { registerPreviewIpc } from '../../plugins/preview/main/previewService'
 import { endDbPools } from '../../plugins/database/main/database'
-import { disposeTerminal, reconcileTmux, registerTerminalIpc, sendToAgent, terminalRunGlue } from '../../plugins/terminal/main/terminal'
+import { disposeTerminal, reconcileTmux, refreshAcornMcpRegistrations, registerTerminalIpc, sendToAgent, terminalRunGlue } from '../../plugins/terminal/main/terminal'
 import { seedTaskNotes } from '../../plugins/notes/main/seedTaskNotes'
 import { reconcileWorktrees, setWorktreesRoot } from '../../core/main/taskWorktree'
 import { wireConfigTrust } from './configTrustWiring'
@@ -210,6 +210,10 @@ export async function bootstrap({ dataDir, origin, createWindow }: BootstrapOpti
   // 5. Create the window as soon as the listener is up (docs/electron.md §11 boot policy).
   const win = await createWindow()
   mark('window')
+
+  // Refresh the acorn MCP registration to the current electron binary (heals a stale pnpm-store path
+  // from a prior electron version). Fire-and-forget, off the paint-critical path; shells out per agent CLI.
+  void refreshAcornMcpRegistrations().catch((e) => console.warn('[boot] MCP re-register failed:', e))
 
   // 6. Reconcile durable state AFTER the window, off the paint-critical path. The sessions/worktrees
   //    it recovers are not needed to paint the shell (docs/electron.md §11). The steps are independent —

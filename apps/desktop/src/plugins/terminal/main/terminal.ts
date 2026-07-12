@@ -28,7 +28,7 @@ import {
   tmuxNewSessionArgs,
   trimRing,
 } from './terminalUtils'
-import { getProfile, listProfiles, resolveCommand, tmuxAvailable } from '../../../core/main/profiles'
+import { getProfile, listProfileDefs, listProfiles, resolveCommand, tmuxAvailable } from '../../../core/main/profiles'
 import { getRepoPath, setRepoPath, setRunTargets } from '../../../core/main/repoPaths'
 import { fileURLToPath } from 'node:url'
 import { inspectMcpConfig, MCP_CANDIDATES, STARTER_MCP_JSON, type McpServerSummary } from '../../../core/shared/mcp'
@@ -382,6 +382,21 @@ async function spawnOne(
 // that profile contribution rather than a second profile-id lookup table.
 const mcpName = () => serverName(!process.defaultApp && !process.env.ELECTRON_IS_DEV)
 const mcpLauncher = () => launcherSpec(process.execPath, resolveMcpEntry(dirname(fileURLToPath(import.meta.url))), mcpName())
+
+// Boot-time MCP re-registration (docs/mcp.md): the registered launcher command is process.execPath —
+// a volatile pnpm-store Electron path in dev that ENOENTs after any electron reinstall/bump, leaving
+// `/mcp` showing acorn disconnected. Session-spawn already re-registers, but restored/tmux-reattached
+// sessions never do, so refresh every agent CLI's entry to the CURRENT binary once at boot too.
+// Idempotent (remove-then-add), failures swallowed.
+export async function refreshAcornMcpRegistrations(): Promise<void> {
+  const name = mcpName()
+  const launcher = mcpLauncher()
+  await Promise.all(
+    listProfileDefs()
+      .filter((p) => p.mcpRegistration)
+      .map((p) => p.mcpRegistration!(name, launcher).catch(() => undefined)),
+  )
+}
 
 // Killing a tmux session's attach PTY only *detaches* it — the session keeps running. To actually
 // stop a tmux agent we must kill the tmux session itself (which then EOFs the PTY → onExit).
