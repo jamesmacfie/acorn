@@ -154,7 +154,7 @@ function appendRing(s: Session, data: string) {
 function ensureTmuxSession(name: string, cwd: string, command: string, env: Record<string, string>) {
   // tmux runs the command argument through the user's shell, so a full "pnpm dev" line works; env
   // (e.g. PORT) is inherited by that shell (docs/workspaces-and-tasks.md).
-  execFileSync('tmux', tmuxNewSessionArgs(name, cwd, command), { env, stdio: 'ignore' })
+  execFileSync('tmux', tmuxNewSessionArgs(name, cwd, command, env), { env, stdio: 'ignore' })
   // ponytail: hide tmux's own status bar — we render our own tab strip, so it's just noise
   execFileSync('tmux', ['set-option', '-t', name, 'status', 'off'], { env, stdio: 'ignore' })
 }

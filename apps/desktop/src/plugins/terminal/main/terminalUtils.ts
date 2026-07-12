@@ -19,7 +19,25 @@ export const tmuxName = (id: string) => `${TMUX_PREFIX}${id}`
 
 // argv for the two tmux calls. new-session -A -d is create-or-noop, detached (we drive it through a
 // separate attach PTY). -c sets cwd; the trailing command runs only when the session is created.
-export const tmuxNewSessionArgs = (name: string, cwd: string, command: string) => ['new-session', '-A', '-d', '-s', name, '-c', cwd, command]
+//
+// `-e KEY=VAL` sets the SESSION environment explicitly (tmux ≥3.2). This is load-bearing: the tmux
+// server is a singleton, and a session created against an ALREADY-RUNNING server does NOT inherit
+// the env we hand execFileSync — it takes the server's stale global env plus only the
+// `update-environment` whitelist, silently dropping ACORN_TASK_ID / ACORN_API_TOKEN. That made
+// agent panes (tmux backend) show "connected · no tools" while shell panes (node-pty, full env)
+// worked. Passing every var via -e replicates node-pty's behaviour regardless of server state.
+// (Session names are unique per pane, so -A never attaches to an existing one where -e wouldn't apply.)
+export const tmuxNewSessionArgs = (name: string, cwd: string, command: string, env: Record<string, string> = {}) => [
+  'new-session',
+  '-A',
+  '-d',
+  ...Object.entries(env).flatMap(([k, v]) => ['-e', `${k}=${v}`]),
+  '-s',
+  name,
+  '-c',
+  cwd,
+  command,
+]
 export const tmuxAttachArgs = (name: string) => ['attach', '-t', name]
 
 // Parse `tmux list-sessions -F '#{session_name}'` into the set of our session names.

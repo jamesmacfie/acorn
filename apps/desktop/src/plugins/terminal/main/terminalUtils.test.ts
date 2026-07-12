@@ -58,6 +58,10 @@ describe('tmux arg builders', () => {
   it('build create-or-noop + attach argv', () => {
     expect(tmuxName('abc')).toBe('acorn-abc')
     expect(tmuxNewSessionArgs('acorn-abc', '/repo', 'claude')).toEqual(['new-session', '-A', '-d', '-s', 'acorn-abc', '-c', '/repo', 'claude'])
+    // env is set explicitly via -e so a pre-existing tmux server can't drop ACORN_* (no-tools bug)
+    expect(tmuxNewSessionArgs('acorn-abc', '/repo', 'claude', { ACORN_TASK_ID: 't1', ACORN_API_TOKEN: 'tok' })).toEqual([
+      'new-session', '-A', '-d', '-e', 'ACORN_TASK_ID=t1', '-e', 'ACORN_API_TOKEN=tok', '-s', 'acorn-abc', '-c', '/repo', 'claude',
+    ])
     expect(tmuxAttachArgs('acorn-abc')).toEqual(['attach', '-t', 'acorn-abc'])
   })
 })
