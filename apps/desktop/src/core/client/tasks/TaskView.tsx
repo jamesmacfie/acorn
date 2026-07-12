@@ -158,17 +158,27 @@ export default function TaskView(props: {
     onCleanup(() => { bindings.dispose(); commands.dispose() })
   })
 
+  // While the guarded teardown runs (it can take seconds — teardown script + worktree removal),
+  // the pane-switcher's close button shows a spinner so the archive visibly has feedback.
+  const [archiving, setArchiving] = createSignal(false)
+
   async function confirmClose(skipTeardown = false) {
+    if (archiving()) return
     const archivedTaskId = props.task.id
     const next = nextTask()
     if (api) {
-      const result = await api.task.archive(archivedTaskId, {
-        deleteWorktree: true, force: true, skipTeardown,
-      })
-      if (!result.ok) {
-        setTeardownFailed(!!result.teardownFailed)
-        setCloseError(result.output ? `${result.reason}\n${result.output}` : result.reason)
-        return
+      setArchiving(true)
+      try {
+        const result = await api.task.archive(archivedTaskId, {
+          deleteWorktree: true, force: true, skipTeardown,
+        })
+        if (!result.ok) {
+          setTeardownFailed(!!result.teardownFailed)
+          setCloseError(result.output ? `${result.reason}\n${result.output}` : result.reason)
+          return
+        }
+      } finally {
+        setArchiving(false)
       }
     } else {
       await archiveTask(archivedTaskId)
@@ -213,7 +223,7 @@ export default function TaskView(props: {
   return (
     <div class="workspace-wrap">
       <main class="panes panes-workspace task-layout">
-        <TaskPaneHost task={props.task} extraButtons={extraButtons()} onCloseTask={openClose} shortcutFor={shortcutFor} />
+        <TaskPaneHost task={props.task} extraButtons={extraButtons()} onCloseTask={openClose} closing={archiving()} shortcutFor={shortcutFor} />
 
         <Show when={agentsOpen()}>
           <AgentsPanel task={props.task} onClose={() => setAgentsOpen(false)} />
