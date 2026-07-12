@@ -1,7 +1,7 @@
 import { Buffer } from 'node:buffer'
 import { and, eq } from 'drizzle-orm'
 import type { ContextBudget, ContextItem, ContextSectionResult, TaskContext } from '../../shared/api'
-import type { NoteScope } from '../../shared/notes'
+import type { NoteAuthor, NoteScope } from '../../shared/notes'
 import type { AppDatabase } from '../db'
 import { schema } from '../db'
 import { parseCached } from '../integrations/codec'
@@ -29,7 +29,7 @@ export type ContextSectionContribution = {
 export type ContextNotesSource = (
   taskId: string,
   repo: string,
-) => Promise<{ slug: string; scope: NoteScope; title: string; kind: string; body: string }[]>
+) => Promise<{ slug: string; scope: NoteScope; title: string; kind: string; body: string; author: NoteAuthor }[]>
 export type ContextMemorySource = (taskId: string, repo: string) => Promise<{ name: string; description: string }[]>
 
 const truncateBytes = (value: string, max: number): string => {
@@ -76,6 +76,11 @@ function budgetLegacy(
 
 const formatOmitted = (omitted: number) => (omitted ? `\n- … ${omitted} more omitted` : '')
 
+// INVARIANT (relied on by the client-side Manifest preview + local send assembly, docs/next/context-ui.md):
+// a section's `compact` MUST be computed independently of which *other* sections are included. This lets
+// the client assemble the exact send block from a single `include=*` inventory by filtering ctx.sections
+// and calling formatContextBlock — no second curated fetch. A new section that reads sibling inclusion
+// state into its compact breaks that byte-exactness silently. Don't.
 export function buildContextSections(sources: { notes: ContextNotesSource; memory: ContextMemorySource }): ContextSectionContribution[] {
   return [
     {
@@ -186,7 +191,7 @@ export function buildContextSections(sources: { notes: ContextNotesSource; memor
           ? allNotes.filter((note) => !note.slug.startsWith('workflow-handoffs-') || note.slug === `workflow-handoffs-${workflowRunId}`)
           : allNotes
         return {
-          items: notes.map((note) => ({ id: `${note.scope}:${note.slug}`, kind: note.kind, label: note.title, body: note.body, details: [note.scope] })),
+          items: notes.map((note) => ({ id: `${note.scope}:${note.slug}`, kind: note.kind, label: note.title, body: note.body, details: [note.scope], origin: { author: note.author } })),
           legacy: { notes: notes.map((note) => ({ slug: note.slug, scope: note.scope, title: note.title, body: note.body })) },
         }
       },

@@ -10,6 +10,7 @@ removed; current behavior is documented in the parent [`docs/`](../) tree.
 | [performance.md](./performance.md) | Remaining measurement, retention, and scaling work |
 | [security.md](./security.md) | The unbuilt repo-config trust gate (see [next-review.md](../next-review.md) §1.1) plus future principal kinds, relays, webhooks, and control channels |
 | [rollbar.md](./rollbar.md) | Rollbar master/detail Source and task pane: API capability map, privacy-safe occurrence detail, and phased implementation plan |
+| [context-ui.md](./context-ui.md) | Agent-context UX rework: Manifest pane (persisted selection, preview, sizes, session picker, staleness, inline memory) + scratchpad-first Notes pane, with phased plan |
 | [chat/](./chat/) | Workspace-scoped multi-provider chat plugin: persistence, providers, streaming, attachments, UI, security, and implementation plan |
 
 Shipped contracts belong in durable docs such as [plugins.md](../plugins.md),

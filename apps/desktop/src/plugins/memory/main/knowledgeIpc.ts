@@ -216,6 +216,11 @@ export function registerKnowledgeIpc(db: AppDatabase, dataRoot: string, deps: Kn
         await notesStore.setIncluded(location, slug, included)
         return { ok: true }
       }),
+    notesSetTitle: (location, slug, title) =>
+      guard(async () => {
+        await notesStore.setTitle(location, slug, title)
+        return { ok: true }
+      }),
     notesRemove: (location, slug) =>
       guard(async () => {
         await notesStore.remove(location, slug)

@@ -2,7 +2,7 @@
 .context-pane { display: flex; flex-direction: column; min-height: 0; }
 .context-tray-head { display: flex; align-items: center; gap: 8px; }
 .context-tray-msg { margin-left: auto; }
-.context-tray-body { flex: 1; min-height: 0; overflow-y: auto; padding: 6px var(--pane-pad) 8px; display: flex; flex-direction: column; gap: 2px; }
+.context-tray-body { flex: 1; min-height: 0; overflow-y: auto; padding: 0; display: flex; flex-direction: column; }
 .context-tray-row {
   display: flex;
   align-items: baseline;
@@ -19,10 +19,55 @@
   font-family: var(--font-mono);
 }
 .context-tray-label { flex: 1; min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
-.context-tray-actions { display: flex; gap: 8px; margin-top: 4px; }
+.context-tray-actions { display: flex; gap: 8px; margin-top: 6px; }
 
-/* Expandable list rows — click the label to reveal the item's detail below. */
-.context-tray-item { display: flex; flex-direction: column; }
+/* Each section is a distinct banded block: a top rule + padding separates it from its neighbours,
+   the header reads as a heading, and its items are indented beneath (docs/next/context-ui.md). */
+.context-tray-section { padding: 8px var(--pane-pad) 10px; border-top: 1px solid var(--border); }
+.context-tray-section:first-child { border-top: 0; }
+.context-tray-section > .context-tray-row { align-items: center; }
+/* The section title (rendered via .context-tray-kind) is a heading, not a monospace column token. */
+.context-tray-section > .context-tray-row > .context-tray-kind {
+  min-width: 0;
+  color: var(--text);
+  font-family: inherit;
+  font-weight: 600;
+}
+
+/* Notes provenance / scope badge (docs/next/context-ui.md): 🤖 agent · seed workflow · scope pill. */
+.context-origin-badge { flex: none; font-size: var(--fs-xs, 11px); color: var(--text-muted); }
+
+/* Per-section size + budget bar (docs/next/context-ui.md). The cap is a worst-case allowance, not a
+   hard limit — a full bar means "near the per-item truncation ceiling", nothing more. */
+.context-size { flex: none; margin-left: auto; color: var(--text-muted); font-variant-numeric: tabular-nums; font-size: var(--fs-xs, 11px); }
+/* A contained meter under the header, not a full-width rule — indented to the label, capped narrow. */
+.context-bar { height: 3px; max-width: 140px; margin: 4px 0 0 26px; background: var(--bg-selected); border-radius: 999px; overflow: hidden; }
+.context-bar-fill { height: 100%; background: var(--accent); border-radius: 999px; }
+.context-bar-fill.warn { background: var(--warn); }
+
+/* Preview strip: collapsed one-liner with total size, expands to the byte-exact assembled block. */
+.context-preview { padding: 8px var(--pane-pad) 10px; border-top: 1px solid var(--border); }
+.context-preview-toggle {
+  display: flex; align-items: baseline; gap: 6px; width: 100%;
+  font: inherit; font-size: var(--fs-sm); text-align: left; color: var(--text);
+  background: transparent; border: 0; padding: 0; cursor: pointer;
+}
+.context-preview-block {
+  margin: 6px 0 0; padding: 6px 8px; max-height: 40vh; overflow: auto;
+  background: var(--bg-selected); border-radius: 4px;
+  font-family: var(--font-mono); font-size: var(--fs-xs, 11px); color: var(--text-muted);
+  white-space: pre-wrap; word-break: break-word;
+}
+
+/* Footer: session target picker + staleness pill + Sync (docs/next/context-ui.md). */
+.context-sync-row { display: flex; align-items: center; gap: 8px; padding: 8px var(--pane-pad) 10px; border-top: 1px solid var(--border); }
+.context-sync-btn { margin-left: auto; }
+.context-stale-pill { flex: none; font-size: var(--fs-xs, 11px); border-radius: 999px; padding: 0 8px; }
+.context-stale-pill.warn { color: var(--warn); border: 1px solid var(--warn); }
+
+/* Expandable list rows — indented beneath the section header, click the label to reveal detail. */
+.context-tray-item { display: flex; flex-direction: column; padding: 3px 0 3px 26px; }
+.context-tray-item .context-tray-kind { min-width: 0; font-size: var(--fs-xs, 11px); }
 .context-tray-expand {
   flex: 1;
   min-width: 0;
@@ -53,13 +98,15 @@
 }
 .context-tray-edit:hover { color: var(--accent); }
 .context-tray-detail {
-  margin: 2px 0 4px 60px;
+  margin: 3px 0 2px 18px;
   padding-left: 8px;
   border-left: 1px solid var(--border);
   display: flex;
   flex-direction: column;
   gap: 3px;
 }
+/* The section-level "⚠ absent" line aligns with the indented item rows. */
+.context-tray-section > .context-tray-detail { margin-left: 26px; border-left: 0; padding-left: 0; }
 .context-tray-detail-body { font-size: var(--fs-sm); color: var(--text-muted); white-space: pre-wrap; word-break: break-word; }
 .context-tray-files { margin: 0; padding-left: 16px; font-family: var(--font-mono); font-size: var(--fs-xs, 11px); color: var(--text-muted); }
 

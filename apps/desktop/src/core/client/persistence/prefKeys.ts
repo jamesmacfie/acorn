@@ -27,6 +27,7 @@ export const PrefKeys = {
   taskLayoutsScoped: 'core:task-layouts',
   editorOpenFilesScoped: 'editor:open-files',
   prFiltersScoped: 'github:pr-filters',
+  contextSelectionScoped: 'context:section-selection',
 } as const
 
 export type PrefKey = (typeof PrefKeys)[keyof typeof PrefKeys]
@@ -37,4 +38,5 @@ export const PersistedSliceKeys = {
   taskLayouts: PrefKeys.taskLayoutsScoped,
   editorOpenFiles: PrefKeys.editorOpenFilesScoped,
   prFilters: PrefKeys.prFiltersScoped,
+  contextSelection: PrefKeys.contextSelectionScoped,
 } as const

@@ -179,6 +179,14 @@ export class NotesStore {
     await this.atomicWrite(file, serializeNote(meta, body))
   }
 
+  // Rename the display title. The slug (filename) never changes, so deep links + seeded slugs stay stable.
+  async setTitle(location: NoteLocation, slug: string, title: string): Promise<void> {
+    const file = this.fileFor(location, slug)
+    const { meta, body } = parseNote(await readFile(file, 'utf8'), slug)
+    meta.title = title
+    await this.atomicWrite(file, serializeNote(meta, body))
+  }
+
   // Append (agents logging findings). Missing note → created with the writer's identity.
   async append(location: NoteLocation, slug: string, text: string, opts?: { author?: NoteAuthor; originSessionId?: string; originTaskId?: string }): Promise<void> {
     const file = this.fileFor(location, slug)

@@ -3,6 +3,11 @@
 // two sides can't drift. Kinds are scratch|plan|finding|handoff ONLY — anchored annotations are
 // review_notes rows (README decision 16), never note kinds.
 
+// The per-task scratchpad's reserved slug. A cross-surface contract (Notes pane lands here; the
+// pane creates the file lazily on first keystroke), so it lives in shared. No store changes — the
+// empty-body context filter keeps an untouched scratchpad out of assembled context.
+export const SCRATCHPAD_SLUG = 'scratchpad'
+
 export type NoteAuthor = 'user' | 'agent' | 'workflow'
 export type NoteKind = 'scratch' | 'plan' | 'finding' | 'handoff'
 export type NoteScope = 'global' | 'workspace' | 'task'

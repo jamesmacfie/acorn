@@ -1,0 +1,40 @@
+/* Reusable tab strip (core/client/ui/Tabs.tsx). Generalized from the Rollbar item panel. */
+.ui-tabs {
+  display: flex;
+  align-items: stretch;
+  min-height: 40px;
+  padding: 0 var(--pane-pad);
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-subtle);
+}
+.ui-tab {
+  position: relative;
+  min-width: 88px;
+  padding: 0 12px;
+  font: inherit;
+  font-size: var(--fs-sm);
+  color: var(--text-muted);
+  background: transparent;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.ui-tab.active { color: var(--text); border-bottom-color: var(--accent); }
+.ui-tab:active { background: var(--bg-selected); }
+.ui-tab:focus-visible { outline: 2px solid var(--accent); outline-offset: -3px; }
+.ui-tab-count {
+  margin-left: 6px;
+  padding: 1px 5px;
+  font-family: var(--font-mono);
+  font-size: var(--fs-xs);
+  color: var(--text-muted);
+  background: var(--bg-selected);
+  border-radius: 999px;
+}
+@media (hover: hover) {
+  .ui-tab:hover { color: var(--text); background: var(--bg-hover); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .ui-tab { transition: none; }
+}

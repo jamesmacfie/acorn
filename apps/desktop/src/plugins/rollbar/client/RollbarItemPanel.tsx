@@ -19,6 +19,7 @@ import {
   type RollbarOccurrencesResponse,
 } from '../../../core/shared/api'
 import RollbarOccurrenceView from './RollbarOccurrenceView'
+import { Tabs } from '../../../core/client/ui/Tabs'
 import './rollbar.css'
 
 export type RollbarTarget = { connectionId: string; identifier: string }
@@ -95,16 +96,6 @@ export default function RollbarItemPanel(props: {
     }
   }
 
-  function onTabKeyDown(event: KeyboardEvent) {
-    if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return
-    event.preventDefault()
-    const current = TABS.findIndex((candidate) => candidate.id === tab())
-    const offset = event.key === 'ArrowRight' ? 1 : -1
-    const next = TABS[(current + offset + TABS.length) % TABS.length]
-    setTab(next.id)
-    document.getElementById(`rollbar-tab-${next.id}`)?.focus()
-  }
-
   return (
     <section class="pane rollbar-panel" classList={{ 'rollbar-panel-pane': props.variant === 'pane' }}>
       <div class="section-header rollbar-panel-head">
@@ -133,24 +124,13 @@ export default function RollbarItemPanel(props: {
         </div>
       </Show>
 
-      <div class="rollbar-tabs" role="tablist" aria-label="Rollbar item sections" onKeyDown={onTabKeyDown}>
-        <For each={TABS}>{(candidate) => (
-          <button
-            id={`rollbar-tab-${candidate.id}`}
-            type="button"
-            role="tab"
-            aria-selected={tab() === candidate.id}
-            aria-controls={`rollbar-panel-${candidate.id}`}
-            tabindex={tab() === candidate.id ? 0 : -1}
-            class="rollbar-tab"
-            classList={{ active: tab() === candidate.id }}
-            onClick={() => setTab(candidate.id)}
-          >
-            {candidate.label}
-            <Show when={candidate.id === 'occurrences' && facts()}>{(item) => <span class="rollbar-tab-count">{item().totalOccurrences}</span>}</Show>
-          </button>
-        )}</For>
-      </div>
+      <Tabs
+        tabs={TABS.map((candidate) => (candidate.id === 'occurrences' && facts() ? { ...candidate, count: facts()!.totalOccurrences } : candidate))}
+        active={tab()}
+        onChange={(id) => setTab(id as RollbarPanelTab)}
+        idPrefix="rollbar"
+        ariaLabel="Rollbar item sections"
+      />
       <Show when={refreshError()}><div class="action-error rollbar-refresh-error" role="alert">{refreshError()}</div></Show>
 
       <div class="rollbar-panel-body">

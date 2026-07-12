@@ -1,3 +1,5 @@
+import { contextSelectionsByTask, hydrateContextSelection } from '../../../plugins/context/client/selectionState'
+import type { TraySelection } from '../../../plugins/context/client/model'
 import { editorStateByTask, hydrateTaskEditorState, type TaskEditorState } from '../../../plugins/editor/client/editorState'
 import { hydrateNoticeValues, notices, type Notice } from '../notifications/notifications'
 import { hydratePrFilter, prFilters, type PrFilter } from '../../../plugins/github/client/pullList/filterState'
@@ -131,11 +133,31 @@ const noticesSlice: PersistedStateSlice<Notice[]> = {
   binding: appStateBinding(notices, hydrateNoticeValues),
 }
 
+const parseContextSelection = (raw: unknown): TraySelection => {
+  const value = parseJson(raw)
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return {}
+  return Object.fromEntries(Object.entries(value as Record<string, unknown>).filter(([, v]) => typeof v === 'boolean')) as TraySelection
+}
+
+const contextSelectionSlice: PersistedStateSlice<TraySelection> = {
+  id: 'context.section-selection',
+  key: PersistedSliceKeys.contextSelection,
+  scope: 'task',
+  restore: 'panes',
+  version: 1,
+  codec: { parse: parseContextSelection, serialize: (value) => value },
+  empty: () => ({}),
+  unknownIds: 'retain-inert',
+  maxBytes: 4 * 1024,
+  binding: { values: contextSelectionsByTask, hydrate: hydrateContextSelection },
+}
+
 export const persistedFeatureSlices: readonly PersistedStateSlice<unknown>[] = [
   taskLayoutSlice,
   editorOpenFilesSlice,
   prFiltersSlice,
   noticesSlice,
+  contextSelectionSlice,
 ] as readonly PersistedStateSlice<unknown>[]
 
-export const persistedStateCodecs = { parseEditorState, parsePrFilter, parseNotices }
+export const persistedStateCodecs = { parseEditorState, parsePrFilter, parseNotices, parseContextSelection }

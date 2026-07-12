@@ -6,6 +6,7 @@ export type PaneIntent =
   | { kind: 'notes:open'; slug: string; scope: NoteScope }
   | { kind: 'editor:reveal'; path: string; line: number }
   | { kind: 'integration:show-ref'; ref: ExternalRef }
+  | { kind: 'context:reveal'; sectionId: string; itemId?: string } // → pane 'context'
 
 export type ClientEventMap = {
   'boot:restored': { phases: ('workspace' | 'view' | 'panes')[] }

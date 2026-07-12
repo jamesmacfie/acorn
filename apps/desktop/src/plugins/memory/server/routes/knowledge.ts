@@ -22,6 +22,7 @@ export type KnowledgeBridge = {
   notesCreate(location: NoteLocation, title: string, kind?: string): Promise<unknown>
   notesWrite(location: NoteLocation, slug: string, body: string): Promise<unknown>
   notesSetIncluded(location: NoteLocation, slug: string, included: boolean): Promise<unknown>
+  notesSetTitle(location: NoteLocation, slug: string, title: string): Promise<unknown>
   notesRemove(location: NoteLocation, slug: string): Promise<unknown>
 }
 
@@ -35,6 +36,7 @@ const resolveBody = z.object({ approved: z.boolean(), edited: editedShape.option
 const createBody = z.object({ title: z.string(), kind: z.string().optional() })
 const writeBody = z.object({ body: z.string() })
 const includedBody = z.object({ included: z.boolean() })
+const titleBody = z.object({ title: z.string().trim().min(1) })
 const workspaceLocation = (id: string): NoteLocation => (id === 'global' ? { scope: 'global' } : { scope: 'workspace', workspaceId: id })
 const taskLocation = (id: string): NoteLocation => ({ scope: 'task', taskId: id })
 
@@ -75,6 +77,11 @@ export const knowledge = new Hono<AppEnv>()
     if (!p.success) return respondError(c, 400, 'bad_request')
     return viaBridge(c, knowledgeBridgeSlot, (b) => b.notesSetIncluded(workspaceLocation(c.req.param('wsId')), c.req.param('slug'), p.data.included))
   })
+  .post('/workspaces/:wsId/notes/:slug/title', async (c) => {
+    const p = titleBody.safeParse(await c.req.json().catch(() => null))
+    if (!p.success) return respondError(c, 400, 'bad_request')
+    return viaBridge(c, knowledgeBridgeSlot, (b) => b.notesSetTitle(workspaceLocation(c.req.param('wsId')), c.req.param('slug'), p.data.title))
+  })
   .delete('/workspaces/:wsId/notes/:slug', (c) => viaBridge(c, knowledgeBridgeSlot, (b) => b.notesRemove(workspaceLocation(c.req.param('wsId')), c.req.param('slug'))))
   .get('/tasks/:id/notes', (c) => viaBridge(c, knowledgeBridgeSlot, (b) => b.notesList(taskLocation(c.req.param('id')))))
   .get('/tasks/:id/notes/:slug', (c) => viaBridge(c, knowledgeBridgeSlot, (b) => b.notesRead(taskLocation(c.req.param('id')), c.req.param('slug'))))
@@ -92,5 +99,10 @@ export const knowledge = new Hono<AppEnv>()
     const p = includedBody.safeParse(await c.req.json().catch(() => null))
     if (!p.success) return respondError(c, 400, 'bad_request')
     return viaBridge(c, knowledgeBridgeSlot, (b) => b.notesSetIncluded(taskLocation(c.req.param('id')), c.req.param('slug'), p.data.included))
+  })
+  .post('/tasks/:id/notes/:slug/title', async (c) => {
+    const p = titleBody.safeParse(await c.req.json().catch(() => null))
+    if (!p.success) return respondError(c, 400, 'bad_request')
+    return viaBridge(c, knowledgeBridgeSlot, (b) => b.notesSetTitle(taskLocation(c.req.param('id')), c.req.param('slug'), p.data.title))
   })
   .delete('/tasks/:id/notes/:slug', (c) => viaBridge(c, knowledgeBridgeSlot, (b) => b.notesRemove(taskLocation(c.req.param('id')), c.req.param('slug'))))

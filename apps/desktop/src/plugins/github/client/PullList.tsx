@@ -213,7 +213,7 @@ export default function PullList() {
                       <span class="pr-time muted">{formatRelativeTime(pr.updatedAt)}</span>
                       <Show when={pr.headRef}>
                         <button type="button" class="pr-ws-btn" title="Open as task" onClick={(e) => void openAsTask(e, pr)}>
-                          + ws
+                          +TASK
                         </button>
                       </Show>
                     </A>

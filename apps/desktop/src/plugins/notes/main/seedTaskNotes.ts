@@ -70,7 +70,11 @@ export async function seedTaskNotes(db: AppDatabase, notesStore: NotesStore, int
   const existing = await notesStore.list(location)
   if (existing.some((n) => n.originTaskId === task.id)) return
 
-  const seed = (title: string, body: string) => notesStore.create(location, title, { author: 'user', kind: 'scratch', originTaskId: task.id, included: true, body })
+  // author 'workflow' marks these as external snapshots (PR/comment/ticket), not hand-authored notes
+  // — they carry the `seed` badge, stay in assembled context, and are hidden from the Notes editing
+  // pane (docs/next/context-ui.md). Handoffs are also author 'workflow' but kind 'finding', so they
+  // stay visible; only the workflow+scratch combo is a seed.
+  const seed = (title: string, body: string) => notesStore.create(location, title, { author: 'workflow', kind: 'scratch', originTaskId: task.id, included: true, body })
 
   if (task.pullNumber != null) {
     // pullDetail refreshes the mirror on staleness before returning the composite (serve-then-revalidate).

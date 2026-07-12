@@ -1,6 +1,6 @@
 import { buildContextSections, setContextSections } from '../../core/server/agentTools/contextSections'
 import type { AppDatabase } from '../../core/server/db'
-import type { NoteLocation, NoteScope } from '../../core/shared/notes'
+import type { NoteAuthor, NoteLocation, NoteScope } from '../../core/shared/notes'
 import { memoryIndexSlice } from '../../plugins/memory/main/memory'
 import type { NotesStore } from '../../plugins/notes/main/notes'
 import { loadTask, workspaceConfigRow } from '../../core/main/taskWorktree'
@@ -25,7 +25,7 @@ export function wireContextSections({ db, notesStore, reconciled }: ContextSecti
           ...(workspace ? [{ scope: 'workspace' as const, location: { scope: 'workspace' as const, workspaceId: workspace.id } }] : []),
           { scope: 'global', location: { scope: 'global' } },
         ]
-        const out: { slug: string; scope: NoteScope; title: string; kind: string; body: string }[] = []
+        const out: { slug: string; scope: NoteScope; title: string; kind: string; body: string; author: NoteAuthor }[] = []
         for (const { scope, location } of locations) {
           const summaries = await notesStore.list(location)
           for (const summary of summaries) {
@@ -34,7 +34,9 @@ export function wireContextSections({ db, notesStore, reconciled }: ContextSecti
             // exclude siblings. New task notes are isolated structurally by their directory.
             if (scope === 'workspace' && summary.originTaskId && summary.originTaskId !== taskId) continue
             const note = await notesStore.read(location, summary.slug).catch(() => null)
-            if (note) out.push({ slug: summary.slug, scope, title: `${note.title} (${note.kind})`, kind: note.kind, body: note.body })
+            // Skip empty notes (e.g. an untouched scratchpad): they'd contribute only a `### title`
+            // header of noise. Covers all empty notes, not just scratchpads.
+            if (note && note.body.trim()) out.push({ slug: summary.slug, scope, title: `${note.title} (${note.kind})`, kind: note.kind, body: note.body, author: note.author })
           }
         }
         return out

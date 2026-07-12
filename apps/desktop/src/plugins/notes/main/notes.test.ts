@@ -81,6 +81,16 @@ describe('NotesStore over a temp dir', () => {
     expect((await store.list(workspace)).find((n) => n.slug === slug)?.included).toBe(false)
   })
 
+  it('setTitle renames the display title while the slug stays stable', async () => {
+    const { slug } = await store.create(workspace, 'Old title', { body: 'keep me' })
+    await store.setTitle(workspace, slug, 'New title')
+    const note = await store.read(workspace, slug)
+    expect(note.slug).toBe(slug)
+    expect(note.title).toBe('New title')
+    expect(note.body).toBe('keep me')
+    expect((await store.list(workspace)).find((n) => n.slug === slug)?.title).toBe('New title')
+  })
+
   it('append creates a missing note with the writer identity (agent findings)', async () => {
     await store.append({ scope: 'task', taskId: 'task-1' }, 'findings', 'learned a thing', { author: 'agent', originSessionId: 'sess-1' })
     const note = await store.read({ scope: 'task', taskId: 'task-1' }, 'findings')

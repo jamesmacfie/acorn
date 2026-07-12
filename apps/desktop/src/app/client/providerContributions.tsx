@@ -41,6 +41,12 @@ export const clientIntegrationProviders: readonly ClientIntegrationProviderContr
         canPromote: (_item: LinearProjectIssue, context) => !!context.owner && !!context.repo,
         prepare: prepareLinearPromotion,
         create: createTask,
+        attachToCurrentTask: (taskId: string, item: LinearProjectIssue) =>
+          addTaskLink(taskId, {
+            connectionId: item.integrationId,
+            identifier: item.identifier,
+            ref: { displayId: item.identifier, url: item.url },
+          }).then(() => undefined),
       },
     },
     pane: linearPaneContribution,
