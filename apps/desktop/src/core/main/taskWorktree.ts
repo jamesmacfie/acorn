@@ -82,12 +82,25 @@ export function taskContext(t: TaskRow | undefined): Pick<TerminalSession, 'repo
   }
 }
 
-// Lazy worktree on first terminal (Flow C, docs/workspaces-and-tasks.md). Reuse the task's worktree if
+// Fired once per task, right after its worktree is first created and configured files are copied.
+// Registered by the terminal plugin to run the workspace setup script (maybeRunSetup). It lives
+// HERE — the single worktree-creation choke point — because every lazy creator funnels through
+// resolveTaskCwd (first terminal, editor/changes panes via taskRoot, run config, workflows); hooks
+// at individual callers miss whichever one happens to create the worktree first.
+let onWorktreeCreated: ((t: TaskRow, cwd: string) => Promise<void>) | null = null
+export const setOnWorktreeCreated = (fn: (t: TaskRow, cwd: string) => Promise<void>): void => {
+  onWorktreeCreated = fn
+}
+
+// Lazy worktree on first use (Flow C, docs/workspaces-and-tasks.md). Reuse the task's worktree if
 // it's set and still on disk; otherwise create one from the base checkout, keyed by branch, and
 // persist worktreePath on the task. Returns the cwd + whether it's an isolated worktree. On
 // any failure (no checkout mapped, git error) it degrades to the base checkout so the terminal
 // still opens — the task just doesn't gain isolation until the next try.
 // ponytail: graceful fallback over a hard error; the dirty/teardown guards still key off worktreePath.
+// Concurrent callers for the same task (a pane poll + a terminal opening in the same second) share
+// one in-flight creation, so `git worktree add` never races itself and the created-hook fires once.
+const inflightCreates = new Map<string, Promise<{ cwd: string; isWorktree: boolean; created: boolean }>>()
 export async function resolveTaskCwd(
   db: AppDatabase,
   t: TaskRow | undefined,
@@ -95,11 +108,24 @@ export async function resolveTaskCwd(
 ): Promise<{ cwd: string; isWorktree: boolean; created: boolean }> {
   if (t?.worktreePath && isDir(t.worktreePath)) return { cwd: t.worktreePath, isWorktree: true, created: false }
   if (!t || !baseCheckout || !isDir(baseCheckout)) return { cwd: baseCheckout && isDir(baseCheckout) ? baseCheckout : homedir(), isWorktree: false, created: false }
-  const wt = await ensureWorktree(worktreesRoot, baseCheckout, t.repoOwner, t.repoName, t.branch, t.pullNumber, await baseRefPref(db, t.repoOwner, t.repoName))
-  if (!wt.ok) return { cwd: baseCheckout, isWorktree: false, created: false }
-  await db.update(schema.tasks).set({ worktreePath: wt.path, updatedAt: Date.now() }).where(eq(schema.tasks.id, t.id))
-  if (wt.created) await copyConfiguredFiles(db, t, baseCheckout, wt.path)
-  return { cwd: wt.path, isWorktree: true, created: wt.created }
+  const inflight = inflightCreates.get(t.id)
+  if (inflight) return inflight
+  const create = (async () => {
+    const wt = await ensureWorktree(worktreesRoot, baseCheckout, t.repoOwner, t.repoName, t.branch, t.pullNumber, await baseRefPref(db, t.repoOwner, t.repoName))
+    if (!wt.ok) return { cwd: baseCheckout, isWorktree: false, created: false }
+    await db.update(schema.tasks).set({ worktreePath: wt.path, updatedAt: Date.now() }).where(eq(schema.tasks.id, t.id))
+    if (wt.created) {
+      await copyConfiguredFiles(db, t, baseCheckout, wt.path)
+      await onWorktreeCreated?.(t, wt.path).catch((e) => console.warn('[worktrees] created-hook failed:', e))
+    }
+    return { cwd: wt.path, isWorktree: true, created: wt.created }
+  })()
+  inflightCreates.set(t.id, create)
+  try {
+    return await create
+  } finally {
+    inflightCreates.delete(t.id)
+  }
 }
 
 // The on-disk root the editor/local-git panes operate on: the task's worktree (created lazily,
@@ -136,8 +162,8 @@ export function resolveInRoot(root: string, relPath: string): string | null {
 
 // The setup script + when-to-run configured on the workspace that owns this repo (docs/workspaces-and-tasks.md
 // P5). trigger: 'off' never runs, 'created' pre-creates the worktree at task creation, 'terminal'
-// (the default; null coalesces to it) runs lazily on first terminal. The script itself runs once,
-// whenever the worktree is first created — see maybeRunSetup (terminal.ts).
+// (the default; null coalesces to it) leaves creation lazy. The script itself runs once, whenever
+// the worktree is first created — via the onWorktreeCreated hook above (maybeRunSetup, terminal.ts).
 export type SetupTrigger = 'off' | 'created' | 'terminal'
 export async function workspaceSetup(db: AppDatabase, owner: string, repo: string): Promise<{ script: string | null; trigger: SetupTrigger }> {
   const [wr] = await db
