@@ -6,8 +6,8 @@ import { setWorkspaceProjects } from '../../../core/client/workspaces/mutations'
 import type { LinearProjectIssue, Task, WorkspaceProject } from '../../../core/shared/api'
 import { workspaceForRepo } from '../../../core/client/workspaces/activeWorkspace'
 import { activateTaskSignals, pathForTask } from '../../../core/client/tasks/activate'
-import { sourceRegistry, type SourceContribution } from '../../../core/client/registries/sources'
 import { replaceWorkspaceProjectsForProvider, workspaceProjectsForProvider } from '../../../core/client/integrations/workspaceProjects'
+import { PromoteToTaskModal } from '../../../core/client/integrations/PromoteToTaskModal'
 import LinearIssuePanel from './LinearIssuePanel'
 
 // The Linear Source browse (docs/workspaces-and-tasks.md). Linear projects are linked at the WORKSPACE level
@@ -86,6 +86,16 @@ export default function LinearBrowse() {
     setPickerOpen(false)
   }
 
+  // +TASK: the create-or-attach modal (docs/workspaces-and-tasks.md — one task, many linked tickets).
+  const tasks = createQuery(() => tasksOptions(true))
+  const [promoteIssue, setPromoteIssue] = createSignal<LinearProjectIssue | null>(null)
+
+  // Active tasks eligible to attach to: scoped to the routed workspace, matching the rail roster.
+  const attachTasks = () => {
+    const inWs = new Set((ws()?.repos ?? []).map((r) => `${r.owner}/${r.name}`))
+    return (tasks.data ?? []).filter((t) => t.status === 'active' && (inWs.size === 0 || inWs.has(`${t.repoOwner}/${t.repoName}`)))
+  }
+
   async function promote(it: LinearProjectIssue) {
     const { owner, repo } = params
     if (!owner || !repo) return
@@ -96,14 +106,14 @@ export default function LinearBrowse() {
       activateTaskSignals(existing, { pane: 'linear' })
       return navigate(pathForTask(existing))
     }
-    const promotion = (sourceRegistry.get('linear') as SourceContribution<LinearProjectIssue>).promotion
-    const context = { owner, repo }
-    if (!promotion.canPromote(it, context)) return
-    const w = await promotion.create(await promotion.prepare(it, context))
-    await promotion.afterCreate?.(w, it, context)
-    await qc.invalidateQueries({ queryKey: tasksKey })
+    setPromoteIssue(it)
+  }
+
+  function afterPromote(w: Task) {
+    setPromoteIssue(null)
+    void qc.invalidateQueries({ queryKey: tasksKey })
     activateTaskSignals(w, { pane: 'linear' }) // a promoted ticket lands on its Linear pane
-    navigate(`/${owner}/${repo}`)
+    navigate(pathForTask(w))
   }
 
   return (
@@ -156,14 +166,14 @@ export default function LinearBrowse() {
                           <button
                             type="button"
                             class="linear-browse-ws-btn"
-                            title="Open as task"
+                            title="New task or attach to an existing one"
                             onClick={(event) => {
                               event.preventDefault()
                               event.stopPropagation()
                               void promote(it)
                             }}
                           >
-                            + ws
+                            +TASK
                           </button>
                         </div>
                       </li>
@@ -219,6 +229,22 @@ export default function LinearBrowse() {
             </div>
           </div>
         </div>
+      </Show>
+
+      <Show when={promoteIssue()}>
+        {(issue) => (
+          <PromoteToTaskModal
+            providerId="linear"
+            item={issue()}
+            headerLabel={`+TASK — ${issue().identifier}`}
+            itemTitle={issue().title}
+            attachTasks={attachTasks()}
+            existingBranches={(tasks.data ?? []).map((t) => t.branch)}
+            onClose={() => setPromoteIssue(null)}
+            onCreated={afterPromote}
+            onAttached={afterPromote}
+          />
+        )}
       </Show>
     </main>
   )

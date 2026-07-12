@@ -3,10 +3,10 @@ import { useNavigate, useParams } from '@solidjs/router'
 import { createQuery, useQueryClient } from '@tanstack/solid-query'
 import { integrationsOptions, rollbarItemsOptions, tasksKey, tasksOptions, workspaceProjectsKey, workspaceProjectsOptions, workspacesOptions } from '../../../core/client/queries'
 import type { Integration, RollbarItemSummary, Task, WorkspaceProject } from '../../../core/shared/api'
-import { dedupeBranch, slugifyBranch } from '../../../core/shared/branch'
 import { sourceRegistry, type SourceContribution } from '../../../core/client/registries/sources'
 import { activeTaskId } from '../../../core/client/tasks/tasks'
 import { activateTaskSignals, pathForTask } from '../../../core/client/tasks/activate'
+import { PromoteToTaskModal } from '../../../core/client/integrations/PromoteToTaskModal'
 import { workspaceForRepo } from '../../../core/client/workspaces/activeWorkspace'
 import { replaceWorkspaceProjectsForProvider, workspaceProjectsForProvider } from '../../../core/client/integrations/workspaceProjects'
 import { setWorkspaceProjects } from '../../../core/client/workspaces/mutations'
@@ -28,7 +28,7 @@ const projectKey = (project: WorkspaceProject) => `${project.integrationId}:${pr
 
 // The Rollbar Source browse (docs/integrations.md): a two-column master/detail. The left column lists
 // active items across projects mapped to the routed workspace; selection opens detail on the right.
-// Row click only selects — task promotion (+ ws) and attach-to-task are distinct, explicit actions.
+// Row click only selects — the +TASK action (create a new task or attach to an existing one) is explicit.
 export default function RollbarBrowse() {
   const navigate = useNavigate()
   const params = useParams()
@@ -108,10 +108,16 @@ export default function RollbarBrowse() {
     setPickerOpen(false)
   }
 
-  // Promotion overlay: the project mapping supplies the repo; ask only for the new branch.
-  const [promoting, setPromoting] = createSignal<RollbarItemSummary | null>(null)
-  const [branch, setBranch] = createSignal('')
+  // +TASK: the create-or-attach modal. Selecting an item opens it; the project mapping supplies the
+  // repo (docs/workspaces-and-tasks.md — one task, many linked errors).
+  const [promoteItem, setPromoteItem] = createSignal<RollbarItemSummary | null>(null)
   const [attachMessage, setAttachMessage] = createSignal('')
+
+  // Active tasks eligible to attach to: scoped to the routed workspace, matching the rail roster.
+  const attachTasks = () => {
+    const inWs = new Set((workspace()?.repos ?? []).map((r) => `${r.owner}/${r.name}`))
+    return (tasks.data ?? []).filter((t) => t.status === 'active' && (inWs.size === 0 || inWs.has(`${t.repoOwner}/${t.repoName}`)))
+  }
 
   async function promote(item: RollbarItemSummary) {
     // Focus an existing active task for the same (connection, counter) instead of duplicating it.
@@ -121,24 +127,14 @@ export default function RollbarBrowse() {
       activateTaskSignals(existing, { pane: 'rollbar' })
       return navigate(pathForTask(existing))
     }
-    setPromoting(item)
-    const slug = slugifyBranch(`fix ${item.title}`.slice(0, 50))
-    setBranch(dedupeBranch(slug || `fix-rollbar-${item.identifier}`, (tasks.data ?? []).map((t) => t.branch)))
+    setPromoteItem(item)
   }
 
-  async function confirmPromote() {
-    const item = promoting()
-    const { owner, repo } = params
-    if (!item || !owner || !repo || !branch().trim()) return
-    const promotion = (sourceRegistry.get('rollbar') as SourceContribution<RollbarItemSummary>).promotion
-    const context = { owner, repo, branch: branch(), existingBranches: (tasks.data ?? []).map((t) => t.branch) }
-    if (!promotion.canPromote(item, context)) return
-    const w = await promotion.create(await promotion.prepare(item, context))
-    await promotion.afterCreate?.(w, item, context)
-    await qc.invalidateQueries({ queryKey: tasksKey })
-    setPromoting(null)
+  function afterPromote(w: Task) {
+    setPromoteItem(null)
+    void qc.invalidateQueries({ queryKey: tasksKey })
     activateTaskSignals(w, { pane: 'rollbar' })
-    navigate(`/${owner}/${repo}`)
+    navigate(pathForTask(w))
   }
 
   // Rollbar's most common flow: the error belongs to the task you're already on.
@@ -147,7 +143,7 @@ export default function RollbarBrowse() {
     const taskId = activeTaskId()
     if (!item) return
     setAttachMessage('')
-    if (!taskId) return setAttachMessage('No active task — open one first, or use “Open as task”.')
+    if (!taskId) return setAttachMessage('No active task — open one first, or use +TASK.')
     const promotion = (sourceRegistry.get('rollbar') as SourceContribution<RollbarItemSummary>).promotion
     if (!promotion.attachToCurrentTask) return
     await promotion.attachToCurrentTask(taskId, item)
@@ -239,14 +235,14 @@ export default function RollbarBrowse() {
                             <button
                               type="button"
                               class="rollbar-ws-btn"
-                              title="Open as task"
+                              title="New task or attach to an existing one"
                               onClick={(event) => {
                                 event.preventDefault()
                                 event.stopPropagation()
                                 void promote(item)
                               }}
                             >
-                              + ws
+                              +TASK
                             </button>
                           </div>
                         </li>
@@ -278,7 +274,7 @@ export default function RollbarBrowse() {
                   >
                     Attach to current task
                   </button>
-                  <Show when={selectedSummary()}>{(item) => <button type="button" class="overlay-btn" onClick={() => void promote(item())}>Open as task</button>}</Show>
+                  <Show when={selectedSummary()}>{(item) => <button type="button" class="overlay-btn" onClick={() => void promote(item())}>+TASK</button>}</Show>
                   <Show when={attachMessage()}><span class="muted" role="status">{attachMessage()}</span></Show>
                 </>
               }
@@ -287,22 +283,19 @@ export default function RollbarBrowse() {
         </Show>
       </section>
 
-      <Show when={promoting()}>
+      <Show when={promoteItem()}>
         {(item) => (
-          <div class="overlay-backdrop" onClick={() => setPromoting(null)}>
-            <div class="overlay" role="dialog" aria-modal="true" onClick={(e) => e.stopPropagation()}>
-              <div class="overlay-title">Open as task — #{item().identifier}</div>
-              <div class="overlay-body">
-                <p class="muted">{item().title}</p>
-                <p class="muted">Create this task in {params.owner}/{params.repo}, mapped through {item().integrationLabel}.</p>
-                <input class="integration-key-input" type="text" placeholder="branch" value={branch()} onInput={(e) => setBranch(e.currentTarget.value)} />
-                <div class="close-actions">
-                  <button type="button" class="overlay-btn" onClick={() => setPromoting(null)}>Cancel</button>
-                  <button type="button" class="overlay-btn" disabled={!params.owner || !params.repo || !branch().trim()} onClick={() => void confirmPromote()}>Create task</button>
-                </div>
-              </div>
-            </div>
-          </div>
+          <PromoteToTaskModal
+            providerId="rollbar"
+            item={item()}
+            headerLabel={`+TASK — #${item().identifier}`}
+            itemTitle={item().title}
+            attachTasks={attachTasks()}
+            existingBranches={(tasks.data ?? []).map((t) => t.branch)}
+            onClose={() => setPromoteItem(null)}
+            onCreated={afterPromote}
+            onAttached={afterPromote}
+          />
         )}
       </Show>
 

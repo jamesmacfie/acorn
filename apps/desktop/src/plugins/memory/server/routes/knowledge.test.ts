@@ -34,6 +34,7 @@ const fake = (over: Partial<KnowledgeBridge> = {}): KnowledgeBridge => ({
   notesCreate: async () => ({ slug: 's' }),
   notesWrite: async () => ({ ok: true }),
   notesSetIncluded: async () => ({ ok: true }),
+  notesSetTitle: async () => ({ ok: true }),
   notesRemove: async () => ({ ok: true }),
   ...over,
 })
@@ -58,12 +59,24 @@ describe('knowledge routes (memory + notes)', () => {
     expect(calls).toEqual(['list:acme/widget', 'add:task1:private', 'create:workspace:ws1:Hi', 'rm:workspace:ws1:hi', 'create:task::Task note'])
   })
 
-  it('400s malformed add / resolve / note write bodies and a search with no q', async () => {
+  it('routes note title rename to the bridge (task + workspace)', async () => {
+    const calls: string[] = []
+    setKnowledgeBridge(fake({
+      notesSetTitle: async (location, slug, title) => (calls.push(`title:${location.scope}:${slug}:${title}`), { ok: true }),
+    }))
+    const app = authed()
+    await app.fetch(req('/api/workspaces/ws1/notes/hi/title', 'POST', { title: 'Renamed' }), {} as Env)
+    await app.fetch(req('/api/tasks/task1/notes/scratchpad/title', 'POST', { title: 'Scratch' }), {} as Env)
+    expect(calls).toEqual(['title:workspace:hi:Renamed', 'title:task:scratchpad:Scratch'])
+  })
+
+  it('400s malformed add / resolve / note write / title bodies and a search with no q', async () => {
     setKnowledgeBridge(fake())
     const app = authed()
     expect((await app.fetch(req('/api/tasks/task1/memory', 'POST', { scope: 'nope' }), {} as Env)).status).toBe(400)
     expect((await app.fetch(req('/api/memory/proposals/p1/resolve', 'POST', {}), {} as Env)).status).toBe(400)
     expect((await app.fetch(req('/api/workspaces/ws1/notes/hi', 'PUT', {}), {} as Env)).status).toBe(400)
+    expect((await app.fetch(req('/api/tasks/task1/notes/hi/title', 'POST', { title: '  ' }), {} as Env)).status).toBe(400)
     expect((await app.fetch(req('/api/memory/search'), {} as Env)).status).toBe(400)
   })
 

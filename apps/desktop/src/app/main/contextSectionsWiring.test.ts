@@ -44,4 +44,14 @@ describe('context section wiring', () => {
     expect(one?.notes.map((note) => `${note.scope}:${note.slug}`)).toEqual(['task:private-plan', 'workspace:shared-plan', 'global:global-plan'])
     expect(two?.notes.map((note) => `${note.scope}:${note.slug}`)).toEqual(['workspace:shared-plan', 'global:global-plan'])
   })
+
+  it('skips empty-body notes and carries note author through as provenance', async () => {
+    await store.append({ scope: 'task', taskId: 'task1' }, 'agent-plan', 'from the agent', { author: 'agent' })
+    await store.create({ scope: 'task', taskId: 'task1' }, 'blank', { body: '   \n' })
+
+    const ctx = await assembleContext(testDb.db, 'james', 'task1', new Set(['notes']))
+    const items = ctx?.sections.find((section) => section.id === 'notes')?.items ?? []
+    expect(items.map((item) => item.id)).toEqual(['task:agent-plan'])
+    expect(items[0].origin?.author).toBe('agent')
+  })
 })

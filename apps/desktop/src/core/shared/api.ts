@@ -313,6 +313,7 @@ export type ContextItem = {
   body?: string
   details?: string[]
   jump?: ContextPaneIntent
+  origin?: { author: 'user' | 'agent' | 'workflow' } // notes section only, for provenance badges
 }
 export type ContextSectionResult = {
   id: string
@@ -421,6 +422,7 @@ export const notesListRoute = (location: NoteLocation) =>
     : `/api/workspaces/${encodeURIComponent(location.scope === 'global' ? 'global' : location.workspaceId)}/notes`
 export const noteRoute = (location: NoteLocation, slug: string) => `${notesListRoute(location)}/${encodeURIComponent(slug)}`
 export const noteIncludedRoute = (location: NoteLocation, slug: string) => `${noteRoute(location, slug)}/included`
+export const noteTitleRoute = (location: NoteLocation, slug: string) => `${noteRoute(location, slug)}/title`
 
 // Terminal control (docs/terminal-and-agents.md): request/response routes for the main-process
 // engine. Input/output/status use the WebSocket; only the native folder picker stays on preload IPC.

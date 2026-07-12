@@ -149,7 +149,7 @@ describe('GET /api/tasks/:id/context (docs/agent-tools.md §4)', () => {
   })
 
   it('composes the M4 seams when sources are registered', async () => {
-    notesSource = async () => [{ slug: 'plan', scope: 'task', title: 'plan', kind: 'plan', body: 'do the thing' }]
+    notesSource = async () => [{ slug: 'plan', scope: 'task', title: 'plan', kind: 'plan', body: 'do the thing', author: 'user' }]
     memorySource = async () => [{ name: 'auth-conventions', description: 'how auth flows work' }]
     const ctx = await fetchCtx()
     expect(ctx.notes).toEqual([{ slug: 'plan', scope: 'task', title: 'plan', body: 'do the thing' }])
@@ -158,9 +158,9 @@ describe('GET /api/tasks/:id/context (docs/agent-tools.md §4)', () => {
 
   it('gives workflow assembly only its own run-scoped handoff note', async () => {
     notesSource = async () => [
-      { slug: 'human-plan', scope: 'task', title: 'human plan', kind: 'plan', body: 'keep me' },
-      { slug: 'workflow-handoffs-run-a', scope: 'task', title: 'run a', kind: 'handoff', body: 'current output' },
-      { slug: 'workflow-handoffs-run-b', scope: 'task', title: 'run b', kind: 'handoff', body: 'other run output' },
+      { slug: 'human-plan', scope: 'task', title: 'human plan', kind: 'plan', body: 'keep me', author: 'user' },
+      { slug: 'workflow-handoffs-run-a', scope: 'task', title: 'run a', kind: 'handoff', body: 'current output', author: 'workflow' },
+      { slug: 'workflow-handoffs-run-b', scope: 'task', title: 'run b', kind: 'handoff', body: 'other run output', author: 'workflow' },
     ]
     const ctx = await fetchCtx('?include=notes&workflowRunId=run-a')
     expect(ctx.notes.map((note) => note.slug)).toEqual(['human-plan', 'workflow-handoffs-run-a'])
@@ -184,7 +184,7 @@ describe('GET /api/tasks/:id/context (docs/agent-tools.md §4)', () => {
         const out: Awaited<ReturnType<ContextNotesSource>> = []
         for (const s of list) {
           const n = await store.read(location, s.slug)
-          out.push({ slug: s.slug, scope: 'task', title: `${n.title} (${n.kind})`, kind: n.kind, body: n.body })
+          out.push({ slug: s.slug, scope: 'task', title: `${n.title} (${n.kind})`, kind: n.kind, body: n.body, author: n.author })
         }
         return out
       }
@@ -199,7 +199,7 @@ describe('GET /api/tasks/:id/context (docs/agent-tools.md §4)', () => {
   })
 
   it('uses contribution defaults and enforces the declared note budget', async () => {
-    notesSource = async () => Array.from({ length: 12 }, (_, index) => ({ slug: `n-${index}`, scope: 'task', title: `N${index}`, kind: 'plan', body: 'x'.repeat(2_100) }))
+    notesSource = async () => Array.from({ length: 12 }, (_, index) => ({ slug: `n-${index}`, scope: 'task', title: `N${index}`, kind: 'plan', body: 'x'.repeat(2_100), author: 'user' as const }))
     const ctx = await fetchCtx('')
     expect(ctx.sections.map((section) => section.id)).toEqual(['notes'])
     expect(ctx.sections[0].items).toHaveLength(10)

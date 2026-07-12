@@ -7,6 +7,7 @@
 @import './styles/checks-panel.css';
 @import './styles/integrations-panel.css';
 @import './styles/copy.css';
+@import './styles/tabs.css';
 
 /* Hide scrollbars everywhere; scrolling still works. Electron/Chromium only. */
 *::-webkit-scrollbar {

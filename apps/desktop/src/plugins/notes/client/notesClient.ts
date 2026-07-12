@@ -2,7 +2,7 @@
 // now loopback HTTP. Backed by the main-process NotesStore, so it 503s in dev:node. Note
 // shapes are canonical in shared/notes.ts (main's NotesStore imports the same types) — re-exported
 // here so existing feature imports keep working.
-import { noteIncludedRoute, noteRoute, notesListRoute } from '../../../core/shared/api'
+import { noteIncludedRoute, noteRoute, noteTitleRoute, notesListRoute } from '../../../core/shared/api'
 import { readJson, writeJson } from '../../../core/client/apiClient'
 import type { Note, NoteKind, NoteLocation, NoteScope, NoteSummary } from '../../../core/shared/notes'
 import { openPane } from '../../../core/client/registries/clientEvents'
@@ -14,6 +14,7 @@ export type NotesApi = {
   create(location: NoteLocation, title: string, kind?: NoteKind): Promise<{ slug: string } | { error: string }>
   write(location: NoteLocation, slug: string, body: string): Promise<{ ok: boolean } | { error: string }>
   setIncluded(location: NoteLocation, slug: string, included: boolean): Promise<{ ok: boolean } | { error: string }>
+  setTitle(location: NoteLocation, slug: string, title: string): Promise<{ ok: boolean } | { error: string }>
   remove(location: NoteLocation, slug: string): Promise<{ ok: boolean } | { error: string }>
 }
 
@@ -27,6 +28,7 @@ const api: NotesApi = {
   write: (location, slug, body) =>
     writeJson<{ ok: boolean } | { error: string }>(noteRoute(location, slug), { method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ body }) }),
   setIncluded: (location, slug, included) => post<{ ok: boolean } | { error: string }>(noteIncludedRoute(location, slug), { included }),
+  setTitle: (location, slug, title) => post<{ ok: boolean } | { error: string }>(noteTitleRoute(location, slug), { title }),
   remove: (location, slug) => writeJson<{ ok: boolean } | { error: string }>(noteRoute(location, slug), { method: 'DELETE' }),
 }
 
