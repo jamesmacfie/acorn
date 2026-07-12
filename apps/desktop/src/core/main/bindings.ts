@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto'
-import { existsSync, mkdirSync } from 'node:fs'
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { readFile, writeFile } from 'node:fs/promises'
 import { createRequire } from 'node:module'
 import { dirname, join, resolve } from 'node:path'
@@ -143,6 +143,25 @@ export function openDb(dbPath: string): AppDatabase {
   return withBatch
 }
 
+// Persist the loopback bearer across boots (docs/mcp.md): agent panes run in tmux and are
+// reattached after an acorn restart, so the `claude` process keeps the ACORN_API_TOKEN from the
+// boot that spawned it. A per-boot random token would 404 every reattached session's MCP / notes /
+// memory / context calls ("connected · no tools" after a relaunch). Store it next to the DB (like
+// session.key, 0600) and reuse it; create on first run.
+function loadOrCreateInternalToken(dataDir: string): string {
+  const file = join(dataDir, 'internal-token')
+  try {
+    const existing = readFileSync(file, 'utf8').trim()
+    if (existing) return existing
+  } catch {
+    // not created yet — fall through and mint one
+  }
+  const token = randomUUID()
+  mkdirSync(dataDir, { recursive: true })
+  writeFileSync(file, token, { mode: 0o600 })
+  return token
+}
+
 export type BindingsOptions = { dbPath: string; blobsDir: string }
 
 // Build the bindings object once at startup. Electron resolves the data root in electron.ts
@@ -163,7 +182,7 @@ export function makeBindings({ dbPath, blobsDir }: BindingsOptions): RuntimeBind
     SESSION_ENC_KEY: encKey,
     GITHUB_CLIENT_ID: secret('GITHUB_CLIENT_ID'),
     GITHUB_CLIENT_SECRET: secret('GITHUB_CLIENT_SECRET'),
-    INTERNAL_TOKEN: randomUUID(),
+    INTERNAL_TOKEN: loadOrCreateInternalToken(dirname(dbPath)),
     API_TOKENS: new TokenService(db),
     OAUTH_ACCOUNTS: new OauthAccountService(db, encKey),
     UI_BROKER: new UiControlBroker(),
