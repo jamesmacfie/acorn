@@ -173,6 +173,65 @@
   padding-top: 12px;
   border-top: 1px solid var(--border);
 }
+
+/* --- Enriched detail panel (tabs + overview: meta grid, labels, links, issue graph). --- */
+/* Scroll container for a tab's content (the tab strip is the sticky header above it). */
+.linear-tab-panel { flex: 1; min-height: 0; overflow-y: auto; }
+/* Back to the linked ticket after drilling into a related issue. */
+.linear-panel-back { font: inherit; font-size: var(--fs-sm); color: var(--text-muted); background: transparent; border: 0; cursor: pointer; padding: 0 4px; }
+.linear-panel-back:hover { color: var(--text); }
+
+.linear-labels { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 12px; }
+
+.linear-meta-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 6px 16px;
+  margin: 0 0 14px;
+  padding: 10px 0;
+  border-top: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+}
+.linear-meta-grid dt { font-size: var(--fs-xs); text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-muted); }
+.linear-meta-grid dd { margin: 1px 0 0; font-size: var(--fs-sm); color: var(--text); }
+.linear-branch { display: flex; align-items: center; gap: 6px; }
+.linear-branch code { font-family: var(--font-mono); font-size: var(--fs-xs); }
+
+.linear-links { list-style: none; margin: 0 0 8px; padding: 0; }
+.linear-attachment { display: flex; align-items: baseline; gap: 8px; padding: 3px 0; font-size: var(--fs-sm); }
+.linear-attachment-kind { flex: none; min-width: 56px; font-family: var(--font-mono); font-size: var(--fs-xs); color: var(--text-muted); text-transform: lowercase; }
+.linear-attachment a { color: var(--accent); text-decoration: none; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.linear-attachment a:hover { text-decoration: underline; }
+
+.linear-related { display: flex; flex-direction: column; gap: 2px; margin-bottom: 8px; }
+.linear-related-label { font-size: var(--fs-xs); text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-muted); margin-top: 4px; }
+.linear-related-row {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 6px;
+  font: inherit;
+  font-size: var(--fs-sm);
+  text-align: left;
+  color: var(--text);
+  background: transparent;
+  border: 0;
+  border-radius: var(--radius);
+  cursor: pointer;
+}
+.linear-related-row:hover { background: var(--bg-hover); }
+.linear-related-row:focus-visible { outline: 1px solid var(--accent); outline-offset: -1px; }
+.linear-related-row.done { color: var(--text-muted); }
+.linear-related-row.done .linear-related-title { text-decoration: line-through; }
+.linear-related-check { flex: none; width: 14px; text-align: center; color: var(--text-muted); }
+.linear-related-row.done .linear-related-check { color: var(--accent); }
+.linear-related-id { flex: none; font-family: var(--font-mono); font-size: var(--fs-xs); color: var(--text-muted); }
+.linear-related-title { flex: 1; min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.linear-related-state { flex: none; font-size: var(--fs-xs); color: var(--state-color, var(--text-muted)); }
+.linear-subissue-bar { height: 4px; border-radius: 2px; background: var(--bg-selected); overflow: hidden; margin: 2px 0 6px; }
+.linear-subissue-bar i { display: block; height: 100%; background: var(--accent); }
+
 /* Integrations settings (account menu → Integrations overlay). */
 .integration-setting {
   display: flex;

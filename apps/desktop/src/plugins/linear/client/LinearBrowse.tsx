@@ -1,4 +1,4 @@
-import { createEffect, createSignal, For, on, Show } from 'solid-js'
+import { createEffect, createMemo, createSignal, For, on, Show } from 'solid-js'
 import { useNavigate, useParams } from '@solidjs/router'
 import { createQuery, useQueryClient } from '@tanstack/solid-query'
 import { integrationsOptions, linearProjectsOptions, tasksKey, tasksOptions, workspaceProjectsKey, workspaceProjectsOptions, workspaceLinearIssuesOptions, workspacesOptions } from '../../../core/client/queries'
@@ -8,6 +8,8 @@ import { workspaceForRepo } from '../../../core/client/workspaces/activeWorkspac
 import { activateTaskSignals, pathForTask } from '../../../core/client/tasks/activate'
 import { replaceWorkspaceProjectsForProvider, workspaceProjectsForProvider } from '../../../core/client/integrations/workspaceProjects'
 import { PromoteToTaskModal } from '../../../core/client/integrations/PromoteToTaskModal'
+import { formatRelativeTime } from '../../../core/client/lib/formatRelativeTime'
+import { emptyLinearFilter, filterLinearIssues, groupLinearIssuesByState, linearFacets, priorityMeta, sortLinearIssues, type LinearFilter } from './model'
 import LinearIssuePanel from './LinearIssuePanel'
 
 // The Linear Source browse (docs/workspaces-and-tasks.md). Linear projects are linked at the WORKSPACE level
@@ -31,18 +33,29 @@ export default function LinearBrowse() {
   const connections = () => integrations.data?.integrations ?? []
   const linkedProjects = () => workspaceProjectsForProvider(allLinkedProjects(), connections(), 'linear')
   const issues = createQuery(() => workspaceLinearIssuesOptions(linkedProjects(), linkedProjects().length > 0))
+  const allIssues = () => issues.data?.issues ?? []
+  const facets = createMemo(() => linearFacets(allIssues()))
   const [selectedIssue, setSelectedIssue] = createSignal<LinearProjectIssue | null>(null)
   const isSelected = (issue: LinearProjectIssue) => {
     const selected = selectedIssue()
     return selected !== null && issueKey(selected) === issueKey(issue)
   }
 
+  // Triage is client-side over the one browse fetch (mirrors the Rollbar browse). Filter → sort by
+  // priority/recency → group by workflow-state.
+  const [filter, setFilter] = createSignal<LinearFilter>(emptyLinearFilter)
+  const patch = (part: Partial<LinearFilter>) => setFilter((f) => ({ ...f, ...part }))
+  const groups = createMemo(() => groupLinearIssuesByState(sortLinearIssues(filterLinearIssues(allIssues(), filter()))))
+
   // ponytail: local selection signal, add a route param only if issues need deep-linking.
   // The source component survives repo navigation, so explicitly keep this session-only selection
-  // scoped to the routed repo rather than showing an issue from the workspace we just left.
+  // (and the filter) scoped to the routed repo rather than carrying state from the workspace we left.
   createEffect(on(
     () => `${params.owner ?? ''}/${params.repo ?? ''}`,
-    () => setSelectedIssue(null),
+    () => {
+      setSelectedIssue(null)
+      setFilter(emptyLinearFilter)
+    },
     { defer: true },
   ))
 
@@ -142,44 +155,86 @@ export default function LinearBrowse() {
             }
           >
             <Show when={!issues.isPending} fallback={<p class="placeholder">Loading…</p>}>
-              <Show when={(issues.data?.issues ?? []).length} fallback={<p class="placeholder">No active issues in the selected project(s).</p>}>
-                <ul class="linear-browse-list">
-                  <For each={issues.data?.issues ?? []}>
-                    {(it) => (
-                      <li>
-                        <div
-                          class="linear-browse-row"
-                          classList={{ active: isSelected(it) }}
-                          role="button"
-                          tabindex="0"
-                          aria-pressed={isSelected(it)}
-                          onClick={() => setSelectedIssue(it)}
-                          onKeyDown={(event) => {
-                            if (event.target !== event.currentTarget || (event.key !== 'Enter' && event.key !== ' ')) return
-                            event.preventDefault()
-                            setSelectedIssue(it)
-                          }}
-                        >
-                          <span class="linear-browse-id">{it.identifier}</span>
-                          <span class="linear-browse-title">{it.title}</span>
-                          <Show when={it.state}>{(s) => <span class="linear-browse-state" style={{ '--state-color': s().color }}>{s().name}</span>}</Show>
-                          <button
-                            type="button"
-                            class="linear-browse-ws-btn"
-                            title="New task or attach to an existing one"
-                            onClick={(event) => {
-                              event.preventDefault()
-                              event.stopPropagation()
-                              void promote(it)
+              <Show when={allIssues().length} fallback={<p class="placeholder">No active issues in the selected project(s).</p>}>
+                <div class="linear-filters">
+                  <input
+                    class="linear-search"
+                    type="text"
+                    placeholder="Search title / ENG-…"
+                    value={filter().search}
+                    onInput={(e) => patch({ search: e.currentTarget.value })}
+                  />
+                  <Show when={facets().assignees.length > 1}>
+                    <select value={filter().assignee} onChange={(e) => patch({ assignee: e.currentTarget.value })}>
+                      <option value="">All assignees</option>
+                      <For each={facets().assignees}>{(a) => <option value={a}>{a}</option>}</For>
+                    </select>
+                  </Show>
+                  <Show when={facets().labels.length > 0}>
+                    <select value={filter().label} onChange={(e) => patch({ label: e.currentTarget.value })}>
+                      <option value="">All labels</option>
+                      <For each={facets().labels}>{(l) => <option value={l}>{l}</option>}</For>
+                    </select>
+                  </Show>
+                </div>
+                <Show when={groups().length} fallback={<p class="placeholder">No issues match the current filters.</p>}>
+                  <ul class="linear-browse-list">
+                    <For each={groups()}>
+                      {(group) => (
+                        <>
+                          <li class="linear-browse-group">
+                            <span>{group.label}</span>
+                            <span class="linear-browse-group-count">{group.issues.length}</span>
+                          </li>
+                          <For each={group.issues}>
+                            {(it) => {
+                              const prio = priorityMeta(it.priority, it.priorityLabel)
+                              return (
+                                <li>
+                                  <div
+                                    class="linear-browse-row"
+                                    classList={{ active: isSelected(it) }}
+                                    role="button"
+                                    tabindex="0"
+                                    aria-pressed={isSelected(it)}
+                                    onClick={() => setSelectedIssue(it)}
+                                    onKeyDown={(event) => {
+                                      if (event.target !== event.currentTarget || (event.key !== 'Enter' && event.key !== ' ')) return
+                                      event.preventDefault()
+                                      setSelectedIssue(it)
+                                    }}
+                                  >
+                                    <span class="linear-browse-prio" data-p={prio.level} title={prio.label} aria-label={prio.label}>
+                                      <i /><i /><i />
+                                    </span>
+                                    <span class="linear-browse-id">{it.identifier}</span>
+                                    <span class="linear-browse-title">{it.title}</span>
+                                    <For each={it.labels.slice(0, 2)}>
+                                      {(l) => <span class="linear-label-chip" style={{ '--label-color': l.color }}>{l.name}</span>}
+                                    </For>
+                                    <Show when={formatRelativeTime(it.updatedAt)}>{(age) => <span class="linear-browse-when">{age()}</span>}</Show>
+                                    <button
+                                      type="button"
+                                      class="linear-browse-ws-btn"
+                                      title="New task or attach to an existing one"
+                                      onClick={(event) => {
+                                        event.preventDefault()
+                                        event.stopPropagation()
+                                        void promote(it)
+                                      }}
+                                    >
+                                      +TASK
+                                    </button>
+                                  </div>
+                                </li>
+                              )
                             }}
-                          >
-                            +TASK
-                          </button>
-                        </div>
-                      </li>
-                    )}
-                  </For>
-                </ul>
+                          </For>
+                        </>
+                      )}
+                    </For>
+                  </ul>
+                </Show>
               </Show>
             </Show>
           </Show>

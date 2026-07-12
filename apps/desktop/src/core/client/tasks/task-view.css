@@ -172,7 +172,71 @@
    tracks, so let its remaining detail pane occupy the viewport when the master list is hidden. */
 .app.left-collapsed .panes.linear-browse-panes { grid-template-columns: minmax(0, 1fr); }
 .linear-browse { display: flex; flex-direction: column; overflow: hidden; }
+/* Triage filter bar (mirrors .rollbar-filters). */
+.linear-filters { display: flex; gap: 6px; padding: 6px var(--pane-pad); border-bottom: 1px solid var(--border); flex-wrap: wrap; }
+.linear-filters input,
+.linear-filters select {
+  font: inherit;
+  font-size: var(--fs-sm);
+  color: var(--text);
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 2px 6px;
+}
+.linear-search { flex: 1; min-width: 120px; }
 .linear-browse-list { list-style: none; margin: 0; padding: 0; overflow-y: auto; }
+/* Board-style state group heading. */
+.linear-browse-group {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px var(--pane-pad) 2px;
+  font-size: var(--fs-xs);
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+.linear-browse-group-count { font-variant-numeric: tabular-nums; }
+/* Priority bar glyph, shared with the detail panel's .linear-priority. */
+.linear-browse-prio,
+.linear-priority {
+  flex: none;
+  display: inline-flex;
+  align-items: flex-end;
+  gap: 1.5px;
+  width: 13px;
+  height: 11px;
+}
+.linear-browse-prio i,
+.linear-priority i { width: 3px; border-radius: 1px; background: var(--border-strong); }
+.linear-browse-prio i:nth-child(1),
+.linear-priority i:nth-child(1) { height: 4px; }
+.linear-browse-prio i:nth-child(2),
+.linear-priority i:nth-child(2) { height: 7px; }
+.linear-browse-prio i:nth-child(3),
+.linear-priority i:nth-child(3) { height: 11px; }
+.linear-browse-prio[data-p="urgent"] i,
+.linear-priority[data-p="urgent"] i { background: #eb5757; }
+.linear-browse-prio[data-p="high"] i,
+.linear-priority[data-p="high"] i { background: var(--accent); }
+.linear-browse-prio[data-p="medium"] i:nth-child(-n+2),
+.linear-priority[data-p="medium"] i:nth-child(-n+2) { background: var(--accent); }
+.linear-browse-prio[data-p="low"] i:nth-child(1),
+.linear-priority[data-p="low"] i:nth-child(1) { background: var(--text-muted); }
+/* Tinted label chip, shared with the detail panel's .linear-labels. */
+.linear-label-chip {
+  flex: none;
+  font-size: var(--fs-xs);
+  padding: 1px 6px;
+  border-radius: var(--radius);
+  color: var(--text-muted);
+  background: color-mix(in srgb, var(--label-color, var(--border)) 18%, transparent);
+  border: 1px solid color-mix(in srgb, var(--label-color, var(--border)) 40%, transparent);
+  white-space: nowrap;
+}
+.linear-browse-when { flex: none; font-size: var(--fs-sm); color: var(--text-muted); font-variant-numeric: tabular-nums; }
 .linear-browse-row {
   width: 100%;
   display: flex;

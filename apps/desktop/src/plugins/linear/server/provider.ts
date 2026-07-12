@@ -1,5 +1,5 @@
 import { and, eq } from 'drizzle-orm'
-import type { LinearActivity, LinearComment, LinearIssueDetail, LinearIssueSummary } from '../../../core/shared/api'
+import type { LinearActivity, LinearAttachment, LinearComment, LinearIssueDetail, LinearIssueSummary, LinearRelatedIssue, LinearRelation, LinearRelationKind } from '../../../core/shared/api'
 import type { ExternalRef } from '../../../core/shared/integrations'
 import { schema } from '../../../core/server/db'
 import {
@@ -8,6 +8,7 @@ import {
   VIEWER_QUERY,
   issuesFilter,
   type LinearNode,
+  type LinearRelatedNode,
   type Viewer,
   linearData,
   linearError,
@@ -58,6 +59,49 @@ function buildActivity(node: LinearNode): LinearActivity[] {
   return items.sort((a, b) => (a.createdAt ?? 0) - (b.createdAt ?? 0))
 }
 
+const relatedIssueOf = (node: LinearRelatedNode): LinearRelatedIssue => ({
+  id: node.id,
+  identifier: node.identifier,
+  title: node.title,
+  state: node.state,
+})
+
+function buildAttachments(node: LinearNode): LinearAttachment[] {
+  return (node.attachments?.nodes ?? [])
+    .filter((a) => a.url)
+    .map((a) => ({ id: a.id, title: a.title || a.url, subtitle: a.subtitle ?? null, url: a.url, sourceType: a.sourceType ?? null }))
+}
+
+// Normalize the issue graph. Outgoing `relations` read forward (this issue blocks X); `inverseRelations`
+// read backward (X blocks this issue → this is blocked by X). Linear stores one relation record per
+// link, surfaced via `relations` on the source issue and `inverseRelations` on the target — so a
+// symmetric "related" link must be mapped on both sides or the target issue never shows it.
+function buildRelations(node: LinearNode): LinearRelation[] {
+  const forward: Record<string, { kind: LinearRelationKind; label: string }> = {
+    blocks: { kind: 'blocks', label: 'Blocks' },
+    duplicate: { kind: 'duplicate', label: 'Duplicate of' },
+    related: { kind: 'related', label: 'Related' },
+  }
+  const inverse: Record<string, { kind: LinearRelationKind; label: string }> = {
+    blocks: { kind: 'blocked-by', label: 'Blocked by' },
+    duplicate: { kind: 'duplicated-by', label: 'Duplicated by' },
+    related: { kind: 'related', label: 'Related' },
+  }
+  const out: LinearRelation[] = []
+  for (const rel of node.relations?.nodes ?? []) {
+    if (!rel.relatedIssue) continue
+    const meta = forward[rel.type] ?? { kind: 'related' as const, label: 'Related' }
+    out.push({ id: rel.id, kind: meta.kind, label: meta.label, issue: relatedIssueOf(rel.relatedIssue) })
+  }
+  for (const rel of node.inverseRelations?.nodes ?? []) {
+    if (!rel.issue) continue
+    const meta = inverse[rel.type]
+    if (!meta) continue
+    out.push({ id: rel.id, kind: meta.kind, label: meta.label, issue: relatedIssueOf(rel.issue) })
+  }
+  return out
+}
+
 export function linearNodeToDetail(node: LinearNode): LinearIssueDetail {
   return {
     id: node.id,
@@ -75,6 +119,22 @@ export function linearNodeToDetail(node: LinearNode): LinearIssueDetail {
       parentId: comment.parent?.id ?? null,
     }) satisfies LinearComment),
     activity: buildActivity(node),
+    labels: (node.labels?.nodes ?? []).map((l) => ({ id: l.id, name: l.name, color: l.color })),
+    createdAt: node.createdAt ? Date.parse(node.createdAt) || null : null,
+    updatedAt: node.updatedAt ? Date.parse(node.updatedAt) || null : null,
+    creator: node.creator?.name ?? null,
+    priority: node.priority ?? null,
+    priorityLabel: node.priorityLabel ?? null,
+    estimate: node.estimate ?? null,
+    dueDate: node.dueDate ?? null,
+    branchName: node.branchName ?? null,
+    team: node.team ?? null,
+    project: node.project ?? null,
+    cycle: node.cycle ?? null,
+    attachments: buildAttachments(node),
+    parent: node.parent ? relatedIssueOf(node.parent) : null,
+    children: (node.children?.nodes ?? []).map(relatedIssueOf),
+    relations: buildRelations(node),
   }
 }
 

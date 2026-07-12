@@ -1,5 +1,5 @@
 import { createMemo, For, Show } from 'solid-js'
-import { formatRelativeTime } from '../displayMeta'
+import { formatRelativeTime } from '../../../../core/client/lib/formatRelativeTime'
 import type { PullCommit, Thread, ThreadComment } from '../../../../core/client/queries'
 import { UserAvatar } from '../../../../core/client/ui/UserAvatar'
 import CopyButton from '../../../../core/client/ui/CopyButton'
