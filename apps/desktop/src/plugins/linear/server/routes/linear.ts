@@ -109,9 +109,18 @@ export const linear = new Hono<AppEnv>()
     const err = linearError(res)
     if (err) return respondError(c, err.status, err.status === 401 ? 'provider_needs_auth' : 'provider_unavailable')
     const { issues } = await linearData<{ issues: { nodes: LinearNode[] } }>(res)
-    const out: LinearProjectIssue[] = issues.nodes.map((node) => ({
-      ...linearSummaryOf(linearNodeToDetail(node)), integrationId: row.id, branchName: node.branchName ?? null,
-    }))
+    const out: LinearProjectIssue[] = issues.nodes.map((node) => {
+      const detail = linearNodeToDetail(node)
+      return {
+        ...linearSummaryOf(detail),
+        integrationId: row.id,
+        branchName: detail.branchName ?? null,
+        priority: detail.priority ?? null,
+        priorityLabel: detail.priorityLabel ?? null,
+        updatedAt: detail.updatedAt ?? null,
+        labels: detail.labels ?? [],
+      }
+    })
     return c.json({ issues: out } satisfies LinearProjectIssuesResponse)
   })
   // Batch enrichment for referenced tickets: summaries, serve-then-revalidate (10-min TTL). Stale

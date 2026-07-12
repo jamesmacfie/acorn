@@ -37,7 +37,11 @@ export type LinearProjectNode = { id: string; name: string }
 // list is signal, not history. branchName is Linear's suggested git branch — the promote default.
 export const PROJECT_ISSUES_QUERY = `query($filter: IssueFilter) {
   issues(filter: $filter, first: 100) {
-    nodes { id identifier title url branchName state { name type color } assignee { name } }
+    nodes {
+      id identifier title url branchName priority priorityLabel updatedAt
+      state { name type color } assignee { name }
+      labels { nodes { id name color } }
+    }
   }
 }`
 export const projectIssuesFilter = (projectIds: string[]): Record<string, unknown> => ({
@@ -63,6 +67,14 @@ export type LinearHistoryNode = {
   toTitle: string | null
 }
 
+// A minimal issue node used for parent/children/relation targets.
+export type LinearRelatedNode = {
+  id: string
+  identifier: string
+  title: string
+  state: { name: string; type: string; color: string } | null
+}
+
 // Linear issue node as queried below. Detail-only fields are optional (absent on the summary query).
 export type LinearNode = {
   id: string
@@ -71,11 +83,24 @@ export type LinearNode = {
   url: string
   description?: string | null
   branchName?: string | null
+  priority?: number | null
+  priorityLabel?: string | null
+  estimate?: number | null
+  dueDate?: string | null
   createdAt?: string
+  updatedAt?: string
   state: { name: string; type: string; color: string } | null
   assignee: { name: string } | null
   creator?: { name: string } | null
-  labels?: { nodes: { id: string; name: string }[] }
+  team?: { key: string; name: string } | null
+  project?: { id: string; name: string } | null
+  cycle?: { number: number; endsAt: string | null } | null
+  labels?: { nodes: { id: string; name: string; color: string }[] }
+  attachments?: { nodes: { id: string; title: string | null; subtitle: string | null; url: string; sourceType: string | null }[] }
+  parent?: LinearRelatedNode | null
+  children?: { nodes: LinearRelatedNode[] }
+  relations?: { nodes: { id: string; type: string; relatedIssue: LinearRelatedNode | null }[] }
+  inverseRelations?: { nodes: { id: string; type: string; issue: LinearRelatedNode | null }[] }
   comments?: { nodes: { id: string; body: string; createdAt: string; user: { name: string } | null; parent: { id: string } | null }[] }
   history?: { nodes: LinearHistoryNode[] }
 }
@@ -88,12 +113,23 @@ export const ISSUES_QUERY = `query($filter: IssueFilter) {
   }
 }`
 
-// Full detail for the side panel: description, comments (threaded via parent), and activity history.
+// Full detail for the side panel: description, comments (threaded via parent), activity history,
+// plus context fields (priority/estimate/cycle/team/project), external attachments, and the issue
+// graph (parent, sub-issues, relations). All ride this one request — see the plan.
 export const ISSUE_DETAIL_QUERY = `query($filter: IssueFilter) {
   issues(filter: $filter, first: 1) {
     nodes {
-      id identifier title url description createdAt state { name type color } assignee { name } creator { name }
-      labels { nodes { id name } }
+      id identifier title url description branchName priority priorityLabel estimate dueDate createdAt updatedAt
+      state { name type color } assignee { name } creator { name }
+      team { key name }
+      project { id name }
+      cycle { number endsAt }
+      labels { nodes { id name color } }
+      attachments(first: 25) { nodes { id title subtitle url sourceType } }
+      parent { id identifier title state { name type color } }
+      children(first: 50) { nodes { id identifier title state { name type color } } }
+      relations(first: 25) { nodes { id type relatedIssue { id identifier title state { name type color } } } }
+      inverseRelations(first: 25) { nodes { id type issue { id identifier title state { name type color } } } }
       comments(first: 50) { nodes { id body createdAt user { name } parent { id } } }
       history(first: 50) {
         nodes {

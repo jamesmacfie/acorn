@@ -136,6 +136,22 @@ export class LinearService {
       description: d.description,
       comments: d.comments.map((cm) => ({ id: cm.id, author: cm.author, body: cm.body, createdAt: cm.createdAt, parentId: cm.parentId })),
       activity: d.activity,
+      labels: d.labels,
+      createdAt: d.createdAt,
+      updatedAt: d.updatedAt,
+      creator: d.creator,
+      priority: d.priority,
+      priorityLabel: d.priorityLabel,
+      estimate: d.estimate,
+      dueDate: d.dueDate,
+      branchName: d.branchName,
+      team: d.team,
+      project: d.project,
+      cycle: d.cycle,
+      attachments: d.attachments,
+      parent: d.parent,
+      children: d.children,
+      relations: d.relations,
     }
   }
 

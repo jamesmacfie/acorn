@@ -337,8 +337,10 @@ export const linearProjectsOptions = (enabled: boolean) => ({
 // All active issues for a workspace's linked Linear projects, which may span several connections.
 // Groups the (integrationId, externalId) selection by integration and fans out one request each,
 // merging the results. Each issue carries its integrationId (stamped server-side) for promotion.
+// v2: LinearProjectIssue grew required labels/priority/updatedAt fields — the version suffix orphans
+// persisted pre-redesign rows that would otherwise hydrate and crash the browse model.
 export const workspaceLinearIssuesKey = (selection: WorkspaceProject[]) =>
-  ['workspace-linear-issues', ...selection.map((p) => `${p.integrationId}:${p.externalId}`).sort()] as const
+  ['workspace-linear-issues-v2', ...selection.map((p) => `${p.integrationId}:${p.externalId}`).sort()] as const
 export const workspaceLinearIssuesOptions = (selection: WorkspaceProject[], enabled: boolean) => ({
   queryKey: workspaceLinearIssuesKey(selection),
   enabled,
