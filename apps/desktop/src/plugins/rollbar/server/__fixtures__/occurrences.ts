@@ -14,6 +14,8 @@ export const ITEM: RollbarApiItem = {
   last_occurrence_timestamp: 1_700_100_000,
   framework: 'node',
   last_occurrence_id: 555,
+  last_activated_timestamp: 1_700_050_000,
+  unique_occurrences: 12,
   resolved_in_version: null,
   assigned_user_id: null,
 }
@@ -35,6 +37,7 @@ export const TRACE_INSTANCE: RollbarApiInstance = {
   data: {
     uuid: 'aaaa-bbbb',
     context: 'auth#login',
+    environment: 'prod',
     code_version: 'aabbcc1',
     platform: 'linux',
     language: 'javascript',

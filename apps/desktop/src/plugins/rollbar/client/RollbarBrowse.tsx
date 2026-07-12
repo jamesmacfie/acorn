@@ -1,4 +1,4 @@
-import { createEffect, createSignal, For, on, Show } from 'solid-js'
+import { createEffect, createMemo, createSignal, For, on, Show } from 'solid-js'
 import { useNavigate, useParams } from '@solidjs/router'
 import { createQuery, useQueryClient } from '@tanstack/solid-query'
 import { integrationsOptions, rollbarItemsOptions, tasksKey, tasksOptions, workspaceProjectsKey, workspaceProjectsOptions, workspacesOptions } from '../../../core/client/queries'
@@ -10,7 +10,7 @@ import { PromoteToTaskModal } from '../../../core/client/integrations/PromoteToT
 import { workspaceForRepo } from '../../../core/client/workspaces/activeWorkspace'
 import { replaceWorkspaceProjectsForProvider, workspaceProjectsForProvider } from '../../../core/client/integrations/workspaceProjects'
 import { setWorkspaceProjects } from '../../../core/client/workspaces/mutations'
-import { emptyRollbarFilter, filterRollbarItems, rollbarFacets, sortRollbarItems, type RollbarFilter } from './model'
+import { emptyRollbarFilter, filterRollbarItems, isRegressed, rollbarFacets, sortRollbarItems, type RollbarFilter, type RollbarSortOrder } from './model'
 import RollbarItemPanel, { type RollbarTarget } from './RollbarItemPanel'
 import './rollbar.css'
 
@@ -47,10 +47,11 @@ export default function RollbarBrowse() {
   const items = createQuery(() => rollbarItemsOptions(linkedConnectionIds(), linkedConnectionIds().length > 0))
 
   const rows = () => items.data?.items ?? []
-  const facets = () => rollbarFacets(rows())
+  const facets = createMemo(() => rollbarFacets(rows()))
   const [filter, setFilter] = createSignal<RollbarFilter>(emptyRollbarFilter)
+  const [sort, setSort] = createSignal<RollbarSortOrder>('recent')
   const patch = (part: Partial<RollbarFilter>) => setFilter((f) => ({ ...f, ...part }))
-  const visible = () => sortRollbarItems(filterRollbarItems(rows(), filter()))
+  const visible = createMemo(() => sortRollbarItems(filterRollbarItems(rows(), filter()), sort()))
 
   const [selected, setSelected] = createSignal<RollbarTarget | null>(null)
   const isSelected = (i: RollbarItemSummary) => selected() !== null && targetKeyEq(selected()!, i)
@@ -60,6 +61,7 @@ export default function RollbarBrowse() {
   createEffect(on(() => `${params.owner ?? ''}/${params.repo ?? ''}`, () => {
     setSelected(null)
     setFilter(emptyRollbarFilter)
+    setSort('recent')
   }, { defer: true }))
 
   // Rollbar project picker — one Rollbar connection represents one project. Mappings live at the
@@ -199,6 +201,11 @@ export default function RollbarBrowse() {
                 <option value="">All envs</option>
                 <For each={facets().environments}>{(env) => <option value={env}>{env}</option>}</For>
               </select>
+              <select value={sort()} onChange={(e) => setSort(e.currentTarget.value as RollbarSortOrder)} title="Sort order">
+                <option value="recent">Last seen</option>
+                <option value="occurrences">Occurrences</option>
+                <option value="level">Level</option>
+              </select>
             </div>
 
             <Show when={(items.data?.failures ?? []).length}>
@@ -230,6 +237,7 @@ export default function RollbarBrowse() {
                           >
                             <span class="rollbar-level" data-level={item.level}>✗ {item.level}</span>
                             <span class="rollbar-row-title">{item.title}</span>
+                            <Show when={isRegressed(item)}><span class="rollbar-regressed-chip" title="Resolved and came back">regressed</span></Show>
                             <Show when={facets().connections.length > 1}><span class="rollbar-row-conn muted">{item.integrationLabel}</span></Show>
                             <span class="rollbar-row-meta muted">×{item.totalOccurrences} · {item.environment} · {relTime(item.lastOccurrenceAt)}</span>
                             <button

@@ -153,6 +153,7 @@ export function normalizeOccurrence(instance: RollbarApiInstance): RollbarOccurr
     frames,
     request: request ? { method: asString(request.method), url: asString(request.url) } : null,
     context: asString(occurrence.context),
+    environment: asString(occurrence.environment),
     codeVersion: asString(occurrence.code_version),
     platform: asString(occurrence.platform),
     language: asString(occurrence.language),
@@ -175,6 +176,10 @@ export function occurrenceSummary(detail: RollbarOccurrenceDetail): RollbarOccur
     kind: detail.kind,
     exceptionClass: detail.exceptionClass,
     message: detail.message,
+    environment: detail.environment,
+    codeVersion: detail.codeVersion,
+    request: detail.request,
+    personUsername: detail.person?.username ?? null,
   }
 }
 
@@ -194,6 +199,8 @@ export function normalizeSummary(integrationId: string, integrationLabel: string
     firstOccurrenceAt: asMillis(raw.first_occurrence_timestamp),
     lastOccurrenceAt: asMillis(raw.last_occurrence_timestamp),
     ...(cleanString(raw.framework) ? { framework: cleanString(raw.framework)! } : {}),
+    ...(asMillis(raw.last_activated_timestamp) != null ? { lastActivatedAt: asMillis(raw.last_activated_timestamp) } : {}),
+    ...(asNumber(raw.unique_occurrences) != null ? { uniqueOccurrences: asNumber(raw.unique_occurrences)! } : {}),
   }
 }
 

@@ -170,6 +170,9 @@ export default function EditorPane(props: { task: Task }) {
   const applyPaneIntent = (intent: PaneIntent | undefined) => {
     if (!intent || intent.kind !== 'editor:reveal') return
     setPendingReveal({ path: intent.path, line: intent.line })
+    // Reveal implies open: cross-pane senders (find-in-files, stack frames) go through the core
+    // intent bus alone and can't call editorOpen themselves. No-op when the tab is already current.
+    openPath(intent.path, true)
     if (currentPath === intent.path) maybeReveal(intent.path)
   }
   onMount(() => {

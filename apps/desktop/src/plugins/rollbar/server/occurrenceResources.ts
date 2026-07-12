@@ -25,7 +25,9 @@ import {
 import { normalizeItemMetadata, normalizeOccurrence, normalizeSummary, occurrenceSummary } from './normalize'
 
 const OCCURRENCE_PAGE_SIZE = 50
-const CHILD_CACHE_SCHEMA_VERSION = 2
+// v3 widened occurrence summaries (environment/codeVersion/request/personUsername) and added
+// environment to the detail; rejecting older rows forces a refresh instead of serving sparse rows.
+const CHILD_CACHE_SCHEMA_VERSION = 3
 type ChildResource = 'occurrence-list' | 'occurrence'
 
 export const ROLLBAR_OCCURRENCES_RESOURCE = 'rollbar.item-occurrences'
@@ -69,9 +71,8 @@ async function writeResource(
   identifier: string,
   value: unknown,
 ): Promise<boolean> {
-  // Version the storage envelope independently from the public contract. v1 normalized the wrong
-  // upstream property (`occurrence` instead of `data`); rejecting its bare rows forces an immediate
-  // refresh instead of serving `unknown` diagnostics until the TTL expires.
+  // Version the storage envelope independently from the public contract (see
+  // CHILD_CACHE_SCHEMA_VERSION above for the current version's rationale).
   const data = JSON.stringify({ schemaVersion: CHILD_CACHE_SCHEMA_VERSION, value })
   if (Buffer.byteLength(data, 'utf8') > context.limits.maxCachedItemBytes) return false
   await context.db

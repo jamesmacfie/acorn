@@ -33,6 +33,7 @@ export default function RollbarPane(props: { task: Task }) {
           target={target()}
           targets={targets()}
           onSelectTarget={(t) => setPicked(targetKey(t))}
+          taskId={props.task.id}
         />
       )}
     </Show>
