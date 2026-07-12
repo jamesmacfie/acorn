@@ -19,6 +19,8 @@ export const RollbarItemSummarySchema = z.strictObject({
   firstOccurrenceAt: UnixMillisSchema.nullable(),
   lastOccurrenceAt: UnixMillisSchema.nullable(),
   framework: z.string().optional(),
+  lastActivatedAt: UnixMillisSchema.nullable().optional(),
+  uniqueOccurrences: z.number().int().nonnegative().optional(),
 })
 
 const RollbarStackFrameSchema = z.strictObject({
@@ -41,6 +43,7 @@ const RollbarOccurrenceDetailSchema = z.strictObject({
   frames: z.array(RollbarStackFrameSchema),
   request: z.strictObject({ method: z.string().nullable(), url: z.string().nullable() }).nullable(),
   context: z.string().nullable(),
+  environment: z.string().nullable().optional(),
   codeVersion: z.string().nullable(),
   platform: z.string().nullable(),
   language: z.string().nullable(),

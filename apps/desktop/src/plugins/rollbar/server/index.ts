@@ -35,6 +35,8 @@ export type RollbarApiItem = {
   last_occurrence_timestamp: number
   framework?: string | null
   last_occurrence_id?: number | null
+  last_activated_timestamp?: number | null
+  unique_occurrences?: number | null
   resolved_in_version?: string | null
   assigned_user_id?: number | string | null
 }

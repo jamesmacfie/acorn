@@ -188,6 +188,9 @@ export type RollbarItemSummary = {
   firstOccurrenceAt: number | null
   lastOccurrenceAt: number | null
   framework?: string
+  // Optional (like framework) so cached pre-widening rows stay valid: absent until the next list refresh.
+  lastActivatedAt?: number | null // later than firstOccurrenceAt ⇒ the item regressed after a resolve
+  uniqueOccurrences?: number // distinct-IP count; plan-dependent upstream
 }
 
 export type RollbarStackFrame = {
@@ -210,6 +213,7 @@ export type RollbarOccurrenceDetail = {
   frames: RollbarStackFrame[]
   request: { method: string | null; url: string | null } | null
   context: string | null
+  environment: string | null
   codeVersion: string | null
   platform: string | null
   language: string | null
@@ -225,10 +229,11 @@ export type RollbarItemMetadata = RollbarItemSummary & {
   assignedTo: string | null
 }
 
+// Person is flattened to the username only: list rows never carry emails into the cache.
 export type RollbarOccurrenceSummary = Pick<
   RollbarOccurrenceDetail,
-  'id' | 'occurredAt' | 'uuid' | 'url' | 'kind' | 'exceptionClass' | 'message'
->
+  'id' | 'occurredAt' | 'uuid' | 'url' | 'kind' | 'exceptionClass' | 'message' | 'environment' | 'codeVersion' | 'request'
+> & { personUsername: string | null }
 
 export type RollbarOccurrencesResponse = {
   occurrences: RollbarOccurrenceSummary[]

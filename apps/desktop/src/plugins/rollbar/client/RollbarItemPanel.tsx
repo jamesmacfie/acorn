@@ -19,6 +19,7 @@ import {
   type RollbarOccurrencesResponse,
 } from '../../../core/shared/api'
 import RollbarOccurrenceView from './RollbarOccurrenceView'
+import { isRegressed, rollbarImpact } from './model'
 import { Tabs } from '../../../core/client/ui/Tabs'
 import './rollbar.css'
 
@@ -40,6 +41,7 @@ export default function RollbarItemPanel(props: {
   onSelectTarget?: (target: RollbarTarget) => void
   variant?: 'pane' | 'detail'
   actions?: JSX.Element
+  taskId?: string // enables frame → editor links; only the task pane has a worktree to open into
 }) {
   const qc = useQueryClient()
   const [tab, setTab] = createSignal<RollbarPanelTab>('summary')
@@ -59,10 +61,12 @@ export default function RollbarItemPanel(props: {
     props.target.identifier,
     tab() === 'details' || (tab() === 'summary' && !props.summary),
   ))
+  // Summary also loads the occurrence sample: its Impact rollup is a local reduce over the same
+  // serve-then-revalidate resource the Occurrences tab uses (no new API surface).
   const occurrences = createQuery(() => rollbarOccurrencesOptions(
     props.target.connectionId,
     props.target.identifier,
-    tab() === 'occurrences',
+    tab() === 'occurrences' || tab() === 'summary',
   ))
   const occurrence = createQuery(() => rollbarOccurrenceOptions(
     props.target.connectionId,
@@ -142,14 +146,39 @@ export default function RollbarItemPanel(props: {
                   <h2 class="rollbar-title">{item().title}</h2>
                   <div class="rollbar-summary-line">
                     <span class="rollbar-level" data-level={item().level}>{item().level}</span>
+                    <Show when={isRegressed(item())}><span class="rollbar-regressed-chip" title="Resolved and came back">regressed</span></Show>
                     <span>{item().status}</span>
                     <span>{item().environment || 'No environment'}</span>
                   </div>
                   <dl class="rollbar-summary-stats">
                     <div><dt>Occurrences</dt><dd>{item().totalOccurrences.toLocaleString()}</dd></div>
+                    <Show when={item().uniqueOccurrences != null}>
+                      <div><dt>Unique IPs</dt><dd>{item().uniqueOccurrences!.toLocaleString()}</dd></div>
+                    </Show>
                     <div><dt>First seen</dt><dd>{fmtAbs(item().firstOccurrenceAt)}</dd></div>
                     <div><dt>Last seen</dt><dd>{fmtAbs(item().lastOccurrenceAt)}</dd></div>
                   </dl>
+                  <Show when={isRegressed(item())}>
+                    <p class="rollbar-regressed-note">Reactivated {fmtAbs(item().lastActivatedAt ?? null)} — this error was resolved and came back.</p>
+                  </Show>
+                  <Show when={occurrences.data?.occurrences.length}>
+                    {(_) => {
+                      const impact = () => rollbarImpact(occurrences.data!.occurrences, Date.now())
+                      const spread = (values: Array<{ name: string; count: number }>) =>
+                        values.slice(0, 3).map((v) => `${v.name} ×${v.count}`).join(' · ') || '—'
+                      return (
+                        <>
+                          <h3 class="rollbar-section-head">Impact — of the last {impact().sample} occurrences</h3>
+                          <dl class="rollbar-facts">
+                            <dt>Users</dt><dd>{impact().users || '—'}</dd>
+                            <dt>Last 24h</dt><dd>{impact().last24h}</dd>
+                            <dt>Environments</dt><dd>{spread(impact().environments)}</dd>
+                            <dt>Versions</dt><dd>{spread(impact().versions)}</dd>
+                          </dl>
+                        </>
+                      )
+                    }}
+                  </Show>
                   <Show when={metadata.isError}><p class="action-error" role="alert">Could not refresh this item’s summary.</p></Show>
                 </>
               )}
@@ -200,6 +229,12 @@ export default function RollbarItemPanel(props: {
                           <span class="rollbar-occurrence-time">{fmtAbs(item.occurredAt)}</span>
                           <span class="muted">#{item.id}</span>
                           <span class="rollbar-occurrence-message">{item.exceptionClass || item.message || item.kind}</span>
+                          <Show when={item.environment || item.codeVersion || item.personUsername || item.request?.url}>
+                            <span class="rollbar-occurrence-facts muted">
+                              {[item.environment, item.codeVersion, item.personUsername, [item.request?.method, item.request?.url].filter(Boolean).join(' ') || null]
+                                .filter(Boolean).join(' · ')}
+                            </span>
+                          </Show>
                         </button>
                       )}
                     </For>
@@ -211,7 +246,7 @@ export default function RollbarItemPanel(props: {
             <div class="rollbar-occurrence-view">
               <Show when={selectedOccurrenceId()} fallback={<div class="pane-empty"><p class="placeholder">Select an occurrence to load its diagnostic detail.</p></div>}>
                 <Show when={occurrence.data} fallback={<p class="placeholder">{occurrence.isError ? 'Could not load this occurrence.' : 'Loading occurrence detail…'}</p>}>
-                  {(data) => <RollbarOccurrenceView occurrence={data()} />}
+                  {(data) => <RollbarOccurrenceView occurrence={data()} item={facts()} taskId={props.taskId} />}
                 </Show>
               </Show>
             </div>

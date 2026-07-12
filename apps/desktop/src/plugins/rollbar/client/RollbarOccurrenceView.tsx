@@ -1,5 +1,7 @@
-import { For, Show } from 'solid-js'
-import type { RollbarOccurrenceDetail } from '../../../core/shared/api'
+import { createSignal, For, Show } from 'solid-js'
+import type { RollbarItemSummary, RollbarOccurrenceDetail } from '../../../core/shared/api'
+import { openPane } from '../../../core/client/registries/clientEvents'
+import { agentContext, frameRepoPath } from './model'
 
 const relAge = (at: number | null): string => {
   if (!at) return ''
@@ -18,7 +20,24 @@ const KIND_LABEL: Record<RollbarOccurrenceDetail['kind'], string> = {
   unknown: 'Occurrence',
 }
 
-export default function RollbarOccurrenceView(props: { occurrence: RollbarOccurrenceDetail }) {
+export default function RollbarOccurrenceView(props: {
+  occurrence: RollbarOccurrenceDetail
+  item?: RollbarItemSummary
+  taskId?: string
+}) {
+  const [copied, setCopied] = createSignal(false)
+  let copyTimer: ReturnType<typeof setTimeout> | undefined
+  const copyContext = () => {
+    void navigator.clipboard.writeText(agentContext(props.item, props.occurrence))
+    setCopied(true)
+    clearTimeout(copyTimer)
+    copyTimer = setTimeout(() => setCopied(false), 1200)
+  }
+  // In-project frames open in the task's editor via the core pane-intent bus (editor:reveal opens the
+  // tab and scrolls to the line). Needs a task — only the task pane supplies one.
+  const revealFrame = (path: string, line: number | null) => {
+    openPane(props.taskId!, 'editor', { kind: 'editor:reveal', path, line: line ?? 1 }, 'add')
+  }
   return (
     <article class="rollbar-occurrence-detail">
       <header class="rollbar-occurrence-head">
@@ -28,7 +47,12 @@ export default function RollbarOccurrenceView(props: { occurrence: RollbarOccurr
             {(url) => <a class="rollbar-external-id" href={url()} target="_blank" rel="noreferrer">#{props.occurrence.id}</a>}
           </Show></span>
         </div>
-        <Show when={relAge(props.occurrence.occurredAt)}>{(age) => <span class="muted">{age()}</span>}</Show>
+        <span class="rollbar-occurrence-head-actions">
+          <button type="button" class="new-pr-btn" title="Copy the exception, trace, and facts for pasting into a task terminal" onClick={copyContext}>
+            {copied() ? 'Copied' : 'Copy as agent context'}
+          </button>
+          <Show when={relAge(props.occurrence.occurredAt)}>{(age) => <span class="muted">{age()}</span>}</Show>
+        </span>
       </header>
 
       <Show when={props.occurrence.exceptionClass || props.occurrence.message} fallback={<p class="muted">No message was supplied for this occurrence.</p>}>
@@ -44,7 +68,16 @@ export default function RollbarOccurrenceView(props: { occurrence: RollbarOccurr
             {(frame) => (
               <li class="rollbar-frame" classList={{ 'rollbar-frame-app': frame.inProject === true }}>
                 <div class="rollbar-frame-loc">
-                  <span class="rollbar-frame-file">{frame.filename}</span>
+                  <Show
+                    when={props.taskId && frame.inProject === true ? frameRepoPath(frame.filename) : null}
+                    fallback={<span class="rollbar-frame-file">{frame.filename}</span>}
+                  >
+                    {(path) => (
+                      <button type="button" class="rollbar-frame-open" title={`Open ${path()} in the editor`} onClick={() => revealFrame(path(), frame.line)}>
+                        {frame.filename}
+                      </button>
+                    )}
+                  </Show>
                   <Show when={frame.line != null}><span class="muted">:{frame.line}{frame.column != null ? `:${frame.column}` : ''}</span></Show>
                   <Show when={frame.method}>{(method) => <span class="rollbar-frame-method"> {method()}</span>}</Show>
                 </div>
@@ -59,6 +92,7 @@ export default function RollbarOccurrenceView(props: { occurrence: RollbarOccurr
 
       <dl class="rollbar-facts rollbar-context">
         <Show when={props.occurrence.request}>{(request) => (<><dt>Request</dt><dd>{[request().method, request().url].filter(Boolean).join(' ') || '—'}</dd></>)}</Show>
+        <Show when={props.occurrence.environment}>{(env) => (<><dt>Environment</dt><dd>{env()}</dd></>)}</Show>
         <Show when={props.occurrence.context}>{(context) => (<><dt>Context</dt><dd>{context()}</dd></>)}</Show>
         <Show when={props.occurrence.codeVersion}>{(version) => (<><dt>Version</dt><dd>{version()}</dd></>)}</Show>
         <Show when={props.occurrence.language || props.occurrence.platform || props.occurrence.framework}>

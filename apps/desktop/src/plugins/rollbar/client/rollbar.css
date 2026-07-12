@@ -98,12 +98,26 @@
 .rollbar-level[data-level='info'],
 .rollbar-level[data-level='debug'] { color: var(--text-muted); }
 
+/* "Resolved and came back" — the most decision-relevant fact on a row, so it reads as an alarm pill. */
+.rollbar-regressed-chip {
+  flex: none;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  padding: 0 6px;
+  border: 1px solid var(--del-marker);
+  border-radius: 999px;
+  color: var(--del-marker);
+}
+.rollbar-regressed-note { font-size: var(--fs-sm); color: var(--del-marker); margin: 10px 0; }
+
 .rollbar-title { font-size: var(--fs-lg); font-weight: 600; margin: 8px 0; overflow-wrap: anywhere; }
 .rollbar-summary-line { display: flex; align-items: center; gap: 8px; margin: 10px 0 18px; font-size: var(--fs-sm); }
 .rollbar-summary-line > * + *::before { content: '·'; margin-right: 8px; color: var(--text-faint); }
 .rollbar-summary-stats {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
   margin: 0;
   border-top: 1px solid var(--border);
   border-bottom: 1px solid var(--border);
@@ -189,10 +203,27 @@
 .rollbar-occurrence-row.active { background: var(--bg-selected); border-left-color: var(--accent); }
 .rollbar-occurrence-time { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
 .rollbar-occurrence-message { grid-column: 1 / -1; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; color: var(--text-muted); }
+.rollbar-occurrence-facts { grid-column: 1 / -1; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
 .rollbar-occurrence-view { min-width: 0; min-height: 0; overflow-y: auto; }
 .rollbar-occurrence-detail { padding: 12px var(--pane-pad) 24px; }
-.rollbar-occurrence-head { display: flex; justify-content: space-between; gap: 12px; margin-bottom: 12px; font-size: var(--fs-sm); }
+.rollbar-occurrence-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 12px; font-size: var(--fs-sm); }
 .rollbar-occurrence-kind { font-weight: 600; }
+.rollbar-occurrence-head-actions { display: flex; align-items: center; gap: 8px; flex: none; }
+
+/* In-project frame → editor. Same text as the plain filename, underlined in accent like the mock. */
+.rollbar-frame-open {
+  font: inherit;
+  color: var(--text);
+  background: transparent;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+  text-decoration: underline;
+  text-decoration-color: var(--accent);
+  text-underline-offset: 3px;
+}
+.rollbar-frame-open:hover { color: var(--accent); }
+.rollbar-frame-open:focus-visible { outline: 1px solid var(--accent); outline-offset: 1px; }
 
 @media (hover: hover) {
   .rollbar-occurrence-row:hover { background: var(--bg-hover); }

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { CAPS, composeItemDetail, normalizeItemMetadata, normalizeOccurrence, normalizeSummary } from './normalize'
+import { CAPS, composeItemDetail, normalizeItemMetadata, normalizeOccurrence, normalizeSummary, occurrenceSummary } from './normalize'
 import type { RollbarApiInstance } from './'
 import { CRASH_INSTANCE, ITEM, MESSAGE_INSTANCE, SPARSE_ITEM, TRACE_CHAIN_INSTANCE, TRACE_INSTANCE, UNKNOWN_INSTANCE } from './__fixtures__/occurrences'
 
@@ -22,6 +22,23 @@ describe('rollbar normalizer', () => {
     const s = normalizeSummary('c', 'L', SPARSE_ITEM)
     expect(s).toMatchObject({ identifier: '7', itemId: '12', totalOccurrences: 0, firstOccurrenceAt: null, lastOccurrenceAt: null })
     expect(s.framework).toBeUndefined()
+    expect(s.lastActivatedAt).toBeUndefined()
+    expect(s.uniqueOccurrences).toBeUndefined()
+  })
+
+  it('keeps regression and unique-IP fields when the plan supplies them (unix-seconds → ms)', () => {
+    const s = normalizeSummary('c', 'L', ITEM)
+    expect(s.lastActivatedAt).toBe(1_700_050_000_000)
+    expect(s.uniqueOccurrences).toBe(12)
+  })
+
+  it('occurrence summary carries the scannable facts but flattens person to a username', () => {
+    const summary = occurrenceSummary(normalizeOccurrence(TRACE_INSTANCE))
+    expect(summary).toMatchObject({
+      environment: 'prod', codeVersion: 'aabbcc1', personUsername: 'jo',
+      request: { method: 'POST', url: '/api/login' },
+    })
+    expect(JSON.stringify(summary)).not.toContain('jo@example.test')
   })
 
   it('canonical data envelope: exception + ordered frames + bounded code context', () => {
@@ -51,6 +68,7 @@ describe('rollbar normalizer', () => {
     expect(json).not.toContain('SECRET')
     expect(json).not.toContain('authorization')
     expect(occ.request).toEqual({ method: 'POST', url: '/api/login' })
+    expect(occ.environment).toBe('prod')
     expect(JSON.stringify(normalizeOccurrence(CRASH_INSTANCE))).not.toContain('SHOULD NOT SURVIVE')
   })
 
