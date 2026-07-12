@@ -46,8 +46,16 @@ export function removeArgv(flavour: AgentFlavour, name: string): Argv {
 
 export type ExecLike = (file: string, args: string[]) => Promise<{ stdout: string }>
 
+// GUI-launched apps (Finder/dock) inherit launchd's minimal PATH (`/usr/bin:/bin:…`) with no
+// ~/.local/bin, homebrew or nvm — so `claude`/`codex` aren't found and registration silently fails,
+// leaving a stale server path that ENOENTs at `/mcp` time. Run the CLI through a login shell so the
+// user's real PATH resolves it. ponytail: login shell is the standard macOS GUI-PATH fix; single-
+// quote each arg so paths with spaces survive (`'` → `'\''`).
+const shQuote = (s: string): string => `'${s.replace(/'/g, `'\\''`)}'`
 const realExec: ExecLike = async (file, args) => {
-  const { stdout } = await promisify(execFile)(file, args, { timeout: 20_000 })
+  const shell = process.env.SHELL || '/bin/sh'
+  const cmd = [file, ...args].map(shQuote).join(' ')
+  const { stdout } = await promisify(execFile)(shell, ['-lc', cmd], { timeout: 20_000 })
   return { stdout }
 }
 
