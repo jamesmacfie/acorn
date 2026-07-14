@@ -136,7 +136,7 @@ export const tasks = new Hono<AppEnv>()
   })
   .patch('/:id', async (c) => {
     const id = c.req.param('id')
-    const body = (await c.req.json().catch(() => ({}))) as { title?: string; status?: 'active' | 'archived' }
+    const body = (await c.req.json().catch(() => ({}))) as { title?: string; status?: 'active' | 'archived'; pullNumber?: number | null }
     const db = getDb(c.env)
     const [existing] = await db.select({ id: schema.tasks.id }).from(schema.tasks).where(eq(schema.tasks.id, id))
     if (!existing) return respondError(c, 404, 'not_found')
@@ -146,6 +146,10 @@ export const tasks = new Hono<AppEnv>()
       patch.status = body.status
       patch.archivedAt = body.status === 'archived' ? Date.now() : null
     }
+    // Link a task to a PR after the fact (Flow B: local-first task → PR created → number back-filled).
+    // Accept a positive number to set, or null to unlink.
+    if (typeof body.pullNumber === 'number' && Number.isInteger(body.pullNumber) && body.pullNumber > 0) patch.pullNumber = body.pullNumber
+    else if (body.pullNumber === null) patch.pullNumber = null
     await db.update(schema.tasks).set(patch).where(eq(schema.tasks.id, id))
     return c.json({ id, ...patch })
   })
