@@ -207,7 +207,10 @@ export const removeTaskLink = (id: string, ref: Pick<TaskLink, 'connectionId' | 
   })
 export const renameTask = async (id: string, title: string) => patchTask(id, { title })
 export const archiveTask = async (id: string) => patchTask(id, { status: 'archived' })
-async function patchTask(id: string, body: { title?: string; status?: 'active' | 'archived' }) {
+// Back-fill (or clear, with null) the PR linked to a task. Callers invalidate tasksKey after so
+// pathForTask starts routing the task to its PR.
+export const setTaskPull = async (id: string, pullNumber: number | null) => patchTask(id, { pullNumber })
+async function patchTask(id: string, body: { title?: string; status?: 'active' | 'archived'; pullNumber?: number | null }) {
   return writeJson<unknown>(taskRoute(id), {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json' },
