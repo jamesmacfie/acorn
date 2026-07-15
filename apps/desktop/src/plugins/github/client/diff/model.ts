@@ -228,7 +228,7 @@ export function expandGap(gap: GapRow, body: string, tokenize: TokenizeLine): Co
   return rows
 }
 
-export function buildRenderableRows(parsed: ParsedFile[], threads: Thread[] | undefined, expanded?: Map<string, CodeRow[]>): Row[] {
+export function buildRenderableRows(parsed: ParsedFile[], threads: Thread[] | undefined, expanded?: Map<string, CodeRow[]>, collapsed?: Set<string>): Row[] {
   const threadsByPath = new Map<string, Thread[]>()
   for (const thread of threads ?? []) {
     if (!thread.path) continue
@@ -240,6 +240,7 @@ export function buildRenderableRows(parsed: ParsedFile[], threads: Thread[] | un
   const out: Row[] = []
   for (const { file, diff } of parsed) {
     out.push({ kind: 'file', file })
+    if (collapsed?.has(file.path)) continue
     const fileThreads = threadsByPath.get(file.path) ?? []
     for (const row of diff) {
       // An expanded gap is replaced by its revealed context lines (whole-gap expand).

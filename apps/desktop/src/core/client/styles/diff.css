@@ -106,6 +106,17 @@
   font-weight: 600;
   line-height: 20px;
 }
+.diff-file-collapse {
+  flex: none;
+  width: 16px;
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--text-muted);
+  font-size: 10px;
+  cursor: pointer;
+}
+.diff-file-collapse:hover { color: var(--text); }
 .diff-file-head .diff-file-path {
   flex: 1;
   min-width: 0;

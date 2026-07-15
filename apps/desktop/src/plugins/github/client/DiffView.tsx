@@ -112,6 +112,14 @@ function DiffForPull(props: { route: PullRoute; router: boolean }) {
   // set changes.
   const [expanded, setExpanded] = createSignal<Map<string, CodeRow[]>>(new Map())
   const [lineComposer, setLineComposer] = createSignal<{ key: string; body: string } | null>(null)
+  // Collapsed diff files (header row stays, body rows are dropped from the row model). Session-only.
+  const [collapsedFiles, setCollapsedFiles] = createSignal<Set<string>>(new Set())
+  const toggleFileCollapse = (path: string) =>
+    setCollapsedFiles((prev) => {
+      const next = new Set(prev)
+      if (!next.delete(path)) next.add(path)
+      return next
+    })
   const [threadCollapsed, setThreadCollapsed] = createSignal<Map<string, boolean>>(new Map())
   let tokenizerPromise: Promise<TokenizeLine> | null = null
   const loadTokenizer = async () => {
@@ -165,6 +173,7 @@ function DiffForPull(props: { route: PullRoute; router: boolean }) {
     lastTarget = ''
     setParsedByPath(new Map())
     setExpanded(new Map())
+    setCollapsedFiles(new Set<string>())
     setLineComposer(null)
     resetScrollPosition()
     hydrator.reset(files.data ?? [], typeof searchParams.file === 'string' ? searchParams.file : undefined)
@@ -181,7 +190,7 @@ function DiffForPull(props: { route: PullRoute; router: boolean }) {
     },
   ))
 
-  const rows = createMemo<Row[]>(() => buildRenderableRows(parsed(), detail.data?.threads, expanded()))
+  const rows = createMemo<Row[]>(() => buildRenderableRows(parsed(), detail.data?.threads, expanded(), collapsedFiles()))
   const rowKeys = createMemo(() => rowIdentityKeys(rows()))
 
   // Fetch the file's head body once (cached by immutable sha), slice the gap's hidden lines, and
@@ -611,6 +620,8 @@ function DiffForPull(props: { route: PullRoute; router: boolean }) {
                             retryDiff={(file) => hydrator.retry(file.path)}
                             mentions={mentionsList()}
                             threadCollapse={threadCollapseFor}
+                            fileCollapsed={(path) => collapsedFiles().has(path)}
+                            onToggleFileCollapse={toggleFileCollapse}
                             onLayoutChange={measureRow}
                           />
                         }
@@ -679,6 +690,8 @@ function DiffForPull(props: { route: PullRoute; router: boolean }) {
                             retryDiff={(file) => hydrator.retry(file.path)}
                             mentions={mentionsList()}
                             threadCollapse={threadCollapseFor}
+                            fileCollapsed={(path) => collapsedFiles().has(path)}
+                            onToggleFileCollapse={toggleFileCollapse}
                             onLayoutChange={measureBand}
                           />
                         </div>
