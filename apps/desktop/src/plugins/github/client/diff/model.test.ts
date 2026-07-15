@@ -119,6 +119,20 @@ describe('diff model', () => {
     expect(rows.map((row) => row.kind)).toEqual(['file', 'normal', 'delete', 'thread', 'insert', 'thread', 'file', 'nodiff'])
   })
 
+  it('drops body rows (but keeps the header) for collapsed files', () => {
+    const parsed: ParsedFile[] = [
+      {
+        file: pullFile('src/app.ts', 'patch'),
+        diff: [{ kind: 'normal', path: 'src/app.ts', oldNo: 1, newNo: 1, toks: [], raw: 'same' }],
+      },
+      { file: pullFile('image.png', null), diff: [] },
+    ]
+
+    const rows = buildRenderableRows(parsed, [thread('src/app.ts', 1, 'RIGHT')], undefined, new Set(['src/app.ts']))
+
+    expect(rows.map((row) => row.kind)).toEqual(['file', 'file', 'nodiff'])
+  })
+
   it('creates split bands that preserve full-width rows and pair change runs', () => {
     const rows = buildRenderableRows(
       [

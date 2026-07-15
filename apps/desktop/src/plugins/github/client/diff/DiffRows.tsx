@@ -29,6 +29,8 @@ export function NonCodeRow(props: {
   retryDiff?: (file: LoadDiffRow['file']) => void
   mentions?: string[]
   threadCollapse?: (thread: Thread) => ThreadCollapseController
+  fileCollapsed?: (path: string) => boolean
+  onToggleFileCollapse?: (path: string) => void
   onLayoutChange?: () => void
 }) {
   return (
@@ -38,6 +40,17 @@ export function NonCodeRow(props: {
           const status = () => fileStatusMeta(f().file.status)
           return (
             <div class="diff-file-head copyable" id={fileAnchor(f().file.path)}>
+              <Show when={props.onToggleFileCollapse}>
+                <button
+                  type="button"
+                  class="diff-file-collapse"
+                  aria-expanded={!props.fileCollapsed?.(f().file.path)}
+                  title={props.fileCollapsed?.(f().file.path) ? 'Expand file' : 'Collapse file'}
+                  onClick={() => props.onToggleFileCollapse?.(f().file.path)}
+                >
+                  {props.fileCollapsed?.(f().file.path) ? '▸' : '▾'}
+                </button>
+              </Show>
               <span class={`file-status file-status-${status().tone}`} title={status().label}>
                 {status().letter}
               </span>
