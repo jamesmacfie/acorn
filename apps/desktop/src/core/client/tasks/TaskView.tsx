@@ -8,7 +8,7 @@ import { registerCommands } from '../registries/commands'
 import { registerKeybindings, resolveKeybindings, keybindingRegistry } from '../registries/keybindings'
 import AgentsPanel from '../../../plugins/agents/client/AgentsPanel'
 import { workspaceForRepo } from '../workspaces/activeWorkspace'
-import { refreshSessions, requestTerminalFocus } from '../../../plugins/terminal/client/sessions'
+import { addSession, refreshSessions, requestTerminalFocus } from '../../../plugins/terminal/client/sessions'
 import { terminalApi } from '../../../plugins/terminal/client/terminalClient'
 import { runApi } from '../../../plugins/terminal/client/runClient'
 import { dispatchLayout, layoutForTask, maximizedPane, setActiveTaskId, setMaximizedPane, setSelectedSource } from './tasks'
@@ -87,7 +87,7 @@ export default function TaskView(props: {
     if (!api) return
     const session = await api.create({ taskId: props.task.id, profileId })
     props.onOpenTerminal()
-    await refreshSessions()
+    addSession(session) // create returns the session — no list round trip before focusing it
     requestTerminalFocus(props.task.id, session.id)
   }
 

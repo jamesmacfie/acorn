@@ -5,7 +5,7 @@ import { prefsOptions, type Task } from '../../../core/client/queries'
 import { terminalApi } from './terminalClient'
 import { onClosePaneWithin } from '../../../core/client/lib/onClosePaneWithin'
 import { isTerminalMax } from '../../../core/client/tasks/tasks'
-import { activeTerminal, rememberActiveTerminal, refreshSessions, sessions } from './sessions'
+import { activeTerminal, addSession, rememberActiveTerminal, refreshSessions, sessions } from './sessions'
 import TerminalSurface from './TerminalSurface'
 import type { TerminalProfile, TerminalSession } from '../../../core/shared/terminal'
 import { registerCommands } from '../../../core/client/registries/commands'
@@ -34,6 +34,9 @@ export default function TerminalPanel(props: { onClose: () => void; task: Task |
   // True while the rail-default profile is being auto-launched, so the body shows a loader instead
   // of the empty-state text during the spawn round-trip.
   const [launching, setLaunching] = createSignal(false)
+  // Optimistic tab: the title of a session whose create() is still round-tripping (worktree +
+  // spawn can take seconds), so the click gives instant feedback in the tab strip.
+  const [pendingTitle, setPendingTitle] = createSignal<string | null>(null)
   // Repo-path prompt: set when a launch needs a checkout we don't have mapped yet.
   const [prompt, setPrompt] = createSignal<{ owner: string; repo: string; number?: string } | null>(null)
   const [pendingProfile, setPendingProfile] = createSignal('shell')
@@ -200,17 +203,17 @@ export default function TerminalPanel(props: { onClose: () => void; task: Task |
   async function spawn(profileId: string, checkout: string | undefined, owner?: string, repo?: string, number?: string) {
     const taskId = ws()?.id
     if (!api || !taskId) return
+    const title = titleFor(profileId, owner, repo, number)
     setBusy(true)
+    setPendingTitle(title)
     try {
-      const s = await api.create({
-        taskId,
-        profileId,
-        cwd: checkout,
-        title: titleFor(profileId, owner, repo, number),
-      })
-      await refreshSessions()
+      const s = await api.create({ taskId, profileId, cwd: checkout, title })
+      addSession(s) // create returns the session — no list round trip before the tab renders
       setActiveId(s.id)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Failed to start the session.')
     } finally {
+      setPendingTitle(null)
       setBusy(false)
     }
   }
@@ -297,6 +300,14 @@ export default function TerminalPanel(props: { onClose: () => void; task: Task |
                   </div>
                 )}
               </For>
+              <Show when={pendingTitle()}>
+                {(title) => (
+                  <div class="terminal-tab pending">
+                    <span class="terminal-tab-dot" />
+                    <span class="terminal-tab-title">{title()}</span>
+                  </div>
+                )}
+              </Show>
             </div>
             <div class="terminal-actions">
               <div class="terminal-new-wrap">
@@ -378,7 +389,7 @@ export default function TerminalPanel(props: { onClose: () => void; task: Task |
             when={activeId()}
             fallback={
               <div class="terminal-empty">
-                {launching() ? <span class="terminal-launching">Launching…</span> : 'No sessions. Press + to open one.'}
+                {launching() || pendingTitle() ? <span class="terminal-launching">Launching…</span> : 'No sessions. Press + to open one.'}
               </div>
             }
             keyed
