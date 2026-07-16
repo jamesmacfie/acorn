@@ -359,7 +359,13 @@ async function spawnOne(
   // Auto-register the acorn MCP server with this agent's CLI before it launches, so the current
   // task's tools are always available — no manual "Register" click. Idempotent (remove-then-add),
   // failures (CLI missing) are swallowed. Awaited so the agent sees it at startup.
-  if (profile.mcpRegistration) await profile.mcpRegistration(mcpName(), mcpLauncher()).catch(() => undefined)
+  // ponytail: success is cached per app-run — boot refresh already rewrites every registration and
+  // the launcher path can't change mid-run, so re-running the CLI (~1-2s) per spawn is pure waste.
+  // Failures stay uncached so a CLI installed after boot registers on the next spawn.
+  if (profile.mcpRegistration && !mcpRegistered.has(profile.id)) {
+    const res = await profile.mcpRegistration(mcpName(), mcpLauncher()).catch(() => undefined)
+    if (res?.ok) mcpRegistered.add(profile.id)
+  }
 
   let pty: IPty
   if (backend === 'tmux') {
@@ -378,6 +384,9 @@ async function spawnOne(
   return meta
 }
 
+// Profiles whose MCP registration succeeded this app-run (spawnOne skips the CLI round trip).
+const mcpRegistered = new Set<string>()
+
 // acorn MCP server launcher + build-flavored name. Whether/how a CLI registers it is declared by
 // that profile contribution rather than a second profile-id lookup table.
 const mcpName = () => serverName(!process.defaultApp && !process.env.ELECTRON_IS_DEV)
@@ -394,7 +403,13 @@ export async function refreshAcornMcpRegistrations(): Promise<void> {
   await Promise.all(
     listProfileDefs()
       .filter((p) => p.mcpRegistration)
-      .map((p) => p.mcpRegistration!(name, launcher).catch(() => undefined)),
+      .map((p) =>
+        p.mcpRegistration!(name, launcher)
+          .then((res) => {
+            if (res.ok) mcpRegistered.add(p.id)
+          })
+          .catch(() => undefined),
+      ),
   )
 }
 

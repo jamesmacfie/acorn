@@ -67,6 +67,18 @@
   color: var(--text);
   border-bottom-color: var(--accent);
 }
+.terminal-tab.pending {
+  cursor: default;
+  opacity: 0.7;
+}
+.terminal-tab.pending .terminal-tab-dot {
+  animation: terminal-pending-pulse 1s ease-in-out infinite;
+}
+@keyframes terminal-pending-pulse {
+  50% {
+    opacity: 0.25;
+  }
+}
 .terminal-tab-dot {
   width: 7px;
   height: 7px;

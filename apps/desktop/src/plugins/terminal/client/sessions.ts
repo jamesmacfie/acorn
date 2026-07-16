@@ -20,6 +20,12 @@ export const refreshSessions = latestOnly(
   },
 )
 
+// Insert a session we just created — create() returns the full session, so callers skip the list
+// round trip. The next status broadcast reconciles via refreshSessions anyway.
+export const addSession = (s: TerminalSession): void => {
+  setSessions((prev) => (prev.some((p) => p.id === s.id) ? prev : [...prev, s]))
+}
+
 // Pull once then track main-process idle/exit broadcasts. Returns an unsubscribe; a noop when the
 // terminal bridge is absent (web build / flag off), so consumers naturally show nothing.
 export function initSessions(): () => void {
