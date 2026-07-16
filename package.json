@@ -8,6 +8,7 @@
     "lint": "turbo run lint",
     "test": "turbo run test",
     "dist": "pnpm --filter @acorn/desktop dist",
+    "release": "pnpm dist",
     "rebuild": "pnpm --filter @acorn/desktop electron:rebuild",
     "rebuild:node": "pnpm --filter @acorn/desktop node:rebuild",
     "dev:node": "pnpm --filter @acorn/desktop dev:node",
