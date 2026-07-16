@@ -125,6 +125,10 @@
   text-overflow: ellipsis;
 }
 .diff-file-head .file-stat { flex: none; }
+/* Sticky current-file header pinned to the top of the scrolling diff (GitHub-style). Zero-height
+   sticky shell so it never shifts the virtualizer's row offsets; the head inside paints over rows. */
+.diff-sticky-file { position: sticky; top: 0; z-index: 3; height: 0; }
+.diff-sticky-file .diff-file-head { border-top: none; }
 .diff-nodiff { display: block; padding: 4px var(--pane-pad); }
 
 /* Inline review threads + new-line composer. Thread rows are full-width, variable-height blocks
