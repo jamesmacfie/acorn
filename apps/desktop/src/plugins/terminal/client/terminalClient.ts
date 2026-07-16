@@ -122,7 +122,7 @@ declare global {
         show(taskId: string): void
         hide(): void
         load(taskId: string, url: string): void
-        command(taskId: string, action: 'back' | 'forward' | 'reload' | 'stop'): void
+        command(taskId: string, action: 'back' | 'forward' | 'reload' | 'stop' | 'devtools'): void
         evict(taskId: string): void
         onEvent(cb: (s: PreviewState) => void): () => void
       }

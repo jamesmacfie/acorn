@@ -38,7 +38,7 @@ contextBridge.exposeInMainWorld('acorn', {
     show: (taskId: string) => ipcRenderer.send('preview:show', { taskId }),
     hide: () => ipcRenderer.send('preview:hide'),
     load: (taskId: string, url: string) => ipcRenderer.send('preview:load', { taskId, url }),
-    command: (taskId: string, action: 'back' | 'forward' | 'reload' | 'stop') => ipcRenderer.send('preview:command', { taskId, action }),
+    command: (taskId: string, action: 'back' | 'forward' | 'reload' | 'stop' | 'devtools') => ipcRenderer.send('preview:command', { taskId, action }),
     evict: (taskId: string) => ipcRenderer.send('preview:evict', { taskId }),
     onEvent: (cb: (s: { taskId: string; url: string; loading: boolean; canGoBack: boolean; canGoForward: boolean }) => void) => {
       const listener = (_e: unknown, s: { taskId: string; url: string; loading: boolean; canGoBack: boolean; canGoForward: boolean }) => cb(s)
