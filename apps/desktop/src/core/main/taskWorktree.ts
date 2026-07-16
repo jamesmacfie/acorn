@@ -47,6 +47,22 @@ export const baseRefPref = async (db: AppDatabase, owner: string, repo: string):
   return row?.value ?? null
 }
 
+// Startup context injection toggle (docs/notes-and-memory.md): opt-out, so an ABSENT pref means ON.
+// Key mirrors PrefKeys.startupContextInjection (core/client can't be imported from main).
+export const contextInjectionEnabled = async (db: AppDatabase): Promise<boolean> => {
+  const [row] = await db.select().from(schema.prefs).where(eq(schema.prefs.key, 'startup_context_injection')).limit(1)
+  return row?.value !== 'false'
+}
+
+// The single machine user (docs/authentication.md): prefs rows, else repo rows, else 'local'.
+// Mirrors auth.ts's internal-user resolution for main-process callers with no request context.
+export const primaryUserLogin = async (db: AppDatabase): Promise<string> => {
+  const [pref] = await db.select({ userId: schema.prefs.userId }).from(schema.prefs).limit(1)
+  if (pref) return pref.userId
+  const [repo] = await db.select({ userId: schema.repos.userId }).from(schema.repos).limit(1)
+  return repo?.userId ?? 'local'
+}
+
 // Live worktree status for every active task that has a worktree (docs/workspaces-and-tasks.md/05):
 // dirty + changed-file count via git, and `missing` when the dir vanished (removed outside acorn).
 export async function computeTaskStatuses(db: AppDatabase): Promise<TaskStatus[]> {

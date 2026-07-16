@@ -19,8 +19,10 @@ import { MemoryProposalStore } from './memoryProposals'
 import { NotesStore, type NoteKind } from '../../notes/main/notes'
 import { broadcastWorkflowNotice } from '../../../core/main/notify'
 import { listProfileDefs, profileAvailable, resolveCommand, type ProfileDef } from '../../../core/main/profiles'
-import { isDir, loadTask, workspaceConfigRow } from '../../../core/main/taskWorktree'
+import { contextInjectionEnabled, isDir, loadTask, primaryUserLogin, workspaceConfigRow } from '../../../core/main/taskWorktree'
 import { buildSessionEnv } from '../../terminal/main/terminalUtils'
+import { assembleContext } from '../../../core/server/agentTools/contextSections'
+import { formatLaunchContext } from '../../../core/shared/contextBlock'
 
 export type KnowledgeDeps = {
   // Queue a text block into an agent session on its idle edge (agentSender in terminal.ts).
@@ -33,9 +35,9 @@ export type Knowledge = {
   // Reconcile the derived SQLite memory index from every live source dir (cheap at this scale) —
   // call before any read.
   reconciled(): Promise<void>
-  // Push the memory block into a fresh agent session (docs/notes-and-memory.md). Best-effort — a session
-  // must never fail to launch over memory.
-  memoryInjector(taskId: string, sessionId: string): Promise<void>
+  // Push the combined launch block (task context + repo memory) into a fresh agent session
+  // (docs/notes-and-memory.md). Best-effort — a session must never fail to launch over it.
+  launchInjector(taskId: string, sessionId: string): Promise<void>
   // Memory auto-generation trigger (docs/notes-and-memory.md): fired when an agent session for a task
   // exits, with that session's ring tail as the transcript input.
   memoryReviewTrigger(taskId: string, transcriptTail: string): Promise<void>
@@ -75,20 +77,32 @@ export function registerKnowledgeIpc(db: AppDatabase, dataRoot: string, deps: Kn
   }
   const reconciled = async () => reconcileMemories(db, await buildMemorySources())
 
-  const memoryInjector = async (taskId: string, sessionId: string) => {
-    // Launch injection (docs/notes-and-memory.md): MEMORY.md index slice + repo feedback/convention bodies,
-    // queued 'after-ready' so it lands as the agent's first prompt once it settles.
+  const launchInjector = async (taskId: string, sessionId: string) => {
+    // Launch injection (docs/notes-and-memory.md): one first-prompt block combining task context
+    // (PR + linked issues + notes, gated by the startup_context_injection pref) and the repo-memory
+    // block (MEMORY.md index slice + feedback/convention bodies). Queued 'after-ready' so it lands
+    // as the agent's first prompt once the CLI settles. Best-effort — never blocks a launch.
     try {
       const t = await loadTask(db, taskId)
       if (!t) return
       const repo = `${t.repoOwner}/${t.repoName}`
+      const blocks: string[] = []
+
+      if (await contextInjectionEnabled(db)) {
+        const ctx = await assembleContext(db, await primaryUserLogin(db), taskId, new Set(['pr', 'issues', 'notes']))
+        const contextBlock = ctx ? formatLaunchContext(ctx) : ''
+        if (contextBlock) blocks.push(contextBlock)
+      }
+
       await reconciled()
       const slice = await memoryIndexSlice(db, repo)
       const key = (await listMemories(db, { repo })).filter((m) => m.type === 'feedback' || m.type === 'convention')
-      const block = formatMemoryInjection(slice, key)
-      if (block) deps.sendToAgent(sessionId, block, 'after-ready')
+      const memoryBlock = formatMemoryInjection(slice, key)
+      if (memoryBlock) blocks.push(memoryBlock)
+
+      if (blocks.length) deps.sendToAgent(sessionId, blocks.join('\n\n'), 'after-ready')
     } catch {
-      // memory injection is best-effort — never blocks a session launch
+      // launch injection is best-effort — never blocks a session launch
     }
   }
 
@@ -228,5 +242,5 @@ export function registerKnowledgeIpc(db: AppDatabase, dataRoot: string, deps: Kn
       }),
   })
 
-  return { notesStore, proposals, reconciled, memoryInjector, memoryReviewTrigger }
+  return { notesStore, proposals, reconciled, launchInjector, memoryReviewTrigger }
 }

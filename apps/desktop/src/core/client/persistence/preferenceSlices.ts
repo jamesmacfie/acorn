@@ -51,6 +51,7 @@ export const directPreferenceSlices: readonly PersistedStateSlice<unknown>[] = [
   jsonObject('core.rail-order', PrefKeys.railOrder, 'view'),
   direct('terminal.rail-default', PrefKeys.terminalRailDefault),
   direct('terminal.height', PrefKeys.terminalHeight, 'panes'),
+  direct('core.startup-context-injection', PrefKeys.startupContextInjection),
   direct('core.onboarded', PrefKeys.onboarded),
   jsonObject('agent-tools.permissions', PrefKeys.agentToolPermissions),
 ] as readonly PersistedStateSlice<unknown>[]

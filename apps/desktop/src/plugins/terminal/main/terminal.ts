@@ -96,12 +96,12 @@ export function sendToAgent(sessionId: string, text: string, submit: SendSubmit)
 // installation moves to one place). Held as nullable module state only because the handlers close
 // over module scope — TerminalIpcDeps requires all of them, so registerTerminalIpc sets every one
 // before any session can spawn.
-// - memoryInjector: push the repo-memory block into a fresh agent session (docs/notes-and-memory.md).
+// - launchInjector: push the combined task-context + repo-memory block into a fresh agent session (docs/notes-and-memory.md).
 // - memoryReviewTrigger: fire the auto-generation pass when an agent session exits (docs/notes-and-memory.md).
 // - seedNotes: snapshot PR/ticket context into curatable notes on task creation (docs/notes-and-memory.md).
 // - internalApiEnv: loopback API access (ACORN_API_URL/ACORN_API_TOKEN) inherited by session env.
 // - bootReconciled: the composition root's reconcile pass — archive awaits it (see the handler).
-let memoryInjector: ((taskId: string, sessionId: string) => Promise<void>) | null = null
+let launchInjector: ((taskId: string, sessionId: string) => Promise<void>) | null = null
 let memoryReviewTrigger: ((taskId: string, transcriptTail: string) => Promise<void>) | null = null
 let seedNotes: ((task: TaskRow) => Promise<void>) | null = null
 let internalApiEnv: Record<string, string> = {}
@@ -379,8 +379,8 @@ async function spawnOne(
     pty = spawn(command, [], { name: 'xterm-256color', cols, rows, cwd, env })
   }
   wireSession(db, meta, pty)
-  // A fresh AGENT session gets the repo-memory block queued for its idle edge (docs/notes-and-memory.md).
-  if (profile.kind === 'agent') void memoryInjector?.(opts.taskId, id)
+  // A fresh AGENT session gets the combined task-context + repo-memory block queued for its idle edge (docs/notes-and-memory.md).
+  if (profile.kind === 'agent') void launchInjector?.(opts.taskId, id)
   return meta
 }
 
@@ -483,7 +483,7 @@ export function terminalRunGlue(db: AppDatabase): RunSessionGlue {
 // memory/notes closures come back in here — so the engine never imports knowledge (composition-root ownership).
 export type TerminalIpcDeps = {
   internalApiEnv: Record<string, string>
-  memoryInjector: (taskId: string, sessionId: string) => Promise<void>
+  launchInjector: (taskId: string, sessionId: string) => Promise<void>
   memoryReviewTrigger: (taskId: string, transcriptTail: string) => Promise<void>
   seedTaskNotes: (task: TaskRow) => Promise<void>
   // Resolves when the composition root's post-window reconcile pass is done (always resolves,
@@ -506,7 +506,7 @@ export function disposeTerminal(): void {
 // composition root.
 export function registerTerminalIpc(db: AppDatabase, worktreesDir: string, deps: TerminalIpcDeps): void {
   internalApiEnv = deps.internalApiEnv
-  memoryInjector = deps.memoryInjector
+  launchInjector = deps.launchInjector
   memoryReviewTrigger = deps.memoryReviewTrigger
   seedNotes = deps.seedTaskNotes
   bootReconciled = deps.reconciled
