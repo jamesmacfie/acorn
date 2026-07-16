@@ -7,7 +7,13 @@ on:
 jobs:
   dmg:
     runs-on: macos-latest
+    env:
+      # Baked into the app at build time (see electron.ts). Secret names can't start with GITHUB_.
+      MAIN_VITE_GITHUB_CLIENT_ID: ${{ secrets.ACORN_GITHUB_CLIENT_ID }}
+      MAIN_VITE_GITHUB_CLIENT_SECRET: ${{ secrets.ACORN_GITHUB_CLIENT_SECRET }}
     steps:
+      - name: Require OAuth secrets
+        run: test -n "$MAIN_VITE_GITHUB_CLIENT_ID" && test -n "$MAIN_VITE_GITHUB_CLIENT_SECRET" || { echo "Set the ACORN_GITHUB_CLIENT_ID / ACORN_GITHUB_CLIENT_SECRET repo secrets"; exit 1; }
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v4
