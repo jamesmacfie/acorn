@@ -15,13 +15,16 @@ const dataDir = e2e && process.env.ACORN_E2E_DATA_DIR
   ? resolve(process.env.ACORN_E2E_DATA_DIR)
   : app.isPackaged ? app.getPath('userData') : devDataDir
 
-// Dev: load secrets from .env. Packaged builds have no .env (this no-ops); SESSION_ENC_KEY then
-// falls through to safeStorage (resolveSessionKey, in whenReady below). GITHUB_CLIENT_* still need
-// to be present in the environment for a packaged build until their keychain path lands.
-try {
-  process.loadEnvFile(join(import.meta.dirname, '../../.env'))
-} catch {
-  // no .env present — secrets must already be in the environment / keychain
+// Dev: load secrets from .env. Packaged builds have no bundled .env (that load no-ops); instead a
+// user-provided .env in the data dir (~/Library/Application Support/acorn/.env) supplies
+// GITHUB_CLIENT_* until their keychain path lands. SESSION_ENC_KEY falls through to safeStorage
+// (resolveSessionKey, in whenReady below) either way.
+for (const envFile of [join(import.meta.dirname, '../../.env'), join(dataDir, '.env')]) {
+  try {
+    process.loadEnvFile(envFile)
+  } catch {
+    // no .env at this location — secrets must come from the other file / environment / keychain
+  }
 }
 
 // Single-instance: a second launch focuses the existing window. A pinned port means only one
