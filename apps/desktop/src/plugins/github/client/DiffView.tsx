@@ -448,8 +448,13 @@ function DiffForPull(props: { route: PullRoute; router: boolean }) {
     bands().length
     if (scrollEl()) scheduleVirtualMeasure('split')
   })
+  // Depend on the composer *key* via a memo (equality-checked), not the composer object — the
+  // object is replaced on every keystroke, and re-measuring per keystroke remounts the virtual
+  // rows, which destroys the focused textarea (flicker + lost selection). Only opening/closing/
+  // moving the composer changes row heights.
+  const lineComposerKey = createMemo(() => lineComposer()?.key ?? null)
   createEffect(() => {
-    lineComposer()?.key
+    lineComposerKey()
     if (!scrollEl()) return
     scheduleVirtualMeasure('unified')
     if (viewMode() === 'split') scheduleVirtualMeasure('split')
