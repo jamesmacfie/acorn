@@ -20,6 +20,8 @@ asarUnpack:
 extraResources:
   - from: migrations
     to: migrations
+# Never auto-publish from CI; the workflow uploads the dmg as an artifact instead.
+publish: null
 mac:
   category: public.app-category.developer-tools
   target:
