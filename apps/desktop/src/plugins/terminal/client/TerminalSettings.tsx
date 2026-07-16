@@ -9,20 +9,34 @@ export default function TerminalSettings() {
   const qc = useQueryClient()
   const prefs = createQuery(() => prefsOptions(true))
   const railDefault = () => prefs.data?.[PrefKeys.terminalRailDefault] ?? 'empty'
+  // Opt-out: absent pref means on (matches contextInjectionEnabled in core/main/taskWorktree.ts).
+  const injectContext = () => (prefs.data?.[PrefKeys.startupContextInjection] ?? 'true') !== 'false'
 
   return (
-    <label class="settings-field">
-      <span class="settings-label">When the terminal button is clicked, open</span>
-      <select
-        class="integration-key-input"
-        value={railDefault()}
-        onChange={(e) => void savePref(qc, PrefKeys.terminalRailDefault, e.currentTarget.value)}
-      >
-        <option value="empty">Empty (pick a profile with +)</option>
-        <option value="shell">Shell</option>
-        <option value="claude-code">Claude Code</option>
-        <option value="codex">Codex</option>
-      </select>
-    </label>
+    <>
+      <label class="settings-field">
+        <span class="settings-label">When the terminal button is clicked, open</span>
+        <select
+          class="integration-key-input"
+          value={railDefault()}
+          onChange={(e) => void savePref(qc, PrefKeys.terminalRailDefault, e.currentTarget.value)}
+        >
+          <option value="empty">Empty (pick a profile with +)</option>
+          <option value="shell">Shell</option>
+          <option value="claude-code">Claude Code</option>
+          <option value="codex">Codex</option>
+        </select>
+      </label>
+      <label class="settings-field">
+        <span class="settings-label">
+          <input
+            type="checkbox"
+            checked={injectContext()}
+            onChange={(e) => void savePref(qc, PrefKeys.startupContextInjection, e.currentTarget.checked ? 'true' : 'false')}
+          />
+          {' '}Send task context (PR, linked issues, notes) to new agent sessions at startup
+        </span>
+      </label>
+    </>
   )
 }

@@ -146,7 +146,7 @@ export async function bootstrap({ dataDir, origin, createWindow }: BootstrapOpti
 
   registerTerminalIpc(db, worktreesDir, {
     internalApiEnv,
-    memoryInjector: knowledge.memoryInjector,
+    launchInjector: knowledge.launchInjector,
     memoryReviewTrigger: knowledge.memoryReviewTrigger,
     seedTaskNotes: (task) => seedTaskNotes(db, knowledge.notesStore, internalApiEnv, task),
     reconciled,

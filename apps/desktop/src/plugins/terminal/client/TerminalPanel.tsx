@@ -60,11 +60,14 @@ export default function TerminalPanel(props: { onClose: () => void; task: Task |
     setActiveId((remembered && vis.some((s) => s.id === remembered) ? remembered : vis[0]?.id) ?? null)
   })
 
-  // Remember the viewed tab per task so the effect above can restore it after a remount.
+  // Remember the viewed tab per task so the effect above can restore it after a remount. Only
+  // remember a session that actually belongs to this task: on a task/workspace switch this effect
+  // can fire with the new task id while activeId still holds the old task's tab (effect order vs
+  // the restore effect above isn't guaranteed), which would clobber the remembered entry.
   createEffect(() => {
     const id = ws()?.id
     const a = activeId()
-    if (id && a) rememberActiveTerminal(id, a)
+    if (id && a && visibleSessions().some((s) => s.id === a)) rememberActiveTerminal(id, a)
   })
 
   onMount(async () => {
