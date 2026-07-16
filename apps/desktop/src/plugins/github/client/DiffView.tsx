@@ -6,7 +6,7 @@ import { fetchFilePatches, fileBlobOptions, filePatchKey, filesOptions, mentions
 import { addReviewComment, replyReview, resolveThread } from './mutations'
 import { getHighlighter } from './shiki'
 import { routeKey as makeRouteKey } from './fileNavigation'
-import { DiffLine, NonCodeRow, SplitCell, type LineComposerController, type ThreadCollapseController } from './diff/DiffRows'
+import { DiffLine, FileHead, NonCodeRow, SplitCell, type LineComposerController, type ThreadCollapseController } from './diff/DiffRows'
 import { collectMatches, type FindHighlight } from './diff/find'
 import { registerCommands } from '../../../core/client/registries/commands'
 import { registerKeybindings } from '../../../core/client/registries/keybindings'
@@ -323,6 +323,51 @@ function DiffForPull(props: { route: PullRoute; router: boolean }) {
       return band ? [{ vi, band }] : []
     })
   })
+  // Sticky current-file header (GitHub-style): the rows are transform-positioned by the
+  // virtualizer, so CSS sticky on the real header rows can't work. Instead a zero-height sticky
+  // overlay at the top of the scroller shows the file the top edge is currently inside — the row
+  // crossing scrollTop, walking back to the nearest row that knows its path (hunk/nodiff rows
+  // don't). Hidden when that row IS a fully-visible file header, so the overlay never doubles it.
+  const [scrollTop, setScrollTop] = createSignal(0)
+  const rowPath = (row: Row): string | null => {
+    if (row.kind === 'file' || row.kind === 'load') return row.file.path
+    if (row.kind === 'thread') return row.thread.path
+    if (row.kind === 'hunk' || row.kind === 'nodiff') return null
+    return row.path
+  }
+  const stickyPath = createMemo<string | null>(() => {
+    const top = scrollTop()
+    if (top <= 0) return null
+    const items =
+      viewMode() === 'split'
+        ? virtualBands().map(({ vi, band }) => ({
+            vi,
+            path: band.kind === 'pair' ? (band.left ?? band.right)?.path ?? null : rowPath(band.row),
+            header: band.kind === 'full' && band.row.kind === 'file',
+          }))
+        : virtualRows().map(({ vi, row }) => ({ vi, path: rowPath(row), header: row.kind === 'file' }))
+    const topIdx = items.findIndex(({ vi }) => vi.end > top)
+    if (topIdx < 0) return null
+    if (items[topIdx].header && items[topIdx].vi.start >= top) return null
+    for (let i = topIdx; i >= 0; i--) {
+      if (items[i].path) return items[i].path
+    }
+    return null
+  })
+  const stickyFile = createMemo(() => {
+    const path = stickyPath()
+    return (path && (files.data ?? []).find((file) => file.path === path)) || null
+  })
+  const stickyHead = () => (
+    <Show when={stickyFile()}>
+      {(f) => (
+        <div class="diff-sticky-file">
+          <FileHead file={f()} collapsed={collapsedFiles().has(f().path)} onToggleCollapse={toggleFileCollapse} />
+        </div>
+      )}
+    </Show>
+  )
+
   const threadLayoutSignature = createMemo(() => {
     const collapsed = threadCollapsed()
     return (detail.data?.threads ?? []).map((thread) => `${thread.threadId}:${thread.resolved}:${collapsed.get(thread.threadId) ?? thread.resolved}`).join('\0')
@@ -421,6 +466,7 @@ function DiffForPull(props: { route: PullRoute; router: boolean }) {
     cancelMeasures()
   })
   const resetScrollPosition = () => {
+    setScrollTop(0)
     const el = scrollEl()
     if (!el) return
     el.scrollTop = 0
@@ -583,7 +629,8 @@ function DiffForPull(props: { route: PullRoute; router: boolean }) {
       <Show
         when={viewMode() === 'split'}
         fallback={
-          <div class="diff" ref={publishScrollEl}>
+          <div class="diff" ref={publishScrollEl} onScroll={(e) => setScrollTop(e.currentTarget.scrollTop)}>
+            {stickyHead()}
             <div class="diff-rows" style={{ height: `${virt.getTotalSize()}px` }}>
               <For each={virtualRows()}>
                 {({ vi, row }) => {
@@ -649,7 +696,8 @@ function DiffForPull(props: { route: PullRoute; router: boolean }) {
           </div>
         }
       >
-        <div class="diff diff-split" ref={publishSplitScrollEl}>
+        <div class="diff diff-split" ref={publishSplitScrollEl} onScroll={(e) => setScrollTop(e.currentTarget.scrollTop)}>
+          {stickyHead()}
           <div class="diff-split-rows" style={{ height: `${splitVirt.getTotalSize()}px` }}>
             <For each={virtualBands()}>
               {({ vi, band }) => {

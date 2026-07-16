@@ -2,7 +2,7 @@ import { createEffect, createSignal, For, Match, on, Show, Switch } from 'solid-
 import CopyButton from '../../../../core/client/ui/CopyButton'
 import { fileStatusMeta } from '../displayMeta'
 import MentionTextarea from '../MentionTextarea'
-import type { Thread } from '../../../../core/client/queries'
+import type { PullFile, Thread } from '../../../../core/client/queries'
 import { UserAvatar } from '../../../../core/client/ui/UserAvatar'
 import { fileAnchor, type CodeRow, type FileRow, type GapRow, type HunkRow, type LoadDiffRow, type Row, type ThreadRowT } from './model'
 import { markTokens, type FindHighlight } from './find'
@@ -36,31 +36,14 @@ export function NonCodeRow(props: {
   return (
     <Switch>
       <Match when={props.row.kind === 'file' ? (props.row as FileRow) : null}>
-        {(f) => {
-          const status = () => fileStatusMeta(f().file.status)
-          return (
-            <div class="diff-file-head copyable" id={fileAnchor(f().file.path)}>
-              <Show when={props.onToggleFileCollapse}>
-                <button
-                  type="button"
-                  class="diff-file-collapse"
-                  aria-expanded={!props.fileCollapsed?.(f().file.path)}
-                  title={props.fileCollapsed?.(f().file.path) ? 'Expand file' : 'Collapse file'}
-                  onClick={() => props.onToggleFileCollapse?.(f().file.path)}
-                >
-                  {props.fileCollapsed?.(f().file.path) ? '▸' : '▾'}
-                </button>
-              </Show>
-              <span class={`file-status file-status-${status().tone}`} title={status().label}>
-                {status().letter}
-              </span>
-              <span class="diff-file-path">{f().file.path}</span>
-              <CopyButton text={() => f().file.path} title="Copy path" />
-              <span class="file-stat add">+{f().file.additions ?? 0}</span>
-              <span class="file-stat del">&#8722;{f().file.deletions ?? 0}</span>
-            </div>
-          )
-        }}
+        {(f) => (
+          <FileHead
+            file={f().file}
+            anchorId={fileAnchor(f().file.path)}
+            collapsed={props.fileCollapsed?.(f().file.path)}
+            onToggleCollapse={props.onToggleFileCollapse}
+          />
+        )}
       </Match>
       <Match when={props.row.kind === 'hunk' ? (props.row as HunkRow) : null}>
         {(h) => <span class="diff-hunk-text">{h().text}</span>}
@@ -97,6 +80,39 @@ export function NonCodeRow(props: {
         )}
       </Match>
     </Switch>
+  )
+}
+
+// Per-file header bar: opens each file's section in the stacked diff, and doubles as the sticky
+// current-file header DiffView pins to the top of the scroller (no anchor id there).
+export function FileHead(props: {
+  file: PullFile
+  anchorId?: string
+  collapsed?: boolean
+  onToggleCollapse?: (path: string) => void
+}) {
+  const status = () => fileStatusMeta(props.file.status)
+  return (
+    <div class="diff-file-head copyable" id={props.anchorId}>
+      <Show when={props.onToggleCollapse}>
+        <button
+          type="button"
+          class="diff-file-collapse"
+          aria-expanded={!props.collapsed}
+          title={props.collapsed ? 'Expand file' : 'Collapse file'}
+          onClick={() => props.onToggleCollapse?.(props.file.path)}
+        >
+          {props.collapsed ? '▸' : '▾'}
+        </button>
+      </Show>
+      <span class={`file-status file-status-${status().tone}`} title={status().label}>
+        {status().letter}
+      </span>
+      <span class="diff-file-path">{props.file.path}</span>
+      <CopyButton text={() => props.file.path} title="Copy path" />
+      <span class="file-stat add">+{props.file.additions ?? 0}</span>
+      <span class="file-stat del">&#8722;{props.file.deletions ?? 0}</span>
+    </div>
   )
 }
 
