@@ -173,13 +173,15 @@ export function registerPreviewIpc(): () => void {
     const record = ownedRecord(e, p?.taskId)
     if (record && isAllowedPreviewUrl(p.url)) void record.view.webContents.loadURL(p.url)
   }
-  const onCommand = (e: IpcMainEvent, p: { taskId: string; action: 'back' | 'forward' | 'reload' | 'stop' }) => {
+  const onCommand = (e: IpcMainEvent, p: { taskId: string; action: 'back' | 'forward' | 'reload' | 'stop' | 'devtools' }) => {
     const wc = ownedRecord(e, p?.taskId)?.view.webContents
     if (!wc) return
     if (p.action === 'back' && wc.navigationHistory.canGoBack()) wc.navigationHistory.goBack()
     else if (p.action === 'forward' && wc.navigationHistory.canGoForward()) wc.navigationHistory.goForward()
     else if (p.action === 'reload') wc.reload()
     else if (p.action === 'stop') wc.stop()
+    // Detached: a WebContentsView has no window chrome of its own to dock devtools into.
+    else if (p.action === 'devtools') wc.isDevToolsOpened() ? wc.closeDevTools() : wc.openDevTools({ mode: 'detach' })
   }
   const onEvict = (e: IpcMainEvent, p: { taskId: string }) => {
     if (ownedRecord(e, p?.taskId)) evict(p.taskId)
