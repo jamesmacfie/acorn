@@ -10,6 +10,7 @@
 // no longer the accidental main() — it is just the PTY engine, wired from here.
 import { app, type BrowserWindow } from 'electron'
 import type { ServerType } from '@hono/node-server'
+import { execFileSync } from 'node:child_process'
 import { join } from 'node:path'
 import '../server/providers' // register built-in integration providers into the core registry before the listener starts
 import '../server/routes' // register plugin-owned HTTP routers into the core route registry before createApp() runs
@@ -41,6 +42,22 @@ function bootTimer(): (label: string) => void {
   return (label) => console.log(`[boot] ${label} +${(Number(process.hrtime.bigint() - t0) / 1e6).toFixed(0)}ms`)
 }
 
+// GUI-launched macOS apps inherit launchd's stripped PATH (`/usr/bin:/bin:…`) — no ~/.local/bin,
+// homebrew, nvm — so `which claude`/node-pty/MCP registration can't find agent CLIs the user has
+// installed, even though `pnpm dev` (terminal-launched) works. Pull the login-shell PATH once and
+// merge it in, so every downstream PATH lookup just works instead of each wrapping its own shell.
+// ponytail: login-shell probe is the standard macOS GUI-PATH fix; keep launchd PATH on any failure.
+function inheritLoginShellPath(): void {
+  if (process.platform !== 'darwin' || !app.isPackaged) return
+  try {
+    const shell = process.env.SHELL || '/bin/zsh'
+    const p = execFileSync(shell, ['-lic', 'printf %s "$PATH"'], { encoding: 'utf8', timeout: 5000 }).trim()
+    if (p) process.env.PATH = p
+  } catch (e) {
+    console.warn('[boot] login-shell PATH probe failed; keeping launchd PATH:', e)
+  }
+}
+
 export type BootstrapOptions = {
   // Writable app-data root (DB, blobs, worktrees, notes) — userData when packaged, repo-local .acorn in dev.
   dataDir: string
@@ -54,6 +71,9 @@ export type BootstrapOptions = {
 export async function bootstrap({ dataDir, origin, createWindow }: BootstrapOptions): Promise<BrowserWindow> {
   const mark = bootTimer()
   const startedAt = Date.now()
+
+  // Fix the GUI-launched PATH before anything resolves an agent CLI (onPath, node-pty, MCP re-register).
+  inheritLoginShellPath()
 
   // Teardown is registered FIRST and is idempotent, so a boot that throws part-way can still dispose
   // whatever was constructed (the lifecycle invariant: partial boot still disposes).
