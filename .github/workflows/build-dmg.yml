@@ -9,6 +9,9 @@ jobs:
     runs-on: macos-latest
     env:
       # Baked into the app at build time (see electron.ts). Secret names can't start with GITHUB_.
+      # The OAuth app behind these secrets MUST have its Authorization callback URL set to exactly
+      # http://127.0.0.1:4317/auth/callback (the 127.0.0.1 form, NOT localhost) or downloaded
+      # builds fail login with "The redirect_uri is not associated with this application".
       MAIN_VITE_GITHUB_CLIENT_ID: ${{ secrets.ACORN_GITHUB_CLIENT_ID }}
       MAIN_VITE_GITHUB_CLIENT_SECRET: ${{ secrets.ACORN_GITHUB_CLIENT_SECRET }}
     steps:
