@@ -243,6 +243,7 @@ export default function TaskView(props: {
           {(path) => (
             <>
               <span class="workspace-footer-path" title={path()}>worktree: {path()}</span>
+              <span class="workspace-footer-branch">⎇ {props.task.branch}</span>
               <Show when={status()?.missing}><span class="workspace-footer-repair">⚠ needs repair (removed on disk)</span></Show>
               <Show when={!status()?.missing && status()?.dirty}>
                 <span class="workspace-footer-dirty">● dirty ({status()?.dirtyCount} file{status()?.dirtyCount === 1 ? '' : 's'})</span>
