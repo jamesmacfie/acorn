@@ -8,6 +8,7 @@ import { prActions } from '../../plugins/github/server/routes/prActions'
 import { prCreate } from '../../plugins/github/server/routes/prCreate'
 import { pullBlob } from '../../plugins/github/server/routes/pullBlob'
 import { pullDetail } from '../../plugins/github/server/routes/pullDetail'
+import { pullConflicts } from '../../plugins/github/server/routes/pullConflicts'
 import { pullFiles } from '../../plugins/github/server/routes/pullFiles'
 import { pulls } from '../../plugins/github/server/routes/pulls'
 import { pullsBatch } from '../../plugins/github/server/routes/pullsBatch'
@@ -40,6 +41,7 @@ registerRoute({ prefix: '/api/repos', router: repos })
 registerRoute({ prefix: '/api/repos', router: repoLabels, note: '/:owner/:repo/labels' })
 registerRoute({ prefix: '/api/repos', router: pulls })
 registerRoute({ prefix: '/api/repos', router: pullDetail })
+registerRoute({ prefix: '/api/repos', router: pullConflicts, note: '/:owner/:repo/pulls/:number/conflicts' })
 registerRoute({ prefix: '/api/repos', router: pullFiles })
 registerRoute({ prefix: '/api/repos', router: pullBlob })
 registerRoute({ prefix: '/api/repos', router: pullsBatch })
