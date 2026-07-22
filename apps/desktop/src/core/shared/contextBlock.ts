@@ -16,6 +16,11 @@ const LAUNCH_LEADINS: Record<string, string> = {
   notes: 'The user has written the following notes you may find relevant:',
 }
 
+// Trailer so the agent treats the injected material as reference, not a to-do list — without it the
+// agent sometimes acts on the notes/PR immediately instead of waiting for the user's actual ask.
+const LAUNCH_TRAILER =
+  'Use the above only for reference — do not take any action based on it yet. Wait for the user to give you direction in their next message.'
+
 export function formatLaunchContext(ctx: TaskContext): string {
   const parts = ctx.sections
     .map((section) => {
@@ -26,5 +31,5 @@ export function formatLaunchContext(ctx: TaskContext): string {
     })
     .filter(Boolean)
   if (!parts.length) return ''
-  return [`# Task: ${ctx.task.title} (${ctx.task.repo} · ${ctx.task.branch})`, ...parts].join('\n\n')
+  return [`# Task: ${ctx.task.title} (${ctx.task.repo} · ${ctx.task.branch})`, ...parts, LAUNCH_TRAILER].join('\n\n')
 }
