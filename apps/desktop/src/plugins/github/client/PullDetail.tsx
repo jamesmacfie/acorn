@@ -7,7 +7,7 @@ import { formatRelativeTime } from '../../../core/client/lib/formatRelativeTime'
 import { requestFileScroll, routeKey } from './fileNavigation'
 import Picker from '../../../core/client/ui/Picker'
 import CopyButton from '../../../core/client/ui/CopyButton'
-import { integrationsOptions, linearIssuesOptions, mentionsOptions, pullDetailOptions, pullPrefixKey, pullsPrefixKey, repoLabelsOptions, reposOptions, type Label, type Task } from '../../../core/client/queries'
+import { integrationsOptions, linearIssuesOptions, mentionsOptions, pullConflictsOptions, pullDetailOptions, pullPrefixKey, pullsPrefixKey, repoLabelsOptions, reposOptions, type Label, type Task } from '../../../core/client/queries'
 import MentionTextarea from './MentionTextarea'
 import { addComment, addLabel, closePr, disableAutoMerge, enableAutoMerge, mergePr, removeLabel, removeReviewer, reopenPr, rerunFailed, requestReviewer, setDraft, setViewed, submitReview } from './mutations'
 import { UserAvatar } from '../../../core/client/ui/UserAvatar'
@@ -72,6 +72,11 @@ export default function PullDetail(props: { task?: Task } = {}) {
   const repoLabels = createQuery(() => repoLabelsOptions(o(), r(), hasRepoParams()))
   const mentionsList = () => mentionsQuery.data ?? []
   const fileSummary = createMemo(() => summarizeFileStats(changedFiles.files()))
+  // Merge conflicts: GitHub only tells us *that* a PR conflicts (mergeable === 'CONFLICTING'); the
+  // conflicting files are computed locally (see pullConflicts route). Only fetch when conflicting.
+  const conflicting = () => detail.data?.pull?.mergeable === 'CONFLICTING'
+  const conflictBase = () => detail.data?.pull?.baseRef ?? ''
+  const conflicts = createQuery(() => pullConflictsOptions(o(), r(), n(), conflictBase(), hasPullParams() && conflicting()))
   const conversationEntries = createMemo(() => buildConversationEntries(detail.data))
   const threadSnippetIndex = createMemo(() => buildThreadSnippetIndex(changedFiles.files()))
 
@@ -261,6 +266,38 @@ export default function PullDetail(props: { task?: Task } = {}) {
                 <div class="action-error">{actionError()}</div>
               </Show>
             </div>
+
+            <Show when={conflicting()}>
+              <details class="nav-section" open ref={rememberOpen('conflicts')}>
+                <summary>
+                  Merge conflicts
+                  <Show when={conflicts.data?.available && conflicts.data.files.length}>
+                    <span class="muted"> ({conflicts.data!.files.length})</span>
+                  </Show>
+                </summary>
+                <Show
+                  when={conflicts.data?.available}
+                  fallback={
+                    <p class="muted" style={{ padding: '4px var(--pane-pad)' }}>
+                      {conflicts.isLoading ? 'Checking for conflicting files…' : 'This PR has merge conflicts. Map this repo to a local checkout to list the conflicting files.'}
+                    </p>
+                  }
+                >
+                  <ul class="file-list">
+                    <For each={conflicts.data!.files} fallback={<li class="placeholder">Conflicts reported, but no specific files were detected.</li>}>
+                      {(path) => (
+                        <li class="file-row">
+                          <button type="button" class="file-open" onClick={() => selectFile(path)}>
+                            <span class="file-status file-status-warn" title="Conflicting">!</span>
+                            <span class="file-path">{path}</span>
+                          </button>
+                        </li>
+                      )}
+                    </For>
+                  </ul>
+                </Show>
+              </details>
+            </Show>
 
             <Show when={pull().body}>
               <details class="nav-section" open ref={rememberOpen('description')}>
