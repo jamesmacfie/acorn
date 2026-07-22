@@ -20,6 +20,8 @@ import {
   childEnv,
   clampDim,
   computeIdle,
+  FIRST_IDLE_MS,
+  IDLE_MS,
   matchBlockedPrompt,
   parseTmuxSessions,
   resolveBackend,
@@ -66,6 +68,7 @@ type Session = {
   ring: string
   subscribers: Set<StreamSink> // WebSocket outlets (the WebSocket transport); was Electron WebContents
   lastActivityAt: number
+  sawIdle: boolean // has this session ever gone idle? the first idle uses a shorter window (FIRST_IDLE_MS)
   // PTY output coalescing (docs/electron.md §12): buffer bytes and flush one 'output' frame per ~16ms
   // tick instead of one per PTY chunk, so a busy TUI doesn't spam a frame per keystroke-echo.
   pendingOut: string
@@ -239,7 +242,7 @@ function rowToMeta(row: typeof schema.terminalSessions.$inferSelect, ctx: Pick<T
 // --- session lifecycle ---
 
 function wireSession(db: AppDatabase, meta: TerminalSession, pty: IPty): Session {
-  const s: Session = { meta, pty, ring: '', subscribers: new Set(), lastActivityAt: Date.now(), pendingOut: '', flushTimer: null }
+  const s: Session = { meta, pty, ring: '', subscribers: new Set(), lastActivityAt: Date.now(), sawIdle: false, pendingOut: '', flushTimer: null }
   sessions.set(meta.id, s)
   pty.onData((data) => {
     s.lastActivityAt = Date.now()
@@ -274,8 +277,9 @@ function startIdleWatch() {
   idleWatch = setInterval(() => {
     const now = Date.now()
     for (const s of sessions.values()) {
-      if (computeIdle(s.meta.kind, s.meta.status, s.lastActivityAt, now) && !s.meta.idle) {
+      if (computeIdle(s.meta.kind, s.meta.status, s.lastActivityAt, now, s.sawIdle ? IDLE_MS : FIRST_IDLE_MS) && !s.meta.idle) {
         s.meta.idle = true
+        s.sawIdle = true
         // An idle session showing an input prompt in its tail is BLOCKED, not done (05 P3).
         s.meta.agentState = matchBlockedPrompt(s.ring.slice(-4000)) ? 'blocked' : 'idle'
         agentSender.onIdle(s.meta.id) // flush 'after-ready' sends on the busy→idle edge (04 §D)

@@ -48,6 +48,11 @@ export const parseTmuxSessions = (stdout: string): Set<string> =>
 // indicators). Backend-agnostic: silence, not transcript-scraping. Shells never count as idle —
 // "waiting for input" is only meaningful for an agent.
 export const IDLE_MS = 10_000
+// A fresh agent's FIRST idle uses a shorter window: launch-context injection (notes/PR/memory) is
+// queued 'after-ready' and only fires on that first idle edge, so the 10s "done working" heuristic
+// just delays the first prompt. A booting CLI reaches its input prompt in ~1-2s; 3s of silence is a
+// safe "boot settled" signal without waiting the full mid-session window (docs/notes-and-memory.md).
+export const FIRST_IDLE_MS = 3_000
 export const computeIdle = (
   kind: 'shell' | 'agent',
   status: 'running' | 'exited',
