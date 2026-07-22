@@ -47,6 +47,9 @@ export type PullFile = {
   patch: string | null
 }
 export type PullFilesPatchRequest = { paths: string[] }
+// Conflicting files for a PR. `available` is false when the repo isn't mapped to a local checkout
+// (or the trial merge couldn't run) — the UI then can't enumerate files, only say conflicts exist.
+export type PullConflicts = { available: boolean; files: string[] }
 export type Review = { id: string; author: string | null; state: string | null; body: string | null; submittedAt: number | null }
 export type Comment = { id: string; author: string | null; body: string | null; createdAt: number | null }
 export type PullCommit = { sha: string; message: string; author: string | null; authorLogin: string | null; committedAt: number | null }
@@ -528,6 +531,10 @@ export const fileBlobRoute = (owner: string, repo: string, sha: string) => repoR
 export const resolveThreadRoute = (owner: string, repo: string, number: string | number, threadId: string) =>
   pullRoute(owner, repo, number, `threads/${encodeURIComponent(threadId)}/resolve`)
 export const autoMergeRoute = (owner: string, repo: string, number: string | number) => pullRoute(owner, repo, number, 'auto-merge')
+// Files that conflict on a trial merge of base←head, computed locally (GitHub's API exposes no
+// per-file conflict data — only the `mergeable` enum). `base` is the PR's base ref.
+export const conflictsRoute = (owner: string, repo: string, number: string | number, base: string) =>
+  `${pullRoute(owner, repo, number, 'conflicts')}?base=${encodeURIComponent(base)}`
 export const rerunFailedRoute = (owner: string, repo: string, runId: number) => repoRoute(owner, repo, `actions/${runId}/rerun`)
 export const runJobsRoute = (owner: string, repo: string, runId: number) => repoRoute(owner, repo, `actions/runs/${runId}/jobs`)
 export const jobLogRoute = (owner: string, repo: string, jobId: number) => repoRoute(owner, repo, `actions/jobs/${jobId}/logs`)
@@ -578,6 +585,7 @@ export const pullKey = (owner: string, repo: string, number: string) => ['pull',
 export const pullPrefixKey = (owner: string, repo: string) => ['pull', owner, repo] as const
 export const repoLabelsKey = (owner: string, repo: string) => ['labels', owner, repo] as const
 export const filesKey = (owner: string, repo: string, number: string) => ['files', owner, repo, number] as const
+export const conflictsKey = (owner: string, repo: string, number: string, base: string) => ['conflicts', owner, repo, number, base] as const
 export const fileSummariesKey = (owner: string, repo: string, number: string) => ['files', owner, repo, number, 'summary'] as const
 export const filePatchKey = (owner: string, repo: string, number: string, path: string) => ['files', owner, repo, number, 'patch', path] as const
 export const fileBlobKey = (owner: string, repo: string, sha: string) => ['blob', owner, repo, sha] as const

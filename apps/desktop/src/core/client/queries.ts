@@ -7,6 +7,9 @@ import {
   branchesRoute,
   compareKey,
   compareRoute,
+  conflictsKey,
+  conflictsRoute,
+  type PullConflicts,
   fileBlobKey,
   fileBlobRoute,
   filePatchKey,
@@ -223,6 +226,13 @@ export const filesOptions = (owner: string, repo: string, number: string, enable
   queryKey: filesKey(owner, repo, number),
   enabled,
   queryFn: async ({ signal }: QueryContext): Promise<PullFile[]> => readJson<PullFile[]>(pullRoute(owner, repo, number, 'files'), { signal }),
+})
+
+export const pullConflictsOptions = (owner: string, repo: string, number: string, base: string, enabled: boolean) => ({
+  queryKey: conflictsKey(owner, repo, number, base),
+  enabled,
+  queryFn: async ({ signal }: QueryContext): Promise<PullConflicts> =>
+    readJson<PullConflicts>(conflictsRoute(owner, repo, number, base), { signal }),
 })
 
 export const fileSummariesOptions = (owner: string, repo: string, number: string, enabled: boolean) => ({
