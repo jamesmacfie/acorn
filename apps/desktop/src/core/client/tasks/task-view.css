@@ -48,6 +48,7 @@
   white-space: nowrap;
   text-overflow: ellipsis;
 }
+.workspace-footer-branch { flex: none; font-family: var(--font-mono); }
 .workspace-footer-dirty { flex: none; color: var(--warn); }
 .workspace-footer-repair { flex: none; color: var(--del-marker); }
 
