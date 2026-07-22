@@ -45,7 +45,9 @@ The user has written the following notes you may find relevant:
 
 ## Notes
 ### Plan
-Do the thing.`)
+Do the thing.
+
+Use the above only for reference — do not take any action based on it yet. Wait for the user to give you direction in their next message.`)
   })
 
   it('drops empty sections and returns nothing when all are empty', () => {
