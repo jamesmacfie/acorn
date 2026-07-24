@@ -6,6 +6,7 @@ import type { AppEnv } from '../middleware/auth'
 import { getUser } from '../middleware/requireUser'
 import { respondError } from '../respond'
 import type { PreviewMode, SetupTrigger, Workspace, WorkspaceProject, WorkspaceProjectsResponse, WorkspaceRepo, WorkspaceSeed } from '../../shared/api'
+import { isValidBrowserRule, parseBrowserRules } from '../../shared/browserRules'
 import { isValidWorkspaceColor, isValidWorkspaceIcon, parseWorkspaceIcon, serializeWorkspaceIcon } from '../../shared/workspaceIdentity'
 import { getConnection } from '../integrations/connections'
 
@@ -46,6 +47,7 @@ async function listWorkspaces(db: ReturnType<typeof getDb>): Promise<Workspace[]
     dbUrlScript: r.dbUrlScript,
     previewMode: r.previewMode as PreviewMode | null,
     previewValue: r.previewValue,
+    browserRules: parseBrowserRules(r.browserRules),
     icon: parseWorkspaceIcon(r.icon),
     color: r.color,
     repos: (byWs.get(r.id) ?? []).sort((a, b) => a.sort - b.sort),
@@ -89,12 +91,12 @@ export const workspaces = new Hono<AppEnv>()
     const now = Date.now()
     const id = randomUUID()
     await db.insert(schema.workspaces).values({ id, name: body.name.trim(), isDefault: false, sort: (value ?? -1) + 1, createdAt: now, updatedAt: now })
-    return c.json({ id, name: body.name.trim(), isDefault: false, sort: (value ?? -1) + 1, setupScript: null, setupScriptTrigger: null, devScript: null, devRestartScript: null, teardownScript: null, dbUrlScript: null, previewMode: null, previewValue: null, icon: null, color: null, repos: [] } satisfies Workspace)
+    return c.json({ id, name: body.name.trim(), isDefault: false, sort: (value ?? -1) + 1, setupScript: null, setupScriptTrigger: null, devScript: null, devRestartScript: null, teardownScript: null, dbUrlScript: null, previewMode: null, previewValue: null, browserRules: [], icon: null, color: null, repos: [] } satisfies Workspace)
   })
   // Update a workspace's name, worktree setup script, and/or when it runs. Blank script ⇒ null.
   .patch('/:id', async (c) => {
-    const body = (await c.req.json().catch(() => ({}))) as { name?: string; setupScript?: string; setupScriptTrigger?: SetupTrigger; devScript?: string; devRestartScript?: string; teardownScript?: string; dbUrlScript?: string; previewMode?: string; previewValue?: string; icon?: unknown; color?: string | null }
-    const set: { name?: string; setupScript?: string | null; setupScriptTrigger?: string; devScript?: string | null; devRestartScript?: string | null; teardownScript?: string | null; dbUrlScript?: string | null; previewMode?: string | null; previewValue?: string | null; icon?: string | null; color?: string | null; updatedAt: number } = { updatedAt: Date.now() }
+    const body = (await c.req.json().catch(() => ({}))) as { name?: string; setupScript?: string; setupScriptTrigger?: SetupTrigger; devScript?: string; devRestartScript?: string; teardownScript?: string; dbUrlScript?: string; previewMode?: string; previewValue?: string; browserRules?: unknown; icon?: unknown; color?: string | null }
+    const set: { name?: string; setupScript?: string | null; setupScriptTrigger?: string; devScript?: string | null; devRestartScript?: string | null; teardownScript?: string | null; dbUrlScript?: string | null; previewMode?: string | null; previewValue?: string | null; browserRules?: string | null; icon?: string | null; color?: string | null; updatedAt: number } = { updatedAt: Date.now() }
     if (body.name !== undefined) {
       if (!body.name.trim()) return respondError(c, 400, 'bad_request')
       set.name = body.name.trim()
@@ -120,6 +122,11 @@ export const workspaces = new Hono<AppEnv>()
       const p = Number(set.previewValue)
       if (!/^\d{1,5}$/.test(set.previewValue) || p < 1 || p > 65535) return respondError(c, 400, 'bad_request')
     }
+    // Page rules (docs/panes.md): validated whole-array replace; empty array clears to null.
+    if (body.browserRules !== undefined) {
+      if (!Array.isArray(body.browserRules) || !body.browserRules.every(isValidBrowserRule)) return respondError(c, 400, 'bad_request')
+      set.browserRules = body.browserRules.length ? JSON.stringify(body.browserRules) : null
+    }
     // Identity (docs/workspaces-and-tasks.md): icon is a validated JSON union stored as text; colour a preset token
     // or 6-hex. Explicit null clears either back to the derived default.
     if (body.icon !== undefined) {
@@ -132,7 +139,7 @@ export const workspaces = new Hono<AppEnv>()
       else if (typeof body.color === 'string' && isValidWorkspaceColor(body.color)) set.color = body.color
       else return respondError(c, 400, 'bad_request')
     }
-    if (set.name === undefined && set.setupScript === undefined && set.setupScriptTrigger === undefined && set.devScript === undefined && set.devRestartScript === undefined && set.teardownScript === undefined && set.dbUrlScript === undefined && set.previewMode === undefined && set.previewValue === undefined && set.icon === undefined && set.color === undefined) return respondError(c, 400, 'bad_request')
+    if (set.name === undefined && set.setupScript === undefined && set.setupScriptTrigger === undefined && set.devScript === undefined && set.devRestartScript === undefined && set.teardownScript === undefined && set.dbUrlScript === undefined && set.previewMode === undefined && set.previewValue === undefined && set.browserRules === undefined && set.icon === undefined && set.color === undefined) return respondError(c, 400, 'bad_request')
     const db = getDb(c.env)
     const id = c.req.param('id')
     const [existing] = await db.select({ id: schema.workspaces.id }).from(schema.workspaces).where(eq(schema.workspaces.id, id))

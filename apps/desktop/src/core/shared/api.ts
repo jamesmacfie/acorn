@@ -283,6 +283,17 @@ export type SetupTrigger = 'off' | 'created' | 'terminal'
 // How the browser-preview pane resolves its URL: a fixed URL, http://localhost:<port>, or the
 // stdout of a shell command run in the repo's worktree. null falls back to the dev-server port.
 export type PreviewMode = 'url' | 'port' | 'script'
+// Preview-browser page rules (docs/panes.md): applied by the main process when a preview page
+// loads. Discriminated unions so future triggers ('navigate', …) and actions ('click', 'js', …)
+// extend without a schema change — stored as one JSON column on workspaces.
+export type BrowserRuleAction = { type: 'fill'; selector: string; value: string }
+export type BrowserRule = {
+  id: string
+  enabled: boolean
+  urlPattern: string // substring match against the page URL; '*' = wildcard
+  trigger: 'load'
+  action: BrowserRuleAction
+}
 // Workspace identity (docs/workspaces-and-tasks.md): a small JSON-stored icon union (grows without migrations) and
 // a colour (preset token key or 6-hex). null → derived defaults (name-hash colour, initial glyph).
 export type WorkspaceIcon =
@@ -302,6 +313,7 @@ export type Workspace = {
   dbUrlScript: string | null // shell command run in the worktree to print a Postgres URL for the Database pane (docs/pg.md); null/blank = auto-detect
   previewMode: PreviewMode | null // how the browser-preview URL is resolved; null → dev-server port
   previewValue: string | null // the URL, port, or command per previewMode; null/blank = unset
+  browserRules: BrowserRule[] // preview-browser page rules; empty = none
   icon: WorkspaceIcon | null
   color: string | null
   repos: WorkspaceRepo[]
@@ -595,8 +607,9 @@ export const pinsKey = ['pins'] as const
 export const prefsKey = ['prefs'] as const
 // 'groups' suffix: the bare ['workspaces'] key held the old single-tier task array, which may still
 // be in a user's persisted IndexedDB cache — restoring it under a new shape (repos[]) would poison
-// reads. A distinct key sidesteps the stale entry (same fix as closedPullsKey).
-export const workspacesKey = ['workspaces', 'groups'] as const
+// reads. A distinct key sidesteps the stale entry (same fix as closedPullsKey). 'v2': the shape
+// gained the required browserRules[] — same stale-restore hazard, same fix.
+export const workspacesKey = ['workspaces', 'groups', 'v2'] as const
 export const workspaceAssignmentsKey = ['workspace-assignments'] as const
 export const tasksKey = ['tasks'] as const
 export const mentionsKey = (owner: string, repo: string) => ['mentions', owner, repo] as const

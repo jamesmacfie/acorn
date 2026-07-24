@@ -177,7 +177,7 @@ export async function bootstrap({ dataDir, origin, createWindow }: BootstrapOpti
     seedTaskNotes: (task) => seedTaskNotes(db, knowledge.notesStore, internalApiEnv, task),
     reconciled,
   })
-  disposePreview = registerPreviewIpc() // main-owned browser-preview WebContentsView surface
+  disposePreview = registerPreviewIpc(db) // main-owned browser-preview WebContentsView surface (db → page rules)
   mark('install')
 
   // 4. Start the loopback listener — only now that every bridge is installed.

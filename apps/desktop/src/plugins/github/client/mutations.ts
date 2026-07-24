@@ -25,6 +25,7 @@ import {
   tasksRoute,
   type TaskLink,
   type TaskLinkSeed,
+  type BrowserRule,
   type PreviewMode,
   type SetupTrigger,
   type Task,
@@ -157,6 +158,9 @@ export const setWorkspaceSetupTrigger = async (id: string, setupScriptTrigger: S
 // How the browser-preview pane resolves its URL: '' (dev-server port), 'url', 'port', or 'script'.
 export const setWorkspacePreview = async (id: string, previewMode: PreviewMode | '', previewValue: string) =>
   writeJson<{ ok: true }>(workspaceRoute(id), { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ previewMode, previewValue }) }, (res) => `workspace ${res.status}`)
+// Preview-browser page rules (docs/panes.md): whole-array replace; empty ⇒ cleared server-side.
+export const setWorkspaceBrowserRules = async (id: string, browserRules: BrowserRule[]) =>
+  writeJson<{ ok: true }>(workspaceRoute(id), { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ browserRules }) }, (res) => `workspace ${res.status}`)
 // Workspace identity (docs/workspaces-and-tasks.md): icon (null clears) + colour (preset token or hex; null clears).
 export const setWorkspaceIcon = async (id: string, icon: WorkspaceIcon | null) =>
   writeJson<{ ok: true }>(workspaceRoute(id), { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ icon }) }, (res) => `workspace ${res.status}`)

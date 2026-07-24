@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { buildAxTree, isAllowedBrowserUrl, isBenignNavError, renderAxTree, resolveRef, type CdpAxNode } from './browserAuto'
+import { buildAxTree, buildFillScript, isAllowedBrowserUrl, isBenignNavError, renderAxTree, resolveRef, type CdpAxNode } from './browserAuto'
 
 // A trimmed real-world Accessibility.getFullAXTree payload: RootWebArea → generic wrapper →
 // form with a textbox + button, plus an ignored node.
@@ -65,5 +65,23 @@ describe('guards', () => {
     expect(isAllowedBrowserUrl('http://localhost:5173/login')).toBe(true)
     expect(isAllowedBrowserUrl('file:///etc/passwd')).toBe(false)
     expect(isAllowedBrowserUrl('javascript:alert(1)')).toBe(false)
+  })
+})
+
+describe('buildFillScript (page rules)', () => {
+  it('embeds selector and value as JSON so quotes/backticks/newlines cannot escape the script', () => {
+    const script = buildFillScript(`input[name="pw"]`, 'a"b`c${d}\ne\\f')
+    expect(script).toContain(JSON.stringify('input[name="pw"]'))
+    expect(script).toContain(JSON.stringify('a"b`c${d}\ne\\f'))
+    // The raw (unescaped) value must not appear anywhere outside its JSON form.
+    expect(script).not.toContain('a"b`c${d}\ne\\f')
+    // Parses as a single expression (would throw on injection-broken syntax).
+    expect(() => new Function(`return ${script}`)).not.toThrow()
+  })
+  it('sets via the native prototype setter and dispatches input+change', () => {
+    const script = buildFillScript('#pw', 'x')
+    expect(script).toContain("Object.getOwnPropertyDescriptor(proto, 'value').set.call(el, val)")
+    expect(script).toContain("new Event('input', { bubbles: true })")
+    expect(script).toContain("new Event('change', { bubbles: true })")
   })
 })

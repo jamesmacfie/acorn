@@ -1,0 +1,1 @@
+ALTER TABLE `workspaces` ADD `browser_rules` text;
