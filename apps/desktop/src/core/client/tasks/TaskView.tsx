@@ -17,6 +17,7 @@ import { formatChord } from './paneShortcuts'
 import { taskStatus } from './taskStatus'
 import TaskPaneHost from './TaskPaneHost'
 import { confirmWillEvent } from '../registries/willPhase'
+import { TaskSlotHost } from '../registries/uiSlots'
 import { completeTaskArchive } from './archiveLifecycle'
 import './task-view.css'
 
@@ -244,6 +245,7 @@ export default function TaskView(props: {
             <>
               <span class="workspace-footer-path" title={path()}>worktree: {path()}</span>
               <span class="workspace-footer-branch">⎇ {props.task.branch}</span>
+              <TaskSlotHost slot="task.footer" taskId={props.task.id} />
               <Show when={status()?.missing}><span class="workspace-footer-repair">⚠ needs repair (removed on disk)</span></Show>
               <Show when={!status()?.missing && status()?.dirty}>
                 <span class="workspace-footer-dirty">● dirty ({status()?.dirtyCount} file{status()?.dirtyCount === 1 ? '' : 's'})</span>

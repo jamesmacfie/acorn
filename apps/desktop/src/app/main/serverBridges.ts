@@ -6,10 +6,13 @@
 // dev:node. See docs/electron.md §12 (capability map).
 import type { AppDatabase } from '../../core/server/db'
 import { setDatabaseBridge } from '../../plugins/database/server/routes/database'
+import { setDockerBridge } from '../../plugins/docker/server/routes/docker'
 import { setEditorBridge } from '../../plugins/editor/server/routes/editor'
 import { setLocalGitBridge } from '../../plugins/changes/server/routes/localGit'
 import { setSearchBridge } from '../../plugins/editor/server/routes/search'
 import { databaseBridge } from '../../plugins/database/main/database'
+import { dockerBridge } from '../../plugins/docker/main/dockerBridge'
+import { registerDockerWsChannel } from '../../plugins/docker/main/wsChannel'
 import { editorBridge } from '../../plugins/editor/main/editor'
 import { localGitBridge } from '../../plugins/changes/main/localGit'
 import { searchBridge } from '../../plugins/editor/main/search'
@@ -19,4 +22,6 @@ export function wireServerBridges(db: AppDatabase): void {
   setEditorBridge(editorBridge(db))
   setLocalGitBridge(localGitBridge(db))
   setDatabaseBridge(databaseBridge(db))
+  setDockerBridge(dockerBridge(db))
+  registerDockerWsChannel()
 }

@@ -16,6 +16,7 @@ import { mentions } from '../../plugins/github/server/routes/mentions'
 import { repos } from '../../plugins/github/server/routes/repos'
 import { repoLabels } from '../../plugins/github/server/routes/repoLabels'
 import { database } from '../../plugins/database/server/routes/database'
+import { docker } from '../../plugins/docker/server/routes/docker'
 import { editor } from '../../plugins/editor/server/routes/editor'
 import { knowledge } from '../../plugins/memory/server/routes/knowledge'
 import { localGit } from '../../plugins/changes/server/routes/localGit'
@@ -30,6 +31,9 @@ registerRoute({ prefix: '/api/tasks', router: search, note: '/:id/search (editor
 registerRoute({ prefix: '/api/tasks', router: editor, note: '/:id/editor/* (editor)' })
 registerRoute({ prefix: '/api/tasks', router: localGit, note: '/:id/local/* (changes)' })
 registerRoute({ prefix: '/api/tasks', router: database, note: '/:id/database/* (database)' })
+
+// /api/docker/* — the local docker daemon surface (docker)
+registerRoute({ prefix: '/api/docker', router: docker })
 
 // /api catch-alls
 registerRoute({ prefix: '/api', router: workflow, note: 'workflow control (workflows)' })
