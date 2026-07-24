@@ -19,7 +19,8 @@ export type SourcePromotion<Item> = {
 
 export type SourceContribution<Item = unknown> = {
   id: string
-  providerId: string
+  // Absent for local sources (no integration row backs them, e.g. docker) — they are always shown.
+  providerId?: string
   glyph: string
   label: string
   component?: Component

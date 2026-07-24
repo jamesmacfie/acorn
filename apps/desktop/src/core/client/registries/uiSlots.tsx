@@ -26,6 +26,36 @@ export type UiSlotContribution = {
 
 export const uiSlotRegistry = new Registry<UiSlotContribution>('ui-slot')
 
+// Task-scoped slots: lighter than UiSlotContext (components get just the taskId), so hosts like
+// the worktree footer don't have to thread shell callbacks they don't own. Additive — plugins
+// contribute badges (e.g. docker's running-container count) without a core import of the plugin.
+export type TaskSlotId = 'task.footer' | 'tabrail.task-row'
+
+export type TaskSlotContribution = {
+  id: string
+  slot: TaskSlotId
+  order: number
+  requires?: ClientCapabilityRequirement
+  component: Component<{ taskId: string }>
+}
+
+export const taskSlotRegistry = new Registry<TaskSlotContribution>('task-slot')
+
+export function TaskSlotHost(props: { slot: TaskSlotId; taskId: string }) {
+  const contributions = () => [...taskSlotRegistry.entries()]
+    .filter((contribution) => contribution.slot === props.slot && hasClientCapability(contribution.requires))
+    .sort((a, b) => a.order - b.order || a.id.localeCompare(b.id))
+  return (
+    <For each={contributions()}>
+      {(contribution) => (
+        <ContributionBoundary contributionId={contribution.id} quiet>
+          <Dynamic component={contribution.component} taskId={props.taskId} />
+        </ContributionBoundary>
+      )}
+    </For>
+  )
+}
+
 export function SlotHost(props: { slot: UiSlotId; context: UiSlotContext }) {
   const contributions = () => [...uiSlotRegistry.entries()]
     .filter((contribution) => contribution.slot === props.slot && hasClientCapability(contribution.requires) && (contribution.when?.(props.context) ?? true))

@@ -28,6 +28,21 @@ export const setStreamHandlers = (h: StreamHandlers | null): void => void (handl
 // The public WS hub reuses the same engine stream handlers to serve terminal.attach/input/output.
 export const getStreamHandlers = (): StreamHandlers | null => handlers
 
+// Generic channel handlers: a plugin claims a channel prefix (the token before the first ':', e.g.
+// 'docker') and receives every client frame on it plus a disconnect signal per connection. `conn`
+// is an opaque per-connection identity token — key subscription maps by it, never look inside.
+export type WsChannelHandler = {
+  onFrame(frame: WsClientFrame, send: (frame: WsServerFrame) => void, conn: object): void
+  onDisconnect(conn: object): void
+}
+
+const channelHandlers = new Map<string, WsChannelHandler>()
+
+export function registerWsChannelHandler(prefix: string, handler: WsChannelHandler | null): void {
+  if (handler) channelHandlers.set(prefix, handler)
+  else channelHandlers.delete(prefix)
+}
+
 // The UI control broker (docs/public-api.md). Set by the composition root; the renderer's ui:*
 // frames route to it and it sends ui:command frames back over this socket.
 let broker: import('./publicApi/uiControlBroker').UiControlBroker | null = null
@@ -98,27 +113,32 @@ function onConnect(ws: WebSocket): void {
       broker?.resolveResult(frame)
       return
     }
-    if (!handlers) return
-    if (frame.channel === 'term:input') {
-      if (typeof frame.id === 'string' && typeof frame.data === 'string') handlers.input(frame.id, frame.data)
-    } else if (frame.channel === 'term:attach') {
-      if (typeof frame.id !== 'string' || conn.sinks.has(frame.id)) return
-      const sink: StreamSink = (msg) => sendFrame(ws, { channel: 'term:out', id: frame.id, msg })
-      conn.sinks.set(frame.id, sink)
-      handlers.attach(frame.id, sink) // pushes ready + ring replay synchronously, before any live frame
-    } else if (frame.channel === 'term:detach') {
-      const sink = conn.sinks.get(frame.id)
-      if (sink) {
-        handlers.detach(frame.id, sink)
-        conn.sinks.delete(frame.id)
+    if (frame.channel.startsWith('term:')) {
+      if (!handlers) return
+      if (frame.channel === 'term:input') {
+        if (typeof frame.id === 'string' && typeof frame.data === 'string') handlers.input(frame.id, frame.data)
+      } else if (frame.channel === 'term:attach') {
+        if (typeof frame.id !== 'string' || conn.sinks.has(frame.id)) return
+        const sink: StreamSink = (msg) => sendFrame(ws, { channel: 'term:out', id: frame.id, msg })
+        conn.sinks.set(frame.id, sink)
+        handlers.attach(frame.id, sink) // pushes ready + ring replay synchronously, before any live frame
+      } else if (frame.channel === 'term:detach') {
+        const sink = conn.sinks.get(frame.id)
+        if (sink) {
+          handlers.detach(frame.id, sink)
+          conn.sinks.delete(frame.id)
+        }
       }
+      return
     }
+    channelHandlers.get(frame.channel.split(':')[0])?.onFrame(frame, (f) => sendFrame(ws, f), conn)
   })
   const cleanup = () => {
+    if (!conns.delete(conn)) return // 'error' + 'close' can both fire — run once
     for (const [id, sink] of conn.sinks) handlers?.detach(id, sink)
     conn.sinks.clear()
+    for (const handler of channelHandlers.values()) handler.onDisconnect(conn)
     if (conn.windowId) broker?.disconnect(conn.windowId)
-    conns.delete(conn)
   }
   ws.on('close', cleanup)
   ws.on('error', cleanup)
@@ -152,4 +172,5 @@ export function _resetWsHub(): void {
   for (const c of conns) c.ws.close()
   conns.clear()
   handlers = null
+  channelHandlers.clear()
 }

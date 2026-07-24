@@ -36,6 +36,19 @@ describe('availableSources (docs/integrations.md — gated by integration rows)'
   })
   afterAll(() => disposables.forEach((disposable) => disposable.dispose()))
 
+  it('local sources (no providerId) are always shown', () => {
+    const local = sourceRegistry.register({
+      id: 'docker-test', glyph: '◧', label: 'Docker',
+      promotion: { canPromote: () => false, prepare: () => Promise.reject(new Error('n/a')), create: () => Promise.reject(new Error('n/a')) },
+    })
+    try {
+      expect(availableSources(undefined).map((s) => s.id)).toContain('docker-test')
+      expect(availableSources([]).map((s) => s.id)).toContain('docker-test')
+    } finally {
+      local.dispose()
+    }
+  })
+
   it('GitHub always; Linear/Rollbar iff connected', () => {
     expect(availableSources(undefined).map((s) => s.id)).toEqual(['github'])
     expect(availableSources([integration('linear')]).map((s) => s.id)).toEqual(['github', 'linear'])

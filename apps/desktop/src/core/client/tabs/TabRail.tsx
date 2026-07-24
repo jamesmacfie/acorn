@@ -23,6 +23,7 @@ import { saveJsonPref } from '../settings/savePref'
 import { PrefKeys } from '../persistence/prefKeys'
 import { completeTaskArchive } from '../tasks/archiveLifecycle'
 import { sourceRegistry } from '../registries/sources'
+import { TaskSlotHost } from '../registries/uiSlots'
 import './tabrail.css'
 
 // The Tasks zone of the left rail (docs/workspaces-and-tasks.md). Rows are real Task entities (not path
@@ -314,6 +315,7 @@ export default function TabRail() {
               }>
                 <span class="tabrail-dirty tabrail-repair" title="Worktree missing — needs repair">⚠</span>
               </Show>
+              <TaskSlotHost slot="tabrail.task-row" taskId={w.id} />
               <Show when={menuId() === w.id}>
                 <div class="tabrail-menu">
                   <div class="tabrail-menu-title">{w.title}</div>

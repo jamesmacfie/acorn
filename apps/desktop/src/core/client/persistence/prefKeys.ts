@@ -25,6 +25,7 @@ export const PrefKeys = {
   startupContextInjection: 'startup_context_injection',
   onboarded: 'onboarded',
   agentToolPermissions: AGENT_TOOLS_PERMS_PREF_KEY,
+  dockerPrefs: 'docker_prefs',
   taskLayoutsScoped: 'core:task-layouts',
   editorOpenFilesScoped: 'editor:open-files',
   prFiltersScoped: 'github:pr-filters',

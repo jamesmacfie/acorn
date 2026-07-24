@@ -7,6 +7,7 @@ import AgentToolsSettings from '../../core/client/settings/AgentToolsSettings'
 import WorkflowsSettings from '../../plugins/workflows/client/WorkflowsSettings'
 import AppearanceSettings from '../../core/client/settings/AppearanceSettings'
 import TerminalSettings from '../../plugins/terminal/client/TerminalSettings'
+import DockerSettings from '../../plugins/docker/client/DockerSettings'
 import ShortcutsSettings from '../../core/client/settings/ShortcutsSettings'
 import PermissionsSettings from '../../core/client/settings/PermissionsSettings'
 import ApiSettings from '../../core/client/settings/ApiSettings'
@@ -28,6 +29,7 @@ export const settingsPageContributions: SettingsContribution[] = [
   { id: 'agent-tools', label: 'Agent tools', group: 'general', order: 40, component: () => <AgentToolsSettings /> },
   { id: 'workflows', label: 'Workflows', group: 'general', order: 50, requires: 'desktop', component: () => <WorkflowsSettings /> },
   { id: 'terminal', label: 'Terminal', group: 'general', order: 60, requires: 'desktop', component: () => <TerminalSettings /> },
+  { id: 'docker', label: 'Docker', group: 'general', order: 65, component: () => <DockerSettings /> },
   { id: 'shortcuts', label: 'Shortcuts', title: 'Keyboard shortcuts', group: 'general', order: 70, component: () => <ShortcutsSettings /> },
   {
     id: 'permissions', label: 'Permissions', group: 'general', order: 80,
