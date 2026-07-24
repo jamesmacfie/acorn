@@ -1,10 +1,13 @@
 import { batch, createMemo, createSignal, For, onCleanup, onMount, Show } from 'solid-js'
+import { createQuery } from '@tanstack/solid-query'
 import * as monaco from 'monaco-editor'
 import '../../editor/client/monacoSetup'
-import type { Task } from '../../../core/client/queries'
+import { integrationsOptions, type Task } from '../../../core/client/queries'
+import { availableModelConnections } from '../../../core/shared/modelProviders'
 import { isAppDark, token, watchTheme } from '../../terminal/client/theme'
 import type { DbCell, DbColumn, DbResultSet, DbTable } from '../shared/database'
 import { databaseApi } from './databaseClient'
+import GenerateSqlModal from './GenerateSqlModal'
 import ResultGrid from './ResultGrid'
 import './database.css'
 
@@ -50,6 +53,11 @@ export default function DatabasePane(props: { task: Task }) {
   const [inserting, setInserting] = createSignal(false)
   const [busy, setBusy] = createSignal(false)
   const [deleteArmed, setDeleteArmed] = createSignal(false)
+  const [generating, setGenerating] = createSignal(false)
+
+  // AI SQL generation: available only when a model-provider key is connected (docs/pg.md).
+  const integrations = createQuery(() => integrationsOptions(true))
+  const modelConnections = createMemo(() => (integrations.data ? availableModelConnections(integrations.data) : []))
 
   let editorHost: HTMLDivElement | undefined
   let editor: monaco.editor.IStandaloneCodeEditor | undefined
@@ -208,6 +216,9 @@ export default function DatabasePane(props: { task: Task }) {
             <div class="db-editor-host" ref={editorHost} />
             <div class="db-editor-bar">
               <span class="muted db-hint">⌘↵ to run</span>
+              <Show when={modelConnections().length}>
+                <button type="button" class="db-run-btn" disabled={busy() || status() !== 'connected'} onClick={() => setGenerating(true)}>Generate</button>
+              </Show>
               <button type="button" class="db-run-btn" disabled={busy() || status() !== 'connected'} onClick={() => void execute()}>Execute</button>
             </div>
           </div>
@@ -297,6 +308,15 @@ export default function DatabasePane(props: { task: Task }) {
                 setBusy(false)
               }
             }}
+          />
+        </Show>
+
+        <Show when={generating()}>
+          <GenerateSqlModal
+            taskId={props.task.id}
+            connections={modelConnections()}
+            onClose={() => setGenerating(false)}
+            onGenerated={(sql) => editor?.setValue(sql)}
           />
         </Show>
       </div>

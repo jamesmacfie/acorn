@@ -6,6 +6,7 @@ import type {
   IntegrationAuthKind,
   IntegrationProviderKind,
   MemoryEvidencePolicy,
+  ModelCatalogEntry,
   ProviderAccountRef,
   ProviderBudgets,
   ProviderCapabilities,
@@ -134,6 +135,8 @@ export type ConnectionProviderContribution = {
   connection: ConnectionContract
   capabilities: ProviderCapabilities
   budgets: ProviderRequestBudgets
+  models?: ModelCatalogEntry[]
+  defaultModelId?: string
   toPublic(): PublicIntegrationProvider
 }
 

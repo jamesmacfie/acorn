@@ -21,6 +21,7 @@ import {
   type TaskLink,
   type TaskLinkSeed,
   type BrowserRule,
+  type DbSchemaMode,
   type PreviewMode,
   type SetupTrigger,
   type Task,
@@ -133,6 +134,9 @@ export const setWorkspaceTeardownScript = async (id: string, teardownScript: str
 // Per-workspace Database-pane connection script (docs/pg.md; blank ⇒ cleared → auto-detect).
 export const setWorkspaceDbUrlScript = async (id: string, dbUrlScript: string) =>
   writeJson<{ ok: true }>(workspaceRoute(id), { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ dbUrlScript }) }, (res) => `workspace ${res.status}`)
+// Where the Database pane's AI-generation schema comes from: '' (live introspection), 'script', or 'file'.
+export const setWorkspaceDbSchemaSource = async (id: string, dbSchemaMode: DbSchemaMode | '', dbSchemaValue: string) =>
+  writeJson<{ ok: true }>(workspaceRoute(id), { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ dbSchemaMode, dbSchemaValue }) }, (res) => `workspace ${res.status}`)
 // When the setup script runs: off / on task creation / on first terminal open.
 export const setWorkspaceSetupTrigger = async (id: string, setupScriptTrigger: SetupTrigger) =>
   writeJson<{ ok: true }>(workspaceRoute(id), { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ setupScriptTrigger }) }, (res) => `workspace ${res.status}`)

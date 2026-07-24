@@ -3,7 +3,7 @@
 // The accessor shape is unchanged so DatabasePane keeps its call sites; it just never returns null.
 import { databaseActionRoute, databaseColumnsRoute, databaseRowsRoute, databaseTablesRoute } from '../../../core/shared/api'
 import { readJson, writeJson } from '../../../core/client/apiClient'
-import type { DbCell, DbColumnsResult, DbConnectResult, DbPk, DbQueryResult, DbRowsResult, DbTablesResult, DbWriteResult } from '../shared/database'
+import type { DbCell, DbColumnsResult, DbConnectResult, DbGenerateResult, DbPk, DbQueryResult, DbRowsResult, DbTablesResult, DbWriteResult } from '../shared/database'
 
 export type DatabaseApi = {
   connect(taskId: string): Promise<DbConnectResult>
@@ -15,6 +15,7 @@ export type DatabaseApi = {
   update(taskId: string, schema: string, name: string, column: string, value: DbCell, pk: DbPk): Promise<DbWriteResult>
   insert(taskId: string, schema: string, name: string, values: Record<string, DbCell>): Promise<DbWriteResult>
   remove(taskId: string, schema: string, name: string, pk: DbPk): Promise<DbWriteResult>
+  generate(taskId: string, body: { connectionId: string; modelId?: string; prompt: string }): Promise<DbGenerateResult>
 }
 
 const post = <T>(url: string, body?: unknown) =>
@@ -30,6 +31,7 @@ const api: DatabaseApi = {
   update: (taskId, schema, name, column, value, pk) => post<DbWriteResult>(databaseActionRoute(taskId, 'update'), { schema, name, column, value, pk }),
   insert: (taskId, schema, name, values) => post<DbWriteResult>(databaseActionRoute(taskId, 'insert'), { schema, name, values }),
   remove: (taskId, schema, name, pk) => post<DbWriteResult>(databaseActionRoute(taskId, 'delete'), { schema, name, pk }),
+  generate: (taskId, body) => post<DbGenerateResult>(databaseActionRoute(taskId, 'generate'), body),
 }
 
 export const databaseApi = (): DatabaseApi => api

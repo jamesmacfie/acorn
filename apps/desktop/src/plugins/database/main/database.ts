@@ -15,8 +15,8 @@ import pg from 'pg'
 import type { QueryResult, QueryResultRow } from 'pg'
 import type { AppDatabase } from '../../../core/server/db'
 import type { DatabaseBridge } from '../server/routes/database'
-import type { DbCell, DbColumn, DbConnectResult, DbColumnsResult, DbPk, DbQueryResult, DbResultSet, DbRowsResult, DbTablesResult, DbWriteResult } from '../shared/database'
-import { loadTask, taskRoot, workspaceConfigRow } from '../../../core/main/taskWorktree'
+import type { DbCell, DbColumn, DbConnectResult, DbColumnsResult, DbPk, DbQueryResult, DbResultSet, DbRowsResult, DbSchemaResult, DbTablesResult, DbWriteResult } from '../shared/database'
+import { loadTask, resolveInRoot, taskRoot, workspaceConfigRow } from '../../../core/main/taskWorktree'
 
 const { Pool } = pg
 const exec = promisify(execFile)
@@ -120,6 +120,25 @@ async function tableColumns(pool: InstanceType<typeof Pool>, schema: string, nam
   )
   const pkSet = new Set(pk.rows.map((r) => r.attname))
   return cols.rows.map((r) => ({ name: r.column_name, dataType: r.data_type, nullable: r.is_nullable === 'YES', isPk: pkSet.has(r.column_name) }))
+}
+
+// Cap on the AI-generation schema text (docs/pg.md) — the model runtime rejects system prompts over
+// 100k chars, so truncate below that with a visible marker rather than failing the whole request.
+const SCHEMA_CHAR_CAP = 80_000
+
+const capSchema = (text: string): string =>
+  text.length <= SCHEMA_CHAR_CAP ? text : `${text.slice(0, SCHEMA_CHAR_CAP)}\n-- (schema truncated)`
+
+// Compact CREATE TABLE-ish text from introspected tables — for the AI prompt, not for execution.
+export function formatSchema(tables: { schema: string; name: string; columns: DbColumn[] }[]): string {
+  return tables
+    .map((t) => {
+      const cols = t.columns
+        .map((c) => `  ${qid(c.name)} ${c.dataType}${c.nullable ? '' : ' NOT NULL'}${c.isPk ? ', -- PK' : ','}`)
+        .join('\n')
+      return `CREATE TABLE ${qid(t.schema)}.${qid(t.name)} (\n${cols}\n);`
+    })
+    .join('\n\n')
 }
 
 // Validate a renderer-supplied table against the live schema; returns the matched {schema,name} or
@@ -270,6 +289,43 @@ export function databaseBridge(db: AppDatabase): DatabaseBridge {
         return { ok: true, rowCount: res.rowCount ?? 0 }
       } catch (e) {
         return { ok: false, error: errText(e) }
+      }
+    },
+
+    // Schema text for AI query generation (docs/pg.md): per-workspace source — a shell script's
+    // stdout, a worktree file, or (default) live introspection of the connected pool.
+    schema: async (taskId): Promise<DbSchemaResult> => {
+      try {
+        const t = await loadTask(db, taskId)
+        if (!t) return { error: 'Task not found.' }
+        const ws = await workspaceConfigRow(db, t.repoOwner, t.repoName)
+        const mode = ws?.dbSchemaMode === 'script' || ws?.dbSchemaMode === 'file' ? ws.dbSchemaMode : 'auto'
+        const value = ws?.dbSchemaValue?.trim()
+        if (mode === 'script') {
+          if (!value) return { error: 'No schema script configured in Workspace Settings.' }
+          const root = await taskRoot(db, taskId)
+          if (!root) return { error: 'No worktree for this task yet.' }
+          const { stdout } = await exec('bash', ['-lc', value], { cwd: root, timeout: 15_000, maxBuffer: 4 << 20 })
+          const text = stdout.replace(/\x1b(?:\[[0-9;]*[A-Za-z]|\(B)/g, '').trim()
+          return text ? { schema: capSchema(text), source: 'script' } : { error: 'Schema script produced no output.' }
+        }
+        if (mode === 'file') {
+          if (!value) return { error: 'No schema file configured in Workspace Settings.' }
+          const root = await taskRoot(db, taskId)
+          if (!root) return { error: 'No worktree for this task yet.' }
+          const abs = resolveInRoot(root, value)
+          if (!abs) return { error: 'Schema file path escapes the worktree.' }
+          const text = (await readFile(abs, 'utf8')).trim()
+          return text ? { schema: capSchema(text), source: 'file' } : { error: 'Schema file is empty.' }
+        }
+        const pool = getPool(taskId)
+        if (!pool) return { error: 'Not connected.' }
+        const tables = await listTables(pool)
+        if (!tables.length) return { error: 'No tables found in the connected database.' }
+        const withCols = await Promise.all(tables.map(async (table) => ({ ...table, columns: await tableColumns(pool, table.schema, table.name) })))
+        return { schema: capSchema(formatSchema(withCols)), source: 'auto' }
+      } catch (e) {
+        return { error: errText(e) }
       }
     },
 

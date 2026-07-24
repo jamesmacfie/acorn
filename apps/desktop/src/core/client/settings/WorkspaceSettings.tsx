@@ -1,10 +1,11 @@
 import { createResource, createSignal, For, Index, onCleanup, Show } from 'solid-js'
-import { useQueryClient } from '@tanstack/solid-query'
+import { createQuery, useQueryClient } from '@tanstack/solid-query'
 import { debounce } from '../../../plugins/editor/client/autosave'
 import { terminalApi } from '../../../plugins/terminal/client/terminalClient'
-import { workspacesKey } from '../queries'
-import { deleteWorkspace, renameWorkspace, setWorkspaceBrowserRules, setWorkspaceColor, setWorkspaceDbUrlScript, setWorkspaceDevRestartScript, setWorkspaceDevScript, setWorkspaceIcon, setWorkspacePreview, setWorkspaceSetupScript, setWorkspaceSetupTrigger, setWorkspaceTeardownScript } from '../../../plugins/github/client/mutations'
-import type { BrowserRule, PreviewMode, SetupTrigger, Workspace } from '../../shared/api'
+import { integrationsOptions, workspacesKey } from '../queries'
+import { deleteWorkspace, renameWorkspace, setWorkspaceBrowserRules, setWorkspaceColor, setWorkspaceDbSchemaSource, setWorkspaceDbUrlScript, setWorkspaceDevRestartScript, setWorkspaceDevScript, setWorkspaceIcon, setWorkspacePreview, setWorkspaceSetupScript, setWorkspaceSetupTrigger, setWorkspaceTeardownScript } from '../../../plugins/github/client/mutations'
+import type { BrowserRule, DbSchemaMode, PreviewMode, SetupTrigger, Workspace } from '../../shared/api'
+import { availableModelConnections } from '../../shared/modelProviders'
 import { resolveWorkspaceColor, WORKSPACE_COLORS } from '../../shared/workspaceIdentity'
 import { confirmWillEvent } from '../registries/willPhase'
 import { clientEvents } from '../registries/clientEvents'
@@ -20,6 +21,8 @@ export default function WorkspaceSettings(props: { workspace: Workspace; onDelet
   const [devRestart, setDevRestart] = createSignal(props.workspace.devRestartScript ?? '')
   const [teardown, setTeardown] = createSignal(props.workspace.teardownScript ?? '')
   const [dbUrl, setDbUrl] = createSignal(props.workspace.dbUrlScript ?? '')
+  const [dbSchemaMode, setDbSchemaMode] = createSignal<DbSchemaMode | ''>(props.workspace.dbSchemaMode ?? '')
+  const [dbSchemaValue, setDbSchemaValue] = createSignal(props.workspace.dbSchemaValue ?? '')
   const [trigger, setTrigger] = createSignal<SetupTrigger>(props.workspace.setupScriptTrigger ?? 'terminal')
   const [previewMode, setPreviewMode] = createSignal<PreviewMode | ''>(props.workspace.previewMode ?? '')
   const [previewValue, setPreviewValue] = createSignal(props.workspace.previewValue ?? '')
@@ -28,6 +31,12 @@ export default function WorkspaceSettings(props: { workspace: Workspace; onDelet
   const [color, setColor] = createSignal(props.workspace.color ?? '')
   const [hex, setHex] = createSignal(props.workspace.color && !(props.workspace.color in WORKSPACE_COLORS) ? props.workspace.color : '')
   const refresh = () => qc.invalidateQueries({ queryKey: workspacesKey })
+  // The AI schema-source setting only matters when a model-provider key is connected.
+  const integrations = createQuery(() => integrationsOptions(true))
+  const hasModelConnection = () => {
+    const data = integrations.data
+    return data ? availableModelConnections(data).length > 0 : false
+  }
 
   // Identity (docs/workspaces-and-tasks.md): emoji icon (blank clears back to the derived initial) + a colour
   // swatch row (preset tokens) with a free hex input. Saves immediately — these are single scalars.
@@ -100,6 +109,10 @@ export default function WorkspaceSettings(props: { workspace: Workspace; onDelet
     await setWorkspaceDbUrlScript(props.workspace.id, dbUrl())
     await refresh()
   }
+  const saveDbSchema = async () => {
+    await setWorkspaceDbSchemaSource(props.workspace.id, dbSchemaMode(), dbSchemaValue())
+    await refresh()
+  }
 
   // One debouncer per text field; blur flushes the same pending write immediately.
   const debScript = debounce(() => void saveScript(), 1500)
@@ -108,7 +121,8 @@ export default function WorkspaceSettings(props: { workspace: Workspace; onDelet
   const debDevRestart = debounce(() => void saveDevRestart(), 1500)
   const debPreview = debounce(() => void savePreview(), 1500)
   const debDbUrl = debounce(() => void saveDbUrl(), 1500)
-  onCleanup(() => { debScript.flush(); debTeardown.flush(); debDev.flush(); debDevRestart.flush(); debPreview.flush(); debDbUrl.flush() })
+  const debDbSchema = debounce(() => void saveDbSchema(), 1500)
+  onCleanup(() => { debScript.flush(); debTeardown.flush(); debDev.flush(); debDevRestart.flush(); debPreview.flush(); debDbUrl.flush(); debDbSchema.flush() })
 
   const remove = async () => {
     const confirmed = await confirmWillEvent({
@@ -250,6 +264,51 @@ export default function WorkspaceSettings(props: { workspace: Workspace; onDelet
           onBlur={() => debDbUrl.flush()}
         />
       </label>
+
+      <Show when={hasModelConnection()}>
+        <label class="settings-field">
+          <span class="settings-label">SQL generation schema source</span>
+          <span class="muted settings-hint">
+            Where the database schema in the AI query-generation prompt comes from.
+          </span>
+          <select
+            class="integration-key-input"
+            disabled={busy()}
+            value={dbSchemaMode()}
+            onChange={(e) => {
+              setDbSchemaMode(e.currentTarget.value as DbSchemaMode | '')
+              void saveDbSchema()
+            }}
+          >
+            <option value="">Live database introspection (default)</option>
+            <option value="script">Script — its output is the schema</option>
+            <option value="file">File in the worktree</option>
+          </select>
+          <Show when={dbSchemaMode() === 'script'}>
+            <textarea
+              class="settings-script"
+              rows="2"
+              spellcheck={false}
+              placeholder={'pg_dump --schema-only "$DATABASE_URL"'}
+              value={dbSchemaValue()}
+              onInput={(e) => { setDbSchemaValue(e.currentTarget.value); debDbSchema() }}
+              onBlur={() => debDbSchema.flush()}
+            />
+            <span class="muted settings-hint">Run in the task's worktree; its stdout is used as the schema.</span>
+          </Show>
+          <Show when={dbSchemaMode() === 'file'}>
+            <input
+              class="integration-key-input"
+              type="text"
+              placeholder="db/schema.sql"
+              value={dbSchemaValue()}
+              onInput={(e) => { setDbSchemaValue(e.currentTarget.value); debDbSchema() }}
+              onBlur={() => debDbSchema.flush()}
+            />
+            <span class="muted settings-hint">A path relative to the task's worktree root.</span>
+          </Show>
+        </label>
+      </Show>
 
       <label class="settings-field">
         <span class="settings-label">Run the script</span>
