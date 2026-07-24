@@ -5,8 +5,8 @@
 import { createSignal, type Accessor } from 'solid-js'
 import { wsDockerAttach } from '../../../core/client/wsClient'
 
-const MAX_LOG_CHARS = 512 * 1024 // ponytail: char-capped ring; virtualize if huge logs ever matter
-const MAX_BUFFERS = 8 // ponytail: LRU cap on background `docker logs -f` attachments
+const MAX_LOG_CHARS = 512 * 1024 // char-capped ring; virtualize if huge logs ever matter
+const MAX_BUFFERS = 8 // LRU cap on background `docker logs -f` attachments
 
 type Entry = {
   text: Accessor<string>

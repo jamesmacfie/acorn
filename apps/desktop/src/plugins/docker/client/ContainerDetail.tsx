@@ -77,7 +77,7 @@ export default function ContainerDetail(props: { target: string; taskId?: string
     })
   }))
   // Find-in-logs: case-insensitive substring over the visible buffer, rendered as <mark> segments.
-  const MAX_MATCHES = 5000 // ponytail: mark-render cap; incremental match tracking if it ever binds
+  const MAX_MATCHES = 5000 // mark-render cap; incremental match tracking if it ever binds
   const logMatches = createMemo(() => {
     const q = logQuery().toLowerCase()
     if (!q) return []
