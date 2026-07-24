@@ -6,6 +6,20 @@ import '@xterm/xterm/css/xterm.css'
 import { terminalApi } from './terminalClient'
 import { baseTheme, isAppDark, monoFont, watchTheme, xtermTheme } from './theme'
 
+// xterm 5.5.0 bug: disposing a terminal (workspace/tab switch, or a task finishing in another
+// workspace and stealing focus) can leave a Viewport.syncScrollArea queued for the next frame. By
+// the time it fires the render service's renderer is gone, so its `dimensions` getter reads
+// `_renderer.value.dimensions` on undefined and throws. The terminal is dead and the scroll sync is
+// a no-op — swallow exactly that stack (method names survive minification) and nothing else.
+let scrollGuardInstalled = false
+function installScrollAreaGuard() {
+  if (scrollGuardInstalled || typeof window === 'undefined') return
+  scrollGuardInstalled = true
+  window.addEventListener('error', (e) => {
+    if (e.error?.stack?.includes('syncScrollArea')) { e.preventDefault(); e.stopImmediatePropagation() }
+  }, true)
+}
+
 // One xterm bound to one live session over WebSocket (docs/terminal-and-agents.md). Keyed by session id in the parent, so
 // switching tabs unmounts this (detach, keep PTY running) and remounts a fresh xterm that replays
 // the ring buffer. ponytail: local scrollback beyond the ring is lost on tab switch — fine for now.
@@ -15,6 +29,7 @@ export default function TerminalSurface(props: { sessionId: string; onExit?: (ex
 
   onMount(() => {
     if (!api) return
+    installScrollAreaGuard()
     // No convertEol: the PTY already emits CRLF for normal output (kernel ONLCR) and a full-screen
     // TUI (Claude/Codex) drives the cursor itself — rewriting bare \n to \r\n injects stray carriage
     // returns that shift redraws to column 0, interleaving frames into garbage.
