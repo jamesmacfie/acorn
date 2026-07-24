@@ -360,15 +360,16 @@ async function spawnOne(
     exitCode: null,
   }
 
-  // Auto-register the acorn MCP server with this agent's CLI before it launches, so the current
-  // task's tools are always available — no manual "Register" click. Idempotent (remove-then-add),
-  // failures (CLI missing) are swallowed. Awaited so the agent sees it at startup.
-  // ponytail: success is cached per app-run — boot refresh already rewrites every registration and
-  // the launcher path can't change mid-run, so re-running the CLI (~1-2s) per spawn is pure waste.
-  // Failures stay uncached so a CLI installed after boot registers on the next spawn.
+  // Auto-register the acorn MCP server with this agent's CLI, so the current task's tools are
+  // available — no manual "Register" click. Idempotent (remove-then-add), failures (CLI missing)
+  // swallowed. Fire-and-forget: `claude mcp add --scope user` persists to ~/.claude.json across
+  // runs, so the agent already sees acorn from a prior run; awaiting a fresh ~1-2s login-shell
+  // round-trip (×2) here just to heal a rarely-changed launcher path made the tab hang for seconds
+  // before the PTY appeared. Boot's refreshAcornMcpRegistrations does the durable heal in the
+  // background. ponytail: cached per app-run so we shell out at most once per CLI; failures stay
+  // uncached so a CLI installed after boot registers on the next spawn.
   if (profile.mcpRegistration && !mcpRegistered.has(profile.id)) {
-    const res = await profile.mcpRegistration(mcpName(), mcpLauncher()).catch(() => undefined)
-    if (res?.ok) mcpRegistered.add(profile.id)
+    void profile.mcpRegistration(mcpName(), mcpLauncher()).then((res) => { if (res?.ok) mcpRegistered.add(profile.id) }).catch(() => undefined)
   }
 
   let pty: IPty
