@@ -139,7 +139,7 @@ export default function PreviewPane(props: { taskId: string; url: string | null 
               onInput={(e) => setAddr(e.currentTarget.value)}
               onKeyDown={(e) => e.key === 'Enter' && go()}
             />
-            <button type="button" class="preview-nav-btn" title="Toggle dev tools" onClick={() => preview?.command(props.taskId, 'devtools')}>{'</>'}</button>
+            <button type="button" class="preview-nav-btn" title="Toggle preview DevTools" aria-label="Toggle preview DevTools" onClick={() => preview?.command(props.taskId, 'devtools')}>{'</>'}</button>
             <Show when={loading()}><span class="preview-spinner spin">◐</span></Show>
           </div>
         </Show>
