@@ -5,11 +5,12 @@ import type { Task } from '../../../core/shared/api'
 import type { DockerContainerSummary } from '../shared/model'
 import { fetchTaskContainers } from './dockerClient'
 import { wsOnDockerChanged } from '../../../core/client/wsClient'
+import { dockerSelection, rememberDockerSelection } from './dockerViewState'
 import ContainerDetail from './ContainerDetail'
 import './docker.css'
 
 export default function DockerTaskPane(props: { task: Task }) {
-  const [selected, setSelected] = createSignal<string | null>(null)
+  const [selected, setSelected] = createSignal<string | null>(dockerSelection(props.task.id) ?? null)
   const [linked, { refetch }] = createResource(() => props.task.id, fetchTaskContainers)
 
   const off = wsOnDockerChanged((scopes) => {
@@ -21,6 +22,11 @@ export default function DockerTaskPane(props: { task: Task }) {
   createEffect(on(linked, (list) => {
     if (!list?.length) return setSelected(null)
     if (!selected() || !list.some((c) => c.id === selected())) setSelected(list[0].id)
+  }))
+
+  // Session-only: revisiting the pane lands on the same container.
+  createEffect(on(selected, (id) => {
+    if (id) rememberDockerSelection(props.task.id, id)
   }))
 
   const chipLabel = (c: DockerContainerSummary): string => c.composeService ?? c.name
