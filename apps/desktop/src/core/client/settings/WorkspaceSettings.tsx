@@ -1,4 +1,4 @@
-import { createResource, createSignal, For, onCleanup, Show } from 'solid-js'
+import { createResource, createSignal, For, Index, onCleanup, Show } from 'solid-js'
 import { useQueryClient } from '@tanstack/solid-query'
 import { debounce } from '../../../plugins/editor/client/autosave'
 import { terminalApi } from '../../../plugins/terminal/client/terminalClient'
@@ -342,7 +342,8 @@ export default function WorkspaceSettings(props: { workspace: Workspace; onDelet
         <span class="settings-label">Page rules</span>
         <span class="muted settings-hint">
           On page load in the preview browser, fill an input (CSS selector) with a value when the URL matches
-          the pattern (substring; <code>*</code> is a wildcard) — e.g. auto-fill a dev login. Values are stored
+          the pattern (substring; <code>*</code> is a wildcard, a trailing <code>$</code> anchors to the end —
+          e.g. <code>*/$</code> matches only the root) — e.g. auto-fill a dev login. Values are stored
           plainly in the local database: dev credentials only, never production secrets.
         </span>
         <BrowserRulesEditor workspace={props.workspace} onSaved={refresh} />
@@ -396,22 +397,23 @@ function BrowserRulesEditor(props: { workspace: Workspace; onSaved: () => Promis
 
   return (
     <>
-      <For each={rules()}>
+      {/* Index (not For): keys by position so editing a rule doesn't remount its row and defocus the input. */}
+      <Index each={rules()}>
         {(rule) => (
           <div class="integration-key-row">
             <input
               type="checkbox"
               title="Enabled"
-              checked={rule.enabled}
-              onChange={(e) => { update(rule.id, (r) => ({ ...r, enabled: e.currentTarget.checked })); debSave(); debSave.flush() }}
+              checked={rule().enabled}
+              onChange={(e) => { update(rule().id, (r) => ({ ...r, enabled: e.currentTarget.checked })); debSave(); debSave.flush() }}
             />
             <input
               class="integration-key-input"
               type="text"
               placeholder="localhost:3000/login"
               title="URL pattern"
-              value={rule.urlPattern}
-              onInput={(e) => { update(rule.id, (r) => ({ ...r, urlPattern: e.currentTarget.value })); debSave() }}
+              value={rule().urlPattern}
+              onInput={(e) => { update(rule().id, (r) => ({ ...r, urlPattern: e.currentTarget.value })); debSave() }}
               onBlur={() => debSave.flush()}
             />
             <input
@@ -419,8 +421,8 @@ function BrowserRulesEditor(props: { workspace: Workspace; onSaved: () => Promis
               type="text"
               placeholder="input[type=password]"
               title="CSS selector of the input to fill"
-              value={rule.action.selector}
-              onInput={(e) => { update(rule.id, (r) => ({ ...r, action: { ...r.action, selector: e.currentTarget.value } })); debSave() }}
+              value={rule().action.selector}
+              onInput={(e) => { update(rule().id, (r) => ({ ...r, action: { ...r.action, selector: e.currentTarget.value } })); debSave() }}
               onBlur={() => debSave.flush()}
             />
             <input
@@ -428,16 +430,16 @@ function BrowserRulesEditor(props: { workspace: Workspace; onSaved: () => Promis
               type="text"
               placeholder="value to type"
               title="Text typed into the input"
-              value={rule.action.value}
-              onInput={(e) => { update(rule.id, (r) => ({ ...r, action: { ...r.action, value: e.currentTarget.value } })); debSave() }}
+              value={rule().action.value}
+              onInput={(e) => { update(rule().id, (r) => ({ ...r, action: { ...r.action, value: e.currentTarget.value } })); debSave() }}
               onBlur={() => debSave.flush()}
             />
-            <button type="button" class="overlay-btn" title="Delete rule" onClick={() => remove(rule.id)}>
+            <button type="button" class="overlay-btn" title="Delete rule" onClick={() => remove(rule().id)}>
               ×
             </button>
           </div>
         )}
-      </For>
+      </Index>
       <div>
         <button type="button" class="overlay-btn" onClick={add}>
           Add rule
