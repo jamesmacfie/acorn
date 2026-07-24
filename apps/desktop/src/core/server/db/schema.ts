@@ -309,6 +309,7 @@ export const workspaces = sqliteTable('workspaces', {
   dbUrlScript: text('db_url_script'), // shell command run in the worktree to print a Postgres connection URL for the Database pane (docs/pg.md); null/blank = auto-detect from .env / $DATABASE_URL
   previewMode: text('preview_mode'), // 'url' | 'port' | 'script' — how the browser-preview URL is resolved; null → dev-server port
   previewValue: text('preview_value'), // the URL, port, or shell command per previewMode; null/blank = unset
+  browserRules: text('browser_rules'), // JSON BrowserRule[] — preview-browser page rules (docs/panes.md); null = none
   icon: text('icon'), // JSON WorkspaceIcon ({"kind":"emoji","value":"🌰"} | {"kind":"lucide",…} | {"kind":"github"}); null → derived default
   color: text('color'), // preset token key ('green'|'blue'|…) or 6-hex; null → derived from name hash
   createdAt: integer('created_at').notNull(),

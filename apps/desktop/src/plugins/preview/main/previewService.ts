@@ -9,8 +9,11 @@
 // sit above it via z-index. The renderer detects when an overlay covers the pane and calls hide()
 // (PreviewPane.tsx) — the WebContentsView equivalent of the old z-index dance.
 import { BrowserWindow, WebContentsView, ipcMain, type IpcMainEvent, type IpcMainInvokeEvent, type WebContents } from 'electron'
+import type { AppDatabase } from '../../../core/server/db'
+import { loadTask, workspaceConfigRow } from '../../../core/main/taskWorktree'
+import { matchesUrlPattern, parseBrowserRules } from '../../../core/shared/browserRules'
 import { bindBrowserContents, unbindBrowserContents } from './browserService'
-import { isAllowedPreviewUrl } from './browserAuto'
+import { buildFillScript, isAllowedPreviewUrl } from './browserAuto'
 
 type Rect = { x: number; y: number; width: number; height: number }
 type PreviewState = { taskId: string; url: string; loading: boolean; canGoBack: boolean; canGoForward: boolean }
@@ -18,6 +21,8 @@ type PreviewRecord = { view: WebContentsView; owner: BrowserWindow; homeUrl: str
 
 const previews = new Map<string, PreviewRecord>()
 const trackedOwners = new WeakSet<BrowserWindow>()
+// Set by registerPreviewIpc (bootstrap passes the app DB); without it page rules are a no-op.
+let rulesDb: AppDatabase | undefined
 
 function stateOf(taskId: string, wc: WebContents, loading: boolean): PreviewState {
   return { taskId, url: wc.getURL(), loading, canGoBack: wc.navigationHistory.canGoBack(), canGoForward: wc.navigationHistory.canGoForward() }
@@ -51,6 +56,9 @@ function create(taskId: string, owner: BrowserWindow, homeUrl: string): PreviewR
   wc.on('did-stop-loading', () => emit(record, stateOf(taskId, wc, false)))
   wc.on('did-navigate', () => emit(record, stateOf(taskId, wc, wc.isLoading())))
   wc.on('did-navigate-in-page', () => emit(record, stateOf(taskId, wc, wc.isLoading())))
+  // Page rules (docs/panes.md): fill-on-load, workspace-configured. dom-ready only — SPA in-page
+  // route changes don't refire it; that's the future 'navigate' trigger.
+  wc.on('dom-ready', () => { void applyLoadRules(taskId, wc) })
 
   view.setVisible(false) // shown once the renderer sets bounds and this pane is active
   owner.contentView.addChildView(view)
@@ -62,6 +70,24 @@ function create(taskId: string, owner: BrowserWindow, homeUrl: string): PreviewR
   bindBrowserContents(taskId, wc)
   if (isAllowedPreviewUrl(homeUrl)) void wc.loadURL(homeUrl)
   return record
+}
+
+// Fill-on-load page rules for the task's workspace. Re-checks the URL after the (async) DB reads
+// so a fill meant for page A never lands on page B, and never injects into non-http(s) documents.
+async function applyLoadRules(taskId: string, wc: WebContents): Promise<void> {
+  if (!rulesDb) return
+  const url = wc.getURL()
+  if (!isAllowedPreviewUrl(url)) return
+  const task = await loadTask(rulesDb, taskId)
+  if (!task) return
+  const ws = await workspaceConfigRow(rulesDb, task.repoOwner, task.repoName)
+  const rules = parseBrowserRules(ws?.browserRules)
+  if (wc.isDestroyed() || wc.getURL() !== url) return
+  for (const rule of rules) {
+    if (!rule.enabled || rule.trigger !== 'load' || rule.action.type !== 'fill') continue
+    if (!matchesUrlPattern(url, rule.urlPattern)) continue
+    wc.executeJavaScript(buildFillScript(rule.action.selector, rule.action.value)).catch((e) => console.warn('[preview] page rule failed:', e))
+  }
 }
 
 function evict(taskId: string): void {
@@ -121,7 +147,9 @@ export function previewEvictTask(taskId: string): boolean {
 }
 
 // Registered by the composition root (bootstrap.ts). Returns a disposer that drops every view.
-export function registerPreviewIpc(): () => void {
+// `db` powers page rules (optional so tests can register without one — rules just no-op).
+export function registerPreviewIpc(db?: AppDatabase): () => void {
+  rulesDb = db
   const winOf = (e: IpcMainInvokeEvent | IpcMainEvent) => BrowserWindow.fromWebContents(e.sender)
   const ownedRecord = (e: IpcMainInvokeEvent | IpcMainEvent, taskId: unknown): PreviewRecord | null => {
     const owner = winOf(e)
@@ -203,6 +231,7 @@ export function registerPreviewIpc(): () => void {
     ipcMain.removeListener('preview:load', onLoad)
     ipcMain.removeListener('preview:command', onCommand)
     ipcMain.removeListener('preview:evict', onEvict)
+    rulesDb = undefined
     for (const taskId of [...previews.keys()]) evict(taskId)
   }
 }

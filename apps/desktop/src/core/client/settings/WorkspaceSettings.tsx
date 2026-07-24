@@ -3,8 +3,8 @@ import { useQueryClient } from '@tanstack/solid-query'
 import { debounce } from '../../../plugins/editor/client/autosave'
 import { terminalApi } from '../../../plugins/terminal/client/terminalClient'
 import { workspacesKey } from '../queries'
-import { deleteWorkspace, renameWorkspace, setWorkspaceColor, setWorkspaceDbUrlScript, setWorkspaceDevRestartScript, setWorkspaceDevScript, setWorkspaceIcon, setWorkspacePreview, setWorkspaceSetupScript, setWorkspaceSetupTrigger, setWorkspaceTeardownScript } from '../../../plugins/github/client/mutations'
-import type { PreviewMode, SetupTrigger, Workspace } from '../../shared/api'
+import { deleteWorkspace, renameWorkspace, setWorkspaceBrowserRules, setWorkspaceColor, setWorkspaceDbUrlScript, setWorkspaceDevRestartScript, setWorkspaceDevScript, setWorkspaceIcon, setWorkspacePreview, setWorkspaceSetupScript, setWorkspaceSetupTrigger, setWorkspaceTeardownScript } from '../../../plugins/github/client/mutations'
+import type { BrowserRule, PreviewMode, SetupTrigger, Workspace } from '../../shared/api'
 import { resolveWorkspaceColor, WORKSPACE_COLORS } from '../../shared/workspaceIdentity'
 import { confirmWillEvent } from '../registries/willPhase'
 import { clientEvents } from '../registries/clientEvents'
@@ -338,6 +338,16 @@ export default function WorkspaceSettings(props: { workspace: Workspace; onDelet
         </Show>
       </label>
 
+      <div class="settings-field">
+        <span class="settings-label">Page rules</span>
+        <span class="muted settings-hint">
+          On page load in the preview browser, fill an input (CSS selector) with a value when the URL matches
+          the pattern (substring; <code>*</code> is a wildcard) — e.g. auto-fill a dev login. Values are stored
+          plainly in the local database: dev credentials only, never production secrets.
+        </span>
+        <BrowserRulesEditor workspace={props.workspace} onSaved={refresh} />
+      </div>
+
       <Show when={terminalApi() && (props.workspace.repos ?? []).length}>
         <div class="settings-field">
           <span class="settings-label">Run targets (per repo)</span>
@@ -358,6 +368,82 @@ export default function WorkspaceSettings(props: { workspace: Workspace; onDelet
         </div>
       </Show>
     </div>
+  )
+}
+
+// Preview-browser page rules (docs/panes.md): row-per-rule editor over the workspace's browserRules
+// array. Whole-array PATCH like the other workspace fields; rows missing a pattern or selector are
+// kept locally but not saved, so half-typed rules never 400 against the strict route validation.
+function BrowserRulesEditor(props: { workspace: Workspace; onSaved: () => Promise<unknown> }) {
+  const [rules, setRules] = createSignal<BrowserRule[]>(props.workspace.browserRules ?? [])
+
+  const save = async () => {
+    await setWorkspaceBrowserRules(props.workspace.id, rules().filter((r) => r.urlPattern.trim() && r.action.selector.trim()))
+    await props.onSaved()
+  }
+  const debSave = debounce(() => void save(), 1500)
+  onCleanup(() => debSave.flush())
+
+  const update = (id: string, patch: (r: BrowserRule) => BrowserRule) =>
+    setRules((list) => list.map((r) => (r.id === id ? patch(r) : r)))
+  const add = () =>
+    setRules((list) => [...list, { id: crypto.randomUUID(), enabled: true, urlPattern: '', trigger: 'load', action: { type: 'fill', selector: '', value: '' } }])
+  const remove = (id: string) => {
+    setRules((list) => list.filter((r) => r.id !== id))
+    debSave()
+    debSave.flush()
+  }
+
+  return (
+    <>
+      <For each={rules()}>
+        {(rule) => (
+          <div class="integration-key-row">
+            <input
+              type="checkbox"
+              title="Enabled"
+              checked={rule.enabled}
+              onChange={(e) => { update(rule.id, (r) => ({ ...r, enabled: e.currentTarget.checked })); debSave(); debSave.flush() }}
+            />
+            <input
+              class="integration-key-input"
+              type="text"
+              placeholder="localhost:3000/login"
+              title="URL pattern"
+              value={rule.urlPattern}
+              onInput={(e) => { update(rule.id, (r) => ({ ...r, urlPattern: e.currentTarget.value })); debSave() }}
+              onBlur={() => debSave.flush()}
+            />
+            <input
+              class="integration-key-input"
+              type="text"
+              placeholder="input[type=password]"
+              title="CSS selector of the input to fill"
+              value={rule.action.selector}
+              onInput={(e) => { update(rule.id, (r) => ({ ...r, action: { ...r.action, selector: e.currentTarget.value } })); debSave() }}
+              onBlur={() => debSave.flush()}
+            />
+            <input
+              class="integration-key-input"
+              type="text"
+              placeholder="value to type"
+              title="Text typed into the input"
+              value={rule.action.value}
+              onInput={(e) => { update(rule.id, (r) => ({ ...r, action: { ...r.action, value: e.currentTarget.value } })); debSave() }}
+              onBlur={() => debSave.flush()}
+            />
+            <button type="button" class="overlay-btn" title="Delete rule" onClick={() => remove(rule.id)}>
+              ×
+            </button>
+          </div>
+        )}
+      </For>
+      <div>
+        <button type="button" class="overlay-btn" onClick={add}>
+          Add rule
+        </button>
+      </div>
+    </>
   )
 }
 

@@ -95,3 +95,28 @@ export const isAllowedBrowserUrl = (url: string): boolean => /^https?:\/\//i.tes
 // byte-for-byte: http(s) only AND no userinfo in the authority, so a configured preview URL like
 // `http://localhost@evil.com` can't disguise a foreign host as localhost.
 export const isAllowedPreviewUrl = (url: string): boolean => /^https?:\/\/[^@/?#]+(?::\d+)?(\/|$|\?|#)/.test(url)
+
+// Page-rule fill script (docs/panes.md), run via wc.executeJavaScript on dom-ready. Both strings
+// are JSON.stringify-embedded so selector/value content can't escape into the script. Sets the
+// value through the native prototype setter so controlled inputs (React/Solid) observe it, then
+// dispatches the events their bindings listen for. Retries briefly for SPA-rendered inputs.
+// Returns a boolean — executeJavaScript rejects on non-serializable completion values.
+export function buildFillScript(selector: string, value: string): string {
+  return `(() => {
+  const sel = ${JSON.stringify(selector)}, val = ${JSON.stringify(value)};
+  let tries = 0;
+  const attempt = () => {
+    const el = document.querySelector(sel);
+    if (el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement) {
+      const proto = el instanceof HTMLTextAreaElement ? HTMLTextAreaElement.prototype : HTMLInputElement.prototype;
+      Object.getOwnPropertyDescriptor(proto, 'value').set.call(el, val);
+      el.dispatchEvent(new Event('input', { bubbles: true }));
+      el.dispatchEvent(new Event('change', { bubbles: true }));
+      return true;
+    }
+    if (++tries < 10) setTimeout(attempt, 300);
+    return false;
+  };
+  return attempt();
+})()`
+}
