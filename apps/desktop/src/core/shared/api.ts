@@ -465,6 +465,9 @@ export const databaseRowsRoute = (taskId: string, schema: string, name: string, 
   `/api/tasks/${taskId}/database/rows?schema=${encodeURIComponent(schema)}&name=${encodeURIComponent(name)}${offset ? `&offset=${offset}` : ''}`
 export const databaseActionRoute = (taskId: string, action: 'connect' | 'disconnect' | 'query' | 'update' | 'insert' | 'delete' | 'generate') =>
   `/api/tasks/${taskId}/database/${action}`
+// Saved queries: repo-scoped rows, addressed through the task (the repo is resolved server-side).
+export const databaseQueriesRoute = (taskId: string) => `/api/tasks/${taskId}/database/queries`
+export const databaseQueryRoute = (taskId: string, queryId: string) => `/api/tasks/${taskId}/database/queries/${queryId}`
 
 // Notes + memory pane (docs/notes-and-memory.md). These routes replaced the old feature-specific IPC surface.
 export const memoryListRoute = (repo?: string) => `/api/memory${repo ? `?repo=${encodeURIComponent(repo)}` : ''}`

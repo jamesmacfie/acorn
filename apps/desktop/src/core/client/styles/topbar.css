@@ -111,8 +111,11 @@
   overflow: hidden;
 }
 /* Portalled to body and pinned to the button's rect (inline top/left/width) so it overlays
-   adjacent panes instead of being clipped by their overflow. */
-.repo-picker-popover-fixed { position: fixed; top: auto; left: auto; z-index: 60; }
+   adjacent panes instead of being clipped by their overflow. Above .overlay-backdrop (100): a Picker
+   inside a modal (the Database pane's example multi-select) is portalled to body, so it is a sibling
+   of the backdrop rather than a descendant and would otherwise render behind it. It only exists while
+   open, so being top-most is always what's wanted. */
+.repo-picker-popover-fixed { position: fixed; top: auto; left: auto; z-index: 110; }
 .repo-picker-tools {
   display: flex;
   align-items: stretch;

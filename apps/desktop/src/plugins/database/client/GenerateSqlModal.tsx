@@ -1,13 +1,20 @@
-import { createSignal, Show } from 'solid-js'
+import { createSignal, For, Show } from 'solid-js'
 import { ApiError } from '../../../core/client/apiClient'
 import ModelConnectionPicker, { defaultModelIdFor } from '../../../core/client/modelProviders/ModelConnectionPicker'
 import { trapOverlayFocus } from '../../../core/client/ui/focus'
+import Picker from '../../../core/client/ui/Picker'
 import type { AvailableModelConnection } from '../../../core/shared/modelProviders'
+import type { DbSavedQuery } from '../shared/database'
+import { GENERATE_MAX_PROMPT_CHARS } from '../shared/database'
 import { databaseApi } from './databaseClient'
 
 // AI SQL generation (docs/pg.md): describe the query, pick a configured model connection + model,
 // and the generated PostgreSQL replaces the editor contents via onGenerated. The server route owns
 // the prompt; this modal only collects the inputs and surfaces errors.
+//
+// Saved queries can be added as worked examples — the server sends each one's name, notes and SQL
+// alongside the schema and the repo's schema notes. ponytail: the selection resets each open; nothing
+// to persist until someone asks for a default set.
 
 const errorMessage = (e: unknown): string => {
   if (e instanceof ApiError) {
@@ -21,6 +28,7 @@ const errorMessage = (e: unknown): string => {
 export default function GenerateSqlModal(props: {
   taskId: string
   connections: AvailableModelConnection[]
+  queries: readonly DbSavedQuery[]
   onClose: () => void
   onGenerated: (sql: string) => void
 }) {
@@ -28,9 +36,19 @@ export default function GenerateSqlModal(props: {
   const [prompt, setPrompt] = createSignal('')
   const [connectionId, setConnectionId] = createSignal(props.connections[0]?.connection.id ?? '')
   const [modelId, setModelId] = createSignal(defaultModelIdFor(props.connections[0]))
+  const [exampleIds, setExampleIds] = createSignal<string[]>([])
   const [busy, setBusy] = createSignal(false)
   const [error, setError] = createSignal('')
   let dialog!: HTMLDivElement
+
+  const chosen = () => props.queries.filter((q) => exampleIds().includes(q.id))
+  const toggle = (q: DbSavedQuery) =>
+    setExampleIds((ids) => (ids.includes(q.id) ? ids.filter((i) => i !== q.id) : [...ids, q.id]))
+  const matches = (query: string) => {
+    const needle = query.trim().toLowerCase()
+    if (!needle) return [...props.queries]
+    return props.queries.filter((q) => `${q.name} ${q.notes ?? ''}`.toLowerCase().includes(needle))
+  }
 
   const generate = async () => {
     if (busy() || !prompt().trim() || !connectionId()) return
@@ -41,6 +59,7 @@ export default function GenerateSqlModal(props: {
         connectionId: connectionId(),
         ...(modelId() ? { modelId: modelId() } : {}),
         prompt: prompt().trim(),
+        ...(exampleIds().length ? { queryIds: exampleIds() } : {}),
       })
       props.onGenerated(res.sql)
       props.onClose()
@@ -70,13 +89,41 @@ export default function GenerateSqlModal(props: {
           <textarea
             class="settings-script"
             rows="4"
-            maxlength="4000"
+            maxlength={GENERATE_MAX_PROMPT_CHARS}
             spellcheck={false}
             placeholder="Describe the query — e.g. the 10 most recent orders with the customer's email"
             ref={(el) => queueMicrotask(() => el.focus())}
             value={prompt()}
             onInput={(e) => setPrompt(e.currentTarget.value)}
           />
+          <Show when={props.queries.length}>
+            <div class="db-examples">
+              <span class="muted db-hint">Example queries</span>
+              <div class="db-chips">
+                <For each={chosen()}>
+                  {(q) => (
+                    <span class="db-chip" title={q.notes ?? ''}>
+                      {q.name}
+                      <button type="button" class="db-chip-x" title="Remove" onClick={() => toggle(q)}>
+                        ✕
+                      </button>
+                    </span>
+                  )}
+                </For>
+                <Picker<DbSavedQuery>
+                  keepOpen
+                  label="Add example…"
+                  placeholder="Filter saved queries…"
+                  emptyText="No matching queries."
+                  buttonClass="db-chip-add"
+                  results={matches}
+                  rowLabel={(q) => q.name}
+                  isActive={(q) => exampleIds().includes(q.id)}
+                  onSelect={toggle}
+                />
+              </div>
+            </div>
+          </Show>
           <ModelConnectionPicker
             connections={props.connections}
             connectionId={connectionId()}

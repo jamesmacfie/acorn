@@ -98,6 +98,7 @@ export type RepoPath = {
   dbUrlScript: string | null
   dbSchemaMode: DbSchemaMode | null // where the Database pane's AI-generation schema text comes from; null → 'auto'
   dbSchemaValue: string | null // the command or worktree-relative path per dbSchemaMode; null/blank = unset
+  dbSchemaNotes: string | null // free-form schema notes sent with the AI-generation prompt; null/blank = none
   previewMode: PreviewMode | null
   previewValue: string | null
   browserRules: BrowserRule[] // parsed on the wire (empty = none)
@@ -114,6 +115,7 @@ export type RepoConfigPatch = {
   dbUrlScript?: string
   dbSchemaMode?: DbSchemaMode | ''
   dbSchemaValue?: string
+  dbSchemaNotes?: string
   previewMode?: PreviewMode | ''
   previewValue?: string
   browserRules?: BrowserRule[]
