@@ -52,6 +52,14 @@ describe('matchesUrlPattern', () => {
     expect(matchesUrlPattern('http://app.test/a.b/x', 'a.b')).toBe(true)
     expect(matchesUrlPattern('http://app.test/aXb/x', 'a.b')).toBe(false) // '.' is literal, not regex
   })
+  it('anchors to the end of the URL with a trailing $', () => {
+    expect(matchesUrlPattern('http://localhost:3000/', '*/$')).toBe(true) // root, host/port irrelevant
+    expect(matchesUrlPattern('http://localhost:5173/', '*/$')).toBe(true)
+    expect(matchesUrlPattern('http://localhost:3000/login', '*/$')).toBe(false) // not root
+    expect(matchesUrlPattern('http://localhost:3000/', 'localhost:3000/$')).toBe(true)
+    expect(matchesUrlPattern('http://localhost:3000/login', 'localhost:3000/$')).toBe(false)
+    expect(matchesUrlPattern('http://localhost:3000/', '$')).toBe(false) // bare $ matches nothing
+  })
   it('never matches a blank pattern', () => {
     expect(matchesUrlPattern('http://localhost:3000/', '')).toBe(false)
     expect(matchesUrlPattern('http://localhost:3000/', '   ')).toBe(false)
