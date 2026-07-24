@@ -1,6 +1,7 @@
 import { onCleanup, onMount } from 'solid-js'
 import { Terminal } from '@xterm/xterm'
 import { FitAddon } from '@xterm/addon-fit'
+import { WebglAddon } from '@xterm/addon-webgl'
 import '@xterm/xterm/css/xterm.css'
 import { terminalApi } from './terminalClient'
 import { baseTheme, isAppDark, monoFont, watchTheme, xtermTheme } from './theme'
@@ -21,6 +22,15 @@ export default function TerminalSurface(props: { sessionId: string; onExit?: (ex
     const fit = new FitAddon()
     term.loadAddon(fit)
     term.open(host)
+    // WebGL renderer: the DOM renderer draws box-drawing/block-element glyphs (U+2500–U+259F) from
+    // the font, whose metrics leave gaps — TUI logos/borders (Claude's banner) shatter into stray
+    // bars and boxes. WebGL rasterizes those ranges as exact shapes. Must load after open(). On GPU
+    // context loss (sleep/reset) dispose it and fall back to DOM rather than freeze on a dead canvas.
+    try {
+      const webgl = new WebglAddon()
+      webgl.onContextLoss(() => webgl.dispose())
+      term.loadAddon(webgl)
+    } catch { /* no WebGL context (rare in Electron) — DOM renderer still works, just fuzzier */ }
     // fit() reaches into xterm's render service, which is torn down on dispose and momentarily
     // absent between a resize and the next paint. Guard so a ResizeObserver tick that lands during
     // teardown (or before the first paint) can't throw "reading 'dimensions' of undefined".
