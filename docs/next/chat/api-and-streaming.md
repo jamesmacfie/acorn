@@ -30,25 +30,10 @@ response schema field.
 | --- | --- | --- |
 | `GET` | `/api/chat/workspaces/:workspaceId` | Chat bootstrap: workspace summary, active/archived thread page, connection summaries, selected draft/default projection |
 | `GET` | `/api/chat/workspaces/:workspaceId/models` | Normalized selectable models grouped by connected provider; `?refresh=1` bypasses cache |
-| `GET` | `/api/chat/workspaces/:workspaceId/connections` | Write-only-secret connection summaries |
-| `POST` | `/api/chat/workspaces/:workspaceId/connections` | Validate and create provider connection |
-| `POST` | `/api/chat/workspaces/:workspaceId/connections/:id/test` | Health test |
-| `PUT` | `/api/chat/workspaces/:workspaceId/connections/:id/credential` | Rotate credential/config on stable id |
-| `PATCH` | `/api/chat/workspaces/:workspaceId/connections/:id` | Rename/enable/disable non-secret settings |
-| `DELETE` | `/api/chat/workspaces/:workspaceId/connections/:id` | Cancel dependent active runs, then disconnect; history remains |
 
-Connection create request:
-
-```ts
-type CreateChatConnectionRequest = {
-  providerId: string
-  label?: string
-  credentials: Record<string, string>
-  config?: Record<string, unknown>
-}
-```
-
-The response omits `credentials` and encrypted material. Rotation uses the same write-only field shape.
+Connection CRUD is not duplicated under `/api/chat`. Settings and other features use the shared
+`/api/integrations` lifecycle. Chat bootstrap may project eligible safe summaries, but credential
+values and ciphertext remain outside every chat contract.
 
 ### Threads and messages
 

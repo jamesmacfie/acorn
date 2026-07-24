@@ -1,11 +1,12 @@
 # Add a shared model-provider foundation
 
-Status: proposed
+Status: implemented
 Priority: P1
 Effort: L
 Risk: medium
 Category: architecture / feature foundation
 Planned at: `d39f7797e9b76eae582b596b194084dacbf0c351` on 2026-07-24
+Implemented on: 2026-07-24
 
 ## Summary
 
@@ -498,10 +499,15 @@ Work:
 Run from the repository root:
 
 ```bash
-pnpm --filter @acorn/desktop test -- \
-  src/core/server/integrations \
+pnpm --filter @acorn/desktop exec vitest run \
+  src/core/server/integrations/connectionRegistry.test.ts \
+  src/core/server/integrations/connections.test.ts \
+  src/core/server/integrations/conformance.test.ts \
   src/core/server/modelProviders \
-  src/plugins/model-providers
+  src/core/shared/modelProviders.test.ts \
+  src/plugins/model-providers/server/providers.test.ts \
+  src/core/boundaries.test.ts
+pnpm --filter @acorn/desktop db:check
 pnpm lint
 pnpm test
 pnpm --filter @acorn/desktop build

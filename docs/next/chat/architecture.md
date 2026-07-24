@@ -133,7 +133,7 @@ assembly, input budgeting, or provider error mapping.
 Owns durable behavior:
 
 - workspace/thread/message authorization and input validation;
-- provider connection lifecycle and encrypted credential lookup;
+- selection and use of the shared core model-provider connection lifecycle;
 - repositories over chat tables;
 - prompt assembly and attachment resolution;
 - the provider registry and adapters;
@@ -201,23 +201,24 @@ not the Acorn authority because:
 Adapters may retain provider request ids for diagnostics and optional optimization. They may not use a
 remote id as the only route to the next turn.
 
-## 7. Why not use the integration-provider registry?
+## 7. Provider foundation
 
 The shipped integration contract models external accounts that expose browsable/linkable/mirrored
 resources, external ids, task promotion, provider caches, and context formatting. A model provider is
 a generation runtime. Forcing OpenAI and Anthropic into that descriptor would require meaningless
 external-id, cached-item, resource, memory, and promotion stubs.
 
-Chat instead owns a `ChatProviderRegistry` because there are already two implementations and more are
-explicitly expected. It may reuse core secret encryption, credential-field UI primitives, error
-envelopes, request budget helpers, and registry mechanics; it must not pretend the domain contracts are
-identical.
+The shipped model-provider foundation already separates the core connection registry from that
+external-item registry and provides OpenAI/Anthropic connection descriptors plus one-shot generation
+adapters. Chat reuses those app-wide connections. Its `ChatProviderRegistry` adds only the richer
+model-catalog, attachment, and streaming contracts that chat requires; it must not duplicate
+credential storage or lifecycle.
 
 ## 8. State tiers and scopes
 
 | State | Tier | Scope | Authority |
 | --- | --- | --- | --- |
-| Provider connections and encrypted credentials | T2 | workspace | SQLite |
+| Provider connections and encrypted credentials | T2 | app user | core `integrations` SQLite rows |
 | Threads, messages, parts, runs, attachment metadata | T2 | workspace lineage | SQLite |
 | Attachment bytes | T2 | workspace lineage via metadata | chat object store |
 | Thread list/message query results | projection of T2 | workspace/thread | TanStack Query only |

@@ -157,33 +157,16 @@ canonical message part and must not be stored.
 
 ## 3. Tables
 
-### 3.1 `chat_provider_connections`
+### 3.1 Shared model-provider connections
 
-Workspace-scoped, encrypted model-provider connection.
+Chat adds no credential table. It references the app-wide, per-user `integrations` row managed by
+core. Those rows already contain the opaque connection id, provider id, encrypted `authRef`,
+non-secret config, capabilities, status, validation metadata, and timestamps.
 
-| Column | Type | Rules |
-| --- | --- | --- |
-| `id` | text PK | UUID |
-| `workspace_id` | text not null | application parent → `workspaces.id` |
-| `provider_id` | text not null | registry id such as `openai`, `anthropic` |
-| `label` | text not null | provider-seeded, user-editable later |
-| `auth_kind` | text not null | v1 `api-key`; open for future auth kinds |
-| `encrypted_credential` | text not null | `encryptSecret` output; never returned |
-| `config_json` | text not null default `{}` | adapter-codec-owned non-secret config such as base URL/project/org |
-| `status` | text not null | `connected`, `needs-auth`, `degraded`, `disabled` |
-| `last_validated_at` | integer nullable | milliseconds |
-| `last_error` | text nullable | stable `ChatErrorCode`/connection code |
-| `created_at` | integer not null | milliseconds |
-| `updated_at` | integer not null | milliseconds |
-
-Indexes:
-
-- `(workspace_id, provider_id, status)` for model catalog and settings;
-- `(workspace_id, updated_at)` for summaries.
-
-Do **not** add a unique constraint on `(workspace_id, provider_id)`. The v1 UI may offer at most one
-connection per provider, but the schema must allow later multiple accounts/base URLs without a table
-rebuild. Services enforce the temporary UI policy.
+Workspace/thread state may remember a connection id and model id as a preference. At use time the
+server must resolve the connection under the authenticated user, require a connected
+`textGeneration` capability, and tolerate a missing/disabled historical selection by asking the
+user to choose again.
 
 ### 3.2 `chat_threads`
 
@@ -387,12 +370,10 @@ User messages are inserted directly as `complete`.
 
 ### Connection state
 
-- Successful credential validation → `connected`.
-- Authentication rejection/decrypt failure → `needs-auth`.
-- Transient provider failure does not immediately invalidate the key; connection may become `degraded`
-  only after the connection health policy threshold.
-- User disable → `disabled`; active runs are cancelled first.
-- Credential rotation updates the existing connection id so thread references remain valid.
+Connection state is owned by the shared integration lifecycle. Successful validation yields
+`connected`; authentication rejection/decrypt failure yields `needs-auth`; transient provider
+failure may yield `degraded`; and user disable yields `disabled`. Credential rotation preserves the
+core connection id so thread preferences remain valid.
 
 ## 6. Atomicity
 
@@ -400,7 +381,7 @@ User messages are inserted directly as `complete`.
 
 1. verify thread exists and belongs to requested workspace;
 2. return existing run if `(threadId, clientTurnId)` exists;
-3. verify connection belongs to workspace and is usable;
+3. verify the selected app-wide connection belongs to the authenticated user and is usable;
 4. verify all attachments belong to workspace, are live, and are model-compatible;
 5. allocate two consecutive ordinals from `max(ordinal) + 1` inside the transaction;
 6. insert user message and ordered parts;
@@ -481,4 +462,5 @@ The implementation must:
 - extend workspace deletion to cancel chat runs and remove chat-owned rows/objects;
 - extend the storage-footprint report to count chat database/object bytes separately from cache blobs;
 - add orphan-object reconciliation that is safe to rerun;
-- never print or snapshot `encrypted_credential` in route responses or tests.
+- never print or snapshot core connection ciphertext or plaintext credentials in route responses or
+  tests.

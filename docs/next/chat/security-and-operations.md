@@ -37,19 +37,23 @@ Do not accept a workspace path from the renderer as authority. Resolve the persi
 
 ## Provider credentials
 
-API keys are workspace-scoped secrets. The renderer may read only summaries such as connection ID, provider, label, status, and key suffix. It must never receive the full secret after submission.
+API keys are app-wide per-user secrets managed by the shared core integration lifecycle. The renderer
+may read only summaries such as connection ID, provider, label, and status. It must never receive the
+full secret or a secret-derived suffix after submission.
 
 Credential requirements:
 
 - encrypt at rest with the existing server credential facility or a platform-backed key-encryption key;
-- bind authenticated encryption additional data to credential purpose, workspace ID, connection ID, and provider ID;
+- reuse core `integrations` encryption and its authenticated connection identity;
 - decrypt only immediately before constructing a provider client;
 - never place keys in URLs, logs, notifications, query caches, error details, telemetry, or persisted renderer slices;
 - overwrite a key by creating a new encrypted version and then retiring the old ciphertext;
 - removing a connection destroys its secret but preserves local chat history and model provenance;
 - provider tests use a minimal metadata/model request and a bounded timeout.
 
-If Acorn does not yet have a production-grade credential service, that service is a prerequisite rather than an excuse to store plaintext in SQLite. Development-only fallback behavior must fail loudly and must not migrate into packaged builds.
+Chat must not add a fallback credential store. If the shared integration connection cannot be
+resolved or decrypted, the run fails with the shared safe provider error and Settings owns
+reauthentication.
 
 ## External data disclosure
 

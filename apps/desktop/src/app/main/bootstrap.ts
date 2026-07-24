@@ -220,6 +220,7 @@ export async function bootstrap({ dataDir, origin, createWindow }: BootstrapOpti
         { id: 'workflows', available: true },
         { id: 'rollbar', available: true },
         { id: 'linear', available: true },
+        { id: 'model-providers', available: true },
         { id: 'terminal', available: true },
         { id: 'github', available: true },
         { id: 'preview', available: true },
