@@ -1,7 +1,13 @@
 import { createMemo, createSignal, For, Show } from 'solid-js'
 import { createQuery, useQueryClient } from '@tanstack/solid-query'
 import type { PublicIntegrationProvider } from '../../shared/integrations'
-import { connectIntegration, deleteIntegration, rotateIntegration, testIntegration } from '../../../plugins/github/client/mutations'
+import {
+  connectIntegration,
+  deleteIntegration,
+  rotateIntegration,
+  setIntegrationDisabled,
+  testIntegration,
+} from '../integrations/integrationClient'
 import { integrationsKey, integrationsOptions } from '../queries'
 
 function IntegrationLogo(props: { provider: PublicIntegrationProvider | undefined }) {
@@ -18,7 +24,13 @@ export default function IntegrationsSettings() {
   const providers = () => status.data?.providers ?? []
   const integrations = () => status.data?.integrations ?? []
   const byId = createMemo(() => new Map(providers().map((provider) => [provider.id, provider])))
-  const connectable = () => providers().filter((provider) => provider.connection.connectable)
+  const connectionCount = (providerId: string) =>
+    integrations().filter((connection) => connection.providerId === providerId).length
+  const connectable = () => providers().filter((provider) =>
+    provider.connection.connectable &&
+    (provider.connection.maxConnections === undefined ||
+      connectionCount(provider.id) < provider.connection.maxConnections),
+  )
 
   const [adding, setAdding] = createSignal(false)
   const [rotationId, setRotationId] = createSignal<string | null>(null)
@@ -73,6 +85,16 @@ export default function IntegrationsSettings() {
     }
   }
 
+  const setDisabled = async (id: string, disabled: boolean) => {
+    setBusy(true)
+    try {
+      await setIntegrationDisabled(id, disabled)
+      await refresh()
+    } finally {
+      setBusy(false)
+    }
+  }
+
   return (
     <div class="integrations">
       <div class="integrations-list">
@@ -94,6 +116,9 @@ export default function IntegrationsSettings() {
                   <Show when={provider()?.connection.disconnectable} fallback={<span class="integration-badge">Connected</span>}>
                     <button type="button" class="integration-remove" onClick={() => void test(connection.id)} disabled={busy()}>Test</button>
                     <button type="button" class="integration-remove" onClick={() => { setProviderId(connection.providerId); setRotationId(connection.id); setCredentials({}); setAdding(true) }} disabled={busy()}>Rotate</button>
+                    <button type="button" class="integration-remove" onClick={() => void setDisabled(connection.id, connection.status !== 'disabled')} disabled={busy()}>
+                      {connection.status === 'disabled' ? 'Enable' : 'Disable'}
+                    </button>
                     <button type="button" class="integration-remove" onClick={() => void disconnect(connection.id)} disabled={busy()}>Disconnect</button>
                   </Show>
                 </div>

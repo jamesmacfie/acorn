@@ -5,13 +5,8 @@ import { terminalApi } from '../../terminal/client/terminalClient'
 import {
   autoMergeRoute,
   createPullRoute,
-  type ConnectIntegrationRequest,
-  type Integration,
   type LinearCommentRequest,
   linearCommentsRoute,
-  integrationsRoute,
-  integrationRoute,
-  integrationTestRoute,
   pinsRoute,
   prefsRoute,
   pullRoute,
@@ -71,20 +66,6 @@ export const submitReview = (o: string, r: string, n: string, event: string, bod
 
 export const addLabel = (o: string, r: string, n: string, name: string) => post(pullRoute(o, r, n, 'labels'), { name })
 
-// Provider descriptors define write-only credential fields; core validates, encrypts, and stores.
-export const connectIntegration = (providerId: string, credentials: Record<string, string>) =>
-  post<{ integration: Integration }>(integrationsRoute, { providerId, credentials } satisfies ConnectIntegrationRequest)
-export const rotateIntegration = (id: string, credentials: Record<string, string>) =>
-  writeJson<{ integration: Integration }>(integrationRoute(id), {
-    method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ credentials }),
-  })
-export const testIntegration = (id: string) => post<{ integration: Integration }>(integrationTestRoute(id))
-export const deleteIntegration = async (id: string) => {
-  const res = await fetch(integrationRoute(id), { method: 'DELETE' })
-  if (!res.ok) throw new ApiError(await apiError(res, `${res.status}`), res.status)
-}
 // Add a comment / threaded reply to a Linear ticket; caller refetches the issue after.
 export const postLinearComment = (identifier: string, body: string, parentId?: string, connectionId?: string) =>
   post<{ ok: true }>(linearCommentsRoute(identifier, connectionId), { body, parentId } satisfies LinearCommentRequest)

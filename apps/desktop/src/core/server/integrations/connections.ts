@@ -6,6 +6,7 @@ import type { AppDatabase } from '../db'
 import { schema } from '../db'
 import { cascadeDeleteIntegration } from '../db/cascade'
 import { decryptSecret, encryptSecret } from '../session'
+import { connectionProviderRegistry } from './connectionRegistry'
 import { integrationProviderRegistry } from './registry'
 import { providerRequestScheduler } from './budgetRuntime'
 import { ProviderOperationError, type ProviderCredentials } from './types'
@@ -20,8 +21,11 @@ const json = <T>(raw: string, fallback: T): T => {
   }
 }
 
-const resolvedCapabilities = (row: StoredConnection): Integration['capabilities'] => {
-  const declared = integrationProviderRegistry.get(row.provider)?.capabilities ?? {}
+const resolvedCapabilities = (
+  row: StoredConnection,
+  providers = connectionProviderRegistry,
+): Integration['capabilities'] => {
+  const declared = providers.get(row.provider)?.capabilities ?? {}
   const defaults = Object.fromEntries(
     Object.entries(declared)
       .filter(([, value]) => value !== false && value !== undefined && value !== 'none')
@@ -45,8 +49,11 @@ export const connectionSummary = (row: StoredConnection): Integration => ({
   lastError: (row.lastError as ProviderErrorCode | null) ?? undefined,
 })
 
-export const connectionHasCapability = (row: StoredConnection, capability: string): boolean =>
-  resolvedCapabilities(row)[capability] === 'available'
+export const connectionHasCapability = (
+  row: StoredConnection,
+  capability: string,
+  providers = connectionProviderRegistry,
+): boolean => resolvedCapabilities(row, providers)[capability] === 'available'
 
 export const githubConnectionSummary = (login: string): Integration => ({
   id: 'github',
@@ -70,7 +77,7 @@ export async function listConnections(db: AppDatabase, userId: string): Promise<
 }
 
 export async function listProviderConnections(db: AppDatabase, userId: string, providerId: string): Promise<StoredConnection[]> {
-  integrationProviderRegistry.require(providerId)
+  connectionProviderRegistry.require(providerId)
   return db
     .select()
     .from(schema.integrations)
@@ -92,32 +99,43 @@ export async function connectProvider(
   request: ConnectIntegrationRequest,
   encryptionKey: string,
 ): Promise<Integration> {
-  const provider = integrationProviderRegistry.get(request.providerId)
+  const provider = connectionProviderRegistry.get(request.providerId)
   if (!provider?.connection.connectable) throw new ProviderOperationError('provider_bad_config', 400)
-  const validated = await providerRequestScheduler.run(provider.id, `connect:${userId}`, provider.budgets, () =>
-    provider.connection.validate(request.credentials),
+  return providerRequestScheduler.run(
+    provider.id,
+    `connect:${userId}`,
+    { ...provider.budgets, maxConcurrentRequestsPerConnection: 1 },
+    async () => {
+      if (provider.connection.maxConnections !== undefined) {
+        const existing = await listProviderConnections(db, userId, provider.id)
+        if (existing.length >= provider.connection.maxConnections) {
+          throw new ProviderOperationError('provider_bad_config', 400)
+        }
+      }
+      const validated = await provider.connection.validate(request.credentials)
+      const normalized = provider.connection.normalize(request.credentials, validated)
+      const now = Date.now()
+      const row: StoredConnection = {
+        id: randomUUID(),
+        userId,
+        provider: provider.id,
+        label: normalized.label,
+        authRef: await encryptSecret(normalized.secret, encryptionKey),
+        authKind: provider.connection.authKind,
+        account: normalized.account ? JSON.stringify(normalized.account) : null,
+        scopes: JSON.stringify(normalized.scopes),
+        capabilities: JSON.stringify(normalized.capabilities),
+        config: JSON.stringify(normalized.config ?? {}),
+        status: 'connected',
+        lastValidatedAt: now,
+        lastError: null,
+        createdAt: now,
+        updatedAt: now,
+      }
+      await db.insert(schema.integrations).values(row)
+      return connectionSummary(row)
+    }
   )
-  const normalized = provider.connection.normalize(request.credentials, validated)
-  const now = Date.now()
-  const row: StoredConnection = {
-    id: randomUUID(),
-    userId,
-    provider: provider.id,
-    label: normalized.label,
-    authRef: await encryptSecret(normalized.secret, encryptionKey),
-    authKind: provider.connection.authKind,
-    account: normalized.account ? JSON.stringify(normalized.account) : null,
-    scopes: JSON.stringify(normalized.scopes),
-    capabilities: JSON.stringify(normalized.capabilities),
-    config: JSON.stringify(normalized.config ?? {}),
-    status: 'connected',
-    lastValidatedAt: now,
-    lastError: null,
-    createdAt: now,
-    updatedAt: now,
-  }
-  await db.insert(schema.integrations).values(row)
-  return connectionSummary(row)
 }
 
 export async function rotateConnection(
@@ -129,7 +147,7 @@ export async function rotateConnection(
 ): Promise<Integration> {
   const row = await getConnection(db, userId, id)
   if (!row) throw new ProviderOperationError('provider_not_connected', 404)
-  const provider = integrationProviderRegistry.require(row.provider)
+  const provider = connectionProviderRegistry.require(row.provider)
   const validated = await providerRequestScheduler.run(provider.id, row.id, provider.budgets, () =>
     provider.connection.validate(request.credentials),
   )
@@ -174,7 +192,7 @@ export async function testConnection(db: AppDatabase, userId: string, id: string
     await db.update(schema.integrations).set({ status: 'needs-auth', lastValidatedAt: now, lastError: 'provider_secret_unreadable', updatedAt: now }).where(eq(schema.integrations.id, id))
     throw new ProviderOperationError('provider_secret_unreadable', 400)
   }
-  const provider = integrationProviderRegistry.require(row.provider)
+  const provider = connectionProviderRegistry.require(row.provider)
   const health = await providerRequestScheduler.run(provider.id, row.id, provider.budgets, () =>
     provider.connection.test(secret, json(row.config, {})),
   )
@@ -199,7 +217,7 @@ export async function setConnectionDisabled(db: AppDatabase, userId: string, id:
 export async function disconnectConnection(db: AppDatabase, userId: string, id: string): Promise<void> {
   const row = await getConnection(db, userId, id)
   if (!row) return
-  const provider = integrationProviderRegistry.require(row.provider)
+  const provider = connectionProviderRegistry.require(row.provider)
   if (!provider.connection.disconnectable) throw new ProviderOperationError('provider_bad_config', 400)
   await cascadeDeleteIntegration(db, userId, id)
 }
@@ -211,7 +229,7 @@ export async function forEachConnection<T>(
   encryptionKey: string,
   visit: (connection: StoredConnection, secret: string) => Promise<T | undefined>,
 ): Promise<T[]> {
-  integrationProviderRegistry.require(providerId)
+  connectionProviderRegistry.require(providerId)
   const rows = await listProviderConnections(db, userId, providerId)
   const out: T[] = []
   for (const row of rows) {
@@ -239,7 +257,9 @@ export function externalRefForConnection(row: StoredConnection, identifier: stri
     url: input?.url,
     locator: input?.locator,
   }
-  const parsed = integrationProviderRegistry.require(row.provider).externalIds.parse(fallback, fallback)
+  const provider = integrationProviderRegistry.get(row.provider)
+  if (!provider) throw new ProviderOperationError('provider_bad_config', 400)
+  const parsed = provider.externalIds.parse(fallback, fallback)
   if (!parsed || parsed.connectionId !== row.id || parsed.displayId !== identifier) throw new ProviderOperationError('provider_bad_config', 400)
   return parsed
 }
