@@ -115,7 +115,7 @@ export default function RollbarItemPanel(props: {
             </Show>
           </span>
         </span>
-        <button type="button" class="new-pr-btn" disabled={refreshing()} onClick={() => void refreshActiveTab()}>{refreshing() ? 'Refreshing…' : 'Refresh tab'}</button>
+        <button type="button" class="section-refresh" style={{ 'margin-left': 'auto' }} title="Refresh tab" aria-label="Refresh tab" disabled={refreshing()} onClick={() => void refreshActiveTab()}>{refreshing() ? '...' : '↻'}</button>
       </div>
 
       <Show when={(props.targets?.length ?? 0) > 1}>

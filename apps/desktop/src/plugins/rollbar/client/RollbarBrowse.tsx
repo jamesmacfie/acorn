@@ -166,10 +166,10 @@ export default function RollbarBrowse() {
                 {pickerOpening() ? 'Refreshing…' : `Projects${linkedProjects().length ? ` (${linkedProjects().length})` : ''}`}
               </button>
             </Show>
-            <button type="button" class="new-pr-btn" disabled={!linkedProjects().length || items.isFetching} onClick={() => void items.refetch()}>
-              {items.isFetching ? 'Refreshing…' : 'Refresh'}
-            </button>
           </span>
+          <button type="button" class="section-refresh" style={{ 'margin-left': 'auto' }} title="Refresh" aria-label="Refresh" disabled={!linkedProjects().length || items.isFetching} onClick={() => void items.refetch()}>
+            {items.isFetching ? '...' : '↻'}
+          </button>
         </div>
         <Show when={pickerError()}><div class="action-error" role="alert">{pickerError()}</div></Show>
 

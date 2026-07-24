@@ -263,11 +263,9 @@ export default function DockerBrowse() {
       <section class="pane pane-left docker-browse">
         <div class="section-header">
           Docker{dockerInfo()?.available ? ` · ${runningCount()} running` : ''}
-          <span class="docker-header-actions">
-            <button type="button" class="new-pr-btn" disabled={loading()} onClick={() => void refreshDocker()}>
-              {loading() ? 'Refreshing…' : 'Refresh'}
-            </button>
-          </span>
+          <button type="button" class="section-refresh" style={{ 'margin-left': 'auto' }} title="Refresh" aria-label="Refresh" disabled={loading()} onClick={() => void refreshDocker()}>
+            {loading() ? '...' : '↻'}
+          </button>
         </div>
         <Show when={loadError()}><div class="action-error" role="alert">{loadError()}</div></Show>
 
