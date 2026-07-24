@@ -6,14 +6,18 @@ const electron = vi.hoisted(() => {
   class FakeWebContents {
     private listeners = new Map<string, Listener[]>()
     destroyed = false
+    devToolsOpened = false
     loading = false
     url = ''
     loadURL = vi.fn(async (url: string) => { this.url = url })
     close = vi.fn(() => { this.destroyed = true })
+    closeDevTools = vi.fn(() => { this.devToolsOpened = false })
+    openDevTools = vi.fn((_options?: unknown) => { this.devToolsOpened = true })
     reload = vi.fn()
     stop = vi.fn()
     getURL = () => this.url
     isDestroyed = () => this.destroyed
+    isDevToolsOpened = () => this.devToolsOpened
     isLoading = () => this.loading
     setWindowOpenHandler = vi.fn()
     navigationHistory = {
@@ -134,5 +138,22 @@ describe('previewService lifecycle', () => {
     const replacementView = electron.FakeWebContentsView.instances[1]
     expect(replacementWindow.contentView.addChildView).toHaveBeenCalledWith(replacementView)
     expect(browserBindings.bindBrowserContents).toHaveBeenCalledTimes(2)
+  })
+
+  it('toggles detached devtools only for a preview owned by the requesting window', () => {
+    const owner = new electron.FakeBrowserWindow()
+    const otherWindow = new electron.FakeBrowserWindow()
+    ensure(owner, 'task-1', 'http://localhost:3000')
+    const view = electron.FakeWebContentsView.instances[0]
+    const command = electron.eventHandlers.get('preview:command')
+
+    command?.(eventFor(otherWindow), { taskId: 'task-1', action: 'devtools' })
+    expect(view.webContents.openDevTools).not.toHaveBeenCalled()
+
+    command?.(eventFor(owner), { taskId: 'task-1', action: 'devtools' })
+    expect(view.webContents.openDevTools).toHaveBeenCalledWith({ mode: 'detach' })
+
+    command?.(eventFor(owner), { taskId: 'task-1', action: 'devtools' })
+    expect(view.webContents.closeDevTools).toHaveBeenCalledOnce()
   })
 })

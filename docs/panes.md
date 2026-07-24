@@ -253,7 +253,7 @@ Source: `plugins/rollbar/client/RollbarPane.tsx` + `RollbarItemPanel.tsx`.
 ### `preview` — browser preview (agent-drivable)
 
 A main-owned `WebContentsView` onto the workspace's / run-target's resolved URL, wrapped in browser chrome —
-back / forward / stop-reload / home + an editable URL bar + a loading spinner
+back / forward / stop-reload / home + an editable URL bar + preview-scoped DevTools + a loading spinner
 (`plugins/preview/client/PreviewPane.tsx`). The home
 URL (`previewUrl()` in `TaskView.tsx`) resolves in priority order: a layout recipe's
 `browser=run:<id>` resolution → the default run target's resolved URL → the legacy per-workspace
