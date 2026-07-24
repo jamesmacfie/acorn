@@ -34,7 +34,9 @@ an edge requires removing its baseline entry.
 | UI slots, notices, pollers, themes | `core/client/registries/` | `app/client/activate.ts` |
 | HTTP routes (internal) | `core/server/routeRegistry.ts` | `app/server/routes.ts` |
 | Public API endpoints | `core/server/publicApi/` (schema-first `PluginApiContribution`) | `app/server/publicApi.ts` |
-| Integration providers | `core/server/integrations/registry.ts` | `app/server/providers.ts` |
+| Provider connections | `core/server/integrations/connectionRegistry.ts` | `app/server/providers.ts` |
+| External-item integrations | `core/server/integrations/registry.ts` | `app/server/providers.ts` |
+| Model generation adapters | `core/server/modelProviders/registry.ts` | `app/server/providers.ts` |
 | Agent tools and context | `core/server/agentTools/` | `app/main/{agentToolsWiring,contextSectionsWiring}.ts` |
 | Agent profiles | `core/main/agentProfiles/` | `app/main/agentProfiles.ts` |
 | Workflow steps, policies, triggers | `plugins/workflows/main/workflowRegistry.ts` | `app/main/workflowWiring.ts` |

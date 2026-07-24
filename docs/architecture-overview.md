@@ -106,7 +106,8 @@ Workspace ("Runn", "Acorn")            ← group of repos, picked in the top bar
   agent sessions.
 
 **Maturity.** PR review (list / detail / diff / write actions), Workspaces,
-Tasks, the TabRail, panes, notifications, integrations (Linear live, Rollbar),
+Tasks, the TabRail, panes, notifications, integrations (Linear live, Rollbar), shared model-provider
+connections (OpenAI and Anthropic),
 settings, the command palette, and the file finder are shipped and default-on.
 The **terminal drawer, agent sessions, run targets, and workflows** are
 desktop-only and always on when the Electron terminal capability is present

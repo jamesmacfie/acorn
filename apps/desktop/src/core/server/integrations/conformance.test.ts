@@ -1,11 +1,29 @@
 import { describe, expect, it } from 'vitest'
 import '../../../app/server/providers'
+import { connectionProviderRegistry } from './connectionRegistry'
 import { integrationProviderRegistry } from './registry'
+
+describe('connection provider conformance', () => {
+  for (const provider of connectionProviderRegistry.list()) {
+    describe(provider.id, () => {
+      it('publishes safe descriptor metadata and executable connection behavior', () => {
+        const publicJson = JSON.stringify(provider.toPublic())
+        expect(publicJson).not.toMatch(/authRef|accessToken|refreshToken|plaintext-key/i)
+        expect(provider.budgets.maxConcurrentRequests).toBeGreaterThan(0)
+        expect(provider.budgets.maxConcurrentRequestsPerConnection).toBeGreaterThan(0)
+        expect(provider.connection.validate).toBeTypeOf('function')
+        expect(provider.connection.normalize).toBeTypeOf('function')
+        expect(provider.connection.test).toBeTypeOf('function')
+      })
+    })
+  }
+})
 
 describe('integration provider conformance', () => {
   for (const provider of integrationProviderRegistry.list()) {
     describe(provider.id, () => {
       it('publishes descriptor metadata without secret material', () => {
+        expect(connectionProviderRegistry.get(provider.id)).toBe(provider)
         const publicJson = JSON.stringify(provider.toPublic())
         expect(publicJson).not.toMatch(/authRef|accessToken|refreshToken|secret/i)
         expect(provider.budgets.maxConcurrentRequests).toBeGreaterThan(0)

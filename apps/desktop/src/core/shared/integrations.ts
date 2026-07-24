@@ -4,6 +4,7 @@ export type IntegrationProviderKind =
   | 'error-tracker'
   | 'doc-system'
   | 'observability'
+  | 'model-provider'
   | 'generic'
 
 export type IntegrationAuthKind = 'github-session' | 'api-key' | 'oauth' | 'installation' | 'none'
@@ -33,6 +34,7 @@ export type ProviderCapabilities = Record<string, boolean | string | undefined> 
   contextFormat?: boolean
   webhooks?: boolean
   userFeed?: boolean
+  textGeneration?: boolean
 }
 
 export type CredentialField = {
@@ -65,6 +67,7 @@ export type PublicIntegrationProvider = {
     fields: CredentialField[]
     connectable: boolean
     disconnectable: boolean
+    maxConnections?: number
   }
   capabilities: ProviderCapabilities
 }

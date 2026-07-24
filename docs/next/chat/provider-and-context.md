@@ -57,26 +57,25 @@ type NormalizedChatStreamEvent =
   | { type: 'usage'; inputTokens?: number; outputTokens?: number }
   | { type: 'response-complete'; stopReason?: string }
 
-type ChatProviderConnectionInput = {
-  credential: string
+type ChatProviderRuntimeInput = {
+  secret: string
   config: unknown
 }
 
 interface ChatProviderAdapter {
-  readonly id: string
-  readonly label: string
-  readonly credentialFields: CredentialField[]
-  validateConnection(input: ChatProviderConnectionInput): Promise<ChatConnectionHealth>
-  parseConnectionConfig(raw: unknown): ChatProviderConfig
-  listModels(input: ChatProviderConnectionInput): Promise<ChatModelDescriptor[]>
-  stream(input: ChatProviderConnectionInput, request: CanonicalChatRequest): AsyncIterable<NormalizedChatStreamEvent>
+  readonly providerId: string
+  listModels(input: ChatProviderRuntimeInput): Promise<ChatModelDescriptor[]>
+  stream(input: ChatProviderRuntimeInput, request: CanonicalChatRequest): AsyncIterable<NormalizedChatStreamEvent>
   mapError(error: unknown): ChatProviderFailure
 }
 ```
 
-The registry rejects duplicate provider ids, missing streaming support, invalid model descriptors, and
-adapters whose credential/config public projection could expose a secret. A fake provider implements
-the same interface and drives most tests/E2E.
+The shipped `model-providers` plugin already owns app-wide connection descriptors, credential
+validation, non-streaming text generation, and the OpenAI/Anthropic SDK boundary. Chat extends that
+provider id with model-catalog and streaming behavior; it does not define another credential
+descriptor or connection table. The chat registry rejects duplicate provider ids, missing streaming
+support, and invalid model descriptors. A fake provider implements the same interface and drives most
+tests/E2E.
 
 ## 2. SDK decision
 
@@ -226,18 +225,19 @@ be dated, versioned, and clearly approximate.
 
 ## 6. Credential lifecycle
 
-The chat settings flow is workspace-specific:
+Chat reuses the app-wide lifecycle at `/api/integrations`:
 
-1. Renderer submits credential fields once to a workspace connection endpoint.
-2. Server adapter validates with a cheapest safe request (prefer model-list/account endpoint over a
-   billable generation when possible).
-3. Server normalizes non-secret config and encrypts the credential with `SESSION_ENC_KEY`.
-4. Renderer receives only connection id/provider/label/status/model-catalog summary.
-5. Test, rotate, disable, and disconnect act on the stable connection id.
+1. Settings submits write-only provider fields to the core connection endpoint.
+2. The shipped provider descriptor validates with a non-generating model-list request.
+3. Core normalizes non-secret config and encrypts the key with `SESSION_ENC_KEY`.
+4. The renderer receives only safe provider/connection summaries.
+5. Test, rotate, disable, and disconnect act on the stable core connection id.
 
-Rotation replaces encrypted credential/config on the same row. Threads/runs keep their connection id
-and historical provider/model strings. Disconnect is blocked while a run is active, then soft-deletes
-or removes the connection after cancellation; historical messages remain readable.
+Chat bootstrap filters those summaries to connected `model-provider` rows with
+`textGeneration: available`. A workspace/thread stores only its selected connection and model.
+Before a run, chat resolves the connection under the authenticated user and delegates decryption and
+request scheduling to the core model-provider runtime or its future streaming sibling. Historical
+provider/model strings remain readable after a connection is disabled or removed.
 
 Base URL/custom OpenAI-compatible endpoints are deliberately deferred. When added, they belong to
 adapter config and must pass URL/credential/SSRF validation. Do not smuggle them into `providerId` or

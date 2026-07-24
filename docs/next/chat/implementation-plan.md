@@ -178,8 +178,11 @@ Add official `openai` and `@anthropic-ai/sdk` packages after checking their curr
 1. Add the `ChatProviderAdapter`, model capability, canonical request, and normalized event contracts in [provider-and-context.md](provider-and-context.md).
 2. Build a deterministic fake adapter supporting deltas, delays, cancellation, transient/auth/rate errors, and malformed/out-of-order test events.
 3. Implement `ChatRequestAssembler` with `contextItems: []` in version one. It owns history budgeting, attachment authorization/materialization, and the input manifest.
-4. Implement connection storage through the credential service. If no suitable encrypted credential service exists, implement and security-review it before persisting real keys.
-5. Implement OpenAI Responses and Anthropic Messages adapters using their official SDKs. Pin intentional SDK behavior: timeouts, retries, cancellation signal, user agent, and stream error mapping.
+4. Reuse the shipped app-wide core integration connections and model-provider registry; store only
+   workspace/thread connection and model preferences in chat.
+5. Extend the shipped OpenAI Responses and Anthropic Messages adapters with chat streaming and
+   attachment behavior. Pin intentional SDK behavior: timeouts, retries, cancellation signal, user
+   agent, and stream error mapping.
 6. Implement a server-owned model catalog with capability flags and short-lived model discovery cache. Unknown historical model IDs remain displayable.
 
 ### Tests

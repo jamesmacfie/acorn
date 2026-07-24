@@ -19,6 +19,10 @@ import type { Cached, RefreshResult } from '../sync/engine'
 
 export type ProviderCredentials = Record<string, string>
 export type CacheState = 'fresh' | 'stale' | 'missing' | 'malformed' | 'deleted'
+export type ProviderRequestBudgets = Pick<
+  ProviderBudgets,
+  'maxConcurrentRequests' | 'maxConcurrentRequestsPerConnection'
+>
 
 export type NormalizedConnection = {
   secret: string
@@ -31,15 +35,18 @@ export type NormalizedConnection = {
 
 export type ConnectionHealth = { ok: true } | { ok: false; error: ProviderErrorCode }
 
-export type ConnectionContract<TValidated = unknown> = {
+export type TypedConnectionContract<TValidated> = {
   authKind: IntegrationAuthKind
   fields: CredentialField[]
   connectable: boolean
   disconnectable: boolean
+  maxConnections?: number
   validate(credentials: ProviderCredentials): Promise<TValidated>
   normalize(credentials: ProviderCredentials, validated: TValidated): NormalizedConnection
   test(secret: string, config: unknown): Promise<ConnectionHealth>
 }
+
+export type ConnectionContract = TypedConnectionContract<unknown>
 
 export type CachedExternalItem<TSummary = unknown, TDetail = unknown> = {
   ref: ExternalRef
@@ -119,14 +126,26 @@ export type ProviderRouteContribution = {
   router: Hono<AppEnv>
 }
 
-export type IntegrationProviderContribution = {
+export type ConnectionProviderContribution = {
   id: string
   label: string
   glyph: string
   kind: IntegrationProviderKind
-  connection: ConnectionContract<any>
-  externalIds: ExternalIdContract
+  connection: ConnectionContract
   capabilities: ProviderCapabilities
+  budgets: ProviderRequestBudgets
+  toPublic(): PublicIntegrationProvider
+}
+
+export type ConnectionProviderDefinition<TValidated> = Omit<
+  ConnectionProviderContribution,
+  'connection' | 'toPublic'
+> & {
+  connection: TypedConnectionContract<TValidated>
+}
+
+export type IntegrationProviderContribution = ConnectionProviderContribution & {
+  externalIds: ExternalIdContract
   resources: MirroredResourceContribution<any, any>[]
   codec?: CachedItemCodec<any, any, any>
   taskContext?: LinkContextFormatter
@@ -140,7 +159,13 @@ export type IntegrationProviderContribution = {
     summary: unknown
     detail?: unknown
   }
-  toPublic(): PublicIntegrationProvider
+}
+
+export type IntegrationProviderDefinition<TValidated> = Omit<
+  IntegrationProviderContribution,
+  'connection' | 'toPublic'
+> & {
+  connection: TypedConnectionContract<TValidated>
 }
 
 export class ProviderOperationError extends Error {

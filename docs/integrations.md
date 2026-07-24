@@ -1,36 +1,44 @@
-# Integration providers
+# Integration and model providers
 
-Acorn models Linear, Rollbar, and future third-party systems as integration-provider
-contributions. Core owns connection storage, lifecycle, link integrity, and cache scheduling;
-providers own authentication policy, cached-data codecs, context formatting, reference discovery,
-mutations, capabilities, and operating budgets.
+Acorn separates provider connections from the behavior a provider contributes. Core owns encrypted
+connection storage and lifecycle for every credentialed provider. External-item integrations such
+as Linear and Rollbar additionally own link integrity, mirrored resources, context formatting,
+reference discovery, and mutations. Model providers such as OpenAI and Anthropic instead contribute
+text generation behind a server-only runtime.
 
 The implementation lives under `apps/desktop/src/core/server/integrations/`. Public cross-process types
 live in `apps/desktop/src/core/shared/integrations.ts`; client source, pane, and link contributions live in
 `apps/desktop/src/app/client/providerContributions.tsx`.
 
-## Provider descriptor and registry
+## Connection, integration, and model registries
 
-Every provider registers one `IntegrationProviderContribution` with:
+Every provider first registers one `ConnectionProviderContribution` with:
 
 - identity metadata (`id`, label, glyph, and kind);
-- a connection contract (`fields`, `validate`, `normalize`, `test`);
+- a connection contract (`fields`, `validate`, `normalize`, `test`, and an optional connection-count
+  limit);
 - open-ended capabilities;
+- provider/per-connection request concurrency budgets;
+- a safe public projection used by Settings and connection discovery.
+
+An external-item provider extends that base as an `IntegrationProviderContribution` with:
+
 - executable mirrored-resource descriptors (`key`, `read`, `refresh`) and a versioned cache codec;
 - optional linked-context formatter, reference resolver, and mutations;
-- concurrency, pagination, cache, context, backoff, and resolution budgets;
+- pagination, cache, context, backoff, and resolution budgets;
 - memory-evidence policy. Providers may propose evidence, but `acceptedWrites` is structurally
   false—accepted memory remains human-gated.
 
-Activation rejects duplicate providers and inconsistent declarations. Writable comments require
-an invalidating mutation; context formatting requires a codec and formatter; browse/promotion
-requires a mirrored resource; every codec supplies table-driven conformance fixtures. Client
-provider activation performs the corresponding provider-id cross-checks for source, pane, and
-content-link contributions.
+The connection registry rejects duplicate providers/credential fields, invalid limits, and public
+descriptors that differ from the safe projection. The external-item registry separately enforces
+resource/link obligations. The model registry accepts only adapters whose matching connection
+provider declares `textGeneration`.
 
 GitHub is registered as the non-connectable `identity` provider. Its connection is synthesized from
 the authenticated session and cannot be rotated or disconnected. Linear and Rollbar are stored,
-multi-row providers: each account/workspace/project connection has an opaque stable id.
+multi-row providers: each account/workspace/project connection has an opaque stable id. OpenAI and
+Anthropic are app-wide `model-provider` connections, limited to one connection each by reversible
+service/UI policy; the table remains multi-row.
 
 ## Connection identity and lifecycle
 
@@ -48,6 +56,7 @@ multi-row providers: each account/workspace/project connection has an opaque sta
 Credential forms submit write-only values. A descriptor validates and normalizes them; the core
 connection service encrypts and writes the result. List/test/connect responses use `Integration`
 summaries and never include `authRef`, credential values, or wholesale upstream responses.
+Settings renders the same descriptor fields for external integrations and model providers.
 
 Lifecycle routes:
 
@@ -68,6 +77,33 @@ server process. Mirrored reads use `runProviderResource` instead: core resolves 
 connection, reads cache before credentials, suppresses outbound work for disabled/needs-auth rows,
 then projects the descriptor through the shared sync engine. This is why reauthentication can
 still serve stale linked detail without leaking one account's cache or backoff state into another.
+
+## Model-provider runtime
+
+`plugins/model-providers/server/` contains the official OpenAI and Anthropic SDK adapters. SDK types
+and wire objects stop there. The adapters validate/test API keys with model-list requests and
+provide one-shot text generation through `core/server/modelProviders/`.
+
+`generateTextForConnection` accepts a user id, opaque connection id, bounded provider-neutral input,
+and the server encryption key. It:
+
+1. resolves the connection under that user;
+2. requires a connected `textGeneration` capability;
+3. decrypts immediately before the call;
+4. schedules by provider and connection;
+5. propagates cancellation and a bounded timeout;
+6. maps provider failures to the shared provider error vocabulary;
+7. returns text, provider/connection/model identity, and safe usage counts.
+
+There is intentionally no generic generation HTTP or public-automation endpoint. A consuming plugin
+owns its authenticated feature route, prompt, data-disclosure policy, validation, and UI, then calls
+the core runtime. Renderer code discovers eligible connections only from `/api/integrations` via
+`availableModelConnections`; it never receives an SDK client or secret.
+
+OpenAI uses the Responses API with `store: false`, separate instructions/input, and the SDK's
+aggregated `output_text`. Anthropic uses the Messages API with top-level `system` instructions and
+concatenates text content blocks. Recommended model ids are adapter-owned and the actual response
+model id is returned.
 
 ## External references and link integrity
 
@@ -195,11 +231,13 @@ before caching, and the raw `data` object never crosses the server boundary.
 
 ## Conformance and adding a provider
 
-`core/server/integrations/conformance.test.ts` iterates the registry. A provider is automatically checked
-for public-secret hygiene, capability obligations, cache migration/malformed behavior,
-summary-over-detail preservation, degradation formatting, positive budgets, and the no-accepted-
-memory-write invariant. Route tests separately cover connection-derived link ids and exact lifecycle
-row behavior.
+`core/server/integrations/conformance.test.ts` iterates both registries. Every connection provider is
+checked for public-secret hygiene, executable lifecycle behavior, and positive request budgets.
+External-item providers are additionally checked for capability obligations, cache
+migration/malformed behavior, summary-over-detail preservation, degradation formatting, and the
+no-accepted-memory-write invariant. Model registry/runtime and adapter suites cover connection
+scope, encryption, state transitions, cancellation, request mapping, and error normalization without
+live keys or network calls.
 
 A Sentry-style dry run adds only provider-owned modules and registrations:
 
@@ -215,3 +253,7 @@ No route switch, settings list, source switch, task-link writer, context formatt
 or conformance-test logic is required. OAuth refresh, webhooks/background ingestion, dynamic
 uninstall, and multi-secret credentials are intentionally deferred until a provider requires them;
 new work must extend the connection/resource contracts rather than bypass them.
+
+A new model provider instead adds a connection descriptor and model adapter under
+`plugins/model-providers/server/`, then registers both in `app/server/providers.ts`. It must not add
+external ids, mirrored resources, task links, or a generic prompt route.

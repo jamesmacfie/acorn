@@ -17,7 +17,8 @@ The first release includes:
 
 - a persistent chat source in `rail.sources`, visible in every workspace even before a provider is
   configured;
-- workspace-scoped provider credentials, model selection, threads, messages, drafts, and attachments;
+- app-wide shared provider credentials plus workspace-scoped model selection, threads, messages,
+  drafts, and attachments;
 - OpenAI Responses API and Anthropic Messages API adapters behind an Acorn-owned provider contract;
 - text, image, PDF, and UTF-8 text/code attachments that the selected model actually receives;
 - background streaming over Acorn's authenticated WebSocket, cancellation, retry of failed/cancelled
@@ -77,9 +78,10 @@ chooses.
 8. **Inline attachments in provider requests for v1.** Images/PDFs use provider-supported base64 input;
    text/code is decoded and sent as text. This avoids remote file lifecycle/retention. Provider file
    uploads remain an optional adapter optimization later.
-9. **Credentials are workspace-scoped and write-only.** Store encrypted API keys server-side; the
-   renderer receives only connection summaries. Do not force model providers into the external-item
-   integration registry, whose source/link/cache semantics do not fit chat generation.
+9. **Credentials reuse the shipped app-wide model-provider foundation.** OpenAI and Anthropic keys
+   live in core `integrations` rows and remain write-only to the renderer. Chat stores only a selected
+   connection/model preference per workspace or thread. Model providers remain outside the
+   external-item integration registry, whose source/link/cache semantics do not fit generation.
 10. **Future context enters through one empty assembler stage.** The v1 prompt manifest always records
     `contextItems: []`. Later notes/files/memory contributions populate typed snapshots there; they do
     not mutate stored chat messages or provider adapters.

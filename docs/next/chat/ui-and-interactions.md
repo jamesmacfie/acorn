@@ -267,7 +267,7 @@ The composer and message measure should remain readable. Do not stretch prose ac
 | Composer draft and pending references | Chat UI state slice | T3, per workspace/thread |
 | Open menu, hover, active drop target | Component | T4 |
 | Stream assembly and sequence cursor | Chat query/stream client | T4, recovered from server |
-| Provider keys | Server credential service | Encrypted durable secret, never renderer state |
+| Provider keys | Core integration connection service | Encrypted app-wide secret, never renderer state |
 
 ## Visual and interaction acceptance criteria
 

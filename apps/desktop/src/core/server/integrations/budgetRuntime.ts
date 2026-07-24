@@ -1,4 +1,4 @@
-import type { ProviderBudgets } from '../../shared/integrations'
+import type { ProviderRequestBudgets } from './types'
 
 class Semaphore {
   #active = 0
@@ -24,7 +24,12 @@ export class ProviderRequestScheduler {
   readonly #providers = new Map<string, Semaphore>()
   readonly #connections = new Map<string, Semaphore>()
 
-  run<T>(providerId: string, connectionId: string, budgets: ProviderBudgets, operation: () => Promise<T>): Promise<T> {
+  run<T>(
+    providerId: string,
+    connectionId: string,
+    budgets: ProviderRequestBudgets,
+    operation: () => Promise<T>,
+  ): Promise<T> {
     const provider = this.#providers.get(providerId) ?? new Semaphore(budgets.maxConcurrentRequests)
     this.#providers.set(providerId, provider)
     const connectionKey = `${providerId}:${connectionId}`

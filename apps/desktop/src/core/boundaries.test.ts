@@ -113,7 +113,6 @@ const BASELINE_CORE_TO_PLUGIN = [
   'core/client/persistence/stateSlices.ts => plugins/context/client/selectionState.ts',
   'core/client/persistence/stateSlices.ts => plugins/editor/client/editorState.ts',
   'core/client/persistence/stateSlices.ts => plugins/github/client/pullList/filterState.ts',
-  'core/client/settings/IntegrationsSettings.tsx => plugins/github/client/mutations.ts',
   'core/client/settings/WorkspaceSettings.tsx => plugins/editor/client/autosave.ts',
   'core/client/settings/WorkspaceSettings.tsx => plugins/github/client/mutations.ts',
   'core/client/settings/WorkspaceSettings.tsx => plugins/terminal/client/terminalClient.ts',
