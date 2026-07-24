@@ -1,9 +1,15 @@
 import { Hono } from 'hono'
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { DatabaseBridge } from './database'
+import { ProviderOperationError } from '../../../../core/server/integrations/types'
 import type { AppEnv } from '../../../../core/server/middleware/auth'
 import { requireUser } from '../../../../core/server/middleware/requireUser'
+import { generateTextForConnection } from '../../../../core/server/modelProviders/runtime'
 import { database, setDatabaseBridge } from './database'
+
+vi.mock('../../../../core/server/modelProviders/runtime', () => ({
+  generateTextForConnection: vi.fn(),
+}))
 
 // Transport contract for the database routes: auth + body validation + bridge-unavailable. The
 // SQL-injection posture (identifiers validated against the introspected schema), connection-URL
@@ -36,6 +42,7 @@ const fake = (over: Partial<DatabaseBridge> = {}): DatabaseBridge => ({
   update: async () => ({ ok: true, rowCount: 1 }),
   insert: async () => ({ ok: true, rowCount: 1 }),
   remove: async () => ({ ok: true, rowCount: 1 }),
+  schema: async () => ({ schema: 'CREATE TABLE "public"."users" ();', source: 'auto' }),
   ...over,
 })
 
@@ -69,6 +76,44 @@ describe('database routes', () => {
     expect((await app.fetch(req('/api/tasks/task1/database/query', 'POST', { sql: '' }), {} as Env)).status).toBe(400)
     expect((await app.fetch(req('/api/tasks/task1/database/update', 'POST', { schema: 'public' }), {} as Env)).status).toBe(400)
     expect((await app.fetch(req('/api/tasks/task1/database/columns'), {} as Env)).status).toBe(400) // no schema/name
+  })
+
+  it('generates SQL through the model runtime with the schema in the system prompt', async () => {
+    setDatabaseBridge(fake())
+    vi.mocked(generateTextForConnection).mockResolvedValueOnce({
+      text: '```sql\nSELECT * FROM users;\n```',
+      providerId: 'anthropic',
+      connectionId: 'conn1',
+      modelId: 'claude-sonnet-5',
+    })
+    const res = await authed().fetch(
+      req('/api/tasks/task1/database/generate', 'POST', { connectionId: 'conn1', modelId: 'claude-sonnet-5', prompt: 'all users' }),
+      {} as Env,
+    )
+    expect(res.status).toBe(200)
+    expect(await res.json()).toEqual({ sql: 'SELECT * FROM users;', providerId: 'anthropic', modelId: 'claude-sonnet-5' })
+    const args = vi.mocked(generateTextForConnection).mock.calls[0][0]
+    expect(args.connectionId).toBe('conn1')
+    expect(args.userId).toBe('james')
+    expect(args.input.modelId).toBe('claude-sonnet-5')
+    expect(args.input.system).toContain('CREATE TABLE "public"."users" ();')
+    expect(args.input.prompt).toBe('all users')
+  })
+
+  it('422s when the schema source fails; maps provider errors to their status', async () => {
+    setDatabaseBridge(fake({ schema: async () => ({ error: 'Not connected.' }) }))
+    const app = authed()
+    const failed = await app.fetch(req('/api/tasks/task1/database/generate', 'POST', { connectionId: 'c', prompt: 'x' }), {} as Env)
+    expect(failed.status).toBe(422)
+    expect(await failed.json()).toMatchObject({ error: 'db_schema_unavailable', detail: ['Not connected.'] })
+
+    setDatabaseBridge(fake())
+    vi.mocked(generateTextForConnection).mockRejectedValueOnce(new ProviderOperationError('provider_needs_auth', 401))
+    const denied = await app.fetch(req('/api/tasks/task1/database/generate', 'POST', { connectionId: 'c', prompt: 'x' }), {} as Env)
+    expect(denied.status).toBe(401)
+    expect(await denied.json()).toMatchObject({ error: 'provider_needs_auth' })
+
+    expect((await app.fetch(req('/api/tasks/task1/database/generate', 'POST', { connectionId: '', prompt: 'x' }), {} as Env)).status).toBe(400)
   })
 
   it('401s without a principal; 503s without a bridge', async () => {

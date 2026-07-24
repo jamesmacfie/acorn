@@ -1,6 +1,6 @@
 // Shared terminal protocol (docs/terminal-and-agents.md). Imported by main, preload, and renderer — so it holds the
 // wire contract only, never node-pty types: main owns the PTY, this just describes what crosses IPC.
-import type { BrowserRule, PreviewMode, SetupTrigger } from './api'
+import type { BrowserRule, DbSchemaMode, PreviewMode, SetupTrigger } from './api'
 
 // The ONE AgentState vocabulary (docs/terminal-and-agents.md, README decision 15) — defined here, reused verbatim
 // by the agent surfaces (15); no other module redeclares it. Each transport emits only the subset
@@ -96,6 +96,8 @@ export type RepoPath = {
   devScript: string | null
   devRestartScript: string | null
   dbUrlScript: string | null
+  dbSchemaMode: DbSchemaMode | null // where the Database pane's AI-generation schema text comes from; null → 'auto'
+  dbSchemaValue: string | null // the command or worktree-relative path per dbSchemaMode; null/blank = unset
   previewMode: PreviewMode | null
   previewValue: string | null
   browserRules: BrowserRule[] // parsed on the wire (empty = none)
@@ -110,6 +112,8 @@ export type RepoConfigPatch = {
   devScript?: string
   devRestartScript?: string
   dbUrlScript?: string
+  dbSchemaMode?: DbSchemaMode | ''
+  dbSchemaValue?: string
   previewMode?: PreviewMode | ''
   previewValue?: string
   browserRules?: BrowserRule[]

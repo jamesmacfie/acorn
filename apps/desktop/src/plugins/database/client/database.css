@@ -289,3 +289,12 @@
   padding: 8px var(--pane-pad);
   border-top: 1px solid var(--border);
 }
+
+/* AI SQL generation modal (docs/pg.md): overlay base + a right-aligned action row. */
+.db-generate-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 8px var(--pane-pad);
+  border-top: 1px solid var(--border);
+}

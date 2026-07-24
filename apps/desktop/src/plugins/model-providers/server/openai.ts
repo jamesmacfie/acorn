@@ -2,9 +2,16 @@ import OpenAI from 'openai'
 import { publicConnectionProvider } from '../../../core/server/integrations/providers/shared'
 import { ProviderOperationError } from '../../../core/server/integrations/types'
 import type { ModelProviderAdapter } from '../../../core/server/modelProviders/types'
+import type { ModelCatalogEntry } from '../../../core/shared/integrations'
 import { modelProviderError, modelProviderHealth } from './errors'
 
 export const OPENAI_RECOMMENDED_MODEL_ID = 'gpt-5.6-sol'
+
+export const OPENAI_MODELS: ModelCatalogEntry[] = [
+  { id: 'gpt-5.6-sol', label: 'gpt-5.6-sol' },
+  { id: 'gpt-5.6-luna', label: 'gpt-5.6-luna' },
+  { id: 'gpt-5.6-terra', label: 'gpt-5.6-terra' },
+]
 
 type OpenAIResponse = {
   output_text: string
@@ -90,6 +97,8 @@ export const createOpenAIProviders = (
       },
     },
     capabilities: { textGeneration: true },
+    models: OPENAI_MODELS,
+    defaultModelId: OPENAI_RECOMMENDED_MODEL_ID,
     budgets: {
       maxConcurrentRequests: 4,
       maxConcurrentRequestsPerConnection: 2,

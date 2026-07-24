@@ -2,9 +2,16 @@ import Anthropic from '@anthropic-ai/sdk'
 import { publicConnectionProvider } from '../../../core/server/integrations/providers/shared'
 import { ProviderOperationError } from '../../../core/server/integrations/types'
 import type { ModelProviderAdapter } from '../../../core/server/modelProviders/types'
+import type { ModelCatalogEntry } from '../../../core/shared/integrations'
 import { modelProviderError, modelProviderHealth } from './errors'
 
 export const ANTHROPIC_RECOMMENDED_MODEL_ID = 'claude-sonnet-5'
+
+export const ANTHROPIC_MODELS: ModelCatalogEntry[] = [
+  { id: 'claude-haiku-4-5-20251001', label: 'Haiku' },
+  { id: 'claude-sonnet-5', label: 'Sonnet' },
+  { id: 'claude-opus-4-8', label: 'Opus' },
+]
 
 type AnthropicMessage = {
   content: Array<{ type: string; text?: string }>
@@ -89,6 +96,8 @@ export const createAnthropicProviders = (
       },
     },
     capabilities: { textGeneration: true },
+    models: ANTHROPIC_MODELS,
+    defaultModelId: ANTHROPIC_RECOMMENDED_MODEL_ID,
     budgets: {
       maxConcurrentRequests: 4,
       maxConcurrentRequestsPerConnection: 2,

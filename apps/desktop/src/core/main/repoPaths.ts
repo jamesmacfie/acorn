@@ -6,7 +6,7 @@ import { eq, and } from 'drizzle-orm'
 import type { AppDatabase } from '../server/db'
 import { schema } from '../server/db'
 import { isValidBrowserRule, parseBrowserRules } from '../shared/browserRules'
-import type { BrowserRule, PreviewMode, SetupTrigger } from '../shared/api'
+import type { BrowserRule, DbSchemaMode, PreviewMode, SetupTrigger } from '../shared/api'
 import type { RepoConfigPatch, RepoPath, RepoPathResult } from '../shared/terminal'
 
 const exec = promisify(execFile)
@@ -29,6 +29,8 @@ export async function getRepoPath(db: AppDatabase, owner: string, repo: string):
     devScript: row.devScript,
     devRestartScript: row.devRestartScript,
     dbUrlScript: row.dbUrlScript,
+    dbSchemaMode: (row.dbSchemaMode as DbSchemaMode | null) ?? null,
+    dbSchemaValue: row.dbSchemaValue,
     previewMode: (row.previewMode as PreviewMode | null) ?? null,
     previewValue: row.previewValue,
     browserRules: parseBrowserRules(row.browserRules),
@@ -78,6 +80,11 @@ export async function setRepoConfig(db: AppDatabase, owner: string, repo: string
   if (patch.devScript !== undefined) set.devScript = scalar(patch.devScript)
   if (patch.devRestartScript !== undefined) set.devRestartScript = scalar(patch.devRestartScript)
   if (patch.dbUrlScript !== undefined) set.dbUrlScript = scalar(patch.dbUrlScript)
+  if (patch.dbSchemaValue !== undefined) set.dbSchemaValue = scalar(patch.dbSchemaValue)
+  if (patch.dbSchemaMode !== undefined) {
+    if (patch.dbSchemaMode && !['auto', 'script', 'file'].includes(patch.dbSchemaMode)) return { ok: false, reason: 'Invalid schema mode.' }
+    set.dbSchemaMode = patch.dbSchemaMode || null
+  }
   if (patch.setupScriptTrigger !== undefined) {
     if (!['off', 'created', 'terminal'].includes(patch.setupScriptTrigger)) return { ok: false, reason: 'Invalid setup trigger.' }
     set.setupScriptTrigger = patch.setupScriptTrigger

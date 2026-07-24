@@ -48,6 +48,8 @@ export type CredentialField = {
 
 export type ProviderAccountRef = { id: string; label: string; type?: string }
 
+export type ModelCatalogEntry = { id: string; label: string }
+
 export type ExternalRef = {
   providerId: string
   connectionId: string
@@ -70,6 +72,8 @@ export type PublicIntegrationProvider = {
     maxConnections?: number
   }
   capabilities: ProviderCapabilities
+  models?: ModelCatalogEntry[]
+  defaultModelId?: string
 }
 
 export type IntegrationPaneIntent =

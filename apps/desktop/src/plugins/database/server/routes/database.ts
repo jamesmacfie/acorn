@@ -1,9 +1,14 @@
 import { Hono } from 'hono'
 import { z } from 'zod'
-import type { DbCell, DbColumnsResult, DbConnectResult, DbPk, DbQueryResult, DbRowsResult, DbTablesResult, DbWriteResult } from '../../shared/database'
+import type { DbCell, DbColumnsResult, DbConnectResult, DbGenerateResult, DbPk, DbQueryResult, DbRowsResult, DbSchemaResult, DbTablesResult, DbWriteResult } from '../../shared/database'
 import { bridgeSlot, viaBridge } from '../../../../core/server/bridge'
+import { getDb } from '../../../../core/server/db'
+import { ProviderOperationError } from '../../../../core/server/integrations/types'
 import type { AppEnv } from '../../../../core/server/middleware/auth'
+import { getUser } from '../../../../core/server/middleware/requireUser'
+import { generateTextForConnection } from '../../../../core/server/modelProviders/runtime'
 import { respondError } from '../../../../core/server/respond'
+import { buildSystemPrompt, GENERATE_MAX_OUTPUT_TOKENS, GENERATE_MAX_PROMPT_CHARS, stripSqlFences } from '../generateSql'
 
 // Database pane (docs/pg.md): per-task Postgres browse + edit. Was the `db:*` IPC channels
 //; now task-scoped HTTP behind the DatabaseBridge (main/database.ts). The
@@ -21,6 +26,7 @@ export type DatabaseBridge = {
   update(taskId: string, schema: string, name: string, column: string, value: DbCell, pk: DbPk): Promise<DbWriteResult>
   insert(taskId: string, schema: string, name: string, values: Record<string, DbCell>): Promise<DbWriteResult>
   remove(taskId: string, schema: string, name: string, pk: DbPk): Promise<DbWriteResult>
+  schema(taskId: string): Promise<DbSchemaResult>
 }
 
 export const databaseBridgeSlot = bridgeSlot<DatabaseBridge>()
@@ -32,6 +38,11 @@ const queryBody = z.object({ sql: z.string().min(1) })
 const updateBody = z.object({ schema: z.string(), name: z.string(), column: z.string(), value: cell, pk: z.record(z.string(), cell) })
 const insertBody = z.object({ schema: z.string(), name: z.string(), values: z.record(z.string(), cell) })
 const deleteBody = z.object({ schema: z.string(), name: z.string(), pk: z.record(z.string(), cell) })
+const generateBody = z.object({
+  connectionId: z.string().min(1),
+  modelId: z.string().min(1).optional(),
+  prompt: z.string().min(1).max(GENERATE_MAX_PROMPT_CHARS),
+})
 
 const id = (c: { req: { param(k: string): string } }) => c.req.param('id')
 
@@ -72,4 +83,32 @@ export const database = new Hono<AppEnv>()
     const p = deleteBody.safeParse(await c.req.json().catch(() => null))
     if (!p.success) return respondError(c, 400, 'bad_request')
     return viaBridge(c, databaseBridgeSlot, (b) => b.remove(id(c), p.data.schema, p.data.name, p.data.pk))
+  })
+  // Generate a PostgreSQL query from a natural-language description via a connected model provider
+  // (docs/pg.md). The plugin owns the route + prompt; the core runtime owns provider access.
+  .post('/:id/database/generate', async (c) => {
+    const p = generateBody.safeParse(await c.req.json().catch(() => null))
+    if (!p.success) return respondError(c, 400, 'bad_request')
+    const bridge = databaseBridgeSlot.get()
+    if (!bridge) return respondError(c, 503, 'bridge-unavailable')
+    const schemaRes = await bridge.schema(id(c))
+    if ('error' in schemaRes) return respondError(c, 422, 'db_schema_unavailable', [schemaRes.error])
+    try {
+      const result = await generateTextForConnection({
+        db: getDb(c.env),
+        userId: getUser(c).login,
+        encryptionKey: c.env.SESSION_ENC_KEY,
+        connectionId: p.data.connectionId,
+        input: {
+          system: buildSystemPrompt(schemaRes.schema),
+          prompt: p.data.prompt,
+          ...(p.data.modelId ? { modelId: p.data.modelId } : {}),
+          maxOutputTokens: GENERATE_MAX_OUTPUT_TOKENS,
+        },
+      })
+      return c.json({ sql: stripSqlFences(result.text), providerId: result.providerId, modelId: result.modelId } satisfies DbGenerateResult)
+    } catch (error) {
+      if (error instanceof ProviderOperationError) return respondError(c, error.status, error.code)
+      return respondError(c, 502, 'provider_unavailable')
+    }
   })

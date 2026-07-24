@@ -17,6 +17,7 @@ function stubBridge(over: Partial<DatabaseBridge> = {}): DatabaseBridge {
     insert: async () => ({ ok: true, rowCount: 1 }),
     update: async () => ({ ok: true, rowCount: 1 }),
     remove: async () => ({ ok: true, rowCount: 1 }),
+    schema: async () => ({ schema: 'CREATE TABLE "public"."users" ();', source: 'auto' }),
     ...over,
   }
 }
