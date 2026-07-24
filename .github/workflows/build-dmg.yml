@@ -17,15 +17,15 @@ jobs:
     steps:
       - name: Require OAuth secrets
         run: test -n "$MAIN_VITE_GITHUB_CLIENT_ID" && test -n "$MAIN_VITE_GITHUB_CLIENT_SECRET" || { echo "Set the ACORN_GITHUB_CLIENT_ID / ACORN_GITHUB_CLIENT_SECRET repo secrets"; exit 1; }
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: pnpm/action-setup@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         with:
           node-version: 22
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm dist
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v5
         with:
           name: acorn-dmg
           path: apps/desktop/release/*.dmg
