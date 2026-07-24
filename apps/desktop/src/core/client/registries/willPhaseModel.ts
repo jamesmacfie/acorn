@@ -3,6 +3,10 @@ export type Concern = {
   feature: string
   message: string
   severity: 'warn' | 'danger'
+  // Optional opt-in side action shown as a checkbox under the concern (e.g. docker's "also stop
+  // its containers"). onDecision fires once, when the dialog resolves, with the user's choices.
+  checkbox?: { label: string; checked: boolean }
+  onDecision?: (confirmed: boolean, checked: boolean) => void
 }
 
 export type WillEventMap = {

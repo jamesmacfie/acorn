@@ -27,10 +27,14 @@ export async function confirmWillEvent<K extends keyof WillEventMap>(options: {
 
 export function WillConfirmationHost() {
   let dialog!: HTMLDivElement
+  // Checkbox state per concern id, seeded from the concern's default on open.
+  const [checks, setChecks] = createSignal<Record<string, boolean>>({})
   const finish = (confirmed: boolean) => {
     const current = prompt()
     if (!current) return
     setPrompt(null)
+    for (const concern of current.concerns) concern.onDecision?.(confirmed, checks()[concern.id] ?? concern.checkbox?.checked ?? false)
+    setChecks({})
     current.resolve(confirmed)
   }
   return (
@@ -57,6 +61,18 @@ export function WillConfirmationHost() {
                       <span aria-hidden="true">{concern.severity === 'danger' ? '⛔' : '⚠'}</span>
                       <span>{concern.message}</span>
                       <span class="muted">— {concern.feature}</span>
+                      <Show when={concern.checkbox}>
+                        {(checkbox) => (
+                          <label class="will-concern-option">
+                            <input
+                              type="checkbox"
+                              checked={checks()[concern.id] ?? checkbox().checked}
+                              onChange={(event) => setChecks((all) => ({ ...all, [concern.id]: event.currentTarget.checked }))}
+                            />
+                            {checkbox().label}
+                          </label>
+                        )}
+                      </Show>
                     </li>
                   ))}
                 </ul>
