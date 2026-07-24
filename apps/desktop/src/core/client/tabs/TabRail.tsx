@@ -370,7 +370,7 @@ export default function TabRail() {
                   <input
                     class="integration-key-input"
                     type="text"
-                    autofocus
+                    ref={(el) => queueMicrotask(() => el.focus())}
                     placeholder={d().mode === 'new' ? 'Task title' : 'Task name'}
                     value={text()}
                     onInput={(e) => setText(e.currentTarget.value)}
