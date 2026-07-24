@@ -44,6 +44,35 @@
   line-height: 1.35;
 }
 
+/* Status-icon legend (docs/workspaces-and-tasks.md): the rail markers active on this task, each
+   glyph re-shown next to its meaning so the tooltip both reports state and teaches the icons. */
+.rail-tip-legend {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  margin-top: 4px;
+  padding-top: 6px;
+  border-top: 1px solid var(--border);
+}
+.rail-tip-legend-row {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: var(--fs-xs, 11px);
+  color: var(--text-muted);
+  line-height: 1.3;
+}
+.rail-tip-legend-ico {
+  flex: none;
+  width: 14px;
+  text-align: center;
+  font-family: var(--font-mono);
+}
+.rail-tip-legend-ico.tone-accent { color: var(--accent); }
+.rail-tip-legend-ico.tone-warn { color: var(--warn); }
+.rail-tip-legend-ico.tone-del { color: var(--del-marker); }
+.rail-tip-legend-ico .checks-dot { margin-left: 0; } /* the rail dot self-offsets; centre it here */
+
 @keyframes rail-tip-in {
   from { opacity: 0; }
   to { opacity: 1; }

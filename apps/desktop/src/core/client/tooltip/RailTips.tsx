@@ -1,4 +1,4 @@
-import { createSignal, onCleanup, onMount, Show } from 'solid-js'
+import { createSignal, For, onCleanup, onMount, Show } from 'solid-js'
 import './rail-tips.css'
 
 // One fixed-position tooltip for both icon rails. Driven by `data-tip` (+ optional `data-tip-sub`)
@@ -8,7 +8,21 @@ import './rail-tips.css'
 // `anchor` is the CSS offset for the side the bubble is pinned to: `left` when flying right off the
 // left rail, `right` when flying left off the right rail. Anchoring with `right` (rather than `left`
 // + a transform) is what gives the bubble real layout width instead of squeezing it to the edge.
-type Tip = { title: string; sub?: string; key?: string; anchor: number; y: number; side: 'left' | 'right' }
+// A legend row mirrors one rail status marker: its glyph (`g`) or CI dot class (`d`), a colour tone
+// (`t`), and its meaning (`l`). Serialised into `data-tip-legend` by the rail; see railStatus.ts.
+type LegendItem = { g?: string; d?: string; t?: 'accent' | 'warn' | 'del'; l: string }
+type Tip = { title: string; sub?: string; key?: string; legend?: LegendItem[]; anchor: number; y: number; side: 'left' | 'right' }
+
+// Our own attribute, but JSON.parse can still throw on a malformed value — never let that kill the tip.
+function parseLegend(raw: string | null): LegendItem[] | undefined {
+  if (!raw) return undefined
+  try {
+    const v = JSON.parse(raw)
+    return Array.isArray(v) && v.length ? v : undefined
+  } catch {
+    return undefined
+  }
+}
 
 export default function RailTips() {
   const [tip, setTip] = createSignal<Tip | null>(null)
@@ -22,6 +36,7 @@ export default function RailTips() {
       title,
       sub: el.getAttribute('data-tip-sub') ?? undefined,
       key: el.getAttribute('data-tip-key') ?? undefined,
+      legend: parseLegend(el.getAttribute('data-tip-legend')),
       anchor: side === 'right' ? rect.right + 8 : window.innerWidth - rect.left + 8,
       y: rect.top + rect.height / 2,
       side,
@@ -79,6 +94,22 @@ export default function RailTips() {
           </span>
           <Show when={t().sub}>
             <span class="rail-tip-sub">{t().sub}</span>
+          </Show>
+          <Show when={t().legend}>
+            <div class="rail-tip-legend">
+              <For each={t().legend}>
+                {(it) => (
+                  <div class="rail-tip-legend-row">
+                    <span class="rail-tip-legend-ico" classList={{ [`tone-${it.t}`]: !!it.t }}>
+                      <Show when={it.d} fallback={it.g}>
+                        <span class={it.d} />
+                      </Show>
+                    </span>
+                    <span class="rail-tip-legend-label">{it.l}</span>
+                  </div>
+                )}
+              </For>
+            </div>
           </Show>
         </div>
       )}
