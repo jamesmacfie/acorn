@@ -10,6 +10,7 @@ import { activateTaskSignals, pathForTask } from '../tasks/activate'
 import { capabilities } from '../capabilities'
 import { availableSources } from './sources'
 import { taskStatus } from '../tasks/taskStatus'
+import { railStatusItems } from '../tasks/railStatus'
 import { workingCountFor } from '../../../plugins/terminal/client/sessions'
 import { unreadForTask } from '../notifications/notifications'
 import { workspaceForRepo } from '../workspaces/activeWorkspace'
@@ -257,6 +258,15 @@ export default function TabRail() {
             const detail = createQuery(() => pullDetailOptions(w.repoOwner, w.repoName, w.pullNumber != null ? String(w.pullNumber) : '', w.pullNumber != null))
             const checks = () => detail.data?.checks ?? []
             const st = () => taskStatus(w.id)
+            // Active rail markers — one source of truth for the overlay icons below and the hover
+            // tooltip's legend, so the two never drift.
+            const statusItems = () =>
+              railStatusItems({
+                checks: w.pullNumber != null && checks().length ? checksState(checks()) : null,
+                working: workingCountFor(w.id),
+                unread: !!unreadForTask(w.id),
+                status: st(),
+              })
             // Workspace identity derived onto the row (docs/workspaces-and-tasks.md): 3px accent in the
             // workspace's colour, matching the active-row accent convention in docs/ui-design.md.
             const ws = () => workspaceForRepo(workspaces.data, w.repoOwner, w.repoName)
@@ -291,30 +301,22 @@ export default function TabRail() {
                 classList={{ active: !selectedSource() && w.id === activeTaskId() }}
                 style={accent() ? { 'border-left-color': accent() } : undefined}
                 data-tip={w.title}
-                data-tip-sub={`${w.branch}${st()?.dirty ? ` · ${st()?.dirtyCount} uncommitted` : ''}`}
+                data-tip-sub={w.branch}
+                data-tip-legend={statusItems().length ? JSON.stringify(statusItems().map((s) => ({ g: s.glyph, d: s.dotCls, t: s.tone, l: s.label }))) : undefined}
                 aria-label={w.title}
                 onClick={() => onRowClick(w)}
               >
                 {wsGlyph() ?? originGlyph(w.origin)}
               </button>
-              <Show when={w.pullNumber != null && checks().length}>
-                <span class={`tabrail-checks checks-dot checks-dot-${checksState(checks())}`} title="PR checks" />
-              </Show>
-              {/* Agent-working spinner (docs/terminal-and-agents.md — workingCountFor, finally wired) and the
-                  needs-you marker for unread notices, cleared when the task is viewed. */}
-              <Show when={workingCountFor(w.id)}>
-                <span class="tabrail-spinner spin" title={`${workingCountFor(w.id)} agent(s) working`}>⠿</span>
-              </Show>
-              <Show when={unreadForTask(w.id)}>
-                <span class="tabrail-needs" title="An agent needs you — unread notifications">‼</span>
-              </Show>
-              <Show when={st()?.missing} fallback={
-                <Show when={st()?.dirty}>
-                  <span class="tabrail-dirty" title={`Uncommitted changes (${st()?.dirtyCount})`}>✎</span>
-                </Show>
-              }>
-                <span class="tabrail-dirty tabrail-repair" title="Worktree missing — needs repair">⚠</span>
-              </Show>
+              {/* Live status markers (docs/workspaces-and-tasks.md): CI dot, agent-working spinner,
+                  needs-you notice, dirty/repair — from railStatus.ts, mirrored in the hover tooltip. */}
+              <For each={statusItems()}>
+                {(s) => (
+                  <span class={s.overlayCls} title={s.label}>
+                    {s.glyph}
+                  </span>
+                )}
+              </For>
               <TaskSlotHost slot="tabrail.task-row" taskId={w.id} />
               <Show when={menuId() === w.id}>
                 <div class="tabrail-menu">
