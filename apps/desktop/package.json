@@ -20,6 +20,7 @@
     "db:migrate": "tsx scripts/migrate.ts"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.113.0",
     "@hono/node-server": "^2.0.6",
     "@modelcontextprotocol/sdk": "^1.29.0",
     "@solidjs/router": "^0.16.1",
@@ -41,6 +42,7 @@
     "jose": "^6.2.3",
     "monaco-editor": "^0.55.1",
     "node-pty": "^1.0.0",
+    "openai": "^6.48.0",
     "pg": "^8.22.0",
     "shiki": "^4.2.0",
     "smol-toml": "^1.7.0",

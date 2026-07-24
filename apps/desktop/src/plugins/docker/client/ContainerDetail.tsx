@@ -1,6 +1,6 @@
 // Shared container detail panel (docs/ui-design.md): Info + live Logs + live Stats tabs, used by
 // the browse right pane and the task pane — one component, two hosts (the RollbarItemPanel split).
-import { createEffect, createResource, createSignal, For, on, onCleanup, Show, type JSX } from 'solid-js'
+import { createEffect, createMemo, createResource, createSignal, For, on, onCleanup, Show, type JSX } from 'solid-js'
 import { writeJson } from '../../../core/client/apiClient'
 import { requestTerminalFocusIntent } from '../../../core/client/registries/clientEvents'
 import { terminalSessionsRoute } from '../../../core/shared/api'
@@ -9,20 +9,19 @@ import type { DockerStatsSample } from '../../../core/shared/docker'
 import type { DockerContainerAction, DockerContainerDetail, DockerPort } from '../shared/model'
 import { containerAction, fetchContainerDetail, removeContainer } from './dockerClient'
 import { refreshDocker } from './dockerStore'
+import { dockerLogBuffer, type DockerLogBuffer } from './dockerLogStore'
+import { dockerDetailState, rememberDockerDetailState, type DockerDetailTab as Tab } from './dockerViewState'
 import DockerExecTerminal from './DockerExecTerminal'
 
 // Try bash, fall back to sh — works across alpine/debian-ish images.
 const execCommand = (ref: string): string => `docker exec -it ${ref} sh -c 'command -v bash >/dev/null && exec bash || exec sh'`
 
-type Tab = 'info' | 'logs' | 'stats' | 'terminal'
-
-const MAX_LOG_CHARS = 512 * 1024 // ponytail: char-capped ring; virtualize if huge logs ever matter
-
 const portLabel = (p: DockerPort): string =>
   p.hostPort ? `${p.hostPort} → ${p.containerPort}/${p.protocol}` : `${p.containerPort}/${p.protocol}`
 
 export default function ContainerDetail(props: { target: string; taskId?: string; onRemoved?: () => void; actions?: JSX.Element }) {
-  const [tab, setTab] = createSignal<Tab>('info')
+  const initialView = dockerDetailState(props.taskId, props.target)
+  const [tab, setTab] = createSignal<Tab>(initialView?.tab ?? 'info')
   const [busy, setBusy] = createSignal(false)
   const [error, setError] = createSignal('')
   const [confirmRm, setConfirmRm] = createSignal(false)
@@ -31,26 +30,88 @@ export default function ContainerDetail(props: { target: string; taskId?: string
 
   const [detail, { refetch }] = createResource(() => props.target, fetchContainerDetail)
 
-  // Live logs: attach while the tab is open (docker itself replays the tail on attach).
-  const [logText, setLogText] = createSignal('')
-  const [logEnded, setLogEnded] = createSignal(false)
-  const [follow, setFollow] = createSignal(true)
+  // Live logs: a session-scoped buffer (dockerLogStore) that outlives this component, so
+  // navigating away and back lands on the same content; view state (tab/scroll/follow/find) is
+  // restored per container via dockerViewState.
+  const [logBuf, setLogBuf] = createSignal<DockerLogBuffer | null>(null)
+  const [follow, setFollow] = createSignal(initialView?.logFollow ?? true)
+  const [logQuery, setLogQuery] = createSignal(initialView?.logQuery ?? '')
+  const [matchIdx, setMatchIdx] = createSignal(0)
   let logEl: HTMLPreElement | undefined
+  let logScrollTop = initialView?.logScrollTop ?? 0 // captured in onScroll; a detached <pre> reads 0
+  const logText = () => logBuf()?.text() ?? ''
+  const logEnded = () => logBuf()?.ended() ?? false
+
+  // Remembered eagerly on every mutation (tab/scroll/follow/find), so no unmount hook is needed.
+  const rememberView = () => rememberDockerDetailState(props.taskId, props.target, {
+    tab: tab(), logScrollTop, logFollow: follow(), logQuery: logQuery(),
+  })
+  const switchTab = (t: Tab) => {
+    setTab(t)
+    rememberView()
+  }
+
+  // Chip switches change props.target without remounting — restore the new container's view state.
+  createEffect(on(() => props.target, (target) => {
+    const saved = dockerDetailState(props.taskId, target)
+    setTab(saved?.tab ?? 'info')
+    setFollow(saved?.logFollow ?? true)
+    setLogQuery(saved?.logQuery ?? '')
+    setMatchIdx(0)
+    logScrollTop = saved?.logScrollTop ?? 0
+  }, { defer: true }))
+
   createEffect(on(() => (tab() === 'logs' ? props.target : null), (ref) => {
-    setLogText('')
-    setLogEnded(false)
-    if (!ref) return
-    const off = wsDockerAttach('logs', ref, (event) => {
-      if (event.kind === 'log') {
-        setLogText((t) => (t + event.data).slice(-MAX_LOG_CHARS))
-        // Scroll after the reactive flush has rendered the appended text.
-        if (follow()) queueMicrotask(() => {
-          if (follow() && logEl) logEl.scrollTop = logEl.scrollHeight
-        })
-      } else if (event.kind === 'end') setLogEnded(true)
+    if (!ref) return setLogBuf(null)
+    setLogBuf(dockerLogBuffer(ref))
+    // Land back on the remembered spot (follow mode pins to the bottom via the effect below).
+    if (!follow()) queueMicrotask(() => {
+      if (logEl) logEl.scrollTop = logScrollTop
     })
-    onCleanup(off)
   }))
+
+  // Scroll after the reactive flush has rendered appended output.
+  createEffect(on(logText, () => {
+    if (follow()) queueMicrotask(() => {
+      if (follow() && logEl) logEl.scrollTop = logEl.scrollHeight
+    })
+  }))
+  // Find-in-logs: case-insensitive substring over the visible buffer, rendered as <mark> segments.
+  const MAX_MATCHES = 5000 // mark-render cap; incremental match tracking if it ever binds
+  const logMatches = createMemo(() => {
+    const q = logQuery().toLowerCase()
+    if (!q) return []
+    const text = logText().toLowerCase()
+    const out: number[] = []
+    let i = text.indexOf(q)
+    while (i !== -1 && out.length < MAX_MATCHES) {
+      out.push(i)
+      i = text.indexOf(q, i + q.length)
+    }
+    return out
+  })
+  const currentMatch = () => (logMatches().length ? Math.min(matchIdx(), logMatches().length - 1) : -1)
+  const logSegments = createMemo(() => {
+    const q = logQuery()
+    if (!q) return null
+    const text = logText()
+    const parts: { text: string; match?: number }[] = []
+    let last = 0
+    logMatches().forEach((start, i) => {
+      if (start > last) parts.push({ text: text.slice(last, start) })
+      parts.push({ text: text.slice(start, start + q.length), match: i })
+      last = start + q.length
+    })
+    parts.push({ text: text.slice(last) })
+    return parts
+  })
+  function navMatch(dir: 1 | -1) {
+    const n = logMatches().length
+    if (!n) return
+    setFollow(false)
+    setMatchIdx(((currentMatch() + dir) % n + n) % n)
+    queueMicrotask(() => logEl?.querySelector('mark.current')?.scrollIntoView({ block: 'center' }))
+  }
 
   // Live stats: one sample per docker tick; keep a short history for the text readout.
   const [stats, setStats] = createSignal<DockerStatsSample | null>(null)
@@ -169,11 +230,11 @@ export default function ContainerDetail(props: { target: string; taskId?: string
             <Show when={error()}><div class="action-error" role="alert">{error()}</div></Show>
 
             <nav class="docker-tabs">
-              <button type="button" classList={{ active: tab() === 'info' }} onClick={() => setTab('info')}>Info</button>
-              <button type="button" classList={{ active: tab() === 'logs' }} onClick={() => setTab('logs')}>Logs</button>
-              <button type="button" classList={{ active: tab() === 'stats' }} onClick={() => setTab('stats')}>Stats</button>
+              <button type="button" classList={{ active: tab() === 'info' }} onClick={() => switchTab('info')}>Info</button>
+              <button type="button" classList={{ active: tab() === 'logs' }} onClick={() => switchTab('logs')}>Logs</button>
+              <button type="button" classList={{ active: tab() === 'stats' }} onClick={() => switchTab('stats')}>Stats</button>
               <Show when={running()}>
-                <button type="button" classList={{ active: tab() === 'terminal' }} onClick={() => setTab('terminal')}>Terminal</button>
+                <button type="button" classList={{ active: tab() === 'terminal' }} onClick={() => switchTab('terminal')}>Terminal</button>
               </Show>
             </nav>
 
@@ -232,19 +293,59 @@ export default function ContainerDetail(props: { target: string; taskId?: string
             <Show when={tab() === 'logs'}>
               <div class="docker-logs-bar">
                 <label class="docker-follow">
-                  <input type="checkbox" checked={follow()} onChange={(e) => setFollow(e.currentTarget.checked)} /> Follow
+                  <input
+                    type="checkbox"
+                    checked={follow()}
+                    onChange={(e) => {
+                      setFollow(e.currentTarget.checked)
+                      rememberView()
+                    }}
+                  /> Follow
                 </label>
-                <span class="muted">{logEnded() ? 'stream ended' : 'live · last 300 lines replayed'}</span>
+                <input
+                  class="docker-search docker-logs-search"
+                  type="search"
+                  placeholder="Find in logs"
+                  value={logQuery()}
+                  onInput={(e) => {
+                    setLogQuery(e.currentTarget.value)
+                    setMatchIdx(0)
+                    rememberView()
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') navMatch(e.shiftKey ? -1 : 1)
+                    else if (e.key === 'Escape') setLogQuery('')
+                  }}
+                />
+                <Show when={logQuery()}>
+                  <span class="muted docker-match-count" role="status">
+                    {logMatches().length ? `${currentMatch() + 1}/${logMatches().length}` : 'no matches'}
+                  </span>
+                  <button type="button" class="overlay-btn" title="Previous match (Shift+Enter)" disabled={!logMatches().length} onClick={() => navMatch(-1)}>↑</button>
+                  <button type="button" class="overlay-btn" title="Next match (Enter)" disabled={!logMatches().length} onClick={() => navMatch(1)}>↓</button>
+                </Show>
+                <button type="button" class="overlay-btn" title="Clear the current log view (the stream keeps appending)" onClick={() => logBuf()?.clear()}>Clear</button>
+                <span class="muted">{logEnded() ? 'stream ended' : 'live'}</span>
               </div>
               <pre
                 class="docker-logs mono"
                 ref={logEl}
                 onScroll={() => {
                   if (!logEl) return
+                  logScrollTop = logEl.scrollTop
                   // Manual scroll-up pauses follow; scrolling back to the bottom resumes it.
                   setFollow(logEl.scrollTop + logEl.clientHeight >= logEl.scrollHeight - 8)
+                  rememberView()
                 }}
-              >{logText() || 'Waiting for log output…'}</pre>
+              >
+                <Show when={logSegments()} fallback={logText() || 'Waiting for log output…'}>
+                  {(parts) => (
+                    <For each={parts()}>
+                      {(p) => (p.match === undefined ? p.text : <mark classList={{ current: p.match === currentMatch() }}>{p.text}</mark>)}
+                    </For>
+                  )}
+                </Show>
+              </pre>
             </Show>
 
             <Show when={tab() === 'terminal' && running()}>

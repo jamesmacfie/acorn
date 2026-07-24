@@ -10,7 +10,7 @@ import {
   setConnectionDisabled,
   testConnection,
 } from '../integrations/connections'
-import { integrationProviderRegistry } from '../integrations/registry'
+import { connectionProviderRegistry } from '../integrations/connectionRegistry'
 import { ProviderOperationError } from '../integrations/types'
 import { PublicApiError, type ErrorCode } from '../../shared/publicApi/errors'
 import { IdSchema } from '../../shared/publicApi/primitives'
@@ -76,7 +76,7 @@ export function buildCoreIntegrationsContribution(db: AppDatabase, encKey: strin
         handler: async (ctx) => {
           const rows = await listConnections(db, ctx.actor.principalId)
           return {
-            providers: integrationProviderRegistry.list().map((p) => p.toPublic() as Record<string, unknown>),
+            providers: connectionProviderRegistry.list().map((p) => p.toPublic() as Record<string, unknown>),
             integrations: [toSummary(githubConnectionSummary(ctx.actor.principalId)), ...rows.map((r) => toSummary(connectionSummary(r)))],
           }
         },

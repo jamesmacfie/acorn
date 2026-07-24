@@ -84,7 +84,7 @@
 .workspace-preview-host { flex: 1; min-height: 0; display: flex; }
 .workspace-preview .workspace-empty-inner { margin: auto; text-align: center; }
 
-/* Browser chrome above the preview webview: back / forward / stop-reload / home + URL bar + spinner. */
+/* Browser chrome above the preview WebContentsView: navigation + URL bar + preview devtools + spinner. */
 .preview-chrome { flex: none; display: flex; align-items: center; gap: 4px; padding: 5px 6px; border-bottom: 1px solid var(--border); background: var(--bg-subtle); }
 .preview-nav-btn {
   flex: none;

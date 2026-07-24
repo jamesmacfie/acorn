@@ -26,10 +26,16 @@ export function parseBrowserRules(text: string | null | undefined): BrowserRule[
   }
 }
 
-// Substring match against the full page URL; '*' in the pattern is a wildcard.
+// Substring match against the full page URL; '*' is a wildcard, and a trailing '$' anchors to the
+// end of the URL (so 'localhost:3000/$' — or '*/$' when the host/port varies — matches only root,
+// not '/login'). Otherwise the pattern matches anywhere in the URL.
 export function matchesUrlPattern(url: string, pattern: string): boolean {
   const p = pattern.trim()
   if (!p) return false
-  if (!p.includes('*')) return url.includes(p)
-  return new RegExp(p.split('*').map((s) => s.replace(/[.+?^${}()|[\]\\]/g, '\\$&')).join('.*')).test(url)
+  const anchored = p.endsWith('$')
+  const body = anchored ? p.slice(0, -1) : p
+  if (!body) return false
+  if (!body.includes('*')) return anchored ? url.endsWith(body) : url.includes(body)
+  const re = body.split('*').map((s) => s.replace(/[.+?^${}()|[\]\\]/g, '\\$&')).join('.*')
+  return new RegExp(anchored ? `(?:${re})$` : re).test(url)
 }

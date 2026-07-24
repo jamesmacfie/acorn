@@ -12,7 +12,7 @@ import {
   setConnectionDisabled,
   testConnection,
 } from '../integrations/connections'
-import { integrationProviderRegistry } from '../integrations/registry'
+import { connectionProviderRegistry } from '../integrations/connectionRegistry'
 import { ProviderOperationError } from '../integrations/types'
 import type { AppEnv } from '../middleware/auth'
 import { getUser } from '../middleware/requireUser'
@@ -30,7 +30,7 @@ export const integrations = new Hono<AppEnv>()
     const user = getUser(c)
     const rows = await listConnections(getDb(c.env), user.login)
     return c.json({
-      providers: integrationProviderRegistry.list().map((provider) => provider.toPublic()),
+      providers: connectionProviderRegistry.list().map((provider) => provider.toPublic()),
       integrations: [githubConnectionSummary(user.login), ...rows.map(connectionSummary)],
     } satisfies IntegrationsResponse)
   })
