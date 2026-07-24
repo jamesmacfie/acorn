@@ -229,12 +229,28 @@ filesystem, read by the terminal service outside any GitHub user context.
 | `path` | text | absolute checkout path |
 | `runTargets` | text | JSON `RunTarget[]` — DB fallback below a committed `.acorn/config.toml`, parsed by `main/runConfig.ts`. (The legacy scalar `run_command`/`dev_port` columns were folded into it by migration `0017` and dropped by `0018`.) |
 | `editorCommand` | text | external editor for this repo's worktrees (`code`/`zed`/`cursor -n`/abs path); null → prefs `editor_command_default` → `code` |
+| `setupScript` | text | shell run once when a task worktree is created; null/blank = none |
+| `setupScriptTrigger` | text | `off` \| `created` \| `terminal` — when to run it; null → `terminal` |
+| `devScript` | text | "run dev" → a `dev` run target; null/blank = no run button |
+| `devRestartScript` | text | restart command for the `dev` target; when set, `run_restart` uses it instead of stop+start |
+| `teardownScript` | text | shell run in the worktree just before removal (docs/terminal-and-agents.md); null/blank = none |
+| `dbUrlScript` | text | shell run in the worktree that prints a Postgres URL for the Database pane (docs/pg.md); null/blank = auto-detect |
+| `previewMode` | text | `url` \| `port` \| `script` — how the browser-preview URL resolves; null → dev-server port |
+| `previewValue` | text | the URL/port/command per `previewMode`; null/blank = unset |
+| `browserRules` | text | JSON `BrowserRule[]` — preview-browser page rules (docs/panes.md); null = none |
 | `createdAt`, `updatedAt` | integer | epoch ms |
+
+The lifecycle/build/db/preview columns above are the machine-local DB fallback beneath a committed
+`.acorn/config.toml` (`main/runConfig.ts` `loadRepoConfig` precedence: committed repo toml → user
+`~/.acorn/config.toml` → these columns). They **moved off `workspaces` (repo-level-settings)**: a
+workspace groups repos, but this config describes one repo. `browserRules` is DB-only (dev-login
+autofill selectors are machine/personal, not committed). Write via `PUT /api/terminal/repo-path/config`.
 
 #### `workspaces`
 
 A **Workspace** is a named *group of repos* ("Runn", "Acorn") — the top-level unit selected in the
 top bar (see [workspaces-and-tasks](./workspaces-and-tasks.md)). PK opaque `id`. Machine-scoped.
+**Pure grouping**: identity + membership only — build/run/db/preview config is repo-level (`repo_paths`).
 
 | Column | Type | Note |
 | --- | --- | --- |
@@ -242,22 +258,15 @@ top bar (see [workspaces-and-tasks](./workspaces-and-tasks.md)). PK opaque `id`.
 | `name` | text | editable label |
 | `isDefault` | boolean | the catch-all group |
 | `sort` | integer | selector ordering |
-| `setupScript` | text | shell run once when a task worktree is created; null/blank = none |
-| `setupScriptTrigger` | text | `off` \| `created` \| `terminal` — when to run it; null → `terminal` |
-| `devScript` | text | per-workspace "run dev" → a `dev` run target; null/blank = no run button |
-| `devRestartScript` | text | restart command for the `dev` target; when set, `run_restart` uses it instead of stop+start |
-| `teardownScript` | text | shell run in the worktree just before removal (docs/terminal-and-agents.md); null/blank = none |
-| `previewMode` | text | `url` \| `port` \| `script` — how the browser-preview URL resolves; null → dev-server port |
-| `previewValue` | text | the URL/port/command per `previewMode`; null/blank = unset |
 | `icon` | text | JSON `WorkspaceIcon` (`emoji`/`lucide`/`github`); null → derived default |
 | `color` | text | preset token key or 6-hex; null → derived from name hash |
 | `createdAt`, `updatedAt` | integer | epoch ms |
 
-There is intentionally no generic `workspace_config` key/value table. Typed workspace fields remain
-the validated fallback layer, while shareable extensible configuration lives in
+There is intentionally no generic `workspace_config` / `repo_config` key/value table. Typed columns on
+`repo_paths` remain the validated fallback layer, while shareable extensible configuration lives in
 `.acorn/config.toml` and personal defaults in `~/.acorn/config.toml`. This keeps executable config
 reviewable in files and avoids moving typed contracts into an unstructured row store. Revisit only
-if a contribution needs workspace-scoped values that cannot be represented by the file layers or a
+if a contribution needs repo-scoped values that cannot be represented by the file layers or a
 provider-owned typed config codec.
 
 #### `config_acks`

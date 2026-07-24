@@ -9,6 +9,7 @@
 // from the editor (query) runs verbatim — it's the user's own DB and writes are wanted.
 import { execFile } from 'node:child_process'
 import { readFile } from 'node:fs/promises'
+import { homedir } from 'node:os'
 import { join } from 'node:path'
 import { promisify } from 'node:util'
 import pg from 'pg'
@@ -16,7 +17,9 @@ import type { QueryResult, QueryResultRow } from 'pg'
 import type { AppDatabase } from '../../../core/server/db'
 import type { DatabaseBridge } from '../server/routes/database'
 import type { DbCell, DbColumn, DbConnectResult, DbColumnsResult, DbPk, DbQueryResult, DbResultSet, DbRowsResult, DbTablesResult, DbWriteResult } from '../shared/database'
-import { loadTask, taskRoot, workspaceConfigRow } from '../../../core/main/taskWorktree'
+import { loadTask, taskRoot } from '../../../core/main/taskWorktree'
+import { getRepoPath } from '../../../core/main/repoPaths'
+import { loadRepoConfig } from '../../../core/main/runConfig'
 
 const { Pool } = pg
 const exec = promisify(execFile)
@@ -49,14 +52,16 @@ const qid = (id: string): string => `"${id.replace(/"/g, '""')}"`
 
 const errText = (e: unknown): string => (e instanceof Error ? e.message : String(e))
 
-// Resolve the connection URL for a task WITHOUT persisting it: workspace dbUrlScript (run in the
-// worktree) → <worktree>/.env DATABASE_URL → process.env.DATABASE_URL. Returns null if none found.
+// Resolve the connection URL for a task WITHOUT persisting it: repo dbUrlScript (committed
+// .acorn/config.toml [database].url_script wins over the repo_paths fallback; run in the worktree)
+// → <worktree>/.env DATABASE_URL → process.env.DATABASE_URL. Returns null if none found.
 async function resolveDbUrl(db: AppDatabase, taskId: string): Promise<string | null> {
   const t = await loadTask(db, taskId)
   if (!t) return null
   const root = await taskRoot(db, taskId) // the task worktree (created lazily), or null
-  const ws = await workspaceConfigRow(db, t.repoOwner, t.repoName)
-  const script = ws?.dbUrlScript?.trim()
+  const rp = await getRepoPath(db, t.repoOwner, t.repoName)
+  const cfg = loadRepoConfig(root ?? rp?.path ?? null, homedir(), { dbUrlScript: rp?.dbUrlScript })
+  const script = cfg.dbUrlScript?.trim()
   if (script && root) {
     try {
       const { stdout } = await exec('bash', ['-lc', script], { cwd: root, timeout: 15_000, maxBuffer: 1 << 20 })

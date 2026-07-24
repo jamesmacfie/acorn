@@ -131,7 +131,6 @@ const BASELINE_CORE_TO_PLUGIN = [
   'core/client/workspaces/WorkspaceRepoAssignments.tsx => plugins/github/client/mutations.ts',
   'core/client/workspaces/WorkspaceRepoAssignments.tsx => plugins/terminal/client/terminalClient.ts',
   'core/main/archive.ts => plugins/terminal/main/terminalUtils.ts',
-  'core/main/taskWorktree.ts => plugins/terminal/main/runConfig.ts',
   'core/main/worktrees.ts => plugins/terminal/main/terminalUtils.ts',
 ]
 const BASELINE_PLUGIN_TO_PLUGIN = [

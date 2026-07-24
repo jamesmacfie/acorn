@@ -60,16 +60,16 @@ the canonical layering comment lives at its merge point):
 | --- | --- | --- |
 | repo | `./.acorn/config.toml` (committed, team-shared) | **canonical** — `[scripts.run.<id>]` tables |
 | user | `~/.acorn/config.toml` (personal defaults) | same shape, personal overrides |
-| db | `repo_paths.runTargets` JSON, else `workspaces.devScript` as a base `dev` target | fallback layers only; `legacyRunTargets` (`runConfig.ts`) parses the JSON column. (The old scalar `run_command`/`dev_port` columns were folded into the JSON by migration `0017` and dropped in `0018`.) |
+| db | `repo_paths.runTargets` JSON, else `repo_paths.devScript` as a base `dev` target | fallback layers only; `legacyRunTargets` (`runConfig.ts`) parses the JSON column. (The old scalar `run_command`/`dev_port` columns were folded into the JSON by migration `0017` and dropped in `0018`.) |
 
 The committed `.acorn/config.toml` file (`[scripts.run.<id>]` with `command` / `stop` / `url` /
 `url_command` / `icon` / `default`) is the canonical shape; the reader (`runConfig.ts`) parses it
 today, surfacing malformed files as visible error rows rather than silently dropping them.
 
-Per-workspace scripts on the `workspaces` table also feed targets: `devScript` maps to a `dev` run
+Repo-level scripts on the `repo_paths` table also feed targets: `devScript` maps to a `dev` run
 target, and `devRestartScript`, when set, is what `run_restart` runs instead of stop+start
-(`apps/desktop/src/core/server/db/schema.ts:282-283`). The DB fallback JSON lives on
-`repo_paths.runTargets` (`schema.ts:262`).
+(repo-level-settings moved these off `workspaces`). The DB fallback JSON lives on
+`repo_paths.runTargets`.
 
 ### How targets run
 
@@ -279,7 +279,7 @@ saved-prompt/skills-as-steps polish, and acorn-as-a-Linear-agent-host.
 ## Source
 
 - Schema: `apps/desktop/src/core/server/db/schema.ts:445-481` (`workflow_runs`, `workflow_steps`),
-  `:248-270` (`repo_paths.runTargets`), `:282-283` (`workspaces.devScript`/`devRestartScript`),
+  `:248-270` (`repo_paths.runTargets`, `repo_paths.devScript`/`devRestartScript`),
   `:351` (`tasks.parentId`)
 - Run targets: `apps/desktop/src/plugins/terminal/main/runConfig.ts`, `apps/desktop/src/plugins/terminal/main/runtime.ts`,
   bridge injection in `apps/desktop/src/plugins/terminal/main/runIpc.ts`, wire shapes in `apps/desktop/src/core/shared/terminal.ts`

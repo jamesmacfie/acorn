@@ -9,7 +9,7 @@ removed — see git history for the rationale and alternatives considered.)
 
 | Tier | What it is | Scope | Key table |
 | --- | --- | --- | --- |
-| **Workspace** | A named group of repositories ("Runn", "Acorn"). The top-level unit picked in the top bar. Carries identity (colour + icon) and per-workspace scripts + browser-preview config. | A repo belongs to **exactly one** workspace (a partition). The active workspace is **derived** from the current repo — there is no URL/routing dimension and nothing stores "the selected workspace". | `workspaces` |
+| **Workspace** | A named group of repositories ("Runn", "Acorn"). The top-level unit picked in the top bar. Pure grouping: carries identity (colour + icon) + membership only — build/run/db/preview config is repo-level (`repo_paths`). | A repo belongs to **exactly one** workspace (a partition). The active workspace is **derived** from the current repo — there is no URL/routing dimension and nothing stores "the selected workspace". | `workspaces` |
 | **Task** | The single-repo unit of work: repo + branch + optional git worktree + optional linked PR + its panes/terminals. Shown as a row in the left **TabRail**. | Bound to one repo; its parent workspace is derived through `workspace_repos` on `(repoOwner, repoName)`. | `tasks` |
 
 Selecting a workspace is not stored — it is inferred. `workspaceForRepo` (`apps/desktop/src/core/client/workspaces/activeWorkspace.ts:6`) returns whichever workspace contains the current repo, and switching workspace simply means navigating to one of its repos.
@@ -49,28 +49,33 @@ and the renderer (`apps/desktop/src/core/shared/workspaceIdentity.ts`).
 The workspace colour surfaces as a 3px left accent on its Task rows in the rail, and an emoji icon (if
 set) is used as the row glyph (see [TabRail](#the-tabrail) below).
 
-### Per-workspace scripts & preview config
+### Per-repo scripts & preview config
 
-A workspace owns the lifecycle scripts that run against each of its Task worktrees, plus how the
-browser-preview pane resolves its URL. All are nullable (blank ⇒ `null` ⇒ "none"). Columns on
-`workspaces`:
+The lifecycle scripts that run against a Task worktree, plus how the browser-preview pane resolves
+its URL, are **repo-level** (repo-level-settings): a workspace groups repos, but this config
+describes how to build/run/inspect one repo. They are columns on `repo_paths` (PK `(owner, repo)`) —
+the machine-local DB fallback beneath a committed `.acorn/config.toml` (`loadRepoConfig` precedence:
+committed repo toml → user `~/.acorn/config.toml` → these columns). All are nullable (blank ⇒ `null`
+⇒ "none").
 
 | Column | Purpose |
 | --- | --- |
 | `setupScript` | Shell command run once when a Task worktree is created; null/blank = none. |
 | `setupScriptTrigger` | `off` \| `created` \| `terminal` — *when* the setup script runs; null → `terminal`. |
-| `devScript` | Per-workspace "run dev" command → a `dev` run target; null/blank = no run button. |
+| `devScript` | "run dev" command → a `dev` run target; null/blank = no run button. |
 | `devRestartScript` | Restart command for the `dev` target; when set, `run_restart` runs it instead of stop+start. |
 | `teardownScript` | Shell command run in the worktree just before removal (on archive); null/blank = none. |
+| `dbUrlScript` | Shell command run in the worktree that prints a Postgres URL for the Database pane; null/blank = auto-detect. |
 | `previewMode` | `url` \| `port` \| `script` — how the browser-preview URL is resolved; null → dev-server port. |
 | `previewValue` | The URL, port, or shell command per `previewMode`; null/blank = unset. |
+| `browserRules` | JSON `BrowserRule[]` — preview-browser page rules (DB-only, no toml layer). |
 
-The `PATCH /api/workspaces/:id` route validates these: `setupScriptTrigger` must be one of the three
-values, `previewMode` one of the three modes, and — importantly — a `port` preview value must be a bare
-1–65535 port so a crafted value (e.g. `@evil.com`) can't redirect the preview webview to another host
-(`apps/desktop/src/core/server/routes/workspaces.ts`). Terminal/agent/run-target behaviour that consumes
-these scripts is desktop-only — it needs the main-process worktree capability (see
-[Lifecycle](#lifecycle-note)).
+The `PUT /api/terminal/repo-path/config` route validates these: `setupScriptTrigger` must be one of
+the three values, `previewMode` one of the three modes, and — importantly — a `port` preview value
+must be a bare 1–65535 port so a crafted value (e.g. `@evil.com`) can't redirect the preview webview
+to another host (`apps/desktop/src/core/main/repoPaths.ts` `setRepoConfig`). This whole surface is
+desktop-only — it needs the main-process worktree capability (see [Lifecycle](#lifecycle-note)), and
+it is edited per-repo under Settings → the workspace page.
 
 ### The Default workspace & bootstrap
 
@@ -275,7 +280,7 @@ Tables (full detail in [`data-layer.md`](./data-layer.md), schema at
 
 | Table | Role |
 | --- | --- |
-| `workspaces` | The group: identity, scripts, preview config. |
+| `workspaces` | The group: identity + membership only (build/run/db/preview config is on `repo_paths`). |
 | `workspace_repos` | Repo → workspace membership (partition). PK `(repoOwner, repoName)`. |
 | `ignored_repos` | Repos hidden from the main UI. PK `(owner, repo)`. |
 | `workspace_projects` | External-project links per workspace. PK `(workspaceId, integrationId, externalId)`. |
@@ -293,7 +298,8 @@ Endpoints (full detail in [`api-reference.md`](./api-reference.md); all auth-gat
 | `GET /api/workspaces` | List workspaces (each with its non-ignored repos). |
 | `POST /api/workspaces/bootstrap` | Idempotent first-run: ensure Default + assign unmapped repos. |
 | `POST /api/workspaces` | Create a workspace. |
-| `PATCH /api/workspaces/:id` | Update name / scripts / trigger / preview / icon / colour. |
+| `PATCH /api/workspaces/:id` | Update workspace identity: name / icon / colour. |
+| `PUT /api/terminal/repo-path/config` | Update a repo's scripts / trigger / db / preview / browser rules (repo-level). |
 | `DELETE /api/workspaces/:id` | Delete (reassigns repos to Default; not allowed for Default). |
 | `POST /api/workspaces/:id/repos` | Assign a repo to this workspace (un-ignores it). |
 | `GET /api/workspaces/assignments` | Per-repo `{ workspaceId, ignored }` map for onboarding. |
@@ -313,10 +319,10 @@ Terminal-driven lifecycle is desktop-only (it needs the main-process worktree ca
 without it.
 
 - **Worktree creation is lazy** (Flow C): `tasks.worktreePath` stays null until a terminal is first
-  opened for the task, at which point the main process creates the git worktree and (per the workspace's
+  opened for the task, at which point the main process creates the git worktree and (per the repo's
   `setupScriptTrigger`) may run the `setupScript`.
 - **Archive** runs through the guarded main-process teardown when on desktop: it refuses while sessions
-  are running or the worktree is dirty, runs the workspace `teardownScript` in the worktree, then removes
+  are running or the worktree is dirty, runs the repo's `teardownScript` in the worktree, then removes
   the worktree (`terminalApi().task.archive`; main decides "no worktree → plain flip"). The rail's
   confirm/error dialog is the same modal shell as create/rename (no `window.confirm`/`alert`), and the
   plain HTTP status flip exists only for the bridge-absent browser dev build. Archiving also evicts the

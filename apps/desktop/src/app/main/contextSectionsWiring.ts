@@ -3,7 +3,7 @@ import type { AppDatabase } from '../../core/server/db'
 import type { NoteAuthor, NoteLocation, NoteScope } from '../../core/shared/notes'
 import { memoryIndexSlice } from '../../plugins/memory/main/memory'
 import type { NotesStore } from '../../plugins/notes/main/notes'
-import { loadTask, workspaceConfigRow } from '../../core/main/taskWorktree'
+import { loadTask, workspaceIdForRepo } from '../../core/main/taskWorktree'
 
 export type ContextSectionsDeps = {
   db: AppDatabase
@@ -19,10 +19,10 @@ export function wireContextSections({ db, notesStore, reconciled }: ContextSecti
       notes: async (taskId) => {
         const task = await loadTask(db, taskId)
         if (!task) return []
-        const workspace = await workspaceConfigRow(db, task.repoOwner, task.repoName)
+        const workspaceId = await workspaceIdForRepo(db, task.repoOwner, task.repoName)
         const locations: { scope: NoteScope; location: NoteLocation }[] = [
           { scope: 'task', location: { scope: 'task', taskId } },
-          ...(workspace ? [{ scope: 'workspace' as const, location: { scope: 'workspace' as const, workspaceId: workspace.id } }] : []),
+          ...(workspaceId ? [{ scope: 'workspace' as const, location: { scope: 'workspace' as const, workspaceId } }] : []),
           { scope: 'global', location: { scope: 'global' } },
         ]
         const out: { slug: string; scope: NoteScope; title: string; kind: string; body: string; author: NoteAuthor }[] = []

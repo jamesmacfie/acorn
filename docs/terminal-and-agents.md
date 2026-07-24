@@ -137,7 +137,7 @@ base checkout as `opts.cwd`; main derives the worktree from it via `ensureWorktr
 by branch (`worktreeBranchDirName` = `<owner>-<repo>-<branch-slug>`); all git runs in the **main
 checkout** (which owns the `.git` the worktree links to). A PR task checks out `pull/<n>/head`
 detached; a local-first task reuses or creates its branch from the resolved base ref (per-repo pref →
-`origin/main` → `origin/master` → HEAD). On the fresh-create path only, the workspace setup script
+`origin/main` → `origin/master` → HEAD). On the fresh-create path only, the repo's setup script
 runs as a "Setup" tab first (`maybeRunSetup`), and configured `copy` files are carried in.
 
 ### `ACORN_*` environment injection (`buildSessionEnv`, `terminalUtils.ts:138`)

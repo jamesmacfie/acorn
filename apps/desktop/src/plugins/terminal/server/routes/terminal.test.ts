@@ -38,6 +38,7 @@ const fake = (over: Partial<TerminalBridge> = {}): TerminalBridge => ({
   repoPathGet: async () => null,
   repoPathSet: async () => ({ ok: true }) as never,
   repoPathRunTargets: async () => ({ ok: true }) as never,
+  repoPathConfig: async () => ({ ok: true }) as never,
   previewUrl: async () => ({ ok: true, url: 'http://x' }),
   onCreated: async () => {},
   useCheckout: async () => ({ worktreePath: '/w', branch: 'main' }),

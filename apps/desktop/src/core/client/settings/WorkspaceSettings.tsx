@@ -3,26 +3,19 @@ import { useQueryClient } from '@tanstack/solid-query'
 import { debounce } from '../../../plugins/editor/client/autosave'
 import { terminalApi } from '../../../plugins/terminal/client/terminalClient'
 import { workspacesKey } from '../queries'
-import { deleteWorkspace, renameWorkspace, setWorkspaceBrowserRules, setWorkspaceColor, setWorkspaceDbUrlScript, setWorkspaceDevRestartScript, setWorkspaceDevScript, setWorkspaceIcon, setWorkspacePreview, setWorkspaceSetupScript, setWorkspaceSetupTrigger, setWorkspaceTeardownScript } from '../../../plugins/github/client/mutations'
+import { deleteWorkspace, renameWorkspace, setWorkspaceColor, setWorkspaceIcon } from '../../../plugins/github/client/mutations'
 import type { BrowserRule, PreviewMode, SetupTrigger, Workspace } from '../../shared/api'
+import type { RepoConfigPatch } from '../../shared/terminal'
 import { resolveWorkspaceColor, WORKSPACE_COLORS } from '../../shared/workspaceIdentity'
 import { confirmWillEvent } from '../registries/willPhase'
 import { clientEvents } from '../registries/clientEvents'
 
-// Settings → per-workspace page: rename, the worktree setup script, and (non-default) delete.
-// The setup script is a shell command run once when a task's git worktree is first created
-// (docs/workspaces-and-tasks.md) — it shows as the first terminal tab. Blank clears it.
+// Settings → per-workspace page: workspace IDENTITY (name / icon / colour) + membership + delete.
+// Build/run/db/preview config is REPO-level (repo-level-settings): a workspace groups repos, but
+// setup/dev/db/preview describe one repo, so those editors live in RepoConfig, one per repo.
 export default function WorkspaceSettings(props: { workspace: Workspace; onDeleted: () => void }) {
   const qc = useQueryClient()
   const [name, setName] = createSignal(props.workspace.name)
-  const [script, setScript] = createSignal(props.workspace.setupScript ?? '')
-  const [dev, setDev] = createSignal(props.workspace.devScript ?? '')
-  const [devRestart, setDevRestart] = createSignal(props.workspace.devRestartScript ?? '')
-  const [teardown, setTeardown] = createSignal(props.workspace.teardownScript ?? '')
-  const [dbUrl, setDbUrl] = createSignal(props.workspace.dbUrlScript ?? '')
-  const [trigger, setTrigger] = createSignal<SetupTrigger>(props.workspace.setupScriptTrigger ?? 'terminal')
-  const [previewMode, setPreviewMode] = createSignal<PreviewMode | ''>(props.workspace.previewMode ?? '')
-  const [previewValue, setPreviewValue] = createSignal(props.workspace.previewValue ?? '')
   const [busy, setBusy] = createSignal(false)
   const [emoji, setEmoji] = createSignal(props.workspace.icon?.kind === 'emoji' ? props.workspace.icon.value : '')
   const [color, setColor] = createSignal(props.workspace.color ?? '')
@@ -52,23 +45,6 @@ export default function WorkspaceSettings(props: { workspace: Workspace; onDelet
     }
   }
 
-  // Autosave: text fields debounce while typing and flush on blur; selects/swatches save on change.
-  const savePreview = async () => {
-    await setWorkspacePreview(props.workspace.id, previewMode(), previewValue())
-    await refresh()
-  }
-
-  const changeTrigger = async (t: SetupTrigger) => {
-    setTrigger(t)
-    setBusy(true)
-    try {
-      await setWorkspaceSetupTrigger(props.workspace.id, t)
-      await refresh()
-    } finally {
-      setBusy(false)
-    }
-  }
-
   const saveName = async () => {
     const n = name().trim()
     if (!n || n === props.workspace.name) return
@@ -80,35 +56,6 @@ export default function WorkspaceSettings(props: { workspace: Workspace; onDelet
       setBusy(false)
     }
   }
-  const saveScript = async () => {
-    await setWorkspaceSetupScript(props.workspace.id, script())
-    await refresh()
-  }
-  const saveDev = async () => {
-    await setWorkspaceDevScript(props.workspace.id, dev())
-    await refresh()
-  }
-  const saveDevRestart = async () => {
-    await setWorkspaceDevRestartScript(props.workspace.id, devRestart())
-    await refresh()
-  }
-  const saveTeardown = async () => {
-    await setWorkspaceTeardownScript(props.workspace.id, teardown())
-    await refresh()
-  }
-  const saveDbUrl = async () => {
-    await setWorkspaceDbUrlScript(props.workspace.id, dbUrl())
-    await refresh()
-  }
-
-  // One debouncer per text field; blur flushes the same pending write immediately.
-  const debScript = debounce(() => void saveScript(), 1500)
-  const debTeardown = debounce(() => void saveTeardown(), 1500)
-  const debDev = debounce(() => void saveDev(), 1500)
-  const debDevRestart = debounce(() => void saveDevRestart(), 1500)
-  const debPreview = debounce(() => void savePreview(), 1500)
-  const debDbUrl = debounce(() => void saveDbUrl(), 1500)
-  onCleanup(() => { debScript.flush(); debTeardown.flush(); debDev.flush(); debDevRestart.flush(); debPreview.flush(); debDbUrl.flush() })
 
   const remove = async () => {
     const confirmed = await confirmWillEvent({
@@ -200,163 +147,15 @@ export default function WorkspaceSettings(props: { workspace: Workspace; onDelet
         </Show>
       </label>
 
-      <label class="settings-field">
-        <span class="settings-label">Worktree setup script</span>
-        <span class="muted settings-hint">
-          A shell command run once in a new task's git worktree, shown as the first terminal tab. Choose when it runs below.
-        </span>
-        <textarea
-          class="settings-script"
-          rows="6"
-          spellcheck={false}
-          placeholder="./scripts/setup-worktree.sh"
-          value={script()}
-          onInput={(e) => { setScript(e.currentTarget.value); debScript() }}
-          onBlur={() => debScript.flush()}
-        />
-      </label>
-
-      <label class="settings-field">
-        <span class="settings-label">Worktree teardown script</span>
-        <span class="muted settings-hint">
-          Runs in the worktree just before it's removed on task close (e.g. <code>docker compose down</code>). Non-zero exit pauses the close.
-        </span>
-        <textarea
-          class="settings-script"
-          rows="4"
-          spellcheck={false}
-          placeholder="docker compose -f dev.yml down"
-          value={teardown()}
-          onInput={(e) => { setTeardown(e.currentTarget.value); debTeardown() }}
-          onBlur={() => debTeardown.flush()}
-        />
-      </label>
-
-      <label class="settings-field">
-        <span class="settings-label">Database connection script</span>
-        <span class="muted settings-hint">
-          Optional. A shell command run in a task's worktree that prints a Postgres connection URL for the
-          Database pane. Blank means auto-detect from <code>DATABASE_URL</code> in the
-          worktree <code>.env</code> or the environment. Use this for setups auto-detect can't read, e.g.
-          <code>bin/rails runner 'puts ActiveRecord::Base.connection_db_config.url'</code>.
-        </span>
-        <textarea
-          class="settings-script"
-          rows="2"
-          spellcheck={false}
-          placeholder="(blank = auto-detect)"
-          value={dbUrl()}
-          onInput={(e) => { setDbUrl(e.currentTarget.value); debDbUrl() }}
-          onBlur={() => debDbUrl.flush()}
-        />
-      </label>
-
-      <label class="settings-field">
-        <span class="settings-label">Run the script</span>
-        <select class="integration-key-input" disabled={busy()} value={trigger()} onChange={(e) => void changeTrigger(e.currentTarget.value as SetupTrigger)}>
-          <option value="terminal">When the terminal is first opened</option>
-          <option value="created">When the task is created</option>
-          <option value="off">Off — never run it</option>
-        </select>
-      </label>
-
-      <label class="settings-field">
-        <span class="settings-label">Dev script</span>
-        <span class="muted settings-hint">
-          A custom command for this workspace, shown as a ▶ run button on a task's right rail — it starts/stops
-          the script in its own terminal. Blank means no run button. A repo's <code>.acorn/config.toml</code> or
-          named run targets override it.
-        </span>
-        <textarea
-          class="settings-script"
-          rows="3"
-          spellcheck={false}
-          placeholder="pnpm dev"
-          value={dev()}
-          onInput={(e) => { setDev(e.currentTarget.value); debDev() }}
-          onBlur={() => debDev.flush()}
-        />
-      </label>
-
-      <label class="settings-field">
-        <span class="settings-label">Dev restart command</span>
-        <span class="muted settings-hint">
-          Optional. How to restart the dev script in place — e.g. <code>touch tmp/restart.txt</code>. Agents call this
-          via the <code>run_restart</code> tool. Blank means restart just stops and starts the dev script again.
-        </span>
-        <textarea
-          class="settings-script"
-          rows="2"
-          spellcheck={false}
-          placeholder="(blank = stop + start)"
-          value={devRestart()}
-          onInput={(e) => { setDevRestart(e.currentTarget.value); debDevRestart() }}
-          onBlur={() => debDevRestart.flush()}
-        />
-      </label>
-
-      <label class="settings-field">
-        <span class="settings-label">Browser preview URL</span>
-        <span class="muted settings-hint">
-          How the browser-preview pane finds its URL for tasks in this workspace.
-        </span>
-        <select
-          class="integration-key-input"
-          disabled={busy()}
-          value={previewMode()}
-          onChange={(e) => {
-            setPreviewMode(e.currentTarget.value as PreviewMode | '')
-            void savePreview()
-          }}
-        >
-          <option value="">Dev-server port (default)</option>
-          <option value="url">A fixed URL</option>
-          <option value="port">localhost with a port</option>
-          <option value="script">Script — its output is the URL</option>
-        </select>
-        <Show when={previewMode() === 'script'}>
-          <textarea
-            class="settings-script"
-            rows="4"
-            spellcheck={false}
-            placeholder="./scripts/preview-url.sh"
-            value={previewValue()}
-            onInput={(e) => { setPreviewValue(e.currentTarget.value); debPreview() }}
-            onBlur={() => debPreview.flush()}
-          />
-          <span class="muted settings-hint">Run in the task's worktree; its stdout (trimmed) is loaded as the URL.</span>
-        </Show>
-        <Show when={previewMode() === 'url' || previewMode() === 'port'}>
-          <input
-            class="integration-key-input"
-            type={previewMode() === 'port' ? 'number' : 'text'}
-            placeholder={previewMode() === 'port' ? '3000' : 'https://example.test'}
-            value={previewValue()}
-            onInput={(e) => { setPreviewValue(e.currentTarget.value); debPreview() }}
-            onBlur={() => debPreview.flush()}
-          />
-        </Show>
-      </label>
-
-      <div class="settings-field">
-        <span class="settings-label">Page rules</span>
-        <span class="muted settings-hint">
-          On page load in the preview browser, fill an input (CSS selector) with a value when the URL matches
-          the pattern (substring; <code>*</code> is a wildcard, a trailing <code>$</code> anchors to the end —
-          e.g. <code>*/$</code> matches only the root) — e.g. auto-fill a dev login. Values are stored
-          plainly in the local database: dev credentials only, never production secrets.
-        </span>
-        <BrowserRulesEditor workspace={props.workspace} onSaved={refresh} />
-      </div>
-
       <Show when={terminalApi() && (props.workspace.repos ?? []).length}>
         <div class="settings-field">
-          <span class="settings-label">Run targets (per repo)</span>
+          <span class="settings-label">Repository settings</span>
           <span class="muted settings-hint">
-            Named commands run in a task's worktree: JSON array of {'{'}"id", "command", "stop"?, "url"?, "urlCommand"?, "default"?{'}'}. A committed <code>.acorn/config.toml</code> overrides these.
+            Build, run, database and preview config for each repo in this workspace. A committed{' '}
+            <code>.acorn/config.toml</code> overrides these machine-local values.
           </span>
           <For each={props.workspace.repos ?? []}>
-            {(r) => <RepoRunTargets owner={r.owner} name={r.name} />}
+            {(r) => <RepoConfig owner={r.owner} name={r.name} />}
           </For>
         </div>
       </Show>
@@ -372,15 +171,210 @@ export default function WorkspaceSettings(props: { workspace: Workspace; onDelet
   )
 }
 
-// Preview-browser page rules (docs/panes.md): row-per-rule editor over the workspace's browserRules
-// array. Whole-array PATCH like the other workspace fields; rows missing a pattern or selector are
-// kept locally but not saved, so half-typed rules never 400 against the strict route validation.
-function BrowserRulesEditor(props: { workspace: Workspace; onSaved: () => Promise<unknown> }) {
-  const [rules, setRules] = createSignal<BrowserRule[]>(props.workspace.browserRules ?? [])
+// All repo-level config for one (owner, repo), collapsed behind a native <details> so a workspace
+// with several repos isn't an overwhelming wall of fields. Reads/writes the repo_paths row via the
+// terminal repoPath bridge; local signals override the fetched row while typing (null = use row).
+// Desktop-only — the runtime lives in the main process. Gated on a mapped checkout, like run targets.
+function RepoConfig(props: { owner: string; name: string }) {
+  const api = terminalApi()
+  const [row, { refetch }] = createResource(
+    () => `${props.owner}/${props.name}`,
+    () => api?.repoPath.get(props.owner, props.name) ?? null,
+  )
+  const [setup, setSetup] = createSignal<string | null>(null)
+  const [teardown, setTeardown] = createSignal<string | null>(null)
+  const [dbUrl, setDbUrl] = createSignal<string | null>(null)
+  const [dev, setDev] = createSignal<string | null>(null)
+  const [devRestart, setDevRestart] = createSignal<string | null>(null)
+  const [previewValue, setPreviewValue] = createSignal<string | null>(null)
+  const [err, setErr] = createSignal('')
+
+  const trigger = (): SetupTrigger => row()?.setupScriptTrigger ?? 'terminal'
+  const previewMode = (): PreviewMode | '' => row()?.previewMode ?? ''
+
+  const save = async (patch: RepoConfigPatch) => {
+    if (!api) return
+    setErr('')
+    const res = await api.repoPath.config(props.owner, props.name, patch)
+    if (!res.ok) return setErr(res.reason)
+    await refetch()
+  }
+  const debSetup = debounce(() => void save({ setupScript: setup() ?? '' }), 1500)
+  const debTeardown = debounce(() => void save({ teardownScript: teardown() ?? '' }), 1500)
+  const debDbUrl = debounce(() => void save({ dbUrlScript: dbUrl() ?? '' }), 1500)
+  const debDev = debounce(() => void save({ devScript: dev() ?? '' }), 1500)
+  const debDevRestart = debounce(() => void save({ devRestartScript: devRestart() ?? '' }), 1500)
+  const debPreview = debounce(() => void save({ previewValue: previewValue() ?? '' }), 1500)
+  onCleanup(() => { debSetup.flush(); debTeardown.flush(); debDbUrl.flush(); debDev.flush(); debDevRestart.flush(); debPreview.flush() })
+
+  return (
+    <details class="settings-repo-config">
+      <summary class="muted">{props.owner}/{props.name}</summary>
+      <Show when={row()} fallback={<span class="muted settings-hint">No local checkout mapped yet.</span>}>
+        <label class="settings-field">
+          <span class="settings-label">Worktree setup script</span>
+          <span class="muted settings-hint">
+            A shell command run once in a new task's git worktree, shown as the first terminal tab. Choose when it runs below.
+          </span>
+          <textarea
+            class="settings-script"
+            rows="6"
+            spellcheck={false}
+            placeholder="./scripts/setup-worktree.sh"
+            value={setup() ?? row()?.setupScript ?? ''}
+            onInput={(e) => { setSetup(e.currentTarget.value); debSetup() }}
+            onBlur={() => debSetup.flush()}
+          />
+        </label>
+
+        <label class="settings-field">
+          <span class="settings-label">Run the script</span>
+          <select class="integration-key-input" value={trigger()} onChange={(e) => void save({ setupScriptTrigger: e.currentTarget.value as SetupTrigger })}>
+            <option value="terminal">When the terminal is first opened</option>
+            <option value="created">When the task is created</option>
+            <option value="off">Off — never run it</option>
+          </select>
+        </label>
+
+        <label class="settings-field">
+          <span class="settings-label">Worktree teardown script</span>
+          <span class="muted settings-hint">
+            Runs in the worktree just before it's removed on task close (e.g. <code>docker compose down</code>). Non-zero exit pauses the close.
+          </span>
+          <textarea
+            class="settings-script"
+            rows="4"
+            spellcheck={false}
+            placeholder="docker compose -f dev.yml down"
+            value={teardown() ?? row()?.teardownScript ?? ''}
+            onInput={(e) => { setTeardown(e.currentTarget.value); debTeardown() }}
+            onBlur={() => debTeardown.flush()}
+          />
+        </label>
+
+        <label class="settings-field">
+          <span class="settings-label">Database connection script</span>
+          <span class="muted settings-hint">
+            Optional. A shell command run in a task's worktree that prints a Postgres connection URL for the
+            Database pane. Blank means auto-detect from <code>DATABASE_URL</code> in the
+            worktree <code>.env</code> or the environment. Use this for setups auto-detect can't read, e.g.
+            <code>bin/rails runner 'puts ActiveRecord::Base.connection_db_config.url'</code>.
+          </span>
+          <textarea
+            class="settings-script"
+            rows="2"
+            spellcheck={false}
+            placeholder="(blank = auto-detect)"
+            value={dbUrl() ?? row()?.dbUrlScript ?? ''}
+            onInput={(e) => { setDbUrl(e.currentTarget.value); debDbUrl() }}
+            onBlur={() => debDbUrl.flush()}
+          />
+        </label>
+
+        <label class="settings-field">
+          <span class="settings-label">Dev script</span>
+          <span class="muted settings-hint">
+            A ▶ run button on a task's right rail — it starts/stops the script in its own terminal. Blank means no
+            run button. A repo's <code>.acorn/config.toml</code> or named run targets override it.
+          </span>
+          <textarea
+            class="settings-script"
+            rows="3"
+            spellcheck={false}
+            placeholder="pnpm dev"
+            value={dev() ?? row()?.devScript ?? ''}
+            onInput={(e) => { setDev(e.currentTarget.value); debDev() }}
+            onBlur={() => debDev.flush()}
+          />
+        </label>
+
+        <label class="settings-field">
+          <span class="settings-label">Dev restart command</span>
+          <span class="muted settings-hint">
+            Optional. How to restart the dev script in place — e.g. <code>touch tmp/restart.txt</code>. Agents call this
+            via the <code>run_restart</code> tool. Blank means restart just stops and starts the dev script again.
+          </span>
+          <textarea
+            class="settings-script"
+            rows="2"
+            spellcheck={false}
+            placeholder="(blank = stop + start)"
+            value={devRestart() ?? row()?.devRestartScript ?? ''}
+            onInput={(e) => { setDevRestart(e.currentTarget.value); debDevRestart() }}
+            onBlur={() => debDevRestart.flush()}
+          />
+        </label>
+
+        <label class="settings-field">
+          <span class="settings-label">Browser preview URL</span>
+          <span class="muted settings-hint">How the browser-preview pane finds its URL for this repo's tasks.</span>
+          <select
+            class="integration-key-input"
+            value={previewMode()}
+            onChange={(e) => { setPreviewValue(null); void save({ previewMode: e.currentTarget.value as PreviewMode | '' }) }}
+          >
+            <option value="">Dev-server port (default)</option>
+            <option value="url">A fixed URL</option>
+            <option value="port">localhost with a port</option>
+            <option value="script">Script — its output is the URL</option>
+          </select>
+          <Show when={previewMode() === 'script'}>
+            <textarea
+              class="settings-script"
+              rows="4"
+              spellcheck={false}
+              placeholder="./scripts/preview-url.sh"
+              value={previewValue() ?? row()?.previewValue ?? ''}
+              onInput={(e) => { setPreviewValue(e.currentTarget.value); debPreview() }}
+              onBlur={() => debPreview.flush()}
+            />
+            <span class="muted settings-hint">Run in the task's worktree; its stdout (trimmed) is loaded as the URL.</span>
+          </Show>
+          <Show when={previewMode() === 'url' || previewMode() === 'port'}>
+            <input
+              class="integration-key-input"
+              type={previewMode() === 'port' ? 'number' : 'text'}
+              placeholder={previewMode() === 'port' ? '3000' : 'https://example.test'}
+              value={previewValue() ?? row()?.previewValue ?? ''}
+              onInput={(e) => { setPreviewValue(e.currentTarget.value); debPreview() }}
+              onBlur={() => debPreview.flush()}
+            />
+          </Show>
+        </label>
+
+        <div class="settings-field">
+          <span class="settings-label">Page rules</span>
+          <span class="muted settings-hint">
+            On page load in the preview browser, fill an input (CSS selector) with a value when the URL matches
+            the pattern (substring; <code>*</code> is a wildcard, a trailing <code>$</code> anchors to the end —
+            e.g. <code>*/$</code> matches only the root) — e.g. auto-fill a dev login. Values are stored
+            plainly in the local database: dev credentials only, never production secrets.
+          </span>
+          <BrowserRulesEditor rules={row()?.browserRules ?? []} onSave={(rules) => save({ browserRules: rules })} />
+        </div>
+
+        <div class="settings-field">
+          <span class="settings-label">Run targets</span>
+          <span class="muted settings-hint">
+            Named commands run in a task's worktree: JSON array of {'{'}"id", "command", "stop"?, "url"?, "urlCommand"?, "default"?{'}'}. A committed <code>.acorn/config.toml</code> overrides these.
+          </span>
+          <RepoRunTargets owner={props.owner} name={props.name} />
+        </div>
+
+        <Show when={err()}><span class="action-error">{err()}</span></Show>
+      </Show>
+    </details>
+  )
+}
+
+// Preview-browser page rules (docs/panes.md): row-per-rule editor over a repo's browserRules array.
+// Whole-array save; rows missing a pattern or selector are kept locally but not saved, so half-typed
+// rules never 400 against the strict route validation.
+function BrowserRulesEditor(props: { rules: BrowserRule[]; onSave: (rules: BrowserRule[]) => Promise<unknown> }) {
+  const [rules, setRules] = createSignal<BrowserRule[]>(props.rules)
 
   const save = async () => {
-    await setWorkspaceBrowserRules(props.workspace.id, rules().filter((r) => r.urlPattern.trim() && r.action.selector.trim()))
-    await props.onSaved()
+    await props.onSave(rules().filter((r) => r.urlPattern.trim() && r.action.selector.trim()))
   }
   const debSave = debounce(() => void save(), 1500)
   onCleanup(() => debSave.flush())
@@ -449,8 +443,8 @@ function BrowserRulesEditor(props: { workspace: Workspace; onSaved: () => Promis
   )
 }
 
-// Per-repo run-target JSON editor (docs/workflows.md §2) — the DB fallback surface, edited at the
-// workspace level like the worktree scripts. Desktop-only because it uses the main-process runtime.
+// Per-repo run-target JSON editor (docs/workflows.md §2) — the DB fallback surface. Desktop-only
+// because it uses the main-process runtime.
 function RepoRunTargets(props: { owner: string; name: string }) {
   const api = terminalApi()
   const [row, { refetch }] = createResource(
@@ -473,20 +467,17 @@ function RepoRunTargets(props: { owner: string; name: string }) {
   onCleanup(() => debSave.flush())
 
   return (
-    <div class="settings-field">
-      <span class="muted">{props.owner}/{props.name}</span>
-      <Show when={row()} fallback={<span class="muted settings-hint">No local checkout mapped yet.</span>}>
-        <textarea
-          class="settings-script"
-          rows="3"
-          spellcheck={false}
-          placeholder='[{"id":"dev","command":"./scripts/dev.sh","urlCommand":"./scripts/dev-url.sh","default":true}]'
-          value={value()}
-          onInput={(e) => { setText(e.currentTarget.value); debSave() }}
-          onBlur={() => debSave.flush()}
-        />
-        <Show when={err()}><span class="action-error">{err()}</span></Show>
-      </Show>
-    </div>
+    <Show when={row()} fallback={<span class="muted settings-hint">No local checkout mapped yet.</span>}>
+      <textarea
+        class="settings-script"
+        rows="3"
+        spellcheck={false}
+        placeholder='[{"id":"dev","command":"./scripts/dev.sh","urlCommand":"./scripts/dev-url.sh","default":true}]'
+        value={value()}
+        onInput={(e) => { setText(e.currentTarget.value); debSave() }}
+        onBlur={() => debSave.flush()}
+      />
+      <Show when={err()}><span class="action-error">{err()}</span></Show>
+    </Show>
   )
 }

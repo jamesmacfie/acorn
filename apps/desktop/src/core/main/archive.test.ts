@@ -73,7 +73,7 @@ describe('archiveTask teardown ordering', () => {
     runTeardown: runTeardownProcess,
   })
 
-  const setTeardown = (script: string | null) => t.db.update(schema.workspaces).set({ teardownScript: script })
+  const setTeardown = (script: string | null) => t.db.update(schema.repoPaths).set({ teardownScript: script })
 
   it('runs teardown in the live worktree (ACORN_* env) before removal', async () => {
     const marker = join(dir, 'marker')
