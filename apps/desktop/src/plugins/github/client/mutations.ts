@@ -20,10 +20,6 @@ import {
   tasksRoute,
   type TaskLink,
   type TaskLinkSeed,
-  type BrowserRule,
-  type DbSchemaMode,
-  type PreviewMode,
-  type SetupTrigger,
   type Task,
   type TaskSeed,
   type Workspace,
@@ -119,33 +115,8 @@ export const bootstrapWorkspaces = () => post<Workspace[]>(workspaceBootstrapRou
 export const createWorkspace = (name: string) => post<Workspace>(workspacesRoute, { name })
 export const renameWorkspace = async (id: string, name: string) =>
   writeJson<{ ok: true }>(workspaceRoute(id), { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name }) }, (res) => `workspace ${res.status}`)
-// Per-workspace worktree setup script (blank ⇒ cleared server-side).
-export const setWorkspaceSetupScript = async (id: string, setupScript: string) =>
-  writeJson<{ ok: true }>(workspaceRoute(id), { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ setupScript }) }, (res) => `workspace ${res.status}`)
-// Per-workspace "run dev" command → a `dev` run target in the pane-switcher (blank ⇒ cleared, no button).
-export const setWorkspaceDevScript = async (id: string, devScript: string) =>
-  writeJson<{ ok: true }>(workspaceRoute(id), { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ devScript }) }, (res) => `workspace ${res.status}`)
-// Per-workspace restart command for the `dev` run target (blank ⇒ cleared server-side → run_restart falls back to stop+start).
-export const setWorkspaceDevRestartScript = async (id: string, devRestartScript: string) =>
-  writeJson<{ ok: true }>(workspaceRoute(id), { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ devRestartScript }) }, (res) => `workspace ${res.status}`)
-// Per-workspace worktree teardown script (docs/terminal-and-agents.md; blank ⇒ cleared server-side).
-export const setWorkspaceTeardownScript = async (id: string, teardownScript: string) =>
-  writeJson<{ ok: true }>(workspaceRoute(id), { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ teardownScript }) }, (res) => `workspace ${res.status}`)
-// Per-workspace Database-pane connection script (docs/pg.md; blank ⇒ cleared → auto-detect).
-export const setWorkspaceDbUrlScript = async (id: string, dbUrlScript: string) =>
-  writeJson<{ ok: true }>(workspaceRoute(id), { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ dbUrlScript }) }, (res) => `workspace ${res.status}`)
-// Where the Database pane's AI-generation schema comes from: '' (live introspection), 'script', or 'file'.
-export const setWorkspaceDbSchemaSource = async (id: string, dbSchemaMode: DbSchemaMode | '', dbSchemaValue: string) =>
-  writeJson<{ ok: true }>(workspaceRoute(id), { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ dbSchemaMode, dbSchemaValue }) }, (res) => `workspace ${res.status}`)
-// When the setup script runs: off / on task creation / on first terminal open.
-export const setWorkspaceSetupTrigger = async (id: string, setupScriptTrigger: SetupTrigger) =>
-  writeJson<{ ok: true }>(workspaceRoute(id), { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ setupScriptTrigger }) }, (res) => `workspace ${res.status}`)
-// How the browser-preview pane resolves its URL: '' (dev-server port), 'url', 'port', or 'script'.
-export const setWorkspacePreview = async (id: string, previewMode: PreviewMode | '', previewValue: string) =>
-  writeJson<{ ok: true }>(workspaceRoute(id), { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ previewMode, previewValue }) }, (res) => `workspace ${res.status}`)
-// Preview-browser page rules (docs/panes.md): whole-array replace; empty ⇒ cleared server-side.
-export const setWorkspaceBrowserRules = async (id: string, browserRules: BrowserRule[]) =>
-  writeJson<{ ok: true }>(workspaceRoute(id), { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ browserRules }) }, (res) => `workspace ${res.status}`)
+// Build/run/db/preview config moved off the workspace to repo scope (repo-level-settings) — edit it
+// via terminalApi().repoPath.config(owner, name, patch). Only workspace identity is patched here.
 // Workspace identity (docs/workspaces-and-tasks.md): icon (null clears) + colour (preset token or hex; null clears).
 export const setWorkspaceIcon = async (id: string, icon: WorkspaceIcon | null) =>
   writeJson<{ ok: true }>(workspaceRoute(id), { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ icon }) }, (res) => `workspace ${res.status}`)

@@ -31,7 +31,7 @@ import {
   trimRing,
 } from './terminalUtils'
 import { getProfile, listProfileDefs, listProfiles, resolveCommand, tmuxAvailable } from '../../../core/main/profiles'
-import { getRepoPath, setRepoPath, setRunTargets } from '../../../core/main/repoPaths'
+import { getRepoPath, setRepoConfig, setRepoPath, setRunTargets } from '../../../core/main/repoPaths'
 import { fileURLToPath } from 'node:url'
 import { inspectMcpConfig, MCP_CANDIDATES, STARTER_MCP_JSON, type McpServerSummary } from '../../../core/shared/mcp'
 import { launcherSpec, resolveMcpEntry, serverName } from '../../../core/main/mcpRegister'
@@ -46,7 +46,7 @@ import {
   setOnWorktreeCreated,
   taskContext,
   taskRoot,
-  workspaceSetup,
+  repoSetup,
   type TaskRow,
 } from '../../../core/main/taskWorktree'
 import { currentBranch } from '../../../core/main/worktrees'
@@ -296,7 +296,7 @@ function startIdleWatch() {
 // onCreated eager pre-create, run config, workflows). Ordered before any requested session so a
 // setup spawned from create() is tab #1.
 async function maybeRunSetup(db: AppDatabase, t: TaskRow, cwd: string): Promise<void> {
-  const { script, trigger } = await workspaceSetup(db, t.repoOwner, t.repoName)
+  const { script, trigger } = await repoSetup(db, t.repoOwner, t.repoName)
   if (trigger === 'off' || !script?.trim()) return
   await spawnOne(db, { taskId: t.id, command: script, title: 'Setup' }, cwd, true, taskContext(t), t)
   broadcastStatus() // panel re-lists to show the Setup tab even when no other spawn follows
@@ -569,6 +569,7 @@ export function registerTerminalIpc(db: AppDatabase, worktreesDir: string, deps:
     repoPathGet: (owner, repo) => getRepoPath(db, owner, repo),
     repoPathSet: (owner, repo, path) => setRepoPath(db, owner, repo, path),
     repoPathRunTargets: (owner, repo, runTargets) => setRunTargets(db, owner, repo, typeof runTargets === 'string' ? runTargets : ''),
+    repoPathConfig: (owner, repo, patch) => setRepoConfig(db, owner, repo, patch),
     // Browser-preview 'script' mode (WorkspaceSettings): run the configured shell command in the
     // task's worktree and use its stdout (last non-empty line, trimmed) as the preview URL. Keyed
     // by taskId so the renderer never supplies a path; a short timeout guards a hung script.
@@ -597,7 +598,7 @@ export function registerTerminalIpc(db: AppDatabase, worktreesDir: string, deps:
       // Snapshot PR/ticket context into curatable notes (docs/notes-and-memory.md). Best-effort and
       // independent of worktree setup — runs even when there's no setup script / the worktree exists.
       await seedNotes?.(t).catch((e) => console.warn('[notes] seed failed:', e))
-      const { script, trigger } = await workspaceSetup(db, t.repoOwner, t.repoName)
+      const { script, trigger } = await repoSetup(db, t.repoOwner, t.repoName)
       if (trigger !== 'created' || !script?.trim()) return
       // Re-read after the seedNotes await — a pane may have created the worktree meanwhile.
       t = await loadTask(db, id)

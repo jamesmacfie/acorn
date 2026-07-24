@@ -1,7 +1,7 @@
 import { Hono } from 'hono'
 import { z } from 'zod'
 import type { McpServerSummary } from '../../../../core/shared/mcp'
-import type { ArchiveOpts, ArchiveResult, CreateOpts, RepoPath, RepoPathResult, TaskStatus, TerminalProfile, TerminalSession } from '../../../../core/shared/terminal'
+import type { ArchiveOpts, ArchiveResult, CreateOpts, RepoConfigPatch, RepoPath, RepoPathResult, TaskStatus, TerminalProfile, TerminalSession } from '../../../../core/shared/terminal'
 import { bridgeSlot, viaBridge } from '../../../../core/server/bridge'
 import type { AppEnv } from '../../../../core/server/middleware/auth'
 import { respondError } from '../../../../core/server/respond'
@@ -26,6 +26,7 @@ export type TerminalBridge = {
   repoPathGet(owner: string, repo: string): Promise<RepoPath | null>
   repoPathSet(owner: string, repo: string, path: string): Promise<RepoPathResult>
   repoPathRunTargets(owner: string, repo: string, runTargets: string): Promise<RepoPathResult>
+  repoPathConfig(owner: string, repo: string, patch: RepoConfigPatch): Promise<RepoPathResult>
   previewUrl(taskId: string, script: string): Promise<{ ok: boolean; url?: string; reason?: string }>
   onCreated(taskId: string): Promise<void>
   useCheckout(taskId: string): Promise<{ worktreePath: string; branch: string } | null>
@@ -55,6 +56,30 @@ const resizeBody = z.object({ cols: z.number(), rows: z.number() })
 const sendBody = z.object({ text: z.string().min(1), submit: z.enum(['now', 'after-ready', 'draft']) })
 const repoPathSetBody = z.object({ owner: z.string(), repo: z.string(), path: z.string() })
 const runTargetsBody = z.object({ owner: z.string(), repo: z.string(), runTargets: z.string() })
+const browserRuleSchema = z.object({
+  id: z.string(),
+  enabled: z.boolean(),
+  urlPattern: z.string(),
+  trigger: z.literal('load'),
+  action: z.object({ type: z.literal('fill'), selector: z.string(), value: z.string() }),
+})
+const repoConfigBody = z.object({
+  owner: z.string(),
+  repo: z.string(),
+  patch: z.object({
+    setupScript: z.string().optional(),
+    setupScriptTrigger: z.enum(['off', 'created', 'terminal']).optional(),
+    teardownScript: z.string().optional(),
+    devScript: z.string().optional(),
+    devRestartScript: z.string().optional(),
+    dbUrlScript: z.string().optional(),
+    dbSchemaMode: z.enum(['auto', 'script', 'file']).or(z.literal('')).optional(),
+    dbSchemaValue: z.string().optional(),
+    previewMode: z.enum(['url', 'port', 'script']).or(z.literal('')).optional(),
+    previewValue: z.string().optional(),
+    browserRules: z.array(browserRuleSchema).optional(),
+  }),
+})
 const previewBody = z.object({ script: z.string() })
 const archiveBody = z.object({ deleteWorktree: z.boolean().optional(), force: z.boolean().optional(), skipTeardown: z.boolean().optional() })
 
@@ -101,6 +126,11 @@ export const terminal = new Hono<AppEnv>()
     const p = runTargetsBody.safeParse(await c.req.json().catch(() => null))
     if (!p.success) return respondError(c, 400, 'bad_request')
     return viaBridge(c, b, (t) => t.repoPathRunTargets(p.data.owner, p.data.repo, p.data.runTargets))
+  })
+  .put('/terminal/repo-path/config', async (c) => {
+    const p = repoConfigBody.safeParse(await c.req.json().catch(() => null))
+    if (!p.success) return respondError(c, 400, 'bad_request')
+    return viaBridge(c, b, (t) => t.repoPathConfig(p.data.owner, p.data.repo, p.data.patch))
   })
   // --- task lifecycle (task-scoped) ---
   .post('/tasks/:id/preview-url', async (c) => {

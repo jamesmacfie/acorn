@@ -1,12 +1,13 @@
 // Typed accessor for the preload's `window.acorn.terminal` bridge (docs/terminal-and-agents.md). The global is declared
 // here so anything importing it (App's flag check, TerminalPanel) sees the same shape.
-import type { ArchiveOpts, ArchiveResult, CreateOpts, RepoPath, RepoPathResult, ServerMsg, TerminalProfile, TerminalSession, TaskStatus } from '../../../core/shared/terminal'
+import type { ArchiveOpts, ArchiveResult, CreateOpts, RepoConfigPatch, RepoPath, RepoPathResult, ServerMsg, TerminalProfile, TerminalSession, TaskStatus } from '../../../core/shared/terminal'
 import {
   taskArchiveRoute,
   taskOnCreatedRoute,
   taskPreviewUrlRoute,
   taskUseCheckoutRoute,
   terminalProfilesRoute,
+  terminalRepoPathConfigRoute,
   terminalRepoPathRoute,
   terminalRepoPathRunTargetsRoute,
   terminalRepoPathSetRoute,
@@ -35,6 +36,7 @@ export type TerminalApi = {
     set(owner: string, repo: string, path: string): Promise<RepoPathResult>
     pick(): Promise<string | null>
     runTargets(owner: string, repo: string, runTargets: string): Promise<RepoPathResult>
+    config(owner: string, repo: string, patch: RepoConfigPatch): Promise<RepoPathResult>
   }
   // Run a workspace's browser-preview script in the task's worktree; stdout (trimmed) is the URL.
   previewUrl(taskId: string, script: string): Promise<{ ok: boolean; url?: string; reason?: string }>
@@ -157,6 +159,7 @@ export const terminalApi = (): TerminalApi | null => {
       get: (owner, repo) => readJson<RepoPath | null>(terminalRepoPathRoute(owner, repo)),
       set: (owner, repo, path) => put<RepoPathResult>(terminalRepoPathSetRoute, { owner, repo, path }),
       runTargets: (owner, repo, runTargets) => put<RepoPathResult>(terminalRepoPathRunTargetsRoute, { owner, repo, runTargets }),
+      config: (owner, repo, patch) => put<RepoPathResult>(terminalRepoPathConfigRoute, { owner, repo, patch }),
       pick: () => bridge.repoPath.pick(),
     },
     previewUrl: (taskId, script) => post<{ ok: boolean; url?: string; reason?: string }>(taskPreviewUrlRoute(taskId), { script }),

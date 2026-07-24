@@ -23,6 +23,7 @@ function stubBridge(over: Partial<TerminalBridge> = {}): TerminalBridge {
     repoPathGet: async () => null,
     repoPathSet: async () => ({ ok: false, reason: 'x' }),
     repoPathRunTargets: async () => ({ ok: false, reason: 'x' }),
+    repoPathConfig: async () => ({ ok: false, reason: 'x' }),
     previewUrl: async () => ({ ok: false }),
     onCreated: async () => {},
     useCheckout: async () => null,

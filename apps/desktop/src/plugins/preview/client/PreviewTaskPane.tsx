@@ -1,9 +1,6 @@
 import { createResource } from 'solid-js'
-import { createQuery } from '@tanstack/solid-query'
 import type { Task } from '../../../core/client/queries'
-import { workspacesOptions } from '../../../core/client/queries'
 import type { PaneContribution } from '../../../core/client/registries/panes'
-import { workspaceForRepo } from '../../../core/client/workspaces/activeWorkspace'
 import { terminalApi } from '../../terminal/client/terminalClient'
 import { recipeBrowserUrl } from '../../../core/client/tasks/tasks'
 import { runApi } from '../../terminal/client/runClient'
@@ -11,8 +8,12 @@ import PreviewPane from './PreviewPane'
 
 export function PreviewTaskPane(props: { task: Task }) {
   const api = terminalApi()
-  const workspaces = createQuery(() => workspacesOptions(true))
-  const workspace = () => workspaceForRepo(workspaces.data, props.task.repoOwner, props.task.repoName)
+  // Repo-level preview config (repo-level-settings): the machine-local repo_paths values. ponytail:
+  // committed .acorn/config.toml preview keys drive the public-API resolver, not this in-app pane.
+  const [config] = createResource(
+    () => `${props.task.repoOwner}/${props.task.repoName}`,
+    () => api?.repoPath.get(props.task.repoOwner, props.task.repoName) ?? null,
+  )
   const [targets] = createResource(
     () => props.task.id,
     async (taskId) => {
@@ -27,7 +28,7 @@ export function PreviewTaskPane(props: { task: Task }) {
   )
   const [scriptUrl] = createResource(
     () => {
-      const current = workspace()
+      const current = config()
       return current?.previewMode === 'script' && current.previewValue
         ? { taskId: props.task.id, script: current.previewValue }
         : null
@@ -42,7 +43,7 @@ export function PreviewTaskPane(props: { task: Task }) {
     const recipe = recipeBrowserUrl(props.task.id)
     if (recipe) return recipe
     if (runUrl()) return runUrl()!
-    const current = workspace()
+    const current = config()
     const value = current?.previewValue?.trim() || null
     if (current?.previewMode === 'url') return value
     if (current?.previewMode === 'port') {

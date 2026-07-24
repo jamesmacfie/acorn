@@ -9,6 +9,7 @@
 // from the editor (query) runs verbatim — it's the user's own DB and writes are wanted.
 import { execFile } from 'node:child_process'
 import { readFile } from 'node:fs/promises'
+import { homedir } from 'node:os'
 import { join } from 'node:path'
 import { promisify } from 'node:util'
 import pg from 'pg'
@@ -16,7 +17,9 @@ import type { QueryResult, QueryResultRow } from 'pg'
 import type { AppDatabase } from '../../../core/server/db'
 import type { DatabaseBridge } from '../server/routes/database'
 import type { DbCell, DbColumn, DbConnectResult, DbColumnsResult, DbPk, DbQueryResult, DbResultSet, DbRowsResult, DbSchemaResult, DbTablesResult, DbWriteResult } from '../shared/database'
-import { loadTask, resolveInRoot, taskRoot, workspaceConfigRow } from '../../../core/main/taskWorktree'
+import { loadTask, resolveInRoot, taskRoot } from '../../../core/main/taskWorktree'
+import { getRepoPath } from '../../../core/main/repoPaths'
+import { loadRepoConfig } from '../../../core/main/runConfig'
 
 const { Pool } = pg
 const exec = promisify(execFile)
@@ -49,14 +52,16 @@ const qid = (id: string): string => `"${id.replace(/"/g, '""')}"`
 
 const errText = (e: unknown): string => (e instanceof Error ? e.message : String(e))
 
-// Resolve the connection URL for a task WITHOUT persisting it: workspace dbUrlScript (run in the
-// worktree) → <worktree>/.env DATABASE_URL → process.env.DATABASE_URL. Returns null if none found.
+// Resolve the connection URL for a task WITHOUT persisting it: repo dbUrlScript (committed
+// .acorn/config.toml [database].url_script wins over the repo_paths fallback; run in the worktree)
+// → <worktree>/.env DATABASE_URL → process.env.DATABASE_URL. Returns null if none found.
 async function resolveDbUrl(db: AppDatabase, taskId: string): Promise<string | null> {
   const t = await loadTask(db, taskId)
   if (!t) return null
   const root = await taskRoot(db, taskId) // the task worktree (created lazily), or null
-  const ws = await workspaceConfigRow(db, t.repoOwner, t.repoName)
-  const script = ws?.dbUrlScript?.trim()
+  const rp = await getRepoPath(db, t.repoOwner, t.repoName)
+  const cfg = loadRepoConfig(root ?? rp?.path ?? null, homedir(), { dbUrlScript: rp?.dbUrlScript })
+  const script = cfg.dbUrlScript?.trim()
   if (script && root) {
     try {
       const { stdout } = await exec('bash', ['-lc', script], { cwd: root, timeout: 15_000, maxBuffer: 1 << 20 })
@@ -292,17 +297,17 @@ export function databaseBridge(db: AppDatabase): DatabaseBridge {
       }
     },
 
-    // Schema text for AI query generation (docs/pg.md): per-workspace source — a shell script's
-    // stdout, a worktree file, or (default) live introspection of the connected pool.
+    // Schema text for AI query generation (docs/pg.md): per-repo source (repo-level-settings) — a
+    // shell script's stdout, a worktree file, or (default) live introspection of the connected pool.
     schema: async (taskId): Promise<DbSchemaResult> => {
       try {
         const t = await loadTask(db, taskId)
         if (!t) return { error: 'Task not found.' }
-        const ws = await workspaceConfigRow(db, t.repoOwner, t.repoName)
-        const mode = ws?.dbSchemaMode === 'script' || ws?.dbSchemaMode === 'file' ? ws.dbSchemaMode : 'auto'
-        const value = ws?.dbSchemaValue?.trim()
+        const rp = await getRepoPath(db, t.repoOwner, t.repoName)
+        const mode = rp?.dbSchemaMode === 'script' || rp?.dbSchemaMode === 'file' ? rp.dbSchemaMode : 'auto'
+        const value = rp?.dbSchemaValue?.trim()
         if (mode === 'script') {
-          if (!value) return { error: 'No schema script configured in Workspace Settings.' }
+          if (!value) return { error: 'No schema script configured in the repo settings.' }
           const root = await taskRoot(db, taskId)
           if (!root) return { error: 'No worktree for this task yet.' }
           const { stdout } = await exec('bash', ['-lc', value], { cwd: root, timeout: 15_000, maxBuffer: 4 << 20 })
@@ -310,7 +315,7 @@ export function databaseBridge(db: AppDatabase): DatabaseBridge {
           return text ? { schema: capSchema(text), source: 'script' } : { error: 'Schema script produced no output.' }
         }
         if (mode === 'file') {
-          if (!value) return { error: 'No schema file configured in Workspace Settings.' }
+          if (!value) return { error: 'No schema file configured in the repo settings.' }
           const root = await taskRoot(db, taskId)
           if (!root) return { error: 'No worktree for this task yet.' }
           const abs = resolveInRoot(root, value)

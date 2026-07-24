@@ -1,4 +1,4 @@
-import { createEffect, createMemo, createResource, createSignal, For, on, onCleanup, onMount, Show } from 'solid-js'
+import { createMemo, createResource, createSignal, For, onCleanup, onMount, Show } from 'solid-js'
 import { useNavigate } from '@solidjs/router'
 import { createQuery, useQueryClient } from '@tanstack/solid-query'
 import { prefsOptions, tasksKey, tasksOptions, workspacesOptions, type Task } from '../queries'
@@ -44,7 +44,8 @@ export default function TaskView(props: {
       return 'targets' in result ? result.targets : []
     },
   )
-  createEffect(on(() => workspace()?.devScript, () => void refetchTargets(), { defer: true }))
+  // ponytail: run targets refetch on task open + after a toggle. Dev script is repo-level config now
+  // (edited in a separate resource in settings), so there's no shared signal to live-watch here.
   const [runError, setRunError] = createSignal('')
   async function toggleTarget(id: string, running: boolean) {
     if (!api) return

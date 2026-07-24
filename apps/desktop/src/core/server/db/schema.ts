@@ -272,6 +272,21 @@ export const repoPaths = sqliteTable(
     // External editor command for this repo's worktrees (docs/workspaces-and-tasks.md): 'code' | 'zed' |
     // 'cursor -n' | an absolute path. null → the prefs 'editor_command_default' → 'code'.
     editorCommand: text('editor_command'),
+    // Repo-level lifecycle/build config (docs/workspaces-and-tasks.md). These are the machine-local DB
+    // fallback layer beneath a committed .acorn/config.toml (loadRepoConfig precedence). They were
+    // per-workspace columns until repo-level-settings moved them here — a workspace is a GROUP of
+    // repos, but these describe how to build/run/inspect ONE repo, so they belong per (owner, repo).
+    setupScript: text('setup_script'), // shell command run once when a task worktree is created; null/blank = none
+    setupScriptTrigger: text('setup_script_trigger'), // 'off' | 'created' | 'terminal' — when to run it; null → 'terminal'
+    devScript: text('dev_script'), // "run dev" command → a base `dev` run target; null/blank = no run button
+    devRestartScript: text('dev_restart_script'), // restart command for the `dev` target; when set, run_restart runs it instead of stop+start
+    teardownScript: text('teardown_script'), // shell command run in the worktree just before removal (docs/terminal-and-agents.md); null/blank = none
+    dbUrlScript: text('db_url_script'), // shell command run in the worktree to print a Postgres connection URL for the Database pane (docs/pg.md); null/blank = auto-detect from .env / $DATABASE_URL
+    dbSchemaMode: text('db_schema_mode'), // 'auto' | 'script' | 'file' — where the Database pane's AI-generation schema text comes from; null → 'auto' (live introspection)
+    dbSchemaValue: text('db_schema_value'), // the shell command or worktree-relative file path per dbSchemaMode; null/blank = unset
+    previewMode: text('preview_mode'), // 'url' | 'port' | 'script' — how the browser-preview URL is resolved; null → dev-server port
+    previewValue: text('preview_value'), // the URL, port, or shell command per previewMode; null/blank = unset
+    browserRules: text('browser_rules'), // JSON BrowserRule[] — preview-browser page rules (docs/panes.md); null = none
     createdAt: integer('created_at').notNull(),
     updatedAt: integer('updated_at').notNull(),
   },
@@ -296,22 +311,14 @@ export const configAcks = sqliteTable(
 // A Workspace is a named GROUP of repos (docs/workspaces-and-tasks.md) — "Runn", "Acorn". The top-level unit
 // the user selects in the top bar. Machine-scoped like repo_paths / tasks (single-user machine).
 // A repo belongs to exactly one workspace (partition) — see workspaceRepos.
+// PURE GROUPING: identity (name/icon/color/sort) + membership + external-project links only. The
+// build/run/db/preview config that used to live here moved to repo_paths (repo-level-settings) —
+// those describe a repo, not the group.
 export const workspaces = sqliteTable('workspaces', {
   id: text('id').primaryKey(), // opaque uuid
   name: text('name').notNull(), // editable label
   isDefault: integer('is_default', { mode: 'boolean' }).notNull().default(false), // the catch-all group
   sort: integer('sort').notNull().default(0), // selector ordering
-  setupScript: text('setup_script'), // shell command run once when a task worktree is created; null/blank = none
-  setupScriptTrigger: text('setup_script_trigger'), // 'off' | 'created' | 'terminal' — when to run it; null → 'terminal'
-  devScript: text('dev_script'), // per-workspace "run dev" command → a `dev` run target; null/blank = no run button
-  devRestartScript: text('dev_restart_script'), // per-workspace restart command for the `dev` target; when set, run_restart runs it instead of stop+start
-  teardownScript: text('teardown_script'), // shell command run in the worktree just before removal (docs/terminal-and-agents.md); null/blank = none
-  dbUrlScript: text('db_url_script'), // shell command run in the worktree to print a Postgres connection URL for the Database pane (docs/pg.md); null/blank = auto-detect from .env / $DATABASE_URL
-  dbSchemaMode: text('db_schema_mode'), // 'auto' | 'script' | 'file' — where the Database pane's AI-generation schema text comes from; null → 'auto' (live introspection)
-  dbSchemaValue: text('db_schema_value'), // the shell command or worktree-relative file path per dbSchemaMode; null/blank = unset
-  previewMode: text('preview_mode'), // 'url' | 'port' | 'script' — how the browser-preview URL is resolved; null → dev-server port
-  previewValue: text('preview_value'), // the URL, port, or shell command per previewMode; null/blank = unset
-  browserRules: text('browser_rules'), // JSON BrowserRule[] — preview-browser page rules (docs/panes.md); null = none
   icon: text('icon'), // JSON WorkspaceIcon ({"kind":"emoji","value":"🌰"} | {"kind":"lucide",…} | {"kind":"github"}); null → derived default
   color: text('color'), // preset token key ('green'|'blue'|…) or 6-hex; null → derived from name hash
   createdAt: integer('created_at').notNull(),

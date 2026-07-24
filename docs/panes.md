@@ -218,7 +218,7 @@ Source: `features/search/SearchPane.tsx`, `features/search/searchClient.ts`.
 
 A native Postgres pane, Postico-shaped: a searchable virtualized table list, a row grid with a
 detail panel that edits/inserts/deletes, and a Monaco SQL editor with a results grid. The
-connection is per-task, resolved on demand (workspace `dbUrlScript` → `.env` `DATABASE_URL` →
+connection is per-task, resolved on demand (repo `dbUrlScript` → `.env` `DATABASE_URL` →
 `process.env`) and never persisted; one `pg.Pool` per task lives in main behind task-scoped HTTP
 routes. Full detail: [pg.md](./pg.md).
 
@@ -252,15 +252,15 @@ Source: `plugins/rollbar/client/RollbarPane.tsx` + `RollbarItemPanel.tsx`.
 
 ### `preview` — browser preview (agent-drivable)
 
-A main-owned `WebContentsView` onto the workspace's / run-target's resolved URL, wrapped in browser chrome —
+A main-owned `WebContentsView` onto the repo's / run-target's resolved URL, wrapped in browser chrome —
 back / forward / stop-reload / home + an editable URL bar + preview-scoped DevTools + a loading spinner
 (`plugins/preview/client/PreviewPane.tsx`). The home
-URL (`previewUrl()` in `TaskView.tsx`) resolves in priority order: a layout recipe's
-`browser=run:<id>` resolution → the default run target's resolved URL → the legacy per-workspace
-preview config (url / port / script mode) → the dev-server port. One native view is kept per task
-so page/scroll/form state survives pane and task switches; archiving a task evicts its view.
-Navigation is restricted to `http(s)`.
-Preview needs a resolvable URL (a configured run target / workspace preview), so it only does its
+URL (`url()` in `PreviewTaskPane.tsx`) resolves in priority order: a layout recipe's
+`browser=run:<id>` resolution → the default run target's resolved URL → the repo-level
+preview config (url / port / script mode; `repo_paths` + committed `[preview]`) → the dev-server port.
+One native view is kept per task so page/scroll/form state survives pane and task switches; archiving
+a task evicts its view. Navigation is restricted to `http(s)`.
+Preview needs a resolvable URL (a configured run target / repo preview), so it only does its
 full job on desktop.
 
 **Agent driving is a capability of this same pane**, not a separate `browser` pane. The main process

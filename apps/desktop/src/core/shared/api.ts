@@ -303,22 +303,13 @@ export type WorkspaceIcon =
   | { kind: 'emoji'; value: string }
   | { kind: 'lucide'; value: string }
   | { kind: 'github' }
+// PURE GROUPING (repo-level-settings): identity + membership only. The build/run/db/preview config
+// that used to live here moved to RepoPath (per (owner, repo)) — see core/shared/terminal.ts.
 export type Workspace = {
   id: string
   name: string
   isDefault: boolean
   sort: number
-  setupScript: string | null // shell command run once when a task worktree is created; null/blank = none
-  setupScriptTrigger: SetupTrigger | null
-  devScript: string | null // per-workspace "run dev" command surfaced as a `dev` run target; null/blank = none
-  devRestartScript: string | null // per-workspace restart command for the `dev` target; null/blank = stop+start
-  teardownScript: string | null // shell command run in the worktree just before removal (docs/terminal-and-agents.md); null/blank = none
-  dbUrlScript: string | null // shell command run in the worktree to print a Postgres URL for the Database pane (docs/pg.md); null/blank = auto-detect
-  dbSchemaMode: DbSchemaMode | null // where the AI-generation schema text comes from; null → 'auto'
-  dbSchemaValue: string | null // the command or worktree-relative path per dbSchemaMode; null/blank = unset
-  previewMode: PreviewMode | null // how the browser-preview URL is resolved; null → dev-server port
-  previewValue: string | null // the URL, port, or command per previewMode; null/blank = unset
-  browserRules: BrowserRule[] // preview-browser page rules; empty = none
   icon: WorkspaceIcon | null
   color: string | null
   repos: WorkspaceRepo[]
@@ -503,6 +494,7 @@ export const terminalRepoPathRoute = (owner: string, repo: string) =>
   `/api/terminal/repo-path?owner=${encodeURIComponent(owner)}&repo=${encodeURIComponent(repo)}`
 export const terminalRepoPathSetRoute = '/api/terminal/repo-path'
 export const terminalRepoPathRunTargetsRoute = '/api/terminal/repo-path/run-targets'
+export const terminalRepoPathConfigRoute = '/api/terminal/repo-path/config'
 export const taskArchiveRoute = (id: string) => `/api/tasks/${id}/archive`
 export const taskPreviewUrlRoute = (id: string) => `/api/tasks/${id}/preview-url`
 export const taskOnCreatedRoute = (id: string) => `/api/tasks/${id}/on-created`

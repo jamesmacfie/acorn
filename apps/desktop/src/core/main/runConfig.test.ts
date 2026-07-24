@@ -99,6 +99,29 @@ browser = "run:dev"
     expect(cfg.layouts).toEqual([{ id: 'review', panes: ['pr', 'changes'], terminal: 'dev', browser: 'run:dev' }])
   })
 
+  it('db/preview: repo_paths fallback resolves; committed [database]/[preview] toml wins (repo-level-settings)', () => {
+    // DB fallback only (no toml): the repo_paths values pass through.
+    const fallback = loadRepoConfig(repoDir, userDir, { dbUrlScript: 'db-fallback', previewMode: 'port', previewValue: '3000' })
+    expect(fallback.errors).toEqual([])
+    expect(fallback.dbUrlScript).toBe('db-fallback')
+    expect(fallback.preview).toEqual({ mode: 'port', value: '3000' })
+    // Committed .acorn/config.toml wins over the repo_paths fallback.
+    writeConfig(repoDir, `
+[database]
+url_script = "bin/print-db-url"
+[preview]
+mode = "url"
+value = "https://app.test"
+`)
+    const cfg = loadRepoConfig(repoDir, userDir, { dbUrlScript: 'db-fallback', previewMode: 'port', previewValue: '3000' })
+    expect(cfg.errors).toEqual([])
+    expect(cfg.dbUrlScript).toBe('bin/print-db-url')
+    expect(cfg.preview).toEqual({ mode: 'url', value: 'https://app.test' })
+    // browserRules is DB-only (no toml layer): it passes through untouched.
+    const rule = { id: 'r1', enabled: true, urlPattern: 'localhost/login', trigger: 'load' as const, action: { type: 'fill' as const, selector: '#u', value: 'dev' } }
+    expect(loadRepoConfig(repoDir, userDir, { browserRules: [rule] }).browserRules).toEqual([rule])
+  })
+
   it('malformed TOML → structured error, not a throw; falls back to lower layers', () => {
     writeConfig(repoDir, `[scripts\nsetup = broken`)
     writeConfig(userDir, `[scripts]\nsetup = "user-setup"`)
