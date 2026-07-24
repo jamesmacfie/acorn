@@ -1,8 +1,8 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "7235ef06-3897-4503-9ef0-b22a4c0b8c07",
-  "prevId": "1c877e55-50f6-4fa4-834c-8a58b193d685",
+  "id": "f13e928a-b7c4-4b5e-96aa-6c0670757036",
+  "prevId": "7235ef06-3897-4503-9ef0-b22a4c0b8c07",
   "tables": {
     "api_idempotency": {
       "name": "api_idempotency",
@@ -1452,6 +1452,83 @@
           "notNull": false,
           "autoincrement": false
         },
+        "setup_script": {
+          "name": "setup_script",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "setup_script_trigger": {
+          "name": "setup_script_trigger",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "dev_script": {
+          "name": "dev_script",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "dev_restart_script": {
+          "name": "dev_restart_script",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "teardown_script": {
+          "name": "teardown_script",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "db_url_script": {
+          "name": "db_url_script",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "db_schema_mode": {
+          "name": "db_schema_mode",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "db_schema_value": {
+          "name": "db_schema_value",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "preview_mode": {
+          "name": "preview_mode",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "preview_value": {
+          "name": "preview_value",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "browser_rules": {
+          "name": "browser_rules",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
         "created_at": {
           "name": "created_at",
           "type": "integer",
@@ -2675,83 +2752,6 @@
           "notNull": true,
           "autoincrement": false,
           "default": 0
-        },
-        "setup_script": {
-          "name": "setup_script",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "setup_script_trigger": {
-          "name": "setup_script_trigger",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "dev_script": {
-          "name": "dev_script",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "dev_restart_script": {
-          "name": "dev_restart_script",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "teardown_script": {
-          "name": "teardown_script",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "db_url_script": {
-          "name": "db_url_script",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "db_schema_mode": {
-          "name": "db_schema_mode",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "db_schema_value": {
-          "name": "db_schema_value",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "preview_mode": {
-          "name": "preview_mode",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "preview_value": {
-          "name": "preview_value",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "browser_rules": {
-          "name": "browser_rules",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
         },
         "icon": {
           "name": "icon",

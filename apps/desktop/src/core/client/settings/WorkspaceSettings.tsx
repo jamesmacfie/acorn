@@ -1,11 +1,12 @@
 import { createResource, createSignal, For, Index, onCleanup, Show } from 'solid-js'
-import { useQueryClient } from '@tanstack/solid-query'
+import { createQuery, useQueryClient } from '@tanstack/solid-query'
 import { debounce } from '../../../plugins/editor/client/autosave'
 import { terminalApi } from '../../../plugins/terminal/client/terminalClient'
-import { workspacesKey } from '../queries'
+import { integrationsOptions, workspacesKey } from '../queries'
 import { deleteWorkspace, renameWorkspace, setWorkspaceColor, setWorkspaceIcon } from '../../../plugins/github/client/mutations'
-import type { BrowserRule, PreviewMode, SetupTrigger, Workspace } from '../../shared/api'
+import type { BrowserRule, DbSchemaMode, PreviewMode, SetupTrigger, Workspace } from '../../shared/api'
 import type { RepoConfigPatch } from '../../shared/terminal'
+import { availableModelConnections } from '../../shared/modelProviders'
 import { resolveWorkspaceColor, WORKSPACE_COLORS } from '../../shared/workspaceIdentity'
 import { confirmWillEvent } from '../registries/willPhase'
 import { clientEvents } from '../registries/clientEvents'
@@ -186,10 +187,20 @@ function RepoConfig(props: { owner: string; name: string }) {
   const [dbUrl, setDbUrl] = createSignal<string | null>(null)
   const [dev, setDev] = createSignal<string | null>(null)
   const [devRestart, setDevRestart] = createSignal<string | null>(null)
+  const [dbSchemaValue, setDbSchemaValue] = createSignal<string | null>(null)
   const [previewValue, setPreviewValue] = createSignal<string | null>(null)
   const [err, setErr] = createSignal('')
 
+  // Gate the AI-SQL schema-source editor on a configured model provider connection (the feature is
+  // useless without one), matching where SQL generation itself is available.
+  const integrations = createQuery(() => integrationsOptions(true))
+  const hasModelConnection = () => {
+    const data = integrations.data
+    return data ? availableModelConnections(data).length > 0 : false
+  }
+
   const trigger = (): SetupTrigger => row()?.setupScriptTrigger ?? 'terminal'
+  const dbSchemaMode = (): DbSchemaMode | '' => row()?.dbSchemaMode ?? ''
   const previewMode = (): PreviewMode | '' => row()?.previewMode ?? ''
 
   const save = async (patch: RepoConfigPatch) => {
@@ -204,8 +215,9 @@ function RepoConfig(props: { owner: string; name: string }) {
   const debDbUrl = debounce(() => void save({ dbUrlScript: dbUrl() ?? '' }), 1500)
   const debDev = debounce(() => void save({ devScript: dev() ?? '' }), 1500)
   const debDevRestart = debounce(() => void save({ devRestartScript: devRestart() ?? '' }), 1500)
+  const debDbSchema = debounce(() => void save({ dbSchemaValue: dbSchemaValue() ?? '' }), 1500)
   const debPreview = debounce(() => void save({ previewValue: previewValue() ?? '' }), 1500)
-  onCleanup(() => { debSetup.flush(); debTeardown.flush(); debDbUrl.flush(); debDev.flush(); debDevRestart.flush(); debPreview.flush() })
+  onCleanup(() => { debSetup.flush(); debTeardown.flush(); debDbUrl.flush(); debDev.flush(); debDevRestart.flush(); debDbSchema.flush(); debPreview.flush() })
 
   return (
     <details class="settings-repo-config">
@@ -270,6 +282,47 @@ function RepoConfig(props: { owner: string; name: string }) {
             onBlur={() => debDbUrl.flush()}
           />
         </label>
+
+        <Show when={hasModelConnection()}>
+          <label class="settings-field">
+            <span class="settings-label">SQL generation schema source</span>
+            <span class="muted settings-hint">
+              Where the database schema in the AI query-generation prompt comes from.
+            </span>
+            <select
+              class="integration-key-input"
+              value={dbSchemaMode()}
+              onChange={(e) => { setDbSchemaValue(null); void save({ dbSchemaMode: e.currentTarget.value as DbSchemaMode | '' }) }}
+            >
+              <option value="">Live database introspection (default)</option>
+              <option value="script">Script — its output is the schema</option>
+              <option value="file">File in the worktree</option>
+            </select>
+            <Show when={dbSchemaMode() === 'script'}>
+              <textarea
+                class="settings-script"
+                rows="2"
+                spellcheck={false}
+                placeholder={'pg_dump --schema-only "$DATABASE_URL"'}
+                value={dbSchemaValue() ?? row()?.dbSchemaValue ?? ''}
+                onInput={(e) => { setDbSchemaValue(e.currentTarget.value); debDbSchema() }}
+                onBlur={() => debDbSchema.flush()}
+              />
+              <span class="muted settings-hint">Run in the task's worktree; its stdout is used as the schema.</span>
+            </Show>
+            <Show when={dbSchemaMode() === 'file'}>
+              <input
+                class="integration-key-input"
+                type="text"
+                placeholder="db/schema.sql"
+                value={dbSchemaValue() ?? row()?.dbSchemaValue ?? ''}
+                onInput={(e) => { setDbSchemaValue(e.currentTarget.value); debDbSchema() }}
+                onBlur={() => debDbSchema.flush()}
+              />
+              <span class="muted settings-hint">A path relative to the task's worktree root.</span>
+            </Show>
+          </label>
+        </Show>
 
         <label class="settings-field">
           <span class="settings-label">Dev script</span>
