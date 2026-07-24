@@ -30,6 +30,7 @@ import { registerWorkflowIpc } from './workflowWiring'
 import { registerPreviewIpc } from '../../plugins/preview/main/previewService'
 import { endDbPools } from '../../plugins/database/main/database'
 import { disposeTerminal, reconcileTmux, refreshAcornMcpRegistrations, registerTerminalIpc, sendToAgent, terminalRunGlue } from '../../plugins/terminal/main/terminal'
+import { disposeDocker } from '../../plugins/docker/main/dockerService'
 import { seedTaskNotes } from '../../plugins/notes/main/seedTaskNotes'
 import { reconcileWorktrees, setWorktreesRoot } from '../../core/main/taskWorktree'
 import { wireConfigTrust } from './configTrustWiring'
@@ -103,6 +104,11 @@ export async function bootstrap({ dataDir, origin, createWindow }: BootstrapOpti
       disposeTerminal() // clear the engine idle-watch interval
     } catch (e) {
       console.warn('[boot] disposeTerminal failed:', e)
+    }
+    try {
+      disposeDocker() // kill the docker events watcher child
+    } catch (e) {
+      console.warn('[boot] disposeDocker failed:', e)
     }
     try {
       await endDbPools() // end any open pg pools (database pane)
@@ -210,6 +216,7 @@ export async function bootstrap({ dataDir, origin, createWindow }: BootstrapOpti
         { id: 'editor', available: true },
         { id: 'memory', available: true },
         { id: 'database', available: true },
+        { id: 'docker', available: true },
         { id: 'workflows', available: true },
         { id: 'rollbar', available: true },
         { id: 'linear', available: true },

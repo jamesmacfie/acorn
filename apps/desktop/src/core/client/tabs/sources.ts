@@ -1,6 +1,6 @@
 // Source gating (docs/workspaces-and-tasks.md / docs/integrations.md): which browse Sources the rail shows.
-// GitHub is always available; Linear/Rollbar appear iff a connected integration row exists.
-// Pure — unit tested; TabRail is the consumer.
+// GitHub is always available; Linear/Rollbar appear iff a connected integration row exists; local
+// sources (no providerId, e.g. docker) are always shown. Pure — unit tested; TabRail is the consumer.
 import type { Integration } from '../../shared/api'
 import type { SourceId } from '../tasks/tasks'
 import { sourceRegistry } from '../registries/sources'
@@ -13,6 +13,6 @@ export function availableSources(integrations: Integration[] | undefined): Sourc
   )
   return [
     { id: 'github', glyph: '◇', label: 'GitHub' },
-    ...sourceRegistry.entries().filter((source) => has(source.providerId, source.requiredCapability)).map(({ id, glyph, label }) => ({ id, glyph, label })),
+    ...sourceRegistry.entries().filter((source) => !source.providerId || has(source.providerId, source.requiredCapability)).map(({ id, glyph, label }) => ({ id, glyph, label })),
   ]
 }

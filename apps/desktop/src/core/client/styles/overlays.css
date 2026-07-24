@@ -42,6 +42,8 @@
 .will-concerns { display: flex; flex-direction: column; gap: 8px; margin: 0 0 16px; padding: 0; list-style: none; }
 .will-concerns li { display: grid; grid-template-columns: auto 1fr auto; gap: 8px; align-items: baseline; }
 .will-concerns li[data-severity='danger'] { color: var(--del-marker); }
+.will-concern-option { grid-column: 2 / -1; display: flex; align-items: center; gap: 6px; font-size: var(--fs-sm); color: var(--text); cursor: pointer; }
+.will-concern-option input { accent-color: var(--accent); cursor: pointer; }
 .query-gate-loading, .query-gate-error { padding: var(--pane-pad); color: var(--text-muted); }
 .query-gate-error { display: flex; align-items: center; gap: 8px; color: var(--del-marker); }
 .ui-form-field { display: flex; flex-direction: column; gap: 5px; }

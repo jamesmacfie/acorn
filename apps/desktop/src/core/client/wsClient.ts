@@ -2,6 +2,7 @@
 // per-session `window.acorn.terminal.attach/write/onStatus` + `workflow.onNotice` IPC. One lazily-
 // opened WebSocket, same-origin so the session cookie rides the upgrade automatically; it
 // reconnects and re-attaches live subscriptions, and fans kind-tagged frames out to local callers.
+import type { DockerStatsSample } from '../shared/docker'
 import type { ServerMsg } from '../shared/terminal'
 import { WS_PATH, type WsClientFrame, type WsServerFrame } from '../shared/ws'
 
@@ -13,6 +14,15 @@ const outputSubs = new Map<string, Set<OutputCb>>() // sessionId → local subsc
 const statusSubs = new Set<() => void>()
 const noticeSubs = new Set<NoticeCb>()
 const stepEventSubs = new Set<StepEventCb>()
+const dockerChangedSubs = new Set<(scopes: string[]) => void>()
+// Docker log/stats stream subscribers, keyed `${kind}:${id}` — mirrors outputSubs' first-attach /
+// last-detach contract and the reconnect re-attach below.
+export type DockerStreamEvent = { kind: 'log'; data: string } | { kind: 'stats'; sample: DockerStatsSample } | { kind: 'end' }
+const dockerStreamSubs = new Map<string, Set<(event: DockerStreamEvent) => void>>()
+// Interactive docker-exec PTYs: one listener per execId, no reconnect re-attach (the PTY dies with
+// the connection — the component shows the exit and the user reopens).
+export type DockerExecEvent = { kind: 'out'; data: string } | { kind: 'exit' }
+const dockerExecSubs = new Map<string, (event: DockerExecEvent) => void>()
 const outbox: WsClientFrame[] = [] // frames queued while the socket isn't OPEN
 
 // UI control broker (docs/public-api.md): the renderer registers a window, reports
@@ -45,6 +55,10 @@ function connect(): void {
     // Re-attach every live subscription so a reconnect (or a reload) re-subscribes the PTY and
     // replays its ring — the server treats attach as idempotent per connection.
     for (const id of outputSubs.keys()) sock.send(JSON.stringify({ channel: 'term:attach', id } satisfies WsClientFrame))
+    for (const key of dockerStreamSubs.keys()) {
+      const [kind, id] = splitStreamKey(key)
+      sock.send(JSON.stringify({ channel: `docker:${kind}:attach`, id } satisfies WsClientFrame))
+    }
     // Re-register the UI control window on reconnect so the broker regains its control connection.
     if (uiRegistration) sock.send(JSON.stringify({ channel: 'ui:register', ...uiRegistration } satisfies WsClientFrame))
     for (const frame of outbox.splice(0)) sock.send(JSON.stringify(frame))
@@ -60,6 +74,12 @@ function connect(): void {
     else if (frame.channel === 'term:status') statusSubs.forEach((cb) => cb())
     else if (frame.channel === 'workflow:notice') noticeSubs.forEach((cb) => cb(frame.notice))
     else if (frame.channel === 'workflow:step:event') stepEventSubs.forEach((cb) => cb(frame))
+    else if (frame.channel === 'docker:changed') dockerChangedSubs.forEach((cb) => cb(frame.scopes))
+    else if (frame.channel === 'docker:log') dockerStreamSubs.get(`logs:${frame.id}`)?.forEach((cb) => cb({ kind: 'log', data: frame.data }))
+    else if (frame.channel === 'docker:stats') dockerStreamSubs.get(`stats:${frame.id}`)?.forEach((cb) => cb({ kind: 'stats', sample: frame.sample }))
+    else if (frame.channel === 'docker:stream-end') dockerStreamSubs.get(`${frame.kind}:${frame.id}`)?.forEach((cb) => cb({ kind: 'end' }))
+    else if (frame.channel === 'docker:exec:out') dockerExecSubs.get(frame.execId)?.({ kind: 'out', data: frame.data })
+    else if (frame.channel === 'docker:exec:exit') dockerExecSubs.get(frame.execId)?.({ kind: 'exit' })
     else if (frame.channel === 'ui:command') {
       const handler = uiHandler
       if (!handler) return
@@ -84,7 +104,7 @@ function scheduleReconnect(): void {
   // ponytail: fixed 1s backoff; enough for a hardened loopback listener that only drops on quit.
   reconnectTimer = setTimeout(() => {
     reconnectTimer = null
-    if (outputSubs.size || statusSubs.size || noticeSubs.size || stepEventSubs.size) connect()
+    if (outputSubs.size || statusSubs.size || noticeSubs.size || stepEventSubs.size || dockerChangedSubs.size || dockerStreamSubs.size) connect()
   }, 1000)
 }
 
@@ -132,6 +152,62 @@ export function wsOnWorkflowStepEvent(cb: StepEventCb): () => void {
   stepEventSubs.add(cb)
   connect()
   return () => void stepEventSubs.delete(cb)
+}
+
+// Docker cache-dirty pings (the docker plugin's event-driven refresh edge).
+export function wsOnDockerChanged(cb: (scopes: string[]) => void): () => void {
+  dockerChangedSubs.add(cb)
+  connect()
+  return () => void dockerChangedSubs.delete(cb)
+}
+
+const splitStreamKey = (key: string): ['logs' | 'stats', string] => {
+  const sep = key.indexOf(':')
+  return [key.slice(0, sep) as 'logs' | 'stats', key.slice(sep + 1)]
+}
+
+// Open an interactive docker-exec PTY; returns a dispose that kills it. Input/resize ride the
+// same socket via the exported senders.
+export function wsDockerExecOpen(execId: string, ref: string, cols: number, rows: number, cb: (event: DockerExecEvent) => void): () => void {
+  dockerExecSubs.set(execId, cb)
+  connect()
+  rawSend({ channel: 'docker:exec:open', execId, ref, cols, rows })
+  return () => {
+    dockerExecSubs.delete(execId)
+    rawSend({ channel: 'docker:exec:kill', execId })
+  }
+}
+
+export function wsDockerExecInput(execId: string, data: string): void {
+  rawSend({ channel: 'docker:exec:in', execId, data })
+}
+
+export function wsDockerExecResize(execId: string, cols: number, rows: number): void {
+  rawSend({ channel: 'docker:exec:resize', execId, cols, rows })
+}
+
+// Subscribe to a docker log/stats stream; returns an unsubscribe. First local subscriber per
+// (kind, container) attaches, the last detaches — the wsAttach contract.
+export function wsDockerAttach(kind: 'logs' | 'stats', id: string, cb: (event: DockerStreamEvent) => void): () => void {
+  const key = `${kind}:${id}`
+  let set = dockerStreamSubs.get(key)
+  const first = !set
+  if (!set) {
+    set = new Set()
+    dockerStreamSubs.set(key, set)
+  }
+  set.add(cb)
+  connect()
+  if (first) rawSend({ channel: `docker:${kind}:attach`, id })
+  return () => {
+    const s = dockerStreamSubs.get(key)
+    if (!s) return
+    s.delete(cb)
+    if (s.size === 0) {
+      dockerStreamSubs.delete(key)
+      rawSend({ channel: `docker:${kind}:detach`, id })
+    }
+  }
 }
 
 // Register this window as the UI control connection and handle incoming ui:command frames. `handler`

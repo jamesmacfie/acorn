@@ -5,7 +5,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { sealSession, SESSION_COOKIE } from '../server/session'
 import type { ServerMsg } from '../shared/terminal'
 import type { WsServerFrame } from '../shared/ws'
-import { _resetWsHub, attachWsHub, setStreamHandlers, wsBroadcast, type StreamSink } from './wsHub'
+import { _resetWsHub, attachWsHub, registerWsChannelHandler, setStreamHandlers, wsBroadcast, type StreamSink } from './wsHub'
 
 // Headless verification of the delicate transport bits the smoke suite (S4) can't cover in a unit:
 // upgrade auth (cookie / internal-token / origin / host), deterministic replay-before-live ordering
@@ -113,6 +113,29 @@ describe('wsHub streaming', () => {
     await tick()
     expect(inputs).toEqual(['ls\n'])
     ws.close()
+  })
+
+  it('routes prefixed frames to a registered channel handler and signals disconnect', async () => {
+    const seen: string[] = []
+    const disconnects: object[] = []
+    registerWsChannelHandler('docker', {
+      onFrame: (frame, send) => {
+        seen.push(frame.channel)
+        send({ channel: 'docker:log', id: 'c1', data: 'hi' })
+      },
+      onDisconnect: (conn) => disconnects.push(conn),
+    })
+    // Terminal handlers untouched: term frames still need setStreamHandlers, unknown prefixes are dropped.
+    const ws = await open(await cookieHeaders())
+    const got = frames(ws)
+    ws.send(JSON.stringify({ channel: 'docker:logs:attach', id: 'c1' }))
+    ws.send(JSON.stringify({ channel: 'nobody:home' }))
+    await tick()
+    expect(seen).toEqual(['docker:logs:attach'])
+    expect(got).toEqual([{ channel: 'docker:log', id: 'c1', data: 'hi' }])
+    ws.close()
+    await tick()
+    expect(disconnects).toHaveLength(1)
   })
 
   it('detach removes the sink; status broadcast reaches the socket', async () => {
