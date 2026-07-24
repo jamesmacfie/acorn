@@ -7,7 +7,6 @@
 .app.left-collapsed .panes.docker-browse-panes { grid-template-columns: minmax(0, 1fr); }
 
 .docker-browse { display: flex; flex-direction: column; overflow: hidden; }
-.docker-header-actions { display: flex; align-items: center; gap: 6px; }
 
 .docker-filters { display: flex; gap: 6px; padding: 6px var(--pane-pad); border-bottom: 1px solid var(--border); }
 .docker-search {

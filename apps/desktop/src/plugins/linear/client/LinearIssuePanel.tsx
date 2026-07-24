@@ -341,8 +341,8 @@ export default function LinearIssuePanel(props: {
       <Show when={override()}>
         <button type="button" class="linear-panel-back" title="Back to the linked ticket" onClick={() => setOverride(null)}>← back</button>
       </Show>
-      <button type="button" class="new-pr-btn" disabled={refreshing()} onClick={() => void refresh()}>
-        {refreshing() ? 'Refreshing…' : 'Refresh'}
+      <button type="button" class="section-refresh" style={{ 'margin-left': 'auto' }} title="Refresh" aria-label="Refresh" disabled={refreshing()} onClick={() => void refresh()}>
+        {refreshing() ? '...' : '↻'}
       </button>
     </>
   )

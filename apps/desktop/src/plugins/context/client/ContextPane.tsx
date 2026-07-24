@@ -211,7 +211,7 @@ export default function ContextPane(props: { task: Task }) {
                 </span>
               </Show>
               <button type="button" class="overlay-btn context-sync-btn" onClick={() => void syncContext()}>Sync context</button>
-              <button type="button" class="overlay-btn" onClick={() => void refetch()}>Refresh</button>
+              <button type="button" class="section-refresh" style={{ 'margin-left': 'auto' }} title="Refresh" aria-label="Refresh" onClick={() => void refetch()}>↻</button>
             </div>
           </div>
       </Show>
