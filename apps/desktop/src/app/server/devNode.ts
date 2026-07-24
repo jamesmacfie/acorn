@@ -8,5 +8,5 @@ import { devDataDir, makeRuntime, startListener } from '../../core/main/server'
 import { wireServerBridges } from '../main/serverBridges'
 
 const runtime = makeRuntime(devDataDir)
-wireServerBridges(runtime.DB) // search / editor / local-git / database HTTP route bridges
+wireServerBridges(runtime.DB, devDataDir) // search / editor / local-git / database / agent-usage HTTP route bridges
 void startListener(runtime)
