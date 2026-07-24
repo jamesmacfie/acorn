@@ -22,5 +22,14 @@ export type DbPk = Record<string, DbCell>
 // AI query generation (docs/pg.md): where the schema text in the prompt came from, and the result
 // of a generate call. Generate errors travel as HTTP error responses, not a union.
 export type DbSchemaSource = 'auto' | 'script' | 'file'
-export type DbSchemaResult = { schema: string; source: DbSchemaSource } | { error: string }
+// `notes` is the repo's free-form schema notes (repo_paths.db_schema_notes) — facts the schema text
+// can't express (JSONB shapes, enum meanings), carried here so the route needs no repo lookup.
+export type DbSchemaResult = { schema: string; source: DbSchemaSource; notes?: string } | { error: string }
 export type DbGenerateResult = { sql: string; providerId: string; modelId: string }
+
+// Shared so the modal's maxlength and the route's zod bound can't drift apart.
+export const GENERATE_MAX_PROMPT_CHARS = 4000
+
+// A named SQL snippet saved against a repo (docs/pg.md): loaded back into the editor, and optionally
+// fed to AI generation as a worked example (name + notes + SQL).
+export type DbSavedQuery = { id: string; name: string; notes: string | null; sql: string; updatedAt: number }

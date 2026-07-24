@@ -306,13 +306,16 @@ export function databaseBridge(db: AppDatabase): DatabaseBridge {
         const rp = await getRepoPath(db, t.repoOwner, t.repoName)
         const mode = rp?.dbSchemaMode === 'script' || rp?.dbSchemaMode === 'file' ? rp.dbSchemaMode : 'auto'
         const value = rp?.dbSchemaValue?.trim()
+        // Free-form repo notes ride along with every source so the route never has to read repo_paths.
+        const notesText = rp?.dbSchemaNotes?.trim()
+        const notes = notesText ? { notes: notesText } : {}
         if (mode === 'script') {
           if (!value) return { error: 'No schema script configured in the repo settings.' }
           const root = await taskRoot(db, taskId)
           if (!root) return { error: 'No worktree for this task yet.' }
           const { stdout } = await exec('bash', ['-lc', value], { cwd: root, timeout: 15_000, maxBuffer: 4 << 20 })
           const text = stdout.replace(/\x1b(?:\[[0-9;]*[A-Za-z]|\(B)/g, '').trim()
-          return text ? { schema: capSchema(text), source: 'script' } : { error: 'Schema script produced no output.' }
+          return text ? { schema: capSchema(text), source: 'script', ...notes } : { error: 'Schema script produced no output.' }
         }
         if (mode === 'file') {
           if (!value) return { error: 'No schema file configured in the repo settings.' }
@@ -321,14 +324,14 @@ export function databaseBridge(db: AppDatabase): DatabaseBridge {
           const abs = resolveInRoot(root, value)
           if (!abs) return { error: 'Schema file path escapes the worktree.' }
           const text = (await readFile(abs, 'utf8')).trim()
-          return text ? { schema: capSchema(text), source: 'file' } : { error: 'Schema file is empty.' }
+          return text ? { schema: capSchema(text), source: 'file', ...notes } : { error: 'Schema file is empty.' }
         }
         const pool = getPool(taskId)
         if (!pool) return { error: 'Not connected.' }
         const tables = await listTables(pool)
         if (!tables.length) return { error: 'No tables found in the connected database.' }
         const withCols = await Promise.all(tables.map(async (table) => ({ ...table, columns: await tableColumns(pool, table.schema, table.name) })))
-        return { schema: capSchema(formatSchema(withCols)), source: 'auto' }
+        return { schema: capSchema(formatSchema(withCols)), source: 'auto', ...notes }
       } catch (e) {
         return { error: errText(e) }
       }

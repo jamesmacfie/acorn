@@ -11,6 +11,9 @@ the hardened window (a cross-origin iframe can't be restyled, so it would never 
 - **Row viewer/editor** — click a table → grid of rows; click a row → a detail panel that also
   edits/inserts/deletes (the write surface; the grid itself stays display-only in v1).
 - **SQL editor** — Monaco (`language: 'sql'`), Execute → results grid below.
+- **AI query generation** — describe a query in prose, get PostgreSQL back in the editor.
+- **Saved queries** — name + notes + SQL, kept per repo, loaded back from the editor bar and
+  optionally fed to generation as worked examples.
 
 Out of scope for now: query history, Structure/DDL tabs, in-grid cell editing, functions/views
 browser, CSV export, cross-task connection pooling. Marked with `// ponytail:` where they'd land.
@@ -57,19 +60,66 @@ runner 'puts ActiveRecord::Base.connection_db_config.url'`).
 | `POST /query` | arbitrary SQL → `{ columns, rows, rowCount, command }` or `{ error }` |
 | `POST /update`, `/insert`, `/delete` | parameterized DML, identifiers validated |
 | `POST /disconnect` | `pool.end()`, drop from map |
+| `POST /generate` | `{ connectionId, modelId?, prompt, queryIds? }` → `{ sql, providerId, modelId }` |
+| `GET /queries` | this repo's saved queries → `{ id, name, notes, sql, updatedAt }[]` |
+| `POST /queries` | `{ name, notes, sql }` → upsert on (repo, name) → the stored query |
+| `DELETE /queries/:queryId` | drop it (scoped to the task's repo) |
 
 Cell values are normalized in main (objects → JSON, dates → ISO) so the grid renders uniformly;
 `null` stays distinct for `NULL` styling.
 
+The saved-query routes are the only ones that **don't** go through the bridge — they're plain app
+state in the server DB (`db_saved_queries`), like `review_notes`. None of `/generate`, `/queries` are
+exposed on the public `/api/v1` surface; they're renderer-only.
+
+## AI query generation
+
+`Generate` in the editor bar (visible only when a model-provider connection is configured — see
+[integrations.md](./integrations.md)) collects a prose description and a model, and the route
+builds the system prompt from up to three pieces (`server/generateSql.ts` `buildSystemPrompt`):
+
+1. **The schema** — per-repo source, `repo_paths.dbSchemaMode` / `dbSchemaValue`: `auto` (live
+   introspection via `formatSchema`, the default), `script` (a command's stdout), or `file` (a
+   worktree-relative path). Capped at `SCHEMA_CHAR_CAP` 80k.
+2. **Schema notes** — `repo_paths.dbSchemaNotes`, free-form prose for facts the schema can't express:
+   what a `jsonb` column actually holds, what a status column's values mean, which of two similar
+   tables is live. Edited per repo in the same settings block as the schema source.
+3. **Example queries** — the saved queries picked in the modal's multi-select, each rendered as its
+   name and notes as `--` comments above its SQL.
+
+Notes + examples share one `GENERATE_MAX_CONTEXT_CHARS` (16k) budget, truncated as a block so the
+schema is never the thing that gets cut; 80k + 16k stays under the model runtime's 100k system-prompt
+limit. The reply is expected to be the query itself — `stripSqlFences` unwraps a fenced reply
+defensively, and the result replaces the editor contents rather than executing.
+
+## Saved queries
+
+`db_saved_queries` is keyed by `(repo_owner, repo_name)`, **not** by task: a query written against a
+repo's schema outlives any one worktree. The renderer still addresses the routes by task id (that's
+what a pane has) and the route resolves the repo from `tasks`; an id belonging to another repo won't
+resolve, so it can't be smuggled into a prompt.
+
+`(owner, repo, name)` is unique and `POST /queries` upserts, so **saving under an existing name
+overwrites it** — that is also the edit and rename path. There is deliberately no PATCH route and no
+edit form. Notes are worth writing even for a query you only ever load by hand, because they're what
+travels into the prompt when it's used as an example.
+
 ## Where the code lives
 
-Main process: `apps/desktop/src/plugins/database/main/database.ts` (pool cache + `resolveDbUrl`).
-HTTP routes: `apps/desktop/src/plugins/database/server/routes/database.ts`; wire types:
-`apps/desktop/src/plugins/database/shared/database.ts`. Client:
-`apps/desktop/src/plugins/database/client/`. The `repo_paths.dbUrlScript` column lives in
-`apps/desktop/src/core/server/db/schema.ts`, edited via the per-repo section of
-`core/client/settings/WorkspaceSettings.tsx` → `PUT /api/terminal/repo-path/config`
-(`core/main/repoPaths.ts` `setRepoConfig`).
+Main process: `apps/desktop/src/plugins/database/main/database.ts` (pool cache + `resolveDbUrl` +
+`schema()`, which resolves the schema source and carries the repo's notes back with it). HTTP routes:
+`apps/desktop/src/plugins/database/server/routes/database.ts`; prompt assembly:
+`server/generateSql.ts`; wire types: `shared/database.ts`. Client:
+`apps/desktop/src/plugins/database/client/` — `DatabasePane.tsx` plus `GenerateSqlModal.tsx` and
+`SaveQueryModal.tsx`. Both the saved-query dropdown and the example multi-select are the shared
+`core/client/ui/Picker` (the latter with its `keepOpen` prop, which is what makes one Picker do
+multi-select).
+
+The `repo_paths` columns (`dbUrlScript`, `dbSchemaMode`, `dbSchemaValue`, `dbSchemaNotes`) and
+`db_saved_queries` live in `apps/desktop/src/core/server/db/schema.ts`. The repo columns are edited via
+the per-repo section of `core/client/settings/WorkspaceSettings.tsx` → `PUT
+/api/terminal/repo-path/config` (`core/main/repoPaths.ts` `setRepoConfig`); the schema-source, notes,
+and generation UI are all gated on `availableModelConnections(...)` being non-empty.
 
 ## Smoke test
 
@@ -77,3 +127,9 @@ Open a task with a reachable Postgres, open the Database pane: auto-detect conne
 filters; click table → grid; click row → detail; edit/+Row/delete; SQL editor runs SELECT (grid)
 and DML (rowcount); set a repo `dbUrlScript` → reconnect uses it. Toggle theme → editor +
 grid follow tokens.
+
+With a model provider connected: type SQL → `Save` with a name + notes → `Queries ▾` lists it →
+selecting it loads the SQL back → saving again under the same name overwrites rather than duplicating
+→ the row `✕` deletes it. Then write schema notes in the repo settings, pick a saved query as an
+example in `Generate`, and ask for something only the notes could tell it (e.g. a key inside a `jsonb`
+column) — the generated SQL should use it.

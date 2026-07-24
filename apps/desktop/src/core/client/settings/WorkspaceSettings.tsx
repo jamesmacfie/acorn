@@ -188,6 +188,7 @@ function RepoConfig(props: { owner: string; name: string }) {
   const [dev, setDev] = createSignal<string | null>(null)
   const [devRestart, setDevRestart] = createSignal<string | null>(null)
   const [dbSchemaValue, setDbSchemaValue] = createSignal<string | null>(null)
+  const [dbSchemaNotes, setDbSchemaNotes] = createSignal<string | null>(null)
   const [previewValue, setPreviewValue] = createSignal<string | null>(null)
   const [err, setErr] = createSignal('')
 
@@ -216,8 +217,9 @@ function RepoConfig(props: { owner: string; name: string }) {
   const debDev = debounce(() => void save({ devScript: dev() ?? '' }), 1500)
   const debDevRestart = debounce(() => void save({ devRestartScript: devRestart() ?? '' }), 1500)
   const debDbSchema = debounce(() => void save({ dbSchemaValue: dbSchemaValue() ?? '' }), 1500)
+  const debDbNotes = debounce(() => void save({ dbSchemaNotes: dbSchemaNotes() ?? '' }), 1500)
   const debPreview = debounce(() => void save({ previewValue: previewValue() ?? '' }), 1500)
-  onCleanup(() => { debSetup.flush(); debTeardown.flush(); debDbUrl.flush(); debDev.flush(); debDevRestart.flush(); debDbSchema.flush(); debPreview.flush() })
+  onCleanup(() => { debSetup.flush(); debTeardown.flush(); debDbUrl.flush(); debDev.flush(); debDevRestart.flush(); debDbSchema.flush(); debDbNotes.flush(); debPreview.flush() })
 
   return (
     <details class="settings-repo-config">
@@ -321,6 +323,24 @@ function RepoConfig(props: { owner: string; name: string }) {
               />
               <span class="muted settings-hint">A path relative to the task's worktree root.</span>
             </Show>
+          </label>
+
+          <label class="settings-field">
+            <span class="settings-label">Schema notes</span>
+            <span class="muted settings-hint">
+              Optional. Free-form context for AI query generation that the schema itself can't express —
+              what a <code>jsonb</code> column actually holds, what a status column's values mean, which of
+              two similar tables is live. Sent with the schema on every generate.
+            </span>
+            <textarea
+              class="settings-script"
+              rows="6"
+              spellcheck={false}
+              placeholder={'orders.meta jsonb: { coupon: string, source: "web" | "app" }\norders.status: 0 pending, 1 paid, 2 refunded'}
+              value={dbSchemaNotes() ?? row()?.dbSchemaNotes ?? ''}
+              onInput={(e) => { setDbSchemaNotes(e.currentTarget.value); debDbNotes() }}
+              onBlur={() => debDbNotes.flush()}
+            />
           </label>
         </Show>
 

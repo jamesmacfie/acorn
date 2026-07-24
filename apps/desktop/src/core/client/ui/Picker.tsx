@@ -23,6 +23,7 @@ export default function Picker<T>(props: {
   status?: JSX.Element // optional status line under the toolbar (e.g. refresh failed)
   buttonClass?: string
   disabled?: boolean // greys the button and blocks opening (e.g. repo is fixed in a task view)
+  keepOpen?: boolean // stay open after a pick, so the same list can drive a multi-select (isActive marks the chosen ones)
 }) {
   const [open, setOpen] = createSignal(false)
   const [filter, setFilter] = createSignal('')
@@ -55,7 +56,7 @@ export default function Picker<T>(props: {
   }
   const choose = (item: T) => {
     props.onSelect(item)
-    close()
+    if (!props.keepOpen) close()
   }
 
   // Outside-click must account for the portalled popover living outside rootRef.
