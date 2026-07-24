@@ -6,7 +6,7 @@ import { archiveTask } from '../../../plugins/github/client/mutations'
 import { paneAvailable, paneContribution, paneContributions } from '../registries/panes'
 import { registerCommands } from '../registries/commands'
 import { registerKeybindings, resolveKeybindings, keybindingRegistry } from '../registries/keybindings'
-import AgentsPanel from '../../../plugins/agents/client/AgentsPanel'
+import AgentsPanel, { AgentsToggle } from '../../../plugins/agents/client/AgentsPanel'
 import { workspaceForRepo } from '../workspaces/activeWorkspace'
 import { addSession, refreshSessions, requestTerminalFocus } from '../../../plugins/terminal/client/sessions'
 import { terminalApi } from '../../../plugins/terminal/client/terminalClient'
@@ -216,7 +216,11 @@ export default function TaskView(props: {
           )}
         </For>
       </Show>
-      <button type="button" class="pane-switch-btn" classList={{ active: agentsOpen() }} data-tip="Agents" data-tip-key={shortcutFor('task.agents.toggle') ? formatChord(shortcutFor('task.agents.toggle')!) : undefined} data-tip-sub="Roster · launcher · feed" aria-label="Agents" onClick={() => setAgentsOpen(!agentsOpen())}>⠿</button>
+      <AgentsToggle
+        active={agentsOpen()}
+        shortcut={shortcutFor('task.agents.toggle') ? formatChord(shortcutFor('task.agents.toggle')!) : undefined}
+        onToggle={() => setAgentsOpen(!agentsOpen())}
+      />
       <button type="button" class="pane-switch-btn" classList={{ active: props.terminalOpen }} data-tip="Terminal" data-tip-key={shortcutFor('task.terminal.toggle') ? formatChord(shortcutFor('task.terminal.toggle')!) : undefined} data-tip-sub="Shell in the worktree" aria-label="Terminal" onClick={props.onToggleTerminal}>{'>_'}</button>
     </>
   )

@@ -211,6 +211,41 @@ and a quiet step shows a no-output hint after 30 seconds.
   `codex resume <id>` or `claude --resume <id>` (session ids are validated as opaque tokens — never
   shell metachars) and opens it as a raw TUI in the drawer.
 
+### Provider usage
+
+The panel's **Usage** section is account-scoped, unlike the task-scoped roster below it. One
+main-process service collects Claude and Codex concurrently, caches the normalized snapshot for
+five minutes, and retains a stale last-good provider when its next refresh fails. The rail toggle
+reads that same client store, so hovering never launches a subprocess; its tooltip summarizes each
+provider's current session percentage and health. The panel's `↻` action forces a refresh.
+
+- **Claude** runs `claude /usage --allowed-tools ""` through a bounded PTY and replays the
+  full-screen output through `@xterm/headless` before parsing session, weekly, model-specific, reset,
+  plan, account, and optional Extra Usage fields. `CLAUDE_CODE_OAUTH_TOKEN` is deliberately omitted
+  so the CLI uses its existing stored login. API-billed accounts fall back to `claude /cost`.
+- The Claude collector also reads recent `~/.claude/projects/**/*.jsonl` assistant usage records.
+  It returns only aggregate token/time/session counts and locally estimated cost/cache savings;
+  prompts, responses, project paths, message IDs, and request IDs never reach the renderer.
+  Estimates use a local table checked against
+  [Anthropic's published pricing](https://platform.claude.com/docs/en/about-claude/pricing) and are
+  labeled estimated rather than billed cost.
+- **Codex** first uses newline-delimited JSON-RPC with
+  `codex -s read-only -a untrusted app-server` and `account/rateLimits/read`. A failed RPC probe
+  falls back to the same bounded PTY runner with `/status`; this fallback can report the 5-hour and
+  weekly percentages but may not include reset times.
+
+Both commands inherit a small environment allowlist and have a 20-second deadline and 2 MiB output
+cap. Acorn does not call provider usage HTTP APIs, read OAuth credentials into the renderer, refresh
+tokens, or store usage in SQLite/IndexedDB. Claude may require its dedicated
+`<dataDir>/agent-usage-probe` directory to be trusted. Acorn first answers the CLI prompt; if that
+does not stick, it atomically adds only that exact path's `hasTrustDialogAccepted` entry to
+`~/.claude.json`, preserving unknown keys and refusing malformed/unexpected config shapes.
+
+Health derives from percentage remaining: green at 50% or above, yellow from 20% to below 50%, red
+above 0% to below 20%, and neutral at 0% or when unavailable. A missing, logged-out, outdated,
+timed-out, or no-longer-parseable CLI becomes a provider-local error and does not hide the other
+provider.
+
 ## 7. Send-to-agent
 
 The Changes / Editor / Context panes can push text into a live agent without leaving them.

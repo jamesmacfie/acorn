@@ -30,6 +30,7 @@
     "@vscode/ripgrep": "^1.15.9",
     "@xterm/addon-fit": "^0.10.0",
     "@xterm/addon-webgl": "^0.18.0",
+    "@xterm/headless": "5.5.0",
     "@xterm/xterm": "^5.5.0",
     "better-sqlite3": "^12.11.1",
     "diff": "^9.0.0",

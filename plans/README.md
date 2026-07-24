@@ -8,7 +8,7 @@ honor its STOP conditions, and update the row when done.
 
 | Plan | Title | Priority | Effort | Depends on | Status |
 |---|---|---|---|---|---|
-| 001 | Add local Claude and Codex usage details to the Agents surface | P1 | L | — | TODO |
+| 001 | Add local Claude and Codex usage details to the Agents surface | P1 | L | — | DONE |
 
 Status values: TODO | IN PROGRESS | DONE | BLOCKED (with one-line reason) |
 REJECTED (with one-line rationale — finding fixed independently or approach

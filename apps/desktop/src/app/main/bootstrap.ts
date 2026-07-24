@@ -168,7 +168,7 @@ export async function bootstrap({ dataDir, origin, createWindow }: BootstrapOpti
   })
   // search, editor, local-git, and database are HTTP routes wired via wireServerBridges() — the
   // composition root owns this so core/main/server.ts stays free of plugin bridge imports.
-  wireServerBridges(db)
+  wireServerBridges(db, dataDir)
 
   registerTerminalIpc(db, worktreesDir, {
     internalApiEnv,

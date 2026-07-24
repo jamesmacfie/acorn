@@ -4,7 +4,9 @@
 // and these routes work in either. The stateful, boot-constructed bridges (harness: notes/memory/
 // run/browser; terminal; workflow) are wired separately in main/bootstrap.ts and stay 503 under
 // dev:node. See docs/electron.md §12 (capability map).
+import { join } from 'node:path'
 import type { AppDatabase } from '../../core/server/db'
+import { setAgentUsageBridge } from '../../plugins/agents/server/routes/usage'
 import { setDatabaseBridge } from '../../plugins/database/server/routes/database'
 import { setDockerBridge } from '../../plugins/docker/server/routes/docker'
 import { setEditorBridge } from '../../plugins/editor/server/routes/editor'
@@ -16,8 +18,10 @@ import { registerDockerWsChannel } from '../../plugins/docker/main/wsChannel'
 import { editorBridge } from '../../plugins/editor/main/editor'
 import { localGitBridge } from '../../plugins/changes/main/localGit'
 import { searchBridge } from '../../plugins/editor/main/search'
+import { createAgentUsageService } from '../../plugins/agents/main/usage/service'
 
-export function wireServerBridges(db: AppDatabase): void {
+export function wireServerBridges(db: AppDatabase, dataDir: string): void {
+  setAgentUsageBridge(createAgentUsageService({ probeDir: join(dataDir, 'agent-usage-probe') }))
   setSearchBridge(searchBridge(db))
   setEditorBridge(editorBridge(db))
   setLocalGitBridge(localGitBridge(db))
