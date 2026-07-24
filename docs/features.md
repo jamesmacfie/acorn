@@ -42,8 +42,8 @@ threads, reply to review threads, and **re-run failed Actions** (`rerunFailed`).
 A **workspace** is a named group of repos (e.g. "Runn", "Acorn") — the top-level unit picked in the
 top bar. A repo belongs to exactly one workspace (a partition); the active workspace is *derived*
 from the current repo. Workspaces carry identity (a color plus an emoji / lucide / github icon,
-rendered as a 3px accent on task rows) and per-workspace scripts (setup / dev / dev-restart /
-teardown) plus browser-preview config, all edited in **Settings → (workspace)**.
+rendered as a 3px accent on task rows); the per-repo scripts (setup / dev / dev-restart / teardown /
+db) plus browser-preview config are repo-level, edited per-repo in **Settings → (workspace)**.
 
 First run bootstraps a Default workspace and assigns every mirrored repo; an **onboarding modal**
 lets you re-group afterwards. Repos can be **hidden** from a workspace. Repo→workspace assignment

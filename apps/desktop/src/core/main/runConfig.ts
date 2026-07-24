@@ -7,6 +7,7 @@
 import { existsSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { parse as parseToml } from 'smol-toml'
+import type { BrowserRule, PreviewMode } from '../shared/api'
 
 export type RunTarget = {
   id: string
@@ -33,20 +34,31 @@ export type RepoConfig = {
   runTargets: RunTarget[]
   copy: string[]
   layouts: LayoutRecipe[]
+  // Database-pane connection resolver + browser-preview URL config (repo-level-settings). db/preview
+  // moved off the workspace and gained a committed-toml layer here; browserRules stays DB-only
+  // (dev-login autofill selectors are machine/personal, not something you'd commit).
+  dbUrlScript: string | null
+  preview: { mode: PreviewMode | null; value: string | null }
+  browserRules: BrowserRule[]
   errors: ConfigError[]
   // Resolved target ids whose winning layer is the committed repo config. Execution uses this
   // provenance to apply the trust gate without penalising user/DB-authored targets.
   repoTargetIds: string[]
 }
 
-// The DB columns the file layers override. The `dev` run button comes from the per-workspace dev
-// script (or explicit config) — see the layering comment in loadRepoConfig below.
+// The DB columns the file layers override — now the repo_paths repo-config row (repo-level-settings;
+// was the per-workspace columns). The `dev` run button comes from the dev script (or explicit
+// config) — see the layering comment in loadRepoConfig below.
 export type DbConfigFallback = {
   setupScript?: string | null
   teardownScript?: string | null
-  devScript?: string | null // per-workspace "run dev" command → a base `dev` target (repo config overrides)
-  devRestartScript?: string | null // per-workspace restart command for the base `dev` target
+  devScript?: string | null // "run dev" command → a base `dev` target (repo config overrides)
+  devRestartScript?: string | null // restart command for the base `dev` target
   runTargetsJson?: string | null // repo_paths.runTargets (JSON column, 13 §A DB fallback surface)
+  dbUrlScript?: string | null // repo_paths.dbUrlScript
+  previewMode?: PreviewMode | null // repo_paths.previewMode
+  previewValue?: string | null // repo_paths.previewValue
+  browserRules?: BrowserRule[] // repo_paths.browserRules (parsed; DB-only, no toml layer)
 }
 
 const str = (v: unknown): string | undefined => (typeof v === 'string' && v.trim() ? v.trim() : undefined)
@@ -87,6 +99,9 @@ type Layer = {
   run: Map<string, RunTarget>
   copy?: string[]
   layouts: Map<string, LayoutRecipe>
+  dbUrlScript?: string
+  previewMode?: PreviewMode
+  previewValue?: string
 }
 
 function parseLayer(text: string, source: string, errors: ConfigError[]): Layer | null {
@@ -111,6 +126,24 @@ function parseLayer(text: string, source: string, errors: ConfigError[]): Layer 
         const target = parseRunTarget(id, v, source, errors)
         if (target) layer.run.set(id, target)
       }
+    }
+  }
+  // [database] url_script — the Database pane's connection resolver (docs/pg.md).
+  const database = doc.database
+  if (database && typeof database === 'object') layer.dbUrlScript = str((database as Record<string, unknown>).url_script)
+  // [preview] mode + value — how the browser-preview pane resolves its URL (docs/panes.md).
+  const preview = doc.preview
+  if (preview && typeof preview === 'object') {
+    const pv = preview as Record<string, unknown>
+    const mode = str(pv.mode)
+    if (mode) {
+      if (mode !== 'url' && mode !== 'port' && mode !== 'script') errors.push({ source, message: `preview.mode must be 'url' | 'port' | 'script'` })
+      else layer.previewMode = mode
+    }
+    const value = str(pv.value)
+    if (value) {
+      if (layer.previewMode === 'port' && !/^\d{1,5}$/.test(value)) errors.push({ source, message: `preview.value must be a bare port 1-65535` })
+      else layer.previewValue = value
     }
   }
   const copy = doc.copy
@@ -216,6 +249,12 @@ export function loadRepoConfig(repoDir: string | null, userConfigDir: string | n
     runTargets: [...run.values()],
     copy: repo?.copy ?? user?.copy ?? [],
     layouts: [...layouts.values()],
+    dbUrlScript: repo?.dbUrlScript ?? user?.dbUrlScript ?? (db.dbUrlScript?.trim() || null),
+    preview: {
+      mode: repo?.previewMode ?? user?.previewMode ?? (db.previewMode ?? null),
+      value: repo?.previewValue ?? user?.previewValue ?? (db.previewValue?.trim() || null),
+    },
+    browserRules: db.browserRules ?? [],
     errors,
     repoTargetIds: [...(repo?.run.keys() ?? [])],
   }

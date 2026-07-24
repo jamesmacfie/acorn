@@ -2,7 +2,10 @@ import { execFile } from 'node:child_process'
 import { promisify } from 'node:util'
 import { z } from 'zod'
 import type { AppDatabase } from '../../../core/server/db'
-import { loadTask, taskRoot, workspaceConfigRow } from '../../../core/main/taskWorktree'
+import { homedir } from 'node:os'
+import { loadTask, taskRoot } from '../../../core/main/taskWorktree'
+import { getRepoPath } from '../../../core/main/repoPaths'
+import { loadRepoConfig } from '../../../core/main/runConfig'
 import { PublicApiError } from '../../../core/shared/publicApi/errors'
 import { IdSchema } from '../../../core/shared/publicApi/primitives'
 import {
@@ -27,8 +30,10 @@ const TaskParams = z.strictObject({ taskId: IdSchema })
 async function previewSettings(db: AppDatabase, taskId: string): Promise<{ mode: 'url' | 'port' | 'script' | null; value: string | null }> {
   const t = await loadTask(db, taskId)
   if (!t) throw new PublicApiError('not_found', 'Task not found')
-  const ws = await workspaceConfigRow(db, t.repoOwner, t.repoName)
-  return { mode: (ws?.previewMode as 'url' | 'port' | 'script' | null) ?? null, value: ws?.previewValue ?? null }
+  const root = await taskRoot(db, taskId)
+  const rp = await getRepoPath(db, t.repoOwner, t.repoName)
+  const cfg = loadRepoConfig(root ?? rp?.path ?? null, homedir(), { previewMode: rp?.previewMode, previewValue: rp?.previewValue })
+  return cfg.preview
 }
 
 async function resolveUrl(db: AppDatabase, taskId: string): Promise<string> {

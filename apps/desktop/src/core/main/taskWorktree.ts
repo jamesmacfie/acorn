@@ -9,7 +9,7 @@ import { and, eq } from 'drizzle-orm'
 import type { AppDatabase } from '../server/db'
 import { schema } from '../server/db'
 import type { TaskStatus, TerminalSession } from '../shared/terminal'
-import { loadRepoConfig, type LayoutRecipe, type RunTarget } from '../../plugins/terminal/main/runConfig'
+import { loadRepoConfig, type LayoutRecipe, type RunTarget } from './runConfig'
 import { getRepoPath } from './repoPaths'
 import { copyWorktreeFiles, ensureWorktree, worktreePorcelain } from './worktrees'
 
@@ -176,22 +176,14 @@ export function resolveInRoot(root: string, relPath: string): string | null {
   }
 }
 
-// The setup script + when-to-run configured on the workspace that owns this repo (docs/workspaces-and-tasks.md
-// P5). trigger: 'off' never runs, 'created' pre-creates the worktree at task creation, 'terminal'
-// (the default; null coalesces to it) leaves creation lazy. The script itself runs once, whenever
-// the worktree is first created — via the onWorktreeCreated hook above (maybeRunSetup, terminal.ts).
+// The setup script + when-to-run configured for this repo (docs/workspaces-and-tasks.md P5; repo-level-settings
+// moved these off the workspace). trigger: 'off' never runs, 'created' pre-creates the worktree at
+// task creation, 'terminal' (the default; null coalesces to it) leaves creation lazy. The script
+// runs once, whenever the worktree is first created — via onWorktreeCreated (maybeRunSetup, terminal.ts).
 export type SetupTrigger = 'off' | 'created' | 'terminal'
-export async function workspaceSetup(db: AppDatabase, owner: string, repo: string): Promise<{ script: string | null; trigger: SetupTrigger }> {
-  const [wr] = await db
-    .select({ workspaceId: schema.workspaceRepos.workspaceId })
-    .from(schema.workspaceRepos)
-    .where(and(eq(schema.workspaceRepos.repoOwner, owner), eq(schema.workspaceRepos.repoName, repo)))
-  if (!wr) return { script: null, trigger: 'terminal' }
-  const [ws] = await db
-    .select({ setupScript: schema.workspaces.setupScript, trigger: schema.workspaces.setupScriptTrigger })
-    .from(schema.workspaces)
-    .where(eq(schema.workspaces.id, wr.workspaceId))
-  return { script: ws?.setupScript ?? null, trigger: (ws?.trigger as SetupTrigger) || 'terminal' }
+export async function repoSetup(db: AppDatabase, owner: string, repo: string): Promise<{ script: string | null; trigger: SetupTrigger }> {
+  const rp = await getRepoPath(db, owner, repo)
+  return { script: rp?.setupScript ?? null, trigger: rp?.setupScriptTrigger ?? 'terminal' }
 }
 
 // Files-to-copy on a fresh worktree (docs/workflows.md §2): read the config from the SOURCE
@@ -199,8 +191,8 @@ export async function workspaceSetup(db: AppDatabase, owner: string, repo: strin
 // worktree. Best-effort — warnings are logged, never thrown.
 export async function copyConfiguredFiles(db: AppDatabase, t: TaskRow, checkout: string, worktreePath: string): Promise<void> {
   try {
-    const ws = await workspaceConfigRow(db, t.repoOwner, t.repoName)
-    const cfg = loadRepoConfig(checkout, homedir(), { setupScript: ws?.setupScript, teardownScript: ws?.teardownScript })
+    const rp = await getRepoPath(db, t.repoOwner, t.repoName)
+    const cfg = loadRepoConfig(checkout, homedir(), { setupScript: rp?.setupScript, teardownScript: rp?.teardownScript })
     if (!cfg.copy.length) return
     const res = copyWorktreeFiles(checkout, worktreePath, cfg.copy)
     for (const w of res.warnings) console.warn(`[worktrees] ${w}`)
@@ -209,25 +201,23 @@ export async function copyConfiguredFiles(db: AppDatabase, t: TaskRow, checkout:
   }
 }
 
-// Workspace-level config columns for a repo (preview + scripts) — the DB fallback layer that
-// loadRepoConfig merges below any committed .acorn/config.toml (docs/workflows.md §2).
-export async function workspaceConfigRow(db: AppDatabase, owner: string, repo: string) {
+// The workspace a repo belongs to (its grouping membership). Repo config no longer lives on the
+// workspace (repo-level-settings), so this resolves membership only: repo → workspaceRepos → id.
+export async function workspaceIdForRepo(db: AppDatabase, owner: string, repo: string): Promise<string | null> {
   const [wr] = await db
     .select({ workspaceId: schema.workspaceRepos.workspaceId })
     .from(schema.workspaceRepos)
     .where(and(eq(schema.workspaceRepos.repoOwner, owner), eq(schema.workspaceRepos.repoName, repo)))
-  if (!wr) return null
-  const [ws] = await db.select().from(schema.workspaces).where(eq(schema.workspaces.id, wr.workspaceId))
-  return ws ?? null
+  return wr?.workspaceId ?? null
 }
 
-// The task's workspace id / repo slug — the scoping keys the knowledge + harness surfaces use.
+// The task's workspace id — the scoping key the knowledge + harness surfaces use.
 export async function workspaceIdFor(db: AppDatabase, taskId: string): Promise<string> {
   const t = await loadTask(db, taskId)
   if (!t) throw new Error('Task not found.')
-  const ws = await workspaceConfigRow(db, t.repoOwner, t.repoName)
-  if (!ws) throw new Error('Task has no workspace.')
-  return ws.id
+  const workspaceId = await workspaceIdForRepo(db, t.repoOwner, t.repoName)
+  if (!workspaceId) throw new Error('Task has no workspace.')
+  return workspaceId
 }
 
 export async function repoFor(db: AppDatabase, taskId: string): Promise<string> {
@@ -247,12 +237,11 @@ export async function taskRunConfig(
   const baseCheckout = mapped?.path && isDir(mapped.path) ? mapped.path : undefined
   if (!baseCheckout) return { error: 'No checkout mapped for this repo yet.' }
   const { cwd } = await resolveTaskCwd(db, t, baseCheckout)
-  const ws = await workspaceConfigRow(db, t.repoOwner, t.repoName)
   const cfg = loadRepoConfig(cwd, homedir(), {
-    setupScript: ws?.setupScript,
-    teardownScript: ws?.teardownScript,
-    devScript: ws?.devScript,
-    devRestartScript: ws?.devRestartScript,
+    setupScript: mapped?.setupScript,
+    teardownScript: mapped?.teardownScript,
+    devScript: mapped?.devScript,
+    devRestartScript: mapped?.devRestartScript,
     runTargetsJson: mapped?.runTargets,
   })
   return { targets: cfg.runTargets, cwd, errors: cfg.errors, layouts: cfg.layouts, repoTargetIds: cfg.repoTargetIds }

@@ -87,9 +87,9 @@ Workspace ("Runn", "Acorn")            ← group of repos, picked in the top bar
 - **Workspace** — a named *group of repos*, the top-level unit picked in the top
   bar. A repo belongs to exactly one workspace (a partition), and the active
   workspace is *derived* from the current repo — there is no separate URL
-  dimension. Workspaces carry identity (color + emoji/lucide/github icon) and
-  per-workspace scripts (setup / dev / dev-restart / teardown) plus
-  browser-preview config.
+  dimension. Workspaces carry identity (color + emoji/lucide/github icon); the
+  per-repo scripts (setup / dev / dev-restart / teardown / db) plus
+  browser-preview config are repo-level (`repo_paths`).
 - **Task** — the single-repo *unit of work*: repo + branch + optional git
   worktree + optional linked PR + its panes and terminals. Shown as a row in the
   left **TabRail**. A task's `origin` is one of `github-pr | linear | rollbar |

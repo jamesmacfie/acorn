@@ -16,19 +16,13 @@ export const WorkspaceRepoSchema = z.strictObject({
   sort: z.number().int().nonnegative(),
 })
 
+// PURE GROUPING (repo-level-settings): the build/run/db/preview config that used to live here is now
+// repo-level — see the RepoConfig surface. This resource is identity + membership only.
 export const WorkspaceSchema = z.strictObject({
   id: IdSchema,
   name: z.string().min(1).max(120),
   isDefault: z.boolean(),
   sort: z.number().int().nonnegative(),
-  setupScript: z.string().nullable(),
-  setupScriptTrigger: z.enum(['off', 'created', 'terminal']).nullable(),
-  devScript: z.string().nullable(),
-  devRestartScript: z.string().nullable(),
-  teardownScript: z.string().nullable(),
-  dbUrlScript: z.string().nullable(),
-  previewMode: z.enum(['url', 'port', 'script']).nullable(),
-  previewValue: z.string().nullable(),
   icon: WorkspaceIconSchema.nullable(),
   color: z.string().nullable(),
   repos: z.array(WorkspaceRepoSchema).max(10_000),
@@ -47,14 +41,6 @@ export const PatchWorkspaceSchema = z
   .strictObject({
     name: z.string().trim().min(1).max(120).optional(),
     sort: z.number().int().nonnegative().optional(),
-    setupScript: z.string().max(100_000).nullable().optional(),
-    setupScriptTrigger: z.enum(['off', 'created', 'terminal']).nullable().optional(),
-    devScript: z.string().max(100_000).nullable().optional(),
-    devRestartScript: z.string().max(100_000).nullable().optional(),
-    teardownScript: z.string().max(100_000).nullable().optional(),
-    dbUrlScript: z.string().max(100_000).nullable().optional(),
-    previewMode: z.enum(['url', 'port', 'script']).nullable().optional(),
-    previewValue: z.string().max(4096).nullable().optional(),
     icon: WorkspaceIconSchema.nullable().optional(),
     color: z.string().nullable().optional(),
   })

@@ -20,13 +20,16 @@ browser, CSV export, cross-task connection pooling. Marked with `// ponytail:` w
 The URL embeds a password, so it is **resolved on demand at connect time and never persisted**.
 Order (in `database.ts` `resolveDbUrl`):
 
-1. Workspace has a `dbUrlScript` → run it in the task's worktree (`bash -lc`), use trimmed stdout.
+1. Repo has a `dbUrlScript` → run it in the task's worktree (`bash -lc`), use trimmed stdout. Resolved
+   via `loadRepoConfig`, so a committed `.acorn/config.toml` `[database].url_script` wins over the
+   `repo_paths.dbUrlScript` fallback.
 2. Else auto-detect: `DATABASE_URL=` in `<worktree>/.env`, then `process.env.DATABASE_URL`.
-3. Else → the pane prompts to set a connection script in Workspace Settings.
+3. Else → the pane prompts to set a connection script in the repo's settings.
 
-The optional script is a per-workspace column (`workspaces.dbUrlScript`), edited in Workspace
-Settings alongside the dev/setup scripts. It handles setups auto-detect can't read — Rails
-`database.yml`, direnv, etc. (e.g. `bin/rails runner 'puts ActiveRecord::Base.connection_db_config.url'`).
+The optional script is **repo-level** (repo-level-settings): the `repo_paths.dbUrlScript` column (or a
+committed `[database].url_script`), edited per-repo under the workspace page alongside the dev/setup
+scripts. It handles setups auto-detect can't read — Rails `database.yml`, direnv, etc. (e.g. `bin/rails
+runner 'puts ActiveRecord::Base.connection_db_config.url'`).
 
 ## Architecture
 
@@ -34,8 +37,8 @@ Settings alongside the dev/setup scripts. It handles setups auto-detect can't re
   through an injected main-process bridge. No streaming.
 - **`pg` (node-postgres)** — not a native module (no better-sqlite3-style ABI dance). One `pg.Pool`
   per task, cached `Map<taskId, { pool, url }>`; `pool.end()` on disconnect/reconnect.
-- **Pane is client-only** — panes aren't DB rows, so this is just a new `PaneId`. The only migration
-  is `workspaces.dbUrlScript`.
+- **Pane is client-only** — panes aren't DB rows, so this is just a new `PaneId`. The connection
+  script is the `repo_paths.dbUrlScript` column.
 - **Editing via the row-detail panel**, not editable virtualized cells — a form covers
   view/edit/insert/delete far more simply.
 - **SQL-injection posture** — values are always parameterized (`$1…`); identifiers (table/column
@@ -63,13 +66,14 @@ Cell values are normalized in main (objects → JSON, dates → ISO) so the grid
 Main process: `apps/desktop/src/plugins/database/main/database.ts` (pool cache + `resolveDbUrl`).
 HTTP routes: `apps/desktop/src/plugins/database/server/routes/database.ts`; wire types:
 `apps/desktop/src/plugins/database/shared/database.ts`. Client:
-`apps/desktop/src/plugins/database/client/`. The `workspaces.dbUrlScript` column lives in
-`apps/desktop/src/core/server/db/schema.ts`, edited via
-`core/client/settings/WorkspaceSettings.tsx` → `core/server/routes/workspaces.ts`.
+`apps/desktop/src/plugins/database/client/`. The `repo_paths.dbUrlScript` column lives in
+`apps/desktop/src/core/server/db/schema.ts`, edited via the per-repo section of
+`core/client/settings/WorkspaceSettings.tsx` → `PUT /api/terminal/repo-path/config`
+(`core/main/repoPaths.ts` `setRepoConfig`).
 
 ## Smoke test
 
 Open a task with a reachable Postgres, open the Database pane: auto-detect connects; table list
 filters; click table → grid; click row → detail; edit/+Row/delete; SQL editor runs SELECT (grid)
-and DML (rowcount); set a workspace `dbUrlScript` → reconnect uses it. Toggle theme → editor +
+and DML (rowcount); set a repo `dbUrlScript` → reconnect uses it. Toggle theme → editor +
 grid follow tokens.

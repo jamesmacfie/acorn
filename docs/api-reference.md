@@ -181,7 +181,7 @@ See [workspaces-and-tasks](./workspaces-and-tasks.md).
 | `GET` | `/api/workspaces` | List workspaces with their (non-ignored) repos, ordered by `sort`. | — |
 | `POST` | `/api/workspaces/bootstrap` | Idempotent first-run: create `Default`, assign every mirrored repo not yet in a workspace. Returns the full list. | — |
 | `POST` | `/api/workspaces` | Create a workspace. | `{ name }` → `Workspace` |
-| `PATCH` | `/api/workspaces/:id` | Update name / setup+dev+devRestart+teardown scripts / trigger / browser-preview mode+value / icon / color. Blank string ⇒ `null`; `null` clears to derived default. `port` preview values must be a bare 1–65535 port (open-redirect guard). `404` on unknown ids. | partial `Workspace` fields |
+| `PATCH` | `/api/workspaces/:id` | Update workspace identity: name / icon / color. `null` clears icon/color to the derived default. `404` on unknown ids. (Build/run/db/preview config is repo-level — see `PUT /api/terminal/repo-path/config`.) | `{ name?, icon?, color? }` |
 | `DELETE` | `/api/workspaces/:id` | Delete; its repos are reassigned to `Default`, its project links dropped. `Default` cannot be deleted. | — |
 | `POST` | `/api/workspaces/:id/repos` | Move a repo into this workspace (partition upsert on `(owner,name)`); clears any ignore flag. | `{ owner, name, sort? }` |
 | `GET` | `/api/workspaces/assignments` | Per-repo assignment map for onboarding: `{ owner, name, workspaceId, ignored }[]`. | — |
