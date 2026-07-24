@@ -48,14 +48,6 @@ export class WorkspaceService {
       name: row.name,
       isDefault: row.isDefault,
       sort: row.sort,
-      setupScript: row.setupScript,
-      setupScriptTrigger: row.setupScriptTrigger as Workspace['setupScriptTrigger'],
-      devScript: row.devScript,
-      devRestartScript: row.devRestartScript,
-      teardownScript: row.teardownScript,
-      dbUrlScript: row.dbUrlScript,
-      previewMode: row.previewMode as Workspace['previewMode'],
-      previewValue: row.previewValue,
       icon: parseWorkspaceIcon(row.icon) as Icon | null,
       color: row.color,
       repos: [...repos].sort((a, b) => a.sort - b.sort),
@@ -126,23 +118,6 @@ export class WorkspaceService {
     const set: Partial<typeof schema.workspaces.$inferInsert> = { updatedAt: this.now() }
     if (patch.name !== undefined) set.name = patch.name
     if (patch.sort !== undefined) set.sort = patch.sort
-    if (patch.setupScript !== undefined) set.setupScript = patch.setupScript?.trim() || null
-    if (patch.devScript !== undefined) set.devScript = patch.devScript?.trim() || null
-    if (patch.devRestartScript !== undefined) set.devRestartScript = patch.devRestartScript?.trim() || null
-    if (patch.teardownScript !== undefined) set.teardownScript = patch.teardownScript?.trim() || null
-    if (patch.dbUrlScript !== undefined) set.dbUrlScript = patch.dbUrlScript?.trim() || null
-    if (patch.setupScriptTrigger !== undefined) set.setupScriptTrigger = patch.setupScriptTrigger
-    if (patch.previewMode !== undefined) set.previewMode = patch.previewMode
-    if (patch.previewValue !== undefined) set.previewValue = patch.previewValue?.trim() || null
-    // 'port' preview mode is interpolated into http://localhost:<value>; require a bare port so a
-    // crafted value can't redirect the preview to another host (matches the internal route).
-    const effectiveMode = patch.previewMode !== undefined ? patch.previewMode : undefined
-    if (effectiveMode === 'port' && set.previewValue != null) {
-      const p = Number(set.previewValue)
-      if (!/^\d{1,5}$/.test(set.previewValue) || p < 1 || p > 65535) {
-        throw new PublicApiError('validation_failed', 'previewValue must be a bare port 1-65535')
-      }
-    }
     if (patch.icon !== undefined) set.icon = patch.icon === null ? null : serializeWorkspaceIcon(patch.icon)
     if (patch.color !== undefined) {
       if (patch.color === null || patch.color === '') set.color = null

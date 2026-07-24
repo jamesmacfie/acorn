@@ -10,8 +10,9 @@
 // (PreviewPane.tsx) — the WebContentsView equivalent of the old z-index dance.
 import { BrowserWindow, WebContentsView, ipcMain, type IpcMainEvent, type IpcMainInvokeEvent, type WebContents } from 'electron'
 import type { AppDatabase } from '../../../core/server/db'
-import { loadTask, workspaceConfigRow } from '../../../core/main/taskWorktree'
-import { matchesUrlPattern, parseBrowserRules } from '../../../core/shared/browserRules'
+import { loadTask } from '../../../core/main/taskWorktree'
+import { getRepoPath } from '../../../core/main/repoPaths'
+import { matchesUrlPattern } from '../../../core/shared/browserRules'
 import { bindBrowserContents, unbindBrowserContents } from './browserService'
 import { buildFillScript, isAllowedPreviewUrl } from './browserAuto'
 
@@ -80,8 +81,8 @@ async function applyLoadRules(taskId: string, wc: WebContents): Promise<void> {
   if (!isAllowedPreviewUrl(url)) return
   const task = await loadTask(rulesDb, taskId)
   if (!task) return
-  const ws = await workspaceConfigRow(rulesDb, task.repoOwner, task.repoName)
-  const rules = parseBrowserRules(ws?.browserRules)
+  const rp = await getRepoPath(rulesDb, task.repoOwner, task.repoName)
+  const rules = rp?.browserRules ?? []
   if (wc.isDestroyed() || wc.getURL() !== url) return
   for (const rule of rules) {
     if (!rule.enabled || rule.trigger !== 'load' || rule.action.type !== 'fill') continue

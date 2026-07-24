@@ -5,7 +5,9 @@ import { promisify } from 'node:util'
 import { eq, and } from 'drizzle-orm'
 import type { AppDatabase } from '../server/db'
 import { schema } from '../server/db'
-import type { RepoPath, RepoPathResult } from '../shared/terminal'
+import { isValidBrowserRule, parseBrowserRules } from '../shared/browserRules'
+import type { BrowserRule, DbSchemaMode, PreviewMode, SetupTrigger } from '../shared/api'
+import type { RepoConfigPatch, RepoPath, RepoPathResult } from '../shared/terminal'
 
 const exec = promisify(execFile)
 
@@ -15,7 +17,24 @@ export async function getRepoPath(db: AppDatabase, owner: string, repo: string):
     .from(schema.repoPaths)
     .where(and(eq(schema.repoPaths.owner, owner), eq(schema.repoPaths.repo, repo)))
   const row = rows[0]
-  return row ? { owner: row.owner, repo: row.repo, path: row.path, runTargets: row.runTargets } : null
+  if (!row) return null
+  return {
+    owner: row.owner,
+    repo: row.repo,
+    path: row.path,
+    runTargets: row.runTargets,
+    setupScript: row.setupScript,
+    setupScriptTrigger: (row.setupScriptTrigger as SetupTrigger | null) ?? null,
+    teardownScript: row.teardownScript,
+    devScript: row.devScript,
+    devRestartScript: row.devRestartScript,
+    dbUrlScript: row.dbUrlScript,
+    dbSchemaMode: (row.dbSchemaMode as DbSchemaMode | null) ?? null,
+    dbSchemaValue: row.dbSchemaValue,
+    previewMode: (row.previewMode as PreviewMode | null) ?? null,
+    previewValue: row.previewValue,
+    browserRules: parseBrowserRules(row.browserRules),
+  }
 }
 
 // Persist the per-repo run-target list (docs/workflows.md §2 — the DB fallback below a committed
@@ -44,6 +63,55 @@ export async function setRunTargets(db: AppDatabase, owner: string, repo: string
     .set({ runTargets: value, updatedAt: Date.now() })
     .where(and(eq(schema.repoPaths.owner, owner), eq(schema.repoPaths.repo, repo)))
   return { ok: true, repoPath: { ...existing, runTargets: value } }
+}
+
+// Persist a partial repo-config update (the machine-local DB fallback for lifecycle/build/preview
+// config; committed .acorn/config.toml still wins at read time). Validation mirrors the old
+// per-workspace PATCH route: trigger + preview-mode enums, a bare-port check, and browser-rule
+// shape. An omitted field is untouched; '' (or [] for rules) clears.
+export async function setRepoConfig(db: AppDatabase, owner: string, repo: string, patch: RepoConfigPatch): Promise<RepoPathResult> {
+  const existing = await getRepoPath(db, owner, repo)
+  if (!existing) return { ok: false, reason: 'Map a local checkout for this repo first.' }
+
+  const set: Record<string, string | null> = {}
+  const scalar = (v: string) => v.trim() || null
+  if (patch.setupScript !== undefined) set.setupScript = scalar(patch.setupScript)
+  if (patch.teardownScript !== undefined) set.teardownScript = scalar(patch.teardownScript)
+  if (patch.devScript !== undefined) set.devScript = scalar(patch.devScript)
+  if (patch.devRestartScript !== undefined) set.devRestartScript = scalar(patch.devRestartScript)
+  if (patch.dbUrlScript !== undefined) set.dbUrlScript = scalar(patch.dbUrlScript)
+  if (patch.dbSchemaValue !== undefined) set.dbSchemaValue = scalar(patch.dbSchemaValue)
+  if (patch.dbSchemaMode !== undefined) {
+    if (patch.dbSchemaMode && !['auto', 'script', 'file'].includes(patch.dbSchemaMode)) return { ok: false, reason: 'Invalid schema mode.' }
+    set.dbSchemaMode = patch.dbSchemaMode || null
+  }
+  if (patch.setupScriptTrigger !== undefined) {
+    if (!['off', 'created', 'terminal'].includes(patch.setupScriptTrigger)) return { ok: false, reason: 'Invalid setup trigger.' }
+    set.setupScriptTrigger = patch.setupScriptTrigger
+  }
+  if (patch.previewMode !== undefined) {
+    if (patch.previewMode && !['url', 'port', 'script'].includes(patch.previewMode)) return { ok: false, reason: 'Invalid preview mode.' }
+    set.previewMode = patch.previewMode || null
+  }
+  if (patch.previewValue !== undefined) set.previewValue = scalar(patch.previewValue)
+  // A port preview value must be a bare 1-65535 (same guard the workspace route applied).
+  const effectiveMode = patch.previewMode !== undefined ? patch.previewMode : existing.previewMode
+  const effectiveValue = 'previewValue' in set ? set.previewValue : existing.previewValue
+  if (effectiveMode === 'port' && effectiveValue != null) {
+    const p = Number(effectiveValue)
+    if (!/^\d{1,5}$/.test(effectiveValue) || p < 1 || p > 65535) return { ok: false, reason: 'Preview port must be 1-65535.' }
+  }
+  if (patch.browserRules !== undefined) {
+    const rules: BrowserRule[] = Array.isArray(patch.browserRules) ? patch.browserRules.filter(isValidBrowserRule) : []
+    set.browserRules = rules.length ? JSON.stringify(rules) : null
+  }
+
+  if (Object.keys(set).length === 0) return { ok: true, repoPath: existing }
+  await db
+    .update(schema.repoPaths)
+    .set({ ...set, updatedAt: Date.now() })
+    .where(and(eq(schema.repoPaths.owner, owner), eq(schema.repoPaths.repo, repo)))
+  return { ok: true, repoPath: (await getRepoPath(db, owner, repo))! }
 }
 
 // Does a remote URL point at github.com/<owner>/<repo>? Accept https + ssh forms and an optional

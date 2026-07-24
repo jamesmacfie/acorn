@@ -4,7 +4,7 @@
 import { execFile } from 'node:child_process'
 import { promisify } from 'node:util'
 import type { AppDatabase } from '../../../core/server/db'
-import type { RunTarget } from './runConfig'
+import type { RunTarget } from '../../../core/main/runConfig'
 import { RuntimeService } from './runtime'
 import { loadTask, taskRunConfig } from '../../../core/main/taskWorktree'
 import { buildSessionEnv } from './terminalUtils'

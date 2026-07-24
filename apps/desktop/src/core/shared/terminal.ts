@@ -1,5 +1,6 @@
 // Shared terminal protocol (docs/terminal-and-agents.md). Imported by main, preload, and renderer — so it holds the
 // wire contract only, never node-pty types: main owns the PTY, this just describes what crosses IPC.
+import type { BrowserRule, DbSchemaMode, PreviewMode, SetupTrigger } from './api'
 
 // The ONE AgentState vocabulary (docs/terminal-and-agents.md, README decision 15) — defined here, reused verbatim
 // by the agent surfaces (15); no other module redeclares it. Each transport emits only the subset
@@ -80,12 +81,42 @@ export type TerminalProfile = {
   tmuxMissing?: boolean
 }
 
-// Local checkout mapping for a repo (docs/workspaces-and-tasks.md). Returned by repoPath.get / set.
+// Local checkout mapping + repo-level config (docs/workspaces-and-tasks.md). Returned by repoPath.get / set.
+// The config fields below are the machine-local DB fallback beneath a committed .acorn/config.toml
+// (loadRepoConfig precedence). They moved off the workspace (repo-level-settings): a workspace groups
+// repos, but this describes how to build/run/inspect ONE repo.
 export type RepoPath = {
   owner: string
   repo: string
   path: string
   runTargets: string | null // JSON RunTarget[] (docs/workflows.md §2) — the DB fallback config surface
+  setupScript: string | null
+  setupScriptTrigger: SetupTrigger | null
+  teardownScript: string | null
+  devScript: string | null
+  devRestartScript: string | null
+  dbUrlScript: string | null
+  dbSchemaMode: DbSchemaMode | null // where the Database pane's AI-generation schema text comes from; null → 'auto'
+  dbSchemaValue: string | null // the command or worktree-relative path per dbSchemaMode; null/blank = unset
+  previewMode: PreviewMode | null
+  previewValue: string | null
+  browserRules: BrowserRule[] // parsed on the wire (empty = none)
+}
+
+// Partial repo-config update sent to repoPath.config. Any omitted field is left unchanged; a field
+// set to '' (or [] for browserRules) clears server-side. Mirrors the old per-workspace PATCH body.
+export type RepoConfigPatch = {
+  setupScript?: string
+  setupScriptTrigger?: SetupTrigger
+  teardownScript?: string
+  devScript?: string
+  devRestartScript?: string
+  dbUrlScript?: string
+  dbSchemaMode?: DbSchemaMode | ''
+  dbSchemaValue?: string
+  previewMode?: PreviewMode | ''
+  previewValue?: string
+  browserRules?: BrowserRule[]
 }
 
 // Run targets as the renderer sees them (docs/workflows.md §2): the merged config list + live status.
