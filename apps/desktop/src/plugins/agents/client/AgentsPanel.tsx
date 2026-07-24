@@ -5,9 +5,12 @@ import type { TerminalProfile } from '../../../core/shared/terminal'
 import { refreshSessions, sessions } from '../../terminal/client/sessions'
 import { terminalApi, type WorkflowStepRow } from '../../terminal/client/terminalClient'
 import { workflowApi } from './workflowClient'
+import AgentUsageSection from './AgentUsageSection'
 import { setTerminalOpen } from '../../../core/client/tasks/tasks'
 import { buildRoster, feedFromEvents, resumeCommandFor, stepFeed, type RosterRow, type StreamEvent } from './model'
 import './agents-panel.css'
+
+export { default as AgentsToggle } from './AgentsToggle'
 
 const STATE_GLYPH: Record<string, string> = {
   starting: '◔',
@@ -141,6 +144,8 @@ export default function AgentsPanel(props: { task: Task; onClose: () => void }) 
             </For>
           </div>
         </Show>
+
+        <AgentUsageSection />
 
         <ul class="agents-roster">
           <For each={roster()} fallback={<li class="muted agents-empty">No agents yet — launch one, or start a workflow from ⌘K.</li>}>

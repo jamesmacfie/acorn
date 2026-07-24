@@ -38,6 +38,53 @@
 }
 .agents-launch-row:hover:not(:disabled) { background: var(--bg-hover); }
 .agents-launch-row:disabled { color: var(--text-faint); cursor: default; }
+.agent-usage {
+  flex: none;
+  max-height: 45%;
+  overflow-y: auto;
+  border-bottom: 1px solid var(--border);
+}
+.agent-usage-head {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  padding: 5px 10px;
+  color: var(--text-muted);
+  background: var(--bg-subtle);
+  border-bottom: 1px solid var(--border);
+  font-size: var(--fs-xs, 11px);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.agent-usage-head .section-refresh { margin-left: auto; }
+.agent-usage-provider { padding: 7px 10px; border-bottom: 1px solid var(--border); }
+.agent-usage-provider:last-child { border-bottom: 0; }
+.agent-usage-provider-head { display: flex; align-items: center; gap: 6px; font-size: var(--fs-sm); }
+.agent-usage-health {
+  width: 7px;
+  height: 7px;
+  flex: none;
+  border-radius: 50%;
+  background: var(--text-faint);
+}
+.agent-usage-health[data-health='healthy'] { background: var(--add-marker); }
+.agent-usage-health[data-health='warning'] { background: var(--warn); }
+.agent-usage-health[data-health='critical'] { background: var(--del-marker); }
+.agent-usage-health[data-health='depleted'],
+.agent-usage-health[data-health='unknown'] { background: var(--text-faint); }
+.agent-usage-plan { color: var(--text-muted); font-size: var(--fs-xs, 11px); }
+.agent-usage-updated { margin-left: auto; font-size: 10px; white-space: nowrap; }
+.agent-usage-account { margin: 2px 0 4px 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 10px; }
+.agent-usage-values { margin: 5px 0 0 13px; font-size: var(--fs-xs, 11px); }
+.agent-usage-value { display: grid; grid-template-columns: minmax(86px, 0.7fr) minmax(0, 1.3fr); gap: 8px; padding: 1px 0; }
+.agent-usage-value dt { color: var(--text-muted); }
+.agent-usage-value dd { margin: 0; min-width: 0; color: var(--text); text-align: right; overflow-wrap: anywhere; }
+.agent-usage-error,
+.agent-usage-route-error { padding: 4px 10px; color: var(--del-marker); font-size: var(--fs-xs, 11px); }
+.agent-usage-error { padding-left: 23px; }
+.agent-usage-loading { padding: 10px; font-size: var(--fs-sm); }
 .agents-roster { flex: none; max-height: 40%; overflow-y: auto; list-style: none; margin: 0; padding: 0; border-bottom: 1px solid var(--border); }
 .agents-empty { padding: 12px; font-size: var(--fs-sm); }
 .agents-row {
