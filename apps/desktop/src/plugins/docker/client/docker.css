@@ -178,6 +178,10 @@
 }
 
 .docker-logs-bar { display: flex; align-items: center; gap: 8px; padding: 4px 0; }
+.docker-logs-search { flex: 0 1 200px; min-width: 100px; }
+.docker-match-count { white-space: nowrap; }
+.docker-logs mark { background: color-mix(in srgb, var(--accent) 30%, transparent); color: inherit; border-radius: 2px; }
+.docker-logs mark.current { background: var(--accent); color: var(--bg); }
 .docker-follow { display: inline-flex; align-items: center; gap: 5px; font-size: var(--fs-sm); color: var(--text); cursor: pointer; }
 .docker-follow input { accent-color: var(--accent); cursor: pointer; }
 .docker-stats { align-content: start; }

@@ -1,6 +1,6 @@
 // Shared container detail panel (docs/ui-design.md): Info + live Logs + live Stats tabs, used by
 // the browse right pane and the task pane — one component, two hosts (the RollbarItemPanel split).
-import { createEffect, createResource, createSignal, For, on, onCleanup, Show, type JSX } from 'solid-js'
+import { createEffect, createMemo, createResource, createSignal, For, on, onCleanup, Show, type JSX } from 'solid-js'
 import { writeJson } from '../../../core/client/apiClient'
 import { requestTerminalFocusIntent } from '../../../core/client/registries/clientEvents'
 import { terminalSessionsRoute } from '../../../core/shared/api'
@@ -39,6 +39,7 @@ export default function ContainerDetail(props: { target: string; taskId?: string
   createEffect(on(() => (tab() === 'logs' ? props.target : null), (ref) => {
     setLogText('')
     setLogEnded(false)
+    setLogQuery('')
     if (!ref) return
     const off = wsDockerAttach('logs', ref, (event) => {
       if (event.kind === 'log') {
@@ -51,6 +52,45 @@ export default function ContainerDetail(props: { target: string; taskId?: string
     })
     onCleanup(off)
   }))
+
+  // Find-in-logs: case-insensitive substring over the visible buffer, rendered as <mark> segments.
+  const [logQuery, setLogQuery] = createSignal('')
+  const [matchIdx, setMatchIdx] = createSignal(0)
+  const MAX_MATCHES = 5000 // ponytail: mark-render cap; incremental match tracking if it ever binds
+  const logMatches = createMemo(() => {
+    const q = logQuery().toLowerCase()
+    if (!q) return []
+    const text = logText().toLowerCase()
+    const out: number[] = []
+    let i = text.indexOf(q)
+    while (i !== -1 && out.length < MAX_MATCHES) {
+      out.push(i)
+      i = text.indexOf(q, i + q.length)
+    }
+    return out
+  })
+  const currentMatch = () => (logMatches().length ? Math.min(matchIdx(), logMatches().length - 1) : -1)
+  const logSegments = createMemo(() => {
+    const q = logQuery()
+    if (!q) return null
+    const text = logText()
+    const parts: { text: string; match?: number }[] = []
+    let last = 0
+    logMatches().forEach((start, i) => {
+      if (start > last) parts.push({ text: text.slice(last, start) })
+      parts.push({ text: text.slice(start, start + q.length), match: i })
+      last = start + q.length
+    })
+    parts.push({ text: text.slice(last) })
+    return parts
+  })
+  function navMatch(dir: 1 | -1) {
+    const n = logMatches().length
+    if (!n) return
+    setFollow(false)
+    setMatchIdx(((currentMatch() + dir) % n + n) % n)
+    queueMicrotask(() => logEl?.querySelector('mark.current')?.scrollIntoView({ block: 'center' }))
+  }
 
   // Live stats: one sample per docker tick; keep a short history for the text readout.
   const [stats, setStats] = createSignal<DockerStatsSample | null>(null)
@@ -234,6 +274,28 @@ export default function ContainerDetail(props: { target: string; taskId?: string
                 <label class="docker-follow">
                   <input type="checkbox" checked={follow()} onChange={(e) => setFollow(e.currentTarget.checked)} /> Follow
                 </label>
+                <input
+                  class="docker-search docker-logs-search"
+                  type="search"
+                  placeholder="Find in logs"
+                  value={logQuery()}
+                  onInput={(e) => {
+                    setLogQuery(e.currentTarget.value)
+                    setMatchIdx(0)
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') navMatch(e.shiftKey ? -1 : 1)
+                    else if (e.key === 'Escape') setLogQuery('')
+                  }}
+                />
+                <Show when={logQuery()}>
+                  <span class="muted docker-match-count" role="status">
+                    {logMatches().length ? `${currentMatch() + 1}/${logMatches().length}` : 'no matches'}
+                  </span>
+                  <button type="button" class="overlay-btn" title="Previous match (Shift+Enter)" disabled={!logMatches().length} onClick={() => navMatch(-1)}>↑</button>
+                  <button type="button" class="overlay-btn" title="Next match (Enter)" disabled={!logMatches().length} onClick={() => navMatch(1)}>↓</button>
+                </Show>
+                <button type="button" class="overlay-btn" title="Clear the current log view (the stream keeps appending)" onClick={() => setLogText('')}>Clear</button>
                 <span class="muted">{logEnded() ? 'stream ended' : 'live · last 300 lines replayed'}</span>
               </div>
               <pre
@@ -244,7 +306,15 @@ export default function ContainerDetail(props: { target: string; taskId?: string
                   // Manual scroll-up pauses follow; scrolling back to the bottom resumes it.
                   setFollow(logEl.scrollTop + logEl.clientHeight >= logEl.scrollHeight - 8)
                 }}
-              >{logText() || 'Waiting for log output…'}</pre>
+              >
+                <Show when={logSegments()} fallback={logText() || 'Waiting for log output…'}>
+                  {(parts) => (
+                    <For each={parts()}>
+                      {(p) => (p.match === undefined ? p.text : <mark classList={{ current: p.match === currentMatch() }}>{p.text}</mark>)}
+                    </For>
+                  )}
+                </Show>
+              </pre>
             </Show>
 
             <Show when={tab() === 'terminal' && running()}>
