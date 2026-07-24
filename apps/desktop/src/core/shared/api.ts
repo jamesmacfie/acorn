@@ -283,6 +283,9 @@ export type SetupTrigger = 'off' | 'created' | 'terminal'
 // How the browser-preview pane resolves its URL: a fixed URL, http://localhost:<port>, or the
 // stdout of a shell command run in the repo's worktree. null falls back to the dev-server port.
 export type PreviewMode = 'url' | 'port' | 'script'
+// Where the Database pane's AI-generation schema text comes from: live introspection of the
+// connected Postgres, the stdout of a shell command, or a file in the worktree. null → 'auto'.
+export type DbSchemaMode = 'auto' | 'script' | 'file'
 // Preview-browser page rules (docs/panes.md): applied by the main process when a preview page
 // loads. Discriminated unions so future triggers ('navigate', …) and actions ('click', 'js', …)
 // extend without a schema change — stored as one JSON column on workspaces.
@@ -311,6 +314,8 @@ export type Workspace = {
   devRestartScript: string | null // per-workspace restart command for the `dev` target; null/blank = stop+start
   teardownScript: string | null // shell command run in the worktree just before removal (docs/terminal-and-agents.md); null/blank = none
   dbUrlScript: string | null // shell command run in the worktree to print a Postgres URL for the Database pane (docs/pg.md); null/blank = auto-detect
+  dbSchemaMode: DbSchemaMode | null // where the AI-generation schema text comes from; null → 'auto'
+  dbSchemaValue: string | null // the command or worktree-relative path per dbSchemaMode; null/blank = unset
   previewMode: PreviewMode | null // how the browser-preview URL is resolved; null → dev-server port
   previewValue: string | null // the URL, port, or command per previewMode; null/blank = unset
   browserRules: BrowserRule[] // preview-browser page rules; empty = none
@@ -467,7 +472,7 @@ export const databaseColumnsRoute = (taskId: string, schema: string, name: strin
   `/api/tasks/${taskId}/database/columns?schema=${encodeURIComponent(schema)}&name=${encodeURIComponent(name)}`
 export const databaseRowsRoute = (taskId: string, schema: string, name: string, offset?: number) =>
   `/api/tasks/${taskId}/database/rows?schema=${encodeURIComponent(schema)}&name=${encodeURIComponent(name)}${offset ? `&offset=${offset}` : ''}`
-export const databaseActionRoute = (taskId: string, action: 'connect' | 'disconnect' | 'query' | 'update' | 'insert' | 'delete') =>
+export const databaseActionRoute = (taskId: string, action: 'connect' | 'disconnect' | 'query' | 'update' | 'insert' | 'delete' | 'generate') =>
   `/api/tasks/${taskId}/database/${action}`
 
 // Notes + memory pane (docs/notes-and-memory.md). These routes replaced the old feature-specific IPC surface.

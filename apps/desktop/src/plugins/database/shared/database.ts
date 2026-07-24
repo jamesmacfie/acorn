@@ -18,3 +18,9 @@ export type DbWriteResult = { ok: true; rowCount: number } | { ok: false; error:
 
 // A primary-key locator for update/delete: column name → its current (string) value.
 export type DbPk = Record<string, DbCell>
+
+// AI query generation (docs/pg.md): where the schema text in the prompt came from, and the result
+// of a generate call. Generate errors travel as HTTP error responses, not a union.
+export type DbSchemaSource = 'auto' | 'script' | 'file'
+export type DbSchemaResult = { schema: string; source: DbSchemaSource } | { error: string }
+export type DbGenerateResult = { sql: string; providerId: string; modelId: string }

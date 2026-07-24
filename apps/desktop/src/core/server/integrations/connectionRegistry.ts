@@ -26,6 +26,8 @@ const descriptorFor = (provider: ConnectionProviderContribution): PublicIntegrat
       : { maxConnections: provider.connection.maxConnections }),
   },
   capabilities: provider.capabilities,
+  ...(provider.models === undefined ? {} : { models: provider.models }),
+  ...(provider.defaultModelId === undefined ? {} : { defaultModelId: provider.defaultModelId }),
 })
 
 const positiveInteger = (value: number): boolean => Number.isInteger(value) && value > 0

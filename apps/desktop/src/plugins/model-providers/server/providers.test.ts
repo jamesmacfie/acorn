@@ -5,12 +5,14 @@ import { connectProvider, rotateConnection, testConnection } from '../../../core
 import { makeTestDb, type TestDb } from '../../../core/server/routes/testDb'
 import { decryptSecret } from '../../../core/server/session'
 import {
+  ANTHROPIC_MODELS,
   ANTHROPIC_RECOMMENDED_MODEL_ID,
   createAnthropicProviders,
   type AnthropicGateway,
 } from './anthropic'
 import {
   createOpenAIProviders,
+  OPENAI_MODELS,
   OPENAI_RECOMMENDED_MODEL_ID,
   type OpenAIGateway,
 } from './openai'
@@ -76,6 +78,23 @@ describe('model provider connections', () => {
       })
       expect(JSON.stringify(provider.toPublic())).not.toContain('plaintext-key')
     }
+  })
+
+  it('publishes the model catalog and default model per provider', () => {
+    expect(openAIProviders.connectionProvider.toPublic()).toMatchObject({
+      models: OPENAI_MODELS,
+      defaultModelId: OPENAI_RECOMMENDED_MODEL_ID,
+    })
+    expect(OPENAI_MODELS.map((m) => m.id)).toEqual(['gpt-5.6-sol', 'gpt-5.6-luna', 'gpt-5.6-terra'])
+    expect(anthropicProviders.connectionProvider.toPublic()).toMatchObject({
+      models: ANTHROPIC_MODELS,
+      defaultModelId: ANTHROPIC_RECOMMENDED_MODEL_ID,
+    })
+    expect(ANTHROPIC_MODELS.map((m) => m.id)).toEqual([
+      'claude-haiku-4-5-20251001',
+      'claude-sonnet-5',
+      'claude-opus-4-8',
+    ])
   })
 
   it('validates with model listing and persists only encrypted OpenAI credentials', async () => {

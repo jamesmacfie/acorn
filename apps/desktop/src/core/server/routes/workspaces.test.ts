@@ -79,4 +79,23 @@ describe('workspace icon + colour', () => {
     const res = await app.fetch(jsonReq('/api/workspaces/nope', 'PATCH', { name: 'Ghost' }), {} as Env)
     expect(res.status).toBe(404)
   })
+
+  it('PATCHes the AI schema source, clears it with blank, rejects unknown modes', async () => {
+    const w = await create()
+    expect(w.dbSchemaMode).toBeNull()
+    expect(w.dbSchemaValue).toBeNull()
+
+    const res = await app.fetch(jsonReq(`/api/workspaces/${w.id}`, 'PATCH', { dbSchemaMode: 'script', dbSchemaValue: ' pg_dump --schema-only "$DATABASE_URL" ' }), {} as Env)
+    expect(res.status).toBe(200)
+    let back = await read(w.id)
+    expect(back?.dbSchemaMode).toBe('script')
+    expect(back?.dbSchemaValue).toBe('pg_dump --schema-only "$DATABASE_URL"')
+
+    await app.fetch(jsonReq(`/api/workspaces/${w.id}`, 'PATCH', { dbSchemaMode: '', dbSchemaValue: '' }), {} as Env)
+    back = await read(w.id)
+    expect(back?.dbSchemaMode).toBeNull()
+    expect(back?.dbSchemaValue).toBeNull()
+
+    expect((await app.fetch(jsonReq(`/api/workspaces/${w.id}`, 'PATCH', { dbSchemaMode: 'bogus' }), {} as Env)).status).toBe(400)
+  })
 })

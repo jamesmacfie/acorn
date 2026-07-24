@@ -46,6 +46,8 @@ export const publicConnectionProvider = <TValidated>(
         ...(connection.maxConnections === undefined ? {} : { maxConnections: connection.maxConnections }),
       },
       capabilities: provider.capabilities,
+      ...(provider.models === undefined ? {} : { models: provider.models }),
+      ...(provider.defaultModelId === undefined ? {} : { defaultModelId: provider.defaultModelId }),
     }),
   }
 }
