@@ -13,11 +13,10 @@ import { schema } from '../../../core/server/db'
 import { setTerminalBridge } from '../server/routes/terminal'
 import { setStreamHandlers, type StreamSink } from '../../../core/main/wsHub'
 import type { ArchiveOpts, ArchiveResult, CreateOpts, ServerMsg, TerminalSession } from '../../../core/shared/terminal'
-import { AgentSender, type SendSubmit } from '../../agents/main/agentSend'
+import { AgentSender, type SendSubmit } from './agentSend'
 import { archiveTask, TEARDOWN_TIMEOUT_MS } from '../../../core/main/archive'
+import { buildSessionEnv, childEnv } from '../../../core/main/taskEnv'
 import {
-  buildSessionEnv,
-  childEnv,
   clampDim,
   computeIdle,
   FIRST_IDLE_MS,

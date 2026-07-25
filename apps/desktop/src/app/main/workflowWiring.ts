@@ -19,7 +19,7 @@ import { getProfile, requireProfile, resolveCommand } from '../../core/main/prof
 import { getRepoPath } from '../../core/main/repoPaths'
 import type { RuntimeService } from '../../plugins/terminal/main/runtime'
 import { isDir, loadTask, resolveTaskCwd } from '../../core/main/taskWorktree'
-import { buildSessionEnv } from '../../plugins/terminal/main/terminalUtils'
+import { buildSessionEnv } from '../../core/main/taskEnv'
 import { loadWorkflowFiles } from '../../plugins/workflows/main/workflowFiles'
 import { WorkflowRunner, type WorkflowDef } from '../../plugins/workflows/main/workflowRunner'
 import { encodeToolCeiling } from '../../plugins/workflows/main/workflowTools'

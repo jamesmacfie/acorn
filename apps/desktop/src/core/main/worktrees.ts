@@ -3,7 +3,7 @@ import { copyFileSync, existsSync, mkdirSync } from 'node:fs'
 import { dirname, isAbsolute, join, resolve } from 'node:path'
 import { promisify } from 'node:util'
 import type { WorktreeResult } from '../shared/terminal'
-import { isContainedPath, isDirty, worktreeBranchDirName } from '../../plugins/terminal/main/terminalUtils'
+import { isContainedPath, isDirty, worktreeBranchDirName } from './pathGuards'
 
 const exec = promisify(execFile)
 

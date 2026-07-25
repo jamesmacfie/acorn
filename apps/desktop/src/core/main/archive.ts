@@ -10,7 +10,7 @@ import type { AppDatabase } from '../server/db'
 import { schema } from '../server/db'
 import type { ArchiveOpts, ArchiveResult } from '../shared/terminal'
 import { getRepoPath } from './repoPaths'
-import { buildSessionEnv } from '../../plugins/terminal/main/terminalUtils'
+import { buildSessionEnv } from './taskEnv'
 import { removeWorktree } from './worktrees'
 
 const exec = promisify(execFile)

@@ -120,15 +120,12 @@ const BASELINE_CORE_TO_PLUGIN = [
   'core/client/tasks/taskStatus.ts => plugins/terminal/client/terminalClient.ts',
   'core/client/workspaces/WorkspaceRepoAssignments.tsx => plugins/github/client/mutations.ts',
   'core/client/workspaces/WorkspaceRepoAssignments.tsx => plugins/terminal/client/terminalClient.ts',
-  'core/main/archive.ts => plugins/terminal/main/terminalUtils.ts',
-  'core/main/worktrees.ts => plugins/terminal/main/terminalUtils.ts',
 ]
 const BASELINE_PLUGIN_TO_PLUGIN = [
   'plugins/agents/client/AgentsPanel.tsx => plugins/terminal/client/sessions.ts',
   'plugins/agents/client/AgentsPanel.tsx => plugins/terminal/client/terminalClient.ts',
   'plugins/agents/client/model.ts => plugins/terminal/client/terminalClient.ts',
   'plugins/agents/client/workflowClient.ts => plugins/terminal/client/terminalClient.ts',
-  'plugins/agents/main/agentSend.ts => plugins/terminal/main/terminalUtils.ts',
   'plugins/changes/client/ChangesPane.tsx => plugins/github/client/diff/DiffRows.tsx',
   'plugins/changes/client/ChangesPane.tsx => plugins/github/client/diff/model.ts',
   'plugins/changes/client/ChangesPane.tsx => plugins/github/client/mutations.ts',
@@ -146,11 +143,9 @@ const BASELINE_PLUGIN_TO_PLUGIN = [
   'plugins/github/client/mutations.ts => plugins/terminal/client/terminalClient.ts',
   'plugins/linear/client/LinearIssuePanel.tsx => plugins/github/client/mutations.ts',
   'plugins/memory/main/knowledgeIpc.ts => plugins/notes/main/notes.ts',
-  'plugins/memory/main/knowledgeIpc.ts => plugins/terminal/main/terminalUtils.ts',
   'plugins/notes/client/NotesPane.tsx => plugins/context/client/model.ts',
   'plugins/preview/client/PreviewTaskPane.tsx => plugins/terminal/client/runClient.ts',
   'plugins/preview/client/PreviewTaskPane.tsx => plugins/terminal/client/terminalClient.ts',
-  'plugins/terminal/main/terminal.ts => plugins/agents/main/agentSend.ts',
   'plugins/workflows/client/WorkflowsSettings.tsx => plugins/agents/client/workflowClient.ts',
   'plugins/workflows/client/WorkflowsSettings.tsx => plugins/terminal/client/terminalClient.ts',
 ]

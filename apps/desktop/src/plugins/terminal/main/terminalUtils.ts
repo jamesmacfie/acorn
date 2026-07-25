@@ -1,7 +1,7 @@
 // Pure terminal helpers — no electron / node-pty imports, so they're unit-testable under plain Node
-// (terminalUtils.test.ts). The PTY/IPC wiring that does need those lives in terminal.ts.
-
-import { resolve, sep } from 'node:path'
+// (terminalUtils.test.ts). The PTY/IPC wiring that does need those lives in terminal.ts. Helpers that
+// aren't terminal-specific live in core: path/checkout guards in core/main/pathGuards.ts, the
+// task-scoped child environment in core/main/taskEnv.ts.
 
 export const RING_CAP = 256 * 1024 // bytes of recent output kept per session, replayed on attach
 
@@ -66,47 +66,6 @@ export const computeIdle = (
 export const resolveBackend = (preference: 'node-pty' | 'tmux', tmuxAvailable: boolean): 'node-pty' | 'tmux' =>
   preference === 'tmux' && tmuxAvailable ? 'tmux' : 'node-pty'
 
-// PR worktree directory name (docs/workspaces-and-tasks.md): `<owner>-<repo>-pr-<number>` under the worktrees root.
-export const worktreeDirName = (owner: string, repo: string, number: number | string) => `${owner}-${repo}-pr-${number}`
-
-// The filesystem/DNS-safe branch slug (docs/terminal-and-agents.md): shared by the worktree dir name and the
-// ACORN_TASK_SLUG env var — the isolation handle for parallel tasks (compose -p, derived names).
-export const branchSlug = (branch: string) => branch.replace(/[^A-Za-z0-9._-]/g, '-')
-
-// Workspace worktree directory name (docs/workspaces-and-tasks.md): keyed by branch, since a workspace is
-// branch-first (local-first workspaces have no PR number). The branch slug replaces any char that
-// isn't filesystem-safe (`feat/login` → `feat-login`); isContainedPath still guards the result.
-export const worktreeBranchDirName = (owner: string, repo: string, branch: string) =>
-  `${owner}-${repo}-${branchSlug(branch)}`
-
-// Guard repo identifiers before they reach a filesystem path (docs/terminal-and-agents.md: validate every IPC
-// payload at the boundary). Allow only GitHub-legal chars and forbid a leading dot, so `..`, `/`,
-// and absolute/relative traversal can't escape the worktrees root.
-export const isValidRepoIdent = (s: string): boolean => /^[A-Za-z0-9._-]+$/.test(s) && !s.startsWith('.')
-
-// Is `candidate` the same as, or strictly inside, `root`? Both are resolved first, so a
-// renderer-supplied path with `..` segments can't point outside the worktrees dir.
-export const isContainedPath = (root: string, candidate: string): boolean => {
-  const r = resolve(root)
-  const c = resolve(candidate)
-  return c === r || c.startsWith(r + sep)
-}
-
-// A checkout is dirty when `git status --porcelain` prints anything.
-export const isDirty = (porcelain: string): boolean => porcelain.trim().length > 0
-
-// Controlled child environment (docs/security.md): preserve the few vars a shell needs, never copy
-// SESSION_ENC_KEY / GITHUB_CLIENT_SECRET (or anything else) into the child.
-export function childEnv(env: NodeJS.ProcessEnv = process.env): Record<string, string> {
-  const out: Record<string, string> = {}
-  for (const k of ['HOME', 'PATH', 'SHELL', 'LANG', 'LC_ALL', 'USER', 'LOGNAME', 'TMPDIR']) {
-    const v = env[k]
-    if (v) out[k] = v
-  }
-  out.TERM = 'xterm-256color'
-  return out
-}
-
 // Blocked-prompt detection (docs/terminal-and-agents.md): when an agent session is otherwise idle, scan the
 // tail of its PTY ring for a tiny const rule list of input prompts. ponytail: a heuristic with a
 // known ceiling — the upgrade path is config-injected agent hooks (deferred, invasive).
@@ -149,32 +108,4 @@ const PASTE_MARKERS = /\x1b\[20[01]~/g
 export function wrapBracketedPaste(text: string): string {
   const sanitized = text.replace(PASTE_MARKERS, '').replace(/[\s\r\n]+$/, '')
   return `${PASTE_BEGIN}${sanitized}${PASTE_END}`
-}
-
-// Task identity fields a session env needs — a projection of the tasks row, so this stays free of
-// drizzle types and testable under plain Node.
-export type SessionTaskInfo = { repoOwner: string; repoName: string; branch: string; title: string }
-
-// Environment for every task-scoped session and lifecycle script (docs/terminal-and-agents.md, docs/agent-tools.md §4): the childEnv
-// whitelist (never secrets), plus the ACORN_* identity vars agents / MCP / setup / teardown scripts
-// key off. Caller-supplied opts.env still wins — it's spread last.
-export function buildSessionEnv(opts: {
-  taskId: string
-  cwd: string
-  task?: SessionTaskInfo | null
-  env?: Record<string, string>
-  baseEnv?: NodeJS.ProcessEnv
-}): Record<string, string> {
-  const out: Record<string, string> = {
-    ...childEnv(opts.baseEnv ?? process.env),
-    ACORN_TASK_ID: opts.taskId,
-    ACORN_WORKTREE_PATH: opts.cwd,
-  }
-  if (opts.task) {
-    out.ACORN_REPO = `${opts.task.repoOwner}/${opts.task.repoName}`
-    out.ACORN_BRANCH = opts.task.branch
-    out.ACORN_TASK_SLUG = branchSlug(opts.task.branch)
-    out.ACORN_TASK_TITLE = opts.task.title
-  }
-  return { ...out, ...(opts.env ?? {}) }
 }
