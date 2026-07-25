@@ -1,7 +1,7 @@
 import { createSignal, For, Show } from 'solid-js'
 import { ApiError } from '../../../core/client/apiClient'
 import ModelConnectionPicker, { defaultModelIdFor } from '../../../core/client/modelProviders/ModelConnectionPicker'
-import { trapOverlayFocus } from '../../../core/client/ui/focus'
+import { createDismissable } from '../../../core/client/ui/dismissable'
 import Picker from '../../../core/client/ui/Picker'
 import type { AvailableModelConnection } from '../../../core/shared/modelProviders'
 import type { DbSavedQuery } from '../shared/database'
@@ -40,6 +40,7 @@ export default function GenerateSqlModal(props: {
   const [busy, setBusy] = createSignal(false)
   const [error, setError] = createSignal('')
   let dialog!: HTMLDivElement
+  const dismiss = createDismissable({ onDismiss: () => props.onClose(), container: () => dialog })
 
   const chosen = () => props.queries.filter((q) => exampleIds().includes(q.id))
   const toggle = (q: DbSavedQuery) =>
@@ -71,17 +72,16 @@ export default function GenerateSqlModal(props: {
   }
 
   return (
-    <div class="overlay-backdrop" onClick={props.onClose}>
+    <div class="overlay-backdrop" onClick={dismiss.onBackdropClick}>
       <div
         ref={dialog}
         class="overlay db-generate"
         role="dialog"
         aria-modal="true"
-        onClick={(event) => event.stopPropagation()}
+        onClick={dismiss.onContainerClick}
         onKeyDown={(event) => {
-          if (event.key === 'Escape') props.onClose()
-          else if (event.key === 'Enter' && (event.metaKey || event.ctrlKey)) void generate()
-          else trapOverlayFocus(event, dialog)
+          if (event.key === 'Enter' && (event.metaKey || event.ctrlKey)) void generate()
+          else dismiss.onKeyDown(event)
         }}
       >
         <div class="overlay-title">Generate SQL</div>
@@ -138,7 +138,7 @@ export default function GenerateSqlModal(props: {
           </Show>
         </div>
         <div class="db-generate-actions">
-          <button type="button" class="overlay-btn" disabled={busy()} onClick={props.onClose}>
+          <button type="button" class="ui-btn" disabled={busy()} onClick={props.onClose}>
             Cancel
           </button>
           <button type="button" class="db-run-btn" disabled={busy() || !prompt().trim()} onClick={() => void generate()}>

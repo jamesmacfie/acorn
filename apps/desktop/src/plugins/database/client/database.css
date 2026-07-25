@@ -10,23 +10,23 @@
 .db-head {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--space-4);
 }
 .db-status {
   font-size: var(--fs-sm);
   color: var(--text-muted);
   text-transform: none;
 }
-.db-status.ok { color: var(--add-marker, var(--accent)); }
-.db-status.err { color: var(--del-marker, var(--warn)); }
+.db-status.ok { color: var(--add-marker); }
+.db-status.err { color: var(--del-marker); }
 .db-head .db-icon-btn { margin-left: auto; }
 
 .db-icon-btn {
   background: transparent;
-  border: 1px solid var(--border);
+  border: var(--divider);
   color: var(--text-muted);
   border-radius: var(--radius);
-  padding: 2px 8px;
+  padding: var(--space-1) var(--space-4);
   font: inherit;
   font-size: var(--fs-sm);
   cursor: pointer;
@@ -37,9 +37,9 @@
 .db-error {
   padding: 6px var(--pane-pad);
   font-size: var(--fs-sm);
-  color: var(--del-marker, var(--warn));
-  background: var(--del-bg, var(--bg-subtle));
-  border-bottom: 1px solid var(--border);
+  color: var(--del-marker);
+  background: var(--del-bg);
+  border-bottom: var(--divider);
   white-space: pre-wrap;
 }
 
@@ -52,13 +52,13 @@
 /* Sidebar — searchable table list */
 .db-sidebar {
   width: clamp(180px, 22%, 280px);
-  border-right: 1px solid var(--border);
+  border-right: var(--divider);
   display: flex;
   flex-direction: column;
   min-height: 0;
 }
 .db-filter {
-  margin: 8px;
+  margin: var(--space-4);
   flex: none;
 }
 .db-table-list {
@@ -70,11 +70,11 @@
   display: block;
   width: 100%;
   text-align: left;
-  padding: 0 12px;
+  padding: 0 var(--space-6);
   height: var(--row-h);
   line-height: var(--row-h);
   border: none;
-  border-left: 3px solid transparent;
+  border-left: var(--marker-w) solid transparent;
   background: transparent;
   color: var(--text);
   font: inherit;
@@ -111,18 +111,18 @@
   flex: none;
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: var(--space-5);
   justify-content: flex-end;
-  padding: 5px 10px;
-  border-top: 1px solid var(--border);
+  padding: 5px var(--space-5);
+  border-top: var(--divider);
 }
 .db-hint { font-size: var(--fs-sm); }
 .db-run-btn {
   background: var(--accent);
-  color: #fff;
+  color: var(--accent-fg);
   border: none;
   border-radius: var(--radius);
-  padding: 4px 12px;
+  padding: var(--space-2) var(--space-6);
   font: inherit;
   font-size: var(--fs-sm);
   cursor: pointer;
@@ -130,15 +130,15 @@
 .db-run-btn:disabled { opacity: 0.5; cursor: default; }
 .db-del-btn {
   background: transparent;
-  color: var(--del-marker, var(--warn));
-  border: 1px solid var(--border);
+  color: var(--del-marker);
+  border: var(--divider);
   border-radius: var(--radius);
-  padding: 4px 12px;
+  padding: var(--space-2) var(--space-6);
   font: inherit;
   font-size: var(--fs-sm);
   cursor: pointer;
 }
-.db-del-btn:hover:not(:disabled) { background: var(--del-bg, var(--bg-hover)); }
+.db-del-btn:hover:not(:disabled) { background: var(--del-bg); }
 
 .db-split {
   flex: none;
@@ -158,9 +158,9 @@
   flex: none;
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 4px 10px;
-  border-bottom: 1px solid var(--border);
+  gap: var(--space-5);
+  padding: var(--space-2) var(--space-5);
+  border-bottom: var(--divider);
 }
 .db-footer {
   font-size: var(--fs-sm);
@@ -178,21 +178,21 @@
 .dbgrid-head {
   position: sticky;
   top: 0;
-  z-index: 2;
+  z-index: calc(var(--z-base) + 1);
   display: grid;
   height: var(--row-h);
-  background: var(--bg-subtle, var(--bg));
-  border-bottom: 1px solid var(--border);
+  background: var(--bg-subtle);
+  border-bottom: var(--divider);
 }
 .dbgrid-hcell {
-  padding: 0 8px;
+  padding: 0 var(--space-4);
   line-height: var(--row-h);
   font-size: var(--fs-sm);
   color: var(--text-muted);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  border-right: 1px solid var(--border);
+  border-right: var(--divider);
 }
 .dbgrid-body { position: relative; }
 .dbgrid-row {
@@ -203,24 +203,24 @@
   display: grid;
   align-items: center;
   cursor: pointer;
-  border-bottom: 1px solid var(--border);
+  border-bottom: var(--divider);
 }
 .dbgrid-row:hover { background: var(--bg-hover); }
 .dbgrid-row.active { background: var(--bg-selected); }
 .dbgrid-cell {
-  padding: 0 8px;
+  padding: 0 var(--space-4);
   font-size: var(--fs-sm);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  border-right: 1px solid var(--border);
+  border-right: var(--divider);
 }
 .dbgrid-cell.is-null { color: var(--text-faint); font-style: italic; }
 
 /* Row detail / editor panel */
 .db-detail {
   width: clamp(280px, 32%, 420px);
-  border-left: 1px solid var(--border);
+  border-left: var(--divider);
   display: flex;
   flex-direction: column;
   min-height: 0;
@@ -232,9 +232,9 @@
   align-items: center;
   height: var(--pane-head-h);
   padding: 0 var(--pane-pad);
-  border-bottom: 1px solid var(--border);
+  border-bottom: var(--divider);
   font-size: var(--fs-sm);
-  text-transform: uppercase;
+  text-transform: var(--label-transform);
   color: var(--text-muted);
 }
 .db-detail-head .db-icon-btn { margin-left: auto; }
@@ -244,89 +244,89 @@
   overflow: auto;
   padding: 8px var(--pane-pad);
 }
-.db-field { display: block; margin-bottom: 10px; }
+.db-field { display: block; margin-bottom: var(--space-5); }
 .db-field-label {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: var(--space-3);
   font-size: var(--fs-sm);
   color: var(--text-muted);
   margin-bottom: 3px;
 }
 .db-pk {
   font-style: normal;
-  font-size: 10px;
+  font-size: var(--fs-2xs);
   color: var(--accent);
-  border: 1px solid var(--accent);
+  border: var(--control-bw) solid var(--accent);
   border-radius: var(--radius);
   padding: 0 3px;
 }
-.db-field-type { margin-left: auto; color: var(--text-faint); font-size: 11px; }
+.db-field-type { margin-left: auto; color: var(--text-faint); font-size: var(--fs-xs); }
 .db-field-input {
   width: 100%;
   resize: vertical;
-  background: var(--bg-subtle, var(--bg));
-  border: 1px solid var(--border);
+  background: var(--bg-subtle);
+  border: var(--divider);
   border-radius: var(--radius);
   color: var(--text);
   font: inherit;
   font-size: var(--fs-sm);
-  padding: 4px 6px;
+  padding: var(--space-2) var(--space-3);
 }
 .db-field-input:disabled { color: var(--text-faint); }
 .db-null-toggle {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
-  font-size: 11px;
+  gap: var(--space-2);
+  font-size: var(--fs-xs);
   color: var(--text-muted);
   margin-top: 3px;
 }
 .db-detail-actions {
   flex: none;
   display: flex;
-  gap: 8px;
+  gap: var(--space-4);
   padding: 8px var(--pane-pad);
-  border-top: 1px solid var(--border);
+  border-top: var(--divider);
 }
 
 /* AI SQL generation modal (docs/pg.md): overlay base + a right-aligned action row. */
 .db-generate-actions {
   display: flex;
   justify-content: flex-end;
-  gap: 8px;
+  gap: var(--space-4);
   padding: 8px var(--pane-pad);
-  border-top: 1px solid var(--border);
+  border-top: var(--divider);
 }
 
 /* Example-query multi-select: chips for the picked queries + the Picker button that adds more. */
-.db-examples { display: flex; flex-direction: column; gap: 4px; }
-.db-chips { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.db-examples { display: flex; flex-direction: column; gap: var(--space-2); }
+.db-chips { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-3); }
 .db-chip {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
-  padding: 2px 4px 2px 8px;
+  gap: var(--space-2);
+  padding: var(--space-1) var(--space-2) var(--space-1) var(--space-4);
   font-size: var(--fs-sm);
-  border: 1px solid var(--border);
-  border-radius: 999px;
-  background: var(--bg-subtle, var(--bg));
+  border: var(--divider);
+  border-radius: var(--radius-pill);
+  background: var(--bg-subtle);
 }
 .db-chip-x {
   background: none;
   border: none;
-  padding: 0 2px;
+  padding: 0 var(--space-1);
   font: inherit;
-  font-size: 10px;
+  font-size: var(--fs-2xs);
   color: var(--text-faint);
   cursor: pointer;
 }
-.db-chip-x:hover { color: var(--del-marker, var(--warn)); }
+.db-chip-x:hover { color: var(--del-marker); }
 .db-chip-add {
   background: none;
-  border: 1px dashed var(--border);
-  border-radius: 999px;
-  padding: 2px 10px;
+  border: var(--control-bw) dashed var(--border);
+  border-radius: var(--radius-pill);
+  padding: var(--space-1) var(--space-5);
   font: inherit;
   font-size: var(--fs-sm);
   color: var(--text-muted);
@@ -339,11 +339,11 @@
   margin: 0;
   max-height: 120px;
   overflow: auto;
-  padding: 6px 8px;
+  padding: var(--space-3) var(--space-4);
   font-size: var(--fs-sm);
   color: var(--text-muted);
-  background: var(--bg-subtle, var(--bg));
-  border: 1px solid var(--border);
+  background: var(--bg-subtle);
+  border: var(--divider);
   border-radius: var(--radius);
   white-space: pre-wrap;
 }

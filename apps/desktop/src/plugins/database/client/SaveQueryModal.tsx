@@ -1,5 +1,5 @@
 import { createSignal, Show } from 'solid-js'
-import { trapOverlayFocus } from '../../../core/client/ui/focus'
+import { createDismissable } from '../../../core/client/ui/dismissable'
 import type { DbSavedQuery } from '../shared/database'
 import { databaseApi } from './databaseClient'
 
@@ -39,24 +39,24 @@ export default function SaveQueryModal(props: {
   }
 
   let dialog!: HTMLDivElement
+  const dismiss = createDismissable({ onDismiss: () => props.onClose(), container: () => dialog })
   return (
-    <div class="overlay-backdrop" onClick={props.onClose}>
+    <div class="overlay-backdrop" onClick={dismiss.onBackdropClick}>
       <div
         ref={dialog}
         class="overlay db-generate"
         role="dialog"
         aria-modal="true"
-        onClick={(event) => event.stopPropagation()}
+        onClick={dismiss.onContainerClick}
         onKeyDown={(event) => {
-          if (event.key === 'Escape') props.onClose()
-          else if (event.key === 'Enter' && (event.metaKey || event.ctrlKey)) void submit()
-          else trapOverlayFocus(event, dialog)
+          if (event.key === 'Enter' && (event.metaKey || event.ctrlKey)) void submit()
+          else dismiss.onKeyDown(event)
         }}
       >
         <div class="overlay-title">Save query</div>
         <div class="overlay-body db-generate-body">
           <input
-            class="integration-key-input"
+            class="ui-input"
             type="text"
             maxlength="80"
             placeholder="Name — e.g. recent paid orders"
@@ -79,7 +79,7 @@ export default function SaveQueryModal(props: {
           </Show>
         </div>
         <div class="db-generate-actions">
-          <button type="button" class="overlay-btn" disabled={busy()} onClick={props.onClose}>
+          <button type="button" class="ui-btn" disabled={busy()} onClick={props.onClose}>
             Cancel
           </button>
           <button type="button" class="db-run-btn" disabled={busy() || !name().trim()} onClick={() => void submit()}>

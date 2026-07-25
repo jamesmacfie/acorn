@@ -7,6 +7,9 @@ export const PrefKeys = {
   theme: 'theme',
   themeLight: 'theme_light',
   themeDark: 'theme_dark',
+  // Visual style — the appearance axis orthogonal to theme. One key, not four: unlike light/dark
+  // there is no OS signal to follow, and nobody wants square panes by day and rounded by night.
+  style: 'style',
   lastTask: 'last_task',
   lastPath: 'last_path',
   lastSource: 'last_source',

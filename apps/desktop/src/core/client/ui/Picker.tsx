@@ -10,6 +10,11 @@ import { Portal } from 'solid-js/web'
 // `overflow`, and an absolutely-positioned child can't escape an overflow-clipped ancestor — it'd
 // be clipped at the pane edge instead of overlaying the next column. The Portal lifts it out of
 // every overflow/stacking context so it floats above the rest of the app.
+//
+// The anchoring below is deliberately NOT extracted into a shared hook: it has exactly one
+// consumer. AccountMenu and NotificationBell position with plain CSS (no portal, no rect), and
+// MentionTextarea anchors to the text caret rather than to an element, which is a different
+// problem. Extract it if a second element-anchored popover appears.
 export default function Picker<T>(props: {
   label: string
   placeholder: string

@@ -210,7 +210,7 @@ export default function ContextPane(props: { task: Task }) {
                   {pillText(status()!)}
                 </span>
               </Show>
-              <button type="button" class="overlay-btn context-sync-btn" onClick={() => void syncContext()}>Sync context</button>
+              <button type="button" class="ui-btn context-sync-btn" onClick={() => void syncContext()}>Sync context</button>
               <button type="button" class="section-refresh" style={{ 'margin-left': 'auto' }} title="Refresh" aria-label="Refresh" onClick={() => void refetch()}>↻</button>
             </div>
           </div>

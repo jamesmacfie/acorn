@@ -4,12 +4,12 @@
   position: fixed;
   inset: 0;
   /* Above the terminal drawer (z 50) and its menu (z 60) — modals always sit on top. */
-  z-index: 100;
+  z-index: var(--z-modal);
   display: flex;
   align-items: flex-start;
   justify-content: center;
   padding-top: 12vh;
-  background: rgba(0, 0, 0, 0.4);
+  background: var(--scrim);
 }
 .overlay {
   width: min(560px, 92vw);
@@ -17,57 +17,40 @@
   display: flex;
   flex-direction: column;
   background: var(--bg);
-  border: 1px solid var(--border-strong);
-  border-radius: var(--radius);
-  box-shadow: 0 12px 28px var(--shadow-popover);
+  border: var(--control-border);
+  border-radius: var(--radius-popover);
+  box-shadow: var(--shadow-5);
   overflow: hidden;
 }
 .overlay-title {
   font-size: var(--fs-sm);
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
+  text-transform: var(--label-transform);
+  letter-spacing: var(--label-tracking);
   color: var(--text-muted);
   padding: var(--pane-pad);
-  border-bottom: 1px solid var(--border);
+  border-bottom: var(--divider);
 }
 
 /* Padded body for simple form modals (matches the Integrations settings spacing). */
 .overlay-body {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: var(--space-5);
   padding: var(--pane-pad);
 }
 .overlay-body .muted { margin: 0; }
-.will-concerns { display: flex; flex-direction: column; gap: 8px; margin: 0 0 16px; padding: 0; list-style: none; }
-.will-concerns li { display: grid; grid-template-columns: auto 1fr auto; gap: 8px; align-items: baseline; }
+.will-concerns { display: flex; flex-direction: column; gap: var(--space-4); margin: 0 0 var(--space-8); padding: 0; list-style: none; }
+.will-concerns li { display: grid; grid-template-columns: auto 1fr auto; gap: var(--space-4); align-items: baseline; }
 .will-concerns li[data-severity='danger'] { color: var(--del-marker); }
-.will-concern-option { grid-column: 2 / -1; display: flex; align-items: center; gap: 6px; font-size: var(--fs-sm); color: var(--text); cursor: pointer; }
+.will-concern-option { grid-column: 2 / -1; display: flex; align-items: center; gap: var(--space-3); font-size: var(--fs-sm); color: var(--text); cursor: pointer; }
 .will-concern-option input { accent-color: var(--accent); cursor: pointer; }
-.query-gate-loading, .query-gate-error { padding: var(--pane-pad); color: var(--text-muted); }
-.query-gate-error { display: flex; align-items: center; gap: 8px; color: var(--del-marker); }
-.ui-form-field { display: flex; flex-direction: column; gap: 5px; }
 
-/* Standard modal button — same look as the app's action buttons (.pr-actions button etc.). */
-.overlay-btn {
-  flex: none;
-  font: inherit;
-  font-size: var(--fs-sm);
-  color: var(--text);
-  background: var(--bg);
-  border: 1px solid var(--border-strong);
-  border-radius: var(--radius);
-  padding: 6px 12px;
-  cursor: pointer;
-}
-.overlay-btn:hover:not(:disabled) { background: var(--bg-hover); border-color: var(--accent); }
-.overlay-btn:disabled { opacity: 0.5; cursor: default; }
 
 /* Help: two-column key → description grid. */
 .help-list {
   display: grid;
   grid-template-columns: max-content 1fr;
-  gap: 8px 16px;
+  gap: var(--space-4) var(--space-8);
   margin: 0;
   padding: var(--pane-pad);
   overflow-y: auto;
@@ -77,9 +60,9 @@
   font-size: var(--fs-sm);
   color: var(--text);
   background: var(--bg-subtle);
-  border: 1px solid var(--border);
+  border: var(--divider);
   border-radius: var(--radius);
-  padding: 1px 6px;
+  padding: 1px var(--space-3);
   justify-self: start;
 }
 .help-desc { margin: 0; font-size: var(--fs-sm); color: var(--text-muted); align-self: center; }
@@ -91,18 +74,18 @@
   color: var(--text);
   background: var(--bg);
   border: 0;
-  border-bottom: 1px solid var(--border);
+  border-bottom: var(--divider);
   padding: 10px var(--pane-pad);
   outline: none;
 }
 .finder-empty { color: var(--text-muted); font-size: var(--fs-sm); padding: var(--pane-pad); margin: 0; }
-.finder-list { list-style: none; margin: 0; padding: 4px 0; overflow-y: auto; }
+.finder-list { list-style: none; margin: 0; padding: var(--space-2) 0; overflow-y: auto; }
 .finder-row {
   display: flex;
   align-items: baseline;
-  gap: 2px;
+  gap: var(--space-1);
   padding: 4px var(--pane-pad);
-  border-left: 2px solid transparent;
+  border-left: var(--tab-active-w) solid transparent;
   font-size: var(--fs-sm);
   white-space: nowrap;
   overflow: hidden;
@@ -115,21 +98,21 @@
 /* @mention autocomplete popup (MentionTextarea.tsx): fixed below the textarea. */
 .mention-popup {
   position: fixed;
-  z-index: 70;
+  z-index: var(--z-overlay);
   list-style: none;
   margin: 0;
-  padding: 4px 0;
+  padding: var(--space-2) 0;
   background: var(--bg);
-  border: 1px solid var(--border-strong);
-  border-radius: var(--radius);
-  box-shadow: 0 8px 20px var(--shadow-popover);
+  border: var(--control-border);
+  border-radius: var(--radius-popover);
+  box-shadow: var(--shadow-3);
   max-width: 220px;
   overflow: hidden;
 }
 .mention-item {
   display: flex;
   align-items: center;
-  padding: 5px 10px;
+  padding: 5px var(--space-5);
   font-size: var(--fs-sm);
   color: var(--text);
   cursor: pointer;

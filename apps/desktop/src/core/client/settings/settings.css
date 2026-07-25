@@ -13,17 +13,17 @@
   display: flex;
   flex-direction: column;
   gap: 1px;
-  padding: 8px;
+  padding: var(--space-4);
   overflow-y: auto;
-  border-right: 1px solid var(--border);
+  border-right: var(--divider);
   background: var(--bg-subtle);
 }
 .settings-nav-group {
   font-size: var(--fs-sm);
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
+  text-transform: var(--label-transform);
+  letter-spacing: var(--label-tracking);
   color: var(--text-muted);
-  padding: 10px 8px 4px;
+  padding: var(--space-5) var(--space-4) var(--space-2);
 }
 .settings-nav-item {
   font: inherit;
@@ -33,7 +33,7 @@
   background: transparent;
   border: 0;
   border-radius: var(--radius);
-  padding: 6px 8px;
+  padding: var(--space-3) var(--space-4);
   cursor: pointer;
   white-space: nowrap;
   overflow: hidden;
@@ -41,7 +41,7 @@
 }
 .settings-nav-item:hover { background: var(--bg-hover); }
 .settings-nav-item.active { background: var(--bg-selected); color: var(--text); }
-.settings-nav-sub { padding-left: 16px; }
+.settings-nav-sub { padding-left: var(--space-8); }
 
 .settings-pane {
   position: relative;
@@ -49,11 +49,11 @@
   min-width: 0;
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: var(--space-5);
   padding: var(--pane-pad);
   overflow-y: auto;
 }
-.settings-pane .overlay-title { padding: 0 0 8px; margin: 0 32px 0 0; }
+.settings-pane .overlay-title { padding: 0 0 var(--space-4); margin: 0 var(--space-11) 0 0; }
 .settings-close {
   position: absolute;
   top: 8px;
@@ -64,37 +64,39 @@
   border: 0;
   cursor: pointer;
   line-height: 1;
-  padding: 4px;
+  padding: var(--space-2);
 }
 .settings-close:hover { color: var(--text); }
 
 .settings-section { display: flex; flex-direction: column; gap: 18px; }
-.settings-field { display: flex; flex-direction: column; gap: 6px; }
-.settings-field-row { flex-direction: row; align-items: center; gap: 8px; margin-bottom: 14px; }
+.settings-field { display: flex; flex-direction: column; gap: var(--space-3); }
+.settings-field-row { flex-direction: row; align-items: center; gap: var(--space-4); margin-bottom: var(--space-7); }
 .settings-label { font-size: var(--fs-sm); color: var(--text); }
 .settings-hint { font-size: var(--fs-sm); }
+/* Was styled only by an inline `style={{ color: 'var(--danger, #d33)' }}` at its two call sites. */
+.settings-error { margin: 0; font-size: var(--fs-sm); color: var(--danger); }
 .settings-script {
   font-family: var(--font-mono);
   font-size: var(--fs-sm);
   color: var(--text);
   background: var(--bg);
-  border: 1px solid var(--border-strong);
+  border: var(--control-border);
   border-radius: var(--radius);
-  padding: 8px;
+  padding: var(--space-4);
   resize: vertical;
   outline: none;
 }
 .settings-script:focus { border-color: var(--accent); }
-.settings-actions { display: flex; align-items: center; gap: 10px; }
-.settings-section-label { margin-top: 16px; font-size: var(--fs-sm); font-weight: 600; color: var(--text); }
+.settings-actions { display: flex; align-items: center; gap: var(--space-5); }
+.settings-section-label { margin-top: var(--space-8); font-size: var(--fs-sm); font-weight: 600; color: var(--text); }
 /* Editable shortcut key: styled like .help-key but focusable/centred; highlights on focus while it waits for a keypress. */
 .shortcut-input { width: 3.5em; text-align: center; text-transform: lowercase; outline: none; cursor: pointer; }
 .shortcut-input:focus { border-color: var(--accent); color: var(--accent); }
-.settings-danger { margin-top: 8px; padding-top: 14px; border-top: 1px solid var(--border); }
-.settings-delete { color: var(--danger, #c0392b); border-color: var(--danger, #c0392b); }
+.settings-danger { margin-top: var(--space-4); padding-top: var(--space-7); border-top: var(--divider); }
+.settings-delete { color: var(--danger); border-color: var(--danger); }
 
 /* Workspace identity (docs/workspaces-and-tasks.md): flat preview chip + swatch row, 1px borders, square. */
-.ws-identity-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.ws-identity-row { display: flex; align-items: center; gap: var(--space-5); flex-wrap: wrap; }
 .ws-identity-preview {
   width: 32px;
   height: 32px;
@@ -102,16 +104,16 @@
   align-items: center;
   justify-content: center;
   font-size: var(--fs-lg);
-  border: 1px solid var(--border-strong);
-  border-left-width: 3px;
+  border: var(--control-border);
+  border-left-width: var(--marker-w);
   background: var(--bg-subtle);
 }
 .ws-emoji-input { width: 64px; text-align: center; }
-.ws-swatches { display: flex; align-items: center; gap: 6px; }
+.ws-swatches { display: flex; align-items: center; gap: var(--space-3); }
 .ws-swatch {
   width: 18px;
   height: 18px;
-  border: 1px solid var(--border-strong);
+  border: var(--control-border);
   cursor: pointer;
   padding: 0;
 }
@@ -120,13 +122,30 @@
 
 /* MCP inspector (docs/mcp.md). */
 .mcp-file { font-family: var(--font-mono); font-size: var(--fs-sm); }
-.mcp-server { display: flex; align-items: baseline; gap: 10px; padding: 3px 0 3px 12px; font-size: var(--fs-sm); flex-wrap: wrap; }
+.mcp-server { display: flex; align-items: baseline; gap: var(--space-5); padding: 3px 0 3px var(--space-6); font-size: var(--fs-sm); flex-wrap: wrap; }
 .mcp-server-name { font-family: var(--font-mono); color: var(--text); }
 .mcp-server-status { color: var(--add-marker); }
 .mcp-server-status.mcp-disabled { color: var(--text-faint); }
 .mcp-server-status.mcp-invalid { color: var(--del-marker); }
 .mcp-server-cmd { max-width: 40ch; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; font-family: var(--font-mono); }
 .mcp-server-env { font-family: var(--font-mono); }
-.shortcut-reset { margin-left: 8px; padding: 0; border: 0; background: none; color: var(--text-faint); cursor: pointer; font: inherit; font-size: var(--fs-sm); }
+.shortcut-reset { margin-left: var(--space-4); padding: 0; border: 0; background: none; color: var(--text-faint); cursor: pointer; font: inherit; font-size: var(--fs-sm); }
 .shortcut-reset:hover { color: var(--text); text-decoration: underline; }
 .shortcut-conflict { border-color: var(--del-marker); }
+
+/* Dev-only style gallery (StyleGallery.tsx): every primitive × variant in one place so a style
+   pack can be authored against the whole vocabulary at once. */
+.gallery { display: flex; flex-direction: column; gap: var(--gap-stack); }
+.gallery-pickers { display: flex; gap: var(--space-8); flex-wrap: wrap; }
+.gallery-row { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-4); }
+.gallery-rows { display: flex; flex-direction: column; border: var(--divider); border-radius: var(--radius-surface); overflow: hidden; }
+.gallery-code { border: var(--divider); border-radius: var(--radius-surface); overflow: hidden; }
+.gallery-term {
+  margin: 0;
+  padding: var(--space-4) var(--pane-pad);
+  font-family: var(--font-mono);
+  font-size: var(--fs-sm);
+  background: var(--bg-subtle);
+  color: var(--text);
+  white-space: pre;
+}

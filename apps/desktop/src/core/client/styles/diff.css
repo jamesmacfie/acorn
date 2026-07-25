@@ -26,7 +26,7 @@
   min-height: 20px;
   white-space: normal;
 }
-.diff-gutter { flex: none; width: 44px; padding-right: 8px; text-align: right; color: var(--text-faint); user-select: none; }
+.diff-gutter { flex: none; width: 44px; padding-right: var(--space-4); text-align: right; color: var(--text-faint); user-select: none; }
 .diff-marker { flex: none; width: 14px; text-align: center; color: var(--text-faint); user-select: none; }
 .diff-code {
   flex: 1 1 0;
@@ -63,7 +63,7 @@
   flex: 1 0 100%;
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--space-4);
   width: 100%;
   padding: 3px var(--pane-pad);
   background: var(--bg);
@@ -97,12 +97,12 @@
 .diff-file-head {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--space-4);
   height: 36px;
   padding: 0 var(--pane-pad);
   background: var(--bg-subtle);
-  border-top: 1px solid var(--border);
-  border-bottom: 1px solid var(--border);
+  border-top: var(--divider);
+  border-bottom: var(--divider);
   font-weight: 600;
   line-height: 20px;
 }
@@ -113,7 +113,7 @@
   border: none;
   background: none;
   color: var(--text-muted);
-  font-size: 10px;
+  font-size: var(--fs-2xs);
   cursor: pointer;
 }
 .diff-file-collapse:hover { color: var(--text); }
@@ -127,7 +127,7 @@
 .diff-file-head .file-stat { flex: none; }
 /* Sticky current-file header pinned to the top of the scrolling diff (GitHub-style). Zero-height
    sticky shell so it never shifts the virtualizer's row offsets; the head inside paints over rows. */
-.diff-sticky-file { position: sticky; top: 0; z-index: 3; height: 0; }
+.diff-sticky-file { position: sticky; top: 0; z-index: var(--z-sticky); height: 0; }
 .diff-sticky-file .diff-file-head { border-top: none; }
 .diff-nodiff { display: block; padding: 4px var(--pane-pad); }
 
@@ -137,14 +137,14 @@
   flex: none;
   width: 16px;
   height: 16px;
-  margin-right: 4px;
+  margin-right: var(--space-2);
   padding: 0;
   font: inherit;
-  font-size: 11px;
+  font-size: var(--fs-xs);
   line-height: 14px;
   color: var(--text-muted);
   background: var(--bg);
-  border: 1px solid var(--border-strong);
+  border: var(--control-border);
   border-radius: var(--radius);
   cursor: pointer;
   visibility: hidden;
@@ -163,20 +163,20 @@
 
 .diff-thread {
   margin: 6px var(--pane-pad);
-  padding: 9px 10px;
+  padding: 9px var(--space-5);
   background: var(--bg);
-  border: 1px solid var(--border);
-  border-left: 2px solid var(--accent);
+  border: var(--divider);
+  border-left: var(--tab-active-w) solid var(--accent);
   border-radius: var(--radius);
   line-height: var(--lh);
 }
 .diff-thread-resolved { background: var(--bg-subtle); border-left-color: var(--add-marker); }
-.diff-thread-head { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+.diff-thread-head { display: flex; align-items: center; gap: var(--space-4); margin-bottom: var(--space-3); }
 .diff-thread-collapsed .diff-thread-head { margin-bottom: 0; }
 .diff-thread-status {
   font-size: var(--fs-sm);
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
+  text-transform: var(--label-transform);
+  letter-spacing: var(--label-tracking);
   color: var(--text-muted);
   font-weight: 600;
 }
@@ -194,12 +194,12 @@
 .diff-thread-link + .diff-thread-link { margin-left: 0; }
 .diff-thread-link:hover:not(:disabled) { color: var(--text); }
 .diff-thread-link:disabled { opacity: 0.5; cursor: default; }
-.diff-thread-comment { padding: 8px 0; border-top: 1px solid var(--border); }
+.diff-thread-comment { padding: var(--space-4) 0; border-top: var(--divider); }
 .diff-thread-comment:first-of-type { border-top: 0; }
 .diff-thread-comment .comment-meta { margin-bottom: 5px; }
 
 /* Reply box (thread) + new-line composer share the textarea + action styling. */
-.diff-reply, .diff-composer { display: flex; flex-direction: column; gap: 6px; margin-top: 6px; }
+.diff-reply, .diff-composer { display: flex; flex-direction: column; gap: var(--space-3); margin-top: var(--space-3); }
 .diff-composer { flex-basis: 100%; padding: 7px var(--pane-pad) 7px 68px; white-space: normal; }
 .diff-reply-input {
   width: 100%;
@@ -209,30 +209,21 @@
   font-size: var(--fs-sm);
   color: var(--text);
   background: var(--bg);
-  border: 1px solid var(--border-strong);
+  border: var(--control-border);
   border-radius: var(--radius);
-  padding: 6px 8px;
+  padding: var(--space-3) var(--space-4);
   resize: vertical;
   white-space: normal;
 }
 .diff-reply-input:disabled { opacity: 0.5; }
-.diff-composer-actions { display: flex; gap: 6px; }
+.diff-composer-actions { display: flex; gap: var(--space-3); }
 .diff-thread-err { font-size: var(--fs-sm); color: var(--del-marker); }
 
-/* Shiki dual-theme: light by default, dark when the app theme is dark (mirrors token theming). */
-.diff-code span { color: var(--l); }
-:root[data-theme='dark'] .diff-code span,
-:root[data-theme='solarized-dark'] .diff-code span,
-:root[data-theme='monokai'] .diff-code span,
-:root[data-theme='nord'] .diff-code span,
-:root[data-theme='catppuccin-frappe'] .diff-code span,
-:root[data-theme='catppuccin-macchiato'] .diff-code span,
-:root[data-theme='catppuccin-mocha'] .diff-code span,
-:root[data-theme='one-dark'] .diff-code span,
-:root[data-theme='dracula'] .diff-code span { color: var(--r); }
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme='light']) .diff-code span { color: var(--r); }
-}
+/* Shiki dual-theme: each token carries both colours as --l/--r, and the active theme declares
+   which side to read via --syntax-fg (tokens-theme.css). This used to be a hardcoded list of dark
+   theme *names*, duplicated here and in checks-panel.css, that had to be extended in both files
+   every time a dark theme was added. */
+.diff-code span { color: var(--syntax-fg); }
 
 /* Diff view-mode toggle (Unified | Split), persisted via the `diff_view` pref. Sits above the
    diff scroller; segmented control styled with the shared button tokens. */
@@ -242,28 +233,28 @@
   justify-content: flex-end;
   min-height: 40px;
   padding: 6px var(--pane-pad);
-  border-bottom: 1px solid var(--border);
+  border-bottom: var(--divider);
   background: var(--bg);
 }
 /* In-diff find (⌘F). Lives in the toolbar, pushed to the far left so the view-mode toggle keeps
    its flex-end spot. */
-.diff-find { display: flex; align-items: center; gap: 4px; margin-right: auto; }
+.diff-find { display: flex; align-items: center; gap: var(--space-2); margin-right: auto; }
 .diff-find-input {
   width: 200px;
-  padding: 3px 8px;
+  padding: 3px var(--space-4);
   font: inherit;
   color: var(--text);
   background: var(--bg);
-  border: 1px solid var(--border-strong);
+  border: var(--control-border);
   border-radius: var(--radius);
 }
 .diff-find-input:focus { outline: none; border-color: var(--focus); }
 .diff-find-count { min-width: 40px; font-size: var(--fs-sm); color: var(--text-faint); text-align: center; }
 .diff-find-btn {
-  padding: 2px 6px;
+  padding: var(--space-1) var(--space-3);
   color: var(--text-muted);
   background: transparent;
-  border: 1px solid transparent;
+  border: var(--control-bw) solid transparent;
   border-radius: var(--radius);
   cursor: pointer;
 }
@@ -273,27 +264,27 @@
 
 /* Match highlights layer over the line/word backgrounds; theme-independent yellow/orange so the
    syntax colour underneath stays legible. */
-.diff-find-hit { background: rgba(255, 200, 0, 0.28); border-radius: 2px; }
-.diff-find-current { background: rgba(255, 145, 0, 0.6); border-radius: 2px; }
+.diff-find-hit { background: var(--find-hit-bg); border-radius: var(--radius-marker); }
+.diff-find-current { background: var(--find-current-bg); border-radius: var(--radius-marker); }
 
-.diff-viewmode { display: inline-flex; border: 1px solid var(--border-strong); border-radius: var(--radius); overflow: hidden; }
+.diff-viewmode { display: inline-flex; border: var(--control-border); border-radius: var(--radius); overflow: hidden; }
 .diff-viewmode-btn {
   font: inherit;
   font-size: var(--fs-sm);
   color: var(--text-muted);
   background: var(--bg);
   border: 0;
-  padding: 4px 12px;
+  padding: var(--space-2) var(--space-6);
   cursor: pointer;
 }
-.diff-viewmode-btn + .diff-viewmode-btn { border-left: 1px solid var(--border-strong); }
+.diff-viewmode-btn + .diff-viewmode-btn { border-left: var(--control-border); }
 .diff-viewmode-btn:hover:not(.active) { color: var(--text); }
 .diff-viewmode-btn.active { color: var(--text); background: var(--bg-selected); }
 
 /* Word-level intra-line diff: changed spans within a paired delete/insert line get a stronger
    background + (inherited) marker glyph on the line — never colour alone. Layers over the line bg. */
-.diff-word-del { background: var(--del-word-bg); border-radius: 2px; }
-.diff-word-add { background: var(--add-word-bg); border-radius: 2px; }
+.diff-word-del { background: var(--del-word-bg); border-radius: var(--radius-marker); }
+.diff-word-add { background: var(--add-word-bg); border-radius: var(--radius-marker); }
 
 /* Split (side-by-side) mode. Bands are virtualized; each mounted pair band is a two-column grid,
    while hunk headers + threads span both columns full-width. */
@@ -313,7 +304,7 @@
   align-items: flex-start;
   min-width: 0;
   white-space: normal;
-  border-left: 1px solid var(--border);
+  border-left: var(--divider);
 }
 .diff-split-cell:first-child { border-left: 0; }
 .diff-split-cell .diff-code { min-width: 0; }

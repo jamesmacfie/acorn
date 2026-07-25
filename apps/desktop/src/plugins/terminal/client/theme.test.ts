@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import githubDark from 'shiki/themes/github-dark.mjs'
 import githubLight from 'shiki/themes/github-light.mjs'
-import { ansiPalette, isDarkColor } from './theme'
+import { ansiPalette } from './theme'
+import { isDarkColor } from '../../../core/client/ui/appearance'
 
 // The palette derivation is a key-name mapping (terminal.ansiBrightRed → brightRed); run it
 // against the real theme JSONs the app ships so a casing slip or a theme dropping its terminal

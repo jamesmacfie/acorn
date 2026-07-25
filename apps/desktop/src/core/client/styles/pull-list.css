@@ -6,8 +6,8 @@
   gap: 9px;
   height: var(--row-h);
   padding: 0 var(--pane-pad);
-  border-bottom: 1px solid var(--border);
-  border-left: 3px solid transparent;
+  border-bottom: var(--divider);
+  border-left: var(--marker-w) solid transparent;
   font-size: var(--fs-sm);
   transition:
     background-color var(--dur-short) var(--ease-out),
@@ -17,18 +17,18 @@
 .pr-tabs {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--space-4);
   padding: 10px var(--pane-pad);
-  border-bottom: 1px solid var(--border);
+  border-bottom: var(--divider);
 }
 .pr-tabs button {
   font: inherit;
   font-size: var(--fs-sm);
   color: var(--text-muted);
   background: var(--bg);
-  border: 1px solid transparent;
+  border: var(--control-bw) solid transparent;
   border-radius: var(--radius);
-  padding: 4px 8px;
+  padding: var(--space-2) var(--space-4);
   cursor: pointer;
 }
 .pr-tabs button:hover { color: var(--text); border-color: var(--border); }
@@ -40,7 +40,7 @@
   font-size: var(--fs-sm);
   color: var(--text);
   background: var(--bg);
-  border: 1px solid var(--border-strong);
+  border: var(--control-border);
   border-radius: var(--radius);
   padding: 5px 7px;
 }
@@ -72,9 +72,9 @@
   font-size: var(--fs-sm);
   color: var(--text-muted);
   background: transparent;
-  border: 1px solid var(--border);
+  border: var(--divider);
   border-radius: var(--radius);
-  padding: 0 6px;
+  padding: 0 var(--space-3);
   cursor: pointer;
 }
 .pr-row:hover .pr-ws-btn,
@@ -88,7 +88,7 @@
   color: var(--text-muted);
   background: var(--bg);
   border: none;
-  border-top: 1px solid var(--border);
+  border-top: var(--divider);
   padding: 10px var(--pane-pad);
   text-align: center;
   cursor: pointer;
@@ -97,10 +97,10 @@
 .pr-load-more:disabled { cursor: default; }
 .pr-badge {
   flex-shrink: 0;
-  font-size: 11px;
+  font-size: var(--fs-xs);
   line-height: 18px;
   color: var(--warn);
-  border: 1px solid var(--badge-border);
+  border: var(--control-bw) solid var(--badge-border);
   border-radius: var(--radius);
   padding: 0 5px;
 }

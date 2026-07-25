@@ -8,7 +8,7 @@ export function ContributionBoundary(props: { contributionId: string; children: 
           <section class="pane contribution-failed" role="status">
             <strong>Contribution failed</strong>
             <span class="muted">{props.contributionId}</span>
-            <button type="button" class="overlay-btn" onClick={reset}>Try again</button>
+            <button type="button" class="ui-btn" onClick={reset}>Try again</button>
             <span class="sr-only">{error instanceof Error ? error.message : String(error)}</span>
           </section>
         )

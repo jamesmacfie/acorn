@@ -5,7 +5,7 @@ export default function PermissionsSettings(props: { onPermissions: () => void |
     <>
       <p class="muted">Re-request GitHub access (e.g. after adding organizations or private repos). This reloads acorn.</p>
       <div class="settings-actions">
-        <button type="button" class="overlay-btn" onClick={() => void props.onPermissions()}>
+        <button type="button" class="ui-btn" onClick={() => void props.onPermissions()}>
           Re-request GitHub permissions
         </button>
       </div>

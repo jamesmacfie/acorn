@@ -1,5 +1,7 @@
 import { createEffect, createSignal, For, on, onCleanup } from 'solid-js'
 import { createVirtualizer } from '@tanstack/solid-virtual'
+import { rowHeightSm } from '../../../core/client/ui/metrics'
+import { watchAppearance } from '../../../core/client/ui/appearance'
 import type { DbCell } from '../shared/database'
 
 // A read-only, vertically-virtualized result grid (docs/pg.md). There's no generic table
@@ -9,7 +11,6 @@ import type { DbCell } from '../shared/database'
 // ponytail: fixed 200px columns; per-column autosize is a later add. Editing lives in the row
 // detail panel, so the grid itself is display + selection only.
 const COL_W = 200
-const ROW_H = 30
 
 export default function ResultGrid(props: {
   columns: string[]
@@ -18,12 +19,19 @@ export default function ResultGrid(props: {
   onRowClick?: (index: number) => void
 }) {
   const [scrollEl, setScrollEl] = createSignal<HTMLDivElement>()
+  // Row height comes from --row-h-sm so a style pack's density actually reaches the grid; the
+  // virtualizer writes it back as an inline height, which would beat any CSS rule.
+  const [rowH, setRowH] = createSignal(rowHeightSm())
+  onCleanup(watchAppearance(() => {
+    setRowH(rowHeightSm())
+    virt.measure()
+  }))
   const virt = createVirtualizer({
     get count() {
       return props.rows.length
     },
     getScrollElement: () => scrollEl() ?? null,
-    estimateSize: () => ROW_H,
+    estimateSize: () => rowH(),
     overscan: 16,
   })
   let frame = 0
@@ -58,7 +66,7 @@ export default function ResultGrid(props: {
                 <div
                   class="dbgrid-row"
                   classList={{ active: props.activeRow === vi.index }}
-                  style={{ transform: `translateY(${vi.start}px)`, height: `${ROW_H}px`, 'grid-template-columns': template() }}
+                  style={{ transform: `translateY(${vi.start}px)`, height: `${rowH()}px`, 'grid-template-columns': template() }}
                   onClick={() => props.onRowClick?.(vi.index)}
                 >
                   <For each={row()}>

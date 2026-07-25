@@ -5,25 +5,25 @@
   flex: 0 0 clamp(200px, 18vw, 300px);
   min-width: 0;
   overflow-y: auto;
-  border-right: 1px solid var(--border);
+  border-right: var(--divider);
   background: var(--bg-subtle);
 }
 /* Group heads reuse .section-header (see JSX) so the two lists match the pane title; just size the
    divider down a touch inside the scrolling list. */
-.changes-group-head { height: auto; padding-top: 6px; padding-bottom: 6px; }
+.changes-group-head { height: auto; padding-top: var(--space-3); padding-bottom: var(--space-3); }
 .changes-row {
   width: 100%;
   display: flex;
   align-items: center;
-  gap: 6px;
-  padding: 4px 10px;
+  gap: var(--space-3);
+  padding: var(--space-2) var(--space-5);
   font: inherit;
   font-size: var(--fs-sm);
   text-align: left;
   color: var(--text);
   background: transparent;
   border: 0;
-  border-left: 2px solid transparent;
+  border-left: var(--tab-active-w) solid transparent;
   cursor: pointer;
 }
 .changes-row:hover { background: var(--bg-hover); }
@@ -38,7 +38,7 @@
   text-align: left;
   font-family: var(--font-mono);
 }
-.changes-empty { padding: 10px; font-size: var(--fs-sm); }
+.changes-empty { padding: var(--space-5); font-size: var(--fs-sm); }
 .changes-diff { flex: 1; min-width: 0; overflow: auto; }
 
 /* File-row "add to agent" affordance (docs/panes.md). */
@@ -59,19 +59,19 @@
 .changes-to-agent:hover { color: var(--text); }
 
 /* Bulk actions live in the header, not a hoverable row — keep them always visible. */
-.changes-toolbar { display: inline-flex; gap: 2px; }
+.changes-toolbar { display: inline-flex; gap: var(--space-1); }
 .changes-toolbar .changes-to-agent { visibility: visible; }
 .changes-toolbar .changes-to-agent:disabled { opacity: 0.35; cursor: default; color: var(--text-faint); }
 
 /* Review notes (docs/panes.md): flat inline annotation under its anchor line. */
-.changes-header { display: flex; align-items: center; gap: 10px; }
+.changes-header { display: flex; align-items: center; gap: var(--space-5); }
 .changes-send {
   font: inherit;
   font-size: var(--fs-sm);
-  padding: 2px 8px;
+  padding: var(--space-1) var(--space-4);
   color: var(--text);
   background: var(--bg);
-  border: 1px solid var(--border-strong);
+  border: var(--control-border);
   cursor: pointer;
 }
 .changes-send:hover { background: var(--bg-hover); }
@@ -81,13 +81,13 @@
 .review-note {
   display: flex;
   align-items: baseline;
-  gap: 8px;
-  margin: 2px 0 2px 90px;
-  padding: 4px 8px;
+  gap: var(--space-4);
+  margin: var(--space-1) 0 var(--space-1) 90px;
+  padding: var(--space-2) var(--space-4);
   font-size: var(--fs-sm);
   background: var(--bg-subtle);
-  border: 1px solid var(--border-strong);
-  border-left: 3px solid var(--warn);
+  border: var(--control-border);
+  border-left: var(--marker-w) solid var(--warn);
 }
 .review-note-sent { border-left-color: var(--add-marker); opacity: 0.75; }
 .review-note-status { flex: none; color: var(--text-muted); }
@@ -103,4 +103,4 @@
 .review-note-delete:hover { color: var(--del-marker); }
 
 /* Commit box (docs/panes.md) at the bottom of the file list. */
-.changes-commit { display: flex; flex-direction: column; gap: 6px; padding: 8px 10px; border-top: 1px solid var(--border); }
+.changes-commit { display: flex; flex-direction: column; gap: var(--space-3); padding: var(--space-4) var(--space-5); border-top: var(--divider); }

@@ -7,7 +7,7 @@
   background: none;
   border: 0;
   cursor: pointer;
-  padding: 2px 6px;
+  padding: var(--space-1) var(--space-3);
   line-height: 1;
 }
 .theme-toggle:hover { color: var(--text); }
@@ -30,7 +30,7 @@
   background: none;
   border: 0;
   cursor: pointer;
-  padding: 2px 6px;
+  padding: var(--space-1) var(--space-3);
   line-height: 1;
 }
 .collapse-toggle:hover { color: var(--text); }
@@ -39,7 +39,7 @@
 .breadcrumb {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
+  gap: var(--space-2);
   justify-self: center;
   max-width: 100%;
   overflow: hidden;
@@ -68,30 +68,30 @@
 .repo-picker-button {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--space-4);
   height: 36px;
   max-width: 300px;
   box-sizing: border-box;
   font: inherit;
   color: var(--text);
   background: var(--bg);
-  border: 1px solid var(--border-strong);
+  border: var(--control-border);
   border-radius: var(--radius);
-  padding: 0 10px;
+  padding: 0 var(--space-5);
   cursor: pointer;
 }
 .repo-picker-button:hover:not(:disabled) { background: var(--bg-hover); border-color: var(--accent); }
 .repo-picker-button:disabled { opacity: 0.5; cursor: default; }
 .repo-picker-label { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
-.repo-picker-chevron { flex: none; color: var(--text-muted); font-size: 10px; }
+.repo-picker-chevron { flex: none; color: var(--text-muted); font-size: var(--fs-2xs); }
 
 /* Workspace colour dot leading the workspace-picker rows (docs/workspaces-and-tasks.md). */
 .ws-color-dot {
   flex: none;
   width: 10px;
   height: 10px;
-  margin-left: 6px;
-  border: 1px solid var(--border-strong);
+  margin-left: var(--space-3);
+  border: var(--control-border);
   display: inline-block;
 }
 
@@ -99,15 +99,15 @@
   position: absolute;
   top: calc(100% + 4px);
   left: 0;
-  z-index: 40;
+  z-index: var(--z-popover);
   width: 300px;
   max-width: 90vw;
   display: flex;
   flex-direction: column;
   background: var(--bg);
-  border: 1px solid var(--border-strong);
-  border-radius: var(--radius);
-  box-shadow: 0 12px 28px var(--shadow-popover);
+  border: var(--control-border);
+  border-radius: var(--radius-popover);
+  box-shadow: var(--shadow-5);
   overflow: hidden;
 }
 /* Portalled to body and pinned to the button's rect (inline top/left/width) so it overlays
@@ -115,11 +115,11 @@
    inside a modal (the Database pane's example multi-select) is portalled to body, so it is a sibling
    of the backdrop rather than a descendant and would otherwise render behind it. It only exists while
    open, so being top-most is always what's wanted. */
-.repo-picker-popover-fixed { position: fixed; top: auto; left: auto; z-index: 110; }
+.repo-picker-popover-fixed { position: fixed; top: auto; left: auto; z-index: var(--z-picker); }
 .repo-picker-tools {
   display: flex;
   align-items: stretch;
-  border-bottom: 1px solid var(--border);
+  border-bottom: var(--divider);
 }
 .repo-picker-filter {
   flex: 1;
@@ -129,7 +129,7 @@
   color: var(--text);
   background: var(--bg);
   border: 0;
-  padding: 8px 10px;
+  padding: var(--space-4) var(--space-5);
   outline: none;
 }
 .repo-picker-refresh {
@@ -140,7 +140,7 @@
   color: var(--text-muted);
   background: var(--bg);
   border: 0;
-  border-left: 1px solid var(--border);
+  border-left: var(--divider);
   padding: 0;
   cursor: pointer;
 }
@@ -148,22 +148,22 @@
 .repo-picker-refresh:disabled { color: var(--text-faint); cursor: wait; }
 .repo-picker-status {
   margin: 0;
-  padding: 6px 10px;
-  border-bottom: 1px solid var(--border);
+  padding: var(--space-3) var(--space-5);
+  border-bottom: var(--divider);
   color: var(--text-muted);
   font-size: var(--fs-sm);
 }
-.repo-picker-empty { color: var(--text-muted); font-size: var(--fs-sm); padding: 10px; margin: 0; }
+.repo-picker-empty { color: var(--text-muted); font-size: var(--fs-sm); padding: var(--space-5); margin: 0; }
 /* overflow-x: hidden is load-bearing: without it `overflow-y: auto` computes overflow-x to `auto`
    too, so long branch names get a horizontal scrollbar instead of ellipsizing (.repo-picker-name
    already clips). max-height tracks the viewport so the list runs near-full-height before scrolling. */
-.repo-picker-list { list-style: none; margin: 0; padding: 4px 0; max-height: min(70vh, 560px); overflow-y: auto; overflow-x: hidden; }
+.repo-picker-list { list-style: none; margin: 0; padding: var(--space-2) 0; max-height: min(70vh, 560px); overflow-y: auto; overflow-x: hidden; }
 .repo-picker-row {
   display: flex;
   align-items: center;
-  gap: 6px;
-  padding: 0 6px;
-  border-left: 2px solid transparent;
+  gap: var(--space-3);
+  padding: 0 var(--space-3);
+  border-left: var(--tab-active-w) solid transparent;
 }
 .repo-picker-row:hover { background: var(--bg-subtle); }
 .repo-picker-row.active { background: var(--bg-selected); border-left-color: var(--accent); }
@@ -174,7 +174,7 @@
   color: var(--text-faint);
   background: none;
   border: 0;
-  padding: 2px 4px;
+  padding: var(--space-1) var(--space-2);
   cursor: pointer;
   line-height: 1;
 }
@@ -188,7 +188,7 @@
   color: var(--text);
   background: none;
   border: 0;
-  padding: 6px 4px;
+  padding: var(--space-3) var(--space-2);
   text-align: left;
   overflow: hidden;
   white-space: nowrap;
@@ -200,7 +200,7 @@
 .auth-control {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--space-4);
   color: var(--text);
   text-decoration: none;
   font-size: var(--fs-sm);
@@ -211,14 +211,14 @@
 .account-menu-button {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
+  gap: var(--space-2);
   height: 32px;
   font: inherit;
   color: var(--text-muted);
   background: var(--bg);
-  border: 1px solid transparent;
+  border: var(--control-bw) solid transparent;
   border-radius: var(--radius);
-  padding: 3px 6px 3px 3px;
+  padding: 3px var(--space-3) 3px 3px;
   cursor: pointer;
 }
 .account-menu-button:hover,
@@ -227,11 +227,11 @@
   background: var(--bg-hover);
   border-color: var(--border);
 }
-.account-menu-chevron { flex: none; font-size: 10px; line-height: 1; }
+.account-menu-chevron { flex: none; font-size: var(--fs-2xs); line-height: 1; }
 
 .avatar {
-  border-radius: 50%;
-  border: 1px solid var(--border);
+  border-radius: var(--radius-circle);
+  border: var(--divider);
   display: block;
 }
 
@@ -239,21 +239,21 @@
   position: absolute;
   top: calc(100% + 4px);
   right: 0;
-  z-index: 40;
+  z-index: var(--z-popover);
   width: 184px;
   max-width: calc(100vw - (2 * var(--pane-pad)));
   display: flex;
   flex-direction: column;
-  padding: 4px;
+  padding: var(--space-2);
   background: var(--bg);
-  border: 1px solid var(--border-strong);
-  border-radius: var(--radius);
-  box-shadow: 0 12px 28px var(--shadow-popover);
+  border: var(--control-border);
+  border-radius: var(--radius-popover);
+  box-shadow: var(--shadow-5);
 }
 .account-menu-user {
   min-width: 0;
-  padding: 7px 8px 8px;
-  border-bottom: 1px solid var(--border);
+  padding: 7px var(--space-4) var(--space-4);
+  border-bottom: var(--divider);
   color: var(--text-muted);
   font-size: var(--fs-sm);
   overflow: hidden;
@@ -271,7 +271,7 @@
   background: none;
   border: 0;
   border-radius: var(--radius);
-  padding: 6px 8px;
+  padding: var(--space-3) var(--space-4);
   text-align: left;
   text-decoration: none;
   cursor: pointer;

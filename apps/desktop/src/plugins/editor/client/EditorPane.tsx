@@ -5,7 +5,7 @@ import type { Task } from '../../../core/client/queries'
 import { debounce } from './autosave'
 import { editorApi, type EditorEntry } from './editorClient'
 import { formatFileReference, sendReferenceToAgent } from '../../../core/client/agent/reference'
-import { isAppDark, token, watchTheme } from '../../terminal/client/theme'
+import { isAppDark, token, watchAppearance } from '../../../core/client/ui/appearance'
 import { onClosePaneWithin } from '../../../core/client/lib/onClosePaneWithin'
 import { activeFile, editorActivate, editorClose, editorOpen, editorPromote, editorSetDirty, openFiles } from './editorState'
 import { clientEvents, consumePaneIntent, type PaneIntent } from '../../../core/client/registries/clientEvents'
@@ -113,7 +113,7 @@ export default function EditorPane(props: { task: Task }) {
       })
       editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyS, () => void save()) // explicit flush; autosave still runs
       editor.onDidBlurEditorText(() => scheduleSave.flush())
-      stopTheme = watchTheme(applyMonacoTheme)
+      stopTheme = watchAppearance(applyMonacoTheme)
       window.addEventListener('focus', onFocus)
       const restore = active()
       if (restore) void show(restore)

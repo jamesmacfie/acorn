@@ -5,6 +5,7 @@ import { integrationsOptions, linearProjectsOptions, tasksKey, tasksOptions, wor
 import { setWorkspaceProjects } from '../../../core/client/workspaces/mutations'
 import type { LinearProjectIssue, Task, WorkspaceProject } from '../../../core/shared/api'
 import { workspaceForRepo } from '../../../core/client/workspaces/activeWorkspace'
+import { createDismissable } from '../../../core/client/ui/dismissable'
 import { activateTaskSignals, pathForTask } from '../../../core/client/tasks/activate'
 import { replaceWorkspaceProjectsForProvider, workspaceProjectsForProvider } from '../../../core/client/integrations/workspaceProjects'
 import { PromoteToTaskModal } from '../../../core/client/integrations/PromoteToTaskModal'
@@ -62,6 +63,8 @@ export default function LinearBrowse() {
   // Project picker — lists projects across every connected Linear, tagged by connection.
   const [pickerOpen, setPickerOpen] = createSignal(false)
   const [pickerOpening, setPickerOpening] = createSignal(false)
+  let pickerDialog!: HTMLDivElement
+  const pickerDismiss = createDismissable({ onDismiss: () => setPickerOpen(false), container: () => pickerDialog })
   const [pickerError, setPickerError] = createSignal('')
   const projects = createQuery(() => linearProjectsOptions(pickerOpen()))
   const [checked, setChecked] = createSignal<Set<string>>(new Set())
@@ -148,7 +151,7 @@ export default function LinearBrowse() {
             fallback={
               <div class="workspace-empty-inner">
                 <p class="muted">No Linear projects linked to {ws()?.name}.</p>
-                <button type="button" class="overlay-btn" disabled={pickerOpening()} onClick={() => void openPicker()}>
+                <button type="button" class="ui-btn" disabled={pickerOpening()} onClick={() => void openPicker()}>
                   {pickerOpening() ? 'Refreshing projects…' : 'Choose projects'}
                 </button>
               </div>
@@ -258,8 +261,8 @@ export default function LinearBrowse() {
       </section>
 
       <Show when={pickerOpen()}>
-        <div class="overlay-backdrop" onClick={() => setPickerOpen(false)}>
-          <div class="overlay" role="dialog" aria-modal="true" onClick={(e) => e.stopPropagation()}>
+        <div class="overlay-backdrop" onClick={pickerDismiss.onBackdropClick}>
+          <div ref={pickerDialog} class="overlay" role="dialog" aria-modal="true" onClick={pickerDismiss.onContainerClick} onKeyDown={pickerDismiss.onKeyDown}>
             <div class="overlay-title">Linear projects — {ws()?.name}</div>
             <div class="overlay-body">
               <Show when={!projects.isPending} fallback={<p class="muted">Loading projects…</p>}>
@@ -279,7 +282,7 @@ export default function LinearBrowse() {
                 </Show>
               </Show>
               <div class="integration-key-row" style={{ 'justify-content': 'flex-end' }}>
-                <button type="button" class="overlay-btn" onClick={savePicker}>Save</button>
+                <button type="button" class="ui-btn" onClick={savePicker}>Save</button>
               </div>
             </div>
           </div>

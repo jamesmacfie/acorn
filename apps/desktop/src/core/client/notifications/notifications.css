@@ -7,32 +7,32 @@
   min-width: 14px;
   height: 14px;
   padding: 0 3px;
-  font-size: 10px;
+  font-size: var(--fs-2xs);
   line-height: 14px;
   text-align: center;
   color: var(--bg);
   background: var(--del-marker);
-  border-radius: 7px;
+  border-radius: var(--radius-pill-fixed);
   pointer-events: none;
 }
 .notify-popover {
   position: absolute;
   top: calc(100% + 6px);
   right: 0;
-  z-index: 40;
+  z-index: var(--z-popover);
   width: 340px;
   background: var(--bg);
-  border: 1px solid var(--border-strong);
-  box-shadow: 0 4px 16px var(--shadow-popover);
+  border: var(--control-border);
+  box-shadow: var(--shadow-2);
 }
 .notify-head {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 6px 10px;
+  padding: var(--space-3) var(--space-5);
   font-size: var(--fs-sm);
   color: var(--text-muted);
-  border-bottom: 1px solid var(--border);
+  border-bottom: var(--divider);
 }
 .notify-mark-all {
   font: inherit;
@@ -44,25 +44,25 @@
 }
 .notify-mark-all:hover { color: var(--text); }
 .notify-list { list-style: none; margin: 0; padding: 0; max-height: 50vh; overflow-y: auto; }
-.notify-empty { padding: 12px; font-size: var(--fs-sm); }
+.notify-empty { padding: var(--space-6); font-size: var(--fs-sm); }
 .notify-row {
   width: 100%;
   display: flex;
   align-items: baseline;
-  gap: 8px;
-  padding: 6px 10px;
+  gap: var(--space-4);
+  padding: var(--space-3) var(--space-5);
   font: inherit;
   font-size: var(--fs-sm);
   text-align: left;
   color: var(--text-muted);
   background: transparent;
   border: 0;
-  border-bottom: 1px solid var(--border);
+  border-bottom: var(--divider);
   cursor: pointer;
 }
 .notify-row:hover { background: var(--bg-hover); }
 .notify-row.unread { color: var(--text); }
-.notify-glyph { flex: none; }
+.notify-glyph { flex: none; font-family: var(--font-glyph); }
 .notify-warn { color: var(--warn); }
 .notify-title { flex: none; }
 .notify-detail { flex: 1; min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
@@ -73,9 +73,9 @@
   position: absolute;
   top: 4px;
   right: 5px;
-  font-size: 11px;
+  font-size: var(--fs-xs);
   line-height: 1;
   color: var(--warn);
   pointer-events: none;
-  z-index: 1;
+  z-index: var(--z-base);
 }

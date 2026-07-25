@@ -17,7 +17,7 @@ export default function TerminalSettings() {
       <label class="settings-field">
         <span class="settings-label">When the terminal button is clicked, open</span>
         <select
-          class="integration-key-input"
+          class="ui-input"
           value={railDefault()}
           onChange={(e) => void savePref(qc, PrefKeys.terminalRailDefault, e.currentTarget.value)}
         >

@@ -1,0 +1,191 @@
+/* Base styling for the shared primitives (core/client/ui/primitives.tsx, Modal.tsx).
+ *
+ * This file IS the Terminal look for these roles: flat, square, 1px-bordered, dense. Every value
+ * is a token, so a style pack changes the look by re-pointing tokens and only reaches for a
+ * `:root[data-style="x"] .ui-*` override when the difference is structural.
+ *
+ * Base is (0,1,0), variants are (0,2,0), pack overrides are (0,3,0) — so packs win on specificity
+ * rather than on source order.
+ */
+
+/* ── Button ─────────────────────────────────────────────────────────────────────────────────
+   Matches .overlay-btn exactly, which is what lets a converted call site keep its old class
+   alongside .ui-btn and render identically during migration. */
+.ui-btn {
+  flex: none;
+  /* Not inline-flex: <button>'s UA default is inline-block, and .overlay-btn never overrode it.
+     Switching would shift baseline alignment at 56 migrated call sites. The Button component's
+     spinner slot is inline anyway. */
+  gap: var(--space-3);
+  font: inherit;
+  font-size: var(--fs-sm);
+  color: var(--text);
+  background: var(--bg);
+  border: var(--control-border);
+  border-radius: var(--radius-control);
+  padding: var(--pad-control-lg);
+  cursor: pointer;
+}
+.ui-btn:hover:not(:disabled) { background: var(--bg-hover); border-color: var(--accent); }
+.ui-btn:disabled { opacity: 0.5; cursor: default; }
+
+.ui-btn[data-size='sm'] { padding: var(--pad-control); font-size: var(--fs-xs); }
+.ui-btn[data-icon-only] { padding: var(--space-1); width: var(--control-h); }
+
+.ui-btn[data-variant='solid'] { background: var(--accent); color: var(--accent-fg); border-color: var(--accent); }
+.ui-btn[data-variant='solid']:hover:not(:disabled) { opacity: 0.9; background: var(--accent); }
+.ui-btn[data-variant='ghost'] { background: transparent; border-color: transparent; }
+.ui-btn[data-variant='ghost']:hover:not(:disabled) { background: var(--bg-hover); border-color: transparent; }
+/* 'bare' is the .section-refresh / .settings-close shape: an icon affordance with no box at all. */
+.ui-btn[data-variant='bare'] {
+  background: transparent;
+  border: 0;
+  padding: 0;
+  color: var(--text-muted);
+  line-height: 1;
+}
+.ui-btn[data-variant='bare']:hover:not(:disabled) { color: var(--text); background: transparent; }
+
+.ui-btn[data-tone='accent'] { color: var(--accent); }
+.ui-btn[data-tone='danger'] { color: var(--danger); }
+.ui-btn[data-tone='danger']:hover:not(:disabled) { border-color: var(--danger); }
+.ui-btn[data-tone='warn'] { color: var(--warn); }
+.ui-btn[data-tone='warn']:hover:not(:disabled) { border-color: var(--warn); }
+/* Tone must survive the solid variant, where the tint moves to the background. */
+.ui-btn[data-variant='solid'][data-tone='danger'] { background: var(--danger); border-color: var(--danger); color: var(--accent-fg); }
+
+/* ── Form controls ──────────────────────────────────────────────────────────────────────────
+   Matches .integration-key-input, the de-facto shared input this replaces. */
+/* `flex: 1` lives in the BASE rather than under [data-width='full'] so that a call site migrated by
+   swapping the class alone — `class="integration-key-input"` → `class="ui-input"`, with no
+   data-attributes — renders byte-identically to what it replaced. */
+.ui-input {
+  flex: 1;
+  min-width: 0;
+  font: inherit;
+  font-size: var(--fs-sm);
+  color: var(--text);
+  background: var(--input-bg);
+  border: var(--control-border);
+  border-radius: var(--radius-control);
+  padding: 7px var(--space-5);
+}
+.ui-input::placeholder { color: var(--text-faint); }
+.ui-input:focus { outline: none; border-color: var(--accent); }
+.ui-input:disabled { opacity: 0.5; cursor: default; }
+.ui-input[data-width='auto'] { flex: none; }
+.ui-input[data-width='narrow'] { flex: none; width: 90px; }
+.ui-input[data-size='sm'] { padding: var(--pad-control); }
+.ui-input[data-invalid] { border-color: var(--danger); }
+textarea.ui-input { resize: vertical; font-family: var(--font-mono); }
+
+.ui-field { display: flex; flex-direction: column; gap: var(--space-3); }
+.ui-field[data-layout='row'] { flex-direction: row; align-items: center; gap: var(--space-4); }
+.ui-field-label { font-size: var(--fs-sm); color: var(--text); }
+.ui-field-hint { font-size: var(--fs-sm); color: var(--text-muted); }
+.ui-field-error { font-size: var(--fs-sm); color: var(--danger); }
+
+/* ── Badge ──────────────────────────────────────────────────────────────────────────────────
+   'tag' is the aesthetic shape a pack may round; 'pill' is a capsule by meaning, in every pack. */
+.ui-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex: none;
+  font-size: var(--fs-xs);
+  line-height: 1.6;
+  padding: var(--pad-chip);
+  color: var(--text-muted);
+  background: var(--chip-bg);
+  border: var(--control-bw) solid var(--badge-border);
+  border-radius: var(--radius-chip);
+  white-space: nowrap;
+}
+.ui-badge[data-shape='pill'] { border-radius: var(--radius-pill-fixed); }
+.ui-badge[data-size='xs'] { font-size: var(--fs-2xs); padding: 0 var(--space-3); }
+.ui-badge[data-dashed] { border-style: dashed; background: transparent; }
+.ui-badge[data-tone='accent'] { color: var(--accent); border-color: var(--accent); }
+.ui-badge[data-tone='add'] { color: var(--add-marker); border-color: var(--add-marker); }
+.ui-badge[data-tone='del'] { color: var(--del-marker); border-color: var(--del-marker); }
+.ui-badge[data-tone='warn'] { color: var(--warn); border-color: var(--warn); }
+
+/* ── Spinner ────────────────────────────────────────────────────────────────────────────────
+   Terminal spins a braille glyph. A pack that wants a ring replaces the content, not the markup. */
+.ui-spinner {
+  display: inline-block;
+  flex: none;
+  font-family: var(--font-glyph);
+  color: var(--accent);
+}
+.ui-spinner[data-size='md'] { font-size: var(--fs-md); }
+
+/* ── SectionHeader ──────────────────────────────────────────────────────────────────────────
+   The base rule is `.section-header` in shell.css — already shared across 18 sites, so the
+   component reuses it rather than introducing a parallel class. These are only the level variants
+   and the slot layout the component adds. */
+.section-header[data-level='group'] {
+  height: auto;
+  padding: var(--space-5) var(--space-6) var(--space-2);
+  border-bottom: 0;
+  color: var(--text-faint);
+}
+.section-header[data-level='sub'] {
+  height: auto;
+  padding: 0;
+  border-bottom: 0;
+  text-transform: none;
+  letter-spacing: 0;
+  color: var(--text);
+}
+.ui-section-header-label { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ui-section-header-count { flex: none; color: var(--text-faint); font-variant-numeric: var(--tabular); }
+.ui-section-header-actions { margin-left: auto; display: flex; align-items: center; gap: var(--space-2); }
+
+/* ── Row ────────────────────────────────────────────────────────────────────────────────────
+   The full-bleed dense row with a left accent marker IS the Terminal look. A pack turns it into an
+   inset card by setting --row-radius / --row-inset and zeroing the marker — which is exactly the
+   structural change no amount of token substitution could reach across 18 bespoke `-row` rules. */
+.ui-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  width: 100%;
+  min-height: var(--row-h);
+  padding: 0 var(--pane-pad);
+  font-size: var(--fs-sm);
+  color: var(--text);
+  background: transparent;
+  border: 0;
+  border-left: var(--marker-w) solid transparent;
+  border-radius: var(--radius-surface);
+  text-align: left;
+  cursor: default;
+}
+.ui-row[role='button'] { cursor: pointer; }
+.ui-row[role='button']:hover { background: var(--bg-hover); }
+.ui-row[data-selected] { background: var(--bg-selected); border-left-color: var(--accent); }
+.ui-row[data-nested] { padding-left: var(--space-9); }
+.ui-row[data-density='compact'] { min-height: var(--row-h-sm); }
+.ui-row[data-density='roomy'] { min-height: calc(var(--row-h) + var(--space-4)); }
+.ui-row:focus-visible { outline: var(--focus-ring-w) var(--focus-ring-style) var(--focus); outline-offset: calc(-1 * var(--focus-ring-w)); }
+.ui-row-leading { flex: none; display: inline-flex; align-items: center; }
+.ui-row-body { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ui-row-meta { flex: none; color: var(--text-muted); font-variant-numeric: var(--tabular); }
+.ui-row-trailing { flex: none; display: inline-flex; align-items: center; gap: var(--space-2); }
+
+/* ── Modal ──────────────────────────────────────────────────────────────────────────────────
+   .overlay / .overlay-backdrop / .overlay-title / .overlay-body stay in overlays.css — Modal
+   reuses them so migrating a call site is not also a restyle. These add only the size/align/layout
+   variants that the old markup expressed with extra classes (.overlay.settings, .overlay.palette). */
+.overlay[data-size='sm'] { width: min(420px, 92vw); }
+.overlay[data-size='lg'] { width: min(720px, 94vw); }
+.overlay[data-size='wide'] { width: min(820px, 94vw); }
+.overlay[data-layout='split'] { flex-direction: row; }
+.overlay-backdrop:has(> .overlay[data-align='center']) { align-items: center; padding-top: 0; }
+.ui-modal-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--space-4);
+  padding: 0 var(--pane-pad) var(--pane-pad);
+}

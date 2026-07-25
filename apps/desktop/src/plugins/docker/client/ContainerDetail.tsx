@@ -203,21 +203,21 @@ export default function ContainerDetail(props: { target: string; taskId?: string
               <span class="docker-detail-name" title={d().name}>{d().name}</span>
               <span class="docker-detail-actions">
                 <Show when={!running()}>
-                  <button type="button" class="overlay-btn" disabled={busy()} onClick={() => void act('start')}>Start</button>
+                  <button type="button" class="ui-btn" disabled={busy()} onClick={() => void act('start')}>Start</button>
                 </Show>
                 <Show when={running()}>
-                  <button type="button" class="overlay-btn" disabled={busy()} onClick={() => void act('stop')}>Stop</button>
-                  <button type="button" class="overlay-btn" disabled={busy()} onClick={() => void act('restart')}>Restart</button>
+                  <button type="button" class="ui-btn" disabled={busy()} onClick={() => void act('stop')}>Stop</button>
+                  <button type="button" class="ui-btn" disabled={busy()} onClick={() => void act('restart')}>Restart</button>
                   <button
                     type="button"
-                    class="overlay-btn"
+                    class="ui-btn"
                     title={props.taskId ? 'Open a shell in this container in the task terminal' : 'Copy a docker exec command'}
                     onClick={() => void openExec(d().name)}
                   >
                     {props.taskId ? 'Terminal' : 'Copy exec'}
                   </button>
                 </Show>
-                <button type="button" class="overlay-btn docker-danger" disabled={busy()} onClick={() => void remove()}>
+                <button type="button" class="ui-btn docker-danger" disabled={busy()} onClick={() => void remove()}>
                   {confirmRm() ? 'Sure?' : 'Remove'}
                 </button>
                 {props.actions}
@@ -282,7 +282,7 @@ export default function ContainerDetail(props: { target: string; taskId?: string
                 <Show when={d().env.length}>
                   <dt>Env</dt>
                   <dd>
-                    <Show when={showEnv()} fallback={<button type="button" class="overlay-btn" onClick={() => setShowEnv(true)}>Show {d().env.length} variables</button>}>
+                    <Show when={showEnv()} fallback={<button type="button" class="ui-btn" onClick={() => setShowEnv(true)}>Show {d().env.length} variables</button>}>
                       <ul class="docker-env mono"><For each={d().env}>{(line) => <li>{line}</li>}</For></ul>
                     </Show>
                   </dd>
@@ -321,10 +321,10 @@ export default function ContainerDetail(props: { target: string; taskId?: string
                   <span class="muted docker-match-count" role="status">
                     {logMatches().length ? `${currentMatch() + 1}/${logMatches().length}` : 'no matches'}
                   </span>
-                  <button type="button" class="overlay-btn" title="Previous match (Shift+Enter)" disabled={!logMatches().length} onClick={() => navMatch(-1)}>↑</button>
-                  <button type="button" class="overlay-btn" title="Next match (Enter)" disabled={!logMatches().length} onClick={() => navMatch(1)}>↓</button>
+                  <button type="button" class="ui-btn" title="Previous match (Shift+Enter)" disabled={!logMatches().length} onClick={() => navMatch(-1)}>↑</button>
+                  <button type="button" class="ui-btn" title="Next match (Enter)" disabled={!logMatches().length} onClick={() => navMatch(1)}>↓</button>
                 </Show>
-                <button type="button" class="overlay-btn" title="Clear the current log view (the stream keeps appending)" onClick={() => logBuf()?.clear()}>Clear</button>
+                <button type="button" class="ui-btn" title="Clear the current log view (the stream keeps appending)" onClick={() => logBuf()?.clear()}>Clear</button>
                 <span class="muted">{logEnded() ? 'stream ended' : 'live'}</span>
               </div>
               <pre
