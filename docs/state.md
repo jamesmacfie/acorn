@@ -79,7 +79,9 @@ logs because it cannot report failure by persisting another notice).
 Task archive and workspace removal emit lifecycle events only after the durable mutation succeeds.
 For an active task, the task-id-keyed UI scope disposes first and the archive event performs the
 final eviction, preventing cleanup from repopulating cursor/editor state after eviction.
-`persistence/scopedEviction.ts` maps those events to owner-provided eviction functions. It clears
+`app/client/scopedEviction.ts` maps those events to owner-provided eviction functions — it lives in the
+composition root because choosing the concrete set of state owners is composition, not a core concern
+(so `core/` never imports the feature state modules it evicts). It clears
 task layouts, recipe URLs, terminal open/max/active state, pane focus/maximize, editor tabs and
 Monaco view state, pending presentation intents, per-workspace view memory, and PR filters. The
 persistent bindings then write a scoped tombstone so legacy aggregate values cannot resurrect the
