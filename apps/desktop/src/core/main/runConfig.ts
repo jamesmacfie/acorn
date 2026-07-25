@@ -38,6 +38,10 @@ export type RepoConfig = {
   // moved off the workspace and gained a committed-toml layer here; browserRules stays DB-only
   // (dev-login autofill selectors are machine/personal, not something you'd commit).
   dbUrlScript: string | null
+  // True when dbUrlScript's winning layer is the committed repo config — the same provenance signal
+  // repoTargetIds carries, for the same reason: dbUrlScript is executed as a shell script, so the
+  // trust gate must apply when the checkout authored it and must NOT when the user did.
+  dbUrlFromRepo: boolean
   preview: { mode: PreviewMode | null; value: string | null }
   browserRules: BrowserRule[]
   errors: ConfigError[]
@@ -250,6 +254,7 @@ export function loadRepoConfig(repoDir: string | null, userConfigDir: string | n
     copy: repo?.copy ?? user?.copy ?? [],
     layouts: [...layouts.values()],
     dbUrlScript: repo?.dbUrlScript ?? user?.dbUrlScript ?? (db.dbUrlScript?.trim() || null),
+    dbUrlFromRepo: repo?.dbUrlScript != null,
     preview: {
       mode: repo?.previewMode ?? user?.previewMode ?? (db.previewMode ?? null),
       value: repo?.previewValue ?? user?.previewValue ?? (db.previewValue?.trim() || null),

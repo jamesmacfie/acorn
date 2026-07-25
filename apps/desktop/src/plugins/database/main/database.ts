@@ -20,6 +20,7 @@ import type { DbCell, DbColumn, DbConnectResult, DbColumnsResult, DbPk, DbQueryR
 import { loadTask, resolveInRoot, taskRoot } from '../../../core/main/taskWorktree'
 import { getRepoPath } from '../../../core/main/repoPaths'
 import { loadRepoConfig } from '../../../core/main/runConfig'
+import { assertRepoConfigTrusted } from '../../../core/main/repoConfigTrust'
 
 const { Pool } = pg
 const exec = promisify(execFile)
@@ -55,7 +56,9 @@ const errText = (e: unknown): string => (e instanceof Error ? e.message : String
 // Resolve the connection URL for a task WITHOUT persisting it: repo dbUrlScript (committed
 // .acorn/config.toml [database].url_script wins over the repo_paths fallback; run in the worktree)
 // → <worktree>/.env DATABASE_URL → process.env.DATABASE_URL. Returns null if none found.
-async function resolveDbUrl(db: AppDatabase, taskId: string): Promise<string | null> {
+// Exported for database.test.ts: this is where the repo-config trust gate sits, and it's the only
+// place the "did the untrusted script execute?" question can be asked without a live Postgres.
+export async function resolveDbUrl(db: AppDatabase, taskId: string): Promise<string | null> {
   const t = await loadTask(db, taskId)
   if (!t) return null
   const root = await taskRoot(db, taskId) // the task worktree (created lazily), or null
@@ -63,6 +66,13 @@ async function resolveDbUrl(db: AppDatabase, taskId: string): Promise<string | n
   const cfg = loadRepoConfig(root ?? rp?.path ?? null, homedir(), { dbUrlScript: rp?.dbUrlScript })
   const script = cfg.dbUrlScript?.trim()
   if (script && root) {
+    // A committed `[database].url_script` is executable content from the checkout, so it carries the
+    // same trust gate as repo-authored run targets and workflows (core/main/repoConfigTrust.ts):
+    // cloning a repo must not be enough to run its commands. Deliberately OUTSIDE the try below —
+    // a trust failure must propagate to the caller, never fall through to the .env/env fallbacks as
+    // if the script had merely errored. User/DB-authored scripts (dbUrlFromRepo false) are the
+    // user's own input and are not gated.
+    if (cfg.dbUrlFromRepo) await assertRepoConfigTrusted(db, taskId)
     try {
       const { stdout } = await exec('bash', ['-lc', script], { cwd: root, timeout: 15_000, maxBuffer: 1 << 20 })
       // Scripts may echo noise before the URL — strip ANSI escapes (some CLIs emit them even when

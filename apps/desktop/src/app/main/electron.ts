@@ -3,6 +3,7 @@ import { join, resolve } from 'node:path'
 import { bootstrap } from './bootstrap'
 import { resolveSessionKey } from '../../core/main/sessionKeyStore'
 import { ACORN_PORT, devDataDir } from '../../core/main/server'
+import { isAllowedExternalUrl } from '../../core/main/urlGuards'
 
 const ORIGIN = `http://127.0.0.1:${ACORN_PORT}`
 const PRELOAD = join(import.meta.dirname, '../preload/index.cjs')
@@ -81,6 +82,14 @@ function openAuthWindow(parent: BrowserWindow, loginUrl: string) {
 }
 
 function hardenNavigation(win: BrowserWindow) {
+  // Anything leaving the renderer for the OS goes through the scheme allowlist first: the pane
+  // content that produces these links (GitHub bodies, Linear issues/attachments, Rollbar) is
+  // third-party, so a `file:`/custom-scheme href would otherwise be an arbitrary-app launch.
+  const openExternal = (url: string): void => {
+    if (!isAllowedExternalUrl(url)) return void console.warn('[electron] blocked external open:', url)
+    void shell.openExternal(url)
+  }
+
   // The main window may only ever sit on the loopback origin. External links open in the system
   // browser; a /auth/login navigation is rerouted into the OAuth window above.
   win.webContents.on('will-navigate', (e, url) => {
@@ -92,10 +101,10 @@ function hardenNavigation(win: BrowserWindow) {
       return
     }
     e.preventDefault()
-    void shell.openExternal(url)
+    openExternal(url)
   })
   win.webContents.setWindowOpenHandler(({ url }) => {
-    void shell.openExternal(url)
+    openExternal(url)
     return { action: 'deny' }
   })
   // The browser-preview pane is now a main-owned WebContentsView (previewService.ts), not

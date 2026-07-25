@@ -12,6 +12,8 @@ Electron capabilities to the renderer.
   attacks.
 - `/auth/*` is public because it establishes the session. Every `/api/*` request passes `csrf()`,
   `authMiddleware`, and `requireUser` before core or contributed routers run.
+- `/auth/*` also passes `csrf()`. Public is not unprotected: `POST /auth/logout` mutates session
+  state, so a foreign page must not be able to force it.
 - Browser callers use the encrypted, HTTP-only, same-site session cookie. Internal MCP callers use
   the per-app-run `INTERNAL_TOKEN`; the token maps to the machine user but carries no GitHub token.
 - The WebSocket upgrade rechecks Host, Origin, and either the session cookie or internal token.
@@ -40,8 +42,11 @@ Preload IPC is reserved for native capabilities: close/quit lifecycle, the folde
 main-owned preview `WebContentsView`.
 
 Unexpected navigation and window creation are blocked or opened externally by the main process.
-Preview navigation is restricted to `http(s)`, and its `webContents` identifier never crosses to the
-renderer. Browser automation binds inside main and is exposed to agents through permission-checked
+Anything handed to the OS via `shell.openExternal` passes a scheme allowlist first (`http`, `https`,
+`mailto` — `core/main/urlGuards.ts`): pane content includes third-party text we do not author, so an
+anchor's `href` is untrusted, and `openExternal` resolves schemes through the OS launcher where
+`file:` and custom schemes reach local bundles and other installed apps. Preview navigation is
+restricted to `http(s)`, and its `webContents` identifier never crosses to the renderer. Browser automation binds inside main and is exposed to agents through permission-checked
 tools.
 
 ## Secrets and sessions
@@ -91,14 +96,19 @@ memory.
 ## Repo-authored configuration
 
 Committed `.acorn/config.toml` and `.acorn/workflows/*.toml` are remote-authored executable input.
-Before a repo-owned run target or workflow can start, acorn hashes the verbatim repo configuration
-snapshot and requires an explicit review. A machine-scoped `config_acks` row records the repo and
+Before a repo-owned run target, workflow, or `[database].url_script` can run, acorn hashes the
+verbatim repo configuration snapshot and requires an explicit review. A machine-scoped `config_acks` row records the repo and
 hash; a changed snapshot shows a diff and requires a new acknowledgement. User-level and database
-fallback configuration remain usable while the repo layer is untrusted. Agent-triggered attempts
+fallback configuration remain usable while the repo layer is untrusted — which is why each executable
+field carries provenance (`repoTargetIds`, `dbUrlFromRepo` in `core/main/runConfig.ts`) rather than
+gating on the merged value, so a user-authored script is never penalised for a repo-authored one.
+A tripped gate always fails closed: it must not degrade to a lower-precedence fallback, or the
+refusal becomes invisible. Agent-triggered attempts
 fail immediately with the stable `needs-trust` code and add a “Review & trust” notification; they
 are never silently resumed after approval.
 
 Security-relevant source: `core/main/server.ts`, `core/main/preload.ts`,
-`core/main/sessionKeyStore.ts`, `core/main/repoConfigTrust.ts`, `core/server/index.ts`,
+`core/main/sessionKeyStore.ts`, `core/main/repoConfigTrust.ts`, `core/main/urlGuards.ts`,
+`core/main/pathGuards.ts`, `core/server/index.ts`,
 `core/server/middleware/`, `core/server/agentTools/`, feature route validators under
 `plugins/*/server/routes/`, and the public API under `core/{server,main}/publicApi/`.

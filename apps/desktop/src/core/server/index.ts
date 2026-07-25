@@ -30,6 +30,10 @@ export function createApp() {
   // before any router. A router mounted before requireUser would be an unauthenticated hole, so
   // all /api routers stay below this line. See docs/security.md §3.
   const app = new Hono<AppEnv>()
+    // /auth is public, but its one mutating route (POST /logout) still needs the Origin check —
+    // without it any page the user visits can force-log-them-out. Registered before the router
+    // because Hono runs handlers in registration order.
+    .use('/auth/*', csrf())
     .route('/auth', auth)
     .use('/api/*', csrf()) // Origin / Sec-Fetch-Site check on mutating calls
     .use('/api/*', authMiddleware) // resolve ctx.principal from cookie or internal token
