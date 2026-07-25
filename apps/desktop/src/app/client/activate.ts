@@ -29,7 +29,7 @@ import { taskSlotRegistry } from '../../core/client/registries/uiSlots'
 import { persistedStateRegistry } from '../../core/client/persistence/persistedState'
 import { persistedFeatureSlices } from '../../core/client/persistence/stateSlices'
 import { directPreferenceSlices } from '../../core/client/persistence/preferenceSlices'
-import { activateScopedStateEviction } from '../../core/client/persistence/scopedEviction'
+import { activateScopedStateEviction } from './scopedEviction'
 import { activateUiControl } from '../../core/client/publicApi/uiControlClient'
 
 const panes = [

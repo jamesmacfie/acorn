@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest'
-import { editorOpen, openFiles } from '../../../plugins/editor/client/editorState'
-import { editorViewState, rememberEditorViewState } from '../../../plugins/editor/client/editorViewState'
-import { prFilterFor, setPrFilter } from '../../../plugins/github/client/pullList/filterState'
-import { activeTerminal, rememberActiveTerminal } from '../../../plugins/terminal/client/sessions'
+import { editorOpen, openFiles } from '../../plugins/editor/client/editorState'
+import { editorViewState, rememberEditorViewState } from '../../plugins/editor/client/editorViewState'
+import { prFilterFor, setPrFilter } from '../../plugins/github/client/pullList/filterState'
+import { activeTerminal, rememberActiveTerminal } from '../../plugins/terminal/client/sessions'
 import {
   dispatchLayout,
   focusedPane,
@@ -18,10 +18,10 @@ import {
   setTerminalMax,
   setTerminalOpen,
   workspaceView,
-} from '../tasks/tasks'
-import { clientEvents, consumePaneIntent, openPane, requestTerminalFocusIntent, consumeTerminalFocusIntent } from '../registries/clientEvents'
+} from '../../core/client/tasks/tasks'
+import { clientEvents, consumePaneIntent, openPane, requestTerminalFocusIntent, consumeTerminalFocusIntent } from '../../core/client/registries/clientEvents'
 import { activateScopedStateEviction } from './scopedEviction'
-import { completeTaskArchive } from '../tasks/archiveLifecycle'
+import { completeTaskArchive } from '../../core/client/tasks/archiveLifecycle'
 
 describe('scoped lifecycle eviction', () => {
   it('clears every task-owned keyed collection on archive', () => {

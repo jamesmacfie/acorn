@@ -12,7 +12,6 @@ export type PersistedStateBinding<T> = {
   // App slices use the empty id. Scoped slices use their workspace/task/pane id.
   values(): Readonly<Record<string, T>>
   hydrate(scopeId: string, value: T): void
-  evict?(scopeId: string): void
 }
 
 export type PersistedStateSlice<T> = {
