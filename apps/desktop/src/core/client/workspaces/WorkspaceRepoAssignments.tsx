@@ -1,7 +1,7 @@
 import { createEffect, createSignal, For, Show } from 'solid-js'
 import { createQuery, useQueryClient } from '@tanstack/solid-query'
 import { assignmentsOptions, reposOptions, workspaceAssignmentsKey, workspacesKey, workspacesOptions } from '../queries'
-import { createWorkspace, ignoreRepo, setAllReposIgnored, setRepoWorkspace, unignoreRepo } from '../../../plugins/github/client/mutations'
+import { createWorkspace, ignoreRepo, setAllReposIgnored, setRepoWorkspace, unignoreRepo } from './mutations'
 import { terminalApi } from '../../../plugins/terminal/client/terminalClient'
 import './onboarding.css'
 

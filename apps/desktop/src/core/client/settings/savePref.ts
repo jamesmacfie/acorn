@@ -1,8 +1,17 @@
 import type { QueryClient } from '@tanstack/solid-query'
-import { prefsKey } from '../../shared/api'
-import { setPref } from '../../../plugins/github/client/mutations'
+import { prefsKey, prefsRoute } from '../../shared/api'
+import { writeJson } from '../apiClient'
 import { pushBackgroundError } from '../notifications/notifications'
 import { persistedStateRegistry, utf8Bytes } from '../persistence/persistedState'
+
+// The single server write behind every pref. Lives here because savePref is its only caller — the
+// optimistic-cache + rollback dance below is the whole contract.
+const setPref = async (key: string, value: string) =>
+  writeJson<{ key: string; value: string }>(prefsRoute, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ key, value }),
+  }, (res) => `prefs ${res.status}`)
 
 type PrefWriteState = {
   tail: Promise<void>

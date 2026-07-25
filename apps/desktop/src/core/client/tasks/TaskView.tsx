@@ -2,7 +2,7 @@ import { createMemo, createResource, createSignal, For, onCleanup, onMount, Show
 import { useNavigate } from '@solidjs/router'
 import { createQuery, useQueryClient } from '@tanstack/solid-query'
 import { prefsOptions, tasksKey, tasksOptions, workspacesOptions, type Task } from '../queries'
-import { archiveTask } from '../../../plugins/github/client/mutations'
+import { archiveTask } from './mutations'
 import { paneAvailable, paneContribution, paneContributions } from '../registries/panes'
 import { registerCommands } from '../registries/commands'
 import { registerKeybindings, resolveKeybindings, keybindingRegistry } from '../registries/keybindings'

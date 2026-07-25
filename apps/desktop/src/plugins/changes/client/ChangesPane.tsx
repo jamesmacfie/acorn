@@ -1,7 +1,7 @@
 import { createEffect, createMemo, createResource, createSignal, For, Show } from 'solid-js'
 import type { Task } from '../../../core/client/queries'
 import { readJson } from '../../../core/client/apiClient'
-import { addReviewNote, deleteReviewNote, markReviewNotesSent } from '../../github/client/mutations'
+import { addReviewNote, deleteReviewNote, markReviewNotesSent } from '../../../core/client/tasks/mutations'
 import { fileStatusMeta } from '../../../core/client/ui/displayMeta'
 import { getHighlighter } from '../../../core/client/highlight/shiki'
 import { reviewNotesRoute, type ReviewNote } from '../../../core/shared/api'

@@ -44,3 +44,13 @@ export async function writeJson<T>(url: string, init: RequestInit, fallback: Err
   }
   return res.json()
 }
+
+// Same-origin JSON POST (cookie auth; the server's csrf() checks Origin). Throws the structured
+// error code on failure so callers can branch (e.g. merge_failed, reauth). Every write surface
+// shares this rather than re-declaring it.
+export const postJson = async <T>(url: string, body?: unknown): Promise<T> =>
+  writeJson<T>(url, {
+    method: 'POST',
+    headers: body === undefined ? {} : { 'Content-Type': 'application/json' },
+    body: body === undefined ? undefined : JSON.stringify(body),
+  })
