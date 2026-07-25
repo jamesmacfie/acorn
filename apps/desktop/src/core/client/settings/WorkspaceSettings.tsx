@@ -1,7 +1,7 @@
 import { createResource, createSignal, For, Index, onCleanup, Show } from 'solid-js'
 import { createQuery, useQueryClient } from '@tanstack/solid-query'
 import { debounce } from '../lib/debounce'
-import { terminalApi } from '../../../plugins/terminal/client/terminalClient'
+import { taskBridge } from '../tasks/taskBridge'
 import { integrationsOptions, workspacesKey } from '../queries'
 import { deleteWorkspace, renameWorkspace, setWorkspaceColor, setWorkspaceIcon } from '../workspaces/mutations'
 import type { BrowserRule, DbSchemaMode, PreviewMode, SetupTrigger, Workspace } from '../../shared/api'
@@ -148,7 +148,7 @@ export default function WorkspaceSettings(props: { workspace: Workspace; onDelet
         </Show>
       </label>
 
-      <Show when={terminalApi() && (props.workspace.repos ?? []).length}>
+      <Show when={taskBridge() && (props.workspace.repos ?? []).length}>
         <div class="settings-field">
           <span class="settings-label">Repository settings</span>
           <span class="muted settings-hint">
@@ -177,7 +177,7 @@ export default function WorkspaceSettings(props: { workspace: Workspace; onDelet
 // terminal repoPath bridge; local signals override the fetched row while typing (null = use row).
 // Desktop-only — the runtime lives in the main process. Gated on a mapped checkout, like run targets.
 function RepoConfig(props: { owner: string; name: string }) {
-  const api = terminalApi()
+  const api = taskBridge()
   const [row, { refetch }] = createResource(
     () => `${props.owner}/${props.name}`,
     () => api?.repoPath.get(props.owner, props.name) ?? null,
@@ -519,7 +519,7 @@ function BrowserRulesEditor(props: { rules: BrowserRule[]; onSave: (rules: Brows
 // Per-repo run-target JSON editor (docs/workflows.md §2) — the DB fallback surface. Desktop-only
 // because it uses the main-process runtime.
 function RepoRunTargets(props: { owner: string; name: string }) {
-  const api = terminalApi()
+  const api = taskBridge()
   const [row, { refetch }] = createResource(
     () => `${props.owner}/${props.name}`,
     () => api?.repoPath.get(props.owner, props.name) ?? null,

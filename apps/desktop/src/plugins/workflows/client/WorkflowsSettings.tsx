@@ -1,6 +1,6 @@
 import { createResource, For, Show } from 'solid-js'
 import { activeTaskId } from '../../../core/client/tasks/tasks'
-import { terminalApi } from '../../terminal/client/terminalClient'
+import { capabilities } from '../../../core/client/capabilities'
 import { workflowApi } from '../../agents/client/workflowClient'
 
 // Settings → Workflows (docs/workflows.md): a read-only inspector over the committed/user workflow
@@ -14,7 +14,7 @@ export default function WorkflowsSettings() {
   const [data, { refetch }] = createResource(
     () => taskId() ?? 'no-task',
     async () => {
-      const api = terminalApi()
+      const api = capabilities().terminal
       const id = taskId()
       if (!api || !id) return { workflows: [], errors: [] }
       return workflowApi.defs(id)

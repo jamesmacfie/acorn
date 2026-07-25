@@ -7,8 +7,7 @@ import RollbarBrowse from '../../plugins/rollbar/client/RollbarBrowse'
 import { linearPaneContribution, rollbarPaneContribution } from './taskPaneContributions'
 import { contentLinkRegistry, linearContentLinkContribution, type ContentLinkContribution } from '../../plugins/github/client/contentLinks'
 import type { LinearProjectIssue, RollbarItemSummary } from '../../core/shared/api'
-import { addTaskLink } from '../../core/client/tasks/mutations'
-import { createTask } from '../../plugins/github/client/mutations'
+import { addTaskLink, createTask } from '../../core/client/tasks/mutations'
 import { prepareLinearPromotion, prepareRollbarPromotion } from '../../core/client/integrations/providerPromotion'
 
 export type ClientIntegrationProviderContribution = {

@@ -1,13 +1,13 @@
 import { createResource } from 'solid-js'
 import type { Task } from '../../../core/client/queries'
 import type { PaneContribution } from '../../../core/client/registries/panes'
-import { terminalApi } from '../../terminal/client/terminalClient'
+import { taskBridge } from '../../../core/client/tasks/taskBridge'
 import { recipeBrowserUrl } from '../../../core/client/tasks/tasks'
 import { runApi } from '../../terminal/client/runClient'
 import PreviewPane from './PreviewPane'
 
 export function PreviewTaskPane(props: { task: Task }) {
-  const api = terminalApi()
+  const api = taskBridge()
   // Repo-level preview config (repo-level-settings): the machine-local repo_paths values. ponytail:
   // committed .acorn/config.toml preview keys drive the public-API resolver, not this in-app pane.
   const [config] = createResource(

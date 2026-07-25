@@ -11,7 +11,7 @@ import { buildDiffRows, highlighterTokenize, isCodeRow, plainTokenize, type Code
 import { formatFileReference, sendReferenceToAgent } from '../../../core/client/agent/reference'
 import { taskStatus } from '../../../core/client/tasks/taskStatus'
 import { agentSessionsFor } from '../../terminal/client/sessions'
-import { terminalApi } from '../../terminal/client/terminalClient'
+import { taskBridge } from '../../../core/client/tasks/taskBridge'
 import { localGitApi } from './localGitClient'
 import { changeKey, groupChanges, pickSelected, toPullFile } from './model'
 import './changes.css'
@@ -21,7 +21,7 @@ import './changes.css'
 // fed by the local:changes/local:diff IPC instead of GitHub patches. Refreshes on the existing
 // dirty-poll signal (taskStatus). Read-only in P1; stage/commit actions land in P4.
 export default function ChangesPane(props: { task: Task }) {
-  const api = terminalApi()
+  const api = taskBridge()
   const [selectedKey, setSelectedKey] = createSignal<string | null>(null)
   const [actionError, setActionError] = createSignal('')
   const [discardArmed, setDiscardArmed] = createSignal('')

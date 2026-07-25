@@ -4,7 +4,8 @@
 // file changes don't ping onStatus) plus on onStatus edges. ponytail: 5s poll over a few worktrees
 // is cheap; tighten to a watcher only if it ever matters.
 import { createSignal } from 'solid-js'
-import { terminalApi } from '../../../plugins/terminal/client/terminalClient'
+import { taskBridge } from './taskBridge'
+import { wsOnStatus } from '../wsClient'
 import type { TaskStatus } from '../../shared/terminal'
 import type { PollerContribution } from '../registries/pollers'
 import { latestOnly } from '../lib/latestOnly'
@@ -15,7 +16,7 @@ export { statuses }
 export const taskStatus = (id: string): TaskStatus | undefined => statuses()[id]
 
 export const refreshTaskStatuses = latestOnly(
-  async () => terminalApi()?.task.statuses() ?? [],
+  async () => taskBridge()?.task.statuses() ?? [],
   (list) => setStatuses(Object.fromEntries(list.map((s) => [s.taskId, s]))),
 )
 
@@ -25,5 +26,7 @@ export const taskStatusPollerContribution: PollerContribution = {
   intervalMs: 5000,
   requires: 'desktop',
   run: refreshTaskStatuses,
-  subscribe: (refresh) => terminalApi()?.onStatus(refresh) ?? (() => {}),
+  // PTY status edges arrive on the shared WebSocket, which is core's own transport — no need to go
+  // through a feature accessor for it.
+  subscribe: (refresh) => wsOnStatus(refresh),
 }

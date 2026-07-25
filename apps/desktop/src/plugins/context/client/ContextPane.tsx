@@ -3,7 +3,7 @@ import { readJson } from '../../../core/client/apiClient'
 import type { Task } from '../../../core/client/queries'
 import { taskContextRoute, type ContextItem, type TaskContext } from '../../../core/shared/api'
 import { agentSessionsFor } from '../../terminal/client/sessions'
-import { terminalApi } from '../../terminal/client/terminalClient'
+import { taskBridge } from '../../../core/client/tasks/taskBridge'
 import MemorySection from '../../memory/client/MemorySection'
 import { requestNoteOpen } from '../../notes/client/notesClient'
 import { clientEvents, consumePaneIntent, openPane, type PaneIntent } from '../../../core/client/registries/clientEvents'
@@ -18,7 +18,7 @@ const originBadge = (author?: 'user' | 'agent' | 'workflow'): string => (author 
 const scopePill = (scope?: string): string => (scope === 'task' ? '◆ task' : scope === 'workspace' ? 'ws' : scope === 'global' ? '🌐' : '')
 
 export default function ContextPane(props: { task: Task }) {
-  const api = terminalApi()
+  const api = taskBridge()
   const [msg, setMsg] = createSignal('')
   const [expanded, setExpanded] = createSignal<Set<string>>(new Set())
   const [pendingMemory, setPendingMemory] = createSignal(0)

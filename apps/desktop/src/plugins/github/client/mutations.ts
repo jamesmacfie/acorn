@@ -5,7 +5,6 @@
 // task and review-note writes in core/client/tasks/mutations.ts, and prefs behind
 // core/client/settings/savePref.ts — none of those are GitHub concepts.
 import { ApiError, apiError, postJson } from '../../../core/client/apiClient'
-import { terminalApi } from '../../terminal/client/terminalClient'
 import {
   autoMergeRoute,
   createPullRoute,
@@ -13,9 +12,6 @@ import {
   rerunFailedRoute,
   requestedReviewersRoute,
   resolveThreadRoute,
-  type Task,
-  type TaskSeed,
-  tasksRoute,
 } from '../../../core/shared/api'
 
 export const createPr = (o: string, r: string, input: { title: string; body: string; base: string; head: string; draft: boolean }) =>
@@ -71,21 +67,3 @@ export const setViewed = (o: string, r: string, n: string, path: string, viewed:
 
 // Rerun a check's failed Actions jobs. Repo-scoped (keyed by the workflow run id, not the PR).
 export const rerunFailed = (o: string, r: string, runId: number) => postJson(rerunFailedRoute(o, r, runId))
-
-// Task creation still lives here because it has to reach the main process after the row is written
-// (setup script, checkout borrow) via the desktop bridge. It moves to core with that bridge.
-export const createTask = async (seed: TaskSeed) => {
-  const task = await postJson<Task>(tasksRoute, seed)
-  // Desktop: let main run the workspace's setup script now if it's configured to run on task
-  // creation (no-op otherwise). Fire-and-forget so task creation isn't blocked on git/worktree.
-  void terminalApi()?.task.onCreated(task.id)
-  return task
-}
-// Create a task that borrows the mapped checkout (current dir + current branch) instead of an
-// isolated worktree. Awaits useCheckout (not onCreated) so no worktree is ever created; without the
-// desktop bridge it degrades to a normal local task on the seed branch. Callers invalidate tasksKey.
-export const createCheckoutTask = async (seed: TaskSeed) => {
-  const task = await postJson<Task>(tasksRoute, seed)
-  const patch = await terminalApi()?.task.useCheckout(task.id)
-  return patch ? { ...task, ...patch } : task
-}
