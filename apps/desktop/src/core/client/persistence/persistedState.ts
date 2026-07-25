@@ -31,6 +31,18 @@ export type PersistedStateSlice<T> = {
 
 export const persistedStateRegistry = new Registry<PersistedStateSlice<unknown>>('persisted-state')
 
+// Every slice codec parses the same way: a persisted value arrives as a JSON string, but a legacy or
+// already-decoded value can arrive as the object itself. Undefined on malformed input — codecs are
+// required to tolerate it (persistedState.conformance.test.ts).
+export const parseJson = (raw: unknown): unknown => {
+  if (typeof raw !== 'string') return raw
+  try {
+    return JSON.parse(raw) as unknown
+  } catch {
+    return undefined
+  }
+}
+
 export const appStateBinding = <T>(read: () => T, hydrate: (value: T) => void): PersistedStateBinding<T> => ({
   values: () => ({ '': read() }),
   hydrate: (_scopeId, value) => hydrate(value),

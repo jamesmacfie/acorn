@@ -24,11 +24,9 @@ import { dockerPaneContribution } from '../../plugins/docker/client/paneContribu
 import { dockerTaskPollerContribution } from '../../plugins/docker/client/dockerStore'
 import { dockerFooterSlotContribution, dockerRailSlotContribution } from '../../plugins/docker/client/slotContribution'
 import { registerDockerArchiveConcern } from '../../plugins/docker/client/archiveConcern'
-import { dockerPrefsSlice } from '../../plugins/docker/client/dockerPrefs'
 import { taskSlotRegistry } from '../../core/client/registries/uiSlots'
 import { persistedStateRegistry } from '../../core/client/persistence/persistedState'
-import { persistedFeatureSlices } from '../../core/client/persistence/stateSlices'
-import { directPreferenceSlices } from '../../core/client/persistence/preferenceSlices'
+import { persistedSliceContributions } from './persistedSliceContributions'
 import { activateScopedStateEviction } from './scopedEviction'
 import { activateUiControl } from '../../core/client/publicApi/uiControlClient'
 
@@ -58,8 +56,7 @@ taskSlotRegistry.register(dockerFooterSlotContribution)
 taskSlotRegistry.register(dockerRailSlotContribution)
 registerDockerArchiveConcern()
 for (const contribution of shellSlotContributions) uiSlotRegistry.register(contribution)
-for (const slice of [...persistedFeatureSlices, ...directPreferenceSlices]) persistedStateRegistry.register(slice)
-persistedStateRegistry.register(dockerPrefsSlice)
+for (const slice of persistedSliceContributions) persistedStateRegistry.register(slice)
 activateScopedStateEviction()
 // Register this window with the public UI control broker (docs/public-api.md) so
 // presentation commands from the automation API can drive it. No-op until a public client connects.

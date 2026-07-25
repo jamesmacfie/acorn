@@ -1,11 +1,11 @@
 import { createEffect, createMemo, For, onCleanup, onMount, Show } from 'solid-js'
 import { useNavigate, useParams } from '@solidjs/router'
-import { useChangedFiles } from '../../plugins/github/client/changedFiles'
-import { fuzzyScore } from './palette/model'
-import { createOverlayPalette } from './palette/overlay'
-import type { PullFile } from './queries'
-import { registerCommands } from './registries/commands'
-import { registerKeybindings } from './registries/keybindings'
+import { useChangedFiles } from './changedFiles'
+import { fuzzyScore } from '../../../core/client/palette/model'
+import { createOverlayPalette } from '../../../core/client/palette/overlay'
+import type { PullFile } from '../../../core/client/queries'
+import { registerCommands } from '../../../core/client/registries/commands'
+import { registerKeybindings } from '../../../core/client/registries/keybindings'
 
 // Global keyboard shortcuts + the file finder. Mounted once in App. PullList owns j/k (next/prev
 // PR) — those keys are deliberately untouched here. Global shortcut dispatch lives in the command

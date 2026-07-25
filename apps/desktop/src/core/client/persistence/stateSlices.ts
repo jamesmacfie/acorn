@@ -1,21 +1,13 @@
-import { contextSelectionsByTask, hydrateContextSelection } from '../../../plugins/context/client/selectionState'
-import type { TraySelection } from '../../../plugins/context/client/model'
-import { editorStateByTask, hydrateTaskEditorState, type TaskEditorState } from '../../../plugins/editor/client/editorState'
 import { hydrateNoticeValues, notices, type Notice } from '../notifications/notifications'
-import { hydratePrFilter, prFilters, type PrFilter } from '../../../plugins/github/client/pullList/filterState'
 import { defaultLayout, normalizeLayout, parseTaskLayouts, type TaskLayout } from '../tasks/layout'
 import { hydrateTaskLayout, taskLayouts } from '../tasks/tasks'
 import { PrefKeys, PersistedSliceKeys } from './prefKeys'
-import { appStateBinding, type PersistedStateSlice } from './persistedState'
+import { appStateBinding, parseJson, type PersistedStateSlice } from './persistedState'
 
-const parseJson = (raw: unknown): unknown => {
-  if (typeof raw !== 'string') return raw
-  try {
-    return JSON.parse(raw) as unknown
-  } catch {
-    return undefined
-  }
-}
+// Core-owned persisted state only: the task layout (core owns panes) and notices (core owns the
+// notification centre). Feature-owned slices live next to the store they bind — see
+// plugins/{editor/client/openFilesSlice,github/client/pullList/filterSlice,context/client/selectionSlice}.ts
+// — and the composition root assembles the full set in app/client/persistedSliceContributions.ts.
 
 const taskLayoutSlice: PersistedStateSlice<TaskLayout> = {
   id: 'core.task-layouts',
@@ -35,74 +27,6 @@ const taskLayoutSlice: PersistedStateSlice<TaskLayout> = {
     hydrate: hydrateTaskLayout,
   },
   legacy: (prefs) => parseTaskLayouts(prefs[PrefKeys.taskLayouts], prefs[PrefKeys.taskPanesLegacy]),
-}
-
-const parseEditorState = (raw: unknown): TaskEditorState => {
-  const value = parseJson(raw)
-  if (!value || typeof value !== 'object' || Array.isArray(value)) return { files: [], active: null }
-  const source = value as { files?: unknown; active?: unknown }
-  const files = (Array.isArray(source.files) ? source.files : [])
-    .filter((file): file is { path: string; ephemeral?: unknown } => {
-      return !!file && typeof file === 'object' && typeof (file as { path?: unknown }).path === 'string' && !!(file as { path: string }).path
-    })
-    .map((file) => ({ path: file.path, ephemeral: file.ephemeral === true, dirty: false }))
-  const active = typeof source.active === 'string' && files.some((file) => file.path === source.active)
-    ? source.active
-    : (files[0]?.path ?? null)
-  return { files, active }
-}
-
-const editorOpenFilesSlice: PersistedStateSlice<TaskEditorState> = {
-  id: 'editor.open-files',
-  key: PersistedSliceKeys.editorOpenFiles,
-  scope: 'task',
-  restore: 'panes',
-  version: 1,
-  codec: {
-    parse: parseEditorState,
-    serialize: (state) => ({
-      files: state.files.map((file) => ({ path: file.path, ephemeral: file.ephemeral })),
-      active: state.active,
-    }),
-  },
-  empty: () => ({ files: [], active: null }),
-  unknownIds: 'retain-inert',
-  maxBytes: 32 * 1024,
-  binding: {
-    values: editorStateByTask,
-    hydrate: hydrateTaskEditorState,
-  },
-  legacy: (prefs) => {
-    const value = parseJson(prefs[PrefKeys.editorOpenFiles])
-    return value && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, unknown> : {}
-  },
-}
-
-const parsePrFilter = (raw: unknown): PrFilter => {
-  const value = parseJson(raw)
-  if (!value || typeof value !== 'object' || Array.isArray(value)) return { tab: 'open', filter: '' }
-  const source = value as { tab?: unknown; filter?: unknown }
-  return {
-    tab: source.tab === 'closed' ? 'closed' : 'open',
-    filter: typeof source.filter === 'string' ? source.filter : '',
-  }
-}
-
-const prFiltersSlice: PersistedStateSlice<PrFilter> = {
-  id: 'github.pr-filters',
-  key: PersistedSliceKeys.prFilters,
-  scope: 'workspace',
-  restore: 'view',
-  version: 1,
-  codec: { parse: parsePrFilter, serialize: (filter) => filter },
-  empty: () => ({ tab: 'open', filter: '' }),
-  unknownIds: 'drop',
-  maxBytes: 4 * 1024,
-  binding: { values: prFilters, hydrate: hydratePrFilter },
-  legacy: (prefs) => {
-    const value = parseJson(prefs[PrefKeys.prFilters])
-    return value && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, unknown> : {}
-  },
 }
 
 const parseNotices = (raw: unknown): Notice[] => {
@@ -133,31 +57,7 @@ const noticesSlice: PersistedStateSlice<Notice[]> = {
   binding: appStateBinding(notices, hydrateNoticeValues),
 }
 
-const parseContextSelection = (raw: unknown): TraySelection => {
-  const value = parseJson(raw)
-  if (!value || typeof value !== 'object' || Array.isArray(value)) return {}
-  return Object.fromEntries(Object.entries(value as Record<string, unknown>).filter(([, v]) => typeof v === 'boolean')) as TraySelection
-}
-
-const contextSelectionSlice: PersistedStateSlice<TraySelection> = {
-  id: 'context.section-selection',
-  key: PersistedSliceKeys.contextSelection,
-  scope: 'task',
-  restore: 'panes',
-  version: 1,
-  codec: { parse: parseContextSelection, serialize: (value) => value },
-  empty: () => ({}),
-  unknownIds: 'retain-inert',
-  maxBytes: 4 * 1024,
-  binding: { values: contextSelectionsByTask, hydrate: hydrateContextSelection },
-}
-
-export const persistedFeatureSlices: readonly PersistedStateSlice<unknown>[] = [
+export const coreStateSlices: readonly PersistedStateSlice<unknown>[] = [
   taskLayoutSlice,
-  editorOpenFilesSlice,
-  prFiltersSlice,
   noticesSlice,
-  contextSelectionSlice,
 ] as readonly PersistedStateSlice<unknown>[]
-
-export const persistedStateCodecs = { parseEditorState, parsePrFilter, parseNotices, parseContextSelection }

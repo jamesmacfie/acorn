@@ -12,10 +12,10 @@ import {
   workflowTriggerPollRoute,
 } from '../../../core/shared/api'
 import { readJson, writeJson } from '../../../core/client/apiClient'
-import type { WorkflowDefSummary, WorkflowRunRow, WorkflowStepRow } from '../../terminal/client/terminalClient'
+import type { WorkflowDefSummary, WorkflowRunRow, WorkflowStepRow } from '../../../core/shared/workflow'
 import { openRepoConfigTrust } from '../../../core/client/configTrust/configTrust'
 
-export type { WorkflowDefSummary, WorkflowRunRow, WorkflowStepRow } from '../../terminal/client/terminalClient'
+export type { WorkflowDefSummary, WorkflowRunRow, WorkflowStepRow } from '../../../core/shared/workflow'
 
 type Defs = { workflows: WorkflowDefSummary[]; errors: { source: string; message: string }[] }
 

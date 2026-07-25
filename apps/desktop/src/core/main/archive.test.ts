@@ -3,10 +3,14 @@ import { existsSync, mkdtempSync, readFileSync, realpathSync, rmSync, statSync, 
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { eq } from 'drizzle-orm'
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { makeTestDb, type TestDb } from '../server/routes/testDb'
 import { schema } from '../server/db'
 import { archiveTask, runTeardownProcess, type ArchiveDeps } from './archive'
+
+// Real git subprocesses plus a teardown script per test: the 5s default is too tight under a fully
+// parallel run. Matches the other git-backed suites (plugins/changes/main/localGitService.test.ts).
+vi.setConfig({ testTimeout: 30_000, hookTimeout: 30_000 })
 
 // Real temp git repo + worktree per test (plan §validation: never test against the acorn repo).
 const git = (cwd: string, ...args: string[]) => execFileSync('git', ['-C', cwd, ...args], { stdio: 'pipe' })
