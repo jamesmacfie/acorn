@@ -5,7 +5,7 @@
   flex: 0 0 clamp(200px, 18vw, 300px);
   min-width: 0;
   overflow-y: auto;
-  border-right: var(--divider);
+  border-right: var(--chrome-divider);
   background: var(--bg-subtle);
 }
 /* Group heads reuse .section-header (see JSX) so the two lists match the pane title; just size the
@@ -87,7 +87,7 @@
   font-size: var(--fs-sm);
   background: var(--bg-subtle);
   border: var(--control-border);
-  border-left: var(--marker-w) solid var(--warn);
+  border-left: var(--stripe-w) solid var(--warn);
 }
 .review-note-sent { border-left-color: var(--add-marker); opacity: 0.75; }
 .review-note-status { flex: none; color: var(--text-muted); }
@@ -103,4 +103,4 @@
 .review-note-delete:hover { color: var(--del-marker); }
 
 /* Commit box (docs/panes.md) at the bottom of the file list. */
-.changes-commit { display: flex; flex-direction: column; gap: var(--space-3); padding: var(--space-4) var(--space-5); border-top: var(--divider); }
+.changes-commit { display: flex; flex-direction: column; gap: var(--space-3); padding: var(--space-4) var(--space-5); border-top: var(--chrome-divider); }

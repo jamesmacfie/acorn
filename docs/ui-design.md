@@ -120,9 +120,21 @@ between `--radius-chip` (aesthetic — a chip may be square or a pill) and `--ra
 
 Border widths are **role-scoped**, not one token: `--divider-w` (list rows), `--chrome-divider-w`
 (topbar, section headers), `--pane-divider-w`, `--pane-bw`, `--control-bw`, `--surface-bw`,
-`--marker-w`, `--tab-active-w`. A single width token sounds tidy until a pack zeroes it to drop row
-dividers and also deletes the topbar rule, which every pack still wants. Four composite recipes
-cover ~380 declarations: `--divider`, `--chrome-divider`, `--control-border`, `--surface-border`.
+`--marker-w`, `--stripe-w`, `--tab-active-w`. A single width token sounds tidy until a pack zeroes it
+to drop row dividers and also deletes the topbar rule, which every pack still wants. Four composite
+recipes cover ~380 declarations: `--divider`, `--chrome-divider`, `--control-border`,
+`--surface-border`.
+
+**Picking the right recipe is load-bearing, because two of these widths are zero in some packs.**
+Modern and Cute set `--divider-w: 0` and `--marker-w: 0`, so reaching for the wrong role does not
+render "slightly differently" there — it renders *nothing*, with no test failure and no type error.
+`--divider` is for row and list separators **only**; a pane split, toolbar, sticky head, banner or
+footer bar is `--chrome-divider`, a button/input/select is `--control-border`, and a card, popover or
+code block is `--surface-border`. `cssHygiene.test.ts` catches the mechanical half of this: a
+four-sided `border: var(--divider)` can never be a row separator. Likewise `--marker-w` means "this
+row is selected" (a pack may express that as a fill instead), while `--stripe-w` is the accent stripe
+whose **colour carries information** — a workspace's identity colour, warn-vs-sent on a review note —
+and no pack may zero it.
 
 **Space.** A `--space-0…11` scale plus semantic spacings (`--pane-pad`, `--gap-*`, `--pad-*`).
 Restated per pack, deliberately **not** derived from a density multiplier: `calc()` against a scalar

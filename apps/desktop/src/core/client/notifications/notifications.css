@@ -32,7 +32,7 @@
   padding: var(--space-3) var(--space-5);
   font-size: var(--fs-sm);
   color: var(--text-muted);
-  border-bottom: var(--divider);
+  border-bottom: var(--chrome-divider);
 }
 .notify-mark-all {
   font: inherit;

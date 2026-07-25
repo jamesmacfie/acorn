@@ -22,7 +22,7 @@
   align-items: center;
   gap: var(--space-4);
   padding: var(--pane-pad);
-  border-bottom: var(--divider);
+  border-bottom: var(--chrome-divider);
 }
 .integrations-panel-title {
   font-size: var(--fs-sm);
@@ -35,14 +35,14 @@
   flex-wrap: wrap;
   gap: var(--space-2);
   padding: 6px var(--pane-pad);
-  border-bottom: var(--divider);
+  border-bottom: var(--chrome-divider);
 }
 .integrations-panel-tab {
   font: inherit;
   font-size: var(--fs-sm);
   color: var(--text-muted);
   background: var(--bg-subtle);
-  border: var(--divider);
+  border: var(--control-border);
   border-radius: var(--radius);
   padding: var(--space-1) var(--space-4);
   cursor: pointer;
@@ -171,7 +171,7 @@
 .linear-composer-sep {
   margin-top: var(--space-8);
   padding-top: var(--space-6);
-  border-top: var(--divider);
+  border-top: var(--chrome-divider);
 }
 
 /* --- Enriched detail panel (tabs + overview: meta grid, labels, links, issue graph). --- */
@@ -189,8 +189,8 @@
   gap: var(--space-3) var(--space-8);
   margin: 0 0 var(--space-7);
   padding: var(--space-5) 0;
-  border-top: var(--divider);
-  border-bottom: var(--divider);
+  border-top: var(--chrome-divider);
+  border-bottom: var(--chrome-divider);
 }
 .linear-meta-grid dt { font-size: var(--fs-xs); text-transform: var(--label-transform); letter-spacing: var(--label-tracking); color: var(--text-muted); }
 .linear-meta-grid dd { margin: 1px 0 0; font-size: var(--fs-sm); color: var(--text); }
@@ -264,7 +264,7 @@
   gap: var(--space-6);
   padding: var(--space-5) var(--space-6);
   background: var(--bg-subtle);
-  border: var(--divider);
+  border: var(--surface-border);
   border-radius: var(--radius);
 }
 
@@ -293,7 +293,7 @@
 .integration-badge {
   font-size: var(--fs-sm);
   color: var(--text-faint);
-  border: var(--divider);
+  border: var(--control-bw) solid var(--badge-border);
   border-radius: var(--radius-pill);
   padding: var(--space-1) 9px;
 }
@@ -323,7 +323,7 @@
   gap: var(--space-5);
   padding: var(--space-7);
   background: var(--bg-subtle);
-  border: var(--divider);
+  border: var(--surface-border);
   border-radius: var(--radius);
 }
 .integration-provider-chips { display: flex; gap: var(--space-4); flex-wrap: wrap; }

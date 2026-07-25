@@ -5,7 +5,7 @@
   width: var(--tabrail-w);
   display: flex;
   flex-direction: column;
-  border-right: var(--divider);
+  border-right: var(--chrome-divider);
   background: var(--bg-subtle);
 }
 
@@ -97,7 +97,7 @@
   color: var(--text-muted);
   background: transparent;
   border: 0;
-  border-top: var(--divider);
+  border-top: var(--chrome-divider);
   cursor: pointer;
   line-height: 1;
 }
@@ -137,7 +137,7 @@
   text-align: left;
   color: var(--text);
   background: transparent;
-  border: var(--divider);
+  border: var(--control-border);
   border-radius: var(--radius);
   cursor: pointer;
   white-space: nowrap;
@@ -146,7 +146,7 @@
 
 /* Workspace identity accent (docs/workspaces-and-tasks.md): task rows carry their workspace's colour as the 3px
    left accent (the docs/ui-design.md active-accent convention, tinted per workspace). */
-.tabrail-task { border-left-width: var(--marker-w); }
+.tabrail-task { border-left-width: var(--stripe-w); }
 
 /* Pin-to-top marker (docs/panes.md). */
 .tabrail-pin {

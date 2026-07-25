@@ -1,7 +1,7 @@
 /* PR detail (mid / Navigator pane). */
 .pr-detail-header {
   padding: 14px var(--pane-pad);
-  border-bottom: var(--divider);
+  border-bottom: var(--chrome-divider);
 }
 .pr-detail-title { font-size: var(--fs-lg); font-weight: 600; line-height: 1.35; margin-bottom: var(--space-4); }
 .pr-detail-meta { display: flex; align-items: center; gap: var(--space-5); flex-wrap: wrap; font-size: var(--fs-sm); }
@@ -21,7 +21,7 @@
   cursor: pointer;
   color: var(--text);
   background: var(--bg-selected);
-  border: var(--divider);
+  border: var(--control-border);
   border-radius: var(--radius);
   padding: 1px var(--space-3);
   font: inherit;
@@ -54,7 +54,7 @@
 .state-closed { color: var(--del-marker); }
 
 /* Navigator collapsible sections. */
-.nav-section { border-bottom: var(--divider); padding: 0; }
+.nav-section { border-bottom: var(--chrome-divider); padding: 0; }
 .nav-section > summary {
   display: flex;
   align-items: center;
@@ -78,7 +78,7 @@
 
 .markdown { font-size: var(--fs-sm); line-height: var(--lh); overflow-wrap: anywhere; }
 .markdown :is(pre, code) { font-family: var(--font-mono); background: var(--bg-subtle); border-radius: var(--radius); }
-.markdown pre { padding: var(--space-4); overflow-x: auto; border: var(--divider); }
+.markdown pre { padding: var(--space-4); overflow-x: auto; border: var(--surface-border); }
 .markdown :is(h1, h2, h3) { font-size: var(--fs); margin: var(--space-4) 0 var(--space-2); }
 /* Links track the theme accent instead of the browser-default blue (clashes with non-blue themes). */
 .markdown a, .linear-md a { color: var(--accent); }
@@ -303,8 +303,8 @@
   margin: 9px;
   padding: 9px var(--pane-pad);
   background: var(--bg);
-  border: var(--divider);
-  border-left: var(--marker-w) solid var(--accent);
+  border: var(--surface-border);
+  border-left: var(--stripe-w) solid var(--accent);
   border-radius: var(--radius);
 }
 .comment-card-empty {
@@ -324,8 +324,8 @@
 }
 .file-thread-card {
   background: var(--bg);
-  border: var(--divider);
-  border-left: var(--marker-w) solid var(--accent);
+  border: var(--surface-border);
+  border-left: var(--stripe-w) solid var(--accent);
   border-radius: var(--radius);
   overflow: hidden;
 }
@@ -362,8 +362,8 @@
   color: var(--text);
   background: var(--bg-subtle);
   border: 0;
-  border-top: var(--divider);
-  border-bottom: var(--divider);
+  border-top: var(--chrome-divider);
+  border-bottom: var(--chrome-divider);
   padding: 7px var(--space-5);
   text-align: left;
   cursor: pointer;
@@ -384,7 +384,7 @@
 }
 .file-thread-code {
   overflow-x: auto;
-  border-bottom: var(--divider);
+  border-bottom: var(--chrome-divider);
   background: var(--bg);
   font-family: var(--font-mono);
   line-height: 20px;

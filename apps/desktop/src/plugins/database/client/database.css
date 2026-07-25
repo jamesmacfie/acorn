@@ -23,7 +23,7 @@
 
 .db-icon-btn {
   background: transparent;
-  border: var(--divider);
+  border: var(--control-border);
   color: var(--text-muted);
   border-radius: var(--radius);
   padding: var(--space-1) var(--space-4);
@@ -39,7 +39,7 @@
   font-size: var(--fs-sm);
   color: var(--del-marker);
   background: var(--del-bg);
-  border-bottom: var(--divider);
+  border-bottom: var(--chrome-divider);
   white-space: pre-wrap;
 }
 
@@ -52,7 +52,7 @@
 /* Sidebar — searchable table list */
 .db-sidebar {
   width: clamp(180px, 22%, 280px);
-  border-right: var(--divider);
+  border-right: var(--chrome-divider);
   display: flex;
   flex-direction: column;
   min-height: 0;
@@ -114,7 +114,7 @@
   gap: var(--space-5);
   justify-content: flex-end;
   padding: 5px var(--space-5);
-  border-top: var(--divider);
+  border-top: var(--chrome-divider);
 }
 .db-hint { font-size: var(--fs-sm); }
 .db-run-btn {
@@ -131,7 +131,7 @@
 .db-del-btn {
   background: transparent;
   color: var(--del-marker);
-  border: var(--divider);
+  border: var(--control-border);
   border-radius: var(--radius);
   padding: var(--space-2) var(--space-6);
   font: inherit;
@@ -160,7 +160,7 @@
   align-items: center;
   gap: var(--space-5);
   padding: var(--space-2) var(--space-5);
-  border-bottom: var(--divider);
+  border-bottom: var(--chrome-divider);
 }
 .db-footer {
   font-size: var(--fs-sm);
@@ -182,7 +182,7 @@
   display: grid;
   height: var(--row-h);
   background: var(--bg-subtle);
-  border-bottom: var(--divider);
+  border-bottom: var(--chrome-divider);
 }
 .dbgrid-hcell {
   padding: 0 var(--space-4);
@@ -192,7 +192,7 @@
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  border-right: var(--divider);
+  border-right: var(--chrome-divider);
 }
 .dbgrid-body { position: relative; }
 .dbgrid-row {
@@ -213,14 +213,14 @@
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  border-right: var(--divider);
+  border-right: var(--chrome-divider);
 }
 .dbgrid-cell.is-null { color: var(--text-faint); font-style: italic; }
 
 /* Row detail / editor panel */
 .db-detail {
   width: clamp(280px, 32%, 420px);
-  border-left: var(--divider);
+  border-left: var(--chrome-divider);
   display: flex;
   flex-direction: column;
   min-height: 0;
@@ -232,7 +232,7 @@
   align-items: center;
   height: var(--pane-head-h);
   padding: 0 var(--pane-pad);
-  border-bottom: var(--divider);
+  border-bottom: var(--chrome-divider);
   font-size: var(--fs-sm);
   text-transform: var(--label-transform);
   color: var(--text-muted);
@@ -266,7 +266,7 @@
   width: 100%;
   resize: vertical;
   background: var(--bg-subtle);
-  border: var(--divider);
+  border: var(--control-border);
   border-radius: var(--radius);
   color: var(--text);
   font: inherit;
@@ -287,7 +287,7 @@
   display: flex;
   gap: var(--space-4);
   padding: 8px var(--pane-pad);
-  border-top: var(--divider);
+  border-top: var(--chrome-divider);
 }
 
 /* AI SQL generation modal (docs/pg.md): overlay base + a right-aligned action row. */
@@ -296,7 +296,7 @@
   justify-content: flex-end;
   gap: var(--space-4);
   padding: 8px var(--pane-pad);
-  border-top: var(--divider);
+  border-top: var(--chrome-divider);
 }
 
 /* Example-query multi-select: chips for the picked queries + the Picker button that adds more. */
@@ -308,7 +308,7 @@
   gap: var(--space-2);
   padding: var(--space-1) var(--space-2) var(--space-1) var(--space-4);
   font-size: var(--fs-sm);
-  border: var(--divider);
+  border: var(--control-bw) solid var(--badge-border);
   border-radius: var(--radius-pill);
   background: var(--bg-subtle);
 }
@@ -343,7 +343,7 @@
   font-size: var(--fs-sm);
   color: var(--text-muted);
   background: var(--bg-subtle);
-  border: var(--divider);
+  border: var(--surface-border);
   border-radius: var(--radius);
   white-space: pre-wrap;
 }

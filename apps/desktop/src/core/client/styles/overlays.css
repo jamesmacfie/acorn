@@ -28,7 +28,7 @@
   letter-spacing: var(--label-tracking);
   color: var(--text-muted);
   padding: var(--pane-pad);
-  border-bottom: var(--divider);
+  border-bottom: var(--chrome-divider);
 }
 
 /* Padded body for simple form modals (matches the Integrations settings spacing). */
@@ -60,7 +60,7 @@
   font-size: var(--fs-sm);
   color: var(--text);
   background: var(--bg-subtle);
-  border: var(--divider);
+  border: var(--control-border);
   border-radius: var(--radius);
   padding: 1px var(--space-3);
   justify-self: start;
@@ -74,7 +74,7 @@
   color: var(--text);
   background: var(--bg);
   border: 0;
-  border-bottom: var(--divider);
+  border-bottom: var(--chrome-divider);
   padding: 10px var(--pane-pad);
   outline: none;
 }

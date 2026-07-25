@@ -8,7 +8,7 @@
 
 .docker-browse { display: flex; flex-direction: column; overflow: hidden; }
 
-.docker-filters { display: flex; gap: var(--space-3); padding: 6px var(--pane-pad); border-bottom: var(--divider); }
+.docker-filters { display: flex; gap: var(--space-3); padding: 6px var(--pane-pad); border-bottom: var(--chrome-divider); }
 .docker-search {
   flex: 1;
   min-width: 120px;
@@ -16,7 +16,7 @@
   font-size: var(--fs-sm);
   color: var(--text);
   background: var(--bg);
-  border: var(--divider);
+  border: var(--control-border);
   border-radius: var(--radius);
   padding: var(--space-1) var(--space-3);
 }
@@ -75,7 +75,7 @@
 .docker-detail-sub { font-size: var(--fs-sm); }
 .docker-danger { color: var(--danger); }
 
-.docker-tabs { display: flex; gap: var(--space-1); border-bottom: var(--divider); }
+.docker-tabs { display: flex; gap: var(--space-1); border-bottom: var(--chrome-divider); }
 .docker-tabs button {
   font: inherit;
   font-size: var(--fs-sm);
@@ -99,7 +99,7 @@
   font-family: var(--font-mono);
   color: var(--text);
   background: var(--bg-subtle);
-  border: var(--divider);
+  border: var(--control-border);
   border-radius: var(--radius);
   padding: 1px var(--space-3);
   cursor: pointer;
@@ -128,12 +128,12 @@
   padding: 6px var(--pane-pad);
   font-size: var(--fs-sm);
   color: var(--state-warn);
-  border-bottom: var(--divider);
+  border-bottom: var(--chrome-divider);
 }
 
 /* Task pane */
 .docker-task-pane { display: flex; flex-direction: column; overflow: hidden; }
-.docker-chips { display: flex; flex-wrap: wrap; gap: var(--space-2); padding: 6px var(--pane-pad); border-bottom: var(--divider); }
+.docker-chips { display: flex; flex-wrap: wrap; gap: var(--space-2); padding: 6px var(--pane-pad); border-bottom: var(--chrome-divider); }
 .docker-chip {
   display: inline-flex;
   align-items: center;
@@ -142,7 +142,7 @@
   font-size: var(--fs-sm);
   color: var(--text);
   background: var(--bg-subtle);
-  border: var(--divider);
+  border: var(--control-border);
   border-radius: var(--radius-pill);
   padding: var(--space-1) var(--space-5);
   cursor: pointer;
@@ -161,7 +161,7 @@
   padding: var(--space-4);
   font-size: var(--fs-sm);
   background: var(--bg-subtle);
-  border: var(--divider);
+  border: var(--surface-border);
   border-radius: var(--radius);
   overflow-x: auto;
 }
@@ -193,7 +193,7 @@
   padding: var(--space-4);
   font-size: var(--fs-sm);
   background: var(--bg-subtle);
-  border: var(--divider);
+  border: var(--surface-border);
   border-radius: var(--radius);
   white-space: pre-wrap;
   overflow-wrap: anywhere;

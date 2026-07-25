@@ -36,7 +36,7 @@
   align-items: center;
   gap: var(--space-7);
   padding: 4px var(--pane-pad);
-  border-top: var(--divider);
+  border-top: var(--chrome-divider);
   background: var(--bg-subtle);
   font-size: var(--fs-sm);
   color: var(--text-muted);
@@ -85,7 +85,7 @@
 .workspace-preview .workspace-empty-inner { margin: auto; text-align: center; }
 
 /* Browser chrome above the preview WebContentsView: navigation + URL bar + preview devtools + spinner. */
-.preview-chrome { flex: none; display: flex; align-items: center; gap: var(--space-2); padding: 5px var(--space-3); border-bottom: var(--divider); background: var(--bg-subtle); }
+.preview-chrome { flex: none; display: flex; align-items: center; gap: var(--space-2); padding: 5px var(--space-3); border-bottom: var(--chrome-divider); background: var(--bg-subtle); }
 .preview-nav-btn {
   flex: none;
   width: 26px;
@@ -133,7 +133,7 @@
   width: var(--tabrail-w);
   display: flex;
   flex-direction: column;
-  border-left: var(--divider);
+  border-left: var(--chrome-divider);
   background: var(--bg-subtle);
 }
 .pane-switch-btn {
@@ -155,7 +155,7 @@
 .pane-switch-btn:hover { background: var(--bg-hover); color: var(--text); }
 .pane-switch-btn.active { background: var(--bg-selected); color: var(--text); border-right-color: var(--accent); }
 /* Close-task ✕ sits at the bottom of the rail, set off from the pane switches above it. */
-.pane-switch-close { margin-top: auto; border-bottom: 0; border-top: var(--divider); }
+.pane-switch-close { margin-top: auto; border-bottom: 0; border-top: var(--chrome-divider); }
 .pane-switch-close:hover { color: var(--del-marker); }
 
 /* Close-task confirmation modal bits (reuses the shared .overlay shell). */
@@ -174,14 +174,14 @@
 .app.left-collapsed .panes.linear-browse-panes { grid-template-columns: minmax(0, 1fr); }
 .linear-browse { display: flex; flex-direction: column; overflow: hidden; }
 /* Triage filter bar (mirrors .rollbar-filters). */
-.linear-filters { display: flex; gap: var(--space-3); padding: 6px var(--pane-pad); border-bottom: var(--divider); flex-wrap: wrap; }
+.linear-filters { display: flex; gap: var(--space-3); padding: 6px var(--pane-pad); border-bottom: var(--chrome-divider); flex-wrap: wrap; }
 .linear-filters input,
 .linear-filters select {
   font: inherit;
   font-size: var(--fs-sm);
   color: var(--text);
   background: var(--bg);
-  border: var(--divider);
+  border: var(--control-border);
   border-radius: var(--radius);
   padding: var(--space-1) var(--space-3);
 }
@@ -270,7 +270,7 @@
   font-size: var(--fs-sm);
   color: var(--text-muted);
   background: transparent;
-  border: var(--divider);
+  border: var(--control-border);
   border-radius: var(--radius);
   padding: 0 var(--space-3);
   cursor: pointer;

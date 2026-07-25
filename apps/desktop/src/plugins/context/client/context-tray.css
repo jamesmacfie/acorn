@@ -23,7 +23,7 @@
 
 /* Each section is a distinct banded block: a top rule + padding separates it from its neighbours,
    the header reads as a heading, and its items are indented beneath (docs/next/context-ui.md). */
-.context-tray-section { padding: 8px var(--pane-pad) 10px; border-top: var(--divider); }
+.context-tray-section { padding: 8px var(--pane-pad) 10px; border-top: var(--chrome-divider); }
 .context-tray-section:first-child { border-top: 0; }
 .context-tray-section > .context-tray-row { align-items: center; }
 /* The section title (rendered via .context-tray-kind) is a heading, not a monospace column token. */
@@ -46,7 +46,7 @@
 .context-bar-fill.warn { background: var(--warn); }
 
 /* Preview strip: collapsed one-liner with total size, expands to the byte-exact assembled block. */
-.context-preview { padding: 8px var(--pane-pad) 10px; border-top: var(--divider); }
+.context-preview { padding: 8px var(--pane-pad) 10px; border-top: var(--chrome-divider); }
 .context-preview-toggle {
   display: flex; align-items: baseline; gap: var(--space-3); width: 100%;
   font: inherit; font-size: var(--fs-sm); text-align: left; color: var(--text);
@@ -60,7 +60,7 @@
 }
 
 /* Footer: session target picker + staleness pill + Sync (docs/next/context-ui.md). */
-.context-sync-row { display: flex; align-items: center; gap: var(--space-4); padding: 8px var(--pane-pad) 10px; border-top: var(--divider); }
+.context-sync-row { display: flex; align-items: center; gap: var(--space-4); padding: 8px var(--pane-pad) 10px; border-top: var(--chrome-divider); }
 .context-sync-btn { margin-left: auto; }
 .context-stale-pill { flex: none; font-size: var(--fs-xs); border-radius: var(--radius-pill); padding: 0 var(--space-4); }
 .context-stale-pill.warn { color: var(--warn); border: var(--control-bw) solid var(--warn); }
@@ -100,7 +100,7 @@
 .context-tray-detail {
   margin: 3px 0 var(--space-1) 18px;
   padding-left: var(--space-4);
-  border-left: var(--divider);
+  border-left: var(--chrome-divider);
   display: flex;
   flex-direction: column;
   gap: 3px;
@@ -111,10 +111,10 @@
 .context-tray-files { margin: 0; padding-left: var(--space-8); font-family: var(--font-mono); font-size: var(--fs-xs); color: var(--text-muted); }
 
 /* Inline add-memory form (docs/notes-and-memory.md). */
-.context-tray-memform { display: flex; flex-direction: column; gap: var(--space-3); margin-top: var(--space-3); padding-top: var(--space-3); border-top: var(--divider); }
+.context-tray-memform { display: flex; flex-direction: column; gap: var(--space-3); margin-top: var(--space-3); padding-top: var(--space-3); border-top: var(--chrome-divider); }
 
 /* Auto-generated memory proposals (docs/notes-and-memory.md — the human gate; MemoryTray.tsx). */
-.context-tray-proposals { display: flex; flex-direction: column; gap: var(--space-2); margin-top: var(--space-3); padding-top: var(--space-3); border-top: var(--divider); font-size: var(--fs-sm); }
+.context-tray-proposals { display: flex; flex-direction: column; gap: var(--space-2); margin-top: var(--space-3); padding-top: var(--space-3); border-top: var(--chrome-divider); font-size: var(--fs-sm); }
 .context-tray-proposal { display: flex; align-items: center; gap: var(--space-4); }
 .context-tray-proposal-desc { flex: 1; min-width: 0; }
 /* Structural verification flags under a proposal row (never folded into the description). */

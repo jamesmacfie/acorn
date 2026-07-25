@@ -45,7 +45,12 @@
   --pane-bw: var(--bw-0);          /* the other three pane edges — Modern: var(--bw) */
   --control-bw: var(--bw);
   --surface-bw: var(--bw);         /* cards, popovers, modals */
-  --marker-w: var(--bw-marker);    /* active-row left rule */
+  --marker-w: var(--bw-marker);    /* active-row left rule — Modern/Cute zero this */
+  /* SEMANTIC sibling of --marker-w, and no pack may zero it. --marker-w says "this row is
+     selected", which a pack can legitimately express as a fill instead; --stripe-w carries
+     information in its COLOUR (a workspace's identity colour, warn-vs-sent on a review note),
+     so zeroing it deletes state rather than restyling it. */
+  --stripe-w: var(--bw-marker);
   --tab-active-w: var(--bw-strong);
 
   /* The four composite border recipes, covering ~380 declarations between them. Splitting by ROLE

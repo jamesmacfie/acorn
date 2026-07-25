@@ -34,7 +34,7 @@
   font-weight: 500;
   color: var(--text-muted);
   background: var(--bg-subtle);
-  border: var(--divider);
+  border: var(--control-border);
   border-radius: var(--radius);
   padding: 0 5px;
 }
@@ -52,7 +52,7 @@
   gap: 3px;
   margin-top: var(--space-2);
   padding-top: var(--space-3);
-  border-top: var(--divider);
+  border-top: var(--chrome-divider);
 }
 .rail-tip-legend-row {
   display: flex;
