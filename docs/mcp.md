@@ -43,7 +43,7 @@ The server therefore reads its identity from the env it inherits (`src/core/mcp/
 | `ACORN_SESSION_ID` | this terminal session's id, sent as `x-acorn-session-id` and stamped on notes/memory writes for provenance |
 
 These are injected into every task-scoped terminal session by the main process
-(`buildSessionEnv`, `apps/desktop/src/plugins/terminal/main/terminalUtils.ts:138-157`, plus `internalApiEnv` and
+(`buildSessionEnv`, `apps/desktop/src/core/main/taskEnv.ts`, plus `internalApiEnv` and
 `ACORN_SESSION_ID` in `spawnOne`, `apps/desktop/src/plugins/terminal/main/terminal.ts`). See
 [terminal-and-agents.md](./terminal-and-agents.md) for the full `ACORN_*` injection story.
 

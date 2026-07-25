@@ -87,28 +87,49 @@ IPC") in whatever home the parity checklist graduates to.
 Phase 10's pause conditions were: empty boundary ledger, verified parity checklist, docs
 graduated. Current state of each:
 
-### 2.1 Boundary ledger: 82 edges, burn-down plan
+### 2.1 Boundary ledger: 84 → 27 edges (burn-down largely done)
 
-`core/boundaries.test.ts` hard-fails `→app` and client↔node process edges (both already zero)
-and freezes 47 core→plugin + 35 plugin→plugin edges as a shrink-only ledger. The clusters and
-the levers, in leverage order:
+`core/boundaries.test.ts` hard-fails `→app` and client↔node process edges (both still zero) and
+freezes the rest as a shrink-only ledger. The burn-down below has been executed: **84 edges
+(51 core→plugin + 33 plugin→plugin) → 27 (14 + 13)**, behaviour-preserving, in eight commits.
 
-| Lever | Removes | Effort |
-| --- | --- | --- |
-| **Terminal client capability seam** — register the terminal client API (terminalApi/sessions/runClient) behind the existing `capabilities().terminal` accessor instead of deep imports from core shell + 6 sibling plugins | **~29 edges** | High but mechanical; terminal is the hub of both lists |
-| **Split `plugins/github/client/mutations.ts`** — it's misfiled: task, workspace, integration, and pref mutations live in the github plugin. Move them to core-owned client modules; leave PR mutations | ~9–10 edges | Medium — pure file split |
-| **Move misfiled generic utilities** — `debounce` (in editor/autosave), `shiki.ts` (generic, in github), `theme.ts` (generic, in terminal), `formatRelativeTime`/`fileStatusMeta` (in github/displayMeta), git/worktree helpers (`isContainedPath`, `isDirty`, `worktreeBranchDirName`… in terminal/terminalUtils) | ~10 edges | Low — trivial moves; do `shiki` before `theme` |
-| **Persisted-state descriptor adoption** — `persistence/scopedEviction.ts` + `stateSlices.ts` already ride `clientEvents` for lifecycle but still statically import every plugin's `evict*`/`hydrate*`; the descriptor half of the seam is missing | ~7–8 edges | Medium — registry pattern half-built |
-| **Pane/uiSlots/provider adoption for App.tsx** — the github PR views (6 edges), OnboardingModal, AgentsPanel, MemoryTray, Linear cross-ref panel are hard-mounted; the registries they should ride all exist | ~10 edges | High — the PR view is the app's primary surface |
+The thesis that made it cheap: the ledger was never 84 missing registries. **Three de-facto platform
+modules misfiled into `plugins/` accounted for ~33 edges on their own**, and one piece of composition
+code sitting in `core/` accounted for 7 more. Almost none of it needed a new seam.
 
-Two clusters are genuine **cycles** that a move alone can't fix: github↔linear (needs the
-provider-contract cross-ref seam) and terminal↔agents (`terminal.ts` imports `agentSend`;
-needs a sender contract, the `setAgentTools` setter-injection pattern is the precedent).
+| Lever | Estimated | Actual | Outcome |
+| --- | --- | --- | --- |
+| **Terminal client capability seam** | ~29 | **21** | Done, but *not* via a capability registry. `terminalClient.ts` was itself misfiled: it owned the renderer's only `declare global { Window.acorn }` (so core's `capabilities.ts` was typed by a plugin) and its surface spanned task lifecycle, repo config and preview. Split into `core/client/tasks/taskBridge.ts` (platform) + a PTY-only `terminalClient.ts`; `sessions.ts` → `core/client/tasks/agentSessions.ts`. |
+| **Split `plugins/github/client/mutations.ts`** | ~9–10 | **9** | Done. ~24 non-GitHub writes moved to `core/client/{workspaces,tasks}/mutations.ts`; `setPref` inlined into its only caller `savePref.ts`; `postLinearComment` → the linear plugin. `RepoPicker.tsx` rode along to `core/client/ui/`. |
+| **Move misfiled generic utilities** | ~10 | **12** | Done. `debounce` → `core/client/lib/`, `shiki.ts` → `core/client/highlight/`, `displayMeta.ts` → `core/client/ui/`, worktree/env helpers → `core/main/{pathGuards,taskEnv}.ts`, workflow row types → `core/shared/workflow.ts`, `Shortcuts.tsx`/`FilePalette.tsx` → their owning plugins. `theme.ts` did *not* need moving once `shiki` did. |
+| **Persisted-state descriptor adoption** | ~7–8 | **11** | Done, but the diagnosis was wrong twice over. `scopedEviction.ts` needed no registry at all — its only non-test importer was `app/client/activate.ts`, so moving the file to `app/` (the layer allowed to name features) removed all 7 edges. `PersistedStateBinding.evict?` was declared and never called; deleted. The three feature-owned slices in `stateSlices.ts` moved next to their stores and are assembled in `app/client/persistedSliceContributions.ts`, which also brought `dockerPrefsSlice` under the conformance test for the first time. |
+| **Pane/uiSlots/provider adoption for App.tsx** | ~10 | **0** | **Deliberately not done.** See below. |
 
-**Suggested order:** utilities first (cheap, ~10 edges, zero risk), then the mutations split,
-then the terminal capability seam (the big one), then descriptors, and treat the App.tsx
-main-view adoption as its own deliberate slice — it's the largest architectural change left
-and shouldn't be rushed to zero a counter.
+**Cycles:** terminal↔agents is resolved — `agentSend.ts` had exactly one importer (the PTY engine that
+closes over it), so it was a filing error, not a case for a sender contract. github↔linear is
+half-resolved (`linear → github/mutations` is gone); `github/PullDetail → linear` remains and still
+wants the provider cross-ref seam.
+
+**The remaining 27 are qualitatively different from the original 84**: every one is a genuine
+feature-to-feature UI coupling rather than a misfiling, which is a fine place for the ledger to sit.
+The four largest deliberately-deferred items, with the reasons:
+
+- **App.tsx GitHub browse → source contribution (5 edges).** `core/shared/api.ts` owns every pull
+  route, `core/client/queries.ts` every pull query option, `core/server` the GitHub auth and repos
+  mirror. Extracting the *views* while core keeps the *domain* makes the ownership story less honest,
+  not more. Only worth doing as part of making GitHub a real plugin.
+- **CommandPalette (3 edges).** These are not command definitions — they are async *row providers*
+  (`createResource`s refetched on open, variable-length). `commandRegistry` is a static `Registry<T>`
+  and structurally cannot express them; a real fix needs a `paletteRowProviderRegistry` plus a
+  generalised `PaletteItem` (`palette/model.ts` hardcodes `kind: 'run' | 'layout' | 'workflow'`).
+  Design work, not paydown.
+- **TabRail badges → the `tabrail.task-row` slot.** Rejected as *not behaviour-preserving*:
+  `checksState`/`workingCountFor` feed `railStatusItems`, whose output is also serialised into
+  `data-tip-legend` on the task button, so splitting two of four inputs into independent slot
+  components would silently drop the CI dot and agent spinner from the hover legend.
+- **`diff/` → core.** `diff/DiffRows.tsx` imports `../MentionTextarea` and `../comments/draftState` —
+  it is the PR diff renderer with inline-review composition baked in, not a neutral one. Moving the
+  generic `displayMeta`/`shiki` out already harvested 5 of that cluster's 7 edges.
 
 ### 2.2 Parity checklist: 106 unchecked, but mostly verification debt
 

@@ -213,8 +213,9 @@ Be aware of what's real today:
 - Client shell: `apps/desktop/src/core/client/App.tsx`; capabilities: `core/client/capabilities.ts`
 - TabRail: `apps/desktop/src/core/client/tabs/{TabRail.tsx,sources.ts,railOrder.ts}`
 - Task view + panes: `apps/desktop/src/core/client/tasks/{TaskView.tsx,layout.ts}`
-- Write actions: `apps/desktop/src/plugins/github/client/mutations.ts`
-- Palette / shortcuts: `apps/desktop/src/core/client/palette/model.ts`, `core/client/Shortcuts.tsx`
+- Write actions: PR verbs in `apps/desktop/src/plugins/github/client/mutations.ts`; workspace/repo and
+  task/review-note writes in `core/client/{workspaces,tasks}/mutations.ts`
+- Palette / shortcuts: `apps/desktop/src/core/client/palette/model.ts`, `plugins/github/client/Shortcuts.tsx`
 - Settings shell: `apps/desktop/src/core/client/settings/`; contributed pages live with plugins
 - MCP server: `apps/desktop/src/core/mcp/server.ts`
 
