@@ -8,7 +8,7 @@
 // 2. Target session — which agent session Sync targets, per task (the activeByTask pattern), always
 //    validated against the live list so a killed target falls back to the most-recent session.
 import { createSignal } from 'solid-js'
-import { agentSessionsFor } from '../../terminal/client/sessions'
+import { agentSessionsFor } from '../../../core/client/tasks/agentSessions'
 import type { TerminalSession } from '../../../core/shared/terminal'
 
 type SyncRecord = { taskId: string; at: number; sections: Record<string, string> }

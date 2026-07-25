@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { editorOpen, openFiles } from '../../plugins/editor/client/editorState'
 import { editorViewState, rememberEditorViewState } from '../../plugins/editor/client/editorViewState'
 import { prFilterFor, setPrFilter } from '../../plugins/github/client/pullList/filterState'
-import { activeTerminal, rememberActiveTerminal } from '../../plugins/terminal/client/sessions'
+import { activeTerminal, rememberActiveTerminal } from '../../core/client/tasks/agentSessions'
 import {
   dispatchLayout,
   focusedPane,

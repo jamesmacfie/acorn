@@ -2,7 +2,7 @@ import { createResource, createSignal, For, onCleanup, onMount, Show } from 'sol
 import { Portal } from 'solid-js/web'
 import type { Task } from '../../../core/client/queries'
 import type { TerminalProfile } from '../../../core/shared/terminal'
-import { refreshSessions, sessions } from '../../terminal/client/sessions'
+import { refreshSessions, sessions } from '../../../core/client/tasks/agentSessions'
 import { terminalApi } from '../../terminal/client/terminalClient'
 import type { WorkflowStepRow } from '../../../core/shared/workflow'
 import { workflowApi } from './workflowClient'

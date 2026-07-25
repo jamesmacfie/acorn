@@ -5,7 +5,7 @@ import { evictNotesPaneState } from '../../plugins/notes/client/notesPaneState'
 import { evictEditorState } from '../../plugins/editor/client/editorState'
 import { evictEditorViewStates } from '../../plugins/editor/client/editorViewState'
 import { evictPrFilter } from '../../plugins/github/client/pullList/filterState'
-import { evictActiveTerminal } from '../../plugins/terminal/client/sessions'
+import { evictActiveTerminal } from '../../core/client/tasks/agentSessions'
 import { evictTaskState, evictWorkspaceView } from '../../core/client/tasks/tasks'
 
 // Each owner exposes its own eviction operation; this only maps lifecycle events to scopes. It lives
