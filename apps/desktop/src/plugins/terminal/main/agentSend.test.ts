@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { AgentSender, type SendableSession } from './agentSend'
-import { PASTE_BEGIN, PASTE_END, wrapBracketedPaste } from '../../terminal/main/terminalUtils'
+import { PASTE_BEGIN, PASTE_END, wrapBracketedPaste } from './terminalUtils'
 
 describe('wrapBracketedPaste', () => {
   it('wraps multi-line payloads as one block and trims trailing whitespace', () => {

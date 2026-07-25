@@ -6,7 +6,7 @@
 //                   idle-detector edge (terminal.ts calls onIdle when a session flips idle)
 //   'draft'       → paste only; the user reviews and hits enter
 // Deps-injected (a session is just write/running/idle) so the logic tests under plain Node.
-import { wrapBracketedPaste } from '../../terminal/main/terminalUtils'
+import { wrapBracketedPaste } from './terminalUtils'
 
 export type SendSubmit = 'now' | 'after-ready' | 'draft'
 

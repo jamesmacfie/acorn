@@ -20,7 +20,7 @@ import { NotesStore, type NoteKind } from '../../notes/main/notes'
 import { broadcastWorkflowNotice } from '../../../core/main/notify'
 import { listProfileDefs, profileAvailable, resolveCommand, type ProfileDef } from '../../../core/main/profiles'
 import { contextInjectionEnabled, isDir, loadTask, primaryUserLogin } from '../../../core/main/taskWorktree'
-import { buildSessionEnv } from '../../terminal/main/terminalUtils'
+import { buildSessionEnv } from '../../../core/main/taskEnv'
 import { assembleContext } from '../../../core/server/agentTools/contextSections'
 import { formatLaunchContext } from '../../../core/shared/contextBlock'
 
