@@ -1,10 +1,10 @@
 import { createMemo, createResource, For, Show } from 'solid-js'
-import { editorApi } from '../../../plugins/editor/client/editorClient'
-import { editorOpen } from '../../../plugins/editor/client/editorState'
-import { activeTaskId, dispatchActiveLayout } from '../tasks/tasks'
-import { fuzzyScore } from './model'
-import { createOverlayPalette } from './overlay'
-import './palette.css'
+import { editorApi } from './editorClient'
+import { editorOpen } from './editorState'
+import { activeTaskId, dispatchActiveLayout } from '../../../core/client/tasks/tasks'
+import { fuzzyScore } from '../../../core/client/palette/model'
+import { createOverlayPalette } from '../../../core/client/palette/overlay'
+import '../../../core/client/palette/palette.css'
 
 // ⌘P quick-open: fuzzy-jump to a file in the active task's worktree. Monaco has no built-in file
 // finder (that's a VS Code workbench feature, not the editor core), so this reuses OUR command-

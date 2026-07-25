@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest'
-import { directPreferenceSlices } from './preferenceSlices'
-import { persistedFeatureSlices } from './stateSlices'
+
+import { persistedSliceContributions } from '../../../app/client/persistedSliceContributions'
 import { stringifyPersistedValue, utf8Bytes } from './persistedState'
 
-const slices = [...persistedFeatureSlices, ...directPreferenceSlices]
+const slices = persistedSliceContributions
 
 describe('persisted-state descriptor conformance', () => {
   it('has unique identities and bounded, valid descriptor metadata', () => {

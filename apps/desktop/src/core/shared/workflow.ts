@@ -38,3 +38,50 @@ export function decodeToolCeiling(raw: string | undefined): ToolCeiling | undefi
     return undefined
   }
 }
+
+// --- renderer-side projections of the workflow rows ---
+// These mirror the persisted rows (plugins/workflows/main/workflowContracts.ts derives its own from
+// drizzle) but are declared structurally so the renderer never imports a node-side module. They live
+// in core/shared because both the workflows and agents features read them.
+
+// A committed/user workflow definition as loadWorkflowFiles returns it (docs/workflows.md): what the
+// palette launches and the settings inspector lists. `source` is the layer it was found in.
+export type WorkflowDefSummary = {
+  id: string
+  name: string
+  source: 'repo' | 'user'
+  posture?: 'gated' | 'autonomous'
+  steps: { name: string; kind?: string }[]
+}
+
+export type WorkflowRunRow = {
+  id: string
+  taskId: string
+  name: string
+  status: 'running' | 'gated' | 'cancelling' | 'done' | 'failed' | 'safety-rail' | 'cancelled'
+  posture: string
+  error: string | null
+  createdAt: number
+  updatedAt: number
+}
+
+export type WorkflowStepRow = {
+  id: string
+  runId: string
+  idx: number
+  name: string
+  kind: string
+  mode: string
+  profileId: string | null
+  model: string | null
+  status: 'pending' | 'running' | 'waiting-gate' | 'done' | 'failed' | 'skipped' | 'safety-rail' | 'cancelled'
+  resultJson: string | null
+  structuredJson: string | null
+  sessionId: string | null
+  costUsd: number | null
+  iteration: number
+  error: string | null
+  createdAt: number
+  updatedAt: number
+  resumeCommand?: string | null
+}

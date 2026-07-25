@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { TerminalSession } from '../../../core/shared/terminal'
-import type { WorkflowRunRow, WorkflowStepRow } from '../../terminal/client/terminalClient'
+import type { WorkflowRunRow, WorkflowStepRow } from '../../../core/shared/workflow'
 import { buildRoster, feedFromEvents, resumeCommandFor, streamJsonToAgentState, streamJsonToFeedItems } from './model'
 
 describe('streamJsonToAgentState (the 15 §status table)', () => {

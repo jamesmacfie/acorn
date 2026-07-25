@@ -2,8 +2,12 @@ import { execFileSync } from 'node:child_process'
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { copyWorktreeFiles, ensureWorktree, resolveBaseRef } from './worktrees'
+
+// Real git subprocesses per test/hook: the defaults (5s test, 10s hook) are too tight under a fully
+// parallel run. Matches the other git-backed suites (plugins/changes/main/localGitService.test.ts).
+vi.setConfig({ testTimeout: 30_000, hookTimeout: 30_000 })
 
 const git = (cwd: string, ...args: string[]) => execFileSync('git', ['-C', cwd, ...args], { stdio: 'pipe' }).toString()
 

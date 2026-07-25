@@ -2,7 +2,7 @@
 // AgentState enum (05 — never redeclared) and to activity-feed items, plus roster composition
 // (PTY sessions + workflow steps merged into one list). Unit tested; AgentsPanel is thin glue.
 import type { AgentState, TerminalSession } from '../../../core/shared/terminal'
-import type { WorkflowRunRow, WorkflowStepRow } from '../../terminal/client/terminalClient'
+import type { WorkflowRunRow, WorkflowStepRow } from '../../../core/shared/workflow'
 
 export type StreamEvent = Record<string, unknown> & { type?: string }
 

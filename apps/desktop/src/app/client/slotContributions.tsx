@@ -1,9 +1,9 @@
 import type { UiSlotContribution } from '../../core/client/registries/uiSlots'
 import NotificationBell from '../../core/client/notifications/NotificationBell'
 import CommandPalette from '../../core/client/palette/CommandPalette'
-import FilePalette from '../../core/client/palette/FilePalette'
+import FilePalette from '../../plugins/editor/client/FilePalette'
 import WorkspacePalette from '../../core/client/palette/WorkspacePalette'
-import Shortcuts from '../../core/client/Shortcuts'
+import Shortcuts from '../../plugins/github/client/Shortcuts'
 import ConfigTrustDialog from '../../core/client/configTrust/ConfigTrustDialog'
 
 export const shellSlotContributions: UiSlotContribution[] = [
