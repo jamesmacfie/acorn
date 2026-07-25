@@ -1,8 +1,8 @@
 import { createMemo, createSignal, Show } from 'solid-js'
 import { useQueryClient } from '@tanstack/solid-query'
-import { setPin } from './mutations'
-import { pinsKey, reposKey, reposRefreshRoute, type Repo } from '../../../core/client/queries'
-import Picker from '../../../core/client/ui/Picker'
+import { setPin } from '../workspaces/mutations'
+import { pinsKey, reposKey, reposRefreshRoute, type Repo } from '../queries'
+import Picker from './Picker'
 
 // Searchable repo picker (the topbar selector). Owns repo-specific bits — pinned-first ordering,
 // the ★ pin toggle, the ↻ refresh — and delegates the popover/filter chrome to the shared Picker,
