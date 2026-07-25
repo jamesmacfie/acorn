@@ -23,7 +23,7 @@ export default function ModelConnectionPicker(props: {
     <>
       <Show when={props.connections.length > 1}>
         <select
-          class="integration-key-input"
+          class="ui-input"
           title="Model provider"
           value={current()?.connection.id ?? ''}
           onChange={(e) => {
@@ -38,7 +38,7 @@ export default function ModelConnectionPicker(props: {
       </Show>
       <Show when={models().length}>
         <select
-          class="integration-key-input"
+          class="ui-input"
           title="Model"
           value={props.modelId}
           onChange={(e) => props.onChange({ connectionId: current()?.connection.id ?? '', modelId: e.currentTarget.value })}

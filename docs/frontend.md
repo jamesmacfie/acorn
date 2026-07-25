@@ -115,17 +115,26 @@ global `Shortcuts` handler are mounted after the switch, independent of the acti
 component scope before the replacement mounts. The archive lifecycle event then performs final
 T3/T4 eviction after component cleanup has published any last session-only view state.
 
-### Login gate + theme
+### Login gate + appearance
 
 `LoginGate` shows the bare `Acorn` mark while auth is unknown (initial load / cache restore) to
 avoid a redirect flash, then bounces to GitHub OAuth once settled-logged-out — unless the user
 explicitly logged out (`sessionStorage['acorn:loggedout']`), in which case it holds and offers a
 manual Login (else GitHub silently re-auths and logout is a no-op) (`App.tsx:269`, `464`).
 
-Theme is applied by the startup-state service writing `document.documentElement.dataset.theme`.
-When `theme_follow_system` is on it swaps the chosen `theme_light`/`theme_dark`
-on the OS `prefers-color-scheme` and re-applies live on change; otherwise it uses the fixed `theme`
-pref.
+Appearance is two orthogonal axes, both written by the startup-state service onto `<html>`
+(`persistence/appStartup.ts`):
+
+- **`data-theme` — colour.** When `theme_follow_system` is on it swaps the chosen
+  `theme_light`/`theme_dark` on the OS `prefers-color-scheme` and re-applies live on change;
+  otherwise it uses the fixed `theme` pref.
+- **`data-style` — shape, typography, spacing, density, chrome, motion.** A single `style` pref;
+  there is no OS signal to follow and no follow-system mode. `terminal` is the attribute-less
+  default, so the correct default paints before any JS runs and no FOUC script is needed.
+
+The two token sets are disjoint (`styles/tokenAxes.test.ts` enforces it), so every style composes
+with every theme and their relative source order is irrelevant. See
+[ui-design.md](./ui-design.md).
 
 ## Session restore
 
@@ -145,7 +154,8 @@ Core prefs and scoped slices that make up a restored session:
 | `core:task-layouts:<taskId>` | A task's pane row; legacy `task_layouts` / `task_panes` migrate on hydrate. | layout descriptor |
 | `rail_order` | Task rail pin-to-top + drag order. | `TabRail` |
 | `left_collapsed` | Left-pane collapse (`'1'`/`'0'`). | shell descriptor |
-| `theme`, `theme_follow_system`, `theme_light`, `theme_dark` | Theme selection + follow-system. | `AppearanceSettings` |
+| `theme`, `theme_follow_system`, `theme_light`, `theme_dark` | Theme (colour) selection + follow-system. | `AppearanceSettings` |
+| `style` | Style pack (shape/type/space/density). | `AppearanceSettings` |
 | `pane_shortcuts` | Per-pane keyboard-shortcut overrides (JSON). | `ShortcutsSettings` |
 | `term_rail_default` | Default terminal profile for a new task's rail. | `TerminalSettings` |
 | `term_height` | Terminal drawer height. | `TerminalPanel` |

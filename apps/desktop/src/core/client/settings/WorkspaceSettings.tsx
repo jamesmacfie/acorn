@@ -88,7 +88,7 @@ export default function WorkspaceSettings(props: { workspace: Workspace; onDelet
             {emoji() || props.workspace.name.slice(0, 1).toUpperCase()}
           </span>
           <input
-            class="integration-key-input ws-emoji-input"
+            class="ui-input ws-emoji-input"
             type="text"
             maxlength="4"
             placeholder="🌰"
@@ -112,7 +112,7 @@ export default function WorkspaceSettings(props: { workspace: Workspace; onDelet
               )}
             </For>
             <input
-              class="integration-key-input ws-hex-input"
+              class="ui-input ws-hex-input"
               type="text"
               placeholder="#8250df"
               value={hex()}
@@ -123,7 +123,7 @@ export default function WorkspaceSettings(props: { workspace: Workspace; onDelet
                 if (/^#?[0-9a-fA-F]{6}$/.test(v)) void saveColor(v.startsWith('#') ? v : `#${v}`)
               }}
             />
-            <button type="button" class="overlay-btn" disabled={busy() || !color()} onClick={() => void saveColor(null)}>
+            <button type="button" class="ui-btn" disabled={busy() || !color()} onClick={() => void saveColor(null)}>
               Reset
             </button>
           </div>
@@ -134,7 +134,7 @@ export default function WorkspaceSettings(props: { workspace: Workspace; onDelet
         <span class="settings-label">Name</span>
         <div class="integration-key-row">
           <input
-            class="integration-key-input"
+            class="ui-input"
             type="text"
             value={name()}
             disabled={props.workspace.isDefault}
@@ -163,7 +163,7 @@ export default function WorkspaceSettings(props: { workspace: Workspace; onDelet
 
       <Show when={!props.workspace.isDefault}>
         <div class="settings-danger">
-          <button type="button" class="overlay-btn settings-delete" disabled={busy()} onClick={() => void remove()}>
+          <button type="button" class="ui-btn settings-delete" disabled={busy()} onClick={() => void remove()}>
             Delete workspace
           </button>
         </div>
@@ -188,6 +188,7 @@ function RepoConfig(props: { owner: string; name: string }) {
   const [dev, setDev] = createSignal<string | null>(null)
   const [devRestart, setDevRestart] = createSignal<string | null>(null)
   const [dbSchemaValue, setDbSchemaValue] = createSignal<string | null>(null)
+  const [dbSchemaNotes, setDbSchemaNotes] = createSignal<string | null>(null)
   const [previewValue, setPreviewValue] = createSignal<string | null>(null)
   const [err, setErr] = createSignal('')
 
@@ -216,8 +217,9 @@ function RepoConfig(props: { owner: string; name: string }) {
   const debDev = debounce(() => void save({ devScript: dev() ?? '' }), 1500)
   const debDevRestart = debounce(() => void save({ devRestartScript: devRestart() ?? '' }), 1500)
   const debDbSchema = debounce(() => void save({ dbSchemaValue: dbSchemaValue() ?? '' }), 1500)
+  const debDbNotes = debounce(() => void save({ dbSchemaNotes: dbSchemaNotes() ?? '' }), 1500)
   const debPreview = debounce(() => void save({ previewValue: previewValue() ?? '' }), 1500)
-  onCleanup(() => { debSetup.flush(); debTeardown.flush(); debDbUrl.flush(); debDev.flush(); debDevRestart.flush(); debDbSchema.flush(); debPreview.flush() })
+  onCleanup(() => { debSetup.flush(); debTeardown.flush(); debDbUrl.flush(); debDev.flush(); debDevRestart.flush(); debDbSchema.flush(); debDbNotes.flush(); debPreview.flush() })
 
   return (
     <details class="settings-repo-config">
@@ -241,7 +243,7 @@ function RepoConfig(props: { owner: string; name: string }) {
 
         <label class="settings-field">
           <span class="settings-label">Run the script</span>
-          <select class="integration-key-input" value={trigger()} onChange={(e) => void save({ setupScriptTrigger: e.currentTarget.value as SetupTrigger })}>
+          <select class="ui-input" value={trigger()} onChange={(e) => void save({ setupScriptTrigger: e.currentTarget.value as SetupTrigger })}>
             <option value="terminal">When the terminal is first opened</option>
             <option value="created">When the task is created</option>
             <option value="off">Off — never run it</option>
@@ -290,7 +292,7 @@ function RepoConfig(props: { owner: string; name: string }) {
               Where the database schema in the AI query-generation prompt comes from.
             </span>
             <select
-              class="integration-key-input"
+              class="ui-input"
               value={dbSchemaMode()}
               onChange={(e) => { setDbSchemaValue(null); void save({ dbSchemaMode: e.currentTarget.value as DbSchemaMode | '' }) }}
             >
@@ -312,7 +314,7 @@ function RepoConfig(props: { owner: string; name: string }) {
             </Show>
             <Show when={dbSchemaMode() === 'file'}>
               <input
-                class="integration-key-input"
+                class="ui-input"
                 type="text"
                 placeholder="db/schema.sql"
                 value={dbSchemaValue() ?? row()?.dbSchemaValue ?? ''}
@@ -321,6 +323,24 @@ function RepoConfig(props: { owner: string; name: string }) {
               />
               <span class="muted settings-hint">A path relative to the task's worktree root.</span>
             </Show>
+          </label>
+
+          <label class="settings-field">
+            <span class="settings-label">Schema notes</span>
+            <span class="muted settings-hint">
+              Optional. Free-form context for AI query generation that the schema itself can't express —
+              what a <code>jsonb</code> column actually holds, what a status column's values mean, which of
+              two similar tables is live. Sent with the schema on every generate.
+            </span>
+            <textarea
+              class="settings-script"
+              rows="6"
+              spellcheck={false}
+              placeholder={'orders.meta jsonb: { coupon: string, source: "web" | "app" }\norders.status: 0 pending, 1 paid, 2 refunded'}
+              value={dbSchemaNotes() ?? row()?.dbSchemaNotes ?? ''}
+              onInput={(e) => { setDbSchemaNotes(e.currentTarget.value); debDbNotes() }}
+              onBlur={() => debDbNotes.flush()}
+            />
           </label>
         </Show>
 
@@ -362,7 +382,7 @@ function RepoConfig(props: { owner: string; name: string }) {
           <span class="settings-label">Browser preview URL</span>
           <span class="muted settings-hint">How the browser-preview pane finds its URL for this repo's tasks.</span>
           <select
-            class="integration-key-input"
+            class="ui-input"
             value={previewMode()}
             onChange={(e) => { setPreviewValue(null); void save({ previewMode: e.currentTarget.value as PreviewMode | '' }) }}
           >
@@ -385,7 +405,7 @@ function RepoConfig(props: { owner: string; name: string }) {
           </Show>
           <Show when={previewMode() === 'url' || previewMode() === 'port'}>
             <input
-              class="integration-key-input"
+              class="ui-input"
               type={previewMode() === 'port' ? 'number' : 'text'}
               placeholder={previewMode() === 'port' ? '3000' : 'https://example.test'}
               value={previewValue() ?? row()?.previewValue ?? ''}
@@ -455,7 +475,7 @@ function BrowserRulesEditor(props: { rules: BrowserRule[]; onSave: (rules: Brows
               onChange={(e) => { update(rule().id, (r) => ({ ...r, enabled: e.currentTarget.checked })); debSave(); debSave.flush() }}
             />
             <input
-              class="integration-key-input"
+              class="ui-input"
               type="text"
               placeholder="localhost:3000/login"
               title="URL pattern"
@@ -464,7 +484,7 @@ function BrowserRulesEditor(props: { rules: BrowserRule[]; onSave: (rules: Brows
               onBlur={() => debSave.flush()}
             />
             <input
-              class="integration-key-input"
+              class="ui-input"
               type="text"
               placeholder="input[type=password]"
               title="CSS selector of the input to fill"
@@ -473,7 +493,7 @@ function BrowserRulesEditor(props: { rules: BrowserRule[]; onSave: (rules: Brows
               onBlur={() => debSave.flush()}
             />
             <input
-              class="integration-key-input"
+              class="ui-input"
               type="text"
               placeholder="value to type"
               title="Text typed into the input"
@@ -481,14 +501,14 @@ function BrowserRulesEditor(props: { rules: BrowserRule[]; onSave: (rules: Brows
               onInput={(e) => { update(rule().id, (r) => ({ ...r, action: { ...r.action, value: e.currentTarget.value } })); debSave() }}
               onBlur={() => debSave.flush()}
             />
-            <button type="button" class="overlay-btn" title="Delete rule" onClick={() => remove(rule().id)}>
+            <button type="button" class="ui-btn" title="Delete rule" onClick={() => remove(rule().id)}>
               ×
             </button>
           </div>
         )}
       </Index>
       <div>
-        <button type="button" class="overlay-btn" onClick={add}>
+        <button type="button" class="ui-btn" onClick={add}>
           Add rule
         </button>
       </div>

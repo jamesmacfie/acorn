@@ -75,6 +75,7 @@ const repoConfigBody = z.object({
     dbUrlScript: z.string().optional(),
     dbSchemaMode: z.enum(['auto', 'script', 'file']).or(z.literal('')).optional(),
     dbSchemaValue: z.string().optional(),
+    dbSchemaNotes: z.string().max(8000).optional(),
     previewMode: z.enum(['url', 'port', 'script']).or(z.literal('')).optional(),
     previewValue: z.string().optional(),
     browserRules: z.array(browserRuleSchema).optional(),

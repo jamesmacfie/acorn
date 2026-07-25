@@ -10,6 +10,8 @@ import { filterPulls } from './pullList/model'
 import { prFilterFor, setPrFilter } from './pullList/filterState'
 import { workspaceForRepo } from '../../../core/client/workspaces/activeWorkspace'
 import { createTask } from './mutations'
+import { rowHeight } from '../../../core/client/ui/metrics'
+import { watchAppearance } from '../../../core/client/ui/appearance'
 import { scanLinearRefs } from '../../linear/client/scanLinearRefs'
 import { activateTaskSignals, pathForTask } from '../../../core/client/tasks/activate'
 import { registerCommands } from '../../../core/client/registries/commands'
@@ -120,12 +122,19 @@ export default function PullList() {
   onCleanup(cancelRowPrefetch)
 
   const [scrollEl, setScrollEl] = createSignal<HTMLDivElement>()
+  const [rowH, setRowH] = createSignal(rowHeight())
+  onCleanup(watchAppearance(() => {
+    setRowH(rowHeight())
+    virt.measure()
+  }))
   const virt = createVirtualizer({
     get count() {
       return shown().length
     },
     getScrollElement: () => scrollEl() ?? null,
-    estimateSize: () => 36, // --row-h
+    // --row-h-virt, read from the token: the virtualizer applies its result as an inline height,
+    // so a hardcoded 36 here silently pinned the PR list's density regardless of the style pack.
+    estimateSize: () => rowH(),
     overscan: 12,
   })
   let publishFrame = 0

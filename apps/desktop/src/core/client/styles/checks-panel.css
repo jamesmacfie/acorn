@@ -3,26 +3,26 @@
 .checks-panel-backdrop {
   position: fixed;
   inset: 0;
-  z-index: 60;
-  background: rgba(0, 0, 0, 0.4);
+  z-index: var(--z-drawer-menu);
+  background: var(--scrim);
 }
 .checks-panel {
   position: fixed;
   inset: 0 0 0 auto;
-  z-index: 61;
+  z-index: calc(var(--z-drawer-menu) + 1);
   width: min(620px, 92vw);
   display: flex;
   flex-direction: column;
   background: var(--bg);
-  border-left: 1px solid var(--border-strong);
-  box-shadow: -12px 0 28px var(--shadow-popover);
+  border-left: var(--control-border);
+  box-shadow: var(--shadow-drawer-l);
 }
 .checks-panel-head {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--space-4);
   padding: var(--pane-pad);
-  border-bottom: 1px solid var(--border);
+  border-bottom: var(--divider);
 }
 .checks-panel-title {
   flex: 1;
@@ -39,7 +39,7 @@
   background: transparent;
   border: 0;
   cursor: pointer;
-  padding: 2px 6px;
+  padding: var(--space-1) var(--space-3);
 }
 .checks-panel-body {
   flex: 1;
@@ -52,12 +52,12 @@
   padding: 0;
 }
 .step-row {
-  border-bottom: 1px solid var(--border);
+  border-bottom: var(--divider);
 }
 .step-head {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--space-4);
   width: 100%;
   font: inherit;
   font-size: var(--fs-sm);
@@ -74,8 +74,8 @@
   white-space: nowrap;
 }
 .step-log {
-  margin: 0 0 8px;
-  padding: 8px 10px;
+  margin: 0 0 var(--space-4);
+  padding: var(--space-4) var(--space-5);
   max-height: 50vh;
   overflow: auto;
   font-family: var(--font-mono);
@@ -85,7 +85,7 @@
   word-break: break-word;
   color: var(--text);
   background: var(--bg-subtle);
-  border: 1px solid var(--border);
+  border: var(--divider);
   border-radius: var(--radius);
 }
 /* Copy button: absolute top-right of the log block, revealed on hover. */
@@ -97,10 +97,10 @@
   top: 6px;
   right: 6px;
   display: flex;
-  padding: 4px;
+  padding: var(--space-2);
   color: var(--text-muted);
   background: var(--bg);
-  border: 1px solid var(--border);
+  border: var(--divider);
   border-radius: var(--radius);
   cursor: pointer;
   opacity: 0;
@@ -111,20 +111,8 @@
 .log-line {
   min-height: 1.45em;
 }
-/* ANSI dual-theme: light token colour by default, dark when the app theme is dark (mirrors diff). */
-.step-log span { color: var(--l); }
-:root[data-theme='dark'] .step-log span,
-:root[data-theme='solarized-dark'] .step-log span,
-:root[data-theme='monokai'] .step-log span,
-:root[data-theme='nord'] .step-log span,
-:root[data-theme='catppuccin-frappe'] .step-log span,
-:root[data-theme='catppuccin-macchiato'] .step-log span,
-:root[data-theme='catppuccin-mocha'] .step-log span,
-:root[data-theme='one-dark'] .step-log span,
-:root[data-theme='dracula'] .step-log span { color: var(--r); }
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme='light']) .step-log span { color: var(--r); }
-}
+/* ANSI dual-theme: --syntax-fg picks the light or dark side of Shiki's dual output (mirrors diff). */
+.step-log span { color: var(--syntax-fg); }
 /* Clickable check name in the PR detail checks list. */
 .check-name-link {
   font: inherit;

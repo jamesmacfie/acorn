@@ -97,7 +97,7 @@ export default function ApiSettings() {
       </p>
 
       <Show when={error()}>
-        <p class="settings-error" style={{ color: 'var(--danger, #d33)' }}>{error()}</p>
+        <p class="settings-error">{error()}</p>
       </Show>
 
       {/* --- Listener --- */}
@@ -129,7 +129,7 @@ export default function ApiSettings() {
                 <Show when={s().portOverridden}> Overridden by the <code>ACORN_API_PORT</code> environment variable (read-only until restart).</Show>
                 {' '}Port <code>4317</code> is reserved for the app itself.
               </p>
-              <Show when={s().error}><p class="muted" style={{ color: 'var(--danger, #d33)' }}>{s().error}</p></Show>
+              <Show when={s().error}><p class="settings-error">{s().error}</p></Show>
             </div>
           </>
         )}

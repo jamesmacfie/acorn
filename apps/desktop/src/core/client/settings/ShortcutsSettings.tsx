@@ -75,7 +75,7 @@ export default function ShortcutsSettings() {
       <div class="settings-actions">
         <button
           type="button"
-          class="overlay-btn"
+          class="ui-btn"
           onClick={() => {
             setError('')
             void saveJsonPref(queryClient, PrefKeys.keybindings, {})

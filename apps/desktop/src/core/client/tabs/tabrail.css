@@ -5,7 +5,7 @@
   width: var(--tabrail-w);
   display: flex;
   flex-direction: column;
-  border-right: 1px solid var(--border);
+  border-right: var(--divider);
   background: var(--bg-subtle);
 }
 
@@ -43,7 +43,7 @@
   position: absolute;
   bottom: 4px;
   right: 5px;
-  font-size: 15px;
+  font-size: var(--fs-lg);
   line-height: 1;
   color: var(--warn);
   pointer-events: none;
@@ -56,13 +56,13 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  font-family: var(--font-mono);
+  font-family: var(--font-ui);
   font-size: var(--fs-lg);
   color: var(--text-muted);
   background: transparent;
   border: 0;
-  border-bottom: 1px solid var(--border);
-  border-left: 2px solid transparent;
+  border-bottom: var(--divider);
+  border-left: var(--tab-active-w) solid transparent;
   cursor: pointer;
   line-height: 1;
 }
@@ -76,10 +76,17 @@
 /* Sources zone (docs/workspaces-and-tasks.md): fixed browse entry points above the workspace roster. */
 .tabrail-zone { flex: none; }
 .tabrail-source { font-size: var(--fs-md); }
+
+/* Unicode source and status glyphs (railStatus.ts) stay on the mono stack in every style pack —
+   the box-drawing and dingbat characters only have consistent metrics there. */
+.tabrail-source,
+.tabrail-spinner,
+.tabrail-needs,
+.tabrail-dirty { font-family: var(--font-glyph); }
 .tabrail-sep {
   flex: none;
   height: 1px;
-  margin: 4px 8px;
+  margin: var(--space-2) var(--space-4);
   background: var(--border-strong);
 }
 
@@ -90,7 +97,7 @@
   color: var(--text-muted);
   background: transparent;
   border: 0;
-  border-top: 1px solid var(--border);
+  border-top: var(--divider);
   cursor: pointer;
   line-height: 1;
 }
@@ -101,18 +108,18 @@
   position: absolute;
   top: 0;
   left: 100%;
-  z-index: 20;
-  margin-left: 6px;
-  padding: 6px;
+  z-index: var(--z-rail);
+  margin-left: var(--space-3);
+  padding: var(--space-3);
   background: var(--bg);
-  border: 1px solid var(--border-strong);
-  border-radius: var(--radius);
-  box-shadow: 0 4px 16px var(--shadow-popover);
+  border: var(--control-border);
+  border-radius: var(--radius-popover);
+  box-shadow: var(--shadow-2);
 }
 
 .tabrail-menu-title {
   max-width: 180px;
-  padding: 2px 4px 6px;
+  padding: var(--space-1) var(--space-2) var(--space-3);
   font-size: var(--fs-sm);
   color: var(--text-muted);
   white-space: nowrap;
@@ -123,14 +130,14 @@
 .tabrail-close {
   display: block;
   width: 100%;
-  margin-top: 4px;
-  padding: 4px 8px;
+  margin-top: var(--space-2);
+  padding: var(--space-2) var(--space-4);
   font: inherit;
   font-size: var(--fs-sm);
   text-align: left;
   color: var(--text);
   background: transparent;
-  border: 1px solid var(--border);
+  border: var(--divider);
   border-radius: var(--radius);
   cursor: pointer;
   white-space: nowrap;
@@ -139,16 +146,16 @@
 
 /* Workspace identity accent (docs/workspaces-and-tasks.md): task rows carry their workspace's colour as the 3px
    left accent (the docs/ui-design.md active-accent convention, tinted per workspace). */
-.tabrail-task { border-left-width: 3px; }
+.tabrail-task { border-left-width: var(--marker-w); }
 
 /* Pin-to-top marker (docs/panes.md). */
 .tabrail-pin {
   position: absolute;
   top: 4px;
   left: 5px;
-  font-size: 10px;
+  font-size: var(--fs-2xs);
   line-height: 1;
   color: var(--warn);
   pointer-events: none;
-  z-index: 1;
+  z-index: var(--z-base);
 }

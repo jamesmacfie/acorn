@@ -1,5 +1,5 @@
 import { createSignal, Show } from 'solid-js'
-import { trapOverlayFocus } from '../ui/focus'
+import { createDismissable } from '../ui/dismissable'
 import { collectConcerns, type Concern, type WillEventMap } from './willPhaseModel'
 export { collectConcerns, registerWillHandler } from './willPhaseModel'
 export type { Concern, WillEventMap } from './willPhaseModel'
@@ -37,20 +37,18 @@ export function WillConfirmationHost() {
     setChecks({})
     current.resolve(confirmed)
   }
+  const dismiss = createDismissable({ onDismiss: () => finish(false), container: () => dialog })
   return (
     <Show when={prompt()} keyed>
       {(current) => (
-        <div class="overlay-backdrop" onClick={() => finish(false)}>
+        <div class="overlay-backdrop" onClick={dismiss.onBackdropClick}>
           <div
             ref={dialog}
             class="overlay will-confirmation"
             role="alertdialog"
             aria-modal="true"
-            onClick={(event) => event.stopPropagation()}
-            onKeyDown={(event) => {
-              if (event.key === 'Escape') finish(false)
-              else trapOverlayFocus(event, dialog)
-            }}
+            onClick={dismiss.onContainerClick}
+            onKeyDown={dismiss.onKeyDown}
           >
             <div class="overlay-title">{current.title}</div>
             <div class="overlay-body">
@@ -78,8 +76,8 @@ export function WillConfirmationHost() {
                 </ul>
               </Show>
               <div class="close-actions">
-                <button autofocus={current.concerns.some((concern) => concern.severity === 'danger')} type="button" class="overlay-btn" onClick={() => finish(false)}>Cancel</button>
-                <button autofocus={!current.concerns.some((concern) => concern.severity === 'danger')} type="button" class="overlay-btn close-confirm" onClick={() => finish(true)}>{current.actionLabel}</button>
+                <button autofocus={current.concerns.some((concern) => concern.severity === 'danger')} type="button" class="ui-btn" onClick={() => finish(false)}>Cancel</button>
+                <button autofocus={!current.concerns.some((concern) => concern.severity === 'danger')} type="button" class="ui-btn close-confirm" onClick={() => finish(true)}>{current.actionLabel}</button>
               </div>
             </div>
           </div>

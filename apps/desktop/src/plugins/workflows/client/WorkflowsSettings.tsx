@@ -55,7 +55,7 @@ export default function WorkflowsSettings() {
       </Show>
 
       <div class="settings-actions">
-        <button type="button" class="overlay-btn" onClick={() => void refetch()}>Rescan</button>
+        <button type="button" class="ui-btn" onClick={() => void refetch()}>Rescan</button>
       </div>
     </div>
   )

@@ -239,7 +239,7 @@ export default function TaskView(props: {
           <div class="task-run-error action-error" role="alert">
             <span style={{ 'white-space': 'pre-wrap' }}>{runError() || closeError()}</span>
             <Show when={teardownFailed()}>
-              <button type="button" class="overlay-btn close-confirm" onClick={() => void confirmClose(true)}>Archive anyway (skip teardown)</button>
+              <button type="button" class="ui-btn close-confirm" onClick={() => void confirmClose(true)}>Archive anyway (skip teardown)</button>
             </Show>
           </div>
         </Show>

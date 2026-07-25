@@ -31,6 +31,7 @@ export async function getRepoPath(db: AppDatabase, owner: string, repo: string):
     dbUrlScript: row.dbUrlScript,
     dbSchemaMode: (row.dbSchemaMode as DbSchemaMode | null) ?? null,
     dbSchemaValue: row.dbSchemaValue,
+    dbSchemaNotes: row.dbSchemaNotes,
     previewMode: (row.previewMode as PreviewMode | null) ?? null,
     previewValue: row.previewValue,
     browserRules: parseBrowserRules(row.browserRules),
@@ -81,6 +82,7 @@ export async function setRepoConfig(db: AppDatabase, owner: string, repo: string
   if (patch.devRestartScript !== undefined) set.devRestartScript = scalar(patch.devRestartScript)
   if (patch.dbUrlScript !== undefined) set.dbUrlScript = scalar(patch.dbUrlScript)
   if (patch.dbSchemaValue !== undefined) set.dbSchemaValue = scalar(patch.dbSchemaValue)
+  if (patch.dbSchemaNotes !== undefined) set.dbSchemaNotes = scalar(patch.dbSchemaNotes)
   if (patch.dbSchemaMode !== undefined) {
     if (patch.dbSchemaMode && !['auto', 'script', 'file'].includes(patch.dbSchemaMode)) return { ok: false, reason: 'Invalid schema mode.' }
     set.dbSchemaMode = patch.dbSchemaMode || null

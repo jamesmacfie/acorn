@@ -1,0 +1,36 @@
+/* Bundled webfaces for the non-Terminal style packs. See fonts/README.md for provenance and the
+ * OFL attribution the licence requires.
+ *
+ * Declaring all three costs a Terminal user ZERO bytes: a browser fetches a @font-face source only
+ * when a rule actually uses the family, and Terminal's --font-ui resolves to --font-mono.
+ *
+ * These are variable fonts, so one file covers the whole weight axis — hence `font-weight` ranges
+ * rather than one @font-face per weight.
+ *
+ * `font-display: swap` renders immediately in the fallback and swaps when the face loads. On a
+ * local file that window is imperceptible, and it avoids a blank first paint if the asset 404s.
+ */
+
+@font-face {
+  font-family: 'Inter';
+  src: url('./fonts/inter-var.woff2') format('woff2-variations');
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Literata';
+  src: url('./fonts/literata-var.woff2') format('woff2-variations');
+  font-weight: 200 900;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Nunito';
+  src: url('./fonts/nunito-var.woff2') format('woff2-variations');
+  font-weight: 200 1000;
+  font-style: normal;
+  font-display: swap;
+}

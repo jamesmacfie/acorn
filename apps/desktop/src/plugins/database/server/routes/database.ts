@@ -1,14 +1,17 @@
+import { randomUUID } from 'node:crypto'
+import { and, eq, inArray } from 'drizzle-orm'
 import { Hono } from 'hono'
 import { z } from 'zod'
-import type { DbCell, DbColumnsResult, DbConnectResult, DbGenerateResult, DbPk, DbQueryResult, DbRowsResult, DbSchemaResult, DbTablesResult, DbWriteResult } from '../../shared/database'
+import { GENERATE_MAX_PROMPT_CHARS } from '../../shared/database'
+import type { DbCell, DbColumnsResult, DbConnectResult, DbGenerateResult, DbPk, DbQueryResult, DbRowsResult, DbSavedQuery, DbSchemaResult, DbTablesResult, DbWriteResult } from '../../shared/database'
 import { bridgeSlot, viaBridge } from '../../../../core/server/bridge'
-import { getDb } from '../../../../core/server/db'
+import { type AppDatabase, getDb, schema } from '../../../../core/server/db'
 import { ProviderOperationError } from '../../../../core/server/integrations/types'
 import type { AppEnv } from '../../../../core/server/middleware/auth'
 import { getUser } from '../../../../core/server/middleware/requireUser'
 import { generateTextForConnection } from '../../../../core/server/modelProviders/runtime'
 import { respondError } from '../../../../core/server/respond'
-import { buildSystemPrompt, GENERATE_MAX_OUTPUT_TOKENS, GENERATE_MAX_PROMPT_CHARS, stripSqlFences } from '../generateSql'
+import { buildSystemPrompt, GENERATE_MAX_OUTPUT_TOKENS, stripSqlFences } from '../generateSql'
 
 // Database pane (docs/pg.md): per-task Postgres browse + edit. Was the `db:*` IPC channels
 //; now task-scoped HTTP behind the DatabaseBridge (main/database.ts). The
@@ -42,9 +45,43 @@ const generateBody = z.object({
   connectionId: z.string().min(1),
   modelId: z.string().min(1).optional(),
   prompt: z.string().min(1).max(GENERATE_MAX_PROMPT_CHARS),
+  queryIds: z.array(z.string()).max(10).optional(), // saved queries to include as worked examples
+})
+const savedQueryBody = z.object({
+  name: z.string().trim().min(1).max(80),
+  notes: z.string().max(2000),
+  sql: z.string().trim().min(1).max(20_000),
 })
 
 const id = (c: { req: { param(k: string): string } }) => c.req.param('id')
+
+// Saved queries are repo-scoped but addressed through the task, like everything else in this pane —
+// the task is what the renderer has. Resolve its repo the same way reviewNotes does.
+const repoOf = async (db: AppDatabase, taskId: string) =>
+  (await db.select().from(schema.tasks).where(eq(schema.tasks.id, taskId)))[0] ?? null
+
+type SavedRow = typeof schema.dbSavedQueries.$inferSelect
+const rowToQuery = (r: SavedRow): DbSavedQuery => ({ id: r.id, name: r.name, notes: r.notes, sql: r.sql, updatedAt: r.updatedAt })
+
+// The saved queries a generate call asked to include as examples, scoped to the task's repo so an id
+// from another repo can't be smuggled into the prompt.
+const loadExamples = async (db: AppDatabase, taskId: string, ids: readonly string[]): Promise<DbSavedQuery[]> => {
+  if (!ids.length) return []
+  const t = await repoOf(db, taskId)
+  if (!t) return []
+  const rows = await db
+    .select()
+    .from(schema.dbSavedQueries)
+    .where(
+      and(
+        eq(schema.dbSavedQueries.repoOwner, t.repoOwner),
+        eq(schema.dbSavedQueries.repoName, t.repoName),
+        inArray(schema.dbSavedQueries.id, [...ids]),
+      ),
+    )
+    .orderBy(schema.dbSavedQueries.name)
+  return rows.map(rowToQuery)
+}
 
 export const database = new Hono<AppEnv>()
   .post('/:id/database/connect', (c) => viaBridge(c, databaseBridgeSlot, (b) => b.connect(id(c))))
@@ -84,8 +121,65 @@ export const database = new Hono<AppEnv>()
     if (!p.success) return respondError(c, 400, 'bad_request')
     return viaBridge(c, databaseBridgeSlot, (b) => b.remove(id(c), p.data.schema, p.data.name, p.data.pk))
   })
+  // --- saved queries (repo-scoped, plain app state — no bridge) ---
+  .get('/:id/database/queries', async (c) => {
+    const db = getDb(c.env)
+    const t = await repoOf(db, id(c))
+    if (!t) return respondError(c, 404, 'not_found')
+    const rows = await db
+      .select()
+      .from(schema.dbSavedQueries)
+      .where(and(eq(schema.dbSavedQueries.repoOwner, t.repoOwner), eq(schema.dbSavedQueries.repoName, t.repoName)))
+      .orderBy(schema.dbSavedQueries.name)
+    return c.json(rows.map(rowToQuery))
+  })
+  // Save = upsert on (repo, name): re-saving under an existing name overwrites it, which is also how
+  // a query is edited or renamed. ponytail: no PATCH route, add one if renaming without retyping matters.
+  .post('/:id/database/queries', async (c) => {
+    const p = savedQueryBody.safeParse(await c.req.json().catch(() => null))
+    if (!p.success) return respondError(c, 400, 'bad_request')
+    const db = getDb(c.env)
+    const t = await repoOf(db, id(c))
+    if (!t) return respondError(c, 404, 'not_found')
+    const now = Date.now()
+    const row: SavedRow = {
+      id: randomUUID(),
+      repoOwner: t.repoOwner,
+      repoName: t.repoName,
+      name: p.data.name.trim(),
+      notes: p.data.notes.trim() || null,
+      sql: p.data.sql.trim(),
+      createdAt: now,
+      updatedAt: now,
+    }
+    const [saved] = await db
+      .insert(schema.dbSavedQueries)
+      .values(row)
+      .onConflictDoUpdate({
+        target: [schema.dbSavedQueries.repoOwner, schema.dbSavedQueries.repoName, schema.dbSavedQueries.name],
+        set: { notes: row.notes, sql: row.sql, updatedAt: now },
+      })
+      .returning()
+    return c.json(rowToQuery(saved))
+  })
+  .delete('/:id/database/queries/:queryId', async (c) => {
+    const db = getDb(c.env)
+    const t = await repoOf(db, id(c))
+    if (!t) return respondError(c, 404, 'not_found')
+    await db
+      .delete(schema.dbSavedQueries)
+      .where(
+        and(
+          eq(schema.dbSavedQueries.id, c.req.param('queryId')),
+          eq(schema.dbSavedQueries.repoOwner, t.repoOwner),
+          eq(schema.dbSavedQueries.repoName, t.repoName),
+        ),
+      )
+    return c.json({ ok: true })
+  })
   // Generate a PostgreSQL query from a natural-language description via a connected model provider
-  // (docs/pg.md). The plugin owns the route + prompt; the core runtime owns provider access.
+  // (docs/pg.md). The plugin owns the route + prompt; the core runtime owns provider access. The
+  // prompt carries the schema, the repo's schema notes, and any saved queries picked as examples.
   .post('/:id/database/generate', async (c) => {
     const p = generateBody.safeParse(await c.req.json().catch(() => null))
     if (!p.success) return respondError(c, 400, 'bad_request')
@@ -93,14 +187,17 @@ export const database = new Hono<AppEnv>()
     if (!bridge) return respondError(c, 503, 'bridge-unavailable')
     const schemaRes = await bridge.schema(id(c))
     if ('error' in schemaRes) return respondError(c, 422, 'db_schema_unavailable', [schemaRes.error])
+    const db = getDb(c.env)
+    // Unknown/foreign ids just don't resolve — a stale pick shouldn't fail the whole generate.
+    const examples = await loadExamples(db, id(c), p.data.queryIds ?? [])
     try {
       const result = await generateTextForConnection({
-        db: getDb(c.env),
+        db,
         userId: getUser(c).login,
         encryptionKey: c.env.SESSION_ENC_KEY,
         connectionId: p.data.connectionId,
         input: {
-          system: buildSystemPrompt(schemaRes.schema),
+          system: buildSystemPrompt(schemaRes.schema, { ...(schemaRes.notes ? { notes: schemaRes.notes } : {}), examples }),
           prompt: p.data.prompt,
           ...(p.data.modelId ? { modelId: p.data.modelId } : {}),
           maxOutputTokens: GENERATE_MAX_OUTPUT_TOKENS,

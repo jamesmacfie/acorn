@@ -81,13 +81,13 @@ export default function MemorySection(props: {
                   <span class="context-tray-kind">{p.type}</span>
                   <span class="context-tray-label" title={p.body}>{p.name}</span>
                   <input
-                    class="integration-key-input context-tray-proposal-desc"
+                    class="ui-input context-tray-proposal-desc"
                     type="text"
                     value={propEdits()[p.id] ?? p.description}
                     onInput={(e) => setPropEdits((prev) => ({ ...prev, [p.id]: e.currentTarget.value }))}
                   />
-                  <button type="button" class="overlay-btn" onClick={() => void resolveProposal(p.id, true)}>Accept</button>
-                  <button type="button" class="overlay-btn" onClick={() => void resolveProposal(p.id, false)}>Reject</button>
+                  <button type="button" class="ui-btn" onClick={() => void resolveProposal(p.id, true)}>Accept</button>
+                  <button type="button" class="ui-btn" onClick={() => void resolveProposal(p.id, false)}>Reject</button>
                 </div>
                 {/* Verification flags (structural `flags`, docs/notes-and-memory.md): shown as warning badges
                     beside the proposal, never folded into the description text. */}
@@ -103,7 +103,7 @@ export default function MemorySection(props: {
       </Show>
       <Show when={memoryApi()}>
         <div class="context-tray-actions">
-          <button type="button" class="overlay-btn" onClick={() => setMemFormOpen(!memFormOpen())}>+ memory</button>
+          <button type="button" class="ui-btn" onClick={() => setMemFormOpen(!memFormOpen())}>+ memory</button>
           <Show when={memMsg()}><span class="muted">{memMsg()}</span></Show>
         </div>
       </Show>
@@ -116,19 +116,19 @@ export default function MemorySection(props: {
           }}
         >
           <div class="integration-key-row">
-            <input class="integration-key-input" type="text" placeholder="name (kebab-case)" value={memName()} onInput={(e) => setMemName(e.currentTarget.value)} />
-            <select class="integration-key-input" value={memType()} onChange={(e) => setMemType(e.currentTarget.value as MemoryType)}>
+            <input class="ui-input" type="text" placeholder="name (kebab-case)" value={memName()} onInput={(e) => setMemName(e.currentTarget.value)} />
+            <select class="ui-input" value={memType()} onChange={(e) => setMemType(e.currentTarget.value as MemoryType)}>
               <For each={MEMORY_TYPE_OPTIONS}>{(k) => <option value={k}>{k}</option>}</For>
             </select>
-            <select class="integration-key-input" value={memScope()} onChange={(e) => setMemScope(e.currentTarget.value as 'repo' | 'private')}>
+            <select class="ui-input" value={memScope()} onChange={(e) => setMemScope(e.currentTarget.value as 'repo' | 'private')}>
               <option value="repo">repo (worktree, committed)</option>
               <option value="private">private (~/.acorn)</option>
             </select>
           </div>
-          <input class="integration-key-input" type="text" placeholder="one-line description" value={memDesc()} onInput={(e) => setMemDesc(e.currentTarget.value)} />
+          <input class="ui-input" type="text" placeholder="one-line description" value={memDesc()} onInput={(e) => setMemDesc(e.currentTarget.value)} />
           <textarea class="settings-script" rows="3" placeholder={'Body — include a **Why:** line.'} value={memBody()} onInput={(e) => setMemBody(e.currentTarget.value)} />
           <div class="context-tray-actions">
-            <button type="submit" class="overlay-btn" disabled={!memName().trim() || !memDesc().trim()}>Save memory</button>
+            <button type="submit" class="ui-btn" disabled={!memName().trim() || !memDesc().trim()}>Save memory</button>
           </div>
         </form>
       </Show>
