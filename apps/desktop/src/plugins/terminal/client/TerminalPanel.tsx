@@ -3,6 +3,7 @@ import { Portal } from 'solid-js/web'
 import { createQuery, useQueryClient } from '@tanstack/solid-query'
 import { prefsOptions, type Task } from '../../../core/client/queries'
 import { terminalApi } from './terminalClient'
+import { taskBridge } from '../../../core/client/tasks/taskBridge'
 import { onClosePaneWithin } from '../../../core/client/lib/onClosePaneWithin'
 import { isTerminalMax } from '../../../core/client/tasks/tasks'
 import { activeTerminal, addSession, rememberActiveTerminal, refreshSessions, sessions } from './sessions'
@@ -22,6 +23,8 @@ import './terminal.css'
 // visible terminals.
 export default function TerminalPanel(props: { onClose: () => void; task: Task | null }) {
   const api = terminalApi()
+  // Repo checkout mapping is a platform concern (core's task bridge); the PTY verbs above are ours.
+  const bridge = taskBridge()
   const queryClient = useQueryClient()
   const ws = () => props.task
   const prefs = createQuery(() => prefsOptions(true))
@@ -228,11 +231,11 @@ export default function TerminalPanel(props: { onClose: () => void; task: Task |
     setMenuOpen(false)
     setError(null)
     const w = ws()
-    if (!api || !w) return
+    if (!api || !bridge || !w) return
     const owner = w.repoOwner
     const repo = w.repoName
     const number = w.pullNumber != null ? String(w.pullNumber) : undefined
-    const mapped = await api.repoPath.get(owner, repo)
+    const mapped = await bridge.repoPath.get(owner, repo)
     if (mapped) return spawn(profileId, mapped.path, owner, repo, number)
     setPendingProfile(profileId)
     setPathError(null)
@@ -240,19 +243,19 @@ export default function TerminalPanel(props: { onClose: () => void; task: Task |
     setPrompt({ owner, repo, number })
   }
 
-  // Native folder picker — same bridge the onboarding modal uses (api.repoPath.pick). Fills the
+  // Native folder picker — same bridge the onboarding modal uses (bridge.repoPath.pick). Fills the
   // input so the user can eyeball it before hitting Open; submitPath still validates in main.
   async function pickPath() {
-    if (!api) return
-    const picked = await api.repoPath.pick()
+    if (!bridge) return
+    const picked = await bridge.repoPath.pick()
     if (picked) setPathInput(picked)
   }
 
   async function submitPath(e: Event) {
     e.preventDefault()
     const ctx = prompt()
-    if (!ctx || !api) return
-    const res = await api.repoPath.set(ctx.owner, ctx.repo, pathInput().trim())
+    if (!ctx || !bridge) return
+    const res = await bridge.repoPath.set(ctx.owner, ctx.repo, pathInput().trim())
     if (!res.ok) {
       setPathError(res.reason)
       return

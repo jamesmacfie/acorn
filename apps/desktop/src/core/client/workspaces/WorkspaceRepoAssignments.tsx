@@ -2,7 +2,7 @@ import { createEffect, createSignal, For, Show } from 'solid-js'
 import { createQuery, useQueryClient } from '@tanstack/solid-query'
 import { assignmentsOptions, reposOptions, workspaceAssignmentsKey, workspacesKey, workspacesOptions } from '../queries'
 import { createWorkspace, ignoreRepo, setAllReposIgnored, setRepoWorkspace, unignoreRepo } from './mutations'
-import { terminalApi } from '../../../plugins/terminal/client/terminalClient'
+import { taskBridge } from '../tasks/taskBridge'
 import './onboarding.css'
 
 // The repo→workspace mapping body (docs/workspaces-and-tasks.md): create named workspaces, assign each repo to
@@ -14,7 +14,7 @@ export default function WorkspaceRepoAssignments() {
   const repos = createQuery(() => reposOptions(true))
   const workspaces = createQuery(() => workspacesOptions(true))
   const assignments = createQuery(() => assignmentsOptions(true))
-  const api = terminalApi()
+  const api = taskBridge()
 
   const assignFor = (key: string) => assignments.data?.find((a) => `${a.owner}/${a.name}` === key)
   const isIgnored = (key: string) => assignFor(key)?.ignored ?? false

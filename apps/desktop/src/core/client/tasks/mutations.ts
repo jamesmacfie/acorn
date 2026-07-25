@@ -2,8 +2,6 @@
 // the workspace's unit of work, not a GitHub concept — and every route helper below already lives in
 // core/shared/api.ts. Callers invalidate tasksKey / reviewNotesKey(taskId) after.
 //
-// createTask / createCheckoutTask live with the desktop task bridge instead: they have to reach the
-// main process after the row is written (setup script, checkout borrow).
 import { postJson, writeJson } from '../apiClient'
 import {
   reviewNoteRoute,
@@ -11,11 +9,33 @@ import {
   reviewNotesSentRoute,
   type ReviewNote,
   type ReviewNoteSeed,
+  type Task,
+  type TaskSeed,
   taskLinksRoute,
   taskRoute,
+  tasksRoute,
   type TaskLink,
   type TaskLinkSeed,
 } from '../../shared/api'
+import { taskBridge } from './taskBridge'
+
+// Create from a seed (docs/workspaces-and-tasks.md). Callers invalidate tasksKey after.
+export const createTask = async (seed: TaskSeed) => {
+  const task = await postJson<Task>(tasksRoute, seed)
+  // Desktop: let main run the repo's setup script now if it's configured to run on task creation
+  // (no-op otherwise). Fire-and-forget so task creation isn't blocked on git/worktree.
+  void taskBridge()?.task.onCreated(task.id)
+  return task
+}
+
+// Create a task that borrows the mapped checkout (current dir + current branch) instead of an
+// isolated worktree. Awaits useCheckout (not onCreated) so no worktree is ever created; without the
+// desktop bridge it degrades to a normal local task on the seed branch. Callers invalidate tasksKey.
+export const createCheckoutTask = async (seed: TaskSeed) => {
+  const task = await postJson<Task>(tasksRoute, seed)
+  const patch = await taskBridge()?.task.useCheckout(task.id)
+  return patch ? { ...task, ...patch } : task
+}
 
 export async function patchTask(id: string, body: { title?: string; status?: 'active' | 'archived'; pullNumber?: number | null }) {
   return writeJson<unknown>(taskRoute(id), {

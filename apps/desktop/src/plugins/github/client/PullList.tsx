@@ -9,7 +9,7 @@ import { closedPullsInfiniteOptions, integrationsOptions, pullDetailOptions, pul
 import { filterPulls } from './pullList/model'
 import { prFilterFor, setPrFilter } from './pullList/filterState'
 import { workspaceForRepo } from '../../../core/client/workspaces/activeWorkspace'
-import { createTask } from './mutations'
+import { createTask } from '../../../core/client/tasks/mutations'
 import { rowHeight } from '../../../core/client/ui/metrics'
 import { watchAppearance } from '../../../core/client/ui/appearance'
 import { scanLinearRefs } from '../../linear/client/scanLinearRefs'

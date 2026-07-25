@@ -5,7 +5,7 @@ import type { RunTargetInfo } from '../../shared/terminal'
 import { tasksOptions, workspacesOptions } from '../queries'
 import { workspaceForRepo } from '../workspaces/activeWorkspace'
 import { refreshSessions } from '../../../plugins/terminal/client/sessions'
-import { terminalApi } from '../../../plugins/terminal/client/terminalClient'
+import { capabilities } from '../capabilities'
 import { runApi } from '../../../plugins/terminal/client/runClient'
 import { workflowApi } from '../../../plugins/agents/client/workflowClient'
 import { activeTaskId, dispatchLayout, setRecipeBrowserUrl, setTerminalOpen } from '../tasks/tasks'
@@ -25,7 +25,8 @@ const EMPTY_RUN_SOURCES: RunSources = { targets: [], errors: [], layouts: [] }
 // config parse-error rows (13 §B — a broken .acorn/config.toml is visible, not silent). Thin glue
 // over the pure model; keyboard/overlay plumbing comes from the shared createOverlayPalette hook.
 export default function CommandPalette() {
-  const api = terminalApi()
+  // Desktop-only rows (run targets, workflows): guard on the capability, not on a PTY accessor.
+  const api = capabilities().terminal
   const navigate = useNavigate()
   const params = useParams()
   const tasks = createQuery(() => tasksOptions(true))

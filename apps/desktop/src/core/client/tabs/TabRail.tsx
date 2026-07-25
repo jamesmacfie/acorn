@@ -2,8 +2,7 @@ import { createSignal, For, onCleanup, onMount, Show } from 'solid-js'
 import { useNavigate, useParams } from '@solidjs/router'
 import { createQuery, useQueryClient } from '@tanstack/solid-query'
 import { integrationsOptions, prefsOptions, pullDetailOptions, tasksKey, tasksOptions, workspacesOptions, type Task } from '../queries'
-import { archiveTask, renameTask } from '../tasks/mutations'
-import { createCheckoutTask, createTask } from '../../../plugins/github/client/mutations'
+import { archiveTask, createCheckoutTask, createTask, renameTask } from '../tasks/mutations'
 import { applyRailOrder, isPinned, moveTask, parseRailOrder, pinTask, unpinTask, type RailOrder } from './railOrder'
 import { checksState } from '../ui/displayMeta'
 import { createDismissable } from '../ui/dismissable'
@@ -18,7 +17,7 @@ import { unreadForTask } from '../notifications/notifications'
 import { workspaceForRepo } from '../workspaces/activeWorkspace'
 import { resolveWorkspaceColor } from '../../shared/workspaceIdentity'
 import { dedupeBranch, slugifyBranch } from '../../shared/branch'
-import { terminalApi } from '../../../plugins/terminal/client/terminalClient'
+import { taskBridge } from '../tasks/taskBridge'
 import { registerCommands } from '../registries/commands'
 import { registerKeybindings } from '../registries/keybindings'
 import { confirmWillEvent } from '../registries/willPhase'
@@ -221,7 +220,7 @@ export default function TabRail() {
 
   async function archive(w: Task) {
     if (capabilities().terminal) {
-      const res = await terminalApi()!.task.archive(w.id)
+      const res = await taskBridge()!.task.archive(w.id)
       if (!res.ok) return setArchiveErr(res.output ? `${res.reason}\n${res.output}` : res.reason)
     } else {
       await archiveTask(w.id)

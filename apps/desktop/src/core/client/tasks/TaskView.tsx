@@ -10,6 +10,7 @@ import AgentsPanel, { AgentsToggle } from '../../../plugins/agents/client/Agents
 import { workspaceForRepo } from '../workspaces/activeWorkspace'
 import { addSession, refreshSessions, requestTerminalFocus } from '../../../plugins/terminal/client/sessions'
 import { terminalApi } from '../../../plugins/terminal/client/terminalClient'
+import { taskBridge } from './taskBridge'
 import { runApi } from '../../../plugins/terminal/client/runClient'
 import { dispatchLayout, layoutForTask, maximizedPane, setActiveTaskId, setMaximizedPane, setSelectedSource } from './tasks'
 import { activateTaskSignals, pathForTask } from './activate'
@@ -28,6 +29,7 @@ export default function TaskView(props: {
   onOpenTerminal: () => void
 }) {
   const api = terminalApi()
+  const bridge = taskBridge()
   const navigate = useNavigate()
   const queryClient = useQueryClient()
   const tasksQuery = createQuery(() => tasksOptions(true))
@@ -168,10 +170,10 @@ export default function TaskView(props: {
     if (archiving()) return
     const archivedTaskId = props.task.id
     const next = nextTask()
-    if (api) {
+    if (bridge) {
       setArchiving(true)
       try {
-        const result = await api.task.archive(archivedTaskId, {
+        const result = await bridge.task.archive(archivedTaskId, {
           deleteWorktree: true, force: true, skipTeardown,
         })
         if (!result.ok) {
