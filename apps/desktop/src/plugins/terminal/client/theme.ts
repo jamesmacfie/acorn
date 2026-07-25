@@ -1,5 +1,5 @@
 import type { ITheme } from '@xterm/xterm'
-import { getHighlighter } from '../../github/client/shiki'
+import { getHighlighter } from '../../../core/client/highlight/shiki'
 import { isAppDark, token } from '../../../core/client/ui/appearance'
 
 // Re-exported for convenience inside this plugin. The generic appearance readers live in

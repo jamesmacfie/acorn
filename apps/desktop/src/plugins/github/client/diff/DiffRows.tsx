@@ -1,6 +1,6 @@
 import { createEffect, createSignal, For, Match, on, Show, Switch } from 'solid-js'
 import CopyButton from '../../../../core/client/ui/CopyButton'
-import { fileStatusMeta } from '../displayMeta'
+import { fileStatusMeta } from '../../../../core/client/ui/displayMeta'
 import MentionTextarea from '../MentionTextarea'
 import type { PullFile, Thread } from '../../../../core/client/queries'
 import { UserAvatar } from '../../../../core/client/ui/UserAvatar'

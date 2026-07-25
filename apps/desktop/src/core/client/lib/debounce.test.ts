@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { debounce } from './autosave'
+import { debounce } from './debounce'
 
 describe('debounce', () => {
   beforeEach(() => vi.useFakeTimers())

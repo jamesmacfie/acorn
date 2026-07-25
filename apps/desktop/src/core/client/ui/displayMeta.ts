@@ -1,4 +1,4 @@
-import type { PullFile } from '../../../core/client/queries'
+import type { PullFile } from '../queries'
 
 export type FileStatusTone = 'add' | 'del' | 'warn' | 'muted'
 

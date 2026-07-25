@@ -1,8 +1,8 @@
 import { diffWordsWithSpace } from 'diff'
 import gitdiffParser from 'gitdiff-parser'
 import { synth } from '../diff'
-import type { getHighlighter } from '../shiki'
-import { langFor } from '../shiki'
+import type { getHighlighter } from '../../../../core/client/highlight/shiki'
+import { langFor } from '../../../../core/client/highlight/shiki'
 import type { PullFile, Thread } from '../../../../core/client/queries'
 
 export type Tok = { content: string; light: string; dark: string }

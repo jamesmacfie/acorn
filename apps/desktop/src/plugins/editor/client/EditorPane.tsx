@@ -2,7 +2,7 @@ import { createEffect, createSignal, For, on, onCleanup, onMount, Show } from 's
 import * as monaco from 'monaco-editor'
 import './monacoSetup'
 import type { Task } from '../../../core/client/queries'
-import { debounce } from './autosave'
+import { debounce } from '../../../core/client/lib/debounce'
 import { editorApi, type EditorEntry } from './editorClient'
 import { formatFileReference, sendReferenceToAgent } from '../../../core/client/agent/reference'
 import { isAppDark, token, watchAppearance } from '../../../core/client/ui/appearance'

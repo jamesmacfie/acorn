@@ -1,6 +1,6 @@
 import { createEffect, createSignal, createResource, For, onCleanup, onMount, Show } from 'solid-js'
 import type { Task, Workspace } from '../../../core/client/queries'
-import { debounce } from '../../editor/client/autosave'
+import { debounce } from '../../../core/client/lib/debounce'
 import { renderMarkdown } from '../../../core/client/integrations/markdown'
 import { bytesOf, formatSize } from '../../context/client/model'
 import { notesApi, type NoteLocation, type NoteScope, type NoteSummary } from './notesClient'

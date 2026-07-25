@@ -2,8 +2,8 @@ import { createEffect, createMemo, createResource, createSignal, For, onCleanup,
 import { Portal } from 'solid-js/web'
 import { createQuery } from '@tanstack/solid-query'
 import { jobLogOptions, runJobsOptions } from '../../../../core/client/queries'
-import { FAILED_STATUSES } from '../displayMeta'
-import { getHighlighter, tokenizeAnsiLines } from '../shiki'
+import { FAILED_STATUSES } from '../../../../core/client/ui/displayMeta'
+import { getHighlighter, tokenizeAnsiLines } from '../../../../core/client/highlight/shiki'
 import { splitJobLog } from './splitJobLog'
 
 // One step's log, ANSI-colour highlighted (the colours CI tools emit). Falls back to raw text while

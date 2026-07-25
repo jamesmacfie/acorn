@@ -1,6 +1,6 @@
 import { createResource, createSignal, For, Index, onCleanup, Show } from 'solid-js'
 import { createQuery, useQueryClient } from '@tanstack/solid-query'
-import { debounce } from '../../../plugins/editor/client/autosave'
+import { debounce } from '../lib/debounce'
 import { terminalApi } from '../../../plugins/terminal/client/terminalClient'
 import { integrationsOptions, workspacesKey } from '../queries'
 import { deleteWorkspace, renameWorkspace, setWorkspaceColor, setWorkspaceIcon } from '../../../plugins/github/client/mutations'
