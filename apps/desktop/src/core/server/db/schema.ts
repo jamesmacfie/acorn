@@ -1,4 +1,4 @@
-import { blob, index, integer, primaryKey, real, sqliteTable, text } from 'drizzle-orm/sqlite-core'
+import { blob, index, integer, primaryKey, real, sqliteTable, text, uniqueIndex } from 'drizzle-orm/sqlite-core'
 
 // The read-model mirror + app-state schema (docs/data-layer.md). Mirror tables are cached,
 // revalidated projections of GitHub data; app-state tables (prefs, pins, viewed files) are the
@@ -284,6 +284,7 @@ export const repoPaths = sqliteTable(
     dbUrlScript: text('db_url_script'), // shell command run in the worktree to print a Postgres connection URL for the Database pane (docs/pg.md); null/blank = auto-detect from .env / $DATABASE_URL
     dbSchemaMode: text('db_schema_mode'), // 'auto' | 'script' | 'file' — where the Database pane's AI-generation schema text comes from; null → 'auto' (live introspection)
     dbSchemaValue: text('db_schema_value'), // the shell command or worktree-relative file path per dbSchemaMode; null/blank = unset
+    dbSchemaNotes: text('db_schema_notes'), // free-form prose sent with the schema on every AI generate: JSONB shapes, enum meanings, which tables are live; null/blank = none
     previewMode: text('preview_mode'), // 'url' | 'port' | 'script' — how the browser-preview URL is resolved; null → dev-server port
     previewValue: text('preview_value'), // the URL, port, or shell command per previewMode; null/blank = unset
     browserRules: text('browser_rules'), // JSON BrowserRule[] — preview-browser page rules (docs/panes.md); null = none
@@ -425,6 +426,25 @@ export const reviewNotes = sqliteTable('review_notes', {
   sentAt: integer('sent_at'), // stamped on delivery; cleared on edit
   createdAt: integer('created_at').notNull(),
 })
+
+// Named SQL snippets for the Database pane (docs/pg.md). Repo-scoped, NOT task-scoped: a query
+// written against a repo's schema outlives any one task worktree. Machine-scoped (no user_id) like
+// tasks/review_notes. (owner, repo, name) is unique — saving under an existing name overwrites it,
+// which is also how a query gets edited or renamed (there is no PATCH route).
+export const dbSavedQueries = sqliteTable(
+  'db_saved_queries',
+  {
+    id: text('id').primaryKey(), // opaque uuid
+    repoOwner: text('repo_owner').notNull(),
+    repoName: text('repo_name').notNull(),
+    name: text('name').notNull(),
+    notes: text('notes'), // what it answers / gotchas — sent alongside the SQL as AI-generation context
+    sql: text('sql').notNull(),
+    createdAt: integer('created_at').notNull(),
+    updatedAt: integer('updated_at').notNull(),
+  },
+  (t) => [uniqueIndex('db_saved_queries_repo_name_idx').on(t.repoOwner, t.repoName, t.name)],
+)
 
 // Memory index (docs/notes-and-memory.md): markdown files are the TRUTH (<worktree>/.acorn/memory committed,
 // ~/.acorn/memory private); this table is a derived index reconciled on change from all active

@@ -45,6 +45,7 @@ export const directPreferenceSlices: readonly PersistedStateSlice<unknown>[] = [
   direct('core.theme', PrefKeys.theme),
   direct('core.theme-light', PrefKeys.themeLight),
   direct('core.theme-dark', PrefKeys.themeDark),
+  direct('core.style', PrefKeys.style),
   jsonObject('core.keybindings', PrefKeys.keybindings),
   jsonObject('core.pane-shortcuts-legacy', PrefKeys.paneShortcuts),
   direct('github.diff-view', PrefKeys.diffView, 'view'),

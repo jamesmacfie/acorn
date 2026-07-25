@@ -21,7 +21,7 @@ export default function OnboardingModal(props: { onClose: () => void }) {
           <WorkspaceRepoAssignments />
         </div>
         <div class="onboarding-footer">
-          <button type="button" class="overlay-btn" onClick={() => void done()}>
+          <button type="button" class="ui-btn" onClick={() => void done()}>
             Done
           </button>
         </div>

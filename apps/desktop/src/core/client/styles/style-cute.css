@@ -1,0 +1,90 @@
+/* CUTE — rounded and playful: chunky radii, pill chrome, a springy press.
+ *
+ * The pack that exercises the radius and motion axes hardest. The springy hover/press comes from
+ * the null-default `transform` declarations in base.css — nothing in the app sets transform on
+ * hover, so a token alone could not add one; base.css declares it at `none` and this pack just
+ * fills the token in. That is the pattern to reuse for any property no rule currently declares.
+ */
+:root[data-style='cute'] {
+  /* ── Shape ─────────────────────────────────────────────────────────────────────────────── */
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --radius-xl: 22px;
+  --radius-control: var(--radius-md);
+  --radius-surface: var(--radius-lg);
+  --radius-popover: var(--radius-xl);
+  --radius-chip: var(--radius-pill);
+  --radius-marker: var(--radius-sm);
+
+  --divider-w: var(--bw-0);      /* no rules at all — shapes do the separating */
+  --marker-w: var(--bw-0);
+  --pane-bw: var(--bw);
+  --pane-divider-w: var(--bw);
+
+  /* ── Space ─────────────────────────────────────────────────────────────────────────────── */
+  --pane-pad: var(--space-8);
+  --pane-pad-y: var(--space-6);
+  --gap-inline: var(--space-4);
+  --gap-row: var(--space-5);
+  --gap-stack: var(--space-6);
+  --gap-section: var(--space-9);
+  --pad-control: var(--space-3) var(--space-6);
+  --pad-control-lg: var(--space-4) var(--space-8);
+  --pad-chip: 0 var(--space-6);
+
+  /* ── Density ───────────────────────────────────────────────────────────────────────────── */
+  --row-h: 44px;
+  --row-h-virt: 44px;
+  --row-h-sm: 34px;
+  --control-h: 34px;
+  --topbar-h: 54px;
+  --pane-head-h: 46px;
+  --shell-pad: var(--space-5);
+  --pane-gap: var(--space-5);
+
+  /* ── Typography ────────────────────────────────────────────────────────────────────────── */
+  --font-ui: 'Nunito', ui-rounded, 'SF Pro Rounded', -apple-system, sans-serif;
+  --fs-sm: 13px;
+  --fs: 14px;
+  --fs-md: 15px;
+  --fs-lg: 17px;
+  --lh: 1.6;
+  --label-transform: none;
+  --label-tracking: 0.01em;
+  --label-weight: var(--fw-bold);
+
+  /* ── Chrome ────────────────────────────────────────────────────────────────────────────── */
+  --elev-card: var(--shadow-2);
+  --elev-pane: var(--shadow-2);
+  --elev-popover: var(--shadow-4);
+  --card-bg: var(--bg-subtle);
+  --chip-bg: var(--bg-subtle);
+  --scrim-alpha: 0.45;
+  --scrim-filter: blur(6px);
+  --focus-ring-offset: 3px;
+
+  /* ── Motion — the springy bit ──────────────────────────────────────────────────────────── */
+  --dur-short: 180ms;
+  --dur-med: 260ms;
+  --ease-interactive: var(--ease-spring);
+  --hover-lift: translateY(-1px);
+  --press-scale: scale(0.97);
+}
+
+/* ─────────────────────────────────────────────────────────────────────────────────────────────
+   ESCAPE HATCH — budget 25 selectors. Currently 2.
+   ───────────────────────────────────────────────────────────────────────────────────────────── */
+
+/* See shell.css: a zero-width grid column still emits its gap. */
+:root[data-style='cute'] .app.left-collapsed .panes {
+  grid-template-columns: 0 clamp(360px, 23vw, 430px) minmax(0, 1fr);
+  gap: 0 var(--pane-gap);
+}
+
+/* With --marker-w: 0 there is no accent bar, so selection has to read from the fill; the rounded
+   pill shape also needs the row inset from the pane edge or the corners clip. */
+:root[data-style='cute'] .ui-row[data-selected] {
+  background: color-mix(in srgb, var(--accent) 16%, var(--bg));
+  border-radius: var(--radius-pill);
+}

@@ -261,14 +261,14 @@ export default function ChangesPane(props: { task: Task }) {
           <Show when={groups().staged.length}>
             <div class="changes-commit">
               <input
-                class="integration-key-input"
+                class="ui-input"
                 type="text"
                 placeholder="Commit message"
                 value={commitMsg()}
                 onInput={(e) => setCommitMsg(e.currentTarget.value)}
                 onKeyDown={(e) => e.key === 'Enter' && void commit()}
               />
-              <button type="button" class="overlay-btn" disabled={!commitMsg().trim()} onClick={() => void commit()}>
+              <button type="button" class="ui-btn" disabled={!commitMsg().trim()} onClick={() => void commit()}>
                 Commit staged
               </button>
             </div>

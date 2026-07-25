@@ -34,6 +34,13 @@ function applyTheme(prefs: Readonly<Record<string, string>>): () => void {
   return () => media.removeEventListener('change', update)
 }
 
+// Visual style (shape/typography/space/density) is the second appearance axis, orthogonal to theme
+// (colour). No disposer and no media listener: unlike light/dark there is no OS signal to follow.
+// 'terminal' is the attribute-less :root default, so this only ever writes a non-default pack.
+function applyStyle(prefs: Readonly<Record<string, string>>): void {
+  document.documentElement.dataset.style = prefs[PrefKeys.style] ?? 'terminal'
+}
+
 export type AppStartupOptions = {
   queryClient: QueryClient
   prefs: Accessor<Readonly<Record<string, string>> | undefined>
@@ -53,6 +60,7 @@ export function createAppStartupRestore(options: AppStartupOptions): { restored:
     if (!prefs) return
     disposeTheme()
     disposeTheme = applyTheme(prefs)
+    applyStyle(prefs)
   })
   onCleanup(() => disposeTheme())
 

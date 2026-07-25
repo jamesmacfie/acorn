@@ -1,4 +1,26 @@
-@import './styles/tokens-layout.css';
+/* Shell stylesheet manifest (docs/ui-design.md). Feature modules co-locate their own stylesheet
+ * next to the component and import it directly; this covers the shell and the token axes.
+ *
+ * ORDER. Only "defaults before overrides" is load-bearing. The theme and style axes declare
+ * disjoint token sets (styles/tokenAxes.test.ts enforces it), so their order relative to each
+ * other is irrelevant — which is what removes the old source-order fragility where every
+ * :root[data-theme] block sat at the same (0,2,0) specificity as the prefers-color-scheme block.
+ */
+@import './styles/fonts.css';
+@import './styles/tokens-invariant.css';
+@import './styles/tokens-style.css'; /* style defaults == the 'terminal' pack */
+@import './styles/tokens-theme.css';
+@import './styles/base.css';
+@import './styles/shell.css';
+@import './styles/primitives.css';
+
+/* Style packs last: their token blocks and their few structural overrides both sit after
+   everything they override. Specificity already guarantees this ((0,3,0) beats the (0,1,0)/(0,2,0)
+   bases), so the order is for the reader, not the cascade. */
+@import './styles/style-modern.css';
+@import './styles/style-cozy.css';
+@import './styles/style-cute.css';
+
 @import './styles/pull-list.css';
 @import './styles/pull-detail.css';
 @import './styles/diff.css';

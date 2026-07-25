@@ -3,7 +3,7 @@ import { createQuery } from '@tanstack/solid-query'
 import { workspacesOptions } from '../queries'
 import { settingsContributions } from '../registries/settings'
 import { ContributionBoundary } from '../ui/ContributionBoundary'
-import { trapOverlayFocus } from '../ui/focus'
+import { createDismissable } from '../ui/dismissable'
 import { Dynamic } from 'solid-js/web'
 import './settings.css'
 
@@ -18,19 +18,17 @@ export default function SettingsModal(props: { onClose: () => void; initialTab?:
     return generalPages().find((page) => page.id === tab()) ?? generalPages()[0]
   })
   let dialog!: HTMLDivElement
+  const dismiss = createDismissable({ onDismiss: () => props.onClose(), container: () => dialog })
 
   return (
-    <div class="overlay-backdrop" onClick={props.onClose}>
+    <div class="overlay-backdrop" onClick={dismiss.onBackdropClick}>
       <div
         ref={dialog}
         class="overlay settings"
         role="dialog"
         aria-modal="true"
-        onKeyDown={(event) => {
-          if (event.key === 'Escape') props.onClose()
-          else trapOverlayFocus(event, dialog)
-        }}
-        onClick={(event) => event.stopPropagation()}
+        onKeyDown={dismiss.onKeyDown}
+        onClick={dismiss.onContainerClick}
       >
         <nav class="settings-nav">
           <Show when={generalPages().find((page) => page.id === 'workspaces')}>

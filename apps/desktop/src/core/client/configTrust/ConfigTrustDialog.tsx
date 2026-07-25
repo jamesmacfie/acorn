@@ -3,6 +3,7 @@ import { diffLines } from 'diff'
 import { readJson, writeJson } from '../apiClient'
 import { repoConfigTrustRoute, type RepoConfigTrustReview } from '../../shared/api'
 import { closeRepoConfigTrust, configTrustRequest } from './configTrust'
+import { createDismissable } from '../ui/dismissable'
 import './config-trust.css'
 
 export default function ConfigTrustDialog() {
@@ -45,10 +46,21 @@ export default function ConfigTrustDialog() {
     return value?.current && value.previous ? diffLines(value.previous.text, value.current.text) : []
   }
 
+  let dialog!: HTMLElement
+  const dismiss = createDismissable({ onDismiss: closeRepoConfigTrust, container: () => dialog })
+
   return (
     <Show when={configTrustRequest()}>
-      <div class="overlay-backdrop" onClick={closeRepoConfigTrust}>
-        <section class="overlay config-trust-dialog" role="alertdialog" aria-modal="true" aria-labelledby="config-trust-title" onClick={(event) => event.stopPropagation()}>
+      <div class="overlay-backdrop" onClick={dismiss.onBackdropClick}>
+        <section
+          ref={dialog}
+          class="overlay config-trust-dialog"
+          role="alertdialog"
+          aria-modal="true"
+          aria-labelledby="config-trust-title"
+          onClick={dismiss.onContainerClick}
+          onKeyDown={dismiss.onKeyDown}
+        >
           <div class="overlay-title" id="config-trust-title">Review repo configuration</div>
           <div class="overlay-body config-trust-body">
             <p>
@@ -78,8 +90,8 @@ export default function ConfigTrustDialog() {
             </Show>
           </div>
           <div class="overlay-actions">
-            <button type="button" class="overlay-btn overlay-btn-ghost" onClick={closeRepoConfigTrust}>Not now</button>
-            <button type="button" class="overlay-btn" disabled={saving() || !review()?.current} onClick={() => void trustAndRun()}>
+            <button type="button" class="ui-btn" data-variant="ghost" onClick={closeRepoConfigTrust}>Not now</button>
+            <button type="button" class="ui-btn" disabled={saving() || !review()?.current} onClick={() => void trustAndRun()}>
               {saving() ? 'Trusting…' : configTrustRequest()?.retry ? 'Trust and run' : 'Trust configuration'}
             </button>
           </div>

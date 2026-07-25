@@ -5,6 +5,7 @@ import { integrationsOptions, prefsOptions, pullDetailOptions, tasksKey, tasksOp
 import { archiveTask, createCheckoutTask, createTask, renameTask } from '../../../plugins/github/client/mutations'
 import { applyRailOrder, isPinned, moveTask, parseRailOrder, pinTask, unpinTask, type RailOrder } from './railOrder'
 import { checksState } from '../../../plugins/github/client/displayMeta'
+import { createDismissable } from '../ui/dismissable'
 import { activeTaskId, selectedSource, setActiveTaskId, setSelectedSource, type SourceId } from '../tasks/tasks'
 import { activateTaskSignals, pathForTask } from '../tasks/activate'
 import { capabilities } from '../capabilities'
@@ -205,6 +206,8 @@ export default function TabRail() {
   // bridge-absent browser dev build (capabilities()).
   const [archiveErr, setArchiveErr] = createSignal('')
   const [draftErr, setDraftErr] = createSignal('')
+  let draftDialog!: HTMLDivElement
+  const draftDismiss = createDismissable({ onDismiss: () => setDraft(null), container: () => draftDialog })
 
   async function openArchive(w: Task) {
     setMenuId(null)
@@ -351,13 +354,13 @@ export default function TabRail() {
       <Show when={archiveErr()}><div class="tabrail-action-error action-error" role="alert">{archiveErr()}</div></Show>
       <Show when={draft()}>
         {(d) => (
-          <div class="overlay-backdrop" onClick={() => setDraft(null)}>
-            <div class="overlay" role="dialog" aria-modal="true" onClick={(e) => e.stopPropagation()}>
+          <div class="overlay-backdrop" onClick={draftDismiss.onBackdropClick}>
+            <div ref={draftDialog} class="overlay" role="dialog" aria-modal="true" onClick={draftDismiss.onContainerClick} onKeyDown={draftDismiss.onKeyDown}>
               <div class="overlay-title">{d().mode === 'new' ? 'New task' : 'Rename task'}</div>
               <div class="overlay-body">
                 <Show when={d().mode === 'new'}>
                   <p class="muted">{useCheckout() ? "Works in the repo's current checkout and branch — no worktree." : 'A local-first task on a new branch.'}</p>
-                  <select class="integration-key-input" value={newRepo()} onChange={(e) => setNewRepo(e.currentTarget.value)}>
+                  <select class="ui-input" value={newRepo()} onChange={(e) => setNewRepo(e.currentTarget.value)}>
                     <For each={newRepoOptions()}>
                       {(r) => <option value={`${r.owner}/${r.name}`}>{r.owner}/{r.name}</option>}
                     </For>
@@ -370,17 +373,16 @@ export default function TabRail() {
                 <form class="integration-key-row" style={{ 'flex-direction': 'column', 'align-items': 'stretch', gap: '6px' }} onSubmit={submitDraft}>
                   <Show when={draftErr()}><div class="action-error" role="alert">{draftErr()}</div></Show>
                   <input
-                    class="integration-key-input"
+                    class="ui-input"
                     type="text"
                     ref={(el) => queueMicrotask(() => el.focus())}
                     placeholder={d().mode === 'new' ? 'Task title' : 'Task name'}
                     value={text()}
                     onInput={(e) => setText(e.currentTarget.value)}
-                    onKeyDown={(e) => e.key === 'Escape' && setDraft(null)}
                   />
                   <Show when={d().mode === 'new' && !useCheckout()}>
                     <input
-                      class="integration-key-input"
+                      class="ui-input"
                       type="text"
                       placeholder="branch (from title)"
                       title="Branch name — defaults to a slug of the title"
@@ -389,10 +391,9 @@ export default function TabRail() {
                         setBranchTouched(true)
                         setBranchText(e.currentTarget.value)
                       }}
-                      onKeyDown={(e) => e.key === 'Escape' && setDraft(null)}
-                    />
+                      />
                   </Show>
-                  <button type="submit" class="overlay-btn" disabled={!text().trim() || (d().mode === 'new' && !useCheckout() && !effectiveBranch())}>
+                  <button type="submit" class="ui-btn" disabled={!text().trim() || (d().mode === 'new' && !useCheckout() && !effectiveBranch())}>
                     {d().mode === 'new' ? 'Create' : 'Save'}
                   </button>
                 </form>

@@ -1,14 +1,16 @@
-import { batch, createMemo, createSignal, For, onCleanup, onMount, Show } from 'solid-js'
+import { batch, createMemo, createResource, createSignal, For, onCleanup, onMount, Show } from 'solid-js'
 import { createQuery } from '@tanstack/solid-query'
 import * as monaco from 'monaco-editor'
 import '../../editor/client/monacoSetup'
 import { integrationsOptions, type Task } from '../../../core/client/queries'
+import Picker from '../../../core/client/ui/Picker'
 import { availableModelConnections } from '../../../core/shared/modelProviders'
-import { isAppDark, token, watchTheme } from '../../terminal/client/theme'
-import type { DbCell, DbColumn, DbResultSet, DbTable } from '../shared/database'
+import { isAppDark, token, watchAppearance } from '../../../core/client/ui/appearance'
+import type { DbCell, DbColumn, DbResultSet, DbSavedQuery, DbTable } from '../shared/database'
 import { databaseApi } from './databaseClient'
 import GenerateSqlModal from './GenerateSqlModal'
 import ResultGrid from './ResultGrid'
+import SaveQueryModal from './SaveQueryModal'
 import './database.css'
 
 // Monaco ignores CSS custom properties, so it gets an explicit theme built from the live app tokens
@@ -54,10 +56,36 @@ export default function DatabasePane(props: { task: Task }) {
   const [busy, setBusy] = createSignal(false)
   const [deleteArmed, setDeleteArmed] = createSignal(false)
   const [generating, setGenerating] = createSignal(false)
+  const [saving, setSaving] = createSignal<string | null>(null) // the SQL being saved (null = modal closed)
 
   // AI SQL generation: available only when a model-provider key is connected (docs/pg.md).
   const integrations = createQuery(() => integrationsOptions(true))
   const modelConnections = createMemo(() => (integrations.data ? availableModelConnections(integrations.data) : []))
+
+  // Saved queries (docs/pg.md) are repo-scoped, so they outlive this task; the route resolves the repo
+  // from the task id. createResource, not the query cache — this pane holds all its other state in signals.
+  // Failures surface in the pane's error line rather than rejecting — a resource in an error state
+  // re-throws on read, which would take the whole pane down over a missing list of snippets.
+  const [saved, { refetch: refetchSaved }] = createResource(
+    () => props.task.id,
+    (taskId) => api.queries(taskId).catch((e: unknown) => (setError(e instanceof Error ? e.message : String(e)), [])),
+  )
+  const savedList = (): DbSavedQuery[] => saved() ?? []
+  // The name a Save would default to: whatever was last loaded, so load → tweak → Save updates in place.
+  const [loadedName, setLoadedName] = createSignal('')
+  const matchSaved = (query: string) => {
+    const needle = query.trim().toLowerCase()
+    return needle ? savedList().filter((q) => `${q.name} ${q.notes ?? ''}`.toLowerCase().includes(needle)) : savedList()
+  }
+  const deleteSaved = async (q: DbSavedQuery) => {
+    try {
+      await api.deleteQuery(props.task.id, q.id)
+    } catch (e) {
+      return setError(e instanceof Error ? e.message : String(e))
+    }
+    if (loadedName() === q.name) setLoadedName('')
+    await refetchSaved()
+  }
 
   let editorHost: HTMLDivElement | undefined
   let editor: monaco.editor.IStandaloneCodeEditor | undefined
@@ -167,7 +195,7 @@ export default function DatabasePane(props: { task: Task }) {
         fontSize: 13,
       })
       editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.Enter, () => void execute())
-      stopTheme = watchTheme(applyMonacoTheme)
+      stopTheme = watchAppearance(applyMonacoTheme)
     }
     void connect()
   })
@@ -216,6 +244,25 @@ export default function DatabasePane(props: { task: Task }) {
             <div class="db-editor-host" ref={editorHost} />
             <div class="db-editor-bar">
               <span class="muted db-hint">⌘↵ to run</span>
+              <Picker<DbSavedQuery>
+                label={loadedName() || 'Queries'}
+                placeholder="Filter saved queries…"
+                emptyText="No saved queries yet."
+                buttonClass="db-run-btn"
+                results={matchSaved}
+                // Notes are searchable, so show their first line to explain why a row matched.
+                rowLabel={(q) => (q.notes?.trim() ? `${q.name} — ${q.notes.trim().split('\n')[0]}` : q.name)}
+                isActive={(q) => q.name === loadedName()}
+                leading={(q) => (
+                  <button type="button" class="db-chip-x" title="Delete query" onClick={() => void deleteSaved(q)}>✕</button>
+                )}
+                onSelect={(q) => { editor?.setValue(q.sql); setLoadedName(q.name) }}
+              />
+              {/* ponytail: Monaco's content isn't a signal, so this can't be disabled-when-empty
+                  without watching every keystroke — an empty editor just makes the click a no-op. */}
+              <button type="button" class="db-run-btn" onClick={() => { const sql = editor?.getValue().trim(); if (sql) setSaving(sql) }}>
+                Save
+              </button>
               <Show when={modelConnections().length}>
                 <button type="button" class="db-run-btn" disabled={busy() || status() !== 'connected'} onClick={() => setGenerating(true)}>Generate</button>
               </Show>
@@ -315,8 +362,20 @@ export default function DatabasePane(props: { task: Task }) {
           <GenerateSqlModal
             taskId={props.task.id}
             connections={modelConnections()}
+            queries={savedList()}
             onClose={() => setGenerating(false)}
             onGenerated={(sql) => editor?.setValue(sql)}
+          />
+        </Show>
+
+        <Show when={saving() !== null}>
+          <SaveQueryModal
+            taskId={props.task.id}
+            sql={saving() ?? ''}
+            name={loadedName()}
+            existing={savedList()}
+            onClose={() => setSaving(null)}
+            onSaved={(q) => { setLoadedName(q.name); void refetchSaved() }}
           />
         </Show>
       </div>
