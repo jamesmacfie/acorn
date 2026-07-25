@@ -92,13 +92,13 @@ export default function WorkspaceRepoAssignments() {
 
       <form class="integration-key-row onboarding-newrow" onSubmit={addWorkspace}>
         <input
-          class="integration-key-input"
+          class="ui-input"
           type="text"
           placeholder="New workspace name (e.g. Runn)"
           value={newName()}
           onInput={(e) => setNewName(e.currentTarget.value)}
         />
-        <button type="submit" class="overlay-btn" disabled={busy() || !newName().trim()}>
+        <button type="submit" class="ui-btn" disabled={busy() || !newName().trim()}>
           Add workspace
         </button>
       </form>
@@ -140,11 +140,11 @@ export default function WorkspaceRepoAssignments() {
                 {/* Per-option `selected` (not select `value`): TanStack returns fresh objects on
                     refetch, so the option <For> recreates nodes and a `value` binding would drop
                     the selection. `selected` is reapplied as each option node is created. */}
-                <select class="integration-key-input" disabled={hidden()} onChange={(e) => void assign(r.owner, r.name, e.currentTarget.value)}>
+                <select class="ui-input" disabled={hidden()} onChange={(e) => void assign(r.owner, r.name, e.currentTarget.value)}>
                   <For each={workspaces.data ?? []}>{(w) => <option value={w.id} selected={w.id === wsForRepo(key)}>{w.name}</option>}</For>
                 </select>
                 <Show when={api} fallback={<span />}>
-                  <button type="button" class="overlay-btn onboarding-browse" disabled={hidden()} title={paths()[key] ?? 'Choose folder'} onClick={() => void browse(r.owner, r.name)}>
+                  <button type="button" class="ui-btn onboarding-browse" disabled={hidden()} title={paths()[key] ?? 'Choose folder'} onClick={() => void browse(r.owner, r.name)}>
                     {paths()[key] ? '✓ Folder' : 'Browse…'}
                   </button>
                 </Show>

@@ -4,19 +4,19 @@
   align-items: stretch;
   min-height: 40px;
   padding: 0 var(--pane-pad);
-  border-bottom: 1px solid var(--border);
+  border-bottom: var(--divider);
   background: var(--bg-subtle);
 }
 .ui-tab {
   position: relative;
   min-width: 88px;
-  padding: 0 12px;
+  padding: 0 var(--space-6);
   font: inherit;
   font-size: var(--fs-sm);
   color: var(--text-muted);
   background: transparent;
   border: 0;
-  border-bottom: 2px solid transparent;
+  border-bottom: var(--tab-active-w) solid transparent;
   cursor: pointer;
   white-space: nowrap;
 }
@@ -24,13 +24,13 @@
 .ui-tab:active { background: var(--bg-selected); }
 .ui-tab:focus-visible { outline: 2px solid var(--accent); outline-offset: -3px; }
 .ui-tab-count {
-  margin-left: 6px;
+  margin-left: var(--space-3);
   padding: 1px 5px;
-  font-family: var(--font-mono);
+  font-family: var(--font-ui);
   font-size: var(--fs-xs);
   color: var(--text-muted);
   background: var(--bg-selected);
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
 }
 @media (hover: hover) {
   .ui-tab:hover { color: var(--text); background: var(--bg-hover); }

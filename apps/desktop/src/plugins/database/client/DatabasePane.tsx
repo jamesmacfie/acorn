@@ -5,7 +5,7 @@ import '../../editor/client/monacoSetup'
 import { integrationsOptions, type Task } from '../../../core/client/queries'
 import Picker from '../../../core/client/ui/Picker'
 import { availableModelConnections } from '../../../core/shared/modelProviders'
-import { isAppDark, token, watchTheme } from '../../terminal/client/theme'
+import { isAppDark, token, watchAppearance } from '../../../core/client/ui/appearance'
 import type { DbCell, DbColumn, DbResultSet, DbSavedQuery, DbTable } from '../shared/database'
 import { databaseApi } from './databaseClient'
 import GenerateSqlModal from './GenerateSqlModal'
@@ -195,7 +195,7 @@ export default function DatabasePane(props: { task: Task }) {
         fontSize: 13,
       })
       editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.Enter, () => void execute())
-      stopTheme = watchTheme(applyMonacoTheme)
+      stopTheme = watchAppearance(applyMonacoTheme)
     }
     void connect()
   })

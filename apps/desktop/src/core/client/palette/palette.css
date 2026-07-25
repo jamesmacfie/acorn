@@ -2,19 +2,19 @@
 .overlay.palette { width: min(560px, 90vw); padding: 0; }
 .palette-input {
   width: 100%;
-  padding: 10px 12px;
+  padding: var(--space-5) var(--space-6);
   font: inherit;
   font-size: var(--fs);
   color: var(--text);
   background: var(--bg);
   border: 0;
-  border-bottom: 1px solid var(--border);
+  border-bottom: var(--divider);
   outline: none;
 }
 .palette-list {
   list-style: none;
   margin: 0;
-  padding: 4px 0;
+  padding: var(--space-2) 0;
   max-height: 50vh;
   overflow-y: auto;
 }
@@ -22,8 +22,8 @@
   width: 100%;
   display: flex;
   align-items: baseline;
-  gap: 10px;
-  padding: 6px 12px;
+  gap: var(--space-5);
+  padding: var(--space-3) var(--space-6);
   font: inherit;
   font-size: var(--fs-sm);
   text-align: left;
@@ -41,6 +41,6 @@
   overflow: hidden;
   white-space: nowrap;
   text-overflow: ellipsis;
-  font-family: var(--font-mono);
+  font-family: var(--font-ui);
 }
-.palette-empty { padding: 10px 12px; font-size: var(--fs-sm); }
+.palette-empty { padding: var(--space-5) var(--space-6); font-size: var(--fs-sm); }

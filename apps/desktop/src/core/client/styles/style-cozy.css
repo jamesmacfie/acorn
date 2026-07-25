@@ -1,0 +1,86 @@
+/* COZY — warm and unhurried: a reading serif, generous spacing, low density, soft structure.
+ *
+ * This is the pack that leans hardest on the space and density axes, which is why it is the real
+ * test of whether --space-*, --row-h and --row-h-virt were tokenised properly. Colour is not set
+ * here; Cozy composes with all 12 themes.
+ */
+:root[data-style='cozy'] {
+  /* ── Shape ─────────────────────────────────────────────────────────────────────────────── */
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 10px;
+  --radius-xl: 14px;
+  --radius-control: var(--radius-md);
+  --radius-surface: var(--radius-lg);
+  --radius-popover: var(--radius-lg);
+  --radius-chip: var(--radius-pill);   /* chips read as soft labels rather than boxes */
+
+  /* Structure by whitespace rather than by rules: dividers stay but go hairline-quiet, and the
+     selected-row marker thins out. */
+  --divider-w: var(--bw);
+  --marker-w: var(--bw-strong);
+  --pane-bw: var(--bw-0);
+
+  /* ── Space — the point of this pack ────────────────────────────────────────────────────── */
+  --pane-pad: var(--space-10);
+  --pane-pad-y: var(--space-8);
+  --gap-inline: var(--space-4);
+  --gap-row: var(--space-6);
+  --gap-stack: var(--space-8);
+  --gap-section: var(--space-11);
+  --pad-control: var(--space-3) var(--space-6);
+  --pad-control-lg: var(--space-5) var(--space-9);
+  --pad-chip: 0 var(--space-6);
+  --pad-cell: var(--space-3) var(--space-5);
+
+  /* ── Density ───────────────────────────────────────────────────────────────────────────── */
+  --row-h: 46px;
+  --row-h-virt: 46px;
+  --row-h-sm: 36px;
+  --control-h: 34px;
+  --topbar-h: 56px;
+  --pane-head-h: 52px;
+  --shell-pad: var(--space-3);
+  --pane-gap: var(--space-3);
+
+  /* ── Typography ────────────────────────────────────────────────────────────────────────── */
+  --font-ui: 'Literata', ui-serif, Georgia, 'Times New Roman', serif;
+  --font-display: var(--font-ui);
+  --fs-sm: 13px;
+  --fs: 15px;
+  --fs-md: 16px;
+  --fs-lg: 18px;
+  --fs-xl: 22px;
+  --lh: 1.7;             /* the roomiest line-height of any pack — this IS "cozy" */
+  --lh-tight: 1.4;
+
+  --label-transform: none;
+  --label-tracking: 0.01em;
+  --label-weight: var(--fw-semibold);
+  --label-size: var(--fs-sm);
+
+  /* ── Chrome ────────────────────────────────────────────────────────────────────────────── */
+  --elev-card: var(--shadow-0);
+  --elev-pane: var(--shadow-0);
+  --elev-popover: var(--shadow-2);
+  --chip-bg: var(--bg-subtle);
+  --scrim-alpha: 0.35;
+
+  /* ── Motion ────────────────────────────────────────────────────────────────────────────── */
+  --dur-short: 200ms;
+  --dur-med: 280ms;
+}
+
+/* ─────────────────────────────────────────────────────────────────────────────────────────────
+   ESCAPE HATCH — budget 25 selectors. Currently 2.
+   ───────────────────────────────────────────────────────────────────────────────────────────── */
+
+/* See shell.css: a zero-width grid column still emits its gap. */
+:root[data-style='cozy'] .app.left-collapsed .panes {
+  grid-template-columns: 0 clamp(360px, 23vw, 430px) minmax(0, 1fr);
+  gap: 0 var(--pane-gap);
+}
+
+/* A serif at 1.7 line-height needs the extra optical breathing room around body copy that a
+   fixed --pane-pad cannot give a nested prose block. */
+:root[data-style='cozy'] .markdown { line-height: var(--lh); }

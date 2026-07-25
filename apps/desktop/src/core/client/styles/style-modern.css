@@ -1,0 +1,104 @@
+/* MODERN — the shadcn / Tailwind-UI register: sans type, real radii, card surfaces, soft
+ * elevation, roomier rows, sentence-case labels.
+ *
+ * Colour is NOT set here. Every value below is either a scalar or a var() pointing at a theme
+ * slot, so Modern composes with all 12 themes and styles/tokenAxes.test.ts enforces that.
+ */
+:root[data-style='modern'] {
+  /* ── Shape ─────────────────────────────────────────────────────────────────────────────── */
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 10px;
+  --radius-xl: 14px;
+  --radius-control: var(--radius-md);
+  --radius-surface: var(--radius-lg);   /* panes and cards stop being square */
+  --radius-popover: var(--radius-lg);
+  --radius-chip: var(--radius-md);
+  --radius-marker: var(--radius-sm);
+
+  /* Structure moves from hairlines to surfaces: row dividers go, chrome rules stay. This is the
+     single most characteristic change, and it is one token. */
+  --divider-w: var(--bw-0);
+  --pane-bw: var(--bw);                 /* panes gain all four edges … */
+  --pane-divider-w: var(--bw);
+  --marker-w: var(--bw-0);              /* … and drop the 3px selected-row bar for a filled row */
+
+  /* ── Space ─────────────────────────────────────────────────────────────────────────────── */
+  --pane-pad: var(--space-8);
+  --pane-pad-y: var(--space-6);
+  --gap-inline: var(--space-4);
+  --gap-row: var(--space-5);
+  --gap-stack: var(--space-6);
+  --gap-section: var(--space-9);
+  --pad-control: var(--space-3) var(--space-5);
+  --pad-control-lg: var(--space-4) var(--space-7);
+  --pad-chip: 0 var(--space-5);
+  --pad-cell: var(--space-2) var(--space-4);
+
+  /* ── Density ───────────────────────────────────────────────────────────────────────────── */
+  --row-h: 40px;
+  --row-h-virt: 40px;
+  --row-h-sm: 32px;
+  --control-h: 32px;
+  --control-h-sm: 26px;
+  --topbar-h: 52px;
+  --pane-head-h: 44px;
+
+  /* Inset pane cards — no markup change, purely these three. */
+  --shell-pad: var(--space-4);
+  --pane-gap: var(--space-4);
+  --pane-radius: var(--radius-surface);
+
+  /* ── Typography ────────────────────────────────────────────────────────────────────────── */
+  --font-ui: 'Inter', ui-sans-serif, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --fs-sm: 13px;
+  --fs: 14px;
+  --fs-md: 15px;
+  --fs-lg: 16px;
+  --lh: 1.55;
+
+  /* Sentence case, no tracking, medium weight — the other half of "not a terminal". */
+  --label-transform: none;
+  --label-tracking: 0;
+  --label-weight: var(--fw-medium);
+  --label-size: var(--fs-sm);
+
+  /* ── Chrome ────────────────────────────────────────────────────────────────────────────── */
+  --elev-card: var(--shadow-1);
+  --elev-pane: var(--shadow-1);
+  --elev-popover: var(--shadow-3);
+  --card-bg: var(--bg-subtle);
+  --chip-bg: var(--bg-subtle);
+  --scrim-alpha: 0.5;
+  --scrim-filter: blur(4px);
+  --focus-ring-offset: 1px;
+
+  /* ── Motion ────────────────────────────────────────────────────────────────────────────── */
+  --dur-short: 120ms;
+  --ease-interactive: var(--ease-in-out);
+}
+
+/* ─────────────────────────────────────────────────────────────────────────────────────────────
+   ESCAPE HATCH — every rule here is a bug report against the token vocabulary.
+   Budget: 25 selectors (asserted by styles/tokenAxes.test.ts). Currently 3.
+   ───────────────────────────────────────────────────────────────────────────────────────────── */
+
+/* A zero-width grid column still emits its gap, so collapsing the left pane would otherwise leave
+   an 8px sliver where the pane was. shell.css flags this for exactly this reason. */
+:root[data-style='modern'] .app.left-collapsed .panes {
+  grid-template-columns: 0 clamp(360px, 23vw, 430px) minmax(0, 1fr);
+  gap: 0 var(--pane-gap);
+}
+
+/* Rows lose their left marker bar (--marker-w: 0), so selection needs to read from the fill alone.
+   A plain --bg-selected is too quiet once rows are inset cards. */
+:root[data-style='modern'] .ui-row[data-selected] {
+  background: color-mix(in srgb, var(--accent) 12%, var(--bg));
+  border-radius: var(--radius-control);
+}
+
+/* Buttons read as filled affordances rather than outlined ones. */
+:root[data-style='modern'] .ui-btn:not([data-variant='bare']) {
+  background: var(--bg-subtle);
+  font-weight: var(--fw-medium);
+}

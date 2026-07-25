@@ -1,0 +1,116 @@
+/* Shell layout: the tab rail, the three-pane grid, and pane chrome (docs/ui-design.md).
+ * Extracted from the old tokens-layout.css. Every value here is a style token, so a pack can turn
+ * the flat full-bleed grid into inset rounded cards without touching App.tsx.
+ */
+
+/* Shell: workspace tab rail on the far left, the app to its right. */
+.shell { display: flex; height: 100%; }
+
+/* Three-pane layout: top bar + independently-scrolling panes. */
+.app { flex: 1; min-width: 0; display: grid; grid-template-rows: var(--topbar-h) 1fr; height: 100%; }
+
+.topbar {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr; /* dropdown | centered brand | auth */
+  align-items: center;
+  min-width: 0;
+  padding: 0 var(--pane-pad);
+  border-bottom: var(--chrome-divider);
+  font-size: var(--fs-sm);
+}
+.brand { color: var(--text-muted); text-align: center; }
+
+.panes {
+  display: grid;
+  grid-template-columns: var(--left, clamp(320px, 28vw, 420px)) clamp(360px, 23vw, 430px) minmax(0, 1fr);
+  min-height: 0;
+  padding: var(--shell-pad);
+  gap: var(--pane-gap);
+}
+
+/* Empty state: no repo selected — single full-width column for the centered acorn. */
+.panes-empty { grid-template-columns: 1fr; }
+.pane-empty { display: flex; }
+
+/* Logged-out gate: no app chrome, so center the mark in the full viewport. */
+.login-gate { min-height: 100vh; display: grid; place-items: center; }
+
+.acorn-empty {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-6);
+  min-height: 0;
+}
+.acorn-art {
+  margin: 0;
+  font-family: var(--font-mono);
+  color: var(--text-muted);
+  line-height: 1.1;
+  white-space: pre;
+}
+.acorn-word {
+  font-family: var(--font-mono);
+  color: var(--text-muted);
+  letter-spacing: 0.2em;
+}
+
+/* Left-pane collapse: zero the left column and hide the pane entirely (no stray border).
+   NOTE for style packs: a zero-width grid column still emits a `gap`, so any pack that sets
+   --pane-gap must also collapse it here or a sliver appears where the left pane was. */
+.app.left-collapsed .panes { grid-template-columns: 0 clamp(360px, 23vw, 430px) minmax(0, 1fr); }
+.app.left-collapsed .pane-left { display: none; }
+
+.pane {
+  background: var(--pane-bg);
+  border: var(--pane-bw) solid var(--border);
+  border-right: var(--pane-divider-w) solid var(--border);
+  border-radius: var(--pane-radius);
+  box-shadow: var(--elev-pane);
+  padding: 0;
+  overflow: auto;
+  contain: layout paint; /* isolate reflow per pane (docs/ui-design.md) */
+}
+/* Right-most pane: drops the trailing border, and is a flex column so the sticky header stays put
+   while the diff scroller below owns the viewport. Sole owner of .pane-right (was split with diff.css). */
+.pane-right { border-right: 0; display: flex; flex-direction: column; overflow: hidden; }
+.pane-right .section-header { flex: none; }
+/* Left pane is a flex column so the PR list scrolls (and virtualizes) independently of the tabs. */
+.pane-left { display: flex; flex-direction: column; overflow: hidden; }
+.pr-list-scroll { flex: 1; min-height: 0; overflow: auto; margin: 0; padding: 0; }
+
+.section-header {
+  position: sticky;
+  top: 0;
+  z-index: var(--z-sticky);
+  display: flex;
+  align-items: center;
+  height: var(--pane-head-h);
+  padding: 0 var(--pane-pad);
+  margin: 0;
+  background: var(--bg);
+  border-bottom: var(--chrome-divider);
+  font-size: var(--label-size);
+  color: var(--text-muted);
+  text-transform: var(--label-transform);
+  letter-spacing: var(--label-tracking);
+  font-weight: var(--label-weight);
+}
+
+.section-refresh {
+  flex: none;
+  margin-left: var(--space-2);
+  width: 22px;
+  font: inherit;
+  font-size: var(--fs);
+  color: var(--text-muted);
+  background: transparent;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+  line-height: 1;
+}
+.section-refresh:hover:not(:disabled) { color: var(--text); }
+.section-refresh:disabled { color: var(--text-faint); cursor: wait; }

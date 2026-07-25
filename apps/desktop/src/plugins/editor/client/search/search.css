@@ -7,9 +7,9 @@
   flex: none;
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--space-4);
   padding: var(--pane-pad);
-  border-bottom: 1px solid var(--border);
+  border-bottom: var(--divider);
   background: var(--bg-subtle);
 }
 .search-input {
@@ -19,24 +19,24 @@
   font-size: var(--fs-sm);
   color: var(--text);
   background: var(--bg);
-  border: 1px solid var(--border-strong);
-  border-radius: 4px;
-  padding: 4px 8px;
+  border: var(--control-border);
+  border-radius: var(--radius-control);
+  padding: var(--space-2) var(--space-4);
 }
 .search-toggles {
   flex: none;
   display: flex;
-  gap: 4px;
+  gap: var(--space-2);
 }
 .search-toggle {
-  font-family: var(--font-mono);
+  font-family: var(--font-ui);
   font-size: var(--fs-sm);
   min-width: 26px;
   padding: 3px 5px;
   color: var(--text-muted);
   background: var(--bg);
-  border: 1px solid var(--border-strong);
-  border-radius: 4px;
+  border: var(--control-border);
+  border-radius: var(--radius-control);
   cursor: pointer;
 }
 .search-toggle:hover {
@@ -51,7 +51,7 @@
   flex: none;
   padding: 4px var(--pane-pad);
   font-size: var(--fs-sm);
-  border-bottom: 1px solid var(--border);
+  border-bottom: var(--divider);
 }
 .search-truncated {
   color: var(--text-muted);
@@ -64,17 +64,17 @@
   font-size: var(--fs-sm);
 }
 .search-file {
-  padding: 2px 0;
+  padding: var(--space-1) 0;
 }
 .search-file-head {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--space-4);
   padding: 4px var(--pane-pad);
   position: sticky;
   top: 0;
   background: var(--bg-subtle);
-  border-bottom: 1px solid var(--border);
+  border-bottom: var(--divider);
 }
 .search-file-path {
   overflow: hidden;
@@ -90,7 +90,7 @@
 .search-hit {
   display: flex;
   align-items: baseline;
-  gap: 10px;
+  gap: var(--space-5);
   width: 100%;
   text-align: left;
   padding: 2px var(--pane-pad) 2px 20px;
@@ -117,5 +117,5 @@
 .search-mark {
   background: var(--bg-selected);
   color: var(--text);
-  border-radius: 2px;
+  border-radius: var(--radius-marker);
 }

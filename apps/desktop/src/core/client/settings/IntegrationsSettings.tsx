@@ -128,7 +128,7 @@ export default function IntegrationsSettings() {
         </For>
       </div>
 
-      <button type="button" class="overlay-btn integration-add-btn" classList={{ open: adding() }} onClick={() => setAdding((value) => !value)}>
+      <button type="button" class="ui-btn integration-add-btn" classList={{ open: adding() }} onClick={() => setAdding((value) => !value)}>
         <span class="integration-add-icon">+</span> Add or rotate integration
       </button>
 
@@ -149,7 +149,7 @@ export default function IntegrationsSettings() {
                 {field.label}
                 <div class="integration-key-row">
                   <input
-                    class="integration-key-input"
+                    class="ui-input"
                     type={field.type}
                     placeholder={field.placeholder}
                     value={valueFor(field.id)}
@@ -161,7 +161,7 @@ export default function IntegrationsSettings() {
               </label>
             )}
           </For>
-          <button type="button" class="overlay-btn" onClick={() => void add()} disabled={busy() || !complete()}>
+          <button type="button" class="ui-btn" onClick={() => void add()} disabled={busy() || !complete()}>
             {busy() ? 'Saving…' : rotationId() ? 'Rotate credentials' : 'Connect new'}
           </button>
           <Show when={error()}><div class="action-error">{error()}</div></Show>

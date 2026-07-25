@@ -278,7 +278,7 @@ export default function DockerBrowse() {
                   ? 'The docker CLI was not found on PATH.'
                   : 'The docker daemon is not reachable — is Docker/OrbStack running?'}
               </p>
-              <button type="button" class="overlay-btn" onClick={() => void refreshDocker()}>Try again</button>
+              <button type="button" class="ui-btn" onClick={() => void refreshDocker()}>Try again</button>
             </div>
           }
         >
@@ -296,7 +296,7 @@ export default function DockerBrowse() {
             <Show when={staleProjects().length}>
               <div class="docker-stale-banner">
                 <span>{staleProjects().length} stale project{staleProjects().length === 1 ? '' : 's'} — worktree gone.</span>
-                <button type="button" class="overlay-btn" onClick={() => void cleanUpStale()}>
+                <button type="button" class="ui-btn" onClick={() => void cleanUpStale()}>
                   {confirmRm() === 'stale-cleanup' ? 'Sure? Composes down all stale' : 'Clean up'}
                 </button>
               </div>

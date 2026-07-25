@@ -4,7 +4,9 @@ import { FitAddon } from '@xterm/addon-fit'
 import { WebglAddon } from '@xterm/addon-webgl'
 import '@xterm/xterm/css/xterm.css'
 import { terminalApi } from './terminalClient'
-import { baseTheme, isAppDark, monoFont, watchTheme, xtermTheme } from './theme'
+import { baseTheme, monoFont, xtermTheme } from './theme'
+import { isAppDark, watchAppearance } from '../../../core/client/ui/appearance'
+import { termFontSize } from '../../../core/client/ui/metrics'
 
 // xterm 5.5.0 bug: disposing a terminal (workspace/tab switch, or a task finishing in another
 // workspace and stealing focus) can leave a Viewport.syncScrollArea queued for the next frame. By
@@ -33,7 +35,7 @@ export default function TerminalSurface(props: { sessionId: string; onExit?: (ex
     // No convertEol: the PTY already emits CRLF for normal output (kernel ONLCR) and a full-screen
     // TUI (Claude/Codex) drives the cursor itself — rewriting bare \n to \r\n injects stray carriage
     // returns that shift redraws to column 0, interleaving frames into garbage.
-    const term = new Terminal({ fontFamily: monoFont(), fontSize: 13, theme: baseTheme(isAppDark()) })
+    const term = new Terminal({ fontFamily: monoFont(), fontSize: termFontSize(), theme: baseTheme(isAppDark()) })
     const fit = new FitAddon()
     term.loadAddon(fit)
     term.open(host)
@@ -55,9 +57,19 @@ export default function TerminalSurface(props: { sessionId: string; onExit?: (ex
 
     // Follow the app theme live (manual toggle or OS preference change). The full theme resolves
     // async (ANSI palette comes from the Shiki theme); guard against applying to a disposed term.
-    const applyTheme = () => void xtermTheme(isAppDark()).then((t) => { if (!disposed) term.options.theme = t })
-    applyTheme()
-    const unwatchTheme = watchTheme(applyTheme)
+    // Colours AND type: a style pack can move --font-mono's stack and --term-fs, which changes the
+    // cell metrics, so re-fit after applying or the PTY keeps the old cols/rows and the TUI wraps
+    // wrong. The theme resolves async (the ANSI palette comes from Shiki); guard against a disposed
+    // terminal.
+    const applyAppearance = () => {
+      if (disposed) return
+      term.options.fontFamily = monoFont()
+      term.options.fontSize = termFontSize()
+      safeFit()
+      void xtermTheme(isAppDark()).then((t) => { if (!disposed) term.options.theme = t })
+    }
+    applyAppearance()
+    const unwatchAppearance = watchAppearance(applyAppearance)
 
     let detach: (() => void) | undefined
     // Size the PTY to the fitted dims BEFORE attaching, so the replayed ring + repaint land at the
@@ -97,7 +109,7 @@ export default function TerminalSurface(props: { sessionId: string; onExit?: (ex
     onCleanup(() => {
       disposed = true
       detach?.()
-      unwatchTheme()
+      unwatchAppearance()
       ro.disconnect()
       term.dispose()
     })

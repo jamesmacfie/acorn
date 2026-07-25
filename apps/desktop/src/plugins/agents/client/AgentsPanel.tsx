@@ -128,7 +128,7 @@ export default function AgentsPanel(props: { task: Task; onClose: () => void }) 
       <aside class="agents-panel">
         <div class="agents-head">
           <span class="agents-title">Agents</span>
-          <button type="button" class="overlay-btn" onClick={() => setLauncherOpen(!launcherOpen())}>+ New agent</button>
+          <button type="button" class="ui-btn" onClick={() => setLauncherOpen(!launcherOpen())}>+ New agent</button>
           <button type="button" class="agents-close" title="Close" onClick={props.onClose}>✕</button>
         </div>
         <Show when={actionError()}><div class="action-error" role="alert">{actionError()}</div></Show>
@@ -174,12 +174,12 @@ export default function AgentsPanel(props: { task: Task; onClose: () => void }) 
                   <span class="agents-row-title">{row().title}</span>
                   <div class="agents-gate-actions">
                     <Show when={row().kind === 'step' && stepRow().step.status === 'running'}>
-                      <button type="button" class="overlay-btn agents-reject" onClick={() => void killStep(stepRow())}>kill step</button>
+                      <button type="button" class="ui-btn agents-reject" onClick={() => void killStep(stepRow())}>kill step</button>
                     </Show>
                     <Show when={row().kind === 'step' && ['running', 'gated'].includes(stepRow().run?.status ?? '')}>
-                      <button type="button" class="overlay-btn agents-reject" onClick={() => void cancelRun(stepRow())}>cancel run</button>
+                      <button type="button" class="ui-btn agents-reject" onClick={() => void cancelRun(stepRow())}>cancel run</button>
                     </Show>
-                    <button type="button" class="overlay-btn" onClick={() => void openInTerminal(row())}>
+                    <button type="button" class="ui-btn" onClick={() => void openInTerminal(row())}>
                       {row().kind === 'session' ? 'show terminal' : 'open in terminal'}
                     </button>
                   </div>
@@ -224,8 +224,8 @@ export default function AgentsPanel(props: { task: Task; onClose: () => void }) 
                     <div class="agents-gate">
                       <p>This workflow is waiting at a human gate: <strong>{stepRow().step.name}</strong></p>
                       <div class="agents-gate-actions">
-                        <button type="button" class="overlay-btn" onClick={() => void resolveGate(row(), true)}>Approve</button>
-                        <button type="button" class="overlay-btn agents-reject" onClick={() => void resolveGate(row(), false)}>Reject</button>
+                        <button type="button" class="ui-btn" onClick={() => void resolveGate(row(), true)}>Approve</button>
+                        <button type="button" class="ui-btn agents-reject" onClick={() => void resolveGate(row(), false)}>Reject</button>
                       </div>
                     </div>
                   </Show>

@@ -5,6 +5,7 @@ import { integrationsOptions, rollbarItemsOptions, tasksKey, tasksOptions, works
 import type { Integration, RollbarItemSummary, Task, WorkspaceProject } from '../../../core/shared/api'
 import { sourceRegistry, type SourceContribution } from '../../../core/client/registries/sources'
 import { activeTaskId } from '../../../core/client/tasks/tasks'
+import { createDismissable } from '../../../core/client/ui/dismissable'
 import { activateTaskSignals, pathForTask } from '../../../core/client/tasks/activate'
 import { PromoteToTaskModal } from '../../../core/client/integrations/PromoteToTaskModal'
 import { workspaceForRepo } from '../../../core/client/workspaces/activeWorkspace'
@@ -68,6 +69,8 @@ export default function RollbarBrowse() {
   // workspace boundary, matching Linear, and scope both browsing and the repo used for promotion.
   const [pickerOpen, setPickerOpen] = createSignal(false)
   const [pickerOpening, setPickerOpening] = createSignal(false)
+  let pickerDialog!: HTMLDivElement
+  const pickerDismiss = createDismissable({ onDismiss: () => setPickerOpen(false), container: () => pickerDialog })
   const [pickerError, setPickerError] = createSignal('')
   const [checked, setChecked] = createSignal<Set<string>>(new Set())
   const projectForConnection = (connection: Integration): WorkspaceProject => ({
@@ -179,7 +182,7 @@ export default function RollbarBrowse() {
             fallback={
               <div class="workspace-empty-inner">
                 <p class="muted">No Rollbar projects linked to {workspace()?.name}.</p>
-                <button type="button" class="overlay-btn" disabled={pickerOpening()} onClick={() => void openPicker()}>
+                <button type="button" class="ui-btn" disabled={pickerOpening()} onClick={() => void openPicker()}>
                   {pickerOpening() ? 'Refreshing projects…' : 'Choose projects'}
                 </button>
               </div>
@@ -275,14 +278,14 @@ export default function RollbarBrowse() {
                 <>
                   <button
                     type="button"
-                    class="overlay-btn"
+                    class="ui-btn"
                     disabled={!hasActiveTask()}
                     title={hasActiveTask() ? 'Attach this item to the active task' : 'No active task — open one first'}
                     onClick={() => void attach()}
                   >
                     Attach to current task
                   </button>
-                  <Show when={selectedSummary()}>{(item) => <button type="button" class="overlay-btn" onClick={() => void promote(item())}>+TASK</button>}</Show>
+                  <Show when={selectedSummary()}>{(item) => <button type="button" class="ui-btn" onClick={() => void promote(item())}>+TASK</button>}</Show>
                   <Show when={attachMessage()}><span class="muted" role="status">{attachMessage()}</span></Show>
                 </>
               }
@@ -308,8 +311,8 @@ export default function RollbarBrowse() {
       </Show>
 
       <Show when={pickerOpen()}>
-        <div class="overlay-backdrop" onClick={() => setPickerOpen(false)}>
-          <div class="overlay" role="dialog" aria-modal="true" onClick={(event) => event.stopPropagation()}>
+        <div class="overlay-backdrop" onClick={pickerDismiss.onBackdropClick}>
+          <div ref={pickerDialog} class="overlay" role="dialog" aria-modal="true" onClick={pickerDismiss.onContainerClick} onKeyDown={pickerDismiss.onKeyDown}>
             <div class="overlay-title">Rollbar projects — {workspace()?.name}</div>
             <div class="overlay-body">
               <Show when={rollbarConnections().length} fallback={<p class="muted">No Rollbar projects are connected. Add one in Settings → Integrations.</p>}>
@@ -335,7 +338,7 @@ export default function RollbarBrowse() {
                 </ul>
               </Show>
               <div class="integration-key-row" style={{ 'justify-content': 'flex-end' }}>
-                <button type="button" class="overlay-btn" onClick={() => void savePicker()}>Save</button>
+                <button type="button" class="ui-btn" onClick={() => void savePicker()}>Save</button>
               </div>
             </div>
           </div>

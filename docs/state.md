@@ -62,7 +62,7 @@ logs because it cannot report failure by persisting another notice).
 
 | State | Classification | Restore/ownership decision |
 | --- | --- | --- |
-| Theme keys, `left_collapsed`, keybindings, `rail_order`, terminal defaults/height, `diff_view`, `onboarded`, agent-tool permissions | T3 app view state | Descriptor-declared; reactive settings write through `savePref` |
+| Theme keys, `style`, `left_collapsed`, keybindings, `rail_order`, terminal defaults/height, `diff_view`, `onboarded`, agent-tool permissions | T3 app view state | Descriptor-declared; reactive settings write through `savePref` |
 | Last path/task/source | T3 app view state | Ordered shell descriptors |
 | Task layouts and editor tabs | T3 task state | Scoped descriptors; weights/pins persist, maximize/dirty content do not |
 | PR filters | T3 workspace state | Scoped GitHub descriptor |
