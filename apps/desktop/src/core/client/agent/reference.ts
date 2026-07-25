@@ -1,6 +1,6 @@
 // "Add file/line to agent" quick path (docs/panes.md): format a path[:line[–line]] reference and
 // drop it into the task's agent composer as a draft (the user finishes the thought and submits).
-import { agentSessionsFor } from '../../../plugins/terminal/client/sessions'
+import { agentSessionsFor } from '../tasks/agentSessions'
 import { taskBridge } from '../tasks/taskBridge'
 
 // path · path:42 · path:42-48 (a collapsed range renders as the single line).

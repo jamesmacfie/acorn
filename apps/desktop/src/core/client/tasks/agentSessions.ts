@@ -1,18 +1,27 @@
-// Shared terminal-session store. Lifted out of TerminalPanel so the rail and topbar can read live
-// session state even when the drawer is closed — a single onStatus subscription + one session list,
-// in the codebase's signals-only style (cf. ../tabs/tabs.ts).
+// "Which agents are running in this task" — platform state, not terminal-drawer internals. The rail
+// spinner, the topbar badge, the notification edge tracker, the archive/quit concerns and the
+// send-to-agent target pickers in the changes and context panes all read it, so it lives in core, in
+// the codebase's signals-only style (cf. ./tasks.ts). One status subscription, one session list.
+//
+// It reads the session route and the status stream directly because both are core's own transports,
+// so no feature accessor is needed. `capabilities().terminal` is the same probe taskBridge() and
+// terminalApi() use (pinned by ./taskBridge.test.ts), so off-desktop behaviour is unchanged: an
+// empty list and no subscription.
 import { createSignal } from 'solid-js'
-import { terminalApi } from './terminalClient'
-import { trackSessionEdges } from '../../../core/client/notifications/notifications'
-import type { TerminalSession } from '../../../core/shared/terminal'
-import { requestTerminalFocusIntent } from '../../../core/client/registries/clientEvents'
-import { latestOnly } from '../../../core/client/lib/latestOnly'
+import { capabilities } from '../capabilities'
+import { readJson } from '../apiClient'
+import { terminalSessionsRoute } from '../../shared/api'
+import { wsOnStatus } from '../wsClient'
+import { trackSessionEdges } from '../notifications/notifications'
+import type { TerminalSession } from '../../shared/terminal'
+import { requestTerminalFocusIntent } from '../registries/clientEvents'
+import { latestOnly } from '../lib/latestOnly'
 
 const [sessions, setSessions] = createSignal<TerminalSession[]>([])
 export { sessions }
 
 export const refreshSessions = latestOnly(
-  async () => terminalApi()?.list() ?? [],
+  async () => (capabilities().terminal ? await readJson<TerminalSession[]>(terminalSessionsRoute) : []),
   (next) => {
     // Notification centre: compare against the last committed snapshot, never a stale request.
     trackSessionEdges(sessions(), next)
@@ -27,12 +36,11 @@ export const addSession = (s: TerminalSession): void => {
 }
 
 // Pull once then track main-process idle/exit broadcasts. Returns an unsubscribe; a noop when the
-// terminal bridge is absent (web build / flag off), so consumers naturally show nothing.
+// terminal engine is absent (web build), so consumers naturally show nothing.
 export function initSessions(): () => void {
-  const api = terminalApi()
-  if (!api) return () => {}
+  if (!capabilities().terminal) return () => {}
   void refreshSessions()
-  return api.onStatus(() => void refreshSessions())
+  return wsOnStatus(() => void refreshSessions())
 }
 
 // Which terminal tab was last viewed, per task (session-only, like isTerminalOpen). Lets the drawer

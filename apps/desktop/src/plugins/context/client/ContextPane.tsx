@@ -2,7 +2,7 @@ import { createEffect, createMemo, createResource, createSignal, For, onCleanup,
 import { readJson } from '../../../core/client/apiClient'
 import type { Task } from '../../../core/client/queries'
 import { taskContextRoute, type ContextItem, type TaskContext } from '../../../core/shared/api'
-import { agentSessionsFor } from '../../terminal/client/sessions'
+import { agentSessionsFor } from '../../../core/client/tasks/agentSessions'
 import { taskBridge } from '../../../core/client/tasks/taskBridge'
 import MemorySection from '../../memory/client/MemorySection'
 import { requestNoteOpen } from '../../notes/client/notesClient'

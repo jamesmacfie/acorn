@@ -10,7 +10,7 @@ import { DiffLine, NonCodeRow, type LineComposerController } from '../../github/
 import { buildDiffRows, highlighterTokenize, isCodeRow, plainTokenize, type CodeRow, type Row } from '../../github/client/diff/model'
 import { formatFileReference, sendReferenceToAgent } from '../../../core/client/agent/reference'
 import { taskStatus } from '../../../core/client/tasks/taskStatus'
-import { agentSessionsFor } from '../../terminal/client/sessions'
+import { agentSessionsFor } from '../../../core/client/tasks/agentSessions'
 import { taskBridge } from '../../../core/client/tasks/taskBridge'
 import { localGitApi } from './localGitClient'
 import { changeKey, groupChanges, pickSelected, toPullFile } from './model'
