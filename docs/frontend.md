@@ -208,7 +208,7 @@ prefs). They export getters + mutators in the codebase's single-writer style:
 | Module | Owns |
 | --- | --- |
 | `core/client/tasks/tasks.ts` | `selectedSource`, `activeTaskId`, and per-task `taskLayouts` (all layout transitions go through `dispatchLayout` → the pure `applyLayoutAction` reducer); plus per-task terminal-open and recipe-browser-URL state. |
-| `plugins/terminal/client/sessions.ts` | The live terminal-session list + a single `onStatus` subscription, so the rail/topbar can show agent-working activity even with the drawer closed. |
+| `core/client/tasks/agentSessions.ts` | The live agent/terminal session list + a single `onStatus` subscription, so the rail/topbar can show agent-working activity even with the drawer closed. |
 | `core/client/tasks/taskStatus.ts` | Live worktree status per task (dirty count / `missing`), 5s-polled + `onStatus` edges. |
 | `core/client/notifications/notifications.ts` | The bounded in-memory notice ring (mirrored to the `notices` pref) + pure edge detection over session snapshots. |
 | `plugins/editor/client/editorState.ts` | Open-file tabs per task (mirrored to `editor:open-files:<taskId>`). |

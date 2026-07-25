@@ -77,8 +77,10 @@ renderer on attach. Nothing is written to disk or the DB.
 
 ### The renderer session store
 
-`plugins/terminal/client/sessions.ts` is a single lifted store so the rail and
-topbar can read live session state even when the drawer is closed:
+`core/client/tasks/agentSessions.ts` is a single lifted store so the rail and
+topbar can read live session state even when the drawer is closed. It is core-owned: "which agents
+are running in this task" is platform state, read by the rail, topbar, notification tracker and the
+send-to-agent pickers, not just the terminal drawer.
 
 - `initSessions()` (called once in App) pulls the list, then subscribes to the **single** `onStatus`
   ping from main; every ping calls `refreshSessions()`.

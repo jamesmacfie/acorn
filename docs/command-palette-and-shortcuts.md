@@ -248,8 +248,9 @@ always matches what's bound.
 
 ---
 
-**Source:** `apps/desktop/src/core/client/palette/{model.ts,overlay.ts,CommandPalette.tsx,FilePalette.tsx}`
-· `apps/desktop/src/core/client/Shortcuts.tsx` · `apps/desktop/src/plugins/github/client/changedFiles.ts` ·
+**Source:** `apps/desktop/src/core/client/palette/{model.ts,overlay.ts,CommandPalette.tsx}`
+· `apps/desktop/src/plugins/editor/client/FilePalette.tsx` ·
+`apps/desktop/src/plugins/github/client/{Shortcuts.tsx,changedFiles.ts}` ·
 `apps/desktop/src/core/client/lib/isTypingTarget.ts` ·
 `apps/desktop/src/core/client/tasks/paneShortcuts.ts`
 · `apps/desktop/src/core/client/tabs/TabRail.tsx` ·

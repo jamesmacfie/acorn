@@ -47,7 +47,7 @@ needs. The renderer shape is `RunTargetInfo` (`apps/desktop/src/core/shared/term
 
 acorn **allocates no ports**. Isolation across parallel tasks is the *script's* job, informed by the
 stable identity env acorn injects into every session — notably **`ACORN_TASK_SLUG`**
-(`apps/desktop/src/plugins/terminal/main/terminalUtils.ts:153`), the branch-derived handle a compose target namespaces
+(`apps/desktop/src/core/main/taskEnv.ts`), the branch-derived handle a compose target namespaces
 with (`docker compose -p acorn-$ACORN_TASK_SLUG …`) or a dev script uses to pick a free port and
 report it back via `url_command`.
 
