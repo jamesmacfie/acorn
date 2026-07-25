@@ -66,5 +66,5 @@
   justify-content: flex-end;
   gap: var(--space-4);
   padding: var(--pane-pad);
-  border-top: var(--divider);
+  border-top: var(--chrome-divider);
 }

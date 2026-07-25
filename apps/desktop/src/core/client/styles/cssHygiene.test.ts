@@ -54,6 +54,15 @@ describe('literal ratchets (these may only go down)', () => {
     expect(count(/border(?:-(?:top|right|bottom|left))?:\s*\d+px/g)).toBe(0)
   })
 
+  // --divider is the ROW-SEPARATOR recipe, and Modern/Cute set --divider-w: 0 — so any site that
+  // used it for a job the pack still wants silently lost its border in 2 of 4 packs. That is how
+  // the database pane ended up borderless everywhere but Terminal. An all-four-sides shorthand can
+  // never be a row separator: it is a control (--control-border), a card or popover
+  // (--surface-border) or a badge, so this shape is mechanically a misuse.
+  it('four-sided border using the row-divider recipe', () => {
+    expect(count(/border:\s*var\(--divider\)/g)).toBe(0)
+  })
+
   it('box-shadow geometry not using an elevation token', () => {
     expect(count(/box-shadow:(?!\s*var\()[^;]+;/g)).toBe(0)
   })

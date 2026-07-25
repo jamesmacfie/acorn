@@ -35,7 +35,7 @@ export const STYLE_TOKENS = [
   '--radius-pill-fixed', '--radius-marker', '--radius',
   '--bw-0', '--bw', '--bw-strong', '--bw-marker',
   '--divider-w', '--chrome-divider-w', '--pane-divider-w', '--pane-bw',
-  '--control-bw', '--surface-bw', '--marker-w', '--tab-active-w',
+  '--control-bw', '--surface-bw', '--marker-w', '--stripe-w', '--tab-active-w',
   '--divider', '--chrome-divider', '--control-border', '--surface-border',
   // space
   '--space-0', '--space-1', '--space-2', '--space-3', '--space-4', '--space-5',

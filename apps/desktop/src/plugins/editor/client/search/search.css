@@ -9,7 +9,7 @@
   align-items: center;
   gap: var(--space-4);
   padding: var(--pane-pad);
-  border-bottom: var(--divider);
+  border-bottom: var(--chrome-divider);
   background: var(--bg-subtle);
 }
 .search-input {
@@ -51,7 +51,7 @@
   flex: none;
   padding: 4px var(--pane-pad);
   font-size: var(--fs-sm);
-  border-bottom: var(--divider);
+  border-bottom: var(--chrome-divider);
 }
 .search-truncated {
   color: var(--text-muted);
@@ -74,7 +74,7 @@
   position: sticky;
   top: 0;
   background: var(--bg-subtle);
-  border-bottom: var(--divider);
+  border-bottom: var(--chrome-divider);
 }
 .search-file-path {
   overflow: hidden;

@@ -15,7 +15,7 @@
   gap: 1px;
   padding: var(--space-4);
   overflow-y: auto;
-  border-right: var(--divider);
+  border-right: var(--chrome-divider);
   background: var(--bg-subtle);
 }
 .settings-nav-group {
@@ -92,7 +92,7 @@
 /* Editable shortcut key: styled like .help-key but focusable/centred; highlights on focus while it waits for a keypress. */
 .shortcut-input { width: 3.5em; text-align: center; text-transform: lowercase; outline: none; cursor: pointer; }
 .shortcut-input:focus { border-color: var(--accent); color: var(--accent); }
-.settings-danger { margin-top: var(--space-4); padding-top: var(--space-7); border-top: var(--divider); }
+.settings-danger { margin-top: var(--space-4); padding-top: var(--space-7); border-top: var(--chrome-divider); }
 .settings-delete { color: var(--danger); border-color: var(--danger); }
 
 /* Workspace identity (docs/workspaces-and-tasks.md): flat preview chip + swatch row, 1px borders, square. */
@@ -105,7 +105,7 @@
   justify-content: center;
   font-size: var(--fs-lg);
   border: var(--control-border);
-  border-left-width: var(--marker-w);
+  border-left-width: var(--stripe-w);
   background: var(--bg-subtle);
 }
 .ws-emoji-input { width: 64px; text-align: center; }
@@ -138,8 +138,8 @@
 .gallery { display: flex; flex-direction: column; gap: var(--gap-stack); }
 .gallery-pickers { display: flex; gap: var(--space-8); flex-wrap: wrap; }
 .gallery-row { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-4); }
-.gallery-rows { display: flex; flex-direction: column; border: var(--divider); border-radius: var(--radius-surface); overflow: hidden; }
-.gallery-code { border: var(--divider); border-radius: var(--radius-surface); overflow: hidden; }
+.gallery-rows { display: flex; flex-direction: column; border: var(--surface-border); border-radius: var(--radius-surface); overflow: hidden; }
+.gallery-code { border: var(--surface-border); border-radius: var(--radius-surface); overflow: hidden; }
 .gallery-term {
   margin: 0;
   padding: var(--space-4) var(--pane-pad);

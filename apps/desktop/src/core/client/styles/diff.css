@@ -101,8 +101,8 @@
   height: 36px;
   padding: 0 var(--pane-pad);
   background: var(--bg-subtle);
-  border-top: var(--divider);
-  border-bottom: var(--divider);
+  border-top: var(--chrome-divider);
+  border-bottom: var(--chrome-divider);
   font-weight: 600;
   line-height: 20px;
 }
@@ -165,7 +165,7 @@
   margin: 6px var(--pane-pad);
   padding: 9px var(--space-5);
   background: var(--bg);
-  border: var(--divider);
+  border: var(--surface-border);
   border-left: var(--tab-active-w) solid var(--accent);
   border-radius: var(--radius);
   line-height: var(--lh);
@@ -233,7 +233,7 @@
   justify-content: flex-end;
   min-height: 40px;
   padding: 6px var(--pane-pad);
-  border-bottom: var(--divider);
+  border-bottom: var(--chrome-divider);
   background: var(--bg);
 }
 /* In-diff find (⌘F). Lives in the toolbar, pushed to the far left so the view-mode toggle keeps
@@ -304,7 +304,7 @@
   align-items: flex-start;
   min-width: 0;
   white-space: normal;
-  border-left: var(--divider);
+  border-left: var(--chrome-divider);
 }
 .diff-split-cell:first-child { border-left: 0; }
 .diff-split-cell .diff-code { min-width: 0; }
