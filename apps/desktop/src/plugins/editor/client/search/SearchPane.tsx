@@ -1,6 +1,6 @@
 import { createMemo, createResource, createSignal, For, Show } from 'solid-js'
 import type { Task } from '../../../../core/client/queries'
-import { debounce } from '../autosave'
+import { debounce } from '../../../../core/client/lib/debounce'
 import { editorOpen, requestEditorReveal } from '../editorState'
 import { findInFiles, type SearchHit } from './searchClient'
 import './search.css'

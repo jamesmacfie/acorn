@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { fileStatusMeta, githubAvatarUrl, summarizeFileStats } from './displayMeta'
-import { routeKey } from './fileNavigation'
+import { routeKey } from '../../../plugins/github/client/fileNavigation'
 
 describe('fileStatusMeta', () => {
   it('maps common GitHub file statuses to compact letters', () => {

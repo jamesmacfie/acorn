@@ -2,7 +2,7 @@ import { createEffect, createMemo, createSignal, For, on, onCleanup, onMount, Sh
 import { createInfiniteQuery, createQuery, useQueryClient } from '@tanstack/solid-query'
 import { A, useNavigate, useParams } from '@solidjs/router'
 import { createVirtualizer } from '@tanstack/solid-virtual'
-import { checksState } from './displayMeta'
+import { checksState } from '../../../core/client/ui/displayMeta'
 import { formatRelativeTime } from '../../../core/client/lib/formatRelativeTime'
 import { prefetchOpenPulls, schedulePullSummaryPrefetch } from './prefetch'
 import { closedPullsInfiniteOptions, integrationsOptions, pullDetailOptions, pullsOptions, reposOptions, tasksKey, tasksOptions, workspacesOptions, type Pull, type Task } from '../../../core/client/queries'

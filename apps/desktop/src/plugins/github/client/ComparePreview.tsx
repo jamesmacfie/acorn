@@ -2,7 +2,7 @@ import { createEffect, createMemo, createSignal, For, on, onCleanup, Show } from
 import { createQuery } from '@tanstack/solid-query'
 import { useParams, useSearchParams } from '@solidjs/router'
 import { compareOptions, reposOptions } from '../../../core/client/queries'
-import { getHighlighter } from './shiki'
+import { getHighlighter } from '../../../core/client/highlight/shiki'
 import { DiffLine, NonCodeRow } from './diff/DiffRows'
 import { createDiffHydrator } from './diff/hydration'
 import {
