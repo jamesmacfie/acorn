@@ -50,7 +50,8 @@ export function formatReset(resetsAt: number | null, resetText: string | null, n
     const days = Math.floor(hours / 24)
     return `resets in ${days}d ${hours % 24}h`
   }
-  return resetText?.replace(/^resets?\s*/i, 'resets ') ?? null
+  // the CLI appends its own zone ("… 12am (Pacific/Auckland)"); it's always the user's, so drop it
+  return resetText?.replace(/^resets?\s*/i, 'resets ').replace(/\s*\([^()]*\)\s*$/, '') ?? null
 }
 
 export function formatUpdated(capturedAt: number | null, now = Date.now()): string {
