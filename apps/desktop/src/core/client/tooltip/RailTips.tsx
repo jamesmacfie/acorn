@@ -1,4 +1,5 @@
 import { createSignal, For, onCleanup, onMount, Show } from 'solid-js'
+import Icon from '../ui/Icon'
 import './rail-tips.css'
 
 // One fixed-position tooltip for both icon rails. Driven by `data-tip` (+ optional `data-tip-sub`)
@@ -101,7 +102,7 @@ export default function RailTips() {
                 {(it) => (
                   <div class="rail-tip-legend-row">
                     <span class="rail-tip-legend-ico" classList={{ [`tone-${it.t}`]: !!it.t }}>
-                      <Show when={it.d} fallback={it.g}>
+                      <Show when={it.d} fallback={it.g ? <Icon name={it.g} /> : undefined}>
                         <span class={it.d} />
                       </Show>
                     </span>

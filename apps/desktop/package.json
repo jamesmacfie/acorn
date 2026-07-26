@@ -40,6 +40,7 @@
     "hono": "^4.12.32",
     "idb-keyval": "^6.2.5",
     "jose": "^6.2.3",
+    "lucide-static": "^1.27.0",
     "monaco-editor": "^0.55.1",
     "node-pty": "^1.0.0",
     "openai": "^6.48.0",

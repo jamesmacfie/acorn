@@ -211,12 +211,15 @@ process's job; these routes only flip DB rows.
 | --- | --- | --- | --- |
 | `GET` | `/api/tasks` | List `active` tasks (with links), ordered by `sort`. | → `Task[]` |
 | `POST` | `/api/tasks` | Create a task (title auto-seeded if absent: `#<pull> <repo>` or `<repo> · <branch>`; birth links accepted via `links`). | `TaskSeed` → `Task` |
-| `PATCH` | `/api/tasks/:id` | Rename and/or set `status` (`active`\|`archived`; stamps `archivedAt`). `404` on unknown ids. | `{ title?, status? }` |
+| `PATCH` | `/api/tasks/:id` | Rename, set `icon` (Lucide name, `null` clears to the origin default), and/or set `status` (`active`\|`archived`; stamps `archivedAt`). `404` on unknown ids. | `{ title?, icon?, status? }` |
 | `POST` | `/api/tasks/:id/links` | Add an external link (idempotent; `404` if task missing). | `TaskLink` |
 | `DELETE` | `/api/tasks/:id/links` | Remove a link by `(integrationId, identifier)`. | `{ integrationId, identifier }` |
 
 `POST /` requires `origin`, `repoOwner`, `repoName`, `branch`; it and `POST /:id/links` return
-`400 bad_request` on missing required fields.
+`400 bad_request` on missing required fields. `icon` is optional on create and patch: it is
+shape-checked against `ICON_NAME_RE` (`/^[a-z0-9-]{1,40}$/`) rather than the icon set, because the
+name→node map is client-side — an unrecognised name falls back to rendering as-is, so a bad value is
+cosmetic rather than an error. See [ui-design.md](./ui-design.md) §Icons.
 
 ### Review notes — `apps/desktop/src/plugins/changes/server/routes/reviewNotes.ts`
 

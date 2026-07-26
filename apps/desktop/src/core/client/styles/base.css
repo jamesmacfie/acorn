@@ -22,12 +22,21 @@ body {
 }
 :where(button, a, input, textarea, select) { transition: var(--transition-color); }
 
-/* Unicode contribution glyphs (◇ GitHub, ◷ Linear, ◍ Rollbar, ◧ Docker, ▦ Database, ⎇ Changes …)
-   are text, not icons. They only align on a mono stack, so they stay pinned to --font-glyph even
-   when a pack takes the surrounding chrome sans. See docs/ui-design.md §Icons. */
+/* Unicode glyphs that are still text, not icons: the brand marks Lucide has no equivalent for
+   (◇ GitHub, ◷ Linear, ◍ Rollbar, ◧ Docker, ◎ OpenAI) plus every inline literal this pass left
+   alone. They only align on a mono stack, so they stay pinned to --font-glyph even when a pack takes
+   the surrounding chrome sans. ui/Icon.tsx emits this class on its fallback path.
+   See docs/ui-design.md §Icons. */
 .glyph {
   font-family: var(--font-glyph);
   font-variant-numeric: var(--tabular);
+}
+
+/* An Icon rendered inline with text sits slightly low without this — an em-sized svg aligns its
+   bottom edge to the baseline, where a glyph would have a descender below it. */
+svg.glyph,
+.glyph > svg {
+  vertical-align: -0.125em;
 }
 
 /* ── Null defaults ──────────────────────────────────────────────────────────────────────────

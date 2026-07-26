@@ -382,6 +382,7 @@ export const workspaceProjects = sqliteTable(
 export const tasks = sqliteTable('tasks', {
   id: text('id').primaryKey(), // opaque uuid
   title: text('title').notNull(), // editable label; seeded from origin (PR title, ticket, …)
+  icon: text('icon'), // optional Lucide icon name; null = derive from origin (see ui/Icon.tsx)
   origin: text('origin').notNull(), // 'github-pr' | 'linear' | 'rollbar' | 'local'
   repoOwner: text('repo_owner').notNull(), // a task always belongs to a repo
   repoName: text('repo_name').notNull(),

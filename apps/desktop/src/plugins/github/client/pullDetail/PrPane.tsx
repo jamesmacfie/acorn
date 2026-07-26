@@ -21,7 +21,7 @@ export function PrPane(props: { task: Task }) {
 export const prPaneContribution: PaneContribution = {
   id: 'pr',
   label: 'PR review',
-  glyph: '⌥',
+  glyph: 'git-pull-request',
   description: 'Diff, files & review comments',
   order: 10,
   defaultChord: 'meta+shift+r',

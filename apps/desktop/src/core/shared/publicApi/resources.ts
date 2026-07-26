@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import { BranchSchema, IdSchema, OwnerSchema, PageQuerySchema, RelativePathSchema, RepoNameSchema, UnixMillisSchema } from './primitives'
+import { ICON_NAME_RE } from '../api'
 
 // Core resource schemas (docs/public-api.md). Workspaces, tasks, links, repository
 // assignments, and pinned repositories.
@@ -87,9 +88,13 @@ export const TaskLinkInputSchema = z.strictObject({
     .optional(),
 })
 
+// Shape-checked against the shared rule, not the client-side icon map — see ICON_NAME_RE.
+const IconNameSchema = z.string().regex(ICON_NAME_RE)
+
 export const TaskSchema = z.strictObject({
   id: IdSchema,
   title: z.string().min(1).max(240),
+  icon: z.string().nullable(),
   origin: z.string().min(1).max(100),
   repoOwner: OwnerSchema,
   repoName: RepoNameSchema,
@@ -108,6 +113,7 @@ export type Task = z.infer<typeof TaskSchema>
 
 export const CreateTaskSchema = z.strictObject({
   title: z.string().trim().min(1).max(240).optional(),
+  icon: IconNameSchema.optional(),
   origin: z.string().min(1).max(100),
   repoOwner: OwnerSchema,
   repoName: RepoNameSchema,
@@ -126,6 +132,7 @@ export const CreateTaskSchema = z.strictObject({
 export const PatchTaskSchema = z
   .strictObject({
     title: z.string().trim().min(1).max(240).optional(),
+    icon: IconNameSchema.nullable().optional(), // null clears back to the origin-derived default
     sort: z.number().int().nonnegative().optional(),
   })
   .refine((v) => Object.keys(v).length > 0, 'At least one field is required')

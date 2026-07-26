@@ -1,5 +1,6 @@
 import { Show, splitProps, type ComponentProps, type JSX } from 'solid-js'
 import { cx } from './cx'
+import Icon from './Icon'
 
 // The shared primitive layer. Each primitive emits ONE stable semantic class plus `data-*` variant
 // attributes, and appends `props.class`. That is the whole style-awareness mechanism:
@@ -124,13 +125,12 @@ export function Badge(props: {
 }
 
 /* ── Spinner ─────────────────────────────────────────────────────────────────────────────────
-   Busy state is a literal ⠿ braille glyph plus a .spin keyframe at seven sites. As a primitive it
-   becomes pack-varying (Terminal keeps the glyph; Modern can swap in a CSS ring) and Button can
-   own its own busy state. */
+   Busy state at seven sites: a Lucide loader ring plus the .spin keyframe. The rotation stays on the
+   wrapper span, not the svg, so a pack can swap the mark without touching the animation. */
 export function Spinner(props: { size?: 'sm' | 'md'; label?: string }) {
   return (
     <span class="ui-spinner spin" data-size={props.size ?? 'sm'} role="status" aria-label={props.label ?? 'Working'}>
-      ⠿
+      <Icon name="loader-circle" />
     </span>
   )
 }

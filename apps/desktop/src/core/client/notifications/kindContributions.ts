@@ -1,12 +1,12 @@
 import type { NoticeKindContribution } from '../registries/notices'
 
 export const noticeKindContributions: NoticeKindContribution[] = [
-  { id: 'finished', glyph: '●', severity: 'info', toast: true },
-  { id: 'needs-input', glyph: '‼', severity: 'warn', toast: true },
-  { id: 'exited', glyph: '○', severity: 'info', toast: true },
-  { id: 'error', glyph: '✕', severity: 'danger', toast: true },
-  { id: 'gate', glyph: '⛔', severity: 'warn', toast: true },
-  { id: 'run-done', glyph: '▸', severity: 'info', toast: true },
-  { id: 'background-error', glyph: '⚠', severity: 'danger', toast: false },
-  { id: 'repo-config-trust', glyph: '⚠', severity: 'warn', toast: true },
+  { id: 'finished', glyph: 'circle-dot', severity: 'info', toast: true },
+  { id: 'needs-input', glyph: 'circle-alert', severity: 'warn', toast: true },
+  { id: 'exited', glyph: 'circle', severity: 'info', toast: true },
+  { id: 'error', glyph: 'x', severity: 'danger', toast: true },
+  { id: 'gate', glyph: 'ban', severity: 'warn', toast: true },
+  { id: 'run-done', glyph: 'play', severity: 'info', toast: true },
+  { id: 'background-error', glyph: 'triangle-alert', severity: 'danger', toast: false },
+  { id: 'repo-config-trust', glyph: 'triangle-alert', severity: 'warn', toast: true },
 ]

@@ -16,7 +16,7 @@ import { Portal } from 'solid-js/web'
 // MentionTextarea anchors to the text caret rather than to an element, which is a different
 // problem. Extract it if a second element-anchored popover appears.
 export default function Picker<T>(props: {
-  label: string
+  label: string | JSX.Element // JSX so a picker can show its current value as an icon, not just text
   placeholder: string
   emptyText: string
   results: (query: string) => T[]

@@ -37,7 +37,7 @@ export const createCheckoutTask = async (seed: TaskSeed) => {
   return patch ? { ...task, ...patch } : task
 }
 
-export async function patchTask(id: string, body: { title?: string; status?: 'active' | 'archived'; pullNumber?: number | null }) {
+export async function patchTask(id: string, body: { title?: string; icon?: string | null; status?: 'active' | 'archived'; pullNumber?: number | null }) {
   return writeJson<unknown>(taskRoute(id), {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json' },

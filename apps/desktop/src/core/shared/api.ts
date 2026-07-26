@@ -325,9 +325,16 @@ export type TaskLinkSeed = { connectionId: string; identifier: string; ref?: Omi
 // A workspace's linked external projects (docs/workspaces-and-tasks.md) — (integrationId, externalId) pairs.
 export type WorkspaceProject = { integrationId: string; externalId: string }
 export type WorkspaceProjectsResponse = { projects: WorkspaceProject[] }
+// A Lucide icon name (see core/client/ui/Icon.tsx). Shape-checked only, deliberately: the
+// 1756-name map is client-side, and importing it into a route would breach the client↔node boundary
+// that core/boundaries.test.ts enforces. An unrecognised name degrades to Icon's render-as-is
+// fallback, so a bad value is cosmetic. Shared so the internal route and the public API agree.
+export const ICON_NAME_RE = /^[a-z0-9-]{1,40}$/
+
 export type Task = {
   id: string
   title: string
+  icon: string | null // Lucide icon name; null = derive from origin
   origin: string
   repoOwner: string
   repoName: string
@@ -343,6 +350,7 @@ export type Task = {
 // Source (docs/workspaces-and-tasks.md/04). title is optional — the server seeds one from origin if absent.
 export type TaskSeed = {
   title?: string
+  icon?: string
   origin: Task['origin']
   repoOwner: string
   repoName: string
@@ -611,7 +619,9 @@ export const prefsKey = ['prefs'] as const
 // gained the required browserRules[] — same stale-restore hazard, same fix.
 export const workspacesKey = ['workspaces', 'groups', 'v2'] as const
 export const workspaceAssignmentsKey = ['workspace-assignments'] as const
-export const tasksKey = ['tasks'] as const
+// 'v2': Task gained a non-optional `icon`. A row restored from a user's persisted IndexedDB cache
+// would lack it, contradicting the type — same stale-restore hazard as workspacesKey above.
+export const tasksKey = ['tasks', 'v2'] as const
 export const mentionsKey = (owner: string, repo: string) => ['mentions', owner, repo] as const
 export const runJobsKey = (owner: string, repo: string, runId: number) => ['run-jobs', owner, repo, runId] as const
 export const jobLogKey = (owner: string, repo: string, jobId: number) => ['job-log', owner, repo, jobId] as const

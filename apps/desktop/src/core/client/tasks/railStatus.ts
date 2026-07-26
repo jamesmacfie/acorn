@@ -18,7 +18,7 @@ export type RailStatusItem = {
   key: string
   label: string
   overlayCls: string // positioned class(es) for the rail overlay
-  glyph?: string // text glyph; omitted for the CI dot (which is a coloured circle)
+  glyph?: string // icon name for ui/Icon.tsx; omitted for the CI dot (which is a coloured circle)
   dotCls?: string // 'checks-dot checks-dot-…' — the CI dot, self-coloured
   tone?: 'accent' | 'warn' | 'del' // legend glyph colour
 }
@@ -34,10 +34,10 @@ export function railStatusItems({ checks, working, unread, status }: RailStatusI
   const items: RailStatusItem[] = []
   if (checks)
     items.push({ key: 'checks', label: CHECKS_LABEL[checks], overlayCls: `tabrail-checks checks-dot checks-dot-${checks}`, dotCls: `checks-dot checks-dot-${checks}` })
-  if (working) items.push({ key: 'working', label: `${working} agent${working > 1 ? 's' : ''} working`, overlayCls: 'tabrail-spinner spin', glyph: '⠿', tone: 'accent' })
-  if (unread) items.push({ key: 'needs', label: 'An agent needs you — unread notifications', overlayCls: 'tabrail-needs', glyph: '‼', tone: 'warn' })
+  if (working) items.push({ key: 'working', label: `${working} agent${working > 1 ? 's' : ''} working`, overlayCls: 'tabrail-spinner spin', glyph: 'loader-circle', tone: 'accent' })
+  if (unread) items.push({ key: 'needs', label: 'An agent needs you — unread notifications', overlayCls: 'tabrail-needs', glyph: 'circle-alert', tone: 'warn' })
   // Dirty and missing are mutually exclusive: a vanished worktree can't report a file count.
-  if (status?.missing) items.push({ key: 'repair', label: 'Worktree missing — needs repair', overlayCls: 'tabrail-dirty tabrail-repair', glyph: '⚠', tone: 'del' })
-  else if (status?.dirty) items.push({ key: 'dirty', label: `Uncommitted changes (${status.dirtyCount})`, overlayCls: 'tabrail-dirty', glyph: '✎', tone: 'warn' })
+  if (status?.missing) items.push({ key: 'repair', label: 'Worktree missing — needs repair', overlayCls: 'tabrail-dirty tabrail-repair', glyph: 'triangle-alert', tone: 'del' })
+  else if (status?.dirty) items.push({ key: 'dirty', label: `Uncommitted changes (${status.dirtyCount})`, overlayCls: 'tabrail-dirty', glyph: 'pencil', tone: 'warn' })
   return items
 }
