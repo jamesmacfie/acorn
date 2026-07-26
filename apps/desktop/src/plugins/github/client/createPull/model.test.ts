@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { humanizeBranch, prefillFromCompare } from './model'
+import { humanizeBranch, parsePullDraft, prefillFromCompare } from './model'
 
 describe('humanizeBranch', () => {
   it('takes the last segment and humanizes separators', () => {
@@ -25,5 +25,26 @@ describe('prefillFromCompare', () => {
   })
   it('humanizes the branch when there are no commits', () => {
     expect(prefillFromCompare([], 'release/v2')).toEqual({ title: 'V2', body: '' })
+  })
+})
+
+describe('parsePullDraft', () => {
+  it('round-trips a stored draft', () => {
+    const d = { base: 'main', head: 'feat', title: 'T', body: 'B', draft: true, touched: true }
+    expect(parsePullDraft(JSON.stringify(d))).toEqual(d)
+  })
+  it('fills missing fields and drops unusable values', () => {
+    expect(parsePullDraft('{"head":"feat","draft":"yes"}')).toEqual({
+      base: '',
+      head: 'feat',
+      title: '',
+      body: '',
+      draft: false,
+      touched: false,
+    })
+  })
+  it('returns null for nothing stored or malformed JSON', () => {
+    expect(parsePullDraft(null)).toBeNull()
+    expect(parsePullDraft('{oops')).toBeNull()
   })
 })

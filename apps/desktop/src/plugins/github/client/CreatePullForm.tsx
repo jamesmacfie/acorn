@@ -1,10 +1,10 @@
-import { createEffect, createSignal, Show } from 'solid-js'
+import { createEffect, createSignal, on, Show } from 'solid-js'
 import { createMutation, createQuery, useQueryClient } from '@tanstack/solid-query'
 import { useNavigate, useParams, useSearchParams } from '@solidjs/router'
 import { branchesOptions, compareOptions, mentionsOptions, pullsKey, reposOptions, type Branch } from '../../../core/client/queries'
 import MentionTextarea from './MentionTextarea'
 import { createPr } from './mutations'
-import { prefillFromCompare } from './createPull/model'
+import { clearPullDraft, prefillFromCompare, readPullDraft, writePullDraft } from './createPull/model'
 import Picker from '../../../core/client/ui/Picker'
 
 // Mid (Navigator) pane in create mode: base/head pickers + title/body/draft + Create. base/head
@@ -44,6 +44,28 @@ export default function CreatePullForm() {
     setBody(filled.body)
   })
 
+  // Restore this repo's stored draft (created after the prefill effect so it wins over a prefill that
+  // resolves from cache on the first tick), then keep writing it back as the user edits. Deps are
+  // explicit via `on` — the body must not subscribe to the fields it assigns.
+  createEffect(
+    on(
+      () => `${o()}/${r()}`,
+      () => {
+        const d = readPullDraft(o(), r())
+        setTitle(d?.title ?? '')
+        setBody(d?.body ?? '')
+        setDraft(d?.draft ?? false)
+        setTouched(d?.touched ?? false)
+        // The URL wins when it carries a comparison already (back-navigation, a shared link).
+        if (d && !searchParams.base && !searchParams.head && (d.base || d.head))
+          setSearchParams({ base: d.base || undefined, head: d.head || undefined }, { replace: true })
+      },
+    ),
+  )
+  createEffect(() => {
+    writePullDraft(o(), r(), { base: base(), head: head(), title: title(), body: body(), draft: draft(), touched: touched() })
+  })
+
   const create = createMutation(() => ({
     mutationFn: () => createPr(o(), r(), { title: title().trim(), body: body(), base: base(), head: head(), draft: draft() }),
   }))
@@ -56,6 +78,7 @@ export default function CreatePullForm() {
     create
       .mutateAsync()
       .then((res) => {
+        clearPullDraft(o(), r())
         qc.invalidateQueries({ queryKey: pullsKey(o(), r(), 'open') })
         navigate(`/${o()}/${r()}/${res.number}`)
       })
