@@ -288,6 +288,10 @@ export const repoPaths = sqliteTable(
     previewMode: text('preview_mode'), // 'url' | 'port' | 'script' — how the browser-preview URL is resolved; null → dev-server port
     previewValue: text('preview_value'), // the URL, port, or shell command per previewMode; null/blank = unset
     browserRules: text('browser_rules'), // JSON BrowserRule[] — preview-browser page rules (docs/panes.md); null = none
+    // Prefix prepended to the branch a NEW task derives from its title, e.g. 'jamesmacfie/' →
+    // 'jamesmacfie/fix-the-thing'. Stored already-normalised (slug + a trailing '/' or '-'
+    // separator). DB-only like browser_rules — a naming convention is personal, not committed.
+    branchPrefix: text('branch_prefix'),
     createdAt: integer('created_at').notNull(),
     updatedAt: integer('updated_at').notNull(),
   },

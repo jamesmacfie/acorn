@@ -79,6 +79,7 @@ const repoConfigBody = z.object({
     previewMode: z.enum(['url', 'port', 'script']).or(z.literal('')).optional(),
     previewValue: z.string().optional(),
     browserRules: z.array(browserRuleSchema).optional(),
+    branchPrefix: z.string().max(60).optional(),
   }),
 })
 const previewBody = z.object({ script: z.string() })

@@ -1,4 +1,4 @@
-import { createSignal, For, onCleanup, onMount, Show } from 'solid-js'
+import { createResource, createSignal, For, onCleanup, onMount, Show } from 'solid-js'
 import { useNavigate, useParams } from '@solidjs/router'
 import { createQuery, useQueryClient } from '@tanstack/solid-query'
 import { integrationsOptions, prefsOptions, pullDetailOptions, tasksKey, tasksOptions, workspacesOptions, type Task } from '../queries'
@@ -16,7 +16,7 @@ import { workingCountFor } from '../../../plugins/terminal/client/sessions'
 import { unreadForTask } from '../notifications/notifications'
 import { workspaceForRepo } from '../workspaces/activeWorkspace'
 import { resolveWorkspaceColor } from '../../shared/workspaceIdentity'
-import { dedupeBranch, slugifyBranch } from '../../shared/branch'
+import { dedupeBranch, slugifyBranch, withBranchPrefix } from '../../shared/branch'
 import { terminalApi } from '../../../plugins/terminal/client/terminalClient'
 import { registerCommands } from '../registries/commands'
 import { registerKeybindings } from '../registries/keybindings'
@@ -76,10 +76,23 @@ export default function TabRail() {
   // branch instead of cutting an isolated worktree. Hides the branch field (main picks the branch).
   const [useCheckout, setUseCheckout] = createSignal(false)
 
+  // The selected repo's branch prefix (repo settings). Desktop-only — the repo_paths row is behind the
+  // main-process bridge; on web there's no checkout to prefix branches for.
+  const [prefixRow] = createResource(
+    () => (draft()?.mode === 'new' ? newRepo() : undefined),
+    (key) => {
+      const [owner, repo] = key.split('/')
+      return owner && repo ? (terminalApi()?.repoPath.get(owner, repo) ?? null) : null
+    },
+  )
+  const branchPrefix = () => prefixRow()?.branchPrefix ?? null
+
   const branchesInRepo = (repoKey: string) =>
     (query.data ?? []).filter((t) => `${t.repoOwner}/${t.repoName}` === repoKey).map((t) => t.branch)
+  // Prefix first, then de-dupe: existing branches are already prefixed, so the suffix has to be
+  // chosen against the final name (`me/fix`, `me/fix-2`), not the bare slug.
   const defaultBranch = (title: string) => {
-    const slug = slugifyBranch(title)
+    const slug = withBranchPrefix(branchPrefix(), slugifyBranch(title))
     return slug ? dedupeBranch(slug, branchesInRepo(newRepo())) : ''
   }
   const effectiveBranch = () => (branchTouched() ? slugifyBranch(branchText()) : defaultBranch(text()))
