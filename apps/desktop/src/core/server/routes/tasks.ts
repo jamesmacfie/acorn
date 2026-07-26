@@ -4,7 +4,7 @@ import { getDb, schema } from '../db'
 import type { AppEnv } from '../middleware/auth'
 import { respondError } from '../respond'
 import { Hono } from 'hono'
-import type { Task, TaskLink, TaskLinkSeed, TaskSeed } from '../../shared/api'
+import { ICON_NAME_RE, type Task, type TaskLink, type TaskLinkSeed, type TaskSeed } from '../../shared/api'
 import type { ExternalRef } from '../../shared/integrations'
 import { externalRefForConnection, getConnection } from '../integrations/connections'
 import { ProviderOperationError } from '../integrations/types'
@@ -18,10 +18,13 @@ import { integrationProviderRegistry } from '../integrations/registry'
 
 type Row = typeof schema.tasks.$inferSelect
 
+const cleanIcon = (v: unknown): string | null => (typeof v === 'string' && ICON_NAME_RE.test(v) ? v : null)
+
 function rowToTask(row: Row, links: TaskLink[]): Task {
   return {
     id: row.id,
     title: row.title,
+    icon: row.icon,
     origin: row.origin as Task['origin'],
     repoOwner: row.repoOwner,
     repoName: row.repoName,
@@ -106,9 +109,11 @@ export const tasks = new Hono<AppEnv>()
     const id = randomUUID()
     const title = seed.title?.trim() || (seed.pullNumber ? `#${seed.pullNumber} ${seed.repoName}` : `${seed.repoName} · ${seed.branch}`)
     const sort = (value ?? -1) + 1
+    const icon = cleanIcon(seed.icon)
     await db.insert(schema.tasks).values({
       id,
       title,
+      icon,
       origin: seed.origin,
       repoOwner: seed.repoOwner,
       repoName: seed.repoName,
@@ -129,19 +134,22 @@ export const tasks = new Hono<AppEnv>()
     }
     return c.json(
       rowToTask(
-        { id, title, origin: seed.origin, repoOwner: seed.repoOwner, repoName: seed.repoName, branch: seed.branch, pullNumber: seed.pullNumber ?? null, worktreePath: null, status: 'active', parentId: null, sort, createdAt: now, updatedAt: now, archivedAt: null },
+        { id, title, icon, origin: seed.origin, repoOwner: seed.repoOwner, repoName: seed.repoName, branch: seed.branch, pullNumber: seed.pullNumber ?? null, worktreePath: null, status: 'active', parentId: null, sort, createdAt: now, updatedAt: now, archivedAt: null },
         links,
       ),
     )
   })
   .patch('/:id', async (c) => {
     const id = c.req.param('id')
-    const body = (await c.req.json().catch(() => ({}))) as { title?: string; status?: 'active' | 'archived'; pullNumber?: number | null }
+    const body = (await c.req.json().catch(() => ({}))) as { title?: string; icon?: string | null; status?: 'active' | 'archived'; pullNumber?: number | null }
     const db = getDb(c.env)
     const [existing] = await db.select({ id: schema.tasks.id }).from(schema.tasks).where(eq(schema.tasks.id, id))
     if (!existing) return respondError(c, 404, 'not_found')
     const patch: Partial<Row> = { updatedAt: Date.now() }
     if (typeof body.title === 'string' && body.title.trim()) patch.title = body.title.trim()
+    // A name to set, or null to clear back to the origin-derived default.
+    if (typeof body.icon === 'string') patch.icon = cleanIcon(body.icon)
+    else if (body.icon === null) patch.icon = null
     if (body.status === 'archived' || body.status === 'active') {
       patch.status = body.status
       patch.archivedAt = body.status === 'archived' ? Date.now() : null

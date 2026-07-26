@@ -56,7 +56,7 @@ export function PreviewTaskPane(props: { task: Task }) {
 }
 
 export const previewPaneContribution: PaneContribution = {
-  id: 'preview', label: 'Browser preview', glyph: '◍', description: 'Live preview of the app', order: 80,
+  id: 'preview', label: 'Browser preview', glyph: 'globe', description: 'Live preview of the app', order: 80,
   defaultChord: 'meta+shift+b', requires: 'desktop', component: PreviewTaskPane,
   keepAlive: 'dom', minWidth: 320,
 }

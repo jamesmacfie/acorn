@@ -3,6 +3,7 @@ import type { Task } from '../queries'
 import { paneAvailable, paneContribution, paneContributions, type PaneContribution, type PaneId } from '../registries/panes'
 import { ContributionBoundary } from '../ui/ContributionBoundary'
 import { paneFocus } from '../ui/focus'
+import Icon from '../ui/Icon'
 import { dispatchLayout, layoutForTask, maximizedPane } from './tasks'
 import { defaultLayout, type LayoutAction } from './layout'
 import { formatChord } from './paneShortcuts'
@@ -180,7 +181,7 @@ export default function TaskPaneHost(props: {
               data-tip-sub={`${pane.description ?? pane.label} · ⌘-click to open beside`}
               aria-label={pane.label}
               onClick={(event) => onSwitch(pane.id, event)}
-            >{pane.glyph}</button>
+            ><Icon name={pane.glyph} /></button>
           )}
         </For>
         {props.extraButtons}

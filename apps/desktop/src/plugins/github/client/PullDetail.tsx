@@ -4,6 +4,7 @@ import { useNavigate, useParams } from '@solidjs/router'
 import { useChangedFiles } from './changedFiles'
 import { checksState, FAILED_STATUSES, fileStatusMeta, summarizeFileStats } from '../../../core/client/ui/displayMeta'
 import { formatRelativeTime } from '../../../core/client/lib/formatRelativeTime'
+import Icon from '../../../core/client/ui/Icon'
 import { requestFileScroll, routeKey } from './fileNavigation'
 import Picker from '../../../core/client/ui/Picker'
 import CopyButton from '../../../core/client/ui/CopyButton'
@@ -202,12 +203,12 @@ export default function PullDetail(props: { task?: Task } = {}) {
                 <span class="branch-flow">
                   <button class="branch-chip" title={pull().baseRef ?? 'base'} onClick={() => navigator.clipboard.writeText(pull().baseRef ?? '')}>
                     <span class="branch-chip-label">{pull().baseRef ?? 'base'}</span>
-                    <svg class="branch-chip-copy" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+                    <Icon name="copy" class="branch-chip-copy" size={12} />
                   </button>
                   <span class="branch-arrow">←</span>
                   <button class="branch-chip" title={pull().headRef ?? 'head'} onClick={() => navigator.clipboard.writeText(pull().headRef ?? '')}>
                     <span class="branch-chip-label">{pull().headRef ?? 'head'}</span>
-                    <svg class="branch-chip-copy" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+                    <Icon name="copy" class="branch-chip-copy" size={12} />
                   </button>
                 </span>
                 <span>

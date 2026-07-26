@@ -1,6 +1,7 @@
 import { createMemo, createSignal, For, Show } from 'solid-js'
 import { createQuery, useQueryClient } from '@tanstack/solid-query'
 import type { PublicIntegrationProvider } from '../../shared/integrations'
+import Icon from '../ui/Icon'
 import {
   connectIntegration,
   deleteIntegration,
@@ -13,7 +14,7 @@ import { integrationsKey, integrationsOptions } from '../queries'
 function IntegrationLogo(props: { provider: PublicIntegrationProvider | undefined }) {
   return (
     <span class="integration-logo" data-provider={props.provider?.id}>
-      <span class="integration-logo-mono">{props.provider?.glyph ?? props.provider?.label[0] ?? '?'}</span>
+      <span class="integration-logo-mono"><Icon name={props.provider?.glyph ?? props.provider?.label[0] ?? '?'} /></span>
     </span>
   )
 }
@@ -138,7 +139,7 @@ export default function IntegrationsSettings() {
             <For each={connectable()}>
               {(provider) => (
                 <button type="button" class="integration-chip" classList={{ active: selectedProvider()?.id === provider.id }} onClick={() => { setProviderId(provider.id); setRotationId(null); setCredentials({}) }}>
-                  <span class="integration-logo-mono">{provider.glyph}</span> {provider.label}
+                  <span class="integration-logo-mono"><Icon name={provider.glyph} /></span> {provider.label}
                 </button>
               )}
             </For>

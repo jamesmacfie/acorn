@@ -212,15 +212,36 @@ tokens, so radii, spacing and chrome type still vary per pack, but their structu
 
 ## Icons
 
-There is no icon library and no icon dependency. Icons are Unicode glyphs carried as
-`glyph: string` on contribution types, plus five hand-written inline SVGs.
+Icons are Lucide, resolved by name through `ui/Icon.tsx`. The mechanism is the one this section used
+to prescribe — **the type stayed `glyph: string`, only the meaning of the string changed**
+(`glyph: '⎇'` → `glyph: 'git-compare'`). `glyph` is deliberately still a plain string: it lives in
+`core/shared/integrations.ts` *and* `core/server/integrations/types.ts`, so widening it to
+`string | Component` would put a `solid-js` type into server code, and `core/boundaries.test.ts`
+enforces the client↔node split as a hard invariant.
 
-When real icons are wanted, the mechanism is **keep the type and change what the string means** —
-`glyph: '◇'` → `glyph: 'github'`, with a `<Glyph name>` resolver mapping names per pack and unmapped
-names rendering as-is. Do **not** widen `glyph` to `string | Component`: that type lives in
-`core/shared/integrations.ts` *and* `core/server/integrations/types.ts`, so it would put a `solid-js`
-type into server code, and `core/boundaries.test.ts` enforces the client↔node split as a hard
-invariant.
+`<Icon name>` looks the name up in `lucide-static/icon-nodes.json` (1756 icons as
+`[tag, attrs][]` data, rendered through `<Dynamic>` — no `innerHTML`) and **renders the string as-is
+when there is no match**. That fallback is load-bearing, not a nicety:
+
+- **Lucide ships no brand icons** — no `github`, `docker`, `linear`, `slack`, `openai`. The provider
+  marks `◇ ◷ ◍ ◧ ◎` and Anthropic's `A` are still Unicode and stay that way until someone hand-adds
+  brand SVGs. A generic `git-pull-request` in place of GitHub's mark is a downgrade, not a migration.
+- The ~120 inline glyph literals in `plugins/*/client/*.tsx` (`✕` close, `↻` refresh, `▾` disclosure,
+  `🗑`, `⚠`) were **not** converted. They render unchanged. Convert them opportunistically.
+
+Sizing is `width/height: 1em` with `stroke="currentColor"`, so an icon inherits the `font-size` and
+`color` that already styled the glyph it replaced. That is why the conversion needed no CSS changes,
+and why `--icon-size`/`--icon-box` remain unused. `.glyph` still pins the *fallback* text path to
+`--font-glyph`.
+
+The whole node map is imported eagerly — one module, ~390KB minified, ~4% of a renderer bundle that
+already carries `monaco-editor` and `shiki`. It buys a pure-lookup `<Icon>` and a free dictionary for
+the task-icon picker (`ICON_NAMES`). It is invisible to `pnpm test`: `vitest.config.ts` has no Solid
+plugin and `include` is `*.test.ts`, so no test ever loads a `.tsx` module.
+
+Per-icon `lucide-solid` imports were rejected: with all 1756 names reachable by a user-chosen string,
+tree-shaking cannot help, and the barrel resolves to ~1756 ES modules — a known vite-dev-server
+pathology.
 
 ## Three-pane layout
 

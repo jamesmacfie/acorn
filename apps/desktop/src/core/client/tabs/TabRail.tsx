@@ -2,7 +2,7 @@ import { createResource, createSignal, For, onCleanup, onMount, Show } from 'sol
 import { useNavigate, useParams } from '@solidjs/router'
 import { createQuery, useQueryClient } from '@tanstack/solid-query'
 import { integrationsOptions, prefsOptions, pullDetailOptions, tasksKey, tasksOptions, workspacesOptions, type Task } from '../queries'
-import { archiveTask, createCheckoutTask, createTask, renameTask } from '../tasks/mutations'
+import { archiveTask, createCheckoutTask, createTask, patchTask } from '../tasks/mutations'
 import { applyRailOrder, isPinned, moveTask, parseRailOrder, pinTask, unpinTask, type RailOrder } from './railOrder'
 import { checksState } from '../ui/displayMeta'
 import { createDismissable } from '../ui/dismissable'
@@ -26,6 +26,8 @@ import { PrefKeys } from '../persistence/prefKeys'
 import { completeTaskArchive } from '../tasks/archiveLifecycle'
 import { sourceRegistry } from '../registries/sources'
 import { TaskSlotHost } from '../registries/uiSlots'
+import Icon from '../ui/Icon'
+import IconPicker from '../ui/IconPicker'
 import './tabrail.css'
 
 // The Tasks zone of the left rail (docs/workspaces-and-tasks.md). Rows are real Task entities (not path
@@ -33,8 +35,10 @@ import './tabrail.css'
 // opens a popover to rename or archive it. ponytail: create/rename use a small modal reusing the
 // shared .overlay shell. (Electron's BrowserWindow has no window.prompt, so we can't shortcut.)
 
-// Origin → glyph; cosmetic, replaces the old cycled icon.
-const originGlyph = (origin: string) => ({ 'github-pr': '⌥', local: '●' })[origin] ?? sourceRegistry.get(origin)?.glyph ?? '●'
+// Origin → icon name; cosmetic, and only the default — a task's own `icon` wins (see the row below).
+// A source's glyph may still be a Unicode brand mark (Lucide has none); ui/Icon.tsx renders those as-is.
+const originIcon = (origin: string) =>
+  ({ 'github-pr': 'git-pull-request', local: 'circle-dot' })[origin] ?? sourceRegistry.get(origin)?.glyph ?? 'circle-dot'
 
 type Draft = { mode: 'new' } | { mode: 'rename'; w: Task }
 
@@ -63,6 +67,8 @@ export default function TabRail() {
   }
   const [draft, setDraft] = createSignal<Draft | null>(null)
   const [text, setText] = createSignal('')
+  // Chosen icon for the task being created/renamed. null = let the origin derive it.
+  const [iconDraft, setIconDraft] = createSignal<string | null>(null)
   const [newRepo, setNewRepo] = createSignal('') // "owner/name" for the new-task repo selector
   // Repo options are snapshotted when the modal opens, not bound to the reactive activeWorkspace().
   // Otherwise a workspace switch mid-modal (App.tsx restore-nav / workspaces refetch) repopulates the
@@ -97,6 +103,11 @@ export default function TabRail() {
     return slug ? dedupeBranch(slug, branchesInRepo(newRepo())) : ''
   }
   const effectiveBranch = () => (branchTouched() ? slugifyBranch(branchText()) : defaultBranch(text()))
+  // What the icon picker shows while no icon is chosen: the same default the rail row would derive.
+  const draftFallbackIcon = () => {
+    const d = draft()
+    return originIcon(d?.mode === 'rename' ? d.w.origin : 'local')
+  }
 
   const invalidate = () => queryClient.invalidateQueries({ queryKey: tasksKey })
 
@@ -172,6 +183,7 @@ export default function TabRail() {
     setNewRepoOptions(repos)
     setNewRepo(repos.some((r) => `${r.owner}/${r.name}` === cur) ? cur : `${repos[0].owner}/${repos[0].name}`)
     setText('')
+    setIconDraft(null)
     setBranchText('')
     setBranchTouched(false)
     setUseCheckout(false)
@@ -181,6 +193,7 @@ export default function TabRail() {
   function openRename(w: Task) {
     setMenuId(null)
     setText(w.title)
+    setIconDraft(w.icon)
     setDraft({ mode: 'rename', w })
   }
 
@@ -198,14 +211,20 @@ export default function TabRail() {
         // fallback when the desktop bridge is absent. Otherwise cut a worktree on the derived branch.
         const branch = useCheckout() ? effectiveBranch() || 'HEAD' : effectiveBranch()
         if (!branch) return
-        const seed = { origin: 'local' as const, repoOwner: owner, repoName: repo, branch, title: value }
+        const seed = { origin: 'local' as const, repoOwner: owner, repoName: repo, branch, title: value, icon: iconDraft() ?? undefined }
         const w = useCheckout() ? await createCheckoutTask(seed) : await createTask(seed)
         await invalidate()
         activateTaskSignals(w, { pane: 'pr' }) // fresh local task → start on the PR/default pane
         navigate(pathForTask(w))
-      } else if (value !== d.w.title) {
-        await renameTask(d.w.id, value)
-        await invalidate()
+      } else {
+        // One PATCH for whichever of title/icon actually changed; nothing changed → no request.
+        const body: { title?: string; icon?: string | null } = {}
+        if (value !== d.w.title) body.title = value
+        if (iconDraft() !== d.w.icon) body.icon = iconDraft()
+        if (Object.keys(body).length) {
+          await patchTask(d.w.id, body)
+          await invalidate()
+        }
       }
       setDraft(null)
     } catch (error) {
@@ -262,7 +281,7 @@ export default function TabRail() {
               aria-label={s.label}
               onClick={() => selectSource(s.id)}
             >
-              {s.glyph}
+              <Icon name={s.glyph} />
             </button>
           )}
         </For>
@@ -310,7 +329,7 @@ export default function TabRail() {
               }}
             >
               <Show when={isPinned(railOrder(), w.id)}>
-                <span class="tabrail-pin" title="Pinned to top">⌖</span>
+                <span class="tabrail-pin" title="Pinned to top"><Icon name="pin" /></span>
               </Show>
               <button
                 type="button"
@@ -323,14 +342,16 @@ export default function TabRail() {
                 aria-label={w.title}
                 onClick={() => onRowClick(w)}
               >
-                {wsGlyph() ?? originGlyph(w.origin)}
+                {/* The task's own icon wins, then the workspace's, then the origin default. */}
+                <Icon name={w.icon ?? wsGlyph() ?? originIcon(w.origin)} />
               </button>
               {/* Live status markers (docs/workspaces-and-tasks.md): CI dot, agent-working spinner,
                   needs-you notice, dirty/repair — from railStatus.ts, mirrored in the hover tooltip. */}
               <For each={statusItems()}>
                 {(s) => (
                   <span class={s.overlayCls} title={s.label}>
-                    {s.glyph}
+                    {/* The CI marker has no glyph — it's the self-coloured dot on overlayCls. */}
+                    <Show when={s.glyph}>{(g) => <Icon name={g()} />}</Show>
                   </span>
                 )}
               </For>
@@ -386,14 +407,18 @@ export default function TabRail() {
                 </Show>
                 <form class="integration-key-row" style={{ 'flex-direction': 'column', 'align-items': 'stretch', gap: '6px' }} onSubmit={submitDraft}>
                   <Show when={draftErr()}><div class="action-error" role="alert">{draftErr()}</div></Show>
-                  <input
-                    class="ui-input"
-                    type="text"
-                    ref={(el) => queueMicrotask(() => el.focus())}
-                    placeholder={d().mode === 'new' ? 'Task title' : 'Task name'}
-                    value={text()}
-                    onInput={(e) => setText(e.currentTarget.value)}
-                  />
+                  <div style={{ display: 'flex', 'align-items': 'center', gap: '6px' }}>
+                    <IconPicker value={iconDraft()} fallback={draftFallbackIcon()} onSelect={setIconDraft} />
+                    <input
+                      class="ui-input"
+                      style={{ flex: 1, 'min-width': 0 }}
+                      type="text"
+                      ref={(el) => queueMicrotask(() => el.focus())}
+                      placeholder={d().mode === 'new' ? 'Task title' : 'Task name'}
+                      value={text()}
+                      onInput={(e) => setText(e.currentTarget.value)}
+                    />
+                  </div>
                   <Show when={d().mode === 'new' && !useCheckout()}>
                     <input
                       class="ui-input"

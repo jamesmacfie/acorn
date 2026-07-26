@@ -48,6 +48,7 @@ function rowToTask(row: TaskRow, links: Task['links']): Task {
   return {
     id: row.id,
     title: row.title,
+    icon: row.icon,
     origin: row.origin,
     repoOwner: row.repoOwner,
     repoName: row.repoName,
@@ -132,6 +133,7 @@ export class TaskService {
     await this.db.insert(schema.tasks).values({
       id,
       title,
+      icon: input.icon ?? null,
       origin: input.origin,
       repoOwner: input.repoOwner,
       repoName: input.repoName,
@@ -177,6 +179,7 @@ export class TaskService {
     if (!existing) throw new PublicApiError('not_found', 'Task not found')
     const set: Partial<TaskRow> = { updatedAt: this.now() }
     if (patch.title !== undefined) set.title = patch.title
+    if (patch.icon !== undefined) set.icon = patch.icon // null clears back to the origin default
     if (patch.sort !== undefined) set.sort = patch.sort
     await this.db.update(schema.tasks).set(set).where(eq(schema.tasks.id, id))
     return this.getOrThrow(id)

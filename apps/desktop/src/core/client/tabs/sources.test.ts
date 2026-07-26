@@ -27,7 +27,7 @@ describe('availableSources (docs/integrations.md — gated by integration rows)'
           prepare: async () => ({ origin: id, repoOwner: 'acme', repoName: 'widget', branch: 'main' }),
           create: async (seed) => ({
             ...seed,
-            id: 'task', title: seed.title ?? 'Task', worktreePath: null, pullNumber: seed.pullNumber ?? null,
+            id: 'task', title: seed.title ?? 'Task', icon: seed.icon ?? null, worktreePath: null, pullNumber: seed.pullNumber ?? null,
             status: 'active', parentId: null, sort: 0, links: [],
           }),
         },

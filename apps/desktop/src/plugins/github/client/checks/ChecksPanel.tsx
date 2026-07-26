@@ -4,6 +4,7 @@ import { createQuery } from '@tanstack/solid-query'
 import { jobLogOptions, runJobsOptions } from '../../../../core/client/queries'
 import { FAILED_STATUSES } from '../../../../core/client/ui/displayMeta'
 import { getHighlighter, tokenizeAnsiLines } from '../../../../core/client/highlight/shiki'
+import Icon from '../../../../core/client/ui/Icon'
 import { splitJobLog } from './splitJobLog'
 
 // One step's log, ANSI-colour highlighted (the colours CI tools emit). Falls back to raw text while
@@ -16,10 +17,7 @@ function StepLog(props: { text: string }) {
   return (
     <div class="step-log-wrap">
       <button type="button" class="step-log-copy" title="Copy log" aria-label="Copy log" onClick={() => navigator.clipboard?.writeText(props.text)}>
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
-          <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
-        </svg>
+        <Icon name="copy" size={14} />
       </button>
       <pre class="step-log">
         <Show when={lines()} fallback={props.text}>
