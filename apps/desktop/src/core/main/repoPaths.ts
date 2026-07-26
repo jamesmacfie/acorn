@@ -5,6 +5,7 @@ import { promisify } from 'node:util'
 import { eq, and } from 'drizzle-orm'
 import type { AppDatabase } from '../server/db'
 import { schema } from '../server/db'
+import { normalizeBranchPrefix } from '../shared/branch'
 import { isValidBrowserRule, parseBrowserRules } from '../shared/browserRules'
 import type { BrowserRule, DbSchemaMode, PreviewMode, SetupTrigger } from '../shared/api'
 import type { RepoConfigPatch, RepoPath, RepoPathResult } from '../shared/terminal'
@@ -35,6 +36,7 @@ export async function getRepoPath(db: AppDatabase, owner: string, repo: string):
     previewMode: (row.previewMode as PreviewMode | null) ?? null,
     previewValue: row.previewValue,
     browserRules: parseBrowserRules(row.browserRules),
+    branchPrefix: row.branchPrefix,
   }
 }
 
@@ -103,6 +105,9 @@ export async function setRepoConfig(db: AppDatabase, owner: string, repo: string
     const p = Number(effectiveValue)
     if (!/^\d{1,5}$/.test(effectiveValue) || p < 1 || p > 65535) return { ok: false, reason: 'Preview port must be 1-65535.' }
   }
+  // Normalised on write so every reader (and the branch field the user sees) gets the same canonical
+  // form, and an unslugifiable prefix ('///') clears rather than persisting an illegal branch stem.
+  if (patch.branchPrefix !== undefined) set.branchPrefix = normalizeBranchPrefix(patch.branchPrefix) || null
   if (patch.browserRules !== undefined) {
     const rules: BrowserRule[] = Array.isArray(patch.browserRules) ? patch.browserRules.filter(isValidBrowserRule) : []
     set.browserRules = rules.length ? JSON.stringify(rules) : null
