@@ -20,12 +20,16 @@
   position: relative;
 }
 
-/* Agent-working indicator: a small spinning glyph under the tab's icon. */
+/* Agent-working indicator: a small spinning glyph under the tab's icon. Centred with inset+
+   text-align, NOT transform: translateX(-50%) — `.spin` animates `transform`, and interpolating
+   a translate into rotate(360deg) goes through matrix decomposition, which reads a full turn as
+   no turn at all. The icon slid sideways instead of spinning. */
 .tabrail-spinner {
   position: absolute;
   bottom: 4px;
-  left: 50%;
-  transform: translateX(-50%);
+  left: 0;
+  right: 0;
+  text-align: center;
   font-size: 9px;
   line-height: 1;
   color: var(--accent);
@@ -43,7 +47,7 @@
   position: absolute;
   bottom: 4px;
   right: 5px;
-  font-size: var(--fs-lg);
+  font-size: var(--fs-2xs);
   line-height: 1;
   color: var(--warn);
   pointer-events: none;
