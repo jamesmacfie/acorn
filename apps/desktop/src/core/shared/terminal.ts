@@ -102,6 +102,7 @@ export type RepoPath = {
   previewMode: PreviewMode | null
   previewValue: string | null
   browserRules: BrowserRule[] // parsed on the wire (empty = none)
+  branchPrefix: string | null // prepended to a new task's derived branch (already normalised); null = none
 }
 
 // Partial repo-config update sent to repoPath.config. Any omitted field is left unchanged; a field
@@ -119,6 +120,7 @@ export type RepoConfigPatch = {
   previewMode?: PreviewMode | ''
   previewValue?: string
   browserRules?: BrowserRule[]
+  branchPrefix?: string // normalised server-side; '' clears
 }
 
 // Run targets as the renderer sees them (docs/workflows.md §2): the merged config list + live status.
