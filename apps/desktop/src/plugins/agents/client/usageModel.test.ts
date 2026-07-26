@@ -55,6 +55,7 @@ describe('agent usage detail formatting', () => {
   it('prefers a live reset countdown but preserves provider text without a timestamp', () => {
     expect(formatReset(1_000 + 135 * 60_000, null, 1_000)).toBe('resets in 2h 15m')
     expect(formatReset(null, 'Resets Friday', 1_000)).toBe('resets Friday')
+    expect(formatReset(null, 'Resets Jul 31 at 12am (Pacific/Auckland)', 1_000)).toBe('resets Jul 31 at 12am')
   })
 
   it('projects quotas, reported cost, and estimated daily data into explicit key/value rows', () => {
