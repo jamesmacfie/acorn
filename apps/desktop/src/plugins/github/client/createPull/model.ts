@@ -17,3 +17,40 @@ export function prefillFromCompare(commits: CompareCommit[], headRef: string): {
   }
   return { title: humanizeBranch(headRef), body: '' }
 }
+
+// An in-progress new-PR form, kept in localStorage per repo so navigating away doesn't lose it —
+// same rationale (and per-device scope) as the comment drafts in ../comments/draftState.ts. base/head
+// are stored too: they live in the URL while the form is mounted, but a fresh visit to /:owner/:repo/new
+// carries no query params, so the URL alone can't restore them.
+export type PullDraft = { base: string; head: string; title: string; body: string; draft: boolean; touched: boolean }
+
+const draftKey = (owner: string, repo: string) => `new-pr:${owner}/${repo}`
+
+// Tolerate anything that isn't a draft we wrote (hand-edited or older shape) by discarding it.
+export function parsePullDraft(raw: string | null): PullDraft | null {
+  if (!raw) return null
+  try {
+    const d = JSON.parse(raw) as Partial<PullDraft>
+    return {
+      base: typeof d.base === 'string' ? d.base : '',
+      head: typeof d.head === 'string' ? d.head : '',
+      title: typeof d.title === 'string' ? d.title : '',
+      body: typeof d.body === 'string' ? d.body : '',
+      draft: d.draft === true,
+      touched: d.touched === true,
+    }
+  } catch {
+    return null
+  }
+}
+
+export const readPullDraft = (owner: string, repo: string): PullDraft | null =>
+  parsePullDraft(localStorage.getItem(draftKey(owner, repo)))
+
+// An untouched form with no head chosen is indistinguishable from a fresh one — don't leave a key behind.
+export function writePullDraft(owner: string, repo: string, d: PullDraft): void {
+  if (d.head || d.touched || d.draft) localStorage.setItem(draftKey(owner, repo), JSON.stringify(d))
+  else clearPullDraft(owner, repo)
+}
+
+export const clearPullDraft = (owner: string, repo: string): void => localStorage.removeItem(draftKey(owner, repo))

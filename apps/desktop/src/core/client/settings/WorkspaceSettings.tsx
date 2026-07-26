@@ -190,6 +190,7 @@ function RepoConfig(props: { owner: string; name: string }) {
   const [dbSchemaValue, setDbSchemaValue] = createSignal<string | null>(null)
   const [dbSchemaNotes, setDbSchemaNotes] = createSignal<string | null>(null)
   const [previewValue, setPreviewValue] = createSignal<string | null>(null)
+  const [branchPrefix, setBranchPrefix] = createSignal<string | null>(null)
   const [err, setErr] = createSignal('')
 
   // Gate the AI-SQL schema-source editor on a configured model provider connection (the feature is
@@ -219,12 +220,33 @@ function RepoConfig(props: { owner: string; name: string }) {
   const debDbSchema = debounce(() => void save({ dbSchemaValue: dbSchemaValue() ?? '' }), 1500)
   const debDbNotes = debounce(() => void save({ dbSchemaNotes: dbSchemaNotes() ?? '' }), 1500)
   const debPreview = debounce(() => void save({ previewValue: previewValue() ?? '' }), 1500)
-  onCleanup(() => { debSetup.flush(); debTeardown.flush(); debDbUrl.flush(); debDev.flush(); debDevRestart.flush(); debDbSchema.flush(); debDbNotes.flush(); debPreview.flush() })
+  // The prefix is normalised server-side ('feature' → 'feature/'), so drop the local override once
+  // saved — the refetched row is the canonical value and the input should show it, not the raw typing.
+  const debBranchPrefix = debounce(() => void save({ branchPrefix: branchPrefix() ?? '' }).then(() => setBranchPrefix(null)), 1500)
+  onCleanup(() => { debSetup.flush(); debTeardown.flush(); debDbUrl.flush(); debDev.flush(); debDevRestart.flush(); debDbSchema.flush(); debDbNotes.flush(); debPreview.flush(); debBranchPrefix.flush() })
 
   return (
     <details class="settings-repo-config">
       <summary class="muted">{props.owner}/{props.name}</summary>
       <Show when={row()} fallback={<span class="muted settings-hint">No local checkout mapped yet.</span>}>
+        <label class="settings-field">
+          <span class="settings-label">Task branch prefix</span>
+          <span class="muted settings-hint">
+            Prepended to the branch a new task derives from its title — <code>jamesmacfie/</code> gives{' '}
+            <code>jamesmacfie/fix-the-thing</code>. A trailing <code>-</code> is kept as the separator, otherwise{' '}
+            <code>/</code> is added. Blank means no prefix.
+          </span>
+          <input
+            class="ui-input"
+            type="text"
+            spellcheck={false}
+            placeholder="jamesmacfie/"
+            value={branchPrefix() ?? row()?.branchPrefix ?? ''}
+            onInput={(e) => { setBranchPrefix(e.currentTarget.value); debBranchPrefix() }}
+            onBlur={() => debBranchPrefix.flush()}
+          />
+        </label>
+
         <label class="settings-field">
           <span class="settings-label">Worktree setup script</span>
           <span class="muted settings-hint">

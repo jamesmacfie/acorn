@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { dedupeBranch, slugifyBranch } from './branch'
+import { dedupeBranch, normalizeBranchPrefix, slugifyBranch, withBranchPrefix } from './branch'
 
 describe('slugifyBranch', () => {
   it('lowercases and strips illegal chars to [a-z0-9/-]', () => {
@@ -28,5 +28,29 @@ describe('dedupeBranch', () => {
     expect(dedupeBranch('fix-login', [])).toBe('fix-login')
     expect(dedupeBranch('fix-login', ['fix-login'])).toBe('fix-login-2')
     expect(dedupeBranch('fix-login', ['fix-login', 'fix-login-2'])).toBe('fix-login-3')
+  })
+})
+
+describe('normalizeBranchPrefix', () => {
+  it('keeps a trailing - and otherwise adds /', () => {
+    expect(normalizeBranchPrefix('jamesmacfie/')).toBe('jamesmacfie/')
+    expect(normalizeBranchPrefix('jamesmacfie')).toBe('jamesmacfie/')
+    expect(normalizeBranchPrefix('wip-')).toBe('wip-')
+    expect(normalizeBranchPrefix('Feature ')).toBe('feature/')
+  })
+  it('clears when nothing slugifiable survives', () => {
+    expect(normalizeBranchPrefix('')).toBe('')
+    expect(normalizeBranchPrefix('///')).toBe('')
+  })
+})
+
+describe('withBranchPrefix', () => {
+  it('prepends the prefix and is idempotent', () => {
+    expect(withBranchPrefix('me/', 'fix-login')).toBe('me/fix-login')
+    expect(withBranchPrefix('me/', 'me/fix-login')).toBe('me/fix-login')
+  })
+  it('is a no-op without a prefix or without a branch', () => {
+    expect(withBranchPrefix(null, 'fix-login')).toBe('fix-login')
+    expect(withBranchPrefix('me/', '')).toBe('')
   })
 })
