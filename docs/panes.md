@@ -237,8 +237,13 @@ rail Source; the only difference here is that it is scoped to a task.
   `folder` string instead of a folders table) and `http_variables` (repo-scoped). Nothing is
   committed, so nothing is shared with teammates — see [data-layer.md](./data-layer.md).
 - **Ad-hoc requests** are rows with `task_id` set. New requests made in this pane stay with the task
-  until "Save to repo…" clears `task_id` and files them under a folder. Duplicating any request
-  (⧉ on its row) is the same flow pre-filled.
+  until the save dialog's "Keep in" is switched to the repo, which clears `task_id` and files them
+  under a folder. Duplicating any request (⧉ on its row) is the same flow pre-filled.
+- **Naming** happens in the save dialog (`SaveRequestModal.tsx`), reached by Save on an unsaved
+  request or by clicking the name in the metabar — that is also the rename/move path. Saving an
+  already-filed request writes straight through. An unsaved request is mirrored to `localStorage`
+  per repo+task, so leaving the panel mid-request doesn't lose it (the same per-device mechanism as
+  GitHub comment drafts); the copy is dropped once the request has a row.
 - **Variables** resolve at send time, lowest precedence first: task builtins (`{{repo}}`,
   `{{branch}}`, `{{worktree}}`, `{{taskId}}`) → repo variables → the request's own Vars tab. A repo
   variable is a plain value, a `secret` (AES-GCM at rest under `SESSION_ENC_KEY`, never returned to
