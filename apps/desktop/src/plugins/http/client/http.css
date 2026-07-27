@@ -2,11 +2,16 @@
    Feature-owned; shared tokens only. Borders are picked by role: --chrome-divider between regions,
    --divider between rows, --control-border on inputs. */
 
+/* `flex: 1` because a task slot is a flex row and this is its only child: with the default `auto`
+   basis the grid sizes to its own content and leaves half the slot empty. Harmless in the rail
+   Source, where the parent isn't a flex container. */
 .http-panel {
   display: grid;
   grid-template-columns: clamp(200px, 22vw, 300px) minmax(0, 1fr);
   min-height: 0;
+  min-width: 0;
   height: 100%;
+  flex: 1;
   overflow: hidden;
 }
 
@@ -126,10 +131,33 @@
   border-bottom: var(--chrome-divider);
   background: var(--bg-subtle);
 }
-.http-metabar .http-name { flex: 0 1 16em; }
-.http-metabar .http-folder { flex: 0 1 14em; }
 .http-metabar-spacer { flex: 1; }
 .http-dirty { color: var(--accent); font-size: var(--fs-xs); }
+
+/* The request's name is a button that opens the save dialog — the only place it can be edited. */
+.http-name-btn {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+  padding: var(--space-1) var(--space-2);
+  font: inherit;
+  font-size: var(--fs-sm);
+  color: var(--text);
+  background: none;
+  border: 0;
+  border-radius: var(--radius);
+  cursor: pointer;
+}
+.http-name-btn:hover { background: var(--bg-hover); }
+.http-name-folder { color: var(--text-faint); }
+.http-name-text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.http-name-tag {
+  font-size: var(--fs-2xs);
+  color: var(--text-faint);
+  text-transform: var(--label-transform);
+  letter-spacing: var(--label-tracking);
+}
 
 /* ── request tabs ────────────────────────────────────────────────────────────────────────── */
 
@@ -325,7 +353,10 @@
 
 /* ── variables view ──────────────────────────────────────────────────────────────────────── */
 
+/* Fills the main column rather than sizing to its rows — `.http-main` is a flex column, so without
+   `flex: 1` the grid ends where its content does and the scroller never engages. */
 .http-variables {
+  flex: 1;
   padding: var(--space-5) var(--pane-pad);
   overflow-y: auto;
   min-height: 0;
@@ -337,4 +368,4 @@
 .http-choose-repo h2 { margin: 0 0 var(--space-2); font-size: var(--fs-sm); }
 
 /* Settings hosts the same variables component with no pane chrome around it. */
-.settings-page .http-variables { padding: 0; }
+.settings-page .http-variables { padding: 0; flex: none; }

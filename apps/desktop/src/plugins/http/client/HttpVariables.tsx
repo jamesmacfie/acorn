@@ -7,7 +7,7 @@
 //             plaintext never comes back to the renderer, so the field shows a placeholder
 //   command — a shell command run in the task worktree (or the repo checkout) at send time, and
 //             never stored. The same mechanism the Database pane uses for its connection URL.
-import { createResource, createSignal, For, Show } from 'solid-js'
+import { createEffect, createResource, createSignal, For, Index, Show } from 'solid-js'
 import { Button, Input, Select } from '../../../core/client/ui/primitives'
 import Icon from '../../../core/client/ui/Icon'
 import { variableKinds, type HttpVariable, type VariableKind } from '../shared/model'
@@ -34,31 +34,30 @@ export default function HttpVariables(props: { owner: string; repo: string }) {
   const [error, setError] = createSignal<string | null>(null)
   const [busy, setBusy] = createSignal<string | null>(null)
   const scope = () => ({ owner: props.owner, repo: props.repo })
-  const [stored, actions] = createResource(scope, (s) => listVariables(s.owner, s.repo))
+  const [stored] = createResource(scope, (s) => listVariables(s.owner, s.repo))
 
-  // Rows being edited live outside the resource so a keystroke doesn't refetch. The resource is the
-  // saved truth; `drafts` is what's on screen.
-  const [drafts, setDrafts] = createSignal<Row[]>([])
-  const rows = () => [...(stored() ?? []).map(toRow).filter((r) => !drafts().some((d) => d.id === r.id)), ...drafts()]
+  // One local list, seeded from the server load and thereafter edited in place — each save patches
+  // its row from the response, so nothing refetches under a cursor. The earlier stored-plus-drafts
+  // merge rebuilt every row object on each keystroke and moved an edited row to the end of the list,
+  // which tore the input out from under the caret; rows are addressed by position now.
+  const [rows, setRows] = createSignal<Row[]>([])
+  createEffect(() => {
+    const saved = stored()
+    if (saved) setRows(saved.map(toRow))
+  })
 
-  const editRow = (row: Row, patch: Partial<Row>) => {
-    setDrafts((current) => {
-      const existing = current.find((d) => (row.id ? d.id === row.id : d === row))
-      if (existing) return current.map((d) => (d === existing ? { ...d, ...patch } : d))
-      return [...current, { ...row, ...patch }]
-    })
-  }
+  const editRow = (index: number, patch: Partial<Row>) => setRows((current) => current.map((r, i) => (i === index ? { ...r, ...patch } : r)))
+  const dropRow = (index: number) => setRows((current) => current.filter((_, i) => i !== index))
 
-  async function save(row: Row) {
+  async function save(index: number) {
+    const row = rows()[index]
     if (!row.name.trim()) return setError('A variable needs a name.')
     setBusy(row.id ?? row.name)
     setError(null)
     try {
       const body = { name: row.name.trim(), kind: row.kind, value: row.value, enabled: row.enabled }
-      if (row.id) await updateVariable(props.owner, props.repo, row.id, body)
-      else await createVariable(props.owner, props.repo, body)
-      setDrafts((d) => d.filter((x) => x !== row && x.id !== row.id))
-      void actions.refetch()
+      const next = row.id ? await updateVariable(props.owner, props.repo, row.id, body) : await createVariable(props.owner, props.repo, body)
+      setRows((current) => current.map((r, i) => (i === index ? toRow(next) : r)))
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not save the variable')
     } finally {
@@ -66,12 +65,13 @@ export default function HttpVariables(props: { owner: string; repo: string }) {
     }
   }
 
-  async function remove(row: Row) {
-    if (!row.id) return setDrafts((d) => d.filter((x) => x !== row))
+  async function remove(index: number) {
+    const row = rows()[index]
+    if (!row.id) return dropRow(index)
     if (!confirm(`Delete "${row.name}"?`)) return
     try {
       await deleteVariable(props.owner, props.repo, row.id)
-      void actions.refetch()
+      dropRow(index)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not delete the variable')
     }
@@ -99,36 +99,37 @@ export default function HttpVariables(props: { owner: string; repo: string }) {
           <span>Value</span>
           <span />
         </div>
-        <For each={rows()}>
-          {(row) => (
+        {/* <Index>, not <For>: rows are keyed by position, so editing one doesn't recreate its input. */}
+        <Index each={rows()}>
+          {(row, index) => (
             <div class="http-grid-row" role="row">
-              <input type="checkbox" checked={row.enabled} aria-label="Enabled" onChange={(e) => editRow(row, { enabled: e.currentTarget.checked })} />
-              <Input size="sm" value={row.name} placeholder="BASE_URL" onInput={(e) => editRow(row, { name: e.currentTarget.value })} />
-              <Select size="sm" value={row.kind} aria-label="Kind" onChange={(e) => editRow(row, { kind: e.currentTarget.value as VariableKind, value: '' })}>
+              <input type="checkbox" checked={row().enabled} aria-label="Enabled" onChange={(e) => editRow(index, { enabled: e.currentTarget.checked })} />
+              <Input size="sm" value={row().name} placeholder="BASE_URL" onInput={(e) => editRow(index, { name: e.currentTarget.value })} />
+              <Select size="sm" value={row().kind} aria-label="Kind" onChange={(e) => editRow(index, { kind: e.currentTarget.value as VariableKind, value: '' })}>
                 <For each={variableKinds}>{(k) => <option value={k}>{k}</option>}</For>
               </Select>
               <Input
                 size="sm"
-                type={row.kind === 'secret' ? 'password' : 'text'}
-                value={row.value}
-                placeholder={row.kind === 'secret' && row.hasStoredSecret ? 'stored — leave blank to keep' : PLACEHOLDER[row.kind]}
-                onInput={(e) => editRow(row, { value: e.currentTarget.value })}
+                type={row().kind === 'secret' ? 'password' : 'text'}
+                value={row().value}
+                placeholder={row().kind === 'secret' && row().hasStoredSecret ? 'stored — leave blank to keep' : PLACEHOLDER[row().kind]}
+                onInput={(e) => editRow(index, { value: e.currentTarget.value })}
               />
               <span class="http-grid-actions">
-                <Button size="sm" busy={busy() === (row.id ?? row.name)} onClick={() => void save(row)}>
+                <Button size="sm" busy={busy() === (row().id ?? row().name)} onClick={() => void save(index)}>
                   Save
                 </Button>
-                <Button variant="bare" size="sm" iconOnly aria-label="Delete" onClick={() => void remove(row)}>
+                <Button variant="bare" size="sm" iconOnly aria-label="Delete" onClick={() => void remove(index)}>
                   <Icon name="trash-2" />
                 </Button>
               </span>
-              <p class="http-grid-hint">{KIND_HINT[row.kind]}</p>
+              <p class="http-grid-hint">{KIND_HINT[row().kind]}</p>
             </div>
           )}
-        </For>
+        </Index>
       </div>
 
-      <Button size="sm" variant="ghost" onClick={() => setDrafts((d) => [...d, blankRow()])}>
+      <Button size="sm" variant="ghost" onClick={() => setRows((r) => [...r, blankRow()])}>
         + Variable
       </Button>
     </div>

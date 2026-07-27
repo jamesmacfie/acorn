@@ -51,7 +51,9 @@
 .ui-btn[data-tone='danger']:hover:not(:disabled) { border-color: var(--danger); }
 .ui-btn[data-tone='warn'] { color: var(--warn); }
 .ui-btn[data-tone='warn']:hover:not(:disabled) { border-color: var(--warn); }
-/* Tone must survive the solid variant, where the tint moves to the background. */
+/* Tone must survive the solid variant, where the tint moves to the background. Without the accent
+   pair, tone's `color: var(--accent)` lands on solid's accent background and the label vanishes. */
+.ui-btn[data-variant='solid'][data-tone='accent'] { color: var(--accent-fg); }
 .ui-btn[data-variant='solid'][data-tone='danger'] { background: var(--danger); border-color: var(--danger); color: var(--accent-fg); }
 
 /* ── Form controls ──────────────────────────────────────────────────────────────────────────

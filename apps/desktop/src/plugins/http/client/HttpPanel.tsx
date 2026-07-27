@@ -1,15 +1,16 @@
 // The API panel. Mounted twice: as the left-rail Source (repo tree, no task) and as a task pane
 // (that task's ad-hoc requests on top of the repo tree). Everything below is shared between them —
 // the only difference is `taskId`.
-import { createMemo, createResource, createSignal, For, Show } from 'solid-js'
+import { createEffect, createMemo, createResource, createSignal, For, Show } from 'solid-js'
 import { Button, Input, Select, SectionHeader } from '../../../core/client/ui/primitives'
 import Icon from '../../../core/client/ui/Icon'
 import { fromCurl, httpMethods, toCurl, type HttpRequest, type SendResult } from '../shared/model'
 import { createRequest, deleteRequest, listRequests, sendRequest, updateRequest } from './httpClient'
-import { draftsDiffer, emptyDraft, toDraft, type Draft } from './draft'
+import { draftsDiffer, emptyDraft, readStoredDraft, toDraft, writeStoredDraft, type Draft } from './draft'
 import RequestTabs from './RequestTabs'
 import ResponseView from './ResponseView'
 import HttpVariables from './HttpVariables'
+import SaveRequestModal, { type SaveTarget } from './SaveRequestModal'
 import './http.css'
 
 type Selection = { kind: 'saved'; id: string } | { kind: 'new' } | { kind: 'variables' }
@@ -33,12 +34,14 @@ function groupByFolder(requests: HttpRequest[]): Group[] {
 const methodTone = (method: string): string => method.toLowerCase()
 
 export default function HttpPanel(props: { owner: string; repo: string; taskId?: string }) {
+  const blank = () => emptyDraft(props.taskId ?? null)
   const [selection, setSelection] = createSignal<Selection>({ kind: 'new' })
-  const [draft, setDraft] = createSignal<Draft>(emptyDraft(props.taskId ?? null))
+  const [draft, setDraft] = createSignal<Draft>(readStoredDraft(props.owner, props.repo, props.taskId) ?? blank())
   const [result, setResult] = createSignal<SendResult | null>(null)
   const [error, setError] = createSignal<string | null>(null)
   const [sending, setSending] = createSignal(false)
   const [saving, setSaving] = createSignal(false)
+  const [saveOpen, setSaveOpen] = createSignal(false)
 
   const scope = () => ({ owner: props.owner, repo: props.repo, taskId: props.taskId })
 
@@ -62,6 +65,13 @@ export default function HttpPanel(props: { owner: string; repo: string; taskId?:
     return row ? draftsDiffer(draft(), toDraft(row)) : draft().url !== ''
   })
 
+  // A request that hasn't been saved yet outlives navigation and reloads; once it has a row, the row
+  // is the truth and the stored copy goes.
+  createEffect(() => {
+    const unsaved = selection().kind === 'new' && draftsDiffer(draft(), blank())
+    writeStoredDraft(props.owner, props.repo, props.taskId, unsaved ? draft() : null)
+  })
+
   const patch = (p: Partial<Draft>) => setDraft((d) => ({ ...d, ...p }))
 
   function open(row: HttpRequest) {
@@ -75,13 +85,30 @@ export default function HttpPanel(props: { owner: string; repo: string; taskId?:
     setSelection({ kind: 'new' })
     // "Copy an existing request" — the same flow as starting from scratch, just pre-filled. An
     // ad-hoc copy belongs to the task, so it drops the folder it came from.
-    setDraft(from ? { ...toDraft(from), name: `${from.name} copy`, taskId: props.taskId ?? null, folder: props.taskId ? '' : from.folder } : emptyDraft(props.taskId ?? null))
+    setDraft(from ? { ...toDraft(from), name: `${from.name} copy`, taskId: props.taskId ?? null, folder: props.taskId ? '' : from.folder } : blank())
     setResult(null)
     setError(null)
   }
 
-  async function save() {
-    const d = draft()
+  const folders = createMemo(() => [...new Set((saved() ?? []).map((r) => r.folder).filter(Boolean))].sort())
+
+  const saveTarget = createMemo<SaveTarget>(() => ({
+    name: draft().name,
+    folder: draft().folder,
+    scope: draft().taskId ? 'task' : 'repo',
+  }))
+
+  // `error` is shared with the send path, and the dialog shows it — don't open onto a stale one.
+  const openSave = () => {
+    setError(null)
+    setSaveOpen(true)
+  }
+
+  // Saving an existing request writes straight through — its name and home are already settled.
+  // Anything else (a new request, or a rename/move via the name button) asks first.
+  const onSaveClick = () => (current() ? void persist(draft()) : openSave())
+
+  async function persist(d: Draft) {
     if (!d.name.trim()) return setError('Give the request a name before saving.')
     setSaving(true)
     setError(null)
@@ -90,6 +117,7 @@ export default function HttpPanel(props: { owner: string; repo: string; taskId?:
       const next = row ? await updateRequest(props.owner, props.repo, row.id, d) : await createRequest(props.owner, props.repo, d)
       setSelection({ kind: 'saved', id: next.id })
       setDraft(toDraft(next))
+      setSaveOpen(false)
       refresh()
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not save the request')
@@ -210,29 +238,17 @@ export default function HttpPanel(props: { owner: string; repo: string; taskId?:
           </div>
 
           <div class="http-metabar">
-            <Input
-              class="http-name"
-              size="sm"
-              value={draft().name}
-              aria-label="Request name"
-              placeholder="Request name"
-              onInput={(e) => patch({ name: e.currentTarget.value })}
-            />
-            <Show when={!props.taskId || draft().taskId === null}>
-              <Input
-                class="http-folder"
-                size="sm"
-                value={draft().folder}
-                aria-label="Folder"
-                placeholder="Folder (e.g. auth/admin)"
-                onInput={(e) => patch({ folder: e.currentTarget.value })}
-              />
-            </Show>
-            <Show when={props.taskId && draft().taskId !== null}>
-              <Button size="sm" variant="ghost" title="Move this out of the task and into the repo's saved requests" onClick={() => patch({ taskId: null })}>
-                Save to repo…
-              </Button>
-            </Show>
+            {/* The name is a label, not a field: it opens the save dialog, which is also the rename
+                and the move-into-the-repo path. */}
+            <button type="button" class="http-name-btn" title="Rename, move or file this request" onClick={openSave}>
+              <Show when={draft().folder}>
+                <span class="http-name-folder">{draft().folder}/</span>
+              </Show>
+              <span class="http-name-text">{draft().name || 'Untitled request'}</span>
+              <Show when={draft().taskId}>
+                <span class="http-name-tag">task</span>
+              </Show>
+            </button>
             <span class="http-metabar-spacer" />
             <Show when={dirty()}>
               <span class="http-dirty" title="Unsaved changes">
@@ -242,8 +258,8 @@ export default function HttpPanel(props: { owner: string; repo: string; taskId?:
             <Button size="sm" variant="ghost" onClick={() => void copyAsCurl()}>
               Copy as curl
             </Button>
-            <Button size="sm" busy={saving()} onClick={() => void save()}>
-              {current() ? 'Save' : 'Save as new'}
+            <Button size="sm" busy={saving()} onClick={onSaveClick}>
+              {current() ? 'Save' : 'Save…'}
             </Button>
           </div>
 
@@ -251,6 +267,28 @@ export default function HttpPanel(props: { owner: string; repo: string; taskId?:
           <ResponseView result={result()} error={error()} sending={sending()} />
         </Show>
       </div>
+
+      <Show when={saveOpen()}>
+        <SaveRequestModal
+          target={saveTarget()}
+          inTask={!!props.taskId}
+          folders={folders()}
+          busy={saving()}
+          error={error()}
+          onClose={() => setSaveOpen(false)}
+          onSave={(target) => {
+            const next: Draft = {
+              ...draft(),
+              name: target.name,
+              // A task-scoped request has no folder — the task is its home.
+              folder: target.scope === 'repo' ? target.folder : '',
+              taskId: target.scope === 'task' ? (props.taskId ?? null) : null,
+            }
+            setDraft(next)
+            void persist(next)
+          }}
+        />
+      </Show>
     </div>
   )
 }
