@@ -23,6 +23,8 @@ import { dockerSourceContribution } from '../../plugins/docker/client/sourceCont
 import { dockerPaneContribution } from '../../plugins/docker/client/paneContribution'
 import { dockerTaskPollerContribution } from '../../plugins/docker/client/dockerStore'
 import { dockerFooterSlotContribution, dockerRailSlotContribution } from '../../plugins/docker/client/slotContribution'
+import { httpSourceContribution } from '../../plugins/http/client/sourceContribution'
+import { httpPaneContribution } from '../../plugins/http/client/paneContribution'
 import { registerDockerArchiveConcern } from '../../plugins/docker/client/archiveConcern'
 import { taskSlotRegistry } from '../../core/client/registries/uiSlots'
 import { persistedStateRegistry } from '../../core/client/persistence/persistedState'
@@ -40,12 +42,14 @@ const panes = [
   databasePaneContribution,
   previewPaneContribution,
   dockerPaneContribution,
+  httpPaneContribution,
 ]
 
 for (const pane of panes) paneRegistry.register(pane)
 for (const provider of clientIntegrationProviders) registerIntegrationProvider(provider)
-// Local sources (no integration row): docker is always visible in the rail.
+// Local sources (no integration row): docker and the API panel are always visible in the rail.
 sourceRegistry.register(dockerSourceContribution)
+sourceRegistry.register(httpSourceContribution)
 for (const page of settingsPageContributions) settingsRegistry.register(page)
 activatePreviewEvents()
 for (const kind of noticeKindContributions) noticeKindRegistry.register(kind)
