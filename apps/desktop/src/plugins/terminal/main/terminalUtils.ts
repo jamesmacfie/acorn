@@ -40,6 +40,14 @@ export const tmuxNewSessionArgs = (name: string, cwd: string, command: string, e
 ]
 export const tmuxAttachArgs = (name: string) => ['attach', '-t', name]
 
+// A profile's launchArgs (docs/notes-and-memory.md) reach node-pty as a real argv, but tmux and the
+// `-lc` fallback take one shell LINE — so single-quote each arg there. The args are const strings
+// from a profile definition, never user input; quoting is correctness (spaces, apostrophes in the
+// prompt text), not a trust boundary.
+const shellQuote = (s: string): string => `'${s.replace(/'/g, `'\\''`)}'`
+export const launchCommandLine = (command: string, launchArgs: string[] = []): string =>
+  launchArgs.length ? [command, ...launchArgs.map(shellQuote)].join(' ') : command
+
 // Parse `tmux list-sessions -F '#{session_name}'` into the set of our session names.
 export const parseTmuxSessions = (stdout: string): Set<string> =>
   new Set(stdout.split('\n').map((l) => l.trim()).filter((l) => l.startsWith(TMUX_PREFIX)))

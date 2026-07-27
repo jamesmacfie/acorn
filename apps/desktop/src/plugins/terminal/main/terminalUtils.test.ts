@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   clampDim,
   computeIdle,
+  launchCommandLine,
   matchBlockedPrompt,
   parseTmuxSessions,
   resolveBackend,
@@ -57,6 +58,18 @@ describe('tmux arg builders', () => {
       'new-session', '-A', '-d', '-e', 'ACORN_TASK_ID=t1', '-e', 'ACORN_API_TOKEN=tok', '-s', 'acorn-abc', '-c', '/repo', 'claude',
     ])
     expect(tmuxAttachArgs('acorn-abc')).toEqual(['attach', '-t', 'acorn-abc'])
+  })
+})
+
+describe('launchCommandLine (docs/notes-and-memory.md)', () => {
+  it('quotes launchArgs for the shell-line spawn paths, and is a no-op without them', () => {
+    expect(launchCommandLine('claude')).toBe('claude')
+    expect(launchCommandLine('claude', [])).toBe('claude')
+    // The prompt text has spaces and apostrophes — unquoted, tmux would run `claude --append-…` with
+    // "This" as the prompt and the rest as stray argv.
+    expect(launchCommandLine('claude', ['--append-system-prompt', "call task_context; don't ask"])).toBe(
+      `claude '--append-system-prompt' 'call task_context; don'\\''t ask'`,
+    )
   })
 })
 

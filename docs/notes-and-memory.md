@@ -214,6 +214,17 @@ path for memory alone:
   `apps/desktop/src/plugins/memory/main/knowledgeIpc.ts`), so an agent knows what memory exists before it asks.
   The per-directory `MEMORY.md` (one line per memory) serves the same index role for agents reading
   files directly (`memory.ts:106`).
+- **Instruct at launch, instead of injecting** — a launch push is delivered `'after-ready'`
+  (`agentSend.ts`), so whenever the CLI is still busy when the user types, it queues and lands *after*
+  the first ask — arriving as reference material for work already underway, with a trailer telling the
+  agent to wait for direction it has already been given. A profile that can carry a standing
+  instruction avoids the race entirely by pulling instead: it sets `launchArgs` on its
+  `AgentProfileContribution` (Claude Code: `--append-system-prompt`, telling it to call `task_context`
+  / `notes_read` / `memory_search` before starting), and `spawnOne` then skips `launchInjector` for
+  that session — a system prompt cannot lose a race, and a pull sees notes edited mid-session. The
+  push (and the `startup_context_injection` pref that gates its context half) still governs profiles
+  with no such flag. `launchArgs` reach node-pty as argv and the tmux / `-lc` paths as a quoted line
+  (`launchCommandLine`); a command override (dev-server pane) is a different binary and gets none.
 
 `formatContextBlock` is compact by design: it emits note titles + bodies but the memory **index only**
 (`- name — description`) with the hint "ask for bodies via memory_get" (`contextBlock.ts:32-35`). The
