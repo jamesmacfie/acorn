@@ -11,6 +11,7 @@ import DockerSettings from '../../plugins/docker/client/DockerSettings'
 import ShortcutsSettings from '../../core/client/settings/ShortcutsSettings'
 import PermissionsSettings from '../../core/client/settings/PermissionsSettings'
 import ApiSettings from '../../core/client/settings/ApiSettings'
+import HttpVariablesSettings from '../../plugins/http/client/HttpVariablesSettings'
 import StyleGallery from '../../core/client/settings/StyleGallery'
 
 export const settingsPageContributions: SettingsContribution[] = [
@@ -36,6 +37,9 @@ export const settingsPageContributions: SettingsContribution[] = [
     id: 'permissions', label: 'Permissions', group: 'general', order: 80,
     component: (props) => <PermissionsSettings onPermissions={props.context.onPermissions} />,
   },
+  // 'api' is the public automation API's token page (docs/public-api.md); the API *panel*'s
+  // variables are a different thing, hence the distinct id and label.
+  { id: 'http', label: 'API requests', group: 'general', order: 66, component: () => <HttpVariablesSettings /> },
   { id: 'api', label: 'API', group: 'general', order: 90, requires: 'desktop', component: () => <ApiSettings /> },
   // Dev only: the style-pack authoring surface, not something a user needs.
   ...(import.meta.env.DEV
