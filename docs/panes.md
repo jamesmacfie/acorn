@@ -13,7 +13,7 @@ For where the Task view sits in the app, see [frontend.md](./frontend.md) and
 A layout is just an ordered list of pane ids:
 
 ```ts
-type PaneId = 'pr' | 'linear' | 'rollbar' | 'preview' | 'editor' | 'changes' | 'notes' | 'context' | 'database' | 'search'
+type PaneId = 'pr' | 'linear' | 'rollbar' | 'preview' | 'editor' | 'changes' | 'notes' | 'context' | 'database' | 'search' | 'docker' | 'http'
 type TaskLayout = { panes: PaneId[] } // left→right, at least one, no duplicates
 ```
 
@@ -83,6 +83,7 @@ collides too readily with the OS/browser/Monaco):
 | `⌘⇧D` | Notes | | `⌘⇧J` | Database |
 | `⌘⇧X` | Context | | `⌘⇧L` | Linear |
 | `⌘⇧B` | Browser preview | | `⌘⇧O` | Rollbar |
+| `⌘⇧H` | API requests | | | |
 | `⌘⇧A` | Agents (toggle) | | `⌘⇧T` | Terminal (toggle) |
 
 `agents` and `terminal` are toggles, not layout panes; the rest dispatch a `show`. Chords are
@@ -224,6 +225,42 @@ routes. Full detail: [pg.md](./pg.md).
 
 Source: `features/database/DatabasePane.tsx`, `features/database/ResultGrid.tsx`,
 `features/database/databaseClient.ts`, `main/database.ts`.
+
+### `http` — API requests
+
+A Bruno-shaped API client over the task's repo (`plugins/http/client/HttpPanel.tsx`). A sidebar of
+saved requests grouped into folders, a method + URL bar, request tabs (**Params / Body / Headers /
+Auth / Vars**) and a response pane (**Body / Headers / Timeline**). The same component is the `http`
+rail Source; the only difference here is that it is scoped to a task.
+
+- **Storage** is the DB, not files in the repo: `http_requests` (repo-scoped, with a slash-path
+  `folder` string instead of a folders table) and `http_variables` (repo-scoped). Nothing is
+  committed, so nothing is shared with teammates — see [data-layer.md](./data-layer.md).
+- **Ad-hoc requests** are rows with `task_id` set. New requests made in this pane stay with the task
+  until "Save to repo…" clears `task_id` and files them under a folder. Duplicating any request
+  (⧉ on its row) is the same flow pre-filled.
+- **Variables** resolve at send time, lowest precedence first: task builtins (`{{repo}}`,
+  `{{branch}}`, `{{worktree}}`, `{{taskId}}`) → repo variables → the request's own Vars tab. A repo
+  variable is a plain value, a `secret` (AES-GCM at rest under `SESSION_ENC_KEY`, never returned to
+  the renderer), or a `command` — a `bash -lc` line run in the task worktree whose last output line
+  becomes the value, the same mechanism as the Database pane's `dbUrlScript`. Command results are
+  never persisted.
+- **Auth** (`none`/`basic`/`bearer`/`apikey`) is compiled to a header — or a query param for an
+  api-key with `placement: 'query'` — at send time. The Timeline shows exactly what went out, with
+  `Authorization`/`Cookie` redacted.
+- **curl** both ways: pasting a curl command into the URL bar populates the whole request; "Copy as
+  curl" emits one.
+- Deliberately **no scripts, tests or assertions**, no collections (the repo is the collection), no
+  oauth2/digest/ntlm, no multipart bodies, and no per-hop TLS timings — `redirect: 'follow'` is left
+  to undici so `Authorization` is stripped correctly across origins. The body editor is a plain
+  `<textarea>`: Monaco's single cross-plugin import is baselined in `core/boundaries.test.ts` and
+  that baseline only shrinks.
+
+Requests execute server-side (`plugins/http/server/send.ts`) using Node's global `fetch` — no bridge,
+because nothing stateful is held — so the pane also works under `dev:node`. Responses are capped at
+5 MB and flagged when truncated.
+
+Source: `apps/desktop/src/plugins/http/{client,server,shared}/`.
 
 ### `linear` — Linear ticket(s)
 

@@ -218,6 +218,13 @@
       "when": 1785103957986,
       "tag": "0030_dapper_changeling",
       "breakpoints": true
+    },
+    {
+      "idx": 31,
+      "version": "6",
+      "when": 1785118917180,
+      "tag": "0031_soft_giant_man",
+      "breakpoints": true
     }
   ]
 }

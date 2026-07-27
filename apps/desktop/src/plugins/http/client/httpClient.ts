@@ -1,0 +1,51 @@
+// Typed wrapper over the /api/http routes. Goes through core's readJson/writeJson so the CSRF
+// envelope and ApiError decoding stay in one place.
+import { readJson, writeJson } from '../../../core/client/apiClient'
+import { httpRequestRoute, httpRequestsRoute, httpSendRoute, httpVariableRoute, httpVariablesRoute, type HttpRequest, type HttpVariable, type SendResult } from '../shared/model'
+
+// Everything the server needs to fire a request; `id` is deliberately absent — unsaved edits and
+// never-saved ad-hoc requests are sent the same way as stored ones.
+export type SendPayload = Omit<HttpRequest, 'id' | 'repoOwner' | 'repoName' | 'createdAt' | 'updatedAt'>
+
+const json = (method: string, body: unknown): RequestInit => ({
+  method,
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify(body),
+})
+
+export const listRequests = (owner: string, repo: string, taskId?: string): Promise<HttpRequest[]> =>
+  readJson(`${httpRequestsRoute(owner, repo)}${taskId ? `?taskId=${encodeURIComponent(taskId)}` : ''}`)
+
+export const createRequest = (owner: string, repo: string, body: SendPayload): Promise<HttpRequest> =>
+  writeJson(httpRequestsRoute(owner, repo), json('POST', body))
+
+export const updateRequest = (owner: string, repo: string, id: string, body: SendPayload): Promise<HttpRequest> =>
+  writeJson(httpRequestRoute(owner, repo, id), json('PUT', body))
+
+export const deleteRequest = async (owner: string, repo: string, id: string): Promise<void> => {
+  const res = await fetch(httpRequestRoute(owner, repo, id), { method: 'DELETE' })
+  if (!res.ok) throw new Error(`Could not delete request (${res.status})`)
+}
+
+export const listVariables = (owner: string, repo: string): Promise<HttpVariable[]> => readJson(httpVariablesRoute(owner, repo))
+
+export const createVariable = (owner: string, repo: string, body: Omit<HttpVariable, 'id' | 'updatedAt'>): Promise<HttpVariable> =>
+  writeJson(httpVariablesRoute(owner, repo), json('POST', body))
+
+export const updateVariable = (owner: string, repo: string, id: string, body: Omit<HttpVariable, 'id' | 'updatedAt'>): Promise<HttpVariable> =>
+  writeJson(httpVariableRoute(owner, repo, id), json('PUT', body))
+
+export const deleteVariable = async (owner: string, repo: string, id: string): Promise<void> => {
+  const res = await fetch(httpVariableRoute(owner, repo, id), { method: 'DELETE' })
+  if (!res.ok) throw new Error(`Could not delete variable (${res.status})`)
+}
+
+export const sendRequest = (owner: string, repo: string, body: SendPayload): Promise<SendResult> =>
+  writeJson(httpSendRoute(owner, repo), json('POST', body))
+
+// The response body arrives base64'd so binary survives the JSON hop. Decode as UTF-8 for display;
+// callers that know it's binary use the byte array.
+export function decodeBody(bodyBase64: string): { text: string; bytes: Uint8Array } {
+  const bytes = Uint8Array.from(atob(bodyBase64), (ch) => ch.charCodeAt(0))
+  return { text: new TextDecoder().decode(bytes), bytes }
+}

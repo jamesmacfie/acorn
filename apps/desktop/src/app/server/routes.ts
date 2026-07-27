@@ -19,6 +19,7 @@ import { repoLabels } from '../../plugins/github/server/routes/repoLabels'
 import { database } from '../../plugins/database/server/routes/database'
 import { docker } from '../../plugins/docker/server/routes/docker'
 import { editor } from '../../plugins/editor/server/routes/editor'
+import { http } from '../../plugins/http/server/routes/http'
 import { knowledge } from '../../plugins/memory/server/routes/knowledge'
 import { localGit } from '../../plugins/changes/server/routes/localGit'
 import { reviewNotes } from '../../plugins/changes/server/routes/reviewNotes'
@@ -35,6 +36,10 @@ registerRoute({ prefix: '/api/tasks', router: database, note: '/:id/database/* (
 
 // /api/docker/* — the local docker daemon surface (docker)
 registerRoute({ prefix: '/api/docker', router: docker })
+
+// /api/http/:owner/:repo/* — the API panel's saved requests, variables and send (http).
+// Not /api/api/*: 'api' already means the public automation API here (docs/public-api.md).
+registerRoute({ prefix: '/api/http', router: http, note: '/:owner/:repo/* (http)' })
 
 // /api/agents/* — account-scoped local provider usage (agents)
 registerRoute({ prefix: '/api/agents', router: agentUsage })

@@ -666,3 +666,59 @@ export const commandExecutions = sqliteTable(
   },
   (t) => [index('command_executions_task_created_idx').on(t.taskId, t.createdAt), index('command_executions_status_idx').on(t.status)],
 )
+
+// Saved HTTP requests for the API panel (docs/panes.md). Repo-scoped like db_saved_queries — a
+// request written against a repo's API outlives any one task worktree. Machine-scoped (no user_id).
+// The `http_` prefix, not `api_`: `api_tokens`/`api_idempotency` already belong to the public
+// automation API (docs/public-api.md), and so does the settings page id `api`.
+export const httpRequests = sqliteTable(
+  'http_requests',
+  {
+    id: text('id').primaryKey(),
+    repoOwner: text('repo_owner').notNull(),
+    repoName: text('repo_name').notNull(),
+    // ponytail: a slash path ('auth/login'), not a folders table with parent_id. The client splits
+    // on '/' to build the tree. Renaming a folder is one UPDATE; there are no orphans or cycles to
+    // handle. The one cost is that a folder can't exist while empty.
+    folder: text('folder').notNull().default(''),
+    // Set = an ad-hoc request living with a task (shown in that task's API pane). Null = saved in
+    // the repo tree. "Save this ad-hoc request" clears taskId and sets folder + name. No FK: the
+    // schema declares none anywhere, so an orphan row after a hard task delete is inert.
+    taskId: text('task_id'), // → tasks.id
+    name: text('name').notNull(),
+    method: text('method').notNull(),
+    url: text('url').notNull(), // holds the query string too — there is no params column
+    headers: text('headers').notNull().default('[]'), // JSON KeyValue[]
+    bodyMode: text('body_mode').notNull().default('none'), // 'none' | 'json' | 'text' | 'form'
+    body: text('body').notNull().default(''), // raw string, or JSON KeyValue[] when bodyMode = 'form'
+    auth: text('auth').notNull().default('{"mode":"none"}'), // JSON AuthConfig — mode lives inside
+    // Per-request variable overrides: JSON Record<string,string>, plain values only. Secret and
+    // command kinds are repo-level (http_variables) because they need the enc key and a shell.
+    vars: text('vars').notNull().default('{}'),
+    createdAt: integer('created_at').notNull(),
+    updatedAt: integer('updated_at').notNull(),
+  },
+  (t) => [
+    index('http_requests_repo_folder_idx').on(t.repoOwner, t.repoName, t.folder),
+    index('http_requests_task_idx').on(t.taskId),
+  ],
+)
+
+// Repo-level variables for the API panel. `command` values are shell commands resolved at send time
+// (never persisted); `secret` values are JWE ciphertext under SESSION_ENC_KEY and are never sent to
+// the renderer in plaintext.
+export const httpVariables = sqliteTable(
+  'http_variables',
+  {
+    id: text('id').primaryKey(),
+    repoOwner: text('repo_owner').notNull(),
+    repoName: text('repo_name').notNull(),
+    name: text('name').notNull(),
+    kind: text('kind').notNull(), // 'value' | 'secret' | 'command'
+    value: text('value').notNull(), // plaintext | JWE ciphertext | the shell command
+    enabled: integer('enabled', { mode: 'boolean' }).notNull().default(true),
+    createdAt: integer('created_at').notNull(),
+    updatedAt: integer('updated_at').notNull(),
+  },
+  (t) => [uniqueIndex('http_variables_repo_name_idx').on(t.repoOwner, t.repoName, t.name)],
+)
