@@ -86,6 +86,7 @@ describe('agent usage detail formatting', () => {
           estimatedCostUsd: 0.42,
           estimatedCacheSavingsUsd: 0.03,
           pricingFallback: false,
+          unpricedModels: [],
         },
       },
     }
@@ -101,5 +102,33 @@ describe('agent usage detail formatting', () => {
       'Est. cache savings',
     ])
     expect(providerUsageRows(claude).find((row) => row.label === 'Estimated today')?.value).toBe('≈$0.42')
+  })
+
+  it('names models that prevent a daily estimate', () => {
+    const claude: AgentProviderUsage = {
+      ...provider('claude', 82),
+      daily: {
+        skippedFileCount: 0,
+        yesterday: null,
+        today: {
+          day: '2026-07-29',
+          inputTokens: 100,
+          outputTokens: 20,
+          cacheWriteTokens: 0,
+          cacheReadTokens: 0,
+          totalNonCacheTokens: 120,
+          workingSeconds: 10,
+          sessionCount: 1,
+          estimatedCostUsd: null,
+          estimatedCacheSavingsUsd: null,
+          pricingFallback: true,
+          unpricedModels: ['claude-new-model'],
+        },
+      },
+    }
+    expect(providerUsageRows(claude)).toEqual(expect.arrayContaining([
+      { label: 'Estimated today', value: 'pricing unavailable' },
+      { label: 'Unpriced models', value: 'claude-new-model' },
+    ]))
   })
 })

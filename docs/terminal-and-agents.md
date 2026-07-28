@@ -228,9 +228,13 @@ provider's current session percentage and health. The panel's `↻` action force
 - The Claude collector also reads recent `~/.claude/projects/**/*.jsonl` assistant usage records.
   It returns only aggregate token/time/session counts and locally estimated cost/cache savings;
   prompts, responses, project paths, message IDs, and request IDs never reach the renderer.
-  Estimates use a local table checked against
+  Estimates use an agents-plugin-owned catalog checked against
   [Anthropic's published pricing](https://platform.claude.com/docs/en/about-claude/pricing) and are
-  labeled estimated rather than billed cost.
+  labeled estimated rather than billed cost. **Settings → Agent pricing** edits the built-in price
+  groups or adds an exact model id for a newly released model. Overrides are user-scoped app state
+  under the agents plugin's `agents:pricing:v1` preference; the core settings and preference
+  vocabularies do not know about model prices. Saving invalidates the usage-service cache and
+  refreshes the estimate.
 - **Codex** first uses newline-delimited JSON-RPC with
   `codex -s read-only -a untrusted app-server` and `account/rateLimits/read`. A failed RPC probe
   falls back to the same bounded PTY runner with `/status`; this fallback can report the 5-hour and
@@ -242,6 +246,11 @@ tokens, or store usage in SQLite/IndexedDB. Claude may require its dedicated
 `<dataDir>/agent-usage-probe` directory to be trusted. Acorn first answers the CLI prompt; if that
 does not stick, it atomically adds only that exact path's `hasTrustDialogAccepted` entry to
 `~/.claude.json`, preserving unknown keys and refusing malformed/unexpected config shapes.
+
+An unknown model keeps token totals visible but suppresses the whole dollar estimate rather than
+showing a misleading partial amount. The panel names the unpriced model ids, and the settings page
+offers those recent ids as rows to add. Custom ids are exact matches and take priority over a
+built-in group; resetting a built-in row removes only its override.
 
 Health derives from percentage remaining: green at 50% or above, yellow from 20% to below 50%, red
 above 0% to below 20%, and neutral at 0% or when unavailable. A missing, logged-out, outdated,

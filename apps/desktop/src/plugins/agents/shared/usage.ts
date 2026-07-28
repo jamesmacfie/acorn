@@ -37,6 +37,7 @@ export type AgentDailyUsagePeriod = {
   estimatedCostUsd: number | null
   estimatedCacheSavingsUsd: number | null
   pricingFallback: boolean
+  unpricedModels: string[]
 }
 
 export type AgentDailyUsage = {
