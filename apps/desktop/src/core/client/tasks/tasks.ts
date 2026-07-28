@@ -5,8 +5,10 @@
 import { createSignal } from 'solid-js'
 import { applyLayoutAction, defaultLayout, type LayoutAction, type PaneId, type TaskLayout } from './layout'
 import { sourceRegistry } from '../registries/sources'
+import type { WorkspaceView } from '../workspaces/workspaceViewTransition'
 
 export type { PaneId, TaskLayout } from './layout'
+export type { WorkspaceView } from '../workspaces/workspaceViewTransition'
 
 // Which browse Source is selected, or null when a task is the active view (docs/workspaces-and-tasks.md).
 // Known core ids stay typed for contributions and UI construction. The live selection deliberately
@@ -19,7 +21,6 @@ const [selectedSource, setSelectedSource] = createSignal<string | null>('github'
 // Per-workspace memory of the last view — a rail source (browse) or a task — so switching workspaces
 // returns you to exactly what you were looking at rather than always jumping back to GitHub.
 // Session-only (not persisted); first-load restore is handled by the last_source/last_task prefs.
-export type WorkspaceView = { source: string } | { taskId: string }
 const viewByWorkspace = new Map<string, WorkspaceView>()
 export const rememberWorkspaceView = (workspaceId: string, view: WorkspaceView): void => {
   viewByWorkspace.set(workspaceId, view)

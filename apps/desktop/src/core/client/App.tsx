@@ -10,6 +10,7 @@ import RepoPicker from './ui/RepoPicker'
 import WorkspacePicker from './ui/WorkspacePicker'
 import OnboardingModal from '../../plugins/onboarding/client/OnboardingModal'
 import { workspaceForRepo } from './workspaces/activeWorkspace'
+import { planWorkspaceViewTransition } from './workspaces/workspaceViewTransition'
 import PullList from '../../plugins/github/client/PullList'
 import PullDetail from '../../plugins/github/client/PullDetail'
 import CreatePullForm from '../../plugins/github/client/CreatePullForm'
@@ -184,24 +185,29 @@ export default function App() {
   // restore still wins on first load; the `prevWs` guard likewise leaves that first entry untouched.
   createEffect(
     on(activeWorkspace, (ws, prevWs) => {
-      if (prevWs) {
-        const src = untrack(selectedSource)
-        const tid = untrack(activeTaskId)
-        if (src) rememberWorkspaceView(prevWs.id, { source: src })
-        else if (tid) rememberWorkspaceView(prevWs.id, { taskId: tid })
-      }
-      if (ws && prevWs && ws.id !== prevWs.id) {
-        const view = workspaceView(ws.id)
-        // Restore a remembered task if it still exists; else fall back to the remembered source (or
-        // GitHub). Navigating to the task's own path keeps the URL/breadcrumb in step — it stays in
-        // this workspace, so this effect's id guard skips the re-entrant run.
-        const task = view && 'taskId' in view ? tasks.data?.find((t) => t.id === view.taskId) : undefined
-        if (task) {
-          activateTaskSignals(task)
-          navigate(pathForTask(task), { replace: true })
-        } else {
-          setSelectedSource(view && 'source' in view ? view.source : 'github')
-        }
+      if (!ws || !prevWs || ws.id === prevWs.id) return
+      const transition = planWorkspaceViewTransition({
+        previousWorkspace: prevWs,
+        nextWorkspace: ws,
+        selectedSource: untrack(selectedSource),
+        activeTaskId: untrack(activeTaskId),
+        tasks: tasks.data ?? [],
+        rememberedNextView: workspaceView(ws.id),
+      })
+      if (transition.previousView) rememberWorkspaceView(prevWs.id, transition.previousView)
+
+      if (transition.next.kind === 'keep-task') {
+        // An explicit task jump already selected the destination task before navigation. Keep it,
+        // and seed the destination memory so a later workspace switch returns to the same task.
+        rememberWorkspaceView(ws.id, { taskId: transition.next.task.id })
+      } else if (transition.next.kind === 'restore-task') {
+        activateTaskSignals(transition.next.task)
+        navigate(pathForTask(transition.next.task), { replace: true })
+      } else {
+        // Also overwrites an invalid remembered task, so old cross-workspace pollution heals in
+        // the current session rather than requiring a restart.
+        rememberWorkspaceView(ws.id, { source: transition.next.source })
+        setSelectedSource(transition.next.source)
       }
     }, { defer: true }),
   )
