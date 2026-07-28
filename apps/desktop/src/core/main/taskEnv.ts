@@ -13,6 +13,11 @@ export function childEnv(env: NodeJS.ProcessEnv = process.env): Record<string, s
     if (v) out[k] = v
   }
   out.TERM = 'xterm-256color'
+  // xterm.js renders full 24-bit colour, but the whitelist above strips the COLORTERM a native
+  // terminal would set — so agent TUIs (Codex/Claude) downgrade to the 256-colour palette and
+  // their fg/bg-blended dim text turns unreadable. Advertise truecolor explicitly; this also flows
+  // into tmux panes via new-session -e, and tmux ≥3.2 reads it from the attach client too.
+  out.COLORTERM = 'truecolor'
   return out
 }
 
