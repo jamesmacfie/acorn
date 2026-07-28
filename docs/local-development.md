@@ -117,6 +117,7 @@ Run from the repo root via Turborepo, or per-package with `--filter @acorn/deskt
 | `pnpm test` | `vitest run` |
 | `pnpm --filter @acorn/desktop db:generate` | `drizzle-kit generate` — emit a migration from the schema, then replay the full chain on a fresh throwaway DB (`scripts/check-migrations.ts`) |
 | `pnpm --filter @acorn/desktop db:check` | Just the fresh-DB migration replay — catches the NOT-NULL table-rebuild quirk below |
+| `pnpm db:locate` | Print the absolute path to this worktree's local SQLite database |
 | `pnpm --filter @acorn/desktop db:migrate` | `tsx scripts/migrate.ts` — apply migrations to local SQLite |
 
 `pnpm dev`, `pnpm build`, `pnpm lint`, and `pnpm test` all proxy through Turborepo at the root.
