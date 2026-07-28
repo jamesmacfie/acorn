@@ -17,6 +17,7 @@
     "test:e2e": "electron-vite build && electron-rebuild -f -w better-sqlite3,node-pty && playwright test -c playwright.e2e.config.ts",
     "db:generate": "drizzle-kit generate && tsx scripts/check-migrations.ts",
     "db:check": "tsx scripts/check-migrations.ts",
+    "db:locate": "node scripts/locate-db.ts",
     "db:migrate": "tsx scripts/migrate.ts"
   },
   "dependencies": {

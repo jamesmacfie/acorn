@@ -126,6 +126,7 @@ Electron `safeStorage`; an explicit environment value remains the recovery and `
 | `pnpm lint` | `tsc --noEmit` typecheck |
 | `pnpm test` | `vitest run` |
 | `pnpm --filter @acorn/desktop db:generate` | `drizzle-kit generate` — emit a migration |
+| `pnpm db:locate` | Print the absolute path to this worktree's local SQLite database |
 | `pnpm --filter @acorn/desktop db:migrate` | `tsx scripts/migrate.ts` — apply migrations to local SQLite |
 
 ## Packaging (macOS)

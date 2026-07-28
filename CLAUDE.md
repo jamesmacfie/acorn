@@ -67,6 +67,7 @@ app/process boundaries and a shrinking ledger of legacy cross-feature coupling a
 | `pnpm lint` | `tsc --noEmit` typecheck |
 | `pnpm test` | `vitest run` |
 | `pnpm --filter @acorn/desktop db:generate` | `drizzle-kit generate` — emit a migration from the schema |
+| `pnpm db:locate` | Print the absolute path to this worktree's local SQLite database |
 | `pnpm --filter @acorn/desktop db:migrate` | `tsx scripts/migrate.ts` — apply migrations to the local SQLite DB |
 
 ## Conventions & gotchas
