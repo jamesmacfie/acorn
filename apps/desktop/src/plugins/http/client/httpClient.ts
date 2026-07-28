@@ -1,11 +1,21 @@
 // Typed wrapper over the /api/http routes. Goes through core's readJson/writeJson so the CSRF
 // envelope and ApiError decoding stay in one place.
 import { readJson, writeJson } from '../../../core/client/apiClient'
-import { httpRequestRoute, httpRequestsRoute, httpSendRoute, httpVariableRoute, httpVariablesRoute, type HttpRequest, type HttpVariable, type SendResult } from '../shared/model'
+import {
+  httpRequestRoute,
+  httpRequestsRoute,
+  httpSendRoute,
+  httpVariableRoute,
+  httpVariablesRoute,
+  type HttpRequest,
+  type HttpSendInput,
+  type HttpVariable,
+  type SendResult,
+} from '../shared/model'
 
-// Everything the server needs to fire a request; `id` is deliberately absent — unsaved edits and
-// never-saved ad-hoc requests are sent the same way as stored ones.
-export type SendPayload = Omit<HttpRequest, 'id' | 'repoOwner' | 'repoName' | 'createdAt' | 'updatedAt'>
+// The stored-request write shape retains `taskId` because it owns filing. Sending uses
+// HttpSendInput instead, whose executionTaskId comes from the panel context.
+export type RequestPayload = Omit<HttpRequest, 'id' | 'repoOwner' | 'repoName' | 'createdAt' | 'updatedAt'>
 
 const json = (method: string, body: unknown): RequestInit => ({
   method,
@@ -16,10 +26,10 @@ const json = (method: string, body: unknown): RequestInit => ({
 export const listRequests = (owner: string, repo: string, taskId?: string): Promise<HttpRequest[]> =>
   readJson(`${httpRequestsRoute(owner, repo)}${taskId ? `?taskId=${encodeURIComponent(taskId)}` : ''}`)
 
-export const createRequest = (owner: string, repo: string, body: SendPayload): Promise<HttpRequest> =>
+export const createRequest = (owner: string, repo: string, body: RequestPayload): Promise<HttpRequest> =>
   writeJson(httpRequestsRoute(owner, repo), json('POST', body))
 
-export const updateRequest = (owner: string, repo: string, id: string, body: SendPayload): Promise<HttpRequest> =>
+export const updateRequest = (owner: string, repo: string, id: string, body: RequestPayload): Promise<HttpRequest> =>
   writeJson(httpRequestRoute(owner, repo, id), json('PUT', body))
 
 export const deleteRequest = async (owner: string, repo: string, id: string): Promise<void> => {
@@ -40,7 +50,7 @@ export const deleteVariable = async (owner: string, repo: string, id: string): P
   if (!res.ok) throw new Error(`Could not delete variable (${res.status})`)
 }
 
-export const sendRequest = (owner: string, repo: string, body: SendPayload): Promise<SendResult> =>
+export const sendRequest = (owner: string, repo: string, body: HttpSendInput): Promise<SendResult> =>
   writeJson(httpSendRoute(owner, repo), json('POST', body))
 
 // The response body arrives base64'd so binary survives the JSON hop. Decode as UTF-8 for display;

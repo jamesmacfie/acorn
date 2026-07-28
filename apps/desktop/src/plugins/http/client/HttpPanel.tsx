@@ -6,7 +6,7 @@ import { Button, Input, Select, SectionHeader } from '../../../core/client/ui/pr
 import Icon from '../../../core/client/ui/Icon'
 import { fromCurl, httpMethods, toCurl, type HttpRequest, type SendResult } from '../shared/model'
 import { createRequest, deleteRequest, listRequests, sendRequest, updateRequest } from './httpClient'
-import { draftsDiffer, emptyDraft, readStoredDraft, toDraft, writeStoredDraft, type Draft } from './draft'
+import { draftsDiffer, emptyDraft, readStoredDraft, toDraft, toSendInput, writeStoredDraft, type Draft } from './draft'
 import RequestTabs from './RequestTabs'
 import ResponseView from './ResponseView'
 import HttpVariables from './HttpVariables'
@@ -143,7 +143,9 @@ export default function HttpPanel(props: { owner: string; repo: string; taskId?:
     setError(null)
     setResult(null)
     try {
-      setResult(await sendRequest(props.owner, props.repo, draft()))
+      // The panel decides where commands run. A repo-saved request still executes in the current
+      // task when opened here; its persisted taskId remains only its filing/ownership scope.
+      setResult(await sendRequest(props.owner, props.repo, toSendInput(draft(), props.taskId ?? null)))
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Request failed')
     } finally {

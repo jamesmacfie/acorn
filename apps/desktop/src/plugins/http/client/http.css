@@ -288,6 +288,11 @@
   font-size: var(--fs-sm);
   white-space: pre-wrap;
 }
+.http-failure-message {
+  margin: 0 0 var(--space-4);
+  color: var(--state-bad);
+  font-size: var(--fs-sm);
+}
 
 .http-response-strip {
   display: flex;
@@ -350,6 +355,8 @@
 .http-timeline-detail { overflow-wrap: anywhere; white-space: pre-wrap; }
 .http-timeline-row[data-label='request'] .http-timeline-detail,
 .http-timeline-row[data-label='response'] .http-timeline-detail { color: var(--accent); }
+.http-timeline-row[data-label='error'] .http-timeline-detail,
+.http-timeline-row[data-label='error-detail'] .http-timeline-detail { color: var(--state-bad); }
 
 /* ── variables view ──────────────────────────────────────────────────────────────────────── */
 

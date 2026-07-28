@@ -1,10 +1,16 @@
-import { describe, expect, it } from 'vitest'
-import { SendError, buildRequest, readCapped, type SendInput } from './send'
+import { mkdirSync, mkdtempSync, realpathSync, rmSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+import { afterEach, describe, expect, it, vi } from 'vitest'
+import { schema } from '../../../core/server/db'
+import { makeTestDb, type TestDb } from '../../../core/server/routes/testDb'
+import type { HttpSendInput } from '../shared/model'
+import { SendError, buildRequest, describeFetchFailure, readCapped, referencedVariableNames, resolveVars, send } from './send'
 
 // buildRequest is where interpolation, auth compilation and the scheme check land — the parts that
 // would silently send the wrong thing. The fetch call itself and the DB read around it are thin.
 
-const input = (patch: Partial<SendInput> = {}): SendInput => ({
+const input = (patch: Partial<HttpSendInput> = {}): HttpSendInput => ({
   method: 'GET',
   url: 'http://x/y',
   headers: [],
@@ -12,7 +18,7 @@ const input = (patch: Partial<SendInput> = {}): SendInput => ({
   body: '',
   auth: { mode: 'none' },
   vars: {},
-  taskId: null,
+  executionTaskId: null,
   ...patch,
 })
 
@@ -74,6 +80,23 @@ describe('buildRequest — interpolation', () => {
   it('leaves an unresolved placeholder literal rather than sending "undefined"', () => {
     const { headers } = buildRequest(input({ headers: [{ name: 'A', value: '{{nope}}', enabled: true }] }), {})
     expect(headers.get('a')).toBe('{{nope}}')
+  })
+})
+
+describe('referencedVariableNames', () => {
+  it('finds placeholders in active request fields only', () => {
+    const names = referencedVariableNames(input({
+      url: '{{URL}}',
+      headers: [
+        { name: 'X-{{HEADER_NAME}}', value: '{{HEADER_VALUE}}', enabled: true },
+        { name: 'Ignored', value: '{{DISABLED}}', enabled: false },
+      ],
+      bodyMode: 'json',
+      body: '{"id":"{{BODY}}"}',
+      auth: { mode: 'bearer', token: '{{TOKEN}}' },
+    }))
+
+    expect([...names].sort()).toEqual(['BODY', 'HEADER_NAME', 'HEADER_VALUE', 'TOKEN', 'URL'])
   })
 })
 
@@ -140,5 +163,159 @@ describe('readCapped', () => {
     expect(bytes.byteLength).toBe(5 * 1024 * 1024)
     expect(truncated).toBe(true)
     expect(bytes[bytes.byteLength - 1]).toBe(7)
+  })
+})
+
+describe('resolveVars — command execution context', () => {
+  let testDb: TestDb | null = null
+  let root: string | null = null
+
+  afterEach(() => {
+    testDb?.cleanup()
+    testDb = null
+    if (root) rmSync(root, { recursive: true, force: true })
+    root = null
+  })
+
+  it('runs a command in the explicit task worktree and uses its last non-empty output line', async () => {
+    testDb = makeTestDb()
+    root = mkdtempSync(join(tmpdir(), 'acorn-http-command-'))
+    const worktree = join(root, 'worktree')
+    const base = join(root, 'base')
+    mkdirSync(worktree)
+    mkdirSync(base)
+    await testDb.db.insert(schema.repoPaths).values({ owner: 'acme', repo: 'widget', path: base, createdAt: 0, updatedAt: 0 })
+    await testDb.db.insert(schema.tasks).values({
+      id: 'task-1',
+      title: 'API task',
+      origin: 'local',
+      repoOwner: 'acme',
+      repoName: 'widget',
+      branch: 'feature/api-url',
+      worktreePath: worktree,
+      pullNumber: null,
+      status: 'active',
+      parentId: null,
+      sort: 0,
+      createdAt: 0,
+      updatedAt: 0,
+      archivedAt: null,
+    })
+    await testDb.db.insert(schema.httpVariables).values({
+      id: 'var-1',
+      repoOwner: 'acme',
+      repoName: 'widget',
+      name: 'BASE_URL',
+      kind: 'command',
+      value: `printf 'shell startup noise\\n%s|%s|%s\\n' "$PWD" "$ACORN_TASK_ID" "$ACORN_BRANCH"`,
+      enabled: true,
+      createdAt: 0,
+      updatedAt: 0,
+    })
+
+    const vars = await resolveVars(testDb.db, 'acme', 'widget', undefined, input({ url: '{{BASE_URL}}/health', executionTaskId: 'task-1' }))
+
+    const [commandCwd, taskId, branch] = vars.BASE_URL.split('|')
+    expect(realpathSync(commandCwd)).toBe(realpathSync(worktree))
+    expect(taskId).toBe('task-1')
+    expect(branch).toBe('feature/api-url')
+    expect(realpathSync(vars.worktree)).toBe(realpathSync(worktree))
+    expect(vars.branch).toBe('feature/api-url')
+  })
+
+  it('rejects an execution task from another repo', async () => {
+    testDb = makeTestDb()
+    await testDb.db.insert(schema.tasks).values({
+      id: 'task-2',
+      title: 'Other task',
+      origin: 'local',
+      repoOwner: 'acme',
+      repoName: 'other',
+      branch: 'main',
+      worktreePath: null,
+      pullNumber: null,
+      status: 'active',
+      parentId: null,
+      sort: 0,
+      createdAt: 0,
+      updatedAt: 0,
+      archivedAt: null,
+    })
+
+    await expect(resolveVars(testDb.db, 'acme', 'widget', undefined, input({ executionTaskId: 'task-2' }))).rejects.toThrow(
+      'The selected task belongs to acme/other',
+    )
+  })
+
+  it('does not run an unused or request-overridden command variable', async () => {
+    testDb = makeTestDb()
+    await testDb.db.insert(schema.httpVariables).values({
+      id: 'var-unused',
+      repoOwner: 'acme',
+      repoName: 'widget',
+      name: 'BASE_URL',
+      kind: 'command',
+      value: 'exit 17',
+      enabled: true,
+      createdAt: 0,
+      updatedAt: 0,
+    })
+
+    await expect(resolveVars(testDb.db, 'acme', 'widget', undefined, input())).resolves.not.toHaveProperty('BASE_URL')
+    await expect(
+      resolveVars(testDb.db, 'acme', 'widget', undefined, input({ url: '{{BASE_URL}}/health', vars: { BASE_URL: 'http://override.test' } })),
+    ).resolves.toMatchObject({ BASE_URL: 'http://override.test' })
+  })
+})
+
+describe('send — transport outcomes', () => {
+  let testDb: TestDb | null = null
+
+  afterEach(() => {
+    vi.unstubAllGlobals()
+    testDb?.cleanup()
+    testDb = null
+  })
+
+  it('keeps the system error behind Node’s generic fetch failure', async () => {
+    const cause = Object.assign(new Error('connect ECONNREFUSED 127.0.0.1:4321'), { code: 'ECONNREFUSED' })
+    const failure = describeFetchFailure(new TypeError('fetch failed', { cause }), new URL('http://127.0.0.1:4321/health'))
+
+    expect(failure).toEqual({
+      error: 'Connection refused by 127.0.0.1:4321. The server may not be running or may be listening on a different port.',
+      code: 'ECONNREFUSED',
+      detail: 'connect ECONNREFUSED 127.0.0.1:4321',
+    })
+  })
+
+  it('returns a failed attempt with its URL and timeline when no response exists', async () => {
+    testDb = makeTestDb()
+    const cause = Object.assign(new Error('getaddrinfo ENOTFOUND missing.test'), { code: 'ENOTFOUND' })
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new TypeError('fetch failed', { cause })))
+
+    const result = await send(testDb.db, 'acme', 'widget', undefined, input({ url: 'http://missing.test/health' }))
+
+    expect(result).toMatchObject({
+      ok: false,
+      code: 'ENOTFOUND',
+      url: 'http://missing.test/health',
+      error: 'Could not find missing.test. Check the host name or DNS.',
+    })
+    expect(result.timeline).toEqual(expect.arrayContaining([
+      { label: 'request', detail: 'GET http://missing.test/health' },
+      expect.objectContaining({ label: 'error', detail: expect.stringContaining('ENOTFOUND') }),
+    ]))
+  })
+
+  it('keeps an HTTP 500 as a response, including its body', async () => {
+    testDb = makeTestDb()
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response('server broke', { status: 500, statusText: 'Internal Server Error' })))
+
+    const result = await send(testDb.db, 'acme', 'widget', undefined, input({ url: 'http://api.test/fail' }))
+
+    expect(result.ok).toBe(true)
+    if (!result.ok) throw new Error('Expected an HTTP response')
+    expect(result.status).toBe(500)
+    expect(Buffer.from(result.bodyBase64, 'base64').toString()).toBe('server broke')
   })
 })

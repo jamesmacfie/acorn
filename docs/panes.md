@@ -248,13 +248,21 @@ rail Source; the only difference here is that it is scoped to a task.
   `{{branch}}`, `{{worktree}}`, `{{taskId}}`) → repo variables → the request's own Vars tab. A repo
   variable is a plain value, a `secret` (AES-GCM at rest under `SESSION_ENC_KEY`, never returned to
   the renderer), or a `command` — a `bash -lc` line run in the task worktree whose last output line
-  becomes the value, the same mechanism as the Database pane's `dbUrlScript`. Command results are
-  never persisted.
+  becomes the value, the same mechanism as the Database pane's `dbUrlScript`. The pane supplies the
+  execution task separately from the request's storage scope, so a repo-saved request opened in a
+  task still runs commands in that task's worktree. The Source view has no task and uses the mapped
+  base checkout. Only variables referenced by an active request field are resolved, and a
+  request-level override prevents a lower command variable from running. Command results are never
+  persisted.
 - **Auth** (`none`/`basic`/`bearer`/`apikey`) is compiled to a header — or a query param for an
   api-key with `placement: 'query'` — at send time. The Timeline shows exactly what went out, with
   `Authorization`/`Cookie` redacted.
 - **curl** both ways: pasting a curl command into the URL bar populates the whole request; "Copy as
   curl" emits one.
+- A failure before an HTTP response exists (DNS, refused connection, TLS, timeout) is shown as a
+  failed attempt with the resolved URL, elapsed time, system error code/detail, and request
+  timeline. HTTP error statuses such as 404 and 500 remain ordinary responses, including their
+  headers and body.
 - Deliberately **no scripts, tests or assertions**, no collections (the repo is the collection), no
   oauth2/digest/ntlm, no multipart bodies, and no per-hop TLS timings — `redirect: 'follow'` is left
   to undici so `Authorization` is stripped correctly across origins. The body editor is a plain
