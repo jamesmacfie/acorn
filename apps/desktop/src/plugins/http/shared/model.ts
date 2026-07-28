@@ -57,7 +57,15 @@ export type HttpVariable = {
 
 export type TimelineEntry = { label: string; detail: string }
 
-export type SendResult = {
+// Sending has its own task context. `HttpRequest.taskId` says where an ad-hoc request is stored;
+// `executionTaskId` says which task worktree supplies builtins and runs command variables. Keeping
+// those meanings separate lets a repo-saved request run correctly when it is opened in a task pane.
+export type HttpSendInput = Pick<HttpRequest, 'method' | 'url' | 'headers' | 'bodyMode' | 'body' | 'auth' | 'vars'> & {
+  executionTaskId: string | null
+}
+
+export type SendSuccess = {
+  ok: true
   status: number
   statusText: string
   url: string // final URL after any redirects
@@ -70,7 +78,19 @@ export type SendResult = {
   timeline: TimelineEntry[]
 }
 
-export type SendFailure = { error: string }
+// `fetch` rejects only when no HTTP response exists (DNS, connection, TLS, timeout, and similar
+// transport failures). HTTP 4xx/5xx responses are SendSuccess values and retain their body/headers.
+export type SendFailure = {
+  ok: false
+  error: string
+  code: string | null
+  detail: string | null
+  url: string
+  durationMs: number
+  timeline: TimelineEntry[]
+}
+
+export type SendResult = SendSuccess | SendFailure
 
 // --- interpolation ------------------------------------------------------------------------
 

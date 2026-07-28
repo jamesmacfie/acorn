@@ -1,7 +1,7 @@
 // The editable shape of a request, shared by the panel and its tabs. It is the stored row minus the
-// identity/ownership columns, which is also exactly the send payload — so an unsaved edit and an
-// ad-hoc request that was never saved can both be fired without touching the DB first.
-import type { HttpRequest } from '../shared/model'
+// identity columns. Storage ownership stays in `taskId`; send execution context is added explicitly
+// by `toSendInput`, so opening a repo-saved row inside a task does not lose that task's worktree.
+import type { HttpRequest, HttpSendInput } from '../shared/model'
 
 export type Draft = Omit<HttpRequest, 'id' | 'repoOwner' | 'repoName' | 'createdAt' | 'updatedAt'>
 
@@ -29,6 +29,17 @@ export const toDraft = (row: HttpRequest): Draft => ({
   body: row.body,
   auth: row.auth,
   vars: row.vars,
+})
+
+export const toSendInput = (draft: Draft, executionTaskId: string | null): HttpSendInput => ({
+  method: draft.method,
+  url: draft.url,
+  headers: draft.headers,
+  bodyMode: draft.bodyMode,
+  body: draft.body,
+  auth: draft.auth,
+  vars: draft.vars,
+  executionTaskId,
 })
 
 // Structural comparison so the "unsaved changes" dot doesn't depend on key order or identity.

@@ -41,7 +41,19 @@ const variableBody = z.object({
   enabled: z.boolean().default(true),
 })
 
-const sendBody = requestBody.partial({ name: true, folder: true }).extend({ name: z.string().default('') })
+// Sending is not a persistence operation: accept only wire-relevant request fields plus the task
+// whose worktree should resolve builtins/commands. In particular, the stored row's filing taskId
+// must not double as execution context.
+const sendBody = z.object({
+  method: z.enum(httpMethods),
+  url: z.string().max(4000),
+  headers: z.array(keyValue).max(100).default([]),
+  bodyMode: z.enum(bodyModes).default('none'),
+  body: z.string().max(1_000_000).default(''),
+  auth: authSchema.default({ mode: 'none' }),
+  vars: z.record(z.string(), z.string()).default({}),
+  executionTaskId: z.string().nullable().default(null),
+})
 
 const now = () => Date.now()
 const parseJson = <T>(raw: string, fallback: T): T => {
@@ -237,8 +249,8 @@ export const http = new Hono<AppEnv>()
     try {
       return c.json(await send(getDb(c.env), owner, repo, c.env.SESSION_ENC_KEY, parsed.data))
     } catch (err) {
-      // A failed request is a normal outcome here, not a server fault — report it as a 422 with the
-      // reason so the pane can show it in place of a response.
+      // Preparation failures (invalid resolved URL, command/secret resolution) have no attempted
+      // request to display, so they stay a 422. Network attempts return a typed SendFailure above.
       if (err instanceof SendError) return respondError(c, 422, 'send_failed', [err.message])
       throw err
     }

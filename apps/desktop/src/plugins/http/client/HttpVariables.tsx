@@ -5,8 +5,9 @@
 //   value   — stored and shown as typed
 //   secret  — encrypted at rest (AES-GCM, the same key that seals the session cookie); the
 //             plaintext never comes back to the renderer, so the field shows a placeholder
-//   command — a shell command run in the task worktree (or the repo checkout) at send time, and
-//             never stored. The same mechanism the Database pane uses for its connection URL.
+//   command — a stored shell command run in the task worktree (or the repo checkout) when a
+//             request references it. Its output is never stored. The same mechanism the Database
+//             pane uses for its connection URL.
 import { createEffect, createResource, createSignal, For, Index, Show } from 'solid-js'
 import { Button, Input, Select } from '../../../core/client/ui/primitives'
 import Icon from '../../../core/client/ui/Icon'
@@ -16,7 +17,7 @@ import { createVariable, deleteVariable, listVariables, updateVariable } from '.
 const KIND_HINT: Record<VariableKind, string> = {
   value: 'Used exactly as typed.',
   secret: 'Encrypted at rest. Leave blank when editing to keep the stored value.',
-  command: 'Run in the task worktree each time you send. The last line of output is the value.',
+  command: 'Run in the task worktree when a request uses it. The last line of output is the value.',
 }
 
 const PLACEHOLDER: Record<VariableKind, string> = {

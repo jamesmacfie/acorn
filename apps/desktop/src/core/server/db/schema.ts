@@ -704,9 +704,9 @@ export const httpRequests = sqliteTable(
   ],
 )
 
-// Repo-level variables for the API panel. `command` values are shell commands resolved at send time
-// (never persisted); `secret` values are JWE ciphertext under SESSION_ENC_KEY and are never sent to
-// the renderer in plaintext.
+// Repo-level variables for the API panel. `command` values are persisted shell commands whose
+// output is resolved at send time and never persisted; `secret` values are JWE ciphertext under
+// SESSION_ENC_KEY and are never sent to the renderer in plaintext.
 export const httpVariables = sqliteTable(
   'http_variables',
   {

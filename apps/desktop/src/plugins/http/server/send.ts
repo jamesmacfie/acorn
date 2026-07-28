@@ -15,11 +15,12 @@ import {
   defaultContentType,
   interpolate,
   joinUrl,
+  missingVars,
   serializeBody,
   splitUrl,
   type AuthConfig,
-  type BodyMode,
-  type KeyValue,
+  type HttpSendInput,
+  type SendFailure,
   type SendResult,
   type TimelineEntry,
 } from '../shared/model'
@@ -37,20 +38,34 @@ const ALL_COMMANDS_TIMEOUT_MS = 30_000
 
 export class SendError extends Error {}
 
-export type SendInput = {
-  method: string
-  url: string
-  headers: KeyValue[]
-  bodyMode: BodyMode
-  body: string
-  auth: AuthConfig
-  vars: Record<string, string> // per-request overrides (plain values only)
-  taskId: string | null
-}
-
 // CLIs emit colour even when their stdout is a pipe.
 const ANSI = /\x1b(?:\[[0-9;]*[A-Za-z]|\(B)/g
 const lastLine = (stdout: string): string | null => stdout.replace(ANSI, '').split('\n').map((l) => l.trim()).filter(Boolean).pop() ?? null
+
+// Command variables are executable, so resolve only names the request actually references. A
+// per-request override also shadows the repo variable before execution; precedence must not mean
+// "run a lower layer for its side effects, then discard it".
+export function referencedVariableNames(input: HttpSendInput): Set<string> {
+  const fields = [input.url]
+  for (const header of input.headers) {
+    if (header.enabled && header.name) fields.push(header.name, header.value)
+  }
+  if (input.bodyMode !== 'none') fields.push(input.body)
+  switch (input.auth.mode) {
+    case 'basic':
+      fields.push(input.auth.username, input.auth.password)
+      break
+    case 'bearer':
+      fields.push(input.auth.token)
+      break
+    case 'apikey':
+      fields.push(input.auth.key, input.auth.value)
+      break
+    case 'none':
+      break
+  }
+  return new Set(fields.flatMap((field) => missingVars(field, {})))
+}
 
 // --- variable resolution ------------------------------------------------------------------
 
@@ -58,28 +73,31 @@ const lastLine = (stdout: string): string | null => stdout.replace(ANSI, '').spl
  * Flattens every variable layer into one lookup for interpolation.
  * Precedence, lowest first: task builtins < repo variables < per-request overrides.
  *
- * `command` variables run a shell at send time and are never persisted — the same mechanism the
- * Database pane uses for `dbUrlScript` (plugins/database/main/database.ts). Unlike that one there is
- * no repo-config trust gate here: these commands are typed by the user into the app's own DB, not
- * read from a committed .acorn/config.toml, so there is no repo-authored code to authorize.
+ * `command` variables persist the user's shell command, then run it at send time without persisting
+ * its output — the same mechanism the Database pane uses for `dbUrlScript`
+ * (plugins/database/main/database.ts). Unlike that one there is no repo-config trust gate here:
+ * these commands are typed by the user into the app's own DB, not read from a committed
+ * .acorn/config.toml, so there is no repo-authored code to authorize.
  */
-export async function resolveVars(db: AppDatabase, repoOwner: string, repoName: string, encKey: string | undefined, input: SendInput): Promise<Record<string, string>> {
+export async function resolveVars(db: AppDatabase, repoOwner: string, repoName: string, encKey: string | undefined, input: HttpSendInput): Promise<Record<string, string>> {
   const vars: Record<string, string> = {}
 
   // Builtins from the task, so a request can point at this task's worktree/branch.
   let cwd: string | null = null
   let taskInfo: SessionTaskInfo | null = null
-  if (input.taskId) {
-    const task = await loadTask(db, input.taskId)
+  if (input.executionTaskId) {
+    const task = await loadTask(db, input.executionTaskId)
+    if (!task) throw new SendError('The task used to send this request no longer exists')
+    if (task.repoOwner !== repoOwner || task.repoName !== repoName) {
+      throw new SendError(`The selected task belongs to ${task.repoOwner}/${task.repoName}, not ${repoOwner}/${repoName}`)
+    }
     // taskRoot is null until a worktree exists (and always under dev:node) — fall back to the
     // repo checkout, exactly as resolveDbUrl and the preview resolver do.
-    cwd = (await taskRoot(db, input.taskId)) ?? null
-    if (task) {
-      vars.repo = `${task.repoOwner}/${task.repoName}`
-      vars.branch = task.branch
-      vars.taskId = task.id
-      taskInfo = { repoOwner: task.repoOwner, repoName: task.repoName, branch: task.branch, title: task.title }
-    }
+    cwd = (await taskRoot(db, input.executionTaskId)) ?? null
+    vars.repo = `${task.repoOwner}/${task.repoName}`
+    vars.branch = task.branch
+    vars.taskId = task.id
+    taskInfo = { repoOwner: task.repoOwner, repoName: task.repoName, branch: task.branch, title: task.title }
   }
   if (!cwd) cwd = (await getRepoPath(db, repoOwner, repoName))?.path ?? null
   if (cwd) vars.worktree = cwd
@@ -88,7 +106,8 @@ export async function resolveVars(db: AppDatabase, repoOwner: string, repoName: 
     .select()
     .from(schema.httpVariables)
     .where(and(eq(schema.httpVariables.repoOwner, repoOwner), eq(schema.httpVariables.repoName, repoName)))
-  const enabled = rows.filter((r) => r.enabled)
+  const referenced = referencedVariableNames(input)
+  const enabled = rows.filter((r) => r.enabled && referenced.has(r.name) && !(r.name in input.vars))
 
   for (const row of enabled) {
     if (row.kind === 'value') vars[row.name] = row.value
@@ -107,7 +126,7 @@ export async function resolveVars(db: AppDatabase, repoOwner: string, repoName: 
   const commands = enabled.filter((r) => r.kind === 'command')
   if (commands.length) {
     if (!cwd) throw new SendError('Command variables need a repo checkout — set the repo path first')
-    const env = buildSessionEnv({ taskId: input.taskId ?? '', cwd, task: taskInfo })
+    const env = buildSessionEnv({ taskId: input.executionTaskId ?? '', cwd, task: taskInfo })
     const deadline = AbortSignal.timeout(ALL_COMMANDS_TIMEOUT_MS)
     const results = await Promise.all(
       commands.map(async (row) => {
@@ -139,7 +158,7 @@ export async function resolveVars(db: AppDatabase, repoOwner: string, repoName: 
  * Split out from send() so it is testable without a database or a network — this is where the
  * interpolation, the auth compilation and the scheme check all land.
  */
-export function buildRequest(input: SendInput, vars: Record<string, string>): { target: URL; headers: Headers; body: string | undefined } {
+export function buildRequest(input: HttpSendInput, vars: Record<string, string>): { target: URL; headers: Headers; body: string | undefined } {
   // Interpolate per field, never over a serialized request — a value containing a delimiter would
   // otherwise reshape the request rather than fill a slot.
   const applied = applyAuth(interpolateAuth(input.auth, vars))
@@ -170,7 +189,34 @@ export function buildRequest(input: SendInput, vars: Record<string, string>): { 
   return { target, headers, body }
 }
 
-export async function send(db: AppDatabase, repoOwner: string, repoName: string, encKey: string | undefined, input: SendInput): Promise<SendResult> {
+export function describeFetchFailure(err: unknown, target: URL): Pick<SendFailure, 'error' | 'code' | 'detail'> {
+  const nodes = errorNodes(err)
+  const code = nodes.map((node) => stringField(node, 'code')).find(Boolean) ?? null
+  const detail =
+    nodes
+      .map((node) => stringField(node, 'message'))
+      .find((message) => message && message !== 'fetch failed' && message !== 'request failed') ?? null
+  const timedOut = nodes.some((node) => stringField(node, 'name') === 'TimeoutError') || code === 'ETIMEDOUT' || code === 'UND_ERR_CONNECT_TIMEOUT'
+
+  if (timedOut) return { error: `Connection to ${target.host} timed out after ${REQUEST_TIMEOUT_MS / 1000} seconds.`, code, detail }
+  if (code === 'ECONNREFUSED') {
+    return { error: `Connection refused by ${target.host}. The server may not be running or may be listening on a different port.`, code, detail }
+  }
+  if (code === 'ENOTFOUND') return { error: `Could not find ${target.hostname}. Check the host name or DNS.`, code, detail }
+  if (code === 'EAI_AGAIN') return { error: `DNS lookup for ${target.hostname} did not complete. Try again.`, code, detail }
+  if (code === 'ECONNRESET') return { error: `The connection to ${target.host} was reset before a response arrived.`, code, detail }
+  if (code === 'ECONNABORTED') return { error: `The connection to ${target.host} was closed before a response arrived.`, code, detail }
+  if (code && /(CERT|SELF_SIGNED|TLS|SSL|UNABLE_TO_VERIFY|UNABLE_TO_GET_ISSUER)/.test(code)) {
+    return { error: `TLS certificate validation failed for ${target.host}.`, code, detail }
+  }
+  return {
+    error: detail ?? `The request to ${target.host} failed before an HTTP response arrived.`,
+    code,
+    detail: null,
+  }
+}
+
+export async function send(db: AppDatabase, repoOwner: string, repoName: string, encKey: string | undefined, input: HttpSendInput): Promise<SendResult> {
   const vars = await resolveVars(db, repoOwner, repoName, encKey, input)
   const { target, headers, body } = buildRequest(input, vars)
 
@@ -188,14 +234,22 @@ export async function send(db: AppDatabase, repoOwner: string, repoName: string,
       signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
     })
   } catch (err) {
-    const reason = err instanceof Error && err.name === 'TimeoutError' ? `timed out after ${REQUEST_TIMEOUT_MS / 1000}s` : err instanceof Error ? err.message : 'request failed'
-    throw new SendError(reason)
+    const durationMs = Date.now() - started
+    const failure = describeFetchFailure(err, target)
+    return {
+      ok: false,
+      ...failure,
+      url: target.toString(),
+      durationMs,
+      timeline: buildFailureTimeline(input.method, target.toString(), headers, failure, durationMs),
+    }
   }
 
   const { bytes, truncated } = await readCapped(res)
   const durationMs = Date.now() - started
 
   return {
+    ok: true,
     status: res.status,
     statusText: res.statusText,
     url: res.url || target.toString(),
@@ -209,6 +263,33 @@ export async function send(db: AppDatabase, repoOwner: string, repoName: string,
     durationMs,
     timeline: buildTimeline(input.method, target.toString(), headers, res, durationMs, bytes.byteLength, truncated),
   }
+}
+
+const asRecord = (value: unknown): Record<string, unknown> | null =>
+  (typeof value === 'object' && value !== null) || typeof value === 'function' ? (value as Record<string, unknown>) : null
+
+const stringField = (value: unknown, field: string): string | null => {
+  const record = asRecord(value)
+  return record && typeof record[field] === 'string' ? record[field] : null
+}
+
+// Node's fetch usually wraps the useful system error in `cause`; dual-stack connection failures
+// may use AggregateError.errors instead. Flatten both shapes without depending on undici internals.
+function errorNodes(value: unknown): unknown[] {
+  const pending: unknown[] = [value]
+  const seen = new Set<unknown>()
+  const out: unknown[] = []
+  while (pending.length) {
+    const current = pending.shift()
+    if (current === null || current === undefined || seen.has(current)) continue
+    seen.add(current)
+    out.push(current)
+    const record = asRecord(current)
+    if (!record) continue
+    if (record.cause !== null && record.cause !== undefined) pending.push(record.cause)
+    if (Array.isArray(record.errors)) pending.push(...record.errors)
+  }
+  return out
 }
 
 // Read the body a chunk at a time so a huge or endless response can't exhaust memory — the cap has
@@ -248,12 +329,31 @@ export async function readCapped(res: Response): Promise<{ bytes: Uint8Array; tr
 // A chronological log of what went out and what came back, in Bruno's spirit but without its
 // https.Agent subclass — no DNS/TCP/TLS phase breakdown.
 function buildTimeline(method: string, url: string, sent: Headers, res: Response, durationMs: number, size: number, truncated: boolean): TimelineEntry[] {
-  const out: TimelineEntry[] = [{ label: 'request', detail: `${method} ${url}` }]
-  for (const [k, v] of sent.entries()) out.push({ label: 'request-header', detail: `${k}: ${redact(k, v)}` })
+  const out = buildRequestTimeline(method, url, sent)
   if (res.redirected && res.url && res.url !== url) out.push({ label: 'info', detail: `redirected to ${res.url}` })
   out.push({ label: 'response', detail: `${res.status} ${res.statusText}` })
   for (const [k, v] of res.headers.entries()) out.push({ label: 'response-header', detail: `${k}: ${v}` })
   out.push({ label: 'info', detail: `${size} bytes in ${durationMs}ms${truncated ? ' (body truncated at 5 MB)' : ''}` })
+  return out
+}
+
+function buildFailureTimeline(
+  method: string,
+  url: string,
+  sent: Headers,
+  failure: Pick<SendFailure, 'error' | 'code' | 'detail'>,
+  durationMs: number,
+): TimelineEntry[] {
+  const out = buildRequestTimeline(method, url, sent)
+  out.push({ label: 'error', detail: `${failure.error}${failure.code ? ` [${failure.code}]` : ''}` })
+  if (failure.detail && failure.detail !== failure.error) out.push({ label: 'error-detail', detail: failure.detail })
+  out.push({ label: 'info', detail: `failed after ${durationMs}ms without an HTTP response` })
+  return out
+}
+
+function buildRequestTimeline(method: string, url: string, sent: Headers): TimelineEntry[] {
+  const out: TimelineEntry[] = [{ label: 'request', detail: `${method} ${url}` }]
+  for (const [k, v] of sent.entries()) out.push({ label: 'request-header', detail: `${k}: ${redact(k, v)}` })
   return out
 }
 
