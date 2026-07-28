@@ -169,6 +169,25 @@ Upsert one preference. Body `{ key: string, value: string }`.
 
 ---
 
+## Agent usage and pricing (`/api/agents`)
+
+`apps/desktop/src/plugins/agents/server/routes/usage.ts`. Plugin-owned, user-scoped provider usage
+and the local Claude estimate catalog. Usage collection is a **Bridge**; pricing overrides are
+**App-state** stored in the generic prefs table under an agents-owned key.
+
+| Method | Path | Purpose |
+| --- | --- | --- |
+| `GET` | `/api/agents/usage` | Read the five-minute cached Claude/Codex usage snapshot. The current user's pricing preferences are part of the cache identity. |
+| `POST` | `/api/agents/usage/refresh` | Force both provider collectors to run and recalculate the Claude estimate. |
+| `GET` | `/api/agents/pricing` | Read the user's versioned Claude catalog overrides and exact-model prices. |
+| `PUT` | `/api/agents/pricing` | Validate and replace that pricing preference. Invalid model ids, duplicate rows, unknown built-in ids, and non-finite/negative prices return `400 bad_request`. |
+
+Pricing values are USD per million tokens for input, output, cache write, and cache read. They affect
+Acorn's estimate only. The shared contract and default catalog live in
+`plugins/agents/shared/pricing.ts`; core has no model-pricing contract.
+
+---
+
 ## Workspaces (`/api/workspaces`)
 
 `apps/desktop/src/core/server/routes/workspaces.ts`. A **Workspace** is a named group of repos — the
