@@ -13,6 +13,7 @@
     "rebuild:node": "pnpm --filter @acorn/desktop node:rebuild",
     "dev:node": "pnpm --filter @acorn/desktop dev:node",
     "db:generate": "pnpm --filter @acorn/desktop db:generate",
+    "db:locate": "pnpm --filter @acorn/desktop db:locate",
     "db:migrate": "pnpm --filter @acorn/desktop db:migrate"
   },
   "devDependencies": {

@@ -2,7 +2,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
-import { findDesktopRoot, resolveServerPaths } from './serverPaths'
+import { findDesktopRoot, resolveDatabasePath, resolveServerPaths } from './serverPaths'
 
 const roots: string[] = []
 
@@ -30,10 +30,12 @@ describe('server runtime paths', () => {
 
   it('derives the SPA and dev-data paths from the package root', () => {
     const { root, sourceModuleDir } = fixture()
-    expect(resolveServerPaths(sourceModuleDir)).toEqual({
+    const paths = resolveServerPaths(sourceModuleDir)
+    expect(paths).toEqual({
       clientDir: join(root, 'dist/client'),
       devDataDir: join(root, '.acorn'),
     })
+    expect(resolveDatabasePath(paths.devDataDir)).toBe(join(root, '.acorn', 'acorn.sqlite'))
   })
 
   it('fails clearly when invoked outside the desktop package', () => {

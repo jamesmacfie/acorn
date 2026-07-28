@@ -5,7 +5,7 @@ import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { createApp } from '../server/index'
 import { makeBindings, type RuntimeBindings } from './bindings'
-import { resolveServerPaths } from './serverPaths'
+import { resolveDatabasePath, resolveServerPaths } from './serverPaths'
 import { attachWsHub, setUiBroker } from './wsHub'
 
 const here = dirname(fileURLToPath(import.meta.url))
@@ -81,7 +81,7 @@ export function startListener(runtime: RuntimeBindings): Promise<ServerType> {
 // composition root and the plain-Node `dev:node` entry both build their runtime through it.
 export function makeRuntime(dataDir: string): RuntimeBindings {
   return makeBindings({
-    dbPath: resolve(dataDir, 'acorn.sqlite'),
+    dbPath: resolveDatabasePath(dataDir),
     blobsDir: resolve(dataDir, 'blobs'),
   })
 }

@@ -2,6 +2,7 @@ import { existsSync, readFileSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
 
 const DESKTOP_PACKAGE_NAME = '@acorn/desktop'
+const DATABASE_FILENAME = 'acorn.sqlite'
 
 function isDesktopPackage(dir: string): boolean {
   const manifest = join(dir, 'package.json')
@@ -31,4 +32,8 @@ export function resolveServerPaths(moduleDir: string): { clientDir: string; devD
     clientDir: resolve(root, 'dist/client'),
     devDataDir: resolve(root, '.acorn'),
   }
+}
+
+export function resolveDatabasePath(dataDir: string): string {
+  return resolve(dataDir, DATABASE_FILENAME)
 }
