@@ -4,10 +4,13 @@ import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 import {
   analyzeClaudeDailyUsage,
-  claudeModelPrice,
   deduplicateClaudeUsage,
   parseClaudeUsageJsonl,
 } from './claudeDailyUsage'
+import {
+  claudeModelPrice,
+  emptyAgentPricingPreferences,
+} from '../../shared/pricing'
 
 const roots: string[] = []
 const now = new Date(2026, 6, 24, 15, 0, 0).getTime()
@@ -75,6 +78,7 @@ describe('Claude JSONL parsing and pricing', () => {
   })
 
   it('matches current official model rates and refuses to price unknown models', () => {
+    expect(claudeModelPrice('claude-opus-5')).toMatchObject({ input: 5, output: 25, cacheWrite: 6.25, cacheRead: 0.5 })
     expect(claudeModelPrice('claude-opus-4-6')).toMatchObject({ input: 5, output: 25, cacheWrite: 6.25, cacheRead: 0.5 })
     expect(claudeModelPrice('claude-sonnet-5', new Date(2026, 6, 24).getTime())).toMatchObject({ input: 2, output: 10 })
     expect(claudeModelPrice('claude-sonnet-5', new Date(2026, 8, 2).getTime())).toMatchObject({ input: 3, output: 15 })
@@ -121,6 +125,31 @@ describe('analyzeClaudeDailyUsage', () => {
     expect(report.today.pricingFallback).toBe(true)
     expect(report.today.estimatedCostUsd).toBeNull()
     expect(report.today.estimatedCacheSavingsUsd).toBeNull()
+    expect(report.today.unpricedModels).toEqual(['claude-next-unknown'])
+  })
+
+  it('uses an exact custom model price for a model absent from the built-in catalog', async () => {
+    const { root, project } = await fixtureRoot()
+    await writeFile(
+      join(project, 'custom.jsonl'),
+      usageLine(now, {
+        model: 'claude-next-unknown',
+        input: 1_000_000,
+        output: 0,
+        cacheWrite: 0,
+        cacheRead: 0,
+      }),
+    )
+    const pricing = emptyAgentPricingPreferences()
+    pricing.claude.customModels.push({
+      model: 'claude-next-unknown',
+      price: { input: 7, output: 21, cacheWrite: 8.75, cacheRead: 0.7 },
+    })
+
+    const report = await analyzeClaudeDailyUsage(root, now, pricing)
+    expect(report.today.estimatedCostUsd).toBe(7)
+    expect(report.today.pricingFallback).toBe(false)
+    expect(report.today.unpricedModels).toEqual([])
   })
 
   it('handles a missing root and skips old or oversized files', async () => {

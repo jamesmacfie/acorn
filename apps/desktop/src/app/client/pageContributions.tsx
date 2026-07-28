@@ -4,6 +4,7 @@ import IntegrationsSettings from '../../core/client/settings/IntegrationsSetting
 import WorkspaceSettings from '../../core/client/settings/WorkspaceSettings'
 import McpSettings from '../../core/client/settings/McpSettings'
 import AgentToolsSettings from '../../core/client/settings/AgentToolsSettings'
+import AgentPricingSettings from '../../plugins/agents/client/AgentPricingSettings'
 import WorkflowsSettings from '../../plugins/workflows/client/WorkflowsSettings'
 import AppearanceSettings from '../../core/client/settings/AppearanceSettings'
 import TerminalSettings from '../../plugins/terminal/client/TerminalSettings'
@@ -29,6 +30,7 @@ export const settingsPageContributions: SettingsContribution[] = [
   { id: 'integrations', label: 'Integrations', group: 'general', order: 20, component: () => <IntegrationsSettings /> },
   { id: 'mcp', label: 'MCP', group: 'general', order: 30, component: () => <McpSettings /> },
   { id: 'agent-tools', label: 'Agent tools', group: 'general', order: 40, component: () => <AgentToolsSettings /> },
+  { id: 'agent-pricing', label: 'Agent pricing', group: 'general', order: 45, requires: 'desktop', component: () => <AgentPricingSettings /> },
   { id: 'workflows', label: 'Workflows', group: 'general', order: 50, requires: 'desktop', component: () => <WorkflowsSettings /> },
   { id: 'terminal', label: 'Terminal', group: 'general', order: 60, requires: 'desktop', component: () => <TerminalSettings /> },
   { id: 'docker', label: 'Docker', group: 'general', order: 65, component: () => <DockerSettings /> },
