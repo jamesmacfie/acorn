@@ -1,0 +1,81 @@
+.agent-pricing-settings { gap: var(--space-7); }
+.agent-pricing-heading { margin: 0 0 var(--space-4); }
+.agent-pricing-table-wrap {
+  max-width: 100%;
+  overflow-x: auto;
+  border: var(--surface-border);
+  border-radius: var(--radius-surface);
+}
+.agent-pricing-table {
+  width: 100%;
+  min-width: 620px;
+  border-collapse: collapse;
+  font-size: var(--fs-xs);
+}
+.agent-pricing-table th,
+.agent-pricing-table td {
+  padding: var(--space-3);
+  border-bottom: var(--divider);
+  text-align: left;
+  vertical-align: middle;
+}
+.agent-pricing-table tr:last-child th,
+.agent-pricing-table tr:last-child td { border-bottom: 0; }
+.agent-pricing-table thead th {
+  color: var(--text-muted);
+  background: var(--bg-subtle);
+  font-weight: 500;
+  white-space: nowrap;
+}
+.agent-pricing-table tbody th {
+  width: 180px;
+  color: var(--text);
+  font-weight: 500;
+}
+.agent-pricing-table tbody th > span,
+.agent-pricing-table tbody th > code {
+  display: block;
+}
+.agent-pricing-table tbody th > code {
+  margin-top: 2px;
+  color: var(--text-faint);
+  font-size: var(--fs-2xs);
+  font-weight: 400;
+}
+.agent-pricing-rate { width: 76px; min-width: 76px; }
+.agent-pricing-model { width: 180px; min-width: 180px; font-family: var(--font-mono); }
+.agent-pricing-reset,
+.agent-pricing-remove,
+.agent-pricing-model-add {
+  padding: 0;
+  border: 0;
+  color: var(--text-muted);
+  background: none;
+  font: inherit;
+  cursor: pointer;
+}
+.agent-pricing-reset:hover:not(:disabled),
+.agent-pricing-model-add:hover { color: var(--accent); }
+.agent-pricing-reset:disabled { color: var(--text-faint); cursor: default; }
+.agent-pricing-remove { color: var(--del-marker); }
+.agent-pricing-remove:hover { text-decoration: underline; }
+.agent-pricing-custom-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+  margin-bottom: var(--space-3);
+}
+.agent-pricing-custom-head .agent-pricing-heading { margin: 0; }
+.agent-pricing-unpriced {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3) var(--space-5);
+  padding: var(--space-4);
+  border: var(--surface-border);
+  background: var(--bg-subtle);
+}
+.agent-pricing-model-add code { color: inherit; }
+.agent-pricing-empty { margin: 0; }
+.agent-pricing-saved { margin: 0; color: var(--add-marker); }

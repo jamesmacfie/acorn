@@ -1,6 +1,11 @@
 import { readFile, readdir, stat } from 'node:fs/promises'
 import { join } from 'node:path'
 import type { AgentDailyUsage, AgentDailyUsagePeriod } from '../../shared/usage'
+import {
+  claudeModelPrice,
+  emptyAgentPricingPreferences,
+  type AgentPricingPreferences,
+} from '../../shared/pricing'
 
 const MAX_FILE_BYTES = 32 * 1024 * 1024
 const MAX_FILES = 2_000
@@ -17,27 +22,6 @@ type TokenUsageRecord = {
   cacheReadTokens: number
   timestamp: number
 }
-
-type ModelPrice = {
-  input: number
-  output: number
-  cacheWrite: number
-  cacheRead: number
-}
-
-// Standard global API prices per million tokens, verified 2026-07-24 against
-// https://platform.claude.com/docs/en/about-claude/pricing. Daily usage is
-// explicitly presented as an estimate: Claude Code's actual billing mode can
-// carry modifiers this local JSONL format does not expose.
-const PRICE_PATTERNS: Array<[RegExp, ModelPrice]> = [
-  [/(?:claude-)?(?:fable|mythos)-?5/i, { input: 10, output: 50, cacheWrite: 12.5, cacheRead: 1 }],
-  [/(?:claude-)?opus-?4[-.]?(?:8|7|6|5)/i, { input: 5, output: 25, cacheWrite: 6.25, cacheRead: 0.5 }],
-  [/(?:claude-)?opus-?4(?:[-.]?1)?(?:-|$)/i, { input: 15, output: 75, cacheWrite: 18.75, cacheRead: 1.5 }],
-  [/(?:claude-)?sonnet-?4/i, { input: 3, output: 15, cacheWrite: 3.75, cacheRead: 0.3 }],
-  [/(?:claude-)?3[-.]?5-sonnet/i, { input: 3, output: 15, cacheWrite: 3.75, cacheRead: 0.3 }],
-  [/(?:claude-)?haiku-?4[-.]?5/i, { input: 1, output: 5, cacheWrite: 1.25, cacheRead: 0.1 }],
-  [/(?:claude-)?3[-.]?5-haiku/i, { input: 0.8, output: 4, cacheWrite: 1, cacheRead: 0.08 }],
-]
 
 function asObject(value: unknown): Record<string, unknown> | null {
   return typeof value === 'object' && value !== null && !Array.isArray(value) ? (value as Record<string, unknown>) : null
@@ -98,18 +82,6 @@ export function deduplicateClaudeUsage(records: readonly TokenUsageRecord[]): To
   })
 }
 
-function sonnetFivePrice(at: number): ModelPrice {
-  const standardStarts = new Date(2026, 8, 1).getTime()
-  return at < standardStarts
-    ? { input: 2, output: 10, cacheWrite: 2.5, cacheRead: 0.2 }
-    : { input: 3, output: 15, cacheWrite: 3.75, cacheRead: 0.3 }
-}
-
-export function claudeModelPrice(model: string, at = Date.now()): ModelPrice | null {
-  if (/(?:claude-)?sonnet-?5/i.test(model)) return sonnetFivePrice(at)
-  return PRICE_PATTERNS.find(([pattern]) => pattern.test(model))?.[1] ?? null
-}
-
 function localDay(at: number): string {
   const date = new Date(at)
   const year = date.getFullYear()
@@ -123,7 +95,11 @@ function dayStart(at: number): number {
   return new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime()
 }
 
-function aggregate(records: readonly TokenUsageRecord[], at: number): AgentDailyUsagePeriod {
+function aggregate(
+  records: readonly TokenUsageRecord[],
+  at: number,
+  pricing: AgentPricingPreferences,
+): AgentDailyUsagePeriod {
   const sorted = [...records].sort((left, right) => left.timestamp - right.timestamp)
   let inputTokens = 0
   let outputTokens = 0
@@ -132,15 +108,17 @@ function aggregate(records: readonly TokenUsageRecord[], at: number): AgentDaily
   let estimatedCostUsd = 0
   let estimatedCacheSavingsUsd = 0
   let pricingFallback = false
+  const unpricedModels = new Set<string>()
 
   for (const record of sorted) {
     inputTokens += record.inputTokens
     outputTokens += record.outputTokens
     cacheWriteTokens += record.cacheWriteTokens
     cacheReadTokens += record.cacheReadTokens
-    const price = claudeModelPrice(record.model, record.timestamp)
+    const price = claudeModelPrice(record.model, record.timestamp, pricing)
     if (!price) {
       pricingFallback = true
+      unpricedModels.add(record.model)
       continue
     }
     estimatedCostUsd +=
@@ -178,6 +156,7 @@ function aggregate(records: readonly TokenUsageRecord[], at: number): AgentDaily
     estimatedCostUsd: pricingFallback ? null : estimatedCostUsd,
     estimatedCacheSavingsUsd: pricingFallback ? null : estimatedCacheSavingsUsd,
     pricingFallback,
+    unpricedModels: [...unpricedModels].sort(),
   }
 }
 
@@ -220,6 +199,7 @@ async function recentJsonlFiles(root: string, since: number): Promise<{ files: s
 export async function analyzeClaudeDailyUsage(
   claudeDir: string,
   now = Date.now(),
+  pricing = emptyAgentPricingPreferences(),
 ): Promise<AgentDailyUsage> {
   const todayStart = dayStart(now)
   const yesterdayStart = new Date(
@@ -243,8 +223,8 @@ export async function analyzeClaudeDailyUsage(
   const today = deduplicated.filter((record) => localDay(record.timestamp) === todayKey)
   const yesterday = deduplicated.filter((record) => localDay(record.timestamp) === yesterdayKey)
   return {
-    today: aggregate(today, todayStart),
-    yesterday: aggregate(yesterday, yesterdayStart),
+    today: aggregate(today, todayStart, pricing),
+    yesterday: aggregate(yesterday, yesterdayStart, pricing),
     skippedFileCount,
   }
 }

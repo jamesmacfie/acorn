@@ -8,6 +8,7 @@ import type {
   AgentUsageQuota,
 } from '../../shared/usage'
 import { clampRemaining, usageHealth, worstUsageHealth } from '../../shared/usage'
+import type { AgentPricingPreferences } from '../../shared/pricing'
 import { analyzeClaudeDailyUsage } from './claudeDailyUsage'
 import {
   capturePty,
@@ -24,6 +25,7 @@ export type ClaudeUsageOptions = {
   probeDir: string
   configFile?: string
   claudeDir?: string
+  pricing?: AgentPricingPreferences
   now?: () => number
   runPty?: RunPty
 }
@@ -313,7 +315,7 @@ export async function collectClaudeUsage(options: ClaudeUsageOptions): Promise<A
       : parseClaudeUsageOutput(result.output, capturedAt, account)
   provider.account = account
   try {
-    provider.daily = await analyzeClaudeDailyUsage(claudeDir, capturedAt)
+    provider.daily = await analyzeClaudeDailyUsage(claudeDir, capturedAt, options.pricing)
   } catch {
     // Quota data remains useful when local history cannot be read.
   }

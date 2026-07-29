@@ -6,6 +6,7 @@ const IntegrationsSettings = lazy(() => import('../../core/client/settings/Integ
 const WorkspaceSettings = lazy(() => import('../../core/client/settings/WorkspaceSettings'))
 const McpSettings = lazy(() => import('../../core/client/settings/McpSettings'))
 const AgentToolsSettings = lazy(() => import('../../core/client/settings/AgentToolsSettings'))
+const AgentPricingSettings = lazy(() => import('../../plugins/agents/client/AgentPricingSettings'))
 const WorkflowsSettings = lazy(() => import('../../plugins/workflows/client/WorkflowsSettings'))
 const AppearanceSettings = lazy(() => import('../../core/client/settings/AppearanceSettings'))
 const TerminalSettings = lazy(() => import('../../plugins/terminal/client/TerminalSettings'))
@@ -31,6 +32,7 @@ export const settingsPageContributions: SettingsContribution[] = [
   { id: 'integrations', label: 'Integrations', group: 'general', order: 20, component: () => <IntegrationsSettings /> },
   { id: 'mcp', label: 'MCP', group: 'general', order: 30, component: () => <McpSettings /> },
   { id: 'agent-tools', label: 'Agent tools', group: 'general', order: 40, component: () => <AgentToolsSettings /> },
+  { id: 'agent-pricing', label: 'Agent pricing', group: 'general', order: 45, requires: 'desktop', component: () => <AgentPricingSettings /> },
   { id: 'workflows', label: 'Workflows', group: 'general', order: 50, requires: 'desktop', component: () => <WorkflowsSettings /> },
   { id: 'terminal', label: 'Terminal', group: 'general', order: 60, requires: 'desktop', component: () => <TerminalSettings /> },
   { id: 'docker', label: 'Docker', group: 'general', order: 65, component: () => <DockerSettings /> },

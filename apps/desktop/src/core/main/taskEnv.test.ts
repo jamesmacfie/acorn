@@ -42,6 +42,10 @@ describe('buildSessionEnv', () => {
 })
 
 describe('childEnv', () => {
+  it('advertises truecolor — agent TUIs downgrade to 256 colours without it', () => {
+    expect(childEnv({}).COLORTERM).toBe('truecolor')
+  })
+
   it('never leaks secrets and always sets TERM', () => {
     const env = childEnv({
       HOME: '/Users/x',

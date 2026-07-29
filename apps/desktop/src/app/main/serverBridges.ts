@@ -19,9 +19,13 @@ import { editorBridge } from '../../plugins/editor/main/editor'
 import { localGitBridge } from '../../plugins/changes/main/localGit'
 import { searchBridge } from '../../plugins/editor/main/search'
 import { createAgentUsageService } from '../../plugins/agents/main/usage/service'
+import { readAgentPricingPreferences } from '../../plugins/agents/server/pricingStore'
 
 export function wireServerBridges(db: AppDatabase, dataDir: string): void {
-  setAgentUsageBridge(createAgentUsageService({ probeDir: join(dataDir, 'agent-usage-probe') }))
+  setAgentUsageBridge(createAgentUsageService({
+    probeDir: join(dataDir, 'agent-usage-probe'),
+    pricingForUser: (userId) => readAgentPricingPreferences(db, userId),
+  }))
   setSearchBridge(searchBridge(db))
   setEditorBridge(editorBridge(db))
   setLocalGitBridge(localGitBridge(db))
