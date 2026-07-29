@@ -3,9 +3,9 @@
 // aren't terminal-specific live in core: path/checkout guards in core/main/pathGuards.ts, the
 // task-scoped child environment in core/main/taskEnv.ts.
 
-export const RING_CAP = 256 * 1024 // bytes of recent output kept per session, replayed on attach
+export const RING_CAP = 256 * 1024 // bytes of recent raw output kept for prompt detection / transcript-tail analysis
 
-// Keep only the last RING_CAP bytes of output for replay on attach.
+// Keep only the last RING_CAP bytes of raw output used by non-display consumers.
 export const trimRing = (ring: string): string => (ring.length > RING_CAP ? ring.slice(ring.length - RING_CAP) : ring)
 
 // Sanitize cols/rows from the (less-trusted) renderer to a sane integer (docs/security.md).

@@ -22,9 +22,9 @@ function installScrollAreaGuard() {
   }, true)
 }
 
-// One xterm bound to one live session over WebSocket (docs/terminal-and-agents.md). Keyed by session id in the parent, so
-// switching tabs unmounts this (detach, keep PTY running) and remounts a fresh xterm that replays
-// the ring buffer. ponytail: local scrollback beyond the ring is lost on tab switch — fine for now.
+// One xterm bound to one live session over WebSocket (docs/terminal-and-agents.md). Keyed by session
+// id in the parent, so switching tabs unmounts this (detach, keep PTY running) and remounts a fresh
+// xterm restored from main's canonical headless framebuffer.
 export default function TerminalSurface(props: { sessionId: string; fontSize: number; onExit?: (exitCode: number | null) => void }) {
   const api = terminalApi()
   let host!: HTMLDivElement
@@ -88,8 +88,8 @@ export default function TerminalSurface(props: { sessionId: string; fontSize: nu
     const unwatchAppearance = watchAppearance(applyAppearance)
 
     let detach: (() => void) | undefined
-    // Size the PTY to the fitted dims BEFORE attaching, so the replayed ring + repaint land at the
-    // right width — a mismatched width reflows the replayed TUI frame into garbage.
+    // Size the PTY and main-owned framebuffer to the fitted dims BEFORE attaching, so the serialized
+    // screen and subsequent TUI redraws share the renderer's width.
     void api.resize(props.sessionId, term.cols, term.rows).then(() => {
       if (disposed) return
       detach = api.attach(props.sessionId, (m) => {

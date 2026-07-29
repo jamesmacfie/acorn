@@ -85,7 +85,7 @@ describe('wsHub auth', () => {
 })
 
 describe('wsHub streaming', () => {
-  it('replays ready + ring BEFORE any live frame on attach, and routes input', async () => {
+  it('delivers ready + initial screen BEFORE any live frame on attach, and routes input', async () => {
     const inputs: string[] = []
     let liveSink: StreamSink | null = null
     setStreamHandlers({
@@ -93,7 +93,7 @@ describe('wsHub streaming', () => {
       attach: (_id, sink) => {
         liveSink = sink
         sink({ type: 'ready', session: { id: 's1' } as never, replayed: true })
-        sink({ type: 'output', data: 'RING' })
+        sink({ type: 'output', data: 'SCREEN' })
       },
       detach: () => {},
     })
@@ -101,13 +101,13 @@ describe('wsHub streaming', () => {
     const got = frames(ws)
     ws.send(JSON.stringify({ channel: 'term:attach', id: 's1' }))
     await tick()
-    // a live frame after replay
+    // a live frame after the initial screen
     liveSink!({ type: 'output', data: 'LIVE' } satisfies ServerMsg)
     await tick()
     const outs = got.filter((f) => f.channel === 'term:out') as Extract<WsServerFrame, { channel: 'term:out' }>[]
     expect(outs.map((f) => f.msg.type)).toEqual(['ready', 'output', 'output'])
-    expect(outs[1].msg).toMatchObject({ data: 'RING' })
-    expect(outs[2].msg).toMatchObject({ data: 'LIVE' }) // live strictly after replay
+    expect(outs[1].msg).toMatchObject({ data: 'SCREEN' })
+    expect(outs[2].msg).toMatchObject({ data: 'LIVE' }) // live strictly after the screen restore
 
     ws.send(JSON.stringify({ channel: 'term:input', id: 's1', data: 'ls\n' }))
     await tick()

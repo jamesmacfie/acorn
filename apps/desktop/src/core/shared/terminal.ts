@@ -155,7 +155,7 @@ export type LocalChange = {
 // Pushed from main to a subscribed renderer inside a `term:out` WebSocket frame (shared/ws.ts;
 // wsHub → wsClient). Was per-session IPC (`term:out:<id>`) before the WebSocket transport.
 export type ServerMsg =
-  | { type: 'ready'; session: TerminalSession; replayed: boolean }
+  | { type: 'ready'; session: TerminalSession; replayed: boolean } // replayed = a canonical display snapshot follows
   | { type: 'output'; data: string }
   | { type: 'exit'; exitCode: number | null; signal: string | null }
   | { type: 'error'; code: string; message: string }

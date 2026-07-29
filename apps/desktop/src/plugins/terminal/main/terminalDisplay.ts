@@ -1,0 +1,174 @@
+import { createRequire } from 'node:module'
+import type { ServerMsg, TerminalSession } from '../../../core/shared/terminal'
+
+const require = createRequire(import.meta.url)
+
+type HeadlessTerminal = {
+  write(data: string, callback?: () => void): void
+  resize(cols: number, rows: number): void
+  loadAddon(addon: { activate(terminal: unknown): void; dispose(): void }): void
+  dispose(): void
+}
+
+type SerializeAddon = {
+  activate(terminal: unknown): void
+  serialize(options?: { scrollback?: number }): string
+  dispose(): void
+}
+
+const { Terminal } = require('@xterm/headless') as {
+  Terminal: new (options: { cols: number; rows: number; scrollback: number; allowProposedApi: boolean }) => HeadlessTerminal
+}
+const { SerializeAddon } = require('@xterm/addon-serialize') as {
+  SerializeAddon: new () => SerializeAddon
+}
+
+export const DISPLAY_SCROLLBACK_LINES = 1_000
+export const DISPLAY_RESET = '\x1bc'
+
+export type TerminalScreen = {
+  write(data: string): void
+  resize(cols: number, rows: number): void
+  snapshot(): Promise<string>
+  dispose(): void
+}
+
+export type TerminalDisplaySink = (message: ServerMsg) => void
+
+// The PTY stream is a sequence of cursor operations, not a screen that can safely be replayed from
+// an arbitrary byte offset. Keep a real terminal framebuffer in main and serialize that canonical
+// state whenever a renderer attaches. Operations share one promise chain so a snapshot is an exact
+// barrier: output received after it is requested cannot leak into the snapshot.
+export class HeadlessTerminalScreen implements TerminalScreen {
+  private readonly terminal: HeadlessTerminal
+  private readonly serializer: SerializeAddon
+  private pending: Promise<void> = Promise.resolve()
+  private disposed = false
+
+  constructor(cols: number, rows: number) {
+    this.terminal = new Terminal({
+      cols,
+      rows,
+      scrollback: DISPLAY_SCROLLBACK_LINES,
+      // addon-serialize reads the headless buffer API, which xterm 5.5 still marks proposed.
+      allowProposedApi: true,
+    })
+    this.serializer = new SerializeAddon()
+    this.terminal.loadAddon(this.serializer)
+  }
+
+  write(data: string): void {
+    if (!data || this.disposed) return
+    this.enqueue(() => new Promise<void>((resolve) => this.terminal.write(data, resolve)))
+  }
+
+  resize(cols: number, rows: number): void {
+    if (this.disposed) return
+    this.enqueue(() => {
+      this.terminal.resize(cols, rows)
+    })
+  }
+
+  snapshot(): Promise<string> {
+    if (this.disposed) return Promise.resolve('')
+    let snapshot = ''
+    const done = this.enqueue(() => {
+      snapshot = this.serializer.serialize({ scrollback: DISPLAY_SCROLLBACK_LINES })
+    })
+    return done.then(() => snapshot)
+  }
+
+  dispose(): void {
+    if (this.disposed) return
+    this.disposed = true
+    // Let an in-flight write callback settle before tearing down xterm's parser.
+    void this.pending.then(
+      () => this.terminal.dispose(),
+      () => this.terminal.dispose(),
+    )
+  }
+
+  private enqueue(operation: () => void | Promise<void>): Promise<void> {
+    const run = async () => {
+      if (!this.disposed) await operation()
+    }
+    // Recover the queue after an individual emulator failure so later PTY output can still render.
+    this.pending = this.pending.then(run, run)
+    return this.pending
+  }
+}
+
+type PendingAttachment = { frames: ServerMsg[] }
+
+// Owns renderer attachment ordering around the framebuffer above. While a snapshot is being
+// serialized, live frames are retained per attaching sink. The sink receives:
+//   ready → reset + canonical snapshot → every frame published after the snapshot barrier.
+export class TerminalDisplay {
+  private readonly live = new Set<TerminalDisplaySink>()
+  private readonly attaching = new Map<TerminalDisplaySink, PendingAttachment>()
+  private hasOutput = false
+
+  constructor(
+    cols: number,
+    rows: number,
+    private readonly screen: TerminalScreen = new HeadlessTerminalScreen(cols, rows),
+  ) {}
+
+  write(data: string): void {
+    if (!data) return
+    this.hasOutput = true
+    this.screen.write(data)
+  }
+
+  resize(cols: number, rows: number): void {
+    this.screen.resize(cols, rows)
+  }
+
+  publish(message: ServerMsg): void {
+    for (const sink of this.live) sink(message)
+    for (const pending of this.attaching.values()) pending.frames.push(message)
+  }
+
+  attach(sink: TerminalDisplaySink, session: TerminalSession): void {
+    const replayed = this.hasOutput
+    sink({ type: 'ready', session, replayed })
+    if (!replayed) {
+      this.live.add(sink)
+      return
+    }
+
+    // snapshot() installs its barrier synchronously. Any later publish belongs after the snapshot
+    // and is captured in this attachment's frame queue until activate() transfers it to live.
+    const snapshot = this.screen.snapshot()
+    const pending: PendingAttachment = { frames: [] }
+    this.attaching.set(sink, pending)
+    void snapshot
+      .then((data) => {
+        if (this.attaching.get(sink) !== pending) return
+        if (data) sink({ type: 'output', data: `${DISPLAY_RESET}${data}` })
+        this.activate(sink, pending)
+      })
+      .catch(() => {
+        if (this.attaching.get(sink) !== pending) return
+        sink({ type: 'error', code: 'screen_snapshot_failed', message: 'Could not restore the terminal display.' })
+        this.activate(sink, pending)
+      })
+  }
+
+  detach(sink: TerminalDisplaySink): void {
+    this.attaching.delete(sink)
+    this.live.delete(sink)
+  }
+
+  dispose(): void {
+    this.attaching.clear()
+    this.live.clear()
+    this.screen.dispose()
+  }
+
+  private activate(sink: TerminalDisplaySink, pending: PendingAttachment): void {
+    this.attaching.delete(sink)
+    this.live.add(sink)
+    for (const frame of pending.frames) sink(frame)
+  }
+}

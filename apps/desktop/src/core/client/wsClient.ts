@@ -52,8 +52,8 @@ function connect(): void {
   const sock = new WebSocket(wsUrl())
   ws = sock
   sock.onopen = () => {
-    // Re-attach every live subscription so a reconnect (or a reload) re-subscribes the PTY and
-    // replays its ring — the server treats attach as idempotent per connection.
+    // Re-attach every live subscription so a reconnect (or reload) re-subscribes the PTY and
+    // restores its canonical display snapshot — the server treats attach as idempotent per connection.
     for (const id of outputSubs.keys()) sock.send(JSON.stringify({ channel: 'term:attach', id } satisfies WsClientFrame))
     for (const key of dockerStreamSubs.keys()) {
       const [kind, id] = splitStreamKey(key)
@@ -109,8 +109,8 @@ function scheduleReconnect(): void {
 }
 
 // Subscribe to one session's output; returns an unsubscribe. Detaching keeps the PTY running.
-// Only the first local subscriber per session sends the attach frame (the server replays once per
-// connection); the last unsubscribe detaches.
+// Only the first local subscriber per session sends the attach frame (the server restores one
+// display snapshot per connection); the last unsubscribe detaches.
 export function wsAttach(id: string, on: OutputCb): () => void {
   let set = outputSubs.get(id)
   const first = !set

@@ -148,7 +148,7 @@ export function attachPublicWsHub(server: Server, deps: PublicWsDeps): PublicWsH
       else if (msg.type === 'error') sendError(conn, undefined, msg.code, msg.message)
     }
     conn.terminalSinks.set(sessionId, sink)
-    handlers.attach(sessionId, sink) // pushes ready + ring replay before live output
+    handlers.attach(sessionId, sink) // engine restores the canonical screen before queued live output
     ack(conn, frameId)
   }
 
