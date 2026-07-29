@@ -1,5 +1,6 @@
 import { createEffect, createSignal, For, onMount, Show } from 'solid-js'
 import { editorApi, type EditorEntry } from './editorClient'
+import { editorTreeDirectoryOpen, setEditorTreeDirectoryOpen } from './editorTreeState'
 import { directoryContainsFile, type FileTreeRevealRequest } from './fileTreeReveal'
 
 export default function FileTree(props: {
@@ -65,9 +66,10 @@ function TreeNode(props: {
   reveal: FileTreeRevealRequest | null
   onRevealed: (revision: number) => void
 }) {
-  const [open, setOpen] = createSignal(false)
   let fileButton: HTMLButtonElement | undefined
   const path = () => (props.parent ? `${props.parent}/${props.entry.name}` : props.entry.name)
+  const open = () => editorTreeDirectoryOpen(props.taskId, path())
+  const setOpen = (value: boolean) => setEditorTreeDirectoryOpen(props.taskId, path(), value)
 
   createEffect(() => {
     const request = props.reveal

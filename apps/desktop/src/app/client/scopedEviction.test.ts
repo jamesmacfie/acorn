@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { editorOpen, openFiles } from '../../plugins/editor/client/editorState'
+import { editorTreeDirectoryOpen, setEditorTreeDirectoryOpen } from '../../plugins/editor/client/editorTreeState'
 import { editorViewState, rememberEditorViewState } from '../../plugins/editor/client/editorViewState'
 import { prFilterFor, setPrFilter } from '../../plugins/github/client/pullList/filterState'
 import { rememberReviewDiffScroll, reviewDiffScroll } from '../../plugins/github/client/reviewViewState'
@@ -35,6 +36,7 @@ describe('scoped lifecycle eviction', () => {
     setFocusedPane(taskId, 'editor')
     setMaximizedPane(taskId, 'editor')
     editorOpen(taskId, 'src/a.ts', false)
+    setEditorTreeDirectoryOpen(taskId, 'src', true)
     const reviewScope = { taskId, routeKey: 'oak/acorn#42' }
     rememberReviewDiffScroll(reviewScope, {
       top: 4_800,
@@ -59,6 +61,7 @@ describe('scoped lifecycle eviction', () => {
     expect(focusedPane(taskId)).toBeUndefined()
     expect(maximizedPane(taskId)).toBeUndefined()
     expect(openFiles(taskId)).toEqual([])
+    expect(editorTreeDirectoryOpen(taskId, 'src')).toBe(false)
     expect(reviewDiffScroll(reviewScope)).toBeUndefined()
     expect(activeTerminal(taskId)).toBeUndefined()
     expect(consumePaneIntent(taskId, 'editor')).toBeUndefined()

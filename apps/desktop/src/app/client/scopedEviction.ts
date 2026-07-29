@@ -3,6 +3,7 @@ import { evictContextSelection } from '../../plugins/context/client/selectionSta
 import { evictSyncState } from '../../plugins/context/client/syncState'
 import { evictNotesPaneState } from '../../plugins/notes/client/notesPaneState'
 import { evictEditorState } from '../../plugins/editor/client/editorState'
+import { evictEditorTreeState } from '../../plugins/editor/client/editorTreeState'
 import { evictEditorViewStates } from '../../plugins/editor/client/editorViewState'
 import { evictPrFilter } from '../../plugins/github/client/pullList/filterState'
 import { evictReviewViewStates } from '../../plugins/github/client/reviewViewState'
@@ -16,6 +17,7 @@ export function activateScopedStateEviction(): () => void {
   const offTask = clientEvents.on('runtime:task-archived', ({ taskId }) => {
     evictTaskState(taskId)
     evictEditorState(taskId)
+    evictEditorTreeState(taskId)
     evictEditorViewStates(taskId)
     evictReviewViewStates(taskId)
     evictActiveTerminal(taskId)
