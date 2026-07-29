@@ -609,8 +609,9 @@ The renderer↔main contract is:
 - **Streams → one authenticated WebSocket** at `/ws` (`core/shared/ws.ts`, `core/main/wsHub.ts`,
   `core/client/wsClient.ts`). Kind-tagged frames carry `term:out` (PTY output,
   coalesced to ~16 ms), `term:input`, attach/detach, the `term:status` + `workflow:notice` pings,
-  and a reserved `workflow:step:event`. Attach replays `ready` + the ring buffer synchronously
-  before any live frame (deterministic replay-before-live). The upgrade is authorized on the shared
+  and a reserved `workflow:step:event`. Attach sends `ready`, then a serialized canonical terminal
+  framebuffer, then any live frames buffered while serialization ran (deterministic
+  snapshot-before-live ordering). The upgrade is authorized on the shared
   loopback listener: Host guard + exact-Origin + a valid session cookie, or the internal token for
   the loopback MCP caller — anything else is a 403 before the handshake.
 - **IPC residue (`preload.ts`) — only true Electron capabilities:** the `preview:*` browser-preview
