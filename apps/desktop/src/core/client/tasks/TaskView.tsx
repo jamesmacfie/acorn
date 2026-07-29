@@ -20,6 +20,7 @@ import TaskPaneHost from './TaskPaneHost'
 import { confirmWillEvent } from '../registries/willPhase'
 import { TaskSlotHost } from '../registries/uiSlots'
 import { completeTaskArchive } from './archiveLifecycle'
+import CopyButton from '../ui/CopyButton'
 import './task-view.css'
 
 export default function TaskView(props: {
@@ -247,10 +248,13 @@ export default function TaskView(props: {
         </Show>
       </main>
       <footer class="workspace-footer">
-        <Show when={props.task.worktreePath} fallback={<span class="muted">No worktree yet — created on first terminal.</span>}>
+        <Show when={props.task.worktreePath} fallback={<span class="workspace-footer-worktree">no worktree</span>}>
           {(path) => (
             <>
-              <span class="workspace-footer-path" title={path()}>worktree: {path()}</span>
+              <span class="workspace-footer-worktree">
+                worktree
+                <CopyButton class="workspace-footer-copy" text={path} title="Copy worktree path" />
+              </span>
               <span class="workspace-footer-branch">⎇ {props.task.branch}</span>
               <TaskSlotHost slot="task.footer" taskId={props.task.id} />
               <Show when={status()?.missing}><span class="workspace-footer-repair">⚠ needs repair (removed on disk)</span></Show>
