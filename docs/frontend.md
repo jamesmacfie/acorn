@@ -25,13 +25,15 @@ State is deliberately split three ways, with no other store:
 
 `index.tsx` mounts the app and owns cross-cutting cache concerns:
 
-- Constructs a **single** `QueryClient` with `refetchOnWindowFocus: true` and `gcTime: 24h`. The
-  long `gcTime` is required so persisted entries outlive a session and survive reload
-  (`apps/desktop/src/app/client/index.tsx:21`).
+- Constructs a **single** `QueryClient` with `refetchOnWindowFocus: true`, a 30s default
+  `staleTime`, and `gcTime: 24h`. The freshness window prevents a quick app switch from refetching
+  every active query; genuinely live resources override it. The long `gcTime` lets persisted
+  entries outlive a session and survive reload.
 - Wraps the tree in `PersistQueryClientProvider`, persisting the bounded cache to **IndexedDB** via
-  `idb-keyval` under key `acorn-cache` (`maxAge` 24h, 2s write throttle). File bodies and
+  `idb-keyval` under key `acorn-cache` (`maxAge` 24h, 5s write throttle). File bodies and
   patch-bearing queries are excluded because the loopback API/on-disk blob cache reconstructs them;
-  TanStack's successful-query-only gate also excludes pending and failed queries.
+  TanStack's successful-query-only gate also excludes pending and failed queries. A per-query 24h
+  age gate prevents regularly rewritten snapshots from carrying old PR data forward indefinitely.
 - A global `QueryCache`/`MutationCache` `onError` bounces to `/auth/login?return_to=…` whenever an
   error message matches `/\b401\b|reauth|unauthenticated/` — a revoked/expired token surfaces as a
   401 from any read or write. The `me` query returns `null` on 401 (the valid logged-out state) so
@@ -111,6 +113,12 @@ route, and are reused by the rail rows, ⌘1–9, and the palette's Go-to-task. 
 (`SettingsModal`, `OnboardingModal`, `TerminalPanel`, `CommandPalette`, `FilePalette`) and the
 global `Shortcuts` handler are mounted after the switch, independent of the active mode.
 
+The shell, task/source registries, and PR list are in the startup chunk. Conditional screens and
+plugin contributions use Solid `lazy` boundaries: PR detail/diff, Monaco-backed panes, terminal,
+settings pages, provider browsers, and task panes load when selected. `pnpm build` enforces the
+critical HTML script/modulepreload and stylesheet budgets in
+`scripts/check-renderer-budget.mjs`.
+
 `TaskView` is keyed by `activeTaskId`: switching or archiving a task disposes the old task-owned
 component scope before the replacement mounts. The archive lifecycle event then performs final
 T3/T4 eviction after component cleanup has published any last session-only view state.
@@ -177,7 +185,7 @@ path as plain same-origin cookie `fetch` via the thin `apiClient.ts` (`readJson`
 where `readJson(..., { nullOn401: true })` powers the logged-out `me` state). Writes live in
 `mutations.ts` and POST/PUT/DELETE to the same route builders (the server checks `Origin` for CSRF).
 
-Refetch behaviour is tuned per query rather than globally:
+Refetch behaviour starts with the 30s default freshness window and is tightened per query:
 
 - **Polled:** `pullsOptions` refetches every 60s; `tasksOptions` refetches on focus (keeps
   dirty/PR markers fresh).
@@ -186,11 +194,11 @@ Refetch behaviour is tuned per query rather than globally:
 - **Immutable → `staleTime: Infinity`:** `fileBlobOptions` (body keyed by immutable SHA) and
   `jobLogOptions` (a completed job's log never changes). See [caching.md](./caching.md).
 
-`prefetch.ts` warms the open-PR list in the background after it loads — batch-fetching each PR's
-detail + file summaries (`CHUNK` 5, `CONCURRENCY` 2) and seeding the per-PR caches for an instant
-first paint, abortable on repo switch, and `seedIfNotNewer` so it never overwrites fresher data.
-It also exposes `schedulePullSummaryPrefetch`, an 80ms-debounced per-row hover prefetch. Patch
-bodies are deliberately **not** warmed — they stay intent-driven in `DiffView` (see
+`prefetch.ts` warms only the first five open PRs in the background after the list loads, seeding
+detail + file-summary caches for the most likely navigation. This bound prevents network, SQLite,
+JSON parsing, memory, and IndexedDB work from scaling with every open PR in a repo. Remaining rows
+use `schedulePullSummaryPrefetch`, an 80ms-debounced hover/focus prefetch. All warming is abortable
+on repo switch and uses `seedIfNotNewer`; patch bodies remain intent-driven in `DiffView` (see
 [diff-rendering.md](./diff-rendering.md)).
 
 ### IndexedDB persistence
@@ -209,7 +217,7 @@ prefs). They export getters + mutators in the codebase's single-writer style:
 | --- | --- |
 | `core/client/tasks/tasks.ts` | `selectedSource`, `activeTaskId`, and per-task `taskLayouts` (all layout transitions go through `dispatchLayout` → the pure `applyLayoutAction` reducer); plus per-task terminal-open and recipe-browser-URL state. |
 | `core/client/tasks/agentSessions.ts` | The live agent/terminal session list + a single `onStatus` subscription, so the rail/topbar can show agent-working activity even with the drawer closed. |
-| `core/client/tasks/taskStatus.ts` | Live worktree status per task (dirty count / `missing`), 5s-polled + `onStatus` edges. |
+| `core/client/tasks/taskStatus.ts` | Live worktree status per task (dirty count / `missing`), 10s-polled + `onStatus` edges; unchanged snapshots preserve signal identity. |
 | `core/client/notifications/notifications.ts` | The bounded in-memory notice ring (mirrored to the `notices` pref) + pure edge detection over session snapshots. |
 | `plugins/editor/client/editorState.ts` | Open-file tabs per task (mirrored to `editor:open-files:<taskId>`). |
 

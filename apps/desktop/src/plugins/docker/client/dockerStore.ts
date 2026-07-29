@@ -57,12 +57,25 @@ export const dockerTaskSummary = (taskId: string): DockerTaskSummary | undefined
 
 export const refreshDockerTaskSummaries = latestOnly(
   () => fetchTaskSummaries().catch(() => [] as DockerTaskSummary[]), // unavailable daemon → no links
-  (list) => setTaskSummaries(Object.fromEntries(list.map((s) => [s.taskId, s]))),
+  (list) => setTaskSummaries((current) => {
+    if (
+      Object.keys(current).length === list.length
+      && list.every((summary) => {
+        const previous = current[summary.taskId]
+        return previous
+          && previous.total === summary.total
+          && previous.running === summary.running
+          && previous.projects.length === summary.projects.length
+          && previous.projects.every((project, index) => project === summary.projects[index])
+      })
+    ) return current
+    return Object.fromEntries(list.map((summary) => [summary.taskId, summary]))
+  }),
 )
 
 export const dockerTaskPollerContribution: PollerContribution = {
   id: 'docker.task-containers',
-  intervalMs: 10_000,
+  intervalMs: 15_000,
   run: refreshDockerTaskSummaries,
   subscribe: (refresh) => wsOnDockerChanged((scopes) => {
     if (scopes.includes('containers')) refresh()

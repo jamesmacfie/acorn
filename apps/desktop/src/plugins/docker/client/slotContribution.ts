@@ -1,6 +1,8 @@
+import { lazy } from 'solid-js'
 import type { TaskSlotContribution } from '../../../core/client/registries/uiSlots'
-import DockerFooterBadge from './DockerFooterBadge'
-import DockerRailBadge from './DockerRailBadge'
+
+const DockerFooterBadge = lazy(() => import('./DockerFooterBadge'))
+const DockerRailBadge = lazy(() => import('./DockerRailBadge'))
 
 export const dockerFooterSlotContribution: TaskSlotContribution = {
   id: 'docker-footer-badge',

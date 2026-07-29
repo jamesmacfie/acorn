@@ -248,7 +248,7 @@ route tests as their verification method, so this list and §2.2's sweep are the
 - **CLAUDE.md path-prefix consistency** (§2.3 above) — cosmetic, ride the docs pass.
 - **`ponytail:` debt ledger:** 54 deliberate-shortcut markers in tree. Not action items, but
   worth harvesting into a visible ledger once so the ceilings they name (e.g. the preview
-  occlusion centre-point probe, the 5s task-status poll) are tracked decisions rather than
+  occlusion centre-point probe, the 10s task-status poll) are tracked decisions rather than
   archaeology.
 
 ---

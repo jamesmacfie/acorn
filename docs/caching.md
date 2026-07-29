@@ -214,20 +214,30 @@ The SPA uses TanStack Query as a stale-while-revalidate cache and persists it to
 IndexedDB via `idb-keyval`. From `apps/desktop/src/app/client/index.tsx`:
 
 ```ts
-defaultOptions: { queries: { refetchOnWindowFocus: true, gcTime: 1000 * 60 * 60 * 24 } }
+defaultOptions: {
+  queries: {
+    refetchOnWindowFocus: true,
+    staleTime: 30_000,
+    gcTime: 1000 * 60 * 60 * 24,
+  },
+}
 ```
 
 - **`gcTime`: 24h** (`1000 * 60 * 60 * 24`). Deliberately long so persisted
   entries survive a reload — that's what enables offline browsing of
   recently-seen PRs.
-- **`refetchOnWindowFocus: true`** — refocusing the tab revalidates, keeping the
-  serve-then-revalidate feel on the client.
+- **`staleTime: 30s`** — rapid app switches do not fan out across every active query. Resources
+  that need tighter freshness override it.
+- **`refetchOnWindowFocus: true`** — refocusing revalidates data once it is stale, keeping the
+  serve-then-revalidate feel without a request burst on every focus edge.
 
-The persister stores under key `acorn-cache` with `maxAge` 24h and a 2-second write throttle.
+The persister stores under key `acorn-cache` with `maxAge` 24h and a 5-second write throttle.
 It keeps TanStack's successful-query-only dehydration gate; pending Promises and failed queries are
 never serialized. `persistence/queryPersistence.ts` additionally excludes immutable file bodies and
 every patch-bearing files query because those payloads are reconstructable from the loopback API and
-on-disk blob cache. On render the app shows the remaining last-known data instantly, then refetches.
+on-disk blob cache. It also applies a per-query 24h cutoff: `maxAge` alone timestamps the whole
+snapshot, so a regularly used app could otherwise rewrite the snapshot and preserve long-dead PR
+entries forever. On render the app shows the remaining last-known data instantly, then refetches.
 
 This cache is **per-user and private**. On logout the app wipes it
 (`window.addEventListener('acorn:logout', () => void clear())`) so the next

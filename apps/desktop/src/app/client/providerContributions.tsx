@@ -1,14 +1,16 @@
+import { lazy } from 'solid-js'
 import type { PaneContribution } from '../../core/client/registries/panes'
 import { paneRegistry } from '../../core/client/registries/panes'
 import type { SourceContribution } from '../../core/client/registries/sources'
 import { sourceRegistry } from '../../core/client/registries/sources'
-import LinearBrowse from '../../plugins/linear/client/LinearBrowse'
-import RollbarBrowse from '../../plugins/rollbar/client/RollbarBrowse'
 import { linearPaneContribution, rollbarPaneContribution } from './taskPaneContributions'
 import { contentLinkRegistry, linearContentLinkContribution, type ContentLinkContribution } from '../../plugins/github/client/contentLinks'
 import type { LinearProjectIssue, RollbarItemSummary } from '../../core/shared/api'
 import { addTaskLink, createTask } from '../../core/client/tasks/mutations'
 import { prepareLinearPromotion, prepareRollbarPromotion } from '../../core/client/integrations/providerPromotion'
+
+const LinearBrowse = lazy(() => import('../../plugins/linear/client/LinearBrowse'))
+const RollbarBrowse = lazy(() => import('../../plugins/rollbar/client/RollbarBrowse'))
 
 export type ClientIntegrationProviderContribution = {
   id: string

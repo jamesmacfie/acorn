@@ -7,8 +7,8 @@
   "scripts": {
     "dev": "electron-vite build && electron-vite preview",
     "dev:node": "node --import tsx --watch --env-file=.env src/app/server/devNode.ts",
-    "build": "electron-vite build",
-    "dist": "electron-vite build && electron-builder --mac",
+    "build": "electron-vite build && node scripts/check-renderer-budget.mjs",
+    "dist": "pnpm run build && electron-builder --mac",
     "electron:dev": "electron-vite dev",
     "electron:rebuild": "electron-rebuild -f -w better-sqlite3,node-pty",
     "node:rebuild": "node scripts/rebuild-node-abi.mjs",

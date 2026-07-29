@@ -1,5 +1,7 @@
+import { lazy } from 'solid-js'
 import type { PaneContribution } from '../../../core/client/registries/panes'
-import HttpTaskPane from './HttpTaskPane'
+
+const HttpTaskPane = lazy(() => import('./HttpTaskPane'))
 
 // No `requires: 'desktop'`: the executor is plain Node in the Hono server with no bridge, so this
 // pane works under `dev:node` too. Command-derived variables need a checkout, but that degrades to

@@ -1,5 +1,7 @@
 import { defaultShouldDehydrateQuery, type Query, type QueryKey } from '@tanstack/solid-query'
 
+export const PERSISTED_QUERY_MAX_AGE_MS = 24 * 60 * 60 * 1000
+
 // File bodies and patch-bearing file queries are reconstructable from the loopback API/blob cache
 // and dominate IndexedDB size. Summaries remain useful offline because they contain no patch body.
 export const shouldPersistQueryKey = (key: QueryKey): boolean => {
@@ -10,6 +12,10 @@ export const shouldPersistQueryKey = (key: QueryKey): boolean => {
 
 // Supplying a custom TanStack dehydration predicate replaces its default predicate. Preserve the
 // success-state gate explicitly: pending queries contain live Promises that cannot survive JSON
-// persistence, while failed queries are not useful offline cache entries.
+// persistence, while failed queries are not useful offline cache entries. The persister's maxAge
+// applies to the snapshot as a whole; without this per-entry gate, opening Acorn regularly refreshes
+// the snapshot timestamp and can carry years-old PRs forward forever.
 export const shouldPersistQuery = (query: Query): boolean =>
-  defaultShouldDehydrateQuery(query) && shouldPersistQueryKey(query.queryKey)
+  defaultShouldDehydrateQuery(query)
+  && shouldPersistQueryKey(query.queryKey)
+  && query.state.dataUpdatedAt >= Date.now() - PERSISTED_QUERY_MAX_AGE_MS

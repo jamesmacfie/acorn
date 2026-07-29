@@ -290,8 +290,14 @@ export default function TabRail() {
       <div class="tabrail-list">
         <For each={visibleTasks()}>
           {(w) => {
-            // PR checks dot (warmed/fetched detail) and live worktree status (dirty / vanished).
-            const detail = createQuery(() => pullDetailOptions(w.repoOwner, w.repoName, w.pullNumber != null ? String(w.pullNumber) : '', w.pullNumber != null))
+            // PR checks dot reads an already-warmed detail only. Enabling this observer used to turn
+            // every visible linked task into a full composite PR refresh during startup/refocus.
+            const detail = createQuery(() => pullDetailOptions(
+              w.repoOwner,
+              w.repoName,
+              w.pullNumber != null ? String(w.pullNumber) : '',
+              false,
+            ))
             const checks = () => detail.data?.checks ?? []
             const st = () => taskStatus(w.id)
             // Active rail markers — one source of truth for the overlay icons below and the hover
