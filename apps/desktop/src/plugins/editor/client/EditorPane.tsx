@@ -3,13 +3,17 @@ import * as monaco from 'monaco-editor'
 import './monacoSetup'
 import type { Task } from '../../../core/client/queries'
 import { debounce } from '../../../core/client/lib/debounce'
-import { editorApi, type EditorEntry } from './editorClient'
+import { editorApi } from './editorClient'
 import { formatFileReference, sendReferenceToAgent } from '../../../core/client/agent/reference'
 import { isAppDark, token, watchAppearance } from '../../../core/client/ui/appearance'
 import { onClosePaneWithin } from '../../../core/client/lib/onClosePaneWithin'
 import { activeFile, editorActivate, editorClose, editorOpen, editorPromote, editorSetDirty, openFiles } from './editorState'
 import { clientEvents, consumePaneIntent, type PaneIntent } from '../../../core/client/registries/clientEvents'
 import { editorViewState, rememberEditorViewState } from './editorViewState'
+import { registerCommands } from '../../../core/client/registries/commands'
+import { activeTaskId, focusedPane } from '../../../core/client/tasks/tasks'
+import FileTree from './FileTree'
+import { canRevealActiveFile, type FileTreeRevealRequest } from './fileTreeReveal'
 import './editor.css'
 
 // Minimal filename → Monaco language id. Anything unmapped falls back to plaintext (still editable,
@@ -54,6 +58,8 @@ export default function EditorPane(props: { task: Task }) {
   const [root, setRoot] = createSignal<string | null | undefined>(undefined) // undefined = loading
   const [saveErr, setSaveErr] = createSignal('')
   const [pendingReveal, setPendingReveal] = createSignal<{ path: string; line: number } | null>(null)
+  const [treeReveal, setTreeReveal] = createSignal<FileTreeRevealRequest | null>(null)
+  let treeRevealRevision = 0
 
   let host: HTMLDivElement | undefined
   let editor: monaco.editor.IStandaloneCodeEditor | undefined
@@ -74,6 +80,30 @@ export default function EditorPane(props: { task: Task }) {
   onClosePaneWithin(() => paneRef, () => {
     const p = active()
     if (p) void close(p)
+  })
+
+  const revealActiveFile = () => {
+    const path = active()
+    if (path) setTreeReveal({ path, revision: ++treeRevealRevision })
+  }
+
+  onMount(() => {
+    const commands = registerCommands([{
+      id: 'editor.tree.reveal-active-file',
+      title: 'Reveal active file in editor tree',
+      category: 'navigation',
+      hint: () => active() ?? undefined,
+      palette: true,
+      when: () => canRevealActiveFile({
+        paneTaskId: taskId,
+        activeTaskId: activeTaskId(),
+        focusedPane: focusedPane(taskId),
+        activeFile: active(),
+        treeAvailable: !!root(),
+      }),
+      run: revealActiveFile,
+    }])
+    onCleanup(() => commands.dispose())
   })
 
   // Autosave (no Save button): debounce while typing, flush on blur / tab-switch / close.
@@ -245,7 +275,15 @@ export default function EditorPane(props: { task: Task }) {
         <Show when={root()} fallback={<div class="editor-empty muted">Open a terminal first to map this repo's checkout.</div>}>
           <div class="editor-layout">
             <div class="editor-tree">
-              <Tree taskId={taskId} relPath="" onOpen={(p) => openPath(p, true)} openPath={active()} />
+              <FileTree
+                taskId={taskId}
+                onOpen={(p) => openPath(p, true)}
+                openPath={active()}
+                reveal={treeReveal()}
+                onRevealed={(revision) => {
+                  setTreeReveal((request) => request?.revision === revision ? null : request)
+                }}
+              />
             </div>
             <div class="editor-main">
               <div class="editor-tabs">
@@ -293,49 +331,5 @@ export default function EditorPane(props: { task: Task }) {
         </Show>
       </Show>
     </section>
-  )
-}
-
-// A directory's children, listed lazily on mount (so a folder's contents load only when expanded).
-function Tree(props: { taskId: string; relPath: string; onOpen: (p: string) => void; openPath: string | null }) {
-  const api = editorApi()
-  const [entries, setEntries] = createSignal<EditorEntry[]>([])
-  onMount(() => {
-    void (async () => {
-      if (api) setEntries(await api.list(props.taskId, props.relPath))
-    })()
-  })
-  return (
-    <ul class="tree">
-      <For each={entries()}>
-        {(e) => <TreeNode taskId={props.taskId} parent={props.relPath} entry={e} onOpen={props.onOpen} openPath={props.openPath} />}
-      </For>
-    </ul>
-  )
-}
-
-function TreeNode(props: { taskId: string; parent: string; entry: EditorEntry; onOpen: (p: string) => void; openPath: string | null }) {
-  const [open, setOpen] = createSignal(false)
-  const path = () => (props.parent ? `${props.parent}/${props.entry.name}` : props.entry.name)
-  return (
-    <li>
-      <Show
-        when={props.entry.dir}
-        fallback={
-          <button type="button" class="tree-file" classList={{ active: props.openPath === path() }} onClick={() => props.onOpen(path())}>
-            <span class="tree-twist" />
-            {props.entry.name}
-          </button>
-        }
-      >
-        <button type="button" class="tree-dir" onClick={() => setOpen(!open())}>
-          <span class="tree-twist">{open() ? '▾' : '▸'}</span>
-          {props.entry.name}
-        </button>
-        <Show when={open()}>
-          <Tree taskId={props.taskId} relPath={path()} onOpen={props.onOpen} openPath={props.openPath} />
-        </Show>
-      </Show>
-    </li>
   )
 }

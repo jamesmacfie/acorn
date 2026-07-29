@@ -201,6 +201,9 @@ models from disk but never clobbers a dirty one (`EditorPane.tsx:142`). **⌘/Ct
 tab when focus is inside the pane (main suppresses the window-close accelerator and pings the
 renderer; the focus-containment subscription is the shared `onClosePaneWithin` helper in
 `client/lib/`, also used by the terminal drawer).
+When the Editor pane owns focus, **Reveal active file in editor tree** is available in the command
+palette. It expands the active file's lazily-loaded ancestor folders and scrolls its selected row
+into view without moving keyboard focus out of Monaco.
 **→ agent** adds a file (or selection) reference to the agent composer. Open files persist to the
 `editor_open_files` pref (`features/editor/editorState.ts`).
 
