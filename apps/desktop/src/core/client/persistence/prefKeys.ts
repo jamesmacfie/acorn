@@ -25,6 +25,7 @@ export const PrefKeys = {
   railOrder: 'rail_order',
   terminalRailDefault: 'term_rail_default',
   terminalHeight: 'term_height',
+  terminalFontSize: 'term_font_size',
   startupContextInjection: 'startup_context_injection',
   onboarded: 'onboarded',
   agentToolPermissions: AGENT_TOOLS_PERMS_PREF_KEY,
