@@ -66,15 +66,18 @@ committed repo toml → user `~/.acorn/config.toml` → these columns). All are 
 | `devRestartScript` | Restart command for the `dev` target; when set, `run_restart` runs it instead of stop+start. |
 | `teardownScript` | Shell command run in the worktree just before removal (on archive); null/blank = none. |
 | `dbUrlScript` | Shell command run in the worktree that prints a Postgres URL for the Database pane; null/blank = auto-detect. |
+| `dbSchemaMode`, `dbSchemaValue` | `auto` live introspection, a schema-producing script, or a worktree-relative file for model-assisted SQL. |
+| `dbSchemaNotes` | Repo-specific schema semantics sent with every model-assisted SQL request. |
 | `previewMode` | `url` \| `port` \| `script` — how the browser-preview URL is resolved; null → dev-server port. |
 | `previewValue` | The URL, port, or shell command per `previewMode`; null/blank = unset. |
 | `browserRules` | JSON `BrowserRule[]` — preview-browser page rules (DB-only, no toml layer). |
+| `branchPrefix` | Personal prefix prepended to derived branches for new tasks (DB-only). |
 
 The `PUT /api/terminal/repo-path/config` route validates these: `setupScriptTrigger` must be one of
 the three values, `previewMode` one of the three modes, and — importantly — a `port` preview value
 must be a bare 1–65535 port so a crafted value (e.g. `@evil.com`) can't redirect the preview webview
 to another host (`apps/desktop/src/core/main/repoPaths.ts` `setRepoConfig`). This whole surface is
-desktop-only — it needs the main-process worktree capability (see [Lifecycle](#lifecycle-note)), and
+desktop-only — it needs the utility-service worktree capability (see [Lifecycle](#lifecycle-note)), and
 it is edited per-repo under Settings → the workspace page.
 
 ### The Default workspace & bootstrap
@@ -140,10 +143,11 @@ stored. Columns (`apps/desktop/src/core/server/db/schema.ts:341`):
 | --- | --- |
 | `id` | Opaque uuid. |
 | `title` | Editable label; seeded from the origin (PR title, ticket id + title, `repo · branch`). |
+| `icon` | Optional Lucide icon override; null derives a glyph from the task origin. |
 | `origin` | `github-pr` \| `linear` \| `rollbar` \| `local` — where the task came from. |
 | `repoOwner`, `repoName` | The repo this task belongs to (always set). |
 | `branch` | The branch this task works on. |
-| `worktreePath` | Path to its git worktree; **null until a terminal is first opened** (Flow C). |
+| `worktreePath` | Path to its git worktree; null until a worktree-dependent action ensures it. |
 | `pullNumber` | Linked PR number; **null for local-first tasks until a PR is inherited** (Flow B). |
 | `status` | `active` \| `archived`; workflow-created child tasks may be `cancelled`. |
 | `parentId` | Task-tree lineage — set on fan-out children; null = root (workflow feature, design-stage). |
@@ -166,9 +170,9 @@ optional `title`, `pullNumber`, `links`):
   `task_link`.
 - **Local-first** (`origin: local`) — the "New task" (`+`) button in the rail. Opens a small modal
   (Electron's `BrowserWindow` has no `window.prompt`) that picks a repo from the active workspace and a
-  branch. The branch defaults to a de-duped slug of the title (`slugifyBranch` + `dedupeBranch`,
-  `apps/desktop/src/core/shared/branch.ts`) until the user edits the branch field, then their value wins
-  (`TabRail.tsx:62`).
+  branch and optional task icon, or can adopt the mapped checkout instead of creating an isolated
+  worktree. The branch defaults to the repo's personal `branchPrefix` plus a de-duped title slug
+  (`slugifyBranch` + `withBranchPrefix` + `dedupeBranch`) until the user edits it.
 
 ### External links (`task_links`)
 
@@ -185,11 +189,11 @@ rather than creating a new one (`RollbarBrowse.tsx:68`).
 A local-first task (no `pullNumber`) **adopts a PR** once one is opened for its branch. On a real PR-list
 refresh (not a 304), the pulls route builds a `branchName → number` map from the just-mirrored PRs and,
 for every active no-`pullNumber` task in that repo, sets `pullNumber` when its branch matches
-(`apps/desktop/src/plugins/github/server/routes/pulls.ts:142`). No webhook, no polling loop — it piggybacks on the
+(`apps/desktop/src/plugins/github/server/routes/pullRefresh.ts`). No webhook, no polling loop — it piggybacks on the
 normal mirror sync. After inheritance the task's PR pane and checks light up automatically.
 
 (The complementary flows: **Flow A** = task born from an existing PR; **Flow C** = the worktree is
-created lazily on first terminal — see [Lifecycle](#lifecycle-note).)
+created lazily on first worktree-dependent action — see [Lifecycle](#lifecycle-note).)
 
 ---
 
@@ -197,10 +201,9 @@ created lazily on first terminal — see [Lifecycle](#lifecycle-note).)
 
 The left rail (`apps/desktop/src/core/client/tabs/TabRail.tsx`) has two zones separated by a rule:
 
-1. **Sources** (top) — browse entry points. GitHub is always present; Linear and Rollbar appear only
-   when a connected integration of that provider exists (`availableSources`,
-   `apps/desktop/src/core/client/tabs/sources.ts`). Selecting a Source fills the main area with that
-   provider's browse view and clears the active task.
+1. **Sources** (top) — registry-contributed browse entry points. GitHub, Docker, and API Requests
+   are always present; Linear and Rollbar appear only when a connected provider exists. Selecting a
+   Source fills the main area with its browse view and clears the active task.
 2. **Tasks** (below) — one row per active Task, **scoped to the active workspace**: tasks whose repo
    isn't in the current workspace are hidden, so switching workspace swaps the roster (`TabRail.tsx:75`).
 
@@ -211,11 +214,12 @@ Each Task row carries live status glyphs:
 | Decoration | Source | Meaning |
 | --- | --- | --- |
 | 3px left accent | `resolveWorkspaceColor(ws.color, ws.name)` | The task's workspace colour. |
-| Row glyph | workspace emoji icon, else `ORIGIN_GLYPH` | Workspace emoji if set, else origin glyph: `github-pr ⌥`, `linear ◷`, `rollbar ◍`, `local ●`. |
+| Row glyph | task icon, else origin-derived glyph | An explicit task icon wins; otherwise the source/origin contribution supplies the glyph. |
 | Checks dot | warmed PR detail (`checksState`) | PR CI state; shown only when the task has a PR and checks exist. |
 | Spinner `⠿` | `workingCountFor(taskId)` | One or more agents currently working (desktop-only — needs the terminal bridge). |
 | Needs-you `‼` | `unreadForTask(taskId)` | Unread agent notifications; cleared when the task is viewed. |
 | Dirty `✎` / repair `⚠` | `taskStatus(taskId)` | Uncommitted changes (with count), or worktree missing (removed outside acorn → needs repair). |
+| Docker badge | Docker task-summary slot | Running/stopped containers matched to the task. |
 | Pin `⌖` | `rail_order` | Pinned-to-top marker. |
 
 ### Ordering: `rail_order`, not `tasks.sort`
@@ -247,8 +251,8 @@ serializes the result back to the pref and invalidates. Cross-partition drags ad
 ### Per-task worktree status polling
 
 `taskStatus.ts` (`apps/desktop/src/core/client/tasks/taskStatus.ts`) holds a signal of
-`TaskStatus` per task (`dirty`, `dirtyCount`, `missing`), refreshed from the terminal bridge on a 5s
-interval plus on `onStatus` edges. It is a no-op on the web build (no terminal bridge). The 5s poll is a
+`TaskStatus` per task (`dirty`, `dirtyCount`, `missing`), refreshed from the terminal bridge on a 10s
+interval plus on `onStatus` edges. It is a no-op on the web build (no terminal bridge). The poll is a
 deliberate `ponytail` simplification — cheap over a handful of worktrees; tighten to a watcher only if it
 ever matters.
 
@@ -268,6 +272,12 @@ A Source browse view lists a provider's items and **promotes** one to a Task.
   model. Only mapped projects are read and shown. "Open as task" uses the currently routed repo from
   that mapping and prompts only for the branch (defaulting to a slug of the title). Alternatively
   "＋task" attaches the error to the currently active task as a new `task_link`.
+- **DockerBrowse** — the local Docker fleet, always visible and documented in
+  [docker.md](./docker.md). It does not promote an external record into a task; it derives links from
+  worktree/Compose metadata and declarative matching config.
+- **HttpBrowse** — repo-scoped saved API requests, always visible and documented in
+  [http-client.md](./http-client.md). Opening the same request inside a task adds task builtins and
+  a worktree for command-variable resolution.
 
 See [`integrations.md`](./integrations.md) for the provider connections themselves.
 
@@ -314,19 +324,20 @@ Endpoints (full detail in [`api-reference.md`](./api-reference.md); all auth-gat
 
 ## Lifecycle note
 
-Terminal-driven lifecycle is desktop-only (it needs the main-process worktree capability —
+Terminal-driven lifecycle is desktop-only (it needs the utility-service worktree capability —
 `capabilities()`, always on when present; the old `acorn:term` flag is gone). The CRUD above works
 without it.
 
-- **Worktree creation is lazy** (Flow C): `tasks.worktreePath` stays null until a terminal is first
-  opened for the task, at which point the main process creates the git worktree and (per the repo's
-  `setupScriptTrigger`) may run the `setupScript`.
-- **Archive** runs through the guarded main-process teardown when on desktop: it refuses while sessions
+- **Worktree creation is lazy** (Flow C): `tasks.worktreePath` stays null until a
+  worktree-dependent surface/action asks the utility service to ensure it. Opening a terminal is the
+  common path; the setup script follows its configured trigger.
+- **Archive** runs through the guarded utility-service teardown when on desktop: it refuses while sessions
   are running or the worktree is dirty, runs the repo's `teardownScript` in the worktree, then removes
-  the worktree (`terminalApi().task.archive`; main decides "no worktree → plain flip"). The rail's
+  the worktree (`terminalApi().task.archive`; the service decides "no worktree → plain flip"). The rail's
   confirm/error dialog is the same modal shell as create/rename (no `window.confirm`/`alert`), and the
   plain HTTP status flip exists only for the bridge-absent browser dev build. Archiving also evicts the
-  task's kept-alive preview `WebContentsView`.
+  task's kept-alive preview `WebContentsView`. The Docker contribution can add a pre-archive
+  confirmation and Compose teardown for matched running containers.
 - **Archive keeps the row.** `status` flips to `archived` and `archivedAt` is stamped; the row survives
   for history and teardown audit. Only `active` tasks appear in the rail.
 
@@ -337,11 +348,12 @@ without it.
 Client shell: `apps/desktop/src/core/client/{tabs,tasks,workspaces}/`; provider browse views and
 onboarding live under `apps/desktop/src/plugins/{linear,rollbar,onboarding}/client/`.
 Server: `apps/desktop/src/core/server/routes/{workspaces.ts,tasks.ts}`, PR inheritance in
-`apps/desktop/src/plugins/github/server/routes/pulls.ts:142`.
+`apps/desktop/src/plugins/github/server/routes/pullRefresh.ts`.
 Shared: `apps/desktop/src/core/shared/{workspaceIdentity.ts,branch.ts}`. Schema:
 `apps/desktop/src/core/server/db/schema.ts`.
 
 **See also:** [`panes.md`](./panes.md) (the Task view surfaces) ·
 [`terminal-and-agents.md`](./terminal-and-agents.md) (worktrees, sessions, run targets) ·
 [`integrations.md`](./integrations.md) (Linear/Rollbar connections) ·
+[`docker.md`](./docker.md) · [`http-client.md`](./http-client.md) ·
 [`data-layer.md`](./data-layer.md) · [`api-reference.md`](./api-reference.md).

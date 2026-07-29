@@ -2,8 +2,7 @@
 
 > **Runtime note:** acorn migrated from Cloudflare Workers to a local Electron app (see
 > [electron.md](./electron.md)). `pnpm dev` now builds + launches the Electron app; secrets live in
-> `apps/desktop/.env`; migrations apply on startup or via `pnpm db:migrate`. The wrangler/Miniflare/D1
-> steps below are historical.
+> `apps/desktop/.env`; migrations apply on startup or via `pnpm db:migrate`.
 
 Clone → running → logged-in runbook for acorn. For the system design behind it, see
 [architecture-overview.md](./architecture-overview.md).
@@ -33,9 +32,12 @@ browser storage and OAuth callback stay stable. The OAuth flow requests the scop
 
 ## 2. Configure local secrets — `apps/desktop/.env`
 
-Dev secrets live in `apps/desktop/.env`, loaded by the Electron main process (`process.loadEnvFile`)
-and by `dev:node`. Packaged Electron builds use `safeStorage` for `SESSION_ENC_KEY`; the GitHub OAuth
-client ID and secret still come from the environment.
+Dev secrets live in `apps/desktop/.env`, loaded by Electron main (`process.loadEnvFile`) before it
+forks the utility service, and separately by `dev:node`. Packaged Electron builds use `safeStorage`
+for `SESSION_ENC_KEY`; main resolves that key and passes it to the service through its controlled
+environment. GitHub OAuth
+credentials resolve from `<userData>/.env`, then process environment, then the
+`MAIN_VITE_GITHUB_CLIENT_*` fallback embedded by release CI.
 
 ```bash
 cp apps/desktop/.env.example apps/desktop/.env
@@ -81,19 +83,24 @@ The Electron window opens on `http://127.0.0.1:4317`; log in with GitHub.
 > (`SESSION_COOKIE` in `session.ts`); no action needed.
 
 > **Desktop-only features.** The terminal drawer, agent sessions, run targets, and workflows are
-> always on in the Electron app; they require main-process capabilities, so they're absent in a
+> always on in the Electron app; they require utility-service engines, so they're absent in a
 > plain browser via `dev:node` (`capabilities()` in `apps/desktop/src/core/client/capabilities.ts`).
+> Docker and the HTTP client use pure-Node server bridges and also work in `dev:node`.
 
 ## Local data — `apps/desktop/.acorn/`
 
-All server-side state lives under `apps/desktop/.acorn/` (gitignored), resolved relative to the
-built main-process module — not under `~/Library/Application Support`:
+In development, all server-side state lives under `apps/desktop/.acorn/` (gitignored), resolved by
+the Node runtime rather than from `process.cwd()`. Packaged builds use Electron's
+`app.getPath('userData')`:
 
 - `acorn.sqlite` (+ WAL files) — the Drizzle/SQLite database: the GitHub mirror *and* acorn's own
   app-state (workspaces, tasks, review notes, prefs, encrypted integration tokens, the memory
   index).
 - `blobs/` — immutable file/patch bodies keyed by SHA (the `BLOBS` cache).
 - `worktrees/` — per-task git worktrees created by the terminal/agent features.
+- `notes/` and `memory-proposals/` — file-backed working notes and pending human-gated memories.
+- `internal-token` / `active-identity` — mode-`0600` loopback-child credential and its explicit
+  current identity binding.
 
 The mirror tables are disposable (they re-sync from GitHub on demand), but the same database file
 holds app-state acorn owns — so deleting `.acorn/` wholesale resets *everything*: workspaces,
@@ -109,12 +116,13 @@ Run from the repo root via Turborepo, or per-package with `--filter @acorn/deskt
 | --- | --- |
 | `pnpm dev` | `electron-vite build && electron-vite preview` — build + launch the Electron app |
 | `pnpm --filter @acorn/desktop dev:node` | Run just the Node server (no Electron) on `:4317` — needs the Node ABI, and a prior `build` (it serves `dist/client` and reads `index.html` at startup) |
-| `pnpm --filter @acorn/desktop build` | `electron-vite build` (main + preload + renderer) |
-| `pnpm --filter @acorn/desktop dist` | `electron-vite build && electron-builder --mac` — package the `.dmg`/`.zip` |
+| `pnpm --filter @acorn/desktop build` | Build main + utility service + MCP proxy + preload + renderer, then enforce the renderer budget |
+| `pnpm --filter @acorn/desktop dist` | Run the gated build and package the `.dmg`/`.zip` |
 | `pnpm --filter @acorn/desktop electron:dev` | `electron-vite dev` — watch mode for main/preload; the window still loads `:4317` (renderer comes from the last-built `dist/client`, never the vite dev server) |
 | `pnpm --filter @acorn/desktop electron:rebuild` / `node:rebuild` | switch the native ABI of better-sqlite3 + node-pty (Electron ↔ Node) |
 | `pnpm lint` | `tsc --noEmit` typecheck |
-| `pnpm test` | `vitest run` |
+| `pnpm test` | Rebuild native modules for Node, then run the complete Vitest suite |
+| `pnpm --filter @acorn/desktop test:e2e` | Build/rebuild for Electron and run Playwright desktop smoke tests |
 | `pnpm --filter @acorn/desktop db:generate` | `drizzle-kit generate` — emit a migration from the schema, then replay the full chain on a fresh throwaway DB (`scripts/check-migrations.ts`) |
 | `pnpm --filter @acorn/desktop db:check` | Just the fresh-DB migration replay — catches the NOT-NULL table-rebuild quirk below |
 | `pnpm db:locate` | Print the absolute path to this worktree's local SQLite database |
@@ -165,5 +173,6 @@ pnpm --filter @acorn/desktop db:migrate
 For packaging the app into a `.dmg`/`.zip`, see [Packaging](../README.md#packaging-macos) in the
 root README and [electron.md](./electron.md) §4i. Packaged builds resolve their data root to
 `app.getPath('userData')` (dev keeps the repo-local `.acorn/`). `SESSION_ENC_KEY` is generated or
-migrated into `safeStorage`; packaged launches still need GitHub OAuth client credentials in the
-environment.
+migrated into `safeStorage`. Packaged OAuth credentials can come from `<userData>/.env`, process
+environment, or the release build's embedded fallback. The fallback is convenient but recoverable
+from the binary; device flow is the future distribution model.

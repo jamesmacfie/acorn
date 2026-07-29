@@ -1,111 +1,62 @@
-# Self-improvement — the axis we're not building yet (and why the shapes already fit)
+# Self-improvement — future position
 
-**Status:** study + positioning (no build) · **Date:** 2026-07-08 · **Companions:**
-[agent-runtime.md](./agent-runtime.md) §5–6 (the runtime non-goals/near-term this extends),
-[contribution-points.md](./contribution-points.md) §4.8/§4.10/§4.11 (the registries that double as
-the harness surface), [memory.md](./memory.md) §3/§6 (the propose→accept loop),
-[extensibility.md](./extensibility.md) tenet 2 / §9.1 ("don't foreclose, don't build")
+**Status:** design position; no implementation scheduled · **Reviewed:** 2026-07-29
 
-This doc records a design study — Lilian Weng, *"Harness Engineering for Self-Improvement"*
-(lilianweng.github.io, 2026-07-04) — read against acorn's agent runtime, and states acorn's
-position on the axis the post opens.
+This note records how acorn's shipped agent and memory architecture relates to automated
+self-improvement. It is deliberately not an implementation plan. Current runtime contracts live in
+[workflows.md](../workflows.md), [notes-and-memory.md](../notes-and-memory.md),
+[mcp.md](../mcp.md), and [plugins.md](../plugins.md).
 
-The verdict up front: **acorn is already well-positioned for this axis, mostly by accident, and
-we are deliberately not building it.** The designed types and contracts are already extensible in
-the directions self-improvement would need, so this doc adds *annotations*, not machinery. It
-exists so the axis isn't re-litigated and so a future implementer knows which seams were kept open
-on purpose.
+## Position
 
----
+acorn supports a human-gated form of context improvement today:
 
-## 1. Two orthogonal axes
+1. Agent sessions and task changes can produce memory candidates.
+2. Candidates are structurally reviewed and written to the local proposal store.
+3. A human edits, accepts, or rejects each proposal in the Context pane.
+4. Accepting writes Markdown under repo or operator memory; SQLite is only the derived search index.
+5. Later agents receive the accepted memory through launch context and MCP reads.
 
-`agent-runtime.md` / `agent-runtime-influences.md` already pressure-tested the runtime along one
-axis. This post is about a different one. Don't conflate them.
+This is the useful first rung of the broader self-improvement ladder: the working context can improve
+over time, but the evaluator and write authority remain outside the agent loop.
 
-- **Scale / orchestration axis** (agentfield): control planes, message buses, daemons,
-  distributed fleets, cost budgeting. acorn *rejected* most of it (single process, no bus, no
-  daemon — influences §2c). Correct for a single-user local app.
-- **Self-improvement axis** (this doc): does the harness get *better at its job over time*, and
-  who does the improving? This is orthogonal to scale — you can self-improve in one process on one
-  machine, and it needs almost none of the scale machinery acorn rejected.
+acorn does **not** currently search workflow graphs, mutate its harness, evolve populations of agents,
+train models, or maintain an automated quality/fitness score. Those are standing non-goals until a
+concrete product need and a trustworthy evaluator exist.
 
-acorn has thought hard about the first axis and, until now, not at all about the second.
+## Shipped seams that keep the option open
 
-## 2. The post's ladder, and where acorn sits
+| Existing contract | Future seam | Constraint to preserve |
+| --- | --- | --- |
+| File-truth memory plus `MemoryProposalStore` | A future curator can propose consolidations through the same queue | Agents never write accepted memory directly |
+| Durable `workflow_runs` / `workflow_steps` | Completed trajectories can be inspected or replayed by a future evaluation harness | Run records remain auditable and task-scoped |
+| Workflow step, profile, policy, tool, pane, source, and route registries | A future harness can enumerate capabilities without hard-coding every plugin | Provider-specific/runtime details stay behind contributions |
+| Runtime-derived gates and tool ceilings | Evaluation and autonomy can be constrained independently of agent claims | Gate verdicts must not trust self-reported success |
+| Worktree-per-task execution | Candidate changes remain isolated and reviewable | Promotion into the main checkout stays an explicit human/tool action |
 
-The post arranges self-improvement by *what gets optimized* and *who optimizes it*:
+These seams make future work additive; they are not a reason to build it early.
 
-```
-Context engineering  (ACE / MCE — the "evolving playbook")
-  → Workflow design   (ADAS / AFlow — search the workflow graph)
-  → Harness code      (Meta-Harness — the harness is an editable artifact)
-  → Self-modifying    (STOP — improve the improver)
-  → Evolutionary      (AlphaEvolve / DGM — population + fitness search)
-  → Joint model+harness (SIA)
-```
+## What would have to exist first
 
-Unified by one loop — **propose → evaluate → accept** — over **durable file-system state**, gated
-by a **verifier** and **human oversight** that sits *outside* the loop being optimized.
+Any move beyond human-gated context improvement needs all of the following:
 
-**acorn sits at Level 1 (Context engineering), human-gated** — and further along than expected.
-Everything above is absent, mostly on purpose (§5).
+- a representative, versioned task/evaluation corpus;
+- an outcome measure that cannot be gamed by merely changing agent output;
+- cost, time, tool, and concurrency budgets enforced by the runtime;
+- replayable inputs with privacy-safe observability;
+- rollback and comparison of candidate harness/config changes;
+- an approval boundary outside the process being optimized.
 
-## 3. What acorn already gets right
+Without those pieces, “self-improvement” is an uncontrolled mutation loop rather than a product
+capability.
 
-Each maps to a principle the post spends its "design maxims" on:
+## Standing decisions
 
-- **File-truth memory + propose→evaluate→accept.** `.acorn/memory/*.md` is truth, SQLite is a
-  derived index; session-end distill → structural verify → human-gated proposal → committed →
-  injected into the next session ([memory.md](./memory.md) §6). That *is* the post's "evolving
-  playbook" (ACE) and its propose-evaluate-accept loop. ~80% built already.
-- **Runtime-re-derived gates defeat reward-hacking.** `gate-policy` re-derives verdicts in the
-  runtime (`checks-green` polls the checks mirror), never trusting agent output
-  ([agent-runtime.md](./agent-runtime.md) §1). Reward-hacking is the post's hardest named
-  bottleneck; "agents can't lie past a gate" is a structural defense most harnesses lack.
-- **The evaluator sits outside the evolving loop.** The write-path invariant — no
-  `ctx.memory.writeAccepted(...)`; only a human UI action writes accepted memory
-  ([memory.md](./memory.md) §1#2/§4/§9) — is exactly the post's oversight boundary.
-- **Durable, replayable trajectories.** `workflow_runs`/`workflow_steps` persist
-  inputs/results/structured/sessionId; worktree-per-task makes each run self-contained. That's the
-  inspectable execution history the higher levels reason over.
-
-## 4. The two ceilings (both already accounted for)
-
-1. **The harness is hardcoded, not a registry.** Levels 3–5 need the harness to be a
-   first-class, enumerable, editable artifact ("code is the universal search space"). acorn's
-   Phase 4 (agent tools) and Phase 8 (step kinds / profiles) registries are the precondition —
-   **already sequenced for extensibility reasons.** The registry doubles as the harness search
-   space; we get the seam for free.
-2. **No automated evaluator / fitness signal.** acorn's verifier is *structural* (dangling refs,
-   dup-hash, contradiction) plus CI pass/fail. There is no held-out task corpus and no
-   outcome-quality score. Every level above 1 needs a scalar fitness. This is genuinely absent and
-   **correctly YAGNI** — the post itself calls weak evaluators the universal hard part.
-
-## 5. Futureproofing verdict per designed type
-
-The crux, and the reason this is annotation-only. For each already-designed contract: the seam it
-provides, and whether building self-improvement would *reshape* it (it wouldn't — all additive).
-
-| Designed type / contract | Where | Self-improvement seam | Change if we build it? |
-| --- | --- | --- | --- |
-| `AgentToolContribution` | points §4.8 | `name`/`description`/`input`/`risk` make the registry **self-describing** — a harness search space | **Additive.** A read-only "describe the harness" introspection projection is a 4th projection target beside MCP/HTTP/renderer; no field changes. Anchored by ext tenet 2 ("core can index, list, conflict-check"). |
-| `StepHandlerOutcome` | points §4.10 / runtime §4.1 | the outcome union is the extension point for fitness / recovery verdicts | **Additive.** Already designed to extend for typed failure-recovery (agent-runtime §6.4); a fitness/quality signal rides the same union. |
-| `WorkflowDef` / `ToolCeiling` / `posture` | runtime §4.1 | an evolutionary/search loop is a new step-kind + a fitness policy | **Additive.** Rides `registerStepKind` / `registerPolicy` (points §4.10); `posture: autonomous` + tool ceilings already govern the autonomy a loop would use. |
-| `MemoryOrigin` / `MemoryOriginKind` | memory §3 | `'consolidation'` is the reserved ACE-curator kind; `sourceRefs`/`workflowRunId` carry evidence | **None.** The consolidation kind is already reserved; a curator pass emits candidates like any other origin. |
-| Write-path invariant | memory §1#2 / §4 / §9 | evaluator-outside-the-loop boundary | **Protect as a hard rule — never relax.** It is what makes higher automation *safe* to add later. |
-
-## 6. Non-goals (don't build yet)
-
-Standing non-goals on this axis, so they aren't re-proposed:
-
-- **No workflow-graph search** (AFlow/ADAS), **no self-modifying harness** (STOP/DGM), **no
-  evolutionary population loop** (AlphaEvolve), **no joint model+harness** (SIA).
-- **No fitness scorer / outcome-quality metric**, **no eval / regression corpus**, **no
-  embeddings** for memory retrieval (memory.md's existing explicit decision).
-
-The door is left open by three things already in the design — the Phase 4/8 **registries** (the
-editable harness surface), the memory **`'consolidation'` origin kind** + proposal queue (the ACE
-curator seam), and **replayable run records** (what a future eval harness would replay). The one
-prerequisite that would actually gate a move past Level 1 — an automated evaluator — is the thing
-we deliberately don't build until a real need appears.
+- Do not add workflow-graph search, self-modifying harness code, evolutionary populations, or
+  model-training machinery speculatively.
+- Do not weaken the proposal gate to make automation easier.
+- Do not treat tests alone as an outcome-quality score; they are necessary correctness gates, not a
+  complete evaluator.
+- Periodic memory consolidation may be added later, but it must emit ordinary proposals and use the
+  same human accept/reject path.
+- Revisit this position only with a concrete workload whose repeated outcomes can be measured.

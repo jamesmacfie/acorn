@@ -6,7 +6,7 @@ Follow Acorn's shipped rule: request/response work uses authenticated same-origi
 the existing authenticated WebSocket; preload IPC is reserved for true Electron-native capabilities.
 
 Chat does not need native IPC. Browser `File` objects can be uploaded by multipart HTTP, and provider
-network calls run in the server/main process.
+network calls run in the utility service.
 
 The chat transport is intentionally not an HTTP response stream:
 

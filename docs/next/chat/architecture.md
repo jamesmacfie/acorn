@@ -25,16 +25,16 @@ apps/desktop/src/plugins/chat/
   shared/    serializable domain/API/WebSocket contracts and strict schemas
 ```
 
-Activation stays in `app/`. Core gains only genuinely reusable seams: source visibility independent of
-an integration connection, chat frame variants on the shared socket, generalized notice targets, and
-shared code-token rendering extracted from the current GitHub-only Shiki module.
+Activation stays in `app/`. Core gains only genuinely reusable seams: optional source promotion,
+typed source view context, chat frame variants on the shared socket, generalized notice targets,
+and shared code-token rendering through the current core Shiki module.
 
 ## 2. Current seams and required pressure changes
 
 | Existing seam | Current behavior | Chat change |
 | --- | --- | --- |
-| `core/client/registries/sources.ts` | Source requires `providerId`, promotion, and integration gating | Make `when`/visibility explicit and promotion optional so an always-visible non-promotion source is valid |
-| `core/client/tabs/sources.ts` | GitHub always; registry sources only when an integration capability is connected | Evaluate each contribution's `when(context)`; chat returns true for every real workspace |
+| `core/client/registries/sources.ts` | Providerless local sources are already always visible, but every source still requires a promotion object | Make promotion optional so Chat does not need permanent rejecting stubs |
+| `core/client/tabs/sources.ts` | GitHub plus provider-gated or providerless registry sources | Keep existing visibility semantics; Chat is a providerless local source |
 | `core/client/App.tsx` | Renders selected source component with no props | Pass a typed `SourceViewContext` containing the active workspace and navigation services |
 | `core/server/routeRegistry.ts` | Authenticated plugin routers under `/api` | Mount `/api/chat`; retain core auth/CSRF ordering |
 | `core/shared/ws.ts` / `wsClient.ts` | Terminal/workflow frames | Add typed chat lifecycle/delta frames and connection-state callback |
@@ -42,7 +42,7 @@ shared code-token rendering extracted from the current GitHub-only Shiki module.
 | notice registry/store | Notice target is always `taskId`; toast suppression checks only document focus | Generalize to discriminated navigation target and surface-aware attention test |
 | `core/server/db/schema.ts` | One Drizzle schema/migration journal | Add chat plugin tables and indexes; keep app-level cascade conventions |
 | `core/server/blobs.ts` | Unbounded immutable GitHub cache | Do not reuse; add owned chat object store with ref cleanup and limits |
-| `plugins/github/client/shiki.ts` | Fine-grained dual-theme Shiki tokens inside GitHub plugin | Extract generic language/token loader to core UI; GitHub and chat both consume it |
+| `core/client/highlight/shiki.ts` | Shared dual-theme language/token loader | Reuse it through Chat-owned safe Markdown/code components |
 
 ### Source contract target
 

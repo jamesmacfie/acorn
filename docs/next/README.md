@@ -1,20 +1,27 @@
 # Future work
 
-This directory now contains only forward-looking design constraints and explicitly deferred work.
-The completed implementation plan, phase guides, review inventories, and parity checklist have been
-removed; current behavior is documented in the parent [`docs/`](../) tree.
+This directory contains forward-looking proposals and narrow validation records. Shipped behavior
+belongs in the parent [`docs/`](../) tree; a proposal that lands must move its lasting contract
+there rather than leaving two competing descriptions.
 
-| Document | Remaining forward-looking scope |
+## Active proposals
+
+| Document | Remaining scope |
 | --- | --- |
-| [self-improvement.md](./self-improvement.md) | Annotation-only self-improvement seams; no implementation is scheduled |
-| [performance.md](./performance.md) | Remaining measurement, retention, and scaling work |
-| [security.md](./security.md) | The unbuilt repo-config trust gate (see [next-review.md](../next-review.md) §1.1) plus future principal kinds, relays, webhooks, and control channels |
-| [rollbar.md](./rollbar.md) | Rollbar master/detail Source and task pane: API capability map, privacy-safe occurrence detail, and phased implementation plan |
-| [context-ui.md](./context-ui.md) | Agent-context UX rework: Manifest pane (persisted selection, preview, sizes, session picker, staleness, inline memory) + scratchpad-first Notes pane, with phased plan |
-| [chat/](./chat/) | Workspace-scoped multi-provider chat plugin: persistence, providers, streaming, attachments, UI, security, and implementation plan |
+| [self-improvement.md](./self-improvement.md) | Annotation-only self-improvement seams; no implementation scheduled |
+| [performance.md](./performance.md) | Measurement-triggered retention and scaling work |
+| [security.md](./security.md) | Device-flow distribution hardening and future external-control principals/channels |
+| [chat/](./chat/) | Workspace-scoped multi-provider chat plugin |
+| [linear-pane.md](./linear-pane.md) | Proposed Linear pane evolution |
 
-Shipped contracts belong in durable docs such as [plugins.md](../plugins.md),
-[integrations.md](../integrations.md), [state.md](../state.md), [security.md](../security.md),
-[testing.md](../testing.md), [workflows.md](../workflows.md), and
-[notes-and-memory.md](../notes-and-memory.md). If a deferred item ships, move its lasting contract
-into the relevant durable document and remove the completed proposal from this directory.
+## Implementation records with open validation
+
+| Document | Why it remains here |
+| --- | --- |
+| [rollbar.md](./rollbar.md) | The Source/pane shipped; live-account contract and manual privacy/interaction validation remain |
+| [context-ui.md](./context-ui.md) | The Context/Notes rework shipped; compact record of invariants and deferred manual QA |
+
+Current contracts are in [plugins.md](../plugins.md), [integrations.md](../integrations.md),
+[state.md](../state.md), [security.md](../security.md), [testing.md](../testing.md),
+[workflows.md](../workflows.md), [notes-and-memory.md](../notes-and-memory.md),
+[docker.md](../docker.md), and [http-client.md](../http-client.md).

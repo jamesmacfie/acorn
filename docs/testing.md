@@ -7,8 +7,8 @@ Run commands from the repository root unless noted otherwise.
 | --- | --- |
 | `pnpm lint` | Strict TypeScript (`tsc --noEmit`) across the workspace |
 | `pnpm test` | Rebuild native modules for Node, then run the complete Vitest suite |
-| `pnpm build` | Build Electron main, preload, and renderer bundles |
-| `pnpm --filter @acorn/desktop test:e2e` | Build, rebuild native modules for Electron, and run S1–S5 Playwright-Electron smoke tests |
+| `pnpm build` | Build Electron main, utility service, MCP proxy, preload, and renderer; enforce 1.25 MB startup-script / 200 KB CSS budgets |
+| `pnpm --filter @acorn/desktop test:e2e` | Build, rebuild native modules for Electron, and run S1–S6 Playwright-Electron smoke tests |
 | `pnpm --filter @acorn/desktop db:check` | Replay the full migration chain on a fresh database |
 | `pnpm --filter @acorn/desktop exec electron scripts/smoke-browser.cjs` | Manual drivable-preview smoke against a running Electron app |
 
@@ -19,17 +19,22 @@ Run commands from the repository root unless noted otherwise.
 - Route tests mount Hono routers with fake principals and bridge implementations. They verify auth,
   body validation, typed error envelopes, and clean `bridge-unavailable` degradation without
   launching Electron.
-- `core/boundaries.test.ts` scans relative imports to enforce app-layer and runtime boundaries and
+- `core/boundaries.test.ts` scans relative imports to keep the service graph Electron-free, prevent
+  native main from reaching service-owned engines, enforce app/client/server/MCP boundaries, and
   freeze the shrinking legacy cross-feature dependency ledger.
+- `core/shared/serviceProtocol.test.ts` covers concurrent bidirectional RPC, protocol-version
+  mismatch, unavailable handlers, and peer-close cleanup. `app/service/runtime.test.ts` exercises
+  migration, SPA serving, reconciliation, and shutdown without Electron or GitHub.
 - `core/server/integrations/conformance.test.ts` runs every registered provider through capability,
   codec, budget, formatting, and secret-hygiene obligations.
 - Startup/restore integration tests prove descriptor order, late registration, persistence arming,
   and scoped eviction.
 - The persisted-state and workflow registry conformance suites iterate every descriptor and enforce
   malformed-input tolerance, bounds, unique identity, handlers, and descriptor-owned validation.
-- `e2e/desktop.smoke.spec.ts` covers real boot, cross-launch restore, opening a task, terminal echo
-  over the authenticated WebSocket, and clean PTY teardown on quit. It uses an environment-gated
-  local login and isolated temporary data; the seam returns 404 outside `ACORN_E2E=1`.
+- `e2e/desktop.smoke.spec.ts` covers supervised service boot, cross-launch restore, opening a task, terminal echo
+  over the authenticated WebSocket, clean PTY teardown on quit, and find-in-files → copy path /
+  double-click reveal in Editor. It uses an environment-gated local login and isolated temporary
+  data; the seam returns 404 outside `ACORN_E2E=1`.
 - Workflow tests use the committed fake agent through the real argv/template path and cover gates,
   joins, fan-out, branching, cancellation, reconciliation, and tool ceilings.
 - Public API tests live beside the code under `core/{server,main,client}/publicApi/*.test.ts` — token

@@ -30,7 +30,7 @@ Research was performed on 2026-07-11. Links point to upstream projects or primar
 - Repository: <https://github.com/open-webui/open-webui>
 - Relevant concepts: backend-owned model dispatch, WebSocket activity, file lifecycle, provider breadth, and batching streaming updates for renderer performance.
 - Adopted: provider calls outlive individual views; coalesce token updates before rendering; treat file storage as a lifecycle rather than a message JSON field.
-- Deliberately different: use Acorn’s in-process server/core contracts and keep first-release provider configuration intentionally small.
+- Deliberately different: use Acorn’s utility-service/core contracts and keep first-release provider configuration intentionally small.
 
 ### LobeHub / LobeChat
 
@@ -98,18 +98,18 @@ Adopted lesson: parsing Markdown does not make output safe. The plan uses a synt
 These repository documents and modules establish the local constraints used in the design:
 
 - [Plugin architecture](../../plugins.md)
-- [Extensibility roadmap](../extensibility.md)
-- [Contribution model](../contribution-points.md)
-- [State ownership and policies](../state-and-policies.md)
-- [Security direction](../security.md)
-- [UX direction](../ux.md)
+- [Architecture overview](../../architecture-overview.md)
+- [Plugin and contribution model](../../plugins.md)
+- [State ownership and policies](../../state.md)
+- [Current security boundaries](../../security.md)
+- [UI design](../../ui-design.md)
 - `apps/desktop/src/core/client/registries/sources.ts`
 - `apps/desktop/src/core/server/routeRegistry.ts`
 - `apps/desktop/src/core/shared/ws.ts`
 - `apps/desktop/src/core/client/notifications/notifications.ts`
 - `apps/desktop/src/core/server/db/schema.ts`
 - `apps/desktop/src/core/server/blobs.ts`
-- `apps/desktop/src/plugins/github/client/shiki.ts`
+- `apps/desktop/src/core/client/highlight/shiki.ts`
 
 The principal local conclusions are:
 

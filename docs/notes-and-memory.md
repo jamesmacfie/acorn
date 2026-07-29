@@ -53,26 +53,28 @@ Each note carries an `author` (`user | agent | workflow`) and a `kind`
 
 ### The Notes pane
 
-`apps/desktop/src/plugins/notes/client/NotesPane.tsx` — a layout pane (`PaneId` `notes`) whose client
-uses task/workspace-scoped HTTP routes. The backing file store is main-process-owned, so those routes
+`apps/desktop/src/plugins/notes/client/NotesPane.tsx` — the registered `notes` layout pane, whose client
+uses task/workspace-scoped HTTP routes. The backing file store is utility-service-owned, so those routes
 return a clean `503 bridge-unavailable` under `dev:node`. Layout:
 
-- A left list grouping **Task notes**, workspace user/agent notes, and **Global notes**; task context
-  merges those scopes in task → workspace → global order.
-- A create form with a scope selector (This task / This workspace / Global) and a title — humans create `scratch`
-  only (`NotesPane.tsx:87`, `create()`).
-- A right editor: a plain `<textarea>` with an **Edit/Preview** toggle that renders sanitized markdown
-  (`ponytail:` textarea over a rich editor — `NotesPane.tsx:11`). No Save button: **autosave** debounces
-  1.5s while typing and flushes on blur and before switching notes (`NotesPane.tsx:57`, `scheduleSave`).
+- A scratchpad is the landing surface. Until the first keystroke it is virtual; typing creates the
+  task `scratchpad` file through a single-flight guard.
+- A collapsible/filterable library groups **Task**, **Workspace**, and **Global** notes. It creates
+  in any available scope, badges agent/workflow provenance, supports rename/delete, and hides
+  workflow-authored seed snapshots that already appear in their native context sections.
+- Each library row has an include dot. This controls whether the note participates in assembled
+  context without deleting it.
+- The editor keeps sanitized markdown Preview/Edit modes. Body autosave debounces 1.5 seconds and
+  flushes before blur/switch/cleanup; title autosave has its own shorter debounce.
 
-The Context pane's per-note "Edit" jump lands here: `requestNoteOpen(slug)` sets a cross-pane signal
-that `NotesPane` consumes on mount to open that slug editable (`notesClient.ts:26-31`, `NotesPane.tsx:61`).
+The Context pane's per-note edit jump uses a retained pane intent with scope + slug. If Notes is
+already mounted it consumes the live event; otherwise it consumes the retained intent on mount.
 
 ### Agent access — the harness endpoints and MCP tools
 
 Agents reach notes over the **loopback harness routes** (`apps/desktop/src/core/server/routes/harness.ts`),
 which are keyed by **task id** (the store resolves task → workspace internally). The routes delegate to
-the main-process `NotesStore` through the injected `HarnessBridge` (`harness.ts:10-36`):
+the utility-service `NotesStore` through the injected `HarnessBridge` (`harness.ts:10-36`):
 
 | Route | Bridge method | MCP tool |
 | --- | --- | --- |
@@ -135,16 +137,16 @@ The `type` enum splits by decay policy: `convention`/`architecture`/`decision`/`
 are stable; `fix`/`reference` are episodic and `reference` "rots on refactor" (verify); `task` is
 in-flight and dropped on completion.
 
-## The memory UI — the MemoryTray, inside the Context pane
+## The memory UI — `MemorySection` inside Context
 
-Memory has no pane of its own; its UI is the **MemoryTray** component
-(`apps/desktop/src/plugins/memory/client/MemoryTray.tsx`), hosted by the **Context pane**
-(`ContextPane.tsx` keeps context assembly/send as its one job and renders the tray below it). The
-client in `apps/desktop/src/plugins/memory/client/memoryClient.ts` calls loopback HTTP. Two surfaces:
+Memory has no pane of its own. `apps/desktop/src/plugins/memory/client/MemorySection.tsx` renders
+inline inside the Context pane's Memory section, so proposals/manual creation sit beside the exact
+memory inventory and inclusion state they affect. The client in
+`plugins/memory/client/memoryClient.ts` calls loopback HTTP. Two surfaces:
 
 1. **Memory proposals — the human gate.** Pending proposals are listed with an editable
-   description and **Accept / Reject** buttons; a proposal's structural verification `flags` (e.g.
-   a contradiction) render as **warning badges under the row**, separate from the description.
+   description and **Accept / Reject** buttons; structural verification `flags` (e.g. a
+   contradiction) render as warning badges separate from the description.
    Accept writes the memory file into the task worktree's `.acorn/memory/` and reconciles the
    index (repo scope lands via the PR — `acceptProposal`,
    `apps/desktop/src/plugins/memory/main/memoryGen.ts:137-161`); reject leaves no trace. This is the
@@ -189,7 +191,7 @@ existing memory index inlined so the model doesn't duplicate. The structured out
 - a **same-name, different-content** candidate is *flagged* as a contradiction — accepting it
   supersedes the existing memory (supersede, never overwrite in place). Flags ride the proposal's
   structural `flags` field (`MemoryProposal`, `main/memoryProposals.ts`; mirrored on the client's
-  `MemoryProposalRow` and rendered as badges in the MemoryTray) — never folded into the
+  `MemoryProposalRow` and rendered as badges in `MemorySection`) — never folded into the
   description, which would leak into the memory file on accept.
 
 Survivors are filed as proposals through the same gate as `memory_write`; a bell notice ("N memory
@@ -202,11 +204,10 @@ Notes and the memory index are folded into the task's **assembled context**
 (`apps/desktop/src/core/shared/api.ts:198-207`, `TaskContext`), which has two consumers — plus a third
 path for memory alone:
 
-- **Push** — the Context pane's **"Assemble & send → agent"** button. The human ticks include
-  checkboxes (`pr`/`issues`/`notes`/`memory`; memory is opt-in by default —
-  `context/model.ts:9`), the client fetches the curated context, renders it with
-  `formatContextBlock` (`apps/desktop/src/core/shared/contextBlock.ts`), and delivers it to the running
-  agent session gated on the idle edge (`ContextPane.tsx:104-113`).
+- **Push** — the Context pane's **Sync context** button. The human selects sections, previews the
+  exact assembled block and its byte/budget indicators, chooses a running agent session, and sends
+  on the idle edge. A per-session fingerprint reports never synced / synced / stale as selected
+  context changes. Section selection persists per task.
 - **Pull** — the MCP `task_context` tool (`mcp/server.ts`) returns the same assembled bundle,
   including notes and the repo memory *index*.
 - **Inject at launch** — when an agent terminal session starts, the repo's memory index slice is
@@ -230,7 +231,7 @@ query cache, blob cache, and workspace notes).
 
 ## Availability and limits
 
-- **File-backed paths need the main process.** Human-facing HTTP routes delegate through an injected
+- **File-backed paths need the utility service.** Human-facing HTTP routes delegate through an injected
   `KnowledgeBridge`. Without it — e.g.
   `dev:node` running just the Hono server with no Electron — every route degrades to a clean **503**
   (`bridge-unavailable`) rather than crashing.
@@ -248,15 +249,16 @@ query cache, blob cache, and workspace notes).
   `review_notes` for the separate anchored store)
 - Shared note shapes: `apps/desktop/src/core/shared/notes.ts` (canonical `Note`/`NoteSummary` +
   author/kind unions, imported by main and client)
-- Stores (main process): `apps/desktop/src/plugins/notes/main/notes.ts` (`NotesStore` — the `.md` files),
+- Stores (utility service; historical `main` paths):
+  `apps/desktop/src/plugins/notes/main/notes.ts` (`NotesStore` — the `.md` files),
   `apps/desktop/src/plugins/memory/main/memory.ts` (memory files + derived index + `MEMORY.md`),
   `apps/desktop/src/plugins/memory/main/memoryProposals.ts` (proposal JSON store),
   `apps/desktop/src/plugins/memory/main/memoryGen.ts` (auto-generation + accept/reject verdicts; trigger + the
   knowledge bridge wired in `apps/desktop/src/plugins/memory/main/knowledgeIpc.ts`)
 - Human-facing routes: `apps/desktop/src/plugins/memory/server/routes/knowledge.ts`
 - Notes UI: `apps/desktop/src/plugins/notes/client/{NotesPane.tsx,notesClient.ts}`
-- Memory UI: `apps/desktop/src/plugins/memory/client/{MemoryTray.tsx,memoryClient.ts}`, hosted by
-  `apps/desktop/src/plugins/context/client/{ContextPane.tsx,model.ts}`
+- Memory UI: `apps/desktop/src/plugins/memory/client/{MemorySection.tsx,memoryClient.ts}`, hosted by
+  `apps/desktop/src/plugins/context/client/{ContextPane.tsx,model.ts,selectionState.ts,syncState.ts}`
 - Assembly: `apps/desktop/src/core/shared/{api.ts,contextBlock.ts}`
 - MCP tools: `apps/desktop/src/core/mcp/server.ts`
 

@@ -60,8 +60,26 @@ guard rejects unexpected `Host` headers (only `127.0.0.1:4317` is accepted —
 `127.0.0.1` form) so a DNS-rebinding page can't reach the local API as some
 other origin.
 
+The process boundary is deliberately narrower than the HTTP application boundary:
+
+- **Utility service owns domain/runtime state:** SQLite and migrations, both HTTP listeners,
+  WebSocket fan-out, PTYs/tmux, worktrees, Git and child processes, workflows, Docker, Postgres
+  pools, notes/memory/context, agent tools, reconciliation, and shutdown draining.
+- **Electron main owns native state:** `BrowserWindow`, `WebContentsView`, folder dialogs,
+  `safeStorage`, navigation/keyboard policy, and service supervision.
+- **Typed service RPC connects them:** `core/shared/serviceProtocol.ts` validates versioned
+  request/response/event envelopes in both processes. `core/shared/desktopCapabilities.ts` exposes
+  only narrow task-addressed preview/browser operations. No DB handle, process object, or
+  `webContents` identifier crosses the boundary.
+
+Main waits for `service.start` before opening the window. If the child exits unexpectedly after
+startup it applies bounded exponential restart, reloads the renderer after recovery, and fails
+closed after more than three crashes in one minute. This supervision protocol is lifecycle and
+native-capability plumbing; renderer product data still uses HTTP/WebSocket.
+
 All server-side local state — the SQLite DB (`acorn.sqlite`), the `blobs/`
-cache, and per-task `worktrees/` — lives under one data root:
+cache, per-task `worktrees/`, notes/proposals, and the internal-token/active-identity
+files — lives under one data root:
 `app.getPath('userData')` in packaged builds, `apps/desktop/.acorn/`
 (gitignored).
 
@@ -86,7 +104,7 @@ The UI is organised as a three-level hierarchy plus two docked surfaces.
 ```
 Workspace ("Runn", "Acorn")            ← group of repos, picked in the top bar
   └─ Task (repo + branch + worktree)   ← unit of work, a row in the left TabRail
-       ├─ Panes (flat left→right row)  ← pr · changes · notes · editor · preview · …
+       ├─ Panes (ordered/resizable row)← pr · changes · notes · editor · docker · http · …
        ├─ Terminal drawer (bottom)     ← persistent shell / agent sessions   [desktop]
        └─ Agents panel (right rail)    ← agent roster + launcher + activity   [desktop]
 ```
@@ -102,20 +120,21 @@ Workspace ("Runn", "Acorn")            ← group of repos, picked in the top bar
   left **TabRail**. A task's `origin` is one of `github-pr | linear | rollbar |
   local`. (Terminology note: earlier design docs called a Task a "Workspace" —
   it was renamed; Workspace now means the group.)
-- **Pane** — a surface inside the Task view. `PaneId` is one of `pr | linear |
-  rollbar | preview | editor | changes | notes | context | database | search`
-  (`apps/desktop/src/core/client/tasks/layout.ts`). A task's layout is a flat
-  left→right row of open panes (`TaskLayout = { panes: PaneId[] }`); one pure
-  reducer `applyLayoutAction` owns every transition (`show` = single pane, `add`
-  = open beside via ⌘/Ctrl-click, `close`, `replace`).
+- **Pane** — a registry-contributed surface inside the Task view. `PaneId` is a
+  string owned by a contribution rather than a closed core union. The shipped
+  panes are `pr | changes | notes | context | editor | search | database |
+  preview | docker | http | linear | rollbar`. A task layout is a flat,
+  ordered row with optional relative widths and pins
+  (`TaskLayout = { panes, weights?, pinned? }`); one pure reducer owns show/add,
+  close/unpin, pin, move, resize/equalize, and recipe replacement.
 - **Terminal drawer** — bottom, per-task, holds persistent shell/agent sessions.
 - **Agents panel** — right rail, the roster, launcher, and activity feed for
   agent sessions.
 
-**Maturity.** PR review (list / detail / diff / write actions), Workspaces,
-Tasks, the TabRail, panes, notifications, integrations (Linear live, Rollbar), shared model-provider
-connections (OpenAI and Anthropic),
-settings, the command palette, and the file finder are shipped and default-on.
+**Maturity.** PR review, Workspaces, Tasks, the TabRail, all twelve pane
+contributions, the Docker and API Requests sources, notifications, integrations
+(Linear and Rollbar), shared model-provider connections (OpenAI and Anthropic),
+database tools, settings, the command palette, and the file finder are shipped.
 The **terminal drawer, agent sessions, run targets, and workflows** are
 desktop-only and always on when the Electron terminal capability is present
 (`capabilities()`, `apps/desktop/src/core/client/capabilities.ts` — the old
@@ -148,7 +167,8 @@ offline browsing:
 Mirror tables include `repos`, `pull_requests`, `pr_files`, `reviews`,
 `comments`, `pr_commits`, `review_threads`, `pr_labels`, `review_requests`,
 `checks`, the `sync_state` freshness bookkeeping, and `issues` (Linear/Rollbar
-items cached from their providers).
+items cached from their providers) with `issue_resources` for provider-list
+freshness.
 
 **App-state — data acorn owns.** A separate set of tables are the source of
 truth: they survive mirror re-syncs and have no upstream to reconcile against.
@@ -160,19 +180,19 @@ These back the product model above and the agent spine:
 | Tasks | `tasks`, `task_links` |
 | Review | `review_notes` (inline notes on uncommitted changes), `viewed_files` |
 | Agents / memory | `memories` (+ `memories_fts` FTS5), `terminal_sessions` |
-| Automation | `workflow_runs`, `workflow_steps` |
+| Automation | `workflow_runs`, `workflow_steps`, `command_executions`, `config_acks` |
 | Public API | `api_tokens`, on-demand `oauth_accounts`, `api_idempotency` (bearer automation API) |
 | HTTP client | identity-scoped `http_requests`, `http_variables` (sensitive values encrypted at rest) |
+| Database | repo-scoped `db_saved_queries` |
 | Prefs / misc | `prefs`, `pinned_repos`, `integrations`, `repo_paths` |
 
 Locally-owned entities that own an on-disk artefact (a worktree, a memory file, a
 PTY) are **machine-scoped — no `user_id`** — because there is exactly one user on
 the machine: `tasks`, `review_notes`, `memories`, and `terminal_sessions` carry
-no user column by design. The older user-scoped columns on prefs/pins are kept,
-with documented semantics (see the comment in `schema.ts`): `user_id` is the
-single canonical user id — the authenticated GitHub login — so app state is
-pinned to the GitHub identity and a login switch doesn't inherit another
-account's state. See [data-layer](./data-layer.md) for the table-by-table split.
+no user column by design. Identity-scoped rows instead carry the canonical
+authenticated GitHub login so a login switch cannot inherit another account's
+preferences, integrations, saved HTTP requests, or bearer credentials. See
+[data-layer](./data-layer.md) for the table-by-table split.
 
 ## Three cache layers
 
@@ -238,9 +258,11 @@ connection rather than opening a second.
 Agents get task-scoped context through the **acorn MCP server**
 (`apps/desktop/src/core/mcp/server.ts`) over loopback. The stdio MCP proxy runs as a spawned child
 process and calls the running app rather than opening the database itself. Because it holds
-no session cookie, the utility service loads a persistent local `INTERNAL_TOKEN` and injects
-it (with the other `ACORN_*` env vars) into each task session, so the agent's MCP
-calls authenticate back to the machine's single user. Through that channel the
+no session cookie, the utility service loads or creates one persistent mode-`0600`
+`INTERNAL_TOKEN` and injects it (with the other `ACORN_*` env vars) into each task session. The
+token is bound to the explicit `active-identity` written by cookie-authenticated traffic, so the
+agent's MCP calls authenticate back to the current machine user without acquiring a live GitHub
+token. Through that channel the
 agent reads the assembled task context, the current PR/changes, and the
 notes/memory that carry a handoff from the reviewer: `review_notes` become an
 agent prompt, and the `memories` index (markdown files are the truth; the table
@@ -260,9 +282,9 @@ projection itself is transport-neutral.
 - **No server-side session store** — the session lives entirely in an encrypted
   cookie, decrypted per request.
 - **No GitHub token in the browser** — only public profile fields cross the wire.
-- **No second application backend** — one Hono service owns data and domain operations;
-  Electron main is a native UI/supervision host, the stdio MCP child is a thin proxy into that
-  service, and terminal sessions are owned by the same service process.
+- **No second domain backend** — one utility service owns data and domain operations; its internal
+  SPA listener and opt-in public listener project the same registries/services. Electron main is a
+  native UI/supervision host and the stdio MCP child is a thin proxy, not a database owner.
 - **Single machine, single user** — no multi-tenancy, no shared storage to
   protect; locally-owned tables are machine-scoped accordingly.
 
@@ -300,7 +322,9 @@ projection itself is transport-neutral.
 - [ui-design](./ui-design.md) — layout, theming, and the monospace/flat design
   language.
 - [pg](./pg.md) — the Database pane: a native Postgres viewer/editor over
-  task-scoped HTTP routes and main-process pools.
+  task-scoped HTTP routes and utility-service pools.
+- [docker](./docker.md) — Docker Source/pane, task matching, daemon events, and lifecycle.
+- [http-client](./http-client.md) — encrypted API requests, variables, and outbound execution.
 
 **Agents & automation**
 

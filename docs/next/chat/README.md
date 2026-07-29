@@ -110,8 +110,9 @@ credentials are required.
 
 ## Repository drift note
 
-The worktree already contained unrelated, uncommitted public-API changes while this design was written,
-including an untracked `0023` migration and edits to `schema.ts`, `bindings.ts`, and server composition.
-An implementer must inspect the live diff, use the next available migration identifier, and merge
-composition changes rather than overwriting them. The implementation plan has explicit drift and stop
-conditions for this.
+This design predates the current public API, Docker, HTTP-client, database-assistant, and
+model-provider work. An implementer must reconcile its table names, migration number, settings
+placement, registries, stream contracts, encryption helpers, and startup cleanup with the live
+architecture before coding. In particular, use the next generated migration rather than the numbers
+shown in this plan, reuse the shipped model-provider connections, and contribute through the current
+plugin registries instead of copying the old composition examples verbatim.

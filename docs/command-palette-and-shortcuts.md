@@ -24,7 +24,7 @@ score. The kinds, in composition order:
 | 2 | `run` | `Run: <id>` / `Stop: <id>` | One row per run target; toggles on `running`. Hint is the command. |
 | 3 | `layout` | `Layout: <id>` | A layout recipe: seed panes + auto-start a target. Hint `open panes + start target`. |
 | 4 | `workflow` | `Workflow: <name>` | A committed `.acorn/workflows` definition. Hint `<n> steps`. |
-| 5 | `action` | `New terminal`, `Show/Hide terminal drawer`, `Show pane: <label>`, `Close pane: <label>`, `Archive task` | Built-in task actions (see below). |
+| 5 | `action` | Terminal controls, registered pane show/close/pin/move commands, contextual editor actions, archive | Built-in and contribution-projected task actions (see below). |
 | 6 | `workspace` | `Switch workspace: <name>` | Navigation to another workspace (excludes the current one). Hint `<n> repos`. |
 | 7 | `task` | `Go to task: <title>` | Navigation to another task, **last** — it's navigation, not a command. Hint `owner/name`. |
 
@@ -39,10 +39,13 @@ workspace, then Go-to-task) are placed last deliberately. See `model.ts:23` for 
 - **Show / Hide terminal drawer** — toggles `isTerminalOpen(taskId)`.
 - **Show pane: `<label>`** — one row per available pane contribution, dispatching a layout `show`.
 - **Close pane: `<label>`** — only for panes currently open, and only when **more than one** pane is
-  open (closing the last pane is a no-op the reducer guards anyway).
+  open. A pinned pane's first close unpins it.
+- **Pin / Unpin pane: `<label>`** — protects it from ordinary `show` replacement and first close.
+- **Move pane left/right: `<label>`** — present only when that direction exists.
 - **Reveal active file in editor tree** — only while the Editor pane owns focus and has an active
   file; expands the lazy tree to that file and scrolls its row into view.
-- **Archive task** — guarded teardown via `api.task.archive` behind a `window.confirm`.
+- **Archive task** — guarded teardown via the shared will-phase confirmation, so contributed
+  concerns such as linked running Docker containers participate before the main teardown.
 
 ### What requires a task vs the terminal API
 
@@ -53,12 +56,12 @@ workspace, then Go-to-task) are placed last deliberately. See `model.ts:23` for 
   + `navigate(pathForTask(t))`.
 - `workspace` — navigation only. **No active task or terminal API required**; navigates to the
   workspace's first repo (same as the topbar `WorkspacePicker` and the ⌘L switcher below).
-- `action:pane-*` (Show/Close pane) — dispatch a layout action; needs an active task but **not** the
+- `action:pane-*` (show/close/pin/move) — dispatch a layout action; needs an active task but **not** the
   terminal API.
 - `run`, `workflow`, `layout`, and the remaining actions (`new-terminal`, `toggle-terminal`,
   `archive`) — need both an active task **and** the terminal API (`if (!taskId || !api) return`).
 
-**Capability gating.** Run/layout/workflow rows come from HTTP clients backed by main-process
+**Capability gating.** Run/layout/workflow rows come from HTTP clients backed by utility-service
 services. The terminal API only exists when the desktop terminal capability is present
 (`capabilities()`, `core/client/capabilities.ts`), so in a plain browser (`dev:node`)
 those three kinds are simply absent and the palette shows only pane/task/archive actions. See
@@ -215,6 +218,8 @@ shifted layer. Defaults (`PANE_SHORTCUT_DEFAULTS`):
 | `⌘⇧D` | Notes | `⌘⇧O` | Rollbar |
 | `⌘⇧X` | Context | `⌘⇧A` | Agents (toggle) |
 | `⌘⇧B` | Browser preview | `⌘⇧T` | Terminal (toggle) |
+| `⌘⇧F` | Find in Files | `⌘⇧J` | Database |
+| `⌘⇧H` | API requests | | |
 
 Letters mirror the pane name where free; Notes can't be `⌘⇧N` (reserved for New task) so it takes
 `⌘⇧D`. These are active **only in the Task view** (the listener lives for that component's lifetime,
@@ -222,7 +227,7 @@ Letters mirror the pane name where free; Notes can't be `⌘⇧N` (reserved for 
 notes/editor panes — so a focused editor keeps its own ⌘⇧ bindings (⌘⇧O go-to-symbol, etc.); the
 exception is the terminal, where ⌘ chords are safe. Some panes are availability-gated: `⌘⇧R` (PR
 review) is a no-op when the task has no PR, and `⌘⇧L`/`⌘⇧O` are no-ops when the task has no
-Linear/Rollbar links.
+Linear/Rollbar links. Docker is conditional and ships with no default chord; users may assign one.
 
 ### Overriding & reserved chords
 
