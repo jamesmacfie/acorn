@@ -132,7 +132,9 @@ by side inside the slot (`TaskView.tsx:252`):
   (requested reviewers + approve / request-changes / comment).
 - **Diff** — `DiffView.tsx`. A virtualized Shiki-highlighted diff with split/unified toggle, inline
   review threads (reply/resolve), gap expansion, and viewed-marking. The diff rendering pipeline is
-  documented in full in [diff-rendering.md](./diff-rendering.md).
+  documented in full in [diff-rendering.md](./diff-rendering.md). Navigator and Diff scroll
+  positions are session-only and scoped per task/PR (or per PR in the classic browser), so changing
+  panes/sources and returning resumes the review instead of starting at the top.
 
 Source: `apps/desktop/src/plugins/github/client/{pullDetail,diff}/`.
 
@@ -201,6 +203,9 @@ renderer; the focus-containment subscription is the shared `onClosePaneWithin` h
 `client/lib/`, also used by the terminal drawer).
 Expanded folders are remembered per task for the session, so leaving the editor and returning
 restores the same lazy-tree state; collapsing a parent does not discard its nested expansion.
+When the Editor pane owns focus, **Reveal active file in editor tree** is available in the command
+palette. It expands the active file's lazily-loaded ancestor folders and scrolls its selected row
+into view without moving keyboard focus out of Monaco.
 **→ agent** adds a file (or selection) reference to the agent composer. Open files persist to the
 `editor_open_files` pref (`features/editor/editorState.ts`).
 

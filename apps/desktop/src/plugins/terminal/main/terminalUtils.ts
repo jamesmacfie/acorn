@@ -38,11 +38,12 @@ export const tmuxNewSessionArgs = (name: string, cwd: string, command: string, e
   cwd,
   command,
 ]
+// -u: force UTF-8 output even when a GUI-launched Electron process has no locale environment.
+// Without it tmux replaces smart punctuation and box-drawing glyphs before xterm sees the stream.
 // -T RGB: declare the attach client truecolor-capable. TERM=xterm-256color carries no RGB
 // capability in terminfo and the user's terminal-features may not add it, so without this tmux
-// quantizes every 24-bit colour an agent TUI emits down to the 256 palette before xterm.js
-// (which renders full truecolor) ever sees it.
-export const tmuxAttachArgs = (name: string) => ['-T', 'RGB', 'attach', '-t', name]
+// quantizes every 24-bit colour an agent TUI emits down to the 256 palette.
+export const tmuxAttachArgs = (name: string) => ['-u', '-T', 'RGB', 'attach', '-t', name]
 
 // Parse `tmux list-sessions -F '#{session_name}'` into the set of our session names.
 export const parseTmuxSessions = (stdout: string): Set<string> =>

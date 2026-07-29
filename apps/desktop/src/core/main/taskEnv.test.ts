@@ -46,6 +46,16 @@ describe('childEnv', () => {
     expect(childEnv({}).COLORTERM).toBe('truecolor')
   })
 
+  it('guarantees a UTF-8 locale for Finder-launched processes with no locale environment', () => {
+    expect(childEnv({}).LANG).toBe('en_US.UTF-8')
+  })
+
+  it('preserves LC_CTYPE and does not override an existing locale', () => {
+    const env = childEnv({ LC_CTYPE: 'de_DE.UTF-8' })
+    expect(env.LC_CTYPE).toBe('de_DE.UTF-8')
+    expect(env.LANG).toBeUndefined()
+  })
+
   it('never leaks secrets and always sets TERM', () => {
     const env = childEnv({
       HOME: '/Users/x',

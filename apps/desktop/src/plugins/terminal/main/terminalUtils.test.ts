@@ -56,7 +56,7 @@ describe('tmux arg builders', () => {
     expect(tmuxNewSessionArgs('acorn-abc', '/repo', 'claude', { ACORN_TASK_ID: 't1', ACORN_API_TOKEN: 'tok' })).toEqual([
       'new-session', '-A', '-d', '-e', 'ACORN_TASK_ID=t1', '-e', 'ACORN_API_TOKEN=tok', '-s', 'acorn-abc', '-c', '/repo', 'claude',
     ])
-    expect(tmuxAttachArgs('acorn-abc')).toEqual(['-T', 'RGB', 'attach', '-t', 'acorn-abc'])
+    expect(tmuxAttachArgs('acorn-abc')).toEqual(['-u', '-T', 'RGB', 'attach', '-t', 'acorn-abc'])
   })
 })
 
@@ -99,4 +99,3 @@ describe('matchBlockedPrompt (docs/terminal-and-agents.md)', () => {
     expect(matchBlockedPrompt('')).toBe(false)
   })
 })
-

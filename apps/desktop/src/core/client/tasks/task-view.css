@@ -23,7 +23,7 @@
   grid-template-columns: clamp(360px, 23vw, 430px) minmax(0, 1fr) auto;
 }
 
-/* Worktree status line is the bottom-most dock: path + dirty/clean/needs-repair. Keeping it fixed
+/* Worktree status line is the bottom-most dock: worktree presence + dirty/clean/needs-repair. Keeping it fixed
    lets the independently portalled terminal drawer sit immediately above it. */
 .workspace-footer {
   position: fixed;
@@ -41,13 +41,14 @@
   font-size: var(--fs-sm);
   color: var(--text-muted);
 }
-.workspace-footer-path {
+.workspace-footer-worktree {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  flex: none;
   font-family: var(--font-mono);
-  min-width: 0;
-  overflow: hidden;
-  white-space: nowrap;
-  text-overflow: ellipsis;
 }
+.workspace-footer .workspace-footer-copy { opacity: 1; }
 .workspace-footer-branch { flex: none; font-family: var(--font-mono); }
 .workspace-footer-dirty { flex: none; color: var(--warn); }
 .workspace-footer-repair { flex: none; color: var(--del-marker); }

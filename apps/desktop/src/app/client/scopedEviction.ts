@@ -6,6 +6,7 @@ import { evictEditorState } from '../../plugins/editor/client/editorState'
 import { evictEditorTreeState } from '../../plugins/editor/client/editorTreeState'
 import { evictEditorViewStates } from '../../plugins/editor/client/editorViewState'
 import { evictPrFilter } from '../../plugins/github/client/pullList/filterState'
+import { evictReviewViewStates } from '../../plugins/github/client/reviewViewState'
 import { evictActiveTerminal } from '../../core/client/tasks/agentSessions'
 import { evictTaskState, evictWorkspaceView } from '../../core/client/tasks/tasks'
 
@@ -18,6 +19,7 @@ export function activateScopedStateEviction(): () => void {
     evictEditorState(taskId)
     evictEditorTreeState(taskId)
     evictEditorViewStates(taskId)
+    evictReviewViewStates(taskId)
     evictActiveTerminal(taskId)
     evictContextSelection(taskId)
     evictSyncState(taskId)
