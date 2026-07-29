@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { editorOpen, openFiles } from '../../plugins/editor/client/editorState'
 import { editorViewState, rememberEditorViewState } from '../../plugins/editor/client/editorViewState'
 import { prFilterFor, setPrFilter } from '../../plugins/github/client/pullList/filterState'
+import { rememberReviewDiffScroll, reviewDiffScroll } from '../../plugins/github/client/reviewViewState'
 import { activeTerminal, rememberActiveTerminal } from '../../core/client/tasks/agentSessions'
 import {
   dispatchLayout,
@@ -34,6 +35,13 @@ describe('scoped lifecycle eviction', () => {
     setFocusedPane(taskId, 'editor')
     setMaximizedPane(taskId, 'editor')
     editorOpen(taskId, 'src/a.ts', false)
+    const reviewScope = { taskId, routeKey: 'oak/acorn#42' }
+    rememberReviewDiffScroll(reviewScope, {
+      top: 4_800,
+      left: 0,
+      viewMode: 'unified',
+      filesSignature: 'src/a.ts:sha',
+    })
     rememberActiveTerminal(taskId, 'session-1')
     openPane(taskId, 'editor', { kind: 'editor:reveal', path: 'src/a.ts', line: 1 })
     requestTerminalFocusIntent(taskId, 'session-1')
@@ -51,6 +59,7 @@ describe('scoped lifecycle eviction', () => {
     expect(focusedPane(taskId)).toBeUndefined()
     expect(maximizedPane(taskId)).toBeUndefined()
     expect(openFiles(taskId)).toEqual([])
+    expect(reviewDiffScroll(reviewScope)).toBeUndefined()
     expect(activeTerminal(taskId)).toBeUndefined()
     expect(consumePaneIntent(taskId, 'editor')).toBeUndefined()
     expect(consumeTerminalFocusIntent(taskId)).toBeUndefined()

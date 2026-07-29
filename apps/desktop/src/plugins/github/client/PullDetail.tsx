@@ -19,6 +19,8 @@ import { scanLinearRefs } from '../../linear/client/scanLinearRefs'
 import { linkifyLinearIds, makeContentLinkHandler, splitLinearIds } from './contentLinks'
 import { buildConversationEntries, buildThreadSnippetIndex } from './pullDetail/model'
 import { persistDraft } from './comments/draftState'
+import { createNavigatorScrollRestoration } from './reviewScrollRestoration'
+import type { ReviewViewScope } from './reviewViewState'
 
 const labelColor = (color: string | null | undefined) => (color ? `#${color}` : 'var(--text-faint)')
 
@@ -96,6 +98,25 @@ export default function PullDetail(props: { task?: Task } = {}) {
   const linearIssues = createQuery(() => linearIssuesOptions(linearRefs().map((rf) => rf.identifier), linearRefs().length > 0 && linearConnected()))
   const linearSummary = createMemo(() => new Map((linearIssues.data?.issues ?? []).map((i) => [i.identifier, i])))
   const [openIssue, setOpenIssue] = createSignal<string | null>(null)
+
+  // The Navigator pane itself is the scroll container, outside this fragment-owned component.
+  // Keep its session position per task/PR (or classic-browse PR) so disposing the review surface
+  // to show another pane/source does not make returning start over at the header.
+  const reviewScope = createMemo<ReviewViewScope | null>(() =>
+    hasPullParams()
+      ? { taskId: props.task?.id, routeKey: routeKey(o(), r(), n()) }
+      : null,
+  )
+  const bindNavigatorScroll = createNavigatorScrollRestoration({
+    scope: reviewScope,
+    trackContent: () => {
+      detail.data
+      changedFiles.files().length
+      conflicts.data
+      linearIssues.data
+    },
+  })
+
   // Open in-app links found inside rendered bodies (Linear issues → panel; GitHub PRs/repos → SPA).
   const navigate = useNavigate()
   const onContentClick = makeContentLinkHandler(navigate, setOpenIssue)
@@ -186,7 +207,7 @@ export default function PullDetail(props: { task?: Task } = {}) {
       <Show when={detail.data?.pull} fallback={<p class="placeholder">{detail.isError ? 'Not found.' : 'Loading…'}</p>}>
         {(pull) => (
           <>
-            <div class="pr-detail-header">
+            <div class="pr-detail-header" ref={bindNavigatorScroll}>
               <div class="pr-detail-title">
                 <span class="pr-num copyable">#{pull().number}<CopyButton text={() => String(pull().number)} title="Copy PR number" /></span> <LinearText text={pull().title} prefixes={linearPrefixes()} onOpen={setOpenIssue} />
               </div>

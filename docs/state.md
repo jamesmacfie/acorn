@@ -68,7 +68,7 @@ logs because it cannot report failure by persisting another notice).
 | PR filters | T3 workspace state | Scoped GitHub descriptor |
 | Notices | T3 bounded app state | Descriptor capped at 50 notices and 64 KiB |
 | `task_panes` and `pane_shortcuts` | Legacy read/fallback | Retained for compatibility; new state uses layouts and keybindings |
-| Per-workspace last in-session view, active terminal, focused/maximized pane, recipe browser URL | T4 | Signals only; evicted with their task/workspace |
+| Per-workspace last in-session view, active terminal, focused/maximized pane, recipe browser URL, review scroll positions | T4 | Signals/maps only; task-owned entries are evicted with their task |
 | Pull-detail `<details>` open state | Deliberate localStorage exception | Per-device micro-preference; synchronous hydration avoids disclosure flash |
 | Comment/reply drafts | Deliberate localStorage exception | Per-device draft recovery; cleared on successful submit |
 | Tasks, workspaces, provider records, notes, workflow runs | T2 server state | Never prefs/localStorage |
@@ -83,7 +83,7 @@ final eviction, preventing cleanup from repopulating cursor/editor state after e
 composition root because choosing the concrete set of state owners is composition, not a core concern
 (so `core/` never imports the feature state modules it evicts). It clears
 task layouts, recipe URLs, terminal open/max/active state, pane focus/maximize, editor tabs and
-Monaco view state, pending presentation intents, per-workspace view memory, and PR filters. The
-persistent bindings then write a scoped tombstone so legacy aggregate values cannot resurrect the
-evicted scope. Preview webviews keep their existing
-feature-owned subscriber and tear down their guest process on task archive.
+Monaco view state, PR Navigator/Diff scroll state, pending presentation intents, per-workspace view
+memory, and PR filters. The persistent bindings then write a scoped tombstone so legacy aggregate
+values cannot resurrect the evicted scope. Preview webviews keep their existing feature-owned
+subscriber and tear down their guest process on task archive.

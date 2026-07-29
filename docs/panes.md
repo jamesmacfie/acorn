@@ -132,7 +132,9 @@ by side inside the slot (`TaskView.tsx:252`):
   (requested reviewers + approve / request-changes / comment).
 - **Diff** — `DiffView.tsx`. A virtualized Shiki-highlighted diff with split/unified toggle, inline
   review threads (reply/resolve), gap expansion, and viewed-marking. The diff rendering pipeline is
-  documented in full in [diff-rendering.md](./diff-rendering.md).
+  documented in full in [diff-rendering.md](./diff-rendering.md). Navigator and Diff scroll
+  positions are session-only and scoped per task/PR (or per PR in the classic browser), so changing
+  panes/sources and returning resumes the review instead of starting at the top.
 
 Source: `apps/desktop/src/plugins/github/client/{pullDetail,diff}/`.
 
