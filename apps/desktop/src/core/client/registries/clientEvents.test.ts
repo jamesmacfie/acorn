@@ -14,8 +14,8 @@ describe('client events and intents', () => {
   })
 
   it('retains pane and terminal intents until one consumer takes them', () => {
-    openPane('t1', 'editor', { kind: 'editor:reveal', path: 'a.ts', line: 3 }, 'add')
-    expect(consumePaneIntent('t1', 'editor')).toEqual({ kind: 'editor:reveal', path: 'a.ts', line: 3 })
+    openPane('t1', 'editor', { kind: 'editor:reveal', path: 'a.ts', line: 3, column: 7 }, 'add')
+    expect(consumePaneIntent('t1', 'editor')).toEqual({ kind: 'editor:reveal', path: 'a.ts', line: 3, column: 7 })
     expect(consumePaneIntent('t1', 'editor')).toBeUndefined()
     requestTerminalFocusIntent('t1', 's1')
     expect(consumeTerminalFocusIntent('t1')).toBe('s1')

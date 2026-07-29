@@ -4,7 +4,7 @@ import type { ExternalRef } from '../../shared/integrations'
 
 export type PaneIntent =
   | { kind: 'notes:open'; slug: string; scope: NoteScope }
-  | { kind: 'editor:reveal'; path: string; line: number }
+  | { kind: 'editor:reveal'; path: string; line: number; column?: number }
   | { kind: 'integration:show-ref'; ref: ExternalRef }
   | { kind: 'context:reveal'; sectionId: string; itemId?: string } // → pane 'context'
 

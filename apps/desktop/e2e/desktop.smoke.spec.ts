@@ -1,6 +1,6 @@
 import { expect, test, _electron as electron, type ElectronApplication, type Page } from '@playwright/test'
 import { execFileSync } from 'node:child_process'
-import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs'
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
@@ -19,6 +19,7 @@ async function launch(previous?: Pick<RunningApp, 'dataDir' | 'repoDir'>): Promi
     execFileSync('git', ['init', '-q', repoDir])
     execFileSync('git', ['-C', repoDir, 'config', 'user.email', 'e2e@acorn.test'])
     execFileSync('git', ['-C', repoDir, 'config', 'user.name', 'Acorn E2E'])
+    execFileSync('git', ['-C', repoDir, 'remote', 'add', 'origin', 'https://github.com/acorn/smoke.git'])
     execFileSync('git', ['-C', repoDir, 'commit', '--allow-empty', '-qm', 'init'])
   }
   const app = await electron.launch({
@@ -148,4 +149,56 @@ test('S5 quit tears down a live PTY child', async () => {
   await expect.poll(() => {
     try { process.kill(pid, 0); return false } catch { return true }
   }).toBe(true)
+})
+
+test('S6 find-in-files copies paths and double-clicks into the match', async () => {
+  const running = await launch()
+  const path = 'search-target.ts'
+  writeFileSync(join(running.repoDir, path), "const value = 'needleToken'\n")
+  execFileSync('git', ['-C', running.repoDir, 'add', path])
+  execFileSync('git', ['-C', running.repoDir, 'commit', '-qm', 'add search target'])
+  const task = await seedTask(running.page, running.repoDir)
+  await running.page.evaluate(async (taskId) => {
+    const response = await fetch(`/api/tasks/${taskId}/use-checkout`, { method: 'POST' })
+    if (!response.ok) throw new Error(await response.text())
+  }, task.id)
+  await running.page.reload()
+  await dismissOnboarding(running.page)
+  await running.page.getByRole('button', { name: 'Smoke task' }).click()
+  const files = await running.page.evaluate(async (taskId) => {
+    const response = await fetch(`/api/tasks/${taskId}/editor/files`)
+    if (!response.ok) throw new Error(await response.text())
+    return response.json() as Promise<string[]>
+  }, task.id)
+  expect(files).toContain(path)
+  await running.page.keyboard.press('Meta+Shift+f')
+  await expect(running.page.locator('.search-pane')).toBeVisible()
+  await running.page.getByPlaceholder('Search in files…').fill('needleToken')
+
+  const fileHead = running.page.locator('.search-file-head').filter({ hasText: path })
+  await expect(fileHead).toBeVisible()
+  await running.page.evaluate(() => {
+    const state = window as Window & { __acornCopiedText?: string }
+    Object.defineProperty(navigator, 'clipboard', {
+      configurable: true,
+      value: { writeText: async (text: string) => { state.__acornCopiedText = text } },
+    })
+  })
+  await fileHead.hover()
+  await fileHead.getByRole('button', { name: 'Copy file path' }).click()
+  expect(await running.page.evaluate(() => (window as Window & { __acornCopiedText?: string }).__acornCopiedText)).toBe(path)
+
+  const hit = running.page.locator('.search-hit').filter({ hasText: 'needleToken' })
+  await hit.click()
+  await expect(running.page.locator('.editor-pane')).toHaveCount(0)
+  await hit.dblclick()
+  await expect(running.page.locator('.editor-tab.active')).toContainText(path)
+  await expect(running.page.getByRole('textbox', { name: 'Editor content' })).toBeFocused()
+  await running.page.keyboard.type('X')
+  await running.page.keyboard.press('Meta+s')
+  await expect.poll(() => running.page.evaluate(async ({ taskId, path }) => {
+    const response = await fetch(`/api/tasks/${taskId}/editor/read?path=${encodeURIComponent(path)}`)
+    return (await response.json() as { text: string }).text
+  }, { taskId: task.id, path })).toContain("'XneedleToken'")
+  await running.app.close()
 })

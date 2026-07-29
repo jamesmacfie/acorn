@@ -57,7 +57,7 @@ export default function EditorPane(props: { task: Task }) {
   const taskId = props.task.id
   const [root, setRoot] = createSignal<string | null | undefined>(undefined) // undefined = loading
   const [saveErr, setSaveErr] = createSignal('')
-  const [pendingReveal, setPendingReveal] = createSignal<{ path: string; line: number } | null>(null)
+  const [pendingReveal, setPendingReveal] = createSignal<{ path: string; line: number; column?: number } | null>(null)
   const [treeReveal, setTreeReveal] = createSignal<FileTreeRevealRequest | null>(null)
   let treeRevealRevision = 0
 
@@ -185,21 +185,22 @@ export default function EditorPane(props: { task: Task }) {
     maybeReveal(relPath)
   }
 
-  // Consume a pending find-in-files reveal for the just-shown file: scroll to the match line and put
+  // Consume a pending cross-pane reveal for the just-shown file: center the target position and put
   // the cursor there. One-shot — cleared once applied so it doesn't re-fire on the next tab switch.
   function maybeReveal(relPath: string) {
     const r = pendingReveal()
     if (!editor || !r || r.path !== relPath) return
-    const line = Math.max(1, r.line)
-    editor.revealLineInCenter(line)
-    editor.setPosition({ lineNumber: line, column: 1 })
+    const requested = { lineNumber: Math.max(1, r.line), column: Math.max(1, r.column ?? 1) }
+    const position = editor.getModel()?.validatePosition(requested) ?? requested
+    editor.setPosition(position)
+    editor.revealPositionInCenter(position)
     editor.focus()
     setPendingReveal(null)
   }
 
   const applyPaneIntent = (intent: PaneIntent | undefined) => {
     if (!intent || intent.kind !== 'editor:reveal') return
-    setPendingReveal({ path: intent.path, line: intent.line })
+    setPendingReveal({ path: intent.path, line: intent.line, column: intent.column })
     // Reveal implies open: cross-pane senders (find-in-files, stack frames) go through the core
     // intent bus alone and can't call editorOpen themselves. No-op when the tab is already current.
     openPath(intent.path, true)
