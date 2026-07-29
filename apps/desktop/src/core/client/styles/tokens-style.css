@@ -102,7 +102,7 @@
   --diff-line-h: 20px;
   /* xterm renders to a canvas and cannot read CSS, so TerminalSurface reads this via
      metrics.ts. Listed in BRIDGE_TOKENS for that reason. */
-  --term-fs: 13px;
+  --term-fs: 15px;
 
   /* ── Typography ────────────────────────────────────────────────────────────────────────────
      --font-mono is PROTECTED: code, diffs, the terminal and the SQL grid are monospace in every

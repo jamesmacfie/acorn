@@ -8,10 +8,16 @@ import { branchSlug } from './pathGuards'
 // SESSION_ENC_KEY / GITHUB_CLIENT_SECRET (or anything else) into the child.
 export function childEnv(env: NodeJS.ProcessEnv = process.env): Record<string, string> {
   const out: Record<string, string> = {}
-  for (const k of ['HOME', 'PATH', 'SHELL', 'LANG', 'LC_ALL', 'USER', 'LOGNAME', 'TMPDIR']) {
+  for (const k of ['HOME', 'PATH', 'SHELL', 'LANG', 'LC_ALL', 'LC_CTYPE', 'USER', 'LOGNAME', 'TMPDIR']) {
     const v = env[k]
     if (v) out[k] = v
   }
+  // Finder-launched macOS apps may receive no locale variables at all. That makes tmux classify
+  // the attach client as non-UTF-8 and replace smart punctuation / box drawing before xterm sees
+  // the stream. Preserve an explicit locale above; otherwise establish the UTF-8 invariant every
+  // task-scoped process expects. `en_US.UTF-8` ships with macOS and avoids overriding a user's
+  // existing locale with an arbitrary language.
+  if (!out.LC_ALL && !out.LC_CTYPE && !out.LANG) out.LANG = 'en_US.UTF-8'
   out.TERM = 'xterm-256color'
   // xterm.js renders full 24-bit colour, but the whitelist above strips the COLORTERM a native
   // terminal would set — so agent TUIs (Codex/Claude) downgrade to the 256-colour palette and
