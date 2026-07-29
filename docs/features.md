@@ -12,8 +12,8 @@ Code, Codex, aider) against your repositories, each in its own git worktree. It 
 single-page app served by one in-process Hono server running in the Electron main process, backed by
 a local SQLite mirror of GitHub. Everything runs on one machine for one user.
 
-The whole UI is monospace (Berkeley Mono), 1px borders, square panes, token-driven light/dark — see
-[ui-design.md](./ui-design.md).
+The UI is token-driven: colour themes compose independently with style packs that control
+typography, shape, density, chrome, and motion. See [ui-design.md](./ui-design.md).
 
 ---
 
@@ -67,28 +67,48 @@ tasks are created on a fresh branch (slugged from the title) via the rail's `+` 
 
 ## Panes
 
-Inside a task, the view is a flat left→right row of open **panes** (one pure reducer,
-`applyLayoutAction`, owns every transition in
-`apps/desktop/src/core/client/tasks/layout.ts`). A switcher click **shows** a single pane;
-⌘/Ctrl-click **opens one beside** the others; each slot gets a close button when more than one is
-open. Every pane has an overridable single-key shortcut (Settings → Shortcuts).
+Inside a task, the view is a flat left→right row of registered **panes**. One pure reducer owns pane
+order, widths, pins, show/add/close, and recipe replacement. A switcher click keeps pinned panes and
+shows the target; ⌘/Ctrl-click opens it beside the others. Dividers resize/equalize the row, while
+focus and maximize stay session-only. Pane shortcuts are contribution-owned and user-overridable.
 
 | Pane | What it shows |
 | --- | --- |
 | `pr` | PR review — the Navigator + Diff (only when a PR is linked) |
 | `changes` | Uncommitted working-tree review (see below) |
-| `notes` | Workspace / global markdown scratchpad |
-| `context` | What an assembled agent "send" will include |
+| `notes` | Scratchpad-first task/workspace/global markdown library |
+| `context` | Select, preview, size, and sync assembled context to a chosen agent session |
 | `editor` | In-app code editor over the worktree |
 | `preview` | Kept-alive `WebContentsView` preview of the running app, with browser chrome and agent CDP tools |
 | `linear` / `rollbar` | The linked issue panel(s) |
-| `database` | Task-scoped PostgreSQL browser/editor |
+| `database` | Task-scoped PostgreSQL browser/editor, saved queries, and model-assisted SQL |
 | `search` | Ripgrep-backed worktree search |
+| `docker` | Containers linked to this task, with logs/stats/exec |
+| `http` | Encrypted repo/task API requests and variables |
 
 The switcher also hosts **run targets** (one ▶ per configured target — they run as terminal
 sessions, acorn allocates no ports), the **Agents** toggle, and the **Terminal** toggle.
 
 → [panes.md](./panes.md)
+
+## Docker
+
+The always-visible Docker Source browses Compose projects, containers, images, volumes, and
+networks, with guarded lifecycle/prune actions. A conditional task pane, rail badge, and footer
+badge show containers matched to the current task. Docker daemon events flow through the shared
+WebSocket so logs, stats, task summaries, and browse state refresh without an aggressive poll loop.
+
+→ [docker.md](./docker.md)
+
+## API requests
+
+The always-visible API Requests Source and task pane share a server-side HTTP client. Saved
+requests belong to a repo; new task-pane requests can remain task-local until filed. URLs, headers,
+bodies, auth, request variables, and repo variables are encrypted at rest. Variables can be plain,
+secret, or command-backed, resolve only when referenced, and redact from the response timeline.
+Only an interactive cookie-authenticated user may send requests.
+
+→ [http-client.md](./http-client.md)
 
 ## Local-changes review
 
@@ -112,6 +132,11 @@ desktop-only — always on when the native terminal capability is present (`capa
 `apps/desktop/src/core/client/capabilities.ts`); the old `acorn:term` flag is gone. Bridge-absent
 (a plain browser via `dev:node`) is the degraded mode.
 
+The panel also reads provider usage without persisting it: Claude uses bounded local transcript
+aggregates, while Codex uses its app-server usage/status surface. A configurable pricing catalog
+turns token categories into local cost estimates; the cache is five minutes and no usage row is
+written to SQLite or IndexedDB.
+
 → [terminal-and-agents.md](./terminal-and-agents.md)
 
 ## Integrations
@@ -124,6 +149,8 @@ when connected) and as **task links**:
 - **Rollbar** — browse errors as a Source and open the Rollbar pane on a linked task.
 
 Connect / disconnect in **Settings → Integrations**; tokens are encrypted at rest.
+The same registry also hosts shared OpenAI and Anthropic model-provider connections used by
+model-assisted features such as SQL generation.
 
 → [integrations.md](./integrations.md)
 
@@ -160,7 +187,7 @@ Definitions remain file-authored, and execution advances only while the app is o
 
 - **⌘K** — the command palette: fuzzy-filtered run targets, layouts, workflows, pane actions,
   "go to task" navigation, and visible (non-invocable) config parse-error rows
-  (`features/palette/model.ts`).
+  (`core/client/palette/model.ts`).
 - **⌘P** — go-to-file across the task worktree.
 - **`/`** — find file within the current PR's changed files (the finder overlay).
 - **`j` / `k`** — next / previous PR; **`[` / `]`** — previous / next file; **`c`** — create PR;
@@ -187,6 +214,11 @@ Reached from the account menu. A left tab rail:
 | *(per workspace)* | Identity (color/icon), scripts, browser preview, projects |
 | Appearance | Theme (12 themes) + follow-system light/dark |
 | Integrations | Connect / disconnect Linear, Rollbar |
+| Agent tools | Per-tool policy and permission controls |
+| Agent pricing | Provider/model pricing overrides used for local usage estimates |
+| Docker | Daemon status, stopped-container visibility, destructive confirmations |
+| API requests | HTTP-client behavior and stored-variable controls |
+| API | Opt-in public automation listener and bearer-token administration |
 | MCP | MCP server config |
 | Workflows | Read-only workflow inspector |
 | Terminal | Default profile when the terminal button is clicked |
@@ -200,8 +232,9 @@ Reached from the account menu. A left tab rail:
 Be aware of what's real today:
 
 - **Shipped, default-on:** GitHub PR review (list / detail / diff / write actions), Workspaces,
-  Tasks, the TabRail, panes, local-changes review, notifications, integrations (Linear live,
-  Rollbar), settings, command palette, and the file finder.
+  Tasks, the TabRail, panes, local-changes review, Docker/API-request sources, database/model
+  providers, notifications, integrations (Linear and Rollbar), settings, command palette, and the
+  file finder.
 - **Desktop-only (capability-gated, always on):** the terminal drawer, agent sessions, run targets,
   and workflows — available whenever the Electron terminal capability is present (`capabilities()`);
   the `acorn:term` localStorage flag has been deleted.
@@ -223,4 +256,5 @@ See also: [architecture-overview.md](./architecture-overview.md) ·
 [workspaces-and-tasks.md](./workspaces-and-tasks.md) · [panes.md](./panes.md) ·
 [terminal-and-agents.md](./terminal-and-agents.md) · [integrations.md](./integrations.md) ·
 [notes-and-memory.md](./notes-and-memory.md) · [mcp.md](./mcp.md) · [workflows.md](./workflows.md) ·
-[command-palette-and-shortcuts.md](./command-palette-and-shortcuts.md)
+[command-palette-and-shortcuts.md](./command-palette-and-shortcuts.md) ·
+[docker.md](./docker.md) · [http-client.md](./http-client.md)

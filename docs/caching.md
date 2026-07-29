@@ -253,3 +253,16 @@ All three layers are now local to one machine and one user, so the old
 - The `BLOBS` cache is an on-disk dir private to your machine — it caches all
   bodies by sha, public or private (the public-only guard is gone from the code).
 - IndexedDB is per-device and per-user, and is cleared on logout.
+
+## Maintenance and measurement
+
+Startup performs one correctness repair before serving: orphaned GitHub mirror children left by
+older non-atomic refreshes are pruned. It also expires public-API idempotency/command rows through
+their bounded maintenance paths. Derived mirror/provider/blob data does not yet have a general
+age/size retention sweep. Instead `core/main/storageFootprint.ts` logs the SQLite and blob footprint
+at startup so that sweep is triggered by measured growth rather than speculation. See
+[next/performance.md](./next/performance.md).
+
+The Docker plugin also uses short main-memory info/list caches, but they are live-service
+coalescing rather than product persistence: daemon events invalidate them and app quit discards
+them. They are documented in [docker.md](./docker.md), not counted as a fourth durable cache layer.

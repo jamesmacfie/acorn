@@ -7,8 +7,8 @@ Run commands from the repository root unless noted otherwise.
 | --- | --- |
 | `pnpm lint` | Strict TypeScript (`tsc --noEmit`) across the workspace |
 | `pnpm test` | Rebuild native modules for Node, then run the complete Vitest suite |
-| `pnpm build` | Build Electron main, preload, and renderer bundles |
-| `pnpm --filter @acorn/desktop test:e2e` | Build, rebuild native modules for Electron, and run S1–S5 Playwright-Electron smoke tests |
+| `pnpm build` | Build Electron main/preload/renderer and enforce 1.25 MB startup-script / 200 KB CSS budgets |
+| `pnpm --filter @acorn/desktop test:e2e` | Build, rebuild native modules for Electron, and run S1–S6 Playwright-Electron smoke tests |
 | `pnpm --filter @acorn/desktop db:check` | Replay the full migration chain on a fresh database |
 | `pnpm --filter @acorn/desktop exec electron scripts/smoke-browser.cjs` | Manual drivable-preview smoke against a running Electron app |
 
@@ -28,8 +28,9 @@ Run commands from the repository root unless noted otherwise.
 - The persisted-state and workflow registry conformance suites iterate every descriptor and enforce
   malformed-input tolerance, bounds, unique identity, handlers, and descriptor-owned validation.
 - `e2e/desktop.smoke.spec.ts` covers real boot, cross-launch restore, opening a task, terminal echo
-  over the authenticated WebSocket, and clean PTY teardown on quit. It uses an environment-gated
-  local login and isolated temporary data; the seam returns 404 outside `ACORN_E2E=1`.
+  over the authenticated WebSocket, clean PTY teardown on quit, and find-in-files → copy path /
+  double-click reveal in Editor. It uses an environment-gated local login and isolated temporary
+  data; the seam returns 404 outside `ACORN_E2E=1`.
 - Workflow tests use the committed fake agent through the real argv/template path and cover gates,
   joins, fan-out, branching, cancellation, reconciliation, and tool ceilings.
 - Public API tests live beside the code under `core/{server,main,client}/publicApi/*.test.ts` — token

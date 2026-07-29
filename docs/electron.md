@@ -1,11 +1,12 @@
-# acorn → Electron desktop app — migration plan
+# Electron runtime and migration record
 
 > Status: **Migration complete.** Phases 0–2 done (Node-server spike + Electron shell + Cloudflare
 > cut) plus the Phase 3 caching cleanup. The Hono app runs under `@hono/node-server` on
 > `http://127.0.0.1:4317` with a better-sqlite3-backed Bindings object (typed stores — the KV shim
 > is gone), wrapped in an Electron app
 > whose main process starts that server and loads the loopback origin. **Cloudflare/wrangler is fully
-> removed** — Electron is the only runtime. The **v2 terminal (§8) has since shipped**: node-pty
+> removed** — Electron is the shipped product runtime; `dev:node` remains a supported development
+> composition root for pure-Node server capabilities. The **v2 terminal (§8) has since shipped**: node-pty
 > sessions run in the main process (`src/plugins/terminal/main/terminal.ts`, desktop-only and always on — see
 > [terminal-and-agents.md](./terminal-and-agents.md)). `SESSION_ENC_KEY` now uses `safeStorage`;
 > GitHub device flow (dropping `client_secret`) remains an optional distribution enhancement, not
@@ -187,48 +188,47 @@ pin it; IndexedDB continuity is.
 
 ### 4b. The Bindings shim (replaces `Env`)
 
-One module constructs the object the routes already expect via `c.env`. Hand-write the type to
-replace the deleted `worker-configuration.d.ts`, and keep the app-level type separate from
-`@hono/node-server`'s HTTP bindings (as designed at migration time — the `KVish` shim below has
-since been replaced by typed stores: `OauthStateStore` / `BlobCache`):
+One module constructs the object the routes already expect via `c.env`. The hand-written global
+`Env` replaces the deleted `worker-configuration.d.ts` and extends the current runtime bindings
+with optional `@hono/node-server` HTTP bindings:
 
 ```ts
-import type { HttpBindings } from '@hono/node-server'
-
 export type RuntimeBindings = {
-  DB: BetterSQLite3Database              // structural — see 4c
-  OAUTH_STATE: KVish                     // get/put({expirationTtl})/delete
-  BLOBS: KVish
+  DB: AppDatabase
+  OAUTH_STATE: OauthStateStore           // issue/consume; five-minute in-memory TTL
+  BLOBS: BlobCache
   SESSION_ENC_KEY: string
   GITHUB_CLIENT_ID: string
   GITHUB_CLIENT_SECRET: string
+  INTERNAL_TOKEN: string
+  ACTIVE_IDENTITY: ActiveIdentityStore
+  API_TOKENS: TokenService
+  OAUTH_ACCOUNTS: OauthAccountService
+  UI_BROKER: UiControlBroker
 }
-
-export type AppBindings = RuntimeBindings & Partial<HttpBindings>
 ```
 
-- **`OAUTH_STATE`** — 5-minute ephemeral CSRF state. A `Map<string,{v,exp}>` with a lazy expiry
-  check is plenty; no persistence wanted. ~15 lines implementing `.get/.put/.delete`.
-- **`BLOBS`** — immutable public blob/patch bodies keyed by sha. Back it with a cache dir
+- **`OAUTH_STATE`** — 5-minute ephemeral CSRF state with atomic issue/consume semantics; no
+  persistence wanted.
+- **`BLOBS`** — immutable blob/patch bodies keyed by sha for public and private repos. Back it with a cache dir
   (`app.getPath('userData')/blobs/<sha>`), `.get` = read file, `.put` = write file. ~20 lines.
 - **secrets** — read from `.env` in dev. `SESSION_ENC_KEY` falls through to Electron `safeStorage`
   in a packaged build (Phase 9 C, `sessionKeyStore.ts`): env always wins and is persisted as the
   env-only migration path; otherwise a fresh data root mints once. An existing `acorn.sqlite` with
-  neither source fails closed instead of changing identity. `GITHUB_CLIENT_*` still come from the environment. Inject once at
-  bootstrap; never bake `GITHUB_CLIENT_SECRET` or `SESSION_ENC_KEY` into the bundle.
+  neither source fails closed instead of changing identity. GitHub OAuth credentials resolve from
+  the data-root `.env`, process environment, then the `MAIN_VITE_GITHUB_CLIENT_*` build fallback.
+  Release CI uses that fallback so the package is self-contained. `SESSION_ENC_KEY` is never baked;
+  the current OAuth client secret is, and must be treated as recoverable from a distributed binary.
 
-The KV shim only needs the handful of methods actually called (`get`, `put` with optional
-`expirationTtl`, `delete`) — not the full KV surface.
-
-**As shipped**, `RuntimeBindings` (`src/core/main/bindings.ts`) matches the sketch above with two
-divergences. One post-migration addition: `INTERNAL_TOKEN`, private persisted bearer material for
-loopback callers that hold no session cookie (the acorn MCP server — agents inherit it as
-`ACORN_API_TOKEN`; auth maps it through the explicit active-identity binding). And the KV shim is
-gone: the sketch's `KVish` was retired for plain typed modules that say what they mean —
+`INTERNAL_TOKEN` is private persisted bearer material for loopback callers that hold no session
+cookie (the acorn MCP server — agents inherit it as `ACORN_API_TOKEN`; auth maps it through the
+explicit active-identity binding). `API_TOKENS`, `OAUTH_ACCOUNTS`, and `UI_BROKER` are shared by the
+internal administration routes and optional public listener. The migration sketch's `KVish` was
+retired for plain typed modules that say what they mean:
 `OauthStateStore { issue(state), consume(state) }` (in-memory, TTL internal) and
 `BlobCache { get(key), put(key, value) }` (on-disk by sha; immutable content, so no TTL and no
 delete). The global `Env` in `src/env.d.ts` extends `RuntimeBindings` **and**
-`Partial<HttpBindings>` — exactly the `AppBindings` sketch — so `main/server.ts` builds the env at
+`Partial<HttpBindings>` so `main/server.ts` builds the env at
 the `app.fetch()` seam without a cast.
 
 ### 4c. DB driver swap
@@ -405,15 +405,16 @@ gives fast warm reads and offline browsing without a service worker (see [cachin
   - `asarUnpack`: native `.node` modules used by `better-sqlite3` now and `node-pty` later.
   - `extraResources` or equivalent: Drizzle migration files if they are not bundled into JS.
   - `files`: renderer assets, main/preload output, and any static files still served by Hono.
-- New `package.json` scripts:
+- The shipped scripts are:
 
-| Old | New |
+| Script | Current behavior |
 |---|---|
-| `dev: vite` | `dev: electron-vite dev` |
-| `build: vite build` | `build: electron-vite build && electron-builder` |
-| `typegen: wrangler types` | *(deleted)* |
-| `db:migrate: wrangler d1 …` | `db:migrate: tsx scripts/migrate.ts` (or run on startup) |
-| `db:generate: drizzle-kit generate` | *(unchanged)* |
+| `dev` | `electron-vite build && electron-vite preview` |
+| `build` | `electron-vite build` plus the renderer-size budget gate |
+| `dist` | the gated build plus `electron-builder --mac` |
+| `test:e2e` | build/rebuild for Electron and run Playwright smoke tests |
+| `db:generate` | Drizzle generation plus a fresh-DB migration replay |
+| `db:migrate` | `tsx scripts/migrate.ts` (also runs on startup) |
 
 ## 5. Cleanup — what to delete (clean transition matters)
 
@@ -481,7 +482,7 @@ and the `.batch` shim is atomic. The riskiest step (DB driver, waitUntil, bindin
 Remaining one-time setup for OAuth login: register `http://127.0.0.1:4317/auth/callback` as a
 loopback callback on the GitHub OAuth app (the only Phase 0 step that can't be verified headlessly).
 
-**Phase 1 — Electron shell. ✅ DONE (pending GUI/OAuth verification on a real machine).** Wrapped
+**Phase 1 — Electron shell. ✅ DONE.** Wrapped
 Phase 0 in Electron (`electron-vite` + `src/app/main/electron.ts` + `src/core/main/preload.ts`). The main
 process starts the server then loads `http://127.0.0.1:4317`; navigation is locked to the loopback
 origin, external links open in the system browser, and `/auth/login` is rerouted into a dedicated
@@ -502,11 +503,11 @@ added `electron-builder.yml` (mac dmg/zip, `asarUnpack` the native `.node`, migr
 `extraResources` resolved via `process.resourcesPath`), reworked scripts (`build`→electron-vite,
 `dist`→electron-builder, `db:migrate`→`tsx scripts/migrate.ts`, dropped `typegen`/`dev:web`), and
 updated `CLAUDE.md`. Verified: `pnpm lint`, 88/88 tests, `pnpm build`, and `pnpm dev` boots clean.
-**Still not verified:** a packaged `.dmg` from `pnpm dist`. (The old blocker is gone: the data
-root now resolves to `app.getPath('userData')` when packaged — §4c — so nothing tries to write
-inside the read-only asar. `SESSION_ENC_KEY` now self-provisions via `safeStorage` (Phase 9 C), so a
-packaged build with no `.env` still keeps sessions across relaunch; `GITHUB_CLIENT_*` remain the
-outstanding packaged-build secret gap.)
+The release workflow now builds the packaged `.dmg` on pushes to `main` and uploads it as an
+artifact. The data root resolves to `app.getPath('userData')`, migrations are packaged as resources,
+native modules and ripgrep are unpacked, and `SESSION_ENC_KEY` self-provisions through
+`safeStorage`. Release CI embeds the dedicated OAuth application's credentials through the
+build-time fallback; device flow remains the distribution hardening follow-up.
 
 **Phase 3 — Desktop-native cleanups + features.** Caching simplification (§5) **✅ done**. The
 **v2 terminal** (§8) **✅ shipped** — node-pty sessions in the main process, desktop-only and always
@@ -541,11 +542,11 @@ is removed — see git history).
 1. **Pinned app port** must be free. If taken, the stable origin cannot start. Mitigation: enforce
    single-instance startup, pick an uncommon port, and surface a clear error. A dynamic fallback is
    possible, but it creates a new IndexedDB origin.
-2. **`client_secret` in the binary** if we ever distribute (§4f) — device flow is the answer.
+2. **`client_secret` in the binary** in current release artifacts (§4f) — device flow is the answer.
 3. ~~**Service worker masking app updates**~~ — resolved: the service worker was removed (§4h).
-4. **Packaged migrations/native modules** can work in dev and fail in a signed app if paths are
-   resolved from `process.cwd()` or native `.node` files stay inside `asar`. Resolve paths from app
-   resources and unpack native modules.
+4. ~~**Packaged migrations/native modules**~~ — resolved in the current package: migrations are
+   extra resources, native modules/ripgrep are unpacked, and paths resolve from app resources.
+   Signed/notarized distribution still needs its own install-time smoke test.
 5. **Auto-update** — `electron-builder` supports it, but it's new surface vs. "redeploy a Worker."
    Fine for a personal tool; decide later if distributing.
 
@@ -582,7 +583,7 @@ migrate (openDb runs migrations)
   → start loopback listener (startListener — only now do requests get served)
   → create window (electron.ts supplies createWindow; bootstrap owns when)
   → reconcile durable state (tmux resurrect, worktree prune, workflow resume) off the paint path
-  → dispose in reverse on will-quit (loopback listener, idle-watch interval, pg pools)
+  → dispose in reverse on will-quit (public/internal listeners, preview, terminal, Docker, pg pools)
 ```
 
 Two invariants this closes (review §2): the listener starts **after** every harness/context bridge

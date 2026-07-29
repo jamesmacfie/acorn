@@ -98,18 +98,18 @@ Adopted lesson: parsing Markdown does not make output safe. The plan uses a synt
 These repository documents and modules establish the local constraints used in the design:
 
 - [Plugin architecture](../../plugins.md)
-- [Extensibility roadmap](../extensibility.md)
-- [Contribution model](../contribution-points.md)
-- [State ownership and policies](../state-and-policies.md)
-- [Security direction](../security.md)
-- [UX direction](../ux.md)
+- [Architecture overview](../../architecture-overview.md)
+- [Plugin and contribution model](../../plugins.md)
+- [State ownership and policies](../../state.md)
+- [Current security boundaries](../../security.md)
+- [UI design](../../ui-design.md)
 - `apps/desktop/src/core/client/registries/sources.ts`
 - `apps/desktop/src/core/server/routeRegistry.ts`
 - `apps/desktop/src/core/shared/ws.ts`
 - `apps/desktop/src/core/client/notifications/notifications.ts`
 - `apps/desktop/src/core/server/db/schema.ts`
 - `apps/desktop/src/core/server/blobs.ts`
-- `apps/desktop/src/plugins/github/client/shiki.ts`
+- `apps/desktop/src/core/client/highlight/shiki.ts`
 
 The principal local conclusions are:
 

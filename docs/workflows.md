@@ -53,7 +53,7 @@ report it back via `url_command`.
 
 ### Where targets are configured
 
-Three layers, highest precedence first (`loadRepoConfig`, `apps/desktop/src/plugins/terminal/main/runConfig.ts` —
+Three layers, highest precedence first (`loadRepoConfig`, `apps/desktop/src/core/main/runConfig.ts` —
 the canonical layering comment lives at its merge point):
 
 | Layer | Source | Notes |
@@ -236,8 +236,8 @@ control. `reconcile` requeues interrupted running rows and completes interrupted
 | --- | --- | --- |
 | HTTP + WS client | `workflowClient.ts`, `terminalClient.ts` | defs/start/runs/steps/gate/cancel/kill/trigger-poll over HTTP; notices, status, and live step events over WS |
 | Palette launch | `model.ts:28`, `CommandPalette.tsx:114-119` | `Workflow: <name>` rows; selecting one calls `workflow.start` |
-| Settings inspector | `features/settings/WorkflowsSettings.tsx` | **read-only** list of the committed/user workflow defs the active task would load + parse errors; a viewer, not a launcher |
-| Agents panel | `features/agents/AgentsPanel.tsx` | push-refetches transitions, renders a live tail and quiet-step hint, approves gates, cancels runs/kills steps, and uses the profile-projected resume command |
+| Settings inspector | `plugins/workflows/client/WorkflowsSettings.tsx` | **read-only** list of the committed/user workflow defs the active task would load + parse errors; a viewer, not a launcher |
+| Agents panel | `plugins/agents/client/AgentsPanel.tsx` | push-refetches transitions, renders a live tail and quiet-step hint, approves gates, cancels runs/kills steps, and uses the profile-projected resume command |
 
 Gate/run-done notices and live step events are broadcast to the renderer over the authenticated
 WebSocket and feed the same notification bell as agent-state edges.
@@ -281,7 +281,7 @@ saved-prompt/skills-as-steps polish, and acorn-as-a-Linear-agent-host.
 - Schema: `apps/desktop/src/core/server/db/schema.ts:445-481` (`workflow_runs`, `workflow_steps`),
   `:248-270` (`repo_paths.runTargets`, `repo_paths.devScript`/`devRestartScript`),
   `:351` (`tasks.parentId`)
-- Run targets: `apps/desktop/src/plugins/terminal/main/runConfig.ts`, `apps/desktop/src/plugins/terminal/main/runtime.ts`,
+- Run targets: `apps/desktop/src/core/main/runConfig.ts`, `apps/desktop/src/plugins/terminal/main/runtime.ts`,
   bridge injection in `apps/desktop/src/plugins/terminal/main/runIpc.ts`, wire shapes in `apps/desktop/src/core/shared/terminal.ts`
   (canonical `RunTargetInfo`/`RunStatus`)
 - Workflow engine: `apps/desktop/src/plugins/workflows/main/workflowRunner.ts`, `apps/desktop/src/core/main/headless.ts`,
