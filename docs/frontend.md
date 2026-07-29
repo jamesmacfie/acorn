@@ -1,9 +1,9 @@
 # Frontend
 
-The acorn client shell — how the SolidJS SPA boots, how the layout switches between browse
-sources / tasks / the classic PR browser, how session state is restored, and where each kind of
-state lives. Per-pane behaviour lives in [panes.md](./panes.md); this doc is about the shell and
-its state model.
+The acorn client shell — how the SolidJS SPA boots, how contribution registries switch between
+browse sources, tasks, and the classic PR browser, how session state is restored, and where each
+kind of state lives. Per-pane behaviour lives in [panes.md](./panes.md); this doc is about the shell
+and its state model.
 
 ## Overview
 
@@ -68,8 +68,7 @@ theme, and lays out a left `TabRail` beside a topbar + a main-area `Switch`:
 │ Tab  │ topbar: [«] Workspace  Repo    owner / repo / #n   🔔 ▣ Account │
 │ Rail ├───────────────────────────────────────────────────────────────┤
 │      │ main <Switch>:                                                  │
-│ src  │   • selectedSource==='linear'  → <LinearBrowse>                 │
-│ src  │   • selectedSource==='rollbar' → <RollbarBrowse>               │
+│ src  │   • contributed source selected → registry component            │
 │ ──   │   • no source && activeTask()  → <TaskView> (panes + terminal)  │
 │ task │   • fallback (github browse)   → 3-pane PR browser:             │
 │ task │        [ PullList | PullDetail | DiffView ]                     │
@@ -78,10 +77,11 @@ theme, and lays out a left `TabRail` beside a topbar + a main-area `Switch`:
             terminal drawer (bottom, per-task, desktop-only) ─┘
 ```
 
-The left `TabRail` (see [workspaces-and-tasks.md](./workspaces-and-tasks.md)) holds the source
-buttons (GitHub always; Linear/Rollbar when connected) and the workspace-scoped task rows; it is
-always mounted. The right column is a CSS grid of `var(--topbar-h) 1fr` — topbar over the main
-`Switch`. See [ui-design.md](./ui-design.md) for tokens.
+The left `TabRail` (see [workspaces-and-tasks.md](./workspaces-and-tasks.md)) holds contributed
+source buttons and workspace-scoped task rows; it is always mounted. GitHub, Docker, and API
+Requests are always visible, while Linear/Rollbar depend on a connected provider. The right column
+is a CSS grid of `var(--topbar-h) 1fr` — topbar over the main switch. See
+[ui-design.md](./ui-design.md) for tokens.
 
 ### Topbar clusters
 
@@ -93,22 +93,21 @@ always mounted. The right column is a CSS grid of `var(--topbar-h) 1fr` — topb
 | Center (`.breadcrumb`) | `owner / repo / #number` crumbs (the `#n` crumb links out to GitHub), or the `acorn` brand when no repo is routed. |
 | Right (`.topbar-end`) | `NotificationBell`; a terminal toggle `▣` (only when `terminalEnabled` and in a task view); `AccountMenu` (Settings / Clear cache / Logout) or a `Login` link. |
 
-### The four main modes
+### Main modes
 
-The main-area `<Switch>` (`App.tsx:370`) selects exactly one view from two signals —
+The main area selects exactly one view from two signals —
 `selectedSource()` and `activeTask()`:
 
 | Condition | View | Notes |
 | --- | --- | --- |
-| `selectedSource() === 'linear'` | `LinearBrowse` | Linear ticket browse (integration live). |
-| `selectedSource() === 'rollbar'` | `RollbarBrowse` | Rollbar error browse — two-column master/detail (list + reusable tabbed `RollbarItemPanel`), with separate lazy TanStack queries for item metadata, occurrence history, and a selected occurrence. |
+| a registered source is selected | its lazy contribution component | GitHub, Docker, API Requests, Linear, and Rollbar ship today; availability is descriptor-owned. |
 | no source **and** an active task | `TaskView` | The task's pane row + per-task terminal drawer. |
 | fallback (github source) | classic 3-pane PR browser | `PullList` / `PullDetail` / `DiffView`, or on `/new` a `CreatePullForm` + `ComparePreview`, or the `Acorn` mark when no repo is routed. |
 
 So "GitHub browse" is the fallback: `selectedSource()` is `'github'` and no task is active. Picking
 a source in the rail sets `selectedSource`; clicking a task row clears the source and sets
 `activeTaskId`. Task activation is shared logic — `activateTaskSignals` + `pathForTask`
-(`features/tasks/activate.ts`) flip the signals, mark the task's notices read, and compute the
+(`core/client/tasks/activate.ts`) flip the signals, mark the task's notices read, and compute the
 route, and are reused by the rail rows, ⌘1–9, and the palette's Go-to-task. Overlays
 (`SettingsModal`, `OnboardingModal`, `TerminalPanel`, `CommandPalette`, `FilePalette`) and the
 global `Shortcuts` handler are mounted after the switch, independent of the active mode.
@@ -228,20 +227,21 @@ nothing on a non-desktop build.
 
 ### Task pane layout
 
-A task's layout is a **flat left→right row** of open panes: `TaskLayout = { panes: PaneId[] }`
-(`features/tasks/layout.ts`). `PaneId` ∈ `pr | linear | rollbar | preview | editor | changes |
-notes | context | database | search`. One pure reducer `applyLayoutAction` owns every transition — `show`
-(single pane, from a switcher click), `add` (open beside via ⌘/Ctrl-click), `close`, `replace`
-(recipe seeding). `normalizeLayout`/`parseTaskLayouts` defensively validate the persisted
-`task_layouts` value (tolerating legacy shapes). Pane internals are documented in
-[panes.md](./panes.md). (`ponytail:` a flat row, not a layout tree — open-what-you-want side by
-side is enough.)
+A task's layout is a **flat left→right row**:
+`TaskLayout = { panes: string[], weights?, pinned? }`
+(`core/client/tasks/layout.ts`). Pane ids and UI descriptors come from the pane registry; core does
+not carry a feature union. One pure reducer owns show/add, close/unpin, pin, move, resize/equalize,
+and recipe replacement. Durable state is written to the scoped
+`core:task-layouts:<taskId>` descriptor; aggregate `task_layouts` / `task_panes` values are migration
+inputs only. Focus and maximize remain session-only. Pane internals are documented in
+[panes.md](./panes.md).
 
 ## Client transport and desktop capabilities
 
-Normal renderer requests use the same-origin HTTP API, and live terminal/workflow events use one
-authenticated WebSocket. Search, editor, local changes, database, notes, memory, terminal control,
-run targets, workflows, and MCP settings do not have feature-specific preload APIs.
+Normal renderer requests use the same-origin HTTP API, and live terminal/workflow/Docker events use
+one authenticated WebSocket. Search, editor, local changes, database, HTTP requests, notes, memory,
+terminal control, run targets, workflows, and MCP settings do not have feature-specific preload
+APIs.
 
 The Electron preload (`apps/desktop/src/core/main/preload.ts`) exposes only operations that truly
 need Electron:
@@ -253,7 +253,7 @@ need Electron:
 `capabilities()` (`apps/desktop/src/core/client/capabilities.ts`) reports `{ desktop, terminal }`
 from that surface. The terminal drawer, agents, run targets, and workflows are available whenever
 the desktop terminal capability exists; `dev:node` remains a deliberate degraded mode for features
-whose main-process bridge is unavailable.
+whose utility-service engine is unavailable.
 
 ## Source
 

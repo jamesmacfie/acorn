@@ -1,340 +1,60 @@
-# Post-implementation review — docs/next
-
-**Date:** 2026-07-11 · **Scope:** the shipped state of `apps/desktop/src` at `41adadc` (phase 10)
-measured against the goals in `docs/next` (implementation.md, its phase files, and the
-cross-cutting gate docs) · **Method:** six parallel audits — boundary ledger, testing,
-feature parity, security invariants, ongoing tracks, and phase deviations — each verified
-against code, not docs.
-
-`docs/next` is graduating to design history in a parallel docs pass; this file is the
-forward-looking punch list that replaces it. Everything below is a note on something to
-**fix, tweak, test, or alter** — ordered by how much it matters.
-
----
-
-## Verdict
-
-The implementation landed remarkably clean. All ten security invariants in `security.md` §2
-hold with code citations; registry adoption is complete with no stragglers (routes, providers,
-agent tools, panes, commands, settings, pollers, step kinds, profiles all go through their
-registries); the sync-engine divergence the original review called the "single highest-leverage
-server refactor" is gone; the tree has **zero** TODO/FIXME/HACK markers and effectively zero
-`any` escapes. Nothing found is broken or secretly half-done.
-
-The real remaining work is concentrated in four places:
-
-1. **One genuine security gap** — the repo-config trust gate was specified and never built.
-2. **The smoke suite never landed** — the gate that was supposed to block Phases 3/5/6 is 0/5.
-3. **The boundary ledger** — 82 baselined coupling edges, but with a clear burn-down plan
-   (one seam removes ~29 of them).
-4. **Verification debt, not construction debt** — 106 unchecked parity rows of which ~88 are
-   "code is present, nobody has run the verify pass."
-
----
-
-## 1. Fix — security and correctness
-
-### 1.1 Repo-config trust gate is entirely absent (HIGH — the one real security gap)
-
-`security.md` §5 and `ux.md` §2 specify a first-execution trust prompt before anything from a
-repo's committed `.acorn/config.toml` runs. None of it exists: no `config_acks` table, no
-config hash, no needs-trust error anywhere in the tree. Today the execute-tier
-`run_start`/`run_restart` tools (`app/main/agentToolsWiring.ts:359-414`) and the renderer run
-route (`core/server/routes/harness.ts:59-61`) execute run targets and lifecycle scripts merged
-from checked-out repo config (`loadRepoConfig`, `core/main/taskWorktree.ts:204`)
-unconditionally. The threat this defends — clone a repo, its committed config executes
-commands — is live and was a stated §1 threat, so this is a dropped mechanism, not a descoped
-one. Every §2 invariant holds; this §5 mechanism is the gap.
-
-**Do:** build it per the existing spec (hash the repo config layer, `config_acks` row keyed by
-repo+hash, needs-trust error from `run_*` tools + notice with "Review & trust" action showing
-the verbatim commands, diff view on change). Until then, acorn should not be pointed at
-untrusted clones.
-
-### 1.2 Latest-only guards on the two flagged stores
-
-`ui-state.md` §2.3 named exactly two event-driven stores with out-of-order clobber races, and
-both are still unguarded — each is driven concurrently by a WS status ping *and* a poller:
-
-- `plugins/terminal/client/sessions.ts:13-20` — bare `await api.list()` → `setSessions(next)`,
-  and `trackSessionEdges` reads current state at completion time (the phantom-edge race).
-- `core/client/tasks/taskStatus.ts:16-21` — same shape.
-
-**Do:** one small `latestOnly(fn)` helper (generation counter), applied to both. The doc's rule
-2 asked for the helper; it was never written.
-
-### 1.3 `submitDraft` swallows task create/rename failures
-
-`core/client/tabs/TabRail.tsx:170-192` has no try/catch around
-`createTask`/`renameTask`/`createCheckoutTask`: a rejection is an unhandled promise, the modal
-stays open, nothing is surfaced. This is the second half of `ui-state.md` §2.1 (the `savePref`
-half was fixed properly). The archive flow next to it (`setArchiveErr`, `:213`) is the pattern
-to copy.
-
-### 1.4 Rewrite the stale `browser:bind` contract rows
-
-Feature-parity §13 and inventories §1c still assert "`browser:bind` stays IPC-only forever."
-Phase 9A deleted the channel — main now binds CDP directly when it creates the
-`WebContentsView` (`plugins/preview/main/previewService.ts:60-62`), which is strictly better
-(no `webContents` id crosses the bridge). The rows contradict shipped code and can't be ticked
-as written. **Do:** rewrite them to describe the new contract ("main-owned bind, no id over
-IPC") in whatever home the parity checklist graduates to.
-
----
-
-## 2. The Phase-10 acceptance gate — what actually remains
-
-Phase 10's pause conditions were: empty boundary ledger, verified parity checklist, docs
-graduated. Current state of each:
-
-### 2.1 Boundary ledger: 84 → 27 edges (burn-down largely done)
-
-`core/boundaries.test.ts` hard-fails `→app` and client↔node process edges (both still zero) and
-freezes the rest as a shrink-only ledger. The burn-down below has been executed: **84 edges
-(51 core→plugin + 33 plugin→plugin) → 27 (14 + 13)**, behaviour-preserving, in eight commits.
-
-The thesis that made it cheap: the ledger was never 84 missing registries. **Three de-facto platform
-modules misfiled into `plugins/` accounted for ~33 edges on their own**, and one piece of composition
-code sitting in `core/` accounted for 7 more. Almost none of it needed a new seam.
-
-| Lever | Estimated | Actual | Outcome |
-| --- | --- | --- | --- |
-| **Terminal client capability seam** | ~29 | **21** | Done, but *not* via a capability registry. `terminalClient.ts` was itself misfiled: it owned the renderer's only `declare global { Window.acorn }` (so core's `capabilities.ts` was typed by a plugin) and its surface spanned task lifecycle, repo config and preview. Split into `core/client/tasks/taskBridge.ts` (platform) + a PTY-only `terminalClient.ts`; `sessions.ts` → `core/client/tasks/agentSessions.ts`. |
-| **Split `plugins/github/client/mutations.ts`** | ~9–10 | **9** | Done. ~24 non-GitHub writes moved to `core/client/{workspaces,tasks}/mutations.ts`; `setPref` inlined into its only caller `savePref.ts`; `postLinearComment` → the linear plugin. `RepoPicker.tsx` rode along to `core/client/ui/`. |
-| **Move misfiled generic utilities** | ~10 | **12** | Done. `debounce` → `core/client/lib/`, `shiki.ts` → `core/client/highlight/`, `displayMeta.ts` → `core/client/ui/`, worktree/env helpers → `core/main/{pathGuards,taskEnv}.ts`, workflow row types → `core/shared/workflow.ts`, `Shortcuts.tsx`/`FilePalette.tsx` → their owning plugins. `theme.ts` did *not* need moving once `shiki` did. |
-| **Persisted-state descriptor adoption** | ~7–8 | **11** | Done, but the diagnosis was wrong twice over. `scopedEviction.ts` needed no registry at all — its only non-test importer was `app/client/activate.ts`, so moving the file to `app/` (the layer allowed to name features) removed all 7 edges. `PersistedStateBinding.evict?` was declared and never called; deleted. The three feature-owned slices in `stateSlices.ts` moved next to their stores and are assembled in `app/client/persistedSliceContributions.ts`, which also brought `dockerPrefsSlice` under the conformance test for the first time. |
-| **Pane/uiSlots/provider adoption for App.tsx** | ~10 | **0** | **Deliberately not done.** See below. |
-
-**Cycles:** terminal↔agents is resolved — `agentSend.ts` had exactly one importer (the PTY engine that
-closes over it), so it was a filing error, not a case for a sender contract. github↔linear is
-half-resolved (`linear → github/mutations` is gone); `github/PullDetail → linear` remains and still
-wants the provider cross-ref seam.
-
-**The remaining 27 are qualitatively different from the original 84**: every one is a genuine
-feature-to-feature UI coupling rather than a misfiling, which is a fine place for the ledger to sit.
-The four largest deliberately-deferred items, with the reasons:
-
-- **App.tsx GitHub browse → source contribution (5 edges).** `core/shared/api.ts` owns every pull
-  route, `core/client/queries.ts` every pull query option, `core/server` the GitHub auth and repos
-  mirror. Extracting the *views* while core keeps the *domain* makes the ownership story less honest,
-  not more. Only worth doing as part of making GitHub a real plugin.
-- **CommandPalette (3 edges).** These are not command definitions — they are async *row providers*
-  (`createResource`s refetched on open, variable-length). `commandRegistry` is a static `Registry<T>`
-  and structurally cannot express them; a real fix needs a `paletteRowProviderRegistry` plus a
-  generalised `PaletteItem` (`palette/model.ts` hardcodes `kind: 'run' | 'layout' | 'workflow'`).
-  Design work, not paydown.
-- **TabRail badges → the `tabrail.task-row` slot.** Rejected as *not behaviour-preserving*:
-  `checksState`/`workingCountFor` feed `railStatusItems`, whose output is also serialised into
-  `data-tip-legend` on the task button, so splitting two of four inputs into independent slot
-  components would silently drop the CI dot and agent spinner from the hover legend.
-- **`diff/` → core.** `diff/DiffRows.tsx` imports `../MentionTextarea` and `../comments/draftState` —
-  it is the PR diff renderer with inline-review composition baked in, not a neutral one. Moving the
-  generic `displayMeta`/`shiki` out already harvested 5 of that cluster's 7 edges.
-
-### 2.2 Parity checklist: 106 unchecked, but mostly verification debt
-
-Exact census: 122 rows, 16 checked, 106 unchecked. Breakdown of the 106:
-
-- **~88 are "code present, verify pass not run."** Spot-checks of the eleven riskiest rows
-  found zero code breaks — imports resolve, routes/panes/handlers still registered
-  (`boundaries.test.ts` would fail CI on orphans). These need a scheduled verification
-  sweep (route tests where named, live walkthrough for §12 settings, the §5 diff perf-marks
-  pass on a 100+ file PR), not engineering.
-- **~9 are blocked on named pending items:** §13 preview rows on the Phase 9A interactive
-  sign-off (see §5.1 below); the §16 safeStorage row — **re-check this one**: Phase 9C landed
-  (`core/main/sessionKeyStore.ts`), so the row may now be satisfiable as written; the §18
-  docs-overhaul row is mooted by the docs graduation and needs a new home or a strike.
-- **1 is contradicted by code** — `browser:bind` (§1.4 above).
-- **0 hidden non-goals** — the doc already strikes true non-goals inline.
-
-Also: **inventories.md over-reports open work.** §3b/3d/3e/3f/3g/3h (keydown listeners, panes,
-palette actions, mailbox signals, alert/confirm sites, polling sites) were all consumed by
-Phase 5/6 — e.g. `window.alert`/`confirm` sites are now **zero** — but the ✓ markers were
-never applied. If inventories.md survives as history, tick the consumed sections in the
-graduation pass so history reads true.
-
-### 2.3 Docs graduation: in progress, nearly clean
-
-The parallel docs pass is handling this. Independent findings worth folding in: `docs/`
-(excluding next/) has exactly **one** stale pre-foldering path — `docs/electron.md:459`
-references `src/client/**`; CLAUDE.md and README both correctly describe the shipped layout,
-with a cosmetic inconsistency in CLAUDE.md (lines 16–17, 34) mixing bare `src/...` with
-`apps/desktop/src/...` prefixes.
-
----
-
-## 3. Test — the gaps, in priority order
-
-### 3.1 The smoke suite never landed (0/5)
-
-`testing.md` §1's five-test Playwright-Electron suite (S1 boot, S2 restore, S3 open-task,
-S4 terminal-echo, S5 quit-clean) was a hard gate: "must land and pass on main before Phase 3
-starts." There is no `@playwright/test` dependency, no spec, no `test:e2e` script. Phases 3,
-5, and 6 shipped ungated, and the risks it was scoped to cover are exactly the remaining
-untested surfaces:
-
-- **S2/restore:** `startupRestore` has good unit/integration tests of descriptor logic, but
-  the real twice-launched-app race class — the reason S2 exists — is unreachable by unit tests.
-- **S5/quit:** no teardown/orphaned-PTY test of any kind.
-- **S1/boot:** `app/main/bootstrap.ts`, `electron.ts`, `serverBridges.ts`, `harnessWiring.ts`,
-  `workflowWiring.ts` are essentially untested (only the two wiring `.test.ts` exceptions).
-
-The prerequisite auth seam (`core/server/routes/testAuth.ts`) already exists, so the suite is
-unblocked. (`scripts/smoke-browser.cjs` is a different, narrower CDP proof for the preview
-driver — it does not substitute.) **Decide explicitly:** build S1–S5 now (recommended — this
-is the insurance for all future refactors, and the boundary burn-down in §2.1 will churn
-exactly the wiring it covers), or formally re-scope the gate in the graduated testing doc.
-Silently shipping past a "must land before Phase 3" gate is the one place process and reality
-diverged.
-
-### 3.2 `wsClient.ts` has zero tests
-
-The renderer half of the WS transport (`core/client/wsClient.ts` — reconnect, backoff,
-attach-replay handling) has no test of any kind, while the server hub is well covered
-(`core/main/wsHub.test.ts`). This is the load-bearing transport for every terminal pane.
-
-### 3.3 Conformance suites: only 1 of ~4 exists
-
-`testing.md` §4's registry-iterating conformance model is proven — the integrations one
-(`core/server/integrations/conformance.test.ts`) is excellent — but it's the only one:
-
-- **Pane conformance: none.** Nothing iterates `core/client/registries/panes.ts` asserting
-  "renders from bare `{ task }`," keyboard navigability, or activate/dispose hygiene.
-- **Persisted-state conformance: piecemeal.** Each codec tests its own unknown-id tolerance,
-  but no single suite iterates every registered T3 slice feeding current/legacy/malformed/
-  oversize payloads.
-- **Workflow step-kind / profile registry conformance: none** (behavioral coverage via
-  `workflowRunner.test.ts` is strong, but nothing iterates the registries).
-
-These are cheap now that the registries exist, and they're what makes the "plugin additions
-don't require core edits" claim stay true.
-
-### 3.4 Route-test gaps: the GitHub read family
-
-Route contract coverage is strong (parameterized `requireUser` table over 19 paths, mount
-table, envelope test, and the three §6 priorities — prActions, prCreate, harness — all done).
-The remaining behavioral gaps, ~11 files: the GitHub read path (`actions.ts`, `mentions.ts`,
-`prContext.ts`, `prMirror.ts`, `pullBlob.ts`, `pullDetail.ts`, `pullFiles.ts`,
-`repoLabels.ts`) plus core `integrations.ts`, `pins.ts`, `prefs.ts`. Many parity §4 rows name
-route tests as their verification method, so this list and §2.2's sweep are the same work.
-
-### 3.5 Two small targeted tests the security audit asked for
-
-- **Terminal `create` cwd bounding:** `plugins/terminal/main/terminal.ts:302` is the one place
-  a renderer-supplied absolute path is honored (as a base-checkout candidate, guarded
-  `isAbsolute && isDir`). Not a violation, but it deserves a bounding test so it stays the
-  only one.
-- **WS internal-token negative case:** `wsHub.ts:52-53` lets a valid `x-acorn-internal` token
-  skip Origin/cookie checks (by design, for loopback MCP). Add the explicit test that a
-  wrong/absent token still 403s.
-
----
-
-## 4. Tweak — small, worth doing when nearby
-
-- **Two skipped indexes** from performance.md §3.5 ("worth adding regardless"):
-  `pull_requests (userId, repoId, state, updatedAt)` — `pulls.ts:67-71` filters/orders on
-  exactly this with only the PK — and `terminal_sessions (taskId)`. One migration.
-- **PR list refetch visibility gate:** `core/client/queries.ts:120`'s 60s `refetchInterval`
-  relies on TanStack's default focus-pause; add `refetchIntervalInBackground: false` (or move
-  it onto the poller registry) per performance.md §3.2.
-- **`workflowValidation.ts` kind ladder:** execution is fully registry-backed, but
-  `plugins/workflows/main/workflowValidation.ts:65-116` still branches on
-  `gate-policy`/`join`/`decide` for shape validation — the one place a new step kind touches a
-  hardcoded switch. Move a `validate(step)` hook onto the step-kind descriptor.
-- **`repoMirror.ts:11` re-export hop:** re-exports `RouteFailure`/`RouteResult` from the sync
-  engine "for existing importers"; one importer remains (`prMirror.ts:9`). Point it at the
-  engine and delete the shim.
-- **CLAUDE.md path-prefix consistency** (§2.3 above) — cosmetic, ride the docs pass.
-- **`ponytail:` debt ledger:** 54 deliberate-shortcut markers in tree. Not action items, but
-  worth harvesting into a visible ledger once so the ceilings they name (e.g. the preview
-  occlusion centre-point probe, the 10s task-status poll) are tracked decisions rather than
-  archaeology.
-
----
-
-## 5. Alter or explicitly re-decide
-
-Items where the right move is a decision (or a written non-goal), not code:
-
-### 5.1 Phase 9A preview — run the human sign-off, then close it
-
-Code-complete: no dead `<webview>` code, no `webviewTag`, `browser:bind` fully gone, nav/attach
-policy carried over (`previewService.ts:43-49`), CDP smoke passes. All that's left is the
-interactive pass a human must drive (visual check, pane/task-switch state preservation, live
-occlusion behavior). Doing it unblocks most of parity §13. Known documented ceiling to accept
-or not: occlusion detection is a single centre-point probe at ~200ms (`PreviewPane.tsx:44`) —
-corner overlaps go undetected.
-
-### 5.2 `workspace_config` table — absent; decide if that's the design
-
-The data-model hygiene track named a `workspace_config` table; it doesn't exist. Config is
-file-based (`runConfig.ts` layered `.acorn/config.toml`) plus `integrations.config` JSON. This
-looks like an intentional design shift — if so, write the one-paragraph non-goal; if not, it's
-still open. Note it interacts with §1.1: the trust gate needs *somewhere* to store config
-acks, which may resurrect a slice of this table anyway.
-
-### 5.3 Retention sweep — deferred by design, name the trigger
-
-Blob cache is unbounded by design (`core/server/blobs.ts:3`, `bindings.ts:52` — "no TTL and no
-delete") and no age-based row pruning exists; the only deletion is mirror list-reconciliation.
-Fine for a single-user local app *today*, but it's storage rot with no owner. **Do:** don't
-build the sweep; add the trigger — a startup log line (or settings-page stat) of blob-dir size
-and mirror row counts, so growth is visible and the sweep gets built when a number, not a
-guess, says so.
-
-### 5.4 Lineage-derived cascade/prune/index — still hand-maintained
-
-`tasks.parentId` and `workflow_steps.parentStepId` landed, but the "one lineage declaration
-drives cascade + prune + index" vision didn't: `db/cascade.ts` is still a hand-written delete
-list and migration 0021's indexes were hand-added. Acceptable, but it means the original
-review's §5 finding (referential invariants by reviewer discipline) still stands. Revisit when
-the next parent-child table lands — that's the moment the registry pays for itself.
-
-### 5.5 Deliberate deviations that are healthy — keep, they're documented
-
-For the record, these were re-verified and should *not* be "fixed":
-
-- **`pullsBatch` off the sync engine** — documented (`pullsBatch.ts:19-22`), shares
-  `PULLS_STALE_AFTER_MS` and the same mirror helpers; a batch has no single resource to serve
-  stale. The old divergence (duplicate TTLs, three cold-detections) is gone.
-- **Linear multi-connection fan-out off the engine** — documented (`linear.ts:35-38`), reads
-  its TTL from the provider descriptor; single-issue detail *is* on the engine. Legitimate.
-- **The two `resolveRepoForUser` deviations** (`mentions.ts:6-9` best-effort mirror-only;
-  `prContext.ts:20-24` deliberately stricter on the write path) — both present, documented,
-  correct.
-- **node:sqlite parked** — right call (Drizzle has no first-party driver at 0.45.2, and
-  node-pty keeps dual-ABI alive regardless). Revisit trigger is written in
-  `docs/local-development.md`: Drizzle ships a `node:sqlite` driver.
-- **Legacy persisted-format readers** (`task_panes` fallback, flat `TaskContext` envelope) —
-  these are stored-data migrations, not shims; keep.
-
----
-
-## 6. What's healthy — don't churn it
-
-Verified strengths to leave alone: all ten §2 security invariants hold (loopback bind,
-host/Origin/CSRF guards on HTTP *and* WS upgrade, session/key handling, per-run
-`INTERNAL_TOKEN`, tokens encrypted at rest and never serialized, `resolveInRoot` lexical +
-symlink confinement, BrowserWindow/WebContentsView hardening, minimal preload); route mounting
-is structurally forced inside `/api` behind `requireUser` (`routeRegistry.ts:15-17` throws
-otherwise); the sync engine with centralized policy TTLs, in-flight dedupe, and backoff is
-done and tested; autosave clobber guarding, run-scoped workflow handoffs, the poller registry,
-and `savePref`'s failure surface are all complete; and the tree carries zero TODO markers and
-no unsafe `any`. The registries are real: adding a route, provider, tool, pane, command, step
-kind, or profile today touches registration in `app/`, not core.
-
----
-
-## Suggested sequence
-
-1. **Now:** repo-config trust gate (§1.1) · `latestOnly` guards + `submitDraft` catch
-   (§1.2–1.3) · the two-index migration (§4).
-2. **Next slice:** smoke suite S1–S5 (§3.1) — it insures everything after it.
-3. **Then, boundary burn-down in leverage order** (§2.1): utility moves → mutations split →
-   terminal capability seam → persisted-state descriptors → App.tsx main-view adoption.
-   Each slice deletes its ledger lines in the same PR.
-4. **Alongside:** Phase 9A sign-off (§5.1, unblocks parity §13) · parity verification sweep +
-   route tests for the GitHub read family (§2.2/§3.4, same work) · conformance suites (§3.3).
-5. **On triggers, not now:** retention sweep (§5.3) · lineage registry (§5.4) ·
-   node:sqlite (§5.5).
+# Post-implementation review — current follow-ups
+
+This replaces the original point-in-time `docs/next` audit. Its high-priority findings have landed:
+
+- repo-authored config/workflows are protected by the hash/diff acknowledgement gate;
+- latest-only guards cover session, task-status, and Docker summary refreshes;
+- task create/rename errors surface instead of being swallowed;
+- the boundary ledger was reduced and remains shrink-only;
+- the desktop S1–S6 Playwright smoke suite covers boot, restore, task activation, WebSocket PTY,
+  quit cleanup, and search→editor reveal;
+- provider, state-slice, workflow-registry, and public-API conformance suites exist;
+- GitHub mirror rewrites/pruning and startup orphan repair are explicit;
+- startup logs storage footprint and the renderer build has deterministic size budgets;
+- completed phase documents were graduated into durable topic docs.
+
+The parent documentation is authoritative for shipped behavior. The remaining work below should be
+scheduled by evidence or an explicit product decision, not treated as an unfinished migration.
+
+## Remaining verification
+
+1. Run the live Rollbar contract/privacy checklist in
+   [next/rollbar.md](./next/rollbar.md) before expanding provider features.
+2. Exercise the Context/Notes slow-response and narrow-layout cases in
+   [next/context-ui.md](./next/context-ui.md).
+3. Keep preview/browser automation manual QA in release checks: navigation, DevTools isolation,
+   kept-alive state, task archive eviction, and agent-driving permission prompts.
+4. Validate downloaded DMGs on a clean macOS account, including OAuth, `safeStorage`, migrations,
+   unpacked native modules/ripgrep, GUI PATH discovery, and Gatekeeper expectations.
+
+## Measured/deferred engineering work
+
+- **Retention:** SQLite/blob footprint is logged at startup. Add a general age/size sweep when real
+  long-lived data demonstrates growth, with mirror/provider/workflow/command classes governed by
+  separate policies. Immutable blob cache and app-owned state must never share a blind delete rule.
+- **Boundary ledger:** continue replacing existing cross-plugin imports with contribution points
+  when nearby; never grow the baseline for convenience.
+- **Native SQLite:** reconsider `node:sqlite` only when Drizzle offers a suitable driver or dropping
+  `better-sqlite3` removes meaningful complexity. `node-pty` currently preserves the ABI dance
+  anyway.
+- **Runtime performance:** use boot marks, storage logs, the renderer budget, and targeted large-diff
+  captures before creating a general telemetry/benchmark system.
+
+## Open product decisions
+
+- GitHub device flow should replace the OAuth client secret embedded in release binaries before
+  broad distribution. See [next/security.md](./next/security.md).
+- Chat and Linear evolution remain proposals, not implied roadmap commitments.
+- Workflow authoring remains file-only and runs advance only while the app is open. A daemon,
+  general DAG editor, or recovery graph needs a separate product/architecture decision.
+
+## Healthy constraints to preserve
+
+- one composition root owns boot order and reverse teardown;
+- core owns platform contracts; plugins contribute features; app activates them;
+- local GitHub/provider mirrors are disposable, while app state has explicit ownership;
+- internal, interactive-user, and public-API principals remain distinct;
+- executable repo configuration fails closed until its exact snapshot is trusted;
+- privileged path/process inputs are re-derived and validated at the main boundary;
+- no raw provider payload or secret is logged, cached in the renderer, or exposed as a generic
+  debugging escape hatch.

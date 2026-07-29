@@ -37,11 +37,11 @@ runner 'puts ActiveRecord::Base.connection_db_config.url'`).
 ## Architecture
 
 - **Task-scoped HTTP** — renderer requests hit `/api/tasks/:id/database/*`; route handlers delegate
-  through an injected main-process bridge. No streaming.
+  through an injected utility-service bridge. No streaming.
 - **`pg` (node-postgres)** — not a native module (no better-sqlite3-style ABI dance). One `pg.Pool`
   per task, cached `Map<taskId, { pool, url }>`; `pool.end()` on disconnect/reconnect.
-- **Pane is client-only** — panes aren't DB rows, so this is just a new `PaneId`. The connection
-  script is the `repo_paths.dbUrlScript` column.
+- **Pane is registry-owned client presentation** — panes are not DB rows; the database plugin
+  contributes the `database` descriptor while connection configuration stays in `repo_paths`.
 - **Editing via the row-detail panel**, not editable virtualized cells — a form covers
   view/edit/insert/delete far more simply.
 - **SQL-injection posture** — values are always parameterized (`$1…`); identifiers (table/column
@@ -106,13 +106,14 @@ travels into the prompt when it's used as an example.
 
 ## Where the code lives
 
-Main process: `apps/desktop/src/plugins/database/main/database.ts` (pool cache + `resolveDbUrl` +
+Utility service (historical `main` path):
+`apps/desktop/src/plugins/database/main/database.ts` (pool cache + `resolveDbUrl` +
 `schema()`, which resolves the schema source and carries the repo's notes back with it). HTTP routes:
 `apps/desktop/src/plugins/database/server/routes/database.ts`; prompt assembly:
 `server/generateSql.ts`; wire types: `shared/database.ts`. Client:
 `apps/desktop/src/plugins/database/client/` — `DatabasePane.tsx` plus `GenerateSqlModal.tsx` and
 `SaveQueryModal.tsx`. Both the saved-query dropdown and the example multi-select are the shared
-`core/client/ui/Picker` (the latter with its `keepOpen` prop, which is what makes one Picker do
+`core/client/ui/Picker.tsx` (the latter with its `keepOpen` prop, which is what makes one Picker do
 multi-select).
 
 The `repo_paths` columns (`dbUrlScript`, `dbSchemaMode`, `dbSchemaValue`, `dbSchemaNotes`) and

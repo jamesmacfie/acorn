@@ -27,7 +27,9 @@ measurement rather than a framework or speculative rewrite.
 1. Add a repeatable cold/warm startup capture if boot marks show drift or startup work grows beyond
    what log comparison can explain.
 2. Add a retention sweep for derived mirror rows, provider cache entries, completed workflow data,
-   and other usage-proportional local state before long-lived databases become a support problem.
+   and other usage-proportional local state when the startup storage-footprint log shows sustained
+   growth. Startup already repairs orphan GitHub mirror children; a general age/size sweep remains
+   deliberately deferred.
 3. Revisit exact Postgres row counts, fixed search/result caps, and unbounded in-memory scheduler
    maps only when real repositories or tables hit those ceilings.
 4. Promote visible-only poll scheduling into a shared budgeted scheduler if future plugins create

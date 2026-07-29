@@ -17,23 +17,23 @@ been removed — see git history for the original rationale.)
   task** — a session opened under task A never appears under task B, regardless of the URL
   (`TerminalPanel.tsx`, `visibleSessions`).
 - A session is a **shell** or an **agent** (Claude Code / Codex / Aider). Agents run as ordinary PTY
-  sessions launched in the task's **git worktree**, which is created lazily on the first terminal for
-  that task.
+  sessions launched in the task's **git worktree**, which is created lazily by whichever
+  worktree-dependent surface touches the task first (often the first terminal).
 - The **Agents panel** is a right-rail overlay opened from the task view's Agents toggle (glyph `⠿`,
   `TaskView.tsx:347`). It is a managed monitoring surface over the same sessions plus workflow steps
   — a roster, a launcher, and a per-agent activity feed. It never replaces the raw xterm drawer; the
   drawer stays the escape hatch for interactive TUIs.
 
-The whole UI follows the app's flat/monospace design language ([ui-design.md](./ui-design.md)):
-Berkeley Mono, 1px borders, token-driven light/dark. xterm renders to its own canvas and can't read
-CSS, so `terminal/theme.ts` ships an explicit light and dark `ITheme` (full ANSI palette per mode)
-that mirrors the app tokens and follows the theme live.
+The whole UI follows the active theme/style token axes ([ui-design.md](./ui-design.md)). xterm
+renders to its own canvas and cannot read CSS, so `terminal/theme.ts` projects the current colour
+theme into an explicit `ITheme`/ANSI palette and follows changes live.
 
 ## 2. Sessions & persistence
 
 The wire contract is defined once in `apps/desktop/src/core/shared/terminal.ts` (`TerminalSession`,
 `CreateOpts`, `ServerMsg`) and imported by main, server, and renderer; it never exposes `node-pty`
-types. The main process owns PTYs in `plugins/terminal/main/terminal.ts`. Request/response control
+types. The utility service owns PTYs in the historically named
+`plugins/terminal/main/terminal.ts`. Request/response control
 travels through authenticated loopback HTTP routes, while PTY output/input, status, and workflow
 events use the single WebSocket. The preload retains only the native folder picker used to map a
 repository checkout.
@@ -123,7 +123,7 @@ A `Portal`-rendered `<aside class="terminal-drawer">`, one per active task.
 
 One xterm bound to one live session over the authenticated WebSocket. Keyed by session id in the
 parent, so switching tabs unmounts this component (detach, PTY keeps running) and remounts a fresh
-xterm from the main-owned canonical framebuffer. Attach ordering is `ready → reset + serialized
+xterm from the service-owned canonical framebuffer. Attach ordering is `ready → reset + serialized
 snapshot → live frames`; output arriving while serialization runs is buffered behind the snapshot.
 It attaches via `api.attach`, writes keystrokes with `api.write`, and reports resizes with
 `api.resize` (a `ResizeObserver` refits on drawer drag). Shift+Enter is remapped to send a bare `\n`
@@ -140,14 +140,15 @@ instead of inferred from profile ids. `profileAvailable` checks `which`; shell i
 
 ### Worktrees (`core/main/worktrees.ts`, `resolveTaskCwd` in `core/main/taskWorktree.ts`)
 
-The task's git worktree is created **lazily on the first terminal** (Flow C). The renderer passes the
-base checkout as `opts.cwd`; main derives the worktree from it via `ensureWorktree`, persists
-`worktreePath` on the task, and cwds the session there. Worktrees live under the app data dir, keyed
-by branch (`worktreeBranchDirName` = `<owner>-<repo>-<branch-slug>`); all git runs in the **main
-checkout** (which owns the `.git` the worktree links to). A PR task checks out `pull/<n>/head`
-detached; a local-first task reuses or creates its branch from the resolved base ref (per-repo pref →
-`origin/main` → `origin/master` → HEAD). On the fresh-create path only, the repo's setup script
-runs as a "Setup" tab first (`maybeRunSetup`), and configured `copy` files are carried in.
+The task's git worktree is created **lazily on first worktree use** (Flow C). Every caller—terminal,
+editor/search/changes, database, workflows, preview scripts—funnels through `resolveTaskCwd` /
+`taskRoot`, which single-flights `ensureWorktree`, persists `worktreePath`, and fires the created
+hook exactly once. Worktrees live under the app data dir, keyed by branch
+(`worktreeBranchDirName` = `<owner>-<repo>-<branch-slug>`); all git runs in the **main checkout**
+(which owns the `.git` the worktree links to). A PR task fetches `pull/<n>/head` onto its task
+branch; a local-first task reuses or creates its branch from the resolved base ref (per-repo pref →
+`origin/main` → `origin/master` → HEAD). On the fresh-create path only, configured copy files are
+carried in and the setup hook follows `off | created | terminal`.
 
 ### `ACORN_*` environment injection (`buildSessionEnv`, `terminalUtils.ts:138`)
 
@@ -164,7 +165,7 @@ PATH, SHELL, LANG, LC_ALL, LC_CTYPE, USER, LOGNAME, TMPDIR, TERM — **never** `
 | `ACORN_TASK_SLUG` | Filesystem/DNS-safe branch slug (isolation handle for parallel tasks) |
 | `ACORN_TASK_TITLE` | The task title |
 | `ACORN_SESSION_ID` | This session's id — used for `author: agent` provenance on MCP notes/memory writes |
-| `ACORN_API_URL` / `ACORN_API_TOKEN` | The loopback URL + token for the in-process API, so an agent's MCP server can call back |
+| `ACORN_API_URL` / `ACORN_API_TOKEN` | The loopback URL + token for the utility-service API, so an agent's MCP server can call back |
 | `ACORN_TOOL_CEILING` | Workflow-only encoded allowlist/risk cap, forwarded by MCP and intersected with user permissions |
 
 `ACORN_TASK_ID` is the keystone: the acorn MCP server reads it to scope every task-aware tool (see
@@ -227,7 +228,7 @@ and a quiet step shows a no-output hint after 30 seconds.
 ### Provider usage
 
 The panel's **Usage** section is account-scoped, unlike the task-scoped roster below it. One
-main-process service collects Claude and Codex concurrently, caches the normalized snapshot for
+utility-service collector reads Claude and Codex concurrently, caches the normalized snapshot for
 five minutes, and retains a stale last-good provider when its next refresh fails. The rail toggle
 reads that same client store, so hovering never launches a subprocess; its tooltip summarizes each
 provider's current session percentage and health. The panel's `↻` action forces a refresh.

@@ -1,4 +1,4 @@
-# acorn → Electron desktop app — migration plan
+# Electron runtime and migration record
 
 > Status: **Migration complete.** Phases 0–2 done (Node-server spike + Electron shell + Cloudflare
 > cut) plus the Phase 3 caching cleanup. The Hono app runs under `@hono/node-server` on
@@ -6,8 +6,9 @@
 > is gone), wrapped in an Electron app. A supervised Node `utilityProcess` owns the
 > server, SQLite, PTYs, Git/process work, and background reconciliation; Electron main owns only
 > native windows/views/dialogs plus lifecycle supervision and loads the loopback origin.
-> **Cloudflare/wrangler is fully
-> removed** — Electron is the only runtime. The **v2 terminal (§8) has since shipped**: node-pty
+> **Cloudflare/wrangler is fully removed** — Electron is the shipped product runtime; `dev:node`
+> remains a supported development composition root for pure-Node server capabilities. The **v2
+> terminal (§8) has since shipped**: node-pty
 > sessions run in the utility service (`src/plugins/terminal/main/terminal.ts`, desktop-only and always on — see
 > [terminal-and-agents.md](./terminal-and-agents.md)). `SESSION_ENC_KEY` now uses `safeStorage`;
 > GitHub device flow (dropping `client_secret`) remains an optional distribution enhancement, not
@@ -112,9 +113,14 @@ That's the entire list. Everything else — all 16 route modules' business logic
 the migration SQL, the GitHub client, and the SolidJS product UI — is untouched. The only renderer
 change called out below is removing the service worker (§4h).
 
-## 4. The changes
+## 4. The initial migration changes
 
-### 4a. Runtime entry — Worker → node-server + Electron main
+> This section records the Phase 0–2 landing from Workers into a Node server hosted directly by
+> Electron main. Its code sketches and “add” language are historical. The shipped runtime later
+> moved that Node application intact into the supervised utility process described in §2, §11, and
+> §12.
+
+### 4a. Runtime entry — Worker → node-server in Electron main (historical)
 
 `src/core/server/index.ts` keeps building the same route graph, but exposes it as a factory so the Node
 bootstrap can add desktop-only static serving without mutating the singleton used by tests:
@@ -189,48 +195,47 @@ pin it; IndexedDB continuity is.
 
 ### 4b. The Bindings shim (replaces `Env`)
 
-One module constructs the object the routes already expect via `c.env`. Hand-write the type to
-replace the deleted `worker-configuration.d.ts`, and keep the app-level type separate from
-`@hono/node-server`'s HTTP bindings (as designed at migration time — the `KVish` shim below has
-since been replaced by typed stores: `OauthStateStore` / `BlobCache`):
+One module constructs the object the routes already expect via `c.env`. The hand-written global
+`Env` replaces the deleted `worker-configuration.d.ts` and extends the current runtime bindings
+with optional `@hono/node-server` HTTP bindings:
 
 ```ts
-import type { HttpBindings } from '@hono/node-server'
-
 export type RuntimeBindings = {
-  DB: BetterSQLite3Database              // structural — see 4c
-  OAUTH_STATE: KVish                     // get/put({expirationTtl})/delete
-  BLOBS: KVish
+  DB: AppDatabase
+  OAUTH_STATE: OauthStateStore           // issue/consume; five-minute in-memory TTL
+  BLOBS: BlobCache
   SESSION_ENC_KEY: string
   GITHUB_CLIENT_ID: string
   GITHUB_CLIENT_SECRET: string
+  INTERNAL_TOKEN: string
+  ACTIVE_IDENTITY: ActiveIdentityStore
+  API_TOKENS: TokenService
+  OAUTH_ACCOUNTS: OauthAccountService
+  UI_BROKER: UiControlBroker
 }
-
-export type AppBindings = RuntimeBindings & Partial<HttpBindings>
 ```
 
-- **`OAUTH_STATE`** — 5-minute ephemeral CSRF state. A `Map<string,{v,exp}>` with a lazy expiry
-  check is plenty; no persistence wanted. ~15 lines implementing `.get/.put/.delete`.
-- **`BLOBS`** — immutable public blob/patch bodies keyed by sha. Back it with a cache dir
+- **`OAUTH_STATE`** — 5-minute ephemeral CSRF state with atomic issue/consume semantics; no
+  persistence wanted.
+- **`BLOBS`** — immutable blob/patch bodies keyed by sha for public and private repos. Back it with a cache dir
   (`app.getPath('userData')/blobs/<sha>`), `.get` = read file, `.put` = write file. ~20 lines.
 - **secrets** — read from `.env` in dev. `SESSION_ENC_KEY` falls through to Electron `safeStorage`
   in a packaged build (Phase 9 C, `sessionKeyStore.ts`): env always wins and is persisted as the
   env-only migration path; otherwise a fresh data root mints once. An existing `acorn.sqlite` with
-  neither source fails closed instead of changing identity. `GITHUB_CLIENT_*` still come from the environment. Inject once at
-  bootstrap; never bake `GITHUB_CLIENT_SECRET` or `SESSION_ENC_KEY` into the bundle.
+  neither source fails closed instead of changing identity. GitHub OAuth credentials resolve from
+  the data-root `.env`, process environment, then the `MAIN_VITE_GITHUB_CLIENT_*` build fallback.
+  Release CI uses that fallback so the package is self-contained. `SESSION_ENC_KEY` is never baked;
+  the current OAuth client secret is, and must be treated as recoverable from a distributed binary.
 
-The KV shim only needs the handful of methods actually called (`get`, `put` with optional
-`expirationTtl`, `delete`) — not the full KV surface.
-
-**As shipped**, `RuntimeBindings` (`src/core/main/bindings.ts`) matches the sketch above with two
-divergences. One post-migration addition: `INTERNAL_TOKEN`, private persisted bearer material for
-loopback callers that hold no session cookie (the acorn MCP server — agents inherit it as
-`ACORN_API_TOKEN`; auth maps it through the explicit active-identity binding). And the KV shim is
-gone: the sketch's `KVish` was retired for plain typed modules that say what they mean —
+`INTERNAL_TOKEN` is private persisted bearer material for loopback callers that hold no session
+cookie (the acorn MCP server — agents inherit it as `ACORN_API_TOKEN`; auth maps it through the
+explicit active-identity binding). `API_TOKENS`, `OAUTH_ACCOUNTS`, and `UI_BROKER` are shared by the
+internal administration routes and optional public listener. The migration sketch's `KVish` was
+retired for plain typed modules that say what they mean:
 `OauthStateStore { issue(state), consume(state) }` (in-memory, TTL internal) and
 `BlobCache { get(key), put(key, value) }` (on-disk by sha; immutable content, so no TTL and no
 delete). The global `Env` in `src/env.d.ts` extends `RuntimeBindings` **and**
-`Partial<HttpBindings>` — exactly the `AppBindings` sketch — so `main/server.ts` builds the env at
+`Partial<HttpBindings>` so `main/server.ts` builds the env at
 the `app.fetch()` seam without a cast.
 
 ### 4c. DB driver swap
@@ -376,9 +381,9 @@ renderer ↔ preload ↔ main. Treat that as a narrow capability API, not a gene
   This keeps the local HTTP API scoped to the origin the Electron app actually uses.
 - OAuth window: no preload and no Node integration (§4f). It is the only window allowed to visit
   `github.com`.
-- IPC channels for v2 terminal must validate payloads at the main-process boundary: session id,
-  cwd, cols/rows, input bytes, and lifecycle commands. The route/API types in `src/core/shared/api.ts`
-  are the pattern to copy.
+- Terminal request bodies are validated at the Hono/service boundary: session id, cwd, cols/rows,
+  input bytes, and lifecycle commands. Native service↔main calls use the narrower versioned schemas
+  in `core/shared/{serviceProtocol,desktopCapabilities}.ts`.
 - Add a basic CSP for the renderer HTML. The app currently relies on same-origin fetch and GitHub
   API calls from the main/server side, so the renderer policy can stay tight.
 
@@ -407,15 +412,16 @@ gives fast warm reads and offline browsing without a service worker (see [cachin
   - `asarUnpack`: native `.node` modules used by `better-sqlite3` now and `node-pty` later.
   - `extraResources` or equivalent: Drizzle migration files if they are not bundled into JS.
   - `files`: renderer assets, main/preload output, and any static files still served by Hono.
-- New `package.json` scripts:
+- The shipped scripts are:
 
-| Old | New |
+| Script | Current behavior |
 |---|---|
-| `dev: vite` | `dev: electron-vite dev` |
-| `build: vite build` | `build: electron-vite build && electron-builder` |
-| `typegen: wrangler types` | *(deleted)* |
-| `db:migrate: wrangler d1 …` | `db:migrate: tsx scripts/migrate.ts` (or run on startup) |
-| `db:generate: drizzle-kit generate` | *(unchanged)* |
+| `dev` | `electron-vite build && electron-vite preview` |
+| `build` | `electron-vite build` plus the renderer-size budget gate |
+| `dist` | the gated build plus `electron-builder --mac` |
+| `test:e2e` | build/rebuild for Electron and run Playwright smoke tests |
+| `db:generate` | Drizzle generation plus a fresh-DB migration replay |
+| `db:migrate` | `tsx scripts/migrate.ts` (also runs on startup) |
 
 ## 5. Cleanup — what to delete (clean transition matters)
 
@@ -483,7 +489,7 @@ and the `.batch` shim is atomic. The riskiest step (DB driver, waitUntil, bindin
 Remaining one-time setup for OAuth login: register `http://127.0.0.1:4317/auth/callback` as a
 loopback callback on the GitHub OAuth app (the only Phase 0 step that can't be verified headlessly).
 
-**Phase 1 — Electron shell. ✅ DONE (pending GUI/OAuth verification on a real machine).** Wrapped
+**Phase 1 — Electron shell. ✅ DONE.** Wrapped
 Phase 0 in Electron (`electron-vite` + `src/app/main/electron.ts` + `src/core/main/preload.ts`). The main
 process starts the server then loads `http://127.0.0.1:4317`; navigation is locked to the loopback
 origin, external links open in the system browser, and `/auth/login` is rerouted into a dedicated
@@ -504,11 +510,11 @@ added `electron-builder.yml` (mac dmg/zip, `asarUnpack` the native `.node`, migr
 `extraResources` resolved via `process.resourcesPath`), reworked scripts (`build`→electron-vite,
 `dist`→electron-builder, `db:migrate`→`tsx scripts/migrate.ts`, dropped `typegen`/`dev:web`), and
 updated `CLAUDE.md`. Verified: `pnpm lint`, 88/88 tests, `pnpm build`, and `pnpm dev` boots clean.
-**Still not verified:** a packaged `.dmg` from `pnpm dist`. (The old blocker is gone: the data
-root now resolves to `app.getPath('userData')` when packaged — §4c — so nothing tries to write
-inside the read-only asar. `SESSION_ENC_KEY` now self-provisions via `safeStorage` (Phase 9 C), so a
-packaged build with no `.env` still keeps sessions across relaunch; `GITHUB_CLIENT_*` remain the
-outstanding packaged-build secret gap.)
+The release workflow now builds the packaged `.dmg` on pushes to `main` and uploads it as an
+artifact. The data root resolves to `app.getPath('userData')`, migrations are packaged as resources,
+native modules and ripgrep are unpacked, and `SESSION_ENC_KEY` self-provisions through
+`safeStorage`. Release CI embeds the dedicated OAuth application's credentials through the
+build-time fallback; device flow remains the distribution hardening follow-up.
 
 **Phase 3 — Desktop-native cleanups + features.** Caching simplification (§5) **✅ done**. The
 **v2 terminal** (§8) **✅ shipped** — node-pty sessions in the utility service, desktop-only and always
@@ -544,11 +550,11 @@ is removed — see git history).
 1. **Pinned app port** must be free. If taken, the stable origin cannot start. Mitigation: enforce
    single-instance startup, pick an uncommon port, and surface a clear error. A dynamic fallback is
    possible, but it creates a new IndexedDB origin.
-2. **`client_secret` in the binary** if we ever distribute (§4f) — device flow is the answer.
+2. **`client_secret` in the binary** in current release artifacts (§4f) — device flow is the answer.
 3. ~~**Service worker masking app updates**~~ — resolved: the service worker was removed (§4h).
-4. **Packaged migrations/native modules** can work in dev and fail in a signed app if paths are
-   resolved from `process.cwd()` or native `.node` files stay inside `asar`. Resolve paths from app
-   resources and unpack native modules.
+4. ~~**Packaged migrations/native modules**~~ — resolved in the current package: migrations are
+   extra resources, native modules/ripgrep are unpacked, and paths resolve from app resources.
+   Signed/notarized distribution still needs its own install-time smoke test.
 5. **Auto-update** — `electron-builder` supports it, but it's new surface vs. "redeploy a Worker."
    Fine for a personal tool; decide later if distributing.
 
@@ -588,7 +594,8 @@ main: fork utility process
   → acknowledge listening
   → main: create window
   → service: reconcile durable state (tmux/worktrees/workflows) off the paint path
-  → quit: drain automation + loopback listeners, PTYs/watchers, pg pools, then SQLite
+  → quit: service drains automation + loopback listeners, PTYs/watchers, pg pools, then SQLite
+  → main disposes preview views/picker IPC and terminates the utility process
 ```
 
 The service/main channel is a versioned, zod-validated, bidirectional request protocol
@@ -606,9 +613,9 @@ is no longer the accidental `main()`: it is the PTY engine, and the composition 
 exports (`sendToAgent`, `terminalRunGlue`, `reconcileTmux`, `disposeTerminal`). Boot/reconcile/teardown
 timing marks are logged as `[service:boot] <label> +Nms` lines (performance §3.1).
 
-## 12. Current transport: loopback HTTP + one WebSocket + a thin IPC residue
+## 12. Current transport: loopback HTTP + one WebSocket + narrow native RPC
 
-The renderer↔main contract is:
+The current transport split is:
 
 - **Request/response → loopback HTTP.** Every former `ipcMain.handle` domain (search, editor, run,
   workflow, local-git, database, knowledge/notes+memory, terminal control, MCP inspect) is a typed
@@ -616,7 +623,7 @@ The renderer↔main contract is:
   response types live in `core/shared/api.ts`; clients call through `readJson`/`writeJson`. Domain logic stays in the utility
   service behind a **bridge** — a route holds a `bridgeSlot`, the service side fills it at boot
   (`core/server/bridge.ts` `viaBridge` → 503 `bridge-unavailable` when unfilled). Pure-Node bridges
-  (search/editor/local-git/database) are wired by the Electron and `dev:node` composition entries.
+  (search/editor/local-git/database) are wired by the utility-service and `dev:node` composition entries.
   Bodies that write files, spawn
   processes, or execute SQL are zod-validated with malformed-body tests.
 - **Streams → one authenticated WebSocket** at `/ws` (`core/shared/ws.ts`, `core/main/wsHub.ts`,
@@ -627,10 +634,10 @@ The renderer↔main contract is:
   snapshot-before-live ordering). The upgrade is authorized on the shared
   loopback listener: Host guard + exact-Origin + a valid session cookie, or the internal token for
   the loopback MCP caller — anything else is a 403 before the handshake.
-- **IPC residue (`preload.ts`) — only true Electron capabilities:** the `preview:*` browser-preview
+- **Renderer↔main IPC (`preload.ts`) — only true Electron capabilities:** the `preview:*` browser-preview
   channels (drive a main-owned `WebContentsView` per task — see below), `term:repoPath:pick`
   (`dialog.showOpenDialog`), and the `acorn:close-pane` main→window ⌘W ping, plus the
-  `desktop`/`platform` probes. Nothing request/response or streamable remains on IPC. (The old
+  `desktop`/`platform` probes. No domain API or domain stream remains on this IPC surface. (The old
   `browser:bind` handle is gone — with the preview main-owned, the CDP driver binds inside main when
   the view is created, so no `webContents` id ever crosses the bridge.)
 - **Browser preview — main-owned `WebContentsView`:** one kept-alive view per task,
@@ -642,6 +649,12 @@ The renderer↔main contract is:
   it when an overlay covers the pane. The main-owned record also retains the resolved home URL and
   owning window: a changed home reconciles on remount, and closing the window closes/unbinds every
   child view before macOS can create a replacement window.
+- **Service↔main RPC — lifecycle plus native adapters:** `core/shared/serviceProtocol.ts` defines
+  versioned, Zod-validated request/response/event envelopes over `utilityProcess` message ports.
+  `core/shared/desktopCapabilities.ts` projects task-addressed preview and CDP/browser operations
+  from main back into the service. Calls are concurrent and timed; peer exit rejects pending work.
+  Only serializable DTOs cross—never a database connection, child-process object, or
+  `webContents` id.
 
 ### Capability map (`dev:node` / plain browser)
 
@@ -651,7 +664,8 @@ surfaces degrade by whether their bridge is pure-Node or engine-backed:
 | Surface | `dev:node` | Why |
 | --- | --- | --- |
 | PR review, workspaces, tasks, integrations, prefs | ✅ works | server-only (DB + GitHub), never needed IPC |
-| search, editor, local-git, database | ✅ works | pure-Node bridges wired in `startListener` |
+| search, editor, local-git, database, Docker, agent usage | ✅ works | pure-Node bridges wired by both composition roots |
+| HTTP client | ✅ works | executes directly in its authenticated Hono route |
 | terminal drawer, agents, run targets, workflows, MCP inspect | ⛔ 503 | need the utility-process runtime engine (wired only in `app/service/runtime.ts`) |
 | PTY streams + `workflow:notice` (WebSocket) | ⚠️ connects, no data | the socket authorizes, but no engine registers stream handlers |
 | folder picker, drivable browser, ⌘W | ⛔ absent | true Electron capabilities (no `window.acorn` bridge) |
