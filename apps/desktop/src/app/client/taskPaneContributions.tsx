@@ -1,9 +1,11 @@
-import { createMemo, createSignal, onCleanup, onMount } from 'solid-js'
+import { createMemo, createSignal, lazy, onCleanup, onMount } from 'solid-js'
 import type { Task } from '../../core/client/queries'
 import type { PaneContribution } from '../../core/client/registries/panes'
-import LinearIssuePanel, { type LinearIssueTarget } from '../../plugins/linear/client/LinearIssuePanel'
-import RollbarPane from '../../plugins/rollbar/client/RollbarPane'
+import type { LinearIssueTarget } from '../../plugins/linear/client/LinearIssuePanel'
 import { clientEvents, consumePaneIntent } from '../../core/client/registries/clientEvents'
+
+const LinearIssuePanel = lazy(() => import('../../plugins/linear/client/LinearIssuePanel'))
+const RollbarPane = lazy(() => import('../../plugins/rollbar/client/RollbarPane'))
 
 function LinearTaskPane(props: { task: Task }) {
   const links = createMemo(() => props.task.links.filter((link) => link.providerId === 'linear'))

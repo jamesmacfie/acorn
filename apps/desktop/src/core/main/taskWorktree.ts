@@ -5,7 +5,7 @@
 import { existsSync, realpathSync, statSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { dirname, isAbsolute, resolve, sep } from 'node:path'
-import { and, eq } from 'drizzle-orm'
+import { and, eq, isNotNull } from 'drizzle-orm'
 import type { AppDatabase } from '../server/db'
 import { schema } from '../server/db'
 import type { TaskStatus, TerminalSession } from '../shared/terminal'
@@ -66,15 +66,30 @@ export const primaryUserLogin = async (db: AppDatabase): Promise<string> => {
 // Live worktree status for every active task that has a worktree (docs/workspaces-and-tasks.md/05):
 // dirty + changed-file count via git, and `missing` when the dir vanished (removed outside acorn).
 export async function computeTaskStatuses(db: AppDatabase): Promise<TaskStatus[]> {
-  const rows = (await db.select().from(schema.tasks).where(eq(schema.tasks.status, 'active'))).filter((w) => w.worktreePath)
-  return Promise.all(
-    rows.map(async (w) => {
-      const path = w.worktreePath!
-      if (!isDir(path)) return { taskId: w.id, worktreePath: path, dirty: false, dirtyCount: 0, missing: true }
+  const rows = await db
+    .select({ id: schema.tasks.id, worktreePath: schema.tasks.worktreePath })
+    .from(schema.tasks)
+    .where(and(eq(schema.tasks.status, 'active'), isNotNull(schema.tasks.worktreePath)))
+
+  // `git status` is async but still CPU/disk work. An unbounded Promise.all made every task start a
+  // process at once, producing a periodic resource spike that grew with the task roster.
+  const results = new Array<TaskStatus>(rows.length)
+  let next = 0
+  const worker = async () => {
+    while (next < rows.length) {
+      const index = next++
+      const row = rows[index]!
+      const path = row.worktreePath!
+      if (!isDir(path)) {
+        results[index] = { taskId: row.id, worktreePath: path, dirty: false, dirtyCount: 0, missing: true }
+        continue
+      }
       const { dirty, count } = await worktreePorcelain(path)
-      return { taskId: w.id, worktreePath: path, dirty, dirtyCount: count, missing: false }
-    }),
-  )
+      results[index] = { taskId: row.id, worktreePath: path, dirty, dirtyCount: count, missing: false }
+    }
+  }
+  await Promise.all(Array.from({ length: Math.min(4, rows.length) }, worker))
+  return results
 }
 
 // Startup reconciliation (docs/workspaces-and-tasks.md): flag any persisted worktree whose directory is gone

@@ -1,7 +1,9 @@
+import { lazy } from 'solid-js'
 import type { Task } from '../../../../core/client/queries'
-import PullDetail from '../PullDetail'
-import DiffView from '../DiffView'
 import type { PaneContribution } from '../../../../core/client/registries/panes'
+
+const PullDetail = lazy(() => import('../PullDetail'))
+const DiffView = lazy(() => import('../DiffView'))
 
 export function PrPane(props: { task: Task }) {
   return (

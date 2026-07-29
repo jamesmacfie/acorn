@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { schema } from '../server/db'
 import { makeTestDb, type TestDb } from '../server/routes/testDb'
-import { loadTask, resolveTaskCwd, setOnWorktreeCreated, setWorktreesRoot } from './taskWorktree'
+import { computeTaskStatuses, loadTask, resolveTaskCwd, setOnWorktreeCreated, setWorktreesRoot } from './taskWorktree'
 
 vi.setConfig({ testTimeout: 20_000 })
 
@@ -67,5 +67,20 @@ describe('resolveTaskCwd onWorktreeCreated hook', () => {
     })
     const res = await resolveTaskCwd(t.db, await loadTask(t.db, TASK), checkout)
     expect(res).toMatchObject({ isWorktree: true, created: true })
+  })
+
+  it('computes status for active worktrees after the bounded fan-out refactor', async () => {
+    const res = await resolveTaskCwd(t.db, await loadTask(t.db, TASK), checkout)
+    writeFileSync(join(res.cwd, 'f.txt'), 'changed\n')
+
+    await expect(computeTaskStatuses(t.db)).resolves.toEqual([
+      {
+        taskId: TASK,
+        worktreePath: res.cwd,
+        dirty: true,
+        dirtyCount: 1,
+        missing: false,
+      },
+    ])
   })
 })

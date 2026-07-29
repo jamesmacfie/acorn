@@ -1,5 +1,7 @@
+import { lazy } from 'solid-js'
 import type { PaneContribution } from '../../../core/client/registries/panes'
-import DatabasePane from './DatabasePane'
+
+const DatabasePane = lazy(() => import('./DatabasePane'))
 
 export const databasePaneContribution: PaneContribution = {
   id: 'database', label: 'Database', glyph: 'table', description: 'Browse and edit the task database', order: 70,

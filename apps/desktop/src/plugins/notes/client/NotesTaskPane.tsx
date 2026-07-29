@@ -1,9 +1,11 @@
+import { lazy } from 'solid-js'
 import { createQuery } from '@tanstack/solid-query'
 import type { Task } from '../../../core/client/queries'
 import { workspacesOptions } from '../../../core/client/queries'
 import type { PaneContribution } from '../../../core/client/registries/panes'
 import { workspaceForRepo } from '../../../core/client/workspaces/activeWorkspace'
-import NotesPane from './NotesPane'
+
+const NotesPane = lazy(() => import('./NotesPane'))
 
 export function NotesTaskPane(props: { task: Task }) {
   const workspaces = createQuery(() => workspacesOptions(true))

@@ -1,18 +1,20 @@
+import { lazy } from 'solid-js'
 import type { SettingsContribution } from '../../core/client/registries/settings'
-import WorkspaceRepoAssignments from '../../core/client/workspaces/WorkspaceRepoAssignments'
-import IntegrationsSettings from '../../core/client/settings/IntegrationsSettings'
-import WorkspaceSettings from '../../core/client/settings/WorkspaceSettings'
-import McpSettings from '../../core/client/settings/McpSettings'
-import AgentToolsSettings from '../../core/client/settings/AgentToolsSettings'
-import WorkflowsSettings from '../../plugins/workflows/client/WorkflowsSettings'
-import AppearanceSettings from '../../core/client/settings/AppearanceSettings'
-import TerminalSettings from '../../plugins/terminal/client/TerminalSettings'
-import DockerSettings from '../../plugins/docker/client/DockerSettings'
-import ShortcutsSettings from '../../core/client/settings/ShortcutsSettings'
-import PermissionsSettings from '../../core/client/settings/PermissionsSettings'
-import ApiSettings from '../../core/client/settings/ApiSettings'
-import HttpVariablesSettings from '../../plugins/http/client/HttpVariablesSettings'
-import StyleGallery from '../../core/client/settings/StyleGallery'
+
+const WorkspaceRepoAssignments = lazy(() => import('../../core/client/workspaces/WorkspaceRepoAssignments'))
+const IntegrationsSettings = lazy(() => import('../../core/client/settings/IntegrationsSettings'))
+const WorkspaceSettings = lazy(() => import('../../core/client/settings/WorkspaceSettings'))
+const McpSettings = lazy(() => import('../../core/client/settings/McpSettings'))
+const AgentToolsSettings = lazy(() => import('../../core/client/settings/AgentToolsSettings'))
+const WorkflowsSettings = lazy(() => import('../../plugins/workflows/client/WorkflowsSettings'))
+const AppearanceSettings = lazy(() => import('../../core/client/settings/AppearanceSettings'))
+const TerminalSettings = lazy(() => import('../../plugins/terminal/client/TerminalSettings'))
+const DockerSettings = lazy(() => import('../../plugins/docker/client/DockerSettings'))
+const ShortcutsSettings = lazy(() => import('../../core/client/settings/ShortcutsSettings'))
+const PermissionsSettings = lazy(() => import('../../core/client/settings/PermissionsSettings'))
+const ApiSettings = lazy(() => import('../../core/client/settings/ApiSettings'))
+const HttpVariablesSettings = lazy(() => import('../../plugins/http/client/HttpVariablesSettings'))
+const StyleGallery = lazy(() => import('../../core/client/settings/StyleGallery'))
 
 export const settingsPageContributions: SettingsContribution[] = [
   {

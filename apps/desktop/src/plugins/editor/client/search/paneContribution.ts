@@ -1,5 +1,7 @@
+import { lazy } from 'solid-js'
 import type { PaneContribution } from '../../../../core/client/registries/panes'
-import SearchPane from './SearchPane'
+
+const SearchPane = lazy(() => import('./SearchPane'))
 
 export const searchPaneContribution: PaneContribution = {
   id: 'search', label: 'Find in Files', glyph: 'search', description: 'Search file contents across the worktree', order: 60,

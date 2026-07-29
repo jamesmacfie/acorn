@@ -15,6 +15,8 @@ measurement rather than a framework or speculative rewrite.
 - PTY output is coalesced to roughly one renderer frame; do not regress to one UI update per chunk.
 - Persisted TanStack data remains bounded and excludes patch/file bodies that can be reconstructed
   from the loopback server and blob cache.
+- `pnpm build` enforces the critical renderer graph at 1.25 MB of scripts/modulepreloads and 200 KB
+  of CSS; optional Monaco, xterm, Shiki, settings, source, and pane surfaces stay lazy.
 - Provider resources retain explicit TTL, page, concurrency, serialized-size, context, and backoff
   budgets.
 - Diff rendering keeps tokenization cutoffs, idle hydration, stable row identity, and separate
@@ -36,6 +38,8 @@ measurement rather than a framework or speculative rewrite.
 
 ## Non-goals
 
-No benchmark CI, telemetry service, or generalized performance framework is justified today.
-Measurements should stay local and privacy-safe unless a concrete regression requires a broader
-tool. Preserve behavior first; optimize the measured path second.
+No runtime benchmark CI, telemetry service, or generalized performance framework is justified
+today. The deterministic build-size gate is deliberately narrower: it catches an eager-import
+regression without collecting user data or pretending to measure authenticated interaction
+latency. Runtime measurements should stay local and privacy-safe unless a concrete regression
+requires a broader tool. Preserve behavior first; optimize the measured path second.

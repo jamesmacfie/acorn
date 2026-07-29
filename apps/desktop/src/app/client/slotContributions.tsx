@@ -1,10 +1,12 @@
+import { lazy } from 'solid-js'
 import type { UiSlotContribution } from '../../core/client/registries/uiSlots'
-import NotificationBell from '../../core/client/notifications/NotificationBell'
-import CommandPalette from '../../core/client/palette/CommandPalette'
-import FilePalette from '../../plugins/editor/client/FilePalette'
-import WorkspacePalette from '../../core/client/palette/WorkspacePalette'
-import Shortcuts from '../../plugins/github/client/Shortcuts'
-import ConfigTrustDialog from '../../core/client/configTrust/ConfigTrustDialog'
+
+const NotificationBell = lazy(() => import('../../core/client/notifications/NotificationBell'))
+const CommandPalette = lazy(() => import('../../core/client/palette/CommandPalette'))
+const FilePalette = lazy(() => import('../../plugins/editor/client/FilePalette'))
+const WorkspacePalette = lazy(() => import('../../core/client/palette/WorkspacePalette'))
+const Shortcuts = lazy(() => import('../../plugins/github/client/Shortcuts'))
+const ConfigTrustDialog = lazy(() => import('../../core/client/configTrust/ConfigTrustDialog'))
 
 export const shellSlotContributions: UiSlotContribution[] = [
   { id: 'security.config-trust', slot: 'overlay', order: 5, component: () => <ConfigTrustDialog /> },

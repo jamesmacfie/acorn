@@ -1,7 +1,7 @@
 import { QueryClient } from '@tanstack/solid-query'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { fileSummariesKey, filesKey, pullKey } from '../../../core/shared/api'
-import { prefetchOpenPulls, prefetchPullSummary } from './prefetch'
+import { INITIAL_PREFETCH_LIMIT, prefetchOpenPulls, prefetchPullSummary } from './prefetch'
 
 const jsonResponse = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), {
@@ -90,6 +90,39 @@ describe('open PR warmup', () => {
     expect(queryClient.getQueryData(pullKey('acorn', 'web', '42'))).toEqual(detail)
     expect(queryClient.getQueryData(fileSummariesKey('acorn', 'web', '42'))).toEqual(files)
     expect(queryClient.getQueryData(filesKey('acorn', 'web', '42'))).toBeUndefined()
+  })
+
+  it('bounds automatic warm-up and leaves the remaining PRs intent-driven', async () => {
+    const pulls = Array.from({ length: INITIAL_PREFETCH_LIMIT + 3 }, (_, index) => ({
+      number: index + 1,
+      title: `PR ${index + 1}`,
+      state: 'open',
+      draft: false,
+      author: 'james',
+      headRef: `branch-${index + 1}`,
+      baseRef: 'main',
+      updatedAt: index + 1,
+    }))
+    const warmed = pulls.slice(0, INITIAL_PREFETCH_LIMIT).map((pull) => ({
+      number: pull.number,
+      detail: { ...detail, pull: { ...detail.pull, number: pull.number } },
+      files,
+    }))
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(jsonResponse(pulls))
+      .mockResolvedValueOnce(jsonResponse(warmed))
+    vi.stubGlobal('fetch', fetchMock)
+
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+    await prefetchOpenPulls(queryClient, 'acorn', 'web', new AbortController().signal)
+
+    expect(fetchMock).toHaveBeenCalledTimes(2)
+    expect(JSON.parse(fetchMock.mock.calls[1]![1]!.body as string)).toEqual({
+      numbers: [1, 2, 3, 4, 5],
+      files: 'summary',
+    })
+    expect(queryClient.getQueryData(pullKey('acorn', 'web', String(INITIAL_PREFETCH_LIMIT + 1)))).toBeUndefined()
   })
 
   it('does not refetch a hovered PR when detail and summaries are already cached', async () => {

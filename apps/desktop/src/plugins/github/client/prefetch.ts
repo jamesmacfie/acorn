@@ -1,7 +1,8 @@
-// Background warm-up: after the open PR list loads, batch-fetch each PR's detail + file summaries
-// and seed the per-PR query caches so navigating through the list has an instant first paint.
-// Patch bodies stay intent-driven in DiffView; warming them here makes the browser parse and
-// persist data for PRs the user may never open. Open only — closed PRs stay on-demand.
+// Bounded background warm-up: after the open PR list loads, batch-fetch the first visible PRs'
+// detail + file summaries and seed their caches so likely navigation has an instant first paint.
+// The previous unbounded warm-up scaled network, SQLite reads, JSON parsing, memory and IndexedDB
+// writes with every open PR in a repo. Remaining rows are warmed on hover/focus instead.
+// Patch bodies stay intent-driven in DiffView. Open only — closed PRs stay on-demand.
 // Best-effort: any failure just leaves that PR to load on first visit. Abortable, so a repo switch
 // cancels the in-flight warm-up (the caller aborts on cleanup).
 import type { QueryClient } from '@tanstack/solid-query'
@@ -10,6 +11,7 @@ import { pullsOptions } from '../../../core/client/queries'
 
 const CHUNK = 5 // PRs per batch request (one GitHub GraphQL round-trip server-side)
 const CONCURRENCY = 2 // batch requests in flight at once
+export const INITIAL_PREFETCH_LIMIT = 5
 const ROW_PREFETCH_DELAY_MS = 80
 const activeWarmups = new Map<string, Promise<void>>()
 const activeRowWarmups = new Map<string, Promise<void>>()
@@ -32,7 +34,8 @@ async function prefetchOpenPullsOnce(qc: QueryClient, owner: string, repo: strin
   const list = await qc.ensureQueryData(pullsOptions(owner, repo, 'open', true))
   if (!list) return
   const chunks: number[][] = []
-  for (let i = 0; i < list.length; i += CHUNK) chunks.push(list.slice(i, i + CHUNK).map((p) => p.number))
+  const initial = list.slice(0, INITIAL_PREFETCH_LIMIT)
+  for (let i = 0; i < initial.length; i += CHUNK) chunks.push(initial.slice(i, i + CHUNK).map((p) => p.number))
 
   let next = 0
   const worker = async () => {

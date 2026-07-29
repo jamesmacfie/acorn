@@ -24,8 +24,17 @@ const onError = (err: unknown) => {
 const queryClient = new QueryClient({
   queryCache: new QueryCache({ onError }),
   mutationCache: new MutationCache({ onError }),
+  // Keep focus refreshes useful without turning every quick app switch into a fan-out across every
+  // active query. Domain queries that genuinely need fresher data override this (running checks,
+  // integration detail, the one-minute PR-list poll).
   // gcTime must outlive a session so persisted entries survive reload (docs/caching.md 3-tier).
-  defaultOptions: { queries: { refetchOnWindowFocus: true, gcTime: 1000 * 60 * 60 * 24 } },
+  defaultOptions: {
+    queries: {
+      refetchOnWindowFocus: true,
+      staleTime: 30_000,
+      gcTime: 1000 * 60 * 60 * 24,
+    },
+  },
 })
 
 // Persist the cache to IndexedDB → instant render from last-known data + offline browsing of
@@ -33,7 +42,9 @@ const queryClient = new QueryClient({
 const persister = createAsyncStoragePersister({
   storage: { getItem: get, setItem: set, removeItem: del },
   key: 'acorn-cache',
-  throttleTime: 2_000,
+  // Persistence serializes the whole dehydrated cache. A slightly wider coalescing window keeps a
+  // burst of PR-prefetch/query updates from repeatedly stringifying the same growing snapshot.
+  throttleTime: 5_000,
 })
 const noop = () => null
 

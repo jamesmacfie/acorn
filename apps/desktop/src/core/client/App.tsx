@@ -1,4 +1,4 @@
-import { createEffect, createSignal, Match, on, onCleanup, onMount, Show, Switch, untrack } from 'solid-js'
+import { createEffect, createSignal, lazy, Match, on, onCleanup, onMount, Show, Switch, untrack } from 'solid-js'
 import { createQuery, useIsRestoring, useQueryClient } from '@tanstack/solid-query'
 import { useMatch, useNavigate, useParams } from '@solidjs/router'
 import { Dynamic } from 'solid-js/web'
@@ -8,17 +8,10 @@ import { filesKey, forceRefreshPull, meKey, meOptions, pinsOptions, prefsOptions
 import { bootstrapWorkspaces } from './workspaces/mutations'
 import RepoPicker from './ui/RepoPicker'
 import WorkspacePicker from './ui/WorkspacePicker'
-import OnboardingModal from '../../plugins/onboarding/client/OnboardingModal'
 import { workspaceForRepo } from './workspaces/activeWorkspace'
 import { planWorkspaceViewTransition } from './workspaces/workspaceViewTransition'
 import PullList from '../../plugins/github/client/PullList'
-import PullDetail from '../../plugins/github/client/PullDetail'
-import CreatePullForm from '../../plugins/github/client/CreatePullForm'
-import ComparePreview from '../../plugins/github/client/ComparePreview'
-import DiffView from '../../plugins/github/client/DiffView'
 import AccountMenu from './AccountMenu'
-import SettingsModal from './settings/SettingsModal'
-import TerminalPanel from '../../plugins/terminal/client/TerminalPanel'
 import { initWorkflowNotices } from './notifications/notifications'
 import { initSessions, sessions } from './tasks/agentSessions'
 import TabRail from './tabs/TabRail'
@@ -38,6 +31,17 @@ import { SlotHost, type UiSlotContext } from './registries/uiSlots'
 import { createAppStartupRestore } from './persistence/appStartup'
 import { PrefKeys } from './persistence/prefKeys'
 import { sourceRegistry } from './registries/sources'
+
+// The shell and PR list are the startup path. Heavy/conditional surfaces stay behind their actual
+// navigation intent so Monaco, xterm, Shiki/diff rendering, settings plugins, and onboarding do not
+// compete with the first interactive paint.
+const OnboardingModal = lazy(() => import('../../plugins/onboarding/client/OnboardingModal'))
+const PullDetail = lazy(() => import('../../plugins/github/client/PullDetail'))
+const CreatePullForm = lazy(() => import('../../plugins/github/client/CreatePullForm'))
+const ComparePreview = lazy(() => import('../../plugins/github/client/ComparePreview'))
+const DiffView = lazy(() => import('../../plugins/github/client/DiffView'))
+const SettingsModal = lazy(() => import('./settings/SettingsModal'))
+const TerminalPanel = lazy(() => import('../../plugins/terminal/client/TerminalPanel'))
 
 // Layout root (Router root): top bar + three panes. Panes are params-driven — PullList (left)
 // and PullDetail (mid) read useParams() directly; routes exist only to populate params.

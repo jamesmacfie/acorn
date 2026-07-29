@@ -1,5 +1,7 @@
+import { lazy } from 'solid-js'
 import type { PaneContribution } from '../../../core/client/registries/panes'
-import EditorPane from './EditorPane'
+
+const EditorPane = lazy(() => import('./EditorPane'))
 
 export const editorPaneContribution: PaneContribution = {
   id: 'editor', label: 'Editor', glyph: 'pencil', description: 'In-app code editor', order: 50,
