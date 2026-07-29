@@ -3,6 +3,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 import type { AgentProviderUsage, AgentUsageProviderId } from '../../shared/usage'
+import { emptyAgentPricingPreferences } from '../../shared/pricing'
 import { createAgentUsageService } from './service'
 import { UsageProcessError } from './processRunner'
 
@@ -58,7 +59,7 @@ describe('agent usage service', () => {
         return provider('codex')
       },
     })
-    const result = service.read()
+    const result = service.read({ userId: 'james' })
     await allStarted
     expect(started).toBe(2)
     releases.splice(0).forEach((release) => release())
@@ -75,16 +76,15 @@ describe('agent usage service', () => {
       claude: async () => provider('claude', ++calls),
       codex: async () => provider('codex'),
     })
-    const first = service.read()
-    const joined = service.read({ force: true })
-    expect(joined).toBe(first)
-    await first
-    await service.read()
+    const first = service.read({ userId: 'james' })
+    const joined = service.read({ userId: 'james', force: true })
+    await Promise.all([first, joined])
+    await service.read({ userId: 'james' })
     expect(calls).toBe(1)
-    await service.read({ force: true })
+    await service.read({ userId: 'james', force: true })
     expect(calls).toBe(2)
     clock += 101
-    await service.read()
+    await service.read({ userId: 'james' })
     expect(calls).toBe(3)
   })
 
@@ -98,9 +98,9 @@ describe('agent usage service', () => {
       },
       codex: async () => provider('codex', 44),
     })
-    await service.read()
+    await service.read({ userId: 'james' })
     failClaude = true
-    const refreshed = await service.read({ force: true })
+    const refreshed = await service.read({ userId: 'james', force: true })
     expect(refreshed.providers[0]).toMatchObject({
       provider: 'claude',
       stale: true,
@@ -119,8 +119,35 @@ describe('agent usage service', () => {
       },
       codex: async () => provider('codex'),
     })
-    const snapshot = await service.read()
+    const snapshot = await service.read({ userId: 'james' })
     expect(snapshot.providers[0]).toMatchObject({ provider: 'claude', availability: 'missing', error: { code: 'cli_missing' } })
     expect(snapshot.providers[1].availability).toBe('available')
+  })
+
+  it('invalidates cached estimates when the user pricing changes', async () => {
+    let customInput = 1
+    let calls = 0
+    const service = createAgentUsageService({
+      probeDir: await probeDir(),
+      pricingForUser: async () => ({
+        ...emptyAgentPricingPreferences(),
+        claude: {
+          overrides: [],
+          customModels: [{
+            model: 'claude-new',
+            price: { input: customInput, output: 2, cacheWrite: 1, cacheRead: 0.1 },
+          }],
+        },
+      }),
+      claude: async () => provider('claude', ++calls),
+      codex: async () => provider('codex'),
+    })
+
+    await service.read({ userId: 'james' })
+    await service.read({ userId: 'james' })
+    expect(calls).toBe(1)
+    customInput = 3
+    await service.read({ userId: 'james' })
+    expect(calls).toBe(2)
   })
 })

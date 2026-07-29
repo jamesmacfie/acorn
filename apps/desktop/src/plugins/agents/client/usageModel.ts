@@ -102,6 +102,9 @@ export function providerUsageRows(provider: AgentProviderUsage, now = Date.now()
       label: 'Estimated today',
       value: daily.estimatedCostUsd == null ? 'pricing unavailable' : `≈${formatUsd(daily.estimatedCostUsd)}`,
     })
+    if (daily.unpricedModels.length > 0) {
+      rows.push({ label: 'Unpriced models', value: daily.unpricedModels.join(', ') })
+    }
     rows.push({ label: 'Tokens today', value: formatTokens(daily.totalNonCacheTokens) })
     rows.push({ label: 'Input / output', value: `${formatTokens(daily.inputTokens)} / ${formatTokens(daily.outputTokens)}` })
     if (daily.cacheWriteTokens || daily.cacheReadTokens) {
