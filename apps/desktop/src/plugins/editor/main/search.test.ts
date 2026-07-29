@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { parseRgJson } from './search'
+import { parseRgJson, ripgrepExecutablePath } from './search'
 
 // A `rg --json` line for a match. Mirrors the real event shape (see searchIpc.ts RgEvent).
 const begin = (path: string) => JSON.stringify({ type: 'begin', data: { path: { text: path } } })
@@ -37,5 +37,17 @@ describe('parseRgJson', () => {
     const out = parseRgJson(lines.join('\n'))
     expect(out.truncated).toBe(true)
     expect(out.files[0].hits.length).toBe(2000)
+  })
+})
+
+describe('ripgrepExecutablePath', () => {
+  it('uses electron-builder’s unpacked binary beside app.asar', () => {
+    expect(ripgrepExecutablePath('/Applications/acorn.app/Contents/Resources/app.asar/node_modules/@vscode/ripgrep-darwin-arm64/bin/rg'))
+      .toBe('/Applications/acorn.app/Contents/Resources/app.asar.unpacked/node_modules/@vscode/ripgrep-darwin-arm64/bin/rg')
+  })
+
+  it('leaves development dependency paths unchanged', () => {
+    const path = '/workspace/node_modules/@vscode/ripgrep-darwin-arm64/bin/rg'
+    expect(ripgrepExecutablePath(path)).toBe(path)
   })
 })
