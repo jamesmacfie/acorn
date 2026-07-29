@@ -14,6 +14,8 @@ import { registerKeybindings } from '../../../core/client/registries/keybindings
 import { clientEvents, consumeTerminalFocusIntent } from '../../../core/client/registries/clientEvents'
 import { savePref } from '../../../core/client/settings/savePref'
 import { PrefKeys } from '../../../core/client/persistence/prefKeys'
+import { termFontSize } from '../../../core/client/ui/metrics'
+import { resolveTerminalFontSize } from './preferences'
 import './terminal.css'
 
 // Bottom drawer of persistent local sessions. The "+" opens a profile menu
@@ -45,6 +47,7 @@ export default function TerminalPanel(props: { onClose: () => void; task: Task |
   const [pendingProfile, setPendingProfile] = createSignal('shell')
   const [pathInput, setPathInput] = createSignal('')
   const [pathError, setPathError] = createSignal<string | null>(null)
+  const surfaceFontSize = () => resolveTerminalFontSize(prefs.data?.[PrefKeys.terminalFontSize], termFontSize())
 
   // Scope the strip to the active task (docs/workspaces-and-tasks.md). A session opened in task A
   // never shows under B, regardless of the URL.
@@ -400,7 +403,7 @@ export default function TerminalPanel(props: { onClose: () => void; task: Task |
             }
             keyed
           >
-            {(id) => <TerminalSurface sessionId={id} onExit={() => void refreshSessions()} />}
+            {(id) => <TerminalSurface sessionId={id} fontSize={surfaceFontSize()} onExit={() => void refreshSessions()} />}
           </Show>
         </div>
       </aside>

@@ -97,6 +97,8 @@ A `Portal`-rendered `<aside class="terminal-drawer">`, one per active task.
 - **Resizable.** Height seeds once from the `term_height` pref, then drag-to-resize persists it back
   (`onHandleDown` → `setPref('term_height', …)`). The live height is published as the
   `--term-drawer-h` CSS var so the task panes shrink to sit above the drawer rather than being covered.
+- **Readable density.** The default xterm glyph size is 15px with a 1.15 line height. Settings →
+  Terminal persists `term_font_size`; changing it refits xterm and resizes the backing PTY live.
 - **Tab strip.** One tab per visible session with a status dot (running / exited / idle) and a one-
   click `✕` that kills-then-drops (`closeTab` → `api.remove`); closing the last tab closes the drawer.
   An `idle` badge shows on an agent that has gone quiet.
@@ -145,7 +147,7 @@ runs as a "Setup" tab first (`maybeRunSetup`), and configured `copy` files are c
 ### `ACORN_*` environment injection (`buildSessionEnv`, `terminalUtils.ts:138`)
 
 Every task-scoped session and lifecycle script starts from a controlled `childEnv` whitelist (HOME,
-PATH, SHELL, LANG, LC_ALL, USER, LOGNAME, TMPDIR, TERM — **never** `SESSION_ENC_KEY` /
+PATH, SHELL, LANG, LC_ALL, LC_CTYPE, USER, LOGNAME, TMPDIR, TERM — **never** `SESSION_ENC_KEY` /
 `GITHUB_CLIENT_SECRET`), plus the acorn identity vars:
 
 | Var | Value |
@@ -164,6 +166,10 @@ PATH, SHELL, LANG, LC_ALL, USER, LOGNAME, TMPDIR, TERM — **never** `SESSION_EN
 [mcp.md](./mcp.md)). When an **agent** profile spawns, its acorn MCP server is auto-registered with
 the agent's CLI first (`registerAcornMcp`, idempotent, failures swallowed), so the current task's
 tools are always available with no manual "Register" click.
+
+The controlled base environment supplies `LANG=en_US.UTF-8` when a Finder-launched Electron process
+has no locale. The tmux attach client also uses `-u`: the locale keeps programs inside the pane
+Unicode-aware, while `-u` prevents tmux from replacing Unicode glyphs before xterm receives them.
 
 ## 5. Agent status — the one `AgentState` vocabulary
 

@@ -1,4 +1,4 @@
-import { onCleanup, onMount } from 'solid-js'
+import { createEffect, onCleanup, onMount } from 'solid-js'
 import { Terminal } from '@xterm/xterm'
 import { FitAddon } from '@xterm/addon-fit'
 import { WebglAddon } from '@xterm/addon-webgl'
@@ -6,7 +6,7 @@ import '@xterm/xterm/css/xterm.css'
 import { terminalApi } from './terminalClient'
 import { baseTheme, monoFont, xtermTheme } from './theme'
 import { isAppDark, watchAppearance } from '../../../core/client/ui/appearance'
-import { termFontSize } from '../../../core/client/ui/metrics'
+import { TERMINAL_LINE_HEIGHT } from './preferences'
 
 // xterm 5.5.0 bug: disposing a terminal (workspace/tab switch, or a task finishing in another
 // workspace and stealing focus) can leave a Viewport.syncScrollArea queued for the next frame. By
@@ -25,9 +25,15 @@ function installScrollAreaGuard() {
 // One xterm bound to one live session over WebSocket (docs/terminal-and-agents.md). Keyed by session id in the parent, so
 // switching tabs unmounts this (detach, keep PTY running) and remounts a fresh xterm that replays
 // the ring buffer. ponytail: local scrollback beyond the ring is lost on tab switch — fine for now.
-export default function TerminalSurface(props: { sessionId: string; onExit?: (exitCode: number | null) => void }) {
+export default function TerminalSurface(props: { sessionId: string; fontSize: number; onExit?: (exitCode: number | null) => void }) {
   const api = terminalApi()
   let host!: HTMLDivElement
+  let applyFontSize: ((fontSize: number) => void) | undefined
+
+  createEffect(() => {
+    const fontSize = props.fontSize
+    applyFontSize?.(fontSize)
+  })
 
   onMount(() => {
     if (!api) return
@@ -35,7 +41,12 @@ export default function TerminalSurface(props: { sessionId: string; onExit?: (ex
     // No convertEol: the PTY already emits CRLF for normal output (kernel ONLCR) and a full-screen
     // TUI (Claude/Codex) drives the cursor itself — rewriting bare \n to \r\n injects stray carriage
     // returns that shift redraws to column 0, interleaving frames into garbage.
-    const term = new Terminal({ fontFamily: monoFont(), fontSize: termFontSize(), theme: baseTheme(isAppDark()) })
+    const term = new Terminal({
+      fontFamily: monoFont(),
+      fontSize: props.fontSize,
+      lineHeight: TERMINAL_LINE_HEIGHT,
+      theme: baseTheme(isAppDark()),
+    })
     const fit = new FitAddon()
     term.loadAddon(fit)
     term.open(host)
@@ -53,6 +64,11 @@ export default function TerminalSurface(props: { sessionId: string; onExit?: (ex
     // teardown (or before the first paint) can't throw "reading 'dimensions' of undefined".
     let disposed = false
     const safeFit = () => { if (!disposed) { try { fit.fit() } catch { /* term detached mid-resize */ } } }
+    applyFontSize = (fontSize) => {
+      if (disposed || term.options.fontSize === fontSize) return
+      term.options.fontSize = fontSize
+      safeFit()
+    }
     safeFit()
 
     // Follow the app theme live (manual toggle or OS preference change). The full theme resolves
@@ -64,7 +80,7 @@ export default function TerminalSurface(props: { sessionId: string; onExit?: (ex
     const applyAppearance = () => {
       if (disposed) return
       term.options.fontFamily = monoFont()
-      term.options.fontSize = termFontSize()
+      term.options.fontSize = props.fontSize
       safeFit()
       void xtermTheme(isAppDark()).then((t) => { if (!disposed) term.options.theme = t })
     }
@@ -108,6 +124,7 @@ export default function TerminalSurface(props: { sessionId: string; onExit?: (ex
     ro.observe(host)
     onCleanup(() => {
       disposed = true
+      applyFontSize = undefined
       detach?.()
       unwatchAppearance()
       ro.disconnect()

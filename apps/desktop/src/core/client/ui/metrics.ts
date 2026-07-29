@@ -28,4 +28,4 @@ export const rowHeight = (): number => cssPx('--row-h-virt', 36)
 export const rowHeightSm = (): number => cssPx('--row-h-sm', 30)
 
 /** Terminal font size. xterm renders to a canvas and cannot read CSS. */
-export const termFontSize = (): number => cssPx('--term-fs', 13)
+export const termFontSize = (): number => cssPx('--term-fs', 15)
