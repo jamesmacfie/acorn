@@ -10,6 +10,7 @@ import { onClosePaneWithin } from '../../../core/client/lib/onClosePaneWithin'
 import { activeFile, editorActivate, editorClose, editorOpen, editorPromote, editorSetDirty, openFiles } from './editorState'
 import { clientEvents, consumePaneIntent, type PaneIntent } from '../../../core/client/registries/clientEvents'
 import { editorViewState, rememberEditorViewState } from './editorViewState'
+import { editorTreeDirectoryOpen, setEditorTreeDirectoryOpen } from './editorTreeState'
 import './editor.css'
 
 // Minimal filename → Monaco language id. Anything unmapped falls back to plaintext (still editable,
@@ -315,8 +316,9 @@ function Tree(props: { taskId: string; relPath: string; onOpen: (p: string) => v
 }
 
 function TreeNode(props: { taskId: string; parent: string; entry: EditorEntry; onOpen: (p: string) => void; openPath: string | null }) {
-  const [open, setOpen] = createSignal(false)
   const path = () => (props.parent ? `${props.parent}/${props.entry.name}` : props.entry.name)
+  const open = () => editorTreeDirectoryOpen(props.taskId, path())
+  const toggleOpen = () => setEditorTreeDirectoryOpen(props.taskId, path(), !open())
   return (
     <li>
       <Show
@@ -328,7 +330,7 @@ function TreeNode(props: { taskId: string; parent: string; entry: EditorEntry; o
           </button>
         }
       >
-        <button type="button" class="tree-dir" onClick={() => setOpen(!open())}>
+        <button type="button" class="tree-dir" onClick={toggleOpen}>
           <span class="tree-twist">{open() ? '▾' : '▸'}</span>
           {props.entry.name}
         </button>

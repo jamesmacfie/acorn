@@ -199,11 +199,13 @@ models from disk but never clobbers a dirty one (`EditorPane.tsx:142`). **⌘/Ct
 tab when focus is inside the pane (main suppresses the window-close accelerator and pings the
 renderer; the focus-containment subscription is the shared `onClosePaneWithin` helper in
 `client/lib/`, also used by the terminal drawer).
+Expanded folders are remembered per task for the session, so leaving the editor and returning
+restores the same lazy-tree state; collapsing a parent does not discard its nested expansion.
 **→ agent** adds a file (or selection) reference to the agent composer. Open files persist to the
 `editor_open_files` pref (`features/editor/editorState.ts`).
 
 Source: `features/editor/EditorPane.tsx`, `features/editor/editorState.ts`,
-`features/editor/editorClient.ts`.
+`features/editor/editorTreeState.ts`, `features/editor/editorClient.ts`.
 
 ### `search` — find in files
 
