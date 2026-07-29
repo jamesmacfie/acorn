@@ -221,7 +221,7 @@ Source: `apps/desktop/src/plugins/editor/client/{EditorPane.tsx,editorState.ts,e
 
 ### `search` — find in files
 
-Project-wide text search over the task's worktree, backed by **ripgrep** in the main process and a
+Project-wide text search over the task's worktree, backed by **ripgrep** in the utility service and a
 task-scoped HTTP route. Substring search by default with case / whole-word / regex toggles;
 keystrokes are debounced so a ripgrep isn't spawned per character. Results group hits by file;
 each file header can copy its worktree-relative path, and double-clicking a hit opens the file in
@@ -235,7 +235,7 @@ Source: `apps/desktop/src/plugins/editor/client/search/{SearchPane.tsx,searchCli
 A native Postgres pane, Postico-shaped: a searchable virtualized table list, a row grid with a
 detail panel that edits/inserts/deletes, and a Monaco SQL editor with a results grid. The
 connection is per-task, resolved on demand (repo `dbUrlScript` → `.env` `DATABASE_URL` →
-`process.env`) and never persisted; one `pg.Pool` per task lives in main behind task-scoped HTTP
+`process.env`) and never persisted; one `pg.Pool` per task lives in the utility service behind task-scoped HTTP
 routes. Full detail: [pg.md](./pg.md).
 
 Source: `apps/desktop/src/plugins/database/{client,main,server,shared}/`.
@@ -244,7 +244,7 @@ Source: `apps/desktop/src/plugins/database/{client,main,server,shared}/`.
 
 The task pane lists only containers matched to the task, with a chip strip when several are linked
 and a shared detail view for metadata, live logs, stats, and an interactive exec terminal. Matching
-is performed in the main process from Docker Compose working-directory labels, explicit
+is performed in the utility service from Docker Compose working-directory labels, explicit
 `[docker]` config, branch-derived labels, and conservative slug/name fallback. The pane appears only
 when at least one container matches; task-rail and footer badges report running/stopped counts.
 

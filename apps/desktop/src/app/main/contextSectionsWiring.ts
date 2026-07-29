@@ -11,7 +11,7 @@ export type ContextSectionsDeps = {
   reconciled(): Promise<void>
 }
 
-// Context contributions close over main-process stores once at composition time. The server route,
+// Context contributions close over service-process stores once at composition time. The server route,
 // compact formatter and renderer all consume their serialized result; no per-domain source setters.
 export function wireContextSections({ db, notesStore, reconciled }: ContextSectionsDeps): void {
   setContextSections(

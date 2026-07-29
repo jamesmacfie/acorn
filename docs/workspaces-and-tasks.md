@@ -77,7 +77,7 @@ The `PUT /api/terminal/repo-path/config` route validates these: `setupScriptTrig
 the three values, `previewMode` one of the three modes, and — importantly — a `port` preview value
 must be a bare 1–65535 port so a crafted value (e.g. `@evil.com`) can't redirect the preview webview
 to another host (`apps/desktop/src/core/main/repoPaths.ts` `setRepoConfig`). This whole surface is
-desktop-only — it needs the main-process worktree capability (see [Lifecycle](#lifecycle-note)), and
+desktop-only — it needs the utility-service worktree capability (see [Lifecycle](#lifecycle-note)), and
 it is edited per-repo under Settings → the workspace page.
 
 ### The Default workspace & bootstrap
@@ -324,16 +324,16 @@ Endpoints (full detail in [`api-reference.md`](./api-reference.md); all auth-gat
 
 ## Lifecycle note
 
-Terminal-driven lifecycle is desktop-only (it needs the main-process worktree capability —
+Terminal-driven lifecycle is desktop-only (it needs the utility-service worktree capability —
 `capabilities()`, always on when present; the old `acorn:term` flag is gone). The CRUD above works
 without it.
 
 - **Worktree creation is lazy** (Flow C): `tasks.worktreePath` stays null until a
-  worktree-dependent surface/action asks the main process to ensure it. Opening a terminal is the
+  worktree-dependent surface/action asks the utility service to ensure it. Opening a terminal is the
   common path; the setup script follows its configured trigger.
-- **Archive** runs through the guarded main-process teardown when on desktop: it refuses while sessions
+- **Archive** runs through the guarded utility-service teardown when on desktop: it refuses while sessions
   are running or the worktree is dirty, runs the repo's `teardownScript` in the worktree, then removes
-  the worktree (`terminalApi().task.archive`; main decides "no worktree → plain flip"). The rail's
+  the worktree (`terminalApi().task.archive`; the service decides "no worktree → plain flip"). The rail's
   confirm/error dialog is the same modal shell as create/rename (no `window.confirm`/`alert`), and the
   plain HTTP status flip exists only for the bridge-absent browser dev build. Archiving also evicts the
   task's kept-alive preview `WebContentsView`. The Docker contribution can add a pre-archive

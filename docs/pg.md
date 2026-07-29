@@ -37,7 +37,7 @@ runner 'puts ActiveRecord::Base.connection_db_config.url'`).
 ## Architecture
 
 - **Task-scoped HTTP** — renderer requests hit `/api/tasks/:id/database/*`; route handlers delegate
-  through an injected main-process bridge. No streaming.
+  through an injected utility-service bridge. No streaming.
 - **`pg` (node-postgres)** — not a native module (no better-sqlite3-style ABI dance). One `pg.Pool`
   per task, cached `Map<taskId, { pool, url }>`; `pool.end()` on disconnect/reconnect.
 - **Pane is registry-owned client presentation** — panes are not DB rows; the database plugin
@@ -106,7 +106,8 @@ travels into the prompt when it's used as an example.
 
 ## Where the code lives
 
-Main process: `apps/desktop/src/plugins/database/main/database.ts` (pool cache + `resolveDbUrl` +
+Utility service (historical `main` path):
+`apps/desktop/src/plugins/database/main/database.ts` (pool cache + `resolveDbUrl` +
 `schema()`, which resolves the schema source and carries the repo's notes back with it). HTTP routes:
 `apps/desktop/src/plugins/database/server/routes/database.ts`; prompt assembly:
 `server/generateSql.ts`; wire types: `shared/database.ts`. Client:

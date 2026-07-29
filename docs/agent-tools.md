@@ -31,7 +31,9 @@ A handler returns **domain data or throws a `ToolError`** (`not_found` / `bad_re
 It never knows which surface invoked it — if a handler inspects the caller's surface, the boundary is
 wrong. `ctx` carries only invocation-scoped identity (`taskId`, resolved `userLogin`, and the agent
 `sessionId` used to stamp write provenance); every domain dependency is closed over when the
-registry is built in the main process (`apps/desktop/src/app/main/agentToolsWiring.ts`).
+registry is built in the utility service. The wiring retains its historical path at
+`apps/desktop/src/app/main/agentToolsWiring.ts`, but is imported by `app/service/runtime.ts` and
+must remain Electron-free.
 
 ## 2. Projections
 
@@ -89,7 +91,7 @@ optional jump. The serialized `TaskContext.sections` drives both the renderer tr
 - **Notes provenance is single-sourced.** Agent writes stamp `author: agent` + the agent session id
   through the same location-aware `NotesStore` the UI writes through. Agent writes default to
   `notes/task/<taskId>/`; callers can explicitly choose workspace/global scope.
-- **Tools never touch GitHub or open their own DB.** They run in-process against the same local mirror
+- **Tools never touch GitHub or open their own DB.** They run inside the utility service against the same local mirror
   the UI reads, so an agent sees exactly what the UI sees, and the internal principal has an empty
   GitHub token (see [mcp.md](./mcp.md) §2).
 

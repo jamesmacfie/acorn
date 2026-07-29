@@ -16,6 +16,11 @@ export function makeTestDb(): TestDb {
     db,
     cleanup: () => {
       try {
+        db.close()
+      } catch {
+        // A test may have exercised explicit runtime shutdown already.
+      }
+      try {
         rmSync(dir, { recursive: true, force: true })
       } catch {
         // best-effort — tmpdir is reaped by the OS anyway

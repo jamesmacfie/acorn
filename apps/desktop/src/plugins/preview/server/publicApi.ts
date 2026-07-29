@@ -16,12 +16,12 @@ import {
   SetUrlSchema,
 } from '../../../core/shared/publicApi/preview'
 import { NO_CONTENT, defineEndpoint, type PluginApiContribution } from '../../../core/server/publicApi/defineEndpoint'
-import { previewCurrentUrl, previewEvictTask, previewLoadUrl, previewNavState, previewNavigate } from '../main/previewService'
+import type { PreviewDesktopCapability } from '../../../core/shared/desktopCapabilities'
 
 // Preview plugin public API (docs/public-api.md). Base /plugins/preview/tasks/:taskId.
-// Electron-only (WebContentsView): configuration + resolve-url are computed server-side from the
-// workspace preview settings; url/navigation/evict act on the task's live preview view (409 when no
-// view exists — presentation is renderer-owned).
+// Configuration + resolve-url are computed in the utility service from workspace preview settings.
+// url/navigation/evict cross the typed native capability boundary to the task's live
+// WebContentsView (409 when no view exists — presentation is renderer-owned).
 
 const PLUGIN = 'preview'
 const exec = promisify(execFile)
@@ -63,7 +63,7 @@ async function resolveUrl(db: AppDatabase, taskId: string): Promise<string> {
   throw new PublicApiError('conflict', 'Preview is not configured for this task')
 }
 
-export function buildPreviewPublicApi(db: AppDatabase): PluginApiContribution {
+export function buildPreviewPublicApi(db: AppDatabase, desktop: PreviewDesktopCapability): PluginApiContribution {
   return {
     pluginId: PLUGIN,
     endpoints: [
@@ -79,7 +79,7 @@ export function buildPreviewPublicApi(db: AppDatabase): PluginApiContribution {
         response: PreviewConfigurationSchema,
         handler: async (_ctx, { params }) => {
           const { mode, value } = await previewSettings(db, params.taskId)
-          return { mode, value, url: previewCurrentUrl(params.taskId) }
+          return { mode, value, url: await desktop.currentUrl(params.taskId) }
         },
       }),
       defineEndpoint({
@@ -107,7 +107,7 @@ export function buildPreviewPublicApi(db: AppDatabase): PluginApiContribution {
         body: SetUrlSchema,
         response: z.strictObject({ url: z.string() }),
         handler: async (_ctx, { params, body }) => {
-          if (!previewLoadUrl(params.taskId, body.url)) throw new PublicApiError('ui_unavailable', 'No preview view for this task')
+          if (!await desktop.loadUrl(params.taskId, body.url)) throw new PublicApiError('ui_unavailable', 'No preview view for this task')
           return { url: body.url }
         },
       }),
@@ -123,8 +123,8 @@ export function buildPreviewPublicApi(db: AppDatabase): PluginApiContribution {
         body: NavigationSchema,
         response: NavigationStateSchema,
         handler: async (_ctx, { params, body }) => {
-          if (!previewNavigate(params.taskId, body.action)) throw new PublicApiError('ui_unavailable', 'No preview view for this task')
-          const state = previewNavState(params.taskId)
+          if (!await desktop.navigate(params.taskId, body.action)) throw new PublicApiError('ui_unavailable', 'No preview view for this task')
+          const state = await desktop.navState(params.taskId)
           if (!state) throw new PublicApiError('ui_unavailable', 'No preview view for this task')
           return state
         },
@@ -141,7 +141,7 @@ export function buildPreviewPublicApi(db: AppDatabase): PluginApiContribution {
         response: z.undefined(),
         status: 204,
         handler: async (_ctx, { params }) => {
-          previewEvictTask(params.taskId)
+          await desktop.evict(params.taskId)
           return NO_CONTENT
         },
       }),

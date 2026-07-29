@@ -14,9 +14,17 @@ registered at startup, then consumed through a core registry or an injected capa
 
 ## Runtime boundaries
 
-Client code runs in the sandboxed renderer. Server, main, and MCP code run with Node capabilities.
-Renderer modules must not import server/main/MCP implementations, and Node-side modules must not
-import renderer components. Shared modules contain serializable contracts only.
+Client code runs in the sandboxed renderer. Server and most legacy-named `main` modules run in the
+Node utility service; MCP code runs in the stdio proxy. The small Electron `app/main` graph owns
+native UI adapters and service supervision. Renderer modules must not import
+server/main/service/MCP implementations, Node-side modules must not import renderer components, and
+the utility-service graph must remain Electron-free. Shared modules contain serializable contracts only.
+
+Folder names describe the original architecture, not necessarily the current process. In particular,
+the service runtime still imports Electron-free wiring from `app/main/*Wiring.ts` and domain engines
+from `core/main` and `plugins/*/main`. Treat those as service-owned unless their dependency graph
+imports Electron. New native adapters belong in the main graph; new domain engines belong in the
+service graph.
 
 `apps/desktop/src/core/boundaries.test.ts` enforces those runtime boundaries and prevents
 `core/`/`plugins/` from importing the `app/` composition layer. It also records a shrinking baseline
@@ -37,14 +45,14 @@ an edge requires removing its baseline entry.
 | Provider connections | `core/server/integrations/connectionRegistry.ts` | `app/server/providers.ts` |
 | External-item integrations | `core/server/integrations/registry.ts` | `app/server/providers.ts` |
 | Model generation adapters | `core/server/modelProviders/registry.ts` | `app/server/providers.ts` |
-| Agent tools and context | `core/server/agentTools/` | `app/main/{agentToolsWiring,contextSectionsWiring}.ts` |
-| Agent profiles | `core/main/agentProfiles/` | `app/main/agentProfiles.ts` |
-| Workflow steps, policies, triggers | `plugins/workflows/main/workflowRegistry.ts` | `app/main/workflowWiring.ts` |
+| Agent tools and context | `core/server/agentTools/` | service runtime imports `app/main/{agentToolsWiring,contextSectionsWiring}.ts` |
+| Agent profiles | `core/main/agentProfiles/` | service runtime imports `app/main/agentProfiles.ts` |
+| Workflow steps, policies, triggers | `plugins/workflows/main/workflowRegistry.ts` | service runtime imports `app/main/workflowWiring.ts` |
 
 Registries reject duplicate identifiers. Server route contributions must stay under `/api`, where
 the core app applies CSRF, principal resolution, and `requireUser` before mounting contributed
-routers. Main-process services are injected before the listener accepts requests, so a route either
-has its capability or returns the standard `bridge-unavailable` error.
+routers. Service-process implementations are injected before the listener accepts requests, so a
+route either has its capability or returns the standard `bridge-unavailable` error.
 
 A plugin may also contribute to the opt-in [public automation API](./public-api.md): a schema-first
 `PluginApiContribution` mounted under `/api/v1/plugins/<pluginId>`, whose Zod schemas are validated at
@@ -53,13 +61,15 @@ invariants, so a malformed contribution cannot mount. See `plugins/<name>/server
 
 ## Adding a feature
 
-1. Put feature-owned UI, routes, main-process services, and contracts under one
+1. Put feature-owned UI, routes, Node services, native adapters, and contracts under one
    `plugins/<feature>/` directory, split by runtime.
 2. Expose behavior through the narrowest existing contribution point. Add a new registry only when
    the behavior is genuinely open-ended and has more than one plausible contributor.
 3. Register the concrete contribution in `app/`; do not make `core/` discover product modules.
 4. Keep request/response work on authenticated HTTP, streams on the shared WebSocket, and preload
-   IPC for Electron-native capabilities only.
+   IPC for renderer-facing Electron-native capabilities only. If a service-owned feature needs a
+   native operation, add a narrow serializable contract to the service protocol rather than
+   importing Electron into the engine.
 5. Add focused behavior tests plus any registry, route, provider, or architecture conformance case.
 6. Update the durable topic documentation in the same change.
 

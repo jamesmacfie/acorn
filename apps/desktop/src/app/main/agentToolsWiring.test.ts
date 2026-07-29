@@ -34,6 +34,14 @@ describe('agent note contributions', () => {
       proposals: { propose: async () => ({}) } as never,
       runtime: { targets: async () => ({ targets: [] }) } as never,
       reconciled: async () => {},
+      browser: {
+        navigate: async () => ({ ok: false }),
+        snapshot: async () => ({}),
+        click: async () => ({ ok: false }),
+        fill: async () => ({ ok: false }),
+        screenshot: async () => ({}),
+        console: async () => ({ lines: [] }),
+      },
     })
     const append = tools.find((tool) => tool.name === 'notes_append')!
     const write = tools.find((tool) => tool.name === 'notes_write')!

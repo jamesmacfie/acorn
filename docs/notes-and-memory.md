@@ -54,7 +54,7 @@ Each note carries an `author` (`user | agent | workflow`) and a `kind`
 ### The Notes pane
 
 `apps/desktop/src/plugins/notes/client/NotesPane.tsx` — the registered `notes` layout pane, whose client
-uses task/workspace-scoped HTTP routes. The backing file store is main-process-owned, so those routes
+uses task/workspace-scoped HTTP routes. The backing file store is utility-service-owned, so those routes
 return a clean `503 bridge-unavailable` under `dev:node`. Layout:
 
 - A scratchpad is the landing surface. Until the first keystroke it is virtual; typing creates the
@@ -74,7 +74,7 @@ already mounted it consumes the live event; otherwise it consumes the retained i
 
 Agents reach notes over the **loopback harness routes** (`apps/desktop/src/core/server/routes/harness.ts`),
 which are keyed by **task id** (the store resolves task → workspace internally). The routes delegate to
-the main-process `NotesStore` through the injected `HarnessBridge` (`harness.ts:10-36`):
+the utility-service `NotesStore` through the injected `HarnessBridge` (`harness.ts:10-36`):
 
 | Route | Bridge method | MCP tool |
 | --- | --- | --- |
@@ -231,7 +231,7 @@ query cache, blob cache, and workspace notes).
 
 ## Availability and limits
 
-- **File-backed paths need the main process.** Human-facing HTTP routes delegate through an injected
+- **File-backed paths need the utility service.** Human-facing HTTP routes delegate through an injected
   `KnowledgeBridge`. Without it — e.g.
   `dev:node` running just the Hono server with no Electron — every route degrades to a clean **503**
   (`bridge-unavailable`) rather than crashing.
@@ -249,7 +249,8 @@ query cache, blob cache, and workspace notes).
   `review_notes` for the separate anchored store)
 - Shared note shapes: `apps/desktop/src/core/shared/notes.ts` (canonical `Note`/`NoteSummary` +
   author/kind unions, imported by main and client)
-- Stores (main process): `apps/desktop/src/plugins/notes/main/notes.ts` (`NotesStore` — the `.md` files),
+- Stores (utility service; historical `main` paths):
+  `apps/desktop/src/plugins/notes/main/notes.ts` (`NotesStore` — the `.md` files),
   `apps/desktop/src/plugins/memory/main/memory.ts` (memory files + derived index + `MEMORY.md`),
   `apps/desktop/src/plugins/memory/main/memoryProposals.ts` (proposal JSON store),
   `apps/desktop/src/plugins/memory/main/memoryGen.ts` (auto-generation + accept/reject verdicts; trigger + the

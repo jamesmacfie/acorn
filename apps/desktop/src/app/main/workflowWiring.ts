@@ -1,4 +1,4 @@
-// Workflow wiring (docs/workflows.md), split out of terminal.ts: constructs the main-process
+// Workflow wiring (docs/workflows.md), split out of terminal.ts: constructs the service-owned
 // WorkflowRunner over the fake-able headless runner with its real deps — handoff notes, the
 // loopback context assembler, a re-derived checks-green policy, gate/run-done notices — and wires
 // the WorkflowBridge behind the HTTP routes (server/routes/workflow.ts). Gate/run-done notices,

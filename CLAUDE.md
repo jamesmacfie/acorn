@@ -1,7 +1,7 @@
 # CLAUDE.md — acorn
 
 A **local macOS agent workspace** with first-class GitHub pull-request review. A SolidJS SPA is served by an
-in-process Hono server (`@hono/node-server`) running in the Electron main process, backed by a
+Hono server (`@hono/node-server`) running in a supervised Electron utility process, backed by a
 local SQLite read-model mirror of GitHub data (better-sqlite3 + Drizzle), an on-disk blob cache,
 and IndexedDB client persistence. An independent bearer-authenticated automation listener can be
 enabled on a second loopback port; it is off by default.
@@ -10,16 +10,26 @@ enabled on a second loopback port; it is off by default.
 > For the Cloudflare-Workers→Electron migration history and rationale, see
 > [docs/electron.md](./docs/electron.md); current topic docs describe the shipped Electron runtime.
 
-## Architecture (one local server in Electron)
+## Architecture (one local service supervised by Electron)
 
-- The Electron main entry (`apps/desktop/src/app/main/electron.ts`) calls the composition root
-  (`src/app/main/bootstrap.ts`), which builds the runtime bindings and starts the Hono app
-  (`src/core/server/index.ts`, a `createApp()` factory) under `@hono/node-server` on
-  `http://127.0.0.1:4317`, then points a hardened `BrowserWindow` at that origin. The server serves
+- The Electron main entry (`apps/desktop/src/app/main/electron.ts`) calls the native composition
+  root (`src/app/main/bootstrap.ts`), which starts and supervises `src/app/service/index.ts`.
+  The Electron-free service root (`src/app/service/runtime.ts`) builds the runtime bindings and
+  starts the Hono app (`src/core/server/index.ts`, a `createApp()` factory) under
+  `@hono/node-server` on `http://127.0.0.1:4317`; main then points a hardened `BrowserWindow` at
+  that origin. The server serves
   `/api/*` + `/auth/*` and falls back to the SPA shell `index.html` for other navigations.
+- Process boundary: the utility service owns SQLite, HTTP/WebSocket listeners, PTYs/tmux,
+  worktrees, Git/process execution, workflows, Docker/database services, reconciliation, and
+  shutdown draining. Electron main owns `BrowserWindow`/`WebContentsView`, dialogs, `safeStorage`,
+  navigation/keyboard policy, and supervision. `core/shared/serviceProtocol.ts` carries versioned,
+  Zod-validated lifecycle RPC; `core/shared/desktopCapabilities.ts` exposes narrow task-addressed
+  native operations. Serializable data crosses this boundary, never DB handles, process objects,
+  or `webContents` identifiers.
 - Data: GitHub → local SQLite (via Drizzle, `better-sqlite3`) read-model mirror with ETag/TTL
   serve-then-revalidate; an on-disk dir caches immutable blob/patch bodies by SHA for all repos; IndexedDB
-  persists the client query cache. Local data lives under `apps/desktop/.acorn/` (gitignored).
+  persists the client query cache. Server-side data lives under `apps/desktop/.acorn/` in development
+  (gitignored) and Electron's `userData` root when packaged; IndexedDB stays in the browser partition.
 - Bindings: `apps/desktop/src/core/main/bindings.ts` builds the object routes read via `c.env` (DB,
   in-memory `OAUTH_STATE`, on-disk `BLOBS`, secret stores, public-API services). It also protects the
   data root and persists the loopback internal token and active GitHub identity in mode-`0600`
@@ -40,15 +50,18 @@ app/process boundaries and a shrinking ledger of legacy cross-feature coupling a
   persistence, layout, prefs, palettes, tabs, tasks/workspaces, settings framework, WS client),
   `server/` (`createApp` factory, session/auth/csrf middleware, sync engine, route + integration-
   provider registries, Drizzle `db/`), `main/` (PTY/worktree primitives, bindings, server listener,
-  MCP registration, agent-profile registry), `mcp/` (stdio skeleton + tool projection), `shared/`
-  (cross-process contracts: api, ws, terminal/notes/workflow protocols).
+  MCP registration, agent-profile registry; these run in the utility service unless Electron-native),
+  `mcp/` (stdio skeleton + tool projection), `shared/`
+  (cross-process contracts: API, WS, terminal/notes/workflow protocols, service lifecycle, native
+  capabilities).
 - `apps/desktop/src/plugins/<name>/` — one folder per in-tree feature (github, linear, rollbar,
   editor, changes, notes, memory, context, preview, database, docker, http, model-providers,
   terminal, agents, workflows, profiles-{claude,codex,aider}, onboarding), each with
   `client`/`server`/`main` parts as needed. A plugin may import `core/` and explicit cross-plugin
   contribution points. Existing direct cross-feature imports are baselined and must not grow.
-- `apps/desktop/src/app/` — the composition root and contribution activation layer: `main/`
-  (`bootstrap.ts` boot order, `electron.ts` entry, activation modules), `server/` (`providers.ts`,
+- `apps/desktop/src/app/` — the composition roots and contribution activation layer: `main/`
+  (`bootstrap.ts` native supervision, `electron.ts` entry, native capability adapters), `service/`
+  (Electron-free runtime composition and utility entry), `server/` (`providers.ts`,
   `routes.ts` register plugin contributions into core registries; `devNode.ts` is the `dev:node`
   entry), `client/` (`index.tsx` renderer entry + contribution activation).
 - Detail docs: [docs/frontend.md](./docs/frontend.md), [docs/diff-rendering.md](./docs/diff-rendering.md),
@@ -67,7 +80,7 @@ app/process boundaries and a shrinking ledger of legacy cross-feature coupling a
 | --- | --- |
 | `pnpm dev` | Build + launch the Electron app (`electron-vite build && electron-vite preview`); window loads `127.0.0.1:4317` |
 | `pnpm --filter @acorn/desktop dev:node` | Run just the Node server (no Electron) on `:4317` — needs Node-ABI better-sqlite3 (`node:rebuild`) |
-| `pnpm --filter @acorn/desktop build` | Build main + preload + renderer and enforce the renderer-size budget |
+| `pnpm --filter @acorn/desktop build` | Build main + service + MCP + preload + renderer and enforce the renderer-size budget |
 | `pnpm --filter @acorn/desktop dist` | Run the gated build, then `electron-builder --mac` to produce `.dmg`/`.zip` |
 | `pnpm lint` | `tsc --noEmit` typecheck |
 | `pnpm test` | Rebuild native modules for Node, then run `vitest` |
@@ -80,6 +93,11 @@ app/process boundaries and a shrinking ledger of legacy cross-feature coupling a
 ## Conventions & gotchas
 
 - **TypeScript strict; no `any`.** Match existing patterns and naming.
+- **Process ownership:** new domain engines belong in the Electron-free service graph; Electron
+  main is only for native UI/OS adapters and service supervision. Some service-owned modules retain
+  the historical `core/main`, `plugins/*/main`, or `app/main/*Wiring.ts` paths. Classify them by
+  dependency graph and runtime, not the folder label. Keep service↔main payloads serializable and
+  task-addressed; use HTTP/WebSocket for renderer-facing product APIs.
 - **Schema change workflow:** edit `apps/desktop/src/core/server/db/schema.ts` → `db:generate` →
   `db:migrate` (or just launch — `openDb` migrates on startup). After changing the bindings shape,
   update the hand-written `Env` in `apps/desktop/src/env.d.ts`. (Drizzle quirk: a `NOT NULL` column on a

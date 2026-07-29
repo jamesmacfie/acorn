@@ -27,7 +27,7 @@ import { describe, expect, it } from 'vitest'
 const SRC = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const EXTS = ['.ts', '.tsx', '.js', '.jsx', '.mjs', '.cjs', '.json', '.css']
 const IMPORT_RE = /(?:\bfrom\s*|\bimport\s*|\brequire\s*\(\s*|\bimport\s*\(\s*)(['"])(\.[^'"]*)\1/g
-const NODE_PROCS = new Set(['server', 'main', 'mcp'])
+const NODE_PROCS = new Set(['server', 'main', 'service', 'mcp'])
 
 function walk(dir: string, out: string[] = []): string[] {
   for (const e of readdirSync(dir, { withFileTypes: true })) {
@@ -80,6 +80,33 @@ function scan(): Edge[] {
   return edges
 }
 
+function localGraph(): Map<string, string[]> {
+  const graph = new Map<string, string[]>()
+  for (const file of walk(SRC)) {
+    const dependencies: string[] = []
+    const text = readFileSync(file, 'utf8')
+    let match: RegExpExecArray | null
+    while ((match = IMPORT_RE.exec(text))) {
+      const target = resolveSpec(file, match[2])
+      if (target && !relative(SRC, target).startsWith('..')) dependencies.push(target)
+    }
+    graph.set(file, dependencies)
+  }
+  return graph
+}
+
+function reachableFrom(roots: string[], graph: Map<string, string[]>): string[] {
+  const visited = new Set<string>()
+  const pending = [...roots]
+  while (pending.length) {
+    const file = pending.pop()
+    if (!file || visited.has(file)) continue
+    visited.add(file)
+    pending.push(...(graph.get(file) ?? []))
+  }
+  return [...visited]
+}
+
 // --- baselined cross-feature couplings (see header). Sorted; shrink over time, never grow. ---
 const BASELINE_CORE_TO_PLUGIN = [
   'core/client/App.tsx => plugins/github/client/ComparePreview.tsx',
@@ -114,6 +141,7 @@ const BASELINE_PLUGIN_TO_PLUGIN = [
 
 describe('architecture boundaries', () => {
   const edges = scan()
+  const graph = localGraph()
   const seen = (kind: Edge['kind']) => [...new Set(edges.filter((e) => e.kind === kind).map((e) => `${e.from} => ${e.to}`))].sort()
 
   it('nothing in core/ or plugins/ imports app/ (composition root is a leaf)', () => {
@@ -122,6 +150,33 @@ describe('architecture boundaries', () => {
 
   it('the client↔node process boundary holds', () => {
     expect(seen('process')).toEqual([])
+  })
+
+  it('the utility-service dependency graph is Electron-free', () => {
+    const serviceRoot = resolve(SRC, 'app/service/index.ts')
+    const electronImports = reachableFrom([serviceRoot], graph)
+      .filter((file) => /\bfrom\s*['"]electron['"]|\bimport\s*\(\s*['"]electron['"]/.test(readFileSync(file, 'utf8')))
+      .map((file) => relative(SRC, file))
+      .sort()
+    expect(electronImports).toEqual([])
+  })
+
+  it('Electron main cannot reach service-owned runtime engines', () => {
+    const mainRoot = resolve(SRC, 'app/main/electron.ts')
+    const forbidden = new Set([
+      'core/main/bindings.ts',
+      'core/main/server.ts',
+      'core/main/wsHub.ts',
+      'plugins/database/main/database.ts',
+      'plugins/docker/main/dockerService.ts',
+      'plugins/terminal/main/terminal.ts',
+      'plugins/workflows/main/workflowRunner.ts',
+    ])
+    const reached = reachableFrom([mainRoot], graph)
+      .map((file) => relative(SRC, file))
+      .filter((file) => forbidden.has(file))
+      .sort()
+    expect(reached).toEqual([])
   })
 
   it('core→plugin coupling matches the shrinking baseline (no new; remove entry when a coupling is fixed)', () => {

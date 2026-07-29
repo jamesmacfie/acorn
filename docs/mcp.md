@@ -8,7 +8,7 @@ registry, not the source of tool definitions.
 
 > Maturity: the MCP server and its Settings surface are wired and used when the desktop app is
 > running (the agent/terminal features it depends on are desktop-only and always on; see
-> [terminal-and-agents.md](./terminal-and-agents.md)). The tool surface requires the main-process
+> [terminal-and-agents.md](./terminal-and-agents.md)). The tool surface requires the utility-service
 > registry and degrades to a clean `503` without it (e.g. `dev:node`).
 
 ## 1. What it is
@@ -42,7 +42,7 @@ The server therefore reads its identity from the env it inherits (`src/core/mcp/
 | `ACORN_API_TOKEN` | the private persisted internal token sent as `x-acorn-internal` |
 | `ACORN_SESSION_ID` | this terminal session's id, sent as `x-acorn-session-id` and stamped on notes/memory writes for provenance |
 
-These are injected into every task-scoped terminal session by the main process
+These are injected into every task-scoped terminal session by the utility service
 (`buildSessionEnv`, `apps/desktop/src/core/main/taskEnv.ts`, plus `internalApiEnv` and
 `ACORN_SESSION_ID` in `spawnOne`, `apps/desktop/src/plugins/terminal/main/terminal.ts`). See
 [terminal-and-agents.md](./terminal-and-agents.md) for the full `ACORN_*` injection story.
@@ -51,7 +51,7 @@ These are injected into every task-scoped terminal session by the main process
 
 The tools **never open their own SQLite DB or GitHub client.** Every call goes through the running
 app over loopback with `x-acorn-internal: <ACORN_API_TOKEN>` (`apiCall` in
-`apps/desktop/src/core/mcp/api.ts`); the tool handlers run in the app's main process against the same
+`apps/desktop/src/core/mcp/api.ts`); the tool handlers run in the app's utility service against the same
 local mirror the UI reads — including the git tools, which resolve the task's worktree server-side
 (no more `ACORN_WORKTREE_PATH` in the MCP process).
 
@@ -88,13 +88,14 @@ the per-tool table; duplicating it here would create a hand-synced ladder.
 
 **A read-only inspector** of the MCP config files the agents in this task's worktree would load —
 `.mcp.json`, `.cursor/mcp.json` (worktree-relative) and `~/.claude.json` (home)
-(`MCP_CANDIDATES`, `apps/desktop/src/core/shared/mcp.ts:78-82`). These are the *only* paths main reads.
+(`MCP_CANDIDATES`, `apps/desktop/src/core/shared/mcp.ts:78-82`). These are the *only* paths the
+service-side inspector reads.
 `inspectMcpConfig` parses each file's `mcpServers` / `mcp.servers` / `servers` node into per-server
 rows (name, transport, status, command/url, env); unparseable JSON surfaces as one `invalid` row so
 breakage is visible (`apps/desktop/src/core/shared/mcp.ts:34-72`). acorn **never launches** any of these
 servers — it only shows what the agent is configured to load.
 
-**Secret masking happens in main, before crossing to the renderer.** `maskSecretEnv` masks any env
+**Secret masking happens in the utility service, before crossing to the renderer.** `maskSecretEnv` masks any env
 value whose key looks like a credential (`*_TOKEN`/`*_KEY`/`*_SECRET`/…) or whose value carries a
 known prefix (`sk-`, `ghp_`, `xox…`), keeping keys intact so the user sees *what* is configured
 without leaking the value (`apps/desktop/src/core/shared/mcp.ts:16-29`).
@@ -107,7 +108,8 @@ remove the registration with the corresponding agent CLI.
 ## 5. Maturity & operational notes
 
 - The **tool surface** is served by `apps/desktop/src/core/server/routes/agentTools.ts` from the registry
-  installed by `apps/desktop/src/app/main/agentToolsWiring.ts`. Without the registry — e.g. running the
+  installed by the utility runtime through the historically named
+  `apps/desktop/src/app/main/agentToolsWiring.ts`. Without the registry — e.g. running the
   server alone with `dev:node`, no Electron — the tool routes return a clean
   `503 { error: 'bridge-unavailable' }` and the MCP server reports an empty `tools/list`, rather than
   crashing. A handler's typed `ToolError` becomes the machine `error` code

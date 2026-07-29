@@ -7,7 +7,7 @@ import type { AppEnv } from '../middleware/auth'
 import { respondError } from '../respond'
 
 // Internal (cookie-auth) view of the machine-scoped API listener settings so the desktop Settings
-// page can show/edit enabled + port. The controller is the main-owned AutomationApiServer, wired in
+// page can show/edit enabled + port. The controller is the service-owned AutomationApiServer, wired in
 // through this slot at boot (the public /api/v1/settings/api uses the same controller with bearer).
 export const apiSettingsSlot = bridgeSlot<ApiSettingsController>()
 export const setApiSettingsController = apiSettingsSlot.set

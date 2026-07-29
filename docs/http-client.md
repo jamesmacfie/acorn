@@ -44,7 +44,7 @@ is never persisted.
 
 ## Sending and security
 
-The Hono server executes requests with Node's `fetch`; no stateful main-process bridge is needed, so
+The Hono route executes requests with Node's `fetch`; no injected stateful engine bridge is needed, so
 the client works in `dev:node`. Sending is restricted to an interactive cookie-authenticated
 principal. The internal `x-acorn-internal` principal used by agents/MCP receives
 `403 interactive_user_required`, preventing the route from becoming a secret-decryption or SSRF

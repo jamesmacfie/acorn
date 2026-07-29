@@ -2,7 +2,7 @@
 
 > **Runtime note:** acorn migrated from Cloudflare Workers to a local Electron app (see
 > [electron.md](./electron.md)). The OAuth web flow and sealed-cookie session are unchanged — they
-> run in an in-process Node server on `http://127.0.0.1:4317`, and login happens in a dedicated
+> run in a local Node utility service on `http://127.0.0.1:4317`, and login happens in a dedicated
 > Electron OAuth window. Register `http://127.0.0.1:4317/auth/callback` on the GitHub OAuth app.
 > Where this doc says "the Worker", read "the local server".
 
