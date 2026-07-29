@@ -7,6 +7,7 @@ import * as schema from './schema'
 // keeps the type available without pulling the native module into non-main bundles.
 export type AppDatabase = BetterSQLite3Database<typeof schema> & {
   batch<U extends BatchItem<'sqlite'>, T extends Readonly<[U, ...U[]]>>(batch: T): Promise<BatchResponse<T>>
+  close(): void
 }
 
 // One runtime: the client is built once at bootstrap and handed in via env.DB. getDb is an

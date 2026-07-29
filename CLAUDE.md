@@ -1,7 +1,7 @@
 # CLAUDE.md — acorn
 
 A **local macOS agent workspace** with first-class GitHub pull-request review. A SolidJS SPA is served by an
-in-process Hono server (`@hono/node-server`) running in the Electron main process, backed by a
+Hono server (`@hono/node-server`) running in a supervised Electron utility process, backed by a
 local SQLite read-model mirror of GitHub data (better-sqlite3 + Drizzle), an on-disk blob cache,
 and IndexedDB client persistence.
 
@@ -11,10 +11,12 @@ and IndexedDB client persistence.
 
 ## Architecture (one local server in Electron)
 
-- The Electron main entry (`apps/desktop/src/app/main/electron.ts`) calls the composition root
-  (`src/app/main/bootstrap.ts`), which builds the runtime bindings and starts the Hono app
-  (`src/core/server/index.ts`, a `createApp()` factory) under `@hono/node-server` on
-  `http://127.0.0.1:4317`, then points a hardened `BrowserWindow` at that origin. The server serves
+- The Electron main entry (`apps/desktop/src/app/main/electron.ts`) calls the native composition
+  root (`src/app/main/bootstrap.ts`), which starts and supervises `src/app/service/index.ts`.
+  The Electron-free service root (`src/app/service/runtime.ts`) builds the runtime bindings and
+  starts the Hono app (`src/core/server/index.ts`, a `createApp()` factory) under
+  `@hono/node-server` on `http://127.0.0.1:4317`; main then points a hardened `BrowserWindow` at
+  that origin. The server serves
   `/api/*` + `/auth/*` and falls back to the SPA shell `index.html` for other navigations.
 - Data: GitHub → local SQLite (via Drizzle, `better-sqlite3`) read-model mirror with ETag/TTL
   serve-then-revalidate; an on-disk dir caches immutable public blob/patch bodies by SHA; IndexedDB
@@ -36,15 +38,17 @@ app/process boundaries and a shrinking ledger of legacy cross-feature coupling a
   persistence, layout, prefs, palettes, tabs, tasks/workspaces, settings framework, WS client),
   `server/` (`createApp` factory, session/auth/csrf middleware, sync engine, route + integration-
   provider registries, Drizzle `db/`), `main/` (PTY/worktree primitives, bindings, server listener,
-  MCP registration, agent-profile registry), `mcp/` (stdio skeleton + tool projection), `shared/`
+  MCP registration, agent-profile registry; these run in the utility service unless Electron-native),
+  `mcp/` (stdio skeleton + tool projection), `shared/`
   (cross-process contracts: api, ws, terminal/notes/workflow protocols).
 - `apps/desktop/src/plugins/<name>/` — one folder per in-tree feature (github, linear, rollbar,
   editor, changes, notes, memory, context, preview, database, terminal, agents, workflows,
   profiles-{claude,codex,aider}, onboarding), each with `client`/`server`/`main` parts as needed. A
   plugin may import `core/` and cross-plugin contribution points. Existing direct cross-feature
   imports are explicitly baselined and must not grow.
-- `apps/desktop/src/app/` — the composition root and contribution activation layer: `main/`
-  (`bootstrap.ts` boot order, `electron.ts` entry, activation modules), `server/` (`providers.ts`,
+- `apps/desktop/src/app/` — the composition roots and contribution activation layer: `main/`
+  (`bootstrap.ts` native supervision, `electron.ts` entry, native capability adapters), `service/`
+  (Electron-free runtime composition and utility entry), `server/` (`providers.ts`,
   `routes.ts` register plugin contributions into core registries; `devNode.ts` is the `dev:node`
   entry), `client/` (`index.tsx` renderer entry + contribution activation).
 - Detail docs: [docs/frontend.md](./docs/frontend.md), [docs/diff-rendering.md](./docs/diff-rendering.md),

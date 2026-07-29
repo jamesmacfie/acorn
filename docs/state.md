@@ -11,7 +11,7 @@ session state; persistence is reserved for arrangements the user expects to surv
 | T2 | User-owned durable data | SQLite app tables | tasks, notes, memory, workflow runs |
 | T3 | Persisted view arrangement | versioned persisted-state descriptors | layout, editor tabs, filters, theme |
 | T4 | In-session attention | scoped Solid signals | scroll, selection, maximize, active terminal |
-| T5 | Live process resources | main-process lifecycle services | PTYs, webviews, database pools |
+| T5 | Live process resources | utility-service lifecycle + Electron native host | PTYs, webviews, database pools |
 
 Scopes are `app`, `workspace(id)`, `task(id)`, and `pane(taskId, paneId)`. Each state owner is the
 only writer. Server data is never copied from TanStack Query into a second signal store.

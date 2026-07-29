@@ -1,33 +1,28 @@
 import { serve, type Http2Bindings, type HttpBindings, type ServerType } from '@hono/node-server'
 import { serveStatic } from '@hono/node-server/serve-static'
 import { readFileSync } from 'node:fs'
-import { dirname, resolve } from 'node:path'
-import { fileURLToPath } from 'node:url'
+import { resolve } from 'node:path'
 import { createApp } from '../server/index'
 import { makeBindings, type RuntimeBindings } from './bindings'
-import { resolveDatabasePath, resolveServerPaths } from './serverPaths'
+import { resolveDatabasePath } from './serverPaths'
+import { ACORN_PORT, clientDir, devDataDir } from './serverConfig'
 import { attachWsHub, setUiBroker } from './wsHub'
 
-const here = dirname(fileURLToPath(import.meta.url))
-// Resolve from the desktop package root, never process.cwd() or a fixed module depth: source-mode
-// dev:node runs this file under src/core/main while electron-vite bundles it under out/main.
-const serverPaths = resolveServerPaths(here)
-const clientDir = serverPaths.clientDir
 // DEV data root: the repo-local apps/desktop/.acorn (gitignored). Only valid while running from a
 // checkout — a packaged app's module dir is the read-only asar, so electron.ts passes an
 // app.getPath('userData') root into bootstrap() instead when app.isPackaged.
-export const devDataDir = serverPaths.devDataDir
+export { devDataDir }
 const indexHtml = readFileSync(resolve(clientDir, 'index.html'), 'utf8')
 
-export const ACORN_PORT = Number(process.env.ACORN_PORT) || 4317
+export { ACORN_PORT }
 
 // Start the loopback HTTP listener over an already-built runtime. Split from startServer so the
-// composition root (main/bootstrap.ts) can wire the harness/context bridges into the route modules
+// service composition root (app/service/runtime.ts) can wire the harness/context bridges into the route modules
 // BEFORE the listener accepts requests (composition-root ownership boot-order fix). Resolves once listening so
 // callers can safely loadURL the origin.
 export function startListener(runtime: RuntimeBindings): Promise<ServerType> {
   // Every bridge (pure-Node domain bridges AND the stateful harness/context bridges) is installed by
-  // the composition root (app/main/bootstrap.ts under Electron, app/server/devNode.ts under dev:node)
+  // the composition root (app/service/runtime.ts under Electron, app/server/devNode.ts under dev:node)
   // BEFORE this is called — core no longer imports plugin bridge wiring (docs/plugins.md).
   const app = createApp()
 
@@ -77,8 +72,8 @@ export function startListener(runtime: RuntimeBindings): Promise<ServerType> {
   })
 }
 
-// One definition of the on-disk app-data layout under `dataDir` (DB, blobs) — Electron's
-// composition root and the plain-Node `dev:node` entry both build their runtime through it.
+// One definition of the on-disk app-data layout under `dataDir` (DB, blobs) — Electron's utility
+// service and the plain-Node `dev:node` entry both build their runtime through it.
 export function makeRuntime(dataDir: string): RuntimeBindings {
   return makeBindings({
     dbPath: resolveDatabasePath(dataDir),

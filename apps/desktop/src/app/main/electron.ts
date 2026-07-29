@@ -2,7 +2,7 @@ import { app, BrowserWindow, dialog, ipcMain, shell } from 'electron'
 import { join, resolve } from 'node:path'
 import { bootstrap } from './bootstrap'
 import { resolveSessionKey } from '../../core/main/sessionKeyStore'
-import { ACORN_PORT, devDataDir } from '../../core/main/server'
+import { ACORN_PORT, devDataDir } from '../../core/main/serverConfig'
 import { isAllowedExternalUrl } from '../../core/main/urlGuards'
 
 const ORIGIN = `http://127.0.0.1:${ACORN_PORT}`

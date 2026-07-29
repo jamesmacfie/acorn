@@ -1,4 +1,3 @@
-import { dialog, ipcMain } from 'electron'
 import { spawn, type IPty } from 'node-pty'
 import { execFile, execFileSync } from 'node:child_process'
 import { randomUUID } from 'node:crypto'
@@ -33,7 +32,7 @@ import { getProfile, listProfileDefs, listProfiles, resolveCommand, tmuxAvailabl
 import { getRepoPath, setRepoConfig, setRepoPath, setRunTargets } from '../../../core/main/repoPaths'
 import { fileURLToPath } from 'node:url'
 import { inspectMcpConfig, MCP_CANDIDATES, STARTER_MCP_JSON, type McpServerSummary } from '../../../core/shared/mcp'
-import { launcherSpec, resolveMcpEntry, serverName } from '../../../core/main/mcpRegister'
+import { launcherSpec, resolveMcpEntry, serverName, type Launcher } from '../../../core/main/mcpRegister'
 import { broadcastStatus } from '../../../core/main/notify'
 import type { RunSessionGlue } from './runIpc'
 import { TerminalDisplay } from './terminalDisplay'
@@ -51,8 +50,8 @@ import {
 } from '../../../core/main/taskWorktree'
 import { currentBranch } from '../../../core/main/worktrees'
 
-// PTYs live in the main process. Sessions run on one of two backends:
-//  - node-pty: spawn the command directly. Survives a window reload (PTY is in main), not an app
+// PTYs live in the Node utility service. Sessions run on one of two backends:
+//  - node-pty: spawn the command directly. Survives a window reload (PTY is in the service), not an app
 //    restart. In-memory only.
 //  - tmux: a detached `tmux` session drives the command; a PTY attaches to it. Survives an app
 //    restart (the tmux daemon is separate) and can be attached from a real terminal. Persisted to
@@ -399,8 +398,14 @@ const mcpRegistered = new Set<string>()
 
 // acorn MCP server launcher + build-flavored name. Whether/how a CLI registers it is declared by
 // that profile contribution rather than a second profile-id lookup table.
-const mcpName = () => serverName(!process.defaultApp && !process.env.ELECTRON_IS_DEV)
-const mcpLauncher = () => launcherSpec(process.execPath, resolveMcpEntry(dirname(fileURLToPath(import.meta.url))), mcpName())
+let configuredMcp: { name: string; launcher: Launcher } | null = null
+
+export function configureTerminalMcp(name: string, launcher: Launcher): void {
+  configuredMcp = { name, launcher }
+}
+
+const mcpName = () => configuredMcp?.name ?? serverName(!process.defaultApp && !process.env.ELECTRON_IS_DEV)
+const mcpLauncher = () => configuredMcp?.launcher ?? launcherSpec(process.execPath, resolveMcpEntry(dirname(fileURLToPath(import.meta.url))), mcpName())
 
 // Boot-time MCP re-registration (docs/mcp.md): the registered launcher command is process.execPath —
 // a volatile pnpm-store Electron path in dev that ENOENTs after any electron reinstall/bump, leaving
@@ -511,7 +516,7 @@ export function disposeTerminal(): void {
   for (const session of sessions.values()) session.display.dispose()
 }
 
-// Registered once at app start by the composition root (main/bootstrap.ts). Every payload is
+// Registered once at app start by the service composition root (app/service/runtime.ts). Every payload is
 // validated here because the renderer is the less-trusted side (docs/terminal-and-agents.md).
 // Exited sessions linger until explicitly removed. Cross-feature domains are wired by the
 // composition root.
@@ -656,14 +661,6 @@ export function registerTerminalIpc(db: AppDatabase, worktreesDir: string, deps:
       await writeFile(file, STARTER_MCP_JSON, 'utf8')
       return { ok: true }
     },
-  })
-
-  // --- IPC residue: true Electron capabilities that never become HTTP ---
-
-  // Native folder picker for the onboarding repo-mapping flow. Returns the chosen path or null.
-  ipcMain.handle('term:repoPath:pick', async (): Promise<string | null> => {
-    const res = await dialog.showOpenDialog({ properties: ['openDirectory'] })
-    return res.canceled || !res.filePaths[0] ? null : res.filePaths[0]
   })
 
   // Archive orchestration lives in archive.ts (guard → teardown → stop sessions → remove worktree →

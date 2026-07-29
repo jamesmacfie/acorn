@@ -8,7 +8,7 @@ registry, not the source of tool definitions.
 
 > Maturity: the MCP server and its Settings surface are wired and used when the desktop app is
 > running (the agent/terminal features it depends on are desktop-only and always on; see
-> [terminal-and-agents.md](./terminal-and-agents.md)). The tool surface requires the main-process
+> [terminal-and-agents.md](./terminal-and-agents.md)). The tool surface requires the utility-service
 > registry and degrades to a clean `503` without it (e.g. `dev:node`).
 
 ## 1. What it is

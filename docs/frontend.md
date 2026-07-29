@@ -9,7 +9,7 @@ its state model.
 
 The client is a SolidJS single-page app composed from `apps/desktop/src/core/client/`,
 `apps/desktop/src/plugins/*/client/`, and `apps/desktop/src/app/client/`. It is served as static
-assets by the in-process Hono server (running in the Electron main process on
+assets by the Hono server (running in Electron's Node utility process on
 `http://127.0.0.1:4317`) and talks to that same origin over cookie-authenticated `fetch` — the
 GitHub token never reaches the browser (see [authentication.md](./authentication.md)).
 

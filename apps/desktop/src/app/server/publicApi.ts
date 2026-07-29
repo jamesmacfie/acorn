@@ -1,5 +1,6 @@
 import type { AppDatabase } from '../../core/server/db'
 import type { PluginApiContribution } from '../../core/server/publicApi/defineEndpoint'
+import type { PreviewDesktopCapability } from '../../core/shared/desktopCapabilities'
 import { LocalGitService } from '../../plugins/changes/main/localGitService'
 import { buildChangesPublicApi } from '../../plugins/changes/server/publicApi'
 import { databaseBridge } from '../../plugins/database/main/database'
@@ -43,6 +44,7 @@ export type PublicApiPluginDeps = {
   memoryReconcile: () => Promise<void>
   workflowRunner: WorkflowRunnerLike
   commandExecutions: CommandExecutionService
+  preview: PreviewDesktopCapability
 }
 
 export function buildPublicApiContributions(deps: PublicApiPluginDeps): { owner: string; contribution: PluginApiContribution }[] {
@@ -61,6 +63,6 @@ export function buildPublicApiContributions(deps: PublicApiPluginDeps): { owner:
     { owner: 'terminal', contribution: buildTerminalPublicApi(deps.commandExecutions, new WorktreeService(deps.db), new RepoCheckoutService(deps.db), new TerminalProfilesService(), new TerminalSessionService()) },
     { owner: 'terminal', contribution: buildRunTargetsContribution() },
     { owner: 'github', contribution: buildGithubPublicApi(new GitHubPublicService({ db: deps.db, blobs: deps.blobs, resolveToken: deps.resolveGithubToken })) },
-    { owner: 'preview', contribution: buildPreviewPublicApi(deps.db) },
+    { owner: 'preview', contribution: buildPreviewPublicApi(deps.db, deps.preview) },
   ]
 }

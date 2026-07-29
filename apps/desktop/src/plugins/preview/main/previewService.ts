@@ -9,10 +9,8 @@
 // sit above it via z-index. The renderer detects when an overlay covers the pane and calls hide()
 // (PreviewPane.tsx) — the WebContentsView equivalent of the old z-index dance.
 import { BrowserWindow, WebContentsView, ipcMain, type IpcMainEvent, type IpcMainInvokeEvent, type WebContents } from 'electron'
-import type { AppDatabase } from '../../../core/server/db'
-import { loadTask } from '../../../core/main/taskWorktree'
-import { getRepoPath } from '../../../core/main/repoPaths'
 import { matchesUrlPattern } from '../../../core/shared/browserRules'
+import type { PreviewBrowserRule } from '../../../core/shared/serviceProtocol'
 import { bindBrowserContents, unbindBrowserContents } from './browserService'
 import { buildFillScript, isAllowedPreviewUrl } from './browserAuto'
 
@@ -22,8 +20,10 @@ type PreviewRecord = { view: WebContentsView; owner: BrowserWindow; homeUrl: str
 
 const previews = new Map<string, PreviewRecord>()
 const trackedOwners = new WeakSet<BrowserWindow>()
-// Set by registerPreviewIpc (bootstrap passes the app DB); without it page rules are a no-op.
-let rulesDb: AppDatabase | undefined
+type RulesForTask = (taskId: string) => Promise<PreviewBrowserRule[]>
+// Set by registerPreviewIpc. Rules are looked up by the utility service and copied across the
+// process boundary; Electron main never opens or imports the application database.
+let loadRules: RulesForTask | undefined
 
 function stateOf(taskId: string, wc: WebContents, loading: boolean): PreviewState {
   return { taskId, url: wc.getURL(), loading, canGoBack: wc.navigationHistory.canGoBack(), canGoForward: wc.navigationHistory.canGoForward() }
@@ -76,13 +76,13 @@ function create(taskId: string, owner: BrowserWindow, homeUrl: string): PreviewR
 // Fill-on-load page rules for the task's workspace. Re-checks the URL after the (async) DB reads
 // so a fill meant for page A never lands on page B, and never injects into non-http(s) documents.
 async function applyLoadRules(taskId: string, wc: WebContents): Promise<void> {
-  if (!rulesDb) return
+  if (!loadRules) return
   const url = wc.getURL()
   if (!isAllowedPreviewUrl(url)) return
-  const task = await loadTask(rulesDb, taskId)
-  if (!task) return
-  const rp = await getRepoPath(rulesDb, task.repoOwner, task.repoName)
-  const rules = rp?.browserRules ?? []
+  const rules = await loadRules(taskId).catch((error) => {
+    console.warn('[preview] page rule lookup failed:', error)
+    return []
+  })
   if (wc.isDestroyed() || wc.getURL() !== url) return
   for (const rule of rules) {
     if (!rule.enabled || rule.trigger !== 'load' || rule.action.type !== 'fill') continue
@@ -148,9 +148,9 @@ export function previewEvictTask(taskId: string): boolean {
 }
 
 // Registered by the composition root (bootstrap.ts). Returns a disposer that drops every view.
-// `db` powers page rules (optional so tests can register without one — rules just no-op).
-export function registerPreviewIpc(db?: AppDatabase): () => void {
-  rulesDb = db
+// `rulesForTask` is optional so focused preview tests can register without a service host.
+export function registerPreviewIpc(rulesForTask?: RulesForTask): () => void {
+  loadRules = rulesForTask
   const winOf = (e: IpcMainInvokeEvent | IpcMainEvent) => BrowserWindow.fromWebContents(e.sender)
   const ownedRecord = (e: IpcMainInvokeEvent | IpcMainEvent, taskId: unknown): PreviewRecord | null => {
     const owner = winOf(e)
@@ -232,7 +232,7 @@ export function registerPreviewIpc(db?: AppDatabase): () => void {
     ipcMain.removeListener('preview:load', onLoad)
     ipcMain.removeListener('preview:command', onCommand)
     ipcMain.removeListener('preview:evict', onEvict)
-    rulesDb = undefined
+    loadRules = undefined
     for (const taskId of [...previews.keys()]) evict(taskId)
   }
 }

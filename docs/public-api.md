@@ -20,7 +20,7 @@ management routes `apps/desktop/src/core/server/routes/{apiTokens,apiSettings}.t
 
 ## Dedicated loopback listener
 
-The public API runs on its **own** `@hono/node-server` listener in the Electron main process,
+The public API runs on its **own** `@hono/node-server` listener in the Node utility process,
 separate from the `:4317` SPA/internal listener. Keeping them separate means changing the API port
 never touches the SPA origin, OAuth callback, or IndexedDB origin.
 
