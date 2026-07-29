@@ -1,24 +1,29 @@
 // Minimal, XSS-safe Markdown → HTML for Linear ticket bodies (which arrive as raw markdown,
 // unlike GitHub bodies which come pre-sanitized as HTML). Safety invariant: ALL text is HTML-
-// escaped before any transform, and links only emit validated http(s)/mailto hrefs — so even
-// imperfect parsing can never inject markup. Covers the common subset (headings, bold, italic,
-// inline + fenced code, links, lists, blockquotes, rules); not full CommonMark. ponytail: a hand-
-// rolled subset beats adding a markdown lib + sanitizer; widen the subset if tickets need it.
+// escaped before any transform, and links/images only emit validated remote URLs — so even imperfect
+// parsing can never inject markup. Covers the common subset (headings, bold, italic, inline + fenced
+// code, links, images, lists, blockquotes, rules); not full CommonMark. ponytail: a hand-rolled subset
+// beats adding a markdown lib + sanitizer; widen the subset if tickets need it.
 
 const ESC: Record<string, string> = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }
 const esc = (s: string) => s.replace(/[&<>"]/g, (c) => ESC[c])
 
 // Allow only http(s) and mailto; the input is already HTML-escaped when this runs.
 const safeHref = (u: string): string | null => (/^(https?:\/\/|mailto:)/i.test(u) ? u : null)
+// Images are fetched by the renderer, so mailto is not meaningful here.
+const safeImageSrc = (u: string): boolean => /^https?:\/\//i.test(u)
 
-// Sentinel wrapping a code-span index. A private-use char esc() ignores and real text never
-// contains, so it survives escaping and can't collide with content.
+// Sentinel wrapping protected inline-token indexes. A private-use char esc() ignores and real text
+// never contains, so tokens survive escaping and subsequent Markdown transforms can't mutate them.
 const S = '\uE000'
 
-// Inline pass on RAW text: protect code spans, escape, then apply links / bold / italic.
+// Inline pass on RAW text: protect code spans and images, escape, then apply links / bold / italic.
 function inline(raw: string): string {
   const codes: string[] = []
+  const images: { alt: string; url: string }[] = []
   let s = raw.replace(/`([^`]+)`/g, (_m, c: string) => `${S}${codes.push(c) - 1}${S}`)
+  s = s.replace(/!\[([^\]]*)\]\(([^)\s]+)\)/g, (_m, alt: string, url: string) =>
+    `${S}i${images.push({ alt, url }) - 1}${S}`)
   s = esc(s)
   s = s.replace(/\[([^\]]+)\]\(([^)\s]+)\)/g, (_m, text: string, url: string) => {
     const href = safeHref(url) // url is already escaped, so don't re-escape it
@@ -27,6 +32,12 @@ function inline(raw: string): string {
   s = s.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>').replace(/__([^_]+)__/g, '<strong>$1</strong>')
   s = s.replace(/(^|[^*])\*([^*\s][^*]*?)\*/g, '$1<em>$2</em>')
   s = s.replace(new RegExp(`${S}(\\d+)${S}`, 'g'), (_m, i: string) => `<code>${esc(codes[Number(i)])}</code>`)
+  s = s.replace(new RegExp(`${S}i(\\d+)${S}`, 'g'), (_m, i: string) => {
+    const image = images[Number(i)]
+    return safeImageSrc(image.url)
+      ? `<img src="${esc(image.url)}" alt="${esc(image.alt)}" loading="lazy" decoding="async" referrerpolicy="no-referrer">`
+      : esc(image.alt)
+  })
   return s
 }
 

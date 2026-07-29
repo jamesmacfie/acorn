@@ -82,6 +82,12 @@
 .markdown :is(h1, h2, h3) { font-size: var(--fs); margin: var(--space-4) 0 var(--space-2); }
 /* Links track the theme accent instead of the browser-default blue (clashes with non-blue themes). */
 .markdown a, .linear-md a { color: var(--accent); }
+.markdown img, .linear-md img {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  border-radius: var(--radius);
+}
 
 .check-list, .file-list { list-style: none; margin: 0; padding: 0; }
 .check-row {

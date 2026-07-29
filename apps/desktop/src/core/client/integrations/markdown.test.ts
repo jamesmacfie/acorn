@@ -7,6 +7,9 @@ describe('renderMarkdown', () => {
     expect(renderMarkdown('# Title')).toBe('<h1>Title</h1>')
     expect(renderMarkdown('- a\n- b')).toBe('<ul><li>a</li><li>b</li></ul>')
     expect(renderMarkdown('[link](https://x.com)')).toBe('<p><a href="https://x.com" target="_blank" rel="noreferrer">link</a></p>')
+    expect(renderMarkdown('![image.png](https://uploads.linear.app/image.png)')).toBe(
+      '<p><img src="https://uploads.linear.app/image.png" alt="image.png" loading="lazy" decoding="async" referrerpolicy="no-referrer"></p>',
+    )
   })
 
   it('is XSS-safe: escapes raw HTML and drops dangerous link schemes', () => {
@@ -15,5 +18,13 @@ describe('renderMarkdown', () => {
     expect(renderMarkdown('[x](javascript:alert(1))')).not.toContain('href')
     // code span contents are escaped, not executed
     expect(renderMarkdown('`<img onerror=x>`')).toBe('<p><code>&lt;img onerror=x&gt;</code></p>')
+    // image attributes are escaped and non-http(s) sources degrade to their safe alt text
+    expect(renderMarkdown('![<bad>](https://x.com/a.png?name="bad")')).toBe(
+      '<p><img src="https://x.com/a.png?name=&quot;bad&quot;" alt="&lt;bad&gt;" loading="lazy" decoding="async" referrerpolicy="no-referrer"></p>',
+    )
+    expect(renderMarkdown('![fallback](javascript:alert)')).toBe('<p>fallback</p>')
+    expect(renderMarkdown('`![not-an-image](https://x.com/a.png)`')).toBe(
+      '<p><code>![not-an-image](https://x.com/a.png)</code></p>',
+    )
   })
 })
