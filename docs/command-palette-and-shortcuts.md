@@ -40,6 +40,8 @@ workspace, then Go-to-task) are placed last deliberately. See `model.ts:23` for 
 - **Show pane: `<label>`** — one row per available pane contribution, dispatching a layout `show`.
 - **Close pane: `<label>`** — only for panes currently open, and only when **more than one** pane is
   open (closing the last pane is a no-op the reducer guards anyway).
+- **Reveal active file in editor tree** — only while the Editor pane owns focus and has an active
+  file; expands the lazy tree to that file and scrolls its row into view.
 - **Archive task** — guarded teardown via `api.task.archive` behind a `window.confirm`.
 
 ### What requires a task vs the terminal API
