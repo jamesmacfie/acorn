@@ -167,6 +167,7 @@ Core prefs and scoped slices that make up a restored session:
 | `pane_shortcuts` | Per-pane keyboard-shortcut overrides (JSON). | `ShortcutsSettings` |
 | `term_rail_default` | Default terminal profile for a new task's rail. | `TerminalSettings` |
 | `term_height` | Terminal drawer height. | `TerminalPanel` |
+| `term_font_size` | Terminal glyph size; validated to 11–24px and applied live. | `TerminalSettings` |
 | `notices` | The last ~50 notification-centre notices (bounded ring). | notice descriptor |
 | `editor:open-files:<taskId>` | Open-file tabs per task (content not persisted; dirty resets). | editor descriptor |
 | `onboarded` | Whether the onboarding modal has been dismissed. | `OnboardingModal` |
