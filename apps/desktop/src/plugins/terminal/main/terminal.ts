@@ -11,7 +11,7 @@ import { eq } from 'drizzle-orm'
 import type { AppDatabase } from '../../../core/server/db'
 import { schema } from '../../../core/server/db'
 import { setTerminalBridge } from '../server/routes/terminal'
-import { setStreamHandlers, type StreamSink } from '../../../core/main/wsHub'
+import { setStreamHandlers } from '../../../core/main/wsHub'
 import type { ArchiveOpts, ArchiveResult, CreateOpts, ServerMsg, TerminalSession } from '../../../core/shared/terminal'
 import { AgentSender, type SendSubmit } from './agentSend'
 import { archiveTask, TEARDOWN_TIMEOUT_MS } from '../../../core/main/archive'
@@ -36,6 +36,7 @@ import { inspectMcpConfig, MCP_CANDIDATES, STARTER_MCP_JSON, type McpServerSumma
 import { launcherSpec, resolveMcpEntry, serverName } from '../../../core/main/mcpRegister'
 import { broadcastStatus } from '../../../core/main/notify'
 import type { RunSessionGlue } from './runIpc'
+import { TerminalDisplay } from './terminalDisplay'
 import {
   computeTaskStatuses,
   isDir,
@@ -65,7 +66,7 @@ type Session = {
   meta: TerminalSession
   pty: IPty
   ring: string
-  subscribers: Set<StreamSink> // WebSocket outlets (the WebSocket transport); was Electron WebContents
+  display: TerminalDisplay
   lastActivityAt: number
   sawIdle: boolean // has this session ever gone idle? the first idle uses a shorter window (FIRST_IDLE_MS)
   // PTY output coalescing (docs/electron.md §12): buffer bytes and flush one 'output' frame per ~16ms
@@ -114,13 +115,8 @@ let bootReconciled: Promise<void> = Promise.resolve()
 const ptyState = (kind: 'shell' | 'agent', status: 'running' | 'exited', idle: boolean): TerminalSession['agentState'] =>
   kind !== 'agent' ? 'unknown' : status !== 'running' ? 'done' : idle ? 'idle' : 'working'
 
-// Raw fan-out to this session's WebSocket sinks.
-function sendMsg(s: Session, msg: ServerMsg) {
-  for (const sink of s.subscribers) sink(msg)
-}
-
 // Flush any coalesced PTY output as one 'output' frame. Called on the ~16ms tick, and eagerly
-// before any non-output frame (exit) or a new attach's replay so ordering stays exact.
+// before any non-output frame (exit) or a new attachment snapshot so ordering stays exact.
 function flushOutput(s: Session) {
   if (s.flushTimer) {
     clearTimeout(s.flushTimer)
@@ -129,19 +125,20 @@ function flushOutput(s: Session) {
   if (!s.pendingOut) return
   const data = s.pendingOut
   s.pendingOut = ''
-  sendMsg(s, { type: 'output', data })
+  s.display.publish({ type: 'output', data })
 }
 
 // Non-output frames flush pending output first (exit must not overtake buffered bytes).
 function emit(s: Session, msg: ServerMsg) {
   flushOutput(s)
-  sendMsg(s, msg)
+  s.display.publish(msg)
 }
 
-// Buffer PTY output; the ring is appended immediately (replay is always current) while the wire
-// frame is coalesced onto the next tick.
+// Buffer PTY output; the raw ring feeds transcript-tail analysis, while the display emulator owns
+// canonical renderer restoration. The live wire frame is coalesced onto the next tick.
 function queueOutput(s: Session, data: string) {
   appendRing(s, data)
+  s.display.write(data)
   s.pendingOut += data
   if (!s.flushTimer) s.flushTimer = setTimeout(() => flushOutput(s), OUTPUT_COALESCE_MS)
 }
@@ -241,7 +238,16 @@ function rowToMeta(row: typeof schema.terminalSessions.$inferSelect, ctx: Pick<T
 // --- session lifecycle ---
 
 function wireSession(db: AppDatabase, meta: TerminalSession, pty: IPty): Session {
-  const s: Session = { meta, pty, ring: '', subscribers: new Set(), lastActivityAt: Date.now(), sawIdle: false, pendingOut: '', flushTimer: null }
+  const s: Session = {
+    meta,
+    pty,
+    ring: '',
+    display: new TerminalDisplay(meta.cols, meta.rows),
+    lastActivityAt: Date.now(),
+    sawIdle: false,
+    pendingOut: '',
+    flushTimer: null,
+  }
   sessions.set(meta.id, s)
   pty.onData((data) => {
     s.lastActivityAt = Date.now()
@@ -502,6 +508,7 @@ export function disposeTerminal(): void {
     clearInterval(idleWatch)
     idleWatch = null
   }
+  for (const session of sessions.values()) session.display.dispose()
 }
 
 // Registered once at app start by the composition root (main/bootstrap.ts). Every payload is
@@ -550,6 +557,7 @@ export function registerTerminalIpc(db: AppDatabase, worktreesDir: string, deps:
       const s = sessions.get(id)
       if (!s) return false
       if (s.meta.status === 'running') killSession(s)
+      s.display.dispose()
       sessions.delete(id)
       if (s.meta.backend === 'tmux') await deleteRow(db, id)
       return true
@@ -561,6 +569,7 @@ export function registerTerminalIpc(db: AppDatabase, worktreesDir: string, deps:
       const r = clampDim(rows, s.meta.rows)
       s.meta.cols = c
       s.meta.rows = r
+      s.display.resize(c, r)
       if (s.meta.status === 'running') s.pty.resize(c, r)
       return true
     },
@@ -677,6 +686,7 @@ export function registerTerminalIpc(db: AppDatabase, worktreesDir: string, deps:
       dropTaskSessions: async (taskId) => {
         for (const [sid, s] of sessions) {
           if (s.meta.taskId === taskId) {
+            s.display.dispose()
             sessions.delete(sid)
             if (s.meta.backend === 'tmux') await deleteRow(db, sid)
           }
@@ -709,25 +719,17 @@ export function registerTerminalIpc(db: AppDatabase, worktreesDir: string, deps:
       const s = sessions.get(id)
       if (s && s.meta.status === 'running' && typeof data === 'string') s.pty.write(data)
     },
-    // attach = subscribe + replay. The subscription is an attachment, not the session itself:
-    // detaching / reloading never kills the PTY or the tmux session (docs/terminal-and-agents.md). Replay is pushed
-    // synchronously here (ready → ring), BEFORE the sink is fed any live frame, so the WebSocket's
-    // replay-before-live ordering is deterministic even under a busy PTY.
+    // attach = subscribe + restore. The subscription is an attachment, not the session itself:
+    // detaching / reloading never kills the PTY or tmux. TerminalDisplay serializes its canonical
+    // framebuffer and buffers concurrent live frames, preserving snapshot-before-live ordering.
     attach: (id, sink) => {
       const s = sessions.get(id)
       if (!s) return
-      flushOutput(s) // drain buffered output to existing subs first; the new sink gets it via the ring
-      s.subscribers.add(sink)
-      sink({ type: 'ready', session: s.meta, replayed: s.ring.length > 0 })
-      if (s.ring) sink({ type: 'output', data: s.ring })
-      // The ring is a raw byte window, not a screen: for a cursor-addressed TUI (Claude/Codex) the
-      // replay is lossy and corrupts. Nudge the app to repaint from live state over it with Ctrl-L.
-      // ponytail: Ctrl-L repaint; the proper fix is a headless-emulator serialize (docs note), add
-      // when a non-repainting TUI still garbles.
-      if (s.ring && s.meta.kind === 'agent' && s.meta.status === 'running') s.pty.write('\x0c')
+      flushOutput(s)
+      s.display.attach(sink, s.meta)
     },
     detach: (id, sink) => {
-      sessions.get(id)?.subscribers.delete(sink)
+      sessions.get(id)?.display.detach(sink)
     },
   })
 

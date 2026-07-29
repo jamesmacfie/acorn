@@ -14,9 +14,8 @@ import { WS_PATH, type WsClientFrame, type WsServerFrame } from '../shared/ws'
 // from a session's subscriber set on attach/detach and calls it to push output.
 export type StreamSink = (msg: ServerMsg) => void
 
-// The engine handlers the hub routes client frames to (registered by terminal.ts). attach is
-// synchronous and MUST push ready + ring replay to the sink before any live frame — the hub relies
-// on that for deterministic replay-before-live ordering.
+// The engine handlers the hub routes client frames to (registered by terminal.ts). attach registers
+// the sink synchronously; the terminal engine owns canonical-snapshot-before-live ordering.
 export type StreamHandlers = {
   input(id: string, data: string): void
   attach(id: string, sink: StreamSink): void
@@ -121,7 +120,7 @@ function onConnect(ws: WebSocket): void {
         if (typeof frame.id !== 'string' || conn.sinks.has(frame.id)) return
         const sink: StreamSink = (msg) => sendFrame(ws, { channel: 'term:out', id: frame.id, msg })
         conn.sinks.set(frame.id, sink)
-        handlers.attach(frame.id, sink) // pushes ready + ring replay synchronously, before any live frame
+        handlers.attach(frame.id, sink) // engine restores the canonical screen before queued live frames
       } else if (frame.channel === 'term:detach') {
         const sink = conn.sinks.get(frame.id)
         if (sink) {

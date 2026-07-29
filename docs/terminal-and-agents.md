@@ -71,9 +71,13 @@ On startup, `reconcileTmux` (`terminal.ts`) reads every row, intersects against
 `cwd === task.worktreePath` both at session create and during `reconcileTmux`, so a session that
 survives an app restart keeps its worktree-cleanup affordance.
 
-**No terminal output is ever stored.** Recent output lives only in an in-memory ring buffer per
-session (`RING_CAP = 256 KiB`, `terminalUtils.ts:6`), trimmed to the last bytes and replayed to a
-renderer on attach. Nothing is written to disk or the DB.
+**No terminal output is ever stored.** Each live session keeps two bounded, in-memory views:
+
+- a 256 KiB raw tail used only for blocked-prompt detection and memory/transcript-tail analysis;
+- a 1,000-line headless xterm framebuffer used to serialize the canonical display on renderer attach.
+
+Nothing is written to disk or the DB. Raw PTY history is never replayed as a screen: cursor-addressed
+TUIs update rows in place, so an arbitrary byte tail cannot reconstruct their framebuffer.
 
 ### The renderer session store
 
@@ -117,12 +121,13 @@ A `Portal`-rendered `<aside class="terminal-drawer">`, one per active task.
 
 ### `TerminalSurface.tsx`
 
-One xterm bound to one live session over the authenticated WebSocket. Keyed by session id in the parent, so switching tabs
-unmounts this component (detach, PTY keeps running) and remounts a fresh xterm that **replays the ring
-buffer**. Local scrollback beyond the 256 KiB ring is lost on a tab switch (marked `ponytail:`). It
-attaches via `api.attach`, writes keystrokes with `api.write`, and reports resizes with `api.resize`
-(a `ResizeObserver` refits on drawer drag). Shift+Enter is remapped to send a bare `\n` (Claude's
-newline) instead of the `\r` that would submit.
+One xterm bound to one live session over the authenticated WebSocket. Keyed by session id in the
+parent, so switching tabs unmounts this component (detach, PTY keeps running) and remounts a fresh
+xterm from the main-owned canonical framebuffer. Attach ordering is `ready → reset + serialized
+snapshot → live frames`; output arriving while serialization runs is buffered behind the snapshot.
+It attaches via `api.attach`, writes keystrokes with `api.write`, and reports resizes with
+`api.resize` (a `ResizeObserver` refits on drawer drag). Shift+Enter is remapped to send a bare `\n`
+(Claude's newline) instead of the `\r` that would submit.
 
 ## 4. Profiles & worktrees
 
