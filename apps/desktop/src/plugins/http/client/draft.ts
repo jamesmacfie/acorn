@@ -45,23 +45,14 @@ export const toSendInput = (draft: Draft, executionTaskId: string | null): HttpS
 // Structural comparison so the "unsaved changes" dot doesn't depend on key order or identity.
 export const draftsDiffer = (a: Draft, b: Draft): boolean => JSON.stringify(a) !== JSON.stringify(b)
 
-// An unsaved new request survives navigation (and a reload) in localStorage, the same per-device
-// mechanism as GitHub comment drafts — leave the panel mid-request and it is still there. Only the
-// *unsaved* one is kept: once it has a row, the row is the truth.
-const storageKey = (owner: string, repo: string, taskId?: string): string => `http-draft:${owner}/${repo}:${taskId ?? 'repo'}`
-
-export function readStoredDraft(owner: string, repo: string, taskId?: string): Draft | null {
-  const raw = localStorage.getItem(storageKey(owner, repo, taskId))
-  if (!raw) return null
-  try {
-    return JSON.parse(raw) as Draft
-  } catch {
-    return null
+// Older releases persisted full unsaved drafts (including headers/auth/body) in localStorage.
+// Saved rows are now server-encrypted, and unsaved credential-bearing drafts stay memory-only.
+// Purge every legacy key at renderer activation so an unvisited repo cannot leave plaintext behind.
+export function purgeStoredHttpDrafts(storage: Pick<Storage, 'length' | 'key' | 'removeItem'> = localStorage): void {
+  const keys: string[] = []
+  for (let index = 0; index < storage.length; index++) {
+    const key = storage.key(index)
+    if (key?.startsWith('http-draft:')) keys.push(key)
   }
-}
-
-export function writeStoredDraft(owner: string, repo: string, taskId: string | undefined, draft: Draft | null): void {
-  const key = storageKey(owner, repo, taskId)
-  if (draft) localStorage.setItem(key, JSON.stringify(draft))
-  else localStorage.removeItem(key)
+  for (const key of keys) storage.removeItem(key)
 }

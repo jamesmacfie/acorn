@@ -1,5 +1,5 @@
 import { createHash, randomBytes, randomUUID, timingSafeEqual } from 'node:crypto'
-import { and, eq, lte } from 'drizzle-orm'
+import { and, eq, gt, isNull, lte, or } from 'drizzle-orm'
 import type { AppDatabase } from '../db'
 import { schema } from '../db'
 import type { ApiScopes } from '../../shared/publicApi/primitives'
@@ -170,6 +170,21 @@ export class TokenService {
       }))
   }
 
+  async hasActiveTokens(userId: string): Promise<boolean> {
+    const [row] = await this.db
+      .select({ id: schema.apiTokens.id })
+      .from(schema.apiTokens)
+      .where(
+        and(
+          eq(schema.apiTokens.userId, userId),
+          isNull(schema.apiTokens.revokedAt),
+          or(isNull(schema.apiTokens.expiresAt), gt(schema.apiTokens.expiresAt, this.now())),
+        ),
+      )
+      .limit(1)
+    return Boolean(row)
+  }
+
   // Idempotent revocation. Returns false (→ caller 404s) if the token never belonged to this user;
   // returns true whether or not it was already revoked. Notifies listeners so live sockets close.
   async revoke(userId: string, id: string): Promise<boolean> {
@@ -186,8 +201,9 @@ export class TokenService {
     return true
   }
 
-  // Maintenance sweep: drop rows for tokens expired long ago and idempotency records past their
-  // window. Cleanup is housekeeping, not an authentication correctness path.
+  // Maintenance sweep for replay payloads past their documented 24-hour window. Authentication
+  // already rejects expired/revoked tokens synchronously; token metadata remains visible for the
+  // settings audit trail.
   async cleanupExpired(): Promise<void> {
     const now = this.now()
     await this.db.delete(schema.apiIdempotency).where(lte(schema.apiIdempotency.expiresAt, now))

@@ -61,6 +61,27 @@ describe('shared pull refresh operations', () => {
       title: 'Old',
       fetchedAt: 1,
     })
+    await t.db.insert(schema.prFiles).values({
+      userId: USER,
+      repoId: REPO_ID,
+      number: 4,
+      path: 'private.ts',
+      sha: 'old',
+    })
+    await t.db.insert(schema.comments).values({
+      userId: USER,
+      repoId: REPO_ID,
+      number: 4,
+      id: 'comment-4',
+      body: 'sensitive review comment',
+    })
+    await t.db.insert(schema.checks).values({
+      userId: USER,
+      repoId: REPO_ID,
+      number: 4,
+      name: 'private-check',
+      status: 'failure',
+    })
     await t.db.insert(schema.tasks).values({
       id: 'task-1',
       title: 'Feature',
@@ -82,6 +103,9 @@ describe('shared pull refresh operations', () => {
     expect(await refreshOpenPulls('token', t.db, key, fetcher)).toEqual({ ok: true })
     const pulls = await t.db.select().from(schema.pullRequests).where(eq(schema.pullRequests.repoId, REPO_ID))
     expect(pulls.map((pull) => pull.number)).toEqual([5])
+    expect(await t.db.select().from(schema.prFiles)).toEqual([])
+    expect(await t.db.select().from(schema.comments)).toEqual([])
+    expect(await t.db.select().from(schema.checks)).toEqual([])
     expect((await t.db.select().from(schema.tasks).where(eq(schema.tasks.id, 'task-1')))[0].pullNumber).toBe(5)
     expect((await t.db.select().from(schema.syncState).where(eq(schema.syncState.resource, pullsResource(REPO_ID, 'open'))))[0].etag).toBe('"open-v2"')
   })

@@ -1,4 +1,4 @@
-import { and, eq, isNull, lt, sql } from 'drizzle-orm'
+import { and, eq, isNull, sql } from 'drizzle-orm'
 import type { AppDatabase } from '../../../../core/server/db'
 import { schema } from '../../../../core/server/db'
 import { chunkRowsByColumnBudget } from '../../../../core/server/db/batch'
@@ -6,6 +6,7 @@ import { pullsResource } from '../../../../core/server/db/resourceKeys'
 import type { RefreshResult, RouteResult } from '../../../../core/server/sync/engine'
 import { gh, ghError, ghGraphQL, ghGraphQLResult } from '..'
 import { fetchFiles, mirrorFiles, mirrorPr, PR_FRAGMENT, type GqlPull, type PatchBlobStore } from './prMirror'
+import { deletePullMirrorStatements } from '../mirrorRetention'
 
 type GitHubFetcher = (token: string, path: string, init?: RequestInit) => Promise<Response>
 
@@ -66,6 +67,19 @@ export async function refreshOpenPulls(
 
   const etag = res.headers.get('etag')
   const body = (await res.json()) as GitHubPull[]
+  const retainedNumbers = new Set(body.map((pull) => pull.number))
+  const removedPulls = (
+    await db
+      .select({ userId: schema.pullRequests.userId, repoId: schema.pullRequests.repoId, number: schema.pullRequests.number })
+      .from(schema.pullRequests)
+      .where(
+        and(
+          eq(schema.pullRequests.userId, userId),
+          eq(schema.pullRequests.repoId, repoId),
+          eq(schema.pullRequests.state, 'open'),
+        ),
+      )
+  ).filter((pull) => !retainedNumbers.has(pull.number))
   const rows = body.map((pull) => ({
     userId,
     repoId,
@@ -131,16 +145,7 @@ export async function refreshOpenPulls(
           },
         }),
     ),
-    db
-      .delete(schema.pullRequests)
-      .where(
-        and(
-          eq(schema.pullRequests.userId, userId),
-          eq(schema.pullRequests.repoId, repoId),
-          eq(schema.pullRequests.state, 'open'),
-          lt(schema.pullRequests.fetchedAt, now),
-        ),
-      ),
+    ...deletePullMirrorStatements(db, removedPulls),
     ...taskUpdates,
   ])
   return { ok: true }

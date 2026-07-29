@@ -68,9 +68,11 @@ Token source: `core/server/publicApi/tokenService.ts`; schema `api_tokens` / `oa
 ### Persistent GitHub identity
 
 A bearer caller has no session cookie, so the GitHub credential needed for upstream calls is stored
-separately: `/auth/callback` upserts the user's GitHub identity + token into `oauth_accounts`,
-encrypted at rest with `SESSION_ENC_KEY` (same `encryptSecret` used for integration credentials). The
-public GitHub plugin resolves that credential for `api-token` principals. See
+separately in `oauth_accounts`, encrypted at rest with `SESSION_ENC_KEY` (the same `encryptSecret`
+used for integration credentials). Token creation is the opt-in point that persists it; ordinary
+login does not. OAuth callback refreshes it only when active bearers already exist. Logout and
+revocation of the last active bearer remove it, and startup removes credentials whose bearers have
+all expired. The public GitHub plugin resolves it for `api-token` principals. See
 [authentication.md](./authentication.md).
 
 ### Managing tokens and the listener
@@ -97,7 +99,9 @@ commands.
 - **Idempotency:** endpoints marked `optional`/`required` honor an `Idempotency-Key` header; a replay
   with the same key returns the stored response, and reuse with a *different* request body is
   rejected with `idempotency_conflict`. Records live in `api_idempotency` and are swept on a
-  maintenance cleanup.
+  pre-listener maintenance cleanup.
+- **Captured command retention:** command execution rows, including bounded stdout/stderr, are
+  removed 24 hours after creation by the same pre-listener maintenance pass.
 - **Request ids** are assigned per request and echoed.
 - **`dev:node` / no-renderer:** main- or Electron-dependent operations return
   `capability_unavailable` when their capability is absent; core server endpoints still work.

@@ -1,6 +1,6 @@
 import { spawn, type ChildProcess } from 'node:child_process'
 import { randomUUID } from 'node:crypto'
-import { eq } from 'drizzle-orm'
+import { eq, lte } from 'drizzle-orm'
 import type { z } from 'zod'
 import { type AppDatabase, schema } from '../../../core/server/db'
 import { taskRoot } from '../../../core/main/taskWorktree'
@@ -41,7 +41,10 @@ function rowToExecution(row: ExecutionRow, includeOutput: boolean): Execution {
 export class CommandExecutionService {
   private readonly running = new Map<string, ChildProcess>()
 
-  constructor(private readonly db: AppDatabase) {}
+  constructor(
+    private readonly db: AppDatabase,
+    private readonly now: () => number = () => Date.now(),
+  ) {}
 
   async create(taskId: string, input: z.infer<typeof CreateExecutionSchema>): Promise<Execution> {
     const cwd = await taskRoot(this.db, taskId)
@@ -119,5 +122,12 @@ export class CommandExecutionService {
     const child = this.running.get(id)
     if (child) child.kill('SIGTERM')
     return this.get(id, false)
+  }
+
+  // Executions have a one-hour maximum runtime, so anything created over 24 hours ago is
+  // necessarily terminal or abandoned by a prior process. Remove both the command and its captured
+  // output at the documented retention boundary.
+  async cleanupExpired(): Promise<void> {
+    await this.db.delete(schema.commandExecutions).where(lte(schema.commandExecutions.createdAt, this.now() - 24 * 60 * 60_000))
   }
 }

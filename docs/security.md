@@ -15,7 +15,11 @@ Electron capabilities to the renderer.
 - `/auth/*` also passes `csrf()`. Public is not unprotected: `POST /auth/logout` mutates session
   state, so a foreign page must not be able to force it.
 - Browser callers use the encrypted, HTTP-only, same-site session cookie. Internal MCP callers use
-  the per-app-run `INTERNAL_TOKEN`; the token maps to the machine user but carries no GitHub token.
+  the private persisted `INTERNAL_TOKEN`; it maps to the explicit active identity but carries no
+  GitHub token and fails closed when logout clears that identity.
+- The HTTP-client router is cookie-principal-only even inside `/api/*`: internal MCP/agent callers
+  cannot read encrypted request material, resolve variables, or use the outbound sender as a secret
+  oracle.
 - The WebSocket upgrade rechecks Host, Origin, and either the session cookie or internal token.
 
 ## Public automation API
@@ -32,7 +36,8 @@ port, `127.0.0.1`-only, Host-guarded before Hono) so its port is independent of 
   is the single highest-impact capability in the app. Loopback-only bind, show-once random secret, no
   request-body/command logging, and immediate revocation are the mitigations.
 - Token issuance is a cookie-authenticated interactive ceremony; a bearer cannot mint bearers. The
-  GitHub credential a bearer needs is stored encrypted in `oauth_accounts` (never returned).
+  GitHub credential a bearer needs is stored encrypted in `oauth_accounts` only while active
+  bearers exist, and is removed on logout (never returned).
 
 ## Renderer and Electron
 

@@ -5,6 +5,7 @@ import { reposResource } from '../../../../core/server/db/resourceKeys'
 import { gh, ghError } from '..'
 import type { RefreshResult, RouteFailure, RouteResult } from '../../../../core/server/sync/engine'
 import type { Repo } from '../../../../core/shared/api'
+import { deleteRepoMirrorStatements } from '../mirrorRetention'
 
 type Db = ReturnType<typeof getDb>
 type GitHubFetcher = (token: string, path: string, init?: RequestInit) => Promise<Response>
@@ -93,12 +94,16 @@ export const refreshRepos = async (token: string, db: Db, userId: string, fetche
 
   const etag = res.headers.get('etag')
   const body = (await res.json()) as GitHubRepo[]
+  const previous = await db.select({ id: schema.repos.id }).from(schema.repos).where(eq(schema.repos.userId, userId))
+  const retainedIds = new Set(body.map((repo) => repo.id))
+  const removedRepoIds = previous.map((repo) => repo.id).filter((id) => !retainedIds.has(id))
   const rows = body.map((repo) => repoRow(userId, repo, now))
 
   // Full-list replace + sync bump, all-or-nothing: a mid-refresh failure leaves the prior mirror and
   // stale sync intact, and the next request retries.
   await db.batch([
     db.delete(schema.repos).where(eq(schema.repos.userId, userId)),
+    ...deleteRepoMirrorStatements(db, userId, removedRepoIds),
     ...chunkRowsByColumnBudget(rows).map((part) => db.insert(schema.repos).values(part)),
     db
       .insert(schema.syncState)

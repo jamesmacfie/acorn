@@ -42,6 +42,7 @@ export type PublicApiPluginDeps = {
   memoryProposals: MemoryProposalStore
   memoryReconcile: () => Promise<void>
   workflowRunner: WorkflowRunnerLike
+  commandExecutions: CommandExecutionService
 }
 
 export function buildPublicApiContributions(deps: PublicApiPluginDeps): { owner: string; contribution: PluginApiContribution }[] {
@@ -57,7 +58,7 @@ export function buildPublicApiContributions(deps: PublicApiPluginDeps): { owner:
     { owner: 'workflows', contribution: buildWorkflowsPublicApi(new WorkflowService(deps.db, deps.workflowRunner)) },
     { owner: 'rollbar', contribution: buildRollbarPublicApi(deps.db, deps.encKey) },
     { owner: 'linear', contribution: buildLinearPublicApi(new LinearService(deps.db, deps.encKey)) },
-    { owner: 'terminal', contribution: buildTerminalPublicApi(new CommandExecutionService(deps.db), new WorktreeService(deps.db), new RepoCheckoutService(deps.db), new TerminalProfilesService(), new TerminalSessionService()) },
+    { owner: 'terminal', contribution: buildTerminalPublicApi(deps.commandExecutions, new WorktreeService(deps.db), new RepoCheckoutService(deps.db), new TerminalProfilesService(), new TerminalSessionService()) },
     { owner: 'terminal', contribution: buildRunTargetsContribution() },
     { owner: 'github', contribution: buildGithubPublicApi(new GitHubPublicService({ db: deps.db, blobs: deps.blobs, resolveToken: deps.resolveGithubToken })) },
     { owner: 'preview', contribution: buildPreviewPublicApi(deps.db) },

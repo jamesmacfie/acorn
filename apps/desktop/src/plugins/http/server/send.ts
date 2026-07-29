@@ -6,7 +6,6 @@ import { promisify } from 'node:util'
 import { eq, and } from 'drizzle-orm'
 import type { AppDatabase } from '../../../core/server/db'
 import * as schema from '../../../core/server/db/schema'
-import { decryptSecret } from '../../../core/server/session'
 import { loadTask, taskRoot } from '../../../core/main/taskWorktree'
 import { getRepoPath } from '../../../core/main/repoPaths'
 import { buildSessionEnv, type SessionTaskInfo } from '../../../core/main/taskEnv'
@@ -24,6 +23,7 @@ import {
   type SendResult,
   type TimelineEntry,
 } from '../shared/model'
+import { openHttpValue } from './storage'
 
 const exec = promisify(execFile)
 
@@ -79,7 +79,16 @@ export function referencedVariableNames(input: HttpSendInput): Set<string> {
  * these commands are typed by the user into the app's own DB, not read from a committed
  * .acorn/config.toml, so there is no repo-authored code to authorize.
  */
-export async function resolveVars(db: AppDatabase, repoOwner: string, repoName: string, encKey: string | undefined, input: HttpSendInput): Promise<Record<string, string>> {
+type ResolvedVariables = { values: Record<string, string>; sensitiveValues: string[] }
+
+async function resolveVarsWithSensitivity(
+  db: AppDatabase,
+  userId: string,
+  repoOwner: string,
+  repoName: string,
+  encKey: string | undefined,
+  input: HttpSendInput,
+): Promise<ResolvedVariables> {
   const vars: Record<string, string> = {}
 
   // Builtins from the task, so a request can point at this task's worktree/branch.
@@ -93,7 +102,7 @@ export async function resolveVars(db: AppDatabase, repoOwner: string, repoName: 
     }
     // taskRoot is null until a worktree exists (and always under dev:node) — fall back to the
     // repo checkout, exactly as resolveDbUrl and the preview resolver do.
-    cwd = (await taskRoot(db, input.executionTaskId)) ?? null
+    cwd = (await taskRoot(db, input.executionTaskId, userId)) ?? null
     vars.repo = `${task.repoOwner}/${task.repoName}`
     vars.branch = task.branch
     vars.taskId = task.id
@@ -105,21 +114,28 @@ export async function resolveVars(db: AppDatabase, repoOwner: string, repoName: 
   const rows = await db
     .select()
     .from(schema.httpVariables)
-    .where(and(eq(schema.httpVariables.repoOwner, repoOwner), eq(schema.httpVariables.repoName, repoName)))
+    .where(
+      and(
+        eq(schema.httpVariables.userId, userId),
+        eq(schema.httpVariables.repoOwner, repoOwner),
+        eq(schema.httpVariables.repoName, repoName),
+      ),
+    )
   const referenced = referencedVariableNames(input)
   const enabled = rows.filter((r) => r.enabled && referenced.has(r.name) && !(r.name in input.vars))
 
+  const opened = new Map<string, string>()
   for (const row of enabled) {
-    if (row.kind === 'value') vars[row.name] = row.value
+    if (!encKey) throw new SendError(`Cannot read secret variable "${row.name}": no session key`)
+    try {
+      opened.set(row.id, await openHttpValue(row.value, row.encrypted, encKey))
+    } catch {
+      throw new SendError(`Variable "${row.name}" could not be decrypted — re-enter its value`)
+    }
   }
 
-  // Secrets: decryptSecret returns null for anything it can't open (notably after a key rotation).
-  // Fail loudly — a null must never end up in an Authorization header as "undefined".
-  for (const row of enabled.filter((r) => r.kind === 'secret')) {
-    if (!encKey) throw new SendError(`Cannot read secret variable "${row.name}": no session key`)
-    const plain = await decryptSecret(row.value, encKey)
-    if (plain === null) throw new SendError(`Secret variable "${row.name}" could not be decrypted — re-enter its value`)
-    vars[row.name] = plain
+  for (const row of enabled) {
+    if (row.kind === 'value') vars[row.name] = opened.get(row.id)!
   }
 
   // Commands run concurrently under one shared deadline.
@@ -133,7 +149,7 @@ export async function resolveVars(db: AppDatabase, repoOwner: string, repoName: 
         try {
           // bash -lc, not /bin/sh -c: a login shell picks up nvm/rbenv/direnv shims, which is what
           // makes `op read …` or `mise exec …` work the way it does in the user's own terminal.
-          const { stdout } = await exec('bash', ['-lc', row.value], { cwd, env, timeout: COMMAND_TIMEOUT_MS, maxBuffer: COMMAND_MAX_BUFFER, signal: deadline })
+          const { stdout } = await exec('bash', ['-lc', opened.get(row.id)!], { cwd, env, timeout: COMMAND_TIMEOUT_MS, maxBuffer: COMMAND_MAX_BUFFER, signal: deadline })
           const line = lastLine(stdout)
           if (line === null) throw new SendError(`Variable "${row.name}": command produced no output`)
           return [row.name, line] as const
@@ -146,9 +162,30 @@ export async function resolveVars(db: AppDatabase, repoOwner: string, repoName: 
     for (const [name, value] of results) vars[name] = value
   }
 
+  for (const row of enabled) {
+    if (row.kind === 'secret') vars[row.name] = opened.get(row.id)!
+  }
+
   // Per-request overrides win over repo variables, by design.
   for (const [name, value] of Object.entries(input.vars)) vars[name] = value
-  return vars
+  return {
+    values: vars,
+    // Secret variables and command outputs never originated in renderer state. Track their
+    // plaintext only for response redaction; value-kind and per-request overrides are already
+    // visible in the editable draft.
+    sensitiveValues: enabled.filter((row) => row.kind !== 'value').map((row) => vars[row.name]).filter(Boolean),
+  }
+}
+
+export async function resolveVars(
+  db: AppDatabase,
+  userId: string,
+  repoOwner: string,
+  repoName: string,
+  encKey: string | undefined,
+  input: HttpSendInput,
+): Promise<Record<string, string>> {
+  return (await resolveVarsWithSensitivity(db, userId, repoOwner, repoName, encKey, input)).values
 }
 
 // --- execution ----------------------------------------------------------------------------
@@ -216,9 +253,16 @@ export function describeFetchFailure(err: unknown, target: URL): Pick<SendFailur
   }
 }
 
-export async function send(db: AppDatabase, repoOwner: string, repoName: string, encKey: string | undefined, input: HttpSendInput): Promise<SendResult> {
-  const vars = await resolveVars(db, repoOwner, repoName, encKey, input)
-  const { target, headers, body } = buildRequest(input, vars)
+export async function send(
+  db: AppDatabase,
+  userId: string,
+  repoOwner: string,
+  repoName: string,
+  encKey: string | undefined,
+  input: HttpSendInput,
+): Promise<SendResult> {
+  const resolved = await resolveVarsWithSensitivity(db, userId, repoOwner, repoName, encKey, input)
+  const { target, headers, body } = buildRequest(input, resolved.values)
 
   const started = Date.now()
   let res: Response
@@ -235,13 +279,18 @@ export async function send(db: AppDatabase, repoOwner: string, repoName: string,
     })
   } catch (err) {
     const durationMs = Date.now() - started
-    const failure = describeFetchFailure(err, target)
+    const described = describeFetchFailure(err, target)
+    const failure = {
+      error: redactResolved(described.error, resolved.sensitiveValues),
+      code: described.code,
+      detail: described.detail ? redactResolved(described.detail, resolved.sensitiveValues) : null,
+    }
     return {
       ok: false,
       ...failure,
-      url: target.toString(),
+      url: redactResolved(target.toString(), resolved.sensitiveValues),
       durationMs,
-      timeline: buildFailureTimeline(input.method, target.toString(), headers, failure, durationMs),
+      timeline: buildFailureTimeline(input.method, target.toString(), headers, failure, durationMs, resolved.sensitiveValues),
     }
   }
 
@@ -252,7 +301,7 @@ export async function send(db: AppDatabase, repoOwner: string, repoName: string,
     ok: true,
     status: res.status,
     statusText: res.statusText,
-    url: res.url || target.toString(),
+    url: redactResolved(res.url || target.toString(), resolved.sensitiveValues),
     redirected: res.redirected,
     headers: [...res.headers.entries()],
     // Base64 so a binary response survives the JSON hop intact; the renderer decodes it and picks a
@@ -261,7 +310,7 @@ export async function send(db: AppDatabase, repoOwner: string, repoName: string,
     size: bytes.byteLength,
     truncated,
     durationMs,
-    timeline: buildTimeline(input.method, target.toString(), headers, res, durationMs, bytes.byteLength, truncated),
+    timeline: buildTimeline(input.method, target.toString(), headers, res, durationMs, bytes.byteLength, truncated, resolved.sensitiveValues),
   }
 }
 
@@ -328,9 +377,18 @@ export async function readCapped(res: Response): Promise<{ bytes: Uint8Array; tr
 
 // A chronological log of what went out and what came back, in Bruno's spirit but without its
 // https.Agent subclass — no DNS/TCP/TLS phase breakdown.
-function buildTimeline(method: string, url: string, sent: Headers, res: Response, durationMs: number, size: number, truncated: boolean): TimelineEntry[] {
-  const out = buildRequestTimeline(method, url, sent)
-  if (res.redirected && res.url && res.url !== url) out.push({ label: 'info', detail: `redirected to ${res.url}` })
+function buildTimeline(
+  method: string,
+  url: string,
+  sent: Headers,
+  res: Response,
+  durationMs: number,
+  size: number,
+  truncated: boolean,
+  sensitiveValues: string[],
+): TimelineEntry[] {
+  const out = buildRequestTimeline(method, url, sent, sensitiveValues)
+  if (res.redirected && res.url && res.url !== url) out.push({ label: 'info', detail: `redirected to ${redactResolved(res.url, sensitiveValues)}` })
   out.push({ label: 'response', detail: `${res.status} ${res.statusText}` })
   for (const [k, v] of res.headers.entries()) out.push({ label: 'response-header', detail: `${k}: ${v}` })
   out.push({ label: 'info', detail: `${size} bytes in ${durationMs}ms${truncated ? ' (body truncated at 5 MB)' : ''}` })
@@ -343,17 +401,18 @@ function buildFailureTimeline(
   sent: Headers,
   failure: Pick<SendFailure, 'error' | 'code' | 'detail'>,
   durationMs: number,
+  sensitiveValues: string[],
 ): TimelineEntry[] {
-  const out = buildRequestTimeline(method, url, sent)
+  const out = buildRequestTimeline(method, url, sent, sensitiveValues)
   out.push({ label: 'error', detail: `${failure.error}${failure.code ? ` [${failure.code}]` : ''}` })
   if (failure.detail && failure.detail !== failure.error) out.push({ label: 'error-detail', detail: failure.detail })
   out.push({ label: 'info', detail: `failed after ${durationMs}ms without an HTTP response` })
   return out
 }
 
-function buildRequestTimeline(method: string, url: string, sent: Headers): TimelineEntry[] {
-  const out: TimelineEntry[] = [{ label: 'request', detail: `${method} ${url}` }]
-  for (const [k, v] of sent.entries()) out.push({ label: 'request-header', detail: `${k}: ${redact(k, v)}` })
+function buildRequestTimeline(method: string, url: string, sent: Headers, sensitiveValues: string[]): TimelineEntry[] {
+  const out: TimelineEntry[] = [{ label: 'request', detail: `${method} ${redactResolved(url, sensitiveValues)}` }]
+  for (const [k, v] of sent.entries()) out.push({ label: 'request-header', detail: `${k}: ${redact(k, redactResolved(v, sensitiveValues))}` })
   return out
 }
 
@@ -361,6 +420,16 @@ function buildRequestTimeline(method: string, url: string, sent: Headers): Timel
 // ride along in it.
 const SENSITIVE = new Set(['authorization', 'proxy-authorization', 'cookie'])
 const redact = (name: string, value: string): string => (SENSITIVE.has(name.toLowerCase()) ? `${value.split(' ')[0]} ••••••` : value)
+
+function redactResolved(input: string, sensitiveValues: string[]): string {
+  let output = input
+  for (const value of sensitiveValues) {
+    for (const form of new Set([value, encodeURIComponent(value)])) {
+      if (form) output = output.split(form).join('••••••')
+    }
+  }
+  return output
+}
 
 function interpolateAuth(auth: AuthConfig, vars: Record<string, string>): AuthConfig {
   const i = (s: string) => interpolate(s, vars)
