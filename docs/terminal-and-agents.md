@@ -17,17 +17,16 @@ been removed — see git history for the original rationale.)
   task** — a session opened under task A never appears under task B, regardless of the URL
   (`TerminalPanel.tsx`, `visibleSessions`).
 - A session is a **shell** or an **agent** (Claude Code / Codex / Aider). Agents run as ordinary PTY
-  sessions launched in the task's **git worktree**, which is created lazily on the first terminal for
-  that task.
+  sessions launched in the task's **git worktree**, which is created lazily by whichever
+  worktree-dependent surface touches the task first (often the first terminal).
 - The **Agents panel** is a right-rail overlay opened from the task view's Agents toggle (glyph `⠿`,
   `TaskView.tsx:347`). It is a managed monitoring surface over the same sessions plus workflow steps
   — a roster, a launcher, and a per-agent activity feed. It never replaces the raw xterm drawer; the
   drawer stays the escape hatch for interactive TUIs.
 
-The whole UI follows the app's flat/monospace design language ([ui-design.md](./ui-design.md)):
-Berkeley Mono, 1px borders, token-driven light/dark. xterm renders to its own canvas and can't read
-CSS, so `terminal/theme.ts` ships an explicit light and dark `ITheme` (full ANSI palette per mode)
-that mirrors the app tokens and follows the theme live.
+The whole UI follows the active theme/style token axes ([ui-design.md](./ui-design.md)). xterm
+renders to its own canvas and cannot read CSS, so `terminal/theme.ts` projects the current colour
+theme into an explicit `ITheme`/ANSI palette and follows changes live.
 
 ## 2. Sessions & persistence
 
@@ -140,14 +139,15 @@ instead of inferred from profile ids. `profileAvailable` checks `which`; shell i
 
 ### Worktrees (`core/main/worktrees.ts`, `resolveTaskCwd` in `core/main/taskWorktree.ts`)
 
-The task's git worktree is created **lazily on the first terminal** (Flow C). The renderer passes the
-base checkout as `opts.cwd`; main derives the worktree from it via `ensureWorktree`, persists
-`worktreePath` on the task, and cwds the session there. Worktrees live under the app data dir, keyed
-by branch (`worktreeBranchDirName` = `<owner>-<repo>-<branch-slug>`); all git runs in the **main
-checkout** (which owns the `.git` the worktree links to). A PR task checks out `pull/<n>/head`
-detached; a local-first task reuses or creates its branch from the resolved base ref (per-repo pref →
-`origin/main` → `origin/master` → HEAD). On the fresh-create path only, the repo's setup script
-runs as a "Setup" tab first (`maybeRunSetup`), and configured `copy` files are carried in.
+The task's git worktree is created **lazily on first worktree use** (Flow C). Every caller—terminal,
+editor/search/changes, database, workflows, preview scripts—funnels through `resolveTaskCwd` /
+`taskRoot`, which single-flights `ensureWorktree`, persists `worktreePath`, and fires the created
+hook exactly once. Worktrees live under the app data dir, keyed by branch
+(`worktreeBranchDirName` = `<owner>-<repo>-<branch-slug>`); all git runs in the **main checkout**
+(which owns the `.git` the worktree links to). A PR task fetches `pull/<n>/head` onto its task
+branch; a local-first task reuses or creates its branch from the resolved base ref (per-repo pref →
+`origin/main` → `origin/master` → HEAD). On the fresh-create path only, configured copy files are
+carried in and the setup hook follows `off | created | terminal`.
 
 ### `ACORN_*` environment injection (`buildSessionEnv`, `terminalUtils.ts:138`)
 

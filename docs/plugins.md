@@ -27,8 +27,8 @@ an edge requires removing its baseline entry.
 
 | Surface | Registry or contract | Activation home |
 | --- | --- | --- |
-| Panes | `core/client/registries/panes.ts` | `app/client/taskPaneContributions.tsx` and feature pane modules |
-| Sources | `core/client/registries/sources.ts` | `app/client/providerContributions.tsx` |
+| Panes | `core/client/registries/panes.ts` | `app/client/activate.ts`, provider contributions, and feature pane modules |
+| Sources | `core/client/registries/sources.ts` | `app/client/activate.ts` and `providerContributions.tsx` |
 | Commands / keybindings | `core/client/registries/{commands,keybindings}.tsx` | `app/client/activate.ts` |
 | Settings pages | `core/client/registries/settings.ts` | `app/client/pageContributions.tsx` |
 | UI slots, notices, pollers, themes | `core/client/registries/` | `app/client/activate.ts` |

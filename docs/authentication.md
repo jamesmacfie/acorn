@@ -56,7 +56,7 @@ A state minted in one browser cannot be completed in another.
 2. Compare `state` against the `oauth_state` cookie using a constant-time
    compare (`timingSafeEqual`); mismatch → `403 invalid state`. The cookie is
    deleted regardless.
-3. Confirm the state is still live in the TTL map; consume it (`OAUTH_STATE.delete`).
+3. Confirm the state is still live in the TTL map; consume it atomically (`OAUTH_STATE.consume`).
    Missing → `403 invalid state`.
 4. POST `code` + `client_secret` to
    `https://github.com/login/oauth/access_token`. No `access_token` →
@@ -125,8 +125,8 @@ apply; that branch has been removed.
 4. When the identity came from the cookie, re-seal and re-set it with a fresh
    7-day expiry (the sliding TTL). Internal-token callers hold no cookie and
    are not issued one.
-5. Never throws. Routes that require auth check `ctx.user` for `null` and
-   return `401`.
+5. Never throws. The shared `requireUser` middleware rejects a missing user before core or plugin
+   `/api/*` routers run.
 
 ## Internal loopback auth (`x-acorn-internal`)
 
@@ -204,13 +204,12 @@ Two distinct CSRF concerns, two distinct mitigations:
 
 A revoked or expired GitHub token surfaces as a `401` / `reauth` /
 `unauthenticated` error from any read or write. The client's global TanStack
-Query error handler matches that and bounces to the OAuth login:
+Query error handler matches the typed `ApiError.status` and bounces to the OAuth login:
 
 ```ts
 // apps/desktop/src/app/client/index.tsx
 const onError = (err: unknown) => {
-  const msg = err instanceof Error ? err.message : ''
-  if (/\b401\b|reauth|unauthenticated/.test(msg))
+  if (err instanceof ApiError && err.status === 401)
     window.location.href =
       '/auth/login?return_to=' + encodeURIComponent(window.location.pathname + window.location.search)
 }

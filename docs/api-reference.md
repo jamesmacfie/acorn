@@ -274,7 +274,7 @@ inventory for the Context pane, while an omitted include uses contribution defau
 ### Agent-tool projection — `apps/desktop/src/core/server/routes/agentTools.ts`
 
 The registry is installed by the main-process composition root. MCP/harness paths require the
-per-run internal principal; renderer projection is a separate cookie-authenticated opt-in path.
+persisted internal principal; renderer projection is a separate cookie-authenticated opt-in path.
 Missing registries return `503 bridge-unavailable`; hidden, unavailable, or non-renderer tools are
 indistinguishable `404 not_found` responses.
 
@@ -310,6 +310,96 @@ use HTTP; live notices, status pings, and step events use the authenticated WebS
 | `POST` | `/api/workflows/runs/:runId/cancel` | Cancel the run tree and abort active handlers. |
 | `POST` | `/api/workflows/runs/:runId/kill` | Kill one running step with `{ stepId }`. |
 | `POST` | `/api/workflows/triggers/poll` | Evaluate registered trigger predicates on the app-open client poll tick. |
+
+---
+
+## Task config trust (`/api/tasks/:id/config-trust`)
+
+Repo-authored executable config is hash-gated before a run target, workflow, setup, or other
+executable contribution can use it.
+
+| Method | Path | Purpose |
+| --- | --- | --- |
+| `GET` | `/api/tasks/:id/config-trust` | Return the current snapshot/hash, trusted state, and diff from the latest acknowledged snapshot. |
+| `POST` | `/api/tasks/:id/config-trust` | Acknowledge the exact `{ hash }`; a changed hash must be reviewed again. |
+
+Execution surfaces return `409 needs-trust` (or `config-changed`) rather than running an
+unacknowledged snapshot.
+
+## Worktree-local task surfaces
+
+These plugin routers share `/api/tasks/:id/*`. They are cookie-authenticated like the rest of the
+internal API and return `503 bridge-unavailable` when their main-process capability is absent.
+
+| Family | Routes | Purpose |
+| --- | --- | --- |
+| Editor | `GET editor/root`, `editor/files`, `editor/list?path=…`, `editor/read?path=…`; `PUT editor/file` | Resolve the root, browse/read, and save worktree files with path containment. |
+| Search | `POST search` | Ripgrep search with query/case/word/regex options and bounded results. |
+| Local git | `GET local/changes`, `local/diff`, `local/blob`; `POST local/stage`, `unstage`, `discard`, `commit`, `stage-all`, `unstage-all`, `discard-all`, `push` | Review and mutate the task working tree. Destructive operations are renderer-confirmed. |
+| Database | `POST database/connect`, `disconnect`, `query`, `update`, `insert`, `delete`, `generate`; `GET database/tables`, `columns`, `rows`, `queries`; `POST database/queries`; `DELETE database/queries/:queryId` | Task Postgres connection, browsing/editing, repo-saved SQL, and provider-assisted generation. |
+
+Database connections/pools live in main and are disposed on task/app teardown. Saved queries are
+repo-scoped, not task-scoped. See [pg.md](./pg.md).
+
+## Terminal, task lifecycle, and MCP setup (`/api/terminal`, `/api/tasks`)
+
+| Method and path | Purpose |
+| --- | --- |
+| `GET /api/terminal/sessions` · `/profiles` · `/task-statuses` | Current session/profile/worktree status inventory |
+| `POST /api/terminal/sessions` | Create a shell/agent/run-target session |
+| `POST /api/terminal/sessions/:sid/{kill|interrupt|remove|resize|send}` | Control a live session |
+| `GET/PUT /api/terminal/repo-path` | Read/map a checkout |
+| `PUT /api/terminal/repo-path/run-targets` | Replace DB-fallback run targets |
+| `PUT /api/terminal/repo-path/config` | Update lifecycle/db/preview/browser/branch settings |
+| `POST /api/tasks/:id/preview-url` | Resolve a task preview URL |
+| `POST /api/tasks/:id/on-created` | Apply configured creation lifecycle |
+| `POST /api/tasks/:id/use-checkout` | Adopt the mapped checkout/current branch |
+| `POST /api/tasks/:id/archive` | Guarded session/dirty/config teardown and archive |
+| `GET /api/tasks/:id/mcp` | Inspect effective MCP configuration |
+| `POST /api/tasks/:id/mcp/starter` | Create a starter repo MCP config |
+
+Terminal output itself uses the authenticated WebSocket and is never stored in these responses.
+
+## Docker (`/api/docker`)
+
+| Method and path | Purpose |
+| --- | --- |
+| `GET /info`, `/containers`, `/images`, `/volumes`, `/networks` | Daemon/resource inventories |
+| `GET /containers/:ref/inspect` | Container detail |
+| `POST /containers/:ref/action`, `/containers/:ref/remove` | Container lifecycle/removal |
+| `POST /images/:ref/remove`, `/volumes/:ref/remove`, `/networks/:ref/remove` | Resource removal |
+| `POST /prune`, `/compose/action` | Prune or Compose lifecycle |
+| `GET /task-summary`, `/tasks/:id/containers` | Task/container matching projections |
+| `POST /tasks/:id/teardown` | Compose-down/stop matched containers |
+
+Refs are argv-shape validated. Live events, logs, stats, and exec travel over the authenticated
+WebSocket. See [docker.md](./docker.md).
+
+## HTTP client (`/api/http/:owner/:repo`)
+
+| Method and path suffix | Purpose |
+| --- | --- |
+| `GET/POST /requests` | List/create repo or task-ad-hoc requests |
+| `PUT/DELETE /requests/:id` | Update/file/move/delete a request |
+| `GET/POST /vars` | List/create encrypted repo variables |
+| `PUT/DELETE /vars/:id` | Update/delete a variable |
+| `POST /send` | Resolve referenced variables and execute a draft |
+
+This whole family additionally requires `principal.kind === 'user'`; the internal token receives
+`403 interactive_user_required`. See [http-client.md](./http-client.md).
+
+## Public API administration (internal cookie API)
+
+These routes administer the separate [public automation API](./public-api.md); bearer callers
+cannot reach them.
+
+| Method | Path | Purpose |
+| --- | --- | --- |
+| `GET` | `/api/api-tokens` | List token metadata for the signed-in identity. |
+| `POST` | `/api/api-tokens` | Mint `{ name, scopes, expiresAt? }`; raw token appears once. |
+| `DELETE` | `/api/api-tokens/:id` | Revoke a token; last-token revocation removes retained OAuth credentials. |
+| `GET` | `/api/settings/api` | Read effective listener enabled/port settings and override state. |
+| `PATCH` | `/api/settings/api` | Change enabled/port and reconcile the second listener. |
 
 ---
 
@@ -750,19 +840,24 @@ the `error` values below are the stable machine codes, and `detail` (when presen
 | `401` | `reauth` | GitHub returned `401` — token revoked/expired; client bounces to `/auth/login` |
 | `401`/`403` | `provider_not_connected`, `provider_needs_auth`, `provider_missing_scope` | Provider connection/capability state |
 | `403` | `forbidden` | GitHub `403` (insufficient scope/permission, e.g. rerun-failed-jobs) |
+| `403` | `interactive_user_required` | An internal child-process principal attempted to use the HTTP client |
 | `403` | `sso` | GitHub `403` requiring SAML SSO authorization (`x-github-sso` header) |
 | `403` | (auth) `invalid state` | OAuth state mismatch/consumed (`/auth/callback`) |
 | `404` | `repo_not_found`, `pull_not_found`, `not_found`, `provider_resource_not_found`, `provider_resource_deleted` | Resource not in the local mirror / not on the provider |
 | `409` | `merge_failed` | Not mergeable (GitHub 405) or head moved (409) |
 | `409` | `node_id_unknown`, `head_sha_unknown` | Mirror lacks node id / head sha — open the PR first |
+| `409` | `needs-trust`, `config-changed` | Repo-authored executable config has not been acknowledged at its current hash |
+| `409` | `duplicate_name`, `idempotency_conflict`, `port_in_use`, `setting_overridden` | Local uniqueness/replay/listener conflict |
+| `409`/`422` | `docker_unavailable`, `docker_conflict`, `docker_failed` | Docker CLI/daemon/action failure |
 | `422` | `auto_merge_not_allowed`, `validation_failed` | GraphQL/REST validation refusal (auto-merge, create PR). Create-PR puts GitHub's verbatim 422 prose in `detail` |
+| `422` | `send_failed` | HTTP-client URL/secret/command preparation failed before a request was sent |
 | `429` | `rate_limited` | GitHub primary/secondary rate limit |
 | `502` | `github_unavailable` | Any other non-OK GitHub response (incl. GraphQL mutation errors) |
 | `502` | `graphql` (`detail: string[]`) | Composite/batch GraphQL query returned errors |
 | `403`/`429`/`502` | `provider_resource_forbidden`, `provider_rate_limited`, `provider_unavailable` | Provider resource or upstream failure |
 | `500` | `failed` (message in `detail`) | Harness route whose bridge call threw an unclassified error |
 | `500` | `internal` (message in `detail`) | Any route that threw an uncaught error — the app-level `onError` backstop |
-| `503` | `bridge-unavailable` | Harness `/api/tasks/:id/{notes,memory,run,browser}` with no main-process bridge (e.g. `dev:node`) |
+| `503` | `bridge-unavailable`, `capability_unavailable` | Required main-process bridge/controller is absent (e.g. `dev:node`) |
 
 > The `401`/`429`/`403`(`forbidden`/`sso`) rows are produced by the shared `ghError()` helper in
 > `apps/desktop/src/plugins/github/server/index.ts`, applied uniformly across every GitHub-backed route.
@@ -783,6 +878,7 @@ the `error` values below are the stable machine codes, and `detail` (when presen
 **See also:** [authentication](./authentication.md) · [data-layer](./data-layer.md) ·
 [caching](./caching.md) · [github-integration](./github-integration.md) ·
 [integrations](./integrations.md) · [mcp](./mcp.md) ·
-[notes-and-memory](./notes-and-memory.md) · [architecture-overview](./architecture-overview.md)
+[notes-and-memory](./notes-and-memory.md) · [architecture-overview](./architecture-overview.md) ·
+[docker](./docker.md) · [http-client](./http-client.md)
 
 ---

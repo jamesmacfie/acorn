@@ -1,6 +1,6 @@
 # Data Layer
 
-The local SQLite database: 28 [Drizzle ORM](https://orm.drizzle.team/) tables (plus one hand-written
+The local SQLite database: 37 [Drizzle ORM](https://orm.drizzle.team/) tables (plus one hand-written
 FTS5 virtual table) that back everything acorn shows — the GitHub read-model mirror and acorn's own
 app-state.
 
@@ -9,13 +9,14 @@ app-state.
 > (better-sqlite3 + Drizzle) under `apps/desktop/.acorn/`, not D1. `db.batch()` is emulated via a
 > transaction (electron.md §4c). Read any lingering "D1" as "the local SQLite DB".
 
-The schema is three classes of table:
+The schema has three ownership classes:
 
 - **Mirror tables** — cached projections of GitHub (and, generically, of external issue providers)
   data. Disposable, revalidated, populated on read. The SQLite mirror is a *cache of GitHub, not a
   source of truth* (see [architecture-overview](./architecture-overview.md)).
-- **App-state tables, GitHub-scoped** — data GitHub does not have but which is *about* a GitHub user:
-  prefs, pins, viewed-file checkboxes, integration credentials. Keyed by `userId`; acorn owns them.
+- **App-state tables, identity-scoped** — data GitHub does not have but which must follow the signed-in
+  identity: prefs, pins, viewed-file state, integration credentials, public API credentials, and
+  encrypted HTTP requests/variables. Keyed by `userId`; acorn owns them.
 - **App-state tables, machine-scoped** — data that describes *this machine* (local checkouts,
   worktrees, tasks, terminals, notes, memory). No `userId` — they exist outside any GitHub user
   context. acorn owns them.
@@ -155,7 +156,7 @@ occurrence list and each independently-loaded normalized occurrence. `data` is r
 `fetchedAt` is that child resource's TTL base. Keeping child payloads outside `issues.data` prevents a
 large occurrence from evicting the item summary and lets inactive UI tabs remain cold.
 
-### Group 2 — App-state tables, GitHub-scoped (per-user)
+### Group 2 — App-state tables, identity-scoped (per-user)
 
 acorn owns these. No mirror, no TTL — they survive mirror re-syncs. Keyed by `userId`.
 
@@ -235,9 +236,13 @@ filesystem, read by the terminal service outside any GitHub user context.
 | `devRestartScript` | text | restart command for the `dev` target; when set, `run_restart` uses it instead of stop+start |
 | `teardownScript` | text | shell run in the worktree just before removal (docs/terminal-and-agents.md); null/blank = none |
 | `dbUrlScript` | text | shell run in the worktree that prints a Postgres URL for the Database pane (docs/pg.md); null/blank = auto-detect |
+| `dbSchemaMode` | text | `auto` \| `script` \| `file` schema source for model-assisted SQL |
+| `dbSchemaValue` | text | script or worktree-relative file for that mode |
+| `dbSchemaNotes` | text | repo-specific schema semantics sent with model requests |
 | `previewMode` | text | `url` \| `port` \| `script` — how the browser-preview URL resolves; null → dev-server port |
 | `previewValue` | text | the URL/port/command per `previewMode`; null/blank = unset |
 | `browserRules` | text | JSON `BrowserRule[]` — preview-browser page rules (docs/panes.md); null = none |
+| `branchPrefix` | text | normalized personal prefix for branches derived from new task titles |
 | `createdAt`, `updatedAt` | integer | epoch ms |
 
 The lifecycle/build/db/preview columns above are the machine-local DB fallback beneath a committed
@@ -291,10 +296,9 @@ Repo → Workspace membership (a partition — a repo lives in exactly one works
 
 #### `ignored_repos`
 
-Repos the user has hidden from workspaces. PK `(owner, repo)`. An ignored repo has no
-`workspace_repos` row, so it is excluded from the selector/rail/scoping; the onboarding modal still
-lists it (it iterates all mirrored repos) so it can be reassigned. Bootstrap skips ignored repos so
-they don't silently reappear in Default.
+Repos the user has hidden from workspaces. PK `(owner, repo)`. An ignored repo keeps its
+`workspace_repos` membership but readers exclude it from selector/rail/scoping; onboarding can
+unhide it in place. Bootstrap skips ignored repos so they do not silently reappear in Default.
 
 | Column | Type | Note |
 | --- | --- | --- |
@@ -324,10 +328,11 @@ via `workspace_repos` on `(repoOwner, repoName)`. Machine-scoped (it owns a loca
 | --- | --- | --- |
 | `id` | text (PK) | opaque uuid |
 | `title` | text | editable; seeded from origin (PR title, ticket, …) |
+| `icon` | text | optional Lucide icon; null derives from origin |
 | `origin` | text | `github-pr` \| `linear` \| `rollbar` \| `local` |
 | `repoOwner`, `repoName` | text | a task always belongs to a repo |
 | `branch` | text | the branch this task works on |
-| `worktreePath` | text | null until a terminal is first opened |
+| `worktreePath` | text | null until a worktree-dependent action ensures it |
 | `pullNumber` | integer | null for local-first until a PR is inherited |
 | `status` | text | `active` \| `archived`; workflow-created child tasks may end as `cancelled` |
 | `parentId` | text | task tree; set on fan-out children; null = root |
@@ -368,6 +373,21 @@ store).
 | `body` | text | the note |
 | `sentAt` | integer | stamped on delivery; cleared on edit |
 | `createdAt` | integer | epoch ms |
+
+#### `db_saved_queries`
+
+Repo-scoped named SQL snippets for the Database pane. Machine-scoped because they describe a local
+repo workflow, not an authenticated upstream account. Unique on `(repoOwner, repoName, name)`;
+saving an existing name overwrites it.
+
+| Column | Type | Note |
+| --- | --- | --- |
+| `id` | text (PK) | opaque uuid |
+| `repoOwner`, `repoName` | text | owning repo |
+| `name` | text | unique within the repo |
+| `notes` | text | query intent/gotchas supplied to model-assisted generation |
+| `sql` | text | saved SQL |
+| `createdAt`, `updatedAt` | integer | epoch ms |
 
 #### `memories` (+ `memories_fts`)
 
@@ -441,7 +461,7 @@ desktop-capability-gated. See [workflows](./workflows.md).
 | `id` | text (PK) | |
 | `taskId` | text | → `tasks.id` (the worktree/agent scope) |
 | `name` | text | |
-| `status` | text | `running` \| `gated` \| `done` \| `failed` \| `safety-rail` |
+| `status` | text | `running` \| `gated` \| `cancelling` \| `done` \| `failed` \| `safety-rail` \| `cancelled` |
 | `posture` | text | `gated` (default) \| `autonomous` |
 | `trigger` | text | default `manual` |
 | `defJson` | text | the `WorkflowDef` this run executes (frozen at start) |
@@ -460,10 +480,10 @@ Steps carry a first-class working context (`worktreePath`); structured output is
 | `runId` | text | → `workflow_runs.id` |
 | `idx` | integer | sequence position |
 | `name` | text | |
-| `kind` | text | `agent`\|`gate-human`\|`gate-policy`\|`ci-loop`\|`fan-out`\|`join` (default `agent`) |
-| `mode` | text | `headless` \| `interactive` (default `headless`) |
+| `kind` | text | registry id; built-ins include `agent`, gates, `ci-loop`, `fan-out`, `join`, `decide` |
+| `mode` | text | `headless` \| `ai` \| `interactive` (default `headless`) |
 | `profileId`, `model` | text | |
-| `status` | text | `pending`\|`running`\|`waiting-gate`\|`done`\|`failed`\|`skipped` |
+| `status` | text | `pending`\|`running`\|`waiting-gate`\|`done`\|`failed`\|`skipped`\|`safety-rail`\|`cancelled` |
 | `worktreePath` | text | first-class working context |
 | `inputsJson` | text | the assembled bundle handed to the step |
 | `resultJson` | text | captured `HeadlessResult` (sans events) |
@@ -475,12 +495,43 @@ Steps carry a first-class working context (`worktreePath`); structured output is
 | `error` | text | |
 | `createdAt`, `updatedAt` | integer | epoch ms |
 
+### Group 4 — Public API, command capture, and encrypted HTTP state
+
+These tables share a platform/security lifecycle rather than one physical scope. Public API tokens
+and HTTP-client rows follow a GitHub identity; idempotency and command-capture rows key through
+their owning token/task.
+
+#### `api_tokens`
+
+Bearer tokens for the opt-in public automation API. The raw `acorn_<id>_<secret>` value is shown
+once; only its prefix and SHA-256 secret hash are stored. `userId` binds issuance and upstream
+credentials to the interactive identity. `lastUsedAt` is write-throttled, `expiresAt` is optional,
+and revocation stamps `revokedAt`.
+
+#### `oauth_accounts`
+
+The encrypted GitHub credential retained only while a user has an active public API bearer. One row
+per `userId`; the access token is JWE ciphertext and is removed on logout or last-token revocation.
+It lets the separate listener call GitHub without borrowing a browser cookie.
+
+#### `api_idempotency`
+
+24-hour replay rows keyed by `(tokenId, operationId, key)`. A retry with the same request hash gets
+the stored response; reusing a key for different input returns an idempotency conflict. Expired rows
+are swept during maintenance.
+
+#### `command_executions`
+
+Captured public-API command runs keyed to a task. Status covers queued/running/terminal states;
+stdout/stderr are bounded and carry an `outputTruncated` bit so clients can reconnect after an app
+restart. Records expire after 24 hours.
+
 #### `http_requests` — saved requests for the API panel
 
 Repo-scoped and GitHub-user-scoped: a request written against a repo's API outlives any one task
 worktree but never crosses a sequential login switch. Named `http_*`, not `api_*`, because
 `api_tokens` / `api_idempotency` already belong to the public automation API. See
-[panes.md](./panes.md) §`http`.
+[http-client.md](./http-client.md).
 
 | Column | Type | Note |
 | --- | --- | --- |
@@ -567,7 +618,7 @@ workspaces(id)
   └─ workspace_repos(workspaceId, repoOwner, repoName)   -- one workspace per repo (partition)
         └─ repo_paths(owner=repoOwner, repo=repoName)     -- this machine's checkout + run config
   └─ workspace_projects(workspaceId, integrationId, externalId)  -- linked external projects
-ignored_repos(owner, repo)   -- repos with NO workspace_repos row (hidden)
+ignored_repos(owner, repo)   -- independent hidden marker; membership is retained
 ```
 
 **Task graph.** A task is the hub for local work; its dependents point at `tasks.id`:
@@ -577,9 +628,11 @@ tasks(id)
   ├─ task_links(taskId, integrationId, identifier)   -- (integrationId, identifier) → issues PK tail
   ├─ review_notes(taskId)
   ├─ terminal_sessions(taskId)
+  ├─ command_executions(taskId)
   └─ workflow_runs(taskId)
         └─ workflow_steps(runId)                     -- workflow_steps.parentStepId = fan-out lineage
 tasks.parentId → tasks.id                            -- task tree (fan-out children)
+db_saved_queries(repoOwner, repoName)                 -- repo-scoped, not task-scoped
 ```
 
 **Integrations fan-out.** `integrations.id` is referenced by `issues`, `task_links`,
@@ -594,7 +647,7 @@ detail without a lookup table.
 
 Why some tables have `userId` and some do not:
 
-- **`userId` present** (mirror + GitHub-scoped app-state): the data belongs to a GitHub identity and
+- **`userId` present** (mirror + identity-scoped app-state): the data belongs to a GitHub identity and
   must obey the public/private rule — a private repo's mirror or a user's viewed-file state must never
   cross users, so `userId` is part of the PK.
 - **`userId` absent** (machine-scoped app-state): the data describes *this machine* — a local
@@ -603,9 +656,9 @@ Why some tables have `userId` and some do not:
   and the terminal service, which run outside any GitHub request context. On a single-user machine
   there is no second user to isolate from, so adding `userId` would be dead weight.
 
-`integrations` sits on the GitHub-scoped side (a user's third-party credentials), but its dependents
-that describe local work — `task_links`, `workspace_projects` — reference it by `integrationId` from
-the machine-scoped side. This is the one place the two scopes meet by key.
+`integrations`, encrypted HTTP-client rows, bearer tokens, and retained OAuth credentials sit on the
+identity-scoped side. Integration dependents that describe local work — `task_links`,
+`workspace_projects` — reference it by `integrationId` from the machine-scoped side.
 
 ## Staleness / ETag bookkeeping
 
@@ -673,7 +726,7 @@ pnpm --filter @acorn/desktop db:migrate    # tsx scripts/migrate.ts → apply (a
 
 After changing the **bindings** shape, update the hand-written `Env` in `apps/desktop/src/env.d.ts`.
 
-Migrations live in `apps/desktop/migrations/` (`0000_*.sql` … `0015_*.sql` at time of writing, plus a
+Migrations live in `apps/desktop/migrations/` (`0000_*.sql` … `0032_*.sql` at time of writing, plus a
 `meta/` snapshot dir) and are applied by `drizzle-orm/better-sqlite3/migrator` — automatically on app
 startup (`openDb` in `apps/desktop/src/core/main/bindings.ts`) and via `db:migrate`.
 

@@ -11,7 +11,8 @@ git status --short
 git rev-parse HEAD
 ```
 
-The planning worktree already contained unrelated public-API schema and migration work, including migration number `0023`. Reconcile the current migration journal and choose the next free migration number; do not copy a hard-coded number from this plan.
+The live migration chain now runs through `0032`. Reconcile the journal at implementation time and
+use `db:generate` plus `db:check`; do not copy a hard-coded migration number from this plan.
 
 Each phase should be a reviewable commit where practical. Keep core pressure changes separate from the Chat plugin so the architectural boundary is visible.
 
@@ -77,7 +78,7 @@ Protect current source navigation, notifications, WebSocket consumers, state per
 - `apps/desktop/src/core/main/wsHub.ts`
 - `apps/desktop/src/core/server/db/schema.ts`
 - `apps/desktop/src/core/server/db/cascade.ts`
-- `apps/desktop/src/plugins/github/client/shiki.ts`
+- `apps/desktop/src/core/client/highlight/shiki.ts`
 
 ### Implement
 
@@ -101,7 +102,8 @@ Make Chat possible without giving core chat-specific knowledge beyond general so
 
 ### Implement
 
-1. Add `SourceViewContext` and optional `when` to the source registry. Preserve integration capability gating as one caller-side policy, not the source type itself.
+1. Make source promotion optional and preserve the current provider-id capability gating;
+   providerless local sources such as Chat remain always visible.
 2. Pass selected workspace identity/path into source components from the app composition layer.
 3. Generalize notification ownership from required `taskId` to a discriminated target:
 
@@ -112,16 +114,18 @@ Make Chat possible without giving core chat-specific knowledge beyond general so
    ```
 
 4. Route notification clicks through registered target handlers or an exhaustive core dispatcher. Preserve all task behavior and persisted-notification migration.
-5. Extract GitHub’s Shiki theme/token support and the existing copy affordance into reusable core UI. GitHub imports the new core module; Chat does not import GitHub.
+5. Reuse core's Shiki theme/token support from Chat-owned safe rendering components; Chat must not
+   import GitHub presentation code.
 6. Extend shared WebSocket types and hub fan-out with additive chat event frames. Existing clients ignore frames they do not consume.
 
 ### Tests
 
-- source visible/hidden by `when` and existing integration policy;
+- providerless and provider-gated source visibility remains unchanged, and a source without
+  promotion does not need rejecting stubs;
 - source component receives the selected workspace and changes correctly;
 - old task notice records migrate and navigate unchanged;
 - chat target selects workspace/source/thread;
-- Shiki characterization tests pass at their new owner;
+- Core Shiki characterization tests continue to pass;
 - all existing WS hub/client tests pass.
 
 ### Stop condition

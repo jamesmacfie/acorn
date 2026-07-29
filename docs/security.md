@@ -64,7 +64,11 @@ tools.
   can recover or migrate an existing identity. Decryption failure is fatal rather than silently
   minting a replacement that would strand sessions and provider tokens.
 - Child processes receive a controlled environment. GitHub and session secrets are not inherited;
-  task identity and the short-lived internal API token are injected explicitly.
+  task identity and the persistent mode-`0600` internal API token are injected explicitly.
+- The data root and blob/worktree directories are created mode `0700`; SQLite, WAL/SHM, blob files,
+  `internal-token`, and `active-identity` are normalized to mode `0600`.
+- HTTP-client request fields and all variable values are encrypted under the session key. Only the
+  interactive user principal may open/send them; agent/internal principals are rejected.
 
 ## External occurrence data (Rollbar)
 
@@ -111,6 +115,10 @@ A tripped gate always fails closed: it must not degrade to a lower-precedence fa
 refusal becomes invisible. Agent-triggered attempts
 fail immediately with the stable `needs-trust` code and add a “Review & trust” notification; they
 are never silently resumed after approval.
+
+The declarative Docker `[docker]` table contains only project names, label keys, and a boolean name
+matcher. It is not executable and therefore does not require this trust ceremony; Docker-start
+commands remain ordinary trust-gated run targets.
 
 Security-relevant source: `core/main/server.ts`, `core/main/preload.ts`,
 `core/main/sessionKeyStore.ts`, `core/main/repoConfigTrust.ts`, `core/main/urlGuards.ts`,

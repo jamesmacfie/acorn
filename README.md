@@ -16,10 +16,13 @@ with GitHub and you get:
   labels, reviewers, re-run Actions).
 - **Workspaces & tasks** — group your repos into workspaces; open a task (repo + branch + worktree +
   optional PR) from a PR, a Linear ticket, a Rollbar error, or from scratch. Tasks live in a left rail.
-- **Panes** — a task view composes panes side by side: PR review, local-changes review, editor, notes,
-  context, browser preview, Linear, and Rollbar.
+- **Panes** — a task view composes registered panes side by side: PR review, local changes, editor,
+  search, notes, context, database, browser preview, Docker, API requests, Linear, and Rollbar.
 - **Terminals & agents** — persistent shell/agent sessions in the task's worktree, an
-  Agents panel with a live activity feed, and an MCP server that hands agents the task's context.
+  Agents panel with live activity and provider usage/cost estimates, and an MCP server that hands
+  agents task-scoped context and tools.
+- **Local tools** — inspect and act on task-linked Docker containers, browse/edit Postgres, and keep
+  encrypted repo-scoped API requests and variables without checking secrets into the repository.
 
 The Electron main process starts the Hono server on `http://127.0.0.1:4317` and points a hardened
 `BrowserWindow` at it, so the SPA and API are same-origin:
@@ -66,9 +69,10 @@ apps/desktop/
 │   │   ├── github/         #   PR review (PullList/PullDetail/DiffView), mirror, checks, create-PR
 │   │   ├── linear/  rollbar/#   integration providers + browse/pane
 │   │   ├── editor/  changes/#   editor + file finder · working-tree review + review notes
-│   │   ├── notes/  memory/  #   notes pane + scopes · memory tray + proposals
-│   │   ├── context/ preview/#   context tray · browser preview (WebContentsView) + browser_* tools
-│   │   ├── database/ terminal/# pg browse · terminal drawer + run targets
+│   │   ├── notes/  memory/  #   scratchpad/library · memory index + proposal gate
+│   │   ├── context/ preview/#   context manifest/sync · browser preview + browser_* tools
+│   │   ├── database/ docker/ http/# pg browse · Docker · encrypted API requests
+│   │   ├── model-providers/ terminal/# OpenAI/Anthropic adapters · terminal drawer + run targets
 │   │   ├── agents/ workflows/# agent roster · TOML workflows + runner
 │   │   ├── profiles-{claude,codex,aider}/  onboarding/
 │   │   └── …
@@ -121,11 +125,13 @@ Electron `safeStorage`; an explicit environment value remains the recovery and `
 | --- | --- |
 | `pnpm dev` | Build + launch the Electron app (`electron-vite build && electron-vite preview`) |
 | `pnpm --filter @acorn/desktop dev:node` | Run just the Node server (no Electron) on `:4317` |
-| `pnpm --filter @acorn/desktop build` | `electron-vite build` (main + preload + renderer) |
-| `pnpm --filter @acorn/desktop dist` | `electron-vite build && electron-builder --mac` — produce the `.dmg`/`.zip` |
+| `pnpm --filter @acorn/desktop build` | Build main/preload/renderer and enforce the renderer budget |
+| `pnpm --filter @acorn/desktop dist` | Run the gated build and produce the `.dmg`/`.zip` |
 | `pnpm lint` | `tsc --noEmit` typecheck |
-| `pnpm test` | `vitest run` |
-| `pnpm --filter @acorn/desktop db:generate` | `drizzle-kit generate` — emit a migration |
+| `pnpm test` | Rebuild native modules for Node, then run the complete Vitest suite |
+| `pnpm --filter @acorn/desktop test:e2e` | Build/rebuild for Electron and run desktop smoke tests |
+| `pnpm --filter @acorn/desktop db:generate` | Generate a migration and replay-check the chain |
+| `pnpm --filter @acorn/desktop db:check` | Replay all migrations against a fresh database |
 | `pnpm db:locate` | Print the absolute path to this worktree's local SQLite database |
 | `pnpm --filter @acorn/desktop db:migrate` | `tsx scripts/migrate.ts` — apply migrations to local SQLite |
 
@@ -137,9 +143,11 @@ pnpm --filter @acorn/desktop dist   # → apps/desktop/release/*.dmg and *.zip
 
 For personal use the build is ad-hoc signed. To distribute the `.dmg` to other machines, add a
 Developer ID identity + notarization in `apps/desktop/electron-builder.yml` (otherwise Gatekeeper
-blocks it). `SESSION_ENC_KEY` uses `safeStorage`; packaged builds still require
-`GITHUB_CLIENT_ID`/`GITHUB_CLIENT_SECRET` in the environment. Since a GitHub OAuth App allows only
-one callback URL, use a dedicated OAuth App for the desktop build.
+blocks it). `SESSION_ENC_KEY` uses `safeStorage`. GitHub OAuth credentials resolve from a packaged
+data-root `.env`, process environment, or the build-time fallback embedded by the release workflow.
+That fallback makes installation self-contained but does not make the OAuth client secret secret;
+device flow remains the long-term distribution model. Since a GitHub OAuth App allows only one
+callback URL, use a dedicated OAuth App for the desktop build.
 
 ## Documentation
 
@@ -163,6 +171,8 @@ Detailed docs live in [`docs/`](./docs). Start with the architecture overview.
 - [features.md](./docs/features.md) — a tour of what acorn can do.
 - [workspaces-and-tasks.md](./docs/workspaces-and-tasks.md) — the Workspace → Task model and the rail.
 - [panes.md](./docs/panes.md) — the pane system and a catalog of every pane.
+- [docker.md](./docs/docker.md) — Docker source/pane, task matching, event flow, and lifecycle.
+- [http-client.md](./docs/http-client.md) — encrypted API requests, variables, execution, and limits.
 - [pg.md](./docs/pg.md) — the Database pane: a native Postgres viewer/editor.
 - [frontend.md](./docs/frontend.md) — the SolidJS shell, routing, and state model.
 - [diff-rendering.md](./docs/diff-rendering.md) — Shiki highlighting, virtualization, threads.
