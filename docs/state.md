@@ -83,7 +83,7 @@ final eviction, preventing cleanup from repopulating cursor/editor state after e
 composition root because choosing the concrete set of state owners is composition, not a core concern
 (so `core/` never imports the feature state modules it evicts). It clears
 task layouts, recipe URLs, terminal open/max/active state, pane focus/maximize, editor tabs and
-Monaco view state, PR Navigator/Diff scroll state, pending presentation intents, per-workspace view
-memory, and PR filters. The persistent bindings then write a scoped tombstone so legacy aggregate
-values cannot resurrect the evicted scope. Preview webviews keep their existing feature-owned
-subscriber and tear down their guest process on task archive.
+Monaco/tree view state, PR Navigator/Diff scroll state, pending presentation intents, per-workspace
+view memory, and PR filters. The persistent bindings then write a scoped tombstone so legacy
+aggregate values cannot resurrect the evicted scope. Preview webviews keep their existing
+feature-owned subscriber and tear down their guest process on task archive.
