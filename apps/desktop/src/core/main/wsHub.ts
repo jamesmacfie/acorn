@@ -1,6 +1,6 @@
 // The single authenticated WebSocket hub (docs/electron.md §12): one socket on the loopback
-// origin carries every live stream (shared/ws.ts). It lives in main because the streams it serves
-// belong to the PTY engine; terminal.ts registers the stream handlers, notify.ts broadcasts the
+// origin carries every live stream (shared/ws.ts). It lives in the utility service beside the
+// PTY engine; terminal.ts registers the stream handlers, notify.ts broadcasts the
 // pings through it. Attached to the @hono/node-server http.Server's 'upgrade' event so it shares
 // the loopback listener and its Host guard.
 import type { IncomingMessage, Server } from 'node:http'
@@ -49,6 +49,7 @@ export const setUiBroker = (b: import('./publicApi/uiControlBroker').UiControlBr
 
 type Conn = { ws: WebSocket; sinks: Map<string, StreamSink>; windowId?: string }
 const conns = new Set<Conn>()
+const hubDisposers = new WeakMap<Server, () => void>()
 
 function sendFrame(ws: WebSocket, frame: WsServerFrame): void {
   if (ws.readyState === ws.OPEN) ws.send(JSON.stringify(frame))
@@ -145,7 +146,7 @@ function onConnect(ws: WebSocket): void {
 
 export function attachWsHub(server: Server, deps: WsAuthDeps): void {
   const wss = new WebSocketServer({ noServer: true })
-  server.on('upgrade', (req: IncomingMessage, socket: Duplex, head: Buffer) => {
+  const onUpgrade = (req: IncomingMessage, socket: Duplex, head: Buffer): void => {
     // Only claim our path — other upgrades (if any) are left for their own handlers.
     let path: string
     try {
@@ -163,7 +164,18 @@ export function attachWsHub(server: Server, deps: WsAuthDeps): void {
       }
       wss.handleUpgrade(req, socket, head, (ws) => onConnect(ws))
     })
+  }
+  server.on('upgrade', onUpgrade)
+  hubDisposers.set(server, () => {
+    server.off('upgrade', onUpgrade)
+    for (const conn of [...conns]) conn.ws.terminate()
+    wss.close()
   })
+}
+
+export function disposeWsHub(server: Server): void {
+  hubDisposers.get(server)?.()
+  hubDisposers.delete(server)
 }
 
 // Test-only reset so the module singleton doesn't leak connections between cases.

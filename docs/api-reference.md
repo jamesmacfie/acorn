@@ -2,8 +2,8 @@
 
 The server's complete **internal** HTTP surface — the cookie-authenticated `/api/*` transport the SPA
 uses. One Hono app (`apps/desktop/src/core/server/index.ts`, a `createApp()` factory) serves both
-`/auth/*` and `/api/*`, hosted in-process by `@hono/node-server` on `http://127.0.0.1:4317`. The
-Electron main process (`apps/desktop/src/core/main/server.ts`) wraps it with static-asset serving +
+`/auth/*` and `/api/*`, hosted by `@hono/node-server` in the Node utility process on
+`http://127.0.0.1:4317`. The service listener (`apps/desktop/src/core/main/server.ts`) wraps it with static-asset serving +
 SPA fallback. See [architecture-overview](./architecture-overview.md) and [electron](./electron.md).
 
 > **Not the public API.** The opt-in bearer-authenticated **automation API** (`/api/v1`, a separate
@@ -19,7 +19,7 @@ SPA fallback. See [architecture-overview](./architecture-overview.md) and [elect
 > database/*}`, `/api/terminal/*` + `/api/tasks/:id/{archive,preview-url,on-created,use-checkout,
 > mcp}`, `/api/tasks/:id/workflows` + `/api/workflows/runs/:runId/*`, `/api/memory*` +
 > `/api/workspaces/:wsId/notes*`, `/api/tasks/:id/notes*`, and the `RunBridge` at `/api/tasks/:id/run/*`. Each is
-> backed by a main-process **bridge** (`server/bridge.ts`; 503 `bridge-unavailable` when unwired).
+> backed by a service-process **bridge** (`server/bridge.ts`; 503 `bridge-unavailable` when unwired).
 > Live streams (PTY output/input, session status, workflow notices) ride one authenticated
 > WebSocket at `/ws` — see [electron.md §12](./electron.md) for the transport + `dev:node`
 > capability map.

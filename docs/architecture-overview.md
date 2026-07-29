@@ -13,7 +13,7 @@ driving coding agents (Claude Code, Codex, aider) against your repositories, eac
 in its own git worktree.
 
 It is a SolidJS single-page app served by one Hono server running in an Electron
-main process (via `@hono/node-server`), backed by a local SQLite read-model
+utility process (via `@hono/node-server`), backed by a local SQLite read-model
 mirror of GitHub, an on-disk blob cache, and IndexedDB client persistence.
 Everything runs on one machine for one user. acorn started life as a Cloudflare
 Worker and migrated to Electron; the app design (Hono app, Drizzle schema,
@@ -28,15 +28,22 @@ are the same app: one origin, one database, one window.
 
 ## One local server, one origin
 
-The Electron main process boots through one composition root
-(`apps/desktop/src/app/main/bootstrap.ts`, called once from `electron.ts`): it
-migrates the DB, constructs domain services, installs bridge-backed capabilities,
-then starts a single Hono app (`apps/desktop/src/core/server/index.ts`, a
+The Electron main process boots through a thin native composition root
+(`apps/desktop/src/app/main/bootstrap.ts`, called once from `electron.ts`). It
+starts and supervises one Node utility process, installs the native preview and
+folder-picker adapters, then creates the window after the service reports that
+its listener is up. The utility-process composition root
+(`apps/desktop/src/app/service/runtime.ts`) migrates the DB, constructs domain
+services, installs bridge-backed capabilities, then starts a single Hono app
+(`apps/desktop/src/core/server/index.ts`, a
 `createApp()` factory) under `@hono/node-server` on `http://127.0.0.1:4317` (the
 port is pinned for a stable browser-storage origin; `ACORN_PORT` in the
-environment overrides it), and points a hardened `BrowserWindow` at that origin.
-Durable-state reconciliation runs after the window, off the paint path, and a
-`will-quit` teardown disposes services in reverse (see
+environment overrides it).
+The Electron host then points a hardened `BrowserWindow` at that origin.
+Durable-state reconciliation continues in the utility process after the listener
+is available, off the window paint path. `will-quit` asks the service to drain
+its listeners and process-backed resources before Electron terminates it.
+Unexpected exits are retried with bounded exponential backoff (see
 [electron.md](./electron.md) §11). The server serves three things from the same
 origin:
 
@@ -192,7 +199,7 @@ Browser (SolidJS SPA)
   ▼
 GET /api/repos/:owner/:repo/pulls           (same-origin cookie)
   │
-Hono server (Electron main process)
+Hono server (Node utility process)
   │  csrf() + authMiddleware: decrypt session cookie in-CPU → ctx.user
   ▼
 SQLite mirror
@@ -224,13 +231,14 @@ so a read inside the TTL window reflects the change. See
 When a task first needs a working tree, acorn creates a **git worktree per task**
 under `apps/desktop/.acorn/worktrees/`, so several agents can work different
 branches of the same repo without colliding. **Agent sessions** are PTYs managed
-in the Electron main process (`apps/desktop/src/plugins/terminal/main/terminal.ts`, registered at
-startup); they share the single SQLite connection rather than opening a second.
+in the Node utility process (`apps/desktop/src/plugins/terminal/main/terminal.ts`,
+registered by the service composition root); they share the single SQLite
+connection rather than opening a second.
 
 Agents get task-scoped context through the **acorn MCP server**
 (`apps/desktop/src/core/mcp/server.ts`) over loopback. The stdio MCP proxy runs as a spawned child
 process and calls the running app rather than opening the database itself. Because it holds
-no session cookie, the main process mints a per-run `INTERNAL_TOKEN` and injects
+no session cookie, the utility service loads a persistent local `INTERNAL_TOKEN` and injects
 it (with the other `ACORN_*` env vars) into each task session, so the agent's MCP
 calls authenticate back to the machine's single user. Through that channel the
 agent reads the assembled task context, the current PR/changes, and the
@@ -252,8 +260,9 @@ projection itself is transport-neutral.
 - **No server-side session store** — the session lives entirely in an encrypted
   cookie, decrypted per request.
 - **No GitHub token in the browser** — only public profile fields cross the wire.
-- **No second application backend** — one in-process Hono server owns data and domain operations;
-  the stdio MCP child is a thin proxy into that server, and the terminal service is main-owned.
+- **No second application backend** — one Hono service owns data and domain operations;
+  Electron main is a native UI/supervision host, the stdio MCP child is a thin proxy into that
+  service, and terminal sessions are owned by the same service process.
 - **Single machine, single user** — no multi-tenancy, no shared storage to
   protect; locally-owned tables are machine-scoped accordingly.
 

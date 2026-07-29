@@ -26,7 +26,7 @@ A GitHub OAuth App allows exactly **one** callback URL, so the desktop app wants
   form (GitHub treats it as distinct from `localhost`).
 - Copy the **Client ID** and generate a **Client Secret**.
 
-The app origin is pinned to port `4317` (`ACORN_PORT` in `apps/desktop/src/core/main/server.ts`; an
+The app origin is pinned to port `4317` (`ACORN_PORT` in `apps/desktop/src/core/main/serverConfig.ts`; an
 `ACORN_PORT` environment variable overrides it, at the cost of a fresh IndexedDB origin) so the
 browser storage and OAuth callback stay stable. The OAuth flow requests the scopes
 `repo read:org read:user`.
