@@ -77,6 +77,8 @@
   border-bottom: var(--chrome-divider);
 }
 .search-file-path {
+  flex: 1;
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -85,7 +87,6 @@
 }
 .search-file-count {
   flex: none;
-  margin-left: auto;
 }
 .search-hit {
   display: flex;

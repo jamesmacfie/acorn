@@ -8,9 +8,8 @@ export type SearchOpts = {
   regex?: boolean
 }
 
-// One match within a file. `col`/`endCol` are 1-based columns into `preview` for highlighting.
-// ponytail: cols are byte offsets from ripgrep; equal to UTF-16 columns for ASCII. Convert only if
-// multibyte highlighting misaligns.
+// One match within a file. `col`/`endCol` are 1-based UTF-16 columns, matching JavaScript string
+// indices and Monaco positions. The main-process parser converts ripgrep's UTF-8 byte offsets.
 export type SearchHit = {
   line: number
   col: number

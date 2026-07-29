@@ -71,8 +71,9 @@ export function evictEditorState(taskId: string): void {
   })
 }
 
-export const requestEditorReveal = (taskId: string, path: string, line: number): void => {
-  openPane(taskId, 'editor', { kind: 'editor:reveal', path, line }, 'add')
+export const requestEditorReveal = (taskId: string, path: string, line: number, column?: number): void => {
+  const position = column === undefined ? { line } : { line, column }
+  openPane(taskId, 'editor', { kind: 'editor:reveal', path, ...position }, 'add')
 }
 
 // --- Persistence (prefs 'editor_open_files') ---

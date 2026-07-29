@@ -33,6 +33,21 @@ type RgEvent = {
   }
 }
 
+// ripgrep's submatch offsets are UTF-8 bytes, while JavaScript strings and Monaco columns use
+// UTF-16 code units. Convert at the main-process boundary so every renderer consumer gets one
+// coherent column contract. rg only reports code-point boundaries, so a partial character cannot
+// occur; the defensive >= check still clamps malformed offsets to the next valid position.
+function utf16OffsetAtUtf8Byte(text: string, byteOffset: number): number {
+  let bytes = 0
+  let utf16 = 0
+  for (const char of text) {
+    if (bytes >= byteOffset) break
+    bytes += Buffer.byteLength(char, 'utf8')
+    utf16 += char.length
+  }
+  return utf16
+}
+
 // Parse ripgrep's newline-delimited JSON into files→hits, capped at MAX_TOTAL_HITS total matches.
 // rg emits matches file-by-file (begin → match* → end), so we group by consecutive path.
 export function parseRgJson(stdout: string): SearchResult {
@@ -60,13 +75,19 @@ export function parseRgJson(stdout: string): SearchResult {
       const line = ev.data?.line_number
       const text = ev.data?.lines?.text
       if (line == null || text == null) continue // bytes payload (non-UTF8 line) — skip
-      const preview = text.replace(/\r?\n$/, '').slice(0, MAX_PREVIEW_LEN)
+      const content = text.replace(/\r?\n$/, '')
+      const preview = content.slice(0, MAX_PREVIEW_LEN)
       for (const sm of ev.data?.submatches ?? []) {
         if (total >= MAX_TOTAL_HITS) {
           truncated = true
           break
         }
-        current.hits.push({ line, col: sm.start + 1, endCol: sm.end + 1, preview })
+        current.hits.push({
+          line,
+          col: utf16OffsetAtUtf8Byte(content, sm.start) + 1,
+          endCol: utf16OffsetAtUtf8Byte(content, sm.end) + 1,
+          preview,
+        })
         total++
       }
       if (truncated) break

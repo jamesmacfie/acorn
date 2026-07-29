@@ -217,8 +217,9 @@ Source: `features/editor/EditorPane.tsx`, `features/editor/editorState.ts`,
 Project-wide text search over the task's worktree, backed by **ripgrep** in the main process and a
 task-scoped HTTP route. Substring search by default with case / whole-word / regex toggles;
 keystrokes are debounced so a ripgrep isn't spawned per character. Results group hits by file;
-clicking a hit opens the file in the **Editor pane beside this one**, scrolled to the match line
-(`editorOpen` + `requestEditorReveal`).
+each file header can copy its worktree-relative path, and double-clicking a hit opens the file in
+the **Editor pane beside this one**, centered with the cursor at the start of the match
+(`requestEditorReveal`).
 
 Source: `features/search/SearchPane.tsx`, `features/search/searchClient.ts`.
 

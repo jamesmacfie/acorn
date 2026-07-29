@@ -1,14 +1,14 @@
 import { createMemo, createResource, createSignal, For, Show } from 'solid-js'
 import type { Task } from '../../../../core/client/queries'
 import { debounce } from '../../../../core/client/lib/debounce'
-import { editorOpen, requestEditorReveal } from '../editorState'
+import CopyButton from '../../../../core/client/ui/CopyButton'
+import { requestEditorReveal } from '../editorState'
 import { findInFiles, type SearchHit } from './searchClient'
 import './search.css'
 
 // Find-in-files pane (docs/panes.md): project-wide text search over the task's worktree via
 // ripgrep (search:findInFiles IPC). Substring by default, with case / whole-word / regex toggles.
-// Clicking a hit opens the file in the Editor pane (beside this one) scrolled to the match line —
-// editorOpen swaps the tab, requestEditorReveal tells EditorPane which line to reveal.
+// Double-clicking a hit opens the file in the Editor pane beside this one, centered on the match.
 export default function SearchPane(props: { task: Task }) {
   const [query, setQuery] = createSignal('')
   const [debounced, setDebounced] = createSignal('')
@@ -35,9 +35,8 @@ export default function SearchPane(props: { task: Task }) {
 
   const totalHits = createMemo(() => (results()?.files ?? []).reduce((n, f) => n + f.hits.length, 0))
 
-  function openHit(path: string, line: number) {
-    editorOpen(props.task.id, path, true) // ephemeral preview tab, like a tree click
-    requestEditorReveal(props.task.id, path, line)
+  function openHit(path: string, hit: SearchHit) {
+    requestEditorReveal(props.task.id, path, hit.line, hit.col)
   }
 
   return (
@@ -72,14 +71,25 @@ export default function SearchPane(props: { task: Task }) {
         <For each={results()?.files ?? []}>
           {(file) => (
             <div class="search-file">
-              <div class="search-file-head" title={file.path}>
+              <div class="search-file-head copyable" title={file.path}>
                 <span class="search-file-path">{file.path}</span>
+                <CopyButton text={() => file.path} title="Copy file path" />
                 <span class="search-file-count muted">{file.hits.length}</span>
               </div>
               {/* ponytail: render every hit; the backend caps totals at 2000, so no per-file cap yet. */}
               <For each={file.hits}>
                 {(hit) => (
-                  <button type="button" class="search-hit" onClick={() => openHit(file.path, hit.line)}>
+                  <button
+                    type="button"
+                    class="search-hit"
+                    title={`Open ${file.path} at ${hit.line}:${hit.col}`}
+                    onClick={(event) => {
+                      // Native keyboard/assistive button activation has detail 0. Mouse clicks wait
+                      // for the explicit double-click below so inspecting results does not navigate.
+                      if (event.detail === 0) openHit(file.path, hit)
+                    }}
+                    onDblClick={() => openHit(file.path, hit)}
+                  >
                     <span class="search-hit-line muted">{hit.line}</span>
                     <span class="search-hit-preview"><HitPreview hit={hit} /></span>
                   </button>
