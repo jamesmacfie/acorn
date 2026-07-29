@@ -82,7 +82,8 @@ The server router contains validation and error envelopes but no Docker state. T
 CLI execution, parsing, matching, streams, and the cache. Client code owns only presentation,
 ephemeral detail selection, preferences, and contributed source/pane/slot/archive descriptors.
 The bridge and WebSocket handlers require only Node, SQLite, the filesystem, and child processes.
-Both the Electron composition root and `dev:node` install them through `wireServerBridges`; the
+Both the Electron utility-service composition root and `dev:node` install them through
+`wireServerBridges`; the
 plugin therefore works in either runtime when the Docker CLI and daemon are available.
 
 Source: `apps/desktop/src/plugins/docker/{client,main,server,shared}/`.

@@ -39,20 +39,29 @@ port, `127.0.0.1`-only, Host-guarded before Hono) so its port is independent of 
   GitHub credential a bearer needs is stored encrypted in `oauth_accounts` only while active
   bearers exist, and is removed on logout (never returned).
 
-## Renderer and Electron
+## Renderer, service process, and Electron
 
 The window uses context isolation and a sandboxed preload; raw `ipcRenderer` is never exposed.
 Normal data and commands use authenticated HTTP, and streams use the authenticated WebSocket.
 Preload IPC is reserved for native capabilities: close/quit lifecycle, the folder picker, and the
 main-owned preview `WebContentsView`.
 
+The privileged Node/domain runtime is isolated from Electron main in a supervised utility process.
+Its dependency graph is required to remain Electron-free, while main is forbidden from importing
+service-owned engines. The bidirectional protocol is versioned and Zod-validated at both endpoints;
+pending calls have timeouts and reject when the peer closes. Service-to-main capabilities accept
+serializable, task-addressed inputs only. Database handles, process objects, and `webContents`
+identifiers never cross this boundary. Main exposes only native preview/browser adapters and owns
+restart/fail-closed policy; the service owns filesystem/process/database operations and graceful
+resource draining.
+
 Unexpected navigation and window creation are blocked or opened externally by the main process.
 Anything handed to the OS via `shell.openExternal` passes a scheme allowlist first (`http`, `https`,
 `mailto` — `core/main/urlGuards.ts`): pane content includes third-party text we do not author, so an
 anchor's `href` is untrusted, and `openExternal` resolves schemes through the OS launcher where
 `file:` and custom schemes reach local bundles and other installed apps. Preview navigation is
-restricted to `http(s)`, and its `webContents` identifier never crosses to the renderer. Browser automation binds inside main and is exposed to agents through permission-checked
-tools.
+restricted to `http(s)`, and its `webContents` identifier never crosses to the renderer. Browser
+automation binds inside main and is exposed to agents through permission-checked tools.
 
 ## Secrets and sessions
 
@@ -88,7 +97,7 @@ or sent to the renderer; tests use synthetic fixtures only.
 ## Filesystem, processes, and database
 
 Task-scoped file operations re-derive the worktree root from `taskId`, reject traversal and symlink
-escapes, and validate request bodies before reaching main-process bridges. Process-spawning routes
+escapes, and validate request bodies before reaching utility-service bridges. Process-spawning routes
 validate their inputs and use the task worktree as the capability boundary.
 
 The Postgres pane never persists connection URLs. Generated DML parameterizes values and validates
@@ -120,8 +129,9 @@ The declarative Docker `[docker]` table contains only project names, label keys,
 matcher. It is not executable and therefore does not require this trust ceremony; Docker-start
 commands remain ordinary trust-gated run targets.
 
-Security-relevant source: `core/main/server.ts`, `core/main/preload.ts`,
-`core/main/sessionKeyStore.ts`, `core/main/repoConfigTrust.ts`, `core/main/urlGuards.ts`,
-`core/main/pathGuards.ts`, `core/server/index.ts`,
+Security-relevant source: `app/main/{serviceHost,desktopCapabilities,startupSecurity}.ts`,
+`app/service/runtime.ts`, `core/shared/{serviceProtocol,desktopCapabilities}.ts`,
+`core/main/server.ts`, `core/main/preload.ts`, `core/main/sessionKeyStore.ts`,
+`core/main/repoConfigTrust.ts`, `core/main/urlGuards.ts`, `core/main/pathGuards.ts`, `core/server/index.ts`,
 `core/server/middleware/`, `core/server/agentTools/`, feature route validators under
 `plugins/*/server/routes/`, and the public API under `core/{server,main}/publicApi/`.

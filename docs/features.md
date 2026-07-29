@@ -9,7 +9,7 @@ each. For system design (the one-server model, caches, request flow) read
 acorn began as a **GitHub pull-request review tool** and has grown into a **local macOS agent
 workspace**: a keyboard-driven desktop app for reviewing PRs *and* driving coding agents (Claude
 Code, Codex, aider) against your repositories, each in its own git worktree. It is a SolidJS
-single-page app served by one in-process Hono server running in the Electron main process, backed by
+single-page app served by one Hono server running in Electron's Node utility process, backed by
 a local SQLite mirror of GitHub. Everything runs on one machine for one user.
 
 The UI is token-driven: colour themes compose independently with style packs that control

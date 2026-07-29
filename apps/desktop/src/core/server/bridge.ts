@@ -2,10 +2,11 @@ import type { Context } from 'hono'
 import type { AppEnv } from './middleware/auth'
 import { respondError } from './respond'
 
-// A domain bridge is the main-process backing for an /api route family whose work needs a runtime
+// A domain bridge is the service-process backing for an /api route family whose work needs a runtime
 // handle the server layer doesn't own — a PTY engine, git, ripgrep, a pg pool, the worktree
 // resolver. The route holds a slot; the composition root (main/bootstrap.ts) or the server bridge
-// wiring (main/serverBridges.ts) fills it at boot. dev:node leaves the Electron-only bridges null,
+// wiring (app/main/serverBridges.ts, composed by app/service/runtime.ts) fills it at boot. dev:node
+// leaves engine-only bridges null,
 // so those routes answer a clean 503 instead of crashing (docs/electron.md §12 capability map).
 // This is the same seam server/routes/harness.ts pioneered, generalized so every migrated IPC
 // domain shares one shape.

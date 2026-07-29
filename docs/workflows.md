@@ -4,7 +4,7 @@ How acorn launches a task's app (**run targets**) and orchestrates multi-step, m
 (**workflows**). These are two related layers: a run target is the simplest unit (a command acorn can
 start/stop/reach), and a workflow is the composable multi-step machine that consumes those units.
 
-> **Availability.** Everything on this page is **desktop-only** — it needs the main-process
+> **Availability.** Everything on this page is **desktop-only** — it needs the utility-service
 > terminal/worktree services, so it is available in Electron and absent in a plain browser
 > (`capabilities()`, `apps/desktop/src/core/client/capabilities.ts`).
 > Two different maturities live here:
@@ -27,7 +27,7 @@ Two related, desktop-capability-gated ideas:
   **stop**, and an optional way to **reach** what it starts (`url` or `url_command`). Each becomes a
   ▶/■ button, a `Run:`/`Stop:` palette entry, and an MCP `run_*` tool.
 - **Workflows** — a durable state machine of named **steps** (agent runs, gates, loops, fan-out/join)
-  run by the Electron **main process**, where steps hand off through acorn's notes/memory/context
+  run by the Electron **utility service**, where steps hand off through acorn's notes/memory/context
   substrate rather than terminal scrollback, and the composable unit is a **headless step** that
   captures a structured result. Workflows *consume* run targets (a step can declare `requires_run`).
 
@@ -73,7 +73,7 @@ target, and `devRestartScript`, when set, is what `run_restart` runs instead of 
 
 ### How targets run
 
-The **`RuntimeService`** in the main process owns run-target instances per task
+The **`RuntimeService`** in the utility service owns run-target instances per task
 (`apps/desktop/src/plugins/terminal/main/runtime.ts:51`). An instance is *just a terminal session in the task's
 worktree*, so `running` derives from the session map, and reachability comes from the target's `url`
 (fixed) or `url_command` (run-a-command-and-parse-stdout — the same shape as `term:previewUrl`;
@@ -96,7 +96,7 @@ with **one ▶/■ per target**. `start` is idempotent for an already-running in
 ### The harness endpoints
 
 The renderer client is `apps/desktop/src/plugins/terminal/client/runClient.ts`. It calls the
-loopback HTTP routes below; the routes delegate to the main-process `RuntimeService` through the
+loopback HTTP routes below; the routes delegate to the utility-service `RuntimeService` through the
 injected `RunBridge`.
 
 The **loopback HTTP surface** the MCP server calls lives on the harness router
@@ -110,8 +110,9 @@ The **loopback HTTP surface** the MCP server calls lives on the harness router
 | `POST /:id/run/:target/restart` | the target's `restart` command if set, else stop+start |
 | `GET  /:id/run/:target/status` | `{ running, url?, exitCode? }` |
 
-These delegate through the `RunBridge` sub-bridge (`harness.ts`) the main process injects
-(`main/harnessWiring.ts`); under `dev:node` (no Electron) the bridge is absent and every route
+These delegate through the `RunBridge` sub-bridge (`harness.ts`) the service runtime injects
+(`main/harnessWiring.ts`, a historical path); under `dev:node` (no service engine) the bridge is
+absent and every route
 degrades to a clean `503 bridge-unavailable` (bridge-up domain failures map to typed
 `404`/`400`/`500` — see docs/api-reference.md).
 
@@ -139,7 +140,7 @@ today. (A `ratio` key in the file is tolerated but not parsed — panes split eq
 
 ## 4. Workflows
 
-A workflow is an enforced state machine of named steps, run by the main process and persisted on
+A workflow is an enforced state machine of named steps, run by the utility service and persisted on
 every transition so a run survives an app restart. The engine is intentionally bounded: it is not a
 general DAG scheduler or a background daemon.
 
@@ -190,8 +191,8 @@ PRD-style step can emit a task list and spawn N children, each on its own branch
   --output-schema …`); tests use a committed `fake-agent.sh` through the same argv-template path.
 - **`structuredJson` is the edge currency.** Branching, joining, and fan-out read a step's structured
   output (a JSON field), never free text.
-- **Gates are enforced in the main process, not in prompts.** A `gate-human` step pauses the run until
-  the approve HTTP call; a `gate-policy` step **re-derives** its verdict in main and ignores whatever the
+- **Gates are enforced in the utility service, not in prompts.** A `gate-human` step pauses the run until
+  the approve HTTP call; a `gate-policy` step **re-derives** its verdict in the engine and ignores whatever the
   step claimed (e.g. the `checks-green` policy polls the `checks` mirror —
   `apps/desktop/src/plugins/terminal/main/terminal.ts:957-964`). This is roboco's "enforce outside the agent" lesson.
 - **Handoff is run-scoped.** A step's result is appended to the task note
@@ -253,7 +254,7 @@ WebSocket and feed the same notification bell as agent-state edges.
   harness `/:id/run*` HTTP surface.
 - **Layout recipes** (`recipes.ts`) surfaced as `Layout:` palette entries.
 - The **workflow schema** (`workflow_runs` + `workflow_steps`).
-- A main-process **`WorkflowRunner`** + **headless step runner** wired with real deps, the
+- A utility-service **`WorkflowRunner`** + **headless step runner** wired with real deps, the
   **`.acorn/workflows` loader**, the read-only **`WorkflowsSettings`** inspector, **`Workflow:`**
   palette launch, the **`terminalClient` workflow bridge**, and the **Agents-panel** surfacing of
   workflow steps and gates.

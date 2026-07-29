@@ -20,7 +20,7 @@ management routes `apps/desktop/src/core/server/routes/{apiTokens,apiSettings}.t
 
 ## Dedicated loopback listener
 
-The public API runs on its **own** `@hono/node-server` listener in the Electron main process,
+The public API runs on its **own** `@hono/node-server` listener in the Node utility process,
 separate from the `:4317` SPA/internal listener. Keeping them separate means changing the API port
 never touches the SPA origin, OAuth callback, or IndexedDB origin.
 
@@ -37,9 +37,11 @@ never touches the SPA origin, OAuth callback, or IndexedDB origin.
   listening, then stops the old one after the current response flushes. A bind failure keeps the
   prior listener and settings (`port_in_use`).
 
-Lifecycle is owned by `AutomationApiServer` (`core/main/publicApi/server.ts`) and wired in
-`app/main/bootstrap.ts` after the DB/services are built and before the window opens; it stops first
-on teardown.
+Lifecycle is owned by `AutomationApiServer` (`core/main/publicApi/server.ts`, a historical path) and
+wired in `app/service/runtime.ts` after the DB/services are built. Startup attempts the public
+listener before the internal service reports ready; a public-listener failure is isolated and
+reported rather than preventing the desktop UI listener from starting. It stops before the
+internal listener and other service resources on teardown.
 
 ## Authentication
 
@@ -139,7 +141,8 @@ Both return `{ data: { refreshed: true }, requestId }`; callers then use the nor
 A separate bearer-authenticated socket (`core/main/publicApi/wsHub.ts`), attached to the automation
 listener's `upgrade` event so it shares the loopback bind + Host guard. It is **distinct from** the
 internal renderer WebSocket (`/ws`) — different credential, different clients — but shares the
-underlying event/terminal services via the in-process `EventBus` (`core/main/publicApi/eventBus.ts`).
+underlying event/terminal services via the service-local `EventBus`
+(`core/main/publicApi/eventBus.ts`).
 
 - Connections are **indexed by token id**; revocation closes them synchronously with a token-revoked
   close code.

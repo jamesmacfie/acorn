@@ -25,15 +25,17 @@ A GitHub OAuth App allows exactly **one** callback URL, so the desktop app wants
   form (GitHub treats it as distinct from `localhost`).
 - Copy the **Client ID** and generate a **Client Secret**.
 
-The app origin is pinned to port `4317` (`ACORN_PORT` in `apps/desktop/src/core/main/server.ts`; an
+The app origin is pinned to port `4317` (`ACORN_PORT` in `apps/desktop/src/core/main/serverConfig.ts`; an
 `ACORN_PORT` environment variable overrides it, at the cost of a fresh IndexedDB origin) so the
 browser storage and OAuth callback stay stable. The OAuth flow requests the scopes
 `repo read:org read:user`.
 
 ## 2. Configure local secrets — `apps/desktop/.env`
 
-Dev secrets live in `apps/desktop/.env`, loaded by the Electron main process (`process.loadEnvFile`)
-and by `dev:node`. Packaged Electron builds use `safeStorage` for `SESSION_ENC_KEY`. GitHub OAuth
+Dev secrets live in `apps/desktop/.env`, loaded by Electron main (`process.loadEnvFile`) before it
+forks the utility service, and separately by `dev:node`. Packaged Electron builds use `safeStorage`
+for `SESSION_ENC_KEY`; main resolves that key and passes it to the service through its controlled
+environment. GitHub OAuth
 credentials resolve from `<userData>/.env`, then process environment, then the
 `MAIN_VITE_GITHUB_CLIENT_*` fallback embedded by release CI.
 
@@ -81,14 +83,15 @@ The Electron window opens on `http://127.0.0.1:4317`; log in with GitHub.
 > (`SESSION_COOKIE` in `session.ts`); no action needed.
 
 > **Desktop-only features.** The terminal drawer, agent sessions, run targets, and workflows are
-> always on in the Electron app; they require main-process capabilities, so they're absent in a
+> always on in the Electron app; they require utility-service engines, so they're absent in a
 > plain browser via `dev:node` (`capabilities()` in `apps/desktop/src/core/client/capabilities.ts`).
 > Docker and the HTTP client use pure-Node server bridges and also work in `dev:node`.
 
 ## Local data — `apps/desktop/.acorn/`
 
-All server-side state lives under `apps/desktop/.acorn/` (gitignored), resolved relative to the
-built main-process module — not under `~/Library/Application Support`:
+In development, all server-side state lives under `apps/desktop/.acorn/` (gitignored), resolved by
+the Node runtime rather than from `process.cwd()`. Packaged builds use Electron's
+`app.getPath('userData')`:
 
 - `acorn.sqlite` (+ WAL files) — the Drizzle/SQLite database: the GitHub mirror *and* acorn's own
   app-state (workspaces, tasks, review notes, prefs, encrypted integration tokens, the memory
@@ -113,7 +116,7 @@ Run from the repo root via Turborepo, or per-package with `--filter @acorn/deskt
 | --- | --- |
 | `pnpm dev` | `electron-vite build && electron-vite preview` — build + launch the Electron app |
 | `pnpm --filter @acorn/desktop dev:node` | Run just the Node server (no Electron) on `:4317` — needs the Node ABI, and a prior `build` (it serves `dist/client` and reads `index.html` at startup) |
-| `pnpm --filter @acorn/desktop build` | Build main + preload + renderer, then enforce the renderer budget |
+| `pnpm --filter @acorn/desktop build` | Build main + utility service + MCP proxy + preload + renderer, then enforce the renderer budget |
 | `pnpm --filter @acorn/desktop dist` | Run the gated build and package the `.dmg`/`.zip` |
 | `pnpm --filter @acorn/desktop electron:dev` | `electron-vite dev` — watch mode for main/preload; the window still loads `:4317` (renderer comes from the last-built `dist/client`, never the vite dev server) |
 | `pnpm --filter @acorn/desktop electron:rebuild` / `node:rebuild` | switch the native ABI of better-sqlite3 + node-pty (Electron ↔ Node) |

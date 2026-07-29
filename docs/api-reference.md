@@ -2,8 +2,8 @@
 
 The server's complete **internal** HTTP surface — the cookie-authenticated `/api/*` transport the SPA
 uses. One Hono app (`apps/desktop/src/core/server/index.ts`, a `createApp()` factory) serves both
-`/auth/*` and `/api/*`, hosted in-process by `@hono/node-server` on `http://127.0.0.1:4317`. The
-Electron main process (`apps/desktop/src/core/main/server.ts`) wraps it with static-asset serving +
+`/auth/*` and `/api/*`, hosted by `@hono/node-server` in the Node utility process on
+`http://127.0.0.1:4317`. The service listener (`apps/desktop/src/core/main/server.ts`) wraps it with static-asset serving +
 SPA fallback. See [architecture-overview](./architecture-overview.md) and [electron](./electron.md).
 
 > **Not the public API.** The opt-in bearer-authenticated **automation API** (`/api/v1`, a separate
@@ -19,7 +19,7 @@ SPA fallback. See [architecture-overview](./architecture-overview.md) and [elect
 > database/*}`, `/api/terminal/*` + `/api/tasks/:id/{archive,preview-url,on-created,use-checkout,
 > mcp}`, `/api/tasks/:id/workflows` + `/api/workflows/runs/:runId/*`, `/api/memory*` +
 > `/api/workspaces/:wsId/notes*`, `/api/tasks/:id/notes*`, and the `RunBridge` at `/api/tasks/:id/run/*`. Each is
-> backed by a main-process **bridge** (`server/bridge.ts`; 503 `bridge-unavailable` when unwired).
+> backed by a service-process **bridge** (`server/bridge.ts`; 503 `bridge-unavailable` when unwired).
 > Live streams (PTY output/input, session status, workflow notices) ride one authenticated
 > WebSocket at `/ws` — see [electron.md §12](./electron.md) for the transport + `dev:node`
 > capability map.
@@ -77,7 +77,8 @@ construction — they mount *before* the `/api/*` middlewares. See
     background GitHub call to refresh). See [data-layer](./data-layer.md), [caching](./caching.md).
   - **GitHub** — a live GitHub REST/GraphQL call on the request path.
   - **App-state** — local SQLite where acorn is the source of truth (no GitHub involved).
-  - **Bridge** — proxied to the main-process per-domain harness bridges (returns `503` when unavailable).
+  - **Bridge** — proxied to a utility-service per-domain bridge (returns `503` when that runtime
+    capability is unavailable, notably in `dev:node`).
   - **Provider** — a live third-party (Linear/Rollbar) call, cached locally.
 
 ## Shared client contract
@@ -260,7 +261,7 @@ send loop: create (unsent) → deliver → `POST /sent` stamps `sentAt` → an e
 ### Task context — `apps/desktop/src/core/server/routes/taskContext.ts`
 
 The context assembler — never a live GitHub call, so the agent sees the same picture as the UI.
-The contribution registry assembles PR/issues from the **Mirror** and notes/memory from main-process
+The contribution registry assembles PR/issues from the **Mirror** and notes/memory from utility-service
 stores. The response carries serialized section metadata/items/compact text; `include=*` returns the
 inventory for the Context pane, while an omitted include uses contribution defaults.
 
@@ -273,7 +274,7 @@ inventory for the Context pane, while an omitted include uses contribution defau
 
 ### Agent-tool projection — `apps/desktop/src/core/server/routes/agentTools.ts`
 
-The registry is installed by the main-process composition root. MCP/harness paths require the
+The registry is installed by the utility-service composition root. MCP/harness paths require the
 persisted internal principal; renderer projection is a separate cookie-authenticated opt-in path.
 Missing registries return `503 bridge-unavailable`; hidden, unavailable, or non-renderer tools are
 indistinguishable `404 not_found` responses.
@@ -297,7 +298,7 @@ notes, memory, context, and git verbs go through `/tools/:name`.
 
 ### Workflow control — `apps/desktop/src/plugins/workflows/server/routes/workflow.ts`
 
-The desktop main process installs the durable runner behind this bridge. Definitions and controls
+The utility service installs the durable runner behind this bridge. Definitions and controls
 use HTTP; live notices, status pings, and step events use the authenticated WebSocket.
 
 | Method | Path | Purpose |
@@ -329,7 +330,7 @@ unacknowledged snapshot.
 ## Worktree-local task surfaces
 
 These plugin routers share `/api/tasks/:id/*`. They are cookie-authenticated like the rest of the
-internal API and return `503 bridge-unavailable` when their main-process capability is absent.
+internal API and return `503 bridge-unavailable` when their runtime capability is absent.
 
 | Family | Routes | Purpose |
 | --- | --- | --- |
@@ -857,7 +858,7 @@ the `error` values below are the stable machine codes, and `detail` (when presen
 | `403`/`429`/`502` | `provider_resource_forbidden`, `provider_rate_limited`, `provider_unavailable` | Provider resource or upstream failure |
 | `500` | `failed` (message in `detail`) | Harness route whose bridge call threw an unclassified error |
 | `500` | `internal` (message in `detail`) | Any route that threw an uncaught error — the app-level `onError` backstop |
-| `503` | `bridge-unavailable`, `capability_unavailable` | Required main-process bridge/controller is absent (e.g. `dev:node`) |
+| `503` | `bridge-unavailable`, `capability_unavailable` | Required utility-service engine or injected bridge/controller is absent (e.g. `dev:node`) |
 
 > The `401`/`429`/`403`(`forbidden`/`sso`) rows are produced by the shared `ghError()` helper in
 > `apps/desktop/src/plugins/github/server/index.ts`, applied uniformly across every GitHub-backed route.

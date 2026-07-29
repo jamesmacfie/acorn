@@ -3,7 +3,7 @@ import { pruneOrphanedGithubMirror } from '../../plugins/github/server/mirrorRet
 import { protectLegacyHttpStorage } from '../../plugins/http/server/storage'
 import { CommandExecutionService } from '../../plugins/terminal/main/executionService'
 
-// Security-sensitive startup reconciliation shared by the Electron and dev:node composition
+// Security-sensitive startup reconciliation shared by the utility-service and dev:node composition
 // roots. HTTP plaintext migration must succeed before the listener opens. Retention repairs are
 // also pre-listener so an expired payload cannot win a race with its first request after boot.
 export async function prepareSecurityState(runtime: RuntimeBindings): Promise<CommandExecutionService> {

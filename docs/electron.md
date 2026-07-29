@@ -3,11 +3,13 @@
 > Status: **Migration complete.** Phases 0–2 done (Node-server spike + Electron shell + Cloudflare
 > cut) plus the Phase 3 caching cleanup. The Hono app runs under `@hono/node-server` on
 > `http://127.0.0.1:4317` with a better-sqlite3-backed Bindings object (typed stores — the KV shim
-> is gone), wrapped in an Electron app
-> whose main process starts that server and loads the loopback origin. **Cloudflare/wrangler is fully
-> removed** — Electron is the shipped product runtime; `dev:node` remains a supported development
-> composition root for pure-Node server capabilities. The **v2 terminal (§8) has since shipped**: node-pty
-> sessions run in the main process (`src/plugins/terminal/main/terminal.ts`, desktop-only and always on — see
+> is gone), wrapped in an Electron app. A supervised Node `utilityProcess` owns the
+> server, SQLite, PTYs, Git/process work, and background reconciliation; Electron main owns only
+> native windows/views/dialogs plus lifecycle supervision and loads the loopback origin.
+> **Cloudflare/wrangler is fully removed** — Electron is the shipped product runtime; `dev:node`
+> remains a supported development composition root for pure-Node server capabilities. The **v2
+> terminal (§8) has since shipped**: node-pty
+> sessions run in the utility service (`src/plugins/terminal/main/terminal.ts`, desktop-only and always on — see
 > [terminal-and-agents.md](./terminal-and-agents.md)). `SESSION_ENC_KEY` now uses `safeStorage`;
 > GitHub device flow (dropping `client_secret`) remains an optional distribution enhancement, not
 > migration work. This doc is the full change inventory and the record of a clean, phased
@@ -16,8 +18,8 @@
 > exists today.
 >
 > Companion doc: [terminal-and-agents.md](./terminal-and-agents.md) — the terminal/agent-session
-> feature collapsed into the Electron main process as §8 predicted. (Its design record, `vNext.md`,
-> is now removed — see git history.)
+> feature originally collapsed into Electron main as §8 predicted and now runs in the supervised
+> utility service. (Its design record, `vNext.md`, is now removed — see git history.)
 >
 > **Phase 0 artifacts:** `apps/desktop/src/core/main/bindings.ts` (DB + `.batch` shim, in-mem `OAUTH_STATE`,
 > on-disk `BLOBS`, secrets from `process.env`), `apps/desktop/src/core/main/server.ts` (node-server bootstrap
@@ -56,17 +58,17 @@ the runtime under it changes.
 ```
 ┌──────────────────────── Electron app ────────────────────────┐
 │                                                               │
-│  main process (Node)                                          │
-│   ├─ bootstrap(): build the Bindings object (§4b)             │
-│   │     ├─ SQLite (better-sqlite3) ── Drizzle                 │
-│   │     ├─ OAUTH_STATE  → in-memory TTL map                   │
-│   │     ├─ BLOBS        → on-disk cache dir                   │
-│   │     └─ secrets      → .env / OS keychain                  │
-│   ├─ @hono/node-server  serve(app) on http://127.0.0.1:<port> │
+│  main process: BrowserWindow/WebContentsView/dialog + supervisor│
+│       │ typed task-addressed capability RPC                    │
+│       ▼                                                        │
+│  Node utility process                                         │
+│   ├─ Bindings: SQLite/Drizzle, caches, secrets                 │
+│   ├─ @hono/node-server on http://127.0.0.1:<port>              │
 │   │     └─ the SAME Hono app: /auth, /api/*, + static SPA     │
-│   ├─ (v2) node-pty terminal sessions  ── IPC ──┐              │
-│   └─ BrowserWindow.loadURL('http://127.0.0.1:<port>')         │
-│                                                  │            │
+│   └─ node-pty, Git/process work, workflows, reconciliation     │
+│                                                                │
+│  BrowserWindow.loadURL('http://127.0.0.1:<port>')             │
+│                                                  │             │
 │  renderer (Chromium)  ── SolidJS UI + SW gate ────────────────┘
 │        talks to /api same-origin; cookies work as today       │
 └───────────────────────────────────────────────────────────────┘
@@ -111,9 +113,14 @@ That's the entire list. Everything else — all 16 route modules' business logic
 the migration SQL, the GitHub client, and the SolidJS product UI — is untouched. The only renderer
 change called out below is removing the service worker (§4h).
 
-## 4. The changes
+## 4. The initial migration changes
 
-### 4a. Runtime entry — Worker → node-server + Electron main
+> This section records the Phase 0–2 landing from Workers into a Node server hosted directly by
+> Electron main. Its code sketches and “add” language are historical. The shipped runtime later
+> moved that Node application intact into the supervised utility process described in §2, §11, and
+> §12.
+
+### 4a. Runtime entry — Worker → node-server in Electron main (historical)
 
 `src/core/server/index.ts` keeps building the same route graph, but exposes it as a factory so the Node
 bootstrap can add desktop-only static serving without mutating the singleton used by tests:
@@ -374,9 +381,9 @@ renderer ↔ preload ↔ main. Treat that as a narrow capability API, not a gene
   This keeps the local HTTP API scoped to the origin the Electron app actually uses.
 - OAuth window: no preload and no Node integration (§4f). It is the only window allowed to visit
   `github.com`.
-- IPC channels for v2 terminal must validate payloads at the main-process boundary: session id,
-  cwd, cols/rows, input bytes, and lifecycle commands. The route/API types in `src/core/shared/api.ts`
-  are the pattern to copy.
+- Terminal request bodies are validated at the Hono/service boundary: session id, cwd, cols/rows,
+  input bytes, and lifecycle commands. Native service↔main calls use the narrower versioned schemas
+  in `core/shared/{serviceProtocol,desktopCapabilities}.ts`.
 - Add a basic CSP for the renderer HTML. The app currently relies on same-origin fetch and GitHub
   API calls from the main/server side, so the renderer policy can stay tight.
 
@@ -510,7 +517,7 @@ native modules and ripgrep are unpacked, and `SESSION_ENC_KEY` self-provisions t
 build-time fallback; device flow remains the distribution hardening follow-up.
 
 **Phase 3 — Desktop-native cleanups + features.** Caching simplification (§5) **✅ done**. The
-**v2 terminal** (§8) **✅ shipped** — node-pty sessions in the main process, desktop-only and always
+**v2 terminal** (§8) **✅ shipped** — node-pty sessions in the utility service, desktop-only and always
 on. Still optional for broader distribution: GitHub device flow (drop `client_secret`).
 
 Each phase is independently shippable and Phase 0–1 are reversible (Cloudflare config still there
@@ -520,14 +527,15 @@ until Phase 2). That's the clean transition.
 
 The original terminal RFCs designed around a Worker's *lack* of a process model — a separate
 local daemon + a Vite WebSocket proxy. **Electron removed that entire workaround**, and the feature
-has since been **built** (`src/plugins/terminal/main/terminal.ts`, registered from `electron.ts` at startup,
+has since been **built** (`src/plugins/terminal/main/terminal.ts`, registered by the service runtime at startup,
 desktop-only and always on):
 
-- node-pty runs **in the Electron main process**. No separate daemon, no `ws` server, no Vite proxy.
+- node-pty runs **in Electron's supervised Node utility process**. No separate daemon, no Vite
+  proxy, and no terminal-specific WebSocket server.
 - Renderer request/response uses the loopback HTTP API; xterm input/output and status use the one
   authenticated WebSocket. Preload IPC is limited to native capabilities.
 - tmux-backed persistence applies for surviving an app restart; surviving a *window* reload is
-  automatic since the PTY lives in main.
+  automatic since the PTY outlives the renderer window.
 - The `@electron/rebuild` step from §4c covers node-pty's native build (`electron:rebuild` rebuilds
   both native modules).
 - The terminal service shares the server's single SQLite connection, handed to it (with
@@ -571,40 +579,51 @@ The runtime moves; the application doesn't.
 
 ## 11. Composition root & lifecycle
 
-`apps/desktop/src/app/main/bootstrap.ts` is the one explicit main-process composition root. `electron.ts`
-calls `bootstrap()` exactly once from `app.whenReady()`; `bootstrap` owns construction **order** and
-**lifecycle**, while each domain module keeps its own behaviour. The ordered phases are visible
-top-to-bottom in that file:
+There are two explicit composition roots. `apps/desktop/src/app/main/bootstrap.ts` is the thin
+Electron-native host: `electron.ts` calls it once from `app.whenReady()`, and it owns native adapters,
+service supervision, window timing, recovery, and quit coordination.
+`apps/desktop/src/app/service/runtime.ts` is Electron-free and owns the application runtime.
+The ordered phases are:
 
 ```text
-migrate (openDb runs migrations)
+main: fork utility process
+  → service: migrate (openDb runs migrations)
   → construct domain services (knowledge, runtime, workflow, …)
-  → install bridges and native capability handlers
+  → install HTTP/WS bridges
   → start loopback listener (startListener — only now do requests get served)
-  → create window (electron.ts supplies createWindow; bootstrap owns when)
-  → reconcile durable state (tmux resurrect, worktree prune, workflow resume) off the paint path
-  → dispose in reverse on will-quit (public/internal listeners, preview, terminal, Docker, pg pools)
+  → acknowledge listening
+  → main: create window
+  → service: reconcile durable state (tmux/worktrees/workflows) off the paint path
+  → quit: service drains automation + loopback listeners, PTYs/watchers, pg pools, then SQLite
+  → main disposes preview views/picker IPC and terminates the utility process
 ```
 
-Two invariants this closes (review §2): the listener starts **after** every harness/context bridge
+The service/main channel is a versioned, zod-validated, bidirectional request protocol
+(`core/shared/serviceProtocol.ts`). Service-to-main calls expose only task-addressed preview/CDP
+operations; no database handles, `WebContents` ids, or process objects cross the boundary. Pending
+calls have timeouts and fail when the peer exits. Main retries an unexpected exit at most three
+times per minute with exponential backoff, then fails closed instead of looping forever.
+
+Three invariants this closes: synchronous database/Git/process work cannot block Electron's event
+loop; the listener starts **after** every harness/context bridge
 is installed — no more boot-order window where `/api/tasks/:id/notes` 503s — and there is now a
-logged `will-quit` teardown (registered first, idempotent, tolerant of a partial boot). `terminal.ts`
+coordinated, idempotent `will-quit` teardown tolerant of a partial boot. `terminal.ts`
 is no longer the accidental `main()`: it is the PTY engine, and the composition root injects what it needs
 (`memoryInjector`, `memoryReviewTrigger`, `seedTaskNotes`, `internalApiEnv`) and consumes what it
 exports (`sendToAgent`, `terminalRunGlue`, `reconcileTmux`, `disposeTerminal`). Boot/reconcile/teardown
-timing marks are logged as `[boot] <label> +Nms` lines (performance §3.1).
+timing marks are logged as `[service:boot] <label> +Nms` lines (performance §3.1).
 
-## 12. Current transport: loopback HTTP + one WebSocket + a thin IPC residue
+## 12. Current transport: loopback HTTP + one WebSocket + narrow native RPC
 
-The renderer↔main contract is:
+The current transport split is:
 
 - **Request/response → loopback HTTP.** Every former `ipcMain.handle` domain (search, editor, run,
   workflow, local-git, database, knowledge/notes+memory, terminal control, MCP inspect) is a typed
   route under `/api/*` in `core/server/routes/*` or `plugins/*/server/routes/*`. Route builders +
-  response types live in `core/shared/api.ts`; clients call through `readJson`/`writeJson`. Domain logic stays in the main
-  process behind a **bridge** — a route holds a `bridgeSlot`, the main side fills it at boot
+  response types live in `core/shared/api.ts`; clients call through `readJson`/`writeJson`. Domain logic stays in the utility
+  service behind a **bridge** — a route holds a `bridgeSlot`, the service side fills it at boot
   (`core/server/bridge.ts` `viaBridge` → 503 `bridge-unavailable` when unfilled). Pure-Node bridges
-  (search/editor/local-git/database) are wired by the Electron and `dev:node` composition entries.
+  (search/editor/local-git/database) are wired by the utility-service and `dev:node` composition entries.
   Bodies that write files, spawn
   processes, or execute SQL are zod-validated with malformed-body tests.
 - **Streams → one authenticated WebSocket** at `/ws` (`core/shared/ws.ts`, `core/main/wsHub.ts`,
@@ -615,10 +634,10 @@ The renderer↔main contract is:
   snapshot-before-live ordering). The upgrade is authorized on the shared
   loopback listener: Host guard + exact-Origin + a valid session cookie, or the internal token for
   the loopback MCP caller — anything else is a 403 before the handshake.
-- **IPC residue (`preload.ts`) — only true Electron capabilities:** the `preview:*` browser-preview
+- **Renderer↔main IPC (`preload.ts`) — only true Electron capabilities:** the `preview:*` browser-preview
   channels (drive a main-owned `WebContentsView` per task — see below), `term:repoPath:pick`
   (`dialog.showOpenDialog`), and the `acorn:close-pane` main→window ⌘W ping, plus the
-  `desktop`/`platform` probes. Nothing request/response or streamable remains on IPC. (The old
+  `desktop`/`platform` probes. No domain API or domain stream remains on this IPC surface. (The old
   `browser:bind` handle is gone — with the preview main-owned, the CDP driver binds inside main when
   the view is created, so no `webContents` id ever crosses the bridge.)
 - **Browser preview — main-owned `WebContentsView`:** one kept-alive view per task,
@@ -630,6 +649,12 @@ The renderer↔main contract is:
   it when an overlay covers the pane. The main-owned record also retains the resolved home URL and
   owning window: a changed home reconciles on remount, and closing the window closes/unbinds every
   child view before macOS can create a replacement window.
+- **Service↔main RPC — lifecycle plus native adapters:** `core/shared/serviceProtocol.ts` defines
+  versioned, Zod-validated request/response/event envelopes over `utilityProcess` message ports.
+  `core/shared/desktopCapabilities.ts` projects task-addressed preview and CDP/browser operations
+  from main back into the service. Calls are concurrent and timed; peer exit rejects pending work.
+  Only serializable DTOs cross—never a database connection, child-process object, or
+  `webContents` id.
 
 ### Capability map (`dev:node` / plain browser)
 
@@ -639,8 +664,9 @@ surfaces degrade by whether their bridge is pure-Node or engine-backed:
 | Surface | `dev:node` | Why |
 | --- | --- | --- |
 | PR review, workspaces, tasks, integrations, prefs | ✅ works | server-only (DB + GitHub), never needed IPC |
-| search, editor, local-git, database | ✅ works | pure-Node bridges wired in `startListener` |
-| terminal drawer, agents, run targets, workflows, MCP inspect | ⛔ 503 | need the main-process PTY/runtime engine (wired only in `bootstrap.ts`) |
+| search, editor, local-git, database, Docker, agent usage | ✅ works | pure-Node bridges wired by both composition roots |
+| HTTP client | ✅ works | executes directly in its authenticated Hono route |
+| terminal drawer, agents, run targets, workflows, MCP inspect | ⛔ 503 | need the utility-process runtime engine (wired only in `app/service/runtime.ts`) |
 | PTY streams + `workflow:notice` (WebSocket) | ⚠️ connects, no data | the socket authorizes, but no engine registers stream handlers |
 | folder picker, drivable browser, ⌘W | ⛔ absent | true Electron capabilities (no `window.acorn` bridge) |
 

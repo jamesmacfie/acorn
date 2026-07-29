@@ -48,7 +48,7 @@ alone is *not* unique — the primary key includes `userId`.
 
 **Machine-scoped** app-state tables (`repo_paths`, `workspaces`, `tasks`, …) deliberately have *no*
 `userId`. They describe the local filesystem and the user's work on it — the terminal service in the
-Electron main process reads them outside any GitHub user context, and on a single-user machine there
+Electron utility process reads them outside any GitHub user context, and on a single-user machine there
 is no second user to isolate from. See [user- vs machine-scoping](#user--vs-machine-scoping) below.
 
 Patch/blob bodies are the one thing kept outside the tables entirely: the on-disk `BLOBS` cache
@@ -426,7 +426,7 @@ Drizzle relationship.
 #### `terminal_sessions`
 
 Durable terminal sessions. PK opaque `id`. Machine-scoped. **Desktop-only** — the terminal drawer
-requires the main-process terminal capability and is always on in the Electron app (`capabilities()`,
+requires the utility-service terminal capability and is always on in the Electron app (`capabilities()`,
 `apps/desktop/src/core/client/capabilities.ts`).
 Only **tmux-backed** sessions are persisted (tmux outlives an app restart; node-pty sessions die with
 the process and live only in the in-memory map). No terminal output is ever stored. Bound to a task —
@@ -451,7 +451,7 @@ repo/branch/PR are derived through the `taskId → tasks` join.
 
 #### `workflow_runs`
 
-The durable checkpoint for the main-process workflow state machine — every transition is persisted so
+The durable checkpoint for the utility-service workflow state machine — every transition is persisted so
 a run survives an app restart. PK opaque `id`. Machine-scoped. The registry-backed runtime supports
 gates, joins, branching, bounded fan-out, cancellation, tool ceilings, and reconciliation; it is
 desktop-capability-gated. See [workflows](./workflows.md).
@@ -652,8 +652,8 @@ Why some tables have `userId` and some do not:
   cross users, so `userId` is part of the PK.
 - **`userId` absent** (machine-scoped app-state): the data describes *this machine* — a local
   checkout path (`repo_paths`), a worktree-backed task (`tasks`), a tmux session
-  (`terminal_sessions`), a memory file on disk (`memories`). It is read by the Electron main process
-  and the terminal service, which run outside any GitHub request context. On a single-user machine
+  (`terminal_sessions`), a memory file on disk (`memories`). It is read by utility-service domain
+  engines outside any GitHub request context. On a single-user machine
   there is no second user to isolate from, so adding `userId` would be dead weight.
 
 `integrations`, encrypted HTTP-client rows, bearer tokens, and retained OAuth credentials sit on the

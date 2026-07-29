@@ -61,7 +61,7 @@ workspace, then Go-to-task) are placed last deliberately. See `model.ts:23` for 
 - `run`, `workflow`, `layout`, and the remaining actions (`new-terminal`, `toggle-terminal`,
   `archive`) — need both an active task **and** the terminal API (`if (!taskId || !api) return`).
 
-**Capability gating.** Run/layout/workflow rows come from HTTP clients backed by main-process
+**Capability gating.** Run/layout/workflow rows come from HTTP clients backed by utility-service
 services. The terminal API only exists when the desktop terminal capability is present
 (`capabilities()`, `core/client/capabilities.ts`), so in a plain browser (`dev:node`)
 those three kinds are simply absent and the palette shows only pane/task/archive actions. See

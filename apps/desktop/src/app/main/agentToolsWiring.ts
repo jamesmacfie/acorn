@@ -15,7 +15,7 @@ import { setAgentTools, ToolError, type AgentToolContribution, type ToolContext 
 import type { AppDatabase } from '../../core/server/db'
 import { schema } from '../../core/server/db'
 import type { NoteLocation, NoteScope } from '../../core/shared/notes'
-import { driverFor } from '../../plugins/preview/main/browserService'
+import type { BrowserDesktopCapability } from '../../core/shared/desktopCapabilities'
 import { gitLog, localChanges, localDiff } from '../../plugins/changes/main/localDiff'
 import { getMemory, listMemories, MEMORY_TYPES, searchMemories, type MemoryType } from '../../plugins/memory/main/memory'
 import type { MemoryProposalStore } from '../../plugins/memory/main/memoryProposals'
@@ -30,6 +30,7 @@ export type AgentToolsDeps = {
   notesStore: NotesStore
   proposals: MemoryProposalStore
   runtime: RuntimeService
+  browser: BrowserDesktopCapability
   reconciled(): Promise<void>
 }
 
@@ -55,7 +56,7 @@ async function noteLocationFor(db: AppDatabase, taskId: string, scope: NoteScope
 }
 
 export function buildAgentTools(deps: AgentToolsDeps): AgentToolContribution[] {
-  const { db, notesStore, proposals, runtime, reconciled } = deps
+  const { db, notesStore, proposals, runtime, reconciled, browser } = deps
   const empty = z.object({})
   const executeRun = async <T>(taskId: string, execute: () => Promise<T>): Promise<T> => {
     try {
@@ -303,7 +304,7 @@ export function buildAgentTools(deps: AgentToolsDeps): AgentToolContribution[] {
       scope: 'task',
       risk: 'execute',
       exposeToRenderer: true,
-      handler: async (a, ctx) => driverFor(ctx.taskId)?.navigate((a as { url: string }).url) ?? { ok: false, reason: 'No preview webview for this task — open the browser pane first.' },
+      handler: async (a, ctx) => browser.navigate(ctx.taskId, (a as { url: string }).url),
     },
     {
       name: 'browser_snapshot',
@@ -313,8 +314,7 @@ export function buildAgentTools(deps: AgentToolsDeps): AgentToolContribution[] {
       risk: 'execute',
       exposeToRenderer: true,
       handler: async (_a, ctx) => {
-        const d = driverFor(ctx.taskId)
-        return d ? d.takeSnapshot() : { error: 'No preview webview for this task — open the browser pane first.' }
+        return browser.snapshot(ctx.taskId)
       },
     },
     {
@@ -324,7 +324,7 @@ export function buildAgentTools(deps: AgentToolsDeps): AgentToolContribution[] {
       scope: 'task',
       risk: 'execute',
       exposeToRenderer: true,
-      handler: async (a, ctx) => driverFor(ctx.taskId)?.click((a as { ref: string }).ref) ?? { ok: false, reason: 'No preview webview for this task.' },
+      handler: async (a, ctx) => browser.click(ctx.taskId, (a as { ref: string }).ref),
     },
     {
       name: 'browser_fill',
@@ -335,7 +335,7 @@ export function buildAgentTools(deps: AgentToolsDeps): AgentToolContribution[] {
       exposeToRenderer: true,
       handler: async (a, ctx) => {
         const { ref, text } = a as { ref: string; text: string }
-        return driverFor(ctx.taskId)?.fill(ref, text) ?? { ok: false, reason: 'No preview webview for this task.' }
+        return browser.fill(ctx.taskId, ref, text)
       },
     },
     {
@@ -346,8 +346,7 @@ export function buildAgentTools(deps: AgentToolsDeps): AgentToolContribution[] {
       risk: 'execute',
       exposeToRenderer: true,
       handler: async (_a, ctx) => {
-        const d = driverFor(ctx.taskId)
-        return d ? d.screenshot() : { error: 'No preview webview for this task.' }
+        return browser.screenshot(ctx.taskId)
       },
     },
     {
@@ -357,7 +356,7 @@ export function buildAgentTools(deps: AgentToolsDeps): AgentToolContribution[] {
       scope: 'task',
       risk: 'execute',
       exposeToRenderer: true,
-      handler: async (_a, ctx) => driverFor(ctx.taskId)?.console() ?? { lines: [] },
+      handler: async (_a, ctx) => browser.console(ctx.taskId),
     },
   ]
 

@@ -5,10 +5,10 @@ and has grown into a workspace for driving coding agents (Claude Code, Codex, ai
 repositories — each task in its own git worktree, with the PR, diff, terminal, editor, notes, and the
 agent all in one window.
 
-It is a **SolidJS SPA** served by an in-process **Hono server** (`@hono/node-server`) running in the
-Electron main process, backed by a **local SQLite** read-model mirror of GitHub data (better-sqlite3 +
-Drizzle), an **on-disk** blob cache for diff/patch bodies, and **IndexedDB** client persistence. Log in
-with GitHub and you get:
+It is a **SolidJS SPA** served by a **Hono server** (`@hono/node-server`) running in a supervised
+Electron utility process, backed by a **local SQLite** read-model mirror of GitHub data
+(better-sqlite3 + Drizzle), an **on-disk** blob cache for diff/patch bodies, and **IndexedDB** client
+persistence. Log in with GitHub and you get:
 
 - **PR review** — searchable repo picker with pins, virtualized PR lists, and a rich detail view with
   Shiki-highlighted diffs (unified/split, word-level intra-line, inline review-comment threads,
@@ -24,10 +24,16 @@ with GitHub and you get:
 - **Local tools** — inspect and act on task-linked Docker containers, browse/edit Postgres, and keep
   encrypted repo-scoped API requests and variables without checking secrets into the repository.
 
-The Electron main process starts the Hono server on `http://127.0.0.1:4317` and points a hardened
-`BrowserWindow` at it, so the SPA and API are same-origin:
+Electron main supervises the utility service, waits for its Hono listener on
+`http://127.0.0.1:4317`, and then points a hardened `BrowserWindow` at it, so the SPA and API are
+same-origin:
 
 - `/api/*` and `/auth/*` are handled by the server; all other paths serve the SPA shell `index.html`.
+- SQLite, PTYs, worktrees, Git/process work, workflows, and reconciliation stay in the
+  Electron-free utility service. Main owns only native windows/views/dialogs, `safeStorage`,
+  navigation policy, and lifecycle supervision.
+- A versioned, Zod-validated service protocol carries startup/lifecycle messages and narrow,
+  task-addressed native capability calls. Ordinary product data remains on HTTP/WebSocket.
 - acorn was originally a Cloudflare Worker; the migration to Electron is documented in
   [docs/electron.md](./docs/electron.md).
 
@@ -36,13 +42,17 @@ The Electron main process starts the Hono server on `http://127.0.0.1:4317` and 
 - **Frontend:** SolidJS + `@solidjs/router`, TanStack Query (with async-storage persist),
   TanStack Virtual, Shiki for syntax highlighting, `diff` / `gitdiff-parser` for diff parsing, Monaco
   for the editor pane, xterm for terminals.
-- **Backend:** Hono on `@hono/node-server` in the Electron main process; `jose` for the
+- **Backend:** Hono on `@hono/node-server` in a supervised Node utility process; `jose` for the
   encrypted-cookie session and at-rest secret encryption; node-pty + tmux for terminal sessions.
+- **Native host:** a thin Electron main process for windows, preview views, folder selection,
+  `safeStorage`, navigation policy, and utility-service supervision.
 - **Data:** local SQLite (`better-sqlite3`) via Drizzle ORM; on-disk dir for blob/patch caching;
-  IndexedDB (`idb-keyval`) for client-side query persistence. All under `apps/desktop/.acorn/`.
+  IndexedDB (`idb-keyval`) for client-side query persistence. Server-side development data lives
+  under `apps/desktop/.acorn/`; packaged builds use Electron's `userData`, and IndexedDB remains in
+  the browser partition.
 - **Agents:** the acorn MCP server (`@modelcontextprotocol/sdk`) exposes task context to agent CLIs.
-- **Build / tooling:** electron-vite (main/preload/renderer), electron-builder (macOS packaging),
-  drizzle-kit, Vitest, TypeScript (strict). pnpm workspace + Turborepo monorepo.
+- **Build / tooling:** electron-vite (main/service/MCP/preload/renderer), electron-builder (macOS
+  packaging), drizzle-kit, Vitest, TypeScript (strict). pnpm workspace + Turborepo monorepo.
 
 ## Monorepo layout
 
@@ -50,9 +60,10 @@ pnpm workspace + Turborepo. All app code lives in `apps/desktop` (`@acorn/deskto
 
 The source is organised as a **plugin-oriented platform**: `core/` owns platform contracts and
 services, `plugins/<name>/` owns product features, and `app/` composes the shipped application.
-Each layer is split by runtime (`client` / `server` / `main` / `mcp` / `shared`). Import-boundary
-tests prevent app-layer and cross-runtime leakage and keep the explicitly baselined legacy
-cross-feature dependencies from growing.
+Each layer is split by runtime (`client` / `server` / `main` / `mcp` / `shared`), while `app/` also
+has the explicit `service` composition root. Import-boundary tests keep the utility graph
+Electron-free, keep the native main graph out of service-owned engines, prevent app-layer and
+cross-runtime leakage, and stop the explicitly baselined legacy cross-feature dependencies growing.
 
 ```
 apps/desktop/
@@ -62,9 +73,9 @@ apps/desktop/
 │   │   │                   #   tasks/workspaces, settings framework, WS client
 │   │   ├── server/         #   createApp() factory, session/auth/csrf middleware, sync engine,
 │   │   │                   #   route + integration-provider registries, Drizzle db/
-│   │   ├── main/           #   PTY/worktree primitives, bindings, server listener, MCP register
+│   │   ├── main/           #   mostly service-owned Node services; preload/native helpers remain
 │   │   ├── mcp/            #   the acorn MCP server (stdio) — tool projection
-│   │   └── shared/         #   cross-process contracts (api, ws, terminal/notes/workflow protocols)
+│   │   └── shared/         #   serializable contracts, including service/native-capability RPC
 │   ├── plugins/            # one folder per feature (client/server/main parts as needed)
 │   │   ├── github/         #   PR review (PullList/PullDetail/DiffView), mirror, checks, create-PR
 │   │   ├── linear/  rollbar/#   integration providers + browse/pane
@@ -77,7 +88,8 @@ apps/desktop/
 │   │   ├── profiles-{claude,codex,aider}/  onboarding/
 │   │   └── …
 │   ├── app/                # composition root and contribution activation
-│   │   ├── main/           #   bootstrap.ts (boot order), electron.ts entry, activation modules
+│   │   ├── main/           #   Electron entry, native adapters, service host/supervision
+│   │   ├── service/        #   Electron-free utility entry + runtime composition
 │   │   ├── server/         #   providers.ts, routes.ts (register into core registries), devNode.ts
 │   │   └── client/         #   index.tsx renderer entry + contribution activation
 │   └── env.d.ts            # hand-written global Env (binding contract)
@@ -125,7 +137,7 @@ Electron `safeStorage`; an explicit environment value remains the recovery and `
 | --- | --- |
 | `pnpm dev` | Build + launch the Electron app (`electron-vite build && electron-vite preview`) |
 | `pnpm --filter @acorn/desktop dev:node` | Run just the Node server (no Electron) on `:4317` |
-| `pnpm --filter @acorn/desktop build` | Build main/preload/renderer and enforce the renderer budget |
+| `pnpm --filter @acorn/desktop build` | Build main/service/MCP/preload/renderer and enforce the renderer budget |
 | `pnpm --filter @acorn/desktop dist` | Run the gated build and produce the `.dmg`/`.zip` |
 | `pnpm lint` | `tsc --noEmit` typecheck |
 | `pnpm test` | Rebuild native modules for Node, then run the complete Vitest suite |

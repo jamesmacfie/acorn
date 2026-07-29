@@ -30,7 +30,7 @@ Research was performed on 2026-07-11. Links point to upstream projects or primar
 - Repository: <https://github.com/open-webui/open-webui>
 - Relevant concepts: backend-owned model dispatch, WebSocket activity, file lifecycle, provider breadth, and batching streaming updates for renderer performance.
 - Adopted: provider calls outlive individual views; coalesce token updates before rendering; treat file storage as a lifecycle rather than a message JSON field.
-- Deliberately different: use Acorn’s in-process server/core contracts and keep first-release provider configuration intentionally small.
+- Deliberately different: use Acorn’s utility-service/core contracts and keep first-release provider configuration intentionally small.
 
 ### LobeHub / LobeChat
 

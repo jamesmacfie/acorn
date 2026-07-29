@@ -168,6 +168,7 @@ export function openDb(dbPath: string): AppDatabase {
   const withBatch = db as unknown as AppDatabase
   withBatch.batch = (async (statements: ReadonlyArray<{ run(): unknown }>) =>
     db.transaction((_tx) => statements.map((stmt) => stmt.run()))) as AppDatabase['batch']
+  withBatch.close = () => sqlite.close()
   return withBatch
 }
 
