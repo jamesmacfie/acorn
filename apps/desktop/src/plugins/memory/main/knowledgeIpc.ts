@@ -19,7 +19,7 @@ import { MemoryProposalStore } from './memoryProposals'
 import { NotesStore, type NoteKind } from '../../notes/main/notes'
 import { broadcastWorkflowNotice } from '../../../core/main/notify'
 import { listProfileDefs, profileAvailable, resolveCommand, type ProfileDef } from '../../../core/main/profiles'
-import { contextInjectionEnabled, isDir, loadTask, primaryUserLogin } from '../../../core/main/taskWorktree'
+import { contextInjectionEnabled, isDir, loadTask } from '../../../core/main/taskWorktree'
 import { buildSessionEnv } from '../../../core/main/taskEnv'
 import { assembleContext } from '../../../core/server/agentTools/contextSections'
 import { formatLaunchContext } from '../../../core/shared/contextBlock'
@@ -27,6 +27,7 @@ import { formatLaunchContext } from '../../../core/shared/contextBlock'
 export type KnowledgeDeps = {
   // Queue a text block into an agent session on its idle edge (agentSender in terminal.ts).
   sendToAgent(sessionId: string, text: string, submit: 'after-ready'): void
+  currentUserId(): string | null
 }
 
 export type Knowledge = {
@@ -88,8 +89,9 @@ export function registerKnowledgeIpc(db: AppDatabase, dataRoot: string, deps: Kn
       const repo = `${t.repoOwner}/${t.repoName}`
       const blocks: string[] = []
 
-      if (await contextInjectionEnabled(db)) {
-        const ctx = await assembleContext(db, await primaryUserLogin(db), taskId, new Set(['pr', 'issues', 'notes']))
+      const userId = deps.currentUserId()
+      if (userId && (await contextInjectionEnabled(db, userId))) {
+        const ctx = await assembleContext(db, userId, taskId, new Set(['pr', 'issues', 'notes']))
         const contextBlock = ctx ? formatLaunchContext(ctx) : ''
         if (contextBlock) blocks.push(contextBlock)
       }

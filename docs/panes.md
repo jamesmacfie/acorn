@@ -233,21 +233,23 @@ saved requests grouped into folders, a method + URL bar, request tabs (**Params 
 Auth / Vars**) and a response pane (**Body / Headers / Timeline**). The same component is the `http`
 rail Source; the only difference here is that it is scoped to a task.
 
-- **Storage** is the DB, not files in the repo: `http_requests` (repo-scoped, with a slash-path
-  `folder` string instead of a folders table) and `http_variables` (repo-scoped). Nothing is
-  committed, so nothing is shared with teammates — see [data-layer.md](./data-layer.md).
+- **Storage** is the DB, not files in the repo: identity-scoped `http_requests` (with a slash-path
+  `folder` string instead of a folders table) and `http_variables`. Request URL/header/body/auth/vars
+  and every variable value are encrypted at rest. Nothing is committed, so nothing is shared with
+  teammates — see [data-layer.md](./data-layer.md).
 - **Ad-hoc requests** are rows with `task_id` set. New requests made in this pane stay with the task
   until the save dialog's "Keep in" is switched to the repo, which clears `task_id` and files them
   under a folder. Duplicating any request (⧉ on its row) is the same flow pre-filled.
 - **Naming** happens in the save dialog (`SaveRequestModal.tsx`), reached by Save on an unsaved
   request or by clicking the name in the metabar — that is also the rename/move path. Saving an
-  already-filed request writes straight through. An unsaved request is mirrored to `localStorage`
-  per repo+task, so leaving the panel mid-request doesn't lose it (the same per-device mechanism as
-  GitHub comment drafts); the copy is dropped once the request has a row.
+  already-filed request writes straight through. Unsaved drafts are memory-only because they may
+  contain credentials; renderer activation removes plaintext `http-draft:*` localStorage entries
+  left by older releases.
 - **Variables** resolve at send time, lowest precedence first: task builtins (`{{repo}}`,
   `{{branch}}`, `{{worktree}}`, `{{taskId}}`) → repo variables → the request's own Vars tab. A repo
-  variable is a plain value, a `secret` (AES-GCM at rest under `SESSION_ENC_KEY`, never returned to
-  the renderer), or a `command` — a `bash -lc` line run in the task worktree whose last output line
+  variable is a plain value, a `secret` (never returned to the renderer), or a `command` — all three
+  are AES-GCM encrypted at rest under `SESSION_ENC_KEY`. A command is a `bash -lc` line run in the
+  task worktree whose last output line
   becomes the value, the same mechanism as the Database pane's `dbUrlScript`. The pane supplies the
   execution task separately from the request's storage scope, so a repo-saved request opened in a
   task still runs commands in that task's worktree. The Source view has no task and uses the mapped
@@ -256,7 +258,7 @@ rail Source; the only difference here is that it is scoped to a task.
   persisted.
 - **Auth** (`none`/`basic`/`bearer`/`apikey`) is compiled to a header — or a query param for an
   api-key with `placement: 'query'` — at send time. The Timeline shows exactly what went out, with
-  `Authorization`/`Cookie` redacted.
+  `Authorization`/`Cookie` and values resolved from secret/command variables redacted.
 - **curl** both ways: pasting a curl command into the URL bar populates the whole request; "Copy as
   curl" emits one.
 - A failure before an HTTP response exists (DNS, refused connection, TLS, timeout) is shown as a

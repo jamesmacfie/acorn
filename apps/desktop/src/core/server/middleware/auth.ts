@@ -1,6 +1,5 @@
 import { createMiddleware } from 'hono/factory'
 import { getCookie, setCookie } from 'hono/cookie'
-import { getDb, schema } from '../db'
 import { openSession, sealSession, SESSION_COOKIE, SESSION_TTL_SECONDS, type SessionData } from '../session'
 
 export type SessionUser = SessionData
@@ -18,15 +17,14 @@ export type AppEnv = { Bindings: Env; Variables: { principal: Principal | null }
 // Internal loopback auth (docs/mcp.md): the acorn MCP server holds no session cookie; it sends
 // the per-app-run INTERNAL_TOKEN instead. The identity is the machine's single user (this is a
 // machine-local single-user app — same reasoning as the machine-scoped tables), resolved from the
-// mirror's user rows; the GitHub token stays empty, so internal callers can only read local
-// mirrors — never call GitHub.
+// explicit active-identity binding. Never guess from a first prefs/repo row: after sequential
+// logins that is nondeterministic and can select another identity's mirror. The GitHub token stays
+// empty, so internal callers can only read local mirrors — never call GitHub.
 async function internalUser(c: { env: Env; req: { header(name: string): string | undefined } }): Promise<SessionUser | null> {
   const token = c.req.header('x-acorn-internal')
   if (!token || !c.env.INTERNAL_TOKEN || token !== c.env.INTERNAL_TOKEN) return null
-  const db = getDb(c.env)
-  const [row] = await db.select({ userId: schema.prefs.userId }).from(schema.prefs).limit(1)
-  const [repoRow] = row ? [row] : await db.select({ userId: schema.repos.userId }).from(schema.repos).limit(1)
-  const login = row?.userId ?? repoRow?.userId ?? 'local'
+  const login = c.env.ACTIVE_IDENTITY.get()
+  if (!login) return null
   return { token: '', login, name: '', avatar: '', scopes: [] }
 }
 
@@ -46,6 +44,9 @@ export const authMiddleware = createMiddleware<AppEnv>(async (c, next) => {
   c.set('principal', principal)
 
   if (cookieUser) {
+    // Idempotent for the common path (the store only writes when the login changes). This also
+    // backfills the binding for an existing sealed session after upgrading from older releases.
+    c.env.ACTIVE_IDENTITY.set(cookieUser.login)
     const resealed = await sealSession(cookieUser, c.env.SESSION_ENC_KEY)
     setCookie(c, SESSION_COOKIE, resealed, {
       httpOnly: true,

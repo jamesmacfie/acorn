@@ -25,6 +25,7 @@ import { dockerTaskPollerContribution } from '../../plugins/docker/client/docker
 import { dockerFooterSlotContribution, dockerRailSlotContribution } from '../../plugins/docker/client/slotContribution'
 import { httpSourceContribution } from '../../plugins/http/client/sourceContribution'
 import { httpPaneContribution } from '../../plugins/http/client/paneContribution'
+import { purgeStoredHttpDrafts } from '../../plugins/http/client/draft'
 import { registerDockerArchiveConcern } from '../../plugins/docker/client/archiveConcern'
 import { taskSlotRegistry } from '../../core/client/registries/uiSlots'
 import { persistedStateRegistry } from '../../core/client/persistence/persistedState'
@@ -50,6 +51,7 @@ for (const provider of clientIntegrationProviders) registerIntegrationProvider(p
 // Local sources (no integration row): docker and the API panel are always visible in the rail.
 sourceRegistry.register(dockerSourceContribution)
 sourceRegistry.register(httpSourceContribution)
+purgeStoredHttpDrafts()
 for (const page of settingsPageContributions) settingsRegistry.register(page)
 activatePreviewEvents()
 for (const kind of noticeKindContributions) noticeKindRegistry.register(kind)

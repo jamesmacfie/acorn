@@ -1,6 +1,6 @@
 import { Hono } from 'hono'
 import { deleteCookie, getCookie, setCookie } from 'hono/cookie'
-import { sealSession, SESSION_COOKIE, SESSION_TTL_SECONDS } from '../session'
+import { openSession, sealSession, SESSION_COOKIE, SESSION_TTL_SECONDS } from '../session'
 
 // GitHub OAuth web flow (docs/authentication.md). The local server exchanges the code for a
 // token and seals it into the session cookie; the browser never sees the token. All cookies
@@ -112,10 +112,11 @@ export const auth = new Hono<{ Bindings: Env }>()
 
     const scopes = tokenJson.scope ? tokenJson.scope.split(',').map((s) => s.trim()).filter(Boolean) : []
 
-    // Persist the GitHub credential encrypted at rest so bearer API tokens (which carry no cookie)
-    // can call GitHub on this user's behalf (docs/public-api.md). Best-effort — a
-    // storage failure must not block the browser login itself.
-    try {
+    c.env.ACTIVE_IDENTITY.set(user.login)
+
+    // Ordinary login keeps the GitHub token only in the sealed session. Rehydrate the separate,
+    // encrypted public-API credential only when an already-issued active bearer still needs it.
+    if (await c.env.API_TOKENS.hasActiveTokens(user.login)) {
       await c.env.OAUTH_ACCOUNTS.upsertGithub({
         login: user.login,
         accessToken: token,
@@ -123,8 +124,6 @@ export const auth = new Hono<{ Bindings: Env }>()
         avatar: user.avatar_url,
         scopes,
       })
-    } catch (e) {
-      console.warn('[auth] oauth_accounts upsert failed:', e)
     }
 
     const sealed = await sealSession(
@@ -148,7 +147,17 @@ export const auth = new Hono<{ Bindings: Env }>()
     deleteCookie(c, RETURN_TO_COOKIE, { path: '/auth' })
     return c.redirect(returnTo)
   })
-  .post('/logout', (c) => {
+  .post('/logout', async (c) => {
+    const raw = getCookie(c, SESSION_COOKIE)
+    const session = raw ? await openSession(raw, c.env.SESSION_ENC_KEY) : null
+    const userId = session?.login ?? c.env.ACTIVE_IDENTITY.get()
     deleteCookie(c, SESSION_COOKIE, { path: '/' })
+    if (userId) {
+      c.env.ACTIVE_IDENTITY.clear(userId)
+      // Logout removes the durable upstream credential as well as the cookie credential. Existing
+      // public API bearers remain hashed/revocable metadata but cannot call GitHub until that user
+      // explicitly logs in again.
+      await c.env.OAUTH_ACCOUNTS.removeGithub(userId)
+    }
     return c.body(null, 204)
   })

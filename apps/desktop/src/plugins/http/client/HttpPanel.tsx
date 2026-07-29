@@ -1,12 +1,12 @@
 // The API panel. Mounted twice: as the left-rail Source (repo tree, no task) and as a task pane
 // (that task's ad-hoc requests on top of the repo tree). Everything below is shared between them —
 // the only difference is `taskId`.
-import { createEffect, createMemo, createResource, createSignal, For, Show } from 'solid-js'
+import { createMemo, createResource, createSignal, For, Show } from 'solid-js'
 import { Button, Input, Select, SectionHeader } from '../../../core/client/ui/primitives'
 import Icon from '../../../core/client/ui/Icon'
 import { fromCurl, httpMethods, toCurl, type HttpRequest, type SendResult } from '../shared/model'
 import { createRequest, deleteRequest, listRequests, sendRequest, updateRequest } from './httpClient'
-import { draftsDiffer, emptyDraft, readStoredDraft, toDraft, toSendInput, writeStoredDraft, type Draft } from './draft'
+import { draftsDiffer, emptyDraft, toDraft, toSendInput, type Draft } from './draft'
 import RequestTabs from './RequestTabs'
 import ResponseView from './ResponseView'
 import HttpVariables from './HttpVariables'
@@ -36,7 +36,7 @@ const methodTone = (method: string): string => method.toLowerCase()
 export default function HttpPanel(props: { owner: string; repo: string; taskId?: string }) {
   const blank = () => emptyDraft(props.taskId ?? null)
   const [selection, setSelection] = createSignal<Selection>({ kind: 'new' })
-  const [draft, setDraft] = createSignal<Draft>(readStoredDraft(props.owner, props.repo, props.taskId) ?? blank())
+  const [draft, setDraft] = createSignal<Draft>(blank())
   const [result, setResult] = createSignal<SendResult | null>(null)
   const [error, setError] = createSignal<string | null>(null)
   const [sending, setSending] = createSignal(false)
@@ -63,13 +63,6 @@ export default function HttpPanel(props: { owner: string; repo: string; taskId?:
   const dirty = createMemo(() => {
     const row = current()
     return row ? draftsDiffer(draft(), toDraft(row)) : draft().url !== ''
-  })
-
-  // A request that hasn't been saved yet outlives navigation and reloads; once it has a row, the row
-  // is the truth and the stored copy goes.
-  createEffect(() => {
-    const unsaved = selection().kind === 'new' && draftsDiffer(draft(), blank())
-    writeStoredDraft(props.owner, props.repo, props.taskId, unsaved ? draft() : null)
   })
 
   const patch = (p: Partial<Draft>) => setDraft((d) => ({ ...d, ...p }))

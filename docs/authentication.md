@@ -120,7 +120,8 @@ apply; that branch has been removed.
 
 1. Read the session cookie, decrypt it **in-CPU** (no DB reads, no session store).
 2. No (or broken) cookie? Fall back to the internal loopback token (below).
-3. Attach `ctx.user` (the `SessionData`, or `null`).
+3. Attach `ctx.user` (the `SessionData`, or `null`) and bind a cookie-authenticated login as the
+   explicit active machine identity.
 4. When the identity came from the cookie, re-seal and re-set it with a fresh
    7-day expiry (the sliding TTL). Internal-token callers hold no cookie and
    are not issued one.
@@ -131,15 +132,16 @@ apply; that branch has been removed.
 
 The acorn MCP server calls the API over loopback and holds no browser cookie.
 It authenticates with the **`x-acorn-internal: <INTERNAL_TOKEN>`** header
-instead. `INTERNAL_TOKEN` is a fresh `randomUUID()` minted per app run in
-`apps/desktop/src/core/main/bindings.ts` and injected into task terminal sessions as
-`ACORN_API_TOKEN`, so agent-spawned processes inherit it.
+instead. `INTERNAL_TOKEN` is random bearer material persisted mode `0600` beside the database so
+reattached tmux sessions keep working across an app restart. It is injected into task terminal
+sessions as `ACORN_API_TOKEN`, so agent-spawned processes inherit it.
 
-`internalUser` (`middleware/auth.ts`) resolves the identity as the machine's
-single user — the `userId` of the first `prefs` (or `repos`) mirror row,
-falling back to `'local'` — with an **empty GitHub token**. Internal callers
-can therefore read local mirrors and app-state, but any route that would call
-GitHub live fails with `401 reauth` (empty bearer). See
+`internalUser` (`middleware/auth.ts`) resolves the identity from the persisted
+`active-identity` binding written by cookie-authenticated traffic. It never selects an arbitrary
+first `prefs` / `repos` row, and fails closed when no identity is bound. The resolved principal has
+an **empty GitHub token**. Internal callers can therefore read that identity's local mirrors and
+app-state, but any route that would call GitHub live fails with `401 reauth` (empty bearer). Logout
+clears the binding. See
 [api-reference](./api-reference.md#middleware--auth) and [mcp](./mcp.md).
 
 ## API tokens (public automation API)
@@ -158,10 +160,12 @@ kind (`api-token`) that never reaches the internal `/api/*` middleware.
 - **Issuance/revocation** are **cookie-authenticated** internal operations (`/api/api-tokens`,
   `core/server/routes/apiTokens.ts`); a bearer cannot mint bearers.
 
-Because a bearer request carries no session cookie, the GitHub credential it needs for upstream calls
-is stored separately: **`/auth/callback` upserts the GitHub identity + token into `oauth_accounts`,
-encrypted at rest with `SESSION_ENC_KEY`** (via `encryptSecret`, the same mechanism as integration
-credentials). The public GitHub plugin resolves that credential for `api-token` principals. See
+Because a bearer request carries no session cookie, the GitHub credential it needs for upstream
+calls is stored separately and encrypted at rest with `SESSION_ENC_KEY`. Ordinary login does not
+create this second credential: creating the first active public API token opts in and stores it.
+Later OAuth callbacks refresh it only while active bearers exist. Revoking the last bearer or
+logging out removes it; a bearer retained across logout cannot call GitHub until that identity logs
+in again. The public GitHub plugin resolves this credential for `api-token` principals. See
 [public-api.md](./public-api.md).
 
 ## WebSocket upgrade auth (`/ws`)
@@ -220,4 +224,3 @@ state) so it never trips the bounce. Routes that hit GitHub and get a `401`
 back translate it to `{ error: 'reauth' }` (via the shared `ghError()` helper)
 so a stale token (not just a missing cookie) also triggers re-auth. See
 [api-reference](./api-reference.md#error-codes).
-

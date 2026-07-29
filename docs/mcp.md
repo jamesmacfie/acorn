@@ -39,7 +39,7 @@ The server therefore reads its identity from the env it inherits (`src/core/mcp/
 | --- | --- |
 | `ACORN_TASK_ID` | which task this session belongs to (empty = no task) |
 | `ACORN_API_URL` | loopback base into the running app's Hono API (default `http://127.0.0.1:4317`) |
-| `ACORN_API_TOKEN` | the per-app-run internal token sent as `x-acorn-internal` |
+| `ACORN_API_TOKEN` | the private persisted internal token sent as `x-acorn-internal` |
 | `ACORN_SESSION_ID` | this terminal session's id, sent as `x-acorn-session-id` and stamped on notes/memory writes for provenance |
 
 These are injected into every task-scoped terminal session by the main process
@@ -55,9 +55,10 @@ app over loopback with `x-acorn-internal: <ACORN_API_TOKEN>` (`apiCall` in
 local mirror the UI reads — including the git tools, which resolve the task's worktree server-side
 (no more `ACORN_WORKTREE_PATH` in the MCP process).
 
-That token is matched by `internalUser` in `apps/desktop/src/core/server/middleware/auth.ts:14-22`: a
-request bearing the correct `INTERNAL_TOKEN` is resolved to the machine's single user (this is a
-single-user, machine-local app). Two consequences follow:
+That token is matched by `internalUser` in `apps/desktop/src/core/server/middleware/auth.ts`: a
+request bearing the correct `INTERNAL_TOKEN` is resolved to the explicit active GitHub identity
+persisted by cookie-authenticated traffic. Logout clears that binding and internal traffic then
+fails closed. Two consequences follow:
 
 - **An agent sees exactly what the UI sees.** Both read the same local mirror through the same Hono
   routes, so there is one source of truth and no drift.

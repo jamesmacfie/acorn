@@ -41,26 +41,28 @@ export const loadTask = async (db: AppDatabase, id: string): Promise<TaskRow | u
 }
 
 // Per-repo preferred base ref for NEW branches (docs/terminal-and-agents.md): the prefs key
-// `base_ref:<owner>/<repo>`. Read by key alone — machine-local single-user app.
-export const baseRefPref = async (db: AppDatabase, owner: string, repo: string): Promise<string | null> => {
-  const [row] = await db.select().from(schema.prefs).where(eq(schema.prefs.key, `base_ref:${owner}/${repo}`)).limit(1)
+// `base_ref:<owner>/<repo>`. It is user-owned state, so main-process callers must carry the
+// identity that authorized the operation. A missing identity fails closed to git's normal
+// origin/main fallback instead of selecting a stale preference from another login.
+export const baseRefPref = async (db: AppDatabase, userId: string | null, owner: string, repo: string): Promise<string | null> => {
+  if (!userId) return null
+  const [row] = await db
+    .select()
+    .from(schema.prefs)
+    .where(and(eq(schema.prefs.userId, userId), eq(schema.prefs.key, `base_ref:${owner}/${repo}`)))
+    .limit(1)
   return row?.value ?? null
 }
 
 // Startup context injection toggle (docs/notes-and-memory.md): opt-out, so an ABSENT pref means ON.
 // Key mirrors PrefKeys.startupContextInjection (core/client can't be imported from main).
-export const contextInjectionEnabled = async (db: AppDatabase): Promise<boolean> => {
-  const [row] = await db.select().from(schema.prefs).where(eq(schema.prefs.key, 'startup_context_injection')).limit(1)
+export const contextInjectionEnabled = async (db: AppDatabase, userId: string): Promise<boolean> => {
+  const [row] = await db
+    .select()
+    .from(schema.prefs)
+    .where(and(eq(schema.prefs.userId, userId), eq(schema.prefs.key, 'startup_context_injection')))
+    .limit(1)
   return row?.value !== 'false'
-}
-
-// The single machine user (docs/authentication.md): prefs rows, else repo rows, else 'local'.
-// Mirrors auth.ts's internal-user resolution for main-process callers with no request context.
-export const primaryUserLogin = async (db: AppDatabase): Promise<string> => {
-  const [pref] = await db.select({ userId: schema.prefs.userId }).from(schema.prefs).limit(1)
-  if (pref) return pref.userId
-  const [repo] = await db.select({ userId: schema.repos.userId }).from(schema.repos).limit(1)
-  return repo?.userId ?? 'local'
 }
 
 // Live worktree status for every active task that has a worktree (docs/workspaces-and-tasks.md/05):
@@ -136,13 +138,22 @@ export async function resolveTaskCwd(
   db: AppDatabase,
   t: TaskRow | undefined,
   baseCheckout: string | undefined,
+  userId: string | null = null,
 ): Promise<{ cwd: string; isWorktree: boolean; created: boolean }> {
   if (t?.worktreePath && isDir(t.worktreePath)) return { cwd: t.worktreePath, isWorktree: true, created: false }
   if (!t || !baseCheckout || !isDir(baseCheckout)) return { cwd: baseCheckout && isDir(baseCheckout) ? baseCheckout : homedir(), isWorktree: false, created: false }
   const inflight = inflightCreates.get(t.id)
   if (inflight) return inflight
   const create = (async () => {
-    const wt = await ensureWorktree(worktreesRoot, baseCheckout, t.repoOwner, t.repoName, t.branch, t.pullNumber, await baseRefPref(db, t.repoOwner, t.repoName))
+    const wt = await ensureWorktree(
+      worktreesRoot,
+      baseCheckout,
+      t.repoOwner,
+      t.repoName,
+      t.branch,
+      t.pullNumber,
+      await baseRefPref(db, userId, t.repoOwner, t.repoName),
+    )
     if (!wt.ok) return { cwd: baseCheckout, isWorktree: false, created: false }
     await db.update(schema.tasks).set({ worktreePath: wt.path, updatedAt: Date.now() }).where(eq(schema.tasks.id, t.id))
     if (wt.created) {
@@ -162,13 +173,13 @@ export async function resolveTaskCwd(
 // The on-disk root the editor/local-git panes operate on: the task's worktree (created lazily,
 // like the terminal), or null if the repo has no mapped checkout yet. Re-derived per IPC call so
 // the taskId — not a renderer-supplied absolute path — is the capability.
-export async function taskRoot(db: AppDatabase, taskId: string): Promise<string | null> {
+export async function taskRoot(db: AppDatabase, taskId: string, userId: string | null = null): Promise<string | null> {
   const t = await loadTask(db, taskId)
   if (!t) return null
   const mapped = await getRepoPath(db, t.repoOwner, t.repoName)
   const baseCheckout = mapped?.path && isDir(mapped.path) ? mapped.path : undefined
   if (!baseCheckout) return null
-  const { cwd } = await resolveTaskCwd(db, t, baseCheckout)
+  const { cwd } = await resolveTaskCwd(db, t, baseCheckout, userId)
   return resolve(cwd)
 }
 

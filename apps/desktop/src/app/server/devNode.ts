@@ -6,7 +6,9 @@ import './providers' // register built-in integration providers into the core re
 import './routes' // register plugin-owned HTTP routers into the core route registry
 import { devDataDir, makeRuntime, startListener } from '../../core/main/server'
 import { wireServerBridges } from '../main/serverBridges'
+import { prepareSecurityState } from '../main/startupSecurity'
 
 const runtime = makeRuntime(devDataDir)
+await prepareSecurityState(runtime)
 wireServerBridges(runtime.DB, devDataDir) // search / editor / local-git / database / agent-usage HTTP route bridges
 void startListener(runtime)

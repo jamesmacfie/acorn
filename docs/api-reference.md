@@ -35,12 +35,12 @@ Every `/api/*` route runs through three middlewares before the handler, in this 
    - the AES-256-GCM session **cookie** (decrypted in-CPU, then re-sealed with a sliding TTL) →
      `kind: 'user'`; or
    - the internal-loopback header **`x-acorn-internal: <INTERNAL_TOKEN>`** → `kind: 'internal'`.
-     This is the acorn MCP server calling over loopback — it holds no cookie. `INTERNAL_TOKEN` is a
-     fresh `randomUUID()` per app run (`apps/desktop/src/core/main/bindings.ts`), injected into task
-     terminal sessions as `ACORN_API_TOKEN`. The identity is the machine's single user (resolved
-     from the mirror's `prefs`/`repos` rows), and its GitHub token is left **empty**, so internal
-     callers can only read local mirrors — a live GitHub call with the empty token would just come
-     back `401 reauth`.
+     This is the acorn MCP server calling over loopback — it holds no cookie. `INTERNAL_TOKEN` is
+     private persisted bearer material (`apps/desktop/src/core/main/bindings.ts`), injected into
+     task terminal sessions as `ACORN_API_TOKEN`. It resolves through the explicit active-identity
+     binding rather than selecting a cached row, fails closed with no binding, and leaves the
+     GitHub token **empty**. Internal callers can only read that identity's local mirrors — a live
+     GitHub call with the empty token returns `401 reauth`.
 3. `requireUser` (`apps/desktop/src/core/server/middleware/requireUser.ts`) — the single auth gate.
    It rejects any request with no resolved principal → `401 { error: 'unauthenticated' }`. Routes
    no longer carry inline session guards; handlers read the identity via `getUser(c)` (safe because

@@ -62,7 +62,9 @@ describe('TokenService', () => {
     svc.onRevoked((id) => notified.push(id))
 
     expect(await svc.revoke('someone-else', metadata.id)).toBe(false) // not theirs → 404
+    expect(await svc.hasActiveTokens('owner')).toBe(true)
     expect(await svc.revoke('owner', metadata.id)).toBe(true)
+    expect(await svc.hasActiveTokens('owner')).toBe(false)
     expect(await svc.revoke('owner', metadata.id)).toBe(true) // idempotent
     expect(notified).toContain(metadata.id)
   })
@@ -110,5 +112,13 @@ describe('OauthAccountService', () => {
     const { token } = await tokens.create({ userId: 'octocat', name: 'r', scopes: ['read'], expiresAt: null })
     const principal = await tokens.authenticate(token)
     expect(principal?.user).toEqual({ login: 'octocat', name: 'Octo Cat', avatar: 'pic' })
+  })
+
+  it('removes the durable credential explicitly', async () => {
+    const oauth = new OauthAccountService(t.db, ENC_KEY)
+    await oauth.upsertGithub({ login: 'octocat', accessToken: 'x', name: 'Octo', avatar: '', scopes: [] })
+    await oauth.removeGithub('octocat')
+    expect(await oauth.resolveGithubToken('octocat')).toBeNull()
+    expect(await oauth.userIds()).toEqual([])
   })
 })

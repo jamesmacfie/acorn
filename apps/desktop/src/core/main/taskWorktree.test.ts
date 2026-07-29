@@ -5,12 +5,27 @@ import { tmpdir } from 'node:os'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { schema } from '../server/db'
 import { makeTestDb, type TestDb } from '../server/routes/testDb'
-import { computeTaskStatuses, loadTask, resolveTaskCwd, setOnWorktreeCreated, setWorktreesRoot } from './taskWorktree'
+import { baseRefPref, computeTaskStatuses, loadTask, resolveTaskCwd, setOnWorktreeCreated, setWorktreesRoot } from './taskWorktree'
 
 vi.setConfig({ testTimeout: 20_000 })
 
 const TASK = '88888888-8888-4888-8888-888888888888'
 const git = (cwd: string, ...args: string[]) => execFileSync('git', ['-C', cwd, ...args], { stdio: 'pipe' })
+
+describe('baseRefPref identity scope', () => {
+  it('returns only the authenticated identity preference and fails closed without one', async () => {
+    const t = makeTestDb()
+    await t.db.insert(schema.prefs).values([
+      { userId: 'alice', key: 'base_ref:acme/web', value: 'origin/alice' },
+      { userId: 'bob', key: 'base_ref:acme/web', value: 'origin/bob' },
+    ])
+
+    await expect(baseRefPref(t.db, 'alice', 'acme', 'web')).resolves.toBe('origin/alice')
+    await expect(baseRefPref(t.db, 'bob', 'acme', 'web')).resolves.toBe('origin/bob')
+    await expect(baseRefPref(t.db, null, 'acme', 'web')).resolves.toBeNull()
+    t.cleanup()
+  })
+})
 
 // The onWorktreeCreated hook is the single choke point that runs the workspace setup script: it
 // must fire exactly once per task, on whichever path creates the worktree first — including two

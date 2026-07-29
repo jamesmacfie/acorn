@@ -154,7 +154,8 @@ These back the product model above and the agent spine:
 | Review | `review_notes` (inline notes on uncommitted changes), `viewed_files` |
 | Agents / memory | `memories` (+ `memories_fts` FTS5), `terminal_sessions` |
 | Automation | `workflow_runs`, `workflow_steps` |
-| Public API | `api_tokens`, `oauth_accounts`, `api_idempotency` (bearer automation API) |
+| Public API | `api_tokens`, on-demand `oauth_accounts`, `api_idempotency` (bearer automation API) |
+| HTTP client | identity-scoped `http_requests`, `http_variables` (sensitive values encrypted at rest) |
 | Prefs / misc | `prefs`, `pinned_repos`, `integrations`, `repo_paths` |
 
 Locally-owned entities that own an on-disk artefact (a worktree, a memory file, a
