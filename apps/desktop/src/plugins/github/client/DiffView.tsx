@@ -38,6 +38,8 @@ import {
 } from './diff/model'
 import { savePref } from '../../../core/client/settings/savePref'
 import { PrefKeys } from '../../../core/client/persistence/prefKeys'
+import { createDiffScrollRestoration } from './reviewScrollRestoration'
+import type { ReviewViewScope } from './reviewViewState'
 
 // Right (Diff) pane: render EVERY changed file's diff stacked one after another in a single
 // virtualized list (docs/diff-rendering.md, docs/ui-design.md). Each file opens with a header row;
@@ -78,17 +80,18 @@ export default function DiffView(props: { task?: Task } = {}) {
 
   return (
     <Show when={route()} keyed fallback={<p class="placeholder">Select a PR.</p>}>
-      {(r) => <DiffForPull route={r} router={!props.task} />}
+      {(r) => <DiffForPull route={r} router={!props.task} taskId={props.task?.id} />}
     </Show>
   )
 }
 
-function DiffForPull(props: { route: PullRoute; router: boolean }) {
+function DiffForPull(props: { route: PullRoute; router: boolean; taskId?: string }) {
   const searchParams = props.router ? useSearchParams()[0] : {}
   const queryClient = useQueryClient()
   const owner = props.route.owner
   const repo = props.route.repo
   const number = props.route.number
+  const reviewScope: ReviewViewScope = { taskId: props.taskId, routeKey: props.route.key }
 
   const files = createQuery(() => filesOptions(owner, repo, number, true))
   const detail = createQuery(() => pullDetailOptions(owner, repo, number, true))
@@ -169,13 +172,15 @@ function DiffForPull(props: { route: PullRoute; router: boolean }) {
   })
 
   const filesSignature = createMemo(() => (files.data ?? []).map((file) => `${file.path}:${file.sha}:${file.additions}:${file.deletions}`).join('\0'))
-  createEffect(on(filesSignature, () => {
+  createEffect(on(filesSignature, (signature, previous) => {
     lastTarget = ''
     setParsedByPath(new Map())
     setExpanded(new Map())
     setCollapsedFiles(new Set<string>())
     setLineComposer(null)
-    resetScrollPosition()
+    // The empty → populated transition is initial query hydration, not a changed PR. A genuine
+    // signature change invalidates the old pixel position because the diff's geometry changed.
+    if (previous && signature !== previous) resetScrollPosition(true)
     hydrator.reset(files.data ?? [], typeof searchParams.file === 'string' ? searchParams.file : undefined)
   }))
 
@@ -465,34 +470,29 @@ function DiffForPull(props: { route: PullRoute; router: boolean }) {
     scheduleVirtualMeasure('unified')
     if (viewMode() === 'split') scheduleVirtualMeasure('split')
   })
-  let scrollFrame = 0
+  const scrollRestoration = createDiffScrollRestoration({
+    scope: reviewScope,
+    viewMode,
+    filesSignature,
+    selectedPath: () => typeof searchParams.file === 'string' ? searchParams.file : '',
+    scrollEl,
+    setScrollEl,
+    setScrollTop,
+    measure: (mode) => mode === 'split' ? splitVirt.measure() : virt.measure(),
+  })
   onCleanup(() => {
-    cancelAnimationFrame(scrollFrame)
     cancelMeasures()
   })
-  const resetScrollPosition = () => {
-    setScrollTop(0)
-    const el = scrollEl()
-    if (!el) return
-    el.scrollTop = 0
-    el.scrollLeft = 0
-  }
-  const publishScrollEl = (el: HTMLDivElement) => {
-    cancelAnimationFrame(scrollFrame)
-    scrollFrame = requestAnimationFrame(() => {
-      setScrollEl(el)
-      resetScrollPosition()
-      virt.measure()
-    })
-  }
-  const publishSplitScrollEl = (el: HTMLDivElement) => {
-    cancelAnimationFrame(scrollFrame)
-    scrollFrame = requestAnimationFrame(() => {
-      setScrollEl(el)
-      resetScrollPosition()
-      splitVirt.measure()
-    })
-  }
+  const resetScrollPosition = scrollRestoration.reset
+  const publishScrollEl = (el: HTMLDivElement) => scrollRestoration.publish(el, 'unified')
+  const publishSplitScrollEl = (el: HTMLDivElement) => scrollRestoration.publish(el, 'split')
+  // Every progressive hydration pass changes the virtual content height. A pending position is
+  // retried after the row model updates so a deep saved offset is not lost to placeholder clamping.
+  createEffect(() => {
+    rows()
+    if (viewMode() === 'split') bands()
+    scrollRestoration.retry()
+  })
 
   const scrollToFile = (path: string, force = false) => {
     const all = rows()
@@ -634,7 +634,7 @@ function DiffForPull(props: { route: PullRoute; router: boolean }) {
       <Show
         when={viewMode() === 'split'}
         fallback={
-          <div class="diff" ref={publishScrollEl} onScroll={(e) => setScrollTop(e.currentTarget.scrollTop)}>
+          <div class="diff" ref={publishScrollEl} onScroll={(e) => scrollRestoration.onScroll(e.currentTarget)}>
             {stickyHead()}
             <div class="diff-rows" style={{ height: `${virt.getTotalSize()}px` }}>
               <For each={virtualRows()}>
@@ -701,7 +701,7 @@ function DiffForPull(props: { route: PullRoute; router: boolean }) {
           </div>
         }
       >
-        <div class="diff diff-split" ref={publishSplitScrollEl} onScroll={(e) => setScrollTop(e.currentTarget.scrollTop)}>
+        <div class="diff diff-split" ref={publishSplitScrollEl} onScroll={(e) => scrollRestoration.onScroll(e.currentTarget)}>
           {stickyHead()}
           <div class="diff-split-rows" style={{ height: `${splitVirt.getTotalSize()}px` }}>
             <For each={virtualBands()}>
