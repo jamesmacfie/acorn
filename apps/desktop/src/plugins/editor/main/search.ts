@@ -3,6 +3,7 @@
 // path — rg runs with cwd:root and searches `.`), mirroring editor:files in localGitIpc.ts.
 // Exposed as the SearchBridge (server/routes/search.ts); no longer an IPC channel.
 import { execFile } from 'node:child_process'
+import { sep } from 'node:path'
 import { promisify } from 'node:util'
 import { rgPath } from '@vscode/ripgrep'
 import type { SearchBridge, SearchOpts } from '../server/routes/search'
@@ -12,6 +13,14 @@ import { taskRoot } from '../../../core/main/taskWorktree'
 
 const MAX_TOTAL_HITS = 2000 // ponytail: fixed cap; the pane shows "truncated". Raise if it bites.
 const MAX_PREVIEW_LEN = 300 // ponytail: clamp long lines so one minified file can't bloat the payload.
+
+// electron-builder stores executable dependencies beside the archive. Electron's CommonJS
+// child_process shim redirects an app.asar path there, but an ESM import of execFile does not:
+// spawning rgPath verbatim then throws ENOTDIR because app.asar is a file to the OS.
+export function ripgrepExecutablePath(path: string): string {
+  const archiveSegment = `${sep}app.asar${sep}`
+  return path.replace(archiveSegment, `${sep}app.asar.unpacked${sep}`)
+}
 
 // One line of `rg --json` output. Only the fields we consume are typed; `type` discriminates.
 type RgEvent = {
@@ -82,7 +91,7 @@ export async function searchInFiles(db: AppDatabase, taskId: string, query: stri
   // The trailing `.` is REQUIRED: with no path arg and stdin not a TTY (execFile pipes it), rg
   // blocks reading stdin forever and only dies at the timeout. `.` = search cwd (the worktree).
   args.push('--', query, '.')
-  const { stdout } = await promisify(execFile)(rgPath, args, {
+  const { stdout } = await promisify(execFile)(ripgrepExecutablePath(rgPath), args, {
     cwd: root,
     timeout: 10_000,
     maxBuffer: 32 * 1024 * 1024,
