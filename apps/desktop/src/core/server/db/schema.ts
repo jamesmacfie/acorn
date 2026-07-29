@@ -613,8 +613,8 @@ export const apiTokens = sqliteTable(
   (t) => [index('api_tokens_user_created_idx').on(t.userId, t.createdAt), index('api_tokens_active_idx').on(t.id, t.revokedAt)],
 )
 
-// Encrypted upstream identity (docs/public-api.md). Persisted on every successful
-// GitHub /auth/callback so a bearer request (which carries no cookie) can still call GitHub. The
+// Encrypted upstream identity (docs/public-api.md). Persisted only while an active public API
+// bearer needs to call GitHub without a cookie; logout / last-token revocation removes it. The
 // access token is JWE-encrypted with SESSION_ENC_KEY (session.ts encryptSecret).
 export const oauthAccounts = sqliteTable('oauth_accounts', {
   userId: text('user_id').primaryKey(),
@@ -668,13 +668,18 @@ export const commandExecutions = sqliteTable(
 )
 
 // Saved HTTP requests for the API panel (docs/panes.md). Repo-scoped like db_saved_queries — a
-// request written against a repo's API outlives any one task worktree. Machine-scoped (no user_id).
+// request written against a repo's API outlives any one task worktree. Credentials make this
+// identity-scoped even on a single-user machine. Sensitive fields are JWE ciphertext whenever
+// `encrypted` is true; startup migrates pre-encryption rows before opening the listener.
 // The `http_` prefix, not `api_`: `api_tokens`/`api_idempotency` already belong to the public
 // automation API (docs/public-api.md), and so does the settings page id `api`.
 export const httpRequests = sqliteTable(
   'http_requests',
   {
     id: text('id').primaryKey(),
+    // The default exists only so Drizzle can rebuild populated legacy tables. Startup claims
+    // legacy rows only when exactly one GitHub identity exists; ambiguous rows stay quarantined.
+    userId: text('user_id').notNull().default('__legacy_unscoped__'),
     repoOwner: text('repo_owner').notNull(),
     repoName: text('repo_name').notNull(),
     // ponytail: a slash path ('auth/login'), not a folders table with parent_id. The client splits
@@ -687,38 +692,41 @@ export const httpRequests = sqliteTable(
     taskId: text('task_id'), // → tasks.id
     name: text('name').notNull(),
     method: text('method').notNull(),
-    url: text('url').notNull(), // holds the query string too — there is no params column
-    headers: text('headers').notNull().default('[]'), // JSON KeyValue[]
+    url: text('url').notNull(), // encrypted raw URL; holds the query string too
+    headers: text('headers').notNull().default('[]'), // encrypted JSON KeyValue[]
     bodyMode: text('body_mode').notNull().default('none'), // 'none' | 'json' | 'text' | 'form'
-    body: text('body').notNull().default(''), // raw string, or JSON KeyValue[] when bodyMode = 'form'
-    auth: text('auth').notNull().default('{"mode":"none"}'), // JSON AuthConfig — mode lives inside
+    body: text('body').notNull().default(''), // encrypted raw string / JSON KeyValue[]
+    auth: text('auth').notNull().default('{"mode":"none"}'), // encrypted JSON AuthConfig
     // Per-request variable overrides: JSON Record<string,string>, plain values only. Secret and
     // command kinds are repo-level (http_variables) because they need the enc key and a shell.
-    vars: text('vars').notNull().default('{}'),
+    vars: text('vars').notNull().default('{}'), // encrypted JSON Record<string,string>
+    encrypted: integer('encrypted', { mode: 'boolean' }).notNull().default(false),
     createdAt: integer('created_at').notNull(),
     updatedAt: integer('updated_at').notNull(),
   },
   (t) => [
-    index('http_requests_repo_folder_idx').on(t.repoOwner, t.repoName, t.folder),
-    index('http_requests_task_idx').on(t.taskId),
+    index('http_requests_user_repo_folder_idx').on(t.userId, t.repoOwner, t.repoName, t.folder),
+    index('http_requests_user_task_idx').on(t.userId, t.taskId),
   ],
 )
 
 // Repo-level variables for the API panel. `command` values are persisted shell commands whose
-// output is resolved at send time and never persisted; `secret` values are JWE ciphertext under
-// SESSION_ENC_KEY and are never sent to the renderer in plaintext.
+// output is resolved at send time and never persisted. Every value kind is JWE ciphertext under
+// SESSION_ENC_KEY; secret plaintext is additionally never sent to the renderer.
 export const httpVariables = sqliteTable(
   'http_variables',
   {
     id: text('id').primaryKey(),
+    userId: text('user_id').notNull().default('__legacy_unscoped__'),
     repoOwner: text('repo_owner').notNull(),
     repoName: text('repo_name').notNull(),
     name: text('name').notNull(),
     kind: text('kind').notNull(), // 'value' | 'secret' | 'command'
-    value: text('value').notNull(), // plaintext | JWE ciphertext | the shell command
+    value: text('value').notNull(), // JWE ciphertext for plaintext value / secret / shell command
+    encrypted: integer('encrypted', { mode: 'boolean' }).notNull().default(false),
     enabled: integer('enabled', { mode: 'boolean' }).notNull().default(true),
     createdAt: integer('created_at').notNull(),
     updatedAt: integer('updated_at').notNull(),
   },
-  (t) => [uniqueIndex('http_variables_repo_name_idx').on(t.repoOwner, t.repoName, t.name)],
+  (t) => [uniqueIndex('http_variables_user_repo_name_idx').on(t.userId, t.repoOwner, t.repoName, t.name)],
 )

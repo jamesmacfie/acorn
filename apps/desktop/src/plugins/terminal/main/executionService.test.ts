@@ -3,6 +3,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { makeTestDb, type TestDb } from '../../../core/server/routes/testDb'
+import { schema } from '../../../core/server/db'
 import { CommandExecutionService } from './executionService'
 
 vi.setConfig({ testTimeout: 15_000 })
@@ -76,5 +77,31 @@ describe('CommandExecutionService', () => {
     await expect(svc.create(TASK, { command: 'echo x', env: {}, timeoutMs: 5000, maxOutputBytes: 1_048_576 })).rejects.toMatchObject({ code: 'conflict' })
     cwd = dir
     await expect(svc.get('88888888-8888-4888-8888-888888888888', false)).rejects.toMatchObject({ code: 'not_found' })
+  })
+
+  it('removes command output after the 24-hour retention window', async () => {
+    const now = 48 * 60 * 60_000
+    const row = (id: string, createdAt: number) => ({
+      id,
+      taskId: TASK,
+      status: 'succeeded',
+      stdout: `private-${id}`,
+      stderr: '',
+      outputTruncated: false,
+      exitCode: 0,
+      signal: null,
+      timeoutMs: 1000,
+      createdAt,
+      startedAt: createdAt,
+      completedAt: createdAt + 1,
+    })
+    await t.db.insert(schema.commandExecutions).values([
+      row('expired', now - 24 * 60 * 60_000),
+      row('retained', now - 24 * 60 * 60_000 + 1),
+    ])
+
+    await new CommandExecutionService(t.db, () => now).cleanupExpired()
+
+    expect((await t.db.select().from(schema.commandExecutions)).map((execution) => execution.id)).toEqual(['retained'])
   })
 })

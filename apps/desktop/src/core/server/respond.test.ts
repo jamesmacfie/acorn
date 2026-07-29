@@ -1,6 +1,6 @@
 import { Hono } from 'hono'
 import { HTTPException } from 'hono/http-exception'
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { ApiError } from '../shared/api'
 import type { AppEnv } from './middleware/auth'
 import { onServerError } from './respond'
@@ -20,10 +20,16 @@ const app = new Hono<AppEnv>()
 const get = (path: string) => app.fetch(new Request(`http://acorn.test${path}`), {} as Env)
 
 describe('onServerError backstop', () => {
-  it('wraps uncaught /api throws in the ApiError envelope', async () => {
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
+  it('wraps uncaught /api throws without exposing bound values to the client or logs', async () => {
+    const logged = vi.spyOn(console, 'error').mockImplementation(() => undefined)
     const res = await get('/api/boom')
     expect(res.status).toBe(500)
-    expect((await res.json()) as ApiError).toEqual({ error: 'internal', detail: ['db exploded'] })
+    expect((await res.json()) as ApiError).toEqual({ error: 'internal' })
+    expect(JSON.stringify(logged.mock.calls)).not.toContain('db exploded')
   })
 
   it('lets HTTPExceptions keep their own response (csrf 403 stays 403)', async () => {

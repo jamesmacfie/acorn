@@ -28,11 +28,25 @@ export const apiTokens = new Hono<AppEnv>()
     if (parsed.data.expiresAt !== null && parsed.data.expiresAt <= Date.now()) {
       return respondError(c, 400, 'bad_request', ['expiresAt must be in the future'])
     }
+    // This is the ceremony that opts into a durable upstream credential. Persist it before the
+    // bearer so a successfully-created token is never born without the GitHub credential it needs.
+    await c.env.OAUTH_ACCOUNTS.upsertGithub({
+      login: user.login,
+      accessToken: user.token,
+      name: user.name,
+      avatar: user.avatar,
+      scopes: user.scopes,
+    })
     const created = await c.env.API_TOKENS.create({
       userId: user.login,
       name: parsed.data.name,
       scopes: parsed.data.scopes,
       expiresAt: parsed.data.expiresAt,
+    }).catch(async (error: unknown) => {
+      if (!(await c.env.API_TOKENS.hasActiveTokens(user.login))) {
+        await c.env.OAUTH_ACCOUNTS.removeGithub(user.login)
+      }
+      throw error
     })
     // The raw token is present ONLY in this response. The client shows it once and never caches it
     // (implementation-plan.md Phase 2 §7).
@@ -42,5 +56,6 @@ export const apiTokens = new Hono<AppEnv>()
     const user = getUser(c)
     const ok = await c.env.API_TOKENS.revoke(user.login, c.req.param('id'))
     if (!ok) return respondError(c, 404, 'not_found')
+    if (!(await c.env.API_TOKENS.hasActiveTokens(user.login))) await c.env.OAUTH_ACCOUNTS.removeGithub(user.login)
     return c.body(null, 204)
   })

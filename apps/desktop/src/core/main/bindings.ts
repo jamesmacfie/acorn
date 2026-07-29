@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto'
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
+import { chmodSync, closeSync, existsSync, lstatSync, mkdirSync, openSync, readdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { readFile, writeFile } from 'node:fs/promises'
 import { createRequire } from 'node:module'
 import { dirname, join, resolve } from 'node:path'
@@ -9,6 +9,7 @@ import { migrate } from 'drizzle-orm/better-sqlite3/migrator'
 import { type AppDatabase, schema } from '../server/db'
 import { OauthAccountService } from '../server/publicApi/oauthAccountService'
 import { TokenService } from '../server/publicApi/tokenService'
+import { activeIdentityStore, type ActiveIdentityStore } from './activeIdentity'
 import { UiControlBroker } from './publicApi/uiControlBroker'
 
 // The runtime object the routes read via c.env (typed as the global Env in env.d.ts). Built once
@@ -24,6 +25,10 @@ export type RuntimeBindings = {
   // (docs/mcp.md). Injected into task session env (ACORN_API_TOKEN) so agent-spawned servers
   // inherit it; auth middleware maps it to the machine's single user.
   INTERNAL_TOKEN: string
+  // Explicit identity bound to INTERNAL_TOKEN. Cookie-authenticated traffic updates it; logout
+  // clears it. Machine callers fail closed when no identity is bound instead of selecting an
+  // arbitrary cached prefs/repo row.
+  ACTIVE_IDENTITY: ActiveIdentityStore
   // Public automation API services (docs/public-api.md). Singletons so the internal admin routes (4317),
   // the public listener, and the WS hub share one TokenService instance — revocation listeners must
   // survive across requests.
@@ -68,7 +73,18 @@ export type BlobCache = {
 }
 
 export function diskBlobCache(dir: string): BlobCache {
-  mkdirSync(dir, { recursive: true })
+  mkdirSync(dir, { recursive: true, mode: 0o700 })
+  chmodSync(dir, 0o700)
+  // Migrate existing cache entries created under a permissive umask. Never follow symlinks: blob
+  // keys create flat regular files, so anything else is outside this cache's contract.
+  for (const entry of readdirSync(dir)) {
+    const path = join(dir, entry)
+    try {
+      if (lstatSync(path).isFile()) chmodSync(path, 0o600)
+    } catch {
+      // A cache file can disappear concurrently; a later miss simply refetches it.
+    }
+  }
   const fileFor = (key: string) => join(dir, key.replace(/[^a-zA-Z0-9._-]/g, '_'))
   return {
     async get(key) {
@@ -79,7 +95,9 @@ export function diskBlobCache(dir: string): BlobCache {
       }
     },
     async put(key, value) {
-      await writeFile(fileFor(key), value, 'utf8')
+      const path = fileFor(key)
+      await writeFile(path, value, { encoding: 'utf8', mode: 0o600 })
+      chmodSync(path, 0o600) // writeFile preserves an existing inode's prior mode
     },
   }
 }
@@ -122,9 +140,16 @@ function loadDatabase(): typeof import('better-sqlite3') {
 }
 
 export function openDb(dbPath: string): AppDatabase {
-  mkdirSync(dirname(dbPath), { recursive: true }) // better-sqlite3 won't create parent dirs
+  const databasePath = resolve(dbPath)
+  const dataDir = dirname(databasePath)
+  mkdirSync(dataDir, { recursive: true, mode: 0o700 }) // better-sqlite3 won't create parent dirs
+  chmodSync(dataDir, 0o700) // migrate an existing installation created under a permissive umask
+  // Pre-create the database privately. SQLite derives WAL/SHM permissions from the database file,
+  // so hardening before journal_mode prevents newly-created sidecars inheriting 0644.
+  closeSync(openSync(databasePath, 'a', 0o600))
+  chmodSync(databasePath, 0o600)
   const Database = loadDatabase()
-  const sqlite = new Database(dbPath)
+  const sqlite = new Database(databasePath)
   // WAL for concurrent read/write, and a short busy timeout instead of immediate SQLITE_BUSY.
   // No foreign_keys pragma: the schema declares no FK constraints (docs/data-layer.md), so
   // enabling enforcement would be a misleading no-op.
@@ -133,6 +158,9 @@ export function openDb(dbPath: string): AppDatabase {
 
   const db = drizzle(sqlite, { schema })
   migrate(db, { migrationsFolder })
+  for (const path of [databasePath, `${databasePath}-wal`, `${databasePath}-shm`]) {
+    if (existsSync(path)) chmodSync(path, 0o600)
+  }
 
   // `.batch([...])` (which better-sqlite3 lacks) as a synchronous transaction — all-or-nothing
   // semantics. Statements are built on `db`, so they run on this connection inside the
@@ -152,13 +180,18 @@ function loadOrCreateInternalToken(dataDir: string): string {
   const file = join(dataDir, 'internal-token')
   try {
     const existing = readFileSync(file, 'utf8').trim()
-    if (existing) return existing
+    if (existing) {
+      chmodSync(file, 0o600)
+      return existing
+    }
   } catch {
     // not created yet — fall through and mint one
   }
   const token = randomUUID()
-  mkdirSync(dataDir, { recursive: true })
+  mkdirSync(dataDir, { recursive: true, mode: 0o700 })
+  chmodSync(dataDir, 0o700)
   writeFileSync(file, token, { mode: 0o600 })
+  chmodSync(file, 0o600)
   return token
 }
 
@@ -173,16 +206,20 @@ export function makeBindings({ dbPath, blobsDir }: BindingsOptions): RuntimeBind
     if (!value) throw new Error(`Missing required env var ${name} (set it in .env or the environment)`)
     return value
   }
-  const db = openDb(dbPath)
+  const databasePath = resolve(dbPath)
+  const blobCachePath = resolve(blobsDir)
+  const db = openDb(databasePath)
   const encKey = secret('SESSION_ENC_KEY')
+  const dataDir = dirname(databasePath)
   return {
     DB: db,
     OAUTH_STATE: oauthStateStore(),
-    BLOBS: diskBlobCache(blobsDir),
+    BLOBS: diskBlobCache(blobCachePath),
     SESSION_ENC_KEY: encKey,
     GITHUB_CLIENT_ID: secret('GITHUB_CLIENT_ID'),
     GITHUB_CLIENT_SECRET: secret('GITHUB_CLIENT_SECRET'),
-    INTERNAL_TOKEN: loadOrCreateInternalToken(dirname(dbPath)),
+    INTERNAL_TOKEN: loadOrCreateInternalToken(dataDir),
+    ACTIVE_IDENTITY: activeIdentityStore(dataDir),
     API_TOKENS: new TokenService(db),
     OAUTH_ACCOUNTS: new OauthAccountService(db, encKey),
     UI_BROKER: new UiControlBroker(),

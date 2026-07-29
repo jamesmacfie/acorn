@@ -1,11 +1,13 @@
 import { Hono } from 'hono'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import type { AppEnv, Principal } from '../middleware/auth'
+import { OauthAccountService } from '../publicApi/oauthAccountService'
 import { TokenService } from '../publicApi/tokenService'
 import { apiTokens } from './apiTokens'
 import { makeTestDb, type TestDb } from './testDb'
 
 const principal: Principal = { kind: 'user', user: { token: 't', login: 'james', name: '', avatar: '', scopes: [] } }
+const ENC_KEY = '0'.repeat(64)
 
 describe('internal /api/api-tokens admin route', () => {
   let t: TestDb
@@ -14,7 +16,7 @@ describe('internal /api/api-tokens admin route', () => {
 
   beforeEach(() => {
     t = makeTestDb()
-    env = { API_TOKENS: new TokenService(t.db) } as unknown as Env
+    env = { API_TOKENS: new TokenService(t.db), OAUTH_ACCOUNTS: new OauthAccountService(t.db, ENC_KEY) } as unknown as Env
     app = new Hono<AppEnv>()
     app.use('/api/*', async (c, next) => {
       c.set('principal', principal)
@@ -35,6 +37,7 @@ describe('internal /api/api-tokens admin route', () => {
     expect(created.status).toBe(201)
     const body = (await created.json()) as { token: string; metadata: { id: string } }
     expect(body.token).toMatch(/^acorn_v1_/)
+    expect(await env.OAUTH_ACCOUNTS.resolveGithubToken('james')).toBe('t')
 
     const list = await (await call('/api/api-tokens')).json()
     expect(list).toHaveLength(1)
@@ -44,6 +47,7 @@ describe('internal /api/api-tokens admin route', () => {
     expect(del.status).toBe(204)
     // revoked token is no longer authenticatable
     expect(await new TokenService(t.db).authenticate(body.token)).toBeNull()
+    expect(await env.OAUTH_ACCOUNTS.resolveGithubToken('james')).toBeNull()
   })
 
   it('rejects an invalid scope set and a past expiry', async () => {

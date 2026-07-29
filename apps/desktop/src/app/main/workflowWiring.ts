@@ -36,33 +36,39 @@ export type WorkflowWiringDeps = {
   // on failure). workflow:start/gate await it: reconcile() sweeps EVERY 'running' step to
   // 'pending', so a run started before the sweep would have its live step re-queued.
   reconciled: Promise<void>
+  currentUserId: () => string | null
   memoryReviewTrigger?: (taskId: string, transcriptTail: string) => Promise<void>
+}
+
+export async function failingChecksFor(db: AppDatabase, userId: string | null, taskId: string): Promise<string | null> {
+  const t = await loadTask(db, taskId)
+  if (!t || t.pullNumber == null || !userId) return null
+  const [repoRow] = await db
+    .select()
+    .from(schema.repos)
+    .where(and(eq(schema.repos.userId, userId), eq(schema.repos.owner, t.repoOwner), eq(schema.repos.name, t.repoName)))
+  if (!repoRow) return null
+  const rows = await db
+    .select()
+    .from(schema.checks)
+    .where(and(eq(schema.checks.userId, userId), eq(schema.checks.repoId, repoRow.id), eq(schema.checks.number, t.pullNumber)))
+  if (!rows.length) return null
+  const bad = rows.filter((r) => r.status && !['success', 'neutral', 'skipped'].includes(r.status.toLowerCase()))
+  return bad.length ? bad.map((r) => `- ${r.name}: ${r.status}${r.url ? ` (${r.url})` : ''}`).join('\n') : ''
 }
 
 export async function registerWorkflowIpc(
   db: AppDatabase,
-  { runtime, notesStore, internalApiEnv, reconciled, memoryReviewTrigger }: WorkflowWiringDeps,
+  { runtime, notesStore, internalApiEnv, reconciled, currentUserId, memoryReviewTrigger }: WorkflowWiringDeps,
 ): Promise<WorkflowRunner> {
-  const failingChecksFor = async (taskId: string): Promise<string | null> => {
-    const t = await loadTask(db, taskId)
-    if (!t || t.pullNumber == null) return null
-    const [repoRow] = await db.select().from(schema.repos).where(and(eq(schema.repos.owner, t.repoOwner), eq(schema.repos.name, t.repoName)))
-    if (!repoRow) return null
-    const rows = await db
-      .select()
-      .from(schema.checks)
-      .where(and(eq(schema.checks.repoId, repoRow.id), eq(schema.checks.number, t.pullNumber)))
-    if (!rows.length) return null
-    const bad = rows.filter((r) => r.status && !['success', 'neutral', 'skipped'].includes(r.status.toLowerCase()))
-    return bad.length ? bad.map((r) => `- ${r.name}: ${r.status}${r.url ? ` (${r.url})` : ''}`).join('\n') : ''
-  }
+  const activeFailingChecksFor = (taskId: string) => failingChecksFor(db, currentUserId(), taskId)
 
   const workflowRunner = new WorkflowRunner(db, {
     runStep: async (taskId, def, opts) => {
       const t = await loadTask(db, taskId)
       const mapped = t ? await getRepoPath(db, t.repoOwner, t.repoName) : null
       const baseCheckout = mapped?.path && isDir(mapped.path) ? mapped.path : undefined
-      const { cwd } = t ? await resolveTaskCwd(db, t, baseCheckout) : { cwd: homedir() }
+      const { cwd } = t ? await resolveTaskCwd(db, t, baseCheckout, currentUserId()) : { cwd: homedir() }
       const profile = requireProfile(def.profileId ?? DEFAULT_PROFILE_ID)
       const argv = opts.mode === 'ai' ? profile.aiArgv?.(resolveCommand(profile), opts) : buildHeadlessArgv(profile.id, resolveCommand(profile), opts)
       if (!argv) {
@@ -99,13 +105,13 @@ export async function registerWorkflowIpc(
     // Policy verdicts are RE-DERIVED here — a lying step result is ignored by construction.
     evaluatePolicy: async (taskId, policy) => {
       if (policy === 'checks-green') {
-        const failing = await failingChecksFor(taskId)
+        const failing = await activeFailingChecksFor(taskId)
         if (failing === '') return { pass: true }
         return { pass: false, detail: failing == null ? 'No PR/checks to verify.' : `Failing checks:\n${failing}` }
       }
       return { pass: false, detail: `Unknown policy '${policy}' — failing closed.` }
     },
-    failingChecks: failingChecksFor,
+    failingChecks: activeFailingChecksFor,
     notify: broadcastWorkflowNotice,
     statusChanged: broadcastStatus,
     emitStepEvent: broadcastWorkflowStepEvent,

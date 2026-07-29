@@ -221,9 +221,9 @@ The KV shim only needs the handful of methods actually called (`get`, `put` with
 `expirationTtl`, `delete`) — not the full KV surface.
 
 **As shipped**, `RuntimeBindings` (`src/core/main/bindings.ts`) matches the sketch above with two
-divergences. One post-migration addition: `INTERNAL_TOKEN`, a per-app-run `randomUUID()` bearer for
+divergences. One post-migration addition: `INTERNAL_TOKEN`, private persisted bearer material for
 loopback callers that hold no session cookie (the acorn MCP server — agents inherit it as
-`ACORN_API_TOKEN`; the auth middleware maps it to the machine's single user). And the KV shim is
+`ACORN_API_TOKEN`; auth maps it through the explicit active-identity binding). And the KV shim is
 gone: the sketch's `KVish` was retired for plain typed modules that say what they mean —
 `OauthStateStore { issue(state), consume(state) }` (in-memory, TTL internal) and
 `BlobCache { get(key), put(key, value) }` (on-disk by sha; immutable content, so no TTL and no

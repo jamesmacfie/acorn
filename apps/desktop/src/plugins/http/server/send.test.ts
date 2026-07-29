@@ -6,6 +6,7 @@ import { schema } from '../../../core/server/db'
 import { makeTestDb, type TestDb } from '../../../core/server/routes/testDb'
 import type { HttpSendInput } from '../shared/model'
 import { SendError, buildRequest, describeFetchFailure, readCapped, referencedVariableNames, resolveVars, send } from './send'
+import { protectHttpValue } from './storage'
 
 // buildRequest is where interpolation, auth compilation and the scheme check land — the parts that
 // would silently send the wrong thing. The fetch call itself and the DB read around it are thin.
@@ -21,6 +22,8 @@ const input = (patch: Partial<HttpSendInput> = {}): HttpSendInput => ({
   executionTaskId: null,
   ...patch,
 })
+const USER = 'octocat'
+const ENC_KEY = '0'.repeat(64)
 
 describe('buildRequest — scheme', () => {
   it('rejects anything that is not http or https', () => {
@@ -203,17 +206,19 @@ describe('resolveVars — command execution context', () => {
     })
     await testDb.db.insert(schema.httpVariables).values({
       id: 'var-1',
+      userId: USER,
       repoOwner: 'acme',
       repoName: 'widget',
       name: 'BASE_URL',
       kind: 'command',
-      value: `printf 'shell startup noise\\n%s|%s|%s\\n' "$PWD" "$ACORN_TASK_ID" "$ACORN_BRANCH"`,
+      value: await protectHttpValue(`printf 'shell startup noise\\n%s|%s|%s\\n' "$PWD" "$ACORN_TASK_ID" "$ACORN_BRANCH"`, ENC_KEY),
+      encrypted: true,
       enabled: true,
       createdAt: 0,
       updatedAt: 0,
     })
 
-    const vars = await resolveVars(testDb.db, 'acme', 'widget', undefined, input({ url: '{{BASE_URL}}/health', executionTaskId: 'task-1' }))
+    const vars = await resolveVars(testDb.db, USER, 'acme', 'widget', ENC_KEY, input({ url: '{{BASE_URL}}/health', executionTaskId: 'task-1' }))
 
     const [commandCwd, taskId, branch] = vars.BASE_URL.split('|')
     expect(realpathSync(commandCwd)).toBe(realpathSync(worktree))
@@ -242,7 +247,7 @@ describe('resolveVars — command execution context', () => {
       archivedAt: null,
     })
 
-    await expect(resolveVars(testDb.db, 'acme', 'widget', undefined, input({ executionTaskId: 'task-2' }))).rejects.toThrow(
+    await expect(resolveVars(testDb.db, USER, 'acme', 'widget', ENC_KEY, input({ executionTaskId: 'task-2' }))).rejects.toThrow(
       'The selected task belongs to acme/other',
     )
   })
@@ -251,19 +256,21 @@ describe('resolveVars — command execution context', () => {
     testDb = makeTestDb()
     await testDb.db.insert(schema.httpVariables).values({
       id: 'var-unused',
+      userId: USER,
       repoOwner: 'acme',
       repoName: 'widget',
       name: 'BASE_URL',
       kind: 'command',
-      value: 'exit 17',
+      value: await protectHttpValue('exit 17', ENC_KEY),
+      encrypted: true,
       enabled: true,
       createdAt: 0,
       updatedAt: 0,
     })
 
-    await expect(resolveVars(testDb.db, 'acme', 'widget', undefined, input())).resolves.not.toHaveProperty('BASE_URL')
+    await expect(resolveVars(testDb.db, USER, 'acme', 'widget', ENC_KEY, input())).resolves.not.toHaveProperty('BASE_URL')
     await expect(
-      resolveVars(testDb.db, 'acme', 'widget', undefined, input({ url: '{{BASE_URL}}/health', vars: { BASE_URL: 'http://override.test' } })),
+      resolveVars(testDb.db, USER, 'acme', 'widget', ENC_KEY, input({ url: '{{BASE_URL}}/health', vars: { BASE_URL: 'http://override.test' } })),
     ).resolves.toMatchObject({ BASE_URL: 'http://override.test' })
   })
 })
@@ -293,7 +300,7 @@ describe('send — transport outcomes', () => {
     const cause = Object.assign(new Error('getaddrinfo ENOTFOUND missing.test'), { code: 'ENOTFOUND' })
     vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new TypeError('fetch failed', { cause })))
 
-    const result = await send(testDb.db, 'acme', 'widget', undefined, input({ url: 'http://missing.test/health' }))
+    const result = await send(testDb.db, USER, 'acme', 'widget', ENC_KEY, input({ url: 'http://missing.test/health' }))
 
     expect(result).toMatchObject({
       ok: false,
@@ -311,11 +318,46 @@ describe('send — transport outcomes', () => {
     testDb = makeTestDb()
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response('server broke', { status: 500, statusText: 'Internal Server Error' })))
 
-    const result = await send(testDb.db, 'acme', 'widget', undefined, input({ url: 'http://api.test/fail' }))
+    const result = await send(testDb.db, USER, 'acme', 'widget', ENC_KEY, input({ url: 'http://api.test/fail' }))
 
     expect(result.ok).toBe(true)
     if (!result.ok) throw new Error('Expected an HTTP response')
     expect(result.status).toBe(500)
     expect(Buffer.from(result.bodyBase64, 'base64').toString()).toBe('server broke')
+  })
+
+  it('does not return resolved server-side secrets in URLs or request timelines', async () => {
+    testDb = makeTestDb()
+    await testDb.db.insert(schema.httpVariables).values({
+      id: 'secret-var',
+      userId: USER,
+      repoOwner: 'acme',
+      repoName: 'widget',
+      name: 'TOKEN',
+      kind: 'secret',
+      value: await protectHttpValue('server-only-secret', ENC_KEY),
+      encrypted: true,
+      enabled: true,
+      createdAt: 1,
+      updatedAt: 1,
+    })
+    const fetcher = vi.fn().mockResolvedValue(new Response('ok'))
+    vi.stubGlobal('fetch', fetcher)
+
+    const result = await send(
+      testDb.db,
+      USER,
+      'acme',
+      'widget',
+      ENC_KEY,
+      input({
+        url: 'https://api.test/items/server-only-secret?token={{TOKEN}}',
+        headers: [{ name: 'X-API-Key', value: '{{TOKEN}}', enabled: true }],
+      }),
+    )
+
+    expect(String(fetcher.mock.calls[0]?.[0])).toContain('server-only-secret')
+    expect(JSON.stringify(result)).not.toContain('server-only-secret')
+    expect(JSON.stringify(result)).toContain('••••••')
   })
 })

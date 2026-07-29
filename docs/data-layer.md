@@ -477,37 +477,42 @@ Steps carry a first-class working context (`worktreePath`); structured output is
 
 #### `http_requests` — saved requests for the API panel
 
-Repo-scoped, like `db_saved_queries`: a request written against a repo's API outlives any one task
-worktree. Named `http_*`, not `api_*`, because `api_tokens` / `api_idempotency` already belong to the
-public automation API. See [panes.md](./panes.md) §`http`.
+Repo-scoped and GitHub-user-scoped: a request written against a repo's API outlives any one task
+worktree but never crosses a sequential login switch. Named `http_*`, not `api_*`, because
+`api_tokens` / `api_idempotency` already belong to the public automation API. See
+[panes.md](./panes.md) §`http`.
 
 | Column | Type | Note |
 | --- | --- | --- |
 | `id` | text (PK) | |
+| `userId` | text | authenticated GitHub login that owns the saved request |
 | `repoOwner`, `repoName` | text | the owning repo |
 | `folder` | text | a slash path (`auth/login`), `''` = root. **Not** a folders table — the client splits on `/` to build the tree, so renaming a folder is one `UPDATE` and there are no orphans or cycles. The one cost is that a folder cannot exist while empty. |
 | `taskId` | text | → `tasks.id`. Set = an ad-hoc request owned by that task; null = saved in the repo tree. Filing an ad-hoc request clears it. |
 | `name` | text | |
-| `method`, `url` | text | the URL holds the query string; there is no params column |
-| `headers` | text | JSON `KeyValue[]` |
+| `method`, `url` | text | method is plaintext metadata; URL is JWE ciphertext (including query string) |
+| `headers` | text | JWE-encrypted JSON `KeyValue[]` |
 | `bodyMode` | text | `none` \| `json` \| `text` \| `form` |
-| `body` | text | raw string, or JSON `KeyValue[]` when `bodyMode` is `form` |
-| `auth` | text | JSON `AuthConfig` — the mode lives inside the blob |
-| `vars` | text | JSON `Record<string,string>` — per-request overrides, plain values only |
+| `body` | text | JWE-encrypted raw string, or JSON `KeyValue[]` when `bodyMode` is `form` |
+| `auth` | text | JWE-encrypted JSON `AuthConfig` |
+| `vars` | text | JWE-encrypted JSON `Record<string,string>` |
+| `encrypted` | integer (bool) | false only during a pre-listener legacy migration |
 | `createdAt`, `updatedAt` | integer | epoch ms |
 
 #### `http_variables` — repo-level variables for the API panel
 
-Unique on `(repoOwner, repoName, name)`. Per-request overrides are the `vars` column above, not rows
-here — which is why there is no nullable request id and no `''` sentinel.
+Unique on `(userId, repoOwner, repoName, name)`. Per-request overrides are the `vars` column above,
+not rows here — which is why there is no nullable request id and no `''` sentinel.
 
 | Column | Type | Note |
 | --- | --- | --- |
 | `id` | text (PK) | |
+| `userId` | text | authenticated GitHub login that owns the variable |
 | `repoOwner`, `repoName` | text | |
 | `name` | text | the `{{NAME}}` placeholder |
 | `kind` | text | `value` \| `secret` \| `command` |
-| `value` | text | plaintext, JWE ciphertext under `SESSION_ENC_KEY`, or the shell command. A `command` value is run at send time and its **result is never persisted**; a `secret`'s plaintext is never returned to the renderer. |
+| `value` | text | JWE ciphertext under `SESSION_ENC_KEY` for all kinds. A `command` value is decrypted and run at send time and its **result is never persisted**; a `secret`'s plaintext is never returned to the renderer. |
+| `encrypted` | integer (bool) | false only during a pre-listener legacy migration |
 | `enabled` | integer (bool) | |
 | `createdAt`, `updatedAt` | integer | epoch ms |
 
@@ -523,6 +528,10 @@ be a no-op implying enforcement this doc explicitly says doesn't exist. The impo
 
 **GitHub mirror hierarchy.** `repos (userId, id)` ← `pull_requests (userId, repoId, number)` ← the
 PR-detail children, each keyed `(userId, repoId, number, …)`:
+
+Because the schema deliberately has no foreign keys, repo-list and pull-list refreshes carry
+explicit child deletions in the same transaction as parent eviction. Startup reconciliation removes
+orphaned children left by older releases.
 
 ```
 repos(userId, id)

@@ -17,7 +17,16 @@ export const respondError = (c: Context<AppEnv>, status: ContentfulStatusCode, e
 // response, exactly as Hono's default handler would.
 export const onServerError = (err: Error, c: Context<AppEnv>) => {
   if (err instanceof HTTPException) return err.getResponse()
-  console.error('[server] unhandled error:', err)
-  if (c.req.path.startsWith('/api/')) return respondError(c, 500, 'internal', err.message ? [err.message] : undefined)
+  const value = err as Error & { code?: unknown }
+  // Drizzle/better-sqlite3 can embed bound values in err.message. Neither the browser nor logs get
+  // the message/stack at this generic backstop; domain paths that intentionally expose safe detail
+  // must do so before throwing. Name + a short machine code retain useful classification.
+  console.error('[server] unhandled error', {
+    name: err.name,
+    code: typeof value.code === 'string' && /^[A-Z0-9_:-]{1,80}$/i.test(value.code) ? value.code : undefined,
+    method: c.req.method,
+    path: c.req.path,
+  })
+  if (c.req.path.startsWith('/api/')) return respondError(c, 500, 'internal')
   return c.text('Internal Server Error', 500)
 }

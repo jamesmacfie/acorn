@@ -35,6 +35,7 @@ import { seedTaskNotes } from '../../plugins/notes/main/seedTaskNotes'
 import { reconcileWorktrees, setWorktreesRoot } from '../../core/main/taskWorktree'
 import { wireConfigTrust } from './configTrustWiring'
 import { logStorageFootprint } from '../../core/main/storageFootprint'
+import { prepareSecurityState } from './startupSecurity'
 
 // Boot/reconcile/teardown timing marks (docs/electron.md §11): hrtime deltas from boot start, logged as
 // greppable one-liners. "no telemetry, no dashboards; a log you can grep."
@@ -138,6 +139,7 @@ export async function bootstrap({ dataDir, origin, createWindow }: BootstrapOpti
   //    schema is ready before the listener serves any request (docs/electron.md §11).
   const runtime = makeRuntime(dataDir)
   const db = runtime.DB
+  const commandExecutions = await prepareSecurityState(runtime)
   mark('migrate')
 
   const worktreesDir = join(dataDir, 'worktrees')
@@ -147,7 +149,7 @@ export async function bootstrap({ dataDir, origin, createWindow }: BootstrapOpti
   // 2–3. Construct domain services and install their bridges/IPC. knowledge is built with the
   //       engine's exported sendToAgent (one-way dep); its memory/notes closures feed back into the
   //       engine at registerTerminalIpc. All setter-injection happens here, before the listener.
-  const knowledge = registerKnowledgeIpc(db, dataDir, { sendToAgent })
+  const knowledge = registerKnowledgeIpc(db, dataDir, { sendToAgent, currentUserId: () => runtime.ACTIVE_IDENTITY.get() })
   wireConfigTrust(db)
 
   const runtimeSvc = createRuntimeService(db, terminalRunGlue(db))
@@ -164,6 +166,7 @@ export async function bootstrap({ dataDir, origin, createWindow }: BootstrapOpti
     notesStore: knowledge.notesStore,
     internalApiEnv,
     reconciled,
+    currentUserId: () => runtime.ACTIVE_IDENTITY.get(),
     memoryReviewTrigger: knowledge.memoryReviewTrigger,
   })
   // search, editor, local-git, and database are HTTP routes wired via wireServerBridges() — the
@@ -201,6 +204,7 @@ export async function bootstrap({ dataDir, origin, createWindow }: BootstrapOpti
       memoryProposals: knowledge.proposals,
       memoryReconcile: knowledge.reconciled,
       workflowRunner,
+      commandExecutions,
     }),
     runtime: {
       version: app.getVersion(),

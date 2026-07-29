@@ -3,10 +3,10 @@ import type { AppDatabase } from '../db'
 import { schema } from '../db'
 import { decryptSecret, encryptSecret } from '../session'
 
-// Encrypted upstream GitHub identity (docs/public-api.md). Upserted on every
-// successful /auth/callback so a bearer request — which carries no session cookie — can still resolve
-// a GitHub credential. The access token is JWE-encrypted at rest with SESSION_ENC_KEY and never
-// returned or logged.
+// Encrypted upstream GitHub identity (docs/public-api.md). Persisted only while the user has an
+// active public-API bearer that needs an upstream credential; ordinary browser login keeps its
+// token solely in the sealed session cookie. The access token is JWE-encrypted at rest with
+// SESSION_ENC_KEY and never returned or logged.
 
 export type OauthAccountMetadata = {
   userId: string
@@ -76,5 +76,13 @@ export class OauthAccountService {
       scopes: JSON.parse(row.scopesJson) as string[],
       updatedAt: row.updatedAt,
     }
+  }
+
+  async removeGithub(userId: string): Promise<void> {
+    await this.db.delete(schema.oauthAccounts).where(eq(schema.oauthAccounts.userId, userId))
+  }
+
+  async userIds(): Promise<string[]> {
+    return (await this.db.select({ userId: schema.oauthAccounts.userId }).from(schema.oauthAccounts)).map((row) => row.userId)
   }
 }
