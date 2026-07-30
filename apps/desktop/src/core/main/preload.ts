@@ -1,4 +1,12 @@
 import { contextBridge, ipcRenderer } from 'electron'
+import type {
+  PreviewFindDirection,
+  PreviewFindRequested,
+  PreviewFindResult,
+  PreviewFindStopAction,
+  PreviewNavigationCommand,
+  PreviewState,
+} from '../shared/preview'
 
 // Narrow capability surface (docs/electron.md §4g): expose only a desktop marker and the validated
 // terminal channels (docs/terminal-and-agents.md) — never raw ipcRenderer.
@@ -38,12 +46,25 @@ contextBridge.exposeInMainWorld('acorn', {
     show: (taskId: string) => ipcRenderer.send('preview:show', { taskId }),
     hide: () => ipcRenderer.send('preview:hide'),
     load: (taskId: string, url: string) => ipcRenderer.send('preview:load', { taskId, url }),
-    command: (taskId: string, action: 'back' | 'forward' | 'reload' | 'stop' | 'devtools') => ipcRenderer.send('preview:command', { taskId, action }),
+    command: (taskId: string, action: PreviewNavigationCommand) => ipcRenderer.send('preview:command', { taskId, action }),
+    find: (taskId: string, text: string, direction: PreviewFindDirection) => ipcRenderer.send('preview:find', { taskId, text, direction }),
+    stopFind: (taskId: string, action: PreviewFindStopAction) => ipcRenderer.send('preview:stop-find', { taskId, action }),
+    focus: (taskId: string) => ipcRenderer.send('preview:focus', { taskId }),
     evict: (taskId: string) => ipcRenderer.send('preview:evict', { taskId }),
-    onEvent: (cb: (s: { taskId: string; url: string; loading: boolean; canGoBack: boolean; canGoForward: boolean }) => void) => {
-      const listener = (_e: unknown, s: { taskId: string; url: string; loading: boolean; canGoBack: boolean; canGoForward: boolean }) => cb(s)
+    onEvent: (cb: (s: PreviewState) => void) => {
+      const listener = (_e: unknown, s: PreviewState) => cb(s)
       ipcRenderer.on('preview:event', listener)
       return () => ipcRenderer.removeListener('preview:event', listener)
+    },
+    onFindRequested: (cb: (request: PreviewFindRequested) => void) => {
+      const listener = (_e: unknown, request: PreviewFindRequested) => cb(request)
+      ipcRenderer.on('preview:find-requested', listener)
+      return () => ipcRenderer.removeListener('preview:find-requested', listener)
+    },
+    onFindResult: (cb: (result: PreviewFindResult) => void) => {
+      const listener = (_e: unknown, result: PreviewFindResult) => cb(result)
+      ipcRenderer.on('preview:find-result', listener)
+      return () => ipcRenderer.removeListener('preview:find-result', listener)
     },
   },
 })

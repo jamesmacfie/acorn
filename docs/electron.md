@@ -646,9 +646,11 @@ The current transport split is:
   pane/task switches is the view's natural behaviour, not a DOM-reparenting hack. http(s)-only /
   no-userinfo navigation is enforced per-view (`isAllowedPreviewUrl`), replacing the old
   `will-attach-webview` guard. A native view always paints above web content, so the renderer hides
-  it when an overlay covers the pane. The main-owned record also retains the resolved home URL and
-  owning window: a changed home reconciles on remount, and closing the window closes/unbinds every
-  child view before macOS can create a replacement window.
+  it when an overlay covers the pane. Native page find follows the same ownership boundary:
+  `previewService.ts` intercepts `⌘F` / `Ctrl+F` inside the guest and runs `findInPage`; the renderer
+  owns the find controls and receives only task-addressed match counts. The main-owned record also
+  retains the resolved home URL and owning window: a changed home reconciles on remount, and closing
+  the window closes/unbinds every child view before macOS can create a replacement window.
 - **Service↔main RPC — lifecycle plus native adapters:** `core/shared/serviceProtocol.ts` defines
   versioned, Zod-validated request/response/event envelopes over `utilityProcess` message ports.
   `core/shared/desktopCapabilities.ts` projects task-addressed preview and CDP/browser operations

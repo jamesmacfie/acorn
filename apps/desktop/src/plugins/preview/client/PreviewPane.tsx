@@ -1,5 +1,6 @@
 import { createEffect, createSignal, onCleanup, onMount, Show } from 'solid-js'
 import { clientEvents } from '../../../core/client/registries/clientEvents'
+import { PreviewFindBar } from './PreviewFindBar'
 
 // The browser-preview pane (docs/panes.md): browser chrome (back/forward/stop-reload/home
 // + an editable URL bar + a loading spinner) over a per-task, MAIN-owned WebContentsView. `props.url`
@@ -24,6 +25,7 @@ export const activatePreviewEvents = (): (() => void) =>
   clientEvents.on('runtime:task-archived', ({ taskId }) => evictPreviewWebview(taskId))
 
 export default function PreviewPane(props: { taskId: string; url: string | null }) {
+  let pane!: HTMLElement
   let host!: HTMLDivElement
   const preview = window.acorn?.preview
   const [loading, setLoading] = createSignal(false)
@@ -113,7 +115,7 @@ export default function PreviewPane(props: { taskId: string; url: string | null 
   }
 
   return (
-    <section class="pane workspace-preview" style={{ 'grid-column': '1 / 3' }}>
+    <section ref={pane} class="pane workspace-preview" style={{ 'grid-column': '1 / 3' }}>
       <Show when={preview} fallback={
         <div class="workspace-empty-inner">
           <p class="muted">The browser preview needs the desktop app.</p>
@@ -142,6 +144,7 @@ export default function PreviewPane(props: { taskId: string; url: string | null 
             <button type="button" class="preview-nav-btn" title="Toggle preview DevTools" aria-label="Toggle preview DevTools" onClick={() => preview?.command(props.taskId, 'devtools')}>{'</>'}</button>
             <Show when={loading()}><span class="preview-spinner spin">◐</span></Show>
           </div>
+          <PreviewFindBar taskId={props.taskId} preview={preview!} scope={() => pane} />
         </Show>
       </Show>
       <div class="workspace-preview-host" ref={host} />

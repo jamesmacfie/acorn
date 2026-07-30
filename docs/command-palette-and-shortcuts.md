@@ -178,6 +178,7 @@ user overrides, scope, availability, and conflicts; one dispatcher executes the 
 | `⌘P` | File-palette contribution. |
 | `/`, `[`, `]`, `c`, `?` | `Shortcuts.tsx` command/keybinding contributions. |
 | `⌘W / Ctrl+W` | Main process `before-input-event` (`electron.ts:98`) → IPC `acorn:close-pane`. |
+| `⌘F / Ctrl+F` in browser preview | `PreviewFindBar.tsx` for preview chrome; the main-owned guest's `before-input-event` forwards the same request from page content. |
 
 ### Typing & modifier rules
 
@@ -203,6 +204,15 @@ A menu accelerator can't be suppressed from the page, so main intercepts ⌘/Ctr
 acts only if `document.activeElement` is inside its own pane — closing the active editor tab or the
 active terminal tab respectively. If neither owns focus, nothing closes (this is a single-window app;
 ⌘Q quits).
+
+### Browser-preview find flow
+
+The preview page is a main-owned `WebContentsView`, so key events focused inside it cannot bubble to
+the Solid renderer. `previewService.ts` intercepts the unshifted `⌘F` / `Ctrl+F` chord, focuses the
+owner renderer and sends a task-addressed `preview:find-requested` event. The renderer-owned
+`PreviewFindBar` then sends task-addressed find/stop commands back through the preload bridge.
+Chromium's `findInPage` owns matching, traversal and page highlights; only serializable match counts
+cross back to the renderer. `⌘⇧F` remains available to the Task view's Find in Files shortcut.
 
 ## 4. Pane shortcuts (Task view)
 

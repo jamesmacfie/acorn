@@ -1,12 +1,15 @@
 import { expect, test, _electron as electron, type ElectronApplication, type Page } from '@playwright/test'
 import { execFileSync } from 'node:child_process'
 import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { createServer, type Server } from 'node:http'
+import type { AddressInfo } from 'node:net'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
 const KEY = 'e'.repeat(64)
 const roots: string[] = []
 const apps: ElectronApplication[] = []
+const previewServers: Server[] = []
 
 type RunningApp = { app: ElectronApplication; page: Page; dataDir: string; repoDir: string }
 
@@ -89,9 +92,25 @@ async function createTerminalAndCapture(page: Page, taskId: string, command: str
   }, { taskId, command })
 }
 
+async function servePreviewFixture(): Promise<string> {
+  const server = createServer((_request, response) => {
+    response.writeHead(200, { 'content-type': 'text/html; charset=utf-8' })
+    response.end('<!doctype html><html><body><main><p>previewNeedle42 first</p><p>previewNeedle42 second</p></main></body></html>')
+  })
+  await new Promise<void>((resolve, reject) => {
+    server.once('error', reject)
+    server.listen(0, '127.0.0.1', resolve)
+  })
+  previewServers.push(server)
+  return `http://127.0.0.1:${(server.address() as AddressInfo).port}/preview`
+}
+
 test.afterEach(async () => {
   // Per-test cleanup happens after the Electron process has released SQLite and PTY handles.
   for (const app of apps.splice(0)) await app.close().catch(() => {})
+  for (const server of previewServers.splice(0)) {
+    await new Promise<void>((resolve) => server.close(() => resolve()))
+  }
   for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true })
 })
 
@@ -200,5 +219,61 @@ test('S6 find-in-files copies paths and double-clicks into the match', async () 
     const response = await fetch(`/api/tasks/${taskId}/editor/read?path=${encodeURIComponent(path)}`)
     return (await response.json() as { text: string }).text
   }, { taskId: task.id, path })).toContain("'XneedleToken'")
+  await running.app.close()
+})
+
+test('S7 finds and traverses text in the browser preview', async () => {
+  const previewUrl = await servePreviewFixture()
+  const running = await launch()
+  const task = await seedTask(running.page, running.repoDir)
+  await running.page.evaluate(async (previewUrl) => {
+    const response = await fetch('/api/terminal/repo-path/config', {
+      method: 'PUT',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        owner: 'acorn',
+        repo: 'smoke',
+        patch: { previewMode: 'url', previewValue: previewUrl },
+      }),
+    })
+    if (!response.ok) throw new Error(await response.text())
+  }, previewUrl)
+  await running.page.reload()
+  await dismissOnboarding(running.page)
+  await running.page.getByRole('button', { name: 'Smoke task' }).click()
+  await running.page.getByRole('button', { name: 'Browser preview' }).click()
+  await expect(running.page.locator('.preview-url')).toHaveValue(previewUrl)
+
+  await expect.poll(() => running.app.evaluate(({ webContents }, url) => {
+    const guest = webContents.getAllWebContents().find((contents) => contents.getURL() === url)
+    return !!guest && !guest.isLoading()
+  }, previewUrl)).toBe(true)
+  const shortcutSent = await running.app.evaluate(({ webContents }, url) => {
+    const guest = webContents.getAllWebContents().find((contents) => contents.getURL() === url)
+    if (!guest) return false
+    guest.focus()
+    guest.sendInputEvent({ type: 'keyDown', keyCode: 'f', modifiers: ['control'] })
+    guest.sendInputEvent({ type: 'keyUp', keyCode: 'f', modifiers: ['control'] })
+    return true
+  }, previewUrl)
+  expect(shortcutSent).toBe(true)
+
+  const findBar = running.page.getByRole('search', { name: 'Find in preview page' })
+  await expect(findBar).toBeVisible()
+  const findInput = running.page.getByRole('textbox', { name: 'Find in preview page' })
+  await expect(findInput).toBeFocused()
+  await findInput.fill('previewNeedle42')
+  await expect(findBar.locator('.preview-find-count')).toHaveText('1 / 2')
+  await findInput.press('Enter')
+  await expect(findBar.locator('.preview-find-count')).toHaveText('2 / 2')
+  await findInput.press('Shift+Enter')
+  await expect(findBar.locator('.preview-find-count')).toHaveText('1 / 2')
+  await findInput.press('Escape')
+  await expect(findBar).toHaveCount(0)
+  await running.page.locator('.preview-url').focus()
+  await running.page.keyboard.press('Control+f')
+  await expect(findBar).toBeVisible()
+  await expect(findInput).toBeFocused()
+  await findInput.press('Escape')
   await running.app.close()
 })

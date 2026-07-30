@@ -7,14 +7,18 @@ const electron = vi.hoisted(() => {
     private listeners = new Map<string, Listener[]>()
     destroyed = false
     devToolsOpened = false
+    findRequestId = 0
     loading = false
     url = ''
     loadURL = vi.fn(async (url: string) => { this.url = url })
     close = vi.fn(() => { this.destroyed = true })
     closeDevTools = vi.fn(() => { this.devToolsOpened = false })
+    findInPage = vi.fn((_text: string, _options?: unknown) => ++this.findRequestId)
+    focus = vi.fn()
     openDevTools = vi.fn((_options?: unknown) => { this.devToolsOpened = true })
     reload = vi.fn()
     stop = vi.fn()
+    stopFindInPage = vi.fn()
     getURL = () => this.url
     isDestroyed = () => this.destroyed
     isDevToolsOpened = () => this.devToolsOpened
@@ -30,6 +34,9 @@ const electron = vi.hoisted(() => {
       this.listeners.set(event, [...(this.listeners.get(event) ?? []), listener])
       return this
     }
+    emit(event: string, ...args: unknown[]) {
+      for (const listener of this.listeners.get(event) ?? []) listener(...args)
+    }
   }
 
   class FakeWebContentsView {
@@ -43,7 +50,7 @@ const electron = vi.hoisted(() => {
   class FakeBrowserWindow {
     destroyed = false
     private listeners = new Map<string, Listener>()
-    webContents = { owner: this, send: vi.fn() }
+    webContents = { owner: this, focus: vi.fn(), send: vi.fn() }
     childViews: FakeWebContentsView[] = []
     contentView = {
       addChildView: vi.fn((view: FakeWebContentsView) => { this.childViews.push(view) }),
@@ -155,5 +162,102 @@ describe('previewService lifecycle', () => {
 
     command?.(eventFor(owner), { taskId: 'task-1', action: 'devtools' })
     expect(view.webContents.closeDevTools).toHaveBeenCalledOnce()
+  })
+
+  it('opens the renderer find bar for an unshifted Ctrl/Cmd+F focused in the preview page', () => {
+    const owner = new electron.FakeBrowserWindow()
+    ensure(owner, 'task-1', 'http://localhost:3000')
+    const view = electron.FakeWebContentsView.instances[0]
+    const prevented = vi.fn()
+
+    view.webContents.emit('before-input-event', { preventDefault: prevented }, {
+      type: 'keyDown',
+      key: 'f',
+      control: true,
+      meta: false,
+      alt: false,
+      shift: false,
+    })
+
+    expect(prevented).toHaveBeenCalledOnce()
+    expect(owner.webContents.focus).toHaveBeenCalledOnce()
+    expect(owner.webContents.send).toHaveBeenCalledWith('preview:find-requested', { taskId: 'task-1' })
+
+    prevented.mockClear()
+    owner.webContents.send.mockClear()
+    view.webContents.emit('before-input-event', { preventDefault: prevented }, {
+      type: 'keyDown',
+      key: 'f',
+      control: true,
+      meta: false,
+      alt: false,
+      shift: true,
+    })
+    expect(prevented).not.toHaveBeenCalled()
+    expect(owner.webContents.send).not.toHaveBeenCalled()
+  })
+
+  it('finds and traverses page text while ignoring stale and foreign-window results', () => {
+    const owner = new electron.FakeBrowserWindow()
+    const otherWindow = new electron.FakeBrowserWindow()
+    ensure(owner, 'task-1', 'http://localhost:3000')
+    const view = electron.FakeWebContentsView.instances[0]
+    const find = electron.eventHandlers.get('preview:find')
+
+    find?.(eventFor(otherWindow), { taskId: 'task-1', text: 'acorn', direction: 'initial' })
+    expect(view.webContents.findInPage).not.toHaveBeenCalled()
+
+    find?.(eventFor(owner), { taskId: 'task-1', text: 'acorn', direction: 'initial' })
+    expect(view.webContents.findInPage).toHaveBeenLastCalledWith('acorn', { forward: true, findNext: true })
+
+    find?.(eventFor(owner), { taskId: 'task-1', text: 'acorn', direction: 'backward' })
+    expect(view.webContents.findInPage).toHaveBeenLastCalledWith('acorn', { forward: false, findNext: false })
+
+    owner.webContents.send.mockClear()
+    view.webContents.emit('found-in-page', {}, {
+      requestId: 1,
+      activeMatchOrdinal: 1,
+      matches: 3,
+      finalUpdate: true,
+    })
+    expect(owner.webContents.send).not.toHaveBeenCalled()
+
+    view.webContents.emit('found-in-page', {}, {
+      requestId: 2,
+      activeMatchOrdinal: 3,
+      matches: 3,
+      finalUpdate: true,
+    })
+    expect(owner.webContents.send).toHaveBeenCalledWith('preview:find-result', {
+      taskId: 'task-1',
+      activeMatchOrdinal: 3,
+      matches: 3,
+      finalUpdate: true,
+    })
+  })
+
+  it('stops find and returns focus only for the requesting window own preview', () => {
+    const owner = new electron.FakeBrowserWindow()
+    const otherWindow = new electron.FakeBrowserWindow()
+    ensure(owner, 'task-1', 'http://localhost:3000')
+    const view = electron.FakeWebContentsView.instances[0]
+    const stopFind = electron.eventHandlers.get('preview:stop-find')
+    const focus = electron.eventHandlers.get('preview:focus')
+
+    stopFind?.(eventFor(otherWindow), { taskId: 'task-1', action: 'clearSelection' })
+    focus?.(eventFor(otherWindow), { taskId: 'task-1' })
+    expect(view.webContents.stopFindInPage).not.toHaveBeenCalled()
+    expect(view.webContents.focus).not.toHaveBeenCalled()
+
+    stopFind?.(eventFor(owner), { taskId: 'task-1', action: 'keepSelection' })
+    focus?.(eventFor(owner), { taskId: 'task-1' })
+    expect(view.webContents.stopFindInPage).toHaveBeenCalledWith('keepSelection')
+    expect(view.webContents.focus).toHaveBeenCalledOnce()
+    expect(owner.webContents.send).toHaveBeenCalledWith('preview:find-result', {
+      taskId: 'task-1',
+      activeMatchOrdinal: 0,
+      matches: 0,
+      finalUpdate: true,
+    })
   })
 })
