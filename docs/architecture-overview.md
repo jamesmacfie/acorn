@@ -99,14 +99,15 @@ weight or extra per-request abstraction. See
 
 ## The product model
 
-The UI is organised as a three-level hierarchy plus two docked surfaces.
+The UI is organised as a three-level hierarchy plus a docked terminal surface.
 
 ```
 Workspace ("Runn", "Acorn")            ← group of repos, picked in the top bar
+  ├─ Agent Center                      ← workspace-wide managed-session history
   └─ Task (repo + branch + worktree)   ← unit of work, a row in the left TabRail
-       ├─ Panes (ordered/resizable row)← pr · changes · notes · editor · docker · http · …
-       ├─ Terminal drawer (bottom)     ← persistent shell / agent sessions   [desktop]
-       └─ Agents panel (right rail)    ← agent roster + launcher + activity   [desktop]
+       ├─ Panes (ordered/resizable row)← agents · pr · changes · notes · editor · …
+       │    └─ Agent pane              ← chat + same-task agent/activity sidebar
+       └─ Terminal drawer (bottom)     ← shells, raw agents, tool terminals   [desktop]
 ```
 
 - **Workspace** — a named *group of repos*, the top-level unit picked in the top
@@ -122,14 +123,19 @@ Workspace ("Runn", "Acorn")            ← group of repos, picked in the top bar
   it was renamed; Workspace now means the group.)
 - **Pane** — a registry-contributed surface inside the Task view. `PaneId` is a
   string owned by a contribution rather than a closed core union. The shipped
-  panes are `pr | changes | notes | context | editor | search | database |
+  panes include `agents | pr | changes | notes | context | editor | search | database |
   preview | docker | http | linear | rollbar`. A task layout is a flat,
   ordered row with optional relative widths and pins
   (`TaskLayout = { panes, weights?, pinned? }`); one pure reducer owns show/add,
   close/unpin, pin, move, resize/equalize, and recipe replacement.
-- **Terminal drawer** — bottom, per-task, holds persistent shell/agent sessions.
-- **Agents panel** — right rail, the roster, launcher, and activity feed for
-  agent sessions.
+- **Agent Center** — a workspace source for managed Claude/Codex history, search, provider health,
+  attention/unread state, transcript import, launch and outcome comparison. New sessions still
+  require a task/worktree.
+- **Terminal drawer** — bottom, per-task, holds shells, raw provider TUIs and terminals attached to
+  managed tool calls.
+- **Agent pane** — the task-level managed conversation and lifecycle surface. Its persistent
+  sidebar lists same-task managed sessions, attention requests, raw terminals and workflow work,
+  while its header summarizes provider utilization.
 
 **Maturity.** PR review, Workspaces, Tasks, the TabRail, all twelve pane
 contributions, the Docker and API Requests sources, notifications, integrations
@@ -179,7 +185,7 @@ These back the product model above and the agent spine:
 | Workspaces | `workspaces`, `workspace_repos`, `ignored_repos`, `workspace_projects` |
 | Tasks | `tasks`, `task_links` |
 | Review | `review_notes` (inline notes on uncommitted changes), `viewed_files` |
-| Agents / memory | `memories` (+ `memories_fts` FTS5), `terminal_sessions` |
+| Agents / memory | `agent_sessions`, `agent_turns`, `agent_events` (+ FTS5), `agent_requests`, `agent_attachments`, `agent_artifacts`, `agent_operations`, `agent_webhooks`, `agent_webhook_deliveries`, `memories` (+ FTS5), `terminal_sessions` |
 | Automation | `workflow_runs`, `workflow_steps`, `command_executions`, `config_acks` |
 | Public API | `api_tokens`, on-demand `oauth_accounts`, `api_idempotency` (bearer automation API) |
 | HTTP client | identity-scoped `http_requests`, `http_variables` (sensitive values encrypted at rest) |
@@ -250,12 +256,13 @@ so a read inside the TTL window reflects the change. See
 
 When a task first needs a working tree, acorn creates a **git worktree per task**
 under `apps/desktop/.acorn/worktrees/`, so several agents can work different
-branches of the same repo without colliding. **Agent sessions** are PTYs managed
-in the Node utility process (`apps/desktop/src/plugins/terminal/main/terminal.ts`,
-registered by the service composition root); they share the single SQLite
-connection rather than opening a second.
+branches of the same repo without colliding. **Managed Claude/Codex sessions** are structured
+protocol processes owned by the Agents plugin in the Node utility service. Their normalized,
+append-only event ledger and query projections share the app's SQLite connection. Raw shell/agent
+sessions remain PTYs managed by `plugins/terminal/main/terminal.ts`.
 
-Agents get task-scoped context through the **acorn MCP server**
+Managed turns receive immutable context snapshots through pane contribution registries; raw agents
+also get task-scoped tools through the **acorn MCP server**
 (`apps/desktop/src/core/mcp/server.ts`) over loopback. The stdio MCP proxy runs as a spawned child
 process and calls the running app rather than opening the database itself. Because it holds
 no session cookie, the utility service loads or creates one persistent mode-`0600`
@@ -270,15 +277,16 @@ is a derived, FTS-searchable index) persists conventions and decisions across
 sessions.
 
 This section is a map, not the manual — see
-[terminal-and-agents.md](./terminal-and-agents.md), [mcp.md](./mcp.md),
+[managed-agents.md](./managed-agents.md), [terminal-and-agents.md](./terminal-and-agents.md), [mcp.md](./mcp.md),
 [notes-and-memory.md](./notes-and-memory.md), and [workflows.md](./workflows.md)
 for the detail. Interactive sessions and workflows are desktop-only; the HTTP-backed agent-tool
 projection itself is transport-neutral.
 
 ## What acorn deliberately does not have
 
-- **No webhooks or background jobs** — everything is read-driven. (A background
-  triage loop, "Pulse", has been designed but is not shipped.)
+- **No remote ingestion jobs or hosted daemon** — GitHub mirror reads remain demand-driven.
+  Local managed-agent scheduling, workflow reconciliation and optional outbound attention/completion
+  webhook delivery run only while the desktop utility service is alive.
 - **No server-side session store** — the session lives entirely in an encrypted
   cookie, decrypted per request.
 - **No GitHub token in the browser** — only public profile fields cross the wire.
@@ -328,14 +336,16 @@ projection itself is transport-neutral.
 
 **Agents & automation**
 
+- [managed-agents](./managed-agents.md) — structured Claude/Codex sessions, normalized durable
+  events, scheduling/recovery, context, safety, UI, public automation and retained terminal fallback.
 - [terminal-and-agents](./terminal-and-agents.md) — the terminal drawer, agent
-  sessions, run targets, and the agents panel (desktop-only).
+  fallback, raw status, run targets, and the compact agents panel (desktop-only).
 - [mcp](./mcp.md) — the acorn MCP server: the task-scoped tools it exposes to
   agents over loopback.
 - [notes-and-memory](./notes-and-memory.md) — review notes, the memory index, and
   the reviewer→agent handoff.
 - [workflows](./workflows.md) — durable runs/steps, registries, branches, gates,
-  tool ceilings, cancellation, and triggers.
+  tool/budget ceilings, managed sessions, cancellation, and triggers.
 - [integrations](./integrations.md) — third-party sources (Linear, Rollbar):
   connect/status, caching, and how they seed tasks.
 

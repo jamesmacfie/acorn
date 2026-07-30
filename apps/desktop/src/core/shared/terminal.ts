@@ -22,6 +22,7 @@ export type TerminalSession = {
   // so the renderer doesn't need the task join for a per-session badge/cleanup affordance.
   isWorktree: boolean
   taskId: string // → tasks.id (docs/workspaces-and-tasks.md); a session always belongs to a task
+  agentSessionId?: string // managed→terminal controller handoff lineage
   cwd: string
   command: string
   tmuxSession?: string
@@ -45,6 +46,8 @@ export type CreateOpts = {
   // profile binary, with `env` merged in (e.g. PORT). The command is user-configured per repo.
   command?: string
   env?: Record<string, string>
+  // Service-owned handoff metadata. Renderer-created terminal sessions leave this absent.
+  agentSessionId?: string
 }
 
 // Result of creating/removing a worktree (docs/workspaces-and-tasks.md). `reason` explains a failure for the UI.

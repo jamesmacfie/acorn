@@ -13,6 +13,9 @@ export function parseStreamLine(line: string): StreamEvent | null {
 export function parseStreamJson(stdout: string): HeadlessCapture {
   const events = stdout.split('\n').map(parseStreamLine).filter((event): event is StreamEvent => event != null)
   const resultEvent = [...events].reverse().find((event) => event.type === 'result')
+  const usage = resultEvent?.usage && typeof resultEvent.usage === 'object'
+    ? resultEvent.usage as Record<string, unknown>
+    : null
   return {
     result: typeof resultEvent?.result === 'string' ? resultEvent.result : null,
     structuredOutput: resultEvent && 'structured_output' in resultEvent ? (resultEvent.structured_output ?? null) : null,
@@ -23,9 +26,19 @@ export function parseStreamJson(stdout: string): HeadlessCapture {
         : typeof resultEvent?.cost_usd === 'number'
           ? resultEvent.cost_usd
           : null,
+    ...(usage
+      ? {
+          usage: {
+            ...(typeof usage.input_tokens === 'number' ? { inputTokens: usage.input_tokens } : {}),
+            ...(typeof usage.output_tokens === 'number' ? { outputTokens: usage.output_tokens } : {}),
+            ...(typeof usage.cache_read_input_tokens === 'number'
+              ? { cachedInputTokens: usage.cache_read_input_tokens }
+              : {}),
+          },
+        }
+      : {}),
     events,
   }
 }
 
 export const lineDelimitedJsonAdapter: StreamJsonAdapter = { parse: parseStreamJson, parseLine: parseStreamLine }
-

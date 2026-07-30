@@ -1,6 +1,12 @@
-# Workspace chat plugin
+# Workspace chat plugin (superseded)
 
-**Status:** implementation design · **Written against:** `98d6110` · **Date:** 2026-07-11
+**Status:** superseded by [Managed Agents](../../managed-agents.md) ·
+**Written against:** `98d6110` · **Date:** 2026-07-11
+
+> This direct OpenAI/Anthropic API chat product will not be implemented. Managed Agents reuses the
+> safe-rendering, attachment-store, streaming, history and notification decisions from this record
+> inside task-scoped Claude Code and Codex CLI sessions. Statements below describe the retired
+> proposal and are retained only as design provenance.
 
 This folder specifies a first-party Acorn plugin for ordinary model chat. The first release connects
 directly to OpenAI and Anthropic, streams responses, accepts explicit attachments, keeps all thread

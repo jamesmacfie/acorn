@@ -423,6 +423,26 @@ It full-text indexes `name`/`description`/`body` with the porter stemmer; `id` i
 indexed so a hit maps back to the `memories` row. It is kept in sync by application code, not by a
 Drizzle relationship.
 
+#### Managed-agent tables
+
+Managed sessions are machine-scoped, task-owned local history. Provider credentials and raw protocol
+payloads are never stored. The normalized event ledger is append-only; session/turn/request rows are
+transactional query projections. Full contracts and state vocabularies are in
+[managed-agents](./managed-agents.md).
+
+| Table | Key data / invariant |
+| --- | --- |
+| `agent_sessions` | task/provider/profile, opaque provider resume ref, exclusive controller, runtime/attention/authority, config, lineage, event/read cursors, archive timestamps |
+| `agent_turns` | unique `(sessionId, ordinal)` and `(sessionId, idempotencyKey)`; durable queue, input/policy manifest, provider ref, usage/error/timing and safe-retry attempt |
+| `agent_events` | unique monotonically increasing `(sessionId, seq)`; schema-versioned normalized event JSON and bounded search text |
+| `agent_events_fts` | migration-owned FTS5 projection synchronized by triggers |
+| `agent_requests` | unique provider request per session; `pending → resolving → resolved/expired` closes double-answer races |
+| `agent_attachments` / `agent_attachment_refs` | task-scoped content hash/metadata plus turn references into the separate attachment object store |
+| `agent_artifacts` | session/turn metadata and optional storage key for large typed outputs |
+| `agent_operations` | bounded command idempotency results not naturally owned by another resource |
+| `agent_webhooks` | optional task-filtered content-free completion/attention target and encrypted HMAC secret |
+| `agent_webhook_deliveries` | unique event delivery, bounded retry state, response status/error and delivery timestamp |
+
 #### `terminal_sessions`
 
 Durable terminal sessions. PK opaque `id`. Machine-scoped. **Desktop-only** — the terminal drawer
@@ -489,6 +509,7 @@ Steps carry a first-class working context (`worktreePath`); structured output is
 | `resultJson` | text | captured `HeadlessResult` (sans events) |
 | `structuredJson` | text | schema-conforming output — the edge currency |
 | `sessionId` | text | for `--resume` (open in terminal) |
+| `agentSessionId` | text | → `agent_sessions.id` for managed workflow steps |
 | `costUsd` | real | |
 | `iteration` | integer | loop-bound bookkeeping (default 0) |
 | `parentStepId` | text | fan-out lineage |
@@ -627,10 +648,15 @@ ignored_repos(owner, repo)   -- independent hidden marker; membership is retaine
 tasks(id)
   ├─ task_links(taskId, integrationId, identifier)   -- (integrationId, identifier) → issues PK tail
   ├─ review_notes(taskId)
+  ├─ agent_sessions(taskId)
+  │    ├─ agent_turns(sessionId) ── agent_attachment_refs(turnId)
+  │    ├─ agent_events(sessionId)
+  │    ├─ agent_requests(sessionId)
+  │    └─ agent_artifacts(sessionId)
   ├─ terminal_sessions(taskId)
   ├─ command_executions(taskId)
   └─ workflow_runs(taskId)
-        └─ workflow_steps(runId)                     -- workflow_steps.parentStepId = fan-out lineage
+        └─ workflow_steps(runId)                     -- parentStepId fan-out; agentSessionId managed lineage
 tasks.parentId → tasks.id                            -- task tree (fan-out children)
 db_saved_queries(repoOwner, repoName)                 -- repo-scoped, not task-scoped
 ```

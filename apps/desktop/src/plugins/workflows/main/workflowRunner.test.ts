@@ -218,6 +218,61 @@ describe('WorkflowRunner (docs/workflows.md)', () => {
     expect(step2.error).toContain('Safety rail')
   })
 
+  it('enforces cumulative workflow usage and per-step wall-time budgets as safety rails', async () => {
+    const d = deps()
+    d.runStep = async (_taskId, def, opts) => {
+      if (def.name === 'slow') {
+        return new Promise((resolveResult) => {
+          opts.signal?.addEventListener('abort', () => resolveResult({
+            status: 'cancelled',
+            exitCode: null,
+            capture: {
+              result: null,
+              structuredOutput: null,
+              sessionId: null,
+              costUsd: null,
+              events: [],
+            },
+            stderrTail: '',
+          }), { once: true })
+        })
+      }
+      return {
+        status: 'ok',
+        exitCode: 0,
+        capture: {
+          result: `${def.name} done`,
+          structuredOutput: null,
+          sessionId: `${def.name}-session`,
+          costUsd: 0.6,
+          usage: { inputTokens: 600, outputTokens: 200 },
+          events: [],
+        },
+        stderrTail: '',
+      }
+    }
+
+    const runner = new WorkflowRunner(t.db, d)
+    const usageRunId = await runner.start('task1', {
+      name: 'usage-rail',
+      budget: { maxCostUsd: 1, maxInputTokens: 2000 },
+      steps: [{ name: 'one' }, { name: 'two' }, { name: 'never' }],
+    })
+    const usageRun = await waitDone(runner, usageRunId)
+    expect(usageRun.status).toBe('safety-rail')
+    const usageSteps = await runner.steps(usageRunId)
+    expect(usageSteps.map((step) => step.status)).toEqual(['done', 'safety-rail', 'pending'])
+    expect(usageSteps[1].error).toContain('cost budget exceeded')
+
+    const timeoutRunId = await runner.start('task1', {
+      name: 'timeout-rail',
+      steps: [{ name: 'slow', budget: { maxWallTimeMs: 20 } }],
+    })
+    const timeoutRun = await waitDone(runner, timeoutRunId)
+    expect(timeoutRun.status).toBe('safety-rail')
+    expect((await runner.steps(timeoutRunId))[0].error).toContain('Wall-time budget exhausted')
+  })
+
   it('fan-out → 3 child tasks with real worktrees → join aggregates all 3; partial failure marks the join', async () => {
     const { execFileSync } = await import('node:child_process')
     const { existsSync } = await import('node:fs')

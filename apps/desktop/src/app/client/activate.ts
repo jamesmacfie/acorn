@@ -3,6 +3,7 @@ import { prPaneContribution } from '../../plugins/github/client/pullDetail/PrPan
 import { clientIntegrationProviders, registerIntegrationProvider } from './providerContributions'
 import { changesPaneContribution } from '../../plugins/changes/client/paneContribution'
 import { notesPaneContribution } from '../../plugins/notes/client/NotesTaskPane'
+import { agentPaneContribution } from '../../plugins/agents/client/paneContribution'
 import { contextPaneContribution } from '../../plugins/context/client/paneContribution'
 import { editorPaneContribution } from '../../plugins/editor/client/paneContribution'
 import { searchPaneContribution } from '../../plugins/editor/client/search/paneContribution'
@@ -32,9 +33,26 @@ import { persistedStateRegistry } from '../../core/client/persistence/persistedS
 import { persistedSliceContributions } from './persistedSliceContributions'
 import { activateScopedStateEviction } from './scopedEviction'
 import { activateUiControl } from '../../core/client/publicApi/uiControlClient'
+import { agentContextRegistry } from '../../core/client/registries/agentContexts'
+import { taskContextAgentContribution } from '../../plugins/context/client/agentContextContribution'
+import { changesAgentContextContribution } from '../../plugins/changes/client/agentContextContribution'
+import { editorAgentContextContribution } from '../../plugins/editor/client/agentContextContribution'
+import { previewAgentContextContribution } from '../../plugins/preview/client/agentContextContribution'
+import { terminalAgentContextContribution } from '../../plugins/terminal/client/agentContextContribution'
+import { workflowAgentContextContribution } from '../../plugins/workflows/client/agentContextContribution'
+import { databaseAgentContextContribution } from '../../plugins/database/client/agentContextContribution'
+import { dockerAgentContextContribution } from '../../plugins/docker/client/agentContextContribution'
+import { httpAgentContextContribution } from '../../plugins/http/client/agentContextContribution'
+import { activateManagedAgentReferences } from '../../plugins/agents/client/referenceContribution'
+import { agentCenterSourceContribution } from '../../plugins/agents/client/sourceContribution'
+import { agentToolRendererRegistry } from '../../core/client/registries/agentToolRenderers'
+import { changesAgentToolRenderer } from '../../plugins/changes/client/agentToolRenderer'
+import { activateManagedAgentNotifications } from '../../plugins/agents/client/managedStore'
+import { activateManagedAgentNoticeTargets } from '../../plugins/agents/client/managedSelection'
 
 const panes = [
   prPaneContribution,
+  agentPaneContribution,
   changesPaneContribution,
   notesPaneContribution,
   contextPaneContribution,
@@ -47,10 +65,26 @@ const panes = [
 ]
 
 for (const pane of panes) paneRegistry.register(pane)
+for (const contribution of [
+  taskContextAgentContribution,
+  changesAgentContextContribution,
+  editorAgentContextContribution,
+  previewAgentContextContribution,
+  terminalAgentContextContribution,
+  workflowAgentContextContribution,
+  databaseAgentContextContribution,
+  dockerAgentContextContribution,
+  httpAgentContextContribution,
+]) agentContextRegistry.register(contribution)
+agentToolRendererRegistry.register(changesAgentToolRenderer)
+activateManagedAgentReferences()
+activateManagedAgentNotifications()
+activateManagedAgentNoticeTargets()
 for (const provider of clientIntegrationProviders) registerIntegrationProvider(provider)
 // Local sources (no integration row): docker and the API panel are always visible in the rail.
 sourceRegistry.register(dockerSourceContribution)
 sourceRegistry.register(httpSourceContribution)
+sourceRegistry.register(agentCenterSourceContribution)
 purgeStoredHttpDrafts()
 for (const page of settingsPageContributions) settingsRegistry.register(page)
 activatePreviewEvents()

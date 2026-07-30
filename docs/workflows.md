@@ -12,7 +12,8 @@ start/stop/reach), and a workflow is the composable multi-step machine that cons
 >   HTTP/WS client, MCP tools, palette, recipes).
 > - **The workflow runtime is implemented**: registry-backed step kinds/policies/profiles, explicit
 >   joins, named-output templating, `decide` branches, tool ceilings, bounded fan-out, cancellation,
->   live step events, and app-open triggers all run through the durable checkpoint engine. It still
+>   inherited budgets, managed Claude/Codex steps, live step events, and app-open triggers all run
+>   through the durable checkpoint engine. It still
 >   has **no GUI authoring**, and runs/triggers advance **only while the app is open** (no daemon).
 
 ---
@@ -28,8 +29,9 @@ Two related, desktop-capability-gated ideas:
   ▶/■ button, a `Run:`/`Stop:` palette entry, and an MCP `run_*` tool.
 - **Workflows** — a durable state machine of named **steps** (agent runs, gates, loops, fan-out/join)
   run by the Electron **utility service**, where steps hand off through acorn's notes/memory/context
-  substrate rather than terminal scrollback, and the composable unit is a **headless step** that
-  captures a structured result. Workflows *consume* run targets (a step can declare `requires_run`).
+  substrate rather than terminal scrollback. Claude/Codex steps use the same managed-agent ledger
+  and interaction path as the Agent pane; other profiles retain the headless compatibility runner.
+  Workflows *consume* run targets (a step can declare `requires_run`).
 
 Run targets are the simplest (one-shot) end of the same spectrum workflows extend.
 
@@ -175,6 +177,7 @@ run:
 | `resultJson` | the captured `HeadlessResult` (sans events) |
 | `structuredJson` | the schema-conforming output — **the edge currency** passed between steps |
 | `sessionId` | for `--resume` (open the step in a terminal) |
+| `agentSessionId` | managed-agent session owning the structured provider turn |
 | `iteration` | loop-bound bookkeeping |
 | `parentStepId` | fan-out lineage |
 | `costUsd` | per-step cost |
@@ -191,6 +194,10 @@ PRD-style step can emit a task list and spawn N children, each on its own branch
   --output-schema …`); tests use a committed `fake-agent.sh` through the same argv-template path.
 - **`structuredJson` is the edge currency.** Branching, joining, and fan-out read a step's structured
   output (a JSON field), never free text.
+- **Managed Claude/Codex steps share the interactive runtime.** Each creates/resumes an
+  `agent_session`, persists normalized events and provider requests in the same ledger, and records
+  `agentSessionId` on the workflow step. The legacy headless path remains for profiles without a
+  conforming structured driver.
 - **Gates are enforced in the utility service, not in prompts.** A `gate-human` step pauses the run until
   the approve HTTP call; a `gate-policy` step **re-derives** its verdict in the engine and ignores whatever the
   step claimed (e.g. the `checks-green` policy polls the `checks` mirror —
@@ -206,6 +213,11 @@ PRD-style step can emit a task list and spawn N children, each on its own branch
   argv, one-shot structured argv, and stream parsing live together under `main/agentProfiles/`.
 - **Capability only narrows.** `[tools]` and `[steps.tools]` allowlists/risk ceilings intersect;
   the MCP projection then intersects that result with global per-tool/user permissions.
+- **Budgets only narrow.** `[budget]`, `[steps.budget]` and
+  `[steps.child_step.budget]` can cap `max_wall_time_ms`, `max_cost_usd`,
+  `max_input_tokens`, `max_output_tokens` and `max_turns`. Step/child limits may be lower than their
+  parent but never higher. The runner enforces wall-time cancellation and post-turn cumulative
+  usage as a `safety-rail` terminal state.
 - **Safety rails are first-class terminal states.** Hitting a `ci-loop` `maxIterations` bound is a
   `safety-rail` status, not a `failed` — a thrashing loop is the only real failure.
 - **Runs are the checkpoint.** `WorkflowRunner.reconcile()` (`terminal.ts:1027`) resumes or
@@ -238,7 +250,7 @@ control. `reconcile` requeues interrupted running rows and completes interrupted
 | HTTP + WS client | `workflowClient.ts`, `terminalClient.ts` | defs/start/runs/steps/gate/cancel/kill/trigger-poll over HTTP; notices, status, and live step events over WS |
 | Palette launch | `model.ts:28`, `CommandPalette.tsx:114-119` | `Workflow: <name>` rows; selecting one calls `workflow.start` |
 | Settings inspector | `plugins/workflows/client/WorkflowsSettings.tsx` | **read-only** list of the committed/user workflow defs the active task would load + parse errors; a viewer, not a launcher |
-| Agents panel | `plugins/agents/client/AgentsPanel.tsx` | push-refetches transitions, renders a live tail and quiet-step hint, approves gates, cancels runs/kills steps, and uses the profile-projected resume command |
+| Agent task sidebar | `plugins/agents/client/AgentTaskSidebar.tsx` | push-refetches transitions, lists task workflow activity, approves gates, and uses the profile-projected resume command |
 
 Gate/run-done notices and live step events are broadcast to the renderer over the authenticated
 WebSocket and feed the same notification bell as agent-state edges.
@@ -260,18 +272,19 @@ WebSocket and feed the same notification bell as agent-state edges.
   workflow steps and gates.
 
 The runtime includes step/policy/profile/trigger registries; explicit joins;
-`decide` plus named-output templates; per-run/step tool ceilings; bounded concurrency/turns/fan-out;
-engine-owned cancellation; run-scoped handoffs and terminal memory review; push status/live events;
-and visibility-paused, app-open trigger evaluation.
+`decide` plus named-output templates; inherited tool and wall-time/cost/token/turn budgets; managed
+Claude/Codex sessions; bounded concurrency/turns/fan-out; engine-owned cancellation; run-scoped
+handoffs and terminal memory review; push status/live events; and visibility-paused, app-open
+trigger evaluation.
 
 **Still intentionally limited:** no GUI workflow builder, no daemon, no general DAG/dataflow
-engine, no cost budgeting, and no typed recovery/retry graph. `decide` is a single tool-free
-structured call; sub-workflows stay statically expanded; join stays all-or-nothing.
+engine and no arbitrary typed recovery graph. `decide` is a single tool-free structured call;
+sub-workflows stay statically expanded; join stays all-or-nothing.
 
 **Deliberate non-goals** (what the design studied in agentfield and rejected): no control plane
 or agent fleet, **no daemon / background execution** (the runner ticks only while the app is
-open), **no cost budgeting** (acorn drives Claude/Codex on subscriptions), no cryptographic
-identity/audit governance, and no inter-agent message bus (the notes/memory/DB substrate stays
+open), no cryptographic identity/audit governance, and no inter-agent message bus (the
+notes/memory/DB substrate stays
 the only channel). Also still unbuilt: a general DAG engine, sub-workflow depth beyond one level,
 saved-prompt/skills-as-steps polish, and acorn-as-a-Linear-agent-host.
 
@@ -292,7 +305,7 @@ saved-prompt/skills-as-steps polish, and acorn-as-a-Linear-agent-host.
 - Client: `apps/desktop/src/core/client/palette/{model.ts,CommandPalette.tsx}`,
   `apps/desktop/src/plugins/terminal/client/{recipes.ts,runClient.ts,terminalClient.ts}`,
   `apps/desktop/src/plugins/workflows/client/WorkflowsSettings.tsx`, and
-  `apps/desktop/src/plugins/agents/client/AgentsPanel.tsx`
+  `apps/desktop/src/plugins/agents/client/AgentTaskSidebar.tsx`
 - MCP tools: `apps/desktop/src/core/mcp/server.ts:233-251`
 - Capability gate: `apps/desktop/src/core/client/capabilities.ts`
 

@@ -74,6 +74,7 @@ focus and maximize stay session-only. Pane shortcuts are contribution-owned and 
 
 | Pane | What it shows |
 | --- | --- |
+| `agents` | Managed Claude/Codex conversation, requests, queue, context, artifacts and lifecycle |
 | `pr` | PR review — the Navigator + Diff (only when a PR is linked) |
 | `changes` | Uncommitted working-tree review (see below) |
 | `notes` | Scratchpad-first task/workspace/global markdown library |
@@ -121,23 +122,24 @@ and telling it what to fix, without leaving acorn.
 
 ## Terminals & agents *(desktop-only)*
 
-The bottom **terminal drawer** is per-task and holds persistent shell / agent sessions running in
-the task's git worktree — a plain shell, or a coding agent (Claude Code, Codex, aider). Opening a
-terminal creates the worktree on first use, and a PR is inherited automatically once the agent opens
-one.
+The task **Agent pane** is the primary conversation UI for managed Claude Code and Codex sessions.
+It renders structured protocol messages, displayable reasoning, tools, plans, file changes, usage,
+questions and permissions without parsing a terminal. The workspace **Agent Center** aggregates
+history/search, provider health, unread/attention state, transcript import, launch and comparisons.
 
-The right-rail **Agents panel** is the roster + launcher + activity feed for agent sessions, and
-"agent working" status flows back to the TabRail (spinner) and the topbar. All of this is
-desktop-only — always on when the native terminal capability is present (`capabilities()`,
-`apps/desktop/src/core/client/capabilities.ts`); the old `acorn:term` flag is gone. Bridge-absent
-(a plain browser via `dev:node`) is the degraded mode.
+Inside the task **Agent pane**, a persistent sidebar lists the task's managed sessions,
+working/needs-you state, raw terminals and workflow gates. Switching rows changes the conversation
+without hiding the roster. The bottom **terminal drawer** remains per-task for shells, raw
+coding-agent TUIs (including Aider and explicit Claude/Codex fallback) and tool terminals. Managed
+and terminal controllers cannot concurrently write to one provider session.
 
-The panel also reads provider usage without persisting it: Claude uses bounded local transcript
-aggregates, while Codex uses its app-server usage/status surface. A configurable pricing catalog
-turns token categories into local cost estimates; the cache is five minutes and no usage row is
-written to SQLite or IndexedDB.
+The Agent header also reads provider usage without persisting it and shows the detailed breakdown
+on hover/focus: Claude uses bounded local transcript aggregates, while Codex uses its app-server
+usage/status surface. A configurable pricing catalog turns token categories into local cost
+estimates; the cache is five minutes and no usage row is written to SQLite or IndexedDB.
 
-→ [terminal-and-agents.md](./terminal-and-agents.md)
+→ [managed-agents.md](./managed-agents.md) ·
+[terminal-and-agents.md](./terminal-and-agents.md)
 
 ## Integrations
 
@@ -176,8 +178,9 @@ launched outside acorn. Configure in **Settings → MCP**.
 ## Workflows *(desktop-only)*
 
 Composable multi-agent orchestration: committed `.acorn/workflows` run as multi-step agent
-sequences. The durable runtime supports registry-backed step kinds, profiles and policies; explicit
-joins and conditional branches; named-output templates; per-run tool ceilings; bounded fan-out;
+sequences. Claude/Codex steps share the managed-agent ledger and request path. The durable runtime
+supports registry-backed step kinds, profiles and policies; explicit joins and conditional branches;
+named-output templates; inherited tool/wall-time/cost/token/turn ceilings; bounded fan-out;
 cancellation; human/policy gates; live step events; run-scoped handoffs; and app-open triggers.
 Definitions remain file-authored, and execution advances only while the app is open.
 
@@ -239,7 +242,7 @@ Be aware of what's real today:
   and workflows — available whenever the Electron terminal capability is present (`capabilities()`);
   the `acorn:term` localStorage flag has been deleted.
 - **Deliberate workflow limits:** no GUI workflow authoring, daemon/background runner, general DAG,
-  cost budgeting, or recovery graph. See [workflows.md](./workflows.md).
+  or arbitrary recovery graph. See [workflows.md](./workflows.md).
 
 ## Source
 
@@ -254,6 +257,7 @@ Be aware of what's real today:
 
 See also: [architecture-overview.md](./architecture-overview.md) ·
 [workspaces-and-tasks.md](./workspaces-and-tasks.md) · [panes.md](./panes.md) ·
+[managed-agents.md](./managed-agents.md) ·
 [terminal-and-agents.md](./terminal-and-agents.md) · [integrations.md](./integrations.md) ·
 [notes-and-memory.md](./notes-and-memory.md) · [mcp.md](./mcp.md) · [workflows.md](./workflows.md) ·
 [command-palette-and-shortcuts.md](./command-palette-and-shortcuts.md) ·

@@ -1,5 +1,10 @@
 import { DEFAULT_PROFILE_ID } from '../../../core/main/agentProfiles'
-import type { StepValidationContext, WorkflowDef, WorkflowStepDef } from './workflowContracts'
+import type {
+  StepValidationContext,
+  WorkflowBudget,
+  WorkflowDef,
+  WorkflowStepDef,
+} from './workflowContracts'
 import { intersectToolCeilings, narrowsToolCeiling } from './workflowTools'
 
 const TEMPLATE_RE = /\$\{steps\.([^}]+)\.output\}/g
@@ -31,6 +36,31 @@ function invalidTemplateExpressions(prompt: string | undefined): string[] {
   return (prompt.match(STEP_TEMPLATE_TOKEN_RE) ?? []).filter((token) => !/^\$\{steps\.[^}]+\.output\}$/.test(token))
 }
 
+const BUDGET_FIELDS: Array<keyof WorkflowBudget> = [
+  'maxWallTimeMs',
+  'maxCostUsd',
+  'maxInputTokens',
+  'maxOutputTokens',
+  'maxTurns',
+]
+
+function validateBudget(label: string, budget: WorkflowBudget | undefined): string[] {
+  if (!budget) return []
+  return BUDGET_FIELDS.flatMap((field) => {
+    const value = budget[field]
+    if (value == null) return []
+    if (!Number.isFinite(value) || value <= 0) return [`${label} ${field} must be positive`]
+    if (field !== 'maxCostUsd' && !Number.isInteger(value)) return [`${label} ${field} must be an integer`]
+    return []
+  })
+}
+
+function budgetNarrows(parent: WorkflowBudget | undefined, child: WorkflowBudget | undefined): boolean {
+  if (!child) return true
+  return BUDGET_FIELDS.every((field) =>
+    child[field] == null || parent?.[field] == null || child[field]! <= parent[field]!)
+}
+
 export function validateWorkflow(def: WorkflowDef, catalog: WorkflowValidationCatalog): string[] {
   const errors: string[] = []
   if (!def.name?.trim()) errors.push('workflow has no name')
@@ -38,6 +68,7 @@ export function validateWorkflow(def: WorkflowDef, catalog: WorkflowValidationCa
   if (def.posture === 'autonomous' && !def.tools?.allow && !def.tools?.maxRisk) {
     errors.push(`workflow '${def.name}' is autonomous but has no tool allowlist or risk ceiling`)
   }
+  errors.push(...validateBudget(`workflow '${def.name}' budget`, def.budget))
 
   const indexes = new Map<string, number>()
   for (const [index, step] of def.steps.entries()) {
@@ -58,6 +89,20 @@ export function validateWorkflow(def: WorkflowDef, catalog: WorkflowValidationCa
     if (!narrowsToolCeiling(def.tools, step.tools)) errors.push(`${label} tool ceiling widens the workflow ceiling`)
     if (!narrowsToolCeiling(intersectToolCeilings(def.tools, step.tools), step.childStep?.tools)) {
       errors.push(`${label} child tool ceiling widens its parent ceiling`)
+    }
+    errors.push(...validateBudget(`${label} budget`, step.budget))
+    errors.push(...validateBudget(`${label} child budget`, step.childStep?.budget))
+    if (!budgetNarrows(def.budget, step.budget)) errors.push(`${label} budget widens the workflow budget`)
+    const effectiveBudget = {
+      ...def.budget,
+      ...Object.fromEntries(BUDGET_FIELDS.flatMap((field) => {
+        const value = [def.budget?.[field], step.budget?.[field]]
+          .filter((candidate): candidate is number => candidate != null)
+        return value.length ? [[field, Math.min(...value)]] : []
+      })),
+    }
+    if (!budgetNarrows(effectiveBudget, step.childStep?.budget)) {
+      errors.push(`${label} child budget widens its parent budget`)
     }
 
     if (['agent', 'ci-loop', 'fan-out', 'decide'].includes(kind)) {

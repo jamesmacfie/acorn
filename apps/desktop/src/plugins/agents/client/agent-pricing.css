@@ -37,7 +37,7 @@
   display: block;
 }
 .agent-pricing-table tbody th > code {
-  margin-top: 2px;
+  margin-top: var(--space-1);
   color: var(--text-faint);
   font-size: var(--fs-2xs);
   font-weight: 400;

@@ -9,11 +9,17 @@ import { WS_PATH, type WsClientFrame, type WsServerFrame } from '../shared/ws'
 type OutputCb = (m: ServerMsg) => void
 type NoticeCb = (n: { taskId: string; kind: 'gate' | 'run-done' | 'repo-config-trust'; title: string; action?: 'review-config' }) => void
 type StepEventCb = (event: { runId: string; stepId: string; event: unknown }) => void
+type AgentFrameCb = (frame:
+  | { channel: 'agent:event'; event: unknown }
+  | { channel: 'agent:session'; session: unknown }
+  | { channel: 'agent:deleted'; sessionId: string }
+) => void
 
 const outputSubs = new Map<string, Set<OutputCb>>() // sessionId → local subscribers
 const statusSubs = new Set<() => void>()
 const noticeSubs = new Set<NoticeCb>()
 const stepEventSubs = new Set<StepEventCb>()
+const agentFrameSubs = new Set<AgentFrameCb>()
 const dockerChangedSubs = new Set<(scopes: string[]) => void>()
 // Docker log/stats stream subscribers, keyed `${kind}:${id}` — mirrors outputSubs' first-attach /
 // last-detach contract and the reconnect re-attach below.
@@ -74,6 +80,9 @@ function connect(): void {
     else if (frame.channel === 'term:status') statusSubs.forEach((cb) => cb())
     else if (frame.channel === 'workflow:notice') noticeSubs.forEach((cb) => cb(frame.notice))
     else if (frame.channel === 'workflow:step:event') stepEventSubs.forEach((cb) => cb(frame))
+    else if (frame.channel === 'agent:event' || frame.channel === 'agent:session' || frame.channel === 'agent:deleted') {
+      agentFrameSubs.forEach((cb) => cb(frame))
+    }
     else if (frame.channel === 'docker:changed') dockerChangedSubs.forEach((cb) => cb(frame.scopes))
     else if (frame.channel === 'docker:log') dockerStreamSubs.get(`logs:${frame.id}`)?.forEach((cb) => cb({ kind: 'log', data: frame.data }))
     else if (frame.channel === 'docker:stats') dockerStreamSubs.get(`stats:${frame.id}`)?.forEach((cb) => cb({ kind: 'stats', sample: frame.sample }))
@@ -104,7 +113,7 @@ function scheduleReconnect(): void {
   // ponytail: fixed 1s backoff; enough for a hardened loopback listener that only drops on quit.
   reconnectTimer = setTimeout(() => {
     reconnectTimer = null
-    if (outputSubs.size || statusSubs.size || noticeSubs.size || stepEventSubs.size || dockerChangedSubs.size || dockerStreamSubs.size) connect()
+    if (outputSubs.size || statusSubs.size || noticeSubs.size || stepEventSubs.size || agentFrameSubs.size || dockerChangedSubs.size || dockerStreamSubs.size) connect()
   }, 1000)
 }
 
@@ -152,6 +161,12 @@ export function wsOnWorkflowStepEvent(cb: StepEventCb): () => void {
   stepEventSubs.add(cb)
   connect()
   return () => void stepEventSubs.delete(cb)
+}
+
+export function wsOnAgentFrame(cb: AgentFrameCb): () => void {
+  agentFrameSubs.add(cb)
+  connect()
+  return () => void agentFrameSubs.delete(cb)
 }
 
 // Docker cache-dirty pings (the docker plugin's event-driven refresh edge).

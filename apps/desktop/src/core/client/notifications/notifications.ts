@@ -9,6 +9,11 @@ import { wsOnNotice } from '../wsClient'
 import { noticeKindContribution } from '../registries/notices'
 
 export type NoticeKind = string
+export type NoticeTarget = {
+  kind: string
+  resourceId: string
+  subresourceId?: string
+}
 
 export type Notice = {
   id: string
@@ -19,6 +24,7 @@ export type Notice = {
   at: number
   read: boolean
   action?: 'review-config'
+  target?: NoticeTarget
 }
 
 export const NOTICE_CAP = 50
@@ -30,6 +36,21 @@ export const capNotices = (list: Notice[]): Notice[] => list.slice(0, NOTICE_CAP
 
 let counter = 0
 const noticeId = (at: number) => `n${at}-${counter++}`
+const targetHandlers = new Map<string, (taskId: string, target: NoticeTarget) => void>()
+
+export function registerNoticeTargetHandler(
+  kind: string,
+  handler: (taskId: string, target: NoticeTarget) => void,
+): () => void {
+  targetHandlers.set(kind, handler)
+  return () => {
+    if (targetHandlers.get(kind) === handler) targetHandlers.delete(kind)
+  }
+}
+
+export function openNoticeTarget(notice: Notice): void {
+  if (notice.target) targetHandlers.get(notice.target.kind)?.(notice.taskId, notice.target)
+}
 
 export function pushNotice(n: Omit<Notice, 'id' | 'read'>): Notice {
   const notice: Notice = { ...n, id: noticeId(n.at), read: false }
@@ -139,6 +160,40 @@ export function initWorkflowNotices(): () => void {
 
 // --- Wiring: called by sessions.ts on every refresh with the previous + new snapshot.
 const lastToastAt = new Map<string, number>()
+
+// Managed-agent notices deliberately carry no prompt-derived title, response, filename, or path.
+// The durable notice target provides exact navigation without leaking sensitive content to the OS.
+export function pushManagedAgentNotice(input: {
+  taskId: string
+  sessionId: string
+  requestId?: string
+  kind: 'agent-completed' | 'agent-needs-input' | 'agent-error'
+  title: string
+}): Notice {
+  const at = Date.now()
+  const notice = pushNotice({
+    taskId: input.taskId,
+    kind: input.kind,
+    title: input.title,
+    at,
+    target: {
+      kind: 'managed-agent',
+      resourceId: input.sessionId,
+      subresourceId: input.requestId,
+    },
+  })
+  if (
+    typeof Notification !== 'undefined'
+    && shouldToast(notice, { focused: document.hasFocus(), lastToastAt })
+  ) {
+    try {
+      new Notification(input.title)
+    } catch {
+      // Notification permission/support issues never break durable in-app attention.
+    }
+  }
+  return notice
+}
 
 export function trackSessionEdges(prev: TerminalSession[], next: TerminalSession[]): void {
   const at = Date.now()

@@ -19,8 +19,8 @@ persistence. Log in with GitHub and you get:
 - **Panes** — a task view composes registered panes side by side: PR review, local changes, editor,
   search, notes, context, database, browser preview, Docker, API requests, Linear, and Rollbar.
 - **Terminals & agents** — persistent shell/agent sessions in the task's worktree, an
-  Agents panel with live activity and provider usage/cost estimates, and an MCP server that hands
-  agents task-scoped context and tools.
+  Agent pane with chat plus a same-task session/activity sidebar, provider usage/cost detail in its
+  header, and an MCP server that hands agents task-scoped context and tools.
 - **Local tools** — inspect and act on task-linked Docker containers, browse/edit Postgres, and keep
   encrypted repo-scoped API requests and variables without checking secrets into the repository.
 

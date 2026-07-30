@@ -1,5 +1,5 @@
 import { createSignal, For, onCleanup, onMount, Show } from 'solid-js'
-import { markAllRead, markRead, notices, unreadCount } from './notifications'
+import { markAllRead, markRead, notices, openNoticeTarget, unreadCount } from './notifications'
 import { noticeKindContribution } from '../registries/notices'
 import Icon from '../ui/Icon'
 import './notifications.css'
@@ -51,6 +51,7 @@ export default function NotificationBell(props: { onSelectTask: (taskId: string)
                       setOpen(false)
                       props.onSelectTask(n.taskId)
                       if (n.action === 'review-config') openRepoConfigTrust(n.taskId)
+                      openNoticeTarget(n)
                     }}
                   >
                     <span class="notify-glyph" classList={{ 'notify-warn': noticeKindContribution(n.kind)?.severity !== 'info' }}>

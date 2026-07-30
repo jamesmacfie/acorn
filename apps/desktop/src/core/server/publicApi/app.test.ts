@@ -51,6 +51,20 @@ function makeApp(tokens: TokenService, db: TestDb['db']) {
       handler: async (_ctx, { body }) => ({ id: 'e1', value: body.value }),
     }),
   )
+  registry.registerEndpoint(
+    defineEndpoint({
+      operationId: 'agents.permission.resolve',
+      pluginId: 'agents',
+      method: 'POST',
+      path: '/approve',
+      scope: 'agents:approve',
+      risk: 'execute',
+      summary: 'approve',
+      body: z.strictObject({ requestId: z.string() }),
+      response: z.strictObject({ ok: z.literal(true) }),
+      handler: async () => ({ ok: true as const }),
+    }),
+  )
   return createAutomationApp({
     snapshot: registry.freeze(),
     tokens,
@@ -64,12 +78,26 @@ describe('createAutomationApp', () => {
   let app: ReturnType<typeof createAutomationApp>
   let readToken: string
   let writeToken: string
+  let agentWriteToken: string
+  let agentApproveToken: string
 
   beforeEach(async () => {
     t = makeTestDb()
     const tokens = new TokenService(t.db)
     readToken = (await tokens.create({ userId: 'u', name: 'r', scopes: ['read'], expiresAt: null })).token
     writeToken = (await tokens.create({ userId: 'u', name: 'w', scopes: ['read', 'write'], expiresAt: null })).token
+    agentWriteToken = (await tokens.create({
+      userId: 'u',
+      name: 'agent-w',
+      scopes: ['read', 'agents:read', 'agents:write'],
+      expiresAt: null,
+    })).token
+    agentApproveToken = (await tokens.create({
+      userId: 'u',
+      name: 'agent-a',
+      scopes: ['read', 'agents:read', 'agents:approve'],
+      expiresAt: null,
+    })).token
     app = makeApp(tokens, t.db)
   })
   afterEach(() => t.cleanup())
@@ -130,6 +158,18 @@ describe('createAutomationApp', () => {
     expect(ok.status).toBe(201)
     expect(ok.headers.get('location')).toBe('/api/v1/echo/e1')
     expect((await ok.json()).data).toEqual({ id: 'e1', value: 'hi' })
+  })
+
+  it('keeps agent approval separate from general and agent write authority', async () => {
+    const approve = (token: string) => req('/api/v1/plugins/agents/approve', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ requestId: 'request-1' }),
+    }, token)
+
+    expect((await approve(writeToken)).status).toBe(403)
+    expect((await approve(agentWriteToken)).status).toBe(403)
+    expect((await approve(agentApproveToken)).status).toBe(200)
   })
 
   it('validates media type, JSON, and unknown fields', async () => {

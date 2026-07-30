@@ -153,6 +153,11 @@ export function attachPublicWsHub(server: Server, deps: PublicWsDeps): PublicWsH
   }
 
   function onSubscribe(conn: Conn, frame: z.infer<typeof SubscribeFrameSchema>) {
+    const requestsAgentEvents = frame.filter.channels.some((channel) =>
+      channel === 'agents.*' || channel.startsWith('agents.'))
+    if (requestsAgentEvents && !(conn.scopes as readonly string[]).includes('agents:read')) {
+      return sendError(conn, frame.id, 'insufficient_scope', 'Managed-agent events require the agents:read scope')
+    }
     conn.subs.set(frame.subscriptionId, { subscriptionId: frame.subscriptionId, filter: frame.filter })
     // Replay before live (events.md §4): queue retained matches, then ack.
     if (frame.after !== undefined) {

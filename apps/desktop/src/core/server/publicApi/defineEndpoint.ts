@@ -124,7 +124,7 @@ export type EventContribution = {
   channel: string // `${plugin}.${noun}` — dot-namespaced
   description: string
   schema: z.ZodTypeAny
-  scope: 'read'
+  scope: ApiScope
 }
 
 export function defineEvent(def: EventContribution): EventContribution {

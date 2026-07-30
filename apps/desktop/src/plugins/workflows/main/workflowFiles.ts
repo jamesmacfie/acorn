@@ -8,7 +8,13 @@ import { join } from 'node:path'
 import { parse as parseToml } from 'smol-toml'
 import { agentProfileRegistry } from '../../../core/main/agentProfiles'
 import { BUILTIN_POLICIES, BUILTIN_STEP_KINDS, BUILTIN_STEP_VALIDATORS } from './workflowBuiltins'
-import type { ToolCeiling, ToolRisk, WorkflowDef, WorkflowStepDef } from './workflowContracts'
+import type {
+  ToolCeiling,
+  ToolRisk,
+  WorkflowBudget,
+  WorkflowDef,
+  WorkflowStepDef,
+} from './workflowContracts'
 import { validateWorkflow, type WorkflowValidationCatalog } from './workflowValidation'
 
 export type WorkflowFileError = { source: string; message: string }
@@ -26,7 +32,16 @@ const str = (v: unknown): string | undefined => (typeof v === 'string' && v.trim
 
 // A raw parsed step: WorkflowStepDef plus the unexpanded sub-workflow reference.
 type RawStep = WorkflowStepDef & { workflowRef?: string }
-type RawWorkflow = { id: string; name: string; posture?: 'gated' | 'autonomous'; trigger?: string; tools?: ToolCeiling; steps: RawStep[]; source: 'repo' | 'user' }
+type RawWorkflow = {
+  id: string
+  name: string
+  posture?: 'gated' | 'autonomous'
+  trigger?: string
+  tools?: ToolCeiling
+  budget?: WorkflowBudget
+  steps: RawStep[]
+  source: 'repo' | 'user'
+}
 
 function parseTools(value: unknown): ToolCeiling | undefined {
   if (!value || typeof value !== 'object') return undefined
@@ -34,6 +49,21 @@ function parseTools(value: unknown): ToolCeiling | undefined {
   const allow = Array.isArray(raw.allow) && raw.allow.every((id) => typeof id === 'string') ? raw.allow : undefined
   const maxRisk = typeof raw.max_risk === 'string' && ['read', 'write', 'execute'].includes(raw.max_risk) ? (raw.max_risk as ToolRisk) : undefined
   return allow || maxRisk ? { allow, maxRisk } : undefined
+}
+
+function parseBudget(value: unknown): WorkflowBudget | undefined {
+  if (!value || typeof value !== 'object') return undefined
+  const raw = value as Record<string, unknown>
+  const number = (key: string): number | undefined =>
+    typeof raw[key] === 'number' ? raw[key] : undefined
+  const budget = {
+    maxWallTimeMs: number('max_wall_time_ms'),
+    maxCostUsd: number('max_cost_usd'),
+    maxInputTokens: number('max_input_tokens'),
+    maxOutputTokens: number('max_output_tokens'),
+    maxTurns: number('max_turns'),
+  }
+  return Object.values(budget).some((item) => item != null) ? budget : undefined
 }
 
 function parseBranches(value: unknown): Record<string, string> | undefined {
@@ -71,6 +101,7 @@ function parseStep(v: unknown, id: string, i: number, errors: WorkflowFileError[
           model: str((childRaw as Record<string, unknown>).model),
           prompt: str((childRaw as Record<string, unknown>).prompt),
           tools: parseTools((childRaw as Record<string, unknown>).tools),
+          budget: parseBudget((childRaw as Record<string, unknown>).budget),
         }
       : undefined
   return {
@@ -87,6 +118,7 @@ function parseStep(v: unknown, id: string, i: number, errors: WorkflowFileError[
     joins: str(o.joins),
     branches: parseBranches(o.branches),
     tools: parseTools(o.tools),
+    budget: parseBudget(o.budget),
     workflowRef,
   }
 }
@@ -113,6 +145,7 @@ export function parseWorkflowToml(text: string, id: string, source: 'repo' | 'us
     posture: posture === 'autonomous' ? 'autonomous' : posture === 'gated' || posture === undefined ? 'gated' : undefined,
     trigger: str(doc.trigger),
     tools: parseTools(doc.tools),
+    budget: parseBudget(doc.budget),
     steps,
     source,
   }
@@ -163,7 +196,16 @@ export function expandWorkflows(raw: RawWorkflow[], errors: WorkflowFileError[],
   for (const w of raw) {
     const steps = expand(w, [w.id])
     if (steps) {
-      const workflow = { id: w.id, name: w.name, posture: w.posture, trigger: w.trigger, tools: w.tools, steps, source: w.source }
+      const workflow = {
+        id: w.id,
+        name: w.name,
+        posture: w.posture,
+        trigger: w.trigger,
+        tools: w.tools,
+        budget: w.budget,
+        steps,
+        source: w.source,
+      }
       const problems = validateWorkflow(workflow, catalog)
       if (problems.length) errors.push(...problems.map((message) => ({ source: `${w.source}:${w.id}`, message: `${w.id}: ${message}` })))
       else out.push(workflow)

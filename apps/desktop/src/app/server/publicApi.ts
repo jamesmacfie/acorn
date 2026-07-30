@@ -28,6 +28,8 @@ import { buildTerminalPublicApi } from '../../plugins/terminal/server/publicApi'
 import { buildRunTargetsContribution } from '../../plugins/terminal/server/runTargets'
 import { WorkflowService, type WorkflowRunnerLike } from '../../plugins/workflows/main/workflowService'
 import { buildWorkflowsPublicApi } from '../../plugins/workflows/server/publicApi'
+import type { ManagedAgentRuntime } from '../../plugins/agents/main/runtime'
+import { buildAgentsPublicApi } from '../../plugins/agents/server/publicApi'
 
 // Composition leaf for built-in public API plugin contributions (docs/public-api.md
 // §1). The main composition root constructs the plugin services and calls this to assemble the
@@ -45,6 +47,7 @@ export type PublicApiPluginDeps = {
   workflowRunner: WorkflowRunnerLike
   commandExecutions: CommandExecutionService
   preview: PreviewDesktopCapability
+  managedAgents: ManagedAgentRuntime
 }
 
 export function buildPublicApiContributions(deps: PublicApiPluginDeps): { owner: string; contribution: PluginApiContribution }[] {
@@ -58,6 +61,7 @@ export function buildPublicApiContributions(deps: PublicApiPluginDeps): { owner:
     },
     { owner: 'database', contribution: buildDatabasePublicApi(databaseBridge(deps.db)) },
     { owner: 'workflows', contribution: buildWorkflowsPublicApi(new WorkflowService(deps.db, deps.workflowRunner)) },
+    { owner: 'agents', contribution: buildAgentsPublicApi(deps.managedAgents) },
     { owner: 'rollbar', contribution: buildRollbarPublicApi(deps.db, deps.encKey) },
     { owner: 'linear', contribution: buildLinearPublicApi(new LinearService(deps.db, deps.encKey)) },
     { owner: 'terminal', contribution: buildTerminalPublicApi(deps.commandExecutions, new WorktreeService(deps.db), new RepoCheckoutService(deps.db), new TerminalProfilesService(), new TerminalSessionService()) },

@@ -5,6 +5,7 @@
 // initial view but a curated set is never silently flipped by a later default change.
 import { createSignal } from 'solid-js'
 import type { TraySelection } from './model'
+import { bumpContextRevision, evictContextRevision } from './contextRevision'
 
 const [contextSelections, setContextSelections] = createSignal<Record<string, TraySelection>>({})
 
@@ -12,6 +13,7 @@ export const selectionFor = (taskId: string): TraySelection | undefined => conte
 
 export function setSectionSelection(taskId: string, selection: TraySelection): void {
   setContextSelections((current) => ({ ...current, [taskId]: selection }))
+  bumpContextRevision(taskId)
 }
 
 export function hydrateContextSelection(taskId: string, value: TraySelection): void {
@@ -25,6 +27,7 @@ export function evictContextSelection(taskId: string): void {
     delete next[taskId]
     return next
   })
+  evictContextRevision(taskId)
 }
 
 export { contextSelections as contextSelectionsByTask }

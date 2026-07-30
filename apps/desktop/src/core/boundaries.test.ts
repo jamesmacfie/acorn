@@ -119,12 +119,11 @@ const BASELINE_CORE_TO_PLUGIN = [
   'core/client/palette/CommandPalette.tsx => plugins/agents/client/workflowClient.ts',
   'core/client/palette/CommandPalette.tsx => plugins/terminal/client/recipes.ts',
   'core/client/palette/CommandPalette.tsx => plugins/terminal/client/runClient.ts',
-  'core/client/tasks/TaskView.tsx => plugins/agents/client/AgentsPanel.tsx',
   'core/client/tasks/TaskView.tsx => plugins/terminal/client/runClient.ts',
   'core/client/tasks/TaskView.tsx => plugins/terminal/client/terminalClient.ts',
 ]
 const BASELINE_PLUGIN_TO_PLUGIN = [
-  'plugins/agents/client/AgentsPanel.tsx => plugins/terminal/client/terminalClient.ts',
+  'plugins/agents/client/AgentTaskSidebar.tsx => plugins/terminal/client/terminalClient.ts',
   'plugins/changes/client/ChangesPane.tsx => plugins/github/client/diff/DiffRows.tsx',
   'plugins/changes/client/ChangesPane.tsx => plugins/github/client/diff/model.ts',
   'plugins/context/client/ContextPane.tsx => plugins/memory/client/MemorySection.tsx',

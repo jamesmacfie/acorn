@@ -90,10 +90,11 @@ export class AutomationApiRegistry {
     if (!endpoint.risk) throw new Error(`${where}: missing risk`)
     if (!endpoint.response) throw new Error(`${where}: missing response schema`)
 
-    // A mutating/execute operation must require write. A read endpoint that can change state or run
-    // code is a scope hole (authentication.md §2, §8).
-    if (endpoint.risk !== 'read' && endpoint.scope !== 'write') {
-      throw new Error(`${where}: ${endpoint.risk}-risk endpoint must declare scope "write"`)
+    // Mutating operations require an explicitly mutating scope. Agent approval is deliberately not
+    // implied by either general write or agent write, but is still an execute-capable authority.
+    const mutatingScopes = new Set(['write', 'agents:write', 'agents:approve'])
+    if (endpoint.risk !== 'read' && !mutatingScopes.has(endpoint.scope)) {
+      throw new Error(`${where}: ${endpoint.risk}-risk endpoint must declare a mutating scope`)
     }
 
     const bodyBearing = endpoint.method === 'POST' || endpoint.method === 'PUT' || endpoint.method === 'PATCH'

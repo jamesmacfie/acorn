@@ -50,7 +50,7 @@ export const ReadyFrameSchema = ServerBaseSchema.extend({
   type: z.literal('ready'),
   connectionId: z.string(),
   apiVersion: z.literal('v1'),
-  scopes: z.array(z.enum(['read', 'write'])),
+  scopes: z.array(z.enum(['read', 'write', 'agents:read', 'agents:write', 'agents:approve'])),
   heartbeatMs: z.number().int().positive(),
   maxFrameBytes: z.number().int().positive(),
 })

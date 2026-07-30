@@ -190,6 +190,7 @@ async function persistSession(db: AppDatabase, m: TerminalSession) {
     status: m.status,
     cwd: m.cwd,
     taskId: m.taskId,
+    agentSessionId: m.agentSessionId ?? null,
     command: m.command,
     argvJson: '[]',
     tmuxSession: m.tmuxSession ?? null,
@@ -222,6 +223,7 @@ function rowToMeta(row: typeof schema.terminalSessions.$inferSelect, ctx: Pick<T
     agentState: ptyState(row.kind as TerminalSession['kind'], 'running', false),
     isWorktree, // recomputed from the task join (cwd === tasks.worktreePath) — never persisted
     taskId: row.taskId,
+    agentSessionId: row.agentSessionId ?? undefined,
     cwd: row.cwd,
     command: row.command,
     tmuxSession: row.tmuxSession ?? undefined,
@@ -353,6 +355,7 @@ async function spawnOne(
     agentState: ptyState(profile.kind, 'running', false),
     isWorktree,
     taskId: opts.taskId,
+    agentSessionId: opts.agentSessionId,
     cwd,
     command,
     tmuxSession: backend === 'tmux' ? tmuxName(id) : undefined,

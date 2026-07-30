@@ -1,5 +1,6 @@
 import { expect, test, _electron as electron, type ElectronApplication, type Page } from '@playwright/test'
 import { execFileSync } from 'node:child_process'
+import { randomUUID } from 'node:crypto'
 import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -9,6 +10,87 @@ const roots: string[] = []
 const apps: ElectronApplication[] = []
 
 type RunningApp = { app: ElectronApplication; page: Page; dataDir: string; repoDir: string }
+type QueuedAgentSeed = { sessionId: string; alternateSessionId: string; firstTurnId: string; secondTurnId: string }
+
+const sqlText = (value: string): string => `'${value.replaceAll("'", "''")}'`
+
+function seedQueuedAgent(dataDir: string, taskId: string): QueuedAgentSeed {
+  const sessionId = randomUUID()
+  const completedTurnId = randomUUID()
+  const alternateSessionId = randomUUID()
+  const alternateTurnId = randomUUID()
+  const firstTurnId = randomUUID()
+  const secondTurnId = randomUUID()
+  const timestamp = Date.now()
+  const insertTurn = (id: string, ordinal: number, prompt: string) => `
+    INSERT INTO agent_turns (
+      id, session_id, ordinal, source, status, input_json, effective_policy_json,
+      idempotency_key, attempt, created_at
+    ) VALUES (
+      ${sqlText(id)}, ${sqlText(sessionId)}, ${ordinal}, 'interactive', 'queued',
+      ${sqlText(JSON.stringify([{ type: 'text', text: prompt }]))}, '{}',
+      ${sqlText(randomUUID())}, 0, ${timestamp + ordinal}
+    );`
+  execFileSync('sqlite3', [join(dataDir, 'acorn.sqlite'), `
+    BEGIN;
+    INSERT INTO agent_sessions (
+      id, task_id, provider_id, profile_id, kind, driver_kind, driver_version,
+      controller, runtime_state, attention, status_authority, title, config_json,
+      last_event_seq, last_read_seq, created_at, updated_at
+    ) VALUES (
+      ${sqlText(sessionId)}, ${sqlText(taskId)}, 'codex', 'codex', 'interactive',
+      'codex-app-server', 'e2e', 'acorn', 'failed', 'error', 'protocol',
+      'Queued controls smoke', '{}', 5, 0, ${timestamp}, ${timestamp}
+    );
+    INSERT INTO agent_sessions (
+      id, task_id, provider_id, profile_id, kind, driver_kind, driver_version,
+      controller, runtime_state, attention, status_authority, title, config_json,
+      last_event_seq, last_read_seq, created_at, updated_at
+    ) VALUES (
+      ${sqlText(alternateSessionId)}, ${sqlText(taskId)}, 'claude', 'claude-code', 'interactive',
+      'claude-acp', 'e2e', 'acorn', 'ready', 'none', 'protocol',
+      'Alternate agent', '{}', 3, 0, ${timestamp - 100}, ${timestamp - 90}
+    );
+    INSERT INTO agent_turns (
+      id, session_id, ordinal, source, status, input_json, effective_policy_json,
+      idempotency_key, attempt, created_at, started_at, completed_at, stop_reason
+    ) VALUES (
+      ${sqlText(completedTurnId)}, ${sqlText(sessionId)}, 0, 'interactive', 'completed',
+      ${sqlText(JSON.stringify([{ type: 'text', text: 'Explain the smoke.' }]))}, '{}',
+      ${sqlText(randomUUID())}, 1, ${timestamp - 10}, ${timestamp - 9}, ${timestamp - 5}, 'completed'
+    );
+    INSERT INTO agent_events (id, session_id, turn_id, seq, schema_version, event_json, search_text, created_at) VALUES
+      (${sqlText(randomUUID())}, ${sqlText(sessionId)}, ${sqlText(completedTurnId)}, 1, 1,
+        ${sqlText(JSON.stringify({ type: 'user_message', text: 'Explain the smoke.' }))}, 'Explain the smoke.', ${timestamp - 9}),
+      (${sqlText(randomUUID())}, ${sqlText(sessionId)}, ${sqlText(completedTurnId)}, 2, 1,
+        ${sqlText(JSON.stringify({ type: 'reasoning', text: 'I should explain ', messageId: 'reason-1', append: true }))}, 'I should explain ', ${timestamp - 8}),
+      (${sqlText(randomUUID())}, ${sqlText(sessionId)}, ${sqlText(completedTurnId)}, 3, 1,
+        ${sqlText(JSON.stringify({ type: 'reasoning', text: 'this clearly.', messageId: 'reason-1', append: true }))}, 'this clearly.', ${timestamp - 7}),
+      (${sqlText(randomUUID())}, ${sqlText(sessionId)}, ${sqlText(completedTurnId)}, 4, 1,
+        ${sqlText(JSON.stringify({ type: 'assistant_message', text: 'The managed response is visible.' }))}, 'The managed response is visible.', ${timestamp - 6}),
+      (${sqlText(randomUUID())}, ${sqlText(sessionId)}, ${sqlText(completedTurnId)}, 5, 1,
+        ${sqlText(JSON.stringify({ type: 'turn_completed', stopReason: 'completed' }))}, 'completed', ${timestamp - 5});
+    INSERT INTO agent_turns (
+      id, session_id, ordinal, source, status, input_json, effective_policy_json,
+      idempotency_key, attempt, created_at, started_at, completed_at, stop_reason
+    ) VALUES (
+      ${sqlText(alternateTurnId)}, ${sqlText(alternateSessionId)}, 0, 'interactive', 'completed',
+      ${sqlText(JSON.stringify([{ type: 'text', text: 'Show the alternate transcript.' }]))}, '{}',
+      ${sqlText(randomUUID())}, 1, ${timestamp - 99}, ${timestamp - 98}, ${timestamp - 94}, 'completed'
+    );
+    INSERT INTO agent_events (id, session_id, turn_id, seq, schema_version, event_json, search_text, created_at) VALUES
+      (${sqlText(randomUUID())}, ${sqlText(alternateSessionId)}, ${sqlText(alternateTurnId)}, 1, 1,
+        ${sqlText(JSON.stringify({ type: 'user_message', text: 'Show the alternate transcript.' }))}, 'Show the alternate transcript.', ${timestamp - 98}),
+      (${sqlText(randomUUID())}, ${sqlText(alternateSessionId)}, ${sqlText(alternateTurnId)}, 2, 1,
+        ${sqlText(JSON.stringify({ type: 'assistant_message', text: 'This is the alternate agent response.' }))}, 'This is the alternate agent response.', ${timestamp - 96}),
+      (${sqlText(randomUUID())}, ${sqlText(alternateSessionId)}, ${sqlText(alternateTurnId)}, 3, 1,
+        ${sqlText(JSON.stringify({ type: 'turn_completed', stopReason: 'completed' }))}, 'completed', ${timestamp - 94});
+    ${insertTurn(firstTurnId, 1, 'First queued prompt.')}
+    ${insertTurn(secondTurnId, 2, 'Second queued prompt.')}
+    COMMIT;
+  `])
+  return { sessionId, alternateSessionId, firstTurnId, secondTurnId }
+}
 
 async function launch(previous?: Pick<RunningApp, 'dataDir' | 'repoDir'>): Promise<RunningApp> {
   const root = previous ? null : mkdtempSync(join(tmpdir(), 'acorn-e2e-'))
@@ -39,8 +121,8 @@ async function launch(previous?: Pick<RunningApp, 'dataDir' | 'repoDir'>): Promi
   return { app, page, dataDir, repoDir }
 }
 
-async function seedTask(page: Page, repoDir: string) {
-  return page.evaluate(async ({ repoDir }) => {
+async function seedWorkspace(page: Page, repoDir: string): Promise<void> {
+  await page.evaluate(async ({ repoDir }) => {
     const json = (url: string, init?: RequestInit) => fetch(url, init).then(async (response) => {
       if (!response.ok) throw new Error(`${url}: ${response.status} ${await response.text()}`)
       return response.json()
@@ -54,16 +136,36 @@ async function seedTask(page: Page, repoDir: string) {
     await json('/api/terminal/repo-path', {
       method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ owner: 'acorn', repo: 'smoke', path: repoDir }),
     })
+  }, { repoDir })
+}
+
+async function seedTask(page: Page, repoDir: string) {
+  await seedWorkspace(page, repoDir)
+  return page.evaluate(async () => {
+    const json = (url: string, init?: RequestInit) => fetch(url, init).then(async (response) => {
+      if (!response.ok) throw new Error(`${url}: ${response.status} ${await response.text()}`)
+      return response.json()
+    })
     return json('/api/tasks', {
       method: 'POST', headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ origin: 'local', repoOwner: 'acorn', repoName: 'smoke', branch: 'main', title: 'Smoke task' }),
     })
-  }, { repoDir }) as Promise<{ id: string }>
+  }) as Promise<{ id: string }>
 }
 
 async function dismissOnboarding(page: Page): Promise<void> {
   const done = page.getByRole('button', { name: 'Done' })
   if (await done.isVisible().catch(() => false)) await done.click()
+}
+
+async function openSmokeWorkspace(page: Page): Promise<void> {
+  // Workspace creation happens outside the renderer query cache. Navigate to the stable workspace
+  // route, then reload that route so both workspace selection and task queries start from SQLite
+  // instead of the pre-seed in-memory cache.
+  await page.goto(new URL('/acorn/smoke', page.url()).toString())
+  await page.reload()
+  await expect(page.locator('.shell')).toBeVisible()
+  await dismissOnboarding(page)
 }
 
 async function createTerminalAndCapture(page: Page, taskId: string, command: string): Promise<string> {
@@ -104,8 +206,7 @@ test('S1 boots the authenticated desktop shell', async () => {
 test('S2 restores durable task state across two launches', async () => {
   const first = await launch()
   await seedTask(first.page, first.repoDir)
-  await first.page.reload()
-  await dismissOnboarding(first.page)
+  await openSmokeWorkspace(first.page)
   await first.page.getByRole('button', { name: 'Smoke task' }).click()
   await expect(first.page.locator('.task-layout')).toBeVisible()
   await first.app.close()
@@ -117,8 +218,7 @@ test('S2 restores durable task state across two launches', async () => {
 test('S3 opens a task from the rail', async () => {
   const running = await launch()
   await seedTask(running.page, running.repoDir)
-  await running.page.reload()
-  await dismissOnboarding(running.page)
+  await openSmokeWorkspace(running.page)
   await running.page.getByRole('button', { name: 'Smoke task' }).click()
   await expect(running.page.locator('.task-layout')).toBeVisible()
   await running.app.close()
@@ -152,19 +252,27 @@ test('S5 quit tears down a live PTY child', async () => {
 })
 
 test('S6 find-in-files copies paths and double-clicks into the match', async () => {
+  test.setTimeout(60_000)
   const running = await launch()
   const path = 'search-target.ts'
   writeFileSync(join(running.repoDir, path), "const value = 'needleToken'\n")
   execFileSync('git', ['-C', running.repoDir, 'add', path])
   execFileSync('git', ['-C', running.repoDir, 'commit', '-qm', 'add search target'])
-  const task = await seedTask(running.page, running.repoDir)
-  await running.page.evaluate(async (taskId) => {
-    const response = await fetch(`/api/tasks/${taskId}/use-checkout`, { method: 'POST' })
+  await seedWorkspace(running.page, running.repoDir)
+  await openSmokeWorkspace(running.page)
+  await running.page.getByRole('button', { name: 'New task' }).click()
+  await running.page.getByRole('checkbox', { name: 'Use current checkout (no worktree)' }).check()
+  await running.page.getByPlaceholder('Task title').fill('Smoke task')
+  await running.page.getByRole('button', { name: 'Create', exact: true }).click()
+  await expect(running.page.locator('.task-layout')).toBeVisible({ timeout: 30_000 })
+  const task = await running.page.evaluate(async () => {
+    const response = await fetch('/api/tasks')
     if (!response.ok) throw new Error(await response.text())
-  }, task.id)
-  await running.page.reload()
-  await dismissOnboarding(running.page)
-  await running.page.getByRole('button', { name: 'Smoke task' }).click()
+    const tasks = await response.json() as { id: string; title: string }[]
+    const task = tasks.find((candidate) => candidate.title === 'Smoke task')
+    if (!task) throw new Error('The current-checkout task was not persisted.')
+    return task
+  })
   const files = await running.page.evaluate(async (taskId) => {
     const response = await fetch(`/api/tasks/${taskId}/editor/files`)
     if (!response.ok) throw new Error(await response.text())
@@ -200,5 +308,201 @@ test('S6 find-in-files copies paths and double-clicks into the match', async () 
     const response = await fetch(`/api/tasks/${taskId}/editor/read?path=${encodeURIComponent(path)}`)
     return (await response.json() as { text: string }).text
   }, { taskId: task.id, path })).toContain("'XneedleToken'")
+  await running.app.close()
+})
+
+test('S7 loads the Agent Center and combines task agent switching with the conversation', async () => {
+  test.setTimeout(60_000)
+  const first = await launch()
+  const task = await seedTask(first.page, first.repoDir)
+  await first.app.close()
+  seedQueuedAgent(first.dataDir, task.id)
+  const running = await launch(first)
+  const contextResponses: Array<{ status: number; url: string }> = []
+  running.page.on('response', (response) => {
+    if (response.url().includes(`/api/tasks/${task.id}/context`)) {
+      contextResponses.push({ status: response.status(), url: response.url() })
+    }
+  })
+  await openSmokeWorkspace(running.page)
+  await expect(running.page.getByRole('button', { name: 'Smoke task' })).toBeVisible()
+
+  await running.page.locator('.tabrail-source[aria-label="Agents"]').click()
+  await expect(running.page.locator('.agent-center')).toBeVisible()
+  await expect(running.page.getByRole('heading', { name: 'Agent Center' })).toBeVisible()
+  await expect(running.page.locator('.agent-center-launch')).toHaveCount(0)
+
+  await running.page.locator('.tabrail-task[aria-label="Smoke task"]').click({ noWaitAfter: true })
+  await expect.poll(() => running.page.evaluate(() => !!document.querySelector('.task-layout'))).toBe(true)
+  await expect.poll(() => running.page.evaluate(() =>
+    !!document.querySelector('.pane-switch-btn[aria-label="Agent"]'))).toBe(true)
+  await running.page.evaluate(() => {
+    const button = document.querySelector('.pane-switch-btn[aria-label="Agent"]')
+    if (!(button instanceof HTMLButtonElement)) throw new Error('Task Agent pane button is missing.')
+    button.click()
+  })
+  await expect.poll(() => contextResponses).toContainEqual(expect.objectContaining({ status: 200 }))
+  await expect.poll(() => running.page.evaluate(() => ({
+    pane: !!document.querySelector('.managed-agent-pane'),
+    sidebar: !!document.querySelector('.agent-task-sidebar[aria-label="Agents in this task"]'),
+    conversation: !!document.querySelector('.managed-agent-conversation'),
+  }))).toEqual({ pane: true, sidebar: true, conversation: true })
+  await expect.poll(() => running.page.evaluate(() => ({
+    chip: document.querySelector('.agent-context-chip')?.textContent ?? '',
+    error: document.querySelector('.agent-composer-error')?.textContent ?? '',
+  }))).toEqual({
+    chip: expect.stringContaining('Task context · attached'),
+    error: '',
+  })
+  const combinedGeometry = await running.page.evaluate(() => {
+    const pane = document.querySelector('.managed-agent-pane')?.getBoundingClientRect()
+    const slot = document.querySelector('.task-slot[data-pane-id="agents"]')?.getBoundingClientRect()
+    const sidebar = document.querySelector('.agent-task-sidebar')?.getBoundingClientRect()
+    const conversation = document.querySelector('.managed-agent-conversation')?.getBoundingClientRect()
+    return {
+      paneWidth: pane?.width ?? 0,
+      slotWidth: slot?.width ?? 0,
+      sidebarX: sidebar?.x ?? 0,
+      conversationX: conversation?.x ?? 0,
+    }
+  })
+  expect(combinedGeometry.paneWidth).toBeGreaterThan(combinedGeometry.slotWidth - 2)
+  expect(combinedGeometry.sidebarX).toBeLessThan(combinedGeometry.conversationX)
+
+  const clickAgentHeaderButton = (label: string) => running.page.evaluate((accessibleName) => {
+    const button = [...document.querySelectorAll('.managed-agent-head button')]
+      .find((candidate) => candidate.getAttribute('aria-label') === accessibleName || candidate.textContent?.trim() === accessibleName)
+    if (!(button instanceof HTMLButtonElement)) throw new Error(`Agent header action is missing: ${accessibleName}`)
+    button.click()
+  }, label)
+  const clickConversationOutside = () => running.page.evaluate(() => {
+    const target = document.querySelector('.managed-agent-conversation')
+    if (!(target instanceof HTMLElement)) throw new Error('Managed conversation is missing.')
+    target.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }))
+    target.click()
+  })
+  const headerExpanded = (label: string) => running.page.evaluate((accessibleName) => {
+    const button = [...document.querySelectorAll('.managed-agent-head button')]
+      .find((candidate) => candidate.getAttribute('aria-label') === accessibleName || candidate.textContent?.trim() === accessibleName)
+    return button?.getAttribute('aria-expanded') === 'true'
+  }, label)
+  await clickAgentHeaderButton('Session actions')
+  expect(await headerExpanded('Session actions')).toBe(true)
+  await clickConversationOutside()
+  expect(await headerExpanded('Session actions')).toBe(false)
+  await clickAgentHeaderButton('New')
+  expect(await headerExpanded('New')).toBe(true)
+  await clickConversationOutside()
+  expect(await headerExpanded('New')).toBe(false)
+
+  await expect.poll(() => running.page.evaluate(() => ({
+    user: document.querySelector('.agent-message-user')?.textContent ?? '',
+    reasoning: document.querySelector('.agent-reasoning')?.textContent ?? '',
+    assistant: document.querySelector('.agent-message-assistant')?.textContent ?? '',
+    completed: document.querySelector('.agent-turn-complete')?.textContent ?? '',
+  }))).toEqual({
+    user: expect.stringContaining('Explain the smoke.'),
+    reasoning: expect.stringContaining('I should explain this clearly.'),
+    assistant: expect.stringContaining('The managed response is visible.'),
+    completed: expect.stringContaining('Turn complete'),
+  })
+
+  const queuedState = () => running.page.evaluate(() =>
+    [...document.querySelectorAll('.agent-queued-turn')].map((row) => ({
+      text: row.querySelector('p')?.textContent ?? '',
+      iconButtons: row.querySelectorAll('.ui-btn[data-icon-only] svg').length,
+    })))
+  const clickQueuedAction = (rowIndex: number, label: string) => running.page.evaluate(
+    ({ rowIndex, label }) => {
+      const row = document.querySelectorAll('.agent-queued-turn').item(rowIndex)
+      const button = [...row.querySelectorAll('button')]
+        .find((candidate) => candidate.getAttribute('aria-label') === label)
+      if (!button) throw new Error(`Queued action is missing: ${label}`)
+      if (button.disabled) throw new Error(`Queued action is still busy: ${label}`)
+      button.click()
+    },
+    { rowIndex, label },
+  )
+  const queuedActionEnabled = (rowIndex: number, label: string) => running.page.evaluate(
+    ({ rowIndex, label }) => {
+      const row = document.querySelectorAll('.agent-queued-turn').item(rowIndex)
+      const button = [...row.querySelectorAll('button')]
+        .find((candidate) => candidate.getAttribute('aria-label') === label)
+      return button != null && !button.disabled
+    },
+    { rowIndex, label },
+  )
+  await expect.poll(queuedState).toHaveLength(2)
+  expect((await queuedState())[0]?.iconButtons).toBe(4)
+  await clickQueuedAction(0, 'Edit queued prompt')
+  await running.page.evaluate(() => {
+    const textarea = document.querySelector('.agent-queued-turn textarea')
+    if (!(textarea instanceof HTMLTextAreaElement)) throw new Error('Queued prompt editor did not open.')
+    textarea.value = 'Edited first queued prompt.'
+    textarea.dispatchEvent(new InputEvent('input', { bubbles: true, inputType: 'insertText' }))
+  })
+  await clickQueuedAction(0, 'Save queued prompt')
+  await expect.poll(queuedState).toEqual([
+    expect.objectContaining({ text: 'Edited first queued prompt.' }),
+    expect.objectContaining({ text: 'Second queued prompt.' }),
+  ])
+
+  await expect.poll(() => queuedActionEnabled(0, 'Move queued turn down')).toBe(true)
+  await clickQueuedAction(0, 'Move queued turn down')
+  await expect.poll(queuedState).toEqual([
+    expect.objectContaining({ text: 'Second queued prompt.' }),
+    expect.objectContaining({ text: 'Edited first queued prompt.' }),
+  ])
+  await expect.poll(() => queuedActionEnabled(1, 'Remove queued prompt')).toBe(true)
+  await clickQueuedAction(1, 'Remove queued prompt')
+  await expect.poll(queuedState).toEqual([
+    expect.objectContaining({ text: 'Second queued prompt.' }),
+  ])
+
+  await running.page.evaluate(() => {
+    const row = [...document.querySelectorAll('.managed-agent-session-row')]
+      .find((candidate) => candidate.textContent?.includes('Alternate agent'))
+    if (!(row instanceof HTMLElement)) throw new Error('Alternate managed session row is missing.')
+    row.click()
+  })
+  await expect.poll(() => running.page.evaluate(() => ({
+    heading: document.querySelector('.managed-agent-heading')?.textContent ?? '',
+    assistant: document.querySelector('.agent-message-assistant')?.textContent ?? '',
+  }))).toEqual({
+    heading: expect.stringContaining('Alternate agent'),
+    assistant: expect.stringContaining('This is the alternate agent response.'),
+  })
+  expect(await running.page.evaluate(() =>
+    document.querySelectorAll('.pane-switch-btn[aria-label="Agents"]').length)).toBe(0)
+
+  await running.page.evaluate(() => {
+    const trigger = document.querySelector('.managed-agent-usage-trigger')
+    if (!(trigger instanceof HTMLButtonElement)) throw new Error('Agent utilization trigger is missing.')
+    trigger.focus()
+  })
+  await expect.poll(() => running.page.evaluate(() => {
+    const tooltip = document.querySelector('.managed-agent-usage-tooltip')
+    return tooltip ? getComputedStyle(tooltip).visibility : 'missing'
+  })).toBe('visible')
+
+  running.page.once('dialog', (dialog) => dialog.accept())
+  await clickAgentHeaderButton('Session actions')
+  await running.page.evaluate(() => {
+    const button = [...document.querySelectorAll('.managed-agent-menu-popover button')]
+      .find((candidate) => candidate.textContent?.trim() === 'Delete permanently…')
+    if (!(button instanceof HTMLButtonElement)) throw new Error('Delete session action is missing.')
+    button.click()
+  })
+  await expect.poll(() => running.page.evaluate(() => ({
+    alternatePresent: [...document.querySelectorAll('.managed-agent-session-row')]
+      .some((row) => row.textContent?.includes('Alternate agent')),
+    heading: document.querySelector('.managed-agent-heading')?.textContent ?? '',
+    notFound: document.querySelector('.managed-agent-conversation')?.textContent
+      ?.includes('Managed agent session not found') ?? false,
+  }))).toEqual({
+    alternatePresent: false,
+    heading: expect.stringContaining('Queued controls smoke'),
+    notFound: false,
+  })
   await running.app.close()
 })

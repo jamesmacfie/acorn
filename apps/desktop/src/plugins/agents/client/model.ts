@@ -1,6 +1,6 @@
-// Agent-surfaces model (docs/terminal-and-agents.md): pure mappers from headless stream-json events to the ONE
-// AgentState enum (05 — never redeclared) and to activity-feed items, plus roster composition
-// (PTY sessions + workflow steps merged into one list). Unit tested; AgentsPanel is thin glue.
+// Agent-surfaces model (docs/terminal-and-agents.md): pure mappers from headless stream-json events
+// to the ONE AgentState enum (05 — never redeclared), activity-feed items, and task-sidebar roster
+// composition (PTY sessions + workflow steps merged into one list).
 import type { AgentState, TerminalSession } from '../../../core/shared/terminal'
 import type { WorkflowRunRow, WorkflowStepRow } from '../../../core/shared/workflow'
 

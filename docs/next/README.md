@@ -11,7 +11,7 @@ there rather than leaving two competing descriptions.
 | [self-improvement.md](./self-improvement.md) | Annotation-only self-improvement seams; no implementation scheduled |
 | [performance.md](./performance.md) | Measurement-triggered retention and scaling work |
 | [security.md](./security.md) | Device-flow distribution hardening and future external-control principals/channels |
-| [chat/](./chat/) | Workspace-scoped multi-provider chat plugin |
+| [chat/](./chat/) | Superseded Chat design retained as a reusable attachment/rendering design record |
 | [linear-pane.md](./linear-pane.md) | Proposed Linear pane evolution |
 
 ## Implementation records with open validation

@@ -14,6 +14,9 @@ import { clientEvents } from '../../../core/client/registries/clientEvents'
 // z-index. We poll whether something covers the pane and hide the view when so (see checkOcclusion).
 
 const withScheme = (v: string) => (/^[a-z]+:\/\//i.test(v) ? v : `https://${v}`)
+const previewUrls = new Map<string, string>()
+
+export const currentPreviewUrl = (taskId: string): string | null => previewUrls.get(taskId) ?? null
 
 // Drop an archived task's preview view (called by every archive path via the runtime event below).
 export function evictPreviewWebview(taskId: string): void {
@@ -67,6 +70,7 @@ export default function PreviewPane(props: { taskId: string; url: string | null 
     const poll = setInterval(checkOcclusion, 200)
     const offEvent = preview.onEvent((s) => {
       if (s.taskId !== props.taskId) return // only the active view drives the chrome
+      if (s.url) previewUrls.set(s.taskId, s.url)
       setLoading(s.loading)
       setAddr(s.url || props.url || '')
       setCanBack(s.canGoBack)
@@ -88,6 +92,7 @@ export default function PreviewPane(props: { taskId: string; url: string | null 
   createEffect(() => {
     const taskId = props.taskId
     const url = props.url
+    if (url && !previewUrls.has(taskId)) previewUrls.set(taskId, url)
     const covered = suppressed()
     const version = ++ensureVersion
     if (!preview || !host) return

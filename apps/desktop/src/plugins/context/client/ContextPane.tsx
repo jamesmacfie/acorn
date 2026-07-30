@@ -12,6 +12,7 @@ import type { TerminalSession } from '../../../core/shared/terminal'
 import { recordSync, rememberTarget, syncStatus, targetSessionFor, type SyncStatus } from './syncState'
 import { selectionFor, setSectionSelection } from './selectionState'
 import { assembleBlockFrom, bytesOf, formatSize, sectionCap, selectionFromContext, traySummary, type TraySelection } from './model'
+import { bumpContextRevision } from './contextRevision'
 import './context-tray.css'
 
 const originBadge = (author?: 'user' | 'agent' | 'workflow'): string => (author === 'agent' ? '🤖' : author === 'workflow' ? 'seed' : '')
@@ -34,6 +35,10 @@ export default function ContextPane(props: { task: Task }) {
   // task. A toggle writes the full effective map so a later defaultIncluded change can't flip it.
   const effective = (): TraySelection => selectionFor(props.task.id) ?? (ctx() ? selectionFromContext(ctx()!) : {})
   const toggleSection = (id: string) => setSectionSelection(props.task.id, { ...effective(), [id]: !effective()[id] })
+  const refreshContext = async (): Promise<void> => {
+    await refetch()
+    bumpContextRevision(props.task.id)
+  }
 
   // The exact block a send would deliver — assembled locally from the include=* inventory.
   const assembled = createMemo(() => (ctx() ? assembleBlockFrom(ctx()!, effective()) : null))
@@ -107,7 +112,7 @@ export default function ContextPane(props: { task: Task }) {
     setMsg('')
     const t = targetSessionFor(props.task.id)
     if (!t || !api) return setMsg('No running agent session.')
-    await refetch() // fresh inventory, one fetch
+    await refreshContext() // fresh inventory, one fetch
     const current = ctx()
     if (!current) return
     const { block, sections } = assembleBlockFrom(current, effective())
@@ -177,7 +182,7 @@ export default function ContextPane(props: { task: Task }) {
                       }}
                     </For>
                     <Show when={section.id === 'memory'}>
-                      <MemorySection task={props.task} onChanged={() => void refetch()} onPendingChange={setPendingMemory} />
+                      <MemorySection task={props.task} onChanged={() => void refreshContext()} onPendingChange={setPendingMemory} />
                     </Show>
                   </div>
                 )
@@ -211,7 +216,7 @@ export default function ContextPane(props: { task: Task }) {
                 </span>
               </Show>
               <button type="button" class="ui-btn context-sync-btn" onClick={() => void syncContext()}>Sync context</button>
-              <button type="button" class="section-refresh" style={{ 'margin-left': 'auto' }} title="Refresh" aria-label="Refresh" onClick={() => void refetch()}>↻</button>
+              <button type="button" class="section-refresh" style={{ 'margin-left': 'auto' }} title="Refresh" aria-label="Refresh" onClick={() => void refreshContext()}>↻</button>
             </div>
           </div>
       </Show>

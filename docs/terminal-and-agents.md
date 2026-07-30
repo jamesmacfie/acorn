@@ -1,9 +1,10 @@
 # Terminal & agents
 
-The terminal drawer, agent sessions, and the agent-monitoring surfaces: the bottom drawer of
-persistent local shell/agent sessions scoped to the active task, and the right-rail Agents panel that
-watches them. This describes what is in code today. (The historical design record, `vNext.md`, has
-been removed — see git history for the original rationale.)
+The terminal drawer, raw agent fallback and managed-agent surfaces. Structured Claude Code and
+Codex sessions use a task Agent pane that combines the active conversation with a same-task
+live/needs-you sidebar. Persistent local shell/raw-agent sessions remain in the bottom drawer. See
+[managed-agents.md](./managed-agents.md) for the structured runtime, durable event model, provider
+drivers, scheduling, automation and context system.
 
 > **Availability.** This surface is **desktop-only and always on** (the old `acorn:term`
 > localStorage flag is deleted). In Electron the native terminal capability is present; in a plain
@@ -16,13 +17,13 @@ been removed — see git history for the original rationale.)
 - The **terminal drawer** is a bottom overlay of persistent local sessions, **scoped to the active
   task** — a session opened under task A never appears under task B, regardless of the URL
   (`TerminalPanel.tsx`, `visibleSessions`).
-- A session is a **shell** or an **agent** (Claude Code / Codex / Aider). Agents run as ordinary PTY
-  sessions launched in the task's **git worktree**, which is created lazily by whichever
-  worktree-dependent surface touches the task first (often the first terminal).
-- The **Agents panel** is a right-rail overlay opened from the task view's Agents toggle (glyph `⠿`,
-  `TaskView.tsx:347`). It is a managed monitoring surface over the same sessions plus workflow steps
-  — a roster, a launcher, and a per-agent activity feed. It never replaces the raw xterm drawer; the
-  drawer stays the escape hatch for interactive TUIs.
+- A raw session is a **shell** or an **agent** (Claude Code / Codex / Aider). It runs as an ordinary
+  PTY in the task's **git worktree**.
+- A managed session is a separate durable domain owned by the Agents plugin. Claude uses ACP and
+  Codex uses app-server v2; messages, tools and provider requests do not depend on terminal parsing.
+- The **Agent task sidebar** sits beside the managed conversation and lists managed sessions, raw
+  agents and workflow attention for that task. Selecting a managed row changes the active
+  transcript or opens its exact request. The drawer remains the explicit raw fallback.
 
 The whole UI follows the active theme/style token axes ([ui-design.md](./ui-design.md)). xterm
 renders to its own canvas and cannot read CSS, so `terminal/theme.ts` projects the current colour
@@ -177,7 +178,7 @@ The controlled base environment supplies `LANG=en_US.UTF-8` when a Finder-launch
 has no locale. The tmux attach client also uses `-u`: the locale keeps programs inside the pane
 Unicode-aware, while `-u` prevents tmux from replacing Unicode glyphs before xterm receives them.
 
-## 5. Agent status — the one `AgentState` vocabulary
+## 5. Raw-terminal status vocabulary
 
 `AgentState` is declared **once** in `shared/terminal.ts:7` and reused verbatim everywhere. No other
 module redeclares it:
@@ -202,25 +203,27 @@ Each transport emits only the subset it can detect:
   `streamJsonToAgentState` (`agents/model.ts:11`): `system → starting`, `assistant/tool_use/
   tool_result/user → working`, `permission_request → blocked`, `result → done`.
 
-## 6. The Agents panel (`agents/AgentsPanel.tsx` + `agents/model.ts`)
+## 6. The Agent task sidebar
 
-One right-rail overlay, toggled from the task view. `model.ts` holds the pure, unit-tested mappers;
-`AgentsPanel.tsx` is thin glue. Workflow transitions refetch on WS status pings; parsed headless
-events arrive live on `workflow:step:event`. Running steps expose kill-step and cancel-run actions,
-and a quiet step shows a no-output hint after 30 seconds.
+The sidebar is intentionally compact and remains visible beside the current chat. It merges managed
+session snapshots, pending durable requests, raw PTY sessions and workflow activity. Needs-you rows
+deep-link to the exact managed session and request card; managed-session rows switch the transcript
+in place. Full transcript, composer, queue, request resolution, artifacts and lifecycle controls
+live in `AgentPane.tsx`; workspace aggregation lives in `AgentCenter.tsx`. Provider utilization is
+summarized in the Agent header and expands into a detailed hover/focus tooltip.
+
+The material below describes the retained raw-terminal/workflow feed behavior.
+
+`AgentTaskSidebar.tsx` is feature-owned glue around the pure, unit-tested mappers in `model.ts`.
+Workflow transitions refetch on WS status pings.
 
 - **Roster** (`buildRoster`) merges the task's live PTY sessions with its workflow steps into one
   ordered list: **needs-you first** (`blocked` / `waiting-gate`), then active (`working`/`starting`),
   then the rest, newest first. Each row shows a state glyph, title, the state word, and — for a
   workflow step — its `costUsd`.
-- **`+ New agent`** launcher lists the terminal profiles (disabled when not on PATH); launching one
-  `create`s an interactive session and opens the raw drawer (`setTerminalOpen`) — interactive agents
-  live in the drawer, not this panel.
-- **Per-agent view.** For a **workflow step** it renders an activity feed parsed from the persisted
-  headless `stream-json` (`stepFeed` → `feedFromEvents` → `streamJsonToFeedItems`): messages,
-  thinking, tool calls/results, and a final `result` line with cost. For a step at a human gate it
-  shows an inline **Approve / Reject** that calls `api.workflow.gate` (see [workflows.md](./workflows.md)).
-  For an interactive **session** it just points to the terminal drawer.
+- **Workflow gates.** A step at a human gate shows inline **Approve / Reject** actions that call
+  `api.workflow.gate` (see [workflows.md](./workflows.md)).
+- **Raw sessions.** Selecting an interactive raw session opens and focuses it in the terminal drawer.
 - **Open in terminal.** For a step with a captured `sessionId`, `resumeCommandFor` builds
   `codex resume <id>` or `claude --resume <id>` (session ids are validated as opaque tokens — never
   shell metachars) and opens it as a raw TUI in the drawer.
@@ -302,7 +305,7 @@ bounds, and navigation are Electron capabilities; agent browser tools remain ser
 
 - Renderer terminal: `apps/desktop/src/plugins/terminal/client/{TerminalPanel,TerminalSurface}.tsx`,
   `sessions.ts`, `terminalClient.ts`, `theme.ts`
-- Renderer agents: `apps/desktop/src/plugins/agents/client/{AgentsPanel.tsx,model.ts}`,
+- Renderer agents: `apps/desktop/src/plugins/agents/client/{AgentPane.tsx,AgentTaskSidebar.tsx,model.ts}`,
   `apps/desktop/src/core/client/agent/reference.ts`
 - Capability + panel wiring: `apps/desktop/src/core/client/capabilities.ts`,
   `apps/desktop/src/core/client/tasks/TaskView.tsx`

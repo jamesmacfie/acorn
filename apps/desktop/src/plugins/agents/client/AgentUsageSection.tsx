@@ -2,27 +2,30 @@ import { For, onCleanup, onMount, Show } from 'solid-js'
 import type { AgentProviderUsage } from '../shared/usage'
 import { agentUsageStore } from './usageStore'
 import { formatUpdated, providerUsageRows } from './usageModel'
+import './agent-usage.css'
 
 const providerLabel = (provider: AgentProviderUsage): string => (provider.provider === 'claude' ? 'Claude' : 'Codex')
 
-export default function AgentUsageSection() {
+export default function AgentUsageSection(props: { showHeader?: boolean }) {
   onMount(() => onCleanup(agentUsageStore.init()))
 
   return (
     <section class="agent-usage" aria-label="Agent provider usage">
-      <div class="agent-usage-head">
-        <span>Usage</span>
-        <button
-          type="button"
-          class="section-refresh"
-          title="Refresh agent usage"
-          aria-label="Refresh agent usage"
-          disabled={agentUsageStore.refreshing()}
-          onClick={() => void agentUsageStore.refresh()}
-        >
-          {agentUsageStore.refreshing() ? '...' : '↻'}
-        </button>
-      </div>
+      <Show when={props.showHeader !== false}>
+        <div class="agent-usage-head">
+          <span>Usage</span>
+          <button
+            type="button"
+            class="section-refresh"
+            title="Refresh agent usage"
+            aria-label="Refresh agent usage"
+            disabled={agentUsageStore.refreshing()}
+            onClick={() => void agentUsageStore.refresh()}
+          >
+            {agentUsageStore.refreshing() ? '...' : '↻'}
+          </button>
+        </div>
+      </Show>
       <Show when={agentUsageStore.error()}>
         <div class="agent-usage-route-error" role="alert">{agentUsageStore.error()}</div>
       </Show>

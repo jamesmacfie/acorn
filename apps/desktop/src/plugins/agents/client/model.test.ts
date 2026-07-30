@@ -82,6 +82,7 @@ const step = (over: Partial<WorkflowStepRow>): WorkflowStepRow => ({
   resultJson: null,
   structuredJson: null,
   sessionId: 'sess-9',
+  agentSessionId: null,
   costUsd: 0.04,
   iteration: 0,
   error: null,
