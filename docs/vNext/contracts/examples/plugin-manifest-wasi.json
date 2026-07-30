@@ -1,0 +1,197 @@
+{
+  "apiVersion": "acorn.dev/plugin/v2",
+  "coordinate": "acme/service-monitor",
+  "version": "1.2.0",
+  "displayName": "Service Monitor",
+  "description": "Monitors declared service health endpoints.",
+  "license": "Apache-2.0",
+  "compatibility": {
+    "nodeProtocol": {
+      "min": "2.0",
+      "max": "2.0"
+    },
+    "clientProtocol": {
+      "min": "2.0",
+      "max": "2.0"
+    },
+    "rendererCapabilities": [
+      {
+        "kind": "renderer-advertisement",
+        "id": "acorn.content/2",
+        "revision": 0,
+        "required": true,
+        "reason": "Render service state.",
+        "constraints": {}
+      }
+    ]
+  },
+  "artifacts": [
+    {
+      "id": "node",
+      "kind": "runtime",
+      "target": "node",
+      "runtime": "wasi-component",
+      "digest": "sha256:2222222222222222222222222222222222222222222222222222222222222222",
+      "size": 482901,
+      "mediaType": "application/wasm",
+      "path": "runtime/service-monitor.wasm",
+      "platform": "any",
+      "architecture": "any",
+      "entrypoint": "service-monitor.wasm"
+    },
+    {
+      "id": "views",
+      "kind": "ui",
+      "target": "client",
+      "runtime": "declarative",
+      "digest": "sha256:3333333333333333333333333333333333333333333333333333333333333333",
+      "size": 10923,
+      "mediaType": "application/vnd.acorn.declarative-ui+json",
+      "path": "ui/views.json",
+      "platform": "any",
+      "architecture": "any",
+      "entrypoint": "views.json"
+    },
+    {
+      "id": "schemas",
+      "kind": "schemas",
+      "target": "shared",
+      "runtime": "none",
+      "digest": "sha256:1212121212121212121212121212121212121212121212121212121212121212",
+      "size": 24576,
+      "mediaType": "application/schema+json",
+      "path": "schemas/bundle.json",
+      "platform": "any",
+      "architecture": "any",
+      "entrypoint": "bundle.json"
+    }
+  ],
+  "contributions": [
+    {
+      "id": "health-pane",
+      "type": "task-pane",
+      "artifact": "views",
+      "capabilityVersion": "2.0",
+      "label": "Service health",
+      "description": "Show the current service health.",
+      "order": 40,
+      "when": null,
+      "requires": {
+        "dependencies": [],
+        "grants": ["dev.acme.service-monitor.health-read.v1"],
+        "rendererCapabilities": ["acorn.layout/2", "acorn.content/2"],
+        "rendererNodes": ["acorn.stack/1", "acorn.status/1"]
+      },
+      "fallback": {
+        "kind": "unsupported",
+        "desktop": "placeholder",
+        "mobile": "semantic",
+        "reason": "Health renderers are unavailable."
+      },
+      "definition": {
+        "kind": "task-pane",
+        "icon": "heart-pulse",
+        "view": "health-view",
+        "minimumWidth": 280,
+        "retention": "session"
+      }
+    }
+  ],
+  "bespokeViews": [],
+  "operations": [],
+  "streams": [],
+  "capabilities": {
+    "requested": [
+      {
+        "kind": "permission-request",
+        "id": "acorn.network.brokered-http/1",
+        "revision": 0,
+        "scope": "workspace",
+        "required": true,
+        "reason": "Read owner-declared HTTPS health endpoints.",
+        "constraints": {
+          "family": "network",
+          "operations": ["request"],
+          "schemes": ["https"],
+          "hosts": ["status.example.test"],
+          "ports": [443],
+          "pathPrefixes": ["/health"],
+          "allowPrivate": false
+        }
+      }
+    ],
+    "exported": [
+      {
+        "id": "dev.acme.service-monitor.health.query.v1",
+        "version": "1.0.0",
+        "inputSchema": {
+          "uri": "urn:acorn-plugin:acme:service-monitor:schema:health-query-input-v1",
+          "digest": "sha256:4444444444444444444444444444444444444444444444444444444444444444"
+        },
+        "outputSchema": {
+          "uri": "urn:acorn-plugin:acme:service-monitor:schema:health-query-output-v1",
+          "digest": "sha256:5555555555555555555555555555555555555555555555555555555555555555"
+        }
+      }
+    ]
+  },
+  "dependencies": [],
+  "events": {
+    "publishes": [
+      {
+        "type": "dev.acme.service-monitor.alert.raised.v1",
+        "version": "1.0.0",
+        "schema": {
+          "uri": "urn:acorn-plugin:acme:service-monitor:schema:alert-raised-v1",
+          "digest": "sha256:6666666666666666666666666666666666666666666666666666666666666666"
+        }
+      }
+    ],
+    "subscribes": []
+  },
+  "settings": [
+    {
+      "id": "endpoints",
+      "schema": {
+        "uri": "urn:acorn-plugin:acme:service-monitor:schema:settings-v1",
+        "digest": "sha256:7777777777777777777777777777777777777777777777777777777777777777"
+      },
+      "scopes": ["workspace"],
+      "containsSecrets": false
+    }
+  ],
+  "wizards": [
+    {
+      "id": "initial-setup",
+      "schema": {
+        "uri": "urn:acorn-plugin:acme:service-monitor:schema:wizard-v1",
+        "digest": "sha256:8888888888888888888888888888888888888888888888888888888888888888"
+      }
+    }
+  ],
+  "storage": {
+    "schemaVersion": 1,
+    "quotaBytes": 104857600,
+    "backup": "include",
+    "migrations": [
+      {
+        "from": 0,
+        "to": 1,
+        "digest": "sha256:9999999999999999999999999999999999999999999999999999999999999999",
+        "reversible": true
+      }
+    ]
+  },
+  "health": {
+    "startupTimeoutMs": 10000,
+    "checkIntervalMs": 30000,
+    "failureThreshold": 3
+  },
+  "provenance": {
+    "publisherKeyId": "acme-release-2026",
+    "manifestDigest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "signature": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+    "sbomDigest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "transparencyEntry": "https://transparency.acorn.dev/entries/123456"
+  }
+}

@@ -1,0 +1,53 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://acorn.dev/schemas/v2/ui-patch-v2.schema.json",
+  "title": "Acorn V2 UI patch batch",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["apiVersion", "documentId", "fromRevision", "toRevision", "operations"],
+  "properties": {
+    "apiVersion": { "const": "acorn.dev/ui-patch/v2" },
+    "documentId": { "$ref": "#/$defs/uuidv7" },
+    "fromRevision": { "$ref": "#/$defs/decimal" },
+    "toRevision": { "$ref": "#/$defs/decimal" },
+    "operations": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 256,
+      "items": {
+        "oneOf": [
+          { "$ref": "#/$defs/addReplaceTest" },
+          { "$ref": "#/$defs/remove" }
+        ]
+      }
+    }
+  },
+  "$defs": {
+    "uuidv7": { "type": "string", "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$" },
+    "decimal": { "type": "string", "pattern": "^(0|[1-9][0-9]*)$" },
+    "path": {
+      "type": "string",
+      "pattern": "^/(?:title|accessibilityLabel|root)(?:/(?:props|bindings|actions|children|[A-Za-z0-9_~-]+))*$",
+      "maxLength": 1000
+    },
+    "addReplaceTest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["op", "path", "value"],
+      "properties": {
+        "op": { "enum": ["add", "replace", "test"] },
+        "path": { "$ref": "#/$defs/path" },
+        "value": true
+      }
+    },
+    "remove": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["op", "path"],
+      "properties": {
+        "op": { "const": "remove" },
+        "path": { "$ref": "#/$defs/path" }
+      }
+    }
+  }
+}

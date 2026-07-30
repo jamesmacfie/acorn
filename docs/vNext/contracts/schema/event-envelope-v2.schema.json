@@ -1,0 +1,142 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://acorn.dev/schemas/v2/event-envelope-v2.schema.json",
+  "title": "Acorn V2 product event",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "apiVersion", "eventId", "nodeId", "sequence", "type", "schema", "resource",
+    "producer", "actor", "commandId", "correlationId", "causationId", "occurredAt",
+    "recordedAt", "sensitivity", "payload"
+  ],
+  "properties": {
+    "apiVersion": { "const": "acorn.dev/event/v2" },
+    "eventId": { "$ref": "#/$defs/uuidv7" },
+    "nodeId": { "$ref": "#/$defs/uuidv7" },
+    "sequence": { "$ref": "#/$defs/decimal" },
+    "type": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9-]*(?:[.-][a-z0-9-]+)+\\.v[1-9][0-9]*$",
+      "maxLength": 200
+    },
+    "schema": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["uri", "digest", "version"],
+      "properties": {
+        "uri": { "type": "string", "format": "uri", "maxLength": 500 },
+        "digest": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
+        "version": { "type": "integer", "minimum": 1, "maximum": 2147483647 }
+      }
+    },
+    "resource": { "$ref": "#/$defs/acornUri" },
+    "producer": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "coordinate", "version", "generation"],
+      "properties": {
+        "kind": { "enum": ["core", "plugin"] },
+        "coordinate": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9-]{1,62}/[a-z][a-z0-9-]{1,62}$"
+        },
+        "version": {
+          "type": "string",
+          "pattern": "^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)(?:-[0-9A-Za-z.-]+)?(?:\\+[0-9A-Za-z.-]+)?$"
+        },
+        "generation": {
+          "oneOf": [
+            { "type": "null" },
+            { "$ref": "#/$defs/uuidv7" }
+          ]
+        }
+      }
+    },
+    "actor": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "id", "delegation"],
+      "properties": {
+        "kind": { "enum": ["device", "plugin", "system", "agent"] },
+        "id": { "type": "string", "minLength": 1, "maxLength": 200 },
+        "delegation": {
+          "oneOf": [
+            { "type": "null" },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["initiator", "hops", "grantVersions"],
+              "properties": {
+                "initiator": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["kind", "id"],
+                  "properties": {
+                    "kind": { "enum": ["device", "system"] },
+                    "id": { "type": "string", "minLength": 1, "maxLength": 200 }
+                  }
+                },
+                "hops": {
+                  "type": "array",
+                  "minItems": 1,
+                  "maxItems": 16,
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": ["installationId", "installationGeneration"],
+                    "properties": {
+                      "installationId": { "$ref": "#/$defs/uuidv7" },
+                      "installationGeneration": { "$ref": "#/$defs/decimal" }
+                    }
+                  }
+                },
+                "grantVersions": {
+                  "type": "array",
+                  "minItems": 1,
+                  "maxItems": 32,
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": ["grantId", "grantVersion"],
+                    "properties": {
+                      "grantId": { "$ref": "#/$defs/uuidv7" },
+                      "grantVersion": { "$ref": "#/$defs/decimal" }
+                    }
+                  }
+                }
+              }
+            }
+          ]
+        }
+      }
+    },
+    "commandId": {
+      "oneOf": [
+        { "type": "null" },
+        { "$ref": "#/$defs/uuidv7" }
+      ]
+    },
+    "correlationId": {
+      "oneOf": [
+        { "type": "null" },
+        { "$ref": "#/$defs/uuidv7" }
+      ]
+    },
+    "causationId": {
+      "oneOf": [
+        { "type": "null" },
+        { "$ref": "#/$defs/uuidv7" }
+      ]
+    },
+    "occurredAt": { "$ref": "#/$defs/timestamp" },
+    "recordedAt": { "$ref": "#/$defs/timestamp" },
+    "sensitivity": { "enum": ["public-metadata", "internal", "sensitive"] },
+    "payload": { "type": "object", "maxProperties": 128 }
+  },
+  "$defs": {
+    "uuidv7": { "type": "string", "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$" },
+    "decimal": { "type": "string", "pattern": "^(0|[1-9][0-9]*)$" },
+    "acornUri": { "type": "string", "pattern": "^acorn://[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}/[a-z][a-z0-9.-]*/[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$" },
+    "timestamp": { "type": "string", "format": "date-time", "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\\.[0-9]{3}Z$" }
+  }
+}

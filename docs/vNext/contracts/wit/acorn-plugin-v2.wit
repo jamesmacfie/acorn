@@ -1,0 +1,143 @@
+package acorn:plugin@2.0.0;
+
+interface types {
+  type delegation-handle = string;
+  type stream-handle = string;
+  type output-object-handle = string;
+
+  record delegation-hop {
+    installation-id: string,
+    installation-generation: string,
+    capability-id: string,
+    grant-id: string,
+    grant-version: string,
+  }
+
+  record delegation-descriptor {
+    initiator-kind: string,
+    initiator-id: string,
+    agent-session-id: option<string>,
+    audience: string,
+    operation: string,
+    resource: string,
+    purpose: string,
+    deadline-unix-ms: u64,
+    hops: list<delegation-hop>,
+  }
+
+  record invocation-context {
+    invocation-id: string,
+    plugin-coordinate: string,
+    plugin-version: string,
+    installation-id: string,
+    installation-generation: string,
+    target: string,
+    deadline-unix-ms: u64,
+    delegation: delegation-handle,
+  }
+
+  record plugin-error {
+    code: string,
+    retryable: bool,
+    safe-detail: string,
+  }
+
+  record event-draft {
+    event-type: string,
+    schema-digest: string,
+    resource: string,
+    sensitivity: string,
+    payload-json: list<u8>,
+  }
+
+  record worker-heartbeat {
+    status: string,
+    safe-detail: string,
+    processed-offset: option<string>,
+  }
+
+  record worker-signal {
+    kind: string,
+    signal-id: string,
+    cursor: option<string>,
+    deadline-unix-ms: u64,
+    payload-json: list<u8>,
+  }
+}
+
+interface host {
+  use types.{delegation-descriptor, delegation-handle, event-draft, plugin-error,
+    output-object-handle, stream-handle, worker-heartbeat, worker-signal};
+
+  // Every host import is bound to the currently executing invocation-context.
+  // The host rejects use outside an active invocation or after cancellation/revocation.
+  inspect-delegation: func(handle: delegation-handle)
+    -> result<delegation-descriptor, plugin-error>;
+  query: func(query-id: string, target: string, input-json: list<u8>)
+    -> result<list<u8>, plugin-error>;
+  call-capability: func(capability-id: string, target: string, input-json: list<u8>)
+    -> result<list<u8>, plugin-error>;
+  publish-event: func(event: event-draft) -> result<string, plugin-error>;
+  secret-metadata: func(secret-ref: string)
+    -> result<list<u8>, plugin-error>;
+  brokered-http: func(request-json: list<u8>) -> result<list<u8>, plugin-error>;
+  storage-read: func(key: string) -> result<option<list<u8>>, plugin-error>;
+  storage-write: func(key: string, value: list<u8>) -> result<_, plugin-error>;
+  storage-delete: func(key: string) -> result<_, plugin-error>;
+  storage-scan: func(prefix: string, cursor: option<string>, limit: u32)
+    -> result<list<u8>, plugin-error>;
+  clock-now-unix-ms: func(purpose: string) -> result<u64, plugin-error>;
+  random-bytes: func(length: u32, purpose: string) -> result<list<u8>, plugin-error>;
+  worker-ready: func(worker-id: string) -> result<_, plugin-error>;
+  worker-heartbeat: func(worker-id: string, heartbeat: worker-heartbeat)
+    -> result<_, plugin-error>;
+  worker-checkpoint: func(worker-id: string, checkpoint-json: list<u8>)
+    -> result<_, plugin-error>;
+  worker-wait: func(worker-id: string, after-cursor: option<string>,
+    deadline-unix-ms: u64) -> result<worker-signal, plugin-error>;
+  stream-open: func(request-json: list<u8>) -> result<stream-handle, plugin-error>;
+  stream-read: func(handle: stream-handle, maximum-bytes: u32)
+    -> result<list<u8>, plugin-error>;
+  stream-write: func(handle: stream-handle, sequence: string, content: list<u8>)
+    -> result<u32, plugin-error>;
+  stream-wait-credit: func(handle: stream-handle, minimum-credit: u32,
+    deadline-unix-ms: u64) -> result<u32, plugin-error>;
+  stream-close: func(handle: stream-handle, reason: string)
+    -> result<_, plugin-error>;
+  output-object-create: func(metadata-json: list<u8>)
+    -> result<output-object-handle, plugin-error>;
+  output-object-append: func(handle: output-object-handle, content: list<u8>)
+    -> result<string, plugin-error>;
+  output-object-commit: func(handle: output-object-handle)
+    -> result<list<u8>, plugin-error>;
+  output-object-abort: func(handle: output-object-handle, reason: string)
+    -> result<_, plugin-error>;
+  log: func(level: string, message: string, attributes-json: list<u8>);
+}
+
+interface plugin {
+  use types.{invocation-context, plugin-error};
+
+  initialize: func(context: invocation-context) -> result<_, plugin-error>;
+  handle-query: func(context: invocation-context, query-id: string, input-json: list<u8>)
+    -> result<list<u8>, plugin-error>;
+  handle-command: func(context: invocation-context, command-id: string, input-json: list<u8>)
+    -> result<list<u8>, plugin-error>;
+  handle-event: func(context: invocation-context, event-json: list<u8>)
+    -> result<_, plugin-error>;
+  handle-scheduled-tick: func(context: invocation-context, worker-id: string,
+    tick-id: string, scheduled-unix-ms: u64, checkpoint-json: list<u8>)
+    -> result<list<u8>, plugin-error>;
+  handle-event-batch: func(context: invocation-context, worker-id: string,
+    first-sequence: string, last-sequence: string, events-json: list<u8>,
+    checkpoint-json: list<u8>) -> result<list<u8>, plugin-error>;
+  run-resident-worker: func(context: invocation-context, worker-id: string,
+    checkpoint-json: list<u8>) -> result<list<u8>, plugin-error>;
+  health: func() -> result<list<u8>, plugin-error>;
+  shutdown: func(deadline-unix-ms: u64) -> result<_, plugin-error>;
+}
+
+world acorn-plugin {
+  import host;
+  export plugin;
+}

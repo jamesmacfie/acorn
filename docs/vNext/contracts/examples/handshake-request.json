@@ -1,0 +1,33 @@
+{
+  "apiVersion": "acorn.dev/handshake/v2",
+  "clientVersion": "2.0.0",
+  "platform": "darwin",
+  "architecture": "arm64",
+  "http": {
+    "min": "2.0",
+    "max": "2.0"
+  },
+  "events": {
+    "min": "2.0",
+    "max": "2.0"
+  },
+  "rendererCapabilities": [
+    {
+      "kind": "renderer-advertisement",
+      "id": "acorn.code-editor/2",
+      "revision": 0,
+      "required": false,
+      "reason": "Render source files and saved queries.",
+      "constraints": {
+        "platforms": ["darwin"],
+        "maxDocumentBytes": 10485760,
+        "features": ["source-edit"]
+      }
+    }
+  ],
+  "uiArtifacts": [],
+  "encodings": ["identity", "gzip"],
+  "cursors": {
+    "product": "981"
+  }
+}

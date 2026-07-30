@@ -1,0 +1,234 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://acorn.dev/schemas/v2/plugin-operation-v2.schema.json",
+  "title": "Acorn V2 plugin operation descriptor",
+  "description": "Closed security and reliability contract for one query, command or exported capability operation.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "apiVersion", "id", "kind", "inputSchema", "resultSchema", "target",
+    "authentication", "authorization", "idempotency", "concurrency",
+    "cancellation", "deadline", "errors", "commit", "resultingEvents",
+    "retry", "sensitivity", "streams"
+  ],
+  "properties": {
+    "apiVersion": { "const": "acorn.dev/plugin-operation/v2" },
+    "id": { "$ref": "#/$defs/namespacedId" },
+    "kind": {
+      "enum": ["query", "command", "saga-command", "client-command", "capability-query", "capability-command"]
+    },
+    "inputSchema": { "$ref": "#/$defs/schemaRef" },
+    "resultSchema": { "$ref": "#/$defs/schemaRef" },
+    "target": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["scope", "nodeQualified", "ancestryRevalidated"],
+      "properties": {
+        "scope": {
+          "enum": [
+            "fleet", "node", "workspace", "repository", "task", "resource",
+            "plugin-installation", "client-device", "view-session"
+          ]
+        },
+        "nodeQualified": { "type": "boolean" },
+        "ancestryRevalidated": { "type": "boolean" }
+      }
+    },
+    "authentication": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["principal", "transport"],
+      "properties": {
+        "principal": { "enum": ["paired-owner-device", "node-core", "delegated-plugin", "local-client"] },
+        "transport": { "enum": ["mtls-https", "authenticated-websocket", "core-broker", "client-host"] }
+      }
+    },
+    "authorization": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["capabilities", "delegation", "confirmation"],
+      "properties": {
+        "capabilities": {
+          "type": "array",
+          "maxItems": 32,
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/capabilityId" }
+        },
+        "delegation": { "enum": ["not-applicable", "preserve-original-caller", "core-only"] },
+        "confirmation": { "enum": ["none", "policy-dependent", "external-send", "destructive", "unrestricted-code", "secret-entry"] }
+      }
+    },
+    "idempotency": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["mode", "keyLifetimeSeconds", "sameKeyBehavior", "differentInputBehavior"],
+      "properties": {
+        "mode": { "enum": ["forbidden", "optional", "required", "natural"] },
+        "keyLifetimeSeconds": { "type": "integer", "minimum": 0, "maximum": 604800 },
+        "sameKeyBehavior": { "enum": ["fresh-evaluation", "return-original-result", "resume-original-operation", "natural-current-state"] },
+        "differentInputBehavior": { "enum": ["not-applicable", "idempotency-conflict"] }
+      }
+    },
+    "concurrency": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["expectedRevision", "generationChecks", "conflictCode"],
+      "properties": {
+        "expectedRevision": { "enum": ["not-applicable", "optional", "required", "field-dependent"] },
+        "generationChecks": {
+          "type": "array",
+          "maxItems": 8,
+          "uniqueItems": true,
+          "items": {
+            "enum": ["node-trust", "plugin", "task", "checkout", "resource", "view", "stream", "provider"]
+          }
+        },
+        "conflictCode": { "enum": ["not-applicable", "conflict", "stale-resource", "completion-unknown"] }
+      }
+    },
+    "cancellation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["supported", "beforeCommit", "afterCommit"],
+      "properties": {
+        "supported": { "type": "boolean" },
+        "beforeCommit": { "enum": ["not-applicable", "abort-without-effect", "record-cancelled"] },
+        "afterCommit": { "enum": ["not-applicable", "result-still-authoritative", "compensating-operation-only", "continue-settlement"] }
+      }
+    },
+    "deadline": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["defaultMs", "maximumMs", "expiryBehavior"],
+      "properties": {
+        "defaultMs": { "type": "integer", "minimum": 100, "maximum": 3600000 },
+        "maximumMs": { "type": "integer", "minimum": 100, "maximum": 3600000 },
+        "expiryBehavior": { "enum": ["fail-no-effect", "cancel-then-settle", "return-operation", "completion-unknown"] }
+      }
+    },
+    "errors": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 64,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "pattern": "^[a-z][a-z0-9]*(?:_[a-z0-9]+)*$",
+        "maxLength": 80
+      }
+    },
+    "commit": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["point", "atomicWithOutbox", "externalOutcome"],
+      "properties": {
+        "point": { "type": "string", "minLength": 1, "maxLength": 500 },
+        "atomicWithOutbox": { "type": "boolean" },
+        "externalOutcome": { "enum": ["none", "known-before-commit", "saga-recorded", "may-be-unknown"] }
+      }
+    },
+    "resultingEvents": {
+      "type": "array",
+      "maxItems": 32,
+      "uniqueItems": true,
+      "items": { "$ref": "#/$defs/namespacedId" }
+    },
+    "retry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["automatic", "sameKey", "afterAmbiguousOutcome"],
+      "properties": {
+        "automatic": { "type": "boolean" },
+        "sameKey": { "enum": ["fresh-query", "original-result", "resume", "reconcile-first", "not-allowed"] },
+        "afterAmbiguousOutcome": { "enum": ["not-applicable", "reconcile-first", "owner-recovery", "never"] }
+      }
+    },
+    "sensitivity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["input", "result", "eventProjection", "auditProjection"],
+      "properties": {
+        "input": { "enum": ["public", "metadata", "sensitive", "secret-write-only", "unrestricted-code"] },
+        "result": { "enum": ["public", "metadata", "sensitive", "opaque-reference"] },
+        "eventProjection": { "enum": ["none", "safe-metadata", "sensitive-authorized"] },
+        "auditProjection": { "enum": ["safe-metadata", "high-risk-safe-metadata"] }
+      }
+    },
+    "streams": {
+      "type": "array",
+      "maxItems": 16,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "pattern": "^[a-z][a-z0-9-]{0,62}$"
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": { "properties": { "kind": { "enum": ["query", "capability-query"] } } },
+      "then": {
+        "properties": {
+          "idempotency": {
+            "type": "object",
+            "properties": {
+              "mode": { "enum": ["forbidden", "optional"] },
+              "sameKeyBehavior": { "const": "fresh-evaluation" },
+              "differentInputBehavior": { "const": "not-applicable" }
+            }
+          },
+          "commit": {
+            "type": "object",
+            "properties": {
+              "atomicWithOutbox": { "const": false },
+              "externalOutcome": { "enum": ["none", "known-before-commit"] }
+            }
+          },
+          "resultingEvents": { "type": "array", "maxItems": 0 }
+        }
+      }
+    },
+    {
+      "if": { "properties": { "kind": { "const": "client-command" } } },
+      "then": {
+        "properties": {
+          "target": {
+            "type": "object",
+            "properties": {
+              "scope": { "enum": ["fleet", "client-device", "view-session"] },
+              "nodeQualified": { "const": false }
+            }
+          },
+          "authentication": {
+            "type": "object",
+            "properties": {
+              "principal": { "const": "local-client" },
+              "transport": { "const": "client-host" }
+            }
+          }
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "namespacedId": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9-]*(?:[./-][a-z0-9-]+)+(?:[.@/]v?[1-9][0-9]*)$",
+      "maxLength": 220
+    },
+    "capabilityId": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9-]*(?:[.:/-][a-z0-9-]+)+(?:[.@/]v?[1-9][0-9]*)?$",
+      "maxLength": 220
+    },
+    "schemaRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["uri", "digest"],
+      "properties": {
+        "uri": { "type": "string", "format": "uri", "maxLength": 500 },
+        "digest": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" }
+      }
+    }
+  }
+}

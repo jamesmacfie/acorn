@@ -1,0 +1,100 @@
+{
+  "apiVersion": "acorn.dev/setup-wizard/v2",
+  "plugin": "acme/service-monitor",
+  "id": "initial-setup",
+  "version": 1,
+  "purpose": "install",
+  "scope": {
+    "base": "workspace",
+    "resourceTypes": ["workspace"]
+  },
+  "title": "Connect Service Monitor",
+  "description": "Grant network access and choose services to monitor.",
+  "resumable": true,
+  "entry": "introduction",
+  "activationGate": {
+    "mode": "required-capabilities",
+    "capabilities": ["acorn.network.brokered-http.v1"]
+  },
+  "resumePolicy": {
+    "compatibleVersions": [1],
+    "onIncompatible": "repair"
+  },
+  "cancelPolicy": {
+    "mode": "retain-effects",
+    "cleanupCommand": null
+  },
+  "completion": {
+    "postconditions": ["dev.acme.service-monitor.connection.healthy.v1"],
+    "nextAction": "workspace"
+  },
+  "steps": [
+    {
+      "id": "introduction",
+      "type": "information",
+      "title": "About Service Monitor",
+      "description": "Review what the plugin reads before granting access.",
+      "optional": false,
+      "configuration": {
+        "body": "The plugin reads only the HTTPS health endpoints selected by you.",
+        "links": []
+      },
+      "next": [
+        {
+          "step": "permissions",
+          "condition": { "operator": "always" }
+        }
+      ]
+    },
+    {
+      "id": "permissions",
+      "type": "permissions",
+      "title": "Approve access",
+      "optional": false,
+      "configuration": {
+        "capabilities": ["acorn.network.brokered-http.v1"]
+      },
+      "next": [
+        {
+          "step": "confirm",
+          "condition": {
+            "operator": "truthy",
+            "source": "state",
+            "path": "/permissionsApproved"
+          }
+        }
+      ]
+    },
+    {
+      "id": "confirm",
+      "type": "confirmation",
+      "title": "Confirm network access",
+      "optional": false,
+      "configuration": {
+        "risk": "network-egress",
+        "summaryBindings": ["/approvedDestinations"]
+      },
+      "next": [
+        {
+          "step": "complete",
+          "condition": {
+            "operator": "truthy",
+            "source": "answer",
+            "path": "/confirmed"
+          }
+        }
+      ]
+    },
+    {
+      "id": "complete",
+      "type": "completion",
+      "title": "Ready",
+      "optional": false,
+      "configuration": {
+        "result": "success",
+        "nextAction": "workspace"
+      },
+      "next": []
+    }
+  ]
+}
