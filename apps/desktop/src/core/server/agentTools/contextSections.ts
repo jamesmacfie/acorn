@@ -129,7 +129,7 @@ export function buildContextSections(sources: { notes: ContextNotesSource; memor
     {
       id: 'issues',
       label: 'Linked issues',
-      defaultIncluded: false,
+      defaultIncluded: true,
       budget: { maxItems: 50, maxBytesPerItem: 1_000, overflow: 'omit-with-marker' },
       async assemble({ db, userLogin, task }) {
         const links = (await db.select().from(schema.taskLinks).where(eq(schema.taskLinks.taskId, task.id))).sort(

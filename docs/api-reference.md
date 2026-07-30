@@ -187,6 +187,42 @@ Pricing values are USD per million tokens for input, output, cache write, and ca
 Acorn's estimate only. The shared contract and default catalog live in
 `plugins/agents/shared/pricing.ts`; core has no model-pricing contract.
 
+### Managed sessions (`/api/agents`)
+
+`apps/desktop/src/plugins/agents/server/routes/managed.ts`. These cookie-authenticated routes bridge
+to the utility-service managed runtime. Provider processes, session state and object bytes never
+move into the Hono process boundary as raw handles.
+
+| Method | Path | Purpose |
+| --- | --- | --- |
+| `GET` | `/api/agents/providers` | Discover provider installation/auth health and advertised capabilities/configuration. |
+| `GET` | `/api/agents/sessions` | Paginated task/attention/archive-filtered session list. |
+| `GET` | `/api/agents/sessions/search` | FTS over titles, messages, tool summaries and artifact metadata. |
+| `POST` | `/api/agents/sessions` | Idempotently create a task-scoped session. |
+| `POST` | `/api/agents/transcript-imports` | Import Acorn/Claude/Codex history as read-only local history. |
+| `GET` | `/api/agents/sessions/:id` | Session projection, turns, requests and paginated normalized events. |
+| `GET` | `/api/agents/sessions/:id/events` | Continue event replay after a durable sequence. |
+| `PATCH` | `/api/agents/sessions/:id` | Rename, archive/unarchive or advance the exact read sequence. |
+| `DELETE` | `/api/agents/sessions/:id` | Permanently delete local history/references and report provider-side delete support. |
+| `POST` | `/api/agents/sessions/:id/turns` | Idempotently enqueue a turn; dispatch waits for protocol readiness. |
+| `PATCH/DELETE` | `/api/agents/sessions/:id/turns/:turnId` | Edit/reorder or remove an undispatched queued turn. |
+| `POST` | `/api/agents/sessions/:id/cancel` | Cancel the active or named queued turn. |
+| `POST` | `/api/agents/sessions/:id/requests/:requestId/resolve` | Idempotently resolve one provider/workflow request. |
+| `POST` | `/api/agents/sessions/:id/{fork,compact}` | Capability-gated native operation, with an explicitly labelled context-copy fallback for fork. |
+| `POST` | `/api/agents/sessions/:id/handoff-terminal` | Transfer the exclusive input-controller lease to a raw provider TUI. |
+| `POST` | `/api/agents/sessions/:id/resume-managed` | Return a clean stopped terminal-owned provider reference to Acorn. |
+| `POST` | `/api/agents/sessions/:id/verify-imported-resume` | Live-verify an imported provider reference before enabling input. |
+| `GET` | `/api/agents/sessions/:id/export` | Markdown or lossless versioned JSON export. |
+| `GET` | `/api/agents/sessions/:id/wait` | Cursor wait for ready, attention, turn completion or stop. |
+| `POST/GET/DELETE` | `/api/agents/attachments[/:id]` | Stream validated task-scoped uploads and manage unreferenced metadata. |
+| `GET` | `/api/agents/sessions/:id/artifacts` | List large session artifacts. |
+| `GET` | `/api/agents/artifacts/:id/content` | Authenticated, no-store artifact download. |
+
+Session create, turn enqueue and request resolution require an `Idempotency-Key` header. All input
+paths and context references are revalidated against the owning task worktree. See
+[managed-agents.md](./managed-agents.md); the bearer equivalent is documented in
+[public-api.md](./public-api.md).
+
 ---
 
 ## Workspaces (`/api/workspaces`)

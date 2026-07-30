@@ -15,6 +15,8 @@ import { reconcileWorktrees, setWorktreesRoot } from '../../core/main/taskWorktr
 import { logStorageFootprint } from '../../core/main/storageFootprint'
 import { disposeWsHub } from '../../core/main/wsHub'
 import { buildPublicApiContributions } from '../server/publicApi'
+import { wireManagedAgents } from '../main/managedAgentsWiring'
+import { createManagedWorkflowStepRunner } from '../main/managedWorkflowStep'
 import { wireServerBridges } from '../main/serverBridges'
 import { wireRunBridge } from '../main/harnessWiring'
 import { wireAgentTools } from '../main/agentToolsWiring'
@@ -98,6 +100,8 @@ export async function startServiceRuntime({ config, desktop, stateChanged }: Run
 
   let server: ServerType | null = null
   let apiServer: AutomationApiServer | null = null
+  let managedAgents: ReturnType<typeof wireManagedAgents> | null = null
+  let managedPublicEventsOff: (() => void) | null = null
   let reconcileTask: Promise<void> | null = null
   let stopped = false
   let dbClosed = false
@@ -118,6 +122,8 @@ export async function startServiceRuntime({ config, desktop, stateChanged }: Run
     stateChanged('draining')
     try {
       await apiServer?.stop()
+      managedPublicEventsOff?.()
+      managedPublicEventsOff = null
       setApiSettingsController(null)
     } catch (error) {
       console.warn('[service:stop] automation API close failed:', error)
@@ -126,6 +132,11 @@ export async function startServiceRuntime({ config, desktop, stateChanged }: Run
       await closeListener(server)
     } catch (error) {
       console.warn('[service:stop] listener close failed:', error)
+    }
+    try {
+      await managedAgents?.stop()
+    } catch (error) {
+      console.warn('[service:stop] managed agents close failed:', error)
     }
     try {
       await reconcileTask
@@ -187,6 +198,14 @@ export async function startServiceRuntime({ config, desktop, stateChanged }: Run
       reconciled: knowledge.reconciled,
       browser: desktop.browser,
     })
+    managedAgents = wireManagedAgents({
+      db,
+      dataDir: config.dataDir,
+      internalApiEnv,
+      encryptionKey: runtime.SESSION_ENC_KEY,
+      currentUserId: () => runtime.ACTIVE_IDENTITY.get(),
+      memoryReviewTrigger: knowledge.memoryReviewTrigger,
+    })
     const workflowRunner = await registerWorkflowIpc(db, {
       runtime: runtimeService,
       notesStore: knowledge.notesStore,
@@ -194,6 +213,7 @@ export async function startServiceRuntime({ config, desktop, stateChanged }: Run
       reconciled,
       currentUserId: () => runtime.ACTIVE_IDENTITY.get(),
       memoryReviewTrigger: knowledge.memoryReviewTrigger,
+      runManagedStep: createManagedWorkflowStepRunner(managedAgents),
     })
     wireServerBridges(db, config.dataDir)
     registerTerminalIpc(db, worktreesDir, {
@@ -225,6 +245,7 @@ export async function startServiceRuntime({ config, desktop, stateChanged }: Run
         workflowRunner,
         commandExecutions,
         preview: desktop.preview,
+        managedAgents,
       }),
       runtime: {
         version: config.version,
@@ -236,9 +257,37 @@ export async function startServiceRuntime({ config, desktop, stateChanged }: Run
         worktreesAvailable: () => true,
         pluginCapabilities: () => [
           'notes', 'changes', 'editor', 'memory', 'database', 'docker', 'workflows', 'rollbar',
-          'linear', 'model-providers', 'terminal', 'github', 'preview',
+          'linear', 'model-providers', 'terminal', 'github', 'preview', 'agents',
         ].map((id) => ({ id, available: true })),
       },
+    })
+    let managedPublicEventChain = Promise.resolve()
+    managedPublicEventsOff = managedAgents.subscribe((frame) => {
+      managedPublicEventChain = managedPublicEventChain.then(async () => {
+        if (!apiServer) return
+        if (frame.channel === 'agent:event') {
+          const session = await managedAgents!.store.requireSession(frame.event.sessionId)
+          apiServer.bus.publish({
+            channel: 'agents.event',
+            data: frame.event,
+            resource: { type: 'agent_session', id: session.id },
+            taskId: session.taskId,
+          })
+        } else if (frame.channel === 'agent:session') {
+          apiServer.bus.publish({
+            channel: 'agents.session',
+            data: frame.session,
+            resource: { type: 'agent_session', id: frame.session.id },
+            taskId: frame.session.taskId,
+          })
+        } else {
+          apiServer.bus.publish({
+            channel: 'agents.deleted',
+            data: { sessionId: frame.sessionId },
+            resource: { type: 'agent_session', id: frame.sessionId },
+          })
+        }
+      }).catch((error) => console.warn('[agents:public-events] publish failed:', error))
     })
     setApiSettingsController(apiServer)
     try {
@@ -271,6 +320,12 @@ export async function startServiceRuntime({ config, desktop, stateChanged }: Run
         mark('reconcile.workflow')
       } catch (error) {
         console.warn('[service:boot] reconcile workflow failed:', error)
+      }
+      try {
+        await managedAgents?.reconcile()
+        mark('reconcile.agents')
+      } catch (error) {
+        console.warn('[service:boot] reconcile managed agents failed:', error)
       }
       reconcileComplete = true
       finishReconcile()

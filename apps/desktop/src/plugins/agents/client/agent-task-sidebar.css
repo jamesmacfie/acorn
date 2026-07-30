@@ -1,0 +1,61 @@
+.agent-task-sidebar {
+  width: clamp(200px, 23%, 270px);
+  flex: none;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-subtle);
+  border-right: var(--chrome-divider);
+}
+
+.agent-task-sidebar-head {
+  min-height: 38px;
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: 0 var(--space-5);
+  color: var(--text-muted);
+  border-bottom: var(--divider);
+  font-size: var(--fs-xs);
+}
+.agent-task-sidebar-head strong { color: var(--text); }
+.agent-task-sidebar-head span { font-variant-numeric: tabular-nums; }
+.agent-task-sidebar-scroll { flex: 1; min-height: 0; overflow-y: auto; }
+.agent-task-sidebar-section { border-bottom: var(--chrome-divider); }
+.agent-task-sidebar-label {
+  padding: var(--space-3) var(--space-5) var(--space-2);
+  color: var(--text-faint);
+  font-size: var(--fs-2xs);
+  font-weight: 600;
+  letter-spacing: var(--label-tracking);
+  text-transform: uppercase;
+}
+.agent-task-sidebar-empty { margin: 0; padding: var(--space-4) var(--space-5) var(--space-5); font-size: var(--fs-xs); }
+.agent-task-row { align-items: flex-start; }
+.agent-task-row .ui-row-body { min-width: 0; display: grid; gap: 1px; }
+.agent-task-row .ui-row-body strong,
+.agent-task-row .ui-row-body small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.agent-task-row .ui-row-body strong { font-size: var(--fs-sm); font-weight: 500; }
+.agent-task-row .ui-row-body small { color: var(--text-faint); font-size: var(--fs-2xs); }
+.agent-task-state { color: var(--text-faint); font-family: var(--font-glyph); }
+.agent-task-state[data-state='working'],
+.agent-task-state[data-state='starting'],
+.agent-task-state[data-state='ready'] { color: var(--add-marker); }
+.agent-task-state[data-state='waiting'],
+.agent-task-state[data-state='blocked'],
+.agent-task-state[data-state='permission'] { color: var(--warn); }
+.agent-task-state[data-state='failed'] { color: var(--del-marker); }
+.agent-task-legacy-row { border-bottom: var(--divider); }
+.agent-task-legacy-row > .ui-row { border-bottom: 0; }
+.agent-task-gate-actions { display: flex; gap: var(--space-2); padding: 0 var(--space-5) var(--space-3) 31px; }
+
+@container (max-width: 700px) {
+  .agent-task-sidebar { width: 190px; }
+  .agent-task-row .ui-row-trailing { display: none; }
+}

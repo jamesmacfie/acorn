@@ -6,7 +6,6 @@ import { archiveTask } from './mutations'
 import { paneAvailable, paneContribution, paneContributions } from '../registries/panes'
 import { registerCommands } from '../registries/commands'
 import { registerKeybindings, resolveKeybindings, keybindingRegistry } from '../registries/keybindings'
-import AgentsPanel, { AgentsToggle } from '../../../plugins/agents/client/AgentsPanel'
 import { workspaceForRepo } from '../workspaces/activeWorkspace'
 import { addSession, refreshSessions, requestTerminalFocus } from './agentSessions'
 import { terminalApi } from '../../../plugins/terminal/client/terminalClient'
@@ -59,8 +58,6 @@ export default function TaskView(props: {
     await refetchTargets()
     if (!running && result.ok) props.onOpenTerminal()
   }
-
-  const [agentsOpen, setAgentsOpen] = createSignal(false)
 
   const resolvedShortcuts = createMemo(() => resolveKeybindings(keybindingRegistry.entries(), prefs.data ?? {}))
   const shortcutFor = (id: string) => resolvedShortcuts().find((binding) => binding.id === id)?.chord
@@ -134,7 +131,6 @@ export default function TaskView(props: {
     ])
     const commands = registerCommands([
       ...paneCommands,
-      { id: 'task.agents.toggle', title: 'Toggle agents panel', category: 'action', run: () => { setAgentsOpen((open) => !open) } },
       { id: 'task.terminal.toggle', title: () => props.terminalOpen ? 'Hide terminal drawer' : 'Show terminal drawer', category: 'terminal', palette: true, requires: 'desktop', run: props.onToggleTerminal },
       { id: 'task.terminal.new-shell', title: 'New terminal', hint: 'open a shell in the task worktree', category: 'terminal', palette: true, requires: 'desktop', run: () => openProfile('shell') },
       { id: 'task.terminal.new-claude', title: 'New Claude Code terminal', hint: 'run claude in the task worktree', category: 'terminal', palette: true, requires: 'desktop', run: () => openProfile('claude-code') },
@@ -152,7 +148,6 @@ export default function TaskView(props: {
         defaultChord: pane.defaultChord, when: 'task' as const, legacyPaneAction: pane.id,
         active: () => paneAvailable(pane, props.task),
       }] : []),
-      { id: 'task.agents.toggle', command: 'task.agents.toggle', description: 'Toggle agents panel', category: 'Panes', defaultChord: 'meta+shift+a', when: 'task', legacyPaneAction: 'agents' },
       { id: 'task.terminal.toggle', command: 'task.terminal.toggle', description: 'Toggle terminal drawer', category: 'Panes', defaultChord: 'meta+shift+t', when: 'task', legacyPaneAction: 'terminal' },
       ...paneContributions().map((pane) => ({
         id: `pane.restore.${pane.id}`, command: `pane.restore.${pane.id}`, description: `Restore ${pane.label} pane row`, category: 'Panes',
@@ -220,11 +215,6 @@ export default function TaskView(props: {
           )}
         </For>
       </Show>
-      <AgentsToggle
-        active={agentsOpen()}
-        shortcut={shortcutFor('task.agents.toggle') ? formatChord(shortcutFor('task.agents.toggle')!) : undefined}
-        onToggle={() => setAgentsOpen(!agentsOpen())}
-      />
       <button type="button" class="pane-switch-btn" classList={{ active: props.terminalOpen }} data-tip="Terminal" data-tip-key={shortcutFor('task.terminal.toggle') ? formatChord(shortcutFor('task.terminal.toggle')!) : undefined} data-tip-sub="Shell in the worktree" aria-label="Terminal" onClick={props.onToggleTerminal}>{'>_'}</button>
     </>
   )
@@ -233,10 +223,6 @@ export default function TaskView(props: {
     <div class="workspace-wrap">
       <main class="panes panes-workspace task-layout">
         <TaskPaneHost task={props.task} extraButtons={extraButtons()} onCloseTask={openClose} closing={archiving()} shortcutFor={shortcutFor} />
-
-        <Show when={agentsOpen()}>
-          <AgentsPanel task={props.task} onClose={() => setAgentsOpen(false)} />
-        </Show>
 
         <Show when={runError() || closeError()}>
           <div class="task-run-error action-error" role="alert">

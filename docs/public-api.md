@@ -3,7 +3,7 @@
 A **bearer-authenticated HTTP + WebSocket automation API** that inspects and controls acorn with the
 same semantic reach as the desktop UI: configure repositories in workspaces, create and archive
 tasks, drive panes and terminals, run commands, edit files, perform Git and GitHub operations, and
-control workflows. It is a **second transport boundary, not a second backend** — it shares one
+control workflows and managed agents. It is a **second transport boundary, not a second backend** — it shares one
 runtime, database, registries, and application services with the internal UI API.
 
 This is distinct from the internal, cookie-authenticated `/api/*` surface the SPA uses (see
@@ -56,9 +56,11 @@ discovery, documentation, or plugin routes, and the public app rejects cookie/in
   compare. `authenticate()` returns `null` for missing/malformed/unknown/expired/revoked/wrong-secret
   alike, so the endpoint is not a token-status oracle. `last_used_at` is updated off the request path,
   throttled to once per 5 minutes.
-- **Scopes:** a token is either `read` or `read + write` (`write` is never issued alone). Process
-  execution, terminal input, Git/file mutation, UI control, SQL, and upstream mutations all require
-  `write`; a write endpoint hit with a read token returns `403 insufficient_scope`.
+- **Scopes:** general operations use `read` and `write`; Managed Agents adds `agents:read`,
+  `agents:write` and the separately sensitive `agents:approve`. Agent history/status does not grant
+  prompt submission, and prompt submission does not grant permission/question resolution. Process
+  execution, terminal input, Git/file mutation, UI control, SQL, and upstream mutations still
+  require `write`; an endpoint hit without its exact scope returns `403 insufficient_scope`.
 - **Revocation is immediate:** a revoked token returns `401` on its next HTTP call, and the token
   service notifies listeners so the public WS hub synchronously closes that token's sockets.
 - **Principal kind `api-token`.** This kind exists only in the public app's context; existing
@@ -122,13 +124,21 @@ factory is `createAutomationApp()` (`core/server/publicApi/app.ts`).
 | **Commands** | `coreCommands.ts` + UI broker | typed presentation commands (focus task, pane/drawer/overlay control) — projected to the renderer, so they return `409 ui_unavailable` with no live window |
 | **Plugins** | `plugins/<id>/server/publicApi.ts` | see below |
 
-Contributing plugins (each under `/api/v1/plugins/<id>`): `terminal`, `changes` (Git/worktree),
+Contributing plugins (each under `/api/v1/plugins/<id>`): `agents`, `terminal`, `changes` (Git/worktree),
 `editor` (file list/read/write, search), `github` (PR reads + mutations, Actions), `notes`, `memory`,
 `workflows`, `preview`, `database`, `linear`, `rollbar`. Plugins contribute **endpoints only** —
 event channels and commands are core-declared. Contributions are assembled in
 `app/server/publicApi.ts`; the registry `freeze()` enforces the shared invariants (namespaced
 operation/route ids, strict-object schemas, the mutating-⇒-`write`-scope rule, plugin-relative paths)
 so a malformed contribution cannot mount.
+
+The **agents** plugin exposes provider health/capabilities, task-scoped session create/import,
+session/history/search reads, durable prompt queue operations, cancellation, lifecycle
+(resume/fork/compact/archive/delete/export), request resolution, cursor-based waits, artifact
+metadata and signed webhook management/delivery logs. `agents:approve` is required for resolving a
+permission, question, elicitation or workflow gate. Completion/attention webhooks contain ids and
+state only—never prompts, responses, filenames or workspace paths. See
+[managed-agents.md](./managed-agents.md).
 
 The GitHub plugin's PR reads remain mirror-only. Write-scoped automation can synchronously refresh
 the first 100 open PRs for a repository with
@@ -141,7 +151,7 @@ Both return `{ data: { refreshed: true }, requestId }`; callers then use the nor
 A separate bearer-authenticated socket (`core/main/publicApi/wsHub.ts`), attached to the automation
 listener's `upgrade` event so it shares the loopback bind + Host guard. It is **distinct from** the
 internal renderer WebSocket (`/ws`) — different credential, different clients — but shares the
-underlying event/terminal services via the service-local `EventBus`
+  underlying event/terminal/managed-agent services via the service-local `EventBus`
 (`core/main/publicApi/eventBus.ts`).
 
 - Connections are **indexed by token id**; revocation closes them synchronously with a token-revoked
@@ -149,7 +159,8 @@ underlying event/terminal services via the service-local `EventBus`
 - Clients subscribe with typed frames and channel/entity filters (with bounded `after`-cursor
   replay); the hub delivers core events (`core.workspace.*`, `core.task.*`,
   `core.api.settings.updated`) and terminal output streams (raw commands are never sent).
-  `terminal.input` requires **write** scope.
+  `terminal.input` requires **write** scope. Managed-agent channels use `agents:read` and publish
+  only after the normalized event has committed to SQLite.
 - Heartbeat (30s), a 1 MiB max frame size, and a per-connection violation budget bound abusive or
   slow consumers.
 

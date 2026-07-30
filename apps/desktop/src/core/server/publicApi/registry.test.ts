@@ -46,7 +46,27 @@ describe('AutomationApiRegistry', () => {
       r.registerEndpoint(
         coreEndpoint({ operationId: 'core.thing.write', method: 'POST', path: '/things', scope: 'read', risk: 'write', body: z.undefined() }),
       ),
-    ).toThrow(/must declare scope "write"/)
+    ).toThrow(/must declare a mutating scope/)
+  })
+
+  it('accepts narrow agent mutation scopes without allowing agents:read to mutate', () => {
+    const r = new AutomationApiRegistry()
+    expect(() => r.registerEndpoint(coreEndpoint({
+      operationId: 'core.agent.approve',
+      method: 'POST',
+      path: '/agent-approve',
+      scope: 'agents:approve',
+      risk: 'execute',
+      body: z.undefined(),
+    }))).not.toThrow()
+    expect(() => r.registerEndpoint(coreEndpoint({
+      operationId: 'core.agent.bad',
+      method: 'POST',
+      path: '/agent-bad',
+      scope: 'agents:read',
+      risk: 'execute',
+      body: z.undefined(),
+    }))).toThrow(/mutating scope/)
   })
 
   it('rejects body on GET and missing body on POST', () => {

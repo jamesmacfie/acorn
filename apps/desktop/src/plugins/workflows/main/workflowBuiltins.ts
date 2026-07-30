@@ -67,7 +67,9 @@ function headlessOutcome(result: HeadlessResult): StepHandlerOutcome {
     },
     structured: result.capture.structuredOutput ?? undefined,
     sessionId: result.capture.sessionId,
+    agentSessionId: result.agentSessionId,
     costUsd: result.capture.costUsd,
+    usage: result.capture.usage,
     events: result.capture.events,
   }
   if (result.status === 'ok') return { status: 'done', ...data }
@@ -140,13 +142,16 @@ export function registerBuiltinWorkflowContributions(registry: WorkflowContribut
   }
 
   async function runCiLoop(ctx: StepHandlerContext): Promise<StepHandlerOutcome> {
-    const max = Math.min(ctx.def.maxIterations ?? 3, MAX_STEP_TURNS)
+    const max = Math.min(ctx.def.maxIterations ?? 3, ctx.budget.maxTurns ?? MAX_STEP_TURNS, MAX_STEP_TURNS)
     let iteration = ctx.step.iteration
     let sessionId = ctx.step.sessionId ?? undefined
+    let agentSessionId = ctx.step.agentSessionId ?? undefined
     for (;;) {
       if (ctx.signal.aborted) return { status: 'cancelled' }
       const failing = await services.deps.failingChecks(ctx.run.taskId)
-      if (failing === '') return { status: 'done', result: { green: true, iterations: iteration }, sessionId }
+      if (failing === '') {
+        return { status: 'done', result: { green: true, iterations: iteration }, sessionId, agentSessionId }
+      }
       if (failing === null) return { status: 'failed', error: 'No checks to poll (no PR?).' }
       if (iteration >= max) return { status: 'safety-rail', error: `Safety rail: ${max} fix iterations exhausted.` }
       iteration += 1
@@ -159,12 +164,14 @@ export function registerBuiltinWorkflowContributions(registry: WorkflowContribut
           model: ctx.def.model,
           schema: ctx.def.schema,
           resumeSessionId: sessionId,
+          managedSessionId: agentSessionId,
           signal: ctx.signal,
           tools: ctx.tools,
         },
         ctx,
       )
       sessionId = result.capture.sessionId ?? sessionId
+      agentSessionId = result.agentSessionId ?? agentSessionId
       if (result.status !== 'ok') return headlessOutcome(result)
     }
   }
@@ -222,6 +229,7 @@ export function registerBuiltinWorkflowContributions(registry: WorkflowContribut
       result: { children: children.length, failed: outcomes.filter((ok) => !ok).length },
       structured: seeds,
       sessionId: plan.capture.sessionId,
+      agentSessionId: plan.agentSessionId,
       costUsd: plan.capture.costUsd,
     }
 
@@ -253,6 +261,7 @@ export function registerBuiltinWorkflowContributions(registry: WorkflowContribut
           resultJson: JSON.stringify({ status: result.status, result: result.capture.result, events: result.capture.events.slice(-100) }),
           structuredJson: result.capture.structuredOutput == null ? null : JSON.stringify(result.capture.structuredOutput),
           sessionId: result.capture.sessionId,
+          agentSessionId: result.agentSessionId,
           costUsd: result.capture.costUsd,
           error: outcome.status === 'done' ? null : 'error' in outcome ? outcome.error : 'Child step failed.',
         })

@@ -43,4 +43,9 @@ export type WsServerFrame =
   | { channel: 'docker:exec:exit'; execId: string }
   | { channel: 'workflow:notice'; notice: { taskId: string; kind: 'gate' | 'run-done' | 'repo-config-trust'; title: string; action?: 'review-config' } }
   | { channel: 'workflow:step:event'; runId: string; stepId: string; event: unknown }
+  // Product plugins keep their detailed contracts in their own shared folders. Core owns only
+  // the transport envelope, so adding Agents does not invert the core → plugin dependency.
+  | { channel: 'agent:event'; event: unknown }
+  | { channel: 'agent:session'; session: unknown }
+  | { channel: 'agent:deleted'; sessionId: string }
   | { channel: 'ui:command'; requestId: string; windowId: string; commandId: string; input: unknown; expectedRevision?: number }

@@ -3,6 +3,14 @@
 import { agentSessionsFor } from '../tasks/agentSessions'
 import { taskBridge } from '../tasks/taskBridge'
 
+type ReferenceResult = { ok: boolean; reason?: string }
+type ManagedReferenceHandler = (taskId: string, ref: string) => Promise<ReferenceResult | null>
+let managedReferenceHandler: ManagedReferenceHandler | null = null
+
+export function setManagedAgentReferenceHandler(handler: ManagedReferenceHandler | null): void {
+  managedReferenceHandler = handler
+}
+
 // path · path:42 · path:42-48 (a collapsed range renders as the single line).
 export function formatFileReference(path: string, startLine?: number | null, endLine?: number | null): string {
   if (startLine == null) return path
@@ -13,6 +21,8 @@ export function formatFileReference(path: string, startLine?: number | null, end
 
 // Deliver as a draft to the task's most recent running agent session.
 export async function sendReferenceToAgent(taskId: string, ref: string): Promise<{ ok: boolean; reason?: string }> {
+  const managed = await managedReferenceHandler?.(taskId, ref)
+  if (managed) return managed
   const api = taskBridge()
   if (!api) return { ok: false, reason: 'Desktop only.' }
   const target = agentSessionsFor(taskId)[0]

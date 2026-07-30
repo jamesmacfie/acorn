@@ -355,7 +355,7 @@ Source: `apps/desktop/src/plugins/preview/{client,main}/`, `apps/desktop/src/cor
 
 ## Related non-pane surfaces
 
-Two surfaces render *over* the task view rather than as layout slots.
+One feature surface renders *over* the task view rather than as a layout slot.
 
 ### ChecksPanel {#checkspanel-non-pane}
 
@@ -365,18 +365,19 @@ showing one Actions workflow run's job steps GitHub-Actions style: failed steps 
 each step's log is sliced from a single lazy job-log fetch and ANSI-highlighted. Not a pane — it opens
 and closes within the `pr` pane.
 
-### Agents panel
+### Agent task surface
 
-The right rail roster + launcher + activity feed for agent sessions, toggled by the `⠿` switcher
-button or its configured shortcut (`agentsOpen`; `plugins/agents/client/AgentsPanel.tsx`). It lists
-PTY sessions and workflow steps, launches new agents, shows per-agent feeds and inline gate prompts,
-and can resume a step as a raw TUI in the terminal drawer. It is a toggle, not a layout pane. Full
-detail in [terminal-and-agents.md](./terminal-and-agents.md).
+The `agents` layout slot combines the active managed conversation with a persistent same-task
+sidebar (`plugins/agents/client/AgentTaskSidebar.tsx`). The sidebar switches managed sessions
+without hiding the transcript and also surfaces exact attention requests, raw PTY agents and
+workflow gates. Provider utilization is summarized in the pane header with its detail available on
+hover/focus. Workspace-wide history remains in Agent Center. Full detail in
+[managed-agents.md](./managed-agents.md) and [terminal-and-agents.md](./terminal-and-agents.md).
 
 > **Maturity:** the terminal drawer, agent sessions, run targets, and workflows are desktop-only —
 > always on when the native terminal capability is present (`capabilities()`, `core/client/capabilities.ts`; the
 > old `acorn:term` flag is gone). Panes that depend on a worktree or an agent (`changes`, `editor`,
-> `context`'s send, `notes`' agent groups, `preview` targets, the Agents panel) therefore only do
+> `context`'s send, `notes`' agent groups, `preview` targets, the Agent task surface) therefore only do
 > their full job on desktop; in a plain browser session (`dev:node`) the bridge is absent and they
 > degrade. Docker's pure-Node bridge and streams are installed in both Electron and `dev:node`.
 > PR review, Linear, Rollbar, Docker, and the server-backed HTTP client work without the terminal

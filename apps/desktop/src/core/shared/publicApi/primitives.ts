@@ -22,13 +22,16 @@ export const RelativePathSchema = z
 export const PortSchema = z.number().int().min(1024).max(65535)
 export const EmptySchema = z.strictObject({})
 
-// A token is either read-only or read+write. write is never issued without read; a bare ['write'],
-// duplicates, or a different order are invalid (docs/public-api.md).
-export const ApiScopeSchema = z.enum(['read', 'write'])
-export const ApiScopesSchema = z.union([
-  z.tuple([z.literal('read')]),
-  z.tuple([z.literal('read'), z.literal('write')]),
-])
+// `read`/`write` cover the established public API. Managed agents use narrower scopes so a general
+// automation token cannot silently answer a provider permission request. `agents:approve` is
+// intentionally separate from starting/cancelling work.
+export const ApiScopeSchema = z.enum(['read', 'write', 'agents:read', 'agents:write', 'agents:approve'])
+export const ApiScopesSchema = z.array(ApiScopeSchema)
+  .min(1)
+  .max(5)
+  .refine((scopes) => scopes[0] === 'read', 'read must be the first scope')
+  .refine((scopes) => new Set(scopes).size === scopes.length, 'scopes must not contain duplicates')
+  .transform((scopes) => scopes as [z.infer<typeof ApiScopeSchema>, ...z.infer<typeof ApiScopeSchema>[]])
 export type ApiScope = z.infer<typeof ApiScopeSchema>
 export type ApiScopes = z.infer<typeof ApiScopesSchema>
 

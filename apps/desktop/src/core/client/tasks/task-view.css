@@ -124,8 +124,8 @@
    pair of icon rails. (Accent sits on the right edge since this rail is on the right.) */
 .pane-switcher {
   /* Fixed so it runs the full height of the right edge — beside the panes AND the terminal drawer —
-     instead of being squeezed above the drawer with the rest of .workspace-wrap's flow. Same
-     top-anchor as .agents-panel; the drawer's right: var(--tabrail-w) stops exactly at its left. */
+     instead of being squeezed above the drawer with the rest of .workspace-wrap's flow. The
+     drawer's right: var(--tabrail-w) stops exactly at its left. */
   position: fixed;
   top: var(--topbar-h);
   right: 0;

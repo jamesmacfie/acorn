@@ -4,6 +4,7 @@
 // (docs/plugins.md). Adding a plugin route is a one-line edit here, not a core edit.
 import { registerRoute } from '../../core/server/routeRegistry'
 import { agentUsage } from '../../plugins/agents/server/routes/usage'
+import { managedAgents } from '../../plugins/agents/server/routes/managed'
 import { actions } from '../../plugins/github/server/routes/actions'
 import { prActions } from '../../plugins/github/server/routes/prActions'
 import { prCreate } from '../../plugins/github/server/routes/prCreate'
@@ -43,6 +44,7 @@ registerRoute({ prefix: '/api/http', router: http, note: '/:owner/:repo/* (http)
 
 // /api/agents/* — account-scoped local provider usage (agents)
 registerRoute({ prefix: '/api/agents', router: agentUsage })
+registerRoute({ prefix: '/api/agents', router: managedAgents })
 
 // /api catch-alls
 registerRoute({ prefix: '/api', router: workflow, note: 'workflow control (workflows)' })

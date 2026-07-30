@@ -34,17 +34,16 @@ function fullPath(endpoint: AnyEndpoint): string {
   return `${V1}${rel}`
 }
 
-function insufficientScope(): PublicApiError {
-  return new PublicApiError('insufficient_scope', 'This operation requires the write scope', {
-    headers: { 'WWW-Authenticate': 'Bearer realm="acorn", error="insufficient_scope", scope="write"' },
+function insufficientScope(scope: string): PublicApiError {
+  return new PublicApiError('insufficient_scope', `This operation requires the ${scope} scope`, {
+    headers: { 'WWW-Authenticate': `Bearer realm="acorn", error="insufficient_scope", scope="${scope}"` },
   })
 }
 
 function dispatch(endpoint: AnyEndpoint, deps: AutomationAppDeps) {
   return async (c: Context<PublicAppEnv>): Promise<Response> => {
     const principal = c.get('principal')
-    const canWrite = (principal.scopes as readonly string[]).includes('write')
-    if (endpoint.scope === 'write' && !canWrite) throw insufficientScope()
+    if (!(principal.scopes as readonly string[]).includes(endpoint.scope)) throw insufficientScope(endpoint.scope)
 
     // Idempotency (protocol.md §7). 'required' demands the header; 'optional' honors it if present.
     const supportsIdem = endpoint.idempotency === 'required' || endpoint.idempotency === 'optional'

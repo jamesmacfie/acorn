@@ -232,6 +232,34 @@
       "when": 1785293286887,
       "tag": "0032_dusty_young_avengers",
       "breakpoints": true
+    },
+    {
+      "idx": 33,
+      "version": "6",
+      "when": 1785364766554,
+      "tag": "0033_gorgeous_mimic",
+      "breakpoints": true
+    },
+    {
+      "idx": 34,
+      "version": "6",
+      "when": 1785368003282,
+      "tag": "0034_common_emma_frost",
+      "breakpoints": true
+    },
+    {
+      "idx": 35,
+      "version": "6",
+      "when": 1785370801993,
+      "tag": "0035_moaning_loners",
+      "breakpoints": true
+    },
+    {
+      "idx": 36,
+      "version": "6",
+      "when": 1785370929721,
+      "tag": "0036_massive_fenris",
+      "breakpoints": true
     }
   ]
 }

@@ -7,7 +7,8 @@ import { readJson, writeJson } from '../apiClient'
 // Tokens are cookie-authenticated admin (a bearer can never mint tokens); the raw token is shown once.
 
 type ApiServerSettings = { enabled: boolean; port: number; effectivePort: number; bindAddress: string; portOverridden: boolean; error?: string; rebound?: boolean }
-type TokenScopes = ['read'] | ['read', 'write']
+type TokenScope = 'read' | 'write' | 'agents:read' | 'agents:write' | 'agents:approve'
+type TokenScopes = [TokenScope, ...TokenScope[]]
 type TokenSummary = { id: string; name: string; prefix: string; scopes: TokenScopes; createdAt: number; lastUsedAt: number | null; expiresAt: number | null; revokedAt: number | null }
 type CreatedToken = { token: string; metadata: TokenSummary }
 
@@ -38,6 +39,9 @@ export default function ApiSettings() {
   // --- Token create form ---
   const [name, setName] = createSignal('')
   const [canWrite, setCanWrite] = createSignal(false)
+  const [agentsRead, setAgentsRead] = createSignal(false)
+  const [agentsWrite, setAgentsWrite] = createSignal(false)
+  const [agentsApprove, setAgentsApprove] = createSignal(false)
   const [expiry, setExpiry] = createSignal('') // yyyy-mm-dd or ''
   const [creating, setCreating] = createSignal(false)
   const [freshToken, setFreshToken] = createSignal<CreatedToken | null>(null)
@@ -48,7 +52,13 @@ export default function ApiSettings() {
     setCreating(true)
     setError('')
     try {
-      const scopes: TokenScopes = canWrite() ? ['read', 'write'] : ['read']
+      const scopes: TokenScopes = [
+        'read',
+        ...(canWrite() ? ['write' as const] : []),
+        ...(agentsRead() ? ['agents:read' as const] : []),
+        ...(agentsWrite() ? ['agents:write' as const] : []),
+        ...(agentsApprove() ? ['agents:approve' as const] : []),
+      ]
       const expiresAt = expiry() ? new Date(`${expiry()}T23:59:59`).getTime() : null
       const created = await writeJson<CreatedToken>('/api/api-tokens', {
         method: 'POST',
@@ -58,6 +68,9 @@ export default function ApiSettings() {
       setFreshToken(created)
       setName('')
       setCanWrite(false)
+      setAgentsRead(false)
+      setAgentsWrite(false)
+      setAgentsApprove(false)
       setExpiry('')
       await qc.invalidateQueries({ queryKey: TOKENS_KEY })
     } catch (e) {
@@ -164,6 +177,42 @@ export default function ApiSettings() {
         <label class="settings-field-row">
           <input type="checkbox" checked={canWrite()} onChange={(e) => setCanWrite(e.currentTarget.checked)} />
           <span class="settings-label">Grant write scope (create/run/mutate — not just read)</span>
+        </label>
+        <label class="settings-field-row">
+          <input
+            type="checkbox"
+            checked={agentsRead()}
+            onChange={(e) => {
+              setAgentsRead(e.currentTarget.checked)
+              if (!e.currentTarget.checked) {
+                setAgentsWrite(false)
+                setAgentsApprove(false)
+              }
+            }}
+          />
+          <span class="settings-label">Grant <code>agents:read</code> (history, status, events and artifacts)</span>
+        </label>
+        <label class="settings-field-row">
+          <input
+            type="checkbox"
+            checked={agentsWrite()}
+            onChange={(e) => {
+              setAgentsWrite(e.currentTarget.checked)
+              if (e.currentTarget.checked) setAgentsRead(true)
+            }}
+          />
+          <span class="settings-label">Grant <code>agents:write</code> (start, prompt, cancel and lifecycle)</span>
+        </label>
+        <label class="settings-field-row">
+          <input
+            type="checkbox"
+            checked={agentsApprove()}
+            onChange={(e) => {
+              setAgentsApprove(e.currentTarget.checked)
+              if (e.currentTarget.checked) setAgentsRead(true)
+            }}
+          />
+          <span class="settings-label">Grant <code>agents:approve</code> (sensitive: answer permissions, questions and workflow gates)</span>
         </label>
         <div class="settings-field-row">
           <button type="button" disabled={creating() || !name().trim()} onClick={create}>{creating() ? 'Creating…' : 'Create token'}</button>

@@ -16,6 +16,11 @@ export type HeadlessCapture = {
   structuredOutput: unknown | null
   sessionId: string | null
   costUsd: number | null
+  usage?: {
+    inputTokens?: number
+    outputTokens?: number
+    cachedInputTokens?: number
+  }
   events: StreamEvent[]
 }
 
@@ -37,4 +42,3 @@ export type AgentProfileContribution = {
   aiArgv?: (command: string, opts: HeadlessOpts) => HeadlessArgv
   streamJson?: StreamJsonAdapter
 }
-

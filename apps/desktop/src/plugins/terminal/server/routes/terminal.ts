@@ -50,6 +50,7 @@ const createBody = z
     rows: z.number().optional(),
     title: z.string().optional(),
     isWorktree: z.boolean().optional(),
+    agentSessionId: z.string().uuid().optional(),
   })
   .passthrough()
 const resizeBody = z.object({ cols: z.number(), rows: z.number() })

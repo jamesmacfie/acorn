@@ -2,7 +2,7 @@ import { createHash, randomBytes, randomUUID, timingSafeEqual } from 'node:crypt
 import { and, eq, gt, isNull, lte, or } from 'drizzle-orm'
 import type { AppDatabase } from '../db'
 import { schema } from '../db'
-import type { ApiScopes } from '../../shared/publicApi/primitives'
+import { ApiScopesSchema, type ApiScopes } from '../../shared/publicApi/primitives'
 
 // Bearer token issue / parse / verify / revoke (docs/public-api.md). The
 // raw token is shown once; only SHA-256(secret) is stored. A 256-bit random secret makes offline
@@ -17,8 +17,16 @@ function sha256(input: string): Buffer {
   return createHash('sha256').update(input).digest()
 }
 
-function scopesFor(canWrite: boolean): ApiScopes {
-  return canWrite ? ['read', 'write'] : ['read']
+function scopesFor(row: { canWrite: boolean; scopesJson?: string }): ApiScopes {
+  if (row.scopesJson) {
+    try {
+      const parsed = ApiScopesSchema.safeParse(JSON.parse(row.scopesJson))
+      if (parsed.success) return parsed.data
+    } catch {
+      // Fall through to the legacy boolean projection.
+    }
+  }
+  return row.canWrite ? ['read', 'write'] : ['read']
 }
 
 export type ApiTokenSummary = {
@@ -81,6 +89,7 @@ export class TokenService {
       tokenPrefix: prefix,
       secretHash: sha256(secret),
       canWrite,
+      scopesJson: JSON.stringify(input.scopes),
       createdAt: now,
       lastUsedAt: null,
       expiresAt: input.expiresAt,
@@ -93,7 +102,7 @@ export class TokenService {
         id,
         name: input.name,
         prefix,
-        scopes: scopesFor(canWrite),
+        scopes: input.scopes,
         createdAt: now,
         lastUsedAt: null,
         expiresAt: input.expiresAt,
@@ -139,7 +148,7 @@ export class TokenService {
       userId: row.userId,
       name: row.name,
       prefix: row.tokenPrefix,
-      scopes: scopesFor(row.canWrite),
+      scopes: scopesFor(row),
       expiresAt: row.expiresAt,
       user: account ?? { login: row.userId, name: '', avatar: '' },
     }
@@ -162,7 +171,7 @@ export class TokenService {
         id: row.id,
         name: row.name,
         prefix: row.tokenPrefix,
-        scopes: scopesFor(row.canWrite),
+        scopes: scopesFor(row),
         createdAt: row.createdAt,
         lastUsedAt: row.lastUsedAt,
         expiresAt: row.expiresAt,

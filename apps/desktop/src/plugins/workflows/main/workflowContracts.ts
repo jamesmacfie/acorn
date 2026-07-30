@@ -4,6 +4,14 @@ import type { ToolCeiling, ToolRisk } from '../../../core/shared/workflow'
 export type WorkflowPosture = 'gated' | 'autonomous'
 export type { ToolCeiling, ToolRisk } from '../../../core/shared/workflow'
 
+export type WorkflowBudget = {
+  maxWallTimeMs?: number
+  maxCostUsd?: number
+  maxInputTokens?: number
+  maxOutputTokens?: number
+  maxTurns?: number
+}
+
 export type WorkflowChildStepDef = {
   name?: string
   profileId?: string
@@ -11,6 +19,7 @@ export type WorkflowChildStepDef = {
   prompt?: string
   schema?: object
   tools?: ToolCeiling
+  budget?: WorkflowBudget
 }
 
 export type WorkflowStepDef = {
@@ -27,6 +36,7 @@ export type WorkflowStepDef = {
   joins?: string
   branches?: Record<string, string>
   tools?: ToolCeiling
+  budget?: WorkflowBudget
 }
 
 export type WorkflowDef = {
@@ -34,6 +44,7 @@ export type WorkflowDef = {
   posture?: WorkflowPosture
   trigger?: string
   tools?: ToolCeiling
+  budget?: WorkflowBudget
   steps: WorkflowStepDef[]
 }
 
@@ -51,6 +62,7 @@ export type StepHandlerContext = {
   def: WorkflowStepDef
   renderedPrompt: string
   tools: ToolCeiling
+  budget: WorkflowBudget
   signal: AbortSignal
   emit(event: WorkflowStepEvent): void
 }
@@ -60,7 +72,9 @@ type StepHandlerData = {
   result?: unknown
   structured?: unknown
   sessionId?: string | null
+  agentSessionId?: string | null
   costUsd?: number | null
+  usage?: { inputTokens?: number; outputTokens?: number; cachedInputTokens?: number }
   events?: Record<string, unknown>[]
   handoff?: string
 }

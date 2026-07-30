@@ -241,6 +241,66 @@ name = "revise"
     })
   })
 
+  it('parses workflow, step, and child budgets and rejects widened or invalid limits', () => {
+    writeWf(repoDir, 'budgeted', `
+name = "budgeted"
+[budget]
+max_wall_time_ms = 120000
+max_cost_usd = 2.5
+max_input_tokens = 50000
+max_output_tokens = 10000
+max_turns = 8
+
+[[steps]]
+name = "plan"
+kind = "fan-out"
+[steps.budget]
+max_wall_time_ms = 60000
+max_cost_usd = 1.5
+[steps.child_step]
+name = "build"
+[steps.child_step.budget]
+max_wall_time_ms = 30000
+max_turns = 4
+`)
+    const loaded = loadWorkflowFiles(repoDir, null)
+    expect(loaded.errors).toEqual([])
+    expect(loaded.workflows[0]).toMatchObject({
+      budget: {
+        maxWallTimeMs: 120000,
+        maxCostUsd: 2.5,
+        maxInputTokens: 50000,
+        maxOutputTokens: 10000,
+        maxTurns: 8,
+      },
+      steps: [{
+        budget: { maxWallTimeMs: 60000, maxCostUsd: 1.5 },
+        childStep: { budget: { maxWallTimeMs: 30000, maxTurns: 4 } },
+      }],
+    })
+
+    writeWf(repoDir, 'wide-budget', `
+name = "wide"
+[budget]
+max_cost_usd = 1
+[[steps]]
+name = "build"
+[steps.budget]
+max_cost_usd = 2
+`)
+    writeWf(repoDir, 'invalid-budget', `
+name = "invalid"
+[budget]
+max_turns = 1.5
+[[steps]]
+name = "build"
+`)
+    const invalid = loadWorkflowFiles(repoDir, null)
+    const messages = invalid.errors.map((error) => error.message).join('\n')
+    expect(messages).toContain("step 'build' budget widens the workflow budget")
+    expect(messages).toContain('maxTurns must be an integer')
+  })
+
   it('read-normalizes a frozen pre-Phase-8 implicit join without weakening new-file validation', () => {
     const normalized = normalizePersistedWorkflow({
       name: 'legacy',

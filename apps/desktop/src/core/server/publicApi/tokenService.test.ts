@@ -31,6 +31,19 @@ describe('TokenService', () => {
     expect(principal?.userId).toBe('octocat')
   })
 
+  it('round-trips exact managed-agent scopes without widening approval authority', async () => {
+    const svc = new TokenService(t.db)
+    const { token, metadata } = await svc.create({
+      userId: 'octocat',
+      name: 'agent automation',
+      scopes: ['read', 'agents:read', 'agents:write'],
+      expiresAt: null,
+    })
+    expect(metadata.scopes).toEqual(['read', 'agents:read', 'agents:write'])
+    expect((await svc.authenticate(token))?.scopes).toEqual(['read', 'agents:read', 'agents:write'])
+    expect((await svc.authenticate(token))?.scopes).not.toContain('agents:approve')
+  })
+
   it('rejects missing, malformed, unknown, wrong-secret, expired, and revoked tokens', async () => {
     const svc = new TokenService(t.db)
     const { token, metadata } = await svc.create({ userId: 'u', name: 'r', scopes: ['read'], expiresAt: null })

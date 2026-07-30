@@ -134,7 +134,10 @@ describe('GET /api/tasks/:id/context (docs/agent-tools.md §4)', () => {
       { provider: 'rollbar', identifier: '142', title: '142', detail: 'Cache: missing', cache: 'missing' },
     ])
     expect(ctx.sections.map((section) => section.id)).toEqual(['pr', 'issues', 'notes', 'memory'])
-    expect(ctx.sections.find((section) => section.id === 'issues')?.absent?.reason).toBe('missing-cache')
+    expect(ctx.sections.find((section) => section.id === 'issues')).toMatchObject({
+      defaultIncluded: true,
+      absent: { reason: 'missing-cache' },
+    })
     expect(ctx.notes).toEqual([])
     expect(ctx.memory).toEqual([])
   })
@@ -201,10 +204,11 @@ describe('GET /api/tasks/:id/context (docs/agent-tools.md §4)', () => {
   it('uses contribution defaults and enforces the declared note budget', async () => {
     notesSource = async () => Array.from({ length: 12 }, (_, index) => ({ slug: `n-${index}`, scope: 'task', title: `N${index}`, kind: 'plan', body: 'x'.repeat(2_100), author: 'user' as const }))
     const ctx = await fetchCtx('')
-    expect(ctx.sections.map((section) => section.id)).toEqual(['notes'])
-    expect(ctx.sections[0].items).toHaveLength(10)
-    expect(ctx.sections[0].omitted).toBe(2)
-    expect(ctx.sections[0].items[0].body?.endsWith('…')).toBe(true)
+    expect(ctx.sections.map((section) => section.id)).toEqual(['issues', 'notes'])
+    const notes = ctx.sections.find((section) => section.id === 'notes')
+    expect(notes?.items).toHaveLength(10)
+    expect(notes?.omitted).toBe(2)
+    expect(notes?.items[0].body?.endsWith('…')).toBe(true)
   })
 
   it('404s an unknown task', async () => {

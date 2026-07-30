@@ -12,7 +12,7 @@ import type { AppDatabase } from '../../core/server/db'
 import { schema } from '../../core/server/db'
 import { setWorkflowBridge } from '../../plugins/workflows/server/routes/workflow'
 import { DEFAULT_PROFILE_ID } from '../../core/main/agentProfiles'
-import { buildHeadlessArgv, runHeadless } from '../../core/main/headless'
+import { buildHeadlessArgv, runHeadless, type HeadlessResult } from '../../core/main/headless'
 import type { NotesStore } from '../../plugins/notes/main/notes'
 import { broadcastStatus, broadcastWorkflowNotice, broadcastWorkflowStepEvent } from '../../core/main/notify'
 import { getProfile, requireProfile, resolveCommand } from '../../core/main/profiles'
@@ -21,7 +21,8 @@ import type { RuntimeService } from '../../plugins/terminal/main/runtime'
 import { isDir, loadTask, resolveTaskCwd } from '../../core/main/taskWorktree'
 import { buildSessionEnv } from '../../core/main/taskEnv'
 import { loadWorkflowFiles } from '../../plugins/workflows/main/workflowFiles'
-import { WorkflowRunner, type WorkflowDef } from '../../plugins/workflows/main/workflowRunner'
+import { WorkflowRunner, type RunStepOptions, type WorkflowDef } from '../../plugins/workflows/main/workflowRunner'
+import type { WorkflowStepDef } from '../../plugins/workflows/main/workflowContracts'
 import { encodeToolCeiling } from '../../plugins/workflows/main/workflowTools'
 import { WorkflowValidationError } from '../../plugins/workflows/main/workflowValidation'
 import { assertRepoConfigTrusted, isRepoConfigTrustError } from '../../core/main/repoConfigTrust'
@@ -38,6 +39,11 @@ export type WorkflowWiringDeps = {
   reconciled: Promise<void>
   currentUserId: () => string | null
   memoryReviewTrigger?: (taskId: string, transcriptTail: string) => Promise<void>
+  runManagedStep?(
+    taskId: string,
+    def: WorkflowStepDef,
+    opts: RunStepOptions,
+  ): Promise<HeadlessResult | null>
 }
 
 export async function failingChecksFor(db: AppDatabase, userId: string | null, taskId: string): Promise<string | null> {
@@ -59,12 +65,22 @@ export async function failingChecksFor(db: AppDatabase, userId: string | null, t
 
 export async function registerWorkflowIpc(
   db: AppDatabase,
-  { runtime, notesStore, internalApiEnv, reconciled, currentUserId, memoryReviewTrigger }: WorkflowWiringDeps,
+  {
+    runtime,
+    notesStore,
+    internalApiEnv,
+    reconciled,
+    currentUserId,
+    memoryReviewTrigger,
+    runManagedStep,
+  }: WorkflowWiringDeps,
 ): Promise<WorkflowRunner> {
   const activeFailingChecksFor = (taskId: string) => failingChecksFor(db, currentUserId(), taskId)
 
   const workflowRunner = new WorkflowRunner(db, {
     runStep: async (taskId, def, opts) => {
+      const managed = await runManagedStep?.(taskId, def, opts)
+      if (managed) return managed
       const t = await loadTask(db, taskId)
       const mapped = t ? await getRepoPath(db, t.repoOwner, t.repoName) : null
       const baseCheckout = mapped?.path && isDir(mapped.path) ? mapped.path : undefined
@@ -85,7 +101,14 @@ export async function registerWorkflowIpc(
         task: t ? { repoOwner: t.repoOwner, repoName: t.repoName, branch: t.branch, title: t.title } : null,
         env: { ...internalApiEnv, ACORN_TOOL_CEILING: encodeToolCeiling(opts.tools ?? {}) },
       })
-      return runHeadless(argv, { cwd, env, signal: opts.signal, onEvent: opts.onEvent, adapter: profile.streamJson })
+      return runHeadless(argv, {
+        cwd,
+        env,
+        timeoutMs: opts.timeoutMs,
+        signal: opts.signal,
+        onEvent: opts.onEvent,
+        adapter: profile.streamJson,
+      })
     },
     writeHandoff: async (taskId, runId, stepName, body) => {
       await notesStore.append({ scope: 'task', taskId }, `workflow-handoffs-${runId}`, `## ${stepName}\n${body}\n`, { author: 'workflow', originTaskId: taskId })

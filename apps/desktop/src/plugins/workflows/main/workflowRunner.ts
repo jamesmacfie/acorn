@@ -11,6 +11,7 @@ import type {
   StepHandlerOutcome,
   ToolCeiling,
   WorkflowDef,
+  WorkflowBudget,
   WorkflowRunRow,
   WorkflowStepDef,
   WorkflowStepRow,
@@ -33,6 +34,10 @@ export type RunStepOptions = HeadlessOpts & {
   // children use to flip 'pending' → 'running' only when they actually start.
   onStart?: () => void | Promise<void>
   tools?: ToolCeiling
+  workflowRunId?: string
+  workflowStepId?: string
+  managedSessionId?: string
+  timeoutMs?: number
 }
 
 export type RunnerDeps = {
@@ -58,6 +63,57 @@ export const MAX_CONCURRENT_HEADLESS = 4
 export { MAX_FAN_OUT_TASKS, MAX_STEP_TURNS }
 
 const now = () => Date.now()
+
+const minDefined = (...values: Array<number | undefined>): number | undefined => {
+  const defined = values.filter((value): value is number => value != null)
+  return defined.length ? Math.min(...defined) : undefined
+}
+
+const intersectBudgets = (
+  workflow: WorkflowBudget | undefined,
+  step: WorkflowBudget | undefined,
+): WorkflowBudget => ({
+  maxWallTimeMs: minDefined(workflow?.maxWallTimeMs, step?.maxWallTimeMs),
+  maxCostUsd: minDefined(workflow?.maxCostUsd, step?.maxCostUsd),
+  maxInputTokens: minDefined(workflow?.maxInputTokens, step?.maxInputTokens),
+  maxOutputTokens: minDefined(workflow?.maxOutputTokens, step?.maxOutputTokens),
+  maxTurns: minDefined(workflow?.maxTurns, step?.maxTurns),
+})
+
+const budgetViolation = (
+  budget: WorkflowBudget,
+  usage: { costUsd: number; inputTokens: number; outputTokens: number },
+): string | null => {
+  if (budget.maxCostUsd != null && usage.costUsd > budget.maxCostUsd) {
+    return `cost budget exceeded (${usage.costUsd.toFixed(4)} > ${budget.maxCostUsd.toFixed(4)} USD)`
+  }
+  if (budget.maxInputTokens != null && usage.inputTokens > budget.maxInputTokens) {
+    return `input-token budget exceeded (${usage.inputTokens} > ${budget.maxInputTokens})`
+  }
+  if (budget.maxOutputTokens != null && usage.outputTokens > budget.maxOutputTokens) {
+    return `output-token budget exceeded (${usage.outputTokens} > ${budget.maxOutputTokens})`
+  }
+  return null
+}
+
+const persistedUsage = (rows: WorkflowStepRow[]): {
+  costUsd: number
+  inputTokens: number
+  outputTokens: number
+} => rows.reduce((total, row) => {
+  let usage: { inputTokens?: number; outputTokens?: number } = {}
+  try {
+    const result = row.resultJson ? JSON.parse(row.resultJson) as { usage?: typeof usage } : null
+    usage = result?.usage ?? {}
+  } catch {
+    // An old/malformed result remains bounded by cost and wall-time rails.
+  }
+  return {
+    costUsd: total.costUsd + (row.costUsd ?? 0),
+    inputTokens: total.inputTokens + (usage.inputTokens ?? 0),
+    outputTokens: total.outputTokens + (usage.outputTokens ?? 0),
+  }
+}, { costUsd: 0, inputTokens: 0, outputTokens: 0 })
 
 export class WorkflowRunner {
   readonly contributions = new WorkflowContributionRegistry()
@@ -270,20 +326,39 @@ export class WorkflowRunner {
       return 'stop'
     }
     const controller = new AbortController()
-    this.registerActive(run.id, step.id, controller)
     const tools = intersectToolCeilings(workflow.tools, def.tools)
+    const budget = intersectBudgets(workflow.budget, def.budget)
+    const runRemainingMs = workflow.budget?.maxWallTimeMs == null
+      ? undefined
+      : workflow.budget.maxWallTimeMs - (now() - run.createdAt)
+    const timeoutMs = minDefined(budget.maxWallTimeMs, runRemainingMs)
+    if (timeoutMs != null && timeoutMs <= 0) {
+      await this.setStep(step.id, { status: 'safety-rail', error: 'Workflow wall-time budget exhausted.' })
+      await this.finishRun(run, 'safety-rail', 'Workflow wall-time budget exhausted.')
+      return 'stop'
+    }
+    this.registerActive(run.id, step.id, controller)
+    let budgetTimedOut = false
+    const budgetTimer = timeoutMs == null ? null : setTimeout(() => {
+      budgetTimedOut = true
+      controller.abort()
+    }, timeoutMs)
     const context: StepHandlerContext = {
       run,
       step,
       def,
       renderedPrompt,
       tools,
+      budget,
       signal: controller.signal,
       emit: ({ event }) => {
         this.deps.emitStepEvent?.(run.id, step.id, event)
       },
     }
-    await this.setStep(step.id, { status: 'running', inputsJson: JSON.stringify({ prompt: renderedPrompt, tools }) })
+    await this.setStep(step.id, {
+      status: 'running',
+      inputsJson: JSON.stringify({ prompt: renderedPrompt, tools, budget }),
+    })
     let outcome: StepHandlerOutcome
     try {
       outcome = await handler(context)
@@ -292,7 +367,28 @@ export class WorkflowRunner {
         ? { status: 'cancelled', error: 'Step cancelled.' }
         : { status: 'failed', error: error instanceof Error ? error.message : 'Step handler failed.' }
     } finally {
+      if (budgetTimer) clearTimeout(budgetTimer)
       this.unregisterActive(run.id, step.id)
+    }
+    if (budgetTimedOut) {
+      outcome = {
+        status: 'safety-rail',
+        error: `Wall-time budget exhausted after ${timeoutMs}ms.`,
+      }
+    } else if ('costUsd' in outcome || 'usage' in outcome) {
+      const previous = persistedUsage(rows)
+      const current = {
+        costUsd: previous.costUsd + (outcome.costUsd ?? 0),
+        inputTokens: previous.inputTokens + (outcome.usage?.inputTokens ?? 0),
+        outputTokens: previous.outputTokens + (outcome.usage?.outputTokens ?? 0),
+      }
+      const violation = budgetViolation(workflow.budget ?? {}, current)
+        ?? budgetViolation(def.budget ?? {}, {
+          costUsd: outcome.costUsd ?? 0,
+          inputTokens: outcome.usage?.inputTokens ?? 0,
+          outputTokens: outcome.usage?.outputTokens ?? 0,
+        })
+      if (violation) outcome = { ...outcome, status: 'safety-rail', error: `Safety rail: ${violation}.` }
     }
     return this.persistOutcome(run, step, def, outcome)
   }
@@ -322,7 +418,16 @@ export class WorkflowRunner {
       ...(outcome.result !== undefined ? { resultJson: JSON.stringify(outcome.result) } : {}),
       ...(outcome.structured !== undefined ? { structuredJson: JSON.stringify(outcome.structured) } : {}),
       ...(outcome.sessionId !== undefined ? { sessionId: outcome.sessionId } : {}),
+      ...(outcome.agentSessionId !== undefined ? { agentSessionId: outcome.agentSessionId } : {}),
       ...(outcome.costUsd !== undefined ? { costUsd: outcome.costUsd } : {}),
+      ...(outcome.usage !== undefined
+        ? {
+            resultJson: JSON.stringify({
+              ...(outcome.result && typeof outcome.result === 'object' ? outcome.result : { result: outcome.result }),
+              usage: outcome.usage,
+            }),
+          }
+        : {}),
     }
     if (outcome.status === 'failed' || outcome.status === 'safety-rail') {
       await this.setStep(step.id, { ...patch, status: outcome.status, error: outcome.error })
@@ -370,10 +475,14 @@ export class WorkflowRunner {
       await opts.onStart?.()
       return this.deps.runStep(taskId, def, {
         ...opts,
+        workflowRunId: ctx.run.id,
+        workflowStepId: ctx.step.id,
+        managedSessionId: ctx.step.agentSessionId ?? undefined,
         onEvent: (event) => {
           opts.onEvent?.(event)
           ctx.emit({ at: now(), event })
         },
+        timeoutMs: opts.timeoutMs ?? ctx.budget.maxWallTimeMs,
       })
     })
   }

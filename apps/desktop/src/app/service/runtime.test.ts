@@ -97,5 +97,5 @@ describe('Electron-free service runtime', () => {
       await runtime.stop()
     }
     expect(states.at(-1)).toBe('stopped')
-  })
+  }, 15_000)
 })

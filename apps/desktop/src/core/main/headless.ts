@@ -36,6 +36,9 @@ export type HeadlessResult = {
   exitCode: number | null
   capture: HeadlessCapture
   stderrTail: string
+  // Present when the workflow step ran through the durable managed-agent runtime. Kept outside
+  // HeadlessCapture because capture.sessionId is the provider's resume reference.
+  agentSessionId?: string
 }
 
 export const HEADLESS_TIMEOUT_MS = 10 * 60 * 1000

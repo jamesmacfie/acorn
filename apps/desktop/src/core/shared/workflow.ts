@@ -78,6 +78,7 @@ export type WorkflowStepRow = {
   resultJson: string | null
   structuredJson: string | null
   sessionId: string | null
+  agentSessionId: string | null
   costUsd: number | null
   iteration: number
   error: string | null
