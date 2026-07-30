@@ -333,8 +333,10 @@ Source: `plugins/rollbar/client/RollbarPane.tsx` + `RollbarItemPanel.tsx`.
 ### `preview` — browser preview (agent-drivable)
 
 A main-owned `WebContentsView` onto the repo's / run-target's resolved URL, wrapped in browser chrome —
-back / forward / stop-reload / home + an editable URL bar + preview-scoped DevTools + a loading spinner
-(`plugins/preview/client/PreviewPane.tsx`). The home
+back / forward / stop-reload / home + an editable URL bar + native page find + preview-scoped DevTools
+and a loading spinner (`plugins/preview/client/PreviewPane.tsx`). `⌘F` / `Ctrl+F` opens the find bar
+whether focus is in the renderer-owned chrome or the preview page; typing highlights matches through
+Chromium's `findInPage`, Enter / Shift+Enter move forward / backward, and Escape closes the bar. The home
 URL (`url()` in `PreviewTaskPane.tsx`) resolves in priority order: a layout recipe's
 `browser=run:<id>` resolution → the default run target's resolved URL → the repo-level
 preview config (url / port / script mode; `repo_paths` + committed `[preview]`) → the dev-server port.
@@ -349,7 +351,8 @@ the MCP `browser_*` tools
 (`browser_navigate`, `browser_click`, `browser_snapshot`, …) — see [mcp.md](./mcp.md). One webview
 surface, two entry points (human chrome vs. agent driving).
 
-Source: `apps/desktop/src/plugins/preview/{client,main}/`, `apps/desktop/src/core/mcp/server.ts`.
+Source: `apps/desktop/src/plugins/preview/{client,main}/`, `apps/desktop/src/core/shared/preview.ts`,
+`apps/desktop/src/core/mcp/server.ts`.
 
 ---
 

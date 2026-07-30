@@ -10,13 +10,24 @@
 // (PreviewPane.tsx) — the WebContentsView equivalent of the old z-index dance.
 import { BrowserWindow, WebContentsView, ipcMain, type IpcMainEvent, type IpcMainInvokeEvent, type WebContents } from 'electron'
 import { matchesUrlPattern } from '../../../core/shared/browserRules'
+import type {
+  PreviewFindDirection,
+  PreviewFindResult,
+  PreviewFindStopAction,
+  PreviewNavigationCommand,
+  PreviewState,
+} from '../../../core/shared/preview'
 import type { PreviewBrowserRule } from '../../../core/shared/serviceProtocol'
 import { bindBrowserContents, unbindBrowserContents } from './browserService'
 import { buildFillScript, isAllowedPreviewUrl } from './browserAuto'
 
 type Rect = { x: number; y: number; width: number; height: number }
-type PreviewState = { taskId: string; url: string; loading: boolean; canGoBack: boolean; canGoForward: boolean }
-type PreviewRecord = { view: WebContentsView; owner: BrowserWindow; homeUrl: string }
+type PreviewRecord = {
+  view: WebContentsView
+  owner: BrowserWindow
+  homeUrl: string
+  findRequestId: number | null
+}
 
 const previews = new Map<string, PreviewRecord>()
 const trackedOwners = new WeakSet<BrowserWindow>()
@@ -31,6 +42,15 @@ function stateOf(taskId: string, wc: WebContents, loading: boolean): PreviewStat
 
 function emit(record: PreviewRecord, state: PreviewState): void {
   if (!record.owner.isDestroyed()) record.owner.webContents.send('preview:event', state)
+}
+
+function emitFindResult(record: PreviewRecord, result: PreviewFindResult): void {
+  if (!record.owner.isDestroyed()) record.owner.webContents.send('preview:find-result', result)
+}
+
+function resetFindState(taskId: string, record: PreviewRecord): void {
+  record.findRequestId = null
+  emitFindResult(record, { taskId, activeMatchOrdinal: 0, matches: 0, finalUpdate: true })
 }
 
 function trackOwner(owner: BrowserWindow): void {
@@ -48,15 +68,42 @@ function create(taskId: string, owner: BrowserWindow, homeUrl: string): PreviewR
   // will-attach-webview handler pinned on the <webview>.
   const view = new WebContentsView({ webPreferences: { contextIsolation: true, nodeIntegration: false, sandbox: true } })
   const wc = view.webContents
-  const record = { view, owner, homeUrl }
+  const record: PreviewRecord = { view, owner, homeUrl, findRequestId: null }
   // Carry the http(s)-only / no-userinfo restriction (feature-parity §13): block in-page navigations
   // to anything else, and deny window.open outright (preview has no business spawning windows).
   wc.on('will-navigate', (e, url) => { if (!isAllowedPreviewUrl(url)) e.preventDefault() })
   wc.setWindowOpenHandler(() => ({ action: 'deny' }))
-  wc.on('did-start-loading', () => emit(record, stateOf(taskId, wc, true)))
+  wc.on('did-start-loading', () => {
+    resetFindState(taskId, record)
+    emit(record, stateOf(taskId, wc, true))
+  })
   wc.on('did-stop-loading', () => emit(record, stateOf(taskId, wc, false)))
   wc.on('did-navigate', () => emit(record, stateOf(taskId, wc, wc.isLoading())))
   wc.on('did-navigate-in-page', () => emit(record, stateOf(taskId, wc, wc.isLoading())))
+  wc.on('found-in-page', (_event, result) => {
+    if (result.requestId !== record.findRequestId) return
+    emitFindResult(record, {
+      taskId,
+      activeMatchOrdinal: result.activeMatchOrdinal,
+      matches: result.matches,
+      finalUpdate: result.finalUpdate,
+    })
+  })
+  // A key event focused inside the guest never reaches the Solid renderer. Intercept the native
+  // browser chord here, return focus to the owner renderer, and ask its task-scoped find bar to open.
+  wc.on('before-input-event', (event, input) => {
+    if (
+      input.type !== 'keyDown'
+      || input.key.toLowerCase() !== 'f'
+      || (!input.meta && !input.control)
+      || input.alt
+      || input.shift
+    ) return
+    event.preventDefault()
+    if (record.owner.isDestroyed()) return
+    record.owner.webContents.focus()
+    record.owner.webContents.send('preview:find-requested', { taskId })
+  })
   // Page rules (docs/panes.md): fill-on-load, workspace-configured. dom-ready only — SPA in-page
   // route changes don't refire it; that's the future 'navigate' trigger.
   wc.on('dom-ready', () => { void applyLoadRules(taskId, wc) })
@@ -125,7 +172,7 @@ export function previewLoadUrl(taskId: string, url: string): boolean {
   return true
 }
 
-export function previewNavigate(taskId: string, action: 'back' | 'forward' | 'reload' | 'stop'): boolean {
+export function previewNavigate(taskId: string, action: Exclude<PreviewNavigationCommand, 'devtools'>): boolean {
   const wc = previews.get(taskId)?.view.webContents
   if (!wc) return false
   if (action === 'back' && wc.navigationHistory.canGoBack()) wc.navigationHistory.goBack()
@@ -202,7 +249,7 @@ export function registerPreviewIpc(rulesForTask?: RulesForTask): () => void {
     const record = ownedRecord(e, p?.taskId)
     if (record && isAllowedPreviewUrl(p.url)) void record.view.webContents.loadURL(p.url)
   }
-  const onCommand = (e: IpcMainEvent, p: { taskId: string; action: 'back' | 'forward' | 'reload' | 'stop' | 'devtools' }) => {
+  const onCommand = (e: IpcMainEvent, p: { taskId: string; action: PreviewNavigationCommand }) => {
     const wc = ownedRecord(e, p?.taskId)?.view.webContents
     if (!wc) return
     if (p.action === 'back' && wc.navigationHistory.canGoBack()) wc.navigationHistory.goBack()
@@ -211,6 +258,31 @@ export function registerPreviewIpc(rulesForTask?: RulesForTask): () => void {
     else if (p.action === 'stop') wc.stop()
     // Detached: a WebContentsView has no window chrome of its own to dock devtools into.
     else if (p.action === 'devtools') wc.isDevToolsOpened() ? wc.closeDevTools() : wc.openDevTools({ mode: 'detach' })
+  }
+  const onFind = (e: IpcMainEvent, p: { taskId: string; text: string; direction: PreviewFindDirection }) => {
+    const record = ownedRecord(e, p?.taskId)
+    if (
+      !record
+      || record.view.webContents.isDestroyed()
+      || typeof p?.text !== 'string'
+      || p.text.length === 0
+      || p.text.length > 10_000
+      || !['initial', 'forward', 'backward'].includes(p.direction)
+    ) return
+    record.findRequestId = record.view.webContents.findInPage(p.text, {
+      forward: p.direction !== 'backward',
+      // Electron's name is counter-intuitive: true starts a new find session; false traverses it.
+      findNext: p.direction === 'initial',
+    })
+  }
+  const onStopFind = (e: IpcMainEvent, p: { taskId: string; action: PreviewFindStopAction }) => {
+    const record = ownedRecord(e, p?.taskId)
+    if (!record || !['clearSelection', 'keepSelection'].includes(p.action)) return
+    record.view.webContents.stopFindInPage(p.action)
+    resetFindState(p.taskId, record)
+  }
+  const onFocus = (e: IpcMainEvent, p: { taskId: string }) => {
+    ownedRecord(e, p?.taskId)?.view.webContents.focus()
   }
   const onEvict = (e: IpcMainEvent, p: { taskId: string }) => {
     if (ownedRecord(e, p?.taskId)) evict(p.taskId)
@@ -222,6 +294,9 @@ export function registerPreviewIpc(rulesForTask?: RulesForTask): () => void {
   ipcMain.on('preview:hide', onHide)
   ipcMain.on('preview:load', onLoad)
   ipcMain.on('preview:command', onCommand)
+  ipcMain.on('preview:find', onFind)
+  ipcMain.on('preview:stop-find', onStopFind)
+  ipcMain.on('preview:focus', onFocus)
   ipcMain.on('preview:evict', onEvict)
 
   return () => {
@@ -231,6 +306,9 @@ export function registerPreviewIpc(rulesForTask?: RulesForTask): () => void {
     ipcMain.removeListener('preview:hide', onHide)
     ipcMain.removeListener('preview:load', onLoad)
     ipcMain.removeListener('preview:command', onCommand)
+    ipcMain.removeListener('preview:find', onFind)
+    ipcMain.removeListener('preview:stop-find', onStopFind)
+    ipcMain.removeListener('preview:focus', onFocus)
     ipcMain.removeListener('preview:evict', onEvict)
     loadRules = undefined
     for (const taskId of [...previews.keys()]) evict(taskId)

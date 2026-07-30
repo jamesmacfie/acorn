@@ -1,3 +1,12 @@
+import type {
+  PreviewFindDirection,
+  PreviewFindRequested,
+  PreviewFindResult,
+  PreviewFindStopAction,
+  PreviewNavigationCommand,
+  PreviewState,
+} from '../shared/preview'
+
 // What the hosting environment provides (docs/features.md, docs/electron.md §capability-map). The
 // preload is a thin residue (native folder picker, preview view controls, lifecycle callbacks); the
 // data surface is loopback HTTP + one WebSocket, so most panes work in a plain browser (`dev:node`)
@@ -24,8 +33,21 @@ export type TerminalStreamBridge = {
   repoPath: { pick(): Promise<string | null> }
 }
 
-// Chrome state pushed from main for the active preview view (PreviewPane consumes it).
-export type PreviewState = { taskId: string; url: string; loading: boolean; canGoBack: boolean; canGoForward: boolean }
+export type PreviewBridge = {
+  ensure(taskId: string, url: string): Promise<boolean>
+  setBounds(taskId: string, rect: { x: number; y: number; width: number; height: number }): void
+  show(taskId: string): void
+  hide(): void
+  load(taskId: string, url: string): void
+  command(taskId: string, action: PreviewNavigationCommand): void
+  find(taskId: string, text: string, direction: PreviewFindDirection): void
+  stopFind(taskId: string, action: PreviewFindStopAction): void
+  focus(taskId: string): void
+  evict(taskId: string): void
+  onEvent(cb: (state: PreviewState) => void): () => void
+  onFindRequested(cb: (request: PreviewFindRequested) => void): () => void
+  onFindResult(cb: (result: PreviewFindResult) => void): () => void
+}
 
 declare global {
   interface Window {
@@ -38,16 +60,7 @@ declare global {
       onWillQuit?: (cb: () => boolean | Promise<boolean>) => () => void
       terminal?: TerminalStreamBridge
       // Browser-preview surface: drive the task's main-owned WebContentsView.
-      preview?: {
-        ensure(taskId: string, url: string): Promise<boolean>
-        setBounds(taskId: string, rect: { x: number; y: number; width: number; height: number }): void
-        show(taskId: string): void
-        hide(): void
-        load(taskId: string, url: string): void
-        command(taskId: string, action: 'back' | 'forward' | 'reload' | 'stop' | 'devtools'): void
-        evict(taskId: string): void
-        onEvent(cb: (s: PreviewState) => void): () => void
-      }
+      preview?: PreviewBridge
     }
   }
 }
