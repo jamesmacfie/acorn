@@ -1,5 +1,6 @@
 import { createEffect, createSignal, For, Show } from 'solid-js'
 import type { AgentRequest } from '../../../core/shared/managedAgents'
+import { Button, Input, Select } from '../../../core/client/ui/primitives'
 import { managedAgentApi } from './managedClient'
 
 export default function AgentRequestCard(props: {
@@ -60,41 +61,40 @@ export default function AgentRequestCard(props: {
             <Show
               when={question.options?.length}
               fallback={
-                <input
+                <Input
                   type="text"
                   value={answers()[question.id] ?? ''}
                   onInput={(event) => setAnswers((current) => ({ ...current, [question.id]: event.currentTarget.value }))}
                 />
               }
             >
-              <select
+              <Select
                 value={answers()[question.id] ?? ''}
                 onChange={(event) => setAnswers((current) => ({ ...current, [question.id]: event.currentTarget.value }))}
               >
                 <option value="">Choose…</option>
                 <For each={question.options}>{(option) => <option value={option.label}>{option.label}</option>}</For>
-              </select>
+              </Select>
             </Show>
           </label>
         )}
       </For>
       <div class="agent-request-actions">
         <Show when={questions().length}>
-          <button type="button" class="ui-btn" disabled={busy() || props.request.status !== 'pending'} onClick={() => void resolve({ answers: answers() })}>
+          <Button disabled={busy() || props.request.status !== 'pending'} onClick={() => void resolve({ answers: answers() })}>
             Submit answers
-          </button>
+          </Button>
         </Show>
         <For each={options()}>
           {(option) => (
-            <button
-              type="button"
-              class="ui-btn"
+            <Button
+              tone={option.kind?.startsWith('reject') ? 'danger' : 'neutral'}
               classList={{ 'agent-request-reject': option.kind?.startsWith('reject') }}
               disabled={busy() || props.request.status !== 'pending'}
               onClick={() => void resolve({ optionId: option.id })}
             >
               {option.label}
-            </button>
+            </Button>
           )}
         </For>
       </div>

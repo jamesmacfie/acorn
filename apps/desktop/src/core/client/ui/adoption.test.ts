@@ -34,12 +34,29 @@ describe('primitive adoption', () => {
   // list may only grow. It is deliberately not "all files" — migration is incremental by design.
   const CONVERTED = [
     'core/client/settings/AppearanceSettings.tsx',
+    'plugins/changes/client/agentToolRenderer.tsx',
+    'plugins/agents/client/AgentCenter.tsx',
+    'plugins/agents/client/AgentComposer.tsx',
+    'plugins/agents/client/AgentContextPickerModal.tsx',
+    'plugins/agents/client/AgentEventCard.tsx',
+    'plugins/agents/client/AgentMentionTextarea.tsx',
+    'plugins/agents/client/AgentPane.tsx',
+    'plugins/agents/client/AgentRequestCard.tsx',
+    'plugins/agents/client/AgentTaskSidebar.tsx',
+    'plugins/agents/client/AgentTranscript.tsx',
+    'plugins/agents/client/AgentUsageIndicator.tsx',
+    'plugins/agents/client/AgentUsageSection.tsx',
+    'plugins/agents/client/ManagedAgentMarkdown.tsx',
+    'plugins/agents/client/QueuedAgentTurns.tsx',
+    'plugins/agents/client/sourceContribution.tsx',
+    'plugins/agents/client/toolRendererRegistry.tsx',
   ]
 
   it.each(CONVERTED)('%s uses primitives, not raw controls', (file) => {
     const text = readFileSync(join(SRC, file), 'utf8')
-    expect(text, 'raw <button class=').not.toMatch(/<button[^>]*class="/)
-    expect(text, 'raw <select class=').not.toMatch(/<select[^>]*class="/)
+    expect(text, 'raw <button>').not.toMatch(/<button(?:\s|>)/)
+    expect(text, 'raw <select>').not.toMatch(/<select(?:\s|>)/)
+    expect(text, 'raw <textarea>').not.toMatch(/<textarea(?:\s|>)/)
     expect(text, 'raw class="ui-input"').not.toMatch(/class="ui-input"/)
   })
 

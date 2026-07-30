@@ -167,6 +167,7 @@
 }
 .repo-picker-row:hover { background: var(--bg-subtle); }
 .repo-picker-row.active { background: var(--bg-selected); border-left-color: var(--accent); }
+.repo-picker-row.disabled { opacity: 0.5; }
 .repo-pin {
   flex: none;
   font: inherit;
@@ -195,6 +196,15 @@
   text-overflow: ellipsis;
   cursor: pointer;
 }
+.repo-picker-name:disabled { cursor: default; }
+.repo-picker-name > span,
+.repo-picker-name > small {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.repo-picker-name > small { margin-top: var(--space-1); color: var(--text-faint); font-size: var(--fs-2xs); }
 
 /* Auth controls (top-right): Login link, or signed-in account dropdown. */
 .auth-control {

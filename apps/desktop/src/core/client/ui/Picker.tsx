@@ -17,11 +17,14 @@ import { Portal } from 'solid-js/web'
 // problem. Extract it if a second element-anchored popover appears.
 export default function Picker<T>(props: {
   label: string | JSX.Element // JSX so a picker can show its current value as an icon, not just text
+  ariaLabel?: string
   placeholder: string
   emptyText: string
   results: (query: string) => T[]
   rowLabel: (item: T) => string
+  rowDescription?: (item: T) => string | undefined
   isActive: (item: T) => boolean
+  isDisabled?: (item: T) => boolean
   onSelect: (item: T) => void
   leading?: (item: T) => JSX.Element // optional per-row leading control (e.g. pin)
   tools?: JSX.Element // optional extra toolbar control beside the filter (e.g. refresh)
@@ -29,6 +32,7 @@ export default function Picker<T>(props: {
   buttonClass?: string
   disabled?: boolean // greys the button and blocks opening (e.g. repo is fixed in a task view)
   keepOpen?: boolean // stay open after a pick, so the same list can drive a multi-select (isActive marks the chosen ones)
+  placement?: 'top' | 'bottom'
 }) {
   const [open, setOpen] = createSignal(false)
   const [filter, setFilter] = createSignal('')
@@ -43,7 +47,13 @@ export default function Picker<T>(props: {
   // narrow (e.g. "base"); recomputed on open and while open as the page scrolls/resizes.
   const reposition = () => {
     const r = rootRef?.getBoundingClientRect()
-    if (r) setPos({ top: r.bottom + 4, left: r.left, width: Math.max(r.width, 300) })
+    if (!r) return
+    const popoverHeight = popoverRef?.getBoundingClientRect().height ?? 0
+    setPos({
+      top: props.placement === 'top' ? r.top - popoverHeight - 4 : r.bottom + 4,
+      left: r.left,
+      width: Math.max(r.width, 300),
+    })
   }
 
   const close = () => {
@@ -56,10 +66,14 @@ export default function Picker<T>(props: {
     else {
       reposition()
       setOpen(true)
-      queueMicrotask(() => inputRef?.focus())
+      queueMicrotask(() => {
+        reposition()
+        inputRef?.focus()
+      })
     }
   }
   const choose = (item: T) => {
+    if (props.isDisabled?.(item)) return
     props.onSelect(item)
     if (!props.keepOpen) close()
   }
@@ -97,6 +111,7 @@ export default function Picker<T>(props: {
       <button
         type="button"
         class={props.buttonClass ?? 'repo-picker-button'}
+        aria-label={props.ariaLabel}
         aria-haspopup="listbox"
         aria-expanded={open()}
         disabled={props.disabled}
@@ -130,10 +145,21 @@ export default function Picker<T>(props: {
               <ul class="repo-picker-list">
                 <For each={items()}>
                   {(item) => (
-                    <li class="repo-picker-row" classList={{ active: props.isActive(item) }}>
+                    <li
+                      class="repo-picker-row"
+                      classList={{ active: props.isActive(item), disabled: props.isDisabled?.(item) }}
+                    >
                       {props.leading?.(item)}
-                      <button type="button" class="repo-picker-name" onClick={() => choose(item)}>
-                        {props.rowLabel(item)}
+                      <button
+                        type="button"
+                        class="repo-picker-name"
+                        disabled={props.isDisabled?.(item)}
+                        onClick={() => choose(item)}
+                      >
+                        <span>{props.rowLabel(item)}</span>
+                        <Show when={props.rowDescription?.(item)}>
+                          {(description) => <small>{description()}</small>}
+                        </Show>
                       </button>
                     </li>
                   )}

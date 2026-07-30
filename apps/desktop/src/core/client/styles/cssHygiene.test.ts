@@ -26,7 +26,6 @@ describe('no phantom tokens', () => {
     // Set at runtime from JS rather than in any stylesheet, so they are legitimately absent here.
     const runtimeSet = new Set([
       '--term-drawer-h', // TerminalPanel.tsx sets it on documentElement
-      '--agent-comparison-count', // AgentComparison.tsx sets it from the selected session count
       '--left', // reserved override hook for the left pane width
       '--l', '--r', // Shiki emits both syntax colours inline per token
       '--state-color', '--label-color', // inline per-element props carrying live Linear API colours

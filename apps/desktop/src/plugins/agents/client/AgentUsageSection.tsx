@@ -2,6 +2,8 @@ import { For, onCleanup, onMount, Show } from 'solid-js'
 import type { AgentProviderUsage } from '../shared/usage'
 import { agentUsageStore } from './usageStore'
 import { formatUpdated, providerUsageRows } from './usageModel'
+import { Button } from '../../../core/client/ui/primitives'
+import Icon from '../../../core/client/ui/Icon'
 import './agent-usage.css'
 
 const providerLabel = (provider: AgentProviderUsage): string => (provider.provider === 'claude' ? 'Claude' : 'Codex')
@@ -14,16 +16,19 @@ export default function AgentUsageSection(props: { showHeader?: boolean }) {
       <Show when={props.showHeader !== false}>
         <div class="agent-usage-head">
           <span>Usage</span>
-          <button
-            type="button"
+          <Button
+            variant="bare"
+            size="sm"
+            iconOnly
             class="section-refresh"
             title="Refresh agent usage"
             aria-label="Refresh agent usage"
+            busy={agentUsageStore.refreshing()}
             disabled={agentUsageStore.refreshing()}
             onClick={() => void agentUsageStore.refresh()}
           >
-            {agentUsageStore.refreshing() ? '...' : '↻'}
-          </button>
+            <Icon name="refresh-cw" />
+          </Button>
         </div>
       </Show>
       <Show when={agentUsageStore.error()}>

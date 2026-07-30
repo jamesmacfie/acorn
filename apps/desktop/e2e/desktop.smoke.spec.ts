@@ -312,9 +312,10 @@ test('S6 find-in-files copies paths and double-clicks into the match', async () 
 })
 
 test('S7 loads the Agent Center and combines task agent switching with the conversation', async () => {
-  test.setTimeout(60_000)
+  test.setTimeout(150_000)
   const first = await launch()
   const task = await seedTask(first.page, first.repoDir)
+  writeFileSync(join(first.repoDir, 'agent-smoke.ts'), 'export const agentSmoke = true\n')
   await first.app.close()
   seedQueuedAgent(first.dataDir, task.id)
   const running = await launch(first)
@@ -350,10 +351,106 @@ test('S7 loads the Agent Center and combines task agent switching with the conve
   await expect.poll(() => running.page.evaluate(() => ({
     chip: document.querySelector('.agent-context-chip')?.textContent ?? '',
     error: document.querySelector('.agent-composer-error')?.textContent ?? '',
-  }))).toEqual({
+  })), { timeout: 15_000 }).toEqual({
     chip: expect.stringContaining('Task context · attached'),
     error: '',
   })
+  const openContextPicker = () => running.page.evaluate(async () => {
+    const deadline = Date.now() + 8_000
+    while (Date.now() < deadline) {
+      const popover = document.querySelector('.repo-picker-popover')
+      if (popover) {
+        const taskContext = [...popover.querySelectorAll('.repo-picker-name')]
+          .find((candidate) => candidate.textContent?.includes('Task context'))
+        return {
+          text: popover.textContent ?? '',
+          taskContextDisabled: taskContext instanceof HTMLButtonElement && taskContext.disabled,
+        }
+      }
+      const button = document.querySelector('button[aria-label="Add Acorn context"]')
+      if (!(button instanceof HTMLButtonElement)) throw new Error('Context picker trigger is missing.')
+      button.click()
+      await new Promise((resolve) => window.setTimeout(resolve, 50))
+    }
+    throw new Error('Context picker did not open.')
+  })
+  await expect(openContextPicker()).resolves.toEqual({
+    text: expect.stringContaining('Docker service state'),
+    taskContextDisabled: true,
+  })
+  const contextPickerText = await running.page.evaluate(() =>
+    document.querySelector('.repo-picker-popover')?.textContent ?? '')
+  expect(contextPickerText).not.toContain('Current worktree changes')
+  expect(contextPickerText).not.toContain('Editor files')
+  expect(contextPickerText).not.toContain('Preview page')
+  expect(contextPickerText).not.toContain('Workflow runs')
+  await expect(running.page.evaluate(async () => {
+    const deadline = Date.now() + 8_000
+    while (Date.now() < deadline) {
+      const dialog = document.querySelector('[role="dialog"]')
+      if (dialog) {
+        return {
+          dialog: dialog.textContent ?? '',
+          attach: [...dialog.querySelectorAll('button')]
+            .some((candidate) => candidate.textContent?.trim() === 'Attach'),
+        }
+      }
+      const button = [...document.querySelectorAll('.repo-picker-popover .repo-picker-name')]
+        .find((candidate) => candidate.textContent?.includes('Docker service state'))
+      if (button instanceof HTMLButtonElement) button.click()
+      await new Promise((resolve) => window.setTimeout(resolve, 50))
+    }
+    throw new Error('Docker context selection modal did not open.')
+  })).resolves.toEqual({
+    dialog: expect.stringContaining('Add Docker service state'),
+    attach: true,
+  })
+  await running.page.evaluate(() => {
+    const button = [...document.querySelectorAll('[role="dialog"] button')]
+      .find((candidate) => candidate.textContent?.trim() === 'Cancel')
+    if (!(button instanceof HTMLButtonElement)) throw new Error('Context modal cancel button is missing.')
+    button.click()
+  })
+  await expect(openContextPicker()).resolves.toEqual({
+    text: expect.stringContaining('Docker service state'),
+    taskContextDisabled: true,
+  })
+  await running.page.evaluate(() => {
+    const target = document.querySelector('.managed-agent-conversation')
+    if (!(target instanceof HTMLElement)) throw new Error('Managed conversation is missing.')
+    target.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }))
+  })
+  await expect.poll(() => running.page.evaluate(() =>
+    document.querySelectorAll('.repo-picker-popover').length)).toBe(0)
+
+  await running.page.evaluate(() => {
+    const button = document.querySelector('.agent-context-chip .agent-chip-remove')
+    if (!(button instanceof HTMLButtonElement)) throw new Error('Task-context remove button is missing.')
+    button.click()
+  })
+  await expect.poll(() => running.page.evaluate(() =>
+    document.querySelectorAll('.agent-context-chip').length)).toBe(0)
+
+  await running.page.evaluate(() => {
+    const textarea = document.querySelector('textarea[aria-label="Message agent"]')
+    if (!(textarea instanceof HTMLTextAreaElement)) throw new Error('Agent composer is missing.')
+    textarea.focus()
+    textarea.value = 'Inspect @agent'
+    textarea.setSelectionRange(textarea.value.length, textarea.value.length)
+    textarea.dispatchEvent(new InputEvent('input', { bubbles: true, inputType: 'insertText' }))
+  })
+  await expect.poll(() => running.page.evaluate(() =>
+    [...document.querySelectorAll('[role="option"]')]
+      .some((candidate) => candidate.textContent?.includes('agent-smoke.ts')))).toBe(true)
+  await running.page.evaluate(() => {
+    const button = [...document.querySelectorAll('[role="option"]')]
+      .find((candidate) => candidate.textContent?.includes('agent-smoke.ts'))
+    if (!(button instanceof HTMLButtonElement)) throw new Error('File mention suggestion is missing.')
+    button.click()
+  })
+  await expect.poll(() => running.page.evaluate(() =>
+    (document.querySelector('textarea[aria-label="Message agent"]') as HTMLTextAreaElement | null)?.value ?? ''))
+    .toBe('Inspect @agent-smoke.ts ')
   const combinedGeometry = await running.page.evaluate(() => {
     const pane = document.querySelector('.managed-agent-pane')?.getBoundingClientRect()
     const slot = document.querySelector('.task-slot[data-pane-id="agents"]')?.getBoundingClientRect()
@@ -488,7 +585,7 @@ test('S7 loads the Agent Center and combines task agent switching with the conve
   running.page.once('dialog', (dialog) => dialog.accept())
   await clickAgentHeaderButton('Session actions')
   await running.page.evaluate(() => {
-    const button = [...document.querySelectorAll('.managed-agent-menu-popover button')]
+    const button = [...document.querySelectorAll('.repo-picker-popover .repo-picker-name')]
       .find((candidate) => candidate.textContent?.trim() === 'Delete permanently…')
     if (!(button instanceof HTMLButtonElement)) throw new Error('Delete session action is missing.')
     button.click()

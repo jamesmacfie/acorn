@@ -13,7 +13,7 @@ Acorn intends to remove.
 
 | Surface | Role |
 | --- | --- |
-| Agent Center | Workspace-wide history, search, provider health, unread/attention state, transcript import, launch and outcome comparison |
+| Agent Center | Workspace-wide history, search, provider health, unread/attention state, transcript import and launch |
 | Task Agent pane | Session tabs, normalized transcript, composer, queue, requests, artifacts, lifecycle controls and context preview |
 | Right rail | Compact working/needs-you roster; a request opens the exact task, session and request card |
 | Terminal drawer | Shells, legacy agent TUIs, tool terminals and explicit managed-to-terminal handoff |
@@ -158,10 +158,11 @@ session becomes resumable.
 ## Context, attachments and artifacts
 
 Context contributors produce immutable snapshots with source ownership, provenance, capture time,
-freshness, sensitivity, a byte/token estimate and an owning-pane deep link. The composer previews
-the exact snapshots and enforces a 512 KiB Acorn context ceiling before provider-specific limits.
-Shipped contributors cover task/PR/issues/notes/memory, changes, editor, preview, terminal,
-workflows, HTTP, database and Docker state.
+freshness, sensitivity, a byte/token estimate and an owning-pane deep link. The composer opens a
+source-owned selection modal before capture, previews the exact snapshots and enforces a 512 KiB
+Acorn context ceiling before provider-specific limits. Shipped picker contributors cover
+task/PR/issues/notes/memory, terminal, HTTP, saved database queries and Docker state. Worktree files
+are attached with the composer's task-scoped `@` autocomplete.
 
 Attachments live in a dedicated content-addressed store separate from the GitHub blob cache:
 
@@ -237,7 +238,7 @@ extend the same session/event/controller contracts and are not shipped by the cu
 - the paired mobile companion and encrypted relay;
 - third-party driver/renderer distribution, signing and marketplace;
 - structured Gemini CLI, OpenCode and GitHub Copilot drivers;
-- advanced evaluation and saved multi-pane comparison layouts.
+- advanced evaluation.
 
 They must not introduce a second session model or move provider credentials away from the execution
 host.

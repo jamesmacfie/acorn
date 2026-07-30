@@ -1,6 +1,7 @@
 import { For, Show } from 'solid-js'
 import { dispatchLayout } from '../../../core/client/tasks/tasks'
 import type { AgentToolRendererContribution } from '../../../core/client/registries/agentToolRenderers'
+import { Button } from '../../../core/client/ui/primitives'
 
 export const changesAgentToolRenderer: AgentToolRendererContribution = {
   id: 'changes.agent-file-tool',
@@ -16,13 +17,13 @@ export const changesAgentToolRenderer: AgentToolRendererContribution = {
       <Show when={props.tool.output}><pre>{props.tool.output}</pre></Show>
       <For each={props.tool.paths ?? []}>
         {(path) => (
-          <button
-            type="button"
+          <Button
+            variant="bare"
             class="agent-path-link"
             onClick={() => dispatchLayout(props.taskId, { type: 'show', pane: 'changes' })}
           >
             {path}
-          </button>
+          </Button>
         )}
       </For>
     </details>

@@ -8,7 +8,7 @@ import { managedAgentApi } from './managedClient'
 import { managedAgentStore } from './managedStore'
 import { openManagedSession } from './managedSelection'
 import type { AgentProviderDescriptor, AgentSession } from '../../../core/shared/managedAgents'
-import AgentComparison from './AgentComparison'
+import { Button, Input, Row, Select } from '../../../core/client/ui/primitives'
 import './agent-center.css'
 
 const ACTIVE_STATES = new Set(['creating', 'connecting', 'replaying', 'working', 'waiting', 'cancelling', 'reconnecting'])
@@ -62,8 +62,6 @@ export default function AgentCenter() {
   const [providerFilter, setProviderFilter] = createSignal('')
   const [stateFilter, setStateFilter] = createSignal<'all' | 'active' | 'attention' | 'archived'>('all')
   const [error, setError] = createSignal('')
-  const [comparisonIds, setComparisonIds] = createSignal<string[]>([])
-  const [comparing, setComparing] = createSignal(false)
 
   onMount(() => {
     const deactivate = managedAgentStore.activate()
@@ -71,8 +69,6 @@ export default function AgentCenter() {
   })
 
   createEffect(on(workspaceId, () => {
-    setComparisonIds([])
-    setComparing(false)
     setError('')
   }, { defer: true }))
 
@@ -104,18 +100,6 @@ export default function AgentCenter() {
     navigate(pathForTask(task))
   }
 
-  function toggleComparison(sessionId: string) {
-    setComparisonIds((current) => current.includes(sessionId)
-      ? current.filter((id) => id !== sessionId)
-      : current.length < 4 ? [...current, sessionId] : current)
-  }
-
-  const comparisonSessions = createMemo(() => comparisonIds().flatMap((id) => {
-    const session = [...managedAgentStore.sessions(), ...(archived() ?? [])]
-      .find((candidate) => candidate.id === id && workspaceTaskIds().has(candidate.taskId))
-    return session ? [session] : []
-  }))
-
   return (
     <main class="agent-center">
       <header class="agent-center-head">
@@ -146,38 +130,30 @@ export default function AgentCenter() {
       </section>
 
       <section class="agent-center-filters">
-        <input type="search" value={query()} placeholder="Search sessions, tasks and repositories…" onInput={(event) => setQuery(event.currentTarget.value)} />
-        <select value={providerFilter()} onChange={(event) => setProviderFilter(event.currentTarget.value)}>
+        <Input type="search" value={query()} placeholder="Search sessions, tasks and repositories…" onInput={(event) => setQuery(event.currentTarget.value)} />
+        <Select value={providerFilter()} onChange={(event) => setProviderFilter(event.currentTarget.value)}>
           <option value="">All providers</option>
           <For each={providers() ?? []}>{(provider) => <option value={provider.id}>{provider.label}</option>}</For>
-        </select>
+        </Select>
         <div class="agent-center-segments">
           <For each={['all', 'active', 'attention', 'archived'] as const}>
-            {(filter) => <button type="button" classList={{ active: stateFilter() === filter }} onClick={() => setStateFilter(filter)}>{filter}</button>}
+            {(filter) => (
+              <Button
+                variant="bare"
+                size="sm"
+                classList={{ active: stateFilter() === filter }}
+                onClick={() => setStateFilter(filter)}
+              >
+                {filter}
+              </Button>
+            )}
           </For>
         </div>
-        <button
-          type="button"
-          class="ui-btn"
-          disabled={comparisonIds().length < 2}
-          onClick={() => setComparing(true)}
-        >
-          Compare {comparisonIds().length || ''}
-        </button>
       </section>
-
-      <Show when={comparing() && comparisonSessions().length >= 2}>
-        <AgentComparison
-          sessions={comparisonSessions()}
-          tasks={taskById()}
-          onOpen={open}
-          onClose={() => setComparing(false)}
-        />
-      </Show>
 
       <section class="agent-center-list">
         <div class="agent-center-list-head">
-          <span aria-hidden="true" /><span>Session</span><span>Task</span><span>State</span><span>Updated</span>
+          <span>Session</span><span>Task</span><span>State</span><span>Updated</span>
         </div>
         <For
           each={shown()}
@@ -186,19 +162,7 @@ export default function AgentCenter() {
           {(session) => {
             const task = () => taskById().get(session.taskId)
             return (
-              <button type="button" class="agent-center-row" onClick={() => open(session)}>
-                <span
-                  class="agent-center-compare"
-                  role="checkbox"
-                  aria-checked={comparisonIds().includes(session.id)}
-                  title="Include in comparison"
-                  onClick={(event) => {
-                    event.stopPropagation()
-                    toggleComparison(session.id)
-                  }}
-                >
-                  {comparisonIds().includes(session.id) ? '✓' : ''}
-                </span>
+              <Row class="agent-center-row" onActivate={() => open(session)}>
                 <span class="agent-center-session">
                   <span class="agent-center-session-icon" data-provider={session.providerId}>{session.providerId === 'claude' ? 'C' : '⌘'}</span>
                   <span><strong>{session.title}</strong><small>{session.providerId} · {session.kind}</small></span>
@@ -209,7 +173,7 @@ export default function AgentCenter() {
                   <span>{session.runtimeState}<small>{session.attention === 'none' ? '' : session.attention.replace('_', ' ')}</small></span>
                 </span>
                 <span class="muted">{elapsed(session.updatedAt)}</span>
-              </button>
+              </Row>
             )
           }}
         </For>

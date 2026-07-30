@@ -1,13 +1,17 @@
 import { createEffect, createMemo, createSignal, For, on, Show } from 'solid-js'
 import type { AgentAttachment, AgentConfigOption, AgentInputPart, AgentSession } from '../../../core/shared/managedAgents'
-import { agentContextBudget, type AgentContextSnapshot } from '../../../core/shared/agentContext'
+import { agentContextBudget, type AgentContextContribution, type AgentContextSnapshot } from '../../../core/shared/agentContext'
 import { managedAgentApi } from './managedClient'
 import { agentContextContributions } from '../../../core/client/registries/agentContexts'
-import { Field, Select } from '../../../core/client/ui/primitives'
+import { Button, Field, Select } from '../../../core/client/ui/primitives'
+import Picker from '../../../core/client/ui/Picker'
+import Icon from '../../../core/client/ui/Icon'
 import { hydrateManagedDraft, managedDraft, setManagedDraft } from './managedDrafts'
 import { sameAgentConfigOptions } from './agentConfigOptions'
 import { agentComposerDisabledMessage } from './agentComposerState'
 import { parseFileMentions } from './fileMentions'
+import AgentContextPickerModal from './AgentContextPickerModal'
+import AgentMentionTextarea from './AgentMentionTextarea'
 import {
   AUTOMATIC_TASK_CONTEXT_SOURCE,
   TASK_CONTEXT_CONTRIBUTION_ID,
@@ -18,6 +22,13 @@ import {
 const draftKey = (sessionId: string): string => `acorn.agent-draft.${sessionId}`
 const attachmentDraftKey = (sessionId: string): string => `acorn.agent-attachments.${sessionId}`
 const contextDraftKey = (sessionId: string): string => `acorn.agent-context.${sessionId}`
+
+type InsertChoice = {
+  id: string
+  label: string
+  description?: string
+  value: string
+}
 
 export default function AgentComposer(props: {
   session: AgentSession
@@ -31,8 +42,10 @@ export default function AgentComposer(props: {
   const [attachments, setAttachments] = createSignal<AgentAttachment[]>([])
   const [contexts, setContexts] = createSignal<AgentContextSnapshot[]>([])
   const [capturingContext, setCapturingContext] = createSignal('')
+  const [contextPickerId, setContextPickerId] = createSignal('')
   const [dismissedAutomaticPayload, setDismissedAutomaticPayload] = createSignal<string>()
   const [error, setError] = createSignal('')
+  const composerSessionId = createMemo(() => props.session.id)
   const configOptions = createMemo<AgentConfigOption[]>(
     () => {
       const value = props.session.config.configOptions
@@ -49,8 +62,26 @@ export default function AgentComposer(props: {
     const value = props.session.config.skills
     return Array.isArray(value) ? value as Array<{ name: string; description?: string }> : []
   })
+  const insertChoices = createMemo<InsertChoice[]>(() => [
+    ...commands().map((command) => ({
+      id: `command:${command.name}`,
+      label: `/${command.name}`,
+      description: command.description,
+      value: `/${command.name}`,
+    })),
+    ...skills().map((skill) => ({
+      id: `skill:${skill.name}`,
+      label: `$${skill.name}`,
+      description: skill.description,
+      value: `$${skill.name}`,
+    })),
+  ])
   const contextBudget = createMemo(() => agentContextBudget(contexts()))
   const disabledMessage = createMemo(() => agentComposerDisabledMessage(props.session, props.disabled))
+  const contextPicker = createMemo(() =>
+    agentContextContributions().find((contribution) => contribution.id === contextPickerId()))
+  const taskContextAdded = createMemo(() => contexts().some((context) =>
+    context.source === AUTOMATIC_TASK_CONTEXT_SOURCE || context.source === 'context.task'))
   const automaticContextKey = createMemo(() => {
     const contribution = agentContextContributions()
       .find((item) => item.id === TASK_CONTEXT_CONTRIBUTION_ID)
@@ -65,9 +96,10 @@ export default function AgentComposer(props: {
     ].join(':')
   })
 
-  createEffect(on(() => props.session.id, (sessionId) => {
+  createEffect(on(composerSessionId, (sessionId) => {
     hydrateManagedDraft(sessionId, localStorage.getItem(draftKey(sessionId)) ?? '')
     setError('')
+    setContextPickerId('')
     setDismissedAutomaticPayload(undefined)
     let ids: string[] = []
     try {
@@ -136,6 +168,9 @@ export default function AgentComposer(props: {
 
   async function refreshAutomaticContext(): Promise<AgentContextSnapshot[]> {
     if (props.session.kind !== 'interactive') return contexts()
+    // A manually selected task-context snapshot is authoritative for this draft. Do not add a
+    // second automatic copy on send or when the Context pane revision changes underneath it.
+    if (contexts().some((context) => context.source === 'context.task')) return contexts()
     const contribution = agentContextContributions()
       .find((item) => item.id === TASK_CONTEXT_CONTRIBUTION_ID)
     if (!contribution) return contexts()
@@ -241,17 +276,30 @@ export default function AgentComposer(props: {
     setContexts((current) => current.filter((item) => item.contextId !== context.contextId))
   }
 
-  async function captureContext(contributionId: string) {
+  const contextBelongsTo = (
+    context: AgentContextSnapshot,
+    contribution: AgentContextContribution,
+  ): boolean =>
+    context.source === contribution.source
+      || (contribution.id === TASK_CONTEXT_CONTRIBUTION_ID
+        && context.source === AUTOMATIC_TASK_CONTEXT_SOURCE)
+
+  const selectedContextOptionIds = (contribution: AgentContextContribution): string[] =>
+    contexts().flatMap((context) =>
+      context.source === contribution.source && context.resourceId ? [context.resourceId] : [])
+
+  async function captureContext(contributionId: string, optionIds: readonly string[]) {
     const contribution = agentContextContributions().find((item) => item.id === contributionId)
     if (!contribution || capturingContext()) return
     setCapturingContext(contributionId)
     setError('')
     try {
-      const captured = await contribution.capture({ taskId: props.session.taskId })
+      const captured = await contribution.capture({ taskId: props.session.taskId }, optionIds)
       setContexts((current) => [
-        ...current.filter((item) => !captured.some((next) => next.source === item.source)),
+        ...current.filter((item) => !contextBelongsTo(item, contribution)),
         ...captured,
       ])
+      setContextPickerId('')
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : 'Unable to capture Acorn context.')
     } finally {
@@ -305,7 +353,17 @@ export default function AgentComposer(props: {
               <span>{attachment.mediaType.startsWith('image/') ? '▧' : '▤'}</span>
               <span title={attachment.filename}>{attachment.filename}</span>
               <small>{Math.max(1, Math.round(attachment.byteSize / 1024))} KiB</small>
-              <button type="button" title={`Remove ${attachment.filename}`} onClick={() => removeAttachment(attachment)}>×</button>
+              <Button
+                variant="bare"
+                size="sm"
+                iconOnly
+                class="agent-chip-remove"
+                title={`Remove ${attachment.filename}`}
+                aria-label={`Remove ${attachment.filename}`}
+                onClick={() => removeAttachment(attachment)}
+              >
+                <Icon name="x" />
+              </Button>
             </span>
           )}
         </For>
@@ -315,7 +373,17 @@ export default function AgentComposer(props: {
               <span>◇</span>
               <span>{context.label}</span>
               <small>~{(context.estimatedTokens ?? Math.ceil((context.byteSize ?? context.content.length) / 4)).toLocaleString()} tok</small>
-              <button type="button" title={`Remove ${context.label}`} onClick={() => removeContext(context)}>×</button>
+              <Button
+                variant="bare"
+                size="sm"
+                iconOnly
+                class="agent-chip-remove"
+                title={`Remove ${context.label}`}
+                aria-label={`Remove ${context.label}`}
+                onClick={() => removeContext(context)}
+              >
+                <Icon name="x" />
+              </Button>
             </span>
           )}
         </For>
@@ -328,73 +396,63 @@ export default function AgentComposer(props: {
             </p>
           )}
         </Show>
-        <textarea
+        <AgentMentionTextarea
+          taskId={props.session.taskId}
           value={draft()}
           disabled={props.disabled}
-          aria-label="Message agent"
           placeholder={disabledMessage() ?? 'Ask the agent…  @file  /command  $skill'}
-          rows="3"
-          onInput={(event) => setDraft(event.currentTarget.value)}
-          onPaste={(event) => {
-            const files = [...(event.clipboardData?.files ?? [])]
-            if (files.length) {
-              event.preventDefault()
-              void addFiles(files)
-            }
-          }}
-          onDragOver={(event) => {
-            if (event.dataTransfer?.types.includes('Files')) event.preventDefault()
-          }}
-          onDrop={(event) => {
-            const files = [...(event.dataTransfer?.files ?? [])]
-            if (files.length) {
-              event.preventDefault()
-              void addFiles(files)
-            }
-          }}
-          onKeyDown={(event) => {
-            if (event.isComposing) return
-            if (event.key === 'Enter' && !event.shiftKey) {
-              event.preventDefault()
-              void send()
-            }
-          }}
+          onValue={setDraft}
+          onFiles={(files) => void addFiles(files)}
+          onSubmit={() => void send()}
         />
         <div class="agent-composer-actions">
-          <button
-            type="button"
+          <Button
+            size="sm"
             class="agent-attach"
             title="Attach files"
             disabled={uploading() || props.disabled}
+            busy={uploading()}
             onClick={() => fileInput?.click()}
           >
-            {uploading() ? 'Uploading…' : 'Attach'}
-          </button>
-          <details class="agent-insert-menu agent-context-menu">
-            <summary aria-label="Add Acorn context">Context</summary>
-            <div>
-              <For each={agentContextContributions()}>
-                {(contribution) => (
-                  <button
-                    type="button"
-                    title={contribution.description}
-                    disabled={!!capturingContext()}
-                    onClick={() => void captureContext(contribution.id)}
-                  >
-                    {capturingContext() === contribution.id ? 'Capturing…' : contribution.label}
-                  </button>
-                )}
-              </For>
-            </div>
-          </details>
-          <details class="agent-insert-menu">
-            <summary aria-label="Insert provider command or skill">＋</summary>
-            <div>
-              <For each={commands()}>{(command) => <button type="button" title={command.description} onClick={() => insert(`/${command.name}`)}>/{command.name}</button>}</For>
-              <For each={skills()}>{(skill) => <button type="button" title={skill.description} onClick={() => insert(`$${skill.name}`)}>${skill.name}</button>}</For>
-              {!commands().length && !skills().length ? <span class="muted">No commands or skills advertised</span> : null}
-            </div>
-          </details>
+            Attach
+          </Button>
+          <Picker<AgentContextContribution>
+            label="Context"
+            ariaLabel="Add Acorn context"
+            placeholder="Filter context sources…"
+            emptyText="No context sources available."
+            results={(query) => agentContextContributions().filter((contribution) =>
+              contribution.label.toLowerCase().includes(query.trim().toLowerCase()))}
+            rowLabel={(contribution) => contribution.label}
+            rowDescription={(contribution) => contribution.description}
+            isActive={(contribution) => contexts().some((context) => contextBelongsTo(context, contribution))}
+            isDisabled={(contribution) =>
+              !!capturingContext()
+                || (contribution.id === TASK_CONTEXT_CONTRIBUTION_ID && taskContextAdded())}
+            onSelect={(contribution) => {
+              // Solid delegates click handlers at the document. Mounting a backdrop synchronously
+              // lets the selecting click reach the new backdrop and dismiss the modal immediately.
+              window.setTimeout(() => setContextPickerId(contribution.id), 0)
+            }}
+            buttonClass="repo-picker-button agent-composer-picker-button"
+            disabled={props.disabled}
+            placement="top"
+          />
+          <Picker<InsertChoice>
+            label="＋"
+            ariaLabel="Insert provider command or skill"
+            placeholder="Filter commands and skills…"
+            emptyText="No commands or skills advertised."
+            results={(query) => insertChoices().filter((choice) =>
+              `${choice.label} ${choice.description ?? ''}`.toLowerCase().includes(query.trim().toLowerCase()))}
+            rowLabel={(choice) => choice.label}
+            rowDescription={(choice) => choice.description}
+            isActive={() => false}
+            onSelect={(choice) => insert(choice.value)}
+            buttonClass="repo-picker-button agent-composer-picker-button agent-insert-picker-button"
+            disabled={props.disabled}
+            placement="top"
+          />
           <Show when={contexts().length}>
             <details class="agent-context-preview">
               <summary classList={{ 'agent-context-over-budget': contextBudget().overLimit }}>
@@ -404,12 +462,32 @@ export default function AgentComposer(props: {
             </details>
           </Show>
           <span class="muted agent-send-hint">Shift+Enter for newline</span>
-          <button type="button" class="agent-send" disabled={(!draft().trim() && !attachments().length && !contexts().length) || contextBudget().overLimit || sending() || props.disabled} onClick={() => void send()}>
-            {sending() ? 'Queueing…' : 'Send'}
-          </button>
+          <Button
+            variant="solid"
+            tone="accent"
+            class="agent-send"
+            busy={sending()}
+            disabled={(!draft().trim() && !attachments().length && !contexts().length)
+              || contextBudget().overLimit || props.disabled}
+            onClick={() => void send()}
+          >
+            Send
+          </Button>
         </div>
       </div>
       {error() ? <div class="action-error agent-composer-error" role="alert">{error()}</div> : null}
+      <Show when={contextPicker()}>
+        {(contribution) => (
+          <AgentContextPickerModal
+            contribution={contribution()}
+            taskId={props.session.taskId}
+            initialSelectedIds={selectedContextOptionIds(contribution())}
+            attaching={capturingContext() === contribution().id}
+            onAttach={(optionIds) => void captureContext(contribution().id, optionIds)}
+            onClose={() => setContextPickerId('')}
+          />
+        )}
+      </Show>
     </div>
   )
 }

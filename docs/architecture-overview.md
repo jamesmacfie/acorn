@@ -129,7 +129,7 @@ Workspace ("Runn", "Acorn")            ← group of repos, picked in the top bar
   (`TaskLayout = { panes, weights?, pinned? }`); one pure reducer owns show/add,
   close/unpin, pin, move, resize/equalize, and recipe replacement.
 - **Agent Center** — a workspace source for managed Claude/Codex history, search, provider health,
-  attention/unread state, transcript import, launch and outcome comparison. New sessions still
+  attention/unread state, transcript import and launch. New sessions still
   require a task/worktree.
 - **Terminal drawer** — bottom, per-task, holds shells, raw provider TUIs and terminals attached to
   managed tool calls.

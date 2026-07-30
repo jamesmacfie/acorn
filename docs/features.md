@@ -125,7 +125,7 @@ and telling it what to fix, without leaving acorn.
 The task **Agent pane** is the primary conversation UI for managed Claude Code and Codex sessions.
 It renders structured protocol messages, displayable reasoning, tools, plans, file changes, usage,
 questions and permissions without parsing a terminal. The workspace **Agent Center** aggregates
-history/search, provider health, unread/attention state, transcript import, launch and comparisons.
+history/search, provider health, unread/attention state, transcript import and launch.
 
 Inside the task **Agent pane**, a persistent sidebar lists the task's managed sessions,
 working/needs-you state, raw terminals and workflow gates. Switching rows changes the conversation

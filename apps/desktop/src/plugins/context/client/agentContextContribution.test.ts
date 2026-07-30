@@ -63,4 +63,23 @@ describe('task agent context contribution', () => {
 
     expect(fetch).toHaveBeenCalledWith('/api/tasks/task-1/context?include=issues', { signal: undefined })
   })
+
+  it('lists selectable sections and captures the modal selection', async () => {
+    const fetch = vi.fn(async () => new Response(JSON.stringify(context), {
+      status: 200,
+      headers: { 'Content-Type': 'application/json' },
+    }))
+    vi.stubGlobal('fetch', fetch)
+
+    await expect(taskContextAgentContribution.options({ taskId: 'task-1' })).resolves.toEqual([{
+      id: 'issues',
+      label: 'Linked issues',
+      description: '1 item',
+      defaultSelected: true,
+    }])
+    await taskContextAgentContribution.capture({ taskId: 'task-1' }, ['issues'])
+
+    expect(fetch).toHaveBeenNthCalledWith(1, '/api/tasks/task-1/context?include=*', { signal: undefined })
+    expect(fetch).toHaveBeenNthCalledWith(2, '/api/tasks/task-1/context?include=issues', { signal: undefined })
+  })
 })
