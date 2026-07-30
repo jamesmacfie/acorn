@@ -6,6 +6,7 @@ import { dispatchLayout, setTerminalOpen } from '../../../core/client/tasks/task
 import { requestTerminalFocus } from '../../../core/client/tasks/agentSessions'
 import { managedAgentApi } from './managedClient'
 import { AgentToolCallCard } from './toolRendererRegistry'
+import { Button } from '../../../core/client/ui/primitives'
 
 const copy = (text: string): void => {
   void navigator.clipboard.writeText(text)
@@ -29,8 +30,7 @@ export default function AgentEventCard(props: { item: AgentConversationItem; tas
                   <summary>Context manifest</summary>
                   <For each={props.turn?.input.filter((part) => part.type === 'context') ?? []}>
                     {(context) => (
-                      <button
-                        type="button"
+                      <Button
                         disabled={!context.deepLink}
                         onClick={() => context.deepLink && dispatchLayout(props.taskId, { type: 'show', pane: context.deepLink.pane })}
                       >
@@ -39,7 +39,7 @@ export default function AgentEventCard(props: { item: AgentConversationItem; tas
                           {context.source} · {context.freshness ?? 'unknown'} · ~{(context.estimatedTokens ?? 0).toLocaleString()} tok
                         </small>
                         <small>{context.provenance}</small>
-                      </button>
+                      </Button>
                     )}
                   </For>
                   <Show when={Object.keys(props.turn?.effectivePolicy ?? {}).length}>
@@ -58,7 +58,7 @@ export default function AgentEventCard(props: { item: AgentConversationItem; tas
             <div class="agent-message agent-message-assistant">
               <div class="agent-message-head">
                 <span class="agent-message-role">Agent</span>
-                <button type="button" class="agent-copy" title="Copy response" onClick={() => copy(message.text)}>Copy</button>
+                <Button variant="bare" size="sm" class="agent-copy" title="Copy response" onClick={() => copy(message.text)}>Copy</Button>
               </div>
               <AgentMarkdown text={message.text} />
             </div>
@@ -96,10 +96,10 @@ export default function AgentEventCard(props: { item: AgentConversationItem; tas
         {(() => {
           const change = event() as Extract<ReturnType<typeof event>, { type: 'file_change' }>
           return (
-            <button type="button" class="agent-artifact-link" onClick={openChanges}>
+            <Button class="agent-artifact-link" onClick={openChanges}>
               <span>Changed {change.path ?? 'files'}</span>
               <span class="muted">{change.summary ?? 'Open in Changes'} →</span>
-            </button>
+            </Button>
           )
         })()}
       </Show>
@@ -107,12 +107,12 @@ export default function AgentEventCard(props: { item: AgentConversationItem; tas
         {(() => {
           const terminal = event() as Extract<ReturnType<typeof event>, { type: 'terminal' }>
           return (
-            <button type="button" class="agent-artifact-link" onClick={() => {
+            <Button class="agent-artifact-link" onClick={() => {
               setTerminalOpen(props.taskId, true)
               requestTerminalFocus(props.taskId, terminal.terminalSessionId)
             }}>
               <span>{terminal.title}</span><span class="muted">Open terminal →</span>
-            </button>
+            </Button>
           )
         })()}
       </Show>

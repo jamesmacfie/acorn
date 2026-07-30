@@ -19,16 +19,23 @@ import { setTerminalOpen } from '../../../core/client/tasks/tasks'
 import { latestAutomaticTaskContext } from './automaticTaskContext'
 import { Button } from '../../../core/client/ui/primitives'
 import Icon from '../../../core/client/ui/Icon'
+import Picker from '../../../core/client/ui/Picker'
 import './managed-agents.css'
 
 const capability = (provider: AgentProviderDescriptor | undefined, name: string): boolean =>
   provider?.capabilities.includes(name as never) ?? false
 
+type SessionAction = {
+  id: string
+  label: string
+  description?: string
+  disabled?: boolean
+  run(): void
+}
+
 export default function AgentPane(props: { task: Task }) {
   const [error, setError] = createSignal('')
   const [creating, setCreating] = createSignal(false)
-  const [menuOpen, setMenuOpen] = createSignal(false)
-  const [newOpen, setNewOpen] = createSignal(false)
   const [providers, { refetch: refreshProviders }] = createResource(() => managedAgentApi.providers())
   const taskSessions = createMemo(() =>
     managedAgentStore.sessions()
@@ -47,24 +54,9 @@ export default function AgentPane(props: { task: Task }) {
     providers()?.find((candidate) => candidate.id === selected()?.providerId))
   const previousAutomaticContext = createMemo(() =>
     latestAutomaticTaskContext(snapshot()?.turns ?? []))
-  let menuRoot: HTMLDivElement | undefined
-  let newRoot: HTMLDivElement | undefined
 
   onMount(() => {
     const deactivate = managedAgentStore.activate()
-    const dismissPopovers = (event: PointerEvent) => {
-      const target = event.target
-      if (!(target instanceof Node)) return
-      if (menuOpen() && !menuRoot?.contains(target)) setMenuOpen(false)
-      if (newOpen() && !newRoot?.contains(target)) setNewOpen(false)
-    }
-    const dismissWithEscape = (event: KeyboardEvent) => {
-      if (event.key !== 'Escape') return
-      setMenuOpen(false)
-      setNewOpen(false)
-    }
-    document.addEventListener('pointerdown', dismissPopovers)
-    window.addEventListener('keydown', dismissWithEscape)
     void managedAgentStore.loadTask(props.task.id)
       .then((sessions) => {
         if (!selectedManagedSession(props.task.id) && sessions[0]) selectManagedSession(props.task.id, sessions[0].id)
@@ -72,8 +64,6 @@ export default function AgentPane(props: { task: Task }) {
       .catch((caught) => setError(caught instanceof Error ? caught.message : 'Unable to load agent sessions.'))
     onCleanup(() => {
       deactivate()
-      document.removeEventListener('pointerdown', dismissPopovers)
-      window.removeEventListener('keydown', dismissWithEscape)
     })
   })
 
@@ -103,7 +93,6 @@ export default function AgentPane(props: { task: Task }) {
 
   async function createSession(providerDescriptor: AgentProviderDescriptor) {
     if (!providerDescriptor.installed || creating()) return
-    setNewOpen(false)
     setCreating(true)
     setError('')
     try {
@@ -125,7 +114,6 @@ export default function AgentPane(props: { task: Task }) {
   }
 
   async function action(operation: () => Promise<unknown>, reload = true) {
-    setMenuOpen(false)
     setError('')
     try {
       await operation()
@@ -247,6 +235,63 @@ export default function AgentPane(props: { task: Task }) {
     })
   }
 
+  const sessionActions = createMemo<SessionAction[]>(() => {
+    const session = selected()
+    if (!session) return []
+    return [
+      {
+        id: 'fork',
+        label: 'Fork session',
+        run: () => void fork(),
+      },
+      ...(snapshot()?.turns.some((turn) => turn.status === 'failed' || turn.status === 'interrupted')
+        ? [{
+            id: 'retry',
+            label: 'Retry last turn with partial history',
+            run: () => void retryLastTurn(),
+          }]
+        : []),
+      ...(capability(provider(), 'compact')
+        ? [{
+            id: 'compact',
+            label: 'Compact context',
+            run: () => void action(() => managedAgentApi.compact(session.id)),
+          }]
+        : []),
+      ...(session.controller === 'acorn'
+        ? [{
+            id: 'terminal',
+            label: 'Continue in terminal',
+            description: session.providerSessionRef
+              ? undefined
+              : 'The provider has not supplied a resumable session reference.',
+            disabled: !capability(provider(), 'resume') || !session.providerSessionRef,
+            run: () => void handoff(),
+          }]
+        : []),
+      ...(session.controller === 'terminal'
+        ? [{
+            id: 'managed',
+            label: 'Return to managed mode',
+            run: () => void resumeManaged(),
+          }]
+        : []),
+      ...(session.controller === 'external' && session.kind === 'imported'
+        ? [{
+            id: 'verify',
+            label: 'Verify & resume provider session',
+            disabled: typeof session.config.importedProviderSessionRef !== 'string',
+            run: () => void verifyImportedResume(),
+          }]
+        : []),
+      { id: 'rename', label: 'Rename session', run: () => void rename() },
+      { id: 'export-markdown', label: 'Export Markdown', run: () => void exportHistory('markdown') },
+      { id: 'export-json', label: 'Export lossless JSON', run: () => void exportHistory('json') },
+      { id: 'archive', label: 'Archive session', run: () => void archive() },
+      { id: 'delete', label: 'Delete permanently…', run: () => void remove() },
+    ]
+  })
+
   return (
     <section class="pane managed-agent-pane">
       <header class="managed-agent-head">
@@ -268,92 +313,50 @@ export default function AgentPane(props: { task: Task }) {
               >
                 Stop
               </Button>
-              <div ref={menuRoot} class="managed-agent-menu">
-                <Button
-                  iconOnly
-                  aria-label="Session actions"
-                  aria-haspopup="menu"
-                  aria-expanded={menuOpen()}
-                  onClick={() => {
-                    setNewOpen(false)
-                    setMenuOpen(!menuOpen())
-                  }}
-                >
-                  <Icon name="ellipsis" />
-                </Button>
-                <Show when={menuOpen()}>
-                  <div class="managed-agent-menu-popover" role="menu">
-                    <button type="button" onClick={() => void fork()}>Fork session</button>
-                    <Show when={snapshot()?.turns.some((turn) => turn.status === 'failed' || turn.status === 'interrupted')}>
-                      <button type="button" onClick={() => void retryLastTurn()}>Retry last turn with partial history</button>
-                    </Show>
-                    <Show when={capability(provider(), 'compact')}>
-                      <button type="button" onClick={() => void action(() => managedAgentApi.compact(session().id))}>Compact context</button>
-                    </Show>
-                    <Show when={session().controller === 'acorn'}>
-                      <button
-                        type="button"
-                        disabled={!capability(provider(), 'resume') || !session().providerSessionRef}
-                        title={!session().providerSessionRef ? 'The provider has not supplied a resumable session reference.' : ''}
-                        onClick={() => void handoff()}
-                      >
-                        Continue in terminal
-                      </button>
-                    </Show>
-                    <Show when={session().controller === 'terminal'}>
-                      <button type="button" onClick={() => void resumeManaged()}>Return to managed mode</button>
-                    </Show>
-                    <Show when={session().controller === 'external' && session().kind === 'imported'}>
-                      <button
-                        type="button"
-                        disabled={typeof session().config.importedProviderSessionRef !== 'string'}
-                        onClick={() => void verifyImportedResume()}
-                      >
-                        Verify & resume provider session
-                      </button>
-                    </Show>
-                    <button type="button" onClick={() => void rename()}>Rename session</button>
-                    <button type="button" onClick={() => void exportHistory('markdown')}>Export Markdown</button>
-                    <button type="button" onClick={() => void exportHistory('json')}>Export lossless JSON</button>
-                    <button type="button" onClick={() => void archive()}>Archive session</button>
-                    <button type="button" class="danger" onClick={() => void remove()}>Delete permanently…</button>
-                  </div>
-                </Show>
-              </div>
+              <Picker<SessionAction>
+                label={<Icon name="ellipsis" />}
+                ariaLabel="Session actions"
+                placeholder="Filter session actions…"
+                emptyText="No session actions available."
+                results={(query) => sessionActions().filter((item) =>
+                  item.label.toLowerCase().includes(query.trim().toLowerCase()))}
+                rowLabel={(item) => item.label}
+                rowDescription={(item) => item.description}
+                isActive={() => false}
+                isDisabled={(item) => !!item.disabled}
+                onSelect={(item) => item.run()}
+                buttonClass="repo-picker-button managed-agent-picker-button managed-agent-action-picker"
+              />
             </>
           )}
         </Show>
         <AgentUsageIndicator />
-        <div ref={newRoot} class="managed-agent-new">
-          <Button
-            aria-haspopup="menu"
-            aria-expanded={newOpen()}
-            onClick={() => {
-              setMenuOpen(false)
-              setNewOpen(!newOpen())
-            }}
-          >
-            <Icon name="plus" /> New
-          </Button>
-          <Show when={newOpen()}>
-            <div class="managed-agent-new-popover" role="menu">
-            <For each={providers() ?? []}>
-              {(providerDescriptor) => (
-                <button
-                  type="button"
-                  disabled={!providerDescriptor.installed || creating()}
-                  title={providerDescriptor.diagnostics.join('\n')}
-                  onClick={() => void createSession(providerDescriptor)}
-                >
-                  <strong>{providerDescriptor.label}</strong>
-                  <span>{providerDescriptor.installed ? providerDescriptor.executableVersion ?? 'Available' : 'Not installed'}</span>
-                </button>
-              )}
-            </For>
-            <button type="button" class="managed-agent-refresh" onClick={() => void refreshProviders()}>Refresh provider health</button>
-            </div>
-          </Show>
-        </div>
+        <Picker<AgentProviderDescriptor>
+          label={<><Icon name="plus" /> New</>}
+          ariaLabel="New"
+          placeholder="Filter providers…"
+          emptyText="No managed providers available."
+          results={(query) => (providers() ?? []).filter((item) =>
+            item.label.toLowerCase().includes(query.trim().toLowerCase()))}
+          rowLabel={(item) => item.label}
+          rowDescription={(item) =>
+            item.installed ? item.executableVersion ?? 'Available' : item.diagnostics[0] ?? 'Not installed'}
+          isActive={() => false}
+          isDisabled={(item) => !item.installed || creating()}
+          onSelect={(item) => void createSession(item)}
+          buttonClass="repo-picker-button managed-agent-picker-button"
+          tools={
+            <Button
+              variant="bare"
+              iconOnly
+              title="Refresh provider health"
+              aria-label="Refresh provider health"
+              onClick={() => void refreshProviders()}
+            >
+              <Icon name="refresh-cw" />
+            </Button>
+          }
+        />
       </header>
 
       <div class="managed-agent-body">
@@ -372,18 +375,18 @@ export default function AgentPane(props: { task: Task }) {
               <div class="managed-agent-onboarding">
                 <span class="agent-empty-mark">✦</span>
                 <h2>Start a managed coding session</h2>
-                <p>Claude Code and Codex run against this task’s worktree using your existing CLI account.</p>
                 <div class="managed-agent-provider-cards">
                   <For each={providers() ?? []}>
                     {(providerDescriptor) => (
-                      <button
-                        type="button"
+                      <Button
+                        variant="ghost"
+                        class="managed-agent-provider-card"
                         disabled={!providerDescriptor.installed || creating()}
                         onClick={() => void createSession(providerDescriptor)}
                       >
                         <strong>{providerDescriptor.label}</strong>
                         <span>{providerDescriptor.installed ? 'Start managed session' : providerDescriptor.diagnostics[0] ?? 'Unavailable'}</span>
-                      </button>
+                      </Button>
                     )}
                   </For>
                 </div>

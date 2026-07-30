@@ -35,11 +35,7 @@ import { activateScopedStateEviction } from './scopedEviction'
 import { activateUiControl } from '../../core/client/publicApi/uiControlClient'
 import { agentContextRegistry } from '../../core/client/registries/agentContexts'
 import { taskContextAgentContribution } from '../../plugins/context/client/agentContextContribution'
-import { changesAgentContextContribution } from '../../plugins/changes/client/agentContextContribution'
-import { editorAgentContextContribution } from '../../plugins/editor/client/agentContextContribution'
-import { previewAgentContextContribution } from '../../plugins/preview/client/agentContextContribution'
 import { terminalAgentContextContribution } from '../../plugins/terminal/client/agentContextContribution'
-import { workflowAgentContextContribution } from '../../plugins/workflows/client/agentContextContribution'
 import { databaseAgentContextContribution } from '../../plugins/database/client/agentContextContribution'
 import { dockerAgentContextContribution } from '../../plugins/docker/client/agentContextContribution'
 import { httpAgentContextContribution } from '../../plugins/http/client/agentContextContribution'
@@ -67,11 +63,7 @@ const panes = [
 for (const pane of panes) paneRegistry.register(pane)
 for (const contribution of [
   taskContextAgentContribution,
-  changesAgentContextContribution,
-  editorAgentContextContribution,
-  previewAgentContextContribution,
   terminalAgentContextContribution,
-  workflowAgentContextContribution,
   databaseAgentContextContribution,
   dockerAgentContextContribution,
   httpAgentContextContribution,

@@ -7,6 +7,13 @@ export type AgentContextCaptureScope = {
 
 export type AgentContextSnapshot = Extract<AgentInputPart, { type: 'context' }>
 
+export type AgentContextOption = {
+  id: string
+  label: string
+  description?: string
+  defaultSelected?: boolean
+}
+
 // Portable Acorn-side ceiling. Providers may advertise a smaller turn limit, which their driver
 // enforces before dispatch. Keeping the local snapshot bounded makes replay and inspection safe.
 export const MAX_AGENT_CONTEXT_BYTES = 512 * 1024
@@ -30,8 +37,10 @@ export const agentContextBudget = (contexts: AgentContextSnapshot[]): {
 
 export type AgentContextContribution = {
   id: string
+  source: string
   label: string
   description?: string
   revision?(scope: AgentContextCaptureScope): number
-  capture(scope: AgentContextCaptureScope): Promise<AgentContextSnapshot[]>
+  options(scope: AgentContextCaptureScope): Promise<AgentContextOption[]>
+  capture(scope: AgentContextCaptureScope, optionIds?: readonly string[]): Promise<AgentContextSnapshot[]>
 }

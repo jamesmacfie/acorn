@@ -102,7 +102,6 @@ export default function AgentTranscript(props: {
             <div class="agent-conversation-empty">
               <span class="agent-empty-mark">✦</span>
               <p>This session is ready for its first turn.</p>
-              <p class="muted">Acorn will keep the structured history here while the provider owns execution context.</p>
             </div>
           }
         >
