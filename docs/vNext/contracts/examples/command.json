@@ -1,0 +1,12 @@
+{
+  "apiVersion": "acorn.dev/command/v2",
+  "commandId": "01935c89-8a43-7f22-95cb-8b9a04b37282",
+  "command": "acorn.core.task.rename.v2",
+  "target": "acorn://01935c7a-20d2-7a34-baf4-72df9230e3b1/task/01935c7e-b85d-7a98-aeac-d7710ca27f87",
+  "expectedRevision": "12",
+  "sessionRevision": "3",
+  "deadline": "2026-07-30T04:15:00.000Z",
+  "input": {
+    "name": "Review event protocol"
+  }
+}

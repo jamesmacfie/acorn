@@ -1,0 +1,80 @@
+{
+  "apiVersion": "acorn.dev/plugin-operation/v2",
+  "id": "dev.acme.service-monitor.endpoint.refresh.v1",
+  "kind": "saga-command",
+  "inputSchema": {
+    "uri": "urn:acorn-plugin:acme:service-monitor:schema:endpoint-refresh-input-v1",
+    "digest": "sha256:1111111111111111111111111111111111111111111111111111111111111111"
+  },
+  "resultSchema": {
+    "uri": "urn:acorn-plugin:acme:service-monitor:schema:endpoint-refresh-result-v1",
+    "digest": "sha256:2222222222222222222222222222222222222222222222222222222222222222"
+  },
+  "target": {
+    "scope": "workspace",
+    "nodeQualified": true,
+    "ancestryRevalidated": true
+  },
+  "authentication": {
+    "principal": "paired-owner-device",
+    "transport": "mtls-https"
+  },
+  "authorization": {
+    "capabilities": [
+      "acorn.network.brokered-http/1",
+      "dev.acme.service-monitor.health-read.v1"
+    ],
+    "delegation": "preserve-original-caller",
+    "confirmation": "none"
+  },
+  "idempotency": {
+    "mode": "required",
+    "keyLifetimeSeconds": 86400,
+    "sameKeyBehavior": "resume-original-operation",
+    "differentInputBehavior": "idempotency-conflict"
+  },
+  "concurrency": {
+    "expectedRevision": "required",
+    "generationChecks": ["node-trust", "plugin", "resource"],
+    "conflictCode": "conflict"
+  },
+  "cancellation": {
+    "supported": true,
+    "beforeCommit": "record-cancelled",
+    "afterCommit": "continue-settlement"
+  },
+  "deadline": {
+    "defaultMs": 30000,
+    "maximumMs": 120000,
+    "expiryBehavior": "return-operation"
+  },
+  "errors": [
+    "cancelled",
+    "conflict",
+    "deadline_exceeded",
+    "dependency_unavailable",
+    "idempotency_conflict",
+    "permission_denied",
+    "validation_failed"
+  ],
+  "commit": {
+    "point": "The normalized endpoint observation, operation checkpoint, and safe outbox event are committed in one plugin transaction.",
+    "atomicWithOutbox": true,
+    "externalOutcome": "saga-recorded"
+  },
+  "resultingEvents": [
+    "dev.acme.service-monitor.endpoint.refreshed.v1"
+  ],
+  "retry": {
+    "automatic": false,
+    "sameKey": "resume",
+    "afterAmbiguousOutcome": "reconcile-first"
+  },
+  "sensitivity": {
+    "input": "metadata",
+    "result": "metadata",
+    "eventProjection": "safe-metadata",
+    "auditProjection": "safe-metadata"
+  },
+  "streams": ["monitor-output"]
+}

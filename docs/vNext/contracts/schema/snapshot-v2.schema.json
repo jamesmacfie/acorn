@@ -1,0 +1,167 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://acorn.dev/schemas/v2/snapshot-v2.schema.json",
+  "title": "Acorn V2 authorized recovery snapshot",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "apiVersion", "snapshotId", "nodeId", "snapshotSequence", "authorizationRevision",
+    "observedAt", "expiresAt", "groups", "snapshotDigest"
+  ],
+  "properties": {
+    "apiVersion": { "const": "acorn.dev/snapshot/v2" },
+    "snapshotId": { "$ref": "#/$defs/uuidv7" },
+    "nodeId": { "$ref": "#/$defs/uuidv7" },
+    "snapshotSequence": { "$ref": "#/$defs/decimal" },
+    "authorizationRevision": { "$ref": "#/$defs/decimal" },
+    "observedAt": { "$ref": "#/$defs/timestamp" },
+    "expiresAt": { "$ref": "#/$defs/timestamp" },
+    "groups": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 128,
+      "items": { "$ref": "#/$defs/group" }
+    },
+    "snapshotDigest": { "$ref": "#/$defs/digest" }
+  },
+  "$defs": {
+    "uuidv7": { "type": "string", "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$" },
+    "decimal": { "type": "string", "pattern": "^(0|[1-9][0-9]*)$" },
+    "digest": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
+    "timestamp": {
+      "type": "string",
+      "format": "date-time",
+      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\\.[0-9]{3}Z$"
+    },
+    "acornUri": {
+      "type": "string",
+      "pattern": "^acorn://[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}/[a-z][a-z0-9.-]*/[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+    },
+    "schemaRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["uri", "digest", "version"],
+      "properties": {
+        "uri": { "type": "string", "format": "uri", "maxLength": 500 },
+        "digest": { "$ref": "#/$defs/digest" },
+        "version": { "type": "integer", "minimum": 1, "maximum": 2147483647 }
+      }
+    },
+    "owner": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "coordinate", "installationGeneration"],
+      "properties": {
+        "kind": { "enum": ["core", "plugin"] },
+        "coordinate": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9-]{1,62}/[a-z][a-z0-9-]{1,62}$"
+        },
+        "installationGeneration": {
+          "oneOf": [{ "$ref": "#/$defs/decimal" }, { "type": "null" }]
+        }
+      }
+    },
+    "safeError": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["code", "retryable", "detail"],
+      "properties": {
+        "code": { "type": "string", "pattern": "^[a-z][a-z0-9_]{0,99}$" },
+        "retryable": { "type": "boolean" },
+        "detail": { "type": "string", "minLength": 1, "maxLength": 300 }
+      }
+    },
+    "group": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "groupId", "owner", "sourceSequence", "status", "commitBoundary",
+        "resources", "omissions", "error", "encodedBytes", "groupDigest"
+      ],
+      "properties": {
+        "groupId": { "$ref": "#/$defs/uuidv7" },
+        "owner": { "$ref": "#/$defs/owner" },
+        "sourceSequence": { "$ref": "#/$defs/decimal" },
+        "status": { "enum": ["complete", "degraded", "omitted"] },
+        "commitBoundary": { "const": "atomic-group" },
+        "resources": {
+          "type": "array",
+          "maxItems": 10000,
+          "items": { "$ref": "#/$defs/resource" }
+        },
+        "omissions": {
+          "type": "array",
+          "maxItems": 256,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["resourceType", "reason"],
+            "properties": {
+              "resourceType": { "type": "string", "pattern": "^[a-z][a-z0-9.-]{0,99}$" },
+              "reason": { "enum": ["unauthorized", "owner-unavailable", "schema-unavailable", "quota", "not-requested"] }
+            }
+          }
+        },
+        "error": { "oneOf": [{ "$ref": "#/$defs/safeError" }, { "type": "null" }] },
+        "encodedBytes": { "type": "integer", "minimum": 0, "maximum": 8388608 },
+        "groupDigest": { "$ref": "#/$defs/digest" }
+      }
+    },
+    "resource": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "uri", "resourceType", "owner", "schema", "revision", "sensitivity",
+        "sourceSequence", "authorization", "content"
+      ],
+      "properties": {
+        "uri": { "$ref": "#/$defs/acornUri" },
+        "resourceType": { "type": "string", "pattern": "^[a-z][a-z0-9.-]{0,99}$" },
+        "owner": { "$ref": "#/$defs/owner" },
+        "schema": { "$ref": "#/$defs/schemaRef" },
+        "revision": { "$ref": "#/$defs/decimal" },
+        "sensitivity": { "enum": ["public-metadata", "internal", "sensitive"] },
+        "sourceSequence": { "$ref": "#/$defs/decimal" },
+        "authorization": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["decision", "policyRevision", "projectionDigest"],
+          "properties": {
+            "decision": { "const": "allowed" },
+            "policyRevision": { "$ref": "#/$defs/decimal" },
+            "projectionDigest": { "$ref": "#/$defs/digest" }
+          }
+        },
+        "content": {
+          "oneOf": [
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["kind", "encodedBytes", "payloadDigest", "payload"],
+              "properties": {
+                "kind": { "const": "inline-json" },
+                "encodedBytes": { "type": "integer", "minimum": 2, "maximum": 262144 },
+                "payloadDigest": { "$ref": "#/$defs/digest" },
+                "payload": { "type": "object", "maxProperties": 256 }
+              }
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["kind", "objectUri", "digest", "mediaType", "length", "expiresAt"],
+              "properties": {
+                "kind": { "const": "object-reference" },
+                "objectUri": { "$ref": "#/$defs/acornUri" },
+                "digest": { "$ref": "#/$defs/digest" },
+                "mediaType": { "type": "string", "minLength": 1, "maxLength": 160 },
+                "length": { "type": "integer", "minimum": 1, "maximum": 2147483648 },
+                "expiresAt": { "$ref": "#/$defs/timestamp" }
+              }
+            }
+          ]
+        }
+      }
+    }
+  }
+}

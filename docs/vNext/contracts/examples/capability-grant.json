@@ -1,0 +1,43 @@
+{
+  "kind": "security-grant",
+  "grantId": "01935c7a-20d2-7a34-baf4-72df9230e410",
+  "grantGeneration": "3",
+  "plugin": {
+    "coordinate": "acorn/health-monitor",
+    "publisherKeyId": "acorn-release-2026",
+    "installationId": "01935c7a-20d2-7a34-baf4-72df9230e411",
+    "installationGeneration": "7",
+    "artifactDigest": "sha256:3333333333333333333333333333333333333333333333333333333333333333"
+  },
+  "capability": {
+    "id": "acorn.network.brokered-http/1",
+    "revision": 0,
+    "operations": ["request"]
+  },
+  "scope": {
+    "kind": "workspace",
+    "resourceSelector": {
+      "uris": ["acorn://01935c7a-20d2-7a34-baf4-72df9230e3b1/workspace/01935c7a-20d2-7a34-baf4-72df9230e3b2"]
+    }
+  },
+  "constraints": {
+    "family": "network",
+    "operations": ["request"],
+    "schemes": ["https"],
+    "hosts": ["status.example.test"],
+    "ports": [443],
+    "pathPrefixes": ["/health"],
+    "allowPrivate": false
+  },
+  "permissionRequestDigest": "sha256:4444444444444444444444444444444444444444444444444444444444444444",
+  "grantVersion": "2",
+  "status": "active",
+  "approvedBy": {
+    "kind": "device",
+    "id": "01935c7a-20d2-7a34-baf4-72df9230e3d3"
+  },
+  "approvedAt": "2026-07-30T04:00:00.000Z",
+  "expiresAt": null,
+  "reviewAt": "2027-07-30T04:00:00.000Z",
+  "revocation": null
+}

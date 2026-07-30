@@ -1,0 +1,67 @@
+{
+  "apiVersion": "acorn.dev/source-build-plan/v2",
+  "planId": "019fb221-2413-7522-a4c2-14f269d888d8",
+  "source": {
+    "repository": "https://github.com/acme/service-monitor.git",
+    "commit": "1111111111111111111111111111111111111111",
+    "treeDigest": "sha256:2222222222222222222222222222222222222222222222222222222222222222",
+    "submodules": []
+  },
+  "builder": {
+    "imageDigest": "sha256:3333333333333333333333333333333333333333333333333333333333333333",
+    "platform": "linux",
+    "architecture": "arm64",
+    "tools": [
+      {
+        "id": "cargo",
+        "path": "/acorn-tools/cargo",
+        "digest": "sha256:4444444444444444444444444444444444444444444444444444444444444444"
+      }
+    ],
+    "resources": {
+      "cpuMillis": 300000,
+      "memoryMiB": 2048,
+      "diskMiB": 4096,
+      "wallTimeMs": 600000,
+      "processes": 64,
+      "outputBytes": 104857600
+    }
+  },
+  "dependencies": [
+    {
+      "id": "cargo-vendor",
+      "kind": "module-cache",
+      "locator": "https://artifacts.example.test/service-monitor/cargo-vendor.tar.zst",
+      "digest": "sha256:5555555555555555555555555555555555555555555555555555555555555555",
+      "size": 10485760
+    }
+  ],
+  "steps": [
+    {
+      "id": "build",
+      "tool": "cargo",
+      "arguments": ["component", "build", "--release", "--offline"],
+      "workingDirectory": ".",
+      "environment": {
+        "SOURCE_DATE_EPOCH": "1785340800"
+      },
+      "inputs": ["Cargo.toml", "Cargo.lock", "vendor"],
+      "outputs": ["target/wasm32-wasip2/release/service_monitor.wasm"],
+      "timeoutMs": 600000
+    }
+  ],
+  "outputs": [
+    {
+      "artifactId": "node-runtime",
+      "path": "target/wasm32-wasip2/release/service_monitor.wasm",
+      "kind": "runtime",
+      "runtime": "wasi-component",
+      "maximumBytes": 52428800
+    }
+  ],
+  "reproducibility": {
+    "sourceDateEpoch": 1785340800,
+    "runCount": 2,
+    "requireIdenticalDigests": true
+  }
+}

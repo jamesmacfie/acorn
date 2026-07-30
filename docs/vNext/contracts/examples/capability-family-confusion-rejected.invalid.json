@@ -1,0 +1,12 @@
+{
+  "kind": "permission-request",
+  "id": "core.task/2",
+  "revision": 1,
+  "scope": "task",
+  "required": true,
+  "reason": "This must fail because task authority cannot carry workspace constraints.",
+  "constraints": {
+    "family": "workspace",
+    "operations": ["read"]
+  }
+}

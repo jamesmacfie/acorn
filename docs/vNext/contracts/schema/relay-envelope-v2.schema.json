@@ -1,0 +1,22 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://acorn.dev/schemas/v2/relay-envelope-v2.schema.json",
+  "title": "Acorn future relay opaque envelope",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "apiVersion", "routingToken", "routingGeneration", "sessionId",
+    "trustContextDigest", "direction", "keyEpoch", "sequence", "ciphertext"
+  ],
+  "properties": {
+    "apiVersion": { "const": "acorn.dev/relay-envelope/v2" },
+    "routingToken": { "type": "string", "pattern": "^[A-Za-z0-9_-]{43}$" },
+    "routingGeneration": { "type": "string", "pattern": "^(0|[1-9][0-9]*)$" },
+    "sessionId": { "type": "string", "pattern": "^[A-Za-z0-9_-]{22}$" },
+    "trustContextDigest": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
+    "direction": { "enum": ["client-to-node", "node-to-client"] },
+    "keyEpoch": { "type": "integer", "minimum": 0, "maximum": 1048575 },
+    "sequence": { "type": "string", "pattern": "^(0|[1-9][0-9]{0,18})$" },
+    "ciphertext": { "type": "string", "minLength": 22, "maxLength": 1398144 }
+  }
+}

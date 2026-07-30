@@ -1,0 +1,56 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://acorn.dev/schemas/v2/error-envelope-v2.schema.json",
+  "title": "Acorn V2 problem detail",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "type", "title", "status", "code", "requestId", "retryable", "detail",
+    "resource", "currentRevision", "retryAfterMs", "errors"
+  ],
+  "properties": {
+    "type": { "type": "string", "format": "uri", "pattern": "^https://acorn\\.dev/problems/v2/" },
+    "title": { "type": "string", "minLength": 1, "maxLength": 120 },
+    "status": { "type": "integer", "minimum": 400, "maximum": 599 },
+    "code": { "type": "string", "pattern": "^[a-z][a-z0-9_]{1,99}$" },
+    "requestId": { "$ref": "#/$defs/uuidv7" },
+    "retryable": { "type": "boolean" },
+    "detail": { "type": "string", "minLength": 1, "maxLength": 500 },
+    "resource": {
+      "oneOf": [
+        { "type": "null" },
+        { "$ref": "#/$defs/acornUri" }
+      ]
+    },
+    "currentRevision": {
+      "oneOf": [
+        { "type": "null" },
+        { "$ref": "#/$defs/decimal" }
+      ]
+    },
+    "retryAfterMs": {
+      "type": ["integer", "null"],
+      "minimum": 0,
+      "maximum": 3600000
+    },
+    "errors": {
+      "type": "array",
+      "maxItems": 64,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["path", "code", "message"],
+        "properties": {
+          "path": { "type": "string", "pattern": "^(?:/[A-Za-z0-9_~-]+)*$", "maxLength": 500 },
+          "code": { "type": "string", "pattern": "^[a-z][a-z0-9_]{1,99}$" },
+          "message": { "type": "string", "minLength": 1, "maxLength": 300 }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "uuidv7": { "type": "string", "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$" },
+    "decimal": { "type": "string", "pattern": "^(0|[1-9][0-9]*)$" },
+    "acornUri": { "type": "string", "pattern": "^acorn://[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}/[a-z][a-z0-9.-]*/[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$" }
+  }
+}

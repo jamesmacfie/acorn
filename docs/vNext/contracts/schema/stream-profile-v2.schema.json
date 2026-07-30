@@ -1,0 +1,79 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://acorn.dev/schemas/v2/stream-profile-v2.schema.json",
+  "title": "Acorn V2 plugin stream profile",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "id",
+    "owner",
+    "direction",
+    "mediaType",
+    "maximumBytes",
+    "frameBytes",
+    "initialCredit",
+    "maximumCredit",
+    "replayBytes",
+    "retentionSeconds",
+    "sensitivity",
+    "requiredCapabilities",
+    "cancellation"
+  ],
+  "properties": {
+    "id": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9-]{0,62}$"
+    },
+    "owner": { "enum": ["core", "plugin-installation"] },
+    "direction": { "enum": ["input", "output", "duplex"] },
+    "mediaType": {
+      "type": "string",
+      "pattern": "^[a-z0-9!#$&^_.+-]+/[a-z0-9!#$&^_.+-]+$",
+      "maxLength": 160
+    },
+    "maximumBytes": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 67108864
+    },
+    "frameBytes": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 65536
+    },
+    "initialCredit": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 1048576
+    },
+    "maximumCredit": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 1048576
+    },
+    "replayBytes": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 67108864
+    },
+    "retentionSeconds": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 604800
+    },
+    "sensitivity": {
+      "enum": ["public-metadata", "internal", "sensitive"]
+    },
+    "requiredCapabilities": {
+      "type": "array",
+      "maxItems": 16,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "pattern": "^(?:acorn|core)\\.[a-z][a-z0-9.-]*/[1-9][0-9]*$",
+        "maxLength": 160
+      }
+    },
+    "cancellation": { "const": "close-and-delete-uncommitted" }
+  }
+}
