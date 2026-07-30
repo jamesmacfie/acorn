@@ -27,7 +27,7 @@ import { completeTaskArchive } from '../tasks/archiveLifecycle'
 import { sourceRegistry } from '../registries/sources'
 import { TaskSlotHost } from '../registries/uiSlots'
 import Icon from '../ui/Icon'
-import IconPicker from '../ui/IconPicker'
+import IconPicker, { randomIconName } from '../ui/IconPicker'
 import './tabrail.css'
 
 // The Tasks zone of the left rail (docs/workspaces-and-tasks.md). Rows are real Task entities (not path
@@ -183,7 +183,7 @@ export default function TabRail() {
     setNewRepoOptions(repos)
     setNewRepo(repos.some((r) => `${r.owner}/${r.name}` === cur) ? cur : `${repos[0].owner}/${repos[0].name}`)
     setText('')
-    setIconDraft(null)
+    setIconDraft(randomIconName())
     setBranchText('')
     setBranchTouched(false)
     setUseCheckout(false)
