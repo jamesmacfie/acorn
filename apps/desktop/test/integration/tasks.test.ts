@@ -9,7 +9,7 @@ import { makeTestDb, type TestDb } from '@acorn/node-core/server/routes/testDb.t
 import type { Env } from '@acorn/node-core/main/bindings.ts'
 
 vi.mock('@acorn/node-core/server/db/index.ts', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('../db')>()
+  const actual = await importOriginal<typeof import('@acorn/node-core/server/db/index.ts')>()
   return { ...actual, getDb: vi.fn() }
 })
 

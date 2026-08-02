@@ -1,36 +1,34 @@
-import { existsSync, readFileSync } from 'node:fs'
+import { existsSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
 
-const DESKTOP_PACKAGE_NAME = '@acorn/desktop'
 const DATABASE_FILENAME = 'acorn.sqlite'
+const WORKSPACE_MARKER = 'pnpm-workspace.yaml'
 
-function isDesktopPackage(dir: string): boolean {
-  const manifest = join(dir, 'package.json')
-  if (!existsSync(manifest)) return false
-  try {
-    return (JSON.parse(readFileSync(manifest, 'utf8')) as { name?: unknown }).name === DESKTOP_PACKAGE_NAME
-  } catch {
-    return false
-  }
-}
-
-// Source mode executes from src/core/main while electron-vite bundles this module into out/main.
-// Find the package root by identity instead of encoding either module depth in runtime paths.
-export function findDesktopRoot(startDir: string): string {
+// Nearest ancestor holding pnpm-workspace.yaml.
+//
+// This used to walk for a package.json named "@acorn/desktop". From packages/node-core there is no
+// such ancestor, so dev:node and db:locate threw and db:migrate silently created a second database
+// under packages/node-core/.acorn — exit 0, plausible log line, wrong file. node-core cannot know
+// where the app is; it can know where the repo is.
+export function findWorkspaceRoot(startDir: string): string {
   let dir = resolve(startDir)
   for (;;) {
-    if (isDesktopPackage(dir)) return dir
+    if (existsSync(join(dir, WORKSPACE_MARKER))) return dir
     const parent = dirname(dir)
-    if (parent === dir) throw new Error(`Could not locate the ${DESKTOP_PACKAGE_NAME} package root from '${startDir}'.`)
+    if (parent === dir) throw new Error(`Could not locate ${WORKSPACE_MARKER} from '${startDir}'.`)
     dir = parent
   }
 }
 
+// Dev-checkout paths. Only meaningful when running from a source checkout; a packaged app passes
+// its own dataDir and clientDir in through ServiceStartConfig instead.
+// ponytail: the desktop app is still the owner of the dev data root and the built renderer. Both
+// move to apps/node / the client bundle in the next step of the split.
 export function resolveServerPaths(moduleDir: string): { clientDir: string; devDataDir: string } {
-  const root = findDesktopRoot(moduleDir)
+  const root = findWorkspaceRoot(moduleDir)
   return {
-    clientDir: resolve(root, 'dist/client'),
-    devDataDir: resolve(root, '.acorn'),
+    clientDir: resolve(root, 'apps/desktop/dist/client'),
+    devDataDir: resolve(root, 'apps/desktop/.acorn'),
   }
 }
 
