@@ -30,7 +30,7 @@ import {
 import { runProviderResource } from '../../../../core/server/integrations/resourceRuntime'
 import { providerRequestScheduler } from '../../../../core/server/integrations/budgetRuntime'
 import { ProviderOperationError } from '../../../../core/server/integrations/types'
-import type { LinearIssueDetail, LinearIssuesRequest, LinearIssuesResponse, LinearProject, LinearProjectIssue, LinearProjectIssuesResponse, LinearProjectsResponse } from '../../../../core/shared/api'
+import type { LinearIssueDetail, LinearIssuesRequest, LinearIssuesResponse, LinearProject, LinearProjectIssue, LinearProjectIssuesResponse, LinearProjectsResponse } from '@acorn/protocol/api.ts'
 import type { Env } from '../../../../core/main/bindings'
 
 // TTL centralized in server/sync/policy.ts. Linear's reads fan out across all connected

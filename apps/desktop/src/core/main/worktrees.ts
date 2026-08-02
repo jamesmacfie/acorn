@@ -2,7 +2,7 @@ import { execFile } from 'node:child_process'
 import { copyFileSync, existsSync, mkdirSync } from 'node:fs'
 import { dirname, isAbsolute, join, resolve } from 'node:path'
 import { promisify } from 'node:util'
-import type { WorktreeResult } from '../shared/terminal'
+import type { WorktreeResult } from '@acorn/protocol/terminal.ts'
 import { isContainedPath, isDirty, worktreeBranchDirName } from './pathGuards'
 
 const exec = promisify(execFile)

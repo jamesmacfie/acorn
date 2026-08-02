@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import type { TaskContext } from '../../../core/shared/api'
+import type { TaskContext } from '@acorn/protocol/api.ts'
 import { taskContextAgentContribution } from './agentContextContribution'
 import { evictContextSelection, setSectionSelection } from './selectionState'
 

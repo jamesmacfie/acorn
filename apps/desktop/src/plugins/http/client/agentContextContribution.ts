@@ -1,6 +1,6 @@
 import { readJson } from '../../../core/client/apiClient'
-import { taskContextRoute, type TaskContext } from '../../../core/shared/api'
-import type { AgentContextContribution } from '../../../core/shared/agentContext'
+import { taskContextRoute, type TaskContext } from '@acorn/protocol/api.ts'
+import type { AgentContextContribution } from '@acorn/protocol/agentContext.ts'
 import { contextSnapshot } from '../../../core/client/agent/contextSnapshot'
 import { listRequests } from './httpClient'
 

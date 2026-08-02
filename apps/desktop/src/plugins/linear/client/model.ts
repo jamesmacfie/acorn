@@ -1,4 +1,4 @@
-import type { LinearProjectIssue } from '../../../core/shared/api'
+import type { LinearProjectIssue } from '@acorn/protocol/api.ts'
 
 // Pure list model for the Linear Source browse (mirrors rollbar/client/model.ts). Filters/sorts/groups
 // the loaded active set locally — Linear is one GraphQL call per browse load, so triage is all

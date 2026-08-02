@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import type { ServiceRpcPeer } from '../../core/shared/serviceProtocol'
+import type { ServiceRpcPeer } from '@acorn/protocol/serviceProtocol.ts'
 import { driverFor } from '../../plugins/preview/main/browserService'
 import {
   previewCurrentUrl,

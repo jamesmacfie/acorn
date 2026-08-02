@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import type { AgentController, AgentRuntimeState } from '../../../core/shared/managedAgents'
+import type { AgentController, AgentRuntimeState } from '@acorn/protocol/managedAgents.ts'
 import { agentComposerDisabledMessage } from './agentComposerState'
 
 function message(controller: AgentController, runtimeState: AgentRuntimeState, disabled = true) {

@@ -8,8 +8,8 @@ import type {
   AgentRequest,
   AgentSession,
   AgentTurn,
-} from '../../../core/shared/managedAgents'
-import { AGENT_EVENT_SCHEMA_VERSION, agentEventSearchText } from '../../../core/shared/managedAgents'
+} from '@acorn/protocol/managedAgents.ts'
+import { AGENT_EVENT_SCHEMA_VERSION, agentEventSearchText } from '@acorn/protocol/managedAgents.ts'
 import { mapAgentEvent, mapAgentRequest, mapAgentSession, mapAgentTurn } from './rowMapping'
 import type { RemovedArtifactObject } from './artifactStore'
 import { projectAgentEvent } from './stateMachine'

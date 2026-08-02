@@ -1,5 +1,5 @@
-import { normalizeToolCeiling, RISK_ORDER, type ToolCeiling, type ToolRisk } from '../../../core/shared/workflow'
-export { decodeToolCeiling, encodeToolCeiling, isToolWithinCeiling } from '../../../core/shared/workflow'
+import { normalizeToolCeiling, RISK_ORDER, type ToolCeiling, type ToolRisk } from '@acorn/protocol/workflow.ts'
+export { decodeToolCeiling, encodeToolCeiling, isToolWithinCeiling } from '@acorn/protocol/workflow.ts'
 
 export function narrowsToolCeiling(parent: ToolCeiling | undefined, child: ToolCeiling | undefined): boolean {
   if (!child) return true

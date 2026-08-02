@@ -1,6 +1,6 @@
 import { and, eq } from 'drizzle-orm'
-import type { LinearActivity, LinearAttachment, LinearComment, LinearIssueDetail, LinearIssueSummary, LinearRelatedIssue, LinearRelation, LinearRelationKind } from '../../../core/shared/api'
-import type { ExternalRef } from '../../../core/shared/integrations'
+import type { LinearActivity, LinearAttachment, LinearComment, LinearIssueDetail, LinearIssueSummary, LinearRelatedIssue, LinearRelation, LinearRelationKind } from '@acorn/protocol/api.ts'
+import type { ExternalRef } from '@acorn/protocol/integrations.ts'
 import { schema } from '../../../core/server/db'
 import {
   COMMENT_CREATE,

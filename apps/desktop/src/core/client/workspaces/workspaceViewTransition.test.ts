@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import type { Task, Workspace } from '../../shared/api'
+import type { Task, Workspace } from '@acorn/protocol/api.ts'
 import { planWorkspaceViewTransition } from './workspaceViewTransition'
 
 const workspace = (id: string, owner: string, name: string): Workspace => ({

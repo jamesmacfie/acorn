@@ -1,6 +1,6 @@
 import { createMemo, createSignal, For, Show } from 'solid-js'
 import { createQuery, useQueryClient } from '@tanstack/solid-query'
-import type { PublicIntegrationProvider } from '../../shared/integrations'
+import type { PublicIntegrationProvider } from '@acorn/protocol/integrations.ts'
 import Icon from '../ui/Icon'
 import {
   connectIntegration,

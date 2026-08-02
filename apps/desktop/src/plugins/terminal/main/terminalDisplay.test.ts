@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import type { ServerMsg, TerminalSession } from '../../../core/shared/terminal'
+import type { ServerMsg, TerminalSession } from '@acorn/protocol/terminal.ts'
 import {
   DISPLAY_RESET,
   HeadlessTerminalScreen,

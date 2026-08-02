@@ -4,8 +4,8 @@
 // PTY verbs only. Task lifecycle, per-repo checkout/config, preview URLs and agent delivery are
 // platform concerns and live in core/client/tasks/taskBridge.ts; the `window.acorn` global itself is
 // declared in core/client/capabilities.ts, which is what reads it to answer "is this desktop?".
-import type { CreateOpts, ServerMsg, TerminalProfile, TerminalSession } from '../../../core/shared/terminal'
-import { terminalProfilesRoute, terminalSessionActionRoute, terminalSessionsRoute } from '../../../core/shared/api'
+import type { CreateOpts, ServerMsg, TerminalProfile, TerminalSession } from '@acorn/protocol/terminal.ts'
+import { terminalProfilesRoute, terminalSessionActionRoute, terminalSessionsRoute } from '@acorn/protocol/api.ts'
 import { readJson, writeJson } from '../../../core/client/apiClient'
 import { wsAttach, wsOnNotice, wsOnStatus, wsOnWorkflowStepEvent, wsWrite } from '../../../core/client/wsClient'
 

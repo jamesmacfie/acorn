@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { railStatusItems } from './railStatus'
-import type { TaskStatus } from '../../shared/terminal'
+import type { TaskStatus } from '@acorn/protocol/terminal.ts'
 
 const status = (p: Partial<TaskStatus>): TaskStatus => ({ taskId: 't', worktreePath: null, dirty: false, dirtyCount: 0, missing: false, ...p })
 

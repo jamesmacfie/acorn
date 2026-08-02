@@ -1,6 +1,15 @@
 packages:
   - "apps/*"
   - "packages/*"
+  - "plugins/*"
+# Single-versioned across every workspace package. Duplicate solid-js means two reactive graphs
+# (silently broken reactivity); duplicate zod means schema instances that fail each other's
+# instanceof checks. Both are near-impossible to diagnose from the symptom, so pin them here.
+catalog:
+  drizzle-orm: "^0.45.2"
+  hono: "^4.12.32"
+  solid-js: "^1.9.13"
+  zod: "^4.4.3"
 overrides:
   "@hono/node-server": ">=2.0.11"
   dompurify: ">=3.4.12"

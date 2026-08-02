@@ -1,9 +1,9 @@
 // Run targets over the active task's worktree. Was the `window.acorn.terminal.run` preload bridge;
 // now the loopback RunBridge routes shared with the MCP run tools. Run needs the main-
 // process session engine, so it 503s in dev:node (a desktop-only surface — docs/electron.md §12).
-import { runDefaultUrlRoute, runStartRoute, runStatusRoute, runStopRoute, runTargetsRoute } from '../../../core/shared/api'
+import { runDefaultUrlRoute, runStartRoute, runStatusRoute, runStopRoute, runTargetsRoute } from '@acorn/protocol/api.ts'
 import { readJson, writeJson } from '../../../core/client/apiClient'
-import type { RunStatus, RunTargetInfo } from '../../../core/shared/terminal'
+import type { RunStatus, RunTargetInfo } from '@acorn/protocol/terminal.ts'
 import { ApiError } from '../../../core/client/apiClient'
 import { openRepoConfigTrust } from '../../../core/client/configTrust/configTrust'
 

@@ -1,5 +1,5 @@
 import { Hono } from 'hono'
-import type { ConnectIntegrationRequest, IntegrationsResponse, RotateIntegrationRequest } from '../../shared/api'
+import type { ConnectIntegrationRequest, IntegrationsResponse, RotateIntegrationRequest } from '@acorn/protocol/api.ts'
 import { getDb } from '../db'
 import {
   connectProvider,

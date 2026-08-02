@@ -2,11 +2,11 @@
 // now loopback HTTP. Backed by the main-process NotesStore, so it 503s in dev:node. Note
 // shapes are canonical in shared/notes.ts (main's NotesStore imports the same types) — re-exported
 // here so existing feature imports keep working.
-import { noteIncludedRoute, noteRoute, noteTitleRoute, notesListRoute } from '../../../core/shared/api'
+import { noteIncludedRoute, noteRoute, noteTitleRoute, notesListRoute } from '@acorn/protocol/api.ts'
 import { readJson, writeJson } from '../../../core/client/apiClient'
-import type { Note, NoteKind, NoteLocation, NoteScope, NoteSummary } from '../../../core/shared/notes'
+import type { Note, NoteKind, NoteLocation, NoteScope, NoteSummary } from '@acorn/protocol/notes.ts'
 import { openPane } from '../../../core/client/registries/clientEvents'
-export type { Note, NoteAuthor, NoteKind, NoteLocation, NoteScope, NoteSummary } from '../../../core/shared/notes'
+export type { Note, NoteAuthor, NoteKind, NoteLocation, NoteScope, NoteSummary } from '@acorn/protocol/notes.ts'
 
 export type NotesApi = {
   list(location: NoteLocation): Promise<NoteSummary[] | { error: string }>

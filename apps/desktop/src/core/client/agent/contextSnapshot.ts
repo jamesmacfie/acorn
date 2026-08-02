@@ -1,4 +1,4 @@
-import type { AgentContextSnapshot } from '../../shared/agentContext'
+import type { AgentContextSnapshot } from '@acorn/protocol/agentContext.ts'
 
 export function contextSnapshot(input: Omit<
   AgentContextSnapshot,

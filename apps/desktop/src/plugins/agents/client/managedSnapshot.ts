@@ -3,7 +3,7 @@ import type {
   AgentRequest,
   AgentSessionSnapshot,
   AgentTurn,
-} from '../../../core/shared/managedAgents'
+} from '@acorn/protocol/managedAgents.ts'
 
 const mergeById = <T extends { id: string }>(current: T[], incoming: T[]): T[] => {
   const merged = new Map(current.map((item) => [item.id, item]))

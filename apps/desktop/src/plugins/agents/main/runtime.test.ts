@@ -5,7 +5,7 @@ import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { schema } from '../../../core/server/db'
 import { makeTestDb, type TestDb } from '../../../core/server/routes/testDb'
-import type { AgentProviderDescriptor } from '../../../core/shared/managedAgents'
+import type { AgentProviderDescriptor } from '@acorn/protocol/managedAgents.ts'
 import type {
   AgentDriver,
   AgentDriverSession,

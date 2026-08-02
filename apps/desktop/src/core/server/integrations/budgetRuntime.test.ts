@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { ProviderRequestScheduler } from './budgetRuntime'
-import type { ProviderBudgets } from '../../shared/integrations'
+import type { ProviderBudgets } from '@acorn/protocol/integrations.ts'
 
 const budgets: ProviderBudgets = {
   maxConcurrentRequests: 2,

@@ -1,7 +1,7 @@
 import { and, eq } from 'drizzle-orm'
 import { Hono } from 'hono'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import type { Repo } from '../../../../core/shared/api'
+import type { Repo } from '@acorn/protocol/api.ts'
 import { settleBackground } from '../../../../core/server/background'
 import { getDb, schema } from '../../../../core/server/db'
 import { reposResource } from '../../../../core/server/db/resourceKeys'

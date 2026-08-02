@@ -1,12 +1,12 @@
 import { Buffer } from 'node:buffer'
 import { and, eq } from 'drizzle-orm'
-import type { ContextBudget, ContextItem, ContextSectionResult, TaskContext } from '../../shared/api'
-import type { NoteAuthor, NoteScope } from '../../shared/notes'
+import type { ContextBudget, ContextItem, ContextSectionResult, TaskContext } from '@acorn/protocol/api.ts'
+import type { NoteAuthor, NoteScope } from '@acorn/protocol/notes.ts'
 import type { AppDatabase } from '../db'
 import { schema } from '../db'
 import { parseCached } from '../integrations/codec'
 import { integrationProviderRegistry } from '../integrations/registry'
-import type { ExternalRef } from '../../shared/integrations'
+import type { ExternalRef } from '@acorn/protocol/integrations.ts'
 
 type TaskRow = typeof schema.tasks.$inferSelect
 type AssembleArgs = { db: AppDatabase; userLogin: string; task: TaskRow; repo: string; workflowRunId?: string }

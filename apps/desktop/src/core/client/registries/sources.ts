@@ -1,5 +1,5 @@
 import type { Component } from 'solid-js'
-import type { Task, TaskSeed } from '../../shared/api'
+import type { Task, TaskSeed } from '@acorn/protocol/api.ts'
 import { Registry } from './registry'
 
 export type SourcePromotionContext = {

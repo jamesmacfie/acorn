@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import type { LinearProjectIssue } from '../../../core/shared/api'
+import type { LinearProjectIssue } from '@acorn/protocol/api.ts'
 import {
   emptyLinearFilter,
   filterLinearIssues,

@@ -95,7 +95,7 @@ import {
   type PullFile,
   type PullFilesPatchRequest,
   type Repo,
-} from '../shared/api'
+} from '@acorn/protocol/api.ts'
 
 export {
   filesKey,
@@ -116,8 +116,8 @@ export {
   reposRefreshRoute,
   tasksKey,
   workspacesKey,
-} from '../shared/api'
-export type { Branch, Check, Comment, Compare, CompareCommit, Integration, IntegrationsResponse, Label, LinearActivity, LinearComment, LinearIssueDetail, LinearIssueState, LinearIssueSummary, Me, Pull, PullCommit, PullDetail, PullFile, Repo, Review, Thread, ThreadComment, Task, TaskLink, TaskSeed, Workspace, WorkspaceProject, WorkspaceRepo } from '../shared/api'
+} from '@acorn/protocol/api.ts'
+export type { Branch, Check, Comment, Compare, CompareCommit, Integration, IntegrationsResponse, Label, LinearActivity, LinearComment, LinearIssueDetail, LinearIssueState, LinearIssueSummary, Me, Pull, PullCommit, PullDetail, PullFile, Repo, Review, Thread, ThreadComment, Task, TaskLink, TaskSeed, Workspace, WorkspaceProject, WorkspaceRepo } from '@acorn/protocol/api.ts'
 
 type QueryContext = { signal?: AbortSignal }
 type PageQueryContext = QueryContext & { pageParam: number }
@@ -198,8 +198,8 @@ export const workspacesOptions = (enabled: boolean) => ({
 })
 
 // Per-repo workspace assignment + hidden flag, for the onboarding modal (docs/workspaces-and-tasks.md).
-export { workspaceAssignmentsKey } from '../shared/api'
-export type { RepoAssignment } from '../shared/api'
+export { workspaceAssignmentsKey } from '@acorn/protocol/api.ts'
+export type { RepoAssignment } from '@acorn/protocol/api.ts'
 export const assignmentsOptions = (enabled: boolean) => ({
   queryKey: workspaceAssignmentsKey,
   enabled,

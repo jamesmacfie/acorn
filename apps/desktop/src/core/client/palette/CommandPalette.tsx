@@ -1,7 +1,7 @@
 import { createMemo, createResource, createSignal, For, Show } from 'solid-js'
 import { createQuery } from '@tanstack/solid-query'
 import { useNavigate, useParams } from '@solidjs/router'
-import type { RunTargetInfo } from '../../shared/terminal'
+import type { RunTargetInfo } from '@acorn/protocol/terminal.ts'
 import { tasksOptions, workspacesOptions } from '../queries'
 import { workspaceForRepo } from '../workspaces/activeWorkspace'
 import { refreshSessions } from '../tasks/agentSessions'

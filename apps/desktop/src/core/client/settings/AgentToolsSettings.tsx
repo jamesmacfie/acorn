@@ -1,6 +1,6 @@
 import { createEffect, createMemo, For, Show } from 'solid-js'
 import { createQuery, useQueryClient } from '@tanstack/solid-query'
-import { agentToolsCatalogRoute, type AgentToolCatalogEntry, type ToolRisk } from '../../shared/api'
+import { agentToolsCatalogRoute, type AgentToolCatalogEntry, type ToolRisk } from '@acorn/protocol/api.ts'
 import { readJson } from '../apiClient'
 import { prefsOptions } from '../queries'
 import { saveJsonPref } from './savePref'

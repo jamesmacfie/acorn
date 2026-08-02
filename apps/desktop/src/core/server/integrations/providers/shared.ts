@@ -6,7 +6,7 @@ import type {
   IntegrationProviderDefinition,
   TypedConnectionContract,
 } from '../types'
-import type { CredentialField, ExternalRef } from '../../../shared/integrations'
+import type { CredentialField, ExternalRef } from '@acorn/protocol/integrations.ts'
 import { isRecord } from '../codec'
 
 const publicCredentialField = (field: CredentialField): CredentialField => ({

@@ -1,0 +1,9 @@
+{
+  // No DOM and no node types: protocol is the one package both runtimes import, so it must stay
+  // free of both. The boundary test enforces the same rule on its imports (zod + vitest only).
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "types": []
+  },
+  "include": ["src"]
+}

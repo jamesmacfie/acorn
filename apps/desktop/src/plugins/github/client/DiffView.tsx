@@ -1,7 +1,7 @@
 import { createEffect, createMemo, createSignal, For, on, onCleanup, onMount, Show } from 'solid-js'
 import { createQuery, useQueryClient } from '@tanstack/solid-query'
 import { useParams, useSearchParams } from '@solidjs/router'
-import { filesKey } from '../../../core/shared/api'
+import { filesKey } from '@acorn/protocol/api.ts'
 import { fetchFilePatches, fileBlobOptions, filePatchKey, filesOptions, mentionsOptions, prefsOptions, pullDetailOptions, pullKey, type PullFile, type Task, type Thread } from '../../../core/client/queries'
 import { addReviewComment, replyReview, resolveThread } from './mutations'
 import { getHighlighter } from '../../../core/client/highlight/shiki'

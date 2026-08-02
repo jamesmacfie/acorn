@@ -1,5 +1,5 @@
 import type { Component } from 'solid-js'
-import type { AgentToolCall } from '../../shared/managedAgents'
+import type { AgentToolCall } from '@acorn/protocol/managedAgents.ts'
 import { Registry } from './registry'
 
 export type AgentToolRendererProps = {

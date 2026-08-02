@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import type { TaskStatus } from '../../shared/terminal'
+import type { TaskStatus } from '@acorn/protocol/terminal.ts'
 import { taskStatusesChanged } from './taskStatus'
 
 const clean: TaskStatus = {

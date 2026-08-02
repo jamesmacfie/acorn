@@ -12,7 +12,7 @@ import {
   rerunFailedRoute,
   requestedReviewersRoute,
   resolveThreadRoute,
-} from '../../../core/shared/api'
+} from '@acorn/protocol/api.ts'
 
 export const createPr = (o: string, r: string, input: { title: string; body: string; base: string; head: string; draft: boolean }) =>
   postJson<{ number: number }>(createPullRoute(o, r), input)

@@ -22,14 +22,32 @@ export function isToolWithinCeiling(tool: { name: string; risk: ToolRisk }, ceil
   return riskWithinCeiling(tool.risk, normalized)
 }
 
+// base64url via web-standard APIs rather than Buffer. Protocol is the one package both runtimes
+// import, so it may not depend on Node globals — today's callers happen to be node-side, but a
+// renderer importing this would have hit `Buffer is not defined` at runtime. btoa/atob and
+// TextEncoder/TextDecoder exist in both Node and the browser.
+function toBase64Url(text: string): string {
+  const bytes = new TextEncoder().encode(text)
+  let binary = ''
+  for (const byte of bytes) binary += String.fromCharCode(byte)
+  return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
+}
+
+function fromBase64Url(raw: string): string {
+  const b64 = raw.replace(/-/g, '+').replace(/_/g, '/')
+  const binary = atob(b64.padEnd(Math.ceil(b64.length / 4) * 4, '='))
+  const bytes = Uint8Array.from(binary, (c) => c.charCodeAt(0))
+  return new TextDecoder().decode(bytes)
+}
+
 export function encodeToolCeiling(ceiling: ToolCeiling): string {
-  return Buffer.from(JSON.stringify(normalizeToolCeiling(ceiling)), 'utf8').toString('base64url')
+  return toBase64Url(JSON.stringify(normalizeToolCeiling(ceiling)))
 }
 
 export function decodeToolCeiling(raw: string | undefined): ToolCeiling | undefined {
   if (!raw) return undefined
   try {
-    const parsed = JSON.parse(Buffer.from(raw, 'base64url').toString('utf8')) as ToolCeiling
+    const parsed = JSON.parse(fromBase64Url(raw)) as ToolCeiling
     if (!parsed || typeof parsed !== 'object') return undefined
     if (parsed.maxRisk && !['read', 'write', 'execute'].includes(parsed.maxRisk)) return undefined
     if (parsed.allow && (!Array.isArray(parsed.allow) || parsed.allow.some((id) => typeof id !== 'string'))) return undefined

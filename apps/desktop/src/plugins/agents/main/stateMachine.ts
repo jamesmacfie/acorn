@@ -3,7 +3,7 @@ import type {
   AgentNormalizedEvent,
   AgentRuntimeState,
   AgentSession,
-} from '../../../core/shared/managedAgents'
+} from '@acorn/protocol/managedAgents.ts'
 
 export type AgentMachineState = {
   runtimeState: AgentRuntimeState

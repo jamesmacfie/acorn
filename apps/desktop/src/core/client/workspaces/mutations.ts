@@ -15,7 +15,7 @@ import {
   workspaceIgnoreRepoRoute,
   workspaceUnignoreRepoRoute,
   workspaceIgnoreAllRoute,
-} from '../../shared/api'
+} from '@acorn/protocol/api.ts'
 
 // Replace a workspace's combined external-project set. Provider-specific callers merge their slice
 // first via integrations/workspaceProjects.ts so sibling-provider mappings survive.

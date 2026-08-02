@@ -1,5 +1,5 @@
 import { createEffect, createSignal, For, Show } from 'solid-js'
-import type { AgentRequest } from '../../../core/shared/managedAgents'
+import type { AgentRequest } from '@acorn/protocol/managedAgents.ts'
 import { Button, Input, Select } from '../../../core/client/ui/primitives'
 import { managedAgentApi } from './managedClient'
 

@@ -1,11 +1,29 @@
+import { readFileSync } from 'node:fs'
 import { isAbsolute, resolve } from 'node:path'
 import { defineConfig, externalizeDepsPlugin } from 'electron-vite'
 import solid from 'vite-plugin-solid'
 
-// Bundle our own source (relative imports); keep every bare/node: specifier external so it's
-// required from node_modules at runtime. Critically this keeps the native better-sqlite3 (and
-// `electron` itself) out of the bundle — bundling the native loader breaks .node resolution.
-const externalizeBareImports = (id: string) => !id.startsWith('.') && !isAbsolute(id)
+// Bundle our own source (relative imports AND @acorn/* workspace packages); keep every other
+// bare/node: specifier external so it's required from node_modules at runtime. Critically this
+// keeps the native better-sqlite3 (and `electron` itself) out of the bundle — bundling the native
+// loader breaks .node resolution.
+//
+// @acorn/* must stay INTERNAL. Those packages ship TypeScript source (exports './*': './src/*'),
+// so externalizing them would emit `import '@acorn/protocol/api.ts'` into out/main and Electron
+// would try to load a .ts file at runtime from inside the asar.
+const isWorkspacePackage = (id: string) => id.startsWith('@acorn/')
+const externalizeBareImports = (id: string) => !id.startsWith('.') && !isAbsolute(id) && !isWorkspacePackage(id)
+
+// externalizeDepsPlugin() externalizes everything listed in dependencies/peerDependencies, so it
+// would defeat the rule above on its own. @acorn/* deps are declared in devDependencies (correct
+// for a source-only build input, and it keeps them out of the packaged asar), but exclude them
+// explicitly too so a stray dependency-section entry cannot silently break the bundle.
+const workspacePackages = Object.keys(
+  (JSON.parse(readFileSync(resolve(__dirname, 'package.json'), 'utf8')) as {
+    dependencies?: Record<string, string>
+    devDependencies?: Record<string, string>
+  }).devDependencies ?? {},
+).filter(isWorkspacePackage)
 
 // Four targets (docs/electron.md §4i). externalizeDepsPlugin keeps node_modules (notably the
 // native better-sqlite3) external — required at runtime, never bundled. Using rollupOptions.input
@@ -14,7 +32,7 @@ const externalizeBareImports = (id: string) => !id.startsWith('.') && !isAbsolut
 // renderer build out of dist/client.
 export default defineConfig({
   main: {
-    plugins: [externalizeDepsPlugin()],
+    plugins: [externalizeDepsPlugin({ exclude: workspacePackages })],
     build: {
       outDir: 'out/main',
       rollupOptions: {
@@ -32,7 +50,7 @@ export default defineConfig({
     },
   },
   preload: {
-    plugins: [externalizeDepsPlugin()],
+    plugins: [externalizeDepsPlugin({ exclude: workspacePackages })],
     build: {
       outDir: 'out/preload',
       rollupOptions: {

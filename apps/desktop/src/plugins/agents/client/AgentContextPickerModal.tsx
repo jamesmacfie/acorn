@@ -1,5 +1,5 @@
 import { createEffect, createResource, createSignal, For, Show } from 'solid-js'
-import type { AgentContextContribution } from '../../../core/shared/agentContext'
+import type { AgentContextContribution } from '@acorn/protocol/agentContext.ts'
 import { Button } from '../../../core/client/ui/primitives'
 import { Modal } from '../../../core/client/ui/Modal'
 

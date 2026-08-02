@@ -4,7 +4,7 @@ import { chunkRowsByColumnBudget } from '../../../../core/server/db/batch'
 import { reposResource } from '../../../../core/server/db/resourceKeys'
 import { gh, ghError } from '..'
 import type { RefreshResult, RouteFailure, RouteResult } from '../../../../core/server/sync/engine'
-import type { Repo } from '../../../../core/shared/api'
+import type { Repo } from '@acorn/protocol/api.ts'
 import { deleteRepoMirrorStatements } from '../mirrorRetention'
 
 type Db = ReturnType<typeof getDb>

@@ -2,10 +2,10 @@
 // now loopback HTTP routes, so the editor works in a plain browser (dev:node) too. The
 // accessor shape is unchanged so consumers keep their null-tolerant call sites; it just never
 // returns null now that the surface is server-backed.
-import { editorFilesRoute, editorListRoute, editorReadRoute, editorRootRoute, editorWriteRoute, type EditorEntry, type EditorWriteResult } from '../../../core/shared/api'
+import { editorFilesRoute, editorListRoute, editorReadRoute, editorRootRoute, editorWriteRoute, type EditorEntry, type EditorWriteResult } from '@acorn/protocol/api.ts'
 import { readJson, writeJson } from '../../../core/client/apiClient'
 
-export type { EditorEntry } from '../../../core/shared/api'
+export type { EditorEntry } from '@acorn/protocol/api.ts'
 
 export type EditorApi = {
   root(taskId: string): Promise<string | null>

@@ -6,7 +6,7 @@
 import { createSignal } from 'solid-js'
 import { taskBridge } from './taskBridge'
 import { wsOnStatus } from '../wsClient'
-import type { TaskStatus } from '../../shared/terminal'
+import type { TaskStatus } from '@acorn/protocol/terminal.ts'
 import type { PollerContribution } from '../registries/pollers'
 import { latestOnly } from '../lib/latestOnly'
 

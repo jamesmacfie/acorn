@@ -5,7 +5,7 @@ import type { SourceContribution } from '../../core/client/registries/sources'
 import { sourceRegistry } from '../../core/client/registries/sources'
 import { linearPaneContribution, rollbarPaneContribution } from './taskPaneContributions'
 import { contentLinkRegistry, linearContentLinkContribution, type ContentLinkContribution } from '../../plugins/github/client/contentLinks'
-import type { LinearProjectIssue, RollbarItemSummary } from '../../core/shared/api'
+import type { LinearProjectIssue, RollbarItemSummary } from '@acorn/protocol/api.ts'
 import { addTaskLink, createTask } from '../../core/client/tasks/mutations'
 import { prepareLinearPromotion, prepareRollbarPromotion } from '../../core/client/integrations/providerPromotion'
 

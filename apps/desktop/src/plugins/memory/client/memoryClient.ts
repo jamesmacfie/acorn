@@ -1,6 +1,6 @@
 // The renderer's memory surface (docs/notes-and-memory.md). Was the `window.acorn.memory` preload bridge; now
 // loopback HTTP. Backed by the main-process memory index, so it 503s in dev:node.
-import { memoryAddRoute, memoryListRoute, memoryProposalsRoute, memoryResolveProposalRoute, memorySearchRoute } from '../../../core/shared/api'
+import { memoryAddRoute, memoryListRoute, memoryProposalsRoute, memoryResolveProposalRoute, memorySearchRoute } from '@acorn/protocol/api.ts'
 import { readJson, writeJson } from '../../../core/client/apiClient'
 
 export type MemoryType = 'convention' | 'architecture' | 'decision' | 'fix' | 'reference' | 'feedback' | 'task' | 'user'

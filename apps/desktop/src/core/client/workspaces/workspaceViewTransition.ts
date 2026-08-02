@@ -1,4 +1,4 @@
-import type { Task, Workspace } from '../../shared/api'
+import type { Task, Workspace } from '@acorn/protocol/api.ts'
 
 export type WorkspaceView = { source: string } | { taskId: string }
 

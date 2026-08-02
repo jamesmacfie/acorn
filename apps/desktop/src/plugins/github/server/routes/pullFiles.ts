@@ -1,7 +1,7 @@
 import { and, eq } from 'drizzle-orm'
 import type { Context } from 'hono'
 import { Hono } from 'hono'
-import type { PullFile, PullFilesPatchRequest } from '../../../../core/shared/api'
+import type { PullFile, PullFilesPatchRequest } from '@acorn/protocol/api.ts'
 import { getDb, schema } from '../../../../core/server/db'
 import { filesResource } from '../../../../core/server/db/resourceKeys'
 import type { AppEnv } from '../../../../core/server/middleware/auth'

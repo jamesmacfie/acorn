@@ -11,7 +11,7 @@ import {
   type ServiceMessageTransport,
   type ServiceStartConfig,
   type ServiceState,
-} from '../../core/shared/serviceProtocol'
+} from '@acorn/protocol/serviceProtocol.ts'
 
 export type ServiceHostEvents = {
   stateChanged?(state: ServiceState, detail?: string): void

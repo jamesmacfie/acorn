@@ -7,7 +7,7 @@
 import { existsSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { parse as parseToml } from 'smol-toml'
-import type { BrowserRule, PreviewMode } from '../shared/api'
+import type { BrowserRule, PreviewMode } from '@acorn/protocol/api.ts'
 
 export type RunTarget = {
   id: string

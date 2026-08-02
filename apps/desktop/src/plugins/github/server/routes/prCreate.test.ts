@@ -1,6 +1,6 @@
 import { Hono } from 'hono'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import type { ApiError } from '../../../../core/shared/api'
+import type { ApiError } from '@acorn/protocol/api.ts'
 import { gh } from '..'
 import type { AppEnv, Principal, SessionUser } from '../../../../core/server/middleware/auth'
 import { prCreate } from './prCreate'

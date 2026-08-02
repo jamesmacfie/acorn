@@ -1,6 +1,6 @@
 // @vitest-environment node
 import { describe, expect, it } from 'vitest'
-import type { TerminalSession } from '../../shared/terminal'
+import type { TerminalSession } from '@acorn/protocol/terminal.ts'
 import {
   capNotices,
   detectEdges,

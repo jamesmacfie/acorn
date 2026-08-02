@@ -1,5 +1,5 @@
 import { isDeepStrictEqual } from 'node:util'
-import type { CredentialField, PublicIntegrationProvider } from '../../shared/integrations'
+import type { CredentialField, PublicIntegrationProvider } from '@acorn/protocol/integrations.ts'
 import type { ConnectionProviderContribution } from './types'
 
 const publicCredentialField = (field: CredentialField): CredentialField => ({

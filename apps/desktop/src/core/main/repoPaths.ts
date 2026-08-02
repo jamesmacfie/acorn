@@ -5,10 +5,10 @@ import { promisify } from 'node:util'
 import { eq, and } from 'drizzle-orm'
 import type { AppDatabase } from '../server/db'
 import { schema } from '../server/db'
-import { normalizeBranchPrefix } from '../shared/branch'
-import { isValidBrowserRule, parseBrowserRules } from '../shared/browserRules'
-import type { BrowserRule, DbSchemaMode, PreviewMode, SetupTrigger } from '../shared/api'
-import type { RepoConfigPatch, RepoPath, RepoPathResult } from '../shared/terminal'
+import { normalizeBranchPrefix } from '@acorn/protocol/branch.ts'
+import { isValidBrowserRule, parseBrowserRules } from '@acorn/protocol/browserRules.ts'
+import type { BrowserRule, DbSchemaMode, PreviewMode, SetupTrigger } from '@acorn/protocol/api.ts'
+import type { RepoConfigPatch, RepoPath, RepoPathResult } from '@acorn/protocol/terminal.ts'
 
 const exec = promisify(execFile)
 

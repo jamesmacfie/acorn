@@ -1,7 +1,7 @@
 import { createEffect, onCleanup, type Accessor, type Setter } from 'solid-js'
 import type { QueryClient } from '@tanstack/solid-query'
 import type { NavigateOptions } from '@solidjs/router'
-import type { Repo, Task } from '../../shared/api'
+import type { Repo, Task } from '@acorn/protocol/api.ts'
 import { selectedSource, setActiveTaskId, setSelectedSource, activeTaskId } from '../tasks/tasks'
 import { PrefKeys } from './prefKeys'
 import { appStateBinding, persistedStateRegistry, type PersistedStateSlice } from './persistedState'

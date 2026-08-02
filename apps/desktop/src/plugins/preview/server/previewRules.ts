@@ -1,5 +1,5 @@
 import type { AppDatabase } from '../../../core/server/db'
-import type { PreviewBrowserRule } from '../../../core/shared/serviceProtocol'
+import type { PreviewBrowserRule } from '@acorn/protocol/serviceProtocol.ts'
 import { getRepoPath } from '../../../core/main/repoPaths'
 import { loadTask } from '../../../core/main/taskWorktree'
 

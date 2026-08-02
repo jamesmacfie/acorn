@@ -1,5 +1,5 @@
 import { createMemo, createSignal, For, Show } from 'solid-js'
-import type { AgentTurn } from '../../../core/shared/managedAgents'
+import type { AgentTurn } from '@acorn/protocol/managedAgents.ts'
 import Icon from '../../../core/client/ui/Icon'
 import { Button, Textarea } from '../../../core/client/ui/primitives'
 import { managedAgentApi } from './managedClient'

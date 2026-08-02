@@ -1,0 +1,26 @@
+{
+  // Shared compiler options for every workspace package.
+  //
+  // Packages are consumed as TypeScript SOURCE via exports maps ("./*": "./src/*") — no build step,
+  // no .d.ts emit, no project references. A consumer's tsc pulls its dependencies' sources into the
+  // same program, which is why allowImportingTsExtensions + noEmit are load-bearing: cross-package
+  // specifiers carry their real extension (@acorn/protocol/api.ts).
+  //
+  // Deliberately no "types" here. Each package declares its own (protocol: none; node packages:
+  // node; client packages: vite/client + DOM), so a package cannot accidentally rely on globals it
+  // has not asked for.
+  "compilerOptions": {
+    "target": "ESNext",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "jsx": "preserve",
+    "jsxImportSource": "solid-js",
+    "lib": ["ESNext", "DOM", "DOM.Iterable"],
+    "strict": true,
+    "noEmit": true,
+    "skipLibCheck": true,
+    "isolatedModules": true,
+    "verbatimModuleSyntax": true,
+    "allowImportingTsExtensions": true
+  }
+}

@@ -1,6 +1,6 @@
 import { Hono } from 'hono'
 import { z } from 'zod'
-import type { RepoConfigTrustReview } from '../../shared/api'
+import type { RepoConfigTrustReview } from '@acorn/protocol/api.ts'
 import { bridgeSlot, viaBridge } from '../bridge'
 import type { AppEnv } from '../middleware/auth'
 import { respondError } from '../respond'

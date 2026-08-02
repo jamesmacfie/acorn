@@ -2,7 +2,7 @@
 // column is collapsed, per task. Session-only (matches the house session-first guidance — only the
 // Manifest's section selection has a stated durability requirement). Evicted on task archive.
 import { createSignal } from 'solid-js'
-import type { NoteScope } from '../../../core/shared/notes'
+import type { NoteScope } from '@acorn/protocol/notes.ts'
 
 export type NotesSelection = { scope: NoteScope; slug: string }
 

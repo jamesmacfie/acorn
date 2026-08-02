@@ -1,6 +1,6 @@
 import { createMemo, createSignal, onCleanup, onMount, Show } from 'solid-js'
 import { clientEvents, consumePaneIntent } from '../../../core/client/registries/clientEvents'
-import type { Task } from '../../../core/shared/api'
+import type { Task } from '@acorn/protocol/api.ts'
 import RollbarItemPanel, { type RollbarTarget } from './RollbarItemPanel'
 
 // The Rollbar task pane (docs/panes.md): a thin selection wrapper over the shared RollbarItemPanel —

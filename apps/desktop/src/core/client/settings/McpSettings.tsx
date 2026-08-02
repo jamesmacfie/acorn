@@ -1,5 +1,5 @@
 import { createResource, createSignal, For, Show } from 'solid-js'
-import type { McpServerSummary } from '../../shared/mcp'
+import type { McpServerSummary } from '@acorn/protocol/mcp.ts'
 import { activeTaskId } from '../tasks/tasks'
 import { mcpApi } from './mcpClient'
 

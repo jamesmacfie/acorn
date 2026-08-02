@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import type { LinearProjectIssue, RollbarItemSummary } from '../../shared/api'
+import type { LinearProjectIssue, RollbarItemSummary } from '@acorn/protocol/api.ts'
 import { prepareLinearPromotion, prepareRollbarPromotion } from './providerPromotion'
 
 describe('provider-owned source promotion', () => {

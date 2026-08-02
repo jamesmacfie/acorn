@@ -4,7 +4,7 @@ import { promisify } from 'node:util'
 import type {
   AgentInputPart,
   AgentProviderDescriptor,
-} from '../../../../core/shared/managedAgents'
+} from '@acorn/protocol/managedAgents.ts'
 import { resolveUsageCommand, usageProcessEnv } from '../usage/processRunner'
 import { asObject, codexServerRequestResponse, normalizeCodexNotification, normalizeCodexServerRequest } from './codexNormalizer'
 import { JsonRpcProcess, type JsonRpcServerRequest } from './jsonRpcProcess'

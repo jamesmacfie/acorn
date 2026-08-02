@@ -1,4 +1,4 @@
-import { rendererAgentToolRoute } from '../shared/api'
+import { rendererAgentToolRoute } from '@acorn/protocol/api.ts'
 import { writeJson } from './apiClient'
 
 // Thin renderer projection. The server only admits contributions with exposeToRenderer=true; the

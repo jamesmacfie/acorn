@@ -15,7 +15,7 @@ import type {
   AgentSessionList,
   AgentSessionSnapshot,
   AgentTurn,
-} from '../../../../core/shared/managedAgents'
+} from '@acorn/protocol/managedAgents.ts'
 import {
   agentWaitQuerySchema,
   createAgentSessionSchema,

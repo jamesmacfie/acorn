@@ -1,6 +1,6 @@
 import Picker from './Picker'
 import type { Workspace } from '../queries'
-import { resolveWorkspaceColor } from '../../shared/workspaceIdentity'
+import { resolveWorkspaceColor } from '@acorn/protocol/workspaceIdentity.ts'
 
 // The top-level workspace selector (docs/workspaces-and-tasks.md). Sits in the topbar; picking a workspace
 // navigates to one of its repos (the caller derives "active" from the current repo). Reuses the

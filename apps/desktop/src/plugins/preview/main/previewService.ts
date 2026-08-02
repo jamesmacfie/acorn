@@ -9,8 +9,8 @@
 // sit above it via z-index. The renderer detects when an overlay covers the pane and calls hide()
 // (PreviewPane.tsx) — the WebContentsView equivalent of the old z-index dance.
 import { BrowserWindow, WebContentsView, ipcMain, type IpcMainEvent, type IpcMainInvokeEvent, type WebContents } from 'electron'
-import { matchesUrlPattern } from '../../../core/shared/browserRules'
-import type { PreviewBrowserRule } from '../../../core/shared/serviceProtocol'
+import { matchesUrlPattern } from '@acorn/protocol/browserRules.ts'
+import type { PreviewBrowserRule } from '@acorn/protocol/serviceProtocol.ts'
 import { bindBrowserContents, unbindBrowserContents } from './browserService'
 import { buildFillScript, isAllowedPreviewUrl } from './browserAuto'
 

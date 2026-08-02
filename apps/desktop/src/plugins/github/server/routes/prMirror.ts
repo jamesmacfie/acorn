@@ -1,6 +1,6 @@
 import { and, eq, inArray } from 'drizzle-orm'
 import type { SQLiteColumn } from 'drizzle-orm/sqlite-core'
-import type { Check, Comment, Label, PullCommit, PullDetail, PullFile, Review, Thread } from '../../../../core/shared/api'
+import type { Check, Comment, Label, PullCommit, PullDetail, PullFile, Review, Thread } from '@acorn/protocol/api.ts'
 import { patchBlobKey } from '../../../../core/server/blobs'
 import { getDb, schema } from '../../../../core/server/db'
 import { chunkRowsByColumnBudget } from '../../../../core/server/db/batch'

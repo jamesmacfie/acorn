@@ -1,6 +1,6 @@
 import { dispatchLayout } from '../tasks/tasks'
-import type { NoteScope } from '../../shared/notes'
-import type { ExternalRef } from '../../shared/integrations'
+import type { NoteScope } from '@acorn/protocol/notes.ts'
+import type { ExternalRef } from '@acorn/protocol/integrations.ts'
 
 export type PaneIntent =
   | { kind: 'notes:open'; slug: string; scope: NoteScope }

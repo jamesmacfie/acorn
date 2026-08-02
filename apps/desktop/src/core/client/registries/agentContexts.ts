@@ -1,4 +1,4 @@
-import type { AgentContextContribution } from '../../shared/agentContext'
+import type { AgentContextContribution } from '@acorn/protocol/agentContext.ts'
 import { Registry } from './registry'
 
 export const agentContextRegistry = new Registry<AgentContextContribution>('agent context')

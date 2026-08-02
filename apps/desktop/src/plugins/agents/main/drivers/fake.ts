@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto'
-import type { AgentProviderDescriptor } from '../../../../core/shared/managedAgents'
+import type { AgentProviderDescriptor } from '@acorn/protocol/managedAgents.ts'
 import type { AgentDriver, AgentDriverSession, AgentDriverStartOptions, AgentDriverTurnOptions } from './types'
 
 export class FakeAgentDriver implements AgentDriver {

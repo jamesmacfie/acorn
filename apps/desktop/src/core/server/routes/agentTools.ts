@@ -14,7 +14,7 @@ import { getDb, schema } from '../db'
 import type { AppEnv } from '../middleware/auth'
 import { getUser } from '../middleware/requireUser'
 import { respondError } from '../respond'
-import { decodeToolCeiling, isToolWithinCeiling, type ToolCeiling } from '../../shared/workflow'
+import { decodeToolCeiling, isToolWithinCeiling, type ToolCeiling } from '@acorn/protocol/workflow.ts'
 
 const STATUS: Record<ToolError['kind'], 404 | 400 | 409 | 500> = { not_found: 404, bad_request: 400, 'needs-trust': 409, failed: 500 }
 type AvailabilityCache = Map<NonNullable<AgentToolContribution['when']>, Promise<boolean>>

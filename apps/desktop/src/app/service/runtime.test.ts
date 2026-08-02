@@ -3,8 +3,8 @@ import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
-import type { DesktopCapabilities } from '../../core/shared/desktopCapabilities'
-import type { ServiceState } from '../../core/shared/serviceProtocol'
+import type { DesktopCapabilities } from '@acorn/protocol/desktopCapabilities.ts'
+import type { ServiceState } from '@acorn/protocol/serviceProtocol.ts'
 
 function unusedPort(): Promise<number> {
   return new Promise((resolve, reject) => {

@@ -10,7 +10,7 @@
 // the same setter-injection seam the harness bridges used, so dev:node (no main) degrades to a
 // clean 503 and tests can install a fake registry.
 import type { z } from 'zod'
-import { AGENT_TOOLS_PERMS_PREF_KEY, type ToolRisk as SharedToolRisk } from '../../shared/api'
+import { AGENT_TOOLS_PERMS_PREF_KEY, type ToolRisk as SharedToolRisk } from '@acorn/protocol/api.ts'
 
 export type ToolRisk = SharedToolRisk
 

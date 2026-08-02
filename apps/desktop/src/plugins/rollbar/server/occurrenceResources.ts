@@ -3,7 +3,7 @@ import type {
   RollbarItemMetadata,
   RollbarOccurrenceDetail,
   RollbarOccurrencesResponse,
-} from '../../../core/shared/api'
+} from '@acorn/protocol/api.ts'
 import { schema } from '../../../core/server/db'
 import { isRecord, parseJson } from '../../../core/server/integrations/codec'
 import type {

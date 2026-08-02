@@ -1,5 +1,5 @@
 import type { QueryClient } from '@tanstack/solid-query'
-import { prefsKey, prefsRoute } from '../../shared/api'
+import { prefsKey, prefsRoute } from '@acorn/protocol/api.ts'
 import { writeJson } from '../apiClient'
 import { pushBackgroundError } from '../notifications/notifications'
 import { persistedStateRegistry, utf8Bytes } from '../persistence/persistedState'

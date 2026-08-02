@@ -1,7 +1,7 @@
 import { Hono } from 'hono'
 import { HTTPException } from 'hono/http-exception'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import type { ApiError } from '../shared/api'
+import type { ApiError } from '@acorn/protocol/api.ts'
 import type { AppEnv } from './middleware/auth'
 import { onServerError } from './respond'
 import type { Env } from '../main/bindings'

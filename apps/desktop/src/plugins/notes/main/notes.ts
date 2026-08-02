@@ -8,11 +8,11 @@
 import { mkdirSync } from 'node:fs'
 import { readdir, readFile, rename, stat, unlink, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
-import type { Note, NoteAuthor, NoteKind, NoteLocation, NoteSummary } from '../../../core/shared/notes'
+import type { Note, NoteAuthor, NoteKind, NoteLocation, NoteSummary } from '@acorn/protocol/notes.ts'
 
 // Canonical wire shapes live in shared/notes.ts (imported by the client too); re-exported here so
 // main-side callers keep one import point.
-export type { Note, NoteAuthor, NoteKind, NoteSummary } from '../../../core/shared/notes'
+export type { Note, NoteAuthor, NoteKind, NoteSummary } from '@acorn/protocol/notes.ts'
 
 // The frontmatter block of a note file — Note minus slug/body.
 export type NoteMeta = Omit<Note, 'slug' | 'body'>

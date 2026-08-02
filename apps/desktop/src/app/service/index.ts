@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import { desktopCapabilitiesOverRpc } from '../../core/shared/desktopCapabilities'
+import { desktopCapabilitiesOverRpc } from '@acorn/protocol/desktopCapabilities.ts'
 import {
   ServiceRpcError,
   ServiceRpcPeer,
@@ -7,7 +7,7 @@ import {
   type ServiceMessage,
   type ServiceMessageTransport,
   type ServiceState,
-} from '../../core/shared/serviceProtocol'
+} from '@acorn/protocol/serviceProtocol.ts'
 import { startServiceRuntime, type ServiceRuntime } from './runtime'
 
 const parentPort = process.parentPort
