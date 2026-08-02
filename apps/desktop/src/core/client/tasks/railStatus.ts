@@ -3,7 +3,7 @@
 // while its condition holds: the rail overlay renders it positioned (`overlayCls`), the tooltip
 // re-renders the same glyph next to what it means, so hovering both reports the task's live state
 // and teaches the icon. Pure/view-only — callers resolve the reactive inputs and pass them in.
-import type { TaskStatus } from '../../shared/terminal'
+import type { TaskStatus } from '@acorn/protocol/terminal.ts'
 
 export type RailChecks = 'success' | 'failure' | 'pending' | 'mixed'
 

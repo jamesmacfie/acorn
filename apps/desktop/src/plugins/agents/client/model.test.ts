@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import type { TerminalSession } from '../../../core/shared/terminal'
-import type { WorkflowRunRow, WorkflowStepRow } from '../../../core/shared/workflow'
+import type { TerminalSession } from '@acorn/protocol/terminal.ts'
+import type { WorkflowRunRow, WorkflowStepRow } from '@acorn/protocol/workflow.ts'
 import { buildRoster, feedFromEvents, resumeCommandFor, streamJsonToAgentState, streamJsonToFeedItems } from './model'
 
 describe('streamJsonToAgentState (the 15 §status table)', () => {

@@ -16,7 +16,7 @@ import {
   tasksRoute,
   type TaskLink,
   type TaskLinkSeed,
-} from '../../shared/api'
+} from '@acorn/protocol/api.ts'
 import { taskBridge } from './taskBridge'
 
 // Create from a seed (docs/workspaces-and-tasks.md). Callers invalidate tasksKey after.

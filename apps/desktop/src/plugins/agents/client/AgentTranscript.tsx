@@ -1,6 +1,6 @@
 import { createEffect, createMemo, createSignal, For, on, onCleanup, Show } from 'solid-js'
 import { createVirtualizer } from '@tanstack/solid-virtual'
-import type { AgentSessionSnapshot } from '../../../core/shared/managedAgents'
+import type { AgentSessionSnapshot } from '@acorn/protocol/managedAgents.ts'
 import AgentEventCard from './AgentEventCard'
 import AgentRequestCard from './AgentRequestCard'
 import { buildConversationItems } from './conversationItems'

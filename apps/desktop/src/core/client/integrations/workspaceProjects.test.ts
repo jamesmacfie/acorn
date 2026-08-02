@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import type { Integration, WorkspaceProject } from '../../shared/api'
+import type { Integration, WorkspaceProject } from '@acorn/protocol/api.ts'
 import { replaceWorkspaceProjectsForProvider, workspaceProjectsForProvider } from './workspaceProjects'
 
 const integration = (id: string, providerId: string): Integration => ({

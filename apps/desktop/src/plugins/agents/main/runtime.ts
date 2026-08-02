@@ -6,7 +6,7 @@ import type {
   AgentSession,
   AgentSessionSnapshot,
   AgentTurn,
-} from '../../../core/shared/managedAgents'
+} from '@acorn/protocol/managedAgents.ts'
 import type { CreateAgentSessionInput, EnqueueAgentTurnInput } from '../shared/schemas'
 import {
   assertBoundedJson,

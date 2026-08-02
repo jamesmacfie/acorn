@@ -1,6 +1,6 @@
 // Review-notes prompt formatter (docs/panes.md): plain, copy-pasteable, exactly the doc's shape.
 // Pure — unit tested; delivered via sendToAgent as one bracketed-paste block.
-import type { ReviewNote } from '../../../core/shared/api'
+import type { ReviewNote } from '@acorn/protocol/api.ts'
 
 const lineRef = (n: Pick<ReviewNote, 'startLine' | 'endLine'>): string =>
   n.endLine > n.startLine ? `${n.startLine}–${n.endLine}` : `${n.startLine}`

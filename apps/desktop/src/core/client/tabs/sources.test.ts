@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
-import type { Integration } from '../../shared/api'
+import type { Integration } from '@acorn/protocol/api.ts'
 import { availableSources } from './sources'
 import { sourceRegistry } from '../registries/sources'
 

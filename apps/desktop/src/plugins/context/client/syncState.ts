@@ -9,7 +9,7 @@
 //    validated against the live list so a killed target falls back to the most-recent session.
 import { createSignal } from 'solid-js'
 import { agentSessionsFor } from '../../../core/client/tasks/agentSessions'
-import type { TerminalSession } from '../../../core/shared/terminal'
+import type { TerminalSession } from '@acorn/protocol/terminal.ts'
 
 type SyncRecord = { taskId: string; at: number; sections: Record<string, string> }
 const lastSync = new Map<string /* sessionId */, SyncRecord>()

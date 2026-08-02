@@ -1,6 +1,6 @@
 import { Hono } from 'hono'
 import { z } from 'zod'
-import type { NoteLocation } from '../../../../core/shared/notes'
+import type { NoteLocation } from '@acorn/protocol/notes.ts'
 import { bridgeSlot, viaBridge } from '../../../../core/server/bridge'
 import type { AppEnv } from '../../../../core/server/middleware/auth'
 import { respondError } from '../../../../core/server/respond'

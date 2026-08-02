@@ -1,4 +1,4 @@
-import type { ProviderErrorCode } from '../../shared/integrations'
+import type { ProviderErrorCode } from '@acorn/protocol/integrations.ts'
 import { eq } from 'drizzle-orm'
 import type { AppDatabase } from '../db'
 import { schema } from '../db'

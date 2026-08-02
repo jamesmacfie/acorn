@@ -1,7 +1,7 @@
 // Source gating (docs/workspaces-and-tasks.md / docs/integrations.md): which browse Sources the rail shows.
 // GitHub is always available; Linear/Rollbar appear iff a connected integration row exists; local
 // sources (no providerId, e.g. docker) are always shown. Pure — unit tested; TabRail is the consumer.
-import type { Integration } from '../../shared/api'
+import type { Integration } from '@acorn/protocol/api.ts'
 import type { SourceId } from '../tasks/tasks'
 import { sourceRegistry } from '../registries/sources'
 

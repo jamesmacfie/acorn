@@ -1,7 +1,7 @@
 import { Hono } from 'hono'
 import { eq } from 'drizzle-orm'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import type { LinearIssueDetail, LinearIssueSummary, LinearProjectIssuesResponse } from '../../../../core/shared/api'
+import type { LinearIssueDetail, LinearIssueSummary, LinearProjectIssuesResponse } from '@acorn/protocol/api.ts'
 import { getDb, schema } from '../../../../core/server/db'
 import { linearFetch, type LinearNode } from '..'
 import { linearProvider, linearRef } from '../provider'

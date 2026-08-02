@@ -5,8 +5,8 @@ import { getDb, schema } from '../db'
 import type { AppEnv } from '../middleware/auth'
 import { getUser } from '../middleware/requireUser'
 import { respondError } from '../respond'
-import type { Workspace, WorkspaceProject, WorkspaceProjectsResponse, WorkspaceRepo, WorkspaceSeed } from '../../shared/api'
-import { isValidWorkspaceColor, isValidWorkspaceIcon, parseWorkspaceIcon, serializeWorkspaceIcon } from '../../shared/workspaceIdentity'
+import type { Workspace, WorkspaceProject, WorkspaceProjectsResponse, WorkspaceRepo, WorkspaceSeed } from '@acorn/protocol/api.ts'
+import { isValidWorkspaceColor, isValidWorkspaceIcon, parseWorkspaceIcon, serializeWorkspaceIcon } from '@acorn/protocol/workspaceIdentity.ts'
 import { getConnection } from '../integrations/connections'
 
 // Workspaces (docs/workspaces-and-tasks.md): named GROUPS of repos — the top-level unit. Machine-scoped (no

@@ -1,6 +1,6 @@
 import { buildContextSections, setContextSections } from '../../core/server/agentTools/contextSections'
 import type { AppDatabase } from '../../core/server/db'
-import type { NoteAuthor, NoteLocation, NoteScope } from '../../core/shared/notes'
+import type { NoteAuthor, NoteLocation, NoteScope } from '@acorn/protocol/notes.ts'
 import { memoryIndexSlice } from '../../plugins/memory/main/memory'
 import type { NotesStore } from '../../plugins/notes/main/notes'
 import { loadTask, workspaceIdForRepo } from '../../core/main/taskWorktree'

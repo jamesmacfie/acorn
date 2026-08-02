@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto'
 import { HEADLESS_TIMEOUT_MS, type HeadlessResult, type StreamEvent } from '../../core/main/headless'
 import type { ManagedAgentRuntime } from '../../plugins/agents/main/runtime'
-import type { AgentEventRecord, AgentSessionSnapshot } from '../../core/shared/managedAgents'
+import type { AgentEventRecord, AgentSessionSnapshot } from '@acorn/protocol/managedAgents.ts'
 import type { RunStepOptions } from '../../plugins/workflows/main/workflowRunner'
 import type { WorkflowStepDef } from '../../plugins/workflows/main/workflowContracts'
 

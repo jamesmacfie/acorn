@@ -1,6 +1,6 @@
 import { Hono } from 'hono'
 import { describe, expect, it } from 'vitest'
-import type { ApiError, Me } from '../../shared/api'
+import type { ApiError, Me } from '@acorn/protocol/api.ts'
 import type { AppEnv, Principal, SessionUser } from '../middleware/auth'
 import { me } from './me'
 import { testGate } from './testAuth'

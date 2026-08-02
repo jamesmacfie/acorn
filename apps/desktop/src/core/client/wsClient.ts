@@ -2,9 +2,9 @@
 // per-session `window.acorn.terminal.attach/write/onStatus` + `workflow.onNotice` IPC. One lazily-
 // opened WebSocket, same-origin so the session cookie rides the upgrade automatically; it
 // reconnects and re-attaches live subscriptions, and fans kind-tagged frames out to local callers.
-import type { DockerStatsSample } from '../shared/docker'
-import type { ServerMsg } from '../shared/terminal'
-import { WS_PATH, type WsClientFrame, type WsServerFrame } from '../shared/ws'
+import type { DockerStatsSample } from '@acorn/protocol/docker.ts'
+import type { ServerMsg } from '@acorn/protocol/terminal.ts'
+import { WS_PATH, type WsClientFrame, type WsServerFrame } from '@acorn/protocol/ws.ts'
 
 type OutputCb = (m: ServerMsg) => void
 type NoticeCb = (n: { taskId: string; kind: 'gate' | 'run-done' | 'repo-config-trust'; title: string; action?: 'review-config' }) => void

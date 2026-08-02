@@ -1,7 +1,7 @@
 import { realpath, stat } from 'node:fs/promises'
 import { isAbsolute, relative, resolve } from 'node:path'
-import type { AgentInputPart } from '../../../core/shared/managedAgents'
-import { MAX_AGENT_CONTEXT_BYTES } from '../../../core/shared/agentContext'
+import type { AgentInputPart } from '@acorn/protocol/managedAgents.ts'
+import { MAX_AGENT_CONTEXT_BYTES } from '@acorn/protocol/agentContext.ts'
 
 export const MAX_AGENT_INPUT_BYTES = 2 * 1024 * 1024
 export const MAX_AGENT_CONFIG_BYTES = 256 * 1024

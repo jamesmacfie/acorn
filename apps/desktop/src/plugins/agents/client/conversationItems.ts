@@ -1,4 +1,4 @@
-import type { AgentEventRecord, AgentNormalizedEvent } from '../../../core/shared/managedAgents'
+import type { AgentEventRecord, AgentNormalizedEvent } from '@acorn/protocol/managedAgents.ts'
 
 export type AgentConversationItem = {
   key: string

@@ -1,5 +1,5 @@
 import { Hono } from 'hono'
-import type { Me } from '../../shared/api'
+import type { Me } from '@acorn/protocol/api.ts'
 import type { AppEnv } from '../middleware/auth'
 import { getUser } from '../middleware/requireUser'
 

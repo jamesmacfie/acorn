@@ -7,8 +7,8 @@ import type { IncomingMessage, Server } from 'node:http'
 import type { Duplex } from 'node:stream'
 import { WebSocketServer, type WebSocket } from 'ws'
 import { openSession, SESSION_COOKIE } from '../server/session'
-import type { ServerMsg } from '../shared/terminal'
-import { WS_PATH, type WsClientFrame, type WsServerFrame } from '../shared/ws'
+import type { ServerMsg } from '@acorn/protocol/terminal.ts'
+import { WS_PATH, type WsClientFrame, type WsServerFrame } from '@acorn/protocol/ws.ts'
 
 // A sink is one connection's outlet for a session's ServerMsg frames — terminal.ts adds/removes it
 // from a session's subscriber set on attach/detach and calls it to push output.

@@ -1,7 +1,7 @@
 import { createEffect, createSignal, For, Show } from 'solid-js'
 import { diffLines } from 'diff'
 import { readJson, writeJson } from '../apiClient'
-import { repoConfigTrustRoute, type RepoConfigTrustReview } from '../../shared/api'
+import { repoConfigTrustRoute, type RepoConfigTrustReview } from '@acorn/protocol/api.ts'
 import { closeRepoConfigTrust, configTrustRequest } from './configTrust'
 import { createDismissable } from '../ui/dismissable'
 import './config-trust.css'

@@ -1,6 +1,6 @@
 import { QueryClient } from '@tanstack/solid-query'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { fileSummariesKey, filesKey, pullKey } from '../../../core/shared/api'
+import { fileSummariesKey, filesKey, pullKey } from '@acorn/protocol/api.ts'
 import { INITIAL_PREFETCH_LIMIT, prefetchOpenPulls, prefetchPullSummary } from './prefetch'
 
 const jsonResponse = (body: unknown, status = 200) =>

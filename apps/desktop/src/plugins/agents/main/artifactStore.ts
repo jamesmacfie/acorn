@@ -5,7 +5,7 @@ import { join } from 'node:path'
 import { and, asc, eq, ne } from 'drizzle-orm'
 import type { AppDatabase } from '../../../core/server/db'
 import { schema } from '../../../core/server/db'
-import type { AgentArtifact, AgentArtifactKind } from '../../../core/shared/managedAgents'
+import type { AgentArtifact, AgentArtifactKind } from '@acorn/protocol/managedAgents.ts'
 
 export type RemovedArtifactObject = { id: string; storageKey: string | null }
 

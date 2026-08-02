@@ -1,6 +1,6 @@
 import { Hono } from 'hono'
 import { z } from 'zod'
-import type { LocalChange } from '../../../../core/shared/terminal'
+import type { LocalChange } from '@acorn/protocol/terminal.ts'
 import { bridgeSlot, viaBridge } from '../../../../core/server/bridge'
 import type { AppEnv } from '../../../../core/server/middleware/auth'
 import { respondError } from '../../../../core/server/respond'

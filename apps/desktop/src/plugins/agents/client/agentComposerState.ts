@@ -1,4 +1,4 @@
-import type { AgentSession } from '../../../core/shared/managedAgents'
+import type { AgentSession } from '@acorn/protocol/managedAgents.ts'
 
 export function agentComposerDisabledMessage(
   session: Pick<AgentSession, 'controller' | 'runtimeState'>,

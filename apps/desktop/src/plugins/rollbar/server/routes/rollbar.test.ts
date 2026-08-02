@@ -6,7 +6,7 @@ import type {
   RollbarItemsResponse,
   RollbarOccurrenceDetail,
   RollbarOccurrencesResponse,
-} from '../../../../core/shared/api'
+} from '@acorn/protocol/api.ts'
 import { getDb, schema } from '../../../../core/server/db'
 import type { AppEnv } from '../../../../core/server/middleware/auth'
 import { rollbarFetch } from '..'

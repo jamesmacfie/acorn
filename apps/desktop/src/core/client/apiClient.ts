@@ -1,4 +1,4 @@
-import type { ApiError as ApiErrorBody } from '../shared/api'
+import type { ApiError as ApiErrorBody } from '@acorn/protocol/api.ts'
 
 // Typed error for non-OK API responses: carries the HTTP status so consumers branch structurally
 // (e.g. index.tsx's 401 → reauth bounce) instead of pattern-matching message text.

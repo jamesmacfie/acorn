@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import type { RollbarItemSummary, RollbarOccurrenceDetail, RollbarOccurrenceSummary } from '../../../core/shared/api'
+import type { RollbarItemSummary, RollbarOccurrenceDetail, RollbarOccurrenceSummary } from '@acorn/protocol/api.ts'
 import { agentContext, emptyRollbarFilter, filterRollbarItems, frameRepoPath, isRegressed, rollbarFacets, rollbarImpact, sortRollbarItems } from './model'
 
 const item = (over: Partial<RollbarItemSummary>): RollbarItemSummary => ({

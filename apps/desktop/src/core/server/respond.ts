@@ -1,7 +1,7 @@
 import type { Context } from 'hono'
 import { HTTPException } from 'hono/http-exception'
 import type { ContentfulStatusCode } from 'hono/utils/http-status'
-import type { ApiError } from '../shared/api'
+import type { ApiError } from '@acorn/protocol/api.ts'
 import type { AppEnv } from './middleware/auth'
 
 // The single error-construction path. Every /api error body is built here, so it always

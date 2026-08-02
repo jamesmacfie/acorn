@@ -1,5 +1,5 @@
-import type { AgentTurn } from '../../../core/shared/managedAgents'
-import type { AgentContextSnapshot } from '../../../core/shared/agentContext'
+import type { AgentTurn } from '@acorn/protocol/managedAgents.ts'
+import type { AgentContextSnapshot } from '@acorn/protocol/agentContext.ts'
 
 export const TASK_CONTEXT_CONTRIBUTION_ID = 'acorn-task-context'
 export const AUTOMATIC_TASK_CONTEXT_SOURCE = 'context.task.automatic'

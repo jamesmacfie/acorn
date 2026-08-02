@@ -1,5 +1,5 @@
 import { createSignal, For, Show } from 'solid-js'
-import type { RollbarItemSummary, RollbarOccurrenceDetail } from '../../../core/shared/api'
+import type { RollbarItemSummary, RollbarOccurrenceDetail } from '@acorn/protocol/api.ts'
 import { openPane } from '../../../core/client/registries/clientEvents'
 import { agentContext, frameRepoPath } from './model'
 

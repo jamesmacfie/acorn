@@ -1,7 +1,7 @@
 // Per-task Postgres browse/edit (docs/pg.md). Was the `window.acorn.database` preload bridge; now
 // loopback HTTP routes. The connection URL is resolved server-side and never persisted.
 // The accessor shape is unchanged so DatabasePane keeps its call sites; it just never returns null.
-import { databaseActionRoute, databaseColumnsRoute, databaseQueriesRoute, databaseQueryRoute, databaseRowsRoute, databaseTablesRoute } from '../../../core/shared/api'
+import { databaseActionRoute, databaseColumnsRoute, databaseQueriesRoute, databaseQueryRoute, databaseRowsRoute, databaseTablesRoute } from '@acorn/protocol/api.ts'
 import { readJson, writeJson } from '../../../core/client/apiClient'
 import type { DbCell, DbColumnsResult, DbConnectResult, DbGenerateResult, DbPk, DbQueryResult, DbRowsResult, DbSavedQuery, DbTablesResult, DbWriteResult } from '../shared/database'
 

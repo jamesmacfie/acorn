@@ -4,7 +4,7 @@ import type {
   AgentPlanEntry,
   AgentQuestion,
   AgentToolCall,
-} from '../../../../core/shared/managedAgents'
+} from '@acorn/protocol/managedAgents.ts'
 import type { JsonRpcNotification, JsonRpcServerRequest } from './jsonRpcProcess'
 
 type JsonObject = Record<string, unknown>

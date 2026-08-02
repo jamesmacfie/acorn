@@ -1,4 +1,4 @@
-import type { AgentConfigOption } from '../../../core/shared/managedAgents'
+import type { AgentConfigOption } from '@acorn/protocol/managedAgents.ts'
 
 const sameValue = (
   left: AgentConfigOption['values'][number],

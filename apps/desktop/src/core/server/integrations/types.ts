@@ -1,4 +1,4 @@
-import type { ContextItem } from '../../shared/api'
+import type { ContextItem } from '@acorn/protocol/api.ts'
 import type { Hono } from 'hono'
 import type {
   CredentialField,
@@ -12,7 +12,7 @@ import type {
   ProviderCapabilities,
   ProviderErrorCode,
   PublicIntegrationProvider,
-} from '../../shared/integrations'
+} from '@acorn/protocol/integrations.ts'
 import type { AppDatabase } from '../db'
 import { schema } from '../db'
 import type { AppEnv } from '../middleware/auth'

@@ -1,7 +1,7 @@
 import { Hono } from 'hono'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import '../../../app/server/providers'
-import type { Task, TaskLink } from '../../shared/api'
+import type { Task, TaskLink } from '@acorn/protocol/api.ts'
 import { getDb, schema } from '../db'
 import type { AppEnv } from '../middleware/auth'
 import { tasks } from './tasks'

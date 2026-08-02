@@ -1,4 +1,4 @@
-import { AGENT_TOOLS_PERMS_PREF_KEY } from '../../shared/api'
+import { AGENT_TOOLS_PERMS_PREF_KEY } from '@acorn/protocol/api.ts'
 
 // The complete renderer preference vocabulary. Features import this object instead of spelling
 // storage keys so a preference rename or migration has one reviewable boundary.

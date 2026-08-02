@@ -6,7 +6,7 @@
 // Composition mirrors terminalClient: loopback HTTP for commands, the residual preload bridge for the
 // one thing that cannot be HTTP (the native folder picker). Returns null off-desktop on exactly the
 // same probe (`window.acorn?.terminal`), so every consumer's `if (!api)` guard behaves as before.
-import type { ArchiveOpts, ArchiveResult, RepoConfigPatch, RepoPath, RepoPathResult, TaskStatus } from '../../shared/terminal'
+import type { ArchiveOpts, ArchiveResult, RepoConfigPatch, RepoPath, RepoPathResult, TaskStatus } from '@acorn/protocol/terminal.ts'
 import {
   taskArchiveRoute,
   taskOnCreatedRoute,
@@ -18,7 +18,7 @@ import {
   terminalRepoPathSetRoute,
   terminalSessionActionRoute,
   terminalTaskStatusesRoute,
-} from '../../shared/api'
+} from '@acorn/protocol/api.ts'
 import { readJson, writeJson } from '../apiClient'
 
 export type TaskBridge = {

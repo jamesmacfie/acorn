@@ -9,7 +9,7 @@ import type {
   AgentSessionSnapshot,
   AgentTurn,
   AgentWsFrame,
-} from '../../../core/shared/managedAgents'
+} from '@acorn/protocol/managedAgents.ts'
 import { agentDriverRegistry, type AgentDriverRegistry } from './drivers/registry'
 import type { AgentDriverSession } from './drivers/types'
 import type { AgentDriver } from './drivers/types'

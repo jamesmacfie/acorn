@@ -7,7 +7,7 @@ import type {
   AgentSession,
   AgentTurn,
   AgentUsage,
-} from '../../../core/shared/managedAgents'
+} from '@acorn/protocol/managedAgents.ts'
 
 const parseJson = <T>(value: string | null, fallback: T): T => {
   if (value == null) return fallback

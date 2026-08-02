@@ -1,7 +1,7 @@
 // ChangesPane model (docs/panes.md): pure grouping/ordering/selection over LocalChange[] and the
 // adapter that feeds a local patch into the existing PR diff pipeline (PullFile shape → diff.ts).
-import type { PullFile } from '../../../core/shared/api'
-import type { LocalChange } from '../../../core/shared/terminal'
+import type { PullFile } from '@acorn/protocol/api.ts'
+import type { LocalChange } from '@acorn/protocol/terminal.ts'
 
 export type ChangesGroups = { staged: LocalChange[]; unstaged: LocalChange[] }
 

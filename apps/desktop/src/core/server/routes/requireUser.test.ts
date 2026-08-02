@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import type { ApiError } from '../../shared/api'
+import type { ApiError } from '@acorn/protocol/api.ts'
 import { createApp } from '../index'
 import type { Env } from '../../main/bindings'
 

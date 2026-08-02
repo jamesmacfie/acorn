@@ -1,6 +1,6 @@
 import { createEffect, createMemo, createSignal, For, on, Show } from 'solid-js'
-import type { AgentAttachment, AgentConfigOption, AgentInputPart, AgentSession } from '../../../core/shared/managedAgents'
-import { agentContextBudget, type AgentContextContribution, type AgentContextSnapshot } from '../../../core/shared/agentContext'
+import type { AgentAttachment, AgentConfigOption, AgentInputPart, AgentSession } from '@acorn/protocol/managedAgents.ts'
+import { agentContextBudget, type AgentContextContribution, type AgentContextSnapshot } from '@acorn/protocol/agentContext.ts'
 import { managedAgentApi } from './managedClient'
 import { agentContextContributions } from '../../../core/client/registries/agentContexts'
 import { Button, Field, Select } from '../../../core/client/ui/primitives'

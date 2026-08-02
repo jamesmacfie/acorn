@@ -1,8 +1,8 @@
 import type { schema } from '../../../core/server/db'
-import type { ToolCeiling, ToolRisk } from '../../../core/shared/workflow'
+import type { ToolCeiling, ToolRisk } from '@acorn/protocol/workflow.ts'
 
 export type WorkflowPosture = 'gated' | 'autonomous'
-export type { ToolCeiling, ToolRisk } from '../../../core/shared/workflow'
+export type { ToolCeiling, ToolRisk } from '@acorn/protocol/workflow.ts'
 
 export type WorkflowBudget = {
   maxWallTimeMs?: number

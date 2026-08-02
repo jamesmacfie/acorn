@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import type { ReviewNote } from '../../../core/shared/api'
+import type { ReviewNote } from '@acorn/protocol/api.ts'
 import { formatReviewPrompt } from './reviewPrompt'
 
 const note = (over: Partial<ReviewNote>): ReviewNote => ({

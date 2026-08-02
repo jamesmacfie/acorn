@@ -1,4 +1,4 @@
-import type { AgentContextContribution } from '../../../core/shared/agentContext'
+import type { AgentContextContribution } from '@acorn/protocol/agentContext.ts'
 import { contextSnapshot } from '../../../core/client/agent/contextSnapshot'
 import { refreshSessions, sessions } from '../../../core/client/tasks/agentSessions'
 

@@ -22,7 +22,7 @@ import { listProfileDefs, profileAvailable, resolveCommand, type ProfileDef } fr
 import { contextInjectionEnabled, isDir, loadTask } from '../../../core/main/taskWorktree'
 import { buildSessionEnv } from '../../../core/main/taskEnv'
 import { assembleContext } from '../../../core/server/agentTools/contextSections'
-import { formatLaunchContext } from '../../../core/shared/contextBlock'
+import { formatLaunchContext } from '@acorn/protocol/contextBlock.ts'
 
 export type KnowledgeDeps = {
   // Queue a text block into an agent session on its idle edge (agentSender in terminal.ts).

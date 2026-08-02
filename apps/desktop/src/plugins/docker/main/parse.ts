@@ -1,6 +1,6 @@
 // Pure parsers: docker CLI `--format '{{json .}}'` output → shared wire models. Kept free of
 // child-process concerns so they unit-test against captured fixtures (parse.test.ts).
-import type { DockerStatsSample } from '../../../core/shared/docker'
+import type { DockerStatsSample } from '@acorn/protocol/docker.ts'
 import type { DockerContainerDetail, DockerContainerSummary, DockerImage, DockerNetwork, DockerPort, DockerScope, DockerVolume } from '../shared/model'
 
 // Every list command emits one JSON object per line. Malformed lines are skipped, not fatal —

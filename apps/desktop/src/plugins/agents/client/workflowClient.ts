@@ -10,12 +10,12 @@ import {
   workflowStartRoute,
   workflowStepsRoute,
   workflowTriggerPollRoute,
-} from '../../../core/shared/api'
+} from '@acorn/protocol/api.ts'
 import { readJson, writeJson } from '../../../core/client/apiClient'
-import type { WorkflowDefSummary, WorkflowRunRow, WorkflowStepRow } from '../../../core/shared/workflow'
+import type { WorkflowDefSummary, WorkflowRunRow, WorkflowStepRow } from '@acorn/protocol/workflow.ts'
 import { openRepoConfigTrust } from '../../../core/client/configTrust/configTrust'
 
-export type { WorkflowDefSummary, WorkflowRunRow, WorkflowStepRow } from '../../../core/shared/workflow'
+export type { WorkflowDefSummary, WorkflowRunRow, WorkflowStepRow } from '@acorn/protocol/workflow.ts'
 
 type Defs = { workflows: WorkflowDefSummary[]; errors: { source: string; message: string }[] }
 

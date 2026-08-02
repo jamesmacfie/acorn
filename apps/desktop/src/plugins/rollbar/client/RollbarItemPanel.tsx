@@ -17,7 +17,7 @@ import {
   type RollbarItemSummary,
   type RollbarOccurrenceDetail,
   type RollbarOccurrencesResponse,
-} from '../../../core/shared/api'
+} from '@acorn/protocol/api.ts'
 import RollbarOccurrenceView from './RollbarOccurrenceView'
 import { isRegressed, rollbarImpact } from './model'
 import { Tabs } from '../../../core/client/ui/Tabs'

@@ -1,5 +1,5 @@
 import { execFileSync } from 'node:child_process'
-import type { TerminalProfile } from '../shared/terminal'
+import type { TerminalProfile } from '@acorn/protocol/terminal.ts'
 import { agentProfileRegistry, type AgentProfileContribution } from './agentProfiles'
 
 // Built-in agent profiles (docs/terminal-and-agents.md). The user-editable `agent_profiles` table is a later

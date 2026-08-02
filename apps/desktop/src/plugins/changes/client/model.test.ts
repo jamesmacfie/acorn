@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import type { LocalChange } from '../../../core/shared/terminal'
+import type { LocalChange } from '@acorn/protocol/terminal.ts'
 import { changeKey, groupChanges, pickSelected, toPullFile } from './model'
 
 const c = (path: string, staged: boolean, status: LocalChange['status'] = 'modified'): LocalChange => ({

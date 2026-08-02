@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import type { TaskContext } from '../../../core/shared/api'
+import type { TaskContext } from '@acorn/protocol/api.ts'
 import { assembleBlockFrom, sectionCap, selectionFromContext, traySummary } from './model'
 import { bytesOf, formatSize } from '../../../core/client/lib/formatSize'
 

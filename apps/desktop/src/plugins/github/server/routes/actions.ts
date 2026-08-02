@@ -3,7 +3,7 @@ import { gh, ghError } from '..'
 import type { AppEnv } from '../../../../core/server/middleware/auth'
 import { getUser } from '../../../../core/server/middleware/requireUser'
 import { respondError } from '../../../../core/server/respond'
-import type { RunJobs } from '../../../../core/shared/api'
+import type { RunJobs } from '@acorn/protocol/api.ts'
 
 // Read-only Actions endpoints for the checks side panel. Writes (rerun) live in prActions.ts.
 // Deliberately uncached on the server — no mirror table, no BLOBS entry: the client query cache

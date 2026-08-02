@@ -1,6 +1,6 @@
 import { QueryClient } from '@tanstack/solid-query'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { prefsKey } from '../../shared/api'
+import { prefsKey } from '@acorn/protocol/api.ts'
 import { persistedStateRegistry } from '../persistence/persistedState'
 
 const mocks = vi.hoisted(() => ({

@@ -7,7 +7,7 @@ import { workspaceForRepo } from '../../../core/client/workspaces/activeWorkspac
 import { managedAgentApi } from './managedClient'
 import { managedAgentStore } from './managedStore'
 import { openManagedSession } from './managedSelection'
-import type { AgentProviderDescriptor, AgentSession } from '../../../core/shared/managedAgents'
+import type { AgentProviderDescriptor, AgentSession } from '@acorn/protocol/managedAgents.ts'
 import { Button, Input, Row, Select } from '../../../core/client/ui/primitives'
 import './agent-center.css'
 

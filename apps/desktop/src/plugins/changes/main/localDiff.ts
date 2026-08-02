@@ -5,11 +5,11 @@
 // validated at this boundary (reject `..`/absolute — the editor-IPC discipline).
 import { execFile } from 'node:child_process'
 import { promisify } from 'node:util'
-import type { LocalChange } from '../../../core/shared/terminal'
+import type { LocalChange } from '@acorn/protocol/terminal.ts'
 
 const exec = promisify(execFile)
 
-export type { LocalChange } from '../../../core/shared/terminal'
+export type { LocalChange } from '@acorn/protocol/terminal.ts'
 type LocalChangeStatus = LocalChange['status']
 
 export type LocalScope = 'unstaged' | 'staged'

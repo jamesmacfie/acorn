@@ -5,7 +5,7 @@ import type {
   AgentProviderDescriptor,
   AgentSession,
   AgentTurn,
-} from '../../../../core/shared/managedAgents'
+} from '@acorn/protocol/managedAgents.ts'
 
 export type AgentDriverStartOptions = {
   session: AgentSession

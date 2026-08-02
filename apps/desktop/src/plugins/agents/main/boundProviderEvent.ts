@@ -4,7 +4,7 @@ import type {
   AgentNormalizedEvent,
   AgentQuestion,
   AgentSkillDescriptor,
-} from '../../../core/shared/managedAgents'
+} from '@acorn/protocol/managedAgents.ts'
 import { safeProviderMessage } from './drivers/diagnostics'
 
 const sliceText = (value: string | undefined, max = 16_384): string | undefined =>

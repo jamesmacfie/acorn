@@ -1,7 +1,7 @@
 import { Hono } from 'hono'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import '../../../app/server/providers'
-import type { TaskContext } from '../../shared/api'
+import type { TaskContext } from '@acorn/protocol/api.ts'
 import { getDb, schema } from '../db'
 import type { AppEnv } from '../middleware/auth'
 import { buildContextSections, setContextSections, type ContextMemorySource, type ContextNotesSource } from '../agentTools/contextSections'

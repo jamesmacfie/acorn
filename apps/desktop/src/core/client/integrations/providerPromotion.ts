@@ -1,5 +1,5 @@
-import type { LinearProjectIssue, RollbarItemSummary, TaskSeed } from '../../shared/api'
-import { dedupeBranch, slugifyBranch } from '../../shared/branch'
+import type { LinearProjectIssue, RollbarItemSummary, TaskSeed } from '@acorn/protocol/api.ts'
+import { dedupeBranch, slugifyBranch } from '@acorn/protocol/branch.ts'
 import type { SourcePromotionContext } from '../registries/sources'
 
 export const prepareLinearPromotion = (item: LinearProjectIssue, context: SourcePromotionContext): TaskSeed => ({

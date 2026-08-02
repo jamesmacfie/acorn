@@ -2,7 +2,7 @@ import Anthropic from '@anthropic-ai/sdk'
 import { publicConnectionProvider } from '../../../core/server/integrations/providers/shared'
 import { ProviderOperationError } from '../../../core/server/integrations/types'
 import type { ModelProviderAdapter } from '../../../core/server/modelProviders/types'
-import type { ModelCatalogEntry } from '../../../core/shared/integrations'
+import type { ModelCatalogEntry } from '@acorn/protocol/integrations.ts'
 import { modelProviderError, modelProviderHealth } from './errors'
 
 export const ANTHROPIC_RECOMMENDED_MODEL_ID = 'claude-sonnet-5'

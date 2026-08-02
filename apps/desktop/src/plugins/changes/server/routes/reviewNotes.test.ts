@@ -1,6 +1,6 @@
 import { Hono } from 'hono'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import type { ReviewNote } from '../../../../core/shared/api'
+import type { ReviewNote } from '@acorn/protocol/api.ts'
 import { getDb, schema } from '../../../../core/server/db'
 import type { AppEnv } from '../../../../core/server/middleware/auth'
 import { reviewNotes } from './reviewNotes'

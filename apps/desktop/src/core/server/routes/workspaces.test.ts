@@ -1,6 +1,6 @@
 import { Hono } from 'hono'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import type { Workspace } from '../../shared/api'
+import type { Workspace } from '@acorn/protocol/api.ts'
 import { getDb } from '../db'
 import type { AppEnv } from '../middleware/auth'
 import { workspaces } from './workspaces'

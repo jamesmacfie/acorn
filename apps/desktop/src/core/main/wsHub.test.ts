@@ -3,8 +3,8 @@ import type { AddressInfo } from 'node:net'
 import { WebSocket } from 'ws'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { sealSession, SESSION_COOKIE } from '../server/session'
-import type { ServerMsg } from '../shared/terminal'
-import type { WsServerFrame } from '../shared/ws'
+import type { ServerMsg } from '@acorn/protocol/terminal.ts'
+import type { WsServerFrame } from '@acorn/protocol/ws.ts'
 import { _resetWsHub, attachWsHub, registerWsChannelHandler, setStreamHandlers, wsBroadcast, type StreamSink } from './wsHub'
 
 // Headless verification of the delicate transport bits the smoke suite (S4) can't cover in a unit:

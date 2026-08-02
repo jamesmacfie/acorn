@@ -40,9 +40,9 @@
     "@xterm/xterm": "^5.5.0",
     "better-sqlite3": "^12.11.1",
     "diff": "^9.0.0",
-    "drizzle-orm": "^0.45.2",
+    "drizzle-orm": "catalog:",
     "gitdiff-parser": "^0.3.1",
-    "hono": "^4.12.32",
+    "hono": "catalog:",
     "idb-keyval": "^6.2.5",
     "jose": "^6.2.3",
     "lucide-static": "^1.27.0",
@@ -52,11 +52,12 @@
     "pg": "^8.22.0",
     "shiki": "^4.2.0",
     "smol-toml": "^1.7.0",
-    "solid-js": "^1.9.13",
+    "solid-js": "catalog:",
     "ws": "^8.21.0",
-    "zod": "^4.4.3"
+    "zod": "catalog:"
   },
   "devDependencies": {
+    "@acorn/protocol": "workspace:*",
     "@electron/rebuild": "^4.0.6",
     "@playwright/test": "^1.61.1",
     "@types/better-sqlite3": "^7.6.13",

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import type { AgentConfigOption } from '../../../core/shared/managedAgents'
+import type { AgentConfigOption } from '@acorn/protocol/managedAgents.ts'
 import { sameAgentConfigOptions } from './agentConfigOptions'
 
 const options = (): AgentConfigOption[] => [{

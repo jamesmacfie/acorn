@@ -1,5 +1,5 @@
 import { createMemo, For, Show } from 'solid-js'
-import type { AvailableModelConnection } from '../../shared/modelProviders'
+import type { AvailableModelConnection } from '@acorn/protocol/modelProviders.ts'
 
 // Controlled connection + model dropdowns over the configured model-provider connections
 // (availableModelConnections in core/shared/modelProviders). The connection select is hidden when

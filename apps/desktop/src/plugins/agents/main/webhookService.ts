@@ -7,7 +7,7 @@ import { and, asc, desc, eq, inArray, isNull, lte, or } from 'drizzle-orm'
 import type { AppDatabase } from '../../../core/server/db'
 import { schema } from '../../../core/server/db'
 import { decryptSecret, encryptSecret } from '../../../core/server/session'
-import type { AgentWsFrame } from '../../../core/shared/managedAgents'
+import type { AgentWsFrame } from '@acorn/protocol/managedAgents.ts'
 
 export type AgentWebhookEventType = 'completion' | 'attention'
 

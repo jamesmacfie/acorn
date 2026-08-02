@@ -6,7 +6,7 @@ import { join } from 'node:path'
 import { and, desc, eq } from 'drizzle-orm'
 import type { AppDatabase } from '../server/db'
 import { schema } from '../server/db'
-import type { RepoConfigTrustReview } from '../shared/api'
+import type { RepoConfigTrustReview } from '@acorn/protocol/api.ts'
 import { getRepoPath } from './repoPaths'
 import { isDir, loadTask } from './taskWorktree'
 

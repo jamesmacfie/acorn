@@ -4,7 +4,7 @@
 // fed by the sessions store on every refresh; OS toasts are focus-gated + cooldown/deduped here
 // (the main process no longer fires them).
 import { createSignal } from 'solid-js'
-import type { TerminalSession } from '../../shared/terminal'
+import type { TerminalSession } from '@acorn/protocol/terminal.ts'
 import { wsOnNotice } from '../wsClient'
 import { noticeKindContribution } from '../registries/notices'
 

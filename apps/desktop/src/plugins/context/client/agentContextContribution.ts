@@ -1,6 +1,6 @@
 import { readJson } from '../../../core/client/apiClient'
-import { taskContextRoute, type TaskContext } from '../../../core/shared/api'
-import type { AgentContextContribution, AgentContextSnapshot } from '../../../core/shared/agentContext'
+import { taskContextRoute, type TaskContext } from '@acorn/protocol/api.ts'
+import type { AgentContextContribution, AgentContextSnapshot } from '@acorn/protocol/agentContext.ts'
 import { contextRevisionFor } from './contextRevision'
 import { assembleBlockFrom } from './model'
 import { selectionFor } from './selectionState'

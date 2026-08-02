@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import type { AgentEventRecord } from '../../../core/shared/managedAgents'
+import type { AgentEventRecord } from '@acorn/protocol/managedAgents.ts'
 import { buildConversationItems } from './conversationItems'
 
 const event = (seq: number, value: AgentEventRecord['event']): AgentEventRecord => ({

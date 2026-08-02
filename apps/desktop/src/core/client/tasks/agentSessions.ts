@@ -10,10 +10,10 @@
 import { createSignal } from 'solid-js'
 import { capabilities } from '../capabilities'
 import { readJson } from '../apiClient'
-import { terminalSessionsRoute } from '../../shared/api'
+import { terminalSessionsRoute } from '@acorn/protocol/api.ts'
 import { wsOnStatus } from '../wsClient'
 import { trackSessionEdges } from '../notifications/notifications'
-import type { TerminalSession } from '../../shared/terminal'
+import type { TerminalSession } from '@acorn/protocol/terminal.ts'
 import { requestTerminalFocusIntent } from '../registries/clientEvents'
 import { latestOnly } from '../lib/latestOnly'
 

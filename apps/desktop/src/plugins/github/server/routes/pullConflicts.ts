@@ -1,7 +1,7 @@
 import { execFile } from 'node:child_process'
 import { promisify } from 'node:util'
 import { Hono } from 'hono'
-import type { PullConflicts } from '../../../../core/shared/api'
+import type { PullConflicts } from '@acorn/protocol/api.ts'
 import { getDb } from '../../../../core/server/db'
 import { getRepoPath } from '../../../../core/main/repoPaths'
 import type { AppEnv } from '../../../../core/server/middleware/auth'

@@ -6,7 +6,7 @@ import { app, dialog, type BrowserWindow } from 'electron'
 import { join } from 'node:path'
 import { registerPreviewIpc } from '../../plugins/preview/main/previewService'
 import { registerRepoPickerIpc } from '../../plugins/terminal/main/pickerIpc'
-import type { ServiceState } from '../../core/shared/serviceProtocol'
+import type { ServiceState } from '@acorn/protocol/serviceProtocol.ts'
 import { ServiceHost } from './serviceHost'
 
 export type BootstrapOptions = {

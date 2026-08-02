@@ -5,7 +5,7 @@ import {
   integrationRoute,
   integrationsRoute,
   integrationTestRoute,
-} from '../../shared/api'
+} from '@acorn/protocol/api.ts'
 
 const post = <T>(url: string, body?: unknown): Promise<T> =>
   writeJson<T>(url, {

@@ -1,6 +1,6 @@
 import { For, Show } from 'solid-js'
 import type { AgentConversationItem } from './conversationItems'
-import type { AgentTurn } from '../../../core/shared/managedAgents'
+import type { AgentTurn } from '@acorn/protocol/managedAgents.ts'
 import AgentMarkdown from './ManagedAgentMarkdown'
 import { dispatchLayout, setTerminalOpen } from '../../../core/client/tasks/tasks'
 import { requestTerminalFocus } from '../../../core/client/tasks/agentSessions'

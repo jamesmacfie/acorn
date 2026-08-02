@@ -1,4 +1,4 @@
-import type { Integration, WorkspaceProject } from '../../shared/api'
+import type { Integration, WorkspaceProject } from '@acorn/protocol/api.ts'
 
 const connectionIdsFor = (integrations: readonly Integration[], providerId: string): Set<string> =>
   new Set(integrations.filter((integration) => integration.providerId === providerId).map((integration) => integration.id))

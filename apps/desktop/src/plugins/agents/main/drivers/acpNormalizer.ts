@@ -9,7 +9,7 @@ import type {
   AgentConfigOption,
   AgentNormalizedEvent,
   AgentPermissionOption,
-} from '../../../../core/shared/managedAgents'
+} from '@acorn/protocol/managedAgents.ts'
 
 const permissionKind = (kind: string): AgentPermissionOption['kind'] =>
   kind === 'allow_once' || kind === 'allow_always' || kind === 'reject_once' || kind === 'reject_always'
