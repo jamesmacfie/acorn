@@ -1,18 +1,9 @@
 {
+  // The only package-level overrides: this is the Electron app, so it needs both DOM (renderer)
+  // and node (main/service) types in one program.
+  "extends": "../../tsconfig.base.json",
   "compilerOptions": {
-    "target": "ESNext",
-    "module": "ESNext",
-    "moduleResolution": "bundler",
-    "jsx": "preserve",
-    "jsxImportSource": "solid-js",
-    "lib": ["ESNext", "DOM", "DOM.Iterable"],
-    "types": ["vite/client", "node"],
-    "strict": true,
-    "noEmit": true,
-    "skipLibCheck": true,
-    "isolatedModules": true,
-    "verbatimModuleSyntax": true,
-    "allowImportingTsExtensions": true
+    "types": ["vite/client", "node"]
   },
-  "include": ["src", "electron.vite.config.ts", "drizzle.config.ts"]
+  "include": ["src", "test", "electron.vite.config.ts"]
 }

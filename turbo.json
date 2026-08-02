@@ -1,5 +1,8 @@
 {
   "$schema": "https://turbo.build/schema.json",
+  // tsconfig.base.json supplies the compiler options for every package. Without it here, editing
+  // it (e.g. turning off `strict`) leaves all 25 lint tasks on a cache hit and tsc never reruns.
+  "globalDependencies": ["tsconfig.base.json", "pnpm-workspace.yaml"],
   "tasks": {
     // Transit node. Workspace packages are consumed as SOURCE and have no `build` script, so a
     // `dependsOn: ["^build"]` resolves to nothing and a change in @acorn/node-core would NOT
@@ -26,6 +29,18 @@
     },
     "test": {
       "dependsOn": ["topo"]
+    },
+    // The boundary test reads every package off disk rather than importing them, so it has no
+    // dependency edges for `topo` to hash — once cached, nothing in the repo could invalidate it
+    // and it silently reported a stale pass. Hash the manifests and sources it actually inspects.
+    "@acorn/arch-tests#test": {
+      "inputs": [
+        "$TURBO_DEFAULT$",
+        "../../{apps,packages,plugins,tools}/*/package.json",
+        "../../{apps,packages,plugins,tools}/*/src/**",
+        "../../{apps,packages,plugins,tools}/*/test/**",
+        "../../{apps,packages,plugins,tools}/*/scripts/**"
+      ]
     }
   }
 }

@@ -30,7 +30,7 @@ const EXTS = ['.ts', '.tsx', '.js', '.jsx', '.mjs', '.cjs', '.json', '.css']
 type Pkg = { name: string; dir: string; src: string; kind: 'app' | 'plugin' | 'lib' }
 
 // Derived from the filesystem, never hardcoded: a new package is covered the day it is added.
-const PACKAGES: Pkg[] = ['apps', 'packages', 'plugins']
+const PACKAGES: Pkg[] = ['apps', 'packages', 'plugins', 'tools']
   .flatMap((base) => {
     const dir = join(ROOT, base)
     if (!existsSync(dir)) return []
@@ -93,7 +93,7 @@ function resolveSpec(from: string, spec: string): Target {
 type Edge = { fromFile: string; fromPkg: Pkg; spec: string; target: Target; isTest: boolean }
 
 const EDGES: Edge[] = PACKAGES.flatMap((p) =>
-  walk(p.src).concat(walk(join(p.dir, 'test'))).flatMap((file) => {
+  walk(p.src).concat(walk(join(p.dir, 'test')), walk(join(p.dir, 'scripts'))).flatMap((file) => {
     const text = readFileSync(file, 'utf8')
     const out: Edge[] = []
     let m: RegExpExecArray | null
@@ -164,6 +164,15 @@ describe('architecture boundaries', () => {
     expect([...new Set(into)].sort()).toEqual([])
   })
 
+  it('shared libraries never import a plugin', () => {
+    // packages/* -> plugins/* is the inversion that made client-core cyclic. Acyclicity alone does
+    // not catch it: a plugin whose only upstream is @acorn/protocol closes no cycle.
+    const inverted = crossPackage
+      .filter((e) => e.fromPkg.kind === 'lib' && e.target.pkg!.kind === 'plugin')
+      .map((e) => `${e.fromPkg.name} -> ${e.target.pkg!.name}`)
+    expect([...new Set(inverted)].sort()).toEqual([])
+  })
+
   it('apps never import each other', () => {
     const appToApp = crossPackage
       .filter((e) => e.fromPkg.kind === 'app' && e.target.pkg!.kind === 'app')
@@ -180,21 +189,19 @@ describe('architecture boundaries', () => {
   })
 
   it('the Electron surface stays where it is declared', () => {
-    const ELECTRON_OK = new Set([
-      'apps/desktop/src/app/main/electron.ts',
-      'apps/desktop/src/app/main/bootstrap.ts',
-      'apps/desktop/src/app/main/serviceHost.ts',
-      'apps/desktop/src/app/main/preload.ts',
-      'apps/desktop/src/app/main/sessionKeyStore.ts',
+    // apps/desktop IS the Electron app, so anything in it may import electron. What matters is
+    // that the surface OUTSIDE it stays tiny and enumerated — those are the files that would have
+    // to move or grow an adapter when the node service is split out.
+    const ELECTRON_OK_OUTSIDE_DESKTOP = new Set([
       'plugins/terminal/src/main/pickerIpc.ts',
       'plugins/preview/src/main/previewService.ts',
       'plugins/preview/src/main/browserService.ts',
-      // tests colocated with the above, which mock the electron module they exercise
-      'apps/desktop/src/app/main/sessionKeyStore.test.ts',
+      // colocated test that mocks the electron module it exercises
       'plugins/preview/src/main/previewService.test.ts',
     ])
     const importers = [...new Set(EDGES.filter((e) => e.target.external === 'electron').map((e) => rel(e.fromFile)))].sort()
-    expect(importers.filter((f) => !ELECTRON_OK.has(f))).toEqual([])
+    const outside = importers.filter((f) => !f.startsWith('apps/desktop/'))
+    expect(outside.filter((f) => !ELECTRON_OK_OUTSIDE_DESKTOP.has(f))).toEqual([])
   })
 
   it('client code never imports node code, and vice versa', () => {
@@ -240,9 +247,6 @@ describe('architecture boundaries', () => {
       '@acorn/plugin-memory -> @acorn/plugin-notes',
       '@acorn/plugin-preview -> @acorn/plugin-terminal',
       '@acorn/plugin-workflows -> @acorn/plugin-agents',
-      // test-only: workflowRunner.test.ts builds a real NotesStore. Invisible to the previous
-      // ledger, which exempted every test file; this one does not.
-      '@acorn/plugin-workflows -> @acorn/plugin-notes',
     ]
     const seen = crossPackage
       .filter((e) => e.fromPkg.kind === 'plugin' && e.target.pkg!.kind === 'plugin')
