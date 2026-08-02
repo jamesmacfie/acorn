@@ -1,6 +1,6 @@
 import { sql } from 'drizzle-orm'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import { makeTestDb, type TestDb } from '../../../core/server/routes/testDb'
+import { makeTestDb, type TestDb } from '@acorn/node-core/server/routes/testDb.ts'
 
 describe('managed-agent FTS schema', () => {
   let testDb: TestDb

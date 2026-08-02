@@ -40,12 +40,12 @@ describe('workspace icon + colour', () => {
   const create = async (): Promise<Workspace> => {
     const res = await app.fetch(jsonReq('/api/workspaces', 'POST', { name: 'Runn' }), {} as Env)
     expect(res.status).toBe(200)
-    return res.json()
+    return (await res.json()) as Workspace
   }
 
   const read = async (id: string): Promise<Workspace | undefined> => {
     const res = await app.fetch(new Request('http://acorn.test/api/workspaces'), {} as Env)
-    const all: Workspace[] = await res.json()
+    const all = (await res.json()) as Workspace[]
     return all.find((w) => w.id === id)
   }
 

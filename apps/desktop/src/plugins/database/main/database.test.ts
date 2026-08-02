@@ -12,9 +12,9 @@ import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import { makeTestDb, type TestDb } from '../../../core/server/routes/testDb'
-import { schema } from '../../../core/server/db'
-import { RepoConfigTrustError } from '../../../core/main/repoConfigTrust'
+import { makeTestDb, type TestDb } from '@acorn/node-core/server/routes/testDb.ts'
+import { schema } from '@acorn/node-core/server/db/index.ts'
+import { RepoConfigTrustError } from '@acorn/node-core/main/repoConfigTrust.ts'
 import { resolveDbUrl } from './database'
 
 describe('resolveDbUrl: repo-authored url_script trust gate', () => {

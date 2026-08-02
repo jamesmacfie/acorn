@@ -16,7 +16,7 @@ import type {
   RollbarStackFrame,
 } from '@acorn/protocol/api.ts'
 import { levelName, type RollbarApiInstance, type RollbarApiItem } from './'
-import { isRecord } from '../../../core/server/integrations/codec'
+import { isRecord } from '@acorn/node-core/server/integrations/codec.ts'
 
 // Suggested caps (docs/next/rollbar.md). Exported so tests assert against the same numbers.
 export const CAPS = {

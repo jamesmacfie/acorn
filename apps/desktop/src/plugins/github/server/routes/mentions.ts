@@ -1,8 +1,8 @@
 import { and, eq } from 'drizzle-orm'
 import { Hono } from 'hono'
-import { getDb, schema } from '../../../../core/server/db'
-import type { AppEnv } from '../../../../core/server/middleware/auth'
-import { getUser } from '../../../../core/server/middleware/requireUser'
+import { getDb, schema } from '@acorn/node-core/server/db/index.ts'
+import type { AppEnv } from '@acorn/node-core/server/middleware/auth.ts'
+import { getUser } from '@acorn/node-core/server/middleware/requireUser.ts'
 
 // Participant logins for @-mention autocomplete, read straight from the mirror tables. Mirror-only
 // and best-effort: an unmirrored repo yields an empty list (the client just gets no suggestions),

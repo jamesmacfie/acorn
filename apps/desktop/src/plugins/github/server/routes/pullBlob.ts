@@ -1,10 +1,10 @@
 import { Hono } from 'hono'
-import { fileBodyBlobKey } from '../../../../core/server/blobs'
-import { getDb } from '../../../../core/server/db'
+import { fileBodyBlobKey } from '@acorn/node-core/server/blobs.ts'
+import { getDb } from '@acorn/node-core/server/db/index.ts'
 import { gh, ghError } from '..'
-import type { AppEnv } from '../../../../core/server/middleware/auth'
-import { getUser } from '../../../../core/server/middleware/requireUser'
-import { respondError } from '../../../../core/server/respond'
+import type { AppEnv } from '@acorn/node-core/server/middleware/auth.ts'
+import { getUser } from '@acorn/node-core/server/middleware/requireUser.ts'
+import { respondError } from '@acorn/node-core/server/respond.ts'
 import { resolveRepoForUser } from './repoMirror'
 
 // Full file body at an immutable blob sha — used to expand unchanged context around diff hunks.

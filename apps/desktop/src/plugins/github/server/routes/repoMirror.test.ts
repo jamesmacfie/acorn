@@ -1,16 +1,16 @@
 import { Hono } from 'hono'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { settleBackground } from '../../../../core/server/background'
-import { getDb } from '../../../../core/server/db'
+import { settleBackground } from '@acorn/node-core/server/background.ts'
+import { getDb } from '@acorn/node-core/server/db/index.ts'
 import { gh } from '..'
-import type { AppEnv } from '../../../../core/server/middleware/auth'
-import { PULLS_STALE_AFTER_MS as FILES_STALE_AFTER_MS } from '../../../../core/server/sync/policy'
+import type { AppEnv } from '@acorn/node-core/server/middleware/auth.ts'
+import { PULLS_STALE_AFTER_MS as FILES_STALE_AFTER_MS } from '@acorn/node-core/server/sync/policy.ts'
 import { pullFiles } from './pullFiles'
 import { resolveRepoForUser } from './repoMirror'
-import type { Env } from '../../../../core/main/bindings'
+import type { Env } from '@acorn/node-core/main/bindings.ts'
 
-vi.mock('../../../../core/server/db', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('../../../../core/server/db')>()
+vi.mock('@acorn/node-core/server/db/index.ts', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@acorn/node-core/server/db/index.ts')>()
   return { ...actual, getDb: vi.fn() }
 })
 

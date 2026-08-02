@@ -7,14 +7,14 @@ import { readFile, writeFile } from 'node:fs/promises'
 import { dirname, resolve } from 'node:path'
 import { homedir } from 'node:os'
 import { eq } from 'drizzle-orm'
-import type { AppDatabase } from '../../../core/server/db'
-import { schema } from '../../../core/server/db'
+import type { AppDatabase } from '@acorn/node-core/server/db/index.ts'
+import { schema } from '@acorn/node-core/server/db/index.ts'
 import { setTerminalBridge } from '../server/routes/terminal'
-import { setStreamHandlers } from '../../../core/main/wsHub'
+import { setStreamHandlers } from '@acorn/node-core/main/wsHub.ts'
 import type { ArchiveOpts, ArchiveResult, CreateOpts, ServerMsg, TerminalSession } from '@acorn/protocol/terminal.ts'
 import { AgentSender, type SendSubmit } from './agentSend'
-import { archiveTask, TEARDOWN_TIMEOUT_MS } from '../../../core/main/archive'
-import { buildSessionEnv, childEnv } from '../../../core/main/taskEnv'
+import { archiveTask, TEARDOWN_TIMEOUT_MS } from '@acorn/node-core/main/archive.ts'
+import { buildSessionEnv, childEnv } from '@acorn/node-core/main/taskEnv.ts'
 import {
   clampDim,
   computeIdle,
@@ -28,12 +28,12 @@ import {
   tmuxNewSessionArgs,
   trimRing,
 } from './terminalUtils'
-import { getProfile, listProfileDefs, listProfiles, resolveCommand, tmuxAvailable } from '../../../core/main/profiles'
-import { getRepoPath, setRepoConfig, setRepoPath, setRunTargets } from '../../../core/main/repoPaths'
+import { getProfile, listProfileDefs, listProfiles, resolveCommand, tmuxAvailable } from '@acorn/node-core/main/profiles.ts'
+import { getRepoPath, setRepoConfig, setRepoPath, setRunTargets } from '@acorn/node-core/main/repoPaths.ts'
 import { fileURLToPath } from 'node:url'
 import { inspectMcpConfig, MCP_CANDIDATES, STARTER_MCP_JSON, type McpServerSummary } from '@acorn/protocol/mcp.ts'
-import { launcherSpec, resolveMcpEntry, serverName, type Launcher } from '../../../core/main/mcpRegister'
-import { broadcastStatus } from '../../../core/main/notify'
+import { launcherSpec, resolveMcpEntry, serverName, type Launcher } from '@acorn/node-core/main/mcpRegister.ts'
+import { broadcastStatus } from '@acorn/node-core/main/notify.ts'
 import type { RunSessionGlue } from './runIpc'
 import { TerminalDisplay } from './terminalDisplay'
 import {
@@ -47,8 +47,8 @@ import {
   taskRoot,
   repoSetup,
   type TaskRow,
-} from '../../../core/main/taskWorktree'
-import { currentBranch } from '../../../core/main/worktrees'
+} from '@acorn/node-core/main/taskWorktree.ts'
+import { currentBranch } from '@acorn/node-core/main/worktrees.ts'
 
 // PTYs live in the Node utility service. Sessions run on one of two backends:
 //  - node-pty: spawn the command directly. Survives a window reload (PTY is in the service), not an app

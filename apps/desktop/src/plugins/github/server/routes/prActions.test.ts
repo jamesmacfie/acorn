@@ -1,15 +1,15 @@
 import { Hono } from 'hono'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { ApiError } from '@acorn/protocol/api.ts'
-import { getDb, schema } from '../../../../core/server/db'
-import type { AppEnv, Principal, SessionUser } from '../../../../core/server/middleware/auth'
+import { getDb, schema } from '@acorn/node-core/server/db/index.ts'
+import type { AppEnv, Principal, SessionUser } from '@acorn/node-core/server/middleware/auth.ts'
 import { prActions } from './prActions'
-import { testGate } from '../../../../core/server/routes/testAuth'
-import { makeTestDb, type TestDb } from '../../../../core/server/routes/testDb'
-import type { Env } from '../../../../core/main/bindings'
+import { testGate } from '@acorn/node-core/server/routes/testAuth.ts'
+import { makeTestDb, type TestDb } from '@acorn/node-core/server/routes/testDb.ts'
+import type { Env } from '@acorn/node-core/main/bindings.ts'
 
-vi.mock('../../../../core/server/db', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('../../../../core/server/db')>()
+vi.mock('@acorn/node-core/server/db/index.ts', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@acorn/node-core/server/db/index.ts')>()
   return { ...actual, getDb: vi.fn() }
 })
 

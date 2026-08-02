@@ -1,4 +1,4 @@
-import type { schema } from '../../../core/server/db'
+import type { schema } from '@acorn/node-core/server/db/index.ts'
 import type {
   AgentEventRecord,
   AgentInputPart,

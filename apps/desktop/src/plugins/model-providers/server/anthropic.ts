@@ -1,7 +1,7 @@
 import Anthropic from '@anthropic-ai/sdk'
-import { publicConnectionProvider } from '../../../core/server/integrations/providers/shared'
-import { ProviderOperationError } from '../../../core/server/integrations/types'
-import type { ModelProviderAdapter } from '../../../core/server/modelProviders/types'
+import { publicConnectionProvider } from '@acorn/node-core/server/integrations/providers/shared.ts'
+import { ProviderOperationError } from '@acorn/node-core/server/integrations/types.ts'
+import type { ModelProviderAdapter } from '@acorn/node-core/server/modelProviders/types.ts'
 import type { ModelCatalogEntry } from '@acorn/protocol/integrations.ts'
 import { modelProviderError, modelProviderHealth } from './errors'
 

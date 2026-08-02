@@ -1,8 +1,8 @@
 import type { BatchItem } from 'drizzle-orm/batch'
 import { and, eq, inArray } from 'drizzle-orm'
 import type { SQLiteColumn } from 'drizzle-orm/sqlite-core'
-import type { AppDatabase } from '../../../core/server/db'
-import { schema } from '../../../core/server/db'
+import type { AppDatabase } from '@acorn/node-core/server/db/index.ts'
+import { schema } from '@acorn/node-core/server/db/index.ts'
 
 export type MirrorPullKey = { userId: string; repoId: number; number: number }
 

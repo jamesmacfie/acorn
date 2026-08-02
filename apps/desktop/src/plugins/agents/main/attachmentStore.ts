@@ -3,8 +3,8 @@ import { constants } from 'node:fs'
 import { lstat, mkdir, open, readFile, unlink } from 'node:fs/promises'
 import { basename, join } from 'node:path'
 import { and, eq, isNotNull, isNull, lt, or } from 'drizzle-orm'
-import type { AppDatabase } from '../../../core/server/db'
-import { schema } from '../../../core/server/db'
+import type { AppDatabase } from '@acorn/node-core/server/db/index.ts'
+import { schema } from '@acorn/node-core/server/db/index.ts'
 import type { AgentAttachment } from '@acorn/protocol/managedAgents.ts'
 
 const MAX_ATTACHMENT_BYTES = 10 * 1024 * 1024

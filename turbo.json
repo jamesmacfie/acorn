@@ -1,17 +1,31 @@
 {
   "$schema": "https://turbo.build/schema.json",
   "tasks": {
+    // Transit node. Workspace packages are consumed as SOURCE and have no `build` script, so a
+    // `dependsOn: ["^build"]` resolves to nothing and a change in @acorn/node-core would NOT
+    // invalidate a dependent's cached lint/test — turbo would serve a stale pass. `topo` has no
+    // implementation; it exists purely so lint/test inherit their dependencies' input hashes.
+    // Requires an acyclic package graph, which is why the client-core <-> plugin cycles must stay
+    // broken.
+    "topo": {
+      "dependsOn": ["^topo"]
+    },
     "build": {
-      "dependsOn": ["^build"],
-      "outputs": ["dist/**", ".next/**", "!.next/cache/**"]
+      "dependsOn": ["^build", "topo"],
+      // out/** is the Electron main/preload/mcp output and was previously undeclared, so a cache
+      // hit restored dist/client without it. (.next/** was never produced by this repo.)
+      "outputs": ["dist/**", "out/**"],
+      "env": ["MAIN_VITE_GITHUB_CLIENT_ID", "MAIN_VITE_GITHUB_CLIENT_SECRET"]
     },
     "dev": {
       "cache": false,
       "persistent": true
     },
-    "lint": {},
+    "lint": {
+      "dependsOn": ["topo"]
+    },
     "test": {
-      "dependsOn": ["^build"]
+      "dependsOn": ["topo"]
     }
   }
 }

@@ -2,10 +2,10 @@ import { Hono } from 'hono'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { ApiError } from '@acorn/protocol/api.ts'
 import { gh } from '..'
-import type { AppEnv, Principal, SessionUser } from '../../../../core/server/middleware/auth'
+import type { AppEnv, Principal, SessionUser } from '@acorn/node-core/server/middleware/auth.ts'
 import { prCreate } from './prCreate'
-import { testGate } from '../../../../core/server/routes/testAuth'
-import type { Env } from '../../../../core/main/bindings'
+import { testGate } from '@acorn/node-core/server/routes/testAuth.ts'
+import type { Env } from '@acorn/node-core/main/bindings.ts'
 
 vi.mock('..', async (importOriginal) => {
   const actual = await importOriginal<typeof import('..')>()

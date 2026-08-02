@@ -11,7 +11,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 // and env-absent / acorn-down degrade to structured results, never protocol errors. The per-tool
 // behaviour (git, notes provenance, memory PROPOSE-only) is covered at the registry/route layer.
 
-const appRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../../..')
+const appRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../..')
 
 // A tiny fixture manifest — two tools, one with args — projected as JSON schema by the registry.
 const MANIFEST = {
@@ -33,7 +33,7 @@ class McpClient {
   private nextId = 1
 
   constructor(env: Record<string, string | undefined>) {
-    this.child = spawn(process.execPath, ['--import', 'tsx', 'src/core/mcp/main.ts'], { cwd: appRoot, env: { ...process.env, ...env }, stdio: ['pipe', 'pipe', 'pipe'] })
+    this.child = spawn(process.execPath, ['--import', 'tsx', 'src/mcp/main.ts'], { cwd: appRoot, env: { ...process.env, ...env }, stdio: ['pipe', 'pipe', 'pipe'] })
     this.child.stdout!.on('data', (chunk: Buffer) => {
       this.buffer += chunk.toString()
       let i: number

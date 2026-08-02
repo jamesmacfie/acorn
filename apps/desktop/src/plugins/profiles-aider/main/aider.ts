@@ -1,4 +1,4 @@
-import type { AgentProfileContribution } from '../../../core/main/agentProfiles/types'
+import type { AgentProfileContribution } from '@acorn/node-core/main/agentProfiles/types.ts'
 
 export const aiderProfile: AgentProfileContribution = {
   id: 'aider',

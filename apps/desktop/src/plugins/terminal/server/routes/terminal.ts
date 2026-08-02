@@ -2,9 +2,9 @@ import { Hono } from 'hono'
 import { z } from 'zod'
 import type { McpServerSummary } from '@acorn/protocol/mcp.ts'
 import type { ArchiveOpts, ArchiveResult, CreateOpts, RepoConfigPatch, RepoPath, RepoPathResult, TaskStatus, TerminalProfile, TerminalSession } from '@acorn/protocol/terminal.ts'
-import { bridgeSlot, viaBridge } from '../../../../core/server/bridge'
-import type { AppEnv } from '../../../../core/server/middleware/auth'
-import { respondError } from '../../../../core/server/respond'
+import { bridgeSlot, viaBridge } from '@acorn/node-core/server/bridge.ts'
+import type { AppEnv } from '@acorn/node-core/server/middleware/auth.ts'
+import { respondError } from '@acorn/node-core/server/respond.ts'
 
 // Terminal control (docs/terminal-and-agents.md): the request/response half of the terminal engine —
 // list/create/kill/resize sessions, repo-path mapping, task lifecycle (archive/useCheckout/onCreated),

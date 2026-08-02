@@ -2,7 +2,7 @@
 // (server/routes/harness.ts). Notes, memory and the drivable browser moved to the agent-tool
 // registry in the agent-tool registry (main/agentToolsWiring.ts); run keeps a dedicated bridge because its renderer
 // surface (run pane, preview home) is not an agent tool. Wired independently so dev:node stays 503.
-import { setRunBridge } from '../../core/server/routes/harness'
+import { setRunBridge } from '@acorn/node-core/server/routes/harness.ts'
 import type { RuntimeService } from '../../plugins/terminal/main/runtime'
 
 export function wireRunBridge(runtime: RuntimeService): void {

@@ -2,9 +2,9 @@ import { randomUUID } from 'node:crypto'
 import { and, eq, inArray } from 'drizzle-orm'
 import { Hono } from 'hono'
 import type { ReviewNote } from '@acorn/protocol/api.ts'
-import { getDb, schema } from '../../../../core/server/db'
-import type { AppEnv } from '../../../../core/server/middleware/auth'
-import { respondError } from '../../../../core/server/respond'
+import { getDb, schema } from '@acorn/node-core/server/db/index.ts'
+import type { AppEnv } from '@acorn/node-core/server/middleware/auth.ts'
+import { respondError } from '@acorn/node-core/server/respond.ts'
 
 // Local review notes (docs/panes.md): CRUD over the machine-scoped review_notes table. The send
 // loop: create (unsent) → deliver via sendToAgent → POST /sent stamps sentAt → an edit clears it,

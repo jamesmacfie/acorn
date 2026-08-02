@@ -1,8 +1,8 @@
 import { Hono } from 'hono'
 import { gh, ghError } from '..'
-import type { AppEnv } from '../../../../core/server/middleware/auth'
-import { getUser } from '../../../../core/server/middleware/requireUser'
-import { respondError } from '../../../../core/server/respond'
+import type { AppEnv } from '@acorn/node-core/server/middleware/auth.ts'
+import { getUser } from '@acorn/node-core/server/middleware/requireUser.ts'
+import { respondError } from '@acorn/node-core/server/respond.ts'
 import type { RunJobs } from '@acorn/protocol/api.ts'
 
 // Read-only Actions endpoints for the checks side panel. Writes (rerun) live in prActions.ts.

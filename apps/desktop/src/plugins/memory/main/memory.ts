@@ -11,8 +11,8 @@ import { existsSync, mkdirSync } from 'node:fs'
 import { readdir, readFile, rename, stat, unlink, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { and, eq, inArray, sql } from 'drizzle-orm'
-import type { AppDatabase } from '../../../core/server/db'
-import { schema } from '../../../core/server/db'
+import type { AppDatabase } from '@acorn/node-core/server/db/index.ts'
+import { schema } from '@acorn/node-core/server/db/index.ts'
 
 export type MemoryType = 'convention' | 'architecture' | 'decision' | 'fix' | 'reference' | 'feedback' | 'task' | 'user'
 export const MEMORY_TYPES: readonly MemoryType[] = ['convention', 'architecture', 'decision', 'fix', 'reference', 'feedback', 'task', 'user']

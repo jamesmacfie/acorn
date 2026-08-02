@@ -1,12 +1,12 @@
-import { BridgeError } from '../../core/server/bridge'
-import type { AppDatabase } from '../../core/server/db'
-import { wsBroadcast } from '../../core/main/wsHub'
+import { BridgeError } from '@acorn/node-core/server/bridge.ts'
+import type { AppDatabase } from '@acorn/node-core/server/db/index.ts'
+import { wsBroadcast } from '@acorn/node-core/main/wsHub.ts'
 import { ManagedAgentRuntime } from '../../plugins/agents/main/runtime'
 import { agentDriverRegistry } from '../../plugins/agents/main/drivers/registry'
 import { ClaudeAgentDriver } from '../../plugins/agents/main/drivers/claudeDriver'
 import { CodexAgentDriver } from '../../plugins/agents/main/drivers/codexDriver'
 import { terminalBridgeSlot } from '../../plugins/terminal/server/routes/terminal'
-import { getProfile, resolveCommand } from '../../core/main/profiles'
+import { getProfile, resolveCommand } from '@acorn/node-core/main/profiles.ts'
 import {
   setManagedAgentsBridge,
   type ManagedAgentsBridge,

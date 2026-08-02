@@ -102,13 +102,18 @@ export function diskBlobCache(dir: string): BlobCache {
   }
 }
 
-// drizzle-generated migrations: packaged as extraResources (process.resourcesPath/migrations) in a
-// built app, else resolved from this module at apps/desktop/migrations. Never from process.cwd().
-// ponytail: search ancestors for the migrations dir instead of a fixed `../../` — the module sits at
-// a different depth in the built bundle (out/main) vs dev/test source (src/core/main), so a fixed
-// relative path can't serve both. First `migrations` dir up the tree is apps/desktop/migrations.
+// drizzle-generated migrations: packaged as extraResources (<resources>/migrations) in a built
+// app, else resolved by walking ancestors from this module. Never from process.cwd().
+// ponytail: search ancestors instead of a fixed `../../` — the module sits at a different depth in
+// the built bundle (apps/desktop/out/main, where the build copies migrations to out/migrations)
+// than in dev/test source (packages/node-core/src/main, next to packages/node-core/migrations), so
+// no single relative path serves both.
+//
+// resourcesPath is an Electron addition to `process`, and node-core compiles against plain Node
+// types by design — read it defensively rather than widening the package's type surface.
+const electronResourcesPath = (process as { resourcesPath?: string }).resourcesPath
 const migrationsFolder = (() => {
-  const packaged = process.resourcesPath ? join(process.resourcesPath, 'migrations') : null
+  const packaged = electronResourcesPath ? join(electronResourcesPath, 'migrations') : null
   if (packaged && existsSync(packaged)) return packaged
   let dir = dirname(fileURLToPath(import.meta.url))
   for (;;) {

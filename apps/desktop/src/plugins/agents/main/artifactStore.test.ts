@@ -3,8 +3,8 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { eq } from 'drizzle-orm'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import { schema } from '../../../core/server/db'
-import { makeTestDb, type TestDb } from '../../../core/server/routes/testDb'
+import { schema } from '@acorn/node-core/server/db/index.ts'
+import { makeTestDb, type TestDb } from '@acorn/node-core/server/routes/testDb.ts'
 import { AgentArtifactStore } from './artifactStore'
 
 let testDb: TestDb

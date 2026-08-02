@@ -1,9 +1,9 @@
 import { Hono } from 'hono'
 import { afterEach, describe, expect, it } from 'vitest'
-import type { AppEnv } from '../../../../core/server/middleware/auth'
-import { requireUser } from '../../../../core/server/middleware/requireUser'
+import type { AppEnv } from '@acorn/node-core/server/middleware/auth.ts'
+import { requireUser } from '@acorn/node-core/server/middleware/requireUser.ts'
 import { setTerminalBridge, terminal, type TerminalBridge } from './terminal'
-import type { Env } from '../../../../core/main/bindings'
+import type { Env } from '@acorn/node-core/main/bindings.ts'
 
 // Transport contract for terminal control: routing, auth, body validation, and clean
 // bridge-unavailable degradation. PTY/worktree behavior is covered by main tests; streaming is

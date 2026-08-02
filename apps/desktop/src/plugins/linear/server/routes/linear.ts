@@ -1,6 +1,6 @@
 import { and, eq, inArray } from 'drizzle-orm'
 import { Hono } from 'hono'
-import { getDb, schema } from '../../../../core/server/db'
+import { getDb, schema } from '@acorn/node-core/server/db/index.ts'
 import {
   ISSUE_DETAIL_QUERY,
   ISSUE_ID_QUERY,
@@ -15,11 +15,11 @@ import {
   linearError,
   linearFetch,
 } from '..'
-import type { AppEnv } from '../../../../core/server/middleware/auth'
-import { getUser } from '../../../../core/server/middleware/requireUser'
-import { respondError } from '../../../../core/server/respond'
-import { encodeCached, parseCached } from '../../../../core/server/integrations/codec'
-import { connectionHasCapability, forEachConnection, listProviderConnections } from '../../../../core/server/integrations/connections'
+import type { AppEnv } from '@acorn/node-core/server/middleware/auth.ts'
+import { getUser } from '@acorn/node-core/server/middleware/requireUser.ts'
+import { respondError } from '@acorn/node-core/server/respond.ts'
+import { encodeCached, parseCached } from '@acorn/node-core/server/integrations/codec.ts'
+import { connectionHasCapability, forEachConnection, listProviderConnections } from '@acorn/node-core/server/integrations/connections.ts'
 import {
   linearNodeToDetail,
   linearProvider,
@@ -27,11 +27,11 @@ import {
   linearSummaryOf,
   type LinearResourceInput,
 } from '../provider'
-import { runProviderResource } from '../../../../core/server/integrations/resourceRuntime'
-import { providerRequestScheduler } from '../../../../core/server/integrations/budgetRuntime'
-import { ProviderOperationError } from '../../../../core/server/integrations/types'
+import { runProviderResource } from '@acorn/node-core/server/integrations/resourceRuntime.ts'
+import { providerRequestScheduler } from '@acorn/node-core/server/integrations/budgetRuntime.ts'
+import { ProviderOperationError } from '@acorn/node-core/server/integrations/types.ts'
 import type { LinearIssueDetail, LinearIssuesRequest, LinearIssuesResponse, LinearProject, LinearProjectIssue, LinearProjectIssuesResponse, LinearProjectsResponse } from '@acorn/protocol/api.ts'
-import type { Env } from '../../../../core/main/bindings'
+import type { Env } from '@acorn/node-core/main/bindings.ts'
 
 // TTL centralized in server/sync/policy.ts. Linear's reads fan out across all connected
 // integrations with partial results and per-item (`issues.fetchedAt`) freshness, so they do NOT use

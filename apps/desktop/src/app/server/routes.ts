@@ -2,7 +2,7 @@
 // This is the ONE place allowed to import both core and plugin server parts — the composition root
 // imports it before createApp() runs, so core/server/index.ts never names a product route module
 // (docs/plugins.md). Adding a plugin route is a one-line edit here, not a core edit.
-import { registerRoute } from '../../core/server/routeRegistry'
+import { registerRoute } from '@acorn/node-core/server/routeRegistry.ts'
 import { agentUsage } from '../../plugins/agents/server/routes/usage'
 import { managedAgents } from '../../plugins/agents/server/routes/managed'
 import { actions } from '../../plugins/github/server/routes/actions'

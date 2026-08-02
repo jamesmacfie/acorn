@@ -1,13 +1,13 @@
 import { and, eq, inArray } from 'drizzle-orm'
 import type { SQLiteColumn } from 'drizzle-orm/sqlite-core'
 import type { Check, Comment, Label, PullCommit, PullDetail, PullFile, Review, Thread } from '@acorn/protocol/api.ts'
-import { patchBlobKey } from '../../../../core/server/blobs'
-import { getDb, schema } from '../../../../core/server/db'
-import { chunkRowsByColumnBudget } from '../../../../core/server/db/batch'
-import { filesResource, prResource } from '../../../../core/server/db/resourceKeys'
+import { patchBlobKey } from '@acorn/node-core/server/blobs.ts'
+import { getDb, schema } from '@acorn/node-core/server/db/index.ts'
+import { chunkRowsByColumnBudget } from '@acorn/node-core/server/db/batch.ts'
+import { filesResource, prResource } from '@acorn/node-core/server/db/resourceKeys.ts'
 import { gh, ghError } from '..'
-import type { RouteResult } from '../../../../core/server/sync/engine'
-import type { Env } from '../../../../core/main/bindings'
+import type { RouteResult } from '@acorn/node-core/server/sync/engine.ts'
+import type { Env } from '@acorn/node-core/main/bindings.ts'
 
 // Shared PR mirror helpers: the GraphQL detail mirror and the REST files mirror (SQLite rows +
 // on-disk patch blobs), plus their read-backs. Both the single-PR routes (pullDetail / pullFiles)

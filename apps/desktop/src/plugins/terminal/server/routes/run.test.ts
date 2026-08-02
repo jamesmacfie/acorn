@@ -1,9 +1,9 @@
 import { Hono } from 'hono'
 import { afterEach, describe, expect, it } from 'vitest'
-import type { AppEnv } from '../../../../core/server/middleware/auth'
-import { requireUser } from '../../../../core/server/middleware/requireUser'
-import { harness, setRunBridge, type RunBridge } from '../../../../core/server/routes/harness'
-import type { Env } from '../../../../core/main/bindings'
+import type { AppEnv } from '@acorn/node-core/server/middleware/auth.ts'
+import { requireUser } from '@acorn/node-core/server/middleware/requireUser.ts'
+import { harness, setRunBridge, type RunBridge } from '@acorn/node-core/server/routes/harness.ts'
+import type { Env } from '@acorn/node-core/main/bindings.ts'
 
 // The renderer's run surface reuses the harness RunBridge routes. This proves the
 // renderer-facing verbs — targets/start/stop/status + the new default-url — and auth/503.

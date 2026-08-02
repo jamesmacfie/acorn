@@ -1,10 +1,10 @@
 import { Hono } from 'hono'
 import { describe, expect, it } from 'vitest'
-import '../../app/server/providers'
-import '../../app/server/routes'
-import { createApp } from './index'
-import type { AppEnv } from './middleware/auth'
-import { RouteRegistry } from './routeRegistry'
+import '../../src/app/server/providers'
+import '../../src/app/server/routes'
+import { createApp } from '@acorn/node-core/server/index.ts'
+import type { AppEnv } from '@acorn/node-core/server/middleware/auth.ts'
+import { RouteRegistry } from '@acorn/node-core/server/routeRegistry.ts'
 
 describe('plugin route registry', () => {
   it('accepts only prefixes covered by the global /api auth and CSRF middleware', () => {

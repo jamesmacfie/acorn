@@ -1,21 +1,21 @@
 import { Hono } from 'hono'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { DatabaseBridge } from './database'
-import { getDb, schema } from '../../../../core/server/db'
-import { ProviderOperationError } from '../../../../core/server/integrations/types'
-import type { AppEnv } from '../../../../core/server/middleware/auth'
-import { requireUser } from '../../../../core/server/middleware/requireUser'
-import { generateTextForConnection } from '../../../../core/server/modelProviders/runtime'
-import { makeTestDb, type TestDb } from '../../../../core/server/routes/testDb'
+import { getDb, schema } from '@acorn/node-core/server/db/index.ts'
+import { ProviderOperationError } from '@acorn/node-core/server/integrations/types.ts'
+import type { AppEnv } from '@acorn/node-core/server/middleware/auth.ts'
+import { requireUser } from '@acorn/node-core/server/middleware/requireUser.ts'
+import { generateTextForConnection } from '@acorn/node-core/server/modelProviders/runtime.ts'
+import { makeTestDb, type TestDb } from '@acorn/node-core/server/routes/testDb.ts'
 import type { DbSavedQuery } from '../../shared/database'
 import { database, setDatabaseBridge } from './database'
-import type { Env } from '../../../../core/main/bindings'
+import type { Env } from '@acorn/node-core/main/bindings.ts'
 
-vi.mock('../../../../core/server/modelProviders/runtime', () => ({
+vi.mock('@acorn/node-core/server/modelProviders/runtime.ts', () => ({
   generateTextForConnection: vi.fn(),
 }))
-vi.mock('../../../../core/server/db', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('../../../../core/server/db')>()
+vi.mock('@acorn/node-core/server/db/index.ts', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@acorn/node-core/server/db/index.ts')>()
   return { ...actual, getDb: vi.fn() }
 })
 

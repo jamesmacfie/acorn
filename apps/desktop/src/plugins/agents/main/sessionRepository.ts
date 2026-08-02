@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto'
 import { and, asc, eq, inArray, isNull, like, or, sql } from 'drizzle-orm'
-import type { AppDatabase } from '../../../core/server/db'
-import { schema } from '../../../core/server/db'
+import type { AppDatabase } from '@acorn/node-core/server/db/index.ts'
+import { schema } from '@acorn/node-core/server/db/index.ts'
 import type {
   AgentEventRecord,
   AgentNormalizedEvent,

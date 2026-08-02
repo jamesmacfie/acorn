@@ -1,15 +1,15 @@
 import { Hono } from 'hono'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { getDb } from '../../../../core/server/db'
-import type { AppEnv } from '../../../../core/server/middleware/auth'
-import { PULLS_STALE_AFTER_MS as STALE_AFTER_MS } from '../../../../core/server/sync/policy'
+import { getDb } from '@acorn/node-core/server/db/index.ts'
+import type { AppEnv } from '@acorn/node-core/server/middleware/auth.ts'
+import { PULLS_STALE_AFTER_MS as STALE_AFTER_MS } from '@acorn/node-core/server/sync/policy.ts'
 import { readComposite, readFiles } from './prMirror'
 import { pullsBatch } from './pullsBatch'
 import { resolveRepoForUser } from './repoMirror'
-import type { Env } from '../../../../core/main/bindings'
+import type { Env } from '@acorn/node-core/main/bindings.ts'
 
-vi.mock('../../../../core/server/db', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('../../../../core/server/db')>()
+vi.mock('@acorn/node-core/server/db/index.ts', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@acorn/node-core/server/db/index.ts')>()
   return { ...actual, getDb: vi.fn() }
 })
 

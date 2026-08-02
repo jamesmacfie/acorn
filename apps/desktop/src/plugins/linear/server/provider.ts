@@ -1,7 +1,7 @@
 import { and, eq } from 'drizzle-orm'
 import type { LinearActivity, LinearAttachment, LinearComment, LinearIssueDetail, LinearIssueSummary, LinearRelatedIssue, LinearRelation, LinearRelationKind } from '@acorn/protocol/api.ts'
 import type { ExternalRef } from '@acorn/protocol/integrations.ts'
-import { schema } from '../../../core/server/db'
+import { schema } from '@acorn/node-core/server/db/index.ts'
 import {
   COMMENT_CREATE,
   ISSUE_DETAIL_QUERY,
@@ -14,15 +14,15 @@ import {
   linearError,
   linearFetch,
 } from './'
-import { encodeCached, isRecord, parseCached } from '../../../core/server/integrations/codec'
+import { encodeCached, isRecord, parseCached } from '@acorn/node-core/server/integrations/codec.ts'
 import {
   ProviderOperationError,
   type CachedExternalItem,
   type CachedItemCodec,
   type CodecResult,
   type MirroredResourceContribution,
-} from '../../../core/server/integrations/types'
-import { defaultBudgets, externalIdsFor, publicProvider } from '../../../core/server/integrations/providers/shared'
+} from '@acorn/node-core/server/integrations/types.ts'
+import { defaultBudgets, externalIdsFor, publicProvider } from '@acorn/node-core/server/integrations/providers/shared.ts'
 
 type LinearValidated = { viewer: Viewer; secret: string }
 type LinearCached = CachedExternalItem<LinearIssueSummary, LinearIssueDetail>

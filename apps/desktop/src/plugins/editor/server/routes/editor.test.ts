@@ -5,12 +5,12 @@ import { join } from 'node:path'
 import { Hono } from 'hono'
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest'
 import { editorBridge } from '../../main/editor'
-import { schema } from '../../../../core/server/db'
-import type { AppEnv } from '../../../../core/server/middleware/auth'
-import { requireUser } from '../../../../core/server/middleware/requireUser'
-import { makeTestDb, type TestDb } from '../../../../core/server/routes/testDb'
+import { schema } from '@acorn/node-core/server/db/index.ts'
+import type { AppEnv } from '@acorn/node-core/server/middleware/auth.ts'
+import { requireUser } from '@acorn/node-core/server/middleware/requireUser.ts'
+import { makeTestDb, type TestDb } from '@acorn/node-core/server/routes/testDb.ts'
 import { editor, setEditorBridge } from './editor'
-import type { Env } from '../../../../core/main/bindings'
+import type { Env } from '@acorn/node-core/main/bindings.ts'
 
 // Editor is a write/read boundary confined to the worktree, so its route test runs against a REAL
 // worktree (the filesystem-containment contract): path traversal, symlink escape, missing worktree. The path

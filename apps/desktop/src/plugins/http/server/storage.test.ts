@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import { schema } from '../../../core/server/db'
-import { makeTestDb, type TestDb } from '../../../core/server/routes/testDb'
+import { schema } from '@acorn/node-core/server/db/index.ts'
+import { makeTestDb, type TestDb } from '@acorn/node-core/server/routes/testDb.ts'
 import { openHttpValue, protectLegacyHttpStorage } from './storage'
 
 const ENC_KEY = '0'.repeat(64)

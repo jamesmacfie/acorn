@@ -4,10 +4,10 @@
 //. The taskId is the capability; relative paths are validated inside localDiff.ts. Pure-
 // Node, so it works in dev:node too; wired in main/serverBridges.ts.
 import type { LocalGitBridge } from '../server/routes/localGit'
-import type { AppDatabase } from '../../../core/server/db'
+import type { AppDatabase } from '@acorn/node-core/server/db/index.ts'
 import { commitStaged, discardAll, discardFile, localChanges, localDiff, localFileBlob, pushBranch, stageAll, stageFile, unstageAll, unstageFile } from './localDiff'
-import { broadcastStatus } from '../../../core/main/notify'
-import { taskRoot } from '../../../core/main/taskWorktree'
+import { broadcastStatus } from '@acorn/node-core/main/notify.ts'
+import { taskRoot } from '@acorn/node-core/main/taskWorktree.ts'
 
 export function localGitBridge(db: AppDatabase): LocalGitBridge {
   // A mutation resolves the root, runs the git action, then pings status so dirty markers move.

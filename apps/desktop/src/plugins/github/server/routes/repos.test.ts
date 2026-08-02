@@ -2,18 +2,18 @@ import { and, eq } from 'drizzle-orm'
 import { Hono } from 'hono'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { Repo } from '@acorn/protocol/api.ts'
-import { settleBackground } from '../../../../core/server/background'
-import { getDb, schema } from '../../../../core/server/db'
-import { reposResource } from '../../../../core/server/db/resourceKeys'
+import { settleBackground } from '@acorn/node-core/server/background.ts'
+import { getDb, schema } from '@acorn/node-core/server/db/index.ts'
+import { reposResource } from '@acorn/node-core/server/db/resourceKeys.ts'
 import { gh } from '..'
-import type { AppEnv } from '../../../../core/server/middleware/auth'
-import { REPOS_STALE_AFTER_MS } from '../../../../core/server/sync/policy'
+import type { AppEnv } from '@acorn/node-core/server/middleware/auth.ts'
+import { REPOS_STALE_AFTER_MS } from '@acorn/node-core/server/sync/policy.ts'
 import { repos } from './repos'
-import { makeTestDb, type TestDb } from '../../../../core/server/routes/testDb'
-import type { Env } from '../../../../core/main/bindings'
+import { makeTestDb, type TestDb } from '@acorn/node-core/server/routes/testDb.ts'
+import type { Env } from '@acorn/node-core/main/bindings.ts'
 
-vi.mock('../../../../core/server/db', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('../../../../core/server/db')>()
+vi.mock('@acorn/node-core/server/db/index.ts', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@acorn/node-core/server/db/index.ts')>()
   return { ...actual, getDb: vi.fn() }
 })
 

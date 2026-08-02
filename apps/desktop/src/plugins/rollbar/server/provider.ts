@@ -1,7 +1,7 @@
 import { and, eq } from 'drizzle-orm'
 import type { RollbarItemMetadata, RollbarItemSummary } from '@acorn/protocol/api.ts'
 import type { ExternalRef } from '@acorn/protocol/integrations.ts'
-import { schema } from '../../../core/server/db'
+import { schema } from '@acorn/node-core/server/db/index.ts'
 import {
   itemByCounterPath,
   itemByIdPath,
@@ -13,7 +13,7 @@ import {
   type RollbarProject,
 } from './'
 import { normalizeItemMetadata, normalizeSummary, rollbarItemUrl } from './normalize'
-import { encodeCached, isRecord, parseCached } from '../../../core/server/integrations/codec'
+import { encodeCached, isRecord, parseCached } from '@acorn/node-core/server/integrations/codec.ts'
 import {
   ProviderOperationError,
   type CachedExternalItem,
@@ -22,9 +22,9 @@ import {
   type MirroredResourceContribution,
   type ProviderResourceContext,
   type ProviderResourceRefreshContext,
-} from '../../../core/server/integrations/types'
-import type { RouteFailure } from '../../../core/server/sync/engine'
-import { defaultBudgets, externalIdsFor, publicProvider } from '../../../core/server/integrations/providers/shared'
+} from '@acorn/node-core/server/integrations/types.ts'
+import type { RouteFailure } from '@acorn/node-core/server/sync/engine.ts'
+import { defaultBudgets, externalIdsFor, publicProvider } from '@acorn/node-core/server/integrations/providers/shared.ts'
 import {
   createRollbarOccurrenceResources,
 } from './occurrenceResources'

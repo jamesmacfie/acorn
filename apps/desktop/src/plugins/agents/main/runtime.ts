@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto'
-import { taskRoot } from '../../../core/main/taskWorktree'
+import { taskRoot } from '@acorn/node-core/main/taskWorktree.ts'
 import type {
   AgentDeleteResult,
   AgentRequest,

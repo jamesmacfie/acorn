@@ -2,7 +2,7 @@ import { mkdirSync, mkdtempSync, readFileSync, rmSync, utimesSync, writeFileSync
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import { makeTestDb, type TestDb } from '../../../core/server/routes/testDb'
+import { makeTestDb, type TestDb } from '@acorn/node-core/server/routes/testDb.ts'
 import {
   contentHashId,
   listMemories,

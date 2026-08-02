@@ -1,12 +1,12 @@
 import { and, eq } from 'drizzle-orm'
 import { Hono } from 'hono'
-import { getDb, schema } from '../../../../core/server/db'
-import { pullsResource } from '../../../../core/server/db/resourceKeys'
+import { getDb, schema } from '@acorn/node-core/server/db/index.ts'
+import { pullsResource } from '@acorn/node-core/server/db/resourceKeys.ts'
 import { gh, ghError, ghGraphQL, ghGraphQLResult } from '..'
 import type { Branch, Compare } from '@acorn/protocol/api.ts'
-import type { AppEnv } from '../../../../core/server/middleware/auth'
-import { getUser } from '../../../../core/server/middleware/requireUser'
-import { respondError } from '../../../../core/server/respond'
+import type { AppEnv } from '@acorn/node-core/server/middleware/auth.ts'
+import { getUser } from '@acorn/node-core/server/middleware/requireUser.ts'
+import { respondError } from '@acorn/node-core/server/respond.ts'
 
 // Open-a-PR support: branch list + base..head compare (both read-only proxies, no local mirror —
 // branches/compare change too often and are cheap to fetch) and the create POST. Creating busts

@@ -4,11 +4,11 @@ import {
   validateAgentPricingPreferences,
   type AgentPricingPreferences,
 } from '../../shared/pricing'
-import { bridgeSlot, viaBridge } from '../../../../core/server/bridge'
-import { getDb } from '../../../../core/server/db'
-import type { AppEnv } from '../../../../core/server/middleware/auth'
-import { getUser } from '../../../../core/server/middleware/requireUser'
-import { respondError } from '../../../../core/server/respond'
+import { bridgeSlot, viaBridge } from '@acorn/node-core/server/bridge.ts'
+import { getDb } from '@acorn/node-core/server/db/index.ts'
+import type { AppEnv } from '@acorn/node-core/server/middleware/auth.ts'
+import { getUser } from '@acorn/node-core/server/middleware/requireUser.ts'
+import { respondError } from '@acorn/node-core/server/respond.ts'
 import {
   readAgentPricingPreferences,
   writeAgentPricingPreferences,

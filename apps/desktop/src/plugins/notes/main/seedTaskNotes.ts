@@ -5,10 +5,10 @@
 // Best-effort and idempotent per task: a failure never blocks task/worktree setup, and a re-fire
 // no-ops once any note carries this task's id.
 import { eq } from 'drizzle-orm'
-import type { AppDatabase } from '../../../core/server/db'
-import { schema } from '../../../core/server/db'
+import type { AppDatabase } from '@acorn/node-core/server/db/index.ts'
+import { schema } from '@acorn/node-core/server/db/index.ts'
 import type { NotesStore } from './notes'
-import type { TaskRow } from '../../../core/main/taskWorktree'
+import type { TaskRow } from '@acorn/node-core/main/taskWorktree.ts'
 
 // The slices of the mirror composites we render into notes (bodies are sanitized bodyHTML / markdown).
 type PrComment = { author: string | null; body: string | null; createdAt: number | null }

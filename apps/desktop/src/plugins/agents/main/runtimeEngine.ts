@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto'
-import type { AppDatabase } from '../../../core/server/db'
-import { taskRoot, workspaceIdFor } from '../../../core/main/taskWorktree'
+import type { AppDatabase } from '@acorn/node-core/server/db/index.ts'
+import { taskRoot, workspaceIdFor } from '@acorn/node-core/main/taskWorktree.ts'
 import type {
   AgentEventRecord,
   AgentNormalizedEvent,

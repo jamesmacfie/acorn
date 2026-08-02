@@ -1,15 +1,15 @@
 import { Hono } from 'hono'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import '../../../app/server/providers'
+import '../../src/app/server/providers'
 import type { TaskContext } from '@acorn/protocol/api.ts'
-import { getDb, schema } from '../db'
-import type { AppEnv } from '../middleware/auth'
-import { buildContextSections, setContextSections, type ContextMemorySource, type ContextNotesSource } from '../agentTools/contextSections'
-import { taskContext } from './taskContext'
-import { makeTestDb, type TestDb } from './testDb'
-import type { Env } from '../../main/bindings'
+import { getDb, schema } from '@acorn/node-core/server/db/index.ts'
+import type { AppEnv } from '@acorn/node-core/server/middleware/auth.ts'
+import { buildContextSections, setContextSections, type ContextMemorySource, type ContextNotesSource } from '@acorn/node-core/server/agentTools/contextSections.ts'
+import { taskContext } from '@acorn/node-core/server/routes/taskContext.ts'
+import { makeTestDb, type TestDb } from '@acorn/node-core/server/routes/testDb.ts'
+import type { Env } from '@acorn/node-core/main/bindings.ts'
 
-vi.mock('../db', async (importOriginal) => {
+vi.mock('@acorn/node-core/server/db/index.ts', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../db')>()
   return { ...actual, getDb: vi.fn() }
 })
@@ -175,7 +175,7 @@ describe('GET /api/tasks/:id/context (docs/agent-tools.md §4)', () => {
     const { mkdtempSync, rmSync } = await import('node:fs')
     const { tmpdir } = await import('node:os')
     const { join } = await import('node:path')
-    const { NotesStore } = await import('../../../plugins/notes/main/notes')
+    const { NotesStore } = await import('../../src/plugins/notes/main/notes')
     const dir = mkdtempSync(join(tmpdir(), 'acorn-ctx-notes-'))
     try {
       const store = new NotesStore(dir)

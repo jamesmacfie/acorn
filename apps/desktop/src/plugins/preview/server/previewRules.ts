@@ -1,7 +1,7 @@
-import type { AppDatabase } from '../../../core/server/db'
+import type { AppDatabase } from '@acorn/node-core/server/db/index.ts'
 import type { PreviewBrowserRule } from '@acorn/protocol/serviceProtocol.ts'
-import { getRepoPath } from '../../../core/main/repoPaths'
-import { loadTask } from '../../../core/main/taskWorktree'
+import { getRepoPath } from '@acorn/node-core/main/repoPaths.ts'
+import { loadTask } from '@acorn/node-core/main/taskWorktree.ts'
 
 // Database lookup remains service-owned. Only serialisable rules cross into Electron main; the
 // native preview never receives a database handle or reaches back into service modules.

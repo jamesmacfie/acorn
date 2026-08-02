@@ -3,8 +3,8 @@ import { tmpdir } from 'node:os'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { makeTestDb, type TestDb } from '../../../core/server/routes/testDb'
-import { buildHeadlessArgv, runHeadless } from '../../../core/main/headless'
+import { makeTestDb, type TestDb } from '@acorn/node-core/server/routes/testDb.ts'
+import { buildHeadlessArgv, runHeadless } from '@acorn/node-core/main/headless.ts'
 import { NotesStore } from '../../notes/main/notes'
 import { WorkflowRunner, type RunnerDeps, type WorkflowDef } from './workflowRunner'
 
@@ -276,8 +276,8 @@ describe('WorkflowRunner (docs/workflows.md)', () => {
   it('fan-out → 3 child tasks with real worktrees → join aggregates all 3; partial failure marks the join', async () => {
     const { execFileSync } = await import('node:child_process')
     const { existsSync } = await import('node:fs')
-    const { ensureWorktree } = await import('../../../core/main/worktrees')
-    const { schema } = await import('../../../core/server/db')
+    const { ensureWorktree } = await import('@acorn/node-core/main/worktrees.ts')
+    const { schema } = await import('@acorn/node-core/server/db/index.ts')
 
     // Real repo + worktrees per child (never the acorn repo).
     const checkout = join(dir, 'checkout')
@@ -514,7 +514,7 @@ describe('WorkflowRunner (docs/workflows.md)', () => {
       ],
     })
     expect(await runner.pollTriggers()).toEqual({ started: 1, errors: [] })
-    const [run] = await t.db.select().from((await import('../../../core/server/db')).schema.workflowRuns)
+    const [run] = await t.db.select().from((await import('@acorn/node-core/server/db/index.ts')).schema.workflowRuns)
     expect(run.trigger).toBe('source.pr-opened')
     expect((await waitDone(runner, run.id)).status).toBe('done')
   })
@@ -527,11 +527,11 @@ describe('WorkflowRunner (docs/workflows.md)', () => {
     // Simulate a crash mid-run: force step B back to 'running' with the run 'running', as if the
     // app died while it executed, then reconstruct a FRESH runner over the same DB.
     const steps = await runner.steps(runId)
-    await t.db.update((await import('../../../core/server/db')).schema.workflowSteps).set({ status: 'running' }).where(
-      (await import('drizzle-orm')).eq((await import('../../../core/server/db')).schema.workflowSteps.id, steps[1].id),
+    await t.db.update((await import('@acorn/node-core/server/db/index.ts')).schema.workflowSteps).set({ status: 'running' }).where(
+      (await import('drizzle-orm')).eq((await import('@acorn/node-core/server/db/index.ts')).schema.workflowSteps.id, steps[1].id),
     )
-    await t.db.update((await import('../../../core/server/db')).schema.workflowRuns).set({ status: 'running' }).where(
-      (await import('drizzle-orm')).eq((await import('../../../core/server/db')).schema.workflowRuns.id, runId),
+    await t.db.update((await import('@acorn/node-core/server/db/index.ts')).schema.workflowRuns).set({ status: 'running' }).where(
+      (await import('drizzle-orm')).eq((await import('@acorn/node-core/server/db/index.ts')).schema.workflowRuns.id, runId),
     )
 
     const revived = new WorkflowRunner(t.db, deps())

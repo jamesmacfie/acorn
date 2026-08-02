@@ -1,10 +1,10 @@
 import { Hono } from 'hono'
 import type { Label } from '@acorn/protocol/api.ts'
-import { getDb } from '../../../../core/server/db'
+import { getDb } from '@acorn/node-core/server/db/index.ts'
 import { gh, ghError } from '..'
-import type { AppEnv } from '../../../../core/server/middleware/auth'
-import { getUser } from '../../../../core/server/middleware/requireUser'
-import { respondError } from '../../../../core/server/respond'
+import type { AppEnv } from '@acorn/node-core/server/middleware/auth.ts'
+import { getUser } from '@acorn/node-core/server/middleware/requireUser.ts'
+import { respondError } from '@acorn/node-core/server/respond.ts'
 import { resolveRepoForUser } from './repoMirror'
 
 type GitHubLabel = {

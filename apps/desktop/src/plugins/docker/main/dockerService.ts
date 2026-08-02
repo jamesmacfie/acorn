@@ -3,7 +3,7 @@
 // refreshes without polling the daemon. Pure Node (child processes only) — constructed lazily on
 // first use, so it works under both the Electron root and dev:node; bootstrap disposes it on quit.
 import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process'
-import { wsBroadcast } from '../../../core/main/wsHub'
+import { wsBroadcast } from '@acorn/node-core/main/wsHub.ts'
 import type { DockerContainerSummary, DockerImage, DockerInfo, DockerNetwork, DockerScope, DockerVolume } from '../shared/model'
 import { docker, DockerCliError, dockerEnv } from './cli'
 import { eventScope, parseImagesOutput, parseJsonLines, parseNetworksOutput, parsePsOutput, parseVolumesOutput } from './parse'

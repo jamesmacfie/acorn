@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs'
+import { cpSync, readFileSync } from 'node:fs'
 import { isAbsolute, resolve } from 'node:path'
 import { defineConfig, externalizeDepsPlugin } from 'electron-vite'
 import solid from 'vite-plugin-solid'
@@ -30,20 +30,33 @@ const workspacePackages = Object.keys(
 // (not lib mode) is what lets that externalization take effect. The renderer is the existing
 // SolidJS SPA — no Cloudflare plugin, since the in-process Node server serves both API and the
 // renderer build out of dist/client.
+// node-core owns schema.ts and therefore its migrations. The service bundle resolves them by
+// walking ancestors from its own location, so stage a copy above out/main.
+const stageMigrations = () => ({
+  name: 'acorn:stage-migrations',
+  closeBundle() {
+    cpSync(
+      resolve(__dirname, '../../packages/node-core/migrations'),
+      resolve(__dirname, 'out/migrations'),
+      { recursive: true },
+    )
+  },
+})
+
 export default defineConfig({
   main: {
-    plugins: [externalizeDepsPlugin({ exclude: workspacePackages })],
+    plugins: [externalizeDepsPlugin({ exclude: workspacePackages }), stageMigrations()],
     build: {
       outDir: 'out/main',
       rollupOptions: {
         external: externalizeBareImports,
         // `mcp` is the acorn MCP server (docs/mcp.md) — launched by agents via
         // ELECTRON_RUN_AS_NODE=1 <electron> out/main/mcp.js, not by the app itself. The input is
-        // the dedicated entry module (src/core/mcp/main.ts) that imports and calls main().
+        // the dedicated entry module (packages/node-core/src/mcp/main.ts) that imports and calls main().
         input: {
           index: resolve(__dirname, 'src/app/main/electron.ts'),
           service: resolve(__dirname, 'src/app/service/index.ts'),
-          mcp: resolve(__dirname, 'src/core/mcp/main.ts'),
+          mcp: resolve(__dirname, '../../packages/node-core/src/mcp/main.ts'),
         },
         output: { entryFileNames: '[name].js', format: 'es' },
       },
@@ -55,7 +68,7 @@ export default defineConfig({
       outDir: 'out/preload',
       rollupOptions: {
         external: externalizeBareImports,
-        input: { index: resolve(__dirname, 'src/core/main/preload.ts') },
+        input: { index: resolve(__dirname, 'src/app/main/preload.ts') },
         // Sandboxed preloads must be CommonJS — emit .cjs (main references ../preload/index.cjs).
         output: { entryFileNames: 'index.cjs', format: 'cjs' },
       },

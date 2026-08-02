@@ -1,9 +1,9 @@
 import { eq } from 'drizzle-orm'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { patchBlobKey } from '../../../../core/server/blobs'
-import { schema } from '../../../../core/server/db'
-import { filesResource, prResource, pullsResource } from '../../../../core/server/db/resourceKeys'
-import { makeTestDb, type TestDb } from '../../../../core/server/routes/testDb'
+import { patchBlobKey } from '@acorn/node-core/server/blobs.ts'
+import { schema } from '@acorn/node-core/server/db/index.ts'
+import { filesResource, prResource, pullsResource } from '@acorn/node-core/server/db/resourceKeys.ts'
+import { makeTestDb, type TestDb } from '@acorn/node-core/server/routes/testDb.ts'
 import type { GqlPull } from './prMirror'
 import { refreshOpenPulls, refreshPullWithFiles } from './pullRefresh'
 

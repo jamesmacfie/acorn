@@ -1,9 +1,9 @@
 import { Hono } from 'hono'
 import { z } from 'zod'
 import type { NoteLocation } from '@acorn/protocol/notes.ts'
-import { bridgeSlot, viaBridge } from '../../../../core/server/bridge'
-import type { AppEnv } from '../../../../core/server/middleware/auth'
-import { respondError } from '../../../../core/server/respond'
+import { bridgeSlot, viaBridge } from '@acorn/node-core/server/bridge.ts'
+import type { AppEnv } from '@acorn/node-core/server/middleware/auth.ts'
+import { respondError } from '@acorn/node-core/server/respond.ts'
 
 // Notes + memory (docs/notes-and-memory.md): the renderer's knowledge surface — was the
 // `memory:*` and `notes:*` IPC channels. Distinct from the harness memory/notes

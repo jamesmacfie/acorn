@@ -1,12 +1,12 @@
 import { Hono } from 'hono'
 import { afterEach, describe, expect, it } from 'vitest'
-import type { AppEnv } from '../../../../core/server/middleware/auth'
-import { requireUser } from '../../../../core/server/middleware/requireUser'
-import { makeTestDb } from '../../../../core/server/routes/testDb'
+import type { AppEnv } from '@acorn/node-core/server/middleware/auth.ts'
+import { requireUser } from '@acorn/node-core/server/middleware/requireUser.ts'
+import { makeTestDb } from '@acorn/node-core/server/routes/testDb.ts'
 import type { AgentUsageSnapshot } from '../../shared/usage'
 import { emptyAgentPricingPreferences } from '../../shared/pricing'
 import { agentUsage, setAgentUsageBridge } from './usage'
-import type { Env } from '../../../../core/main/bindings'
+import type { Env } from '@acorn/node-core/main/bindings.ts'
 
 const snapshot: AgentUsageSnapshot = { providers: [], refreshedAt: 123 }
 const request = (path: string, method = 'GET', body?: unknown) => new Request(
