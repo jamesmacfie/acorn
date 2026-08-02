@@ -1,8 +1,8 @@
 # GitHub Integration
 
 All GitHub access goes through two thin clients in
-`apps/desktop/src/plugins/github/server/index.ts`. The route handlers
-(`apps/desktop/src/plugins/github/server/routes/`) call these, mirror the result into the local
+`plugins/github/src/server/index.ts`. The route handlers
+(`plugins/github/src/server/routes/`) call these, mirror the result into the local
 SQLite read-model, and return a public projection. The browser never talks to GitHub directly and
 never holds the token (see [authentication](./authentication.md)).
 
@@ -32,7 +32,7 @@ export const ghGraphQL = (token, query, variables) =>
   })
 ```
 
-These deliberately stay in `apps/desktop/src/plugins/github/server/` rather than being promoted to
+These deliberately stay in `plugins/github/src/server/` rather than being promoted to
 a shared package until a third consumer justifies it.
 
 Two calls deliberately bypass the clients: the OAuth code→token exchange

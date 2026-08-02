@@ -1,5 +1,10 @@
 # Authentication
 
+> **Removed.** The bearer-authenticated public automation API (`/api/v1`), its tokens,
+> idempotency store and second listener were deleted in vNext Phase 0 — along with
+> `oauth_accounts`, `api_tokens`, `api_idempotency` and `command_executions`. Passages below
+> that describe it are historical. See [vNext/plan.md](./vNext/plan.md).
+
 > **Runtime note:** acorn migrated from Cloudflare Workers to a local Electron app (see
 > [electron.md](./electron.md)). The OAuth web flow and sealed-cookie session are unchanged — they
 > run in a local Node utility service on `http://127.0.0.1:4317`, and login happens in a dedicated
@@ -13,12 +18,12 @@ do.
 
 > This doc covers the **internal** UI credentials (session cookie + loopback internal token). The
 > optional **public automation API** is a separate transport with its own bearer tokens — see
-> [API tokens](#api-tokens-public-automation-api) below and [public-api.md](./public-api.md).
+> [API tokens](#api-tokens-public-automation-api) below and the removed public-api.md.
 
-Source: `apps/desktop/src/core/server/routes/auth.ts`,
-`apps/desktop/src/core/server/session.ts`,
-`apps/desktop/src/core/server/middleware/auth.ts`,
-`apps/desktop/src/core/server/routes/me.ts`.
+Source: `packages/node-core/src/server/routes/auth.ts`,
+`packages/node-core/src/server/session.ts`,
+`packages/node-core/src/server/middleware/auth.ts`,
+`packages/node-core/src/server/routes/me.ts`.
 
 ## OAuth web flow
 
@@ -146,19 +151,19 @@ clears the binding. See
 
 ## API tokens (public automation API)
 
-The optional [public automation API](./public-api.md) does not use the cookie or the internal token —
+The optional public automation API does not use the cookie or the internal token —
 it authenticates with **bearer API tokens** on its own loopback listener. This is a distinct principal
 kind (`api-token`) that never reaches the internal `/api/*` middleware.
 
 - **Format** `acorn_v1_<uuid>_<43-char base64url secret>`; only `SHA-256(secret)` is stored in
-  `api_tokens`, and the raw token is shown once. `TokenService.authenticate` (`core/server/publicApi/
+  `api_tokens`, and the raw token is shown once. `TokenService.authenticate` (`@acorn/node-core/server/publicApi/
   tokenService.ts`) verifies with a constant-time hash compare and collapses every failure (missing /
   malformed / unknown / expired / revoked / wrong-secret) to one `401` so it is not a token-status
   oracle.
 - **Scopes** `read` or `read + write`; revocation is immediate and also closes the token's live
   WebSockets.
 - **Issuance/revocation** are **cookie-authenticated** internal operations (`/api/api-tokens`,
-  `core/server/routes/apiTokens.ts`); a bearer cannot mint bearers.
+  `@acorn/node-core/server/routes/apiTokens.ts`); a bearer cannot mint bearers.
 
 Because a bearer request carries no session cookie, the GitHub credential it needs for upstream
 calls is stored separately and encrypted at rest with `SESSION_ENC_KEY`. Ordinary login does not
@@ -166,7 +171,7 @@ create this second credential: creating the first active public API token opts i
 Later OAuth callbacks refresh it only while active bearers exist. Revoking the last bearer or
 logging out removes it; a bearer retained across logout cannot call GitHub until that identity logs
 in again. The public GitHub plugin resolves this credential for `api-token` principals. See
-[public-api.md](./public-api.md).
+the removed public-api.md.
 
 ## WebSocket upgrade auth (`/ws`)
 
@@ -176,7 +181,7 @@ the HTTP upgrade, checked in `main/wsHub.ts` **before** the handshake completes:
 **`x-acorn-internal`** token (the loopback MCP caller, which carries no cookie/Origin). Any failure
 returns `403` and the socket is destroyed. Same cookie, same token, same single-user machine as the
 HTTP surface — no new credential kind. (The public API's WebSocket at `/api/v1/ws` is a separate,
-bearer-authenticated socket on the public listener — see [public-api.md](./public-api.md).)
+bearer-authenticated socket on the public listener — see the removal note above.)
 
 ## `GET /api/me`
 

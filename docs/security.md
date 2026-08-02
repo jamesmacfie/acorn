@@ -1,5 +1,10 @@
 # Security model
 
+> **Removed.** The bearer-authenticated public automation API (`/api/v1`), its tokens,
+> idempotency store and second listener were deleted in vNext Phase 0 — along with
+> `oauth_accounts`, `api_tokens`, `api_idempotency` and `command_executions`. Passages below
+> that describe it are historical. See [vNext/plan.md](./vNext/plan.md).
+
 acorn is a local, single-user Electron application, but its loopback server and renderer are still
 separate trust boundaries. The security posture is defense in depth: bind locally, authenticate
 every API route, validate inputs again at the privileged boundary, and never expose general Node or
@@ -24,7 +29,7 @@ Electron capabilities to the renderer.
 
 ## Public automation API
 
-The optional [public automation API](./public-api.md) is a **separate loopback listener** (its own
+The optional public automation API is a **separate loopback listener** (its own
 port, `127.0.0.1`-only, Host-guarded before Hono) so its port is independent of the SPA origin. It is
 **disabled by default** and exposes nothing until a token is minted.
 
@@ -57,7 +62,7 @@ resource draining.
 
 Unexpected navigation and window creation are blocked or opened externally by the main process.
 Anything handed to the OS via `shell.openExternal` passes a scheme allowlist first (`http`, `https`,
-`mailto` — `core/main/urlGuards.ts`): pane content includes third-party text we do not author, so an
+`mailto` — `@acorn/node-core/main/urlGuards.ts`): pane content includes third-party text we do not author, so an
 anchor's `href` is untrusted, and `openExternal` resolves schemes through the OS launcher where
 `file:` and custom schemes reach local bundles and other installed apps. Preview navigation is
 restricted to `http(s)`, and its `webContents` identifier never crosses to the renderer. Browser
@@ -118,7 +123,7 @@ Before a repo-owned run target, workflow, or `[database].url_script` can run, ac
 verbatim repo configuration snapshot and requires an explicit review. A machine-scoped `config_acks` row records the repo and
 hash; a changed snapshot shows a diff and requires a new acknowledgement. User-level and database
 fallback configuration remain usable while the repo layer is untrusted — which is why each executable
-field carries provenance (`repoTargetIds`, `dbUrlFromRepo` in `core/main/runConfig.ts`) rather than
+field carries provenance (`repoTargetIds`, `dbUrlFromRepo` in `@acorn/node-core/main/runConfig.ts`) rather than
 gating on the merged value, so a user-authored script is never penalised for a repo-authored one.
 A tripped gate always fails closed: it must not degrade to a lower-precedence fallback, or the
 refusal becomes invisible. Agent-triggered attempts
@@ -130,8 +135,8 @@ matcher. It is not executable and therefore does not require this trust ceremony
 commands remain ordinary trust-gated run targets.
 
 Security-relevant source: `app/main/{serviceHost,desktopCapabilities,startupSecurity}.ts`,
-`app/service/runtime.ts`, `core/shared/{serviceProtocol,desktopCapabilities}.ts`,
-`core/main/server.ts`, `core/main/preload.ts`, `core/main/sessionKeyStore.ts`,
-`core/main/repoConfigTrust.ts`, `core/main/urlGuards.ts`, `core/main/pathGuards.ts`, `core/server/index.ts`,
-`core/server/middleware/`, `core/server/agentTools/`, feature route validators under
+`app/service/runtime.ts`, `@acorn/protocol/{serviceProtocol,desktopCapabilities}.ts`,
+`@acorn/node-core/main/server.ts`, `@acorn/node-core/main/preload.ts`, `@acorn/node-core/main/sessionKeyStore.ts`,
+`@acorn/node-core/main/repoConfigTrust.ts`, `@acorn/node-core/main/urlGuards.ts`, `@acorn/node-core/main/pathGuards.ts`, `@acorn/node-core/server/index.ts`,
+`@acorn/node-core/server/middleware/`, `@acorn/node-core/server/agentTools/`, feature route validators under
 `plugins/*/server/routes/`, and the public API under `core/{server,main}/publicApi/`.

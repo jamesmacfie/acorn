@@ -87,7 +87,6 @@ function closeListener(server: ServerType | null): Promise<void> {
 // DesktopCapabilities, so importing this module in a plain Node test never loads Electron.
 export async function startServiceRuntime({ config, desktop, stateChanged }: RuntimeOptions): Promise<ServiceRuntime> {
   const mark = bootTimer()
-  const startedAt = Date.now()
   await inheritLoginShellPath(config.isPackaged)
   configureTerminalMcp(
     serverName(config.isPackaged),
@@ -166,7 +165,6 @@ export async function startServiceRuntime({ config, desktop, stateChanged }: Run
 
     let finishReconcile!: () => void
     const reconciled = new Promise<void>((resolve) => (finishReconcile = resolve))
-    let reconcileComplete = false
 
     const knowledge = registerKnowledgeIpc(db, config.dataDir, {
       sendToAgent,
@@ -245,7 +243,6 @@ export async function startServiceRuntime({ config, desktop, stateChanged }: Run
       } catch (error) {
         console.warn('[service:boot] reconcile managed agents failed:', error)
       }
-      reconcileComplete = true
       finishReconcile()
       if (!stopped) stateChanged('ready')
     })()

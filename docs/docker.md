@@ -86,7 +86,7 @@ Both the Electron utility-service composition root and `dev:node` install them t
 `wireServerBridges`; the
 plugin therefore works in either runtime when the Docker CLI and daemon are available.
 
-Source: `apps/desktop/src/plugins/docker/{client,main,server,shared}/`.
+Source: `plugins/docker/src/{client,main,server,shared}/`.
 
 See also: [panes.md](./panes.md) · [workspaces-and-tasks.md](./workspaces-and-tasks.md) ·
 [plugins.md](./plugins.md) · [security.md](./security.md) · [api-reference.md](./api-reference.md)

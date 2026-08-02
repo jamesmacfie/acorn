@@ -38,6 +38,6 @@ surfaces:
 - If Context gains item-level selection, extend the persisted selection contract deliberately;
   current selection is section-level and avoids a large, fragile per-item preference.
 
-Source: `apps/desktop/src/plugins/context/client/`,
-`apps/desktop/src/plugins/notes/client/`, and
-`apps/desktop/src/plugins/memory/client/MemorySection.tsx`.
+Source: `plugins/context/src/client/`,
+`plugins/notes/src/client/`, and
+`plugins/memory/src/client/MemorySection.tsx`.

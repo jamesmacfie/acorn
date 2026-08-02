@@ -18,7 +18,7 @@ appear in another workspace.
 The feature therefore lives under:
 
 ```text
-apps/desktop/src/plugins/chat/
+plugins/chat/src/
   client/    Solid source view, queries, scoped state, Markdown/code components
   server/    repositories, routes, provider adapters, prompt assembly, run service
   main/      chat object store and lifecycle wiring where filesystem ownership is required
@@ -33,16 +33,16 @@ and shared code-token rendering through the current core Shiki module.
 
 | Existing seam | Current behavior | Chat change |
 | --- | --- | --- |
-| `core/client/registries/sources.ts` | Providerless local sources are already always visible, but every source still requires a promotion object | Make promotion optional so Chat does not need permanent rejecting stubs |
-| `core/client/tabs/sources.ts` | GitHub plus provider-gated or providerless registry sources | Keep existing visibility semantics; Chat is a providerless local source |
-| `core/client/App.tsx` | Renders selected source component with no props | Pass a typed `SourceViewContext` containing the active workspace and navigation services |
-| `core/server/routeRegistry.ts` | Authenticated plugin routers under `/api` | Mount `/api/chat`; retain core auth/CSRF ordering |
-| `core/shared/ws.ts` / `wsClient.ts` | Terminal/workflow frames | Add typed chat lifecycle/delta frames and connection-state callback |
-| `core/main/wsHub.ts` | Ordered authenticated broadcast socket | Broadcast chat frames; no second socket or SSE transport |
+| `@acorn/client-core/registries/sources.ts` | Providerless local sources are already always visible, but every source still requires a promotion object | Make promotion optional so Chat does not need permanent rejecting stubs |
+| `@acorn/client-core/tabs/sources.ts` | GitHub plus provider-gated or providerless registry sources | Keep existing visibility semantics; Chat is a providerless local source |
+| `apps/desktop/src/app/client/App.tsx` | Renders selected source component with no props | Pass a typed `SourceViewContext` containing the active workspace and navigation services |
+| `@acorn/node-core/server/routeRegistry.ts` | Authenticated plugin routers under `/api` | Mount `/api/chat`; retain core auth/CSRF ordering |
+| `@acorn/protocol/ws.ts` / `wsClient.ts` | Terminal/workflow frames | Add typed chat lifecycle/delta frames and connection-state callback |
+| `@acorn/node-core/main/wsHub.ts` | Ordered authenticated broadcast socket | Broadcast chat frames; no second socket or SSE transport |
 | notice registry/store | Notice target is always `taskId`; toast suppression checks only document focus | Generalize to discriminated navigation target and surface-aware attention test |
-| `core/server/db/schema.ts` | One Drizzle schema/migration journal | Add chat plugin tables and indexes; keep app-level cascade conventions |
-| `core/server/blobs.ts` | Unbounded immutable GitHub cache | Do not reuse; add owned chat object store with ref cleanup and limits |
-| `core/client/highlight/shiki.ts` | Shared dual-theme language/token loader | Reuse it through Chat-owned safe Markdown/code components |
+| `@acorn/node-core/server/db/schema.ts` | One Drizzle schema/migration journal | Add chat plugin tables and indexes; keep app-level cascade conventions |
+| `@acorn/node-core/server/blobs.ts` | Unbounded immutable GitHub cache | Do not reuse; add owned chat object store with ref cleanup and limits |
+| `@acorn/client-core/highlight/shiki.ts` | Shared dual-theme language/token loader | Reuse it through Chat-owned safe Markdown/code components |
 
 ### Source contract target
 

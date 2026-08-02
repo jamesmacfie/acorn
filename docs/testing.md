@@ -1,5 +1,10 @@
 # Testing
 
+> **Removed.** The bearer-authenticated public automation API (`/api/v1`), its tokens,
+> idempotency store and second listener were deleted in vNext Phase 0 — along with
+> `oauth_accounts`, `api_tokens`, `api_idempotency` and `command_executions`. Passages below
+> that describe it are historical. See [vNext/plan.md](./vNext/plan.md).
+
 The desktop package uses Vitest for unit, route, integration, architecture, and conformance tests.
 Run commands from the repository root unless noted otherwise.
 
@@ -19,13 +24,13 @@ Run commands from the repository root unless noted otherwise.
 - Route tests mount Hono routers with fake principals and bridge implementations. They verify auth,
   body validation, typed error envelopes, and clean `bridge-unavailable` degradation without
   launching Electron.
-- `core/boundaries.test.ts` scans relative imports to keep the service graph Electron-free, prevent
+- `tools/arch/boundaries.test.ts` scans relative imports to keep the service graph Electron-free, prevent
   native main from reaching service-owned engines, enforce app/client/server/MCP boundaries, and
   freeze the shrinking legacy cross-feature dependency ledger.
-- `core/shared/serviceProtocol.test.ts` covers concurrent bidirectional RPC, protocol-version
+- `@acorn/protocol/serviceProtocol.test.ts` covers concurrent bidirectional RPC, protocol-version
   mismatch, unavailable handlers, and peer-close cleanup. `app/service/runtime.test.ts` exercises
   migration, SPA serving, reconciliation, and shutdown without Electron or GitHub.
-- `core/server/integrations/conformance.test.ts` runs every registered provider through capability,
+- `@acorn/node-core/server/integrations/conformance.test.ts` runs every registered provider through capability,
   codec, budget, formatting, and secret-hygiene obligations.
 - Startup/restore integration tests prove descriptor order, late registration, persistence arming,
   and scoped eviction.
@@ -41,7 +46,7 @@ Run commands from the repository root unless noted otherwise.
   grammar/hash/scope/revocation, settings-store atomicity/override, registry freeze invariants,
   idempotency replay, envelopes/auth-gating, and the WebSocket hub — plus the cookie-authed
   management routes (`routes/apiTokens.test.ts`, `routes/apiSettings.test.ts`). See
-  [public-api.md](./public-api.md).
+  the removed public-api.md.
 
 ## Adding tests
 

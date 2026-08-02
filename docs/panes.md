@@ -24,7 +24,7 @@ type TaskLayout = {
 
 There is no separate `browser` pane — agent-driving is a capability of `preview` (see the catalog
 below). Core deliberately does not own a closed union: plugins register descriptors through
-`core/client/registries/panes.ts`, and persisted unknown string ids survive a build where their
+`@acorn/client-core/registries/panes.ts`, and persisted unknown string ids survive a build where their
 contribution is absent. Recipe loading is stricter and drops panes not registered in the running app.
 
 There is **no split-tree**. Panes remain a flat row, but adjacent dividers resize them, the weights
@@ -48,7 +48,7 @@ Every layout change goes through one pure function, `applyLayoutAction`
 | `replace` | recipe seeding | swap in a whole validated layout |
 
 The reducer is the single writer. `TaskView` never mutates the row directly — it calls
-`dispatchLayout(taskId, action)` (`core/client/tasks/tasks.ts`), which runs the reducer and persists
+`dispatchLayout(taskId, action)` (`@acorn/client-core/tasks/tasks.ts`), which runs the reducer and persists
 the result. `layoutForTask(taskId)` reads the current layout; a task with none falls back to
 `defaultLayout()`.
 
@@ -77,11 +77,11 @@ Close-task `✕`. Interaction rules:
 The command palette projects registered panes into show, close, pin/unpin, and move actions, so
 contributed panes are reachable without the mouse — see
 [command-palette-and-shortcuts.md](./command-palette-and-shortcuts.md) and
-`core/client/palette/CommandPalette.tsx`.
+`apps/desktop/src/app/client/CommandPalette.tsx`.
 
 ### Keyboard shortcuts
 
-`core/client/tasks/paneShortcuts.ts` formats modifier **chords** (⌘/⌃/⌥/⇧ + a base key — they never
+`@acorn/client-core/tasks/paneShortcuts.ts` formats modifier **chords** (⌘/⌃/⌥/⇧ + a base key — they never
 fire while typing), dispatched from the task view. Defaults live on the ⌘⇧ layer (plain ⌘<letter>
 collides too readily with the OS/browser/Monaco):
 
@@ -146,7 +146,7 @@ by side inside the slot (`TaskView.tsx:252`):
   positions are session-only and scoped per task/PR (or per PR in the classic browser), so changing
   panes/sources and returning resumes the review instead of starting at the top.
 
-Source: `apps/desktop/src/plugins/github/client/{pullDetail,diff}/`.
+Source: `plugins/github/src/client/{pullDetail,diff}/`.
 
 ### `changes` — local working-tree review
 
@@ -168,7 +168,7 @@ Interactions:
 - **→ agent** on a file, or **⌥-click** a line, drops a `path[:line]` reference into the agent
   composer (`sendReferenceToAgent`).
 
-Source: `apps/desktop/src/plugins/changes/{client,main,server,shared}/`.
+Source: `plugins/changes/src/{client,main,server,shared}/`.
 
 ### `notes` — markdown notes
 
@@ -179,7 +179,7 @@ agent/workflow provenance, and has an include dot controlling assembled context.
 autosave independently; body saves debounce 1.5s and flush on blur/switch. Preview renders sanitized
 markdown. Context jumps open the exact note without losing unsaved work.
 
-Source: `apps/desktop/src/plugins/notes/client/{NotesPane.tsx,notesClient.ts,notesPaneState.ts}`.
+Source: `plugins/notes/src/client/{NotesPane.tsx,notesClient.ts,notesPaneState.ts}`.
 
 ### `context` — assembled context
 
@@ -194,9 +194,9 @@ content fingerprint per session and reports never synced / synced / stale; deliv
 creation render inline through `MemorySection`, with the same human accept/reject gate. See
 [notes-and-memory.md](./notes-and-memory.md).
 
-Source: `apps/desktop/src/plugins/context/client/{ContextPane.tsx,model.ts,syncState.ts,selectionState.ts}`,
-`apps/desktop/src/core/shared/contextBlock.ts`, and
-`apps/desktop/src/plugins/memory/client/{MemorySection.tsx,memoryClient.ts}`.
+Source: `plugins/context/src/client/{ContextPane.tsx,model.ts,syncState.ts,selectionState.ts}`,
+`packages/protocol/src/contextBlock.ts`, and
+`plugins/memory/src/client/{MemorySection.tsx,memoryClient.ts}`.
 
 ### `editor` — in-app code editor
 
@@ -217,7 +217,7 @@ into view without moving keyboard focus out of Monaco.
 **→ agent** adds a file (or selection) reference to the agent composer. Open files persist to the
 the scoped `editor:open-files:<taskId>` preference.
 
-Source: `apps/desktop/src/plugins/editor/client/{EditorPane.tsx,editorState.ts,editorTreeState.ts,editorClient.ts}`.
+Source: `plugins/editor/src/client/{EditorPane.tsx,editorState.ts,editorTreeState.ts,editorClient.ts}`.
 
 ### `search` — find in files
 
@@ -228,7 +228,7 @@ each file header can copy its worktree-relative path, and double-clicking a hit 
 the **Editor pane beside this one**, centered with the cursor at the start of the match
 (`requestEditorReveal`).
 
-Source: `apps/desktop/src/plugins/editor/client/search/{SearchPane.tsx,searchClient.ts}`.
+Source: `plugins/editor/src/client/search/{SearchPane.tsx,searchClient.ts}`.
 
 ### `database` — Postgres viewer/editor
 
@@ -238,7 +238,7 @@ connection is per-task, resolved on demand (repo `dbUrlScript` → `.env` `DATAB
 `process.env`) and never persisted; one `pg.Pool` per task lives in the utility service behind task-scoped HTTP
 routes. Full detail: [pg.md](./pg.md).
 
-Source: `apps/desktop/src/plugins/database/{client,main,server,shared}/`.
+Source: `plugins/database/src/{client,main,server,shared}/`.
 
 ### `docker` — task-linked containers
 
@@ -252,7 +252,7 @@ The always-visible Docker Source is the fleet view: Compose projects plus contai
 volumes, and networks, with start/stop/remove/down/prune actions and daemon-event-driven refresh.
 See [docker.md](./docker.md).
 
-Source: `apps/desktop/src/plugins/docker/{client,main,server,shared}/`.
+Source: `plugins/docker/src/{client,main,server,shared}/`.
 
 ### `http` — API requests
 
@@ -296,14 +296,14 @@ rail Source; the only difference here is that it is scoped to a task.
 - Deliberately **no scripts, tests or assertions**, no collections (the repo is the collection), no
   oauth2/digest/ntlm, no multipart bodies, and no per-hop TLS timings — `redirect: 'follow'` is left
   to undici so `Authorization` is stripped correctly across origins. The body editor is a plain
-  `<textarea>`: Monaco's single cross-plugin import is baselined in `core/boundaries.test.ts` and
+  `<textarea>`: Monaco's single cross-plugin import is baselined in `tools/arch/boundaries.test.ts` and
   that baseline only shrinks.
 
 Requests execute server-side (`plugins/http/server/send.ts`) using Node's global `fetch` — no bridge,
 because nothing stateful is held — so the pane also works under `dev:node`. Responses are capped at
 5 MB and flagged when truncated.
 
-Source: `apps/desktop/src/plugins/http/{client,server,shared}/`.
+Source: `plugins/http/src/{client,server,shared}/`.
 
 ### `linear` — Linear ticket(s)
 
@@ -315,7 +315,7 @@ between them (`identifiers` / `onSelectIdentifier`). The same component still se
 Integrations section as a right-anchored overlay (its original variant). See
 [integrations.md](./integrations.md).
 
-Source: `apps/desktop/src/plugins/linear/client/LinearIssuePanel.tsx`.
+Source: `plugins/linear/src/client/LinearIssuePanel.tsx`.
 
 ### `rollbar` — Rollbar error(s)
 
@@ -349,7 +349,7 @@ the MCP `browser_*` tools
 (`browser_navigate`, `browser_click`, `browser_snapshot`, …) — see [mcp.md](./mcp.md). One webview
 surface, two entry points (human chrome vs. agent driving).
 
-Source: `apps/desktop/src/plugins/preview/{client,main}/`, `apps/desktop/src/core/mcp/server.ts`.
+Source: `plugins/preview/src/{client,main}/`, `packages/node-core/src/mcp/server.ts`.
 
 ---
 
@@ -375,7 +375,7 @@ hover/focus. Workspace-wide history remains in Agent Center. Full detail in
 [managed-agents.md](./managed-agents.md) and [terminal-and-agents.md](./terminal-and-agents.md).
 
 > **Maturity:** the terminal drawer, agent sessions, run targets, and workflows are desktop-only —
-> always on when the native terminal capability is present (`capabilities()`, `core/client/capabilities.ts`; the
+> always on when the native terminal capability is present (`capabilities()`, `@acorn/client-core/capabilities.ts`; the
 > old `acorn:term` flag is gone). Panes that depend on a worktree or an agent (`changes`, `editor`,
 > `context`'s send, `notes`' agent groups, `preview` targets, the Agent task surface) therefore only do
 > their full job on desktop; in a plain browser session (`dev:node`) the bridge is absent and they
@@ -385,13 +385,13 @@ hover/focus. Workspace-wide history remains in Agent Center. Full detail in
 
 ## Source
 
-- Model & reducer: `apps/desktop/src/core/client/tasks/layout.ts`
-- Layout state / dispatch / persistence: `apps/desktop/src/core/client/tasks/tasks.ts`
-- Task view & switcher: `apps/desktop/src/core/client/tasks/TaskView.tsx`
-- Pane shortcuts: `apps/desktop/src/core/client/tasks/paneShortcuts.ts`
-- Recipes: `apps/desktop/src/plugins/terminal/client/recipes.ts`
+- Model & reducer: `packages/client-core/src/tasks/layout.ts`
+- Layout state / dispatch / persistence: `packages/client-core/src/tasks/tasks.ts`
+- Task view & switcher: `apps/desktop/apps/desktop/src/app/client/TaskView.tsx`
+- Pane shortcuts: `packages/client-core/src/tasks/paneShortcuts.ts`
+- Recipes: `plugins/terminal/src/client/recipes.ts`
 - Pane bodies: `apps/desktop/src/plugins/*/client/`; the shell/host lives in
-  `apps/desktop/src/core/client/tasks/`
+  `packages/client-core/src/tasks/`
 
 See also: [frontend.md](./frontend.md) · [diff-rendering.md](./diff-rendering.md) ·
 [command-palette-and-shortcuts.md](./command-palette-and-shortcuts.md) ·

@@ -1,13 +1,18 @@
 # API Reference
 
+> **Removed.** The bearer-authenticated public automation API (`/api/v1`), its tokens,
+> idempotency store and second listener were deleted in vNext Phase 0 — along with
+> `oauth_accounts`, `api_tokens`, `api_idempotency` and `command_executions`. Passages below
+> that describe it are historical. See [vNext/plan.md](./vNext/plan.md).
+
 The server's complete **internal** HTTP surface — the cookie-authenticated `/api/*` transport the SPA
-uses. One Hono app (`apps/desktop/src/core/server/index.ts`, a `createApp()` factory) serves both
+uses. One Hono app (`packages/node-core/src/server/index.ts`, a `createApp()` factory) serves both
 `/auth/*` and `/api/*`, hosted by `@hono/node-server` in the Node utility process on
-`http://127.0.0.1:4317`. The service listener (`apps/desktop/src/core/main/server.ts`) wraps it with static-asset serving +
+`http://127.0.0.1:4317`. The service listener (`packages/node-core/src/main/server.ts`) wraps it with static-asset serving +
 SPA fallback. See [architecture-overview](./architecture-overview.md) and [electron](./electron.md).
 
 > **Not the public API.** The opt-in bearer-authenticated **automation API** (`/api/v1`, a separate
-> loopback listener) is documented in [public-api.md](./public-api.md). This doc is the internal,
+> loopback listener) was documented in the removed public-api.md. This doc is the internal,
 > same-origin, cookie/CSRF surface only.
 
 > **History:** acorn began as a Cloudflare Worker; the HTTP surface carried over unchanged when it
@@ -27,21 +32,21 @@ SPA fallback. See [architecture-overview](./architecture-overview.md) and [elect
 ## Middleware & auth
 
 Every `/api/*` route runs through three middlewares before the handler, in this exact order
-(`apps/desktop/src/core/server/index.ts`):
+(`packages/node-core/src/server/index.ts`):
 
 1. `csrf()` — Origin / `Sec-Fetch-Site` check on mutating calls.
-2. `authMiddleware` (`apps/desktop/src/core/server/middleware/auth.ts`) — resolves a **`Principal`**
+2. `authMiddleware` (`packages/node-core/src/server/middleware/auth.ts`) — resolves a **`Principal`**
    (`{ kind, user }`) plus the raw `ctx.user` (or `null`) from **either** of two credentials:
    - the AES-256-GCM session **cookie** (decrypted in-CPU, then re-sealed with a sliding TTL) →
      `kind: 'user'`; or
    - the internal-loopback header **`x-acorn-internal: <INTERNAL_TOKEN>`** → `kind: 'internal'`.
      This is the acorn MCP server calling over loopback — it holds no cookie. `INTERNAL_TOKEN` is
-     private persisted bearer material (`apps/desktop/src/core/main/bindings.ts`), injected into
+     private persisted bearer material (`packages/node-core/src/main/bindings.ts`), injected into
      task terminal sessions as `ACORN_API_TOKEN`. It resolves through the explicit active-identity
      binding rather than selecting a cached row, fails closed with no binding, and leaves the
      GitHub token **empty**. Internal callers can only read that identity's local mirrors — a live
      GitHub call with the empty token returns `401 reauth`.
-3. `requireUser` (`apps/desktop/src/core/server/middleware/requireUser.ts`) — the single auth gate.
+3. `requireUser` (`packages/node-core/src/server/middleware/requireUser.ts`) — the single auth gate.
    It rejects any request with no resolved principal → `401 { error: 'unauthenticated' }`. Routes
    no longer carry inline session guards; handlers read the identity via `getUser(c)` (safe because
    the gate guarantees a principal). Gating on the principal, not on "a cookie is present," keeps a
@@ -57,13 +62,13 @@ construction — they mount *before* the `/api/*` middlewares. See
 - All responses are JSON unless noted (`/auth/*` errors are plain text). Timestamps are epoch
   **milliseconds**.
 - **Error envelope:** every `/api/*` error body is `ApiError` — `{ error: string; detail?: string[] }`
-  (`apps/desktop/src/core/shared/api.ts`) — built by one server helper, `respondError(c, status, code, detail?)`
-  (`apps/desktop/src/core/server/respond.ts`). `error` is a stable machine code (see
+  (`packages/protocol/src/api.ts`) — built by one server helper, `respondError(c, status, code, detail?)`
+  (`packages/node-core/src/server/respond.ts`). `error` is a stable machine code (see
   [Error codes](#error-codes)); `detail` carries human/upstream prose (GraphQL messages, GitHub's
   422 text, harness failure messages). There is no second error shape — no body-level `status`, no
   `{ kind }`, no prose in `error`.
 - Success **response mappers** are checked against the shared response types with `satisfies`
-  (`apps/desktop/src/core/shared/api.ts`), so adding a required field to a response type fails
+  (`packages/protocol/src/api.ts`), so adding a required field to a response type fails
   `pnpm lint` at every mapper that omits it.
 - Reads return public projections (no `userId`, no staleness columns, no token).
 - Mutating requests take a JSON body.
@@ -84,18 +89,18 @@ construction — they mount *before* the `/api/*` middlewares. See
 ## Shared client contract
 
 The SPA uses a small shared TypeScript contract rather than a runtime RPC client.
-`apps/desktop/src/core/shared/api.ts` owns response types, route builders, and query-key factories;
-`apps/desktop/src/core/client/queries.ts` and `mutations.ts` consume those helpers with plain same-origin
+`packages/protocol/src/api.ts` owns response types, route builders, and query-key factories;
+`packages/client-core/src/queries.ts` and `mutations.ts` consume those helpers with plain same-origin
 `fetch`. That keeps the client bundle thin and preserves the exact request shape of the HTTP API: no
 generated client, no extra network calls, no runtime wrapper on the hot read paths.
-`apps/desktop/src/core/shared/api.test.ts` characterizes the route strings and query-key shapes so cache
+`packages/protocol/src/api.test.ts` characterizes the route strings and query-key shapes so cache
 compatibility does not drift.
 
 ---
 
 ## Auth routes (`/auth`)
 
-`apps/desktop/src/core/server/routes/auth.ts`. The GitHub OAuth web flow; the token is sealed into the
+`packages/node-core/src/server/routes/auth.ts`. The GitHub OAuth web flow; the token is sealed into the
 session cookie and never reaches the browser.
 
 | Method | Path | Purpose | Source |
@@ -113,7 +118,7 @@ Full flow in [authentication](./authentication.md).
 
 ## `GET /api/me`
 
-`apps/desktop/src/core/server/routes/me.ts`. Current user, public fields only (no token). Session-only,
+`packages/node-core/src/server/routes/me.ts`. Current user, public fields only (no token). Session-only,
 no DB read.
 
 ```ts
@@ -125,7 +130,7 @@ no DB read.
 
 ## Pins (`/api/pins`)
 
-`apps/desktop/src/core/server/routes/pins.ts`. Pinned repos for the selector — **App-state**, user-scoped.
+`packages/node-core/src/server/routes/pins.ts`. Pinned repos for the selector — **App-state**, user-scoped.
 
 ### `GET /api/pins`
 
@@ -150,7 +155,7 @@ Pin or unpin one repo. Body `{ repoId: number, pinned: boolean }`.
 
 ## Prefs (`/api/prefs`)
 
-`apps/desktop/src/core/server/routes/prefs.ts`. App-state preferences (theme, diff view mode, …) —
+`packages/node-core/src/server/routes/prefs.ts`. App-state preferences (theme, diff view mode, …) —
 user-scoped key→value store.
 
 ### `GET /api/prefs`
@@ -172,7 +177,7 @@ Upsert one preference. Body `{ key: string, value: string }`.
 
 ## Agent usage and pricing (`/api/agents`)
 
-`apps/desktop/src/plugins/agents/server/routes/usage.ts`. Plugin-owned, user-scoped provider usage
+`plugins/agents/src/server/routes/usage.ts`. Plugin-owned, user-scoped provider usage
 and the local Claude estimate catalog. Usage collection is a **Bridge**; pricing overrides are
 **App-state** stored in the generic prefs table under an agents-owned key.
 
@@ -189,7 +194,7 @@ Acorn's estimate only. The shared contract and default catalog live in
 
 ### Managed sessions (`/api/agents`)
 
-`apps/desktop/src/plugins/agents/server/routes/managed.ts`. These cookie-authenticated routes bridge
+`plugins/agents/src/server/routes/managed.ts`. These cookie-authenticated routes bridge
 to the utility-service managed runtime. Provider processes, session state and object bytes never
 move into the Hono process boundary as raw handles.
 
@@ -221,13 +226,13 @@ move into the Hono process boundary as raw handles.
 Session create, turn enqueue and request resolution require an `Idempotency-Key` header. All input
 paths and context references are revalidated against the owning task worktree. See
 [managed-agents.md](./managed-agents.md); the bearer equivalent is documented in
-[public-api.md](./public-api.md).
+the removed public-api.md.
 
 ---
 
 ## Workspaces (`/api/workspaces`)
 
-`apps/desktop/src/core/server/routes/workspaces.ts`. A **Workspace** is a named group of repos — the
+`packages/node-core/src/server/routes/workspaces.ts`. A **Workspace** is a named group of repos — the
 top-level unit. All routes are **App-state** (machine-scoped tables `workspaces`, `workspace_repos`,
 `ignored_repos`, `workspace_projects`); `bootstrap` and `ignore-all` also read the repos **Mirror**.
 See [workspaces-and-tasks](./workspaces-and-tasks.md).
@@ -258,7 +263,7 @@ id still returns `{ ok: true }` (no `404`).
 
 A **Task** is the single-repo unit of work. This mount is served by four routers.
 
-### CRUD — `apps/desktop/src/core/server/routes/tasks.ts`
+### CRUD — `packages/node-core/src/server/routes/tasks.ts`
 
 All **App-state** (machine-scoped `tasks` / `task_links`). Worktree teardown on archive is the main
 process's job; these routes only flip DB rows.
@@ -277,7 +282,7 @@ shape-checked against `ICON_NAME_RE` (`/^[a-z0-9-]{1,40}$/`) rather than the ico
 name→node map is client-side — an unrecognised name falls back to rendering as-is, so a bad value is
 cosmetic rather than an error. See [ui-design.md](./ui-design.md) §Icons.
 
-### Review notes — `apps/desktop/src/plugins/changes/server/routes/reviewNotes.ts`
+### Review notes — `plugins/changes/src/server/routes/reviewNotes.ts`
 
 Local inline annotations on uncommitted changes, acorn-owned (**App-state**, `review_notes`). The
 send loop: create (unsent) → deliver → `POST /sent` stamps `sentAt` → an edit clears it.
@@ -294,7 +299,7 @@ send loop: create (unsent) → deliver → `POST /sent` stamps `sentAt` → an e
 `'additions' | 'deletions'` (diff-pane sides, not GitHub's `LEFT`/`RIGHT`); `endLine` defaults to
 `startLine`.
 
-### Task context — `apps/desktop/src/core/server/routes/taskContext.ts`
+### Task context — `packages/node-core/src/server/routes/taskContext.ts`
 
 The context assembler — never a live GitHub call, so the agent sees the same picture as the UI.
 The contribution registry assembles PR/issues from the **Mirror** and notes/memory from utility-service
@@ -308,7 +313,7 @@ inventory for the Context pane, while an omitted include uses contribution defau
 
 `404 not_found` when the task id is unknown.
 
-### Agent-tool projection — `apps/desktop/src/core/server/routes/agentTools.ts`
+### Agent-tool projection — `packages/node-core/src/server/routes/agentTools.ts`
 
 The registry is installed by the utility-service composition root. MCP/harness paths require the
 persisted internal principal; renderer projection is a separate cookie-authenticated opt-in path.
@@ -332,7 +337,7 @@ indistinguishable `404 not_found` responses.
 The remaining `/run/*` rows are renderer routes backed by `RunBridge`; agent-facing run/browser,
 notes, memory, context, and git verbs go through `/tools/:name`.
 
-### Workflow control — `apps/desktop/src/plugins/workflows/server/routes/workflow.ts`
+### Workflow control — `plugins/workflows/src/server/routes/workflow.ts`
 
 The utility service installs the durable runner behind this bridge. Definitions and controls
 use HTTP; live notices, status pings, and step events use the authenticated WebSocket.
@@ -427,7 +432,7 @@ This whole family additionally requires `principal.kind === 'user'`; the interna
 
 ## Public API administration (internal cookie API)
 
-These routes administer the separate [public automation API](./public-api.md); bearer callers
+These routes administer the separate public automation API; bearer callers
 cannot reach them.
 
 | Method | Path | Purpose |
@@ -442,7 +447,7 @@ cannot reach them.
 
 ## Integrations (`/api/integrations`)
 
-`apps/desktop/src/core/server/routes/integrations.ts`. List/connect/disconnect third-party providers.
+`packages/node-core/src/server/routes/integrations.ts`. List/connect/disconnect third-party providers.
 Multi-row per provider; GitHub is a **synthesized** entry (id `github`) whose token is the session
 cookie, not a stored row. Connecting validates the pasted token **live** against the provider, then
 stores it encrypted (`encryptSecret`) — **App-state** otherwise.
@@ -462,7 +467,7 @@ Errors use the generic `provider_*` taxonomy listed below. See [integrations](./
 
 ## Linear (`/api/linear`)
 
-`apps/desktop/src/plugins/linear/server/routes/linear.ts`. Reads Linear (**Provider** — live
+`plugins/linear/src/server/routes/linear.ts`. Reads Linear (**Provider** — live
 GraphQL), cached per-user into the generic `issues` table (serve-then-revalidate, 10-min TTL). A bare
 identifier is resolved across every connected Linear connection (first-hit-wins); browse routes take
 an explicit `?integration=<id>`.
@@ -482,7 +487,7 @@ Errors: `provider_not_connected`, `provider_needs_auth`, `provider_resource_not_
 
 ## Rollbar (`/api/rollbar`)
 
-`apps/desktop/src/plugins/rollbar/server/routes/rollbar.ts`. The Rollbar Source's reads (**Provider** — live REST),
+`plugins/rollbar/src/server/routes/rollbar.ts`. The Rollbar Source's reads (**Provider** — live REST),
 cached into `issues` (provider `rollbar`, identifier = the visible counter) with serve-then-revalidate
 (2-min TTL). List, metadata, occurrence history, and occurrence detail are separate typed contracts with
 **independent freshness**: the list gates on `sync_state`, item metadata on the issue envelope's
@@ -513,7 +518,7 @@ Errors: `provider_not_connected`, `provider_needs_auth`, `provider_resource_not_
 
 ## Repos (`/api/repos`)
 
-`apps/desktop/src/plugins/github/server/routes/repos.ts`. This user's repos — **Mirror** (serve-then-revalidate,
+`plugins/github/src/server/routes/repos.ts`. This user's repos — **Mirror** (serve-then-revalidate,
 ~5 min TTL), ordered by `pushedAt` desc.
 
 ### `GET /api/repos`
@@ -537,7 +542,7 @@ Force the next `GET /api/repos` to re-sync (sets `fetchedAt = 0`). **App-state**
 
 ## Repo labels (`/api/repos/:owner/:repo/labels`)
 
-`apps/desktop/src/plugins/github/server/routes/repoLabels.ts`.
+`plugins/github/src/server/routes/repoLabels.ts`.
 
 ### `GET /api/repos/:owner/:repo/labels`
 
@@ -554,7 +559,7 @@ Repo label choices for the PR label picker (**GitHub** — first 100 labels, sor
 
 ## Pull lists (`/api/repos/:owner/:repo/pulls`)
 
-`apps/desktop/src/plugins/github/server/routes/pulls.ts`.
+`plugins/github/src/server/routes/pulls.ts`.
 
 ### `GET /api/repos/:owner/:repo/pulls?state=open|closed`
 
@@ -583,7 +588,7 @@ A GitHub `304` on the open path is handled internally (re-serves the mirror); th
 
 ## Pull detail (`/api/repos/:owner/:repo/pulls/:number`)
 
-`apps/desktop/src/plugins/github/server/routes/pullDetail.ts`. The composite read (GraphQL; **Mirror**, ~45 s TTL,
+`plugins/github/src/server/routes/pullDetail.ts`. The composite read (GraphQL; **Mirror**, ~45 s TTL,
 **TTL-only** — no ETag). Mirror logic shared with the batch route (`prMirror.ts`).
 `?force=true` bypasses even a fresh cache entry, blocks on GitHub, and returns the newly mirrored
 composite; the UI's explicit PR refresh uses this path.
@@ -615,7 +620,7 @@ masquerading as a `404`.
 
 ## Pull files (`/api/repos/:owner/:repo/pulls/:number/files`)
 
-`apps/desktop/src/plugins/github/server/routes/pullFiles.ts`. **Mirror** (REST-backed, ~45 s TTL). Patch bodies are
+`plugins/github/src/server/routes/pullFiles.ts`. **Mirror** (REST-backed, ~45 s TTL). Patch bodies are
 cached on-disk by blob SHA (see [caching](./caching.md)); merges in per-user `viewed` state.
 
 ### `GET .../files`
@@ -645,7 +650,7 @@ Batch patch fetch for specific paths. Body `{ paths: string[] }` (max 20).
 
 ## Pull blob (`/api/repos/:owner/:repo/blobs/:sha`)
 
-`apps/desktop/src/plugins/github/server/routes/pullBlob.ts`. Full file body at an immutable blob SHA — used to expand
+`plugins/github/src/server/routes/pullBlob.ts`. Full file body at an immutable blob SHA — used to expand
 unchanged context around diff hunks. Served from the on-disk **BLOBS** cache (immutable, cached
 forever); a miss hits **GitHub** (`git/blobs`) then caches.
 
@@ -660,7 +665,7 @@ forever); a miss hits **GitHub** (`git/blobs`) then caches.
 
 ## Pull batch prefetch (`/api/repos/:owner/:repo/pulls/batch`)
 
-`apps/desktop/src/plugins/github/server/routes/pullsBatch.ts`. Warm the mirror for several open PRs at once so client
+`plugins/github/src/server/routes/pullsBatch.ts`. Warm the mirror for several open PRs at once so client
 navigation is instant. Detail is one multi-alias GraphQL call for stale PRs; files are N parallel REST
 calls. Already-fresh PRs cost no GitHub calls — **Mirror** with a live top-up.
 
@@ -682,7 +687,7 @@ Body `{ numbers: number[], files?: 'full' | 'summary' | 'none' }` (max 10 number
 
 ## PR write actions (`/api/repos/:owner/:repo/pulls/:number/...`)
 
-`apps/desktop/src/plugins/github/server/routes/prActions.ts`. Each resolves the mirror PR row first (`prContext.ts`:
+`plugins/github/src/server/routes/prActions.ts`. Each resolves the mirror PR row first (`prContext.ts`:
 unknown owner/repo → `404 repo_not_found`, non-integer number → `400 bad_number`, GitHub `401` →
 `401 reauth`), calls **GitHub**, then updates or busts the SQLite mirror so a within-TTL read reflects
 the change. See [github-integration](./github-integration.md#write-actions).
@@ -823,7 +828,7 @@ Rerun a workflow run's failed jobs. **Repo-scoped** — `:runId` is the Actions 
 
 ## Actions reads (`/api/repos/:owner/:repo/actions/...`)
 
-`apps/desktop/src/plugins/github/server/routes/actions.ts`. Read-only Actions endpoints for the checks side panel
+`plugins/github/src/server/routes/actions.ts`. Read-only Actions endpoints for the checks side panel
 (**GitHub**; no mirror — the client query cache covers reuse). Writes (rerun) live in `prActions.ts`
 above.
 
@@ -838,7 +843,7 @@ above.
 
 ## Create PR (`/api/repos/:owner/:repo/...`)
 
-`apps/desktop/src/plugins/github/server/routes/prCreate.ts`. Create-a-PR support. Branch/compare reads are
+`plugins/github/src/server/routes/prCreate.ts`. Create-a-PR support. Branch/compare reads are
 **GitHub** proxies (no mirror — they change too often); the create busts the open-pulls sync state so
 the list refetches.
 
@@ -855,7 +860,7 @@ no commits / bad branch — GitHub's message is surfaced verbatim), `502 github_
 
 ## Mentions (`/api/repos/:owner/:repo/mentions`)
 
-`apps/desktop/src/plugins/github/server/routes/mentions.ts`. Participant logins for `@`-autocomplete — **Mirror**-only
+`plugins/github/src/server/routes/mentions.ts`. Participant logins for `@`-autocomplete — **Mirror**-only
 (distinct authors across mirrored PRs / reviews / comments / threads; unknown repo → `[]`).
 
 ```ts
@@ -897,7 +902,7 @@ the `error` values below are the stable machine codes, and `detail` (when presen
 | `503` | `bridge-unavailable`, `capability_unavailable` | Required utility-service engine or injected bridge/controller is absent (e.g. `dev:node`) |
 
 > The `401`/`429`/`403`(`forbidden`/`sso`) rows are produced by the shared `ghError()` helper in
-> `apps/desktop/src/plugins/github/server/index.ts`, applied uniformly across every GitHub-backed route.
+> `plugins/github/src/server/index.ts`, applied uniformly across every GitHub-backed route.
 > Endpoint-specific statuses (merge `405`/`409`, GraphQL `errors`, create-PR `422`) are handled by the
 > route before it delegates the rest to `ghError()`. Any GitHub-backed route may additionally return
 > `rate_limited` / `sso` / `forbidden` per this table.
@@ -906,11 +911,11 @@ the `error` values below are the stable machine codes, and `detail` (when presen
 
 ## Source
 
-- Route mount map: `apps/desktop/src/core/server/index.ts`
-- Middleware: `apps/desktop/src/core/server/middleware/auth.ts`
-- Core routes: `apps/desktop/src/core/server/routes/*`; plugin routes:
+- Route mount map: `packages/node-core/src/server/index.ts`
+- Middleware: `packages/node-core/src/server/middleware/auth.ts`
+- Core routes: `packages/node-core/src/server/routes/*`; plugin routes:
   `apps/desktop/src/plugins/*/server/routes/*`
-- Shared contract: `apps/desktop/src/core/shared/api.ts` (+ `api.test.ts`)
+- Shared contract: `packages/protocol/src/api.ts` (+ `api.test.ts`)
 
 **See also:** [authentication](./authentication.md) · [data-layer](./data-layer.md) ·
 [caching](./caching.md) · [github-integration](./github-integration.md) ·

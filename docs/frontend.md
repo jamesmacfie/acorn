@@ -7,7 +7,7 @@ and its state model.
 
 ## Overview
 
-The client is a SolidJS single-page app composed from `apps/desktop/src/core/client/`,
+The client is a SolidJS single-page app composed from `packages/client-core/src/`,
 `apps/desktop/src/plugins/*/client/`, and `apps/desktop/src/app/client/`. It is served as static
 assets by the Hono server (running in Electron's Node utility process on
 `http://127.0.0.1:4317`) and talks to that same origin over cookie-authenticated `fetch` — the
@@ -107,7 +107,7 @@ The main area selects exactly one view from two signals —
 So "GitHub browse" is the fallback: `selectedSource()` is `'github'` and no task is active. Picking
 a source in the rail sets `selectedSource`; clicking a task row clears the source and sets
 `activeTaskId`. Task activation is shared logic — `activateTaskSignals` + `pathForTask`
-(`core/client/tasks/activate.ts`) flip the signals, mark the task's notices read, and compute the
+(`@acorn/client-core/tasks/activate.ts`) flip the signals, mark the task's notices read, and compute the
 route, and are reused by the rail rows, ⌘1–9, and the palette's Go-to-task. Overlays
 (`SettingsModal`, `OnboardingModal`, `TerminalPanel`, `CommandPalette`, `FilePalette`) and the
 global `Shortcuts` handler are mounted after the switch, independent of the active mode.
@@ -215,10 +215,10 @@ prefs). They export getters + mutators in the codebase's single-writer style:
 
 | Module | Owns |
 | --- | --- |
-| `core/client/tasks/tasks.ts` | `selectedSource`, `activeTaskId`, and per-task `taskLayouts` (all layout transitions go through `dispatchLayout` → the pure `applyLayoutAction` reducer); plus per-task terminal-open and recipe-browser-URL state. |
-| `core/client/tasks/agentSessions.ts` | The live agent/terminal session list + a single `onStatus` subscription, so the rail/topbar can show agent-working activity even with the drawer closed. |
-| `core/client/tasks/taskStatus.ts` | Live worktree status per task (dirty count / `missing`), 10s-polled + `onStatus` edges; unchanged snapshots preserve signal identity. |
-| `core/client/notifications/notifications.ts` | The bounded in-memory notice ring (mirrored to the `notices` pref) + pure edge detection over session snapshots. |
+| `@acorn/client-core/tasks/tasks.ts` | `selectedSource`, `activeTaskId`, and per-task `taskLayouts` (all layout transitions go through `dispatchLayout` → the pure `applyLayoutAction` reducer); plus per-task terminal-open and recipe-browser-URL state. |
+| `@acorn/client-core/tasks/agentSessions.ts` | The live agent/terminal session list + a single `onStatus` subscription, so the rail/topbar can show agent-working activity even with the drawer closed. |
+| `@acorn/client-core/tasks/taskStatus.ts` | Live worktree status per task (dirty count / `missing`), 10s-polled + `onStatus` edges; unchanged snapshots preserve signal identity. |
+| `@acorn/client-core/notifications/notifications.ts` | The bounded in-memory notice ring (mirrored to the `notices` pref) + pure edge detection over session snapshots. |
 | `plugins/editor/client/editorState.ts` | Open-file tabs per task (mirrored to `editor:open-files:<taskId>`). |
 
 These are initialised once in `App`'s `onMount` (`initSessions`/`initTaskStatuses`/
@@ -229,7 +229,7 @@ nothing on a non-desktop build.
 
 A task's layout is a **flat left→right row**:
 `TaskLayout = { panes: string[], weights?, pinned? }`
-(`core/client/tasks/layout.ts`). Pane ids and UI descriptors come from the pane registry; core does
+(`@acorn/client-core/tasks/layout.ts`). Pane ids and UI descriptors come from the pane registry; core does
 not carry a feature union. One pure reducer owns show/add, close/unpin, pin, move, resize/equalize,
 and recipe replacement. Durable state is written to the scoped
 `core:task-layouts:<taskId>` descriptor; aggregate `task_layouts` / `task_panes` values are migration
@@ -243,14 +243,14 @@ one authenticated WebSocket. Search, editor, local changes, database, HTTP reque
 terminal control, run targets, workflows, and MCP settings do not have feature-specific preload
 APIs.
 
-The Electron preload (`apps/desktop/src/core/main/preload.ts`) exposes only operations that truly
+The Electron preload (`packages/node-core/src/main/preload.ts`) exposes only operations that truly
 need Electron:
 
 - desktop/platform markers and the close-pane/quit lifecycle callbacks;
 - the native repository folder picker;
 - preview `WebContentsView` lifecycle, bounds, navigation, and chrome-state events.
 
-`capabilities()` (`apps/desktop/src/core/client/capabilities.ts`) reports `{ desktop, terminal }`
+`capabilities()` (`packages/client-core/src/capabilities.ts`) reports `{ desktop, terminal }`
 from that surface. The terminal drawer, agents, run targets, and workflows are available whenever
 the desktop terminal capability exists; `dev:node` remains a deliberate degraded mode for features
 whose utility-service engine is unavailable.
@@ -258,9 +258,9 @@ whose utility-service engine is unavailable.
 ## Source
 
 Key files: `apps/desktop/src/app/client/index.tsx`,
-`apps/desktop/src/core/client/{App.tsx,apiClient.ts,queries.ts}`,
-`apps/desktop/src/core/client/tabs/TabRail.tsx`,
-`apps/desktop/src/core/client/tasks/{tasks.ts,layout.ts,activate.ts,TaskView.tsx}`, and feature-owned
+`packages/client-core/src/{App.tsx,apiClient.ts,queries.ts}`,
+`packages/client-core/src/tabs/TabRail.tsx`,
+`packages/client-core/src/tasks/{tasks.ts,layout.ts,activate.ts,TaskView.tsx}`, and feature-owned
 client code under `apps/desktop/src/plugins/*/client/`.
 
 See also: [panes.md](./panes.md) (the pane catalog), [workspaces-and-tasks.md](./workspaces-and-tasks.md)
@@ -270,7 +270,7 @@ See also: [panes.md](./panes.md) (the pane catalog), [workspaces-and-tasks.md](.
 
 ## Notes on shared plumbing
 
-- Task activation lives once in `core/client/tasks/activate.ts`: `activateTaskSignals(t, { pane? })`
+- Task activation lives once in `@acorn/client-core/tasks/activate.ts`: `activateTaskSignals(t, { pane? })`
   (rail rows, ⌘1–9, the new-task flow, browse promotes, the notification bell, the palette) plus
   `pathForTask`. The optional `pane` forces a pane (promotes land on their provider pane);
   otherwise the saved layout is restored and only the first activation picks a default.

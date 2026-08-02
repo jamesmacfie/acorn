@@ -6,8 +6,8 @@ as Linear and Rollbar additionally own link integrity, mirrored resources, conte
 reference discovery, and mutations. Model providers such as OpenAI and Anthropic instead contribute
 text generation behind a server-only runtime.
 
-The implementation lives under `apps/desktop/src/core/server/integrations/`. Public cross-process types
-live in `apps/desktop/src/core/shared/integrations.ts`; client source, pane, and link contributions live in
+The implementation lives under `packages/node-core/src/server/integrations/`. Public cross-process types
+live in `packages/protocol/src/integrations.ts`; client source, pane, and link contributions live in
 `apps/desktop/src/app/client/providerContributions.tsx`.
 
 ## Connection, integration, and model registries
@@ -82,7 +82,7 @@ still serve stale linked detail without leaking one account's cache or backoff s
 
 `plugins/model-providers/server/` contains the official OpenAI and Anthropic SDK adapters. SDK types
 and wire objects stop there. The adapters validate/test API keys with model-list requests and
-provide one-shot text generation through `core/server/modelProviders/`.
+provide one-shot text generation through `@acorn/node-core/server/modelProviders/`.
 
 `generateTextForConnection` accepts a user id, opaque connection id, bounded provider-neutral input,
 and the server encryption key. It:
@@ -231,7 +231,7 @@ before caching, and the raw `data` object never crosses the server boundary.
 
 ## Conformance and adding a provider
 
-`core/server/integrations/conformance.test.ts` iterates both registries. Every connection provider is
+`@acorn/node-core/server/integrations/conformance.test.ts` iterates both registries. Every connection provider is
 checked for public-secret hygiene, executable lifecycle behavior, and positive request budgets.
 External-item providers are additionally checked for capability obligations, cache
 migration/malformed behavior, summary-over-detail preservation, degradation formatting, and the

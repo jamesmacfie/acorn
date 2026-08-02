@@ -167,7 +167,7 @@ write and recall across sessions (FTS5 full-text search, MCP `memory_*` tools).
 
 ## MCP
 
-acorn ships a stdio **MCP server** (`apps/desktop/src/core/mcp/server.ts`) that exposes the current
+acorn ships a stdio **MCP server** (`packages/node-core/src/mcp/server.ts`) that exposes the current
 task's context to any agent launched from it — task/PR context, changed files, local diffs, git log,
 repo info, linked issues, notes, memory, run targets, and browser driving. Tools loopback into the
 running app's Hono API (never their own DB), and return structured "no active task" results when
@@ -190,7 +190,7 @@ Definitions remain file-authored, and execution advances only while the app is o
 
 - **⌘K** — the command palette: fuzzy-filtered run targets, layouts, workflows, pane actions,
   "go to task" navigation, and visible (non-invocable) config parse-error rows
-  (`core/client/palette/model.ts`).
+  (`@acorn/client-core/palette/model.ts`).
 - **⌘P** — go-to-file across the task worktree.
 - **`/`** — find file within the current PR's changed files (the finder overlay).
 - **`j` / `k`** — next / previous PR; **`[` / `]`** — previous / next file; **`c`** — create PR;
@@ -246,14 +246,14 @@ Be aware of what's real today:
 
 ## Source
 
-- Client shell: `apps/desktop/src/core/client/App.tsx`; capabilities: `core/client/capabilities.ts`
-- TabRail: `apps/desktop/src/core/client/tabs/{TabRail.tsx,sources.ts,railOrder.ts}`
-- Task view + panes: `apps/desktop/src/core/client/tasks/{TaskView.tsx,layout.ts}`
-- Write actions: PR verbs in `apps/desktop/src/plugins/github/client/mutations.ts`; workspace/repo and
-  task/review-note writes in `core/client/{workspaces,tasks}/mutations.ts`
-- Palette / shortcuts: `apps/desktop/src/core/client/palette/model.ts`, `plugins/github/client/Shortcuts.tsx`
-- Settings shell: `apps/desktop/src/core/client/settings/`; contributed pages live with plugins
-- MCP server: `apps/desktop/src/core/mcp/server.ts`
+- Client shell: `apps/desktop/apps/desktop/src/app/client/App.tsx`; capabilities: `@acorn/client-core/capabilities.ts`
+- TabRail: `packages/client-core/src/tabs/{TabRail.tsx,sources.ts,railOrder.ts}`
+- Task view + panes: `packages/client-core/src/tasks/{TaskView.tsx,layout.ts}`
+- Write actions: PR verbs in `plugins/github/src/client/mutations.ts`; workspace/repo and
+  task/review-note writes in `@acorn/client-core/{workspaces,tasks}/mutations.ts`
+- Palette / shortcuts: `packages/client-core/src/palette/model.ts`, `plugins/github/client/Shortcuts.tsx`
+- Settings shell: `packages/client-core/src/settings/`; contributed pages live with plugins
+- MCP server: `packages/node-core/src/mcp/server.ts`
 
 See also: [architecture-overview.md](./architecture-overview.md) ·
 [workspaces-and-tasks.md](./workspaces-and-tasks.md) · [panes.md](./panes.md) ·

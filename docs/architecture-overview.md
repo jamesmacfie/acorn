@@ -1,5 +1,10 @@
 # Architecture Overview
 
+> **Removed.** The bearer-authenticated public automation API (`/api/v1`), its tokens,
+> idempotency store and second listener were deleted in vNext Phase 0 — along with
+> `oauth_accounts`, `api_tokens`, `api_idempotency` and `command_executions`. Passages below
+> that describe it are historical. See [vNext/plan.md](./vNext/plan.md).
+
 The keystone doc for acorn: what it is, the one-server model, the two kinds of
 state it holds, the three caches reads pass through, and how a request flows end
 to end. See the [documentation index](#documentation-index) at the bottom for
@@ -35,7 +40,7 @@ folder-picker adapters, then creates the window after the service reports that
 its listener is up. The utility-process composition root
 (`apps/desktop/src/app/service/runtime.ts`) migrates the DB, constructs domain
 services, installs bridge-backed capabilities, then starts a single Hono app
-(`apps/desktop/src/core/server/index.ts`, a
+(`packages/node-core/src/server/index.ts`, a
 `createApp()` factory) under `@hono/node-server` on `http://127.0.0.1:4317` (the
 port is pinned for a stable browser-storage origin; `ACORN_PORT` in the
 environment overrides it).
@@ -51,7 +56,7 @@ origin:
 - the `/api/*` JSON API, and
 - the `/auth/*` OAuth flow.
 
-Routing lives in `apps/desktop/src/core/main/server.ts`: a static-file middleware
+Routing lives in `packages/node-core/src/main/server.ts`: a static-file middleware
 serves the built assets, and a `notFound` handler returns 404s for unmatched
 `/api/*` and `/auth/*` but falls back to `index.html` for other paths so the
 client router can handle deep links (`/:owner/:repo/:number`). A loopback Host
@@ -67,8 +72,8 @@ The process boundary is deliberately narrower than the HTTP application boundary
   pools, notes/memory/context, agent tools, reconciliation, and shutdown draining.
 - **Electron main owns native state:** `BrowserWindow`, `WebContentsView`, folder dialogs,
   `safeStorage`, navigation/keyboard policy, and service supervision.
-- **Typed service RPC connects them:** `core/shared/serviceProtocol.ts` validates versioned
-  request/response/event envelopes in both processes. `core/shared/desktopCapabilities.ts` exposes
+- **Typed service RPC connects them:** `@acorn/protocol/serviceProtocol.ts` validates versioned
+  request/response/event envelopes in both processes. `@acorn/protocol/desktopCapabilities.ts` exposes
   only narrow task-addressed preview/browser operations. No DB handle, process object, or
   `webContents` identifier crosses the boundary.
 
@@ -86,12 +91,12 @@ files — lives under one data root:
 Because the API and the app share an origin, the session is a plain same-origin
 cookie — no CORS, no bearer tokens in the browser, no token storage on the client
 at all. See [authentication](./authentication.md). (A separate, opt-in
-[public automation API](./public-api.md) runs a second `127.0.0.1` listener on
+public automation API runs a second `127.0.0.1` listener on
 its own port with bearer-token auth; it is disabled by default and does not
 change the SPA origin.)
 
 The HTTP API contract is mirrored into shared TypeScript, not a runtime RPC
-client. `apps/desktop/src/core/shared/api.ts` owns response types, route builders, and
+client. `packages/protocol/src/api.ts` owns response types, route builders, and
 query-key factories that the SPA consumes through plain same-origin `fetch`.
 That keeps the route and cache contracts typed without adding client bundle
 weight or extra per-request abstraction. See
@@ -143,7 +148,7 @@ contributions, the Docker and API Requests sources, notifications, integrations
 database tools, settings, the command palette, and the file finder are shipped.
 The **terminal drawer, agent sessions, run targets, and workflows** are
 desktop-only and always on when the Electron terminal capability is present
-(`capabilities()`, `apps/desktop/src/core/client/capabilities.ts` — the old
+(`capabilities()`, `packages/client-core/src/capabilities.ts` — the old
 `acorn:term` localStorage flag has been deleted). The workflow engine is a
 registry-backed durable runtime with explicit branching/joins, profile adapters,
 tool ceilings, cancellation, and app-open triggers; authoring remains file-only. See
@@ -263,7 +268,7 @@ sessions remain PTYs managed by `plugins/terminal/main/terminal.ts`.
 
 Managed turns receive immutable context snapshots through pane contribution registries; raw agents
 also get task-scoped tools through the **acorn MCP server**
-(`apps/desktop/src/core/mcp/server.ts`) over loopback. The stdio MCP proxy runs as a spawned child
+(`packages/node-core/src/mcp/server.ts`) over loopback. The stdio MCP proxy runs as a spawned child
 process and calls the running app rather than opening the database itself. Because it holds
 no session cookie, the utility service loads or creates one persistent mode-`0600`
 `INTERNAL_TOKEN` and injects it (with the other `ACORN_*` env vars) into each task session. The
@@ -359,6 +364,6 @@ projection itself is transport-neutral.
   stateless session cookie, CSRF protections, the 401 → reauth bounce.
 - [security](./security.md) — loopback threat model, authentication boundaries,
   filesystem containment, secret handling, and tool permissions.
-- [public-api](./public-api.md) — the opt-in bearer-authenticated HTTP + WebSocket
+- public-api — the opt-in bearer-authenticated HTTP + WebSocket
   automation API: dedicated listener, token model, schema-first endpoints, OpenAPI.
 - [testing](./testing.md) — test suites, architecture checks, and validation commands.

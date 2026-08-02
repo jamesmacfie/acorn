@@ -107,19 +107,19 @@ travels into the prompt when it's used as an example.
 ## Where the code lives
 
 Utility service (historical `main` path):
-`apps/desktop/src/plugins/database/main/database.ts` (pool cache + `resolveDbUrl` +
+`plugins/database/src/main/database.ts` (pool cache + `resolveDbUrl` +
 `schema()`, which resolves the schema source and carries the repo's notes back with it). HTTP routes:
-`apps/desktop/src/plugins/database/server/routes/database.ts`; prompt assembly:
+`plugins/database/src/server/routes/database.ts`; prompt assembly:
 `server/generateSql.ts`; wire types: `shared/database.ts`. Client:
-`apps/desktop/src/plugins/database/client/` — `DatabasePane.tsx` plus `GenerateSqlModal.tsx` and
+`plugins/database/src/client/` — `DatabasePane.tsx` plus `GenerateSqlModal.tsx` and
 `SaveQueryModal.tsx`. Both the saved-query dropdown and the example multi-select are the shared
-`core/client/ui/Picker.tsx` (the latter with its `keepOpen` prop, which is what makes one Picker do
+`@acorn/client-core/ui/Picker.tsx` (the latter with its `keepOpen` prop, which is what makes one Picker do
 multi-select).
 
 The `repo_paths` columns (`dbUrlScript`, `dbSchemaMode`, `dbSchemaValue`, `dbSchemaNotes`) and
-`db_saved_queries` live in `apps/desktop/src/core/server/db/schema.ts`. The repo columns are edited via
-the per-repo section of `core/client/settings/WorkspaceSettings.tsx` → `PUT
-/api/terminal/repo-path/config` (`core/main/repoPaths.ts` `setRepoConfig`); the schema-source, notes,
+`db_saved_queries` live in `packages/node-core/src/server/db/schema.ts`. The repo columns are edited via
+the per-repo section of `@acorn/client-core/settings/WorkspaceSettings.tsx` → `PUT
+/api/terminal/repo-path/config` (`@acorn/node-core/main/repoPaths.ts` `setRepoConfig`); the schema-source, notes,
 and generation UI are all gated on `availableModelConnections(...)` being non-empty.
 
 ## Smoke test

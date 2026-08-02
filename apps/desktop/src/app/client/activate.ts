@@ -89,5 +89,3 @@ registerDockerArchiveConcern()
 for (const contribution of shellSlotContributions) uiSlotRegistry.register(contribution)
 for (const slice of persistedSliceContributions) persistedStateRegistry.register(slice)
 activateScopedStateEviction()
-// Register this window with the public UI control broker (docs/public-api.md) so
-// presentation commands from the automation API can drive it. No-op until a public client connects.

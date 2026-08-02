@@ -1,5 +1,10 @@
 # Plugin architecture
 
+> **Removed.** The bearer-authenticated public automation API (`/api/v1`), its tokens,
+> idempotency store and second listener were deleted in vNext Phase 0 — along with
+> `oauth_accounts`, `api_tokens`, `api_idempotency` and `command_executions`. Passages below
+> that describe it are historical. See [vNext/plan.md](./vNext/plan.md).
+
 acorn is organised into three layers under `apps/desktop/src`:
 
 - `core/` owns platform contracts and services: the shell, persistence, registries, HTTP/auth,
@@ -26,7 +31,7 @@ from `core/main` and `plugins/*/main`. Treat those as service-owned unless their
 imports Electron. New native adapters belong in the main graph; new domain engines belong in the
 service graph.
 
-`apps/desktop/src/core/boundaries.test.ts` enforces those runtime boundaries and prevents
+`apps/desktop/tools/arch/boundaries.test.ts` enforces those runtime boundaries and prevents
 `core/`/`plugins/` from importing the `app/` composition layer. It also records a shrinking baseline
 of legacy core→plugin and plugin→plugin imports; new cross-feature edges fail the test, and removing
 an edge requires removing its baseline entry.
@@ -35,18 +40,18 @@ an edge requires removing its baseline entry.
 
 | Surface | Registry or contract | Activation home |
 | --- | --- | --- |
-| Panes | `core/client/registries/panes.ts` | `app/client/activate.ts`, provider contributions, and feature pane modules |
-| Sources | `core/client/registries/sources.ts` | `app/client/activate.ts` and `providerContributions.tsx` |
-| Commands / keybindings | `core/client/registries/{commands,keybindings}.tsx` | `app/client/activate.ts` |
-| Settings pages | `core/client/registries/settings.ts` | `app/client/pageContributions.tsx` |
-| UI slots, notices, pollers, themes | `core/client/registries/` | `app/client/activate.ts` |
-| HTTP routes (internal) | `core/server/routeRegistry.ts` | `app/server/routes.ts` |
-| Public API endpoints | `core/server/publicApi/` (schema-first `PluginApiContribution`) | `app/server/publicApi.ts` |
-| Provider connections | `core/server/integrations/connectionRegistry.ts` | `app/server/providers.ts` |
-| External-item integrations | `core/server/integrations/registry.ts` | `app/server/providers.ts` |
-| Model generation adapters | `core/server/modelProviders/registry.ts` | `app/server/providers.ts` |
-| Agent tools and context | `core/server/agentTools/` | service runtime imports `app/main/{agentToolsWiring,contextSectionsWiring}.ts` |
-| Agent profiles | `core/main/agentProfiles/` | service runtime imports `app/main/agentProfiles.ts` |
+| Panes | `@acorn/client-core/registries/panes.ts` | `app/client/activate.ts`, provider contributions, and feature pane modules |
+| Sources | `@acorn/client-core/registries/sources.ts` | `app/client/activate.ts` and `providerContributions.tsx` |
+| Commands / keybindings | `@acorn/client-core/registries/{commands,keybindings}.tsx` | `app/client/activate.ts` |
+| Settings pages | `@acorn/client-core/registries/settings.ts` | `app/client/pageContributions.tsx` |
+| UI slots, notices, pollers, themes | `@acorn/client-core/registries/` | `app/client/activate.ts` |
+| HTTP routes (internal) | `@acorn/node-core/server/routeRegistry.ts` | `app/server/routes.ts` |
+| Public API endpoints | `@acorn/node-core/server/publicApi/` (schema-first `PluginApiContribution`) | `app/server/publicApi.ts` |
+| Provider connections | `@acorn/node-core/server/integrations/connectionRegistry.ts` | `app/server/providers.ts` |
+| External-item integrations | `@acorn/node-core/server/integrations/registry.ts` | `app/server/providers.ts` |
+| Model generation adapters | `@acorn/node-core/server/modelProviders/registry.ts` | `app/server/providers.ts` |
+| Agent tools and context | `@acorn/node-core/server/agentTools/` | service runtime imports `app/main/{agentToolsWiring,contextSectionsWiring}.ts` |
+| Agent profiles | `@acorn/node-core/main/agentProfiles/` | service runtime imports `app/main/agentProfiles.ts` |
 | Workflow steps, policies, triggers | `plugins/workflows/main/workflowRegistry.ts` | service runtime imports `app/main/workflowWiring.ts` |
 
 Registries reject duplicate identifiers. Server route contributions must stay under `/api`, where
@@ -54,7 +59,7 @@ the core app applies CSRF, principal resolution, and `requireUser` before mounti
 routers. Service-process implementations are injected before the listener accepts requests, so a
 route either has its capability or returns the standard `bridge-unavailable` error.
 
-A plugin may also contribute to the opt-in [public automation API](./public-api.md): a schema-first
+A plugin may also contribute to the opt-in public automation API: a schema-first
 `PluginApiContribution` mounted under `/api/v1/plugins/<pluginId>`, whose Zod schemas are validated at
 runtime and generate OpenAPI. The registry `freeze()` enforces namespace, scope, and strict-schema
 invariants, so a malformed contribution cannot mount. See `plugins/<name>/server/publicApi.ts`.

@@ -103,13 +103,13 @@ These repository documents and modules establish the local constraints used in t
 - [State ownership and policies](../../state.md)
 - [Current security boundaries](../../security.md)
 - [UI design](../../ui-design.md)
-- `apps/desktop/src/core/client/registries/sources.ts`
-- `apps/desktop/src/core/server/routeRegistry.ts`
-- `apps/desktop/src/core/shared/ws.ts`
-- `apps/desktop/src/core/client/notifications/notifications.ts`
-- `apps/desktop/src/core/server/db/schema.ts`
-- `apps/desktop/src/core/server/blobs.ts`
-- `apps/desktop/src/core/client/highlight/shiki.ts`
+- `packages/client-core/src/registries/sources.ts`
+- `packages/node-core/src/server/routeRegistry.ts`
+- `packages/protocol/src/ws.ts`
+- `packages/client-core/src/notifications/notifications.ts`
+- `packages/node-core/src/server/db/schema.ts`
+- `packages/node-core/src/server/blobs.ts`
+- `packages/client-core/src/highlight/shiki.ts`
 
 The principal local conclusions are:
 

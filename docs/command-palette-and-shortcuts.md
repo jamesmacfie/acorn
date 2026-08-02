@@ -4,12 +4,12 @@ acorn is keyboard-driven. This doc covers the four overlays — the **command pa
 **file finder** (⌘P), the **workspace switcher** (⌘L), and the in-PR **changed-file finder** (`/`) — plus the full global shortcut
 table, the Task-view **pane shortcuts**, and the **Settings → Shortcuts** tab where the pane bindings
 are edited. Every overlay reuses the same flat `.overlay` shell (`docs/ui-design.md`) and the shared
-`createOverlayPalette` hook (`core/client/palette/overlay.ts`) for dialog-scoped navigation. Global
+`createOverlayPalette` hook (`@acorn/client-core/palette/overlay.ts`) for dialog-scoped navigation. Global
 shortcuts are declarative keybinding contributions dispatched by one `KeybindingDispatcher`.
 
 ## 1. Command palette (⌘K)
 
-The palette is split into a **pure model** (`apps/desktop/src/core/client/palette/model.ts`, unit
+The palette is split into a **pure model** (`packages/client-core/src/palette/model.ts`, unit
 tested) and a **thin overlay** (`CommandPalette.tsx`) that is glue over it. The model does two things:
 compose the item list from data sources, and fuzzy-filter it against the query.
 
@@ -63,7 +63,7 @@ workspace, then Go-to-task) are placed last deliberately. See `model.ts:23` for 
 
 **Capability gating.** Run/layout/workflow rows come from HTTP clients backed by utility-service
 services. The terminal API only exists when the desktop terminal capability is present
-(`capabilities()`, `core/client/capabilities.ts`), so in a plain browser (`dev:node`)
+(`capabilities()`, `@acorn/client-core/capabilities.ts`), so in a plain browser (`dev:node`)
 those three kinds are simply absent and the palette shows only pane/task/archive actions. See
 `docs/terminal-and-agents.md` and `docs/workflows.md`.
 
@@ -255,14 +255,14 @@ always matches what's bound.
 
 ---
 
-**Source:** `apps/desktop/src/core/client/palette/{model.ts,overlay.ts,CommandPalette.tsx}`
-· `apps/desktop/src/plugins/editor/client/FilePalette.tsx` ·
-`apps/desktop/src/plugins/github/client/{Shortcuts.tsx,changedFiles.ts}` ·
-`apps/desktop/src/core/client/lib/isTypingTarget.ts` ·
-`apps/desktop/src/core/client/tasks/paneShortcuts.ts`
-· `apps/desktop/src/core/client/tabs/TabRail.tsx` ·
-`apps/desktop/src/core/client/settings/SettingsModal.tsx` · main-process close-pane
-`apps/desktop/src/{app/main/electron.ts,core/main/preload.ts}`.
+**Source:** `packages/client-core/src/palette/{model.ts,overlay.ts,CommandPalette.tsx}`
+· `plugins/editor/src/client/FilePalette.tsx` ·
+`plugins/github/src/client/{Shortcuts.tsx,changedFiles.ts}` ·
+`packages/client-core/src/lib/isTypingTarget.ts` ·
+`packages/client-core/src/tasks/paneShortcuts.ts`
+· `packages/client-core/src/tabs/TabRail.tsx` ·
+`packages/client-core/src/settings/SettingsModal.tsx` · main-process close-pane
+`apps/desktop/src/{app/main/electron.ts,@acorn/node-core/main/preload.ts}`.
 
 **See also:** [frontend.md](./frontend.md) · [panes.md](./panes.md) ·
 [workflows.md](./workflows.md) (run targets / layout recipes) ·
