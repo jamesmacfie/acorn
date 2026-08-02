@@ -260,6 +260,13 @@
       "when": 1785370929721,
       "tag": "0036_massive_fenris",
       "breakpoints": true
+    },
+    {
+      "idx": 37,
+      "version": "6",
+      "when": 1785697857266,
+      "tag": "0037_sloppy_ironclad",
+      "breakpoints": true
     }
   ]
 }

@@ -31,15 +31,6 @@ export type DockerExecEvent = { kind: 'out'; data: string } | { kind: 'exit' }
 const dockerExecSubs = new Map<string, (event: DockerExecEvent) => void>()
 const outbox: WsClientFrame[] = [] // frames queued while the socket isn't OPEN
 
-// UI control broker (docs/public-api.md): the renderer registers a window, reports
-// state snapshots, and executes ui:command frames the main broker forwards from public callers.
-export type UiCommandResult =
-  | { ok: true; result: unknown; revision: number }
-  | { ok: false; error: { code: string; message: string; details?: unknown }; revision: number }
-type UiCommandHandler = (commandId: string, input: unknown, expectedRevision?: number) => Promise<UiCommandResult>
-let uiHandler: UiCommandHandler | null = null
-let uiRegistration: { windowId: string; primary: boolean; snapshot: unknown } | null = null
-
 let ws: WebSocket | null = null
 let reconnectTimer: ReturnType<typeof setTimeout> | null = null
 
@@ -65,8 +56,6 @@ function connect(): void {
       const [kind, id] = splitStreamKey(key)
       sock.send(JSON.stringify({ channel: `docker:${kind}:attach`, id } satisfies WsClientFrame))
     }
-    // Re-register the UI control window on reconnect so the broker regains its control connection.
-    if (uiRegistration) sock.send(JSON.stringify({ channel: 'ui:register', ...uiRegistration } satisfies WsClientFrame))
     for (const frame of outbox.splice(0)) sock.send(JSON.stringify(frame))
   }
   sock.onmessage = (e) => {
@@ -89,16 +78,6 @@ function connect(): void {
     else if (frame.channel === 'docker:stream-end') dockerStreamSubs.get(`${frame.kind}:${frame.id}`)?.forEach((cb) => cb({ kind: 'end' }))
     else if (frame.channel === 'docker:exec:out') dockerExecSubs.get(frame.execId)?.({ kind: 'out', data: frame.data })
     else if (frame.channel === 'docker:exec:exit') dockerExecSubs.get(frame.execId)?.({ kind: 'exit' })
-    else if (frame.channel === 'ui:command') {
-      const handler = uiHandler
-      if (!handler) return
-      const { requestId } = frame
-      void handler(frame.commandId, frame.input, frame.expectedRevision)
-        .then((r) => rawSend(r.ok
-          ? { channel: 'ui:command-result', requestId, ok: true, result: r.result, revision: r.revision }
-          : { channel: 'ui:command-result', requestId, ok: false, error: r.error, revision: r.revision }))
-        .catch((e) => rawSend({ channel: 'ui:command-result', requestId, ok: false, error: { code: 'internal_error', message: e instanceof Error ? e.message : 'command failed' }, revision: uiRegistration ? (uiRegistration.snapshot as { revision?: number })?.revision ?? 0 : 0 }))
-    }
   }
   const drop = () => {
     if (ws === sock) ws = null
@@ -225,21 +204,3 @@ export function wsDockerAttach(kind: 'logs' | 'stats', id: string, cb: (event: D
   }
 }
 
-// Register this window as the UI control connection and handle incoming ui:command frames. `handler`
-// maps a public command id + input to a reducer action and returns the result + new revision. The
-// app calls this after startup restore with an initial snapshot; wsSendUiState pushes updates.
-export function wsRegisterUi(windowId: string, primary: boolean, snapshot: unknown, handler: UiCommandHandler): () => void {
-  uiHandler = handler
-  uiRegistration = { windowId, primary, snapshot }
-  connect()
-  rawSend({ channel: 'ui:register', windowId, primary, snapshot })
-  return () => {
-    uiHandler = null
-    uiRegistration = null
-  }
-}
-
-export function wsSendUiState(windowId: string, snapshot: unknown): void {
-  if (uiRegistration) uiRegistration = { ...uiRegistration, snapshot }
-  rawSend({ channel: 'ui:state', windowId, snapshot })
-}

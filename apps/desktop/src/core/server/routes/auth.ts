@@ -114,18 +114,9 @@ export const auth = new Hono<{ Bindings: Env }>()
 
     c.env.ACTIVE_IDENTITY.set(user.login)
 
-    // Ordinary login keeps the GitHub token only in the sealed session. Rehydrate the separate,
-    // encrypted public-API credential only when an already-issued active bearer still needs it.
-    if (await c.env.API_TOKENS.hasActiveTokens(user.login)) {
-      await c.env.OAUTH_ACCOUNTS.upsertGithub({
-        login: user.login,
-        accessToken: token,
-        name: user.name ?? user.login,
-        avatar: user.avatar_url,
-        scopes,
-      })
-    }
-
+    // Login keeps the GitHub token only in the sealed session cookie — there is no separate durable
+    // credential store any more (the encrypted oauth_accounts record existed solely to let public
+    // API bearers call GitHub, and that surface is gone).
     const sealed = await sealSession(
       {
         token,
@@ -152,12 +143,6 @@ export const auth = new Hono<{ Bindings: Env }>()
     const session = raw ? await openSession(raw, c.env.SESSION_ENC_KEY) : null
     const userId = session?.login ?? c.env.ACTIVE_IDENTITY.get()
     deleteCookie(c, SESSION_COOKIE, { path: '/' })
-    if (userId) {
-      c.env.ACTIVE_IDENTITY.clear(userId)
-      // Logout removes the durable upstream credential as well as the cookie credential. Existing
-      // public API bearers remain hashed/revocable metadata but cannot call GitHub until that user
-      // explicitly logs in again.
-      await c.env.OAUTH_ACCOUNTS.removeGithub(userId)
-    }
+    if (userId) c.env.ACTIVE_IDENTITY.clear(userId)
     return c.body(null, 204)
   })

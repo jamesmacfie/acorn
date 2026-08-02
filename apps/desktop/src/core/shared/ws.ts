@@ -10,8 +10,7 @@ import type { DockerStatsSample } from './docker'
 
 export const WS_PATH = '/ws'
 
-// Renderer → server. Keystrokes into a PTY and attach/detach (subscribe + screen restore); plus the
-// UI-control-broker registration/state/result frames (docs/public-api.md).
+// Renderer → server. Keystrokes into a PTY and attach/detach (subscribe + screen restore).
 export type WsClientFrame =
   | { channel: 'term:input'; id: string; data: string }
   | { channel: 'term:attach'; id: string }
@@ -24,10 +23,6 @@ export type WsClientFrame =
   | { channel: 'docker:exec:in'; execId: string; data: string }
   | { channel: 'docker:exec:resize'; execId: string; cols: number; rows: number }
   | { channel: 'docker:exec:kill'; execId: string }
-  | { channel: 'ui:register'; windowId: string; primary: boolean; snapshot: unknown }
-  | { channel: 'ui:state'; windowId: string; snapshot: unknown }
-  | { channel: 'ui:command-result'; requestId: string; ok: true; result: unknown; revision: number }
-  | { channel: 'ui:command-result'; requestId: string; ok: false; error: { code: string; message: string; details?: unknown }; revision: number }
 
 // Server → renderer. `term:out` wraps the existing per-session ServerMsg (ready/output/exit); the
 // two pings carry the same payloads the old IPC pushes did. workflow:step:event is reserved.
@@ -48,4 +43,3 @@ export type WsServerFrame =
   | { channel: 'agent:event'; event: unknown }
   | { channel: 'agent:session'; session: unknown }
   | { channel: 'agent:deleted'; sessionId: string }
-  | { channel: 'ui:command'; requestId: string; windowId: string; commandId: string; input: unknown; expectedRevision?: number }

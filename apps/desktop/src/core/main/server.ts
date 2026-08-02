@@ -6,7 +6,7 @@ import { createApp } from '../server/index'
 import { makeBindings, type RuntimeBindings } from './bindings'
 import { resolveDatabasePath } from './serverPaths'
 import { ACORN_PORT, clientDir, devDataDir } from './serverConfig'
-import { attachWsHub, setUiBroker } from './wsHub'
+import { attachWsHub } from './wsHub'
 
 // DEV data root: the repo-local apps/desktop/.acorn (gitignored). Only valid while running from a
 // checkout — a packaged app's module dir is the read-only asar, so electron.ts passes an
@@ -61,7 +61,6 @@ export function startListener(runtime: RuntimeBindings): Promise<ServerType> {
     })
     // The one authenticated WebSocket (the WebSocket transport) shares this loopback listener via its
     // 'upgrade' event; the hub re-checks Host + Origin + session cookie before the handshake.
-    setUiBroker(runtime.UI_BROKER) // route the renderer's ui:* frames to the broker
     attachWsHub(server as unknown as import('node:http').Server, {
       encKey: runtime.SESSION_ENC_KEY,
       internalToken: runtime.INTERNAL_TOKEN,

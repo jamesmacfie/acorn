@@ -42,12 +42,7 @@ export function registerWsChannelHandler(prefix: string, handler: WsChannelHandl
   else channelHandlers.delete(prefix)
 }
 
-// The UI control broker (docs/public-api.md). Set by the composition root; the renderer's ui:*
-// frames route to it and it sends ui:command frames back over this socket.
-let broker: import('./publicApi/uiControlBroker').UiControlBroker | null = null
-export const setUiBroker = (b: import('./publicApi/uiControlBroker').UiControlBroker | null): void => void (broker = b)
-
-type Conn = { ws: WebSocket; sinks: Map<string, StreamSink>; windowId?: string }
+type Conn = { ws: WebSocket; sinks: Map<string, StreamSink> }
 const conns = new Set<Conn>()
 const hubDisposers = new WeakMap<Server, () => void>()
 
@@ -99,20 +94,6 @@ function onConnect(ws: WebSocket): void {
     } catch {
       return // non-JSON noise — ignore defensively
     }
-    // UI control broker frames (renderer registration + command results). Independent of stream handlers.
-    if (frame.channel === 'ui:register') {
-      conn.windowId = frame.windowId
-      broker?.register(frame.windowId, frame.primary, frame.snapshot, (cmd) => sendFrame(ws, cmd))
-      return
-    }
-    if (frame.channel === 'ui:state') {
-      broker?.updateState(frame.windowId, frame.snapshot)
-      return
-    }
-    if (frame.channel === 'ui:command-result') {
-      broker?.resolveResult(frame)
-      return
-    }
     if (frame.channel.startsWith('term:')) {
       if (!handlers) return
       if (frame.channel === 'term:input') {
@@ -138,7 +119,6 @@ function onConnect(ws: WebSocket): void {
     for (const [id, sink] of conn.sinks) handlers?.detach(id, sink)
     conn.sinks.clear()
     for (const handler of channelHandlers.values()) handler.onDisconnect(conn)
-    if (conn.windowId) broker?.disconnect(conn.windowId)
   }
   ws.on('close', cleanup)
   ws.on('error', cleanup)
