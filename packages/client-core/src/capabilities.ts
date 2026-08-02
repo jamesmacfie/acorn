@@ -59,3 +59,11 @@ export const capabilities = (): Capabilities => ({
 
 export const hasClientCapability = (requirement: ClientCapabilityRequirement = 'none'): boolean =>
   requirement === 'none' || capabilities()[requirement]
+
+// Typed accessor for the injected preload global.
+//
+// `declare global { interface Window }` above only applies to programs that include THIS file. A
+// consumer compiling a module that merely says `window.acorn` — taskBridge.ts did — sees a bare
+// Window and fails once it is compiled from another package. Reaching for the global through this
+// function makes the augmentation travel with the import graph.
+export const acornGlobal = (): Window['acorn'] => window.acorn

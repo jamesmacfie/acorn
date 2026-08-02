@@ -3,7 +3,7 @@
 // registry in the agent-tool registry (main/agentToolsWiring.ts); run keeps a dedicated bridge because its renderer
 // surface (run pane, preview home) is not an agent tool. Wired independently so dev:node stays 503.
 import { setRunBridge } from '@acorn/node-core/server/routes/harness.ts'
-import type { RuntimeService } from '../../plugins/terminal/main/runtime'
+import type { RuntimeService } from '@acorn/plugin-terminal/main/runtime.ts'
 
 export function wireRunBridge(runtime: RuntimeService): void {
   setRunBridge({

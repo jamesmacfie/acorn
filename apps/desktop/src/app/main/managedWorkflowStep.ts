@@ -1,9 +1,9 @@
 import { randomUUID } from 'node:crypto'
 import { HEADLESS_TIMEOUT_MS, type HeadlessResult, type StreamEvent } from '@acorn/node-core/main/headless.ts'
-import type { ManagedAgentRuntime } from '../../plugins/agents/main/runtime'
+import type { ManagedAgentRuntime } from '@acorn/plugin-agents/main/runtime.ts'
 import type { AgentEventRecord, AgentSessionSnapshot } from '@acorn/protocol/managedAgents.ts'
-import type { RunStepOptions } from '../../plugins/workflows/main/workflowRunner'
-import type { WorkflowStepDef } from '../../plugins/workflows/main/workflowContracts'
+import type { RunStepOptions } from '@acorn/plugin-workflows/main/workflowRunner.ts'
+import type { WorkflowStepDef } from '@acorn/plugin-workflows/main/workflowContracts.ts'
 
 const MANAGED_PROVIDERS: Readonly<Record<string, string>> = {
   'claude-code': 'claude',

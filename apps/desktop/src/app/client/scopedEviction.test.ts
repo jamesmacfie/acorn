@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest'
-import { editorOpen, openFiles } from '../../plugins/editor/client/editorState'
-import { editorTreeDirectoryOpen, setEditorTreeDirectoryOpen } from '../../plugins/editor/client/editorTreeState'
-import { editorViewState, rememberEditorViewState } from '../../plugins/editor/client/editorViewState'
-import { prFilterFor, setPrFilter } from '../../plugins/github/client/pullList/filterState'
-import { rememberReviewDiffScroll, reviewDiffScroll } from '../../plugins/github/client/reviewViewState'
+import { editorOpen, openFiles } from '@acorn/plugin-editor/client/editorState.ts'
+import { editorTreeDirectoryOpen, setEditorTreeDirectoryOpen } from '@acorn/plugin-editor/client/editorTreeState.ts'
+import { editorViewState, rememberEditorViewState } from '@acorn/plugin-editor/client/editorViewState.ts'
+import { prFilterFor, setPrFilter } from '@acorn/plugin-github/client/pullList/filterState.ts'
+import { rememberReviewDiffScroll, reviewDiffScroll } from '@acorn/plugin-github/client/reviewViewState.ts'
 import { activeTerminal, rememberActiveTerminal } from '@acorn/client-core/tasks/agentSessions.ts'
 import {
   dispatchLayout,

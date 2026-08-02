@@ -20,8 +20,8 @@ import { wireContextSections } from '../main/contextSectionsWiring'
 import { registerWorkflowIpc } from '../main/workflowWiring'
 import { wireConfigTrust } from '../main/configTrustWiring'
 import { prepareSecurityState } from '../main/startupSecurity'
-import { registerKnowledgeIpc } from '../../plugins/memory/main/knowledgeIpc'
-import { createRuntimeService } from '../../plugins/terminal/main/runIpc'
+import { registerKnowledgeIpc } from '@acorn/plugin-memory/main/knowledgeIpc.ts'
+import { createRuntimeService } from '@acorn/plugin-terminal/main/runIpc.ts'
 import {
   configureTerminalMcp,
   disposeTerminal,
@@ -30,11 +30,11 @@ import {
   registerTerminalIpc,
   sendToAgent,
   terminalRunGlue,
-} from '../../plugins/terminal/main/terminal'
-import { endDbPools } from '../../plugins/database/main/database'
-import { disposeDocker } from '../../plugins/docker/main/dockerService'
-import { seedTaskNotes } from '../../plugins/notes/main/seedTaskNotes'
-import { previewRulesForTask } from '../../plugins/preview/server/previewRules'
+} from '@acorn/plugin-terminal/main/terminal.ts'
+import { endDbPools } from '@acorn/plugin-database/main/database.ts'
+import { disposeDocker } from '@acorn/plugin-docker/main/dockerService.ts'
+import { seedTaskNotes } from '@acorn/plugin-notes/main/seedTaskNotes.ts'
+import { previewRulesForTask } from '@acorn/plugin-preview/server/previewRules.ts'
 
 export type ServiceRuntime = {
   previewRules(taskId: string): ReturnType<typeof previewRulesForTask>

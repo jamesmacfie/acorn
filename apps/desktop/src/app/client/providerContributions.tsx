@@ -4,13 +4,13 @@ import { paneRegistry } from '@acorn/client-core/registries/panes.ts'
 import type { SourceContribution } from '@acorn/client-core/registries/sources.ts'
 import { sourceRegistry } from '@acorn/client-core/registries/sources.ts'
 import { linearPaneContribution, rollbarPaneContribution } from './taskPaneContributions'
-import { contentLinkRegistry, linearContentLinkContribution, type ContentLinkContribution } from '../../plugins/github/client/contentLinks'
+import { contentLinkRegistry, linearContentLinkContribution, type ContentLinkContribution } from '@acorn/plugin-github/client/contentLinks.ts'
 import type { LinearProjectIssue, RollbarItemSummary } from '@acorn/protocol/api.ts'
 import { addTaskLink, createTask } from '@acorn/client-core/tasks/mutations.ts'
 import { prepareLinearPromotion, prepareRollbarPromotion } from '@acorn/client-core/integrations/providerPromotion.ts'
 
-const LinearBrowse = lazy(() => import('../../plugins/linear/client/LinearBrowse'))
-const RollbarBrowse = lazy(() => import('../../plugins/rollbar/client/RollbarBrowse'))
+const LinearBrowse = lazy(() => import('@acorn/plugin-linear/client/LinearBrowse.tsx'))
+const RollbarBrowse = lazy(() => import('@acorn/plugin-rollbar/client/RollbarBrowse.tsx'))
 
 export type ClientIntegrationProviderContribution = {
   id: string

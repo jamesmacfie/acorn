@@ -1,0 +1,36 @@
+{
+  "name": "@acorn/plugin-terminal",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./*": "./src/*"
+  },
+  "scripts": {
+    "lint": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@acorn/client-core": "workspace:*",
+    "@acorn/node-core": "workspace:*",
+    "@acorn/protocol": "workspace:*",
+    "@tanstack/solid-query": "^5.101.0",
+    "@xterm/addon-fit": "^0.10.0",
+    "@xterm/addon-webgl": "^0.18.0",
+    "@xterm/xterm": "^5.5.0",
+    "drizzle-orm": "catalog:",
+    "hono": "catalog:",
+    "node-pty": "^1.0.0",
+    "shiki": "^4.2.0",
+    "solid-js": "catalog:",
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "@types/node": "^26.0.0",
+    "electron": "^42.5.0",
+    "typescript": "^6.0.3",
+    "vite": "^8.0.16",
+    "vite-plugin-solid": "^2.11.12",
+    "vitest": "^4.1.9"
+  }
+}

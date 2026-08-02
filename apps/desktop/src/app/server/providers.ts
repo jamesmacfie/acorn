@@ -6,19 +6,19 @@
 import { integrationProviderRegistry } from '@acorn/node-core/server/integrations/registry.ts'
 import { connectionProviderRegistry } from '@acorn/node-core/server/integrations/connectionRegistry.ts'
 import { modelProviderRegistry } from '@acorn/node-core/server/modelProviders/registry.ts'
-import { linear } from '../../plugins/linear/server/routes/linear'
-import { rollbar } from '../../plugins/rollbar/server/routes/rollbar'
-import { githubProvider } from '../../plugins/github/server/provider'
-import { linearProvider } from '../../plugins/linear/server/provider'
-import { rollbarProvider } from '../../plugins/rollbar/server/provider'
+import { linear } from '@acorn/plugin-linear/server/routes/linear.ts'
+import { rollbar } from '@acorn/plugin-rollbar/server/routes/rollbar.ts'
+import { githubProvider } from '@acorn/plugin-github/server/provider.ts'
+import { linearProvider } from '@acorn/plugin-linear/server/provider.ts'
+import { rollbarProvider } from '@acorn/plugin-rollbar/server/provider.ts'
 import {
   openAIConnectionProvider,
   openAIModelProvider,
-} from '../../plugins/model-providers/server/openai'
+} from '@acorn/plugin-model-providers/server/openai.ts'
 import {
   anthropicConnectionProvider,
   anthropicModelProvider,
-} from '../../plugins/model-providers/server/anthropic'
+} from '@acorn/plugin-model-providers/server/anthropic.ts'
 
 export const builtInIntegrationProviders = [githubProvider, linearProvider, rollbarProvider] as const
 export const builtInModelConnectionProviders = [

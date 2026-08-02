@@ -1,0 +1,35 @@
+{
+  "name": "@acorn/plugin-database",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./*": "./src/*"
+  },
+  "scripts": {
+    "lint": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@acorn/client-core": "workspace:*",
+    "@acorn/node-core": "workspace:*",
+    "@acorn/plugin-editor": "workspace:*",
+    "@acorn/protocol": "workspace:*",
+    "@tanstack/solid-query": "^5.101.0",
+    "@tanstack/solid-virtual": "^3.13.29",
+    "drizzle-orm": "catalog:",
+    "hono": "catalog:",
+    "monaco-editor": "^0.55.1",
+    "pg": "^8.22.0",
+    "solid-js": "catalog:",
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "@types/node": "^26.0.0",
+    "@types/pg": "^8.20.0",
+    "typescript": "^6.0.3",
+    "vite": "^8.0.16",
+    "vite-plugin-solid": "^2.11.12",
+    "vitest": "^4.1.9"
+  }
+}

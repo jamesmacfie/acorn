@@ -1,16 +1,16 @@
 import { BridgeError } from '@acorn/node-core/server/bridge.ts'
 import type { AppDatabase } from '@acorn/node-core/server/db/index.ts'
 import { wsBroadcast } from '@acorn/node-core/main/wsHub.ts'
-import { ManagedAgentRuntime } from '../../plugins/agents/main/runtime'
-import { agentDriverRegistry } from '../../plugins/agents/main/drivers/registry'
-import { ClaudeAgentDriver } from '../../plugins/agents/main/drivers/claudeDriver'
-import { CodexAgentDriver } from '../../plugins/agents/main/drivers/codexDriver'
-import { terminalBridgeSlot } from '../../plugins/terminal/server/routes/terminal'
+import { ManagedAgentRuntime } from '@acorn/plugin-agents/main/runtime.ts'
+import { agentDriverRegistry } from '@acorn/plugin-agents/main/drivers/registry.ts'
+import { ClaudeAgentDriver } from '@acorn/plugin-agents/main/drivers/claudeDriver.ts'
+import { CodexAgentDriver } from '@acorn/plugin-agents/main/drivers/codexDriver.ts'
+import { terminalBridgeSlot } from '@acorn/plugin-terminal/server/routes/terminal.ts'
 import { getProfile, resolveCommand } from '@acorn/node-core/main/profiles.ts'
 import {
   setManagedAgentsBridge,
   type ManagedAgentsBridge,
-} from '../../plugins/agents/server/routes/managed'
+} from '@acorn/plugin-agents/server/routes/managed.ts'
 
 let driversRegistered = false
 

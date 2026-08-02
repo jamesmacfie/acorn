@@ -1,0 +1,28 @@
+{
+  "name": "@acorn/plugin-preview",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./*": "./src/*"
+  },
+  "scripts": {
+    "lint": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@acorn/client-core": "workspace:*",
+    "@acorn/node-core": "workspace:*",
+    "@acorn/plugin-terminal": "workspace:*",
+    "@acorn/protocol": "workspace:*",
+    "solid-js": "catalog:"
+  },
+  "devDependencies": {
+    "@types/node": "^26.0.0",
+    "electron": "^42.5.0",
+    "typescript": "^6.0.3",
+    "vite": "^8.0.16",
+    "vite-plugin-solid": "^2.11.12",
+    "vitest": "^4.1.9"
+  }
+}

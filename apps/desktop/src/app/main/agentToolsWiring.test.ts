@@ -5,7 +5,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { schema } from '@acorn/node-core/server/db/index.ts'
 import { makeTestDb, type TestDb } from '@acorn/node-core/server/routes/testDb.ts'
 import { buildAgentTools } from './agentToolsWiring'
-import { NotesStore } from '../../plugins/notes/main/notes'
+import { NotesStore } from '@acorn/plugin-notes/main/notes.ts'
 
 describe('agent note contributions', () => {
   let testDb: TestDb

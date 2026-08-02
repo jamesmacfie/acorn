@@ -1,6 +1,6 @@
 import type { RuntimeBindings } from '@acorn/node-core/main/bindings.ts'
-import { pruneOrphanedGithubMirror } from '../../plugins/github/server/mirrorRetention'
-import { protectLegacyHttpStorage } from '../../plugins/http/server/storage'
+import { pruneOrphanedGithubMirror } from '@acorn/plugin-github/server/mirrorRetention.ts'
+import { protectLegacyHttpStorage } from '@acorn/plugin-http/server/storage.ts'
 
 // Security-sensitive startup reconciliation shared by the utility-service and dev:node composition
 // roots. HTTP plaintext migration must succeed before the listener opens. Retention repairs are
