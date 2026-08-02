@@ -14,7 +14,7 @@ const PRELOAD = join(import.meta.dirname, '../preload/index.cjs')
 const e2e = process.env.ACORN_E2E === '1'
 const dataDir = e2e && process.env.ACORN_E2E_DATA_DIR
   ? resolve(process.env.ACORN_E2E_DATA_DIR)
-  : app.isPackaged ? app.getPath('userData') : devDataDir
+  : app.isPackaged ? app.getPath('userData') : devDataDir()
 
 // Dev: load secrets from .env. Packaged builds have no bundled .env (that load no-ops); instead a
 // user-provided .env in the data dir (~/Library/Application Support/acorn/.env) supplies
