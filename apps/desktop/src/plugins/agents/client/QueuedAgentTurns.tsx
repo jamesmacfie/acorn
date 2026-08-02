@@ -1,7 +1,7 @@
 import { createMemo, createSignal, For, Show } from 'solid-js'
 import type { AgentTurn } from '@acorn/protocol/managedAgents.ts'
-import Icon from '../../../core/client/ui/Icon'
-import { Button, Textarea } from '../../../core/client/ui/primitives'
+import Icon from '@acorn/client-core/ui/Icon.tsx'
+import { Button, Textarea } from '@acorn/client-core/ui/primitives.tsx'
 import { managedAgentApi } from './managedClient'
 
 const promptText = (turn: AgentTurn): string =>

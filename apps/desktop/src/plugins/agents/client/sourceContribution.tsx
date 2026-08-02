@@ -1,5 +1,5 @@
 import { lazy } from 'solid-js'
-import type { SourceContribution } from '../../../core/client/registries/sources'
+import type { SourceContribution } from '@acorn/client-core/registries/sources.ts'
 
 const AgentCenter = lazy(() => import('./AgentCenter'))
 

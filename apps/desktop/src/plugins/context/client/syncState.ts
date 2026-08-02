@@ -8,7 +8,7 @@
 // 2. Target session — which agent session Sync targets, per task (the activeByTask pattern), always
 //    validated against the live list so a killed target falls back to the most-recent session.
 import { createSignal } from 'solid-js'
-import { agentSessionsFor } from '../../../core/client/tasks/agentSessions'
+import { agentSessionsFor } from '@acorn/client-core/tasks/agentSessions.ts'
 import type { TerminalSession } from '@acorn/protocol/terminal.ts'
 
 type SyncRecord = { taskId: string; at: number; sections: Record<string, string> }

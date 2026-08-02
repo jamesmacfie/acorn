@@ -1,11 +1,11 @@
 import { createEffect, createMemo, For, onCleanup, onMount, Show } from 'solid-js'
 import { useNavigate, useParams } from '@solidjs/router'
 import { useChangedFiles } from './changedFiles'
-import { fuzzyScore } from '../../../core/client/palette/model'
-import { createOverlayPalette } from '../../../core/client/palette/overlay'
-import type { PullFile } from '../../../core/client/queries'
-import { registerCommands } from '../../../core/client/registries/commands'
-import { registerKeybindings } from '../../../core/client/registries/keybindings'
+import { fuzzyScore } from '@acorn/client-core/palette/model.ts'
+import { createOverlayPalette } from '@acorn/client-core/palette/overlay.ts'
+import type { PullFile } from '@acorn/client-core/queries.ts'
+import { registerCommands } from '@acorn/client-core/registries/commands.ts'
+import { registerKeybindings } from '@acorn/client-core/registries/keybindings.tsx'
 
 // Global keyboard shortcuts + the file finder. Mounted once in App. PullList owns j/k (next/prev
 // PR) — those keys are deliberately untouched here. Global shortcut dispatch lives in the command

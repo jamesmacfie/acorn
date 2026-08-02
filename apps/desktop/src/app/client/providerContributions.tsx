@@ -1,13 +1,13 @@
 import { lazy } from 'solid-js'
-import type { PaneContribution } from '../../core/client/registries/panes'
-import { paneRegistry } from '../../core/client/registries/panes'
-import type { SourceContribution } from '../../core/client/registries/sources'
-import { sourceRegistry } from '../../core/client/registries/sources'
+import type { PaneContribution } from '@acorn/client-core/registries/panes.ts'
+import { paneRegistry } from '@acorn/client-core/registries/panes.ts'
+import type { SourceContribution } from '@acorn/client-core/registries/sources.ts'
+import { sourceRegistry } from '@acorn/client-core/registries/sources.ts'
 import { linearPaneContribution, rollbarPaneContribution } from './taskPaneContributions'
 import { contentLinkRegistry, linearContentLinkContribution, type ContentLinkContribution } from '../../plugins/github/client/contentLinks'
 import type { LinearProjectIssue, RollbarItemSummary } from '@acorn/protocol/api.ts'
-import { addTaskLink, createTask } from '../../core/client/tasks/mutations'
-import { prepareLinearPromotion, prepareRollbarPromotion } from '../../core/client/integrations/providerPromotion'
+import { addTaskLink, createTask } from '@acorn/client-core/tasks/mutations.ts'
+import { prepareLinearPromotion, prepareRollbarPromotion } from '@acorn/client-core/integrations/providerPromotion.ts'
 
 const LinearBrowse = lazy(() => import('../../plugins/linear/client/LinearBrowse'))
 const RollbarBrowse = lazy(() => import('../../plugins/rollbar/client/RollbarBrowse'))

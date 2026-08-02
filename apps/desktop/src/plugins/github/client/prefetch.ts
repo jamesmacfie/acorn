@@ -7,7 +7,7 @@
 // cancels the in-flight warm-up (the caller aborts on cleanup).
 import type { QueryClient } from '@tanstack/solid-query'
 import { fileSummariesKey, pullKey, pullsBatchRoute, type PullBatchItem, type PullBatchRequest } from '@acorn/protocol/api.ts'
-import { pullsOptions } from '../../../core/client/queries'
+import { pullsOptions } from '@acorn/client-core/queries.ts'
 
 const CHUNK = 5 // PRs per batch request (one GitHub GraphQL round-trip server-side)
 const CONCURRENCY = 2 // batch requests in flight at once

@@ -1,4 +1,4 @@
-import { clientEvents, evictPendingIntents } from '../../core/client/registries/clientEvents'
+import { clientEvents, evictPendingIntents } from '@acorn/client-core/registries/clientEvents.ts'
 import { evictContextSelection } from '../../plugins/context/client/selectionState'
 import { evictSyncState } from '../../plugins/context/client/syncState'
 import { evictNotesPaneState } from '../../plugins/notes/client/notesPaneState'
@@ -7,8 +7,8 @@ import { evictEditorTreeState } from '../../plugins/editor/client/editorTreeStat
 import { evictEditorViewStates } from '../../plugins/editor/client/editorViewState'
 import { evictPrFilter } from '../../plugins/github/client/pullList/filterState'
 import { evictReviewViewStates } from '../../plugins/github/client/reviewViewState'
-import { evictActiveTerminal } from '../../core/client/tasks/agentSessions'
-import { evictTaskState, evictWorkspaceView } from '../../core/client/tasks/tasks'
+import { evictActiveTerminal } from '@acorn/client-core/tasks/agentSessions.ts'
+import { evictTaskState, evictWorkspaceView } from '@acorn/client-core/tasks/tasks.ts'
 
 // Each owner exposes its own eviction operation; this only maps lifecycle events to scopes. It lives
 // in app/ because choosing the concrete set of state owners is composition, not a core concern — that

@@ -1,6 +1,6 @@
 import gitdiffParser from 'gitdiff-parser'
 import { synth } from '../diff'
-import type { Comment, PullCommit, PullDetail, PullFile, Review, Thread } from '../../../../core/client/queries'
+import type { Comment, PullCommit, PullDetail, PullFile, Review, Thread } from '@acorn/client-core/queries.ts'
 
 export function hasRenderableBody(body: string | null | undefined): boolean {
   if (!body) return false

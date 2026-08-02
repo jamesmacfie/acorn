@@ -2,10 +2,10 @@
 // now the loopback RunBridge routes shared with the MCP run tools. Run needs the main-
 // process session engine, so it 503s in dev:node (a desktop-only surface — docs/electron.md §12).
 import { runDefaultUrlRoute, runStartRoute, runStatusRoute, runStopRoute, runTargetsRoute } from '@acorn/protocol/api.ts'
-import { readJson, writeJson } from '../../../core/client/apiClient'
+import { readJson, writeJson } from '@acorn/client-core/apiClient.ts'
 import type { RunStatus, RunTargetInfo } from '@acorn/protocol/terminal.ts'
-import { ApiError } from '../../../core/client/apiClient'
-import { openRepoConfigTrust } from '../../../core/client/configTrust/configTrust'
+import { ApiError } from '@acorn/client-core/apiClient.ts'
+import { openRepoConfigTrust } from '@acorn/client-core/configTrust/configTrust.ts'
 
 export type RunLayout = { id: string; panes: string[]; terminal?: string; browser?: string }
 export type RunTargetsResult =

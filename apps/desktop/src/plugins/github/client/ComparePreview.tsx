@@ -1,8 +1,8 @@
 import { createEffect, createMemo, createSignal, For, on, onCleanup, Show } from 'solid-js'
 import { createQuery } from '@tanstack/solid-query'
 import { useParams, useSearchParams } from '@solidjs/router'
-import { compareOptions, reposOptions } from '../../../core/client/queries'
-import { getHighlighter } from '../../../core/client/highlight/shiki'
+import { compareOptions, reposOptions } from '@acorn/client-core/queries.ts'
+import { getHighlighter } from '@acorn/client-core/highlight/shiki.ts'
 import { DiffLine, NonCodeRow } from './diff/DiffRows'
 import { createDiffHydrator } from './diff/hydration'
 import {

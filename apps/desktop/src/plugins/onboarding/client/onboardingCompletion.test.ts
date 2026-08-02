@@ -2,7 +2,7 @@ import { QueryClient } from '@tanstack/solid-query'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const mocks = vi.hoisted(() => ({ savePref: vi.fn() }))
-vi.mock('../../../core/client/settings/savePref', () => ({ savePref: mocks.savePref }))
+vi.mock('@acorn/client-core/settings/savePref.ts', () => ({ savePref: mocks.savePref }))
 
 import { saveOnboardingCompletion } from './onboardingCompletion'
 

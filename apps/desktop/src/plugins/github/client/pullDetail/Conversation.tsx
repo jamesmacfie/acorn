@@ -1,8 +1,8 @@
 import { createMemo, For, Show } from 'solid-js'
-import { formatRelativeTime } from '../../../../core/client/lib/formatRelativeTime'
-import type { PullCommit, Thread, ThreadComment } from '../../../../core/client/queries'
-import { UserAvatar } from '../../../../core/client/ui/UserAvatar'
-import CopyButton from '../../../../core/client/ui/CopyButton'
+import { formatRelativeTime } from '@acorn/client-core/lib/formatRelativeTime.ts'
+import type { PullCommit, Thread, ThreadComment } from '@acorn/client-core/queries.ts'
+import { UserAvatar } from '@acorn/client-core/ui/UserAvatar.tsx'
+import CopyButton from '@acorn/client-core/ui/CopyButton.tsx'
 import { hasRenderableBody, reviewAction, threadComments, threadSnippetFromIndex, type ConversationEntry, type ThreadSnippetIndex } from './model'
 
 export function ConversationEntryItem(props: {

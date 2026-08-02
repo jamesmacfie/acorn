@@ -2,7 +2,7 @@
 // bridge; now a loopback HTTP route, so it works in a plain browser (dev:node) too — no
 // desktop bridge required.
 import { searchRoute } from '@acorn/protocol/api.ts'
-import { writeJson } from '../../../../core/client/apiClient'
+import { writeJson } from '@acorn/client-core/apiClient.ts'
 import type { SearchOpts, SearchResult } from '../../shared/search'
 
 export type { FileHits, SearchHit, SearchOpts, SearchResult } from '../../shared/search'

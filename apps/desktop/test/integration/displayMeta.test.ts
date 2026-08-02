@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { fileStatusMeta, githubAvatarUrl, summarizeFileStats } from './displayMeta'
-import { routeKey } from '../../../plugins/github/client/fileNavigation'
+import { fileStatusMeta, githubAvatarUrl, summarizeFileStats } from '@acorn/client-core/ui/displayMeta.ts'
+import { routeKey } from '../../src/plugins/github/client/fileNavigation'
 
 describe('fileStatusMeta', () => {
   it('maps common GitHub file statuses to compact letters', () => {

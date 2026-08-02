@@ -1,9 +1,9 @@
 import { createUniqueId } from 'solid-js'
-import Icon from '../../../core/client/ui/Icon'
+import Icon from '@acorn/client-core/ui/Icon.tsx'
 import AgentUsageSection from './AgentUsageSection'
 import { usageTooltipSummary } from './usageModel'
 import { agentUsageStore } from './usageStore'
-import { Button } from '../../../core/client/ui/primitives'
+import { Button } from '@acorn/client-core/ui/primitives.tsx'
 import './agent-usage.css'
 
 export default function AgentUsageIndicator() {

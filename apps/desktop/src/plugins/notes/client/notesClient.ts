@@ -3,9 +3,9 @@
 // shapes are canonical in shared/notes.ts (main's NotesStore imports the same types) — re-exported
 // here so existing feature imports keep working.
 import { noteIncludedRoute, noteRoute, noteTitleRoute, notesListRoute } from '@acorn/protocol/api.ts'
-import { readJson, writeJson } from '../../../core/client/apiClient'
+import { readJson, writeJson } from '@acorn/client-core/apiClient.ts'
 import type { Note, NoteKind, NoteLocation, NoteScope, NoteSummary } from '@acorn/protocol/notes.ts'
-import { openPane } from '../../../core/client/registries/clientEvents'
+import { openPane } from '@acorn/client-core/registries/clientEvents.ts'
 export type { Note, NoteAuthor, NoteKind, NoteLocation, NoteScope, NoteSummary } from '@acorn/protocol/notes.ts'
 
 export type NotesApi = {

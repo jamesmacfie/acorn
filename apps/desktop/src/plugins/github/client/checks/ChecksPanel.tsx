@@ -1,10 +1,10 @@
 import { createEffect, createMemo, createResource, createSignal, For, onCleanup, onMount, Show } from 'solid-js'
 import { Portal } from 'solid-js/web'
 import { createQuery } from '@tanstack/solid-query'
-import { jobLogOptions, runJobsOptions } from '../../../../core/client/queries'
-import { FAILED_STATUSES } from '../../../../core/client/ui/displayMeta'
-import { getHighlighter, tokenizeAnsiLines } from '../../../../core/client/highlight/shiki'
-import Icon from '../../../../core/client/ui/Icon'
+import { jobLogOptions, runJobsOptions } from '@acorn/client-core/queries.ts'
+import { FAILED_STATUSES } from '@acorn/client-core/ui/displayMeta.ts'
+import { getHighlighter, tokenizeAnsiLines } from '@acorn/client-core/highlight/shiki.ts'
+import Icon from '@acorn/client-core/ui/Icon.tsx'
 import { splitJobLog } from './splitJobLog'
 
 // One step's log, ANSI-colour highlighted (the colours CI tools emit). Falls back to raw text while

@@ -1,4 +1,4 @@
-import { setManagedAgentReferenceHandler } from '../../../core/client/agent/reference'
+import { setManagedAgentReferenceHandler } from '@acorn/client-core/agent/reference.ts'
 import { appendManagedDraft } from './managedDrafts'
 import { managedAgentStore } from './managedStore'
 import { openManagedSession } from './managedSelection'

@@ -1,5 +1,5 @@
-import { parseJson, type PersistedStateSlice } from '../../../core/client/persistence/persistedState'
-import { PersistedSliceKeys } from '../../../core/client/persistence/prefKeys'
+import { parseJson, type PersistedStateSlice } from '@acorn/client-core/persistence/persistedState.ts'
+import { PersistedSliceKeys } from '@acorn/client-core/persistence/prefKeys.ts'
 import type { TraySelection } from './model'
 import { contextSelectionsByTask, hydrateContextSelection } from './selectionState'
 

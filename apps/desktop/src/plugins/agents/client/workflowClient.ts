@@ -11,9 +11,9 @@ import {
   workflowStepsRoute,
   workflowTriggerPollRoute,
 } from '@acorn/protocol/api.ts'
-import { readJson, writeJson } from '../../../core/client/apiClient'
+import { readJson, writeJson } from '@acorn/client-core/apiClient.ts'
 import type { WorkflowDefSummary, WorkflowRunRow, WorkflowStepRow } from '@acorn/protocol/workflow.ts'
-import { openRepoConfigTrust } from '../../../core/client/configTrust/configTrust'
+import { openRepoConfigTrust } from '@acorn/client-core/configTrust/configTrust.ts'
 
 export type { WorkflowDefSummary, WorkflowRunRow, WorkflowStepRow } from '@acorn/protocol/workflow.ts'
 

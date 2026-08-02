@@ -4,7 +4,7 @@ import { createEffect, createResource, createSignal, For, on, onCleanup, Show } 
 import type { Task } from '@acorn/protocol/api.ts'
 import type { DockerContainerSummary } from '../shared/model'
 import { fetchTaskContainers } from './dockerClient'
-import { wsOnDockerChanged } from '../../../core/client/wsClient'
+import { wsOnDockerChanged } from '@acorn/client-core/wsClient.ts'
 import { dockerSelection, rememberDockerSelection } from './dockerViewState'
 import ContainerDetail from './ContainerDetail'
 import './docker.css'

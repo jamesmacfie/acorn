@@ -1,6 +1,6 @@
 import type { QueryClient } from '@tanstack/solid-query'
-import { PrefKeys } from '../../../core/client/persistence/prefKeys'
-import { savePref } from '../../../core/client/settings/savePref'
+import { PrefKeys } from '@acorn/client-core/persistence/prefKeys.ts'
+import { savePref } from '@acorn/client-core/settings/savePref.ts'
 
 export async function saveOnboardingCompletion(queryClient: QueryClient, onSaved: () => void): Promise<boolean> {
   const saved = await savePref(queryClient, PrefKeys.onboarded, '1')

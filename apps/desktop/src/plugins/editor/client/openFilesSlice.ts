@@ -1,5 +1,5 @@
-import { parseJson, type PersistedStateSlice } from '../../../core/client/persistence/persistedState'
-import { PrefKeys, PersistedSliceKeys } from '../../../core/client/persistence/prefKeys'
+import { parseJson, type PersistedStateSlice } from '@acorn/client-core/persistence/persistedState.ts'
+import { PrefKeys, PersistedSliceKeys } from '@acorn/client-core/persistence/prefKeys.ts'
 import { editorStateByTask, hydrateTaskEditorState, type TaskEditorState } from './editorState'
 
 // The editor's own persisted-state descriptor: open tabs + active tab, per task. Owned here rather

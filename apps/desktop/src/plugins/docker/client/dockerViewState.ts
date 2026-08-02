@@ -2,7 +2,7 @@
 // container), kept outside the components so navigating away and back restores the same spot —
 // the editorViewState shape. Evicted when the owning task is archived (the PreviewPane precedent:
 // the plugin owns its eviction by subscribing to the core lifecycle event).
-import { clientEvents } from '../../../core/client/registries/clientEvents'
+import { clientEvents } from '@acorn/client-core/registries/clientEvents.ts'
 
 export type DockerDetailTab = 'info' | 'logs' | 'stats' | 'terminal'
 export type DockerDetailViewState = {

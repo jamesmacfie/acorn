@@ -2,7 +2,7 @@
 // containers" checkbox when the task has linked running containers. Reads the polled summary store
 // (collectConcerns has a 250ms budget — no fetch here); the teardown fires-and-forgets alongside
 // the archive (compose down works by project name even after the worktree is removed).
-import { registerWillHandler, type Concern } from '../../../core/client/registries/willPhase'
+import { registerWillHandler, type Concern } from '@acorn/client-core/registries/willPhase.tsx'
 import { teardownTaskContainers } from './dockerClient'
 import { dockerTaskSummary } from './dockerStore'
 

@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it } from 'vitest'
-import { capabilities } from '../capabilities'
-import { taskBridge } from './taskBridge'
-import { terminalApi } from '../../../plugins/terminal/client/terminalClient'
+import { capabilities } from '@acorn/client-core/capabilities.ts'
+import { taskBridge } from '@acorn/client-core/tasks/taskBridge.ts'
+import { terminalApi } from '../../src/plugins/terminal/client/terminalClient'
 
 // The desktop-detection contract. `window.acorn.terminal` is the single probe behind BOTH typed
 // accessors and core's capability map: every consumer's `if (!api) return` guard, and every pane's

@@ -1,5 +1,5 @@
 import { createSignal, Show } from 'solid-js'
-import { createDismissable } from '../../../core/client/ui/dismissable'
+import { createDismissable } from '@acorn/client-core/ui/dismissable.ts'
 import type { DbSavedQuery } from '../shared/database'
 import { databaseApi } from './databaseClient'
 

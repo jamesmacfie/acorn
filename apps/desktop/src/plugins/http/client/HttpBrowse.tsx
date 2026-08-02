@@ -4,8 +4,8 @@
 import { createQuery } from '@tanstack/solid-query'
 import { useNavigate, useParams } from '@solidjs/router'
 import { createMemo, Show } from 'solid-js'
-import RepoPicker from '../../../core/client/ui/RepoPicker'
-import { pinsOptions, reposOptions } from '../../../core/client/queries'
+import RepoPicker from '@acorn/client-core/ui/RepoPicker.tsx'
+import { pinsOptions, reposOptions } from '@acorn/client-core/queries.ts'
 import HttpPanel from './HttpPanel'
 import './http.css'
 

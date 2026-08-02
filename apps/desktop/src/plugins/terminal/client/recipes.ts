@@ -2,8 +2,8 @@
 // its named run target in the drawer, and points the browser pane at a target's resolved URL
 // (`browser = "run:<id>"`). Pure executor over injected services — unit tested with stubs; the
 // palette wires the real runtime/layout/browser glue.
-import { paneContribution } from '../../../core/client/registries/panes'
-import { isPaneId, type TaskLayout } from '../../../core/client/tasks/layout'
+import { paneContribution } from '@acorn/client-core/registries/panes.ts'
+import { isPaneId, type TaskLayout } from '@acorn/client-core/tasks/layout.ts'
 
 export type RecipeSpec = {
   id: string

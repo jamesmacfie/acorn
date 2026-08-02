@@ -1,11 +1,11 @@
 import { createEffect, createSignal, For, on, Show, type JSX } from 'solid-js'
 import { createQuery, useQueryClient } from '@tanstack/solid-query'
-import { readJson } from '../../../core/client/apiClient'
+import { readJson } from '@acorn/client-core/apiClient.ts'
 import {
   rollbarItemMetadataOptions,
   rollbarOccurrenceOptions,
   rollbarOccurrencesOptions,
-} from '../../../core/client/queries'
+} from '@acorn/client-core/queries.ts'
 import {
   rollbarItemMetadataKey,
   rollbarItemMetadataRoute,
@@ -20,7 +20,7 @@ import {
 } from '@acorn/protocol/api.ts'
 import RollbarOccurrenceView from './RollbarOccurrenceView'
 import { isRegressed, rollbarImpact } from './model'
-import { Tabs } from '../../../core/client/ui/Tabs'
+import { Tabs } from '@acorn/client-core/ui/Tabs.tsx'
 import './rollbar.css'
 
 export type RollbarTarget = { connectionId: string; identifier: string }

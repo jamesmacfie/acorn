@@ -2,7 +2,7 @@
 // stay with the task (an ad-hoc request) until you file them into the repo's tree, and the
 // {{worktree}} / {{branch}} / {{taskId}} builtins resolve against it — which is the point, since
 // every task worktree runs its own dev server on its own port.
-import type { Task } from '../../../core/client/queries'
+import type { Task } from '@acorn/client-core/queries.ts'
 import HttpPanel from './HttpPanel'
 import './http.css'
 

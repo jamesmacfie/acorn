@@ -7,9 +7,9 @@ import { createAsyncStoragePersister } from '@tanstack/query-async-storage-persi
 import { Route, Router } from '@solidjs/router'
 import { clear, del, get, set } from 'idb-keyval'
 import App from './App'
-import { ApiError } from '../../core/client/apiClient'
-import '../../core/client/styles.css'
-import { shouldPersistQuery } from '../../core/client/persistence/queryPersistence'
+import { ApiError } from '@acorn/client-core/apiClient.ts'
+import '@acorn/client-core/styles.css'
+import { shouldPersistQuery } from '@acorn/client-core/persistence/queryPersistence.ts'
 
 // A revoked/expired token surfaces as a 401 from any read or write → bounce to the OAuth login
 // (docs/authentication.md). Structural: every API failure is an ApiError carrying the response

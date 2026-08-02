@@ -1,7 +1,7 @@
 import { useQueryClient } from '@tanstack/solid-query'
-import WorkspaceRepoAssignments from '../../../core/client/workspaces/WorkspaceRepoAssignments'
+import WorkspaceRepoAssignments from '@acorn/client-core/workspaces/WorkspaceRepoAssignments.tsx'
 import { saveOnboardingCompletion } from './onboardingCompletion'
-import '../../../core/client/workspaces/onboarding.css'
+import '@acorn/client-core/workspaces/onboarding.css'
 
 // First-run workspace setup (docs/workspaces-and-tasks.md). The bootstrap already put every repo in a Default
 // workspace; the shared mapping body re-groups them and (on desktop) maps on-disk checkouts.

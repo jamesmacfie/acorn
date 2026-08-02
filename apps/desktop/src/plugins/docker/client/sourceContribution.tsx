@@ -2,7 +2,7 @@
 // Containers aren't promotable to tasks; the linkage runs the other way (phase 2 matches running
 // containers back to task worktrees), so promotion is a permanent stub.
 import { lazy } from 'solid-js'
-import type { SourceContribution } from '../../../core/client/registries/sources'
+import type { SourceContribution } from '@acorn/client-core/registries/sources.ts'
 
 const DockerBrowse = lazy(() => import('./DockerBrowse'))
 

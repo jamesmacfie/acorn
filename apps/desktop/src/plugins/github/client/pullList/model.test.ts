@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import type { Pull } from '../../../../core/client/queries'
+import type { Pull } from '@acorn/client-core/queries.ts'
 import { filterPulls } from './model'
 
 const pull = (overrides: Partial<Pull>): Pull => ({

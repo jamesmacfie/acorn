@@ -2,12 +2,12 @@ import { For, Show, type Component } from 'solid-js'
 import {
   agentToolRendererRegistry,
   type AgentToolRendererProps,
-} from '../../../core/client/registries/agentToolRenderers'
+} from '@acorn/client-core/registries/agentToolRenderers.ts'
 
 export type {
   AgentToolRendererContribution,
   AgentToolRendererProps,
-} from '../../../core/client/registries/agentToolRenderers'
+} from '@acorn/client-core/registries/agentToolRenderers.ts'
 
 const GenericAgentTool: Component<AgentToolRendererProps> = (props) => (
   <details class="agent-tool" open={props.tool.status === 'running'}>

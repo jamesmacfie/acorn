@@ -1,10 +1,10 @@
 import type { ITheme } from '@xterm/xterm'
-import { getHighlighter } from '../../../core/client/highlight/shiki'
-import { isAppDark, token } from '../../../core/client/ui/appearance'
+import { getHighlighter } from '@acorn/client-core/highlight/shiki.ts'
+import { isAppDark, token } from '@acorn/client-core/ui/appearance.ts'
 
 // Re-exported for convenience inside this plugin. The generic appearance readers live in
 // core/client/ui/appearance.ts so other plugins reach them without a plugin→plugin import.
-export { isAppDark, isDarkColor, token, watchAppearance } from '../../../core/client/ui/appearance'
+export { isAppDark, isDarkColor, token, watchAppearance } from '@acorn/client-core/ui/appearance.ts'
 
 // xterm renders to its own canvas and ignores CSS, so it needs an explicit theme object. Rather
 // than hand-maintaining palettes, the theme is derived from the app's two existing sources:

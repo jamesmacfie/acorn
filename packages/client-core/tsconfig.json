@@ -1,0 +1,10 @@
+{
+  // Renderer package: DOM + vite/client. `node` is present only for the handful of build-time
+  // style/adoption tests that read .css off disk (readStyleSheets.ts) — product code here must not
+  // reach for node: APIs, and the boundary test is what enforces that.
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "types": ["vite/client", "node"]
+  },
+  "include": ["src"]
+}

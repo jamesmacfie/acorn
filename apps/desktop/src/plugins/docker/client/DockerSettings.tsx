@@ -2,7 +2,7 @@
 // reference (per-repo matcher overrides live in .acorn/config.toml, not here).
 import { createQuery, useQueryClient } from '@tanstack/solid-query'
 import { createResource, Show } from 'solid-js'
-import { prefsOptions } from '../../../core/client/queries'
+import { prefsOptions } from '@acorn/client-core/queries.ts'
 import type { DockerInfo } from '../shared/model'
 import { fetchDockerInfo } from './dockerClient'
 import { readDockerPrefs, saveDockerPrefs, type DockerPrefs } from './dockerPrefs'

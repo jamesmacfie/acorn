@@ -1,6 +1,6 @@
 // Typed wrapper over the /api/http routes. Goes through core's readJson/writeJson so the CSRF
 // envelope and ApiError decoding stay in one place.
-import { readJson, writeJson } from '../../../core/client/apiClient'
+import { readJson, writeJson } from '@acorn/client-core/apiClient.ts'
 import {
   httpRequestRoute,
   httpRequestsRoute,

@@ -1,20 +1,20 @@
 import { lazy } from 'solid-js'
-import type { SettingsContribution } from '../../core/client/registries/settings'
+import type { SettingsContribution } from '@acorn/client-core/registries/settings.ts'
 
-const WorkspaceRepoAssignments = lazy(() => import('../../core/client/workspaces/WorkspaceRepoAssignments'))
-const IntegrationsSettings = lazy(() => import('../../core/client/settings/IntegrationsSettings'))
-const WorkspaceSettings = lazy(() => import('../../core/client/settings/WorkspaceSettings'))
-const McpSettings = lazy(() => import('../../core/client/settings/McpSettings'))
-const AgentToolsSettings = lazy(() => import('../../core/client/settings/AgentToolsSettings'))
+const WorkspaceRepoAssignments = lazy(() => import('@acorn/client-core/workspaces/WorkspaceRepoAssignments.tsx'))
+const IntegrationsSettings = lazy(() => import('@acorn/client-core/settings/IntegrationsSettings.tsx'))
+const WorkspaceSettings = lazy(() => import('@acorn/client-core/settings/WorkspaceSettings.tsx'))
+const McpSettings = lazy(() => import('@acorn/client-core/settings/McpSettings.tsx'))
+const AgentToolsSettings = lazy(() => import('@acorn/client-core/settings/AgentToolsSettings.tsx'))
 const AgentPricingSettings = lazy(() => import('../../plugins/agents/client/AgentPricingSettings'))
 const WorkflowsSettings = lazy(() => import('../../plugins/workflows/client/WorkflowsSettings'))
-const AppearanceSettings = lazy(() => import('../../core/client/settings/AppearanceSettings'))
+const AppearanceSettings = lazy(() => import('@acorn/client-core/settings/AppearanceSettings.tsx'))
 const TerminalSettings = lazy(() => import('../../plugins/terminal/client/TerminalSettings'))
 const DockerSettings = lazy(() => import('../../plugins/docker/client/DockerSettings'))
-const ShortcutsSettings = lazy(() => import('../../core/client/settings/ShortcutsSettings'))
-const PermissionsSettings = lazy(() => import('../../core/client/settings/PermissionsSettings'))
+const ShortcutsSettings = lazy(() => import('@acorn/client-core/settings/ShortcutsSettings.tsx'))
+const PermissionsSettings = lazy(() => import('@acorn/client-core/settings/PermissionsSettings.tsx'))
 const HttpVariablesSettings = lazy(() => import('../../plugins/http/client/HttpVariablesSettings'))
-const StyleGallery = lazy(() => import('../../core/client/settings/StyleGallery'))
+const StyleGallery = lazy(() => import('@acorn/client-core/settings/StyleGallery.tsx'))
 
 export const settingsPageContributions: SettingsContribution[] = [
   {
