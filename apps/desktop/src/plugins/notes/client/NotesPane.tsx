@@ -2,7 +2,7 @@ import { createEffect, createSignal, createResource, For, onCleanup, onMount, Sh
 import type { Task, Workspace } from '../../../core/client/queries'
 import { debounce } from '../../../core/client/lib/debounce'
 import { renderMarkdown } from '../../../core/client/integrations/markdown'
-import { bytesOf, formatSize } from '../../context/client/model'
+import { bytesOf, formatSize } from '../../../core/client/lib/formatSize'
 import { notesApi, type NoteLocation, type NoteScope, type NoteSummary } from './notesClient'
 import { SCRATCHPAD_SLUG } from '../../../core/shared/notes'
 import { clientEvents, consumePaneIntent, openPane } from '../../../core/client/registries/clientEvents'

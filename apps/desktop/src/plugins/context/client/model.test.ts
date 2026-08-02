@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { TaskContext } from '../../../core/shared/api'
-import { assembleBlockFrom, bytesOf, formatSize, sectionCap, selectionFromContext, traySummary } from './model'
+import { assembleBlockFrom, sectionCap, selectionFromContext, traySummary } from './model'
+import { bytesOf, formatSize } from '../../../core/client/lib/formatSize'
 
 const ctx: TaskContext = {
   task: { id: 't', title: 'x', repo: 'a/b', branch: 'm', worktreePath: null, pullNumber: null },

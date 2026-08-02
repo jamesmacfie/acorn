@@ -129,11 +129,12 @@ const BASELINE_PLUGIN_TO_PLUGIN = [
   'plugins/context/client/ContextPane.tsx => plugins/memory/client/MemorySection.tsx',
   'plugins/context/client/ContextPane.tsx => plugins/notes/client/notesClient.ts',
   'plugins/database/client/DatabasePane.tsx => plugins/editor/client/monacoSetup.ts',
+  // NOTE: notes → context is gone (the shared size formatters moved to core/client/lib/formatSize).
+  // That edge closed the only context ↔ notes cycle; keep it closed.
   'plugins/github/client/PullDetail.tsx => plugins/linear/client/LinearIssuePanel.tsx',
   'plugins/github/client/PullDetail.tsx => plugins/linear/client/scanLinearRefs.ts',
   'plugins/github/client/PullList.tsx => plugins/linear/client/scanLinearRefs.ts',
   'plugins/memory/main/knowledgeIpc.ts => plugins/notes/main/notes.ts',
-  'plugins/notes/client/NotesPane.tsx => plugins/context/client/model.ts',
   'plugins/preview/client/PreviewTaskPane.tsx => plugins/terminal/client/runClient.ts',
   'plugins/workflows/client/WorkflowsSettings.tsx => plugins/agents/client/workflowClient.ts',
 ]
