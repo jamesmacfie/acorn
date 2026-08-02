@@ -1,8 +1,13 @@
 # HTTP client
 
+> **Removed.** The bearer-authenticated public automation API (`/api/v1`), its tokens,
+> idempotency store and second listener were deleted in vNext Phase 0 — along with
+> `oauth_accounts`, `api_tokens`, `api_idempotency` and `command_executions`. Passages below
+> that describe it are historical. See [vNext/plan.md](./vNext/plan.md).
+
 The API Requests plugin is a compact, Bruno-inspired HTTP client with an always-visible repo Source
 and a task pane. Both presentations share the same server routes and database rows. It is separate
-from acorn's [public automation API](./public-api.md): `/api/http/*` sends user-authored outbound
+from acorn's public automation API: `/api/http/*` sends user-authored outbound
 requests, while `/api/v1/*` lets external automation control acorn.
 
 ## Scope and storage
@@ -80,8 +85,8 @@ Rows are always constrained by the authenticated login and route repo; opaque id
 that boundary. Duplicate names return `duplicate_name`; network/setup failures return
 `send_failed`; non-interactive callers return `interactive_user_required`.
 
-Source: `apps/desktop/src/plugins/http/{client,server,shared}/`,
-`apps/desktop/src/core/server/db/schema.ts`.
+Source: `plugins/http/src/{client,server,shared}/`,
+`packages/node-core/src/server/db/schema.ts`.
 
 See also: [panes.md](./panes.md) · [data-layer.md](./data-layer.md) ·
 [security.md](./security.md) · [api-reference.md](./api-reference.md)

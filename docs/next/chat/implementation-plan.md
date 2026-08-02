@@ -67,18 +67,18 @@ Protect current source navigation, notifications, WebSocket consumers, state per
 
 ### Inspect
 
-- `apps/desktop/src/core/client/registries/sources.ts`
-- `apps/desktop/src/core/client/tabs/sources.ts`
-- `apps/desktop/src/core/client/tabs/TabRail.tsx`
-- `apps/desktop/src/core/client/App.tsx`
-- `apps/desktop/src/core/client/notifications/notifications.ts`
-- `apps/desktop/src/core/client/notifications/NotificationBell.tsx`
-- `apps/desktop/src/core/shared/ws.ts`
-- `apps/desktop/src/core/client/wsClient.ts`
-- `apps/desktop/src/core/main/wsHub.ts`
-- `apps/desktop/src/core/server/db/schema.ts`
-- `apps/desktop/src/core/server/db/cascade.ts`
-- `apps/desktop/src/core/client/highlight/shiki.ts`
+- `packages/client-core/src/registries/sources.ts`
+- `packages/client-core/src/tabs/sources.ts`
+- `packages/client-core/src/tabs/TabRail.tsx`
+- `apps/desktop/apps/desktop/src/app/client/App.tsx`
+- `packages/client-core/src/notifications/notifications.ts`
+- `packages/client-core/src/notifications/NotificationBell.tsx`
+- `packages/protocol/src/ws.ts`
+- `packages/client-core/src/wsClient.ts`
+- `packages/node-core/src/main/wsHub.ts`
+- `packages/node-core/src/server/db/schema.ts`
+- `packages/node-core/src/server/db/cascade.ts`
+- `packages/client-core/src/highlight/shiki.ts`
 
 ### Implement
 

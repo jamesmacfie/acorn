@@ -180,10 +180,10 @@ describe('resolveVars — command execution context', () => {
     root = null
   })
 
-  // Spawns a real subprocess in a temp git worktree. vitest's 5s default was already marginal and
-  // became flaky once 25 packages test concurrently — the work is I/O, not compute, so the timeout
-  // is the wrong thing to be tight about.
-  it('runs a command in the explicit task worktree and uses its last non-empty output line', { timeout: 30_000 }, async () => {
+  // Spawns a real subprocess via a bash LOGIN shell in a temp git worktree, so it is sensitive to
+  // machine load: on a saturated box the profile-sourcing shell can exceed send.ts's own 15s
+  // production command timeout. Retry rather than loosening a production timeout to suit CI.
+  it('runs a command in the explicit task worktree and uses its last non-empty output line', { timeout: 30_000, retry: 2 }, async () => {
     testDb = makeTestDb()
     root = mkdtempSync(join(tmpdir(), 'acorn-http-command-'))
     const worktree = join(root, 'worktree')

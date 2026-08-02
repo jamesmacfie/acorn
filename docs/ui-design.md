@@ -10,8 +10,8 @@ acorn's appearance is **two orthogonal axes**, both single attributes on `<html>
 Every style composes with every theme — 48 combinations, none of them special-cased. Both are
 picked in Settings → Appearance.
 
-The SPA imports `apps/desktop/src/core/client/styles.css` at boot, a manifest of the shell-owned
-stylesheets under `apps/desktop/src/core/client/styles/`:
+The SPA imports `packages/client-core/src/styles.css` at boot, a manifest of the shell-owned
+stylesheets under `packages/client-core/src/styles/`:
 
 | File | Owns |
 | --- | --- |
@@ -21,7 +21,7 @@ stylesheets under `apps/desktop/src/core/client/styles/`:
 | `tokens-theme.css` | the palette, the `--dark-*` values, and the 11 named theme blocks |
 | `base.css` | reset, `body`, focus ring, `.glyph`, the null-default declarations, global utilities |
 | `shell.css` | `.shell` / `.app` / `.panes` / `.pane` / `.section-header` |
-| `primitives.css` | base styling for `core/client/ui/primitives.tsx` |
+| `primitives.css` | base styling for `@acorn/client-core/ui/primitives.tsx` |
 | `style-{modern,cozy,cute}.css` | one pack each: a token block plus a handful of structural overrides |
 | `pull-list`, `pull-detail`, `diff`, `topbar`, `overlays`, `checks-panel`, `integrations-panel`, `copy`, `tabs` | feature chrome |
 
@@ -47,7 +47,7 @@ one axis file.** Everything else follows from that one sentence:
 - **Completeness.** Every style token has a value on plain `:root` in `tokens-style.css`; packs only
   override. A pack therefore cannot leave a `var()` undefined.
 
-`apps/desktop/src/core/client/ui/tokenAxes.ts` declares which token belongs to which axis, and
+`packages/client-core/src/ui/tokenAxes.ts` declares which token belongs to which axis, and
 `styles/tokenAxes.test.ts` asserts all of the above against the stylesheets — including that no pack
 contains a colour literal and that the two sets never intersect. This is what makes the 4 × 12 grid a
 non-issue rather than a screenshot matrix.
@@ -146,7 +146,7 @@ devtools.
 are what turn the flat three-pane grid into inset cards with no markup change.
 
 `--row-h-virt` is separate from `--row-h` because virtualized lists read it **from JS**
-(`core/client/ui/metrics.ts`). `@tanstack/solid-virtual` needs a number and writes the result back as
+(`@acorn/client-core/ui/metrics.ts`). `@tanstack/solid-virtual` needs a number and writes the result back as
 an inline height, which beats any stylesheet rule — so a hardcoded estimate silently pinned the PR
 list's density regardless of the pack.
 
@@ -176,7 +176,7 @@ null-default `--hover-lift`/`--press-scale`.
 
 ## Primitives
 
-`core/client/ui/primitives.tsx` (+ `Modal.tsx`, `dismissable.ts`) is the shared layer. Each primitive
+`@acorn/client-core/ui/primitives.tsx` (+ `Modal.tsx`, `dismissable.ts`) is the shared layer. Each primitive
 emits **one stable semantic class plus `data-*` variant attributes**, and appends `props.class`:
 
 ```
@@ -215,8 +215,8 @@ tokens, so radii, spacing and chrome type still vary per pack, but their structu
 Icons are Lucide, resolved by name through `ui/Icon.tsx`. The mechanism is the one this section used
 to prescribe — **the type stayed `glyph: string`, only the meaning of the string changed**
 (`glyph: '⎇'` → `glyph: 'git-compare'`). `glyph` is deliberately still a plain string: it lives in
-`core/shared/integrations.ts` *and* `core/server/integrations/types.ts`, so widening it to
-`string | Component` would put a `solid-js` type into server code, and `core/boundaries.test.ts`
+`@acorn/protocol/integrations.ts` *and* `@acorn/node-core/server/integrations/types.ts`, so widening it to
+`string | Component` would put a `solid-js` type into server code, and `tools/arch/boundaries.test.ts`
 enforces the client↔node split as a hard invariant.
 
 `<Icon name>` looks the name up in `lucide-static/icon-nodes.json` (1756 icons as

@@ -44,5 +44,5 @@ tests. Do not add a generic raw-JSON escape hatch.
 - Inspect renderer/network/log output to confirm dropped fields never cross the server boundary.
 - Test refresh, 401/403/404/429/5xx envelopes, reconnect, and offline cached reads.
 
-Source: `apps/desktop/src/plugins/rollbar/{client,server,shared}/` and the external-item provider
-runtime under `apps/desktop/src/core/server/integrations/`.
+Source: `plugins/rollbar/src/{client,server,shared}/` and the external-item provider
+runtime under `packages/node-core/src/server/integrations/`.

@@ -2,7 +2,7 @@
 
 **Status:** proposed, not started.
 **Owner:** _unassigned_
-**Scope:** `apps/desktop/src/plugins/linear/client/` + a little CSS.
+**Scope:** `plugins/linear/src/client/` + a little CSS.
 
 ## Goal
 

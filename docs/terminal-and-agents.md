@@ -9,7 +9,7 @@ drivers, scheduling, automation and context system.
 > **Availability.** This surface is **desktop-only and always on** (the old `acorn:term`
 > localStorage flag is deleted). In Electron the native terminal capability is present; in a plain
 > browser (`dev:node`) `terminalApi()` returns `null` and consumers show a degraded state
-> (`capabilities()`, `apps/desktop/src/core/client/capabilities.ts`). The workflow runtime is
+> (`capabilities()`, `packages/client-core/src/capabilities.ts`). The workflow runtime is
 > implemented with deliberate limits documented in [workflows.md](./workflows.md).
 
 ## 1. Overview
@@ -31,7 +31,7 @@ theme into an explicit `ITheme`/ANSI palette and follows changes live.
 
 ## 2. Sessions & persistence
 
-The wire contract is defined once in `apps/desktop/src/core/shared/terminal.ts` (`TerminalSession`,
+The wire contract is defined once in `packages/protocol/src/terminal.ts` (`TerminalSession`,
 `CreateOpts`, `ServerMsg`) and imported by main, server, and renderer; it never exposes `node-pty`
 types. The utility service owns PTYs in the historically named
 `plugins/terminal/main/terminal.ts`. Request/response control
@@ -82,7 +82,7 @@ TUIs update rows in place, so an arbitrary byte tail cannot reconstruct their fr
 
 ### The renderer session store
 
-`core/client/tasks/agentSessions.ts` is a single lifted store so the rail and
+`@acorn/client-core/tasks/agentSessions.ts` is a single lifted store so the rail and
 topbar can read live session state even when the drawer is closed. It is core-owned: "which agents
 are running in this task" is platform state, read by the rail, topbar, notification tracker and the
 send-to-agent pickers, not just the terminal drawer.
@@ -132,14 +132,14 @@ It attaches via `api.attach`, writes keystrokes with `api.write`, and reports re
 
 ## 4. Profiles & worktrees
 
-### Profiles (`core/main/agentProfiles/`, `core/main/profiles.ts`)
+### Profiles (`@acorn/node-core/main/agentProfiles/`, `@acorn/node-core/main/profiles.ts`)
 
 Profiles are registry contributions. Each declares command, backend preference, MCP registration,
 headless argv, resume argv, stream parsing, and an optional tool-free one-shot structured argv. The
 built-ins are `shell`, `claude-code`, `codex`, and `aider`; unsupported capabilities are absent
 instead of inferred from profile ids. `profileAvailable` checks `which`; shell is always available.
 
-### Worktrees (`core/main/worktrees.ts`, `resolveTaskCwd` in `core/main/taskWorktree.ts`)
+### Worktrees (`@acorn/node-core/main/worktrees.ts`, `resolveTaskCwd` in `@acorn/node-core/main/taskWorktree.ts`)
 
 The task's git worktree is created **lazily on first worktree use** (Flow C). Every caller—terminal,
 editor/search/changes, database, workflows, preview scripts—funnels through `resolveTaskCwd` /
@@ -303,17 +303,17 @@ bounds, and navigation are Electron capabilities; agent browser tools remain ser
 
 ## Source
 
-- Renderer terminal: `apps/desktop/src/plugins/terminal/client/{TerminalPanel,TerminalSurface}.tsx`,
+- Renderer terminal: `plugins/terminal/src/client/{TerminalPanel,TerminalSurface}.tsx`,
   `sessions.ts`, `terminalClient.ts`, `theme.ts`
-- Renderer agents: `apps/desktop/src/plugins/agents/client/{AgentPane.tsx,AgentTaskSidebar.tsx,model.ts}`,
-  `apps/desktop/src/core/client/agent/reference.ts`
-- Capability + panel wiring: `apps/desktop/src/core/client/capabilities.ts`,
-  `apps/desktop/src/core/client/tasks/TaskView.tsx`
-- Wire contract & vocabulary: `apps/desktop/src/core/shared/terminal.ts`
-- Terminal engine: `apps/desktop/src/plugins/terminal/main/`; worktrees, profiles, headless execution,
-  preload and notifications: `apps/desktop/src/core/main/`; cross-feature wiring:
+- Renderer agents: `plugins/agents/src/client/{AgentPane.tsx,AgentTaskSidebar.tsx,model.ts}`,
+  `packages/client-core/src/agent/reference.ts`
+- Capability + panel wiring: `packages/client-core/src/capabilities.ts`,
+  `apps/desktop/apps/desktop/src/app/client/TaskView.tsx`
+- Wire contract & vocabulary: `packages/protocol/src/terminal.ts`
+- Terminal engine: `plugins/terminal/src/main/`; worktrees, profiles, headless execution,
+  preload and notifications: `packages/node-core/src/main/`; cross-feature wiring:
   `apps/desktop/src/app/main/`
-- Schema: `apps/desktop/src/core/server/db/schema.ts` (`terminal_sessions`, `workflow_runs`, `workflow_steps`)
+- Schema: `packages/node-core/src/server/db/schema.ts` (`terminal_sessions`, `workflow_runs`, `workflow_steps`)
 
 ## See also
 

@@ -134,7 +134,7 @@ The engine never touches the caller's store. ETag/304 handling stays inside each
 caller's `refresh()` because it's specific to the `sync_state` ETag store, not
 universal to the flow — a `304` is just a successful (data-preserving) refresh
 from the engine's point of view. Background refreshes go through
-`trackBackgroundRefresh` (`src/core/server/background.ts`); tests settle them via
+`trackBackgroundRefresh` (`packages/node-core/src/server/background.ts`); tests settle them via
 `settleBackground()`.
 
 **Not on the engine** (deliberately, see `inventories.md` §2d): `pullsBatch.ts`
@@ -166,7 +166,7 @@ How the 200 path rewrites the mirror differs per resource:
   `routes/prMirror.ts`: delete-then-insert in one `db.batch`.
 
 Inserts are chunked by column count (`chunkRowsByColumnBudget`,
-`src/core/server/db/batch.ts`) to keep each statement under a conservative
+`packages/node-core/src/server/db/batch.ts`) to keep each statement under a conservative
 100-bound-parameter budget (`MAX_BOUND_PARAMS`) — better-sqlite3 allows far
 more (32k+), but small statements stay predictable. `pr_files` inserts one row
 per statement.
@@ -178,11 +178,11 @@ expanding unchanged context around diff hunks), keyed by the file's blob `sha`.
 It's a local directory — `<dataDir>/blobs/`, where the data root is
 `app.getPath('userData')` in packaged builds and the repo-local
 `apps/desktop/.acorn/` in dev (`main/electron.ts` / `devDataDir` in
-`src/core/main/server.ts`) — one file per key, implemented by `diskBlobCache`
-(the typed `BlobCache { get, put }`) in `src/core/main/bindings.ts`
+`packages/node-core/src/main/server.ts`) — one file per key, implemented by `diskBlobCache`
+(the typed `BlobCache { get, put }`) in `packages/node-core/src/main/bindings.ts`
 (non-filename-safe chars are sanitized to `_`, so `patch:<sha>` lands on disk
 as `patch_<sha>`). Immutable content means no TTL and no delete. Both key
-formats live in one shared module, `src/core/server/blobs.ts`:
+formats live in one shared module, `packages/node-core/src/server/blobs.ts`:
 
 ```ts
 export const patchBlobKey = (sha: string) => `patch:${sha}`       // prMirror.ts — patch bodies
@@ -259,7 +259,7 @@ All three layers are now local to one machine and one user, so the old
 Startup performs one correctness repair before serving: orphaned GitHub mirror children left by
 older non-atomic refreshes are pruned. It also expires public-API idempotency/command rows through
 their bounded maintenance paths. Derived mirror/provider/blob data does not yet have a general
-age/size retention sweep. Instead `core/main/storageFootprint.ts` logs the SQLite and blob footprint
+age/size retention sweep. Instead `@acorn/node-core/main/storageFootprint.ts` logs the SQLite and blob footprint
 at startup so that sweep is triggered by measured growth rather than speculation. See
 [next/performance.md](./next/performance.md).
 

@@ -24,8 +24,6 @@ export type StreamHandlers = {
 
 let handlers: StreamHandlers | null = null
 export const setStreamHandlers = (h: StreamHandlers | null): void => void (handlers = h)
-// The public WS hub reuses the same engine stream handlers to serve terminal.attach/input/output.
-export const getStreamHandlers = (): StreamHandlers | null => handlers
 
 // Generic channel handlers: a plugin claims a channel prefix (the token before the first ':', e.g.
 // 'docker') and receives every client frame on it plus a disconnect signal per connection. `conn`

@@ -9,7 +9,7 @@
 > **Cloudflare/wrangler is fully removed** — Electron is the shipped product runtime; `dev:node`
 > remains a supported development composition root for pure-Node server capabilities. The **v2
 > terminal (§8) has since shipped**: node-pty
-> sessions run in the utility service (`src/plugins/terminal/main/terminal.ts`, desktop-only and always on — see
+> sessions run in the utility service (`plugins/terminal/src/main/terminal.ts`, desktop-only and always on — see
 > [terminal-and-agents.md](./terminal-and-agents.md)). `SESSION_ENC_KEY` now uses `safeStorage`;
 > GitHub device flow (dropping `client_secret`) remains an optional distribution enhancement, not
 > migration work. This doc is the full change inventory and the record of a clean, phased
@@ -21,14 +21,14 @@
 > feature originally collapsed into Electron main as §8 predicted and now runs in the supervised
 > utility service. (Its design record, `vNext.md`, is now removed — see git history.)
 >
-> **Phase 0 artifacts:** `apps/desktop/src/core/main/bindings.ts` (DB + `.batch` shim, in-mem `OAUTH_STATE`,
-> on-disk `BLOBS`, secrets from `process.env`), `apps/desktop/src/core/main/server.ts` (node-server bootstrap
-> + static + SPA fallback), `createApp()` factory in `src/core/server/index.ts`, DB driver swap in
-> `src/core/server/db/index.ts`. Run with `pnpm --filter @acorn/desktop dev:node`. Local data lives under
+> **Phase 0 artifacts:** `packages/node-core/src/main/bindings.ts` (DB + `.batch` shim, in-mem `OAUTH_STATE`,
+> on-disk `BLOBS`, secrets from `process.env`), `packages/node-core/src/main/server.ts` (node-server bootstrap
+> + static + SPA fallback), `createApp()` factory in `packages/node-core/src/server/index.ts`, DB driver swap in
+> `packages/node-core/src/server/db/index.ts`. Run with `pnpm --filter @acorn/desktop dev:node`. Local data lives under
 > `apps/desktop/.acorn/` (gitignored).
 >
 > **Phase 1 artifacts:** `apps/desktop/src/app/main/electron.ts` (main process: starts the server, hardened
-> BrowserWindow, navigation guard, dedicated OAuth window), `src/core/main/preload.ts` (minimal sandboxed
+> BrowserWindow, navigation guard, dedicated OAuth window), `packages/node-core/src/main/preload.ts` (minimal sandboxed
 > bridge), `electron.vite.config.ts` (main/preload/renderer→dist/client), SW gate in
 > `src/app/client/index.tsx`, loopback Host-header guard in `server.ts`. **`pnpm dev` now launches the
 > Electron app** (`electron-vite build && electron-vite preview`; old Cloudflare dev server → `dev:web`),
@@ -92,13 +92,13 @@ Exhaustive — this is everything that isn't portable as-is:
 
 | Touchpoint | Where | Replacement |
 |---|---|---|
-| D1 client | `src/core/server/db/index.ts:1,5` (`drizzle-orm/d1`, `env.DB`) | `drizzle-orm/better-sqlite3` |
+| D1 client | `packages/node-core/src/server/db/index.ts:1,5` (`drizzle-orm/d1`, `env.DB`) | `drizzle-orm/better-sqlite3` |
 | Migrations apply | `package.json` `db:migrate` (`wrangler d1 migrations apply`) | `drizzle-orm/better-sqlite3/migrator` on startup |
 | KV `OAUTH_STATE` | `routes/auth.ts:41,77,78` (put TTL / get / delete) | in-memory `Map` with expiry |
 | KV `BLOBS` | `routes/pullBlob.ts:33,43`, `routes/prMirror.ts:309,360` | on-disk cache dir keyed by sha |
 | `waitUntil` | `routes/repoMirror.ts:27-28`, called from `pulls/repos/pullDetail/pullFiles` via `c.executionCtx` | fire-and-forget in Node (one helper) |
 | Secrets / vars | `SESSION_ENC_KEY`, `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET` via `c.env` + `.dev.vars` | `.env` / OS keychain → injected into Bindings |
-| Worker entry | `src/core/server/index.ts:44` (`export default app`) | `@hono/node-server` `serve(app)` |
+| Worker entry | `packages/node-core/src/server/index.ts:44` (`export default app`) | `@hono/node-server` `serve(app)` |
 | Static + SPA fallback | `wrangler.jsonc` `assets` block | `serveStatic` + index.html fallback in the Hono app |
 | PWA shell | `src/app/client/index.tsx`, `public/sw.js`, `manifest.webmanifest` | removed — the service worker and web manifest are gone; the renderer only unregisters any leftover web-origin service worker (§4h) |
 | Build plugin | `vite.config.ts` `@cloudflare/vite-plugin` | `electron-vite` (main/preload/renderer) |
@@ -122,7 +122,7 @@ change called out below is removing the service worker (§4h).
 
 ### 4a. Runtime entry — Worker → node-server in Electron main (historical)
 
-`src/core/server/index.ts` keeps building the same route graph, but exposes it as a factory so the Node
+`packages/node-core/src/server/index.ts` keeps building the same route graph, but exposes it as a factory so the Node
 bootstrap can add desktop-only static serving without mutating the singleton used by tests:
 
 ```ts
@@ -137,7 +137,7 @@ export function createApp() {
 export default createApp()
 ```
 
-Add a Node bootstrap (new file, e.g. `src/core/main/server.ts`) that supplies runtime bindings through
+Add a Node bootstrap (new file, e.g. `packages/node-core/src/main/server.ts`) that supplies runtime bindings through
 `app.fetch(request, env, executionCtx)`. Do **not** set `c.env` in a late middleware: middleware
 ordering is too easy to get wrong, and `@hono/node-server` also uses `c.env` for its Node HTTP
 bindings.
@@ -209,9 +209,6 @@ export type RuntimeBindings = {
   GITHUB_CLIENT_SECRET: string
   INTERNAL_TOKEN: string
   ACTIVE_IDENTITY: ActiveIdentityStore
-  API_TOKENS: TokenService
-  OAUTH_ACCOUNTS: OauthAccountService
-  UI_BROKER: UiControlBroker
 }
 ```
 
@@ -240,7 +237,7 @@ the `app.fetch()` seam without a cast.
 
 ### 4c. DB driver swap
 
-`src/core/server/db/index.ts` is the *only* DB-runtime file, but the swap is **not** two lines — see the
+`packages/node-core/src/server/db/index.ts` is the *only* DB-runtime file, but the swap is **not** two lines — see the
 `.batch()` caveat below. `getDb` now just hands back the instance built once at bootstrap:
 
 ```ts
@@ -302,7 +299,7 @@ export const getDb = (env: Env): AppDatabase => {
 ### 4d. `waitUntil` shim
 
 *(Historical — the helper has since been renamed `trackBackgroundRefresh` and moved to
-`src/core/server/background.ts`.)*
+`packages/node-core/src/server/background.ts`.)*
 
 `repoMirror.ts` already centralizes this in one helper (`waitUntilLogged`). In Workers,
 `ctx.waitUntil` keeps the isolate alive past the response; in Node the process stays alive anyway,
@@ -324,7 +321,7 @@ no-op `waitUntil`, the background promise still runs to completion in the long-l
 its `.catch` still logs.
 
 **Since cleaned up (post-Phase 2):** the ctx arg was dropped entirely — the helper (now
-`trackBackgroundRefresh(label, promise)` in `src/core/server/background.ts`) is a plain fire-and-forget
+`trackBackgroundRefresh(label, promise)` in `packages/node-core/src/server/background.ts`) is a plain fire-and-forget
 with error logging, the callers no longer read `c.executionCtx`, and `server.ts` passes no
 execution-context stub. The Workers-era `waitUntilLogged` name is gone too.
 
@@ -383,7 +380,7 @@ renderer ↔ preload ↔ main. Treat that as a narrow capability API, not a gene
   `github.com`.
 - Terminal request bodies are validated at the Hono/service boundary: session id, cwd, cols/rows,
   input bytes, and lifecycle commands. Native service↔main calls use the narrower versioned schemas
-  in `core/shared/{serviceProtocol,desktopCapabilities}.ts`.
+  in `@acorn/protocol/{serviceProtocol,desktopCapabilities}.ts`.
 - Add a basic CSP for the renderer HTML. The app currently relies on same-origin fetch and GitHub
   API calls from the main/server side, so the renderer policy can stay tight.
 
@@ -464,7 +461,7 @@ in-between (see §7). Then delete decisively:
 
 To keep the transition calm, note how much does **not** move:
 
-- The SolidJS product UI (`src/core/client/**`, `src/plugins/*/client/**`, `src/app/client/**`) —
+- The SolidJS product UI (`packages/client-core/src/**`, `src/plugins/*/client/**`, `src/app/client/**`) —
   router, TanStack Query, IndexedDB persistence, Shiki,
   all panels. It just loads from `http://127.0.0.1:<port>` instead of the Worker. The exception is
   the boot-time service-worker unregister in `src/app/client/index.tsx` (§4h).
@@ -490,7 +487,7 @@ Remaining one-time setup for OAuth login: register `http://127.0.0.1:4317/auth/c
 loopback callback on the GitHub OAuth app (the only Phase 0 step that can't be verified headlessly).
 
 **Phase 1 — Electron shell. ✅ DONE.** Wrapped
-Phase 0 in Electron (`electron-vite` + `src/app/main/electron.ts` + `src/core/main/preload.ts`). The main
+Phase 0 in Electron (`electron-vite` + `src/app/main/electron.ts` + `packages/node-core/src/main/preload.ts`). The main
 process starts the server then loads `http://127.0.0.1:4317`; navigation is locked to the loopback
 origin, external links open in the system browser, and `/auth/login` is rerouted into a dedicated
 sandboxed OAuth window. SW registration is gated out of the Electron renderer. `better-sqlite3` is
@@ -527,7 +524,7 @@ until Phase 2). That's the clean transition.
 
 The original terminal RFCs designed around a Worker's *lack* of a process model — a separate
 local daemon + a Vite WebSocket proxy. **Electron removed that entire workaround**, and the feature
-has since been **built** (`src/plugins/terminal/main/terminal.ts`, registered by the service runtime at startup,
+has since been **built** (`plugins/terminal/src/main/terminal.ts`, registered by the service runtime at startup,
 desktop-only and always on):
 
 - node-pty runs **in Electron's supervised Node utility process**. No separate daemon, no Vite
@@ -599,7 +596,7 @@ main: fork utility process
 ```
 
 The service/main channel is a versioned, zod-validated, bidirectional request protocol
-(`core/shared/serviceProtocol.ts`). Service-to-main calls expose only task-addressed preview/CDP
+(`@acorn/protocol/serviceProtocol.ts`). Service-to-main calls expose only task-addressed preview/CDP
 operations; no database handles, `WebContents` ids, or process objects cross the boundary. Pending
 calls have timeouts and fail when the peer exits. Main retries an unexpected exit at most three
 times per minute with exponential backoff, then fails closed instead of looping forever.
@@ -619,15 +616,15 @@ The current transport split is:
 
 - **Request/response → loopback HTTP.** Every former `ipcMain.handle` domain (search, editor, run,
   workflow, local-git, database, knowledge/notes+memory, terminal control, MCP inspect) is a typed
-  route under `/api/*` in `core/server/routes/*` or `plugins/*/server/routes/*`. Route builders +
-  response types live in `core/shared/api.ts`; clients call through `readJson`/`writeJson`. Domain logic stays in the utility
+  route under `/api/*` in `@acorn/node-core/server/routes/*` or `plugins/*/server/routes/*`. Route builders +
+  response types live in `@acorn/protocol/api.ts`; clients call through `readJson`/`writeJson`. Domain logic stays in the utility
   service behind a **bridge** — a route holds a `bridgeSlot`, the service side fills it at boot
-  (`core/server/bridge.ts` `viaBridge` → 503 `bridge-unavailable` when unfilled). Pure-Node bridges
+  (`@acorn/node-core/server/bridge.ts` `viaBridge` → 503 `bridge-unavailable` when unfilled). Pure-Node bridges
   (search/editor/local-git/database) are wired by the utility-service and `dev:node` composition entries.
   Bodies that write files, spawn
   processes, or execute SQL are zod-validated with malformed-body tests.
-- **Streams → one authenticated WebSocket** at `/ws` (`core/shared/ws.ts`, `core/main/wsHub.ts`,
-  `core/client/wsClient.ts`). Kind-tagged frames carry `term:out` (PTY output,
+- **Streams → one authenticated WebSocket** at `/ws` (`@acorn/protocol/ws.ts`, `@acorn/node-core/main/wsHub.ts`,
+  `@acorn/client-core/wsClient.ts`). Kind-tagged frames carry `term:out` (PTY output,
   coalesced to ~16 ms), `term:input`, attach/detach, the `term:status` + `workflow:notice` pings,
   and a reserved `workflow:step:event`. Attach sends `ready`, then a serialized canonical terminal
   framebuffer, then any live frames buffered while serialization ran (deterministic
@@ -649,9 +646,9 @@ The current transport split is:
   it when an overlay covers the pane. The main-owned record also retains the resolved home URL and
   owning window: a changed home reconciles on remount, and closing the window closes/unbinds every
   child view before macOS can create a replacement window.
-- **Service↔main RPC — lifecycle plus native adapters:** `core/shared/serviceProtocol.ts` defines
+- **Service↔main RPC — lifecycle plus native adapters:** `@acorn/protocol/serviceProtocol.ts` defines
   versioned, Zod-validated request/response/event envelopes over `utilityProcess` message ports.
-  `core/shared/desktopCapabilities.ts` projects task-addressed preview and CDP/browser operations
+  `@acorn/protocol/desktopCapabilities.ts` projects task-addressed preview and CDP/browser operations
   from main back into the service. Calls are concurrent and timed; peer exit rejects pending work.
   Only serializable DTOs cross—never a database connection, child-process object, or
   `webContents` id.

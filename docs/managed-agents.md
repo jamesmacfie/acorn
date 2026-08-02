@@ -33,8 +33,8 @@ task-addressed OS capabilities.
 
 Across core and `plugins/agents`:
 
-- `core/shared/managedAgents.ts` is the provider-neutral domain and normalized-event vocabulary.
-- `core/shared/agentContext.ts` defines the immutable context snapshot contract and portable budget.
+- `@acorn/protocol/managedAgents.ts` is the provider-neutral domain and normalized-event vocabulary.
+- `@acorn/protocol/agentContext.ts` defines the immutable context snapshot contract and portable budget.
 - `main/drivers/` owns protocol parsing and process supervision for each provider.
 - `main/stateMachine.ts` owns pure command decisions and event projection.
 - `main/sessionRepository.ts` owns append-first event transactions and session projections, while

@@ -25,7 +25,7 @@ A GitHub OAuth App allows exactly **one** callback URL, so the desktop app wants
   form (GitHub treats it as distinct from `localhost`).
 - Copy the **Client ID** and generate a **Client Secret**.
 
-The app origin is pinned to port `4317` (`ACORN_PORT` in `apps/desktop/src/core/main/serverConfig.ts`; an
+The app origin is pinned to port `4317` (`ACORN_PORT` in `packages/node-core/src/main/serverConfig.ts`; an
 `ACORN_PORT` environment variable overrides it, at the cost of a fresh IndexedDB origin) so the
 browser storage and OAuth callback stay stable. The OAuth flow requests the scopes
 `repo read:org read:user`.
@@ -45,7 +45,7 @@ cp apps/desktop/.env.example apps/desktop/.env
 
 For `dev:node`, generate the session encryption key. `SESSION_ENC_KEY` must be **exactly 64 hex characters**
 (32 bytes / 256-bit) — it is the key for the AES-256-GCM (JWE `dir`) session cookie, and
-`src/core/server/session.ts` rejects anything not matching `^[0-9a-fA-F]{64}$`:
+`packages/node-core/src/server/session.ts` rejects anything not matching `^[0-9a-fA-F]{64}$`:
 
 ```bash
 openssl rand -hex 32
@@ -84,7 +84,7 @@ The Electron window opens on `http://127.0.0.1:4317`; log in with GitHub.
 
 > **Desktop-only features.** The terminal drawer, agent sessions, run targets, and workflows are
 > always on in the Electron app; they require utility-service engines, so they're absent in a
-> plain browser via `dev:node` (`capabilities()` in `apps/desktop/src/core/client/capabilities.ts`).
+> plain browser via `dev:node` (`capabilities()` in `packages/client-core/src/capabilities.ts`).
 > Docker and the HTTP client use pure-Node server bridges and also work in `dev:node`.
 
 ## Local data — `apps/desktop/.acorn/`
@@ -134,7 +134,7 @@ Run from the repo root via Turborepo, or per-package with `--filter @acorn/deskt
 (`node:rebuild`) — after either, run `electron:rebuild` again before `pnpm dev`. `db:migrate`
 targets `apps/desktop/.acorn/acorn.sqlite` by default; set `ACORN_DB_PATH` to point it elsewhere.
 A wrong-ABI better-sqlite3 no longer dies with a bare `NODE_MODULE_VERSION` stack: `openDb`
-(`src/core/main/bindings.ts`) catches the native load error and rethrows naming the right rebuild
+(`packages/node-core/src/main/bindings.ts`) catches the native load error and rethrows naming the right rebuild
 script for the runtime you're in.
 
 > **Why acorn still uses `better-sqlite3`.** A `node:sqlite` spike confirmed FTS5
@@ -145,10 +145,10 @@ script for the runtime you're in.
 
 ## Database migrations
 
-The schema lives in `apps/desktop/src/core/server/db/schema.ts` (Drizzle, SQLite dialect). To change it:
+The schema lives in `packages/node-core/src/server/db/schema.ts` (Drizzle, SQLite dialect). To change it:
 
 ```bash
-# 1. Edit src/core/server/db/schema.ts
+# 1. Edit packages/node-core/src/server/db/schema.ts
 
 # 2. Generate the SQL migration into apps/desktop/migrations/
 pnpm --filter @acorn/desktop db:generate
