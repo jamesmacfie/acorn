@@ -3,9 +3,9 @@
 // registry without importing any profile plugin (docs/plugins.md). shellProfile is core and
 // self-registers in core/main/agentProfiles/index.ts.
 import { agentProfileRegistry } from '@acorn/node-core/main/agentProfiles/index.ts'
-import { aiderProfile } from '../../plugins/profiles-aider/main/aider'
-import { claudeCodeProfile } from '../../plugins/profiles-claude/main/claudeCode'
-import { codexProfile } from '../../plugins/profiles-codex/main/codex'
+import { aiderProfile } from '@acorn/plugin-profiles-aider/main/aider.ts'
+import { claudeCodeProfile } from '@acorn/plugin-profiles-claude/main/claudeCode.ts'
+import { codexProfile } from '@acorn/plugin-profiles-codex/main/codex.ts'
 
 export const builtInAgentProfilePlugins = [claudeCodeProfile, codexProfile, aiderProfile] as const
 

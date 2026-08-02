@@ -1,11 +1,11 @@
 import { createMemo, createSignal, lazy, onCleanup, onMount } from 'solid-js'
 import type { Task } from '@acorn/client-core/queries.ts'
 import type { PaneContribution } from '@acorn/client-core/registries/panes.ts'
-import type { LinearIssueTarget } from '../../plugins/linear/client/LinearIssuePanel'
+import type { LinearIssueTarget } from '@acorn/plugin-linear/client/LinearIssuePanel.tsx'
 import { clientEvents, consumePaneIntent } from '@acorn/client-core/registries/clientEvents.ts'
 
-const LinearIssuePanel = lazy(() => import('../../plugins/linear/client/LinearIssuePanel'))
-const RollbarPane = lazy(() => import('../../plugins/rollbar/client/RollbarPane'))
+const LinearIssuePanel = lazy(() => import('@acorn/plugin-linear/client/LinearIssuePanel.tsx'))
+const RollbarPane = lazy(() => import('@acorn/plugin-rollbar/client/RollbarPane.tsx'))
 
 function LinearTaskPane(props: { task: Task }) {
   const links = createMemo(() => props.task.links.filter((link) => link.providerId === 'linear'))

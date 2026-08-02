@@ -5,7 +5,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { assembleContext, buildContextSections, setContextSections } from '@acorn/node-core/server/agentTools/contextSections.ts'
 import { schema } from '@acorn/node-core/server/db/index.ts'
 import { makeTestDb, type TestDb } from '@acorn/node-core/server/routes/testDb.ts'
-import { NotesStore } from '../../plugins/notes/main/notes'
+import { NotesStore } from '@acorn/plugin-notes/main/notes.ts'
 import { wireContextSections } from './contextSectionsWiring'
 
 describe('context section wiring', () => {

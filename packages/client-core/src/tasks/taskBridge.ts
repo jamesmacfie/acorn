@@ -20,6 +20,7 @@ import {
   terminalTaskStatusesRoute,
 } from '@acorn/protocol/api.ts'
 import { readJson, writeJson } from '../apiClient'
+import { acornGlobal } from '../capabilities'
 
 export type TaskBridge = {
   repoPath: {
@@ -47,7 +48,7 @@ const put = <T>(url: string, body: unknown) =>
   writeJson<T>(url, { method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) })
 
 export const taskBridge = (): TaskBridge | null => {
-  const bridge = window.acorn?.terminal
+  const bridge = acornGlobal()?.terminal
   if (!bridge) return null
   return {
     repoPath: {

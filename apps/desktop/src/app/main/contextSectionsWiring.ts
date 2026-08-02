@@ -1,8 +1,8 @@
 import { buildContextSections, setContextSections } from '@acorn/node-core/server/agentTools/contextSections.ts'
 import type { AppDatabase } from '@acorn/node-core/server/db/index.ts'
 import type { NoteAuthor, NoteLocation, NoteScope } from '@acorn/protocol/notes.ts'
-import { memoryIndexSlice } from '../../plugins/memory/main/memory'
-import type { NotesStore } from '../../plugins/notes/main/notes'
+import { memoryIndexSlice } from '@acorn/plugin-memory/main/memory.ts'
+import type { NotesStore } from '@acorn/plugin-notes/main/notes.ts'
 import { loadTask, workspaceIdForRepo } from '@acorn/node-core/main/taskWorktree.ts'
 
 export type ContextSectionsDeps = {

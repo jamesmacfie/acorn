@@ -146,6 +146,66 @@ importers:
       '@acorn/node-core':
         specifier: workspace:*
         version: link:../../packages/node-core
+      '@acorn/plugin-agents':
+        specifier: workspace:*
+        version: link:../../plugins/agents
+      '@acorn/plugin-changes':
+        specifier: workspace:*
+        version: link:../../plugins/changes
+      '@acorn/plugin-context':
+        specifier: workspace:*
+        version: link:../../plugins/context
+      '@acorn/plugin-database':
+        specifier: workspace:*
+        version: link:../../plugins/database
+      '@acorn/plugin-docker':
+        specifier: workspace:*
+        version: link:../../plugins/docker
+      '@acorn/plugin-editor':
+        specifier: workspace:*
+        version: link:../../plugins/editor
+      '@acorn/plugin-github':
+        specifier: workspace:*
+        version: link:../../plugins/github
+      '@acorn/plugin-http':
+        specifier: workspace:*
+        version: link:../../plugins/http
+      '@acorn/plugin-linear':
+        specifier: workspace:*
+        version: link:../../plugins/linear
+      '@acorn/plugin-memory':
+        specifier: workspace:*
+        version: link:../../plugins/memory
+      '@acorn/plugin-model-providers':
+        specifier: workspace:*
+        version: link:../../plugins/model-providers
+      '@acorn/plugin-notes':
+        specifier: workspace:*
+        version: link:../../plugins/notes
+      '@acorn/plugin-onboarding':
+        specifier: workspace:*
+        version: link:../../plugins/onboarding
+      '@acorn/plugin-preview':
+        specifier: workspace:*
+        version: link:../../plugins/preview
+      '@acorn/plugin-profiles-aider':
+        specifier: workspace:*
+        version: link:../../plugins/profiles-aider
+      '@acorn/plugin-profiles-claude':
+        specifier: workspace:*
+        version: link:../../plugins/profiles-claude
+      '@acorn/plugin-profiles-codex':
+        specifier: workspace:*
+        version: link:../../plugins/profiles-codex
+      '@acorn/plugin-rollbar':
+        specifier: workspace:*
+        version: link:../../plugins/rollbar
+      '@acorn/plugin-terminal':
+        specifier: workspace:*
+        version: link:../../plugins/terminal
+      '@acorn/plugin-workflows':
+        specifier: workspace:*
+        version: link:../../plugins/workflows
       '@acorn/protocol':
         specifier: workspace:*
         version: link:../../packages/protocol
@@ -302,6 +362,833 @@ importers:
         specifier: 'catalog:'
         version: 4.4.3
     devDependencies:
+      typescript:
+        specifier: ^6.0.3
+        version: 6.0.3
+      vitest:
+        specifier: ^4.1.9
+        version: 4.1.9(@types/node@26.0.0)(vite@8.0.16(@types/node@26.0.0)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.22.4))
+
+  plugins/agents:
+    dependencies:
+      '@acorn/client-core':
+        specifier: workspace:*
+        version: link:../../packages/client-core
+      '@acorn/node-core':
+        specifier: workspace:*
+        version: link:../../packages/node-core
+      '@acorn/plugin-terminal':
+        specifier: workspace:*
+        version: link:../terminal
+      '@acorn/protocol':
+        specifier: workspace:*
+        version: link:../../packages/protocol
+      '@agentclientprotocol/sdk':
+        specifier: ^1.3.0
+        version: 1.3.0(zod@4.4.3)
+      '@solidjs/router':
+        specifier: ^0.16.1
+        version: 0.16.1(solid-js@1.9.13)
+      '@tanstack/solid-query':
+        specifier: ^5.101.0
+        version: 5.101.0(solid-js@1.9.13)
+      '@tanstack/solid-virtual':
+        specifier: ^3.13.29
+        version: 3.13.29(solid-js@1.9.13)
+      '@xterm/headless':
+        specifier: 5.5.0
+        version: 5.5.0
+      drizzle-orm:
+        specifier: 'catalog:'
+        version: 0.45.2(@types/better-sqlite3@7.6.13)(@types/pg@8.20.0)(better-sqlite3@12.11.1)(pg@8.22.0)
+      hono:
+        specifier: 'catalog:'
+        version: 4.12.32
+      node-pty:
+        specifier: ^1.0.0
+        version: 1.1.0
+      solid-js:
+        specifier: 'catalog:'
+        version: 1.9.13
+      zod:
+        specifier: 'catalog:'
+        version: 4.4.3
+    devDependencies:
+      '@types/node':
+        specifier: ^26.0.0
+        version: 26.0.0
+      typescript:
+        specifier: ^6.0.3
+        version: 6.0.3
+      vite:
+        specifier: ^8.0.16
+        version: 8.0.16(@types/node@26.0.0)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.22.4)
+      vite-plugin-solid:
+        specifier: ^2.11.12
+        version: 2.11.12(solid-js@1.9.13)(vite@8.0.16(@types/node@26.0.0)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.22.4))
+      vitest:
+        specifier: ^4.1.9
+        version: 4.1.9(@types/node@26.0.0)(vite@8.0.16(@types/node@26.0.0)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.22.4))
+
+  plugins/changes:
+    dependencies:
+      '@acorn/client-core':
+        specifier: workspace:*
+        version: link:../../packages/client-core
+      '@acorn/node-core':
+        specifier: workspace:*
+        version: link:../../packages/node-core
+      '@acorn/plugin-github':
+        specifier: workspace:*
+        version: link:../github
+      '@acorn/protocol':
+        specifier: workspace:*
+        version: link:../../packages/protocol
+      drizzle-orm:
+        specifier: 'catalog:'
+        version: 0.45.2(@types/better-sqlite3@7.6.13)(@types/pg@8.20.0)(better-sqlite3@12.11.1)(pg@8.22.0)
+      gitdiff-parser:
+        specifier: ^0.3.1
+        version: 0.3.1
+      hono:
+        specifier: 'catalog:'
+        version: 4.12.32
+      solid-js:
+        specifier: 'catalog:'
+        version: 1.9.13
+      zod:
+        specifier: 'catalog:'
+        version: 4.4.3
+    devDependencies:
+      '@types/node':
+        specifier: ^26.0.0
+        version: 26.0.0
+      typescript:
+        specifier: ^6.0.3
+        version: 6.0.3
+      vite:
+        specifier: ^8.0.16
+        version: 8.0.16(@types/node@26.0.0)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.22.4)
+      vite-plugin-solid:
+        specifier: ^2.11.12
+        version: 2.11.12(solid-js@1.9.13)(vite@8.0.16(@types/node@26.0.0)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.22.4))
+      vitest:
+        specifier: ^4.1.9
+        version: 4.1.9(@types/node@26.0.0)(vite@8.0.16(@types/node@26.0.0)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.22.4))
+
+  plugins/context:
+    dependencies:
+      '@acorn/client-core':
+        specifier: workspace:*
+        version: link:../../packages/client-core
+      '@acorn/plugin-memory':
+        specifier: workspace:*
+        version: link:../memory
+      '@acorn/plugin-notes':
+        specifier: workspace:*
+        version: link:../notes
+      '@acorn/protocol':
+        specifier: workspace:*
+        version: link:../../packages/protocol
+      solid-js:
+        specifier: 'catalog:'
+        version: 1.9.13
+    devDependencies:
+      '@types/node':
+        specifier: ^26.0.0
+        version: 26.0.0
+      typescript:
+        specifier: ^6.0.3
+        version: 6.0.3
+      vite:
+        specifier: ^8.0.16
+        version: 8.0.16(@types/node@26.0.0)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.22.4)
+      vite-plugin-solid:
+        specifier: ^2.11.12
+        version: 2.11.12(solid-js@1.9.13)(vite@8.0.16(@types/node@26.0.0)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.22.4))
+      vitest:
+        specifier: ^4.1.9
+        version: 4.1.9(@types/node@26.0.0)(vite@8.0.16(@types/node@26.0.0)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.22.4))
+
+  plugins/database:
+    dependencies:
+      '@acorn/client-core':
+        specifier: workspace:*
+        version: link:../../packages/client-core
+      '@acorn/node-core':
+        specifier: workspace:*
+        version: link:../../packages/node-core
+      '@acorn/plugin-editor':
+        specifier: workspace:*
+        version: link:../editor
+      '@acorn/protocol':
+        specifier: workspace:*
+        version: link:../../packages/protocol
+      '@tanstack/solid-query':
+        specifier: ^5.101.0
+        version: 5.101.0(solid-js@1.9.13)
+      '@tanstack/solid-virtual':
+        specifier: ^3.13.29
+        version: 3.13.29(solid-js@1.9.13)
+      drizzle-orm:
+        specifier: 'catalog:'
+        version: 0.45.2(@types/better-sqlite3@7.6.13)(@types/pg@8.20.0)(better-sqlite3@12.11.1)(pg@8.22.0)
+      hono:
+        specifier: 'catalog:'
+        version: 4.12.32
+      monaco-editor:
+        specifier: ^0.55.1
+        version: 0.55.1
+      pg:
+        specifier: ^8.22.0
+        version: 8.22.0
+      solid-js:
+        specifier: 'catalog:'
+        version: 1.9.13
+      zod:
+        specifier: 'catalog:'
+        version: 4.4.3
+    devDependencies:
+      '@types/node':
+        specifier: ^26.0.0
+        version: 26.0.0
+      '@types/pg':
+        specifier: ^8.20.0
+        version: 8.20.0
+      typescript:
+        specifier: ^6.0.3
+        version: 6.0.3
+      vite:
+        specifier: ^8.0.16
+        version: 8.0.16(@types/node@26.0.0)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.22.4)
+      vite-plugin-solid:
+        specifier: ^2.11.12
+        version: 2.11.12(solid-js@1.9.13)(vite@8.0.16(@types/node@26.0.0)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.22.4))
+      vitest:
+        specifier: ^4.1.9
+        version: 4.1.9(@types/node@26.0.0)(vite@8.0.16(@types/node@26.0.0)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.22.4))
+
+  plugins/docker:
+    dependencies:
+      '@acorn/client-core':
+        specifier: workspace:*
+        version: link:../../packages/client-core
+      '@acorn/node-core':
+        specifier: workspace:*
+        version: link:../../packages/node-core
+      '@acorn/protocol':
+        specifier: workspace:*
+        version: link:../../packages/protocol
+      '@tanstack/solid-query':
+        specifier: ^5.101.0
+        version: 5.101.0(solid-js@1.9.13)
+      '@xterm/addon-fit':
+        specifier: ^0.10.0
+        version: 0.10.0(@xterm/xterm@5.5.0)
+      '@xterm/xterm':
+        specifier: ^5.5.0
+        version: 5.5.0
+      drizzle-orm:
+        specifier: 'catalog:'
+        version: 0.45.2(@types/better-sqlite3@7.6.13)(@types/pg@8.20.0)(better-sqlite3@12.11.1)(pg@8.22.0)
+      hono:
+        specifier: 'catalog:'
+        version: 4.12.32
+      node-pty:
+        specifier: ^1.0.0
+        version: 1.1.0
+      smol-toml:
+        specifier: ^1.7.0
+        version: 1.7.0
+      solid-js:
+        specifier: 'catalog:'
+        version: 1.9.13
+      zod:
+        specifier: 'catalog:'
+        version: 4.4.3
+    devDependencies:
+      '@types/node':
+        specifier: ^26.0.0
+        version: 26.0.0
+      typescript:
+        specifier: ^6.0.3
+        version: 6.0.3
+      vite:
+        specifier: ^8.0.16
+        version: 8.0.16(@types/node@26.0.0)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.22.4)
+      vite-plugin-solid:
+        specifier: ^2.11.12
+        version: 2.11.12(solid-js@1.9.13)(vite@8.0.16(@types/node@26.0.0)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.22.4))
+      vitest:
+        specifier: ^4.1.9
+        version: 4.1.9(@types/node@26.0.0)(vite@8.0.16(@types/node@26.0.0)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.22.4))
+
+  plugins/editor:
+    dependencies:
+      '@acorn/client-core':
+        specifier: workspace:*
+        version: link:../../packages/client-core
+      '@acorn/node-core':
+        specifier: workspace:*
+        version: link:../../packages/node-core
+      '@acorn/protocol':
+        specifier: workspace:*
+        version: link:../../packages/protocol
+      '@vscode/ripgrep':
+        specifier: ^1.15.9
+        version: 1.18.0
+      hono:
+        specifier: 'catalog:'
+        version: 4.12.32
+      monaco-editor:
+        specifier: ^0.55.1
+        version: 0.55.1
+      solid-js:
+        specifier: 'catalog:'
+        version: 1.9.13
+      zod:
+        specifier: 'catalog:'
+        version: 4.4.3
+    devDependencies:
+      '@types/node':
+        specifier: ^26.0.0
+        version: 26.0.0
+      typescript:
+        specifier: ^6.0.3
+        version: 6.0.3
+      vite:
+        specifier: ^8.0.16
+        version: 8.0.16(@types/node@26.0.0)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.22.4)
+      vite-plugin-solid:
+        specifier: ^2.11.12
+        version: 2.11.12(solid-js@1.9.13)(vite@8.0.16(@types/node@26.0.0)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.22.4))
+      vitest:
+        specifier: ^4.1.9
+        version: 4.1.9(@types/node@26.0.0)(vite@8.0.16(@types/node@26.0.0)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.22.4))
+
+  plugins/github:
+    dependencies:
+      '@acorn/client-core':
+        specifier: workspace:*
+        version: link:../../packages/client-core
+      '@acorn/node-core':
+        specifier: workspace:*
+        version: link:../../packages/node-core
+      '@acorn/plugin-linear':
+        specifier: workspace:*
+        version: link:../linear
+      '@acorn/protocol':
+        specifier: workspace:*
+        version: link:../../packages/protocol
+      '@solidjs/router':
+        specifier: ^0.16.1
+        version: 0.16.1(solid-js@1.9.13)
+      '@tanstack/solid-query':
+        specifier: ^5.101.0
+        version: 5.101.0(solid-js@1.9.13)
+      '@tanstack/solid-virtual':
+        specifier: ^3.13.29
+        version: 3.13.29(solid-js@1.9.13)
+      diff:
+        specifier: ^9.0.0
+        version: 9.0.0
+      drizzle-orm:
+        specifier: 'catalog:'
+        version: 0.45.2(@types/better-sqlite3@7.6.13)(@types/pg@8.20.0)(better-sqlite3@12.11.1)(pg@8.22.0)
+      gitdiff-parser:
+        specifier: ^0.3.1
+        version: 0.3.1
+      hono:
+        specifier: 'catalog:'
+        version: 4.12.32
+      solid-js:
+        specifier: 'catalog:'
+        version: 1.9.13
+    devDependencies:
+      '@types/diff':
+        specifier: ^8.0.0
+        version: 8.0.0
+      '@types/node':
+        specifier: ^26.0.0
+        version: 26.0.0
+      typescript:
+        specifier: ^6.0.3
+        version: 6.0.3
+      vite:
+        specifier: ^8.0.16
+        version: 8.0.16(@types/node@26.0.0)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.22.4)
+      vite-plugin-solid:
+        specifier: ^2.11.12
+        version: 2.11.12(solid-js@1.9.13)(vite@8.0.16(@types/node@26.0.0)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.22.4))
+      vitest:
+        specifier: ^4.1.9
+        version: 4.1.9(@types/node@26.0.0)(vite@8.0.16(@types/node@26.0.0)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.22.4))
+
+  plugins/http:
+    dependencies:
+      '@acorn/client-core':
+        specifier: workspace:*
+        version: link:../../packages/client-core
+      '@acorn/node-core':
+        specifier: workspace:*
+        version: link:../../packages/node-core
+      '@acorn/protocol':
+        specifier: workspace:*
+        version: link:../../packages/protocol
+      '@solidjs/router':
+        specifier: ^0.16.1
+        version: 0.16.1(solid-js@1.9.13)
+      '@tanstack/solid-query':
+        specifier: ^5.101.0
+        version: 5.101.0(solid-js@1.9.13)
+      drizzle-orm:
+        specifier: 'catalog:'
+        version: 0.45.2(@types/better-sqlite3@7.6.13)(@types/pg@8.20.0)(better-sqlite3@12.11.1)(pg@8.22.0)
+      hono:
+        specifier: 'catalog:'
+        version: 4.12.32
+      solid-js:
+        specifier: 'catalog:'
+        version: 1.9.13
+      zod:
+        specifier: 'catalog:'
+        version: 4.4.3
+    devDependencies:
+      '@types/node':
+        specifier: ^26.0.0
+        version: 26.0.0
+      typescript:
+        specifier: ^6.0.3
+        version: 6.0.3
+      vite:
+        specifier: ^8.0.16
+        version: 8.0.16(@types/node@26.0.0)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.22.4)
+      vite-plugin-solid:
+        specifier: ^2.11.12
+        version: 2.11.12(solid-js@1.9.13)(vite@8.0.16(@types/node@26.0.0)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.22.4))
+      vitest:
+        specifier: ^4.1.9
+        version: 4.1.9(@types/node@26.0.0)(vite@8.0.16(@types/node@26.0.0)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.22.4))
+
+  plugins/linear:
+    dependencies:
+      '@acorn/client-core':
+        specifier: workspace:*
+        version: link:../../packages/client-core
+      '@acorn/node-core':
+        specifier: workspace:*
+        version: link:../../packages/node-core
+      '@acorn/protocol':
+        specifier: workspace:*
+        version: link:../../packages/protocol
+      '@solidjs/router':
+        specifier: ^0.16.1
+        version: 0.16.1(solid-js@1.9.13)
+      '@tanstack/solid-query':
+        specifier: ^5.101.0
+        version: 5.101.0(solid-js@1.9.13)
+      drizzle-orm:
+        specifier: 'catalog:'
+        version: 0.45.2(@types/better-sqlite3@7.6.13)(@types/pg@8.20.0)(better-sqlite3@12.11.1)(pg@8.22.0)
+      hono:
+        specifier: 'catalog:'
+        version: 4.12.32
+      solid-js:
+        specifier: 'catalog:'
+        version: 1.9.13
+    devDependencies:
+      '@types/node':
+        specifier: ^26.0.0
+        version: 26.0.0
+      typescript:
+        specifier: ^6.0.3
+        version: 6.0.3
+      vite:
+        specifier: ^8.0.16
+        version: 8.0.16(@types/node@26.0.0)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.22.4)
+      vite-plugin-solid:
+        specifier: ^2.11.12
+        version: 2.11.12(solid-js@1.9.13)(vite@8.0.16(@types/node@26.0.0)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.22.4))
+      vitest:
+        specifier: ^4.1.9
+        version: 4.1.9(@types/node@26.0.0)(vite@8.0.16(@types/node@26.0.0)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.22.4))
+
+  plugins/memory:
+    dependencies:
+      '@acorn/client-core':
+        specifier: workspace:*
+        version: link:../../packages/client-core
+      '@acorn/node-core':
+        specifier: workspace:*
+        version: link:../../packages/node-core
+      '@acorn/plugin-notes':
+        specifier: workspace:*
+        version: link:../notes
+      '@acorn/protocol':
+        specifier: workspace:*
+        version: link:../../packages/protocol
+      drizzle-orm:
+        specifier: 'catalog:'
+        version: 0.45.2(@types/better-sqlite3@7.6.13)(@types/pg@8.20.0)(better-sqlite3@12.11.1)(pg@8.22.0)
+      hono:
+        specifier: 'catalog:'
+        version: 4.12.32
+      solid-js:
+        specifier: 'catalog:'
+        version: 1.9.13
+      zod:
+        specifier: 'catalog:'
+        version: 4.4.3
+    devDependencies:
+      '@types/node':
+        specifier: ^26.0.0
+        version: 26.0.0
+      typescript:
+        specifier: ^6.0.3
+        version: 6.0.3
+      vite:
+        specifier: ^8.0.16
+        version: 8.0.16(@types/node@26.0.0)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.22.4)
+      vite-plugin-solid:
+        specifier: ^2.11.12
+        version: 2.11.12(solid-js@1.9.13)(vite@8.0.16(@types/node@26.0.0)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.22.4))
+      vitest:
+        specifier: ^4.1.9
+        version: 4.1.9(@types/node@26.0.0)(vite@8.0.16(@types/node@26.0.0)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.22.4))
+
+  plugins/model-providers:
+    dependencies:
+      '@acorn/node-core':
+        specifier: workspace:*
+        version: link:../../packages/node-core
+      '@acorn/protocol':
+        specifier: workspace:*
+        version: link:../../packages/protocol
+      '@anthropic-ai/sdk':
+        specifier: ^0.113.0
+        version: 0.113.0(zod@4.4.3)
+      openai:
+        specifier: ^6.48.0
+        version: 6.48.0(ws@8.21.0)(zod@4.4.3)
+    devDependencies:
+      '@types/node':
+        specifier: ^26.0.0
+        version: 26.0.0
+      typescript:
+        specifier: ^6.0.3
+        version: 6.0.3
+      vitest:
+        specifier: ^4.1.9
+        version: 4.1.9(@types/node@26.0.0)(vite@8.0.16(@types/node@26.0.0)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.22.4))
+
+  plugins/notes:
+    dependencies:
+      '@acorn/client-core':
+        specifier: workspace:*
+        version: link:../../packages/client-core
+      '@acorn/node-core':
+        specifier: workspace:*
+        version: link:../../packages/node-core
+      '@acorn/protocol':
+        specifier: workspace:*
+        version: link:../../packages/protocol
+      '@tanstack/solid-query':
+        specifier: ^5.101.0
+        version: 5.101.0(solid-js@1.9.13)
+      drizzle-orm:
+        specifier: 'catalog:'
+        version: 0.45.2(@types/better-sqlite3@7.6.13)(@types/pg@8.20.0)(better-sqlite3@12.11.1)(pg@8.22.0)
+      solid-js:
+        specifier: 'catalog:'
+        version: 1.9.13
+    devDependencies:
+      '@types/node':
+        specifier: ^26.0.0
+        version: 26.0.0
+      typescript:
+        specifier: ^6.0.3
+        version: 6.0.3
+      vite:
+        specifier: ^8.0.16
+        version: 8.0.16(@types/node@26.0.0)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.22.4)
+      vite-plugin-solid:
+        specifier: ^2.11.12
+        version: 2.11.12(solid-js@1.9.13)(vite@8.0.16(@types/node@26.0.0)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.22.4))
+      vitest:
+        specifier: ^4.1.9
+        version: 4.1.9(@types/node@26.0.0)(vite@8.0.16(@types/node@26.0.0)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.22.4))
+
+  plugins/onboarding:
+    dependencies:
+      '@acorn/client-core':
+        specifier: workspace:*
+        version: link:../../packages/client-core
+      '@tanstack/solid-query':
+        specifier: ^5.101.0
+        version: 5.101.0(solid-js@1.9.13)
+      solid-js:
+        specifier: 'catalog:'
+        version: 1.9.13
+    devDependencies:
+      '@types/node':
+        specifier: ^26.0.0
+        version: 26.0.0
+      typescript:
+        specifier: ^6.0.3
+        version: 6.0.3
+      vite:
+        specifier: ^8.0.16
+        version: 8.0.16(@types/node@26.0.0)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.22.4)
+      vite-plugin-solid:
+        specifier: ^2.11.12
+        version: 2.11.12(solid-js@1.9.13)(vite@8.0.16(@types/node@26.0.0)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.22.4))
+      vitest:
+        specifier: ^4.1.9
+        version: 4.1.9(@types/node@26.0.0)(vite@8.0.16(@types/node@26.0.0)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.22.4))
+
+  plugins/preview:
+    dependencies:
+      '@acorn/client-core':
+        specifier: workspace:*
+        version: link:../../packages/client-core
+      '@acorn/node-core':
+        specifier: workspace:*
+        version: link:../../packages/node-core
+      '@acorn/plugin-terminal':
+        specifier: workspace:*
+        version: link:../terminal
+      '@acorn/protocol':
+        specifier: workspace:*
+        version: link:../../packages/protocol
+      solid-js:
+        specifier: 'catalog:'
+        version: 1.9.13
+    devDependencies:
+      '@types/node':
+        specifier: ^26.0.0
+        version: 26.0.0
+      electron:
+        specifier: ^42.5.0
+        version: 42.5.0
+      typescript:
+        specifier: ^6.0.3
+        version: 6.0.3
+      vite:
+        specifier: ^8.0.16
+        version: 8.0.16(@types/node@26.0.0)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.22.4)
+      vite-plugin-solid:
+        specifier: ^2.11.12
+        version: 2.11.12(solid-js@1.9.13)(vite@8.0.16(@types/node@26.0.0)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.22.4))
+      vitest:
+        specifier: ^4.1.9
+        version: 4.1.9(@types/node@26.0.0)(vite@8.0.16(@types/node@26.0.0)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.22.4))
+
+  plugins/profiles-aider:
+    dependencies:
+      '@acorn/node-core':
+        specifier: workspace:*
+        version: link:../../packages/node-core
+    devDependencies:
+      '@types/node':
+        specifier: ^26.0.0
+        version: 26.0.0
+      typescript:
+        specifier: ^6.0.3
+        version: 6.0.3
+      vitest:
+        specifier: ^4.1.9
+        version: 4.1.9(@types/node@26.0.0)(vite@8.0.16(@types/node@26.0.0)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.22.4))
+
+  plugins/profiles-claude:
+    dependencies:
+      '@acorn/node-core':
+        specifier: workspace:*
+        version: link:../../packages/node-core
+    devDependencies:
+      '@types/node':
+        specifier: ^26.0.0
+        version: 26.0.0
+      typescript:
+        specifier: ^6.0.3
+        version: 6.0.3
+      vitest:
+        specifier: ^4.1.9
+        version: 4.1.9(@types/node@26.0.0)(vite@8.0.16(@types/node@26.0.0)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.22.4))
+
+  plugins/profiles-codex:
+    dependencies:
+      '@acorn/node-core':
+        specifier: workspace:*
+        version: link:../../packages/node-core
+    devDependencies:
+      '@types/node':
+        specifier: ^26.0.0
+        version: 26.0.0
+      typescript:
+        specifier: ^6.0.3
+        version: 6.0.3
+      vitest:
+        specifier: ^4.1.9
+        version: 4.1.9(@types/node@26.0.0)(vite@8.0.16(@types/node@26.0.0)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.22.4))
+
+  plugins/rollbar:
+    dependencies:
+      '@acorn/client-core':
+        specifier: workspace:*
+        version: link:../../packages/client-core
+      '@acorn/node-core':
+        specifier: workspace:*
+        version: link:../../packages/node-core
+      '@acorn/protocol':
+        specifier: workspace:*
+        version: link:../../packages/protocol
+      '@solidjs/router':
+        specifier: ^0.16.1
+        version: 0.16.1(solid-js@1.9.13)
+      '@tanstack/solid-query':
+        specifier: ^5.101.0
+        version: 5.101.0(solid-js@1.9.13)
+      drizzle-orm:
+        specifier: 'catalog:'
+        version: 0.45.2(@types/better-sqlite3@7.6.13)(@types/pg@8.20.0)(better-sqlite3@12.11.1)(pg@8.22.0)
+      hono:
+        specifier: 'catalog:'
+        version: 4.12.32
+      solid-js:
+        specifier: 'catalog:'
+        version: 1.9.13
+    devDependencies:
+      '@types/node':
+        specifier: ^26.0.0
+        version: 26.0.0
+      typescript:
+        specifier: ^6.0.3
+        version: 6.0.3
+      vite:
+        specifier: ^8.0.16
+        version: 8.0.16(@types/node@26.0.0)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.22.4)
+      vite-plugin-solid:
+        specifier: ^2.11.12
+        version: 2.11.12(solid-js@1.9.13)(vite@8.0.16(@types/node@26.0.0)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.22.4))
+      vitest:
+        specifier: ^4.1.9
+        version: 4.1.9(@types/node@26.0.0)(vite@8.0.16(@types/node@26.0.0)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.22.4))
+
+  plugins/terminal:
+    dependencies:
+      '@acorn/client-core':
+        specifier: workspace:*
+        version: link:../../packages/client-core
+      '@acorn/node-core':
+        specifier: workspace:*
+        version: link:../../packages/node-core
+      '@acorn/protocol':
+        specifier: workspace:*
+        version: link:../../packages/protocol
+      '@tanstack/solid-query':
+        specifier: ^5.101.0
+        version: 5.101.0(solid-js@1.9.13)
+      '@xterm/addon-fit':
+        specifier: ^0.10.0
+        version: 0.10.0(@xterm/xterm@5.5.0)
+      '@xterm/addon-webgl':
+        specifier: ^0.18.0
+        version: 0.18.0(@xterm/xterm@5.5.0)
+      '@xterm/xterm':
+        specifier: ^5.5.0
+        version: 5.5.0
+      drizzle-orm:
+        specifier: 'catalog:'
+        version: 0.45.2(@types/better-sqlite3@7.6.13)(@types/pg@8.20.0)(better-sqlite3@12.11.1)(pg@8.22.0)
+      hono:
+        specifier: 'catalog:'
+        version: 4.12.32
+      node-pty:
+        specifier: ^1.0.0
+        version: 1.1.0
+      shiki:
+        specifier: ^4.2.0
+        version: 4.2.0
+      solid-js:
+        specifier: 'catalog:'
+        version: 1.9.13
+      zod:
+        specifier: 'catalog:'
+        version: 4.4.3
+    devDependencies:
+      '@types/node':
+        specifier: ^26.0.0
+        version: 26.0.0
+      electron:
+        specifier: ^42.5.0
+        version: 42.5.0
+      typescript:
+        specifier: ^6.0.3
+        version: 6.0.3
+      vite:
+        specifier: ^8.0.16
+        version: 8.0.16(@types/node@26.0.0)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.22.4)
+      vite-plugin-solid:
+        specifier: ^2.11.12
+        version: 2.11.12(solid-js@1.9.13)(vite@8.0.16(@types/node@26.0.0)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.22.4))
+      vitest:
+        specifier: ^4.1.9
+        version: 4.1.9(@types/node@26.0.0)(vite@8.0.16(@types/node@26.0.0)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.22.4))
+
+  plugins/workflows:
+    dependencies:
+      '@acorn/client-core':
+        specifier: workspace:*
+        version: link:../../packages/client-core
+      '@acorn/node-core':
+        specifier: workspace:*
+        version: link:../../packages/node-core
+      '@acorn/plugin-agents':
+        specifier: workspace:*
+        version: link:../agents
+      '@acorn/plugin-notes':
+        specifier: workspace:*
+        version: link:../notes
+      '@acorn/protocol':
+        specifier: workspace:*
+        version: link:../../packages/protocol
+      drizzle-orm:
+        specifier: 'catalog:'
+        version: 0.45.2(@types/better-sqlite3@7.6.13)(@types/pg@8.20.0)(better-sqlite3@12.11.1)(pg@8.22.0)
+      hono:
+        specifier: 'catalog:'
+        version: 4.12.32
+      smol-toml:
+        specifier: ^1.7.0
+        version: 1.7.0
+      solid-js:
+        specifier: 'catalog:'
+        version: 1.9.13
+      zod:
+        specifier: 'catalog:'
+        version: 4.4.3
+    devDependencies:
+      '@types/node':
+        specifier: ^26.0.0
+        version: 26.0.0
+      typescript:
+        specifier: ^6.0.3
+        version: 6.0.3
+      vite:
+        specifier: ^8.0.16
+        version: 8.0.16(@types/node@26.0.0)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.22.4)
+      vite-plugin-solid:
+        specifier: ^2.11.12
+        version: 2.11.12(solid-js@1.9.13)(vite@8.0.16(@types/node@26.0.0)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.22.4))
+      vitest:
+        specifier: ^4.1.9
+        version: 4.1.9(@types/node@26.0.0)(vite@8.0.16(@types/node@26.0.0)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.22.4))
+
+  tools/arch:
+    devDependencies:
+      '@types/node':
+        specifier: ^26.0.0
+        version: 26.0.0
       typescript:
         specifier: ^6.0.3
         version: 6.0.3

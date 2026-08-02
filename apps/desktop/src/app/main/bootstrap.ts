@@ -4,8 +4,8 @@
 // app/service/runtime.ts and cannot stall Electron's main event loop.
 import { app, dialog, type BrowserWindow } from 'electron'
 import { join } from 'node:path'
-import { registerPreviewIpc } from '../../plugins/preview/main/previewService'
-import { registerRepoPickerIpc } from '../../plugins/terminal/main/pickerIpc'
+import { registerPreviewIpc } from '@acorn/plugin-preview/main/previewService.ts'
+import { registerRepoPickerIpc } from '@acorn/plugin-terminal/main/pickerIpc.ts'
 import type { ServiceState } from '@acorn/protocol/serviceProtocol.ts'
 import { ServiceHost } from './serviceHost'
 

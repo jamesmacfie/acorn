@@ -3,9 +3,9 @@ import type { UiSlotContribution } from '@acorn/client-core/registries/uiSlots.t
 
 const NotificationBell = lazy(() => import('@acorn/client-core/notifications/NotificationBell.tsx'))
 const CommandPalette = lazy(() => import('./CommandPalette'))
-const FilePalette = lazy(() => import('../../plugins/editor/client/FilePalette'))
+const FilePalette = lazy(() => import('@acorn/plugin-editor/client/FilePalette.tsx'))
 const WorkspacePalette = lazy(() => import('@acorn/client-core/palette/WorkspacePalette.tsx'))
-const Shortcuts = lazy(() => import('../../plugins/github/client/Shortcuts'))
+const Shortcuts = lazy(() => import('@acorn/plugin-github/client/Shortcuts.tsx'))
 const ConfigTrustDialog = lazy(() => import('@acorn/client-core/configTrust/ConfigTrustDialog.tsx'))
 
 export const shellSlotContributions: UiSlotContribution[] = [

@@ -2,6 +2,7 @@ packages:
   - "apps/*"
   - "packages/*"
   - "plugins/*"
+  - "tools/*"
 # Single-versioned across every workspace package. Duplicate solid-js means two reactive graphs
 # (silently broken reactivity); duplicate zod means schema instances that fail each other's
 # instanceof checks. Both are near-impossible to diagnose from the symptom, so pin them here.

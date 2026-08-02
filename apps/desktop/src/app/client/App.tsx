@@ -10,7 +10,7 @@ import RepoPicker from '@acorn/client-core/ui/RepoPicker.tsx'
 import WorkspacePicker from '@acorn/client-core/ui/WorkspacePicker.tsx'
 import { workspaceForRepo } from '@acorn/client-core/workspaces/activeWorkspace.ts'
 import { planWorkspaceViewTransition } from '@acorn/client-core/workspaces/workspaceViewTransition.ts'
-import PullList from '../../plugins/github/client/PullList'
+import PullList from '@acorn/plugin-github/client/PullList.tsx'
 import AccountMenu from '@acorn/client-core/AccountMenu.tsx'
 import { initWorkflowNotices } from '@acorn/client-core/notifications/notifications.ts'
 import { initSessions, sessions } from '@acorn/client-core/tasks/agentSessions.ts'
@@ -35,13 +35,13 @@ import { sourceRegistry } from '@acorn/client-core/registries/sources.ts'
 // The shell and PR list are the startup path. Heavy/conditional surfaces stay behind their actual
 // navigation intent so Monaco, xterm, Shiki/diff rendering, settings plugins, and onboarding do not
 // compete with the first interactive paint.
-const OnboardingModal = lazy(() => import('../../plugins/onboarding/client/OnboardingModal'))
-const PullDetail = lazy(() => import('../../plugins/github/client/PullDetail'))
-const CreatePullForm = lazy(() => import('../../plugins/github/client/CreatePullForm'))
-const ComparePreview = lazy(() => import('../../plugins/github/client/ComparePreview'))
-const DiffView = lazy(() => import('../../plugins/github/client/DiffView'))
+const OnboardingModal = lazy(() => import('@acorn/plugin-onboarding/client/OnboardingModal.tsx'))
+const PullDetail = lazy(() => import('@acorn/plugin-github/client/PullDetail.tsx'))
+const CreatePullForm = lazy(() => import('@acorn/plugin-github/client/CreatePullForm.tsx'))
+const ComparePreview = lazy(() => import('@acorn/plugin-github/client/ComparePreview.tsx'))
+const DiffView = lazy(() => import('@acorn/plugin-github/client/DiffView.tsx'))
 const SettingsModal = lazy(() => import('@acorn/client-core/settings/SettingsModal.tsx'))
-const TerminalPanel = lazy(() => import('../../plugins/terminal/client/TerminalPanel'))
+const TerminalPanel = lazy(() => import('@acorn/plugin-terminal/client/TerminalPanel.tsx'))
 
 // Layout root (Router root): top bar + three panes. Panes are params-driven — PullList (left)
 // and PullDetail (mid) read useParams() directly; routes exist only to populate params.
