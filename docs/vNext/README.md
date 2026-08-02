@@ -1,78 +1,75 @@
-# Acorn vNext specification
+# Acorn vNext
 
-**Status:** Normative specification programme<br>
-**Requirement prefix:** `VNEXT`<br>
-**Target:** Acorn V2 distributed Node and Electron client<br>
-**Compatibility:** Clean-start release; Acorn V1 remains untouched
+Acorn today is one Electron app: a SolidJS renderer talking to a Hono server that runs in an
+Electron utility process on the same machine. vNext splits that into two products that talk over a
+network protocol:
 
-This tree is the implementation contract for Acorn V2. It replaces the local, statically composed
-runtime with an Electron-free **Acorn Node**, an independently installed **Electron Client**, and a
-runtime plugin system. The first release supports a bundled local Node and directly reachable remote
-Nodes. Relay transport and mobile clients are constrained here so V2 does not close those paths, but
-neither is a V2 deliverable.
+- **Acorn Node** (`apps/node`) — an Electron-free service that owns everything real: workspaces,
+  repos, worktrees, tasks, agents, terminals, Git, processes, Docker, integrations, SQLite, secrets.
+  It runs on any machine.
+- **Acorn Desktop** (`apps/desktop`) — the Electron client. It bundles and supervises a local Node,
+  and can also pair with remote Nodes. One window shows the whole fleet.
 
-The specification is deliberately self-contained. Existing documents under `docs/` describe Acorn
-V1 and do not override a requirement here. When two vNext documents appear to disagree, the
-precedence rules in [normative-conventions.md](./normative-conventions.md) apply and the disagreement
-is a release-blocking documentation defect.
+Features are **plugins**: one Turborepo workspace package each, with a node part and a client part,
+wired into core through registries. GitHub, Terminal, and Agents are required plugins; the rest can
+be disabled.
 
-## Start here
+## Goals
 
-1. [Product contract](./product-contract.md) — the required product outcome and non-goals.
-2. [Decision ledger](./decision-ledger.md) — locked architectural and product choices.
-3. [System overview](./architecture/system-overview.md) — Node, Client, Fleet, and plugin topology.
-4. [Protocol contracts](./contracts/README.md) — portable HTTP, event, schema, and WASI contracts.
-5. [Plugin model](./plugins/plugin-model.md) — packaging, trust, lifecycle, and collaboration.
-6. [UI contribution model](./ui/ui-contribution-model.md) — built-in and bespoke UI behavior.
-7. [Threat model](./security/threat-model.md) — assets, adversaries, boundaries, and residual risks.
-8. [Current plugins](./current-plugins/README.md) — migration specification for every V1 plugin.
-9. [Traceability](./requirements-and-traceability.md) — coverage and completion rules.
-10. [Repository structure](./development/repository-and-workspace-structure.md) — Turborepo roots,
-    package roles, dependency direction, and external plugin source layout.
-11. [Build and implementation sequencing](./migration/build-and-implementation-sequencing.md) —
-    contract-first tasks, vertical slice, security harness, extraction waves and artifact-bound
-    release gates.
+1. The Node runs headless on a remote box (e.g. a beefy dev machine) and the desktop app drives it
+   exactly like the local one. Workspaces live where their repos live.
+2. One fleet shell: aggregated Agent Center, attention, and search across nodes, with every
+   resource tagged by its node. A workspace belongs to exactly one node — no replication, no
+   cross-node transactions.
+3. A real plugin seam: features live in `plugins/*` packages, import core only through
+   `packages/*`, and never import each other's internals. The ~25 known cross-feature imports in V1
+   are broken for good.
+4. Fresh-install parity with V1: same panes, sources, shortcuts, themes, and behavior. Fleet and
+   pairing surfaces are additive.
+5. Clean start: vNext uses a new data root and a new `/v2` protocol. V1 data is never touched;
+   `/api/v1` is gone. A small importer copies workspace/repo *configuration* only.
 
-## Normative map
+## Non-goals (deliberately out)
 
-| Area | Contents |
+These were in an earlier draft of this spec and are consciously dropped. The architecture leaves
+the door open; vNext ships none of them:
+
+- **Third-party / marketplace plugins** — all plugins are first-party, in-repo, compiled into the
+  release. No WASI sandbox, no native-process sandbox, no signing, SBOMs, trust tiers, or install
+  ceremonies. If we ever want community plugins, the plugin API is the seam to harden.
+- **Declarative/bespoke UI machinery** — plugin UI is ordinary SolidJS code in the client. No
+  server-driven UI documents, view-session patch protocols, renderer capability negotiation, or
+  sandboxed UI origins.
+- **PKI** — no per-node certificate authority, mTLS device certificates, rotation journals, or
+  recovery ceremonies. Pairing is a code + a pinned server certificate + a revocable device token.
+- **Relay transport and mobile clients** — future products. We keep resources node-qualified and
+  the protocol Electron-free, which is all the future-proofing they need.
+- **Spec bureaucracy** — no requirement IDs, traceability matrices, evidence bundles, or closure
+  reports. These docs are the plan; tests are the proof.
+- **Mixed queue/replication event bus** — the event stream is a live notification/invalidation
+  channel, not a durable replication log. Clients refetch after a gap. Features that need durable
+  ordered history (agent transcripts) own it in their own tables.
+
+## The documents
+
+| Doc | Contents |
 | --- | --- |
-| `architecture/` | System boundaries, topology, ownership, negotiation, and degraded operation |
-| `contracts/` | OpenAPI, AsyncAPI, JSON Schema, WIT, examples, and wire semantics |
-| `data/` | Core and plugin persistence, client cache, events, backups, and sagas |
-| `plugins/` | Manifests, runtimes, trust, capabilities, collaboration, and lifecycle |
-| `ui/` | Contribution surfaces, renderer catalog, stateful views, and bespoke UI |
-| `ux/` | First run, pairing, fleet navigation, installation, recovery, and parity |
-| `security/` | Threat model, identity, encryption, isolation, supply chain, and conformance |
-| `current-plugins/` | Exact V1-to-V2 disposition for all twenty in-tree plugins |
-| `examples/` | Herdr coverage and end-to-end community plugin examples |
-| `migration/` | Clean-start boundary, API replacement, implementation sequence, and cutover |
-| `development/` | Normative repository/workspace structure plus brief authoring and future Plugin Studio requirements |
-| `reviews/` | Adversarial findings, resolutions, and final closure evidence |
+| [architecture.md](./architecture.md) | Node, client, fleet, repo layout, process model, ownership |
+| [protocol.md](./protocol.md) | Pairing/auth, HTTP conventions, events, streams, errors, versioning |
+| [data.md](./data.md) | Node core DB, per-plugin DBs, client cache, blobs, backups |
+| [plugins.md](./plugins.md) | Plugin packages, contribution points, cross-plugin contracts, testing |
+| [ui.md](./ui.md) | Shell parity, fleet surfaces, offline states, client/node state split |
+| [security.md](./security.md) | Threat model, pairing/revocation, secrets, transport, at-rest |
+| [plugin-inventory.md](./plugin-inventory.md) | All 20 plugins: what each does and its node/client/data split |
+| [plan.md](./plan.md) | Phases with exit criteria and testing, migration and cutover |
 
-## Fixed release properties
+## Vocabulary
 
-- Electron is the V2 client. Tauri is not part of V2.
-- A Node is Electron-free and owns execution and durable product state.
-- One Node owns many workspaces; a workspace belongs to exactly one Node.
-- Every paired client has full owner authority. There are no viewer/operator roles in V2.
-- The Client presents one fleet shell while preserving node-qualified resource ownership.
-- GitHub, Terminal, and Agents are system plugins.
-- Other shipped features are independently packaged Acorn Verified plugins and form the default
-  installation profile.
-- Community executable plugins use WASI Components. Native plugins require enforceable OS
-  sandboxing; unsandboxed native code is Developer Source and unrestricted local code execution.
-- Nodes and plugins have isolated SQLite databases. Cross-plugin SQL is prohibited.
-- Credentials, sensitive fields, transport, and backups use application encryption. General data
-  relies on mandatory OS full-disk encryption.
-- Event replay ends when either seven days or 256 MiB is reached. Clients recover from a current
-  snapshot when their cursor has expired.
-- V2 does not import V1 operational data and does not preserve `/api/v1`.
-- A fresh V2 desktop preserves V1 visual and behavioral product parity, with fleet, pairing, and
-  plugin-management surfaces added.
-
-## Completion rule
-
-This tree is complete only when [reviews/final-closure-report.md](./reviews/final-closure-report.md)
-records that all normative artifacts parse, all requirements are traceable, all twenty current
-plugins and the Herdr top-100 corpus are covered, and all critical/high review findings are closed.
+- **Node** — the Electron-free service. Has a stable `nodeId` and owns its data root.
+- **Client / Desktop** — the Electron app. Owns presentation state and per-node caches, nothing
+  authoritative.
+- **Fleet** — the set of nodes this client is paired with, plus the aggregate UI over them.
+- **Workspace / Task** — same meaning as V1; both belong to exactly one node.
+- **Plugin** — a workspace package under `plugins/` contributing node routes/services and client UI.
+- **Pairing** — the one-time exchange that gives a client a device token for a node.
+- **Device** — one paired client installation, as a node sees it. Full owner authority; revocable.
