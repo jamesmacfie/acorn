@@ -8,7 +8,8 @@ import { devDataDir, makeRuntime, startListener } from '../../core/main/server'
 import { wireServerBridges } from '../main/serverBridges'
 import { prepareSecurityState } from '../main/startupSecurity'
 
-const runtime = makeRuntime(devDataDir)
+const dataDir = devDataDir()
+const runtime = makeRuntime(dataDir)
 await prepareSecurityState(runtime)
-wireServerBridges(runtime.DB, devDataDir) // search / editor / local-git / database / agent-usage HTTP route bridges
+wireServerBridges(runtime.DB, dataDir) // search / editor / local-git / database / agent-usage HTTP route bridges
 void startListener(runtime)

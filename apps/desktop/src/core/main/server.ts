@@ -5,7 +5,7 @@ import { resolve } from 'node:path'
 import { createApp } from '../server/index'
 import { makeBindings, type RuntimeBindings } from './bindings'
 import { resolveDatabasePath } from './serverPaths'
-import { ACORN_PORT, clientDir, devDataDir } from './serverConfig'
+import { ACORN_PORT, devClientDir, devDataDir } from './serverConfig'
 import { attachWsHub } from './wsHub'
 import type { Env } from './bindings'
 
@@ -13,19 +13,25 @@ import type { Env } from './bindings'
 // checkout — a packaged app's module dir is the read-only asar, so electron.ts passes an
 // app.getPath('userData') root into bootstrap() instead when app.isPackaged.
 export { devDataDir }
-const indexHtml = readFileSync(resolve(clientDir, 'index.html'), 'utf8')
 
 export { ACORN_PORT }
+
+export type StartListenerOptions = { clientDir?: string }
 
 // Start the loopback HTTP listener over an already-built runtime. Split from startServer so the
 // service composition root (app/service/runtime.ts) can wire the harness/context bridges into the route modules
 // BEFORE the listener accepts requests (composition-root ownership boot-order fix). Resolves once listening so
 // callers can safely loadURL the origin.
-export function startListener(runtime: RuntimeBindings): Promise<ServerType> {
+export function startListener(runtime: RuntimeBindings, options: StartListenerOptions = {}): Promise<ServerType> {
   // Every bridge (pure-Node domain bridges AND the stateful harness/context bridges) is installed by
   // the composition root (app/service/runtime.ts under Electron, app/server/devNode.ts under dev:node)
   // BEFORE this is called — core no longer imports plugin bridge wiring (docs/plugins.md).
   const app = createApp()
+
+  // Where the built renderer lives. Injected by the composition root so this module holds no
+  // opinion about the package layout around it; defaults to the dev checkout for `dev:node`.
+  const clientDir = options.clientDir ?? devClientDir()
+  const indexHtml = readFileSync(resolve(clientDir, 'index.html'), 'utf8')
 
   // Serve the built SPA, and fall back to the shell only for non-API/auth navigations — so
   // unmatched /api/* and /auth/* still return JSON/text 404s rather than the HTML shell.
@@ -85,6 +91,6 @@ export function makeRuntime(dataDir: string): RuntimeBindings {
 // (app/server/devNode.ts) has no composition root, so it needs both. Kept in core (pure engine);
 // the dev:node entry lives in app/ because choosing to auto-start + registering plugin providers
 // is composition, not engine.
-export function startServer(dataDir: string = devDataDir): Promise<ServerType> {
+export function startServer(dataDir: string = devDataDir()): Promise<ServerType> {
   return startListener(makeRuntime(dataDir))
 }
