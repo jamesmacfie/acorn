@@ -4,7 +4,7 @@
 // never taken — app/main/bootstrap.ts owns boot and installs the stateful bridges too.
 import './providers' // register built-in integration providers into the core registry
 import './routes' // register plugin-owned HTTP routers into the core route registry
-import { devDataDir, makeRuntime, startListener } from '../../core/main/server'
+import { devDataDir, makeRuntime, startListener } from '@acorn/node-core/main/server.ts'
 import { wireServerBridges } from '../main/serverBridges'
 import { prepareSecurityState } from '../main/startupSecurity'
 

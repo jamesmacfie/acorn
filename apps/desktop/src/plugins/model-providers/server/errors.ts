@@ -1,4 +1,4 @@
-import { ProviderOperationError } from '../../../core/server/integrations/types'
+import { ProviderOperationError } from '@acorn/node-core/server/integrations/types.ts'
 
 const statusOf = (error: unknown): number | undefined => {
   if (!error || typeof error !== 'object' || !('status' in error)) return undefined

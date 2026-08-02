@@ -4,8 +4,8 @@
 // anything else → 422 with the stderr tail.
 import { existsSync } from 'node:fs'
 import { eq } from 'drizzle-orm'
-import { BridgeError } from '../../../core/server/bridge'
-import { schema, type AppDatabase } from '../../../core/server/db'
+import { BridgeError } from '@acorn/node-core/server/bridge.ts'
+import { schema, type AppDatabase } from '@acorn/node-core/server/db/index.ts'
 import type { DockerBridge } from '../server/routes/docker'
 import type { DockerComposeAction, DockerContainerAction, DockerContainerSummary, DockerPruneKind, DockerTaskSummary } from '../shared/model'
 import { docker, DockerCliError } from './cli'

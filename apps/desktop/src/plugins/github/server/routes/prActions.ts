@@ -1,10 +1,10 @@
 import { and, eq } from 'drizzle-orm'
 import { Hono, type Context } from 'hono'
-import { schema } from '../../../../core/server/db'
+import { schema } from '@acorn/node-core/server/db/index.ts'
 import { gh, ghError, ghGraphQL, ghGraphQLResult } from '..'
-import type { AppEnv } from '../../../../core/server/middleware/auth'
-import { getUser } from '../../../../core/server/middleware/requireUser'
-import { respondError } from '../../../../core/server/respond'
+import type { AppEnv } from '@acorn/node-core/server/middleware/auth.ts'
+import { getUser } from '@acorn/node-core/server/middleware/requireUser.ts'
+import { respondError } from '@acorn/node-core/server/respond.ts'
 import { bustPrSync, resolvePr, setPrState } from './prContext'
 
 // PR write actions (docs/github-integration.md). Each calls GitHub, updates the local mirror so

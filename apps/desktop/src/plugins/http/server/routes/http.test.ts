@@ -1,11 +1,11 @@
 import { Hono } from 'hono'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import { schema } from '../../../../core/server/db'
-import type { AppEnv, Principal } from '../../../../core/server/middleware/auth'
-import { makeTestDb, type TestDb } from '../../../../core/server/routes/testDb'
+import { schema } from '@acorn/node-core/server/db/index.ts'
+import type { AppEnv, Principal } from '@acorn/node-core/server/middleware/auth.ts'
+import { makeTestDb, type TestDb } from '@acorn/node-core/server/routes/testDb.ts'
 import type { HttpRequest, HttpVariable } from '../../shared/model'
 import { http } from './http'
-import type { Env } from '../../../../core/main/bindings'
+import type { Env } from '@acorn/node-core/main/bindings.ts'
 
 const ENC_KEY = '0'.repeat(64)
 const requestBody = {

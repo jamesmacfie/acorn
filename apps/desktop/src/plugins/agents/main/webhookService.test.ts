@@ -1,8 +1,8 @@
 import { randomUUID } from 'node:crypto'
 import { eq } from 'drizzle-orm'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import { schema } from '../../../core/server/db'
-import { makeTestDb, type TestDb } from '../../../core/server/routes/testDb'
+import { schema } from '@acorn/node-core/server/db/index.ts'
+import { makeTestDb, type TestDb } from '@acorn/node-core/server/routes/testDb.ts'
 import { AgentWebhookService } from './webhookService'
 
 const ENCRYPTION_KEY = '22'.repeat(32)

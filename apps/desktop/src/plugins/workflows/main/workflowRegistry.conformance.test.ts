@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { makeTestDb } from '../../../core/server/routes/testDb'
+import { makeTestDb } from '@acorn/node-core/server/routes/testDb.ts'
 import { WorkflowRunner, type RunnerDeps } from './workflowRunner'
 
 const deps: RunnerDeps = {

@@ -14,13 +14,13 @@ import { join } from 'node:path'
 import { promisify } from 'node:util'
 import pg from 'pg'
 import type { QueryResult, QueryResultRow } from 'pg'
-import type { AppDatabase } from '../../../core/server/db'
+import type { AppDatabase } from '@acorn/node-core/server/db/index.ts'
 import type { DatabaseBridge } from '../server/routes/database'
 import type { DbCell, DbColumn, DbConnectResult, DbColumnsResult, DbPk, DbQueryResult, DbResultSet, DbRowsResult, DbSchemaResult, DbTablesResult, DbWriteResult } from '../shared/database'
-import { loadTask, resolveInRoot, taskRoot } from '../../../core/main/taskWorktree'
-import { getRepoPath } from '../../../core/main/repoPaths'
-import { loadRepoConfig } from '../../../core/main/runConfig'
-import { assertRepoConfigTrusted } from '../../../core/main/repoConfigTrust'
+import { loadTask, resolveInRoot, taskRoot } from '@acorn/node-core/main/taskWorktree.ts'
+import { getRepoPath } from '@acorn/node-core/main/repoPaths.ts'
+import { loadRepoConfig } from '@acorn/node-core/main/runConfig.ts'
+import { assertRepoConfigTrusted } from '@acorn/node-core/main/repoConfigTrust.ts'
 
 const { Pool } = pg
 const exec = promisify(execFile)

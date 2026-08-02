@@ -7,20 +7,20 @@ import type {
   RollbarOccurrenceDetail,
   RollbarOccurrencesResponse,
 } from '@acorn/protocol/api.ts'
-import { getDb, schema } from '../../../../core/server/db'
-import type { AppEnv } from '../../../../core/server/middleware/auth'
+import { getDb, schema } from '@acorn/node-core/server/db/index.ts'
+import type { AppEnv } from '@acorn/node-core/server/middleware/auth.ts'
 import { rollbarFetch } from '..'
-import { encryptSecret } from '../../../../core/server/session'
-import { ROLLBAR_ITEMS_STALE_AFTER_MS } from '../../../../core/server/sync/policy'
-import { settleBackground } from '../../../../core/server/background'
-import { integrations } from '../../../../core/server/routes/integrations'
+import { encryptSecret } from '@acorn/node-core/server/session.ts'
+import { ROLLBAR_ITEMS_STALE_AFTER_MS } from '@acorn/node-core/server/sync/policy.ts'
+import { settleBackground } from '@acorn/node-core/server/background.ts'
+import { integrations } from '@acorn/node-core/server/routes/integrations.ts'
 import { rollbar } from './rollbar'
-import { makeTestDb, type TestDb } from '../../../../core/server/routes/testDb'
+import { makeTestDb, type TestDb } from '@acorn/node-core/server/routes/testDb.ts'
 import '../../../../app/server/providers'
-import type { Env } from '../../../../core/main/bindings'
+import type { Env } from '@acorn/node-core/main/bindings.ts'
 
-vi.mock('../../../../core/server/db', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('../../../../core/server/db')>()
+vi.mock('@acorn/node-core/server/db/index.ts', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@acorn/node-core/server/db/index.ts')>()
   return { ...actual, getDb: vi.fn() }
 })
 

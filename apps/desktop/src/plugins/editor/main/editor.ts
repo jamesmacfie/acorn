@@ -7,10 +7,10 @@
 import { execFile } from 'node:child_process'
 import { readdir, readFile, writeFile } from 'node:fs/promises'
 import { promisify } from 'node:util'
-import { BridgeError } from '../../../core/server/bridge'
-import type { AppDatabase } from '../../../core/server/db'
+import { BridgeError } from '@acorn/node-core/server/bridge.ts'
+import type { AppDatabase } from '@acorn/node-core/server/db/index.ts'
 import type { EditorBridge, EditorEntry } from '../server/routes/editor'
-import { resolveInRoot, taskRoot } from '../../../core/main/taskWorktree'
+import { resolveInRoot, taskRoot } from '@acorn/node-core/main/taskWorktree.ts'
 
 // Confine relPath to the task's worktree; throw the HTTP-classified error the route surfaces.
 // No worktree yet (unmapped repo) → 404; a path that escapes the root → 403 (never leaks whether

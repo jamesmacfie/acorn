@@ -28,6 +28,7 @@ export async function bootstrap({ dataDir, origin, createWindow }: BootstrapOpti
     join(import.meta.dirname, 'service.js'),
     {
       dataDir,
+      clientDir: join(import.meta.dirname, '../../dist/client'),
       origin,
       version: app.getVersion(),
       isPackaged: app.isPackaged,

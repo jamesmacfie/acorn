@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
-import '../../../app/server/providers'
-import { connectionProviderRegistry } from './connectionRegistry'
-import { integrationProviderRegistry } from './registry'
+import '../../src/app/server/providers'
+import { connectionProviderRegistry } from '@acorn/node-core/server/integrations/connectionRegistry.ts'
+import { integrationProviderRegistry } from '@acorn/node-core/server/integrations/registry.ts'
 
 describe('connection provider conformance', () => {
   for (const provider of connectionProviderRegistry.list()) {

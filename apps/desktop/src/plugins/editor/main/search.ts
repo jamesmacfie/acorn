@@ -7,9 +7,9 @@ import { sep } from 'node:path'
 import { promisify } from 'node:util'
 import { rgPath } from '@vscode/ripgrep'
 import type { SearchBridge, SearchOpts } from '../server/routes/search'
-import type { AppDatabase } from '../../../core/server/db'
+import type { AppDatabase } from '@acorn/node-core/server/db/index.ts'
 import type { FileHits, SearchResult } from '../shared/search'
-import { taskRoot } from '../../../core/main/taskWorktree'
+import { taskRoot } from '@acorn/node-core/main/taskWorktree.ts'
 
 const MAX_TOTAL_HITS = 2000 // ponytail: fixed cap; the pane shows "truncated". Raise if it bites.
 const MAX_PREVIEW_LEN = 300 // ponytail: clamp long lines so one minified file can't bloat the payload.

@@ -1,4 +1,4 @@
-import type { RuntimeBindings } from '../../core/main/bindings'
+import type { RuntimeBindings } from '@acorn/node-core/main/bindings.ts'
 import { pruneOrphanedGithubMirror } from '../../plugins/github/server/mirrorRetention'
 import { protectLegacyHttpStorage } from '../../plugins/http/server/storage'
 

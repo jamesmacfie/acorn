@@ -3,9 +3,9 @@
 // import it at boot; provider unit tests import it in-graph (so their vi.mock of a provider module
 // hoists above this registration). It is deliberately NOT in the vitest global setup — a global
 // pre-load would defeat those mocks. Adding a provider is a one-line edit here (docs/plugins.md).
-import { integrationProviderRegistry } from '../../core/server/integrations/registry'
-import { connectionProviderRegistry } from '../../core/server/integrations/connectionRegistry'
-import { modelProviderRegistry } from '../../core/server/modelProviders/registry'
+import { integrationProviderRegistry } from '@acorn/node-core/server/integrations/registry.ts'
+import { connectionProviderRegistry } from '@acorn/node-core/server/integrations/connectionRegistry.ts'
+import { modelProviderRegistry } from '@acorn/node-core/server/modelProviders/registry.ts'
 import { linear } from '../../plugins/linear/server/routes/linear'
 import { rollbar } from '../../plugins/rollbar/server/routes/rollbar'
 import { githubProvider } from '../../plugins/github/server/provider'

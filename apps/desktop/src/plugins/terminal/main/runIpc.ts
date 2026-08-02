@@ -3,12 +3,12 @@
 // service stays dependency-injected (runtime.ts) so it's unit-testable under plain Node.
 import { execFile } from 'node:child_process'
 import { promisify } from 'node:util'
-import type { AppDatabase } from '../../../core/server/db'
-import type { RunTarget } from '../../../core/main/runConfig'
+import type { AppDatabase } from '@acorn/node-core/server/db/index.ts'
+import type { RunTarget } from '@acorn/node-core/main/runConfig.ts'
 import { RuntimeService } from './runtime'
-import { loadTask, taskRunConfig } from '../../../core/main/taskWorktree'
-import { buildSessionEnv } from '../../../core/main/taskEnv'
-import { assertRepoConfigTrusted } from '../../../core/main/repoConfigTrust'
+import { loadTask, taskRunConfig } from '@acorn/node-core/main/taskWorktree.ts'
+import { buildSessionEnv } from '@acorn/node-core/main/taskEnv.ts'
+import { assertRepoConfigTrusted } from '@acorn/node-core/main/repoConfigTrust.ts'
 
 // The session-engine glue the service needs (terminal.ts provides it): spawn a target's command as
 // a terminal session in the task worktree, and observe/kill it.

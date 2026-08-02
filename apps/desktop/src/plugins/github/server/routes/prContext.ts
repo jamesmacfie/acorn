@@ -1,9 +1,9 @@
 import { and, eq } from 'drizzle-orm'
 import type { Context } from 'hono'
-import { getDb, schema } from '../../../../core/server/db'
-import { prResource } from '../../../../core/server/db/resourceKeys'
-import type { AppEnv, SessionUser } from '../../../../core/server/middleware/auth'
-import { getUser } from '../../../../core/server/middleware/requireUser'
+import { getDb, schema } from '@acorn/node-core/server/db/index.ts'
+import { prResource } from '@acorn/node-core/server/db/resourceKeys.ts'
+import type { AppEnv, SessionUser } from '@acorn/node-core/server/middleware/auth.ts'
+import { getUser } from '@acorn/node-core/server/middleware/requireUser.ts'
 
 type Db = ReturnType<typeof getDb>
 type PrFailure = { error: 'bad_number'; status: 400 } | { error: 'repo_not_found'; status: 404 }

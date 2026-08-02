@@ -2,7 +2,7 @@
 // interactive `docker exec` PTYs (node-pty — `-it` needs a real tty). Everything is keyed by
 // connection and torn down on detach/kill/disconnect. Refs are shape-validated here — they reach argv.
 import { spawn as ptySpawn, type IPty } from 'node-pty'
-import { registerWsChannelHandler } from '../../../core/main/wsHub'
+import { registerWsChannelHandler } from '@acorn/node-core/main/wsHub.ts'
 import { isDockerRef } from '../shared/model'
 import { dockerEnv } from './cli'
 import { parseStatsLine } from './parse'

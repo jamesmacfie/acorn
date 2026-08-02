@@ -1,0 +1,38 @@
+{
+  "name": "@acorn/node-core",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./*": "./src/*"
+  },
+  "scripts": {
+    "lint": "tsc --noEmit",
+    "test": "vitest run",
+    "db:generate": "drizzle-kit generate && tsx scripts/check-migrations.ts",
+    "db:check": "tsx scripts/check-migrations.ts",
+    "db:locate": "tsx scripts/locate-db.ts",
+    "db:migrate": "tsx scripts/migrate.ts"
+  },
+  "dependencies": {
+    "@acorn/protocol": "workspace:*",
+    "@hono/node-server": "^2.0.11",
+    "@modelcontextprotocol/sdk": "^1.29.0",
+    "better-sqlite3": "^12.11.1",
+    "drizzle-orm": "catalog:",
+    "hono": "catalog:",
+    "jose": "^6.2.3",
+    "smol-toml": "^1.7.0",
+    "ws": "^8.21.0",
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^7.6.13",
+    "@types/node": "^26.0.0",
+    "@types/ws": "^8.5.13",
+    "drizzle-kit": "^0.31.10",
+    "tsx": "^4.22.4",
+    "typescript": "^6.0.3",
+    "vitest": "^4.1.9"
+  }
+}

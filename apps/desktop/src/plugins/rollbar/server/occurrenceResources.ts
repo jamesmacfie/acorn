@@ -4,14 +4,14 @@ import type {
   RollbarOccurrenceDetail,
   RollbarOccurrencesResponse,
 } from '@acorn/protocol/api.ts'
-import { schema } from '../../../core/server/db'
-import { isRecord, parseJson } from '../../../core/server/integrations/codec'
+import { schema } from '@acorn/node-core/server/db/index.ts'
+import { isRecord, parseJson } from '@acorn/node-core/server/integrations/codec.ts'
 import type {
   MirroredResourceContribution,
   ProviderResourceContext,
   ProviderResourceRefreshContext,
-} from '../../../core/server/integrations/types'
-import type { RouteFailure } from '../../../core/server/sync/engine'
+} from '@acorn/node-core/server/integrations/types.ts'
+import type { RouteFailure } from '@acorn/node-core/server/sync/engine.ts'
 import {
   instancePath,
   itemByCounterPath,

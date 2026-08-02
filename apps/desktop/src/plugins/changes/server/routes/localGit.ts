@@ -1,9 +1,9 @@
 import { Hono } from 'hono'
 import { z } from 'zod'
 import type { LocalChange } from '@acorn/protocol/terminal.ts'
-import { bridgeSlot, viaBridge } from '../../../../core/server/bridge'
-import type { AppEnv } from '../../../../core/server/middleware/auth'
-import { respondError } from '../../../../core/server/respond'
+import { bridgeSlot, viaBridge } from '@acorn/node-core/server/bridge.ts'
+import type { AppEnv } from '@acorn/node-core/server/middleware/auth.ts'
+import { respondError } from '@acorn/node-core/server/respond.ts'
 
 // Local-changes review (docs/panes.md): the ChangesPane's working-tree status/diff/blob reads and
 // stage/commit/discard/push actions. Was the `local:*` IPC channels; now task-

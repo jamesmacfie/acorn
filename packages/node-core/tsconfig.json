@@ -1,0 +1,11 @@
+{
+  // Node runtime only — no DOM. The renderer never imports this package, and the boundary test
+  // enforces that; narrowing the lib here makes an accidental `document`/`window` reference a
+  // compile error rather than something that only fails once it ships.
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "lib": ["ESNext"],
+    "types": ["node"]
+  },
+  "include": ["src", "scripts"]
+}

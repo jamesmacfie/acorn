@@ -2,11 +2,11 @@ import { execFile } from 'node:child_process'
 import { promisify } from 'node:util'
 import { Hono } from 'hono'
 import type { PullConflicts } from '@acorn/protocol/api.ts'
-import { getDb } from '../../../../core/server/db'
-import { getRepoPath } from '../../../../core/main/repoPaths'
-import type { AppEnv } from '../../../../core/server/middleware/auth'
-import { getUser } from '../../../../core/server/middleware/requireUser'
-import { respondError } from '../../../../core/server/respond'
+import { getDb } from '@acorn/node-core/server/db/index.ts'
+import { getRepoPath } from '@acorn/node-core/main/repoPaths.ts'
+import type { AppEnv } from '@acorn/node-core/server/middleware/auth.ts'
+import { getUser } from '@acorn/node-core/server/middleware/requireUser.ts'
+import { respondError } from '@acorn/node-core/server/respond.ts'
 
 const exec = promisify(execFile)
 

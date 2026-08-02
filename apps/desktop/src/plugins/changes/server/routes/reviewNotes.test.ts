@@ -1,14 +1,14 @@
 import { Hono } from 'hono'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { ReviewNote } from '@acorn/protocol/api.ts'
-import { getDb, schema } from '../../../../core/server/db'
-import type { AppEnv } from '../../../../core/server/middleware/auth'
+import { getDb, schema } from '@acorn/node-core/server/db/index.ts'
+import type { AppEnv } from '@acorn/node-core/server/middleware/auth.ts'
 import { reviewNotes } from './reviewNotes'
-import { makeTestDb, type TestDb } from '../../../../core/server/routes/testDb'
-import type { Env } from '../../../../core/main/bindings'
+import { makeTestDb, type TestDb } from '@acorn/node-core/server/routes/testDb.ts'
+import type { Env } from '@acorn/node-core/main/bindings.ts'
 
-vi.mock('../../../../core/server/db', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('../../../../core/server/db')>()
+vi.mock('@acorn/node-core/server/db/index.ts', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@acorn/node-core/server/db/index.ts')>()
   return { ...actual, getDb: vi.fn() }
 })
 

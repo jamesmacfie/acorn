@@ -2,10 +2,10 @@
 // class alone owns validation, ordering, persistence, branching, cancellation, and reconciliation.
 import { randomUUID } from 'node:crypto'
 import { asc, eq, inArray } from 'drizzle-orm'
-import type { AppDatabase } from '../../../core/server/db'
-import { schema } from '../../../core/server/db'
-import { agentProfileRegistry, DEFAULT_PROFILE_ID } from '../../../core/main/agentProfiles'
-import type { HeadlessOpts, HeadlessResult, StreamEvent } from '../../../core/main/headless'
+import type { AppDatabase } from '@acorn/node-core/server/db/index.ts'
+import { schema } from '@acorn/node-core/server/db/index.ts'
+import { agentProfileRegistry, DEFAULT_PROFILE_ID } from '@acorn/node-core/main/agentProfiles/index.ts'
+import type { HeadlessOpts, HeadlessResult, StreamEvent } from '@acorn/node-core/main/headless.ts'
 import type {
   StepHandlerContext,
   StepHandlerOutcome,

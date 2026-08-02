@@ -6,17 +6,20 @@
     "build": "turbo run build",
     "dev": "turbo run dev",
     "lint": "turbo run lint",
-    "test": "turbo run test",
+    "test": "node scripts/rebuild-node-abi.mjs && turbo run test",
     "dist": "pnpm --filter @acorn/desktop dist",
     "release": "pnpm dist",
     "rebuild": "pnpm --filter @acorn/desktop electron:rebuild",
-    "rebuild:node": "pnpm --filter @acorn/desktop node:rebuild",
+    "rebuild:node": "node scripts/rebuild-node-abi.mjs",
     "dev:node": "pnpm --filter @acorn/desktop dev:node",
-    "db:generate": "pnpm --filter @acorn/desktop db:generate",
-    "db:locate": "pnpm --filter @acorn/desktop db:locate",
-    "db:migrate": "pnpm --filter @acorn/desktop db:migrate"
+    "db:generate": "pnpm --filter @acorn/node-core db:generate",
+    "db:locate": "pnpm --filter @acorn/node-core db:locate",
+    "db:migrate": "pnpm --filter @acorn/node-core db:migrate",
+    "db:check": "pnpm --filter @acorn/node-core db:check"
   },
   "devDependencies": {
+    "better-sqlite3": "^12.11.1",
+    "node-pty": "^1.0.0",
     "turbo": "^2"
   }
 }

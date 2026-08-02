@@ -1,7 +1,7 @@
 import { createServer } from 'node:net'
 import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { join, resolve } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 import type { DesktopCapabilities } from '@acorn/protocol/desktopCapabilities.ts'
 import type { ServiceState } from '@acorn/protocol/serviceProtocol.ts'
@@ -74,6 +74,9 @@ describe('Electron-free service runtime', () => {
     const runtime = await startServiceRuntime({
       config: {
         dataDir,
+        // The real built renderer: this test asserts the service serves the SPA shell, so it needs
+        // an actual index.html rather than a stub.
+        clientDir: resolve(import.meta.dirname, '../../../dist/client'),
         origin,
         version: 'test',
         isPackaged: false,

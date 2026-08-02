@@ -2,18 +2,18 @@ import { Hono } from 'hono'
 import { eq } from 'drizzle-orm'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { LinearIssueDetail, LinearIssueSummary, LinearProjectIssuesResponse } from '@acorn/protocol/api.ts'
-import { getDb, schema } from '../../../../core/server/db'
+import { getDb, schema } from '@acorn/node-core/server/db/index.ts'
 import { linearFetch, type LinearNode } from '..'
 import { linearProvider, linearRef } from '../provider'
 import '../../../../app/server/providers'
-import type { AppEnv } from '../../../../core/server/middleware/auth'
-import { encryptSecret } from '../../../../core/server/session'
+import type { AppEnv } from '@acorn/node-core/server/middleware/auth.ts'
+import { encryptSecret } from '@acorn/node-core/server/session.ts'
 import { linear } from './linear'
-import { makeTestDb, type TestDb } from '../../../../core/server/routes/testDb'
-import type { Env } from '../../../../core/main/bindings'
+import { makeTestDb, type TestDb } from '@acorn/node-core/server/routes/testDb.ts'
+import type { Env } from '@acorn/node-core/main/bindings.ts'
 
-vi.mock('../../../../core/server/db', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('../../../../core/server/db')>()
+vi.mock('@acorn/node-core/server/db/index.ts', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@acorn/node-core/server/db/index.ts')>()
   return { ...actual, getDb: vi.fn() }
 })
 

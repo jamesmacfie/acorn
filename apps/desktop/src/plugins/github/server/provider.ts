@@ -1,5 +1,5 @@
-import { ProviderOperationError } from '../../../core/server/integrations/types'
-import { defaultBudgets, externalIdsFor, publicProvider } from '../../../core/server/integrations/providers/shared'
+import { ProviderOperationError } from '@acorn/node-core/server/integrations/types.ts'
+import { defaultBudgets, externalIdsFor, publicProvider } from '@acorn/node-core/server/integrations/providers/shared.ts'
 
 export const githubProvider = publicProvider({
   id: 'github',

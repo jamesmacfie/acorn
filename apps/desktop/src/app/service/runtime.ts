@@ -6,11 +6,11 @@ import '../server/routes'
 import '../main/agentProfiles'
 import type { DesktopCapabilities } from '@acorn/protocol/desktopCapabilities.ts'
 import type { ServiceStartConfig, ServiceState } from '@acorn/protocol/serviceProtocol.ts'
-import { makeRuntime, startListener } from '../../core/main/server'
-import { launcherSpec, serverName } from '../../core/main/mcpRegister'
-import { reconcileWorktrees, setWorktreesRoot } from '../../core/main/taskWorktree'
-import { logStorageFootprint } from '../../core/main/storageFootprint'
-import { disposeWsHub } from '../../core/main/wsHub'
+import { makeRuntime, startListener } from '@acorn/node-core/main/server.ts'
+import { launcherSpec, serverName } from '@acorn/node-core/main/mcpRegister.ts'
+import { reconcileWorktrees, setWorktreesRoot } from '@acorn/node-core/main/taskWorktree.ts'
+import { logStorageFootprint } from '@acorn/node-core/main/storageFootprint.ts'
+import { disposeWsHub } from '@acorn/node-core/main/wsHub.ts'
 import { wireManagedAgents } from '../main/managedAgentsWiring'
 import { createManagedWorkflowStepRunner } from '../main/managedWorkflowStep'
 import { wireServerBridges } from '../main/serverBridges'
@@ -211,7 +211,7 @@ export async function startServiceRuntime({ config, desktop, stateChanged }: Run
     })
     mark('install')
 
-    server = await startListener(runtime)
+    server = await startListener(runtime, { clientDir: config.clientDir })
     stateChanged('listening')
     mark('listener-up')
 

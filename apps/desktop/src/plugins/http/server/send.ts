@@ -4,11 +4,11 @@
 import { execFile } from 'node:child_process'
 import { promisify } from 'node:util'
 import { eq, and } from 'drizzle-orm'
-import type { AppDatabase } from '../../../core/server/db'
-import * as schema from '../../../core/server/db/schema'
-import { loadTask, taskRoot } from '../../../core/main/taskWorktree'
-import { getRepoPath } from '../../../core/main/repoPaths'
-import { buildSessionEnv, type SessionTaskInfo } from '../../../core/main/taskEnv'
+import type { AppDatabase } from '@acorn/node-core/server/db/index.ts'
+import * as schema from '@acorn/node-core/server/db/schema.ts'
+import { loadTask, taskRoot } from '@acorn/node-core/main/taskWorktree.ts'
+import { getRepoPath } from '@acorn/node-core/main/repoPaths.ts'
+import { buildSessionEnv, type SessionTaskInfo } from '@acorn/node-core/main/taskEnv.ts'
 import {
   applyAuth,
   defaultContentType,

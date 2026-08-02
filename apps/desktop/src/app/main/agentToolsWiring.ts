@@ -10,10 +10,10 @@
 // of accepted memory (the agent-tool registry invariant; docs/notes-and-memory.md §1).
 import { and, eq } from 'drizzle-orm'
 import { z } from 'zod'
-import { assembleContext, parseInclude } from '../../core/server/agentTools/contextSections'
-import { setAgentTools, ToolError, type AgentToolContribution, type ToolContext } from '../../core/server/agentTools/registry'
-import type { AppDatabase } from '../../core/server/db'
-import { schema } from '../../core/server/db'
+import { assembleContext, parseInclude } from '@acorn/node-core/server/agentTools/contextSections.ts'
+import { setAgentTools, ToolError, type AgentToolContribution, type ToolContext } from '@acorn/node-core/server/agentTools/registry.ts'
+import type { AppDatabase } from '@acorn/node-core/server/db/index.ts'
+import { schema } from '@acorn/node-core/server/db/index.ts'
 import type { NoteLocation, NoteScope } from '@acorn/protocol/notes.ts'
 import type { BrowserDesktopCapability } from '@acorn/protocol/desktopCapabilities.ts'
 import { gitLog, localChanges, localDiff } from '../../plugins/changes/main/localDiff'
@@ -21,9 +21,9 @@ import { getMemory, listMemories, MEMORY_TYPES, searchMemories, type MemoryType 
 import type { MemoryProposalStore } from '../../plugins/memory/main/memoryProposals'
 import type { NotesStore } from '../../plugins/notes/main/notes'
 import type { RuntimeService } from '../../plugins/terminal/main/runtime'
-import { loadTask, repoFor, workspaceIdFor } from '../../core/main/taskWorktree'
-import { isRepoConfigTrustError } from '../../core/main/repoConfigTrust'
-import { broadcastRepoConfigTrustNotice } from '../../core/main/notify'
+import { loadTask, repoFor, workspaceIdFor } from '@acorn/node-core/main/taskWorktree.ts'
+import { isRepoConfigTrustError } from '@acorn/node-core/main/repoConfigTrust.ts'
+import { broadcastRepoConfigTrustNotice } from '@acorn/node-core/main/notify.ts'
 
 export type AgentToolsDeps = {
   db: AppDatabase

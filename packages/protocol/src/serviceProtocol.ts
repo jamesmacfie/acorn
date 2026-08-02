@@ -20,6 +20,10 @@ export const serviceStateEventSchema = z.strictObject({
 
 export const serviceStartConfigSchema = z.strictObject({
   dataDir: z.string().min(1),
+  // Where the built renderer lives. Passed in rather than derived: the service graph lives in
+  // @acorn/node-core, which has no way to locate the desktop app's dist/ and must not try — only
+  // the composition root knows the layout around it.
+  clientDir: z.string().min(1),
   origin: z.string().url(),
   version: z.string().min(1),
   isPackaged: z.boolean(),

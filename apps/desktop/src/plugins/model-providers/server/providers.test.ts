@@ -1,9 +1,9 @@
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
-import { schema } from '../../../core/server/db'
-import { connectionProviderRegistry } from '../../../core/server/integrations/connectionRegistry'
-import { connectProvider, rotateConnection, testConnection } from '../../../core/server/integrations/connections'
-import { makeTestDb, type TestDb } from '../../../core/server/routes/testDb'
-import { decryptSecret } from '../../../core/server/session'
+import { schema } from '@acorn/node-core/server/db/index.ts'
+import { connectionProviderRegistry } from '@acorn/node-core/server/integrations/connectionRegistry.ts'
+import { connectProvider, rotateConnection, testConnection } from '@acorn/node-core/server/integrations/connections.ts'
+import { makeTestDb, type TestDb } from '@acorn/node-core/server/routes/testDb.ts'
+import { decryptSecret } from '@acorn/node-core/server/session.ts'
 import {
   ANTHROPIC_MODELS,
   ANTHROPIC_RECOMMENDED_MODEL_ID,

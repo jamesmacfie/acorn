@@ -3,9 +3,10 @@ import { tmpdir } from 'node:os'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import { buildHeadlessArgv, parseStreamJson, runHeadless } from './headless'
+import { buildHeadlessArgv, parseStreamJson, runHeadless } from '@acorn/node-core/main/headless.ts'
+import '../../src/app/main/agentProfiles' // register the built-in profile plugins under test
 
-const FAKE_AGENT = resolve(dirname(fileURLToPath(import.meta.url)), '../../../test/fixtures/fake-agent.sh')
+const FAKE_AGENT = resolve(dirname(fileURLToPath(import.meta.url)), '../fixtures/fake-agent.sh')
 
 describe('argv templates (docs/workflows.md — flags verified against installed CLIs)', () => {
   it('claude-code: -p stream-json with permission pre-approval, model, inline schema, resume', () => {

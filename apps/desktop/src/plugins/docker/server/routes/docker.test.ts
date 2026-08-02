@@ -1,11 +1,11 @@
 import { Hono } from 'hono'
 import { afterEach, describe, expect, it } from 'vitest'
 import type { DockerBridge } from './docker'
-import type { AppEnv } from '../../../../core/server/middleware/auth'
-import { requireUser } from '../../../../core/server/middleware/requireUser'
+import type { AppEnv } from '@acorn/node-core/server/middleware/auth.ts'
+import { requireUser } from '@acorn/node-core/server/middleware/requireUser.ts'
 import { docker, setDockerBridge } from './docker'
-import { BridgeError } from '../../../../core/server/bridge'
-import type { Env } from '../../../../core/main/bindings'
+import { BridgeError } from '@acorn/node-core/server/bridge.ts'
+import type { Env } from '@acorn/node-core/main/bindings.ts'
 
 // Transport contract for the docker routes: auth + ref validation (nothing dash-leading reaches
 // argv) + body validation + BridgeError passthrough + bridge-unavailable. The CLI/daemon behaviors

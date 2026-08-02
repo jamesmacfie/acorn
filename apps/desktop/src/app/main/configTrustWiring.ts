@@ -1,7 +1,7 @@
-import { BridgeError } from '../../core/server/bridge'
-import { acknowledgeRepoConfig, repoConfigTrustReview } from '../../core/main/repoConfigTrust'
-import type { AppDatabase } from '../../core/server/db'
-import { setConfigTrustBridge } from '../../core/server/routes/configTrust'
+import { BridgeError } from '@acorn/node-core/server/bridge.ts'
+import { acknowledgeRepoConfig, repoConfigTrustReview } from '@acorn/node-core/main/repoConfigTrust.ts'
+import type { AppDatabase } from '@acorn/node-core/server/db/index.ts'
+import { setConfigTrustBridge } from '@acorn/node-core/server/routes/configTrust.ts'
 
 export function wireConfigTrust(db: AppDatabase): void {
   setConfigTrustBridge({

@@ -5,7 +5,7 @@
 // run/browser; terminal; workflow) are wired separately in main/bootstrap.ts and stay 503 under
 // dev:node. See docs/electron.md §12 (capability map).
 import { join } from 'node:path'
-import type { AppDatabase } from '../../core/server/db'
+import type { AppDatabase } from '@acorn/node-core/server/db/index.ts'
 import { setAgentUsageBridge } from '../../plugins/agents/server/routes/usage'
 import { setDatabaseBridge } from '../../plugins/database/server/routes/database'
 import { setDockerBridge } from '../../plugins/docker/server/routes/docker'

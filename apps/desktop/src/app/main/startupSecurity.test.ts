@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import type { RuntimeBindings } from '../../core/main/bindings'
-import { schema } from '../../core/server/db'
-import { makeTestDb, type TestDb } from '../../core/server/routes/testDb'
+import type { RuntimeBindings } from '@acorn/node-core/main/bindings.ts'
+import { schema } from '@acorn/node-core/server/db/index.ts'
+import { makeTestDb, type TestDb } from '@acorn/node-core/server/routes/testDb.ts'
 import { prepareSecurityState } from './startupSecurity'
 
 const ENC_KEY = '0'.repeat(64)

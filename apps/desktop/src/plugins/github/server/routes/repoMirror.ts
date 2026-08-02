@@ -1,9 +1,9 @@
 import { and, desc, eq } from 'drizzle-orm'
-import { getDb, schema } from '../../../../core/server/db'
-import { chunkRowsByColumnBudget } from '../../../../core/server/db/batch'
-import { reposResource } from '../../../../core/server/db/resourceKeys'
+import { getDb, schema } from '@acorn/node-core/server/db/index.ts'
+import { chunkRowsByColumnBudget } from '@acorn/node-core/server/db/batch.ts'
+import { reposResource } from '@acorn/node-core/server/db/resourceKeys.ts'
 import { gh, ghError } from '..'
-import type { RefreshResult, RouteFailure, RouteResult } from '../../../../core/server/sync/engine'
+import type { RefreshResult, RouteFailure, RouteResult } from '@acorn/node-core/server/sync/engine.ts'
 import type { Repo } from '@acorn/protocol/api.ts'
 import { deleteRepoMirrorStatements } from '../mirrorRetention'
 

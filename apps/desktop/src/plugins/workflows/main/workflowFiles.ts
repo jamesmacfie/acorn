@@ -6,7 +6,7 @@
 import { existsSync, readdirSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { parse as parseToml } from 'smol-toml'
-import { agentProfileRegistry } from '../../../core/main/agentProfiles'
+import { agentProfileRegistry } from '@acorn/node-core/main/agentProfiles/index.ts'
 import { BUILTIN_POLICIES, BUILTIN_STEP_KINDS, BUILTIN_STEP_VALIDATORS } from './workflowBuiltins'
 import type {
   ToolCeiling,
