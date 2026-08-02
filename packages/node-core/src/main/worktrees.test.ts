@@ -1,8 +1,8 @@
 import { execFileSync } from 'node:child_process'
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { cpSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { copyWorktreeFiles, ensureWorktree, resolveBaseRef } from './worktrees'
 
 // Real git subprocesses per test/hook: the defaults (5s test, 10s hook) are too tight under a fully
@@ -20,28 +20,44 @@ describe('worktree base-ref precedence (docs/terminal-and-agents.md)', () => {
   let mainSha: string
   let developSha: string
 
+  // Built ONCE, then copied per test. The assertions below genuinely need real git — they compare
+  // `git rev-parse HEAD` against specific SHAs to prove we branch off origin/main rather than HEAD,
+  // which no mock could show. What they do NOT need is rebuilding the fixture 13 git spawns at a
+  // time, six times over: that was ~78 subprocesses per file and the main reason this suite tipped
+  // over its timeouts under a fully parallel run. Copying a ~40 KB repo keeps per-test isolation at
+  // a fraction of the cost.
+  let template: string
+
+  beforeAll(() => {
+    template = mkdtempSync(join(tmpdir(), 'acorn-wt-template-'))
+    const src = join(template, 'checkout')
+    execFileSync('git', ['init', '-q', '-b', 'main', src])
+    git(src, 'config', 'user.email', 't@t.test')
+    git(src, 'config', 'user.name', 'T')
+    writeFileSync(join(src, 'a.txt'), '1')
+    git(src, 'add', '.')
+    git(src, 'commit', '-q', '-m', 'one')
+    mainSha = git(src, 'rev-parse', 'HEAD').trim()
+    writeFileSync(join(src, 'a.txt'), '2')
+    git(src, 'add', '.')
+    git(src, 'commit', '-q', '-m', 'two')
+    developSha = git(src, 'rev-parse', 'HEAD').trim()
+    // Fake remote-tracking refs: origin/main at commit one, origin/develop at commit two; then
+    // advance local HEAD further so HEAD is neither.
+    git(src, 'update-ref', 'refs/remotes/origin/main', mainSha)
+    git(src, 'update-ref', 'refs/remotes/origin/develop', developSha)
+    writeFileSync(join(src, 'a.txt'), '3')
+    git(src, 'add', '.')
+    git(src, 'commit', '-q', '-m', 'three')
+  })
+
+  afterAll(() => rmSync(template, { recursive: true, force: true }))
+
   beforeEach(() => {
     dir = mkdtempSync(join(tmpdir(), 'acorn-wt-'))
     checkout = join(dir, 'checkout')
     root = join(dir, 'worktrees')
-    execFileSync('git', ['init', '-q', '-b', 'main', checkout])
-    git(checkout, 'config', 'user.email', 't@t.test')
-    git(checkout, 'config', 'user.name', 'T')
-    writeFileSync(join(checkout, 'a.txt'), '1')
-    git(checkout, 'add', '.')
-    git(checkout, 'commit', '-q', '-m', 'one')
-    mainSha = git(checkout, 'rev-parse', 'HEAD').trim()
-    writeFileSync(join(checkout, 'a.txt'), '2')
-    git(checkout, 'add', '.')
-    git(checkout, 'commit', '-q', '-m', 'two')
-    developSha = git(checkout, 'rev-parse', 'HEAD').trim()
-    // Fake remote-tracking refs: origin/main at commit one, origin/develop at commit two; then
-    // advance local HEAD further so HEAD ≠ either.
-    git(checkout, 'update-ref', 'refs/remotes/origin/main', mainSha)
-    git(checkout, 'update-ref', 'refs/remotes/origin/develop', developSha)
-    writeFileSync(join(checkout, 'a.txt'), '3')
-    git(checkout, 'add', '.')
-    git(checkout, 'commit', '-q', '-m', 'three')
+    cpSync(join(template, 'checkout'), checkout, { recursive: true })
   })
 
   afterEach(() => rmSync(dir, { recursive: true, force: true }))

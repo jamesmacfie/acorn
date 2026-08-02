@@ -1,9 +1,9 @@
 import { execFileSync } from 'node:child_process'
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { cpSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import gitdiffParser from 'gitdiff-parser'
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest'
 import { synth } from '@acorn/plugin-github/client/diff.ts'
 import {
   commitStaged,
@@ -70,15 +70,27 @@ describe('local diff over a real worktree', () => {
   let dir: string
   const git = (...args: string[]) => execFileSync('git', ['-C', dir, ...args], { stdio: 'pipe' }).toString()
 
+  // Fixture built once and copied per test: these assertions need real git (renames via `git mv`,
+  // staged-vs-worktree diffs, commit contents) but not six git spawns of setup per case.
+  let template: string
+
+  beforeAll(() => {
+    template = mkdtempSync(join(tmpdir(), 'acorn-ldiff-template-'))
+    const g = (...args: string[]) => execFileSync('git', ['-C', template, ...args], { stdio: 'pipe' })
+    execFileSync('git', ['init', '-q', '-b', 'main', template])
+    g('config', 'user.email', 't@t.test')
+    g('config', 'user.name', 'T')
+    mkdirSync(join(template, 'src'))
+    writeFileSync(join(template, 'src', 'a.ts'), 'line1\nline2\nline3\n')
+    g('add', '.')
+    g('commit', '-q', '-m', 'init')
+  })
+
+  afterAll(() => rmSync(template, { recursive: true, force: true }))
+
   beforeEach(() => {
     dir = mkdtempSync(join(tmpdir(), 'acorn-ldiff-'))
-    execFileSync('git', ['init', '-q', '-b', 'main', dir])
-    git('config', 'user.email', 't@t.test')
-    git('config', 'user.name', 'T')
-    mkdirSync(join(dir, 'src'))
-    writeFileSync(join(dir, 'src', 'a.ts'), 'line1\nline2\nline3\n')
-    git('add', '.')
-    git('commit', '-q', '-m', 'init')
+    cpSync(template, dir, { recursive: true })
   })
 
   afterEach(() => rmSync(dir, { recursive: true, force: true }))

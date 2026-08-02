@@ -1,9 +1,9 @@
 import { execFileSync } from 'node:child_process'
-import { existsSync, mkdtempSync, readFileSync, realpathSync, rmSync, statSync, writeFileSync } from 'node:fs'
+import { cpSync, existsSync, mkdtempSync, readFileSync, realpathSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { eq } from 'drizzle-orm'
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { makeTestDb, type TestDb } from '../server/routes/testDb'
 import { schema } from '../server/db'
 import { archiveTask, runTeardownProcess, type ArchiveDeps } from './archive'
@@ -30,15 +30,29 @@ describe('archiveTask teardown ordering', () => {
   let realWorktree: string
   let t: TestDb
 
+  let template: string
+
+  beforeAll(() => {
+    template = mkdtempSync(join(tmpdir(), 'acorn-archive-template-'))
+    const src = join(template, 'checkout')
+    execFileSync('git', ['init', '-q', '-b', 'main', src])
+    git(src, 'config', 'user.email', 't@t.test')
+    git(src, 'config', 'user.name', 'T')
+    writeFileSync(join(src, 'a.txt'), 'a')
+    git(src, 'add', '.')
+    git(src, 'commit', '-q', '-m', 'init')
+  })
+
+  afterAll(() => rmSync(template, { recursive: true, force: true }))
+
   beforeEach(async () => {
     dir = mkdtempSync(join(tmpdir(), 'acorn-archive-'))
     checkout = join(dir, 'checkout')
-    execFileSync('git', ['init', '-q', '-b', 'main', checkout])
-    git(checkout, 'config', 'user.email', 't@t.test')
-    git(checkout, 'config', 'user.name', 'T')
-    writeFileSync(join(checkout, 'a.txt'), 'a')
-    git(checkout, 'add', '.')
-    git(checkout, 'commit', '-q', '-m', 'init')
+    // Base repo copied from a template built once (see beforeAll) — five fewer git spawns per test.
+    // The worktree itself is still created for real below: `worktree add` records absolute paths in
+    // .git/worktrees, so it cannot be part of a copied fixture, and these tests are precisely about
+    // real worktree teardown and removal.
+    cpSync(join(template, 'checkout'), checkout, { recursive: true })
     worktree = join(dir, 'wt')
     git(checkout, 'worktree', 'add', '-q', '-b', 'feat/x', worktree)
     realWorktree = realpathSync(worktree)

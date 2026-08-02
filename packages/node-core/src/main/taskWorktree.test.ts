@@ -1,8 +1,8 @@
 import { execFileSync } from 'node:child_process'
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { cpSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { schema } from '../server/db'
 import { makeTestDb, type TestDb } from '../server/routes/testDb'
 import { baseRefPref, computeTaskStatuses, loadTask, resolveTaskCwd, setOnWorktreeCreated, setWorktreesRoot } from './taskWorktree'
@@ -36,17 +36,30 @@ describe('resolveTaskCwd onWorktreeCreated hook', () => {
   let checkout: string
   let created: string[]
 
+  let template: string
+
+  beforeAll(() => {
+    template = mkdtempSync(join(tmpdir(), 'acorn-task-wt-template-'))
+    const src = join(template, 'checkout')
+    execFileSync('git', ['init', '-b', 'main', src], { stdio: 'pipe' })
+    git(src, 'config', 'user.email', 't@a.test')
+    git(src, 'config', 'user.name', 'T')
+    git(src, 'config', 'commit.gpgsign', 'false')
+    writeFileSync(join(src, 'f.txt'), 'x')
+    git(src, 'add', 'f.txt')
+    git(src, 'commit', '-m', 'init')
+  })
+
+  afterAll(() => rmSync(template, { recursive: true, force: true }))
+
   beforeEach(async () => {
     t = makeTestDb()
     dir = mkdtempSync(join(tmpdir(), 'acorn-taskwt-'))
     checkout = join(dir, 'checkout')
-    execFileSync('git', ['init', '-b', 'main', checkout], { stdio: 'pipe' })
-    git(checkout, 'config', 'user.email', 't@a.test')
-    git(checkout, 'config', 'user.name', 'T')
-    git(checkout, 'config', 'commit.gpgsign', 'false')
-    writeFileSync(join(checkout, 'f.txt'), 'x\n')
-    git(checkout, 'add', 'f.txt')
-    git(checkout, 'commit', '-m', 'init')
+    // Base repo copied from a template built once (beforeAll): six fewer git spawns per test. The
+    // worktrees these tests create are still real — the subject is the created-hook firing exactly
+    // once per task across concurrent resolution paths.
+    cpSync(join(template, 'checkout'), checkout, { recursive: true })
     const now = Date.now()
     await t.db.insert(schema.tasks).values({ id: TASK, title: 'T', origin: 'local', repoOwner: 'acme', repoName: 'web', branch: 'feat-x', status: 'active', sort: 0, createdAt: now, updatedAt: now })
     setWorktreesRoot(join(dir, 'worktrees'))
