@@ -6,6 +6,7 @@ import { PULLS_STALE_AFTER_MS as STALE_AFTER_MS } from '../../../../core/server/
 import { readComposite, readFiles } from './prMirror'
 import { pullsBatch } from './pullsBatch'
 import { resolveRepoForUser } from './repoMirror'
+import type { Env } from '../../../../core/main/bindings'
 
 vi.mock('../../../../core/server/db', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../../../../core/server/db')>()

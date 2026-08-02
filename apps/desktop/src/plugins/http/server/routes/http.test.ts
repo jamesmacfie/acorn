@@ -5,6 +5,7 @@ import type { AppEnv, Principal } from '../../../../core/server/middleware/auth'
 import { makeTestDb, type TestDb } from '../../../../core/server/routes/testDb'
 import type { HttpRequest, HttpVariable } from '../../shared/model'
 import { http } from './http'
+import type { Env } from '../../../../core/main/bindings'
 
 const ENC_KEY = '0'.repeat(64)
 const requestBody = {

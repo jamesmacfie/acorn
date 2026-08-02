@@ -7,6 +7,7 @@ import type { AppEnv } from '../middleware/auth'
 import { buildContextSections, setContextSections, type ContextMemorySource, type ContextNotesSource } from '../agentTools/contextSections'
 import { taskContext } from './taskContext'
 import { makeTestDb, type TestDb } from './testDb'
+import type { Env } from '../../main/bindings'
 
 vi.mock('../db', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../db')>()

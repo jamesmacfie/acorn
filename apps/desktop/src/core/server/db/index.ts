@@ -1,6 +1,7 @@
 import type { BatchItem, BatchResponse } from 'drizzle-orm/batch'
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3'
 import * as schema from './schema'
+import type { Env } from '../../main/bindings'
 
 // The Drizzle client the routes use. better-sqlite3 has no native `.batch()`, so the bootstrap
 // (main/bindings.ts) attaches an emulated `batch` (a transaction under the hood). Type-only import

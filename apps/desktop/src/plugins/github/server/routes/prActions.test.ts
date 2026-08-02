@@ -6,6 +6,7 @@ import type { AppEnv, Principal, SessionUser } from '../../../../core/server/mid
 import { prActions } from './prActions'
 import { testGate } from '../../../../core/server/routes/testAuth'
 import { makeTestDb, type TestDb } from '../../../../core/server/routes/testDb'
+import type { Env } from '../../../../core/main/bindings'
 
 vi.mock('../../../../core/server/db', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../../../../core/server/db')>()

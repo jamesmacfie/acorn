@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { ApiError } from '../../shared/api'
 import { createApp } from '../index'
+import type { Env } from '../../main/bindings'
 
 // One representative path per mounted /api router. requireUser is a global `/api/*` gate, so an
 // unauthenticated request to any of these must 401 with the ApiError envelope — before routing,

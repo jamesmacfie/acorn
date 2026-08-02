@@ -9,6 +9,7 @@ import { generateTextForConnection } from '../../../../core/server/modelProvider
 import { makeTestDb, type TestDb } from '../../../../core/server/routes/testDb'
 import type { DbSavedQuery } from '../../shared/database'
 import { database, setDatabaseBridge } from './database'
+import type { Env } from '../../../../core/main/bindings'
 
 vi.mock('../../../../core/server/modelProviders/runtime', () => ({
   generateTextForConnection: vi.fn(),

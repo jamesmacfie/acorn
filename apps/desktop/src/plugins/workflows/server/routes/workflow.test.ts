@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it } from 'vitest'
 import type { AppEnv } from '../../../../core/server/middleware/auth'
 import { requireUser } from '../../../../core/server/middleware/requireUser'
 import { workflow, setWorkflowBridge, type WorkflowBridge } from './workflow'
+import type { Env } from '../../../../core/main/bindings'
 
 // Workflow start/gate execute an agent step, so the route test proves body validation + auth +
 // the bridge-unavailable 503 (the privileged-boundary contract). The runner logic is tested in main/workflowRunner.test.ts.

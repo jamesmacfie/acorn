@@ -4,6 +4,7 @@ import type { ApiError } from '../../shared/api'
 import type { AppEnv, Principal, SessionUser } from '../middleware/auth'
 import { harness, HarnessError, type RunBridge, setRunBridge } from './harness'
 import { testGate } from './testAuth'
+import type { Env } from '../../main/bindings'
 
 const USER: SessionUser = { token: '', login: 'local', name: '', avatar: '', scopes: [] }
 const INTERNAL: Principal = { kind: 'internal', user: USER }

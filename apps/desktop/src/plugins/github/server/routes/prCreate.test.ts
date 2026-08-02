@@ -5,6 +5,7 @@ import { gh } from '..'
 import type { AppEnv, Principal, SessionUser } from '../../../../core/server/middleware/auth'
 import { prCreate } from './prCreate'
 import { testGate } from '../../../../core/server/routes/testAuth'
+import type { Env } from '../../../../core/main/bindings'
 
 vi.mock('..', async (importOriginal) => {
   const actual = await importOriginal<typeof import('..')>()

@@ -5,6 +5,7 @@ import { getDb } from '../db'
 import type { AppEnv } from '../middleware/auth'
 import { workspaces } from './workspaces'
 import { makeTestDb, type TestDb } from './testDb'
+import type { Env } from '../../main/bindings'
 
 vi.mock('../db', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../db')>()

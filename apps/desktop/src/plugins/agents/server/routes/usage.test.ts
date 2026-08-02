@@ -6,6 +6,7 @@ import { makeTestDb } from '../../../../core/server/routes/testDb'
 import type { AgentUsageSnapshot } from '../../shared/usage'
 import { emptyAgentPricingPreferences } from '../../shared/pricing'
 import { agentUsage, setAgentUsageBridge } from './usage'
+import type { Env } from '../../../../core/main/bindings'
 
 const snapshot: AgentUsageSnapshot = { providers: [], refreshedAt: 123 }
 const request = (path: string, method = 'GET', body?: unknown) => new Request(

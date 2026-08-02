@@ -7,6 +7,7 @@ import type { AppEnv } from '../../../../core/server/middleware/auth'
 import { PULLS_STALE_AFTER_MS as FILES_STALE_AFTER_MS } from '../../../../core/server/sync/policy'
 import { pullFiles } from './pullFiles'
 import { resolveRepoForUser } from './repoMirror'
+import type { Env } from '../../../../core/main/bindings'
 
 vi.mock('../../../../core/server/db', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../../../../core/server/db')>()

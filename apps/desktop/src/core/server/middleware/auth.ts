@@ -1,6 +1,7 @@
 import { createMiddleware } from 'hono/factory'
 import { getCookie, setCookie } from 'hono/cookie'
 import { openSession, sealSession, SESSION_COOKIE, SESSION_TTL_SECONDS, type SessionData } from '../session'
+import type { Env } from '../../main/bindings'
 
 export type SessionUser = SessionData
 

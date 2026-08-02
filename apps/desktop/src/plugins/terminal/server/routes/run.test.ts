@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it } from 'vitest'
 import type { AppEnv } from '../../../../core/server/middleware/auth'
 import { requireUser } from '../../../../core/server/middleware/requireUser'
 import { harness, setRunBridge, type RunBridge } from '../../../../core/server/routes/harness'
+import type { Env } from '../../../../core/main/bindings'
 
 // The renderer's run surface reuses the harness RunBridge routes. This proves the
 // renderer-facing verbs — targets/start/stop/status + the new default-url — and auth/503.

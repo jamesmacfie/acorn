@@ -31,6 +31,7 @@ import { runProviderResource } from '../../../../core/server/integrations/resour
 import { providerRequestScheduler } from '../../../../core/server/integrations/budgetRuntime'
 import { ProviderOperationError } from '../../../../core/server/integrations/types'
 import type { LinearIssueDetail, LinearIssuesRequest, LinearIssuesResponse, LinearProject, LinearProjectIssue, LinearProjectIssuesResponse, LinearProjectsResponse } from '../../../../core/shared/api'
+import type { Env } from '../../../../core/main/bindings'
 
 // TTL centralized in server/sync/policy.ts. Linear's reads fan out across all connected
 // integrations with partial results and per-item (`issues.fetchedAt`) freshness, so they do NOT use

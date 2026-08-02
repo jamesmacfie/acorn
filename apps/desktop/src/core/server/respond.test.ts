@@ -4,6 +4,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { ApiError } from '../shared/api'
 import type { AppEnv } from './middleware/auth'
 import { onServerError } from './respond'
+import type { Env } from '../main/bindings'
 
 const app = new Hono<AppEnv>()
   .get('/api/boom', () => {

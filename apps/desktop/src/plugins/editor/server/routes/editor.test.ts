@@ -10,6 +10,7 @@ import type { AppEnv } from '../../../../core/server/middleware/auth'
 import { requireUser } from '../../../../core/server/middleware/requireUser'
 import { makeTestDb, type TestDb } from '../../../../core/server/routes/testDb'
 import { editor, setEditorBridge } from './editor'
+import type { Env } from '../../../../core/main/bindings'
 
 // Editor is a write/read boundary confined to the worktree, so its route test runs against a REAL
 // worktree (the filesystem-containment contract): path traversal, symlink escape, missing worktree. The path
