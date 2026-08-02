@@ -10,6 +10,7 @@ import type { AppEnv } from '../../../../core/server/middleware/auth'
 import { encryptSecret } from '../../../../core/server/session'
 import { linear } from './linear'
 import { makeTestDb, type TestDb } from '../../../../core/server/routes/testDb'
+import type { Env } from '../../../../core/main/bindings'
 
 vi.mock('../../../../core/server/db', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../../../../core/server/db')>()

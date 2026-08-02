@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it } from 'vitest'
 import type { AppEnv } from '../../../../core/server/middleware/auth'
 import { requireUser } from '../../../../core/server/middleware/requireUser'
 import { setTerminalBridge, terminal, type TerminalBridge } from './terminal'
+import type { Env } from '../../../../core/main/bindings'
 
 // Transport contract for terminal control: routing, auth, body validation, and clean
 // bridge-unavailable degradation. PTY/worktree behavior is covered by main tests; streaming is

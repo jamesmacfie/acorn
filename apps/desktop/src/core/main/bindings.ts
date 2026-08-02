@@ -1,3 +1,4 @@
+import type { HttpBindings } from '@hono/node-server'
 import { randomUUID } from 'node:crypto'
 import { chmodSync, closeSync, existsSync, lstatSync, mkdirSync, openSync, readdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { readFile, writeFile } from 'node:fs/promises'
@@ -27,6 +28,16 @@ export type RuntimeBindings = {
   // arbitrary cached prefs/repo row.
   ACTIVE_IDENTITY: ActiveIdentityStore
 }
+
+// What routes actually see as `c.env`. Was an ambient `declare global { interface Env }` in
+// src/env.d.ts; that only worked because the whole app was one TypeScript program. Under the vNext
+// package split each package compiles with `include: ["src"]`, so an ambient global declared in
+// node-core would be invisible to the twenty plugin packages whose routes read c.env — hence an
+// ordinary exported type that travels with the import graph.
+//
+// HttpBindings is Partial because the @hono/node-server adapter only spreads raw incoming/outgoing
+// at the app.fetch() seam (main/server.ts); tests and non-HTTP callers don't provide them.
+export type Env = RuntimeBindings & Partial<HttpBindings>
 
 // One-time OAuth CSRF states (docs/authentication.md): /auth/login issues a state, /auth/callback
 // consumes it. TTL is internal — states are short-lived and never persisted.

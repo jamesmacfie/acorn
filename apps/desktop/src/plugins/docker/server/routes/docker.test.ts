@@ -5,6 +5,7 @@ import type { AppEnv } from '../../../../core/server/middleware/auth'
 import { requireUser } from '../../../../core/server/middleware/requireUser'
 import { docker, setDockerBridge } from './docker'
 import { BridgeError } from '../../../../core/server/bridge'
+import type { Env } from '../../../../core/main/bindings'
 
 // Transport contract for the docker routes: auth + ref validation (nothing dash-leading reaches
 // argv) + body validation + BridgeError passthrough + bridge-unavailable. The CLI/daemon behaviors

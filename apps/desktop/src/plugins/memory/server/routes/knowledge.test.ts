@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it } from 'vitest'
 import type { AppEnv } from '../../../../core/server/middleware/auth'
 import { requireUser } from '../../../../core/server/middleware/requireUser'
 import { knowledge, setKnowledgeBridge, type KnowledgeBridge } from './knowledge'
+import type { Env } from '../../../../core/main/bindings'
 
 // Notes/memory write paths get validated bodies (the privileged-boundary contract); the store logic is covered by
 // main/notes.test.ts, memory.test.ts, memoryProposals.test.ts. Here: routing + auth + validation.

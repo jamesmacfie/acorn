@@ -7,6 +7,7 @@ import { makeBindings, type RuntimeBindings } from './bindings'
 import { resolveDatabasePath } from './serverPaths'
 import { ACORN_PORT, clientDir, devDataDir } from './serverConfig'
 import { attachWsHub } from './wsHub'
+import type { Env } from './bindings'
 
 // DEV data root: the repo-local apps/desktop/.acorn (gitignored). Only valid while running from a
 // checkout — a packaged app's module dir is the read-only asar, so electron.ts passes an
@@ -43,7 +44,7 @@ export function startListener(runtime: RuntimeBindings): Promise<ServerType> {
     const host = request.headers.get('host')
     if (!host || host !== allowedHost) return new Response('Forbidden host', { status: 403 })
     // serve() below creates a plain node:http server, so nodeEnv is always HttpBindings — narrow
-    // it once here. Env extends RuntimeBindings + Partial<HttpBindings> (env.d.ts), so the merged
+    // it once here. Env is RuntimeBindings & Partial<HttpBindings> (./bindings), so the merged
     // object IS the env the routes see — no `as unknown as Env` double cast at this seam.
     const env: Env = { ...(nodeEnv as HttpBindings), ...runtime }
     return app.fetch(request, env)

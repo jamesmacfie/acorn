@@ -1,6 +1,7 @@
 import { Hono } from 'hono'
 import { deleteCookie, getCookie, setCookie } from 'hono/cookie'
 import { openSession, sealSession, SESSION_COOKIE, SESSION_TTL_SECONDS } from '../session'
+import type { Env } from '../../main/bindings'
 
 // GitHub OAuth web flow (docs/authentication.md). The local server exchanges the code for a
 // token and seals it into the session cookie; the browser never sees the token. All cookies

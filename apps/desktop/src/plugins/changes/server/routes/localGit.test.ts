@@ -12,6 +12,7 @@ import { requireUser } from '../../../../core/server/middleware/requireUser'
 import { onServerError } from '../../../../core/server/respond'
 import { localGit, setLocalGitBridge } from './localGit'
 import { makeTestDb, type TestDb } from '../../../../core/server/routes/testDb'
+import type { Env } from '../../../../core/main/bindings'
 
 // Wiring test over a REAL git worktree (the git parsing itself is covered by main/localDiff.test.ts):
 // working-tree status, a stage mutation, plus auth + body validation + bridge-unavailable.

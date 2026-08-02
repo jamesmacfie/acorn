@@ -4,6 +4,7 @@ import type { ApiError, Me } from '../../shared/api'
 import type { AppEnv, Principal, SessionUser } from '../middleware/auth'
 import { me } from './me'
 import { testGate } from './testAuth'
+import type { Env } from '../../main/bindings'
 
 const USER: SessionUser = { token: 'gh-token', login: 'james', name: 'James', avatar: 'a.png', scopes: ['repo'] }
 

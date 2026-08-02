@@ -4,6 +4,7 @@ import type { SearchResult } from '../../shared/search'
 import type { AppEnv } from '../../../../core/server/middleware/auth'
 import { requireUser } from '../../../../core/server/middleware/requireUser'
 import { search, setSearchBridge, type SearchOpts } from './search'
+import type { Env } from '../../../../core/main/bindings'
 
 // Route-test convention for a bridge-backed domain: fake the bridge (no real ripgrep),
 // mount the router, and exercise auth + body validation + the bridge-unavailable 503. The rg

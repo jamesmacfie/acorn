@@ -2,6 +2,7 @@ import { Hono } from 'hono'
 import { describe, expect, it, vi } from 'vitest'
 import { sealSession, SESSION_COOKIE } from '../session'
 import { auth, oauthAppSettingsUrl } from './auth'
+import type { Env } from '../../main/bindings'
 
 const ENC_KEY = '0'.repeat(64)
 
