@@ -13,7 +13,6 @@ const TerminalSettings = lazy(() => import('../../plugins/terminal/client/Termin
 const DockerSettings = lazy(() => import('../../plugins/docker/client/DockerSettings'))
 const ShortcutsSettings = lazy(() => import('../../core/client/settings/ShortcutsSettings'))
 const PermissionsSettings = lazy(() => import('../../core/client/settings/PermissionsSettings'))
-const ApiSettings = lazy(() => import('../../core/client/settings/ApiSettings'))
 const HttpVariablesSettings = lazy(() => import('../../plugins/http/client/HttpVariablesSettings'))
 const StyleGallery = lazy(() => import('../../core/client/settings/StyleGallery'))
 
@@ -44,7 +43,6 @@ export const settingsPageContributions: SettingsContribution[] = [
   // 'api' is the public automation API's token page (docs/public-api.md); the API *panel*'s
   // variables are a different thing, hence the distinct id and label.
   { id: 'http', label: 'API requests', group: 'general', order: 66, component: () => <HttpVariablesSettings /> },
-  { id: 'api', label: 'API', group: 'general', order: 90, requires: 'desktop', component: () => <ApiSettings /> },
   // Dev only: the style-pack authoring surface, not something a user needs.
   ...(import.meta.env.DEV
     ? [{ id: 'gallery', label: 'Style gallery', group: 'general' as const, order: 999, component: () => <StyleGallery /> }]

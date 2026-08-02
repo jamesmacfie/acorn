@@ -7,14 +7,10 @@ import '../main/agentProfiles'
 import type { DesktopCapabilities } from '../../core/shared/desktopCapabilities'
 import type { ServiceStartConfig, ServiceState } from '../../core/shared/serviceProtocol'
 import { makeRuntime, startListener } from '../../core/main/server'
-import { AutomationApiServer } from '../../core/main/publicApi/server'
-import { ApiSettingsStore } from '../../core/main/publicApi/settingsStore'
 import { launcherSpec, serverName } from '../../core/main/mcpRegister'
-import { setApiSettingsController } from '../../core/server/routes/apiSettings'
 import { reconcileWorktrees, setWorktreesRoot } from '../../core/main/taskWorktree'
 import { logStorageFootprint } from '../../core/main/storageFootprint'
 import { disposeWsHub } from '../../core/main/wsHub'
-import { buildPublicApiContributions } from '../server/publicApi'
 import { wireManagedAgents } from '../main/managedAgentsWiring'
 import { createManagedWorkflowStepRunner } from '../main/managedWorkflowStep'
 import { wireServerBridges } from '../main/serverBridges'
@@ -99,9 +95,7 @@ export async function startServiceRuntime({ config, desktop, stateChanged }: Run
   )
 
   let server: ServerType | null = null
-  let apiServer: AutomationApiServer | null = null
   let managedAgents: ReturnType<typeof wireManagedAgents> | null = null
-  let managedPublicEventsOff: (() => void) | null = null
   let reconcileTask: Promise<void> | null = null
   let stopped = false
   let dbClosed = false
@@ -120,14 +114,6 @@ export async function startServiceRuntime({ config, desktop, stateChanged }: Run
     if (stopped) return
     stopped = true
     stateChanged('draining')
-    try {
-      await apiServer?.stop()
-      managedPublicEventsOff?.()
-      managedPublicEventsOff = null
-      setApiSettingsController(null)
-    } catch (error) {
-      console.warn('[service:stop] automation API close failed:', error)
-    }
     try {
       await closeListener(server)
     } catch (error) {
@@ -171,7 +157,7 @@ export async function startServiceRuntime({ config, desktop, stateChanged }: Run
   }
 
   try {
-    const commandExecutions = await prepareSecurityState(runtime)
+    await prepareSecurityState(runtime)
     mark('migrate')
 
     const worktreesDir = join(config.dataDir, 'worktrees')
@@ -228,74 +214,6 @@ export async function startServiceRuntime({ config, desktop, stateChanged }: Run
     server = await startListener(runtime)
     stateChanged('listening')
     mark('listener-up')
-
-    apiServer = new AutomationApiServer({
-      settingsStore: new ApiSettingsStore(config.dataDir),
-      bindings: runtime,
-      tokens: runtime.API_TOKENS,
-      version: config.version,
-      contributions: buildPublicApiContributions({
-        db,
-        encKey: runtime.SESSION_ENC_KEY,
-        blobs: runtime.BLOBS,
-        resolveGithubToken: (userId) => runtime.OAUTH_ACCOUNTS.resolveGithubToken(userId),
-        notesStore: knowledge.notesStore,
-        memoryProposals: knowledge.proposals,
-        memoryReconcile: knowledge.reconciled,
-        workflowRunner,
-        commandExecutions,
-        preview: desktop.preview,
-        managedAgents,
-      }),
-      runtime: {
-        version: config.version,
-        startedAt,
-        desktop: true,
-        reconciliationComplete: () => reconcileComplete,
-        rendererConnected: () => runtime.UI_BROKER.rendererConnected,
-        terminalAvailable: () => true,
-        worktreesAvailable: () => true,
-        pluginCapabilities: () => [
-          'notes', 'changes', 'editor', 'memory', 'database', 'docker', 'workflows', 'rollbar',
-          'linear', 'model-providers', 'terminal', 'github', 'preview', 'agents',
-        ].map((id) => ({ id, available: true })),
-      },
-    })
-    let managedPublicEventChain = Promise.resolve()
-    managedPublicEventsOff = managedAgents.subscribe((frame) => {
-      managedPublicEventChain = managedPublicEventChain.then(async () => {
-        if (!apiServer) return
-        if (frame.channel === 'agent:event') {
-          const session = await managedAgents!.store.requireSession(frame.event.sessionId)
-          apiServer.bus.publish({
-            channel: 'agents.event',
-            data: frame.event,
-            resource: { type: 'agent_session', id: session.id },
-            taskId: session.taskId,
-          })
-        } else if (frame.channel === 'agent:session') {
-          apiServer.bus.publish({
-            channel: 'agents.session',
-            data: frame.session,
-            resource: { type: 'agent_session', id: frame.session.id },
-            taskId: frame.session.taskId,
-          })
-        } else {
-          apiServer.bus.publish({
-            channel: 'agents.deleted',
-            data: { sessionId: frame.sessionId },
-            resource: { type: 'agent_session', id: frame.sessionId },
-          })
-        }
-      }).catch((error) => console.warn('[agents:public-events] publish failed:', error))
-    })
-    setApiSettingsController(apiServer)
-    try {
-      await apiServer.start()
-      mark('automation-api')
-    } catch (error) {
-      console.warn('[service:boot] automation API failed to start:', error)
-    }
 
     stateChanged('reconciling')
     if (process.env.NODE_ENV !== 'test') {

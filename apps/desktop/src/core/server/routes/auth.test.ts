@@ -20,13 +20,14 @@ describe('oauthAppSettingsUrl', () => {
 })
 
 describe('logout credential lifecycle', () => {
-  it('clears the active identity and removes its durable OAuth credential', async () => {
+  // The session cookie is now the only credential logout has to clear — the encrypted
+  // oauth_accounts record went away with the /api/v1 surface that was its sole reason to exist.
+  it('clears the active identity and the session cookie', async () => {
     const active = {
       get: vi.fn(() => 'octocat'),
       set: vi.fn(),
       clear: vi.fn(),
     }
-    const removeGithub = vi.fn(async () => undefined)
     const sealed = await sealSession({ token: 'gho_secret', login: 'octocat', name: 'Octo', avatar: '', scopes: [] }, ENC_KEY)
     const app = new Hono<{ Bindings: Env }>().route('/auth', auth)
     const response = await app.fetch(
@@ -37,13 +38,11 @@ describe('logout credential lifecycle', () => {
       {
         SESSION_ENC_KEY: ENC_KEY,
         ACTIVE_IDENTITY: active,
-        OAUTH_ACCOUNTS: { removeGithub },
       } as unknown as Env,
     )
 
     expect(response.status).toBe(204)
     expect(active.clear).toHaveBeenCalledWith('octocat')
-    expect(removeGithub).toHaveBeenCalledWith('octocat')
     expect(response.headers.get('set-cookie')).toContain(`${SESSION_COOKIE}=`)
   })
 })

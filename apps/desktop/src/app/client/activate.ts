@@ -32,7 +32,6 @@ import { taskSlotRegistry } from '../../core/client/registries/uiSlots'
 import { persistedStateRegistry } from '../../core/client/persistence/persistedState'
 import { persistedSliceContributions } from './persistedSliceContributions'
 import { activateScopedStateEviction } from './scopedEviction'
-import { activateUiControl } from '../../core/client/publicApi/uiControlClient'
 import { agentContextRegistry } from '../../core/client/registries/agentContexts'
 import { taskContextAgentContribution } from '../../plugins/context/client/agentContextContribution'
 import { terminalAgentContextContribution } from '../../plugins/terminal/client/agentContextContribution'
@@ -92,4 +91,3 @@ for (const slice of persistedSliceContributions) persistedStateRegistry.register
 activateScopedStateEviction()
 // Register this window with the public UI control broker (docs/public-api.md) so
 // presentation commands from the automation API can drive it. No-op until a public client connects.
-activateUiControl()

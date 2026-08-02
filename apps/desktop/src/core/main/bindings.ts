@@ -7,10 +7,7 @@ import { fileURLToPath } from 'node:url'
 import { drizzle } from 'drizzle-orm/better-sqlite3'
 import { migrate } from 'drizzle-orm/better-sqlite3/migrator'
 import { type AppDatabase, schema } from '../server/db'
-import { OauthAccountService } from '../server/publicApi/oauthAccountService'
-import { TokenService } from '../server/publicApi/tokenService'
 import { activeIdentityStore, type ActiveIdentityStore } from './activeIdentity'
-import { UiControlBroker } from './publicApi/uiControlBroker'
 
 // The runtime object the routes read via c.env (typed as the global Env in env.d.ts). Built once
 // at startup and handed to the Hono app at the single app.fetch() seam in main/server.ts.
@@ -29,14 +26,6 @@ export type RuntimeBindings = {
   // clears it. Machine callers fail closed when no identity is bound instead of selecting an
   // arbitrary cached prefs/repo row.
   ACTIVE_IDENTITY: ActiveIdentityStore
-  // Public automation API services (docs/public-api.md). Singletons so the internal admin routes (4317),
-  // the public listener, and the WS hub share one TokenService instance — revocation listeners must
-  // survive across requests.
-  API_TOKENS: TokenService
-  OAUTH_ACCOUNTS: OauthAccountService
-  // UI control broker (docs/public-api.md): one control connection per renderer window on the 4317
-  // socket; the public command dispatch crosses presentation commands through it.
-  UI_BROKER: UiControlBroker
 }
 
 // One-time OAuth CSRF states (docs/authentication.md): /auth/login issues a state, /auth/callback
@@ -221,8 +210,5 @@ export function makeBindings({ dbPath, blobsDir }: BindingsOptions): RuntimeBind
     GITHUB_CLIENT_SECRET: secret('GITHUB_CLIENT_SECRET'),
     INTERNAL_TOKEN: loadOrCreateInternalToken(dataDir),
     ACTIVE_IDENTITY: activeIdentityStore(dataDir),
-    API_TOKENS: new TokenService(db),
-    OAUTH_ACCOUNTS: new OauthAccountService(db, encKey),
-    UI_BROKER: new UiControlBroker(),
   }
 }
