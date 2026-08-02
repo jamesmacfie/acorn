@@ -1,8 +1,8 @@
 import { createMemo, createSignal, lazy, onCleanup, onMount } from 'solid-js'
-import type { Task } from '../../core/client/queries'
-import type { PaneContribution } from '../../core/client/registries/panes'
+import type { Task } from '@acorn/client-core/queries.ts'
+import type { PaneContribution } from '@acorn/client-core/registries/panes.ts'
 import type { LinearIssueTarget } from '../../plugins/linear/client/LinearIssuePanel'
-import { clientEvents, consumePaneIntent } from '../../core/client/registries/clientEvents'
+import { clientEvents, consumePaneIntent } from '@acorn/client-core/registries/clientEvents.ts'
 
 const LinearIssuePanel = lazy(() => import('../../plugins/linear/client/LinearIssuePanel'))
 const RollbarPane = lazy(() => import('../../plugins/rollbar/client/RollbarPane'))

@@ -1,6 +1,6 @@
 import { createSignal } from 'solid-js'
-import { pushManagedAgentNotice } from '../../../core/client/notifications/notifications'
-import { wsOnAgentFrame } from '../../../core/client/wsClient'
+import { pushManagedAgentNotice } from '@acorn/client-core/notifications/notifications.ts'
+import { wsOnAgentFrame } from '@acorn/client-core/wsClient.ts'
 import type { AgentEventRecord, AgentSession, AgentSessionSnapshot, AgentWsFrame } from '@acorn/protocol/managedAgents.ts'
 import { managedAgentApi } from './managedClient'
 import { mergeManagedSnapshot } from './managedSnapshot'

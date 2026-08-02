@@ -1,11 +1,11 @@
 import { createEffect, createSignal, on, Show } from 'solid-js'
 import { createMutation, createQuery, useQueryClient } from '@tanstack/solid-query'
 import { useNavigate, useParams, useSearchParams } from '@solidjs/router'
-import { branchesOptions, compareOptions, mentionsOptions, pullsKey, reposOptions, type Branch } from '../../../core/client/queries'
+import { branchesOptions, compareOptions, mentionsOptions, pullsKey, reposOptions, type Branch } from '@acorn/client-core/queries.ts'
 import MentionTextarea from './MentionTextarea'
 import { createPr } from './mutations'
 import { clearPullDraft, prefillFromCompare, readPullDraft, writePullDraft } from './createPull/model'
-import Picker from '../../../core/client/ui/Picker'
+import Picker from '@acorn/client-core/ui/Picker.tsx'
 
 // Mid (Navigator) pane in create mode: base/head pickers + title/body/draft + Create. base/head
 // live in the URL (?base=&head=) so they're shareable and reactive — the compare query and the

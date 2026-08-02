@@ -1,7 +1,7 @@
 import { createEffect, createSignal, For, on, onCleanup } from 'solid-js'
 import { createVirtualizer } from '@tanstack/solid-virtual'
-import { rowHeightSm } from '../../../core/client/ui/metrics'
-import { watchAppearance } from '../../../core/client/ui/appearance'
+import { rowHeightSm } from '@acorn/client-core/ui/metrics.ts'
+import { watchAppearance } from '@acorn/client-core/ui/appearance.ts'
 import type { DbCell } from '../shared/database'
 
 // A read-only, vertically-virtualized result grid (docs/pg.md). There's no generic table

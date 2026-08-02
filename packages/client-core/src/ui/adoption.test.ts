@@ -1,5 +1,5 @@
-import { readdirSync, readFileSync } from 'node:fs'
-import { join } from 'node:path'
+import { existsSync, readdirSync, readFileSync } from 'node:fs'
+import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
 
@@ -12,13 +12,27 @@ import { describe, expect, it } from 'vitest'
 //
 // Same shrinking-baseline idiom as core/boundaries.test.ts.
 
-const SRC = fileURLToPath(new URL('../../..', import.meta.url))
+// Anchored on the workspace root rather than a fixed hop to a src/ dir: renderer code is spread
+// across packages/client-core and the plugin/app packages now, and a relative hop breaks on every
+// move. Ledger entries below are workspace-root-relative for the same reason.
+const SRC = (() => {
+  let dir = fileURLToPath(new URL('.', import.meta.url))
+  for (;;) {
+    if (existsSync(join(dir, 'pnpm-workspace.yaml'))) return dir
+    const parent = dirname(dir)
+    if (parent === dir) throw new Error('Could not locate the workspace root from adoption.test.ts')
+    dir = parent
+  }
+})()
 
 const walk = (dir: string): string[] =>
   readdirSync(dir, { withFileTypes: true }).flatMap((e) =>
     e.isDirectory() ? walk(join(dir, e.name)) : e.name.endsWith('.tsx') ? [join(dir, e.name)] : [])
 
-const tsx = () => [...walk(join(SRC, 'core')), ...walk(join(SRC, 'plugins')), ...walk(join(SRC, 'app'))]
+const tsx = () =>
+  [join(SRC, 'packages/client-core/src'), join(SRC, 'plugins'), join(SRC, 'apps/desktop/src')]
+    .filter(existsSync)
+    .flatMap(walk)
 const rel = (p: string) => p.slice(SRC.length + 1)
 
 describe('primitive adoption', () => {
@@ -33,23 +47,23 @@ describe('primitive adoption', () => {
   // Files fully converted to the primitive components. Add a file here when you migrate it; the
   // list may only grow. It is deliberately not "all files" — migration is incremental by design.
   const CONVERTED = [
-    'core/client/settings/AppearanceSettings.tsx',
-    'plugins/changes/client/agentToolRenderer.tsx',
-    'plugins/agents/client/AgentCenter.tsx',
-    'plugins/agents/client/AgentComposer.tsx',
-    'plugins/agents/client/AgentContextPickerModal.tsx',
-    'plugins/agents/client/AgentEventCard.tsx',
-    'plugins/agents/client/AgentMentionTextarea.tsx',
-    'plugins/agents/client/AgentPane.tsx',
-    'plugins/agents/client/AgentRequestCard.tsx',
-    'plugins/agents/client/AgentTaskSidebar.tsx',
-    'plugins/agents/client/AgentTranscript.tsx',
-    'plugins/agents/client/AgentUsageIndicator.tsx',
-    'plugins/agents/client/AgentUsageSection.tsx',
-    'plugins/agents/client/ManagedAgentMarkdown.tsx',
-    'plugins/agents/client/QueuedAgentTurns.tsx',
-    'plugins/agents/client/sourceContribution.tsx',
-    'plugins/agents/client/toolRendererRegistry.tsx',
+    'packages/client-core/src/settings/AppearanceSettings.tsx',
+    'apps/desktop/src/plugins/changes/client/agentToolRenderer.tsx',
+    'apps/desktop/src/plugins/agents/client/AgentCenter.tsx',
+    'apps/desktop/src/plugins/agents/client/AgentComposer.tsx',
+    'apps/desktop/src/plugins/agents/client/AgentContextPickerModal.tsx',
+    'apps/desktop/src/plugins/agents/client/AgentEventCard.tsx',
+    'apps/desktop/src/plugins/agents/client/AgentMentionTextarea.tsx',
+    'apps/desktop/src/plugins/agents/client/AgentPane.tsx',
+    'apps/desktop/src/plugins/agents/client/AgentRequestCard.tsx',
+    'apps/desktop/src/plugins/agents/client/AgentTaskSidebar.tsx',
+    'apps/desktop/src/plugins/agents/client/AgentTranscript.tsx',
+    'apps/desktop/src/plugins/agents/client/AgentUsageIndicator.tsx',
+    'apps/desktop/src/plugins/agents/client/AgentUsageSection.tsx',
+    'apps/desktop/src/plugins/agents/client/ManagedAgentMarkdown.tsx',
+    'apps/desktop/src/plugins/agents/client/QueuedAgentTurns.tsx',
+    'apps/desktop/src/plugins/agents/client/sourceContribution.tsx',
+    'apps/desktop/src/plugins/agents/client/toolRendererRegistry.tsx',
   ]
 
   it.each(CONVERTED)('%s uses primitives, not raw controls', (file) => {
@@ -63,7 +77,7 @@ describe('primitive adoption', () => {
   // Every primitive must keep appending props.class — that passthrough is what makes migration
   // incremental (a converted call site can carry its old bespoke class and look identical).
   it('primitives append props.class rather than replacing it', () => {
-    const text = readFileSync(join(SRC, 'core/client/ui/primitives.tsx'), 'utf8')
+    const text = readFileSync(join(SRC, 'packages/client-core/src/ui/primitives.tsx'), 'utf8')
     const classAttrs = [...text.matchAll(/class=\{cx\(([^)]*)\)\}/g)].map((m) => m[1])
     expect(classAttrs.length).toBeGreaterThan(0)
     for (const attr of classAttrs) expect(attr).toContain('.class')

@@ -1,6 +1,6 @@
 import { createRoot } from 'solid-js'
 import { describe, expect, it, vi } from 'vitest'
-import type { PullFile } from '../../../../core/client/queries'
+import type { PullFile } from '@acorn/client-core/queries.ts'
 import { createDiffHydrator } from './hydration'
 import type { ParsedFile, TokenizeLine } from './model'
 

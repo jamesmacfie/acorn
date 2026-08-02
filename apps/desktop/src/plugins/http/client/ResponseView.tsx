@@ -1,9 +1,9 @@
 // The response half of the API panel: a status strip plus Body / Headers / Timeline tabs.
 // Bruno's shape, minus the TLS/DNS phase rows (those need an https.Agent subclass).
 import { createMemo, createSignal, For, Show } from 'solid-js'
-import { Tabs, type TabDef } from '../../../core/client/ui/Tabs'
-import CopyButton from '../../../core/client/ui/CopyButton'
-import { Badge } from '../../../core/client/ui/primitives'
+import { Tabs, type TabDef } from '@acorn/client-core/ui/Tabs.tsx'
+import CopyButton from '@acorn/client-core/ui/CopyButton.tsx'
+import { Badge } from '@acorn/client-core/ui/primitives.tsx'
 import type { SendFailure, SendResult, SendSuccess, TimelineEntry } from '../shared/model'
 import { decodeBody } from './httpClient'
 

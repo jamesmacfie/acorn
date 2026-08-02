@@ -3,7 +3,7 @@
 // accessor shape is unchanged so consumers keep their null-tolerant call sites; it just never
 // returns null now that the surface is server-backed.
 import { editorFilesRoute, editorListRoute, editorReadRoute, editorRootRoute, editorWriteRoute, type EditorEntry, type EditorWriteResult } from '@acorn/protocol/api.ts'
-import { readJson, writeJson } from '../../../core/client/apiClient'
+import { readJson, writeJson } from '@acorn/client-core/apiClient.ts'
 
 export type { EditorEntry } from '@acorn/protocol/api.ts'
 

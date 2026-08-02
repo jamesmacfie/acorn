@@ -1,9 +1,9 @@
 // Docker preferences: one JSON pref (docker_prefs) read reactively from the prefs query and
 // written through saveJsonPref. The slice declares durability/bounds for the persistence layer.
 import type { QueryClient } from '@tanstack/solid-query'
-import { PrefKeys } from '../../../core/client/persistence/prefKeys'
-import type { PersistedStateSlice } from '../../../core/client/persistence/persistedState'
-import { saveJsonPref } from '../../../core/client/settings/savePref'
+import { PrefKeys } from '@acorn/client-core/persistence/prefKeys.ts'
+import type { PersistedStateSlice } from '@acorn/client-core/persistence/persistedState.ts'
+import { saveJsonPref } from '@acorn/client-core/settings/savePref.ts'
 
 export type DockerPrefs = {
   confirmDestructive: boolean // two-click confirm on remove/prune/compose-down

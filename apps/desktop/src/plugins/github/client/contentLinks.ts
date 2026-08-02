@@ -1,7 +1,7 @@
 // Recognise links inside rendered content (GitHub bodyHTML + Linear markdown) that Acorn can open
 // itself instead of sending the user to github.com / linear.app. Shared by the PR conversation and
 // the Linear ticket panel.
-import { Registry } from '../../../core/client/registries/registry'
+import { Registry } from '@acorn/client-core/registries/registry.ts'
 
 export type InAppTarget =
   | { kind: 'linear'; identifier: string }

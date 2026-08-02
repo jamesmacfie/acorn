@@ -1,4 +1,4 @@
-import type { CompareCommit } from '../../../../core/client/queries'
+import type { CompareCommit } from '@acorn/client-core/queries.ts'
 
 // Branch name → human title: last path segment, dashes/underscores to spaces, first letter upper.
 // `feature/add-foo` → "Add foo".

@@ -3,8 +3,8 @@
 // Variables tab inside the API panel, where the repo is already known.
 import { createQuery } from '@tanstack/solid-query'
 import { createSignal, Show } from 'solid-js'
-import RepoPicker from '../../../core/client/ui/RepoPicker'
-import { pinsOptions, reposOptions } from '../../../core/client/queries'
+import RepoPicker from '@acorn/client-core/ui/RepoPicker.tsx'
+import { pinsOptions, reposOptions } from '@acorn/client-core/queries.ts'
 import HttpVariables from './HttpVariables'
 import './http.css'
 

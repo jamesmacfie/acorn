@@ -1,6 +1,6 @@
 import { For, Show } from 'solid-js'
 import { Dynamic } from 'solid-js/web'
-import nodes from 'lucide-static/icon-nodes.json'
+import { iconNodes as nodes } from './iconNodes'
 
 // The icon resolver (docs/ui-design.md §Icons). Contribution types carry `glyph: string`; this maps
 // that string to a Lucide icon, and renders it as-is when there's no match. That fallback is

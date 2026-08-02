@@ -1,5 +1,5 @@
-import { readdirSync, readFileSync } from 'node:fs'
-import { join } from 'node:path'
+import { existsSync, readdirSync, readFileSync } from 'node:fs'
+import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 // Test-only helper: read every stylesheet in the renderer as text. The appearance contract is
@@ -12,12 +12,26 @@ export type StyleSheetFile = { path: string; name: string; text: string }
 /** Drop CSS comments. Prose mentions selectors and values; scanners must not count them. */
 export const stripComments = (text: string): string => text.replace(/\/\*[\s\S]*?\*\//g, '')
 
-const clientRoot = fileURLToPath(new URL('..', import.meta.url))
+/**
+ * Nearest ancestor holding pnpm-workspace.yaml. Was a fixed `../..` hop to the old single-package
+ * src root; that broke the moment the renderer became its own package, and it would break again on
+ * every subsequent move. Anchor on the one file that marks the repo root instead.
+ */
+function workspaceRoot(): string {
+  let dir = fileURLToPath(new URL('.', import.meta.url))
+  for (;;) {
+    if (existsSync(join(dir, 'pnpm-workspace.yaml'))) return dir
+    const parent = dirname(dir)
+    if (parent === dir) throw new Error('Could not locate the workspace root from readStyleSheets.ts')
+    dir = parent
+  }
+}
 
-/** Every `.css` file under `core/` and `plugins/`, recursively. */
+/** Every `.css` file shipped by the renderer: client-core's own plus every plugin's. */
 export function readStyleSheets(): StyleSheetFile[] {
-  const srcRoot = join(clientRoot, '..', '..')
-  return [...walk(join(srcRoot, 'core')), ...walk(join(srcRoot, 'plugins'))]
+  const root = workspaceRoot()
+  const roots = [join(root, 'packages/client-core/src'), join(root, 'plugins'), join(root, 'apps/desktop/src')]
+  return roots.filter(existsSync).flatMap(walk)
 }
 
 /** Just the token-axis sheets, which are the ones the orthogonality contract applies to. */

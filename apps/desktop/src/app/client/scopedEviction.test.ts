@@ -4,7 +4,7 @@ import { editorTreeDirectoryOpen, setEditorTreeDirectoryOpen } from '../../plugi
 import { editorViewState, rememberEditorViewState } from '../../plugins/editor/client/editorViewState'
 import { prFilterFor, setPrFilter } from '../../plugins/github/client/pullList/filterState'
 import { rememberReviewDiffScroll, reviewDiffScroll } from '../../plugins/github/client/reviewViewState'
-import { activeTerminal, rememberActiveTerminal } from '../../core/client/tasks/agentSessions'
+import { activeTerminal, rememberActiveTerminal } from '@acorn/client-core/tasks/agentSessions.ts'
 import {
   dispatchLayout,
   focusedPane,
@@ -20,10 +20,10 @@ import {
   setTerminalMax,
   setTerminalOpen,
   workspaceView,
-} from '../../core/client/tasks/tasks'
-import { clientEvents, consumePaneIntent, openPane, requestTerminalFocusIntent, consumeTerminalFocusIntent } from '../../core/client/registries/clientEvents'
+} from '@acorn/client-core/tasks/tasks.ts'
+import { clientEvents, consumePaneIntent, openPane, requestTerminalFocusIntent, consumeTerminalFocusIntent } from '@acorn/client-core/registries/clientEvents.ts'
 import { activateScopedStateEviction } from './scopedEviction'
-import { completeTaskArchive } from '../../core/client/tasks/archiveLifecycle'
+import { completeTaskArchive } from '@acorn/client-core/tasks/archiveLifecycle.ts'
 
 describe('scoped lifecycle eviction', () => {
   it('clears every task-owned keyed collection on archive', () => {

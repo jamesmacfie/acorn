@@ -1,7 +1,7 @@
 import { createQuery } from '@tanstack/solid-query'
 import { createSignal } from 'solid-js'
 import { useSearchParams } from '@solidjs/router'
-import { fileSummariesOptions, type PullFile } from '../../../core/client/queries'
+import { fileSummariesOptions, type PullFile } from '@acorn/client-core/queries.ts'
 
 // Single source for a PR's changed-file order and the `?file=` scroll target. `?file=` is written
 // from three places — the `/` finder and `[`/`]` cycling (Shortcuts.tsx) and the file list

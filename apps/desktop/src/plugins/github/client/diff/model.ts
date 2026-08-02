@@ -1,9 +1,9 @@
 import { diffWordsWithSpace } from 'diff'
 import gitdiffParser from 'gitdiff-parser'
 import { synth } from '../diff'
-import type { getHighlighter } from '../../../../core/client/highlight/shiki'
-import { langFor } from '../../../../core/client/highlight/shiki'
-import type { PullFile, Thread } from '../../../../core/client/queries'
+import type { getHighlighter } from '@acorn/client-core/highlight/shiki.ts'
+import { langFor } from '@acorn/client-core/highlight/shiki.ts'
+import type { PullFile, Thread } from '@acorn/client-core/queries.ts'
 
 export type Tok = { content: string; light: string; dark: string }
 export type WordTok = { content: string; kind: 'eq' | 'add' | 'del' }

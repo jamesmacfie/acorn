@@ -52,6 +52,7 @@
     "zod": "catalog:"
   },
   "devDependencies": {
+    "@acorn/client-core": "workspace:*",
     "@acorn/node-core": "workspace:*",
     "@acorn/protocol": "workspace:*",
     "@electron/rebuild": "^4.0.6",

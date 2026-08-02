@@ -1,4 +1,4 @@
-import { readJson } from '../../../core/client/apiClient'
+import { readJson } from '@acorn/client-core/apiClient.ts'
 import { taskContextRoute, type TaskContext } from '@acorn/protocol/api.ts'
 import type { AgentContextContribution, AgentContextSnapshot } from '@acorn/protocol/agentContext.ts'
 import { contextRevisionFor } from './contextRevision'

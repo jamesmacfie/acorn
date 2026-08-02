@@ -2,8 +2,8 @@ import { For, onCleanup, onMount, Show } from 'solid-js'
 import type { AgentProviderUsage } from '../shared/usage'
 import { agentUsageStore } from './usageStore'
 import { formatUpdated, providerUsageRows } from './usageModel'
-import { Button } from '../../../core/client/ui/primitives'
-import Icon from '../../../core/client/ui/Icon'
+import { Button } from '@acorn/client-core/ui/primitives.tsx'
+import Icon from '@acorn/client-core/ui/Icon.tsx'
 import './agent-usage.css'
 
 const providerLabel = (provider: AgentProviderUsage): string => (provider.provider === 'claude' ? 'Claude' : 'Codex')

@@ -1,8 +1,8 @@
 import { createQuery, useQueryClient } from '@tanstack/solid-query'
-import { prefsOptions } from '../../../core/client/queries'
-import { savePref } from '../../../core/client/settings/savePref'
-import { PrefKeys } from '../../../core/client/persistence/prefKeys'
-import { termFontSize } from '../../../core/client/ui/metrics'
+import { prefsOptions } from '@acorn/client-core/queries.ts'
+import { savePref } from '@acorn/client-core/settings/savePref.ts'
+import { PrefKeys } from '@acorn/client-core/persistence/prefKeys.ts'
+import { termFontSize } from '@acorn/client-core/ui/metrics.ts'
 import { resolveTerminalFontSize, TERMINAL_FONT_SIZE_OPTIONS } from './preferences'
 
 // Settings → Terminal: the rail-default profile — what the terminal button auto-launches when the

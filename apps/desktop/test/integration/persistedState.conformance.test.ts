@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
-import { persistedSliceContributions } from '../../../app/client/persistedSliceContributions'
-import { stringifyPersistedValue, utf8Bytes } from './persistedState'
+import { persistedSliceContributions } from '../../src/app/client/persistedSliceContributions'
+import { stringifyPersistedValue, utf8Bytes } from '@acorn/client-core/persistence/persistedState.ts'
 
 const slices = persistedSliceContributions
 

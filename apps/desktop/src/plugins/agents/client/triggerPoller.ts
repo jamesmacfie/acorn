@@ -1,4 +1,4 @@
-import type { PollerContribution } from '../../../core/client/registries/pollers'
+import type { PollerContribution } from '@acorn/client-core/registries/pollers.ts'
 import { workflowApi } from './workflowClient'
 
 // Trigger predicates live with their main-process source/provider contributions. The client poll

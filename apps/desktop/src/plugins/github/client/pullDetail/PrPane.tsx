@@ -1,6 +1,6 @@
 import { lazy } from 'solid-js'
-import type { Task } from '../../../../core/client/queries'
-import type { PaneContribution } from '../../../../core/client/registries/panes'
+import type { Task } from '@acorn/client-core/queries.ts'
+import type { PaneContribution } from '@acorn/client-core/registries/panes.ts'
 
 const PullDetail = lazy(() => import('../PullDetail'))
 const DiffView = lazy(() => import('../DiffView'))

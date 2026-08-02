@@ -1,6 +1,6 @@
 import { createSignal, For, Show } from 'solid-js'
 import type { RollbarItemSummary, RollbarOccurrenceDetail } from '@acorn/protocol/api.ts'
-import { openPane } from '../../../core/client/registries/clientEvents'
+import { openPane } from '@acorn/client-core/registries/clientEvents.ts'
 import { agentContext, frameRepoPath } from './model'
 
 const relAge = (at: number | null): string => {

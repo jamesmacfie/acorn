@@ -2,7 +2,7 @@
 // Saved requests aren't external items, so there is nothing to promote into a task; promotion is a
 // permanent stub, which the contract requires.
 import { lazy } from 'solid-js'
-import type { SourceContribution } from '../../../core/client/registries/sources'
+import type { SourceContribution } from '@acorn/client-core/registries/sources.ts'
 
 const HttpBrowse = lazy(() => import('./HttpBrowse'))
 

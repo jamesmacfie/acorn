@@ -1,5 +1,5 @@
 import type { AgentInputPart } from '@acorn/protocol/managedAgents.ts'
-import { fuzzyScore } from '../../../core/client/palette/model'
+import { fuzzyScore } from '@acorn/client-core/palette/model.ts'
 
 export type ActiveFileMention = {
   start: number

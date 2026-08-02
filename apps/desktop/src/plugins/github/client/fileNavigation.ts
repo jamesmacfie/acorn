@@ -1,4 +1,4 @@
-import { clientEvents } from '../../../core/client/registries/clientEvents'
+import { clientEvents } from '@acorn/client-core/registries/clientEvents.ts'
 
 export type FileScrollDetail = {
   routeKey: string

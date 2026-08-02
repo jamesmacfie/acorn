@@ -1,14 +1,14 @@
 import { useNavigate, useParams } from '@solidjs/router'
 import { createQuery } from '@tanstack/solid-query'
 import { createEffect, createMemo, createResource, createSignal, For, on, onCleanup, onMount, Show } from 'solid-js'
-import { tasksOptions, workspacesOptions } from '../../../core/client/queries'
-import { activateTaskSignals, pathForTask } from '../../../core/client/tasks/activate'
-import { workspaceForRepo } from '../../../core/client/workspaces/activeWorkspace'
+import { tasksOptions, workspacesOptions } from '@acorn/client-core/queries.ts'
+import { activateTaskSignals, pathForTask } from '@acorn/client-core/tasks/activate.ts'
+import { workspaceForRepo } from '@acorn/client-core/workspaces/activeWorkspace.ts'
 import { managedAgentApi } from './managedClient'
 import { managedAgentStore } from './managedStore'
 import { openManagedSession } from './managedSelection'
 import type { AgentProviderDescriptor, AgentSession } from '@acorn/protocol/managedAgents.ts'
-import { Button, Input, Row, Select } from '../../../core/client/ui/primitives'
+import { Button, Input, Row, Select } from '@acorn/client-core/ui/primitives.tsx'
 import './agent-center.css'
 
 const ACTIVE_STATES = new Set(['creating', 'connecting', 'replaying', 'working', 'waiting', 'cancelling', 'reconnecting'])

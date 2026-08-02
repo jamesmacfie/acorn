@@ -3,9 +3,9 @@
 // process's events watcher is the source of truth for freshness). Live daemon state deliberately
 // stays out of the persisted query cache.
 import { createSignal } from 'solid-js'
-import { latestOnly } from '../../../core/client/lib/latestOnly'
-import type { PollerContribution } from '../../../core/client/registries/pollers'
-import { wsOnDockerChanged } from '../../../core/client/wsClient'
+import { latestOnly } from '@acorn/client-core/lib/latestOnly.ts'
+import type { PollerContribution } from '@acorn/client-core/registries/pollers.ts'
+import { wsOnDockerChanged } from '@acorn/client-core/wsClient.ts'
 import type { DockerContainerSummary, DockerInfo, DockerTaskSummary } from '../shared/model'
 import { fetchContainers, fetchDockerInfo, fetchTaskSummaries } from './dockerClient'
 

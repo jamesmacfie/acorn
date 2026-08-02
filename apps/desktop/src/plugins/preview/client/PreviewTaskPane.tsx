@@ -1,8 +1,8 @@
 import { createResource } from 'solid-js'
-import type { Task } from '../../../core/client/queries'
-import type { PaneContribution } from '../../../core/client/registries/panes'
-import { taskBridge } from '../../../core/client/tasks/taskBridge'
-import { recipeBrowserUrl } from '../../../core/client/tasks/tasks'
+import type { Task } from '@acorn/client-core/queries.ts'
+import type { PaneContribution } from '@acorn/client-core/registries/panes.ts'
+import { taskBridge } from '@acorn/client-core/tasks/taskBridge.ts'
+import { recipeBrowserUrl } from '@acorn/client-core/tasks/tasks.ts'
 import { runApi } from '../../terminal/client/runClient'
 import PreviewPane from './PreviewPane'
 

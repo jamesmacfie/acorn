@@ -1,4 +1,4 @@
-import { apiError, readJson, writeJson } from '../../../core/client/apiClient'
+import { apiError, readJson, writeJson } from '@acorn/client-core/apiClient.ts'
 import type {
   AgentAttachment,
   AgentArtifact,

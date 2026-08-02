@@ -1,5 +1,5 @@
-import { parseJson, type PersistedStateSlice } from '../../../../core/client/persistence/persistedState'
-import { PrefKeys, PersistedSliceKeys } from '../../../../core/client/persistence/prefKeys'
+import { parseJson, type PersistedStateSlice } from '@acorn/client-core/persistence/persistedState.ts'
+import { PrefKeys, PersistedSliceKeys } from '@acorn/client-core/persistence/prefKeys.ts'
 import { hydratePrFilter, prFilters, type PrFilter } from './filterState'
 
 // The PR list's own persisted-state descriptor: tab + text filter, per workspace. Owned here rather

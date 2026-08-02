@@ -1,4 +1,4 @@
-import { postJson } from '../../../core/client/apiClient'
+import { postJson } from '@acorn/client-core/apiClient.ts'
 import { type LinearCommentRequest, linearCommentsRoute } from '@acorn/protocol/api.ts'
 
 // Add a comment / threaded reply to a Linear ticket; caller refetches the issue after.

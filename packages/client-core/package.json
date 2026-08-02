@@ -1,0 +1,30 @@
+{
+  "name": "@acorn/client-core",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./*": "./src/*"
+  },
+  "scripts": {
+    "lint": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@acorn/protocol": "workspace:*",
+    "@solidjs/router": "^0.16.1",
+    "@tanstack/solid-query": "^5.101.0",
+    "diff": "^9.0.0",
+    "lucide-static": "^1.27.0",
+    "shiki": "^4.2.0",
+    "solid-js": "catalog:"
+  },
+  "devDependencies": {
+    "@types/diff": "^8.0.0",
+    "@types/node": "^26.0.0",
+    "typescript": "^6.0.3",
+    "vite": "^8.0.16",
+    "vite-plugin-solid": "^2.11.12",
+    "vitest": "^4.1.9"
+  }
+}
