@@ -6,7 +6,7 @@ import { PersistQueryClientProvider } from '@tanstack/solid-query-persist-client
 import { createAsyncStoragePersister } from '@tanstack/query-async-storage-persister'
 import { Route, Router } from '@solidjs/router'
 import { clear, del, get, set } from 'idb-keyval'
-import App from '../../core/client/App'
+import App from './App'
 import { ApiError } from '../../core/client/apiClient'
 import '../../core/client/styles.css'
 import { shouldPersistQuery } from '../../core/client/persistence/queryPersistence'

@@ -2,7 +2,7 @@ import { lazy } from 'solid-js'
 import type { UiSlotContribution } from '../../core/client/registries/uiSlots'
 
 const NotificationBell = lazy(() => import('../../core/client/notifications/NotificationBell'))
-const CommandPalette = lazy(() => import('../../core/client/palette/CommandPalette'))
+const CommandPalette = lazy(() => import('./CommandPalette'))
 const FilePalette = lazy(() => import('../../plugins/editor/client/FilePalette'))
 const WorkspacePalette = lazy(() => import('../../core/client/palette/WorkspacePalette'))
 const Shortcuts = lazy(() => import('../../plugins/github/client/Shortcuts'))

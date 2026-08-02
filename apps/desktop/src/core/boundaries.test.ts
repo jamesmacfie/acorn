@@ -108,20 +108,12 @@ function reachableFrom(roots: string[], graph: Map<string, string[]>): string[] 
 }
 
 // --- baselined cross-feature couplings (see header). Sorted; shrink over time, never grow. ---
-const BASELINE_CORE_TO_PLUGIN = [
-  'core/client/App.tsx => plugins/github/client/ComparePreview.tsx',
-  'core/client/App.tsx => plugins/github/client/CreatePullForm.tsx',
-  'core/client/App.tsx => plugins/github/client/DiffView.tsx',
-  'core/client/App.tsx => plugins/github/client/PullDetail.tsx',
-  'core/client/App.tsx => plugins/github/client/PullList.tsx',
-  'core/client/App.tsx => plugins/onboarding/client/OnboardingModal.tsx',
-  'core/client/App.tsx => plugins/terminal/client/TerminalPanel.tsx',
-  'core/client/palette/CommandPalette.tsx => plugins/agents/client/workflowClient.ts',
-  'core/client/palette/CommandPalette.tsx => plugins/terminal/client/recipes.ts',
-  'core/client/palette/CommandPalette.tsx => plugins/terminal/client/runClient.ts',
-  'core/client/tasks/TaskView.tsx => plugins/terminal/client/runClient.ts',
-  'core/client/tasks/TaskView.tsx => plugins/terminal/client/terminalClient.ts',
-]
+// core -> plugin is now EMPTY. App.tsx, palette/CommandPalette.tsx and tasks/TaskView.tsx owned
+// all twelve edges; they moved to app/client, where importing a feature is legal because the
+// composition root is allowed to know every plugin. That also broke the four
+// client-core <-> plugin package cycles, which turbo's topological `topo` task cannot tolerate.
+// Keep this at zero.
+const BASELINE_CORE_TO_PLUGIN: string[] = []
 const BASELINE_PLUGIN_TO_PLUGIN = [
   'plugins/agents/client/AgentTaskSidebar.tsx => plugins/terminal/client/terminalClient.ts',
   'plugins/changes/client/ChangesPane.tsx => plugins/github/client/diff/DiffRows.tsx',
