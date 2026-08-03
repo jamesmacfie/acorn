@@ -1,6 +1,6 @@
 import { Hono } from 'hono'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import '../../src/app/server/providers'
+import '../../src/server/providers'
 import type { Task, TaskLink } from '@acorn/protocol/api.ts'
 import { getDb, schema } from '@acorn/node-core/server/db/index.ts'
 import type { AppEnv } from '@acorn/node-core/server/middleware/auth.ts'
@@ -49,12 +49,14 @@ describe('task links grow/shrink', () => {
       {} as Env,
     )
     expect(res.status).toBe(200)
-    return res.json()
+    // Node's Response.json() is typed unknown (the DOM lib types it `any`); this package compiles
+    // against plain Node types, so the route's contract is asserted explicitly.
+    return res.json() as Promise<Task>
   }
 
   const listLinks = async (id: string): Promise<TaskLink[]> => {
     const res = await app.fetch(new Request('http://acorn.test/api/tasks'), {} as Env)
-    const all: Task[] = await res.json()
+    const all = (await res.json()) as Task[]
     return all.find((x) => x.id === id)?.links ?? []
   }
 
@@ -139,7 +141,7 @@ describe('task links grow/shrink', () => {
     const res = await app.fetch(jsonReq(`/api/tasks/${task.id}`, 'PATCH', { title: 'Renamed' }), {} as Env)
     expect(res.status).toBe(200)
     const list = await app.fetch(new Request('http://acorn.test/api/tasks'), {} as Env)
-    const all: Task[] = await list.json()
+    const all = (await list.json()) as Task[]
     expect(all.find((x) => x.id === task.id)?.title).toBe('Renamed')
   })
 })

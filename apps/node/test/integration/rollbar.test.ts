@@ -16,7 +16,7 @@ import { settleBackground } from '@acorn/node-core/server/background.ts'
 import { integrations } from '@acorn/node-core/server/routes/integrations.ts'
 import { rollbar } from '@acorn/plugin-rollbar/server/routes/rollbar.ts'
 import { makeTestDb, type TestDb } from '@acorn/node-core/server/routes/testDb.ts'
-import '../../src/app/server/providers'
+import '../../src/server/providers'
 import type { Env } from '@acorn/node-core/main/bindings.ts'
 
 vi.mock('@acorn/node-core/server/db/index.ts', async (importOriginal) => {

@@ -5,8 +5,8 @@
 import './providers' // register built-in integration providers into the core registry
 import './routes' // register plugin-owned HTTP routers into the core route registry
 import { devDataDir, makeRuntime, startListener } from '@acorn/node-core/main/server.ts'
-import { wireServerBridges } from '../main/serverBridges'
-import { prepareSecurityState } from '../main/startupSecurity'
+import { wireServerBridges } from '../wiring/serverBridges'
+import { prepareSecurityState } from '../wiring/startupSecurity'
 
 const dataDir = devDataDir()
 const runtime = makeRuntime(dataDir)

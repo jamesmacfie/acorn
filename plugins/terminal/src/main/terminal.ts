@@ -407,7 +407,13 @@ export function configureTerminalMcp(name: string, launcher: Launcher): void {
   configuredMcp = { name, launcher }
 }
 
-const mcpName = () => configuredMcp?.name ?? serverName(!process.defaultApp && !process.env.ELECTRON_IS_DEV)
+// `defaultApp` is an Electron addition to the Node `process` globals (true for an unpackaged run).
+// This module is service-owned and therefore also compiles inside @acorn/node's plain-Node program,
+// so read it defensively rather than widening this package's type surface — the same pattern
+// node-core uses for `process.resourcesPath`.
+const isDefaultApp = (): boolean => (process as { defaultApp?: boolean }).defaultApp === true
+
+const mcpName = () => configuredMcp?.name ?? serverName(!isDefaultApp() && !process.env.ELECTRON_IS_DEV)
 const mcpLauncher = () => configuredMcp?.launcher ?? launcherSpec(process.execPath, resolveMcpEntry(dirname(fileURLToPath(import.meta.url))), mcpName())
 
 // Boot-time MCP re-registration (docs/mcp.md): the registered launcher command is process.execPath —

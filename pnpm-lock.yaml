@@ -143,6 +143,9 @@ importers:
       '@acorn/client-core':
         specifier: workspace:*
         version: link:../../packages/client-core
+      '@acorn/node':
+        specifier: workspace:*
+        version: link:../node
       '@acorn/node-core':
         specifier: workspace:*
         version: link:../../packages/node-core
@@ -254,6 +257,97 @@ importers:
       vite-plugin-solid:
         specifier: ^2.11.12
         version: 2.11.12(solid-js@1.9.13)(vite@8.0.16(@types/node@26.0.0)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.22.4))
+      vitest:
+        specifier: ^4.1.9
+        version: 4.1.9(@types/node@26.0.0)(vite@8.0.16(@types/node@26.0.0)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.22.4))
+
+  apps/node:
+    dependencies:
+      '@hono/node-server':
+        specifier: '>=2.0.11'
+        version: 2.0.11(hono@4.12.32)
+      drizzle-orm:
+        specifier: 'catalog:'
+        version: 0.45.2(@types/better-sqlite3@7.6.13)(@types/pg@8.20.0)(better-sqlite3@12.11.1)(pg@8.22.0)
+      hono:
+        specifier: 'catalog:'
+        version: 4.12.32
+      zod:
+        specifier: 'catalog:'
+        version: 4.4.3
+    devDependencies:
+      '@acorn/node-core':
+        specifier: workspace:*
+        version: link:../../packages/node-core
+      '@acorn/plugin-agents':
+        specifier: workspace:*
+        version: link:../../plugins/agents
+      '@acorn/plugin-changes':
+        specifier: workspace:*
+        version: link:../../plugins/changes
+      '@acorn/plugin-database':
+        specifier: workspace:*
+        version: link:../../plugins/database
+      '@acorn/plugin-docker':
+        specifier: workspace:*
+        version: link:../../plugins/docker
+      '@acorn/plugin-editor':
+        specifier: workspace:*
+        version: link:../../plugins/editor
+      '@acorn/plugin-github':
+        specifier: workspace:*
+        version: link:../../plugins/github
+      '@acorn/plugin-http':
+        specifier: workspace:*
+        version: link:../../plugins/http
+      '@acorn/plugin-linear':
+        specifier: workspace:*
+        version: link:../../plugins/linear
+      '@acorn/plugin-memory':
+        specifier: workspace:*
+        version: link:../../plugins/memory
+      '@acorn/plugin-model-providers':
+        specifier: workspace:*
+        version: link:../../plugins/model-providers
+      '@acorn/plugin-notes':
+        specifier: workspace:*
+        version: link:../../plugins/notes
+      '@acorn/plugin-preview':
+        specifier: workspace:*
+        version: link:../../plugins/preview
+      '@acorn/plugin-profiles-aider':
+        specifier: workspace:*
+        version: link:../../plugins/profiles-aider
+      '@acorn/plugin-profiles-claude':
+        specifier: workspace:*
+        version: link:../../plugins/profiles-claude
+      '@acorn/plugin-profiles-codex':
+        specifier: workspace:*
+        version: link:../../plugins/profiles-codex
+      '@acorn/plugin-rollbar':
+        specifier: workspace:*
+        version: link:../../plugins/rollbar
+      '@acorn/plugin-terminal':
+        specifier: workspace:*
+        version: link:../../plugins/terminal
+      '@acorn/plugin-workflows':
+        specifier: workspace:*
+        version: link:../../plugins/workflows
+      '@acorn/protocol':
+        specifier: workspace:*
+        version: link:../../packages/protocol
+      '@types/node':
+        specifier: ^26.0.0
+        version: 26.0.0
+      tsx:
+        specifier: ^4.22.4
+        version: 4.22.4
+      typescript:
+        specifier: ^6.0.3
+        version: 6.0.3
+      vite:
+        specifier: ^8.0.16
+        version: 8.0.16(@types/node@26.0.0)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.22.4)
       vitest:
         specifier: ^4.1.9
         version: 4.1.9(@types/node@26.0.0)(vite@8.0.16(@types/node@26.0.0)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.22.4))

@@ -7,7 +7,7 @@ import { makeTestDb, type TestDb } from '@acorn/node-core/server/routes/testDb.t
 import { buildHeadlessArgv, runHeadless } from '@acorn/node-core/main/headless.ts'
 import { NotesStore } from '@acorn/plugin-notes/main/notes.ts'
 import { WorkflowRunner, type RunnerDeps, type WorkflowDef } from '@acorn/plugin-workflows/main/workflowRunner.ts'
-import '../../src/app/main/agentProfiles' // profiles come from the composition root
+import '../../src/wiring/agentProfiles' // profiles come from the composition root
 
 const FAKE_AGENT = resolve(dirname(fileURLToPath(import.meta.url)), '../fixtures/fake-agent.sh')
 

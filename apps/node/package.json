@@ -1,0 +1,48 @@
+{
+  "name": "@acorn/node",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./*": "./src/*"
+  },
+  "scripts": {
+    "lint": "tsc --noEmit",
+    "test": "vitest run",
+    "build": "vite build",
+    "dev:node": "node --import tsx --watch --env-file-if-exists=../desktop/.env src/server/devNode.ts"
+  },
+  "dependencies": {
+    "@hono/node-server": "^2.0.11",
+    "drizzle-orm": "catalog:",
+    "hono": "catalog:",
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "@acorn/node-core": "workspace:*",
+    "@acorn/plugin-agents": "workspace:*",
+    "@acorn/plugin-changes": "workspace:*",
+    "@acorn/plugin-database": "workspace:*",
+    "@acorn/plugin-docker": "workspace:*",
+    "@acorn/plugin-editor": "workspace:*",
+    "@acorn/plugin-github": "workspace:*",
+    "@acorn/plugin-http": "workspace:*",
+    "@acorn/plugin-linear": "workspace:*",
+    "@acorn/plugin-memory": "workspace:*",
+    "@acorn/plugin-model-providers": "workspace:*",
+    "@acorn/plugin-notes": "workspace:*",
+    "@acorn/plugin-preview": "workspace:*",
+    "@acorn/plugin-profiles-aider": "workspace:*",
+    "@acorn/plugin-profiles-claude": "workspace:*",
+    "@acorn/plugin-profiles-codex": "workspace:*",
+    "@acorn/plugin-rollbar": "workspace:*",
+    "@acorn/plugin-terminal": "workspace:*",
+    "@acorn/plugin-workflows": "workspace:*",
+    "@acorn/protocol": "workspace:*",
+    "@types/node": "^26.0.0",
+    "tsx": "^4.22.4",
+    "typescript": "^6.0.3",
+    "vite": "^8.0.16",
+    "vitest": "^4.1.9"
+  }
+}

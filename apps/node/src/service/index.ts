@@ -10,13 +10,24 @@ import {
 } from '@acorn/protocol/serviceProtocol.ts'
 import { startServiceRuntime, type ServiceRuntime } from './runtime'
 
-const parentPort = process.parentPort
+// `process.parentPort` is an addition Electron makes to the Node globals for utilityProcess
+// children, and this package compiles against plain Node types by design — it is the Electron-free
+// service (docs/vNext/architecture.md). So describe the handshake structurally rather than pulling
+// in electron's types, exactly as node-core reads `process.resourcesPath`. Phase 1 replaces this
+// transport with child_process + a socket, at which point the shim disappears.
+type ParentPort = {
+  postMessage(message: ServiceMessage): void
+  on(event: 'message', listener: (event: { data: unknown }) => void): void
+  off(event: 'message', listener: (event: { data: unknown }) => void): void
+}
+
+const parentPort = (process as { parentPort?: ParentPort }).parentPort
 if (!parentPort) throw new Error('The acorn service must run as an Electron utility process')
 
 const transport: ServiceMessageTransport = {
   send: (message: ServiceMessage) => parentPort.postMessage(message),
   subscribe: (listener) => {
-    const receive = (event: Electron.MessageEvent) => listener(event.data)
+    const receive = (event: { data: unknown }) => listener(event.data)
     parentPort.on('message', receive)
     return () => parentPort.off('message', receive)
   },

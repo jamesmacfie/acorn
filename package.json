@@ -11,7 +11,7 @@
     "release": "pnpm dist",
     "rebuild": "pnpm --filter @acorn/desktop electron:rebuild",
     "rebuild:node": "node scripts/rebuild-node-abi.mjs",
-    "dev:node": "pnpm --filter @acorn/desktop dev:node",
+    "dev:node": "pnpm --filter @acorn/node dev:node",
     "db:generate": "pnpm --filter @acorn/node-core db:generate",
     "db:locate": "pnpm --filter @acorn/node-core db:locate",
     "db:migrate": "pnpm --filter @acorn/node-core db:migrate",

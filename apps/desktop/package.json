@@ -6,7 +6,6 @@
   "main": "out/main/index.js",
   "scripts": {
     "dev": "electron-vite build && pnpm run check:runtime-syntax && electron-vite preview",
-    "dev:node": "node --import tsx --watch --env-file=.env src/app/server/devNode.ts",
     "build": "electron-vite build && pnpm run check:runtime-syntax && node scripts/check-renderer-budget.mjs",
     "dist": "pnpm run build && electron-builder --mac",
     "electron:dev": "electron-vite dev",
@@ -53,6 +52,7 @@
   },
   "devDependencies": {
     "@acorn/client-core": "workspace:*",
+    "@acorn/node": "workspace:*",
     "@acorn/node-core": "workspace:*",
     "@acorn/plugin-agents": "workspace:*",
     "@acorn/plugin-changes": "workspace:*",

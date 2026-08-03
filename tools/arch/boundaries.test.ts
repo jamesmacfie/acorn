@@ -116,7 +116,8 @@ function side(pkg: Pkg, file: string): 'client' | 'node' | 'shared' {
   if (pkg.name === '@acorn/protocol') return 'shared'
   const seg = relative(pkg.src, file).split('/')[0]
   if (seg === 'client') return 'client'
-  if (seg === 'server' || seg === 'main' || seg === 'service' || seg === 'mcp') return 'node'
+  // `wiring` is @acorn/node's: the service-owned composition glue that used to sit in app/main.
+  if (seg === 'server' || seg === 'main' || seg === 'service' || seg === 'mcp' || seg === 'wiring') return 'node'
   return 'shared'
 }
 
