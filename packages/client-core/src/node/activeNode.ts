@@ -1,5 +1,6 @@
 import { createSignal } from 'solid-js'
 import { acornGlobal } from '../capabilities'
+import { homeNode, nodes, ORIGIN_NODE_ID, refreshFleet } from './fleet'
 
 // Which node the renderer's ambient requests go to.
 //
@@ -21,6 +22,11 @@ export { activeNodeId }
 export function setActiveNode(nodeId: string | null): void {
   setActiveNodeIdSignal(nodeId)
 }
+
+// Which cache partition the mounted provider uses (node/fleet.ts). Not the same thing as
+// `activeNodeId`: there is no nodeId at all when the origin IS the node, and that mode still needs a
+// stable IndexedDB key.
+export const activeCacheId = (): string => activeNodeId() ?? ORIGIN_NODE_ID
 
 // How far the client has got in finding a node to talk to. This is what the shell gates on, in the
 // place the GitHub session used to be gated: there is no login any more, so the only question left
@@ -52,14 +58,23 @@ export async function selectActiveNode(): Promise<void> {
 
   setNodeReadiness({ kind: 'starting' })
   try {
-    const fleet = await fleetList()
-    // Prefer the bundled local node; choosing among several arrives with Settings → Nodes.
-    const node = fleet.nodes.find((n) => n.local) ?? fleet.nodes[0]
+    await refreshFleet()
+    // Keep a still-known selection: Settings → Nodes calls this after a mutation, and re-homing the
+    // window onto the local node every time the owner renames a remote one would be a bug.
+    const selected = activeNodeId()
+    // Otherwise prefer the home node (the bundled local one) — `homeNode` is the single definition of
+    // that preference, shared with the prefs divergence in queries.ts.
+    const node = (selected && nodes().some((n) => n.nodeId === selected) ? selected : homeNode()?.nodeId) ?? null
     if (!node) {
+      // Clear the selection as well as the readiness. `readiness !== 'ready' ⇒ no active node` has to
+      // hold locally: otherwise removing the last node in Settings → Nodes would leave apiClient
+      // ambiently addressed at a node that is gone, relying on NodeGate to be the only thing standing
+      // between that and a request.
+      setActiveNode(null)
       setNodeReadiness({ kind: 'unpaired' })
       return
     }
-    setActiveNode(node.nodeId)
+    setActiveNode(node)
     setNodeReadiness({ kind: 'ready' })
   } catch (error) {
     setNodeReadiness({ kind: 'failed', reason: error instanceof Error ? error.message : String(error) })

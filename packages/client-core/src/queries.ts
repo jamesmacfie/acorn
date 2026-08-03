@@ -2,6 +2,7 @@
 // so the options live here to avoid drift. Every read goes through the broker's device bearer; 401 on /me
 // is a valid logged-out state, elsewhere it's an error.
 import { readJson, writeJson } from './apiClient'
+import { homeNodeTarget } from './node/fleet'
 import {
   branchesKey,
   branchesRoute,
@@ -207,10 +208,26 @@ export const workspaceProjectsOptions = (workspaceId: string | null, enabled: bo
     readJson<WorkspaceProjectsResponse>(workspaceProjectsRoute(workspaceId as string), { signal }),
 })
 
+// KNOWN PHASE 1 DIVERGENCE — prefs are node-scoped storage serving a client-scoped concern.
+//
+// `/v2/core/prefs` is one flat Record on the NODE, and the client keeps presentation state there:
+// theme, style pack, keybindings, rail order/collapse, restored selection. That was free when there
+// was exactly one node; with a fleet it means the user's theme would flip when they switched nodes,
+// which is not a feature. So every pref read AND write is addressed at the home node
+// (fleet.homeNode — the bundled local one) regardless of which node is active.
+//
+// Addressing is the fix, not the cache partition: pointing these at the home node's QueryClient
+// instead would have left the FETCH going to the active node, and would have split the optimistic
+// write in savePref.ts from the readers mounted under the active provider. Because the content is
+// node-independent once the address is fixed, which partition holds it does not matter.
+//
+// The real answer is a client-side device-prefs tier (docs/vNext/ui.md § State ownership: "Client
+// owns presentation"), which is Phase 4 work. Recorded in docs/vNext/data.md § Client cache.
 export const prefsOptions = (enabled: boolean) => ({
   queryKey: prefsKey,
   enabled,
-  queryFn: async ({ signal }: QueryContext): Promise<Record<string, string>> => readJson<Record<string, string>>(prefsRoute, { signal }),
+  queryFn: async ({ signal }: QueryContext): Promise<Record<string, string>> =>
+    readJson<Record<string, string>>(prefsRoute, { signal, ...homeNodeTarget() }),
 })
 
 export const filesOptions = (owner: string, repo: string, number: string, enabled: boolean) => ({

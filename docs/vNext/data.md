@@ -66,6 +66,17 @@ persistence model, now keyed by `(nodeId, queryKey)`):
 - Client-durable state that is *not* cache: fleet membership (node endpoints, pinned fingerprints,
   labels), layouts and pane weights (keyed by nodeId + task), presentation prefs, drafts. Device
   tokens live in the OS keychain.
+
+The partition is implemented as **one `QueryClient` + one IndexedDB persister key per node**
+(`client-core/node/fleet.ts`), not as a nodeId prefix on every query key. Same guarantee — two nodes
+holding the same UUID cannot collide — reached by construction rather than by every one of the 34
+query-option factories remembering a convention.
+
+**Known Phase 1 divergence — presentation prefs are stored on a node.** ui.md § State ownership says
+the client owns theme, style pack, keybindings and layout, but they live in the node's flat
+`/v2/core/prefs` record (a single-node inheritance). Left there for Phase 1 and pinned to the **home
+node**: `prefsOptions` and `savePref` address that node explicitly whatever node is active, so
+switching nodes cannot flip the user's theme. A real client-side device-prefs tier is Phase 4.
 - Unsent drafts (comment text, dirty editors) are client-local and survive navigation but not
   necessarily restart — same rules as V1.
 

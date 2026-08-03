@@ -13,8 +13,10 @@
   "dependencies": {
     "@acorn/protocol": "workspace:*",
     "@solidjs/router": "^0.16.1",
+    "@tanstack/query-async-storage-persister": "^5.101.0",
     "@tanstack/solid-query": "^5.101.0",
     "diff": "^9.0.0",
+    "idb-keyval": "^6.2.5",
     "lucide-static": "^1.27.0",
     "shiki": "^4.2.0",
     "solid-js": "catalog:"
