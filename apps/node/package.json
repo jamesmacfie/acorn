@@ -10,7 +10,7 @@
     "lint": "tsc --noEmit",
     "test": "vitest run",
     "build": "vite build",
-    "dev:node": "node --import tsx --watch --env-file-if-exists=../desktop/.env src/server/devNode.ts"
+    "dev:node": "node --import tsx --watch --env-file-if-exists=../desktop/.env src/server/standalone.ts"
   },
   "dependencies": {
     "@hono/node-server": "^2.0.11",

@@ -33,8 +33,8 @@ export type Listener = { server: ServerType; endpoint: ServiceEndpoint; fingerpr
 // node.json so a restart usually lands back on the same one.
 export function startListener(runtime: RuntimeBindings, root: DataRoot): Promise<Listener> {
   // Every bridge (pure-Node domain bridges AND the stateful harness/context bridges) is installed by
-  // the composition root (app/service/runtime.ts under Electron, app/server/devNode.ts under dev:node)
-  // BEFORE this is called — core no longer imports plugin bridge wiring (docs/plugins.md).
+  // the composition root (apps/node's service/runtime.ts under Electron, server/standalone.ts
+  // otherwise) BEFORE this is called — core no longer imports plugin bridge wiring (docs/plugins.md).
   const app = createApp()
 
   // No static assets and no SPA fallback: "the Node serves no web assets" (docs/vNext/architecture.md).
@@ -148,10 +148,9 @@ export function makeRuntime(root: DataRoot, appVersion = '0.0.0-dev'): RuntimeBi
   })
 }
 
-// Open the data root, build the runtime AND start listening in one call — the plain-Node `dev:node`
-// entry (app/server/devNode.ts) has no composition root, so it needs all three. Kept in core (pure
-// engine); the dev:node entry lives in app/ because choosing to auto-start + registering plugin
-// providers is composition, not engine.
+// Open the data root, build the runtime AND start listening in one call. Kept in core (pure engine);
+// the standalone entry lives in apps/node (server/standalone.ts) because choosing to auto-start and
+// registering plugin providers is composition, not engine.
 export function startServer(dataDir: string = devDataDir()): Promise<Listener> {
   const root = openDataRoot(dataDir)
   return startListener(makeRuntime(root), root)
