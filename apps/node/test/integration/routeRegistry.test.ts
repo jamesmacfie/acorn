@@ -125,7 +125,7 @@ describe('assembled routes', () => {
   beforeAll(async () => {
     core = makeTestDb()
     dataDir = mkdtempSync(join(tmpdir(), 'acorn-routes-'))
-    await initPlugins(nodePlugins(dataDir), {
+    await initPlugins(nodePlugins(dataDir, { memory: { sendToAgent: () => {}, currentUserId: () => null } }), {
       capabilities: new CapabilityRegistry(),
       core: createCoreServices({ secrets: new SecretService('0'.repeat(64)), db: core.db }),
     })

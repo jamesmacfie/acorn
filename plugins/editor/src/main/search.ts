@@ -7,9 +7,12 @@ import { sep } from 'node:path'
 import { promisify } from 'node:util'
 import { rgPath } from '@vscode/ripgrep'
 import type { SearchBridge, SearchOpts } from '../server/routes/search'
-import type { AppDatabase } from '@acorn/node-core/server/db/index.ts'
+import type { CoreServices } from '@acorn/node-core/main/core/index.ts'
 import type { FileHits, SearchResult } from '../shared/search'
-import { taskRoot } from '@acorn/node-core/main/taskWorktree.ts'
+
+// Only the task→worktree resolution, from core, which owns `tasks`. This plugin owns no tables and so
+// holds no database handle at all (docs/vNext/data.md § Plugin DBs).
+export type SearchCoreServices = Pick<CoreServices, 'tasks'>
 
 const MAX_TOTAL_HITS = 2000 // ponytail: fixed cap; the pane shows "truncated". Raise if it bites.
 const MAX_PREVIEW_LEN = 300 // ponytail: clamp long lines so one minified file can't bloat the payload.
@@ -99,8 +102,8 @@ export function parseRgJson(stdout: string): SearchResult {
 
 // Run ripgrep over the task's worktree. Unknown task / unmapped repo → empty result (the pane just
 // shows no hits), never an error — the taskId is the capability and a stale one is benign.
-export async function searchInFiles(db: AppDatabase, taskId: string, query: string, opts: SearchOpts): Promise<SearchResult> {
-  const root = await taskRoot(db, taskId)
+export async function searchInFiles(core: SearchCoreServices, taskId: string, query: string, opts: SearchOpts): Promise<SearchResult> {
+  const root = await core.tasks.root(taskId)
   if (!root || !query) return { files: [], truncated: false }
   // --json: robust structured output (no path:line:text colon ambiguity). rg already honours
   // .gitignore and skips binary/hidden — the same set editor:files offers. --no-config so a
@@ -120,6 +123,6 @@ export async function searchInFiles(db: AppDatabase, taskId: string, query: stri
   return parseRgJson(stdout)
 }
 
-export const searchBridge = (db: AppDatabase): SearchBridge => ({
-  findInFiles: (taskId, query, opts) => searchInFiles(db, taskId, query, opts),
+export const searchBridge = (core: SearchCoreServices): SearchBridge => ({
+  findInFiles: (taskId, query, opts) => searchInFiles(core, taskId, query, opts),
 })

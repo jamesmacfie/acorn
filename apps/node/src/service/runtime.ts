@@ -26,7 +26,7 @@ import { wireContextSections } from '../wiring/contextSectionsWiring'
 import { registerWorkflowIpc } from '../wiring/workflowWiring'
 import { wireConfigTrust } from '../wiring/configTrustWiring'
 import { prepareSecurityState } from '../wiring/startupSecurity'
-import { registerKnowledgeIpc } from '@acorn/plugin-memory/main/knowledgeIpc.ts'
+import { MEMORY_KNOWLEDGE } from '@acorn/plugin-memory/main/knowledgeIpc.ts'
 import { createRuntimeService } from '@acorn/plugin-terminal/main/runIpc.ts'
 import {
   configureTerminalMcp,
@@ -37,8 +37,6 @@ import {
   sendToAgent,
   terminalRunGlue,
 } from '@acorn/plugin-terminal/main/terminal.ts'
-import { endDbPools } from '@acorn/plugin-database/main/database.ts'
-import { disposeDocker } from '@acorn/plugin-docker/main/dockerService.ts'
 import { seedTaskNotes } from '@acorn/plugin-notes/main/seedTaskNotes.ts'
 import { previewRulesForTask } from '@acorn/plugin-preview/server/previewRules.ts'
 
@@ -157,18 +155,10 @@ export async function startServiceRuntime({ config, desktop, stateChanged }: Run
     } catch (error) {
       console.warn('[service:stop] terminal close failed:', error)
     }
-    try {
-      disposeDocker()
-    } catch (error) {
-      console.warn('[service:stop] docker close failed:', error)
-    }
-    try {
-      await endDbPools()
-    } catch (error) {
-      console.warn('[service:stop] database pools close failed:', error)
-    }
     // Before core's DB and before the root lock: each plugin owns a WAL-mode SQLite file of its own
-    // (main/pluginStorage.ts), and the invariant below applies to those too.
+    // (main/pluginStorage.ts), and the invariant below applies to those too. This is also where the
+    // docker streams and the database plugin's pg pools are closed — each in its own plugin's dispose,
+    // rather than in a list here that a new plugin has to remember to join.
     try {
       await disposePlugins?.()
     } catch (error) {
@@ -256,24 +246,27 @@ export async function startServiceRuntime({ config, desktop, stateChanged }: Run
     const core = createCoreServices({ secrets: runtime.SECRETS, db })
     // Awaited before the listener binds: a plugin's init opens and migrates its own SQLite file, so a
     // request must not be able to arrive first (server/plugin/host.ts).
-    const plugins = await initPlugins(nodePlugins(config.dataDir), { capabilities, core })
+    const plugins = await initPlugins(
+      nodePlugins(config.dataDir, { memory: { sendToAgent, currentUserId: () => runtime.ACTIVE_IDENTITY.get() } }),
+      { capabilities, core },
+    )
     disposePlugins = plugins.dispose
     if (plugins.skipped.length) console.log(`[service:boot] plugins disabled for this node: ${plugins.skipped.join(', ')}`)
 
-    const knowledge = registerKnowledgeIpc(db, config.dataDir, {
-      sendToAgent,
-      currentUserId: () => runtime.ACTIVE_IDENTITY.get(),
-    })
+    // The notes + memory runtime, published by the memory plugin's init rather than constructed here
+    // (contract/knowledge.ts). `require`, not `get`: memory is a `required` plugin because core's agent
+    // tools, core's context assembler and terminal's launch injection all assume it answers.
+    const knowledge = capabilities.require(MEMORY_KNOWLEDGE)
     wireConfigTrust(db)
     const runtimeService = createRuntimeService(db, terminalRunGlue(db))
     wireRunBridge(runtimeService)
-    wireContextSections({ db, notesStore: knowledge.notesStore, reconciled: knowledge.reconciled })
+    wireContextSections({ db, notesStore: knowledge.notesStore, memory: knowledge })
     wireAgentTools({
       db,
       notesStore: knowledge.notesStore,
       proposals: knowledge.proposals,
       runtime: runtimeService,
-      reconciled: knowledge.reconciled,
+      memory: knowledge,
       browser: desktop.browser,
     })
     managedAgents = wireManagedAgents({

@@ -14,16 +14,19 @@ import { join } from 'node:path'
 import { promisify } from 'node:util'
 import pg from 'pg'
 import type { QueryResult, QueryResultRow } from 'pg'
-import type { AppDatabase } from '@acorn/node-core/server/db/index.ts'
+import type { CoreServices } from '@acorn/node-core/main/core/index.ts'
 import type { DatabaseBridge } from '../server/routes/database'
 import type { DbCell, DbColumn, DbConnectResult, DbColumnsResult, DbPk, DbQueryResult, DbResultSet, DbRowsResult, DbSchemaResult, DbTablesResult, DbWriteResult } from '../shared/database'
-import { loadTask, resolveInRoot, taskRoot } from '@acorn/node-core/main/taskWorktree.ts'
-import { getRepoPath } from '@acorn/node-core/main/repoPaths.ts'
 import { loadRepoConfig } from '@acorn/node-core/main/runConfig.ts'
-import { assertRepoConfigTrusted } from '@acorn/node-core/main/repoConfigTrust.ts'
 
 const { Pool } = pg
 const exec = promisify(execFile)
+
+// What this bridge needs from core, and nothing more. It used to take core's `AppDatabase` and query
+// `tasks`/`repo_paths` through core's helpers; the plugin owns its own SQLite file now and has no
+// handle to core's, so the four reads it makes (resolve a task, its worktree, its repo settings, and
+// the executable-config trust gate for a repo-authored url_script) arrive as services.
+export type DatabaseCoreServices = Pick<CoreServices, 'tasks' | 'repos' | 'fs'>
 
 // One pool per task, torn down on disconnect/reconnect. ponytail: keyed by taskId, not by URL —
 // a task points at one database; reconnect ends the old pool first.
@@ -58,11 +61,11 @@ const errText = (e: unknown): string => (e instanceof Error ? e.message : String
 // → <worktree>/.env DATABASE_URL → process.env.DATABASE_URL. Returns null if none found.
 // Exported for database.test.ts: this is where the repo-config trust gate sits, and it's the only
 // place the "did the untrusted script execute?" question can be asked without a live Postgres.
-export async function resolveDbUrl(db: AppDatabase, taskId: string): Promise<string | null> {
-  const t = await loadTask(db, taskId)
+export async function resolveDbUrl(core: DatabaseCoreServices, taskId: string): Promise<string | null> {
+  const t = await core.tasks.load(taskId)
   if (!t) return null
-  const root = await taskRoot(db, taskId) // the task worktree (created lazily), or null
-  const rp = await getRepoPath(db, t.repoOwner, t.repoName)
+  const root = await core.tasks.root(taskId) // the task worktree (created lazily), or null
+  const rp = await core.repos.path(t.repoOwner, t.repoName)
   const cfg = loadRepoConfig(root ?? rp?.path ?? null, homedir(), { dbUrlScript: rp?.dbUrlScript })
   const script = cfg.dbUrlScript?.trim()
   if (script && root) {
@@ -72,7 +75,7 @@ export async function resolveDbUrl(db: AppDatabase, taskId: string): Promise<str
     // a trust failure must propagate to the caller, never fall through to the .env/env fallbacks as
     // if the script had merely errored. User/DB-authored scripts (dbUrlFromRepo false) are the
     // user's own input and are not gated.
-    if (cfg.dbUrlFromRepo) await assertRepoConfigTrusted(db, taskId)
+    if (cfg.dbUrlFromRepo) await core.repos.assertConfigTrusted(taskId)
     try {
       const { stdout } = await exec('bash', ['-lc', script], { cwd: root, timeout: 15_000, maxBuffer: 1 << 20 })
       // Scripts may echo noise before the URL — strip ANSI escapes (some CLIs emit them even when
@@ -180,12 +183,12 @@ export async function endDbPools(): Promise<void> {
   }
 }
 
-export function databaseBridge(db: AppDatabase): DatabaseBridge {
+export function databaseBridge(core: DatabaseCoreServices): DatabaseBridge {
   return {
     // Connect: resolve the URL on demand, (re)build the pool, confirm reachability. Never persists the URL.
     connect: async (taskId): Promise<DbConnectResult> => {
       try {
-        const url = await resolveDbUrl(db, taskId)
+        const url = await resolveDbUrl(core, taskId)
         if (!url) return { ok: false, error: 'No database found. Set a connection script in Workspace Settings, or add DATABASE_URL to the worktree .env.' }
         await pools.get(taskId)?.pool.end().catch(() => {})
         const pool = new Pool({ connectionString: url, max: 4, connectionTimeoutMillis: 8_000 })
@@ -311,9 +314,9 @@ export function databaseBridge(db: AppDatabase): DatabaseBridge {
     // shell script's stdout, a worktree file, or (default) live introspection of the connected pool.
     schema: async (taskId): Promise<DbSchemaResult> => {
       try {
-        const t = await loadTask(db, taskId)
+        const t = await core.tasks.load(taskId)
         if (!t) return { error: 'Task not found.' }
-        const rp = await getRepoPath(db, t.repoOwner, t.repoName)
+        const rp = await core.repos.path(t.repoOwner, t.repoName)
         const mode = rp?.dbSchemaMode === 'script' || rp?.dbSchemaMode === 'file' ? rp.dbSchemaMode : 'auto'
         const value = rp?.dbSchemaValue?.trim()
         // Free-form repo notes ride along with every source so the route never has to read repo_paths.
@@ -321,7 +324,7 @@ export function databaseBridge(db: AppDatabase): DatabaseBridge {
         const notes = notesText ? { notes: notesText } : {}
         if (mode === 'script') {
           if (!value) return { error: 'No schema script configured in the repo settings.' }
-          const root = await taskRoot(db, taskId)
+          const root = await core.tasks.root(taskId)
           if (!root) return { error: 'No worktree for this task yet.' }
           const { stdout } = await exec('bash', ['-lc', value], { cwd: root, timeout: 15_000, maxBuffer: 4 << 20 })
           const text = stdout.replace(/\x1b(?:\[[0-9;]*[A-Za-z]|\(B)/g, '').trim()
@@ -329,9 +332,9 @@ export function databaseBridge(db: AppDatabase): DatabaseBridge {
         }
         if (mode === 'file') {
           if (!value) return { error: 'No schema file configured in the repo settings.' }
-          const root = await taskRoot(db, taskId)
+          const root = await core.tasks.root(taskId)
           if (!root) return { error: 'No worktree for this task yet.' }
-          const abs = resolveInRoot(root, value)
+          const abs = core.fs.resolveInRoot(root, value)
           if (!abs) return { error: 'Schema file path escapes the worktree.' }
           const text = (await readFile(abs, 'utf8')).trim()
           return text ? { schema: capSchema(text), source: 'file', ...notes } : { error: 'Schema file is empty.' }

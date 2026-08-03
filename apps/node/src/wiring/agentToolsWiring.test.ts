@@ -33,7 +33,7 @@ describe('agent note contributions', () => {
       notesStore,
       proposals: { propose: async () => ({}) } as never,
       runtime: { targets: async () => ({ targets: [] }) } as never,
-      reconciled: async () => {},
+      memory: { reconciled: async () => {}, list: async () => [], get: async () => null, search: async () => [], indexSlice: async () => [] },
       browser: {
         navigate: async () => ({ ok: false }),
         snapshot: async () => ({}),

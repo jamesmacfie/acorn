@@ -7,27 +7,31 @@
 import { gitOrThrow } from '@acorn/node-core/main/core/git.ts'
 import { readdir, readFile, writeFile } from 'node:fs/promises'
 import { BridgeError } from '@acorn/node-core/server/bridge.ts'
-import type { AppDatabase } from '@acorn/node-core/server/db/index.ts'
+import type { CoreServices } from '@acorn/node-core/main/core/index.ts'
 import type { EditorBridge, EditorEntry } from '../server/routes/editor'
-import { resolveInRoot, taskRoot } from '@acorn/node-core/main/taskWorktree.ts'
+
+// This plugin owns no tables. Every call is keyed by taskId and resolves the worktree root through
+// core, which owns `tasks` — a plugin has no handle to core's database (docs/vNext/data.md § Plugin
+// DBs). `fs` is core's one path-confinement implementation, which this file used to wrap.
+export type EditorCoreServices = Pick<CoreServices, 'tasks' | 'fs'>
 
 // Confine relPath to the task's worktree; throw the HTTP-classified error the route surfaces.
 // No worktree yet (unmapped repo) → 404; a path that escapes the root → 403 (never leaks whether
 // the outside target exists).
-async function confine(db: AppDatabase, taskId: string, relPath: string): Promise<string> {
-  const root = await taskRoot(db, taskId)
+async function confine(core: EditorCoreServices, taskId: string, relPath: string): Promise<string> {
+  const root = await core.tasks.root(taskId)
   if (!root) throw new BridgeError(404, 'no_worktree', 'No worktree for this task yet.')
-  const abs = resolveInRoot(root, relPath)
+  const abs = core.fs.resolveInRoot(root, relPath)
   if (!abs) throw new BridgeError(403, 'path_outside', 'Path is outside the worktree.')
   return abs
 }
 
-export const editorBridge = (db: AppDatabase): EditorBridge => ({
-  root: (taskId) => taskRoot(db, taskId),
+export const editorBridge = (core: EditorCoreServices): EditorBridge => ({
+  root: (taskId) => core.tasks.root(taskId),
 
   list: async (taskId, relPath) => {
-    const root = await taskRoot(db, taskId)
-    const abs = root && resolveInRoot(root, relPath)
+    const root = await core.tasks.root(taskId)
+    const abs = root && core.fs.resolveInRoot(root, relPath)
     if (!abs) return [] // no worktree / bad path → empty tree, never an error
     const ents = await readdir(abs, { withFileTypes: true })
     return ents
@@ -39,7 +43,7 @@ export const editorBridge = (db: AppDatabase): EditorBridge => ({
   // Flat file list for ⌘P quick-open. `git ls-files` gives the tracked + untracked (non-ignored)
   // set — the same files VS Code's Cmd+P offers — without walking node_modules.
   files: async (taskId) => {
-    const root = await taskRoot(db, taskId)
+    const root = await core.tasks.root(taskId)
     if (!root) return []
     const { stdout } = await gitOrThrow(['ls-files', '--cached', '--others', '--exclude-standard'], {
       cwd: root,
@@ -50,7 +54,7 @@ export const editorBridge = (db: AppDatabase): EditorBridge => ({
   },
 
   read: async (taskId, relPath) => {
-    const abs = await confine(db, taskId, relPath)
+    const abs = await confine(core, taskId, relPath)
     try {
       return await readFile(abs, 'utf8')
     } catch {
@@ -62,8 +66,8 @@ export const editorBridge = (db: AppDatabase): EditorBridge => ({
   // the autosave loop must not see a rejected promise. A path escape is a benign {ok:false}, not a
   // 4xx: the renderer already confined the path, so this is defense-in-depth, not a caller error.
   write: async (taskId, relPath, content) => {
-    const root = await taskRoot(db, taskId)
-    const abs = root && resolveInRoot(root, relPath)
+    const root = await core.tasks.root(taskId)
+    const abs = root && core.fs.resolveInRoot(root, relPath)
     if (!abs) return { ok: false, reason: 'Path is outside the worktree.' }
     try {
       await writeFile(abs, content, 'utf8')

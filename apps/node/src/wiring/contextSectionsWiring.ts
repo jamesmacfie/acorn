@@ -1,19 +1,21 @@
 import { buildContextSections, setContextSections } from '@acorn/node-core/server/agentTools/contextSections.ts'
 import type { AppDatabase } from '@acorn/node-core/server/db/index.ts'
 import type { NoteAuthor, NoteLocation, NoteScope } from '@acorn/protocol/notes.ts'
-import { memoryIndexSlice } from '@acorn/plugin-memory/main/memory.ts'
+import type { MemoryIndex } from '@acorn/plugin-memory/main/knowledgeIpc.ts'
 import type { NotesStore } from '@acorn/plugin-notes/main/notes.ts'
 import { loadTask, workspaceIdForRepo } from '@acorn/node-core/main/taskWorktree.ts'
 
 export type ContextSectionsDeps = {
   db: AppDatabase
   notesStore: NotesStore
-  reconciled(): Promise<void>
+  // The memory index reads, bound to the memory plugin's own SQLite file (its `memory.knowledge`
+  // capability). The app cannot query that database itself — it has no handle to it.
+  memory: MemoryIndex
 }
 
 // Context contributions close over service-process stores once at composition time. The server route,
 // compact formatter and renderer all consume their serialized result; no per-domain source setters.
-export function wireContextSections({ db, notesStore, reconciled }: ContextSectionsDeps): void {
+export function wireContextSections({ db, notesStore, memory }: ContextSectionsDeps): void {
   setContextSections(
     buildContextSections({
       notes: async (taskId) => {
@@ -42,8 +44,8 @@ export function wireContextSections({ db, notesStore, reconciled }: ContextSecti
         return out
       },
       memory: async (_taskId, repo) => {
-        await reconciled()
-        return memoryIndexSlice(db, repo)
+        await memory.reconciled()
+        return memory.indexSlice(repo)
       },
     }),
   )

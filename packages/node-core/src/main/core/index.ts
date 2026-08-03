@@ -25,9 +25,12 @@
 //
 // Recorded in docs/vNext/phase2-notes.md.
 import type { AppDatabase } from '../../server/db'
+import { createContextService, type ContextService } from './context'
 import * as fs from './fs'
 import * as git from './git'
+import { createModelService, type ModelService } from './models'
 import * as proc from './proc'
+import { createRepoService, type RepoService } from './repos'
 import { SecretService } from './secrets'
 import { createTaskService, type TaskService } from './tasks'
 
@@ -44,14 +47,35 @@ export type CoreServices = {
   // `tasks` itself, so this is the "validated by the owning plugin when dereferenced" seam
   // (docs/vNext/data.md § Plugin DBs).
   tasks: TaskService
+  // The same seam for `repo_paths` + the executable-config trust gate: where a repo lives on this
+  // machine, its per-repo settings, and whether its committed config has been acknowledged.
+  repos: RepoService
+  // The launch-context reads (the injection pref + core's section assembler), for the plugin that
+  // pushes a first prompt into a new agent session.
+  context: ContextService
+  // Text generation through a stored model-provider connection. The plugin owns the prompt; core owns
+  // credential resolution and the provider adapters.
+  models: ModelService
 }
 
 export function createCoreServices(options: { secrets: SecretService; db: AppDatabase }): CoreServices {
-  return { fs, git, proc, secrets: options.secrets, tasks: createTaskService(options.db) }
+  return {
+    fs,
+    git,
+    proc,
+    secrets: options.secrets,
+    tasks: createTaskService(options.db),
+    repos: createRepoService(options.db),
+    context: createContextService(options.db),
+    models: createModelService(options.db, options.secrets),
+  }
 }
 
 export { SecretService }
 export type { TaskService } from './tasks'
+export type { RepoCheckout, RepoService } from './repos'
+export type { ContextService } from './context'
+export type { GenerateTextRequest, ModelService } from './models'
 export { SecretUnavailableError, redact } from './secrets'
 export type { ProcResult, ProcSpec } from './proc'
 export type { ConfineFailure, ConfineResult } from './fs'

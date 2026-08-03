@@ -1,16 +1,20 @@
 import { getTableColumns, sql } from 'drizzle-orm'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import { makeTestDb, type TestDb } from '../routes/testDb'
+import { makeTestPluginDb, type TestPluginDb } from '@acorn/node-core/server/routes/testDb.ts'
+import { migrationsDir } from './migrations'
 import { memories } from './schema'
 
-// memories_fts is a hand-written FTS5 virtual table (drizzle can't model it), kept in sync with
-// `memories` by migration discipline alone. This guard opens a real migrated DB and asserts the
-// FTS column set still matches what main/memory.ts indexes, so a drifted migration edit fails CI.
+// memories_fts is a hand-written FTS5 virtual table (drizzle cannot model one), kept in sync with
+// `memories` by migration discipline alone. This guard opens a real migrated DB and asserts the FTS
+// column set still matches what main/memory.ts indexes, so a drifted migration edit fails CI.
+//
+// It moved here with the tables: the chain that creates memories_fts is this plugin's now
+// (migrations/0000_*.sql), and core's database no longer has either table to assert about.
 describe('memories_fts schema drift guard', () => {
-  let t: TestDb
+  let t: TestPluginDb
 
   beforeEach(() => {
-    t = makeTestDb()
+    t = makeTestPluginDb('memory', migrationsDir())
   })
 
   afterEach(() => t.cleanup())

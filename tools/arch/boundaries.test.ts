@@ -285,19 +285,21 @@ describe('architecture boundaries', () => {
     // (docs/vNext/data.md § Plugin DBs). Until then, importing core's table definitions is
     // grandfathered per package. Entries may be removed, never added.
     //
-    // Matches the TABLE barrel specifically, not the module: `import type { AppDatabase }` from the
-    // same path is fine and stays — a plugin is handed a database handle, it just may not reach into
-    // core's schema to decide what is in it.
-    // 'changes' is off this list: it owns its tables and its own SQLite file now. Twelve to go.
+    // The intent is to match the TABLE barrel rather than the module — but be aware of what the regex
+    // below ACTUALLY does in this codebase, because it changes what "remove an entry" costs. The source
+    // has no semicolons, so `[^;]*?` runs backwards past earlier import statements: a file whose only
+    // db import is `import type { AppDatabase }` still matches, because the match starts at some
+    // earlier `import` and the clause it captures is not a `{ … }` list of `type` entries. In practice
+    // the rule therefore reads "no db-module import at all", type-only included. That is the stricter
+    // and more useful reading — a plugin holding core's AppDatabase is exactly the coupling the split
+    // removes — so it is left as is rather than loosened to match the comment.
+    // 'changes', 'database', 'docker', 'editor' and 'memory' are off this list: each owns its own
+    // schema (or no tables at all) and takes CoreServices instead of core's database. Eight to go.
     const SCHEMA_BASELINE = [
       'agents',
-      'database',
-      'docker',
-      'editor',
       'github',
       'http',
       'linear',
-      'memory',
       'notes',
       'rollbar',
       'terminal',
@@ -307,7 +309,12 @@ describe('architecture boundaries', () => {
     // `{ schema }` / `* as schema`, so `import * as db from '.../db/index.ts'` + `db.schema.tasks`, or
     // `import { tasks } from '.../db/schema.ts'` — the natural form once the barrel is off-limits — both
     // slipped through. Type-only imports (`import type { AppDatabase }`) are legitimate and stay.
-    const DB_IMPORT_RE = /\bimport\s+(?!type\b)([^;]*?)\s+from\s*['"]@acorn\/node-core\/server\/db[^'"]*['"]/g
+    // `[^'"]*?` for the clause, NOT `[^;]*?`. A clause never contains a quote, but a PRECEDING import's
+    // specifier does — with `[^;]*?` the lazy match happily spanned two statements in semicolon-free
+    // source, so `import { readFile } from 'node:fs/promises'` followed by a type-only db import matched
+    // as one, and the rule flagged a package that reads nothing. Quotes are the statement boundary here;
+    // newlines are allowed on purpose, for multi-line brace clauses.
+    const DB_IMPORT_RE = /\bimport\s+(?!type\b)([^'"]*?)\s+from\s*['"]@acorn\/node-core\/server\/db[^'"]*['"]/g
     const importsCoreTables = (text: string): boolean => {
       DB_IMPORT_RE.lastIndex = 0
       let m: RegExpExecArray | null

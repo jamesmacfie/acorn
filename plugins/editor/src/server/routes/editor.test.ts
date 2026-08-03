@@ -8,6 +8,8 @@ import { editorBridge } from '../../main/editor'
 import { schema } from '@acorn/node-core/server/db/index.ts'
 import type { AppEnv } from '@acorn/node-core/server/middleware/auth.ts'
 import { requireUser } from '@acorn/node-core/server/middleware/requireUser.ts'
+import * as coreFs from '@acorn/node-core/main/core/fs.ts'
+import { createTaskService } from '@acorn/node-core/main/core/tasks.ts'
 import { makeTestDb, type TestDb } from '@acorn/node-core/server/routes/testDb.ts'
 import { editor, setEditorBridge } from './editor'
 import type { Env } from '@acorn/node-core/main/bindings.ts'
@@ -54,7 +56,7 @@ describe('editor routes over a real worktree', () => {
 
   beforeEach(async () => {
     t = makeTestDb()
-    setEditorBridge(editorBridge(t.db))
+    setEditorBridge(editorBridge({ tasks: createTaskService(t.db), fs: coreFs }))
     const now = Date.now()
     await t.db.insert(schema.repoPaths).values({ owner: 'acme', repo: 'widget', path: work, createdAt: now, updatedAt: now })
     // worktreePath = the checkout itself: taskRoot returns it directly (no worktree creation).
