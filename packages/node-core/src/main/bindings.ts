@@ -14,6 +14,10 @@ import { activeIdentityStore, type ActiveIdentityStore } from './activeIdentity'
 // at startup and handed to the Hono app at the single app.fetch() seam in main/server.ts.
 export type RuntimeBindings = {
   DB: AppDatabase
+  // This Node's durable identity, minted into node.json on first start (main/dataRoot.ts). Every
+  // resource a client caches is keyed (nodeId, id), so two nodes holding the same UUID never
+  // collide (docs/vNext/architecture.md § Fleet semantics).
+  NODE_ID: string
   OAUTH_STATE: OauthStateStore
   BLOBS: BlobCache
   SESSION_ENC_KEY: string
@@ -201,12 +205,12 @@ function loadOrCreateInternalToken(dataDir: string): string {
   return token
 }
 
-export type BindingsOptions = { dbPath: string; blobsDir: string }
+export type BindingsOptions = { dbPath: string; blobsDir: string; nodeId: string }
 
 // Build the bindings object once at startup. Electron resolves the data root in electron.ts
 // (app.getPath('userData') when packaged, the repo-local apps/desktop/.acorn in dev) and passes
 // the paths in; the Node-only entry (dev:node) defaults to the repo-local dir in server.ts.
-export function makeBindings({ dbPath, blobsDir }: BindingsOptions): RuntimeBindings {
+export function makeBindings({ dbPath, blobsDir, nodeId }: BindingsOptions): RuntimeBindings {
   const secret = (name: string): string => {
     const value = process.env[name]
     if (!value) throw new Error(`Missing required env var ${name} (set it in .env or the environment)`)
@@ -219,6 +223,7 @@ export function makeBindings({ dbPath, blobsDir }: BindingsOptions): RuntimeBind
   const dataDir = dirname(databasePath)
   return {
     DB: db,
+    NODE_ID: nodeId,
     OAUTH_STATE: oauthStateStore(),
     BLOBS: diskBlobCache(blobCachePath),
     SESSION_ENC_KEY: encKey,

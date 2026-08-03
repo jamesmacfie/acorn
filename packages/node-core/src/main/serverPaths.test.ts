@@ -31,14 +31,16 @@ describe('server runtime paths', () => {
     expect(findWorkspaceRoot(bundledModuleDir)).toBe(root)
   })
 
+  // The dev data root belongs to apps/node (the service owns SQLite, blobs and node.json), while
+  // clientDir still points into apps/desktop until the renderer moves to the app:// origin.
   it('derives the SPA and dev-data paths from the workspace root', () => {
     const { root, sourceModuleDir } = fixture()
     const paths = resolveServerPaths(sourceModuleDir)
     expect(paths).toEqual({
       clientDir: join(root, 'apps/desktop/dist/client'),
-      devDataDir: join(root, 'apps/desktop/.acorn'),
+      devDataDir: join(root, 'apps/node/.acorn'),
     })
-    expect(resolveDatabasePath(paths.devDataDir)).toBe(join(root, 'apps/desktop/.acorn', 'acorn.sqlite'))
+    expect(resolveDatabasePath(paths.devDataDir)).toBe(join(root, 'apps/node/.acorn', 'core.sqlite'))
   })
 
   // Regression guard: the previous implementation walked for a package.json named "@acorn/desktop",
