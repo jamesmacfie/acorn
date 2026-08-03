@@ -209,7 +209,24 @@ export async function startServiceRuntime({ config, desktop, stateChanged }: Run
     // session, seedTaskNotes and workflowWiring read it per call), so seeding the token here and
     // assigning the URL right after startListener is enough — no restructuring of the wiring order,
     // which exists for a different reason (bridges must be installed before requests arrive).
-    const internalApiEnv = { ACORN_API_URL: '', ACORN_API_TOKEN: runtime.INTERNAL_TOKEN }
+    //
+    // Two of these four are split by LIFETIME, not by taste. ACORN_API_URL is correct for callers
+    // rebuilt on every boot (seedTaskNotes, workflowWiring, both in-process). It is NOT correct for a
+    // child that outlives a boot: an agent pane runs in tmux and is reattached after a restart, keeping
+    // the environment of the boot that created it — and the port is ephemeral now, so a baked URL points
+    // at nothing. ACORN_DATA_DIR is the stable thing, and mcp/api.ts resolves the current port from
+    // <dataDir>/node.json. The internal token needs no such treatment: it is deliberately persisted
+    // across boots for exactly this reason (main/bindings.ts).
+    //
+    // NODE_EXTRA_CA_CERTS is how a child trusts the node's self-signed certificate with zero code. The
+    // certificate is a CA with an IP:127.0.0.1 SAN (main/tls.ts), so the child validates FULLY — no
+    // `rejectUnauthorized: false` anywhere. Ceiling documented in mcp/api.ts.
+    const internalApiEnv = {
+      ACORN_API_URL: '',
+      ACORN_API_TOKEN: runtime.INTERNAL_TOKEN,
+      ACORN_DATA_DIR: config.dataDir,
+      NODE_EXTRA_CA_CERTS: join(config.dataDir, 'tls', 'cert.pem'),
+    }
 
     let finishReconcile!: () => void
     const reconciled = new Promise<void>((resolve) => (finishReconcile = resolve))

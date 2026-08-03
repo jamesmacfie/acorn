@@ -7,7 +7,8 @@
 //
 // Launched by the AGENT (registered user-wide via `claude mcp add …` with the Electron-as-node
 // launcher over ./main.ts), so it scopes itself from inherited env: ACORN_TASK_ID (which task) plus
-// the loopback client's ACORN_API_URL/ACORN_API_TOKEN. Outside a task session, or with acorn not
+// the loopback client's ACORN_DATA_DIR/ACORN_API_TOKEN (the endpoint is resolved from the data root
+// rather than a baked URL — see ./api.ts). Outside a task session, or with acorn not
 // running, tools/list is empty and a call returns a structured 'no-active-task' / 'acorn-not-running'
 // result — never a protocol error (a plain terminal loads this server too).
 import { Server } from '@modelcontextprotocol/sdk/server/index.js'

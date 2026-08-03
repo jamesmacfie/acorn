@@ -1,8 +1,11 @@
 import { spawn, type ChildProcess } from 'node:child_process'
-import { createServer, type Server } from 'node:http'
-import { dirname, resolve } from 'node:path'
+import { createServer, type Server } from 'node:https'
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
+import { ensureCert } from '../main/tls'
 
 // Integration test over REAL stdio JSON-RPC (docs/agent-tools.md): the MCP server is now a generic
 // PROJECTION of the agent-tool registry — it fetches the manifest (GET /:id/tools) and proxies calls
@@ -10,6 +13,11 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 // mirrors the manifest, a call proxies the arguments (with the internal bearer + session header),
 // and env-absent / acorn-down degrade to structured results, never protocol errors. The per-tool
 // behaviour (git, notes provenance, memory PROPOSE-only) is covered at the registry/route layer.
+//
+// The stub is HTTPS with a real acorn certificate, and the child is given ACORN_DATA_DIR +
+// NODE_EXTRA_CA_CERTS exactly as the service gives them (apps/node/src/service/runtime.ts). That is the
+// whole transport contract for an out-of-boot child: resolve the port from node.json, trust the node's
+// certificate as a CA, validate FULLY.
 
 const appRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../..')
 
@@ -84,10 +92,23 @@ const toolText = (res: { result?: unknown }): unknown => JSON.parse((res.result 
 describe('acorn MCP server projects the agent-tool registry over stdio (docs/agent-tools.md)', () => {
   let stub: Server
   let port: number
+  // Stands in for a node's data root: the certificate the stub serves, and the node.json the child reads
+  // the port out of.
+  let dataDir: string
+  let caPath: string
+  // A certificate the stub does NOT serve — the "some other node is on that port" case.
+  let strangerCaPath: string
   const posts: { url: string; body: unknown; internal: string; session: string; ceiling: string }[] = []
 
   beforeAll(async () => {
-    stub = createServer((req, res) => {
+    dataDir = mkdtempSync(join(tmpdir(), 'acorn-mcp-root-'))
+    const cert = ensureCert(dataDir)
+    caPath = join(dataDir, 'tls', 'cert.pem')
+    const stranger = mkdtempSync(join(tmpdir(), 'acorn-mcp-stranger-'))
+    strangerCaPath = join(stranger, 'tls', 'cert.pem')
+    ensureCert(stranger)
+
+    stub = createServer({ key: cert.keyPem, cert: cert.certPem, minVersion: 'TLSv1.3' }, (req, res) => {
       const json = (v: unknown) => {
         res.setHeader('content-type', 'application/json')
         res.end(JSON.stringify(v))
@@ -115,14 +136,25 @@ describe('acorn MCP server projects the agent-tool registry over stdio (docs/age
     })
     await new Promise<void>((r) => stub.listen(0, '127.0.0.1', r))
     port = (stub.address() as { port: number }).port
+    // What openDataRoot writes, and the only current thing a reattached child can read: the URL it was
+    // spawned with is from a previous boot, the port in here is from this one.
+    writeFileSync(join(dataDir, 'node.json'), JSON.stringify({ nodeId: 'n', createdAt: Date.now(), protocolVersion: 1, port }))
   })
 
-  afterAll(() => stub.close())
+  afterAll(() => {
+    stub.close()
+    rmSync(dataDir, { recursive: true, force: true })
+    rmSync(dirname(dirname(strangerCaPath)), { recursive: true, force: true })
+  })
 
   it('tools/list mirrors the manifest; tools/call proxies args with bearer + session header', async () => {
     const client = new McpClient({
       ACORN_TASK_ID: 't1',
-      ACORN_API_URL: `http://127.0.0.1:${port}`,
+      // A STALE url from a previous boot, deliberately: the point is that node.json wins. A reattached
+      // tmux agent really does carry one of these, and it really does point at a port nobody holds.
+      ACORN_API_URL: 'https://127.0.0.1:1',
+      ACORN_DATA_DIR: dataDir,
+      NODE_EXTRA_CA_CERTS: caPath,
       ACORN_API_TOKEN: 'internal-token',
       ACORN_SESSION_ID: 'sess-42',
       ACORN_TOOL_CEILING: 'encoded-scope',
@@ -152,7 +184,7 @@ describe('acorn MCP server projects the agent-tool registry over stdio (docs/age
   }, 30_000)
 
   it('without ACORN_TASK_ID → empty list and a structured no-active-task, not an error', async () => {
-    const client = new McpClient({ ACORN_TASK_ID: '', ACORN_API_URL: `http://127.0.0.1:${port}`, ACORN_API_TOKEN: 'x' })
+    const client = new McpClient({ ACORN_TASK_ID: '', ACORN_DATA_DIR: dataDir, NODE_EXTRA_CA_CERTS: caPath, ACORN_API_TOKEN: 'x' })
     try {
       await client.init()
       expect((await client.send('tools/list')).result).toMatchObject({ tools: [] })
@@ -165,10 +197,26 @@ describe('acorn MCP server projects the agent-tool registry over stdio (docs/age
   }, 30_000)
 
   it('with acorn not running → structured acorn-not-running', async () => {
-    const client = new McpClient({ ACORN_TASK_ID: 't1', ACORN_API_URL: 'http://127.0.0.1:1', ACORN_API_TOKEN: 'x' })
+    const client = new McpClient({ ACORN_TASK_ID: 't1', ACORN_API_URL: 'https://127.0.0.1:1', ACORN_API_TOKEN: 'x' })
     try {
       await client.init()
       expect(toolText(await client.send('tools/call', { name: 'task_current', arguments: {} }))).toMatchObject({ status: 'acorn-not-running' })
+    } finally {
+      client.kill()
+    }
+  }, 30_000)
+
+  // A node answering on the remembered port under an identity this child does not trust. The child must
+  // degrade to the same structured 'acorn-not-running' it uses for "nothing is listening" — NOT connect
+  // anyway, and not die with a TLS stack trace an agent would surface as a tool crash.
+  it('with a certificate it does not trust → the same structured acorn-not-running', async () => {
+    const client = new McpClient({ ACORN_TASK_ID: 't1', ACORN_DATA_DIR: dataDir, NODE_EXTRA_CA_CERTS: strangerCaPath, ACORN_API_TOKEN: 'x' })
+    try {
+      await client.init()
+      expect((await client.send('tools/list')).result).toMatchObject({ tools: [] })
+      const res = await client.send('tools/call', { name: 'task_current', arguments: {} })
+      expect(res.error).toBeUndefined()
+      expect(toolText(res)).toMatchObject({ status: 'acorn-not-running' })
     } finally {
       client.kill()
     }
