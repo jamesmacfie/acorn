@@ -226,9 +226,18 @@ test.afterEach(async () => {
   for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true })
 })
 
-test('S1 boots the authenticated desktop shell', async () => {
+test('S1 boots the authenticated desktop shell with no console errors', async () => {
   const running = await launch()
+  // A CSP violation is reported as a console error and nothing else — the blocked resource just does
+  // not load. So this is the guard on main/appScheme.ts's policy: any directive tightened past what the
+  // shell actually needs shows up here rather than as a subtly missing font, style or worker.
+  const errors: string[] = []
+  running.page.on('console', (message) => {
+    if (message.type() === 'error') errors.push(message.text())
+  })
+  await running.page.reload()
   await expect(running.page.locator('.brand')).toContainText('acorn')
+  expect(errors).toEqual([])
   await running.app.close()
 })
 
@@ -337,6 +346,12 @@ test('S8 survives a hard reload of a deep route under the app scheme', async () 
   await running.page.reload()
   await expect(running.page.locator('.shell')).toBeVisible()
   expect(running.page.url()).toBe('app://acorn/acorn/smoke/1')
+  // Read the policy back off the response. S1's console-error assertion catches a policy that is too
+  // tight; only this catches one that is not there at all — the failure mode where every directive
+  // silently permits everything.
+  const csp = await running.page.evaluate(async () =>
+    (await fetch(location.href)).headers.get('content-security-policy'))
+  expect(csp).toContain("connect-src 'self'")
   await running.app.close()
 })
 
