@@ -1,16 +1,21 @@
 import type { QueryClient } from '@tanstack/solid-query'
 import { prefsKey, prefsRoute } from '@acorn/protocol/api.ts'
 import { writeJson } from '../apiClient'
+import { homeNodeTarget } from '../node/fleet'
 import { pushBackgroundError } from '../notifications/notifications'
 import { persistedStateRegistry, utf8Bytes } from '../persistence/persistedState'
 
 // The single server write behind every pref. Lives here because savePref is its only caller — the
 // optimistic-cache + rollback dance below is the whole contract.
+// Addressed at the home node, matching prefsOptions — see the divergence note there. A pref written
+// to whichever node happens to be active and read back from the home node would silently lose every
+// theme change made while a remote node was selected.
 const setPref = async (key: string, value: string) =>
   writeJson<{ key: string; value: string }>(prefsRoute, {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ key, value }),
+    ...homeNodeTarget(),
   }, (res) => `prefs ${res.status}`)
 
 type PrefWriteState = {

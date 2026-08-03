@@ -360,12 +360,18 @@ importers:
       '@solidjs/router':
         specifier: ^0.16.1
         version: 0.16.1(solid-js@1.9.13)
+      '@tanstack/query-async-storage-persister':
+        specifier: ^5.101.0
+        version: 5.101.0
       '@tanstack/solid-query':
         specifier: ^5.101.0
         version: 5.101.0(solid-js@1.9.13)
       diff:
         specifier: ^9.0.0
         version: 9.0.0
+      idb-keyval:
+        specifier: ^6.2.5
+        version: 6.2.5
       lucide-static:
         specifier: ^1.27.0
         version: 1.27.0
