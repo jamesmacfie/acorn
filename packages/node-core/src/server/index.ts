@@ -15,6 +15,7 @@ import { taskContext } from './routes/taskContext'
 import { workspaces } from './routes/workspaces'
 import { tasks } from './routes/tasks'
 import { configTrust } from './routes/configTrust'
+import { worktree } from './routes/worktree'
 
 // One server, one namespace: /v2. createApp() is a factory so the bootstrap can build a fresh instance.
 // Core mounts only core routers by name, under /v2/core; every plugin-owned router arrives through the
@@ -71,6 +72,10 @@ export function createApp() {
     .route(`${CORE_NAMESPACE}/workspaces`, workspaces)
     .route(`${CORE_NAMESPACE}/tasks`, tasks)
     .route(`${CORE_NAMESPACE}/tasks`, configTrust)
+    // Worktree/repo-config/task-lifecycle authority, moved out of the terminal plugin in Phase 2's
+    // scope-shed. Mounted at the core root because it owns /task-statuses and /repos/path* as well as
+    // /tasks/:id/* (server/routes/worktree.ts).
+    .route(CORE_NAMESPACE, worktree)
     .route(`${CORE_NAMESPACE}/tasks`, taskContext) // /:id/context — the assembled task context (docs/agent-tools.md §4)
     .route(`${CORE_NAMESPACE}/tasks`, harness) // /:id/run — the renderer's run-target surface (docs/workflows.md §2)
     .route(`${CORE_NAMESPACE}/tasks`, agentTools) // /:id/tools + /:id/tools/:name — the agent-tool registry projection (docs/agent-tools.md)

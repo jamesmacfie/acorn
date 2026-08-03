@@ -3,6 +3,10 @@
 // — the terminal feature is one consumer among many (settings, the rail, the changes and context
 // panes, preview, task creation).
 //
+// As of Phase 2's scope-shed the ROUTES agree with that: everything here except sendToAgent now
+// addresses /v2/core/*. Only the bracketed-paste send still goes to the terminal plugin, because only
+// it needs a pseudo-terminal.
+//
 // Composition mirrors terminalClient: loopback HTTP for commands, the residual preload bridge for the
 // one thing that cannot be HTTP (the native folder picker). Returns null off-desktop on exactly the
 // same probe (`window.acorn?.terminal`), so every consumer's `if (!api)` guard behaves as before.
@@ -12,12 +16,12 @@ import {
   taskOnCreatedRoute,
   taskPreviewUrlRoute,
   taskUseCheckoutRoute,
-  terminalRepoPathConfigRoute,
-  terminalRepoPathRoute,
-  terminalRepoPathRunTargetsRoute,
-  terminalRepoPathSetRoute,
+  repoPathConfigRoute,
+  repoPathRoute,
+  repoPathRunTargetsRoute,
+  repoPathSetRoute,
+  taskStatusesRoute,
   terminalSessionActionRoute,
-  terminalTaskStatusesRoute,
 } from '@acorn/protocol/api.ts'
 import { readJson, writeJson } from '../apiClient'
 import { acornGlobal } from '../capabilities'
@@ -52,10 +56,10 @@ export const taskBridge = (): TaskBridge | null => {
   if (!bridge) return null
   return {
     repoPath: {
-      get: (owner, repo) => readJson<RepoPath | null>(terminalRepoPathRoute(owner, repo)),
-      set: (owner, repo, path) => put<RepoPathResult>(terminalRepoPathSetRoute, { owner, repo, path }),
-      runTargets: (owner, repo, runTargets) => put<RepoPathResult>(terminalRepoPathRunTargetsRoute, { owner, repo, runTargets }),
-      config: (owner, repo, patch) => put<RepoPathResult>(terminalRepoPathConfigRoute, { owner, repo, patch }),
+      get: (owner, repo) => readJson<RepoPath | null>(repoPathRoute(owner, repo)),
+      set: (owner, repo, path) => put<RepoPathResult>(repoPathSetRoute, { owner, repo, path }),
+      runTargets: (owner, repo, runTargets) => put<RepoPathResult>(repoPathRunTargetsRoute, { owner, repo, runTargets }),
+      config: (owner, repo, patch) => put<RepoPathResult>(repoPathConfigRoute, { owner, repo, patch }),
       pick: () => bridge.repoPath.pick(),
     },
     previewUrl: (taskId, script) => post<{ ok: boolean; url?: string; reason?: string }>(taskPreviewUrlRoute(taskId), { script }),
@@ -64,7 +68,7 @@ export const taskBridge = (): TaskBridge | null => {
       archive: (id, opts) => post<ArchiveResult>(taskArchiveRoute(id), opts ?? {}),
       onCreated: (id) => post<{ ok: boolean }>(taskOnCreatedRoute(id)).then(() => undefined),
       useCheckout: (id) => post<{ result: { worktreePath: string; branch: string } | null }>(taskUseCheckoutRoute(id)).then((r) => r.result),
-      statuses: () => readJson<TaskStatus[]>(terminalTaskStatusesRoute),
+      statuses: () => readJson<TaskStatus[]>(taskStatusesRoute),
     },
   }
 }

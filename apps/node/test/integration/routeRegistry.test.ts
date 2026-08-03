@@ -49,6 +49,19 @@ const MOUNTED_CORE_ROUTES: ReadonlyArray<readonly [method: string, path: string]
   ['PATCH', '/v2/core/tasks/:id'],
   ['POST', '/v2/core/tasks/:id/links'],
   ['GET', '/v2/core/tasks/:id/config-trust'],
+  // Worktree/repo-config/task-lifecycle authority, moved out of the terminal plugin in Phase 2's
+  // scope-shed (server/routes/worktree.ts).
+  ['GET', '/v2/core/task-statuses'],
+  ['GET', '/v2/core/repos/path'],
+  ['PUT', '/v2/core/repos/path'],
+  ['PUT', '/v2/core/repos/path/run-targets'],
+  ['PUT', '/v2/core/repos/path/config'],
+  ['POST', '/v2/core/tasks/:id/preview-url'],
+  ['POST', '/v2/core/tasks/:id/on-created'],
+  ['POST', '/v2/core/tasks/:id/use-checkout'],
+  ['POST', '/v2/core/tasks/:id/archive'],
+  ['GET', '/v2/core/tasks/:id/mcp'],
+  ['POST', '/v2/core/tasks/:id/mcp/starter'],
   ['GET', '/v2/core/tasks/:id/context'], // taskContext
   ['GET', '/v2/core/tasks/:id/run'], // harness
   ['GET', '/v2/core/tasks/:id/tools'], // agentTools — the MCP/harness projection
@@ -76,8 +89,8 @@ const MOUNTED_PLUGIN_ROUTES: ReadonlyArray<readonly [method: string, path: strin
   ['GET', '/v2/p/memory/memory'], // doubled: the router owns '/memory'
   ['GET', '/v2/p/memory/tasks/:id/notes'],
   ['GET', '/v2/p/memory/workspaces/:wsId/notes'],
-  ['GET', '/v2/p/terminal/terminal/sessions'], // doubled: the router owns '/terminal/*'
-  ['GET', '/v2/p/terminal/tasks/:id/mcp'],
+  ['GET', '/v2/p/terminal/sessions'], // de-doubled in Phase 2's route-declaration pass
+  ['GET', '/v2/p/terminal/profiles'],
   ['GET', '/v2/p/github/repos'],
   ['GET', '/v2/p/github/repos/:owner/:repo/labels'],
   ['GET', '/v2/p/github/repos/:owner/:repo/pulls'],

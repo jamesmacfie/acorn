@@ -201,7 +201,7 @@ type Seed = { workspaceId: string; taskId: string }
 async function seedLocal(page: Page, nodeId: string, repoDir: string, title: string): Promise<Seed> {
   const workspace = await nodeJson<{ id: string }>(page, nodeId, '/v2/core/workspaces', { method: 'POST', body: { name: 'Alpha' } })
   await nodeJson(page, nodeId, `/v2/core/workspaces/${workspace.id}/repos`, { method: 'POST', body: { owner: 'acorn', name: 'smoke' } })
-  await nodeJson(page, nodeId, '/v2/p/terminal/terminal/repo-path', { method: 'PUT', body: { owner: 'acorn', repo: 'smoke', path: repoDir } })
+  await nodeJson(page, nodeId, '/v2/core/repos/path', { method: 'PUT', body: { owner: 'acorn', repo: 'smoke', path: repoDir } })
   const task = await nodeJson<{ id: string }>(page, nodeId, '/v2/core/tasks', {
     method: 'POST',
     body: { origin: 'local', repoOwner: 'acorn', repoName: 'smoke', branch: 'main', title },

@@ -2,20 +2,18 @@ import { spawn, type IPty } from 'node-pty'
 import { execFile, execFileSync } from 'node:child_process'
 import { randomUUID } from 'node:crypto'
 import { promisify } from 'node:util'
-import { existsSync } from 'node:fs'
-import { readFile, writeFile } from 'node:fs/promises'
 import { dirname, resolve } from 'node:path'
 import { homedir } from 'node:os'
 import { eq } from 'drizzle-orm'
 import type { AppDatabase } from '@acorn/node-core/server/db/index.ts'
 import { schema } from '@acorn/node-core/server/db/index.ts'
 import { setTerminalBridge } from '../server/routes/terminal'
+import { setOnTaskCreated, setTaskSessionsBridge } from '@acorn/node-core/server/routes/worktree.ts'
 import { setStreamHandlers } from '@acorn/node-core/main/wsHub.ts'
-import type { ArchiveOpts, ArchiveResult, CreateOpts, ServerMsg, TerminalSession } from '@acorn/protocol/terminal.ts'
+import type { CreateOpts, ServerMsg, TerminalSession } from '@acorn/protocol/terminal.ts'
 import { AgentSender, type SendSubmit } from './agentSend'
-import { archiveTask, TEARDOWN_TIMEOUT_MS } from '@acorn/node-core/main/archive.ts'
+import { TEARDOWN_TIMEOUT_MS } from '@acorn/node-core/main/archive.ts'
 import { buildSessionEnv, childEnv } from '@acorn/node-core/main/taskEnv.ts'
-import { runProcess } from '@acorn/node-core/main/core/proc.ts'
 import {
   clampDim,
   computeIdle,
@@ -30,26 +28,21 @@ import {
   trimRing,
 } from './terminalUtils'
 import { getProfile, listProfileDefs, listProfiles, resolveCommand, tmuxAvailable } from '@acorn/node-core/main/profiles.ts'
-import { getRepoPath, setRepoConfig, setRepoPath, setRunTargets } from '@acorn/node-core/main/repoPaths.ts'
 import { fileURLToPath } from 'node:url'
-import { inspectMcpConfig, MCP_CANDIDATES, STARTER_MCP_JSON, type McpServerSummary } from '@acorn/protocol/mcp.ts'
 import { launcherSpec, resolveMcpEntry, serverName, type Launcher } from '@acorn/node-core/main/mcpRegister.ts'
 import { broadcastStatus } from '@acorn/node-core/main/notify.ts'
 import type { RunSessionGlue } from './runIpc'
 import { TerminalDisplay } from './terminalDisplay'
 import {
-  computeTaskStatuses,
   isDir,
   loadTask,
+  repoSetup,
   rendererBaseCheckout,
   resolveTaskCwd,
   setOnWorktreeCreated,
   taskContext,
-  taskRoot,
-  repoSetup,
   type TaskRow,
 } from '@acorn/node-core/main/taskWorktree.ts'
-import { currentBranch } from '@acorn/node-core/main/worktrees.ts'
 
 // PTYs live in the Node utility service. Sessions run on one of two backends:
 //  - node-pty: spawn the command directly. Survives a window reload (PTY is in the service), not an app
@@ -588,149 +581,58 @@ export function registerTerminalIpc(db: AppDatabase, worktreesDir: string, deps:
       if (s.meta.status === 'running') s.pty.resize(c, r)
       return true
     },
-    taskStatuses: () => computeTaskStatuses(db),
-    repoPathGet: (owner, repo) => getRepoPath(db, owner, repo),
-    repoPathSet: (owner, repo, path) => setRepoPath(db, owner, repo, path),
-    repoPathRunTargets: (owner, repo, runTargets) => setRunTargets(db, owner, repo, typeof runTargets === 'string' ? runTargets : ''),
-    repoPathConfig: (owner, repo, patch) => setRepoConfig(db, owner, repo, patch),
-    // Browser-preview 'script' mode (WorkspaceSettings): run the configured shell command in the
-    // task's worktree and use its stdout (last non-empty line, trimmed) as the preview URL. Keyed
-    // by taskId so the renderer never supplies a path; a short timeout guards a hung script.
-    previewUrl: async (taskId, rawScript) => {
-      const script = rawScript?.trim()
-      if (!script) return { ok: false, reason: 'no script configured' }
-      const cwd = await taskRoot(db, taskId)
-      if (!cwd) return { ok: false, reason: 'no worktree yet — open a terminal first' }
-      // Through the process broker (CoreServices.proc). This call used to pass NO `env` option at
-      // all, so a repo-configured capture command inherited the node's entire environment —
-      // SESSION_ENC_KEY and INTERNAL_TOKEN included — and had no output cap. It also gets a
-      // process-group kill now, which matters because a URL script commonly starts a dev server.
-      const t = await loadTask(db, taskId)
-      const result = await runProcess({
-        file: '/bin/sh',
-        args: ['-c', script],
-        cwd,
-        env: buildSessionEnv({
-          taskId,
-          cwd,
-          task: t ? { repoOwner: t.repoOwner, repoName: t.repoName, branch: t.branch, title: t.title } : null,
-        }),
-        timeoutMs: 10_000,
-      })
-      if (result.spawnError) return { ok: false, reason: result.spawnError }
-      if (result.timedOut) return { ok: false, reason: 'script timed out' }
-      if (result.code !== 0) return { ok: false, reason: result.stderr.trim().slice(0, 200) || 'script failed' }
-      const url = result.stdout.split('\n').map((l) => l.trim()).filter(Boolean).pop()
-      return url ? { ok: true, url } : { ok: false, reason: 'script produced no output' }
+  })
+
+  // The PTY half of archive (@acorn/node-core/server/routes/worktree.ts owns the route and the
+  // orchestration). These four are the only parts of tearing a task down that need a pseudo-terminal:
+  // the running-session guard, killing this task's sessions, dropping their rows, and streaming
+  // teardown output into a "Teardown" tab. An unfilled slot answers 503, which is exactly what
+  // dev:node did before when the whole terminal bridge was unset.
+  setTaskSessionsBridge({
+    runningCount: (taskId) => [...sessions.values()].filter((s) => s.meta.taskId === taskId && s.meta.status === 'running').length,
+    killRunning: (taskId) => {
+      for (const s of sessions.values()) if (s.meta.taskId === taskId && s.meta.status === 'running') killSession(s)
     },
-    // Notified by the client right after a task is created. If its workspace runs the setup script on
-    // task creation (trigger 'created') and the repo checkout is mapped, eagerly create the worktree
-    // now — resolveTaskCwd's onWorktreeCreated hook runs the script (as a background "Setup" tab).
-    // Other triggers no-op here and are handled lazily by whichever surface touches the task first.
-    // Best-effort: a missing checkout defers to first use.
-    onCreated: async (id) => {
-      if (!id) return
-      let t = await loadTask(db, id)
-      if (!t) return
-      // Snapshot PR/ticket context into curatable notes (docs/notes-and-memory.md). Best-effort and
-      // independent of worktree setup — runs even when there's no setup script / the worktree exists.
-      await seedNotes?.(t).catch((e) => console.warn('[notes] seed failed:', e))
-      const { script, trigger } = await repoSetup(db, t.repoOwner, t.repoName)
-      if (trigger !== 'created' || !script?.trim()) return
-      // Re-read after the seedNotes await — a pane may have created the worktree meanwhile.
-      t = await loadTask(db, id)
-      if (!t || (t.worktreePath && isDir(t.worktreePath))) return
-      const mapped = await getRepoPath(db, t.repoOwner, t.repoName)
-      if (!mapped || !isDir(mapped.path)) return
-      await resolveTaskCwd(db, t, mapped.path)
-      broadcastStatus() // rail/footer pick up the new worktree
-    },
-    // "New task here": point a task at the mapped checkout itself instead of an isolated worktree, and
-    // adopt the checkout's current branch. worktreePath === checkout is the marker every guard keys off.
-    // taskId is the capability — the path is re-derived from the DB. null if no checkout is mapped.
-    useCheckout: async (id) => {
-      if (!id) return null
-      const t = await loadTask(db, id)
-      if (!t) return null
-      const mapped = await getRepoPath(db, t.repoOwner, t.repoName)
-      if (!mapped || !isDir(mapped.path)) return null
-      const branch = (await currentBranch(mapped.path)) || t.branch // detached HEAD → keep the seed branch
-      await db.update(schema.tasks).set({ worktreePath: mapped.path, branch, updatedAt: Date.now() }).where(eq(schema.tasks.id, t.id))
-      broadcastStatus() // rail/footer pick up the borrowed checkout
-      return { worktreePath: mapped.path, branch }
-    },
-    archive: (id, opts) => archiveOne(id, opts),
-    // MCP config inspector (docs/mcp.md): read ONLY the known candidate files, parse + MASK IN MAIN
-    // — raw secrets never cross to the renderer. Read-only; acorn never launches these servers.
-    mcpInspect: async (taskId) => {
-      const root = taskId ? await taskRoot(db, taskId) : null
-      const out: { file: string; servers: McpServerSummary[] }[] = []
-      for (const candidate of MCP_CANDIDATES) {
-        const base = candidate.root === 'home' ? homedir() : root
-        if (!base) continue
-        const file = resolve(base, candidate.rel)
-        try {
-          out.push({ file, servers: inspectMcpConfig(await readFile(file, 'utf8')) })
-        } catch {
-          // absent file → not listed
+    // Drop any lingering exited sessions for this task so their rows don't outlive it.
+    dropTaskSessions: async (taskId) => {
+      for (const [sid, s] of sessions) {
+        if (s.meta.taskId === taskId) {
+          s.display.dispose()
+          sessions.delete(sid)
+          if (s.meta.backend === 'tmux') await deleteRow(db, sid)
         }
       }
-      return out
     },
-    mcpCreateStarter: async (taskId) => {
-      const root = await taskRoot(db, taskId)
-      if (!root) return { ok: false, reason: 'No worktree yet — open a terminal first.' }
-      const file = resolve(root, '.mcp.json')
-      if (existsSync(file)) return { ok: false, reason: '.mcp.json already exists.' }
-      await writeFile(file, STARTER_MCP_JSON, 'utf8')
-      return { ok: true }
+    // Teardown streams to the task drawer as a "Teardown" tab; its exit code + ring buffer are the
+    // result. A ~2 min timeout kills it (exitCode null → surfaced as a timeout).
+    //
+    // Archive right after relaunch must wait for tmux reconcile: before it the sessions map is empty,
+    // so the running-session guard would pass vacuously and the task's live tmux session would
+    // survive (and be re-attached) past its deleted worktree. Awaiting here rather than in the route
+    // keeps that constraint next to the map it protects.
+    runTeardown: async (script, cwd, env, taskId) => {
+      await bootReconciled
+      const t = await loadTask(db, taskId)
+      const meta = await spawnOne(db, { taskId, command: script, title: 'Teardown', env }, cwd, true, taskContext(t), t)
+      const s = sessions.get(meta.id)
+      if (!s) return { exitCode: 1, output: 'Could not start the teardown session.' }
+      broadcastStatus()
+      return new Promise((resolveTeardown) => {
+        const timer = setTimeout(() => killSession(s), TEARDOWN_TIMEOUT_MS)
+        s.pty.onExit(({ exitCode }) => {
+          clearTimeout(timer)
+          resolveTeardown({ exitCode, output: s.ring })
+        })
+      })
     },
   })
 
-  // Archive orchestration lives in archive.ts (guard → teardown → stop sessions → remove worktree →
-  // mark archived, docs/terminal-and-agents.md); this injects the live-session + drawer glue. The ONLY path
-  // allowed to tear a worktree down, and never automatic. A closure (not a bridge inline) so the
-  // TerminalBridge.archive stays a one-liner.
-  async function archiveOne(id: string, opts: ArchiveOpts): Promise<ArchiveResult> {
-    if (!id) return { ok: false, reason: 'Invalid task.' }
-    // Archive right after relaunch must wait for tmux reconcile: before it, the sessions map is
-    // empty, so the running-session guard passes vacuously, killRunning kills nothing, and the
-    // task's live tmux session would survive (and be re-attached) past its deleted worktree.
-    await bootReconciled
-    return archiveTask(db, id, opts, {
-      isDir,
-      runningCount: (taskId) => [...sessions.values()].filter((s) => s.meta.taskId === taskId && s.meta.status === 'running').length,
-      killRunning: (taskId) => {
-        for (const s of sessions.values()) if (s.meta.taskId === taskId && s.meta.status === 'running') killSession(s)
-      },
-      // Drop any lingering exited sessions for this task so their rows don't outlive it.
-      dropTaskSessions: async (taskId) => {
-        for (const [sid, s] of sessions) {
-          if (s.meta.taskId === taskId) {
-            s.display.dispose()
-            sessions.delete(sid)
-            if (s.meta.backend === 'tmux') await deleteRow(db, sid)
-          }
-        }
-      },
-      // Teardown streams to the task drawer as a "Teardown" tab; its exit code + ring buffer are
-      // the result. A ~2 min timeout kills it (exitCode null → surfaced as timeout).
-      runTeardown: async (script, cwd, env, taskId) => {
-        const t = await loadTask(db, taskId)
-        const meta = await spawnOne(db, { taskId, command: script, title: 'Teardown', env }, cwd, true, taskContext(t), t)
-        const s = sessions.get(meta.id)
-        if (!s) return { exitCode: 1, output: 'Could not start the teardown session.' }
-        broadcastStatus()
-        return new Promise((resolveTeardown) => {
-          const timer = setTimeout(() => killSession(s), TEARDOWN_TIMEOUT_MS)
-          s.pty.onExit(({ exitCode }) => {
-            clearTimeout(timer)
-            resolveTeardown({ exitCode, output: s.ring })
-          })
-        })
-      },
-    })
-  }
+  // Seeding PR/ticket notes on task creation is core's route now, but the notes store is injected
+  // here by the composition root — so this hands core the hook rather than moving the dependency.
+  setOnTaskCreated(async (taskId) => {
+    const task = await loadTask(db, taskId)
+    if (task) await seedNotes?.(task)
+  })
 
   // The STREAM half (the WebSocket transport): the terminal engine's PTY input/output + attach/detach now
   // ride the one authenticated WebSocket (main/wsHub.ts) instead of per-session IPC channels. The
