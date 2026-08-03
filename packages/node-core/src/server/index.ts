@@ -2,6 +2,7 @@ import { Hono } from 'hono'
 import { csrf } from 'hono/csrf'
 import { authMiddleware, type AppEnv } from './middleware/auth'
 import { buildIntegrationProviderRoutes } from './integrations/providerRoutes'
+import { idempotency } from './middleware/idempotency'
 import { requireUser } from './middleware/requireUser'
 import { onServerError, requestIdMiddleware } from './respond'
 import { CORE_NAMESPACE, PLUGIN_NAMESPACE, pluginRouteContributions, routeMountPath } from './routeRegistry'
@@ -51,6 +52,9 @@ export function createApp() {
     .use('/v2/*', authMiddleware) // resolve ctx.principal from device bearer, cookie or internal token
     .route('/v2', pairing.open) // GET /v2/node + POST /v2/pair — pre-auth by construction (see above)
     .use('/v2/*', requireUser) // single 401 gate over the protected router table
+    // Below the gate on purpose: replay is keyed on the caller's deviceId, which only exists once the
+    // principal is resolved and enforced (docs/vNext/protocol.md § HTTP conventions).
+    .use('/v2/*', idempotency)
     .route(CORE_NAMESPACE, pairing.core) // /pair, /pair/start, /devices — owner-only device administration
     .route(`${CORE_NAMESPACE}/me`, me)
     .route(`${CORE_NAMESPACE}/pins`, pins)

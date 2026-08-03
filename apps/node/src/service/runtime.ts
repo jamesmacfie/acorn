@@ -193,6 +193,10 @@ export async function startServiceRuntime({ config, desktop, stateChanged }: Run
 
   try {
     await prepareSecurityState(runtime)
+    // Expired replay rows read as absent already (auth/idempotency.ts), so this only reclaims space.
+    // Boot is the right moment because it is the one time nothing is mid-request, and a periodic
+    // sweeper would be machinery for a table that holds 24 hours of one owner's mutations.
+    await runtime.IDEMPOTENCY.cleanupExpired()
     mark('migrate')
 
     const worktreesDir = join(config.dataDir, 'worktrees')
