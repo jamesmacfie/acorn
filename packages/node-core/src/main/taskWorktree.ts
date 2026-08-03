@@ -120,8 +120,10 @@ export function taskContext(t: TaskRow | undefined): Pick<TerminalSession, 'repo
 // HERE — the single worktree-creation choke point — because every lazy creator funnels through
 // resolveTaskCwd (first terminal, editor/changes panes via taskRoot, run config, workflows); hooks
 // at individual callers miss whichever one happens to create the worktree first.
+// Nullable on both ends: the plugin that fills it clears it again in dispose, so a hook closed over a
+// torn-down engine cannot be invoked by the next boot's first worktree creation.
 let onWorktreeCreated: ((t: TaskRow, cwd: string) => Promise<void>) | null = null
-export const setOnWorktreeCreated = (fn: (t: TaskRow, cwd: string) => Promise<void>): void => {
+export const setOnWorktreeCreated = (fn: ((t: TaskRow, cwd: string) => Promise<void>) | null): void => {
   onWorktreeCreated = fn
 }
 

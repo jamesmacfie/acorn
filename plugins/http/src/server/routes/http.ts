@@ -1,17 +1,22 @@
-// Routes for the API panel, mounted at /v2/p/http (app/server/routes.ts). The core stack applies
-// authMiddleware → requireUser; this router adds an interactive-principal gate because its
+// Routes for the API panel, mounted at /v2/p/http by this plugin's init (node/index.ts). The core stack
+// applies authMiddleware → requireUser; this router adds an interactive-principal gate because its
 // outbound-request and secret-resolution powers must not be reachable through the internal token.
+//
+// A FACTORY over the plugin's own database, not a module-scope router reading db: the tables
+// live in <data-root>/plugins/http.sqlite now, and c.env deliberately does not carry per-plugin handles
+// (docs/vNext/data.md § Plugin DBs). The SecretService comes from CoreServices for the same reason — this
+// router no longer needs `c.env` at all, which is the point.
 import { Hono } from 'hono'
 import { and, asc, eq, isNull } from 'drizzle-orm'
 import { z } from 'zod'
-import { getDb } from '@acorn/node-core/server/db/index.ts'
-import * as schema from '@acorn/node-core/server/db/schema.ts'
 import type { SecretService } from '@acorn/node-core/main/core/secrets.ts'
+import type { PluginDatabase } from '@acorn/node-core/main/pluginStorage.ts'
 import type { AppEnv } from '@acorn/node-core/server/middleware/auth.ts'
 import { ownerId } from '@acorn/node-core/server/middleware/requireUser.ts'
 import { respondError } from '@acorn/node-core/server/respond.ts'
+import { httpRequests, httpVariables } from '../../node/schema'
 import { bodyModes, httpMethods, variableKinds, type AuthConfig, type BodyMode, type HttpRequest, type HttpVariable, type KeyValue } from '../../shared/model'
-import { SendError, send } from '../send'
+import { SendError, send, type SendCoreServices } from '../send'
 import { HttpStorageError, openHttpValue, protectHttpValue } from '../storage'
 
 const keyValue = z.object({ name: z.string(), value: z.string(), enabled: z.boolean() })
@@ -66,7 +71,7 @@ const parseJson = <T>(raw: string, fallback: T): T => {
   }
 }
 
-const toRequest = async (row: typeof schema.httpRequests.$inferSelect, secrets: SecretService): Promise<HttpRequest> => {
+const toRequest = async (row: typeof httpRequests.$inferSelect, secrets: SecretService): Promise<HttpRequest> => {
   const [url, headers, body, auth, vars] = await Promise.all([
     openHttpValue(row.url, row.encrypted, secrets),
     openHttpValue(row.headers, row.encrypted, secrets),
@@ -95,7 +100,7 @@ const toRequest = async (row: typeof schema.httpRequests.$inferSelect, secrets: 
 
 // Secret values never leave the server. The renderer gets '' and shows a "set" placeholder; saving
 // an unchanged secret means sending '' back, which the PUT handler treats as "keep what's stored".
-const toVariable = async (row: typeof schema.httpVariables.$inferSelect, secrets: SecretService): Promise<HttpVariable> => ({
+const toVariable = async (row: typeof httpVariables.$inferSelect, secrets: SecretService): Promise<HttpVariable> => ({
   id: row.id,
   name: row.name,
   kind: row.kind as HttpVariable['kind'],
@@ -106,9 +111,9 @@ const toVariable = async (row: typeof schema.httpVariables.$inferSelect, secrets
 
 const scope = (c: { req: { param: (k: string) => string } }) => ({ owner: c.req.param('owner'), repo: c.req.param('repo') })
 const inRepo = (userId: string, owner: string, repo: string) =>
-  and(eq(schema.httpRequests.userId, userId), eq(schema.httpRequests.repoOwner, owner), eq(schema.httpRequests.repoName, repo))
+  and(eq(httpRequests.userId, userId), eq(httpRequests.repoOwner, owner), eq(httpRequests.repoName, repo))
 const variablesInRepo = (userId: string, owner: string, repo: string) =>
-  and(eq(schema.httpVariables.userId, userId), eq(schema.httpVariables.repoOwner, owner), eq(schema.httpVariables.repoName, repo))
+  and(eq(httpVariables.userId, userId), eq(httpVariables.repoOwner, owner), eq(httpVariables.repoName, repo))
 
 const protectedRequestFields = async (d: z.infer<typeof requestBody>, secrets: SecretService) => {
   const [url, headers, body, auth, vars] = await Promise.all([
@@ -121,72 +126,44 @@ const protectedRequestFields = async (d: z.infer<typeof requestBody>, secrets: S
   return { url, headers, body, auth, vars }
 }
 
-export const http = new Hono<AppEnv>()
-  // This pane can resolve stored credentials and make arbitrary outbound requests. The internal
-  // token is deliberately insufficient: agent/MCP child processes must never use it as a secret
-  // decryption oracle.
-  .use('*', async (c, next) => {
-    // 'device' is the owner at a client, which is the only principal allowed to drive this pane — it was
-    // 'user' while that meant a session cookie. An internal token must never reach it.
-    if (c.get('principal')?.kind !== 'device') return respondError(c, 403, 'interactive_user_required')
-    await next()
-  })
+export const httpRoutes = (db: PluginDatabase, core: SendCoreServices) => {
+  const secrets = core.secrets
+  return new Hono<AppEnv>()
+    // This pane can resolve stored credentials and make arbitrary outbound requests. The internal
+    // token is deliberately insufficient: agent/MCP child processes must never use it as a secret
+    // decryption oracle.
+    .use('*', async (c, next) => {
+      // 'device' is the owner at a client, which is the only principal allowed to drive this pane — it was
+      // 'user' while that meant a session cookie. An internal token must never reach it.
+      if (c.get('principal')?.kind !== 'device') return respondError(c, 403, 'interactive_user_required')
+      await next()
+    })
 
-  // Saved requests for the repo. `?taskId=` returns that task's ad-hoc requests instead of the
-  // repo tree; the two sets are disjoint by construction (taskId null vs set).
-  .get('/:owner/:repo/requests', async (c) => {
-    const { owner, repo } = scope(c)
-    const userId = ownerId(c)
-    const taskId = c.req.query('taskId')
-    const rows = await getDb(c.env)
-      .select()
-      .from(schema.httpRequests)
-      .where(and(inRepo(userId, owner, repo), taskId ? eq(schema.httpRequests.taskId, taskId) : isNull(schema.httpRequests.taskId)))
-      .orderBy(asc(schema.httpRequests.folder), asc(schema.httpRequests.name))
-    return c.json(await Promise.all(rows.map((row) => toRequest(row, c.env.SECRETS))))
-  })
+    // Saved requests for the repo. `?taskId=` returns that task's ad-hoc requests instead of the
+    // repo tree; the two sets are disjoint by construction (taskId null vs set).
+    .get('/:owner/:repo/requests', async (c) => {
+      const { owner, repo } = scope(c)
+      const userId = ownerId(c)
+      const taskId = c.req.query('taskId')
+      const rows = await db
+        .select()
+        .from(httpRequests)
+        .where(and(inRepo(userId, owner, repo), taskId ? eq(httpRequests.taskId, taskId) : isNull(httpRequests.taskId)))
+        .orderBy(asc(httpRequests.folder), asc(httpRequests.name))
+      return c.json(await Promise.all(rows.map((row) => toRequest(row, secrets))))
+    })
 
-  .post('/:owner/:repo/requests', async (c) => {
-    const { owner, repo } = scope(c)
-    const parsed = requestBody.safeParse(await c.req.json().catch(() => null))
-    if (!parsed.success) return respondError(c, 400, 'bad_request', parsed.error.issues.map((i) => i.message))
-    const d = parsed.data
-    const protectedFields = await protectedRequestFields(d, c.env.SECRETS)
-    const row = {
-      id: crypto.randomUUID(),
-      userId: ownerId(c),
-      repoOwner: owner,
-      repoName: repo,
-      folder: d.folder,
-      taskId: d.taskId,
-      name: d.name,
-      method: d.method,
-      url: protectedFields.url,
-      headers: protectedFields.headers,
-      bodyMode: d.bodyMode,
-      body: protectedFields.body,
-      auth: protectedFields.auth,
-      vars: protectedFields.vars,
-      encrypted: true,
-      createdAt: now(),
-      updatedAt: now(),
-    }
-    await getDb(c.env).insert(schema.httpRequests).values(row)
-    return c.json(await toRequest(row, c.env.SECRETS), 201)
-  })
-
-  .put('/:owner/:repo/requests/:id', async (c) => {
-    const { owner, repo } = scope(c)
-    const parsed = requestBody.safeParse(await c.req.json().catch(() => null))
-    if (!parsed.success) return respondError(c, 400, 'bad_request', parsed.error.issues.map((i) => i.message))
-    const d = parsed.data
-    const db = getDb(c.env)
-    const userId = ownerId(c)
-    const protectedFields = await protectedRequestFields(d, c.env.SECRETS)
-    // Scope the update to this repo so an id from another repo can't be smuggled in.
-    const updated = await db
-      .update(schema.httpRequests)
-      .set({
+    .post('/:owner/:repo/requests', async (c) => {
+      const { owner, repo } = scope(c)
+      const parsed = requestBody.safeParse(await c.req.json().catch(() => null))
+      if (!parsed.success) return respondError(c, 400, 'bad_request', parsed.error.issues.map((i) => i.message))
+      const d = parsed.data
+      const protectedFields = await protectedRequestFields(d, secrets)
+      const row = {
+        id: crypto.randomUUID(),
+        userId: ownerId(c),
+        repoOwner: owner,
+        repoName: repo,
         folder: d.folder,
         taskId: d.taskId,
         name: d.name,
@@ -198,117 +175,146 @@ export const http = new Hono<AppEnv>()
         auth: protectedFields.auth,
         vars: protectedFields.vars,
         encrypted: true,
+        createdAt: now(),
         updatedAt: now(),
-      })
-      .where(and(inRepo(userId, owner, repo), eq(schema.httpRequests.id, c.req.param('id'))))
-      .returning()
-    if (!updated.length) return respondError(c, 404, 'not_found')
-    return c.json(await toRequest(updated[0], c.env.SECRETS))
-  })
+      }
+      await db.insert(httpRequests).values(row)
+      return c.json(await toRequest(row, secrets), 201)
+    })
 
-  .delete('/:owner/:repo/requests/:id', async (c) => {
-    const { owner, repo } = scope(c)
-    const userId = ownerId(c)
-    const deleted = await getDb(c.env)
-      .delete(schema.httpRequests)
-      .where(and(inRepo(userId, owner, repo), eq(schema.httpRequests.id, c.req.param('id'))))
-      .returning({ id: schema.httpRequests.id })
-    if (!deleted.length) return respondError(c, 404, 'not_found')
-    return c.body(null, 204)
-  })
+    .put('/:owner/:repo/requests/:id', async (c) => {
+      const { owner, repo } = scope(c)
+      const parsed = requestBody.safeParse(await c.req.json().catch(() => null))
+      if (!parsed.success) return respondError(c, 400, 'bad_request', parsed.error.issues.map((i) => i.message))
+      const d = parsed.data
+      const userId = ownerId(c)
+      const protectedFields = await protectedRequestFields(d, secrets)
+      // Scope the update to this repo so an id from another repo can't be smuggled in.
+      const updated = await db
+        .update(httpRequests)
+        .set({
+          folder: d.folder,
+          taskId: d.taskId,
+          name: d.name,
+          method: d.method,
+          url: protectedFields.url,
+          headers: protectedFields.headers,
+          bodyMode: d.bodyMode,
+          body: protectedFields.body,
+          auth: protectedFields.auth,
+          vars: protectedFields.vars,
+          encrypted: true,
+          updatedAt: now(),
+        })
+        .where(and(inRepo(userId, owner, repo), eq(httpRequests.id, c.req.param('id'))))
+        .returning()
+      if (!updated.length) return respondError(c, 404, 'not_found')
+      return c.json(await toRequest(updated[0], secrets))
+    })
 
-  // --- repo variables ---
+    .delete('/:owner/:repo/requests/:id', async (c) => {
+      const { owner, repo } = scope(c)
+      const userId = ownerId(c)
+      const deleted = await db
+        .delete(httpRequests)
+        .where(and(inRepo(userId, owner, repo), eq(httpRequests.id, c.req.param('id'))))
+        .returning({ id: httpRequests.id })
+      if (!deleted.length) return respondError(c, 404, 'not_found')
+      return c.body(null, 204)
+    })
 
-  .get('/:owner/:repo/vars', async (c) => {
-    const { owner, repo } = scope(c)
-    const userId = ownerId(c)
-    const rows = await getDb(c.env)
-      .select()
-      .from(schema.httpVariables)
-      .where(variablesInRepo(userId, owner, repo))
-      .orderBy(asc(schema.httpVariables.name))
-    return c.json(await Promise.all(rows.map((row) => toVariable(row, c.env.SECRETS))))
-  })
+    // --- repo variables ---
 
-  .post('/:owner/:repo/vars', async (c) => {
-    const { owner, repo } = scope(c)
-    const parsed = variableBody.safeParse(await c.req.json().catch(() => null))
-    if (!parsed.success) return respondError(c, 400, 'bad_request', parsed.error.issues.map((i) => i.message))
-    const d = parsed.data
-    const userId = ownerId(c)
-    const value = await protectHttpValue(d.value, c.env.SECRETS)
-    const row = {
-      id: crypto.randomUUID(),
-      userId,
-      repoOwner: owner,
-      repoName: repo,
-      name: d.name,
-      kind: d.kind,
-      value,
-      encrypted: true,
-      enabled: d.enabled,
-      createdAt: now(),
-      updatedAt: now(),
-    }
-    try {
-      await getDb(c.env).insert(schema.httpVariables).values(row)
-    } catch {
-      return respondError(c, 409, 'duplicate_name', [`A variable named "${d.name}" already exists for this repo`])
-    }
-    return c.json(await toVariable(row, c.env.SECRETS), 201)
-  })
+    .get('/:owner/:repo/vars', async (c) => {
+      const { owner, repo } = scope(c)
+      const userId = ownerId(c)
+      const rows = await db
+        .select()
+        .from(httpVariables)
+        .where(variablesInRepo(userId, owner, repo))
+        .orderBy(asc(httpVariables.name))
+      return c.json(await Promise.all(rows.map((row) => toVariable(row, secrets))))
+    })
 
-  .put('/:owner/:repo/vars/:id', async (c) => {
-    const { owner, repo } = scope(c)
-    const parsed = variableBody.safeParse(await c.req.json().catch(() => null))
-    if (!parsed.success) return respondError(c, 400, 'bad_request', parsed.error.issues.map((i) => i.message))
-    const d = parsed.data
-    const db = getDb(c.env)
-    const userId = ownerId(c)
-    const id = c.req.param('id')
-    const existing = await db
-      .select()
-      .from(schema.httpVariables)
-      .where(and(variablesInRepo(userId, owner, repo), eq(schema.httpVariables.id, id)))
-    if (!existing.length) return respondError(c, 404, 'not_found')
+    .post('/:owner/:repo/vars', async (c) => {
+      const { owner, repo } = scope(c)
+      const parsed = variableBody.safeParse(await c.req.json().catch(() => null))
+      if (!parsed.success) return respondError(c, 400, 'bad_request', parsed.error.issues.map((i) => i.message))
+      const d = parsed.data
+      const userId = ownerId(c)
+      const value = await protectHttpValue(d.value, secrets)
+      const row = {
+        id: crypto.randomUUID(),
+        userId,
+        repoOwner: owner,
+        repoName: repo,
+        name: d.name,
+        kind: d.kind,
+        value,
+        encrypted: true,
+        enabled: d.enabled,
+        createdAt: now(),
+        updatedAt: now(),
+      }
+      try {
+        await db.insert(httpVariables).values(row)
+      } catch {
+        return respondError(c, 409, 'duplicate_name', [`A variable named "${d.name}" already exists for this repo`])
+      }
+      return c.json(await toVariable(row, secrets), 201)
+    })
 
-    // The renderer never sees a secret's plaintext, so it sends '' to mean "leave it alone".
-    const unchangedSecret = d.kind === 'secret' && existing[0].kind === 'secret' && d.value === ''
-    const value = unchangedSecret ? existing[0].value : await protectHttpValue(d.value, c.env.SECRETS)
+    .put('/:owner/:repo/vars/:id', async (c) => {
+      const { owner, repo } = scope(c)
+      const parsed = variableBody.safeParse(await c.req.json().catch(() => null))
+      if (!parsed.success) return respondError(c, 400, 'bad_request', parsed.error.issues.map((i) => i.message))
+      const d = parsed.data
+      const userId = ownerId(c)
+      const id = c.req.param('id')
+      const existing = await db
+        .select()
+        .from(httpVariables)
+        .where(and(variablesInRepo(userId, owner, repo), eq(httpVariables.id, id)))
+      if (!existing.length) return respondError(c, 404, 'not_found')
 
-    const updated = await db
-      .update(schema.httpVariables)
-      .set({ name: d.name, kind: d.kind, value, encrypted: true, enabled: d.enabled, updatedAt: now() })
-      .where(and(variablesInRepo(userId, owner, repo), eq(schema.httpVariables.id, id)))
-      .returning()
-    return c.json(await toVariable(updated[0], c.env.SECRETS))
-  })
+      // The renderer never sees a secret's plaintext, so it sends '' to mean "leave it alone".
+      const unchangedSecret = d.kind === 'secret' && existing[0].kind === 'secret' && d.value === ''
+      const value = unchangedSecret ? existing[0].value : await protectHttpValue(d.value, secrets)
 
-  .delete('/:owner/:repo/vars/:id', async (c) => {
-    const { owner, repo } = scope(c)
-    const userId = ownerId(c)
-    const deleted = await getDb(c.env)
-      .delete(schema.httpVariables)
-      .where(and(variablesInRepo(userId, owner, repo), eq(schema.httpVariables.id, c.req.param('id'))))
-      .returning({ id: schema.httpVariables.id })
-    if (!deleted.length) return respondError(c, 404, 'not_found')
-    return c.body(null, 204)
-  })
+      const updated = await db
+        .update(httpVariables)
+        .set({ name: d.name, kind: d.kind, value, encrypted: true, enabled: d.enabled, updatedAt: now() })
+        .where(and(variablesInRepo(userId, owner, repo), eq(httpVariables.id, id)))
+        .returning()
+      return c.json(await toVariable(updated[0], secrets))
+    })
 
-  // --- send ---
-  // The request is sent inline rather than by id, so an unsaved edit (and an ad-hoc request that
-  // was never saved at all) can be fired without a round-trip through the DB first.
-  .post('/:owner/:repo/send', async (c) => {
-    const { owner, repo } = scope(c)
-    const parsed = sendBody.safeParse(await c.req.json().catch(() => null))
-    if (!parsed.success) return respondError(c, 400, 'bad_request', parsed.error.issues.map((i) => i.message))
-    try {
-      return c.json(await send(getDb(c.env), ownerId(c), owner, repo, c.env.SECRETS, parsed.data))
-    } catch (err) {
-      // Preparation failures (invalid resolved URL, command/secret resolution) have no attempted
-      // request to display, so they stay a 422. Network attempts return a typed SendFailure above.
-      if (err instanceof SendError) return respondError(c, 422, 'send_failed', [err.message])
-      if (err instanceof HttpStorageError) return respondError(c, 422, 'send_failed', ['Saved HTTP data could not be opened'])
-      throw err
-    }
-  })
+    .delete('/:owner/:repo/vars/:id', async (c) => {
+      const { owner, repo } = scope(c)
+      const userId = ownerId(c)
+      const deleted = await db
+        .delete(httpVariables)
+        .where(and(variablesInRepo(userId, owner, repo), eq(httpVariables.id, c.req.param('id'))))
+        .returning({ id: httpVariables.id })
+      if (!deleted.length) return respondError(c, 404, 'not_found')
+      return c.body(null, 204)
+    })
+
+    // --- send ---
+    // The request is sent inline rather than by id, so an unsaved edit (and an ad-hoc request that
+    // was never saved at all) can be fired without a round-trip through the DB first.
+    .post('/:owner/:repo/send', async (c) => {
+      const { owner, repo } = scope(c)
+      const parsed = sendBody.safeParse(await c.req.json().catch(() => null))
+      if (!parsed.success) return respondError(c, 400, 'bad_request', parsed.error.issues.map((i) => i.message))
+      try {
+        return c.json(await send(db, core, ownerId(c), owner, repo, parsed.data))
+      } catch (err) {
+        // Preparation failures (invalid resolved URL, command/secret resolution) have no attempted
+        // request to display, so they stay a 422. Network attempts return a typed SendFailure above.
+        if (err instanceof SendError) return respondError(c, 422, 'send_failed', [err.message])
+        if (err instanceof HttpStorageError) return respondError(c, 422, 'send_failed', ['Saved HTTP data could not be opened'])
+        throw err
+      }
+    })
+}

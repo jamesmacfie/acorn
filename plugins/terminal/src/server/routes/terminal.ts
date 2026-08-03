@@ -4,6 +4,7 @@ import type { CreateOpts, TerminalProfile, TerminalSession } from '@acorn/protoc
 import { bridgeSlot, viaBridge } from '@acorn/node-core/server/bridge.ts'
 import type { AppEnv } from '@acorn/node-core/server/middleware/auth.ts'
 import { respondError } from '@acorn/node-core/server/respond.ts'
+import type { SendSubmit } from '../../shared/send'
 
 // Terminal control (docs/terminal-and-agents.md): the request/response half of the PTY engine —
 // list/create/kill/interrupt/remove/resize sessions and the bracketed-paste send. Streams ride the
@@ -24,7 +25,7 @@ import { respondError } from '@acorn/node-core/server/respond.ts'
 // app/server/routes.ts flagged for "the route-declaration phase" — this is that phase, and
 // docs/vNext/protocol.md § HTTP conventions already writes the de-doubled form.
 
-export type SendSubmit = 'now' | 'after-ready' | 'draft'
+export type { SendSubmit }
 export type TerminalBridge = {
   list(): Promise<TerminalSession[]>
   profiles(): Promise<TerminalProfile[]>

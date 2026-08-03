@@ -7,8 +7,9 @@
 //   'draft'       → paste only; the user reviews and hits enter
 // Deps-injected (a session is just write/running/idle) so the logic tests under plain Node.
 import { wrapBracketedPaste } from './terminalUtils'
+import type { SendSubmit } from '../shared/send'
 
-export type SendSubmit = 'now' | 'after-ready' | 'draft'
+export type { SendSubmit }
 
 export type SendableSession = {
   write(data: string): void

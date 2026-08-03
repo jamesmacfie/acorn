@@ -76,15 +76,26 @@ describe('env allowlist', () => {
 describe('process-group kill', () => {
   it('reaps a grandchild the direct child left behind', async () => {
     const pidFile = join(dir, 'grandchild.pid')
-    // The child backgrounds a long sleeper and exits its own foreground work into a wait, so killing
-    // only the direct pid would leave the sleeper running — exactly what held stdio pipes open before.
-    const result = await sh(`sh -c 'echo $$ > ${pidFile}; exec sleep 30' & sleep 30`, { timeoutMs: 300 })
-    expect(result.timedOut).toBe(true)
-
-    const pid = (await readFile(pidFile, 'utf8')).trim()
+    // The child backgrounds a long sleeper and waits, so killing only the direct pid would leave the
+    // sleeper running — exactly what held stdio pipes open before.
+    //
+    // Aborted once the grandchild has registered itself, NOT after a fixed timeout: a 300ms deadline
+    // raced the fork under full-suite load and the pid file did not exist yet, which failed this test
+    // intermittently for a reason that had nothing to do with process groups.
+    const controller = new AbortController()
+    const pending = sh(`sh -c 'echo $$ > ${pidFile}; exec sleep 30' & sleep 30`, {
+      timeoutMs: 30_000,
+      signal: controller.signal,
+    })
+    let pid = ''
+    for (let i = 0; i < 400 && !pid; i++) {
+      pid = await readFile(pidFile, 'utf8').then((value) => value.trim()).catch(() => '')
+      if (!pid) await new Promise((r) => setTimeout(r, 25))
+    }
     expect(pid).toMatch(/^\d+$/)
-    // Give the group signal a moment to land.
-    for (let i = 0; i < 40 && (await alive(pid)); i++) await new Promise((r) => setTimeout(r, 25))
+    controller.abort()
+    expect((await pending).aborted).toBe(true)
+    for (let i = 0; i < 400 && (await alive(pid)); i++) await new Promise((r) => setTimeout(r, 25))
     expect(await alive(pid)).toBe(false)
   })
 

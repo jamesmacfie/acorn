@@ -12,13 +12,14 @@ plan.md names four. Honestly assessed:
 
 | Exit criterion | State |
 | --- | --- |
-| every plugin initializes through the plugin API with its own DB | **partial** — the mechanism ships and one plugin (changes) is through it; eleven are not |
+| every plugin initializes through the plugin API with its own DB | **partial** — seven of twelve table-owning plugins are through it (changes, database, memory, docker, editor, terminal, http); five are not (agents, github, linear, notes, rollbar, workflows — six names, five conversions, since linear/rollbar share a table) |
 | core services have direct unit/integration tests (confinement, env allowlists, kill trees, secret non-disclosure) | **done** — all four, plus the process-broker taxonomy |
 | the terminal scope-shed is complete | **done** |
-| boundary baseline shrinks to only the edges scheduled for phase 3 | **not met** — the plugin→plugin ledger is byte-identical at nine entries. The node-side capability win is invisible to it because `workflows -> agents` survives via a *client* edge, and the two entries Phase 2 was to remove need the UI-kit extraction. The schema-import ratchet did shrink, 14 → 12. |
+| boundary baseline shrinks to only the edges scheduled for phase 3 | **partly** — the plugin→plugin ledger is 9 → 7: the UI-kit extraction removed `changes -> github` and `database -> editor`, which were the two Phase 2 owned. The remaining seven are Phase 3's by plan. The schema-import ratchet went 14 → 6. |
 
-So Phase 3 can start on the coupling map, but "every plugin initializes through the plugin API" is not
-true yet, and the client half of the plugin host does not exist.
+So Phase 3 can start on the coupling map — its seven edges are exactly what is left — but "every plugin
+initializes through the plugin API" is not true yet, and the client half of the plugin host
+(`ClientPlugin`) does not exist at all.
 
 ## What shipped
 
@@ -156,20 +157,25 @@ an existing root opening.
 
 These are Phase 2 scope that has **not** landed. Do not assume any of it.
 
-- **Eleven of twelve plugin databases.** Only `changes` owns its schema, chain and SQLite file. The
-  other table-owning plugins (`agents`, `database`, `github`, `http`, `linear`, `memory`, `notes`,
-  `rollbar`, `terminal`, `workflows`, plus `docker`/`editor`/`preview` which own no tables but still
-  need converting) read core's `schema.ts` as before. The boundary test's schema-import ratchet records
-  the remaining fourteen packages, so progress is measurable and cannot regress.
+- **Five plugin conversions.** Converted: `changes`, `database`, `memory`, `terminal`, `http` (own
+  schema + own chain + own SQLite file) and `docker`, `editor` (no tables, so a NodePlugin and no
+  database — the honest outcome, not a gap). Outstanding: `agents` (ten tables and the only real
+  cross-DB joins), `github` (twelve mirror tables, and core's `contextSections.ts`/`storageFootprint.ts`
+  read them), `linear` + `rollbar` (they SHARE the `issues` table, which needs a decision before either
+  can move), `workflows` (its runner re-derives CI state from github's `repos`/`checks`), and `notes`
+  (owns nothing but is consumed through a plugin→plugin import that Phase 3 resolves). The
+  schema-import ratchet records the remaining six packages, so progress is measurable and cannot regress.
 - **The cross-boundary reads that block the hard three.** Still outstanding: core's
   `agentTools/contextSections.ts` reads github's `repos`/`pull_requests`/`pr_files` and linear/rollbar's
   `issues`; `main/storageFootprint.ts` counts rows in four plugin tables; `routes/pins.ts` owns
   github-shaped `pinned_repos`; `db/cascade.ts` is one `db.batch` spanning four future databases; and
   agents' three `agent_* ⋈ tasks ⋈ workspace_repos` joins are the only real cross-DB joins in the
   codebase. `CoreServices.tasks.idsForWorkspace()` exists for that last one but has **no caller yet**.
-- **Most of `apps/node/src/wiring/`.** `serverBridges.ts`, `contextSectionsWiring.ts`,
-  `agentProfiles.ts`, `startupSecurity.ts`, `harnessWiring.ts`, `managedAgentsWiring.ts` and
-  `workflowWiring.ts` all still exist. Only `managedWorkflowStep.ts` is gone.
+- **Part of `apps/node/src/wiring/`.** `managedWorkflowStep.ts` and `harnessWiring.ts` are gone, and
+  `serverBridges.ts` is down to a single bridge (agents' usage service) with a comment saying it is
+  deleted rather than kept as an empty hook when agents converts. Still present:
+  `contextSectionsWiring.ts`, `agentProfiles.ts`, `startupSecurity.ts` (one call left — github's mirror
+  prune), `managedAgentsWiring.ts`, `workflowWiring.ts`.
 - **The `tools` contribution point (W6).** `setAgentTools(list)` is still a whole-list swap, and
   `agentToolsWiring.ts` still defines all 30 tools in one app-layer file with a single
   `AgentToolsDeps` bag.
@@ -246,6 +252,25 @@ sound and the *enforcement* was applied at one site each time.
 Also removed as speculative: the `NodeEventBus` (threaded through the host, the context and both
 composition roots, with zero publishers and zero subscribers) and `CoreServices.tasks.idsForWorkspace`
 (written for the agents joins, but agents is not converted, so it had no caller).
+
+## Two things the plugin conversions surfaced
+
+**`pluginMigrationsFolder` was migrating every plugin database with CORE's chain.** The ancestor walk
+checked the bare `<dir>/migrations` before `<dir>/migrations/<plugin>`, and in the BUILT layout the walk
+starts at `out/main/`, whose parent holds both — so every plugin database got core's 42 migrations and
+none of its own: 46 core tables, zero plugin tables. It failed silently, because a plugin only notices
+when it first touches one of its own tables, and nothing in the e2e suite touches `changes`,
+`database` or `memory` data. `http` is what turned it into a visible boot failure, because its init
+queries its own rows before the listener binds. The packaged path was already plugin-scoped, which is
+why packaging was correct and the unpackaged build was not. Fixed by checking the plugin-scoped
+candidate first at every level, pinned by `pluginMigrations.test.ts`.
+
+**`dev:node` now runs a real terminal engine.** `terminal` is `required`, and a required plugin ignores
+the disabled list by design, so the "PTY bridge unfilled → clean 503" degraded mode that
+phase1-notes.md described for a standalone node is **gone**. `standalone.ts` gets the same deps as the
+supervised root plus a `reconcileTmux()` pass before `reconciled` resolves — without that, archive's
+running-session guard would pass vacuously against an empty session map, which is the exact hazard
+`TaskSessionsBridge.ready()` exists to prevent.
 
 ## Known gaps worth stating plainly
 

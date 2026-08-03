@@ -1,7 +1,8 @@
 import { and, eq } from 'drizzle-orm'
-import type { AppDatabase } from '@acorn/node-core/server/db/index.ts'
-import { schema } from '@acorn/node-core/server/db/index.ts'
+import type { IdentityService } from '@acorn/node-core/main/core/index.ts'
+import type { PluginDatabase } from '@acorn/node-core/main/pluginStorage.ts'
 import { SecretUnavailableError, type SecretService } from '@acorn/node-core/main/core/secrets.ts'
+import { httpRequests, httpVariables } from '../node/schema'
 
 const LEGACY_USER = '__legacy_unscoped__'
 
@@ -27,18 +28,23 @@ export async function openHttpValue(value: string, encrypted: boolean, secrets: 
 
 // Pre-listener upgrade for rows written by releases that stored HTTP drafts in plaintext. All
 // sensitive fields are encrypted in one row update after their ciphertexts are ready. Legacy
-// ownership can be recovered only when the database contains exactly one GitHub identity;
-// otherwise the sentinel remains and no authenticated identity can query those rows.
-export async function protectLegacyHttpStorage(db: AppDatabase, secrets: SecretService): Promise<void> {
-  const [prefUsers, repoUsers] = await Promise.all([
-    db.selectDistinct({ userId: schema.prefs.userId }).from(schema.prefs),
-    db.selectDistinct({ userId: schema.repos.userId }).from(schema.repos),
-  ])
-  const identities = new Set([...prefUsers, ...repoUsers].map((row) => row.userId))
-  const soleIdentity = identities.size === 1 ? [...identities][0]! : null
+// ownership can be recovered only when the node knows exactly one identity; otherwise the sentinel
+// remains and no authenticated identity can query those rows.
+//
+// It runs from this plugin's init (node/index.ts) rather than from apps/node/src/wiring/startupSecurity.ts,
+// which is where it lived while the app owned this plugin's tables. NodePlugin.init is awaited before the
+// listener binds — the property this migration has always depended on — so the move is a relocation, not
+// a change in ordering guarantees.
+//
+// `identity` is CoreServices.identity, not two queries. This function used to compute the sole identity
+// itself by reading core's `prefs` AND github's `repos` with core's database handle: the first a plugin
+// reading a core table, the second a plugin reading ANOTHER PLUGIN's table. Neither is reachable now, and
+// "which identities does this node know?" was never this plugin's question to answer.
+export async function protectLegacyHttpStorage(db: PluginDatabase, secrets: SecretService, identity: IdentityService): Promise<void> {
+  const soleIdentity = await identity.sole()
 
-  const requests = await db.select().from(schema.httpRequests).where(eq(schema.httpRequests.encrypted, false))
-  const variables = await db.select().from(schema.httpVariables).where(eq(schema.httpVariables.encrypted, false))
+  const requests = await db.select().from(httpRequests).where(eq(httpRequests.encrypted, false))
+  const variables = await db.select().from(httpVariables).where(eq(httpVariables.encrypted, false))
 
   const requestUpdates = await Promise.all(
     requests.map(async (row) => ({
@@ -72,15 +78,15 @@ export async function protectLegacyHttpStorage(db: AppDatabase, secrets: SecretS
   const updates = [
     ...requestUpdates.map((row) =>
       db
-        .update(schema.httpRequests)
+        .update(httpRequests)
         .set({ userId: row.userId, url: row.url, headers: row.headers, body: row.body, auth: row.auth, vars: row.vars, encrypted: true })
-        .where(and(eq(schema.httpRequests.id, row.id), eq(schema.httpRequests.encrypted, false))),
+        .where(and(eq(httpRequests.id, row.id), eq(httpRequests.encrypted, false))),
     ),
     ...variableUpdates.map((row) =>
       db
-        .update(schema.httpVariables)
+        .update(httpVariables)
         .set({ userId: row.userId, value: row.value, encrypted: true })
-        .where(and(eq(schema.httpVariables.id, row.id), eq(schema.httpVariables.encrypted, false))),
+        .where(and(eq(httpVariables.id, row.id), eq(httpVariables.encrypted, false))),
     ),
   ]
   if (updates.length) await db.batch(updates as [typeof updates[number], ...typeof updates[number][]])

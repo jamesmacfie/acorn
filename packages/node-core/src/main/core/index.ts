@@ -28,6 +28,7 @@ import type { AppDatabase } from '../../server/db'
 import { createContextService, type ContextService } from './context'
 import * as fs from './fs'
 import * as git from './git'
+import { createIdentityService, type IdentityService } from './identity'
 import { createModelService, type ModelService } from './models'
 import * as proc from './proc'
 import { createRepoService, type RepoService } from './repos'
@@ -56,6 +57,9 @@ export type CoreServices = {
   // Text generation through a stored model-provider connection. The plugin owns the prompt; core owns
   // credential resolution and the provider adapters.
   models: ModelService
+  // "Which owner identities does this node know about?" — the question plugins/http's legacy-row
+  // migration has to answer and must not answer by scanning core's and github's tables itself.
+  identity: IdentityService
 }
 
 export function createCoreServices(options: { secrets: SecretService; db: AppDatabase }): CoreServices {
@@ -68,11 +72,13 @@ export function createCoreServices(options: { secrets: SecretService; db: AppDat
     repos: createRepoService(options.db),
     context: createContextService(options.db),
     models: createModelService(options.db, options.secrets),
+    identity: createIdentityService(options.db),
   }
 }
 
 export { SecretService }
-export type { TaskService } from './tasks'
+export type { TaskRunConfig, TaskService } from './tasks'
+export type { IdentityService } from './identity'
 export type { RepoCheckout, RepoService } from './repos'
 export type { ContextService } from './context'
 export type { GenerateTextRequest, ModelService } from './models'

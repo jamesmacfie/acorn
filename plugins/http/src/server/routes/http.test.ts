@@ -1,11 +1,13 @@
-import { testSecretEnv } from '@acorn/node-core/server/routes/testDb.ts'
 import { Hono } from 'hono'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import { schema } from '@acorn/node-core/server/db/index.ts'
+import { createCoreServices } from '@acorn/node-core/main/core/index.ts'
+import { SecretService } from '@acorn/node-core/main/core/secrets.ts'
 import type { AppEnv, Principal } from '@acorn/node-core/server/middleware/auth.ts'
-import { makeTestDb, type TestDb } from '@acorn/node-core/server/routes/testDb.ts'
+import { makeTestDb, makeTestPluginDb, type TestDb, type TestPluginDb } from '@acorn/node-core/server/routes/testDb.ts'
 import type { HttpRequest, HttpVariable } from '../../shared/model'
-import { http } from './http'
+import { httpRequests, httpVariables } from '../../node/schema'
+import { migrationsDir } from '../../node/migrations'
+import { httpRoutes } from './http'
 import type { Env } from '@acorn/node-core/main/bindings.ts'
 
 const ENC_KEY = '0'.repeat(64)
@@ -25,15 +27,21 @@ const requestBody = {
 const principal = (login: string, kind: Principal['kind'] = 'device'): Principal => ({ kind, userId: login })
 
 describe('HTTP credential isolation', () => {
-  let testDb: TestDb
-  let env: Env
+  // The router is a factory over this plugin's own database now, so the test hands it one instead of
+  // putting core's handle on `c.env`. The empty Env below is deliberate: it proves the router reads
+  // nothing from the bindings any more.
+  let pluginDb: TestPluginDb
+  let coreDb: TestDb
 
   beforeEach(() => {
-    testDb = makeTestDb()
-    env = { DB: testDb.db, ...testSecretEnv(ENC_KEY) } as unknown as Env
+    pluginDb = makeTestPluginDb('http', migrationsDir())
+    coreDb = makeTestDb()
   })
 
-  afterEach(() => testDb.cleanup())
+  afterEach(() => {
+    pluginDb.cleanup()
+    coreDb.cleanup()
+  })
 
   const call = (caller: Principal, path: string, init?: RequestInit) => {
     const app = new Hono<AppEnv>()
@@ -41,8 +49,8 @@ describe('HTTP credential isolation', () => {
       c.set('principal', caller)
       await next()
     })
-    app.route('/api/http', http)
-    return app.fetch(new Request(`http://acorn.test${path}`, init), env)
+    app.route('/api/http', httpRoutes(pluginDb.db, createCoreServices({ secrets: new SecretService(ENC_KEY), db: coreDb.db })))
+    return app.fetch(new Request(`http://acorn.test${path}`, init), {} as Env)
   }
 
   it('encrypts saved request payloads and returns them only to their owner', async () => {
@@ -54,7 +62,7 @@ describe('HTTP credential isolation', () => {
     expect(created.status).toBe(201)
     expect((await created.json()) as HttpRequest).toMatchObject(requestBody)
 
-    const [stored] = await testDb.db.select().from(schema.httpRequests)
+    const [stored] = await pluginDb.db.select().from(httpRequests)
     expect(stored).toMatchObject({ userId: 'alice', encrypted: true })
     const raw = JSON.stringify(stored)
     for (const secret of ['query-secret', 'header-secret', 'body-secret', 'auth-secret', 'override-secret']) {
@@ -81,7 +89,7 @@ describe('HTTP credential isolation', () => {
     expect(bob.status).toBe(201)
     expect(((await alice.json()) as HttpVariable).value).toBe('')
 
-    const stored = await testDb.db.select().from(schema.httpVariables)
+    const stored = await pluginDb.db.select().from(httpVariables)
     expect(stored).toHaveLength(2)
     expect(JSON.stringify(stored)).not.toContain('alice-secret')
     expect(JSON.stringify(stored)).not.toContain('bob-value')

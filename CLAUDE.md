@@ -45,8 +45,9 @@ partitioned per node. V1's bearer-authenticated `/api/v1` automation listener is
   handle, and `apps/node/src/server/plugins.ts` is the list — a plugin absent from it does not exist.
   Cross-plugin collaboration is a `CapabilityRegistry` (typed, late-bound, optional-by-default) and a
   `NodeEventBus`, both owned by the service runtime rather than module singletons. `contract/` is the
-  only cross-plugin import surface, boundary-tested. **Migration is partial** — one plugin is through
-  the host, eleven still wire through `apps/node/src/wiring/*.ts`.
+  only cross-plugin import surface, boundary-tested. **Migration is partial** — seven plugins are through
+  the host; agents, github, linear, rollbar, workflows and notes still wire through
+  `apps/node/src/wiring/*.ts`.
 - **CoreServices** (`packages/node-core/src/main/core/`) is what a plugin consumes instead of
   deep-importing core: `fs` (one symlink-aware confinement), `git` (one seam, `GIT_TERMINAL_PROMPT=0`,
   `SSH_AUTH_SOCK` passthrough), `proc` (**the** process broker: allowlisted env, process-group kill,
@@ -76,7 +77,7 @@ partitioned per node. V1's bearer-authenticated `/api/v1` automation listener is
   serve-then-revalidate; an on-disk dir caches immutable blob/patch bodies by SHA for all repos; IndexedDB
   persists the client query cache (one key per node, `acorn-cache:<nodeId>`). A node's data root holds
   `core.sqlite` (**not** V1's `acorn.sqlite`), `plugins/<name>.sqlite` (one per table-owning plugin —
-  Phase 2, `main/pluginStorage.ts`; only `changes` so far), `node.json` (nodeId + last port),
+  Phase 2, `main/pluginStorage.ts`; changes, database, memory, terminal and http so far), `node.json` (nodeId + last port),
   `node.lock`, `tls/`, `blobs/`, `logs/` and `worktrees/`; `openDataRoot` mints the identity, takes an exclusive pidfile
   lock and **refuses a V1 root outright**. It lives at `apps/node/.acorn/` in development (gitignored)
   and Electron's `userData` root when packaged.

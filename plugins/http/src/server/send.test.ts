@@ -3,9 +3,12 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { schema } from '@acorn/node-core/server/db/index.ts'
-import { makeTestDb, type TestDb } from '@acorn/node-core/server/routes/testDb.ts'
+import { createCoreServices } from '@acorn/node-core/main/core/index.ts'
+import { makeTestDb, makeTestPluginDb } from '@acorn/node-core/server/routes/testDb.ts'
 import type { HttpSendInput } from '../shared/model'
-import { SendError, buildRequest, describeFetchFailure, readCapped, referencedVariableNames, resolveVars, send } from './send'
+import { httpVariables } from '../node/schema'
+import { migrationsDir } from '../node/migrations'
+import { SendError, buildRequest, describeFetchFailure, readCapped, referencedVariableNames, resolveVars, send, type SendCoreServices } from './send'
 import { protectHttpValue } from './storage'
 import { SecretService } from '@acorn/node-core/main/core/secrets.ts'
 
@@ -26,6 +29,26 @@ const input = (patch: Partial<HttpSendInput> = {}): HttpSendInput => ({
 const USER = 'octocat'
 const ENC_KEY = '0'.repeat(64)
 const SECRETS = new SecretService(ENC_KEY)
+
+// TWO databases, which is the whole shape of the split: `http_variables` lives in this plugin's own
+// file, and the task/checkout fixtures the command-variable tests need live in core's. The plugin reads
+// the second only through CoreServices, so the test builds the real thing over a real core DB rather
+// than stubbing the seam it is meant to exercise.
+type Fixture = { core: SendCoreServices; db: ReturnType<typeof makeTestPluginDb>['db']; coreDb: ReturnType<typeof makeTestDb>['db']; cleanup: () => void }
+
+function fixture(): Fixture {
+  const coreDb = makeTestDb()
+  const pluginDb = makeTestPluginDb('http', migrationsDir())
+  return {
+    core: createCoreServices({ secrets: SECRETS, db: coreDb.db }),
+    db: pluginDb.db,
+    coreDb: coreDb.db,
+    cleanup: () => {
+      pluginDb.cleanup()
+      coreDb.cleanup()
+    },
+  }
+}
 
 describe('buildRequest — scheme', () => {
   it('rejects anything that is not http or https', () => {
@@ -172,12 +195,12 @@ describe('readCapped', () => {
 })
 
 describe('resolveVars — command execution context', () => {
-  let testDb: TestDb | null = null
+  let fx: Fixture | null = null
   let root: string | null = null
 
   afterEach(() => {
-    testDb?.cleanup()
-    testDb = null
+    fx?.cleanup()
+    fx = null
     if (root) rmSync(root, { recursive: true, force: true })
     root = null
   })
@@ -186,14 +209,14 @@ describe('resolveVars — command execution context', () => {
   // machine load: on a saturated box the profile-sourcing shell can exceed send.ts's own 15s
   // production command timeout. Retry rather than loosening a production timeout to suit CI.
   it('runs a command in the explicit task worktree and uses its last non-empty output line', { timeout: 30_000, retry: 2 }, async () => {
-    testDb = makeTestDb()
+    fx = fixture()
     root = mkdtempSync(join(tmpdir(), 'acorn-http-command-'))
     const worktree = join(root, 'worktree')
     const base = join(root, 'base')
     mkdirSync(worktree)
     mkdirSync(base)
-    await testDb.db.insert(schema.repoPaths).values({ owner: 'acme', repo: 'widget', path: base, createdAt: 0, updatedAt: 0 })
-    await testDb.db.insert(schema.tasks).values({
+    await fx.coreDb.insert(schema.repoPaths).values({ owner: 'acme', repo: 'widget', path: base, createdAt: 0, updatedAt: 0 })
+    await fx.coreDb.insert(schema.tasks).values({
       id: 'task-1',
       title: 'API task',
       origin: 'local',
@@ -209,7 +232,7 @@ describe('resolveVars — command execution context', () => {
       updatedAt: 0,
       archivedAt: null,
     })
-    await testDb.db.insert(schema.httpVariables).values({
+    await fx.db.insert(httpVariables).values({
       id: 'var-1',
       userId: USER,
       repoOwner: 'acme',
@@ -223,7 +246,7 @@ describe('resolveVars — command execution context', () => {
       updatedAt: 0,
     })
 
-    const vars = await resolveVars(testDb.db, USER, 'acme', 'widget', SECRETS, input({ url: '{{BASE_URL}}/health', executionTaskId: 'task-1' }))
+    const vars = await resolveVars(fx.db, fx.core, USER, 'acme', 'widget', input({ url: '{{BASE_URL}}/health', executionTaskId: 'task-1' }))
 
     const [commandCwd, taskId, branch] = vars.BASE_URL.split('|')
     expect(realpathSync(commandCwd)).toBe(realpathSync(worktree))
@@ -234,8 +257,8 @@ describe('resolveVars — command execution context', () => {
   })
 
   it('rejects an execution task from another repo', async () => {
-    testDb = makeTestDb()
-    await testDb.db.insert(schema.tasks).values({
+    fx = fixture()
+    await fx.coreDb.insert(schema.tasks).values({
       id: 'task-2',
       title: 'Other task',
       origin: 'local',
@@ -252,14 +275,14 @@ describe('resolveVars — command execution context', () => {
       archivedAt: null,
     })
 
-    await expect(resolveVars(testDb.db, USER, 'acme', 'widget', SECRETS, input({ executionTaskId: 'task-2' }))).rejects.toThrow(
+    await expect(resolveVars(fx.db, fx.core, USER, 'acme', 'widget', input({ executionTaskId: 'task-2' }))).rejects.toThrow(
       'The selected task belongs to acme/other',
     )
   })
 
   it('does not run an unused or request-overridden command variable', async () => {
-    testDb = makeTestDb()
-    await testDb.db.insert(schema.httpVariables).values({
+    fx = fixture()
+    await fx.db.insert(httpVariables).values({
       id: 'var-unused',
       userId: USER,
       repoOwner: 'acme',
@@ -273,20 +296,20 @@ describe('resolveVars — command execution context', () => {
       updatedAt: 0,
     })
 
-    await expect(resolveVars(testDb.db, USER, 'acme', 'widget', SECRETS, input())).resolves.not.toHaveProperty('BASE_URL')
+    await expect(resolveVars(fx.db, fx.core, USER, 'acme', 'widget', input())).resolves.not.toHaveProperty('BASE_URL')
     await expect(
-      resolveVars(testDb.db, USER, 'acme', 'widget', SECRETS, input({ url: '{{BASE_URL}}/health', vars: { BASE_URL: 'http://override.test' } })),
+      resolveVars(fx.db, fx.core, USER, 'acme', 'widget', input({ url: '{{BASE_URL}}/health', vars: { BASE_URL: 'http://override.test' } })),
     ).resolves.toMatchObject({ BASE_URL: 'http://override.test' })
   })
 })
 
 describe('send — transport outcomes', () => {
-  let testDb: TestDb | null = null
+  let fx: Fixture | null = null
 
   afterEach(() => {
     vi.unstubAllGlobals()
-    testDb?.cleanup()
-    testDb = null
+    fx?.cleanup()
+    fx = null
   })
 
   it('keeps the system error behind Node’s generic fetch failure', async () => {
@@ -301,11 +324,11 @@ describe('send — transport outcomes', () => {
   })
 
   it('returns a failed attempt with its URL and timeline when no response exists', async () => {
-    testDb = makeTestDb()
+    fx = fixture()
     const cause = Object.assign(new Error('getaddrinfo ENOTFOUND missing.test'), { code: 'ENOTFOUND' })
     vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new TypeError('fetch failed', { cause })))
 
-    const result = await send(testDb.db, USER, 'acme', 'widget', SECRETS, input({ url: 'http://missing.test/health' }))
+    const result = await send(fx.db, fx.core, USER, 'acme', 'widget', input({ url: 'http://missing.test/health' }))
 
     expect(result).toMatchObject({
       ok: false,
@@ -320,10 +343,10 @@ describe('send — transport outcomes', () => {
   })
 
   it('keeps an HTTP 500 as a response, including its body', async () => {
-    testDb = makeTestDb()
+    fx = fixture()
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response('server broke', { status: 500, statusText: 'Internal Server Error' })))
 
-    const result = await send(testDb.db, USER, 'acme', 'widget', SECRETS, input({ url: 'http://api.test/fail' }))
+    const result = await send(fx.db, fx.core, USER, 'acme', 'widget', input({ url: 'http://api.test/fail' }))
 
     expect(result.ok).toBe(true)
     if (!result.ok) throw new Error('Expected an HTTP response')
@@ -332,8 +355,8 @@ describe('send — transport outcomes', () => {
   })
 
   it('does not return resolved server-side secrets in URLs or request timelines', async () => {
-    testDb = makeTestDb()
-    await testDb.db.insert(schema.httpVariables).values({
+    fx = fixture()
+    await fx.db.insert(httpVariables).values({
       id: 'secret-var',
       userId: USER,
       repoOwner: 'acme',
@@ -350,11 +373,11 @@ describe('send — transport outcomes', () => {
     vi.stubGlobal('fetch', fetcher)
 
     const result = await send(
-      testDb.db,
+      fx.db,
+      fx.core,
       USER,
       'acme',
       'widget',
-      SECRETS,
       input({
         url: 'https://api.test/items/server-only-secret?token={{TOKEN}}',
         headers: [{ name: 'X-API-Key', value: '{{TOKEN}}', enabled: true }],

@@ -860,6 +860,9 @@ importers:
       '@types/node':
         specifier: ^26.0.0
         version: 26.0.0
+      drizzle-kit:
+        specifier: ^0.31.10
+        version: 0.31.10
       typescript:
         specifier: ^6.0.3
         version: 6.0.3
@@ -927,6 +930,9 @@ importers:
       '@acorn/plugin-notes':
         specifier: workspace:*
         version: link:../notes
+      '@acorn/plugin-terminal':
+        specifier: workspace:*
+        version: link:../terminal
       '@acorn/protocol':
         specifier: workspace:*
         version: link:../../packages/protocol
@@ -1197,9 +1203,15 @@ importers:
       '@xterm/addon-fit':
         specifier: ^0.10.0
         version: 0.10.0(@xterm/xterm@5.5.0)
+      '@xterm/addon-serialize':
+        specifier: 0.13.0
+        version: 0.13.0(@xterm/xterm@5.5.0)
       '@xterm/addon-webgl':
         specifier: ^0.18.0
         version: 0.18.0(@xterm/xterm@5.5.0)
+      '@xterm/headless':
+        specifier: 5.5.0
+        version: 5.5.0
       '@xterm/xterm':
         specifier: ^5.5.0
         version: 5.5.0
@@ -1225,6 +1237,9 @@ importers:
       '@types/node':
         specifier: ^26.0.0
         version: 26.0.0
+      drizzle-kit:
+        specifier: ^0.31.10
+        version: 0.31.10
       electron:
         specifier: ^42.5.0
         version: 42.5.0

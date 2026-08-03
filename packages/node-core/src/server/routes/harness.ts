@@ -6,8 +6,9 @@ import { respondError } from '../respond'
 // call these (client/features/tasks/runClient.ts). The agent-facing run_* verbs are the same
 // runtime, projected instead through the agent-tool registry (main/agentToolsWiring.ts); notes,
 // memory and the drivable browser moved there wholesale in the agent-tool registry. What's left here is one bridge:
-// the RuntimeService, injected by main/harnessWiring.ts so the routes stay testable and dev:node
-// (no Electron) degrades to a clean 503.
+// the run service, filled by the terminal plugin's init (plugins/terminal/src/node/index.ts) — a run
+// target IS a terminal session in the task worktree, so the plugin that owns the PTYs owns this bridge
+// too. It used to be an app-layer wireRunBridge call. An unfilled slot degrades to a clean 503.
 
 export type RunBridge = {
   targets(taskId: string): Promise<unknown>

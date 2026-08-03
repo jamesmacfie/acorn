@@ -112,10 +112,9 @@ The **loopback HTTP surface** the MCP server calls lives on the harness router
 | `POST /:id/run/:target/restart` | the target's `restart` command if set, else stop+start |
 | `GET  /:id/run/:target/status` | `{ running, url?, exitCode? }` |
 
-These delegate through the `RunBridge` sub-bridge (`harness.ts`) the service runtime injects
-(`main/harnessWiring.ts`, a historical path); under `dev:node` (no service engine) the bridge is
-absent and every route
-degrades to a clean `503 bridge-unavailable` (bridge-up domain failures map to typed
+These delegate through the `RunBridge` sub-bridge (`harness.ts`), filled by the terminal plugin's
+`init` (`plugins/terminal/src/node/index.ts`) — a run target is a terminal session, so the plugin that
+owns the PTYs owns this bridge. An unfilled slot degrades to a clean `503 bridge-unavailable` (bridge-up domain failures map to typed
 `404`/`400`/`500` — see docs/api-reference.md).
 
 ---
