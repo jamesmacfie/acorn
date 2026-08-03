@@ -357,7 +357,7 @@ export const defaultContentType = (mode: BodyMode): string | null => {
 
 // --- routes -------------------------------------------------------------------------------
 
-const repoScope = (owner: string, repo: string) => `/api/http/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}`
+const repoScope = (owner: string, repo: string) => `/v2/p/http/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}`
 export const httpRequestsRoute = (owner: string, repo: string): string => `${repoScope(owner, repo)}/requests`
 export const httpRequestRoute = (owner: string, repo: string, id: string): string => `${repoScope(owner, repo)}/requests/${encodeURIComponent(id)}`
 export const httpVariablesRoute = (owner: string, repo: string): string => `${repoScope(owner, repo)}/vars`

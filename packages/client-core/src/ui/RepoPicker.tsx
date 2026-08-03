@@ -42,7 +42,7 @@ export default function RepoPicker(props: {
         window.location.href = '/auth/login'
         return
       }
-      if (!res.ok) throw new Error(`/api/repos/refresh ${res.status}`)
+      if (!res.ok) throw new Error(`${reposRefreshRoute} ${res.status}`)
       await queryClient.invalidateQueries({ queryKey: reposKey })
     } catch {
       setRefreshFailed(true)

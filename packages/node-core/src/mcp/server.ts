@@ -1,6 +1,6 @@
 // The acorn MCP server (docs/mcp.md, docs/agent-tools.md): a stdio server that PROJECTS the app's
 // agent-tool registry. It holds no tool definitions of its own — it fetches the manifest
-// (GET /api/tasks/:id/tools) and proxies every call (POST /api/tasks/:id/tools/:name) over the
+// (GET /v2/core/tasks/:id/tools) and proxies every call (POST /v2/core/tasks/:id/tools/:name) over the
 // loopback API with the per-run internal bearer (see ./api.ts). One generic proxy replaces the 25
 // hand-written tool bodies; the registry (server/agentTools) is the single source of truth for
 // names, schemas, risk and availability.
@@ -26,7 +26,7 @@ type ManifestTool = { name: string; description: string; inputSchema: Record<str
 // → empty list (a plain terminal shows no acorn tools; they appear once a task session connects).
 async function fetchManifest(): Promise<ManifestTool[]> {
   if (!TASK_ID) return []
-  const res = await apiGet(`/api/tasks/${TASK_ID}/tools`)
+  const res = await apiGet(`/v2/core/tasks/${TASK_ID}/tools`)
   if (!res.ok) return []
   return ((res.data as { tools?: ManifestTool[] }).tools ?? []).map((t) => ({ name: t.name, description: t.description, inputSchema: t.inputSchema }))
 }
@@ -43,7 +43,7 @@ export function buildServer(): Server {
 
   server.setRequestHandler(CallToolRequestSchema, async (req) => {
     if (!TASK_ID) return NO_TASK
-    const res = await apiSend('POST', `/api/tasks/${TASK_ID}/tools/${encodeURIComponent(req.params.name)}`, req.params.arguments ?? {})
+    const res = await apiSend('POST', `/v2/core/tasks/${TASK_ID}/tools/${encodeURIComponent(req.params.name)}`, req.params.arguments ?? {})
     if (!res.ok) return text({ status: res.kind, detail: res.detail })
     return text(res.data)
   })

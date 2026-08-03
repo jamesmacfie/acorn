@@ -17,7 +17,7 @@ import type {
   ImportAgentTranscriptInput,
 } from '../shared/schemas'
 
-const ROOT = '/api/agents'
+const ROOT = '/v2/p/agents'
 const sessionRoute = (sessionId: string, suffix = '') =>
   `${ROOT}/sessions/${encodeURIComponent(sessionId)}${suffix}`
 

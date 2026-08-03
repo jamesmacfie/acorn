@@ -116,7 +116,7 @@ export async function registerWorkflowIpc(
     finishHandoffs: (taskId, runId) => notesStore.setIncluded({ scope: 'task', taskId }, `workflow-handoffs-${runId}`, false),
     assembleContext: async (taskId, runId) => {
       try {
-        const res = await fetch(`${internalApiEnv.ACORN_API_URL}/api/tasks/${taskId}/context?workflowRunId=${encodeURIComponent(runId)}`, {
+        const res = await fetch(`${internalApiEnv.ACORN_API_URL}/v2/core/tasks/${taskId}/context?workflowRunId=${encodeURIComponent(runId)}`, {
           headers: { 'x-acorn-internal': internalApiEnv.ACORN_API_TOKEN ?? '' },
         })
         if (!res.ok) return ''

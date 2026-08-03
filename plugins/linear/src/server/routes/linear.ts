@@ -73,7 +73,7 @@ async function resolveIssues(
   return null
 }
 
-// /api/linear — read Linear issues referenced from a PR. Per-user, cached locally (never shared).
+// /v2/p/linear — read Linear issues referenced from a PR. Per-user, cached locally (never shared).
 // A bare identifier is resolved across all connected Linear integrations (resolveIssues);
 // project/browse routes take an explicit ?integration=<id> since the client already knows it.
 // Provider CRUD (connect/disconnect) lives in routes/integrations.ts.

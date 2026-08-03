@@ -1,4 +1,4 @@
-// Main-process backing for the /api/docker routes (server/routes/docker.ts). Maps the CLI failure
+// Main-process backing for the /v2/p/docker routes (server/routes/docker.ts). Maps the CLI failure
 // taxonomy onto BridgeError statuses: refs the daemon doesn't know → 404, state conflicts → 409,
 // daemon down/CLI missing → 409 docker_unavailable (info() reports availability for UI gating),
 // anything else → 422 with the stderr tail.

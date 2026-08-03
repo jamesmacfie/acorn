@@ -34,7 +34,7 @@ export function parseConflictNames(stdout: string): string[] {
 }
 
 export const pullConflicts = new Hono<AppEnv>().get('/:owner/:repo/pulls/:number/conflicts', async (c) => {
-  getUser(c) // gate on auth, like the other /api/repos reads
+  getUser(c) // gate on auth, like the other /v2/p/github/repos reads
   const db = getDb(c.env)
   const owner = c.req.param('owner')
   const repo = c.req.param('repo')

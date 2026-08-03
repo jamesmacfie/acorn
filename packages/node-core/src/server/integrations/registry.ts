@@ -44,8 +44,10 @@ class IntegrationProviderRegistry {
 
   registerRoute(route: ProviderRouteContribution): void {
     this.validateContribution(route.providerId, 'Provider route')
-    if (this.#routes.some((candidate) => candidate.prefix === route.prefix)) {
-      throw new Error(`Duplicate provider route prefix '${route.prefix}'.`)
+    // Keyed by (providerId, prefix): the prefix is namespace-relative now, so two providers may both
+    // contribute the empty prefix — only the same provider doing it twice is a collision.
+    if (this.#routes.some((candidate) => candidate.providerId === route.providerId && candidate.prefix === route.prefix)) {
+      throw new Error(`Duplicate provider route prefix '${route.prefix}' for provider '${route.providerId}'.`)
     }
     this.#routes.push(route)
   }

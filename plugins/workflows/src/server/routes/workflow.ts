@@ -28,7 +28,7 @@ const startBody = z.object({ def: z.object({ name: z.string().min(1), steps: z.a
 const gateBody = z.object({ stepId: z.string().min(1), approved: z.boolean() })
 const killBody = z.object({ stepId: z.string().min(1) })
 
-// Mounted at /api so it can carry both task-scoped (/tasks/:id/...) and run-scoped
+// Mounted at the plugin namespace root so it can carry both task-scoped (/tasks/:id/...) and run-scoped
 // (/workflows/runs/:runId/...) paths in one router.
 export const workflow = new Hono<AppEnv>()
   .get('/tasks/:id/workflows', (c) => viaBridge(c, workflowBridgeSlot, (b) => b.defs(c.req.param('id'))))

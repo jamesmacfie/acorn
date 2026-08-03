@@ -79,7 +79,7 @@ function openAuthWindow(parent: BrowserWindow, origin: string, loginUrl: string)
   authWin.webContents.on('did-navigate', (_e, url) => {
     if (url.startsWith(origin) && !url.includes('/auth/')) {
       authWin.close()
-      parent.webContents.reload() // re-runs /api/me with the new cookie
+      parent.webContents.reload() // re-runs /v2/core/me with the new cookie
     }
   })
   void authWin.loadURL(loginUrl)

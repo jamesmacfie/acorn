@@ -1,6 +1,6 @@
 // Builds the agent-tool registry (docs/agent-tools.md, docs/agent-tools.md): every agent capability
 // as ONE AgentToolContribution, with its domain dep closed over. Installed via setAgentTools, so the
-// server route (GET/POST /api/tasks/:id/tools) and the MCP server (which fetches the manifest and
+// server route (GET/POST /v2/core/tasks/:id/tools) and the MCP server (which fetches the manifest and
 // proxies calls) both project from this one list. Replaces the notes/memory/browser harness bridges
 // and the 25 hand-written MCP tool bodies. Run targets keep their dedicated renderer routes
 // (server/routes/harness.ts) — run appears here only as the agent-facing run_* tools.

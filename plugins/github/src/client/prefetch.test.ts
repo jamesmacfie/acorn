@@ -64,8 +64,8 @@ describe('open PR warmup', () => {
 
     await prefetchOpenPulls(queryClient, 'acorn', 'web', signal)
 
-    expect(fetchMock).toHaveBeenNthCalledWith(1, '/api/repos/acorn/web/pulls?state=open', expect.objectContaining({ signal: expect.any(AbortSignal) }))
-    expect(fetchMock).toHaveBeenNthCalledWith(2, '/api/repos/acorn/web/pulls/batch', expect.objectContaining({
+    expect(fetchMock).toHaveBeenNthCalledWith(1, '/v2/p/github/repos/acorn/web/pulls?state=open', expect.objectContaining({ signal: expect.any(AbortSignal) }))
+    expect(fetchMock).toHaveBeenNthCalledWith(2, '/v2/p/github/repos/acorn/web/pulls/batch', expect.objectContaining({
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       signal,
@@ -85,7 +85,7 @@ describe('open PR warmup', () => {
 
     await prefetchPullSummary(queryClient, 'acorn', 'web', 42, signal)
 
-    expect(fetchMock).toHaveBeenCalledWith('/api/repos/acorn/web/pulls/batch', expect.objectContaining({
+    expect(fetchMock).toHaveBeenCalledWith('/v2/p/github/repos/acorn/web/pulls/batch', expect.objectContaining({
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       signal,

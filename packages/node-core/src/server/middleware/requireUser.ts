@@ -3,7 +3,7 @@ import { createMiddleware } from 'hono/factory'
 import { respondError } from '../respond'
 import type { AppEnv, SessionUser } from './auth'
 
-// The single authentication gate for /api routes. Mounted once in createApp() over `/api/*`
+// The single authentication gate for /v2 routes. Mounted once in createApp() over `/v2/*`
 // (after csrf + authMiddleware), it replaces the per-route inline guards. It gates on the
 // resolved principal — either credential kind passes — so internal-token callers (empty
 // GitHub token) work exactly as cookie callers do. See docs/security.md §3, §9.1.

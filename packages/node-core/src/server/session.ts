@@ -2,7 +2,7 @@ import { EncryptJWT, jwtDecrypt } from 'jose'
 import { keyBytes } from './secretBox'
 
 // The stateless session: { token, user } sealed into an encrypted cookie (AES-256-GCM via
-// JWE `dir`). Decrypted in-CPU on every /api/* request — no server-side session store.
+// JWE `dir`). Decrypted in-CPU on every /v2/* request — no server-side session store.
 // See docs/authentication.md.
 
 export type SessionData = {

@@ -1,4 +1,4 @@
-// Renderer API for the /api/docker routes — loopback HTTP, same shape as databaseClient.ts.
+// Renderer API for the /v2/p/docker routes — loopback HTTP, same shape as databaseClient.ts.
 import { readJson, writeJson } from '@acorn/client-core/apiClient.ts'
 import type {
   DockerComposeAction,

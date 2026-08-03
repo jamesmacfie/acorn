@@ -3,31 +3,34 @@ import type { ApiError } from '@acorn/protocol/api.ts'
 import { createApp } from '../index'
 import type { Env } from '../../main/bindings'
 
-// One representative path per mounted /api router. requireUser is a global `/api/*` gate, so an
+// One representative path per mounted /v2 router. requireUser is a global `/v2/*` gate, so an
 // unauthenticated request to any of these must 401 with the ApiError envelope — before routing,
-// before any handler. This table is the mount contract: a router added outside `/api/*` (or a
-// public hole) would not appear here and would silently escape the gate, so keep it exhaustive.
-// (docs/security.md §3, §7 · docs/security.md)
+// before any handler. That the gate is one glob over BOTH namespaces is the point: core at
+// /v2/core/* and every plugin at /v2/p/<plugin>/* are covered by the same middleware, so a plugin
+// cannot mount itself outside it. This table is the mount contract: a router added outside `/v2/*`
+// (or a public hole) would not appear here and would silently escape the gate, so keep it
+// exhaustive. (docs/security.md §3, §7 · docs/vNext/protocol.md § HTTP conventions)
 const PROTECTED_PATHS: [string, string][] = [
-  ['GET', '/api/me'],
-  ['GET', '/api/pins'],
-  ['GET', '/api/prefs'],
-  ['GET', '/api/workspaces'],
-  ['GET', '/api/tasks'],
-  ['GET', '/api/tasks/t1/review-notes'],
-  ['GET', '/api/tasks/t1/context'],
-  ['GET', '/api/tasks/t1/notes'], // harness — internal-token surface, still gated
-  ['GET', '/api/integrations'],
-  ['GET', '/api/linear/projects'],
-  ['GET', '/api/rollbar/items'],
-  ['GET', '/api/repos'],
-  ['GET', '/api/repos/o/r/labels'],
-  ['GET', '/api/repos/o/r/pulls'],
-  ['GET', '/api/repos/o/r/pulls/1'],
-  ['GET', '/api/repos/o/r/pulls/1/files'],
-  ['GET', '/api/repos/o/r/blobs/deadbeef'],
-  ['GET', '/api/repos/o/r/actions/runs/1/jobs'],
-  ['GET', '/api/repos/o/r/mentions'],
+  ['GET', '/v2/core/me'],
+  ['GET', '/v2/core/pins'],
+  ['GET', '/v2/core/prefs'],
+  ['GET', '/v2/core/workspaces'],
+  ['GET', '/v2/core/tasks'],
+  ['GET', '/v2/core/tasks/t1/context'],
+  ['GET', '/v2/core/tasks/t1/tools'], // harness — internal-token surface, still gated
+  ['GET', '/v2/core/integrations'],
+  ['GET', '/v2/p/changes/tasks/t1/review-notes'],
+  ['GET', '/v2/p/memory/tasks/t1/notes'],
+  ['GET', '/v2/p/linear/projects'],
+  ['GET', '/v2/p/rollbar/items'],
+  ['GET', '/v2/p/github/repos'],
+  ['GET', '/v2/p/github/repos/o/r/labels'],
+  ['GET', '/v2/p/github/repos/o/r/pulls'],
+  ['GET', '/v2/p/github/repos/o/r/pulls/1'],
+  ['GET', '/v2/p/github/repos/o/r/pulls/1/files'],
+  ['GET', '/v2/p/github/repos/o/r/blobs/deadbeef'],
+  ['GET', '/v2/p/github/repos/o/r/actions/runs/1/jobs'],
+  ['GET', '/v2/p/github/repos/o/r/mentions'],
 ]
 
 describe('requireUser gate over the protected router table', () => {
@@ -47,7 +50,7 @@ describe('requireUser gate over the protected router table', () => {
 
   it('CSRF-guards /auth too — a foreign page cannot force a logout', async () => {
     // /auth is public, but public is not the same as unprotected: POST /auth/logout mutates session
-    // state, so it must reject a cross-origin caller like every /api/* mutation does.
+    // state, so it must reject a cross-origin caller like every /v2/* mutation does.
     const foreign = new Request('http://127.0.0.1:4317/auth/logout', { method: 'POST', headers: { origin: 'http://evil.example.com' } })
     expect((await createApp().fetch(foreign, {} as Env)).status).toBe(403)
     // No Origin at all is equally untrusted — a browser always sends one on a POST.
