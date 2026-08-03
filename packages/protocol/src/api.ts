@@ -495,24 +495,33 @@ export const noteRoute = (location: NoteLocation, slug: string) => `${notesListR
 export const noteIncludedRoute = (location: NoteLocation, slug: string) => `${noteRoute(location, slug)}/included`
 export const noteTitleRoute = (location: NoteLocation, slug: string) => `${noteRoute(location, slug)}/title`
 
-// Terminal control (docs/terminal-and-agents.md): request/response routes for the main-process
-// engine. Input/output/status use the WebSocket; only the native folder picker stays on preload IPC.
-export const terminalSessionsRoute = '/v2/p/terminal/terminal/sessions'
-export const terminalProfilesRoute = '/v2/p/terminal/terminal/profiles'
-export const terminalTaskStatusesRoute = '/v2/p/terminal/terminal/task-statuses'
+// Terminal control (docs/terminal-and-agents.md): request/response routes for the PTY engine.
+// Input/output/status use the WebSocket; only the native folder picker stays on preload IPC.
+//
+// De-doubled in Phase 2's route-declaration pass: /v2/p/terminal/sessions, not
+// /v2/p/terminal/terminal/sessions. The plugin's router used to state its own top-level segment
+// internally, which repeated under the namespace; docs/vNext/protocol.md § HTTP conventions already
+// writes the short form.
+export const terminalSessionsRoute = '/v2/p/terminal/sessions'
+export const terminalProfilesRoute = '/v2/p/terminal/profiles'
 export const terminalSessionActionRoute = (sid: string, action: 'kill' | 'interrupt' | 'remove' | 'resize' | 'send') =>
-  `/v2/p/terminal/terminal/sessions/${encodeURIComponent(sid)}/${action}`
-export const terminalRepoPathRoute = (owner: string, repo: string) =>
-  `/v2/p/terminal/terminal/repo-path?owner=${encodeURIComponent(owner)}&repo=${encodeURIComponent(repo)}`
-export const terminalRepoPathSetRoute = '/v2/p/terminal/terminal/repo-path'
-export const terminalRepoPathRunTargetsRoute = '/v2/p/terminal/terminal/repo-path/run-targets'
-export const terminalRepoPathConfigRoute = '/v2/p/terminal/terminal/repo-path/config'
-export const taskArchiveRoute = (id: string) => `/v2/p/terminal/tasks/${id}/archive`
-export const taskPreviewUrlRoute = (id: string) => `/v2/p/terminal/tasks/${id}/preview-url`
-export const taskOnCreatedRoute = (id: string) => `/v2/p/terminal/tasks/${id}/on-created`
-export const taskUseCheckoutRoute = (id: string) => `/v2/p/terminal/tasks/${id}/use-checkout`
-export const taskMcpRoute = (id: string) => `/v2/p/terminal/tasks/${id}/mcp`
-export const taskMcpStarterRoute = (id: string) => `/v2/p/terminal/tasks/${id}/mcp/starter`
+  `/v2/p/terminal/sessions/${encodeURIComponent(sid)}/${action}`
+
+// Worktree, repo-config and task lifecycle — CORE routes as of Phase 2's scope-shed. These were
+// /v2/p/terminal/* until the terminal plugin stopped owning where a repo lives, what its executable
+// config says, and whether a task is archived (docs/vNext/plan.md § Phase 2).
+export const taskStatusesRoute = '/v2/core/task-statuses'
+export const repoPathRoute = (owner: string, repo: string) =>
+  `/v2/core/repos/path?owner=${encodeURIComponent(owner)}&repo=${encodeURIComponent(repo)}`
+export const repoPathSetRoute = '/v2/core/repos/path'
+export const repoPathRunTargetsRoute = '/v2/core/repos/path/run-targets'
+export const repoPathConfigRoute = '/v2/core/repos/path/config'
+export const taskArchiveRoute = (id: string) => `/v2/core/tasks/${id}/archive`
+export const taskPreviewUrlRoute = (id: string) => `/v2/core/tasks/${id}/preview-url`
+export const taskOnCreatedRoute = (id: string) => `/v2/core/tasks/${id}/on-created`
+export const taskUseCheckoutRoute = (id: string) => `/v2/core/tasks/${id}/use-checkout`
+export const taskMcpRoute = (id: string) => `/v2/core/tasks/${id}/mcp`
+export const taskMcpStarterRoute = (id: string) => `/v2/core/tasks/${id}/mcp/starter`
 
 // Local review notes (docs/panes.md): inline annotations on uncommitted changes, acorn-owned.
 export type ReviewNote = {

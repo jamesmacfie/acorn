@@ -6,8 +6,11 @@ import { setTerminalBridge, terminal, type TerminalBridge } from './terminal'
 import type { Env } from '@acorn/node-core/main/bindings.ts'
 
 // Transport contract for terminal control: routing, auth, body validation, and clean
-// bridge-unavailable degradation. PTY/worktree behavior is covered by main tests; streaming is
-// covered at the WebSocket boundary.
+// bridge-unavailable degradation. PTY behavior is covered by main tests; streaming is covered at the
+// WebSocket boundary.
+//
+// The worktree/repo-path/task-lifecycle half of this router moved to core in Phase 2's scope-shed —
+// its transport contract now lives in packages/node-core/src/server/routes/worktree.test.ts.
 
 const req = (url: string, method = 'GET', body?: unknown) =>
   new Request(`http://acorn.test${url}`, {
@@ -35,57 +38,56 @@ const fake = (over: Partial<TerminalBridge> = {}): TerminalBridge => ({
   remove: async () => true,
   resize: async () => true,
   sendToAgent: async () => ({ ok: true }),
-  taskStatuses: async () => [],
-  repoPathGet: async () => null,
-  repoPathSet: async () => ({ ok: true }) as never,
-  repoPathRunTargets: async () => ({ ok: true }) as never,
-  repoPathConfig: async () => ({ ok: true }) as never,
-  previewUrl: async () => ({ ok: true, url: 'http://x' }),
-  onCreated: async () => {},
-  useCheckout: async () => ({ worktreePath: '/w', branch: 'main' }),
-  archive: async () => ({ ok: true }) as never,
-  mcpInspect: async () => [],
-  mcpCreateStarter: async () => ({ ok: true }),
   ...over,
 })
 
 describe('terminal control routes', () => {
   afterEach(() => setTerminalBridge(null))
 
-  it('creates a session, lists, resizes, and archives via the bridge', async () => {
+  it('creates a session, lists, and resizes via the bridge', async () => {
     const seen: string[] = []
     setTerminalBridge(fake({
       create: async (opts) => (seen.push(`create:${opts.taskId}`), session as never),
       resize: async (id, cols, rows) => (seen.push(`resize:${id}:${cols}x${rows}`), true),
-      archive: async (id) => (seen.push(`archive:${id}`), { ok: true } as never),
+      kill: async (id) => (seen.push(`kill:${id}`), true),
     }))
     const app = authed()
-    expect((await app.fetch(req('/api/terminal/sessions'), {} as Env)).status).toBe(200)
-    await app.fetch(req('/api/terminal/sessions', 'POST', { taskId: 'task1', profileId: 'shell' }), {} as Env)
-    await app.fetch(req('/api/terminal/sessions/s1/resize', 'POST', { cols: 100, rows: 40 }), {} as Env)
-    await app.fetch(req('/api/tasks/task1/archive', 'POST', { force: true }), {} as Env)
-    expect(seen).toEqual(['create:task1', 'resize:s1:100x40', 'archive:task1'])
+    // De-doubled paths: /sessions, not /terminal/sessions. Under the plugin namespace this is
+    // /v2/p/terminal/sessions, which is what docs/vNext/protocol.md § HTTP conventions specifies.
+    expect((await app.fetch(req('/api/sessions'), {} as Env)).status).toBe(200)
+    await app.fetch(req('/api/sessions', 'POST', { taskId: 'task1', profileId: 'shell' }), {} as Env)
+    await app.fetch(req('/api/sessions/s1/resize', 'POST', { cols: 100, rows: 40 }), {} as Env)
+    await app.fetch(req('/api/sessions/s1/kill', 'POST'), {} as Env)
+    expect(seen).toEqual(['create:task1', 'resize:s1:100x40', 'kill:s1'])
   })
 
-  it('use-checkout wraps null-able result; default repo-path get returns null', async () => {
+  it('400s malformed create/resize/send bodies', async () => {
     setTerminalBridge(fake())
     const app = authed()
-    expect(await (await app.fetch(req('/api/tasks/task1/use-checkout', 'POST'), {} as Env)).json()).toEqual({ result: { worktreePath: '/w', branch: 'main' } })
-    expect(await (await app.fetch(req('/api/terminal/repo-path?owner=a&repo=b'), {} as Env)).json()).toBeNull()
+    expect((await app.fetch(req('/api/sessions', 'POST', {}), {} as Env)).status).toBe(400) // no taskId
+    expect((await app.fetch(req('/api/sessions/s1/resize', 'POST', { cols: 100 }), {} as Env)).status).toBe(400)
+    expect((await app.fetch(req('/api/sessions/s1/send', 'POST', { text: '' }), {} as Env)).status).toBe(400)
   })
 
-  it('400s malformed create/resize/send bodies and repo-path with no owner', async () => {
+  it('no longer serves the routes that moved to core', async () => {
     setTerminalBridge(fake())
     const app = authed()
-    expect((await app.fetch(req('/api/terminal/sessions', 'POST', {}), {} as Env)).status).toBe(400) // no taskId
-    expect((await app.fetch(req('/api/terminal/sessions/s1/resize', 'POST', { cols: 100 }), {} as Env)).status).toBe(400)
-    expect((await app.fetch(req('/api/terminal/sessions/s1/send', 'POST', { text: '' }), {} as Env)).status).toBe(400)
-    expect((await app.fetch(req('/api/terminal/repo-path'), {} as Env)).status).toBe(400)
+    // The scope-shed is only real if these are GONE from the plugin, not merely duplicated in core.
+    for (const [path, method] of [
+      ['/api/terminal/sessions', 'GET'],
+      ['/api/terminal/repo-path', 'GET'],
+      ['/api/terminal/task-statuses', 'GET'],
+      ['/api/tasks/task1/archive', 'POST'],
+      ['/api/tasks/task1/use-checkout', 'POST'],
+      ['/api/tasks/task1/mcp', 'GET'],
+    ] as const) {
+      expect((await app.fetch(req(path, method), {} as Env)).status).toBe(404)
+    }
   })
 
   it('401s without a principal; 503s without a bridge', async () => {
     const gated = new Hono<AppEnv>().use('/api/*', requireUser).route('/api', terminal)
-    expect((await gated.fetch(req('/api/terminal/sessions'), {} as Env)).status).toBe(401)
-    expect((await authed().fetch(req('/api/terminal/sessions'), {} as Env)).status).toBe(503)
+    expect((await gated.fetch(req('/api/sessions'), {} as Env)).status).toBe(401)
+    expect((await authed().fetch(req('/api/sessions'), {} as Env)).status).toBe(503)
   })
 })

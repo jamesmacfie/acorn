@@ -1,16 +1,28 @@
 import { Hono } from 'hono'
 import { z } from 'zod'
-import type { McpServerSummary } from '@acorn/protocol/mcp.ts'
-import type { ArchiveOpts, ArchiveResult, CreateOpts, RepoConfigPatch, RepoPath, RepoPathResult, TaskStatus, TerminalProfile, TerminalSession } from '@acorn/protocol/terminal.ts'
+import type { CreateOpts, TerminalProfile, TerminalSession } from '@acorn/protocol/terminal.ts'
 import { bridgeSlot, viaBridge } from '@acorn/node-core/server/bridge.ts'
 import type { AppEnv } from '@acorn/node-core/server/middleware/auth.ts'
 import { respondError } from '@acorn/node-core/server/respond.ts'
 
-// Terminal control (docs/terminal-and-agents.md): the request/response half of the terminal engine —
-// list/create/kill/resize sessions, repo-path mapping, task lifecycle (archive/useCheckout/onCreated),
-// preview-url + the MCP config inspector. Streams use the WebSocket hub; only the native folder
-// picker remains on the terminal preload bridge. Backed by the PTY engine in the main process, so
-// these routes return 503 under dev:node.
+// Terminal control (docs/terminal-and-agents.md): the request/response half of the PTY engine —
+// list/create/kill/interrupt/remove/resize sessions and the bracketed-paste send. Streams ride the
+// WebSocket hub; only the native folder picker remains on the terminal preload bridge. Backed by the
+// PTY engine in the service process, so these routes return 503 under dev:node.
+//
+// Eight routes, all of them about a pseudo-terminal. The other eleven this router used to serve —
+// task statuses, repo-path mapping, repo executable config, preview-url capture, task
+// on-created/use-checkout/archive, and the MCP config inspector — moved to
+// @acorn/node-core/server/routes/worktree.ts under /v2/core (docs/vNext/plan.md § Phase 2, "the
+// terminal scope-shed"). None of them were about a terminal; they were about where a repo lives and
+// what a task is, and leaving them here meant disabling the terminal plugin would disable worktree
+// management. Archive's PTY half comes back through worktree.ts's taskSessionsBridgeSlot, which this
+// plugin fills.
+//
+// Paths are relative to /v2/p/terminal, so `/sessions` mounts at /v2/p/terminal/sessions. It used to
+// state `/terminal/sessions` internally, producing the doubled /v2/p/terminal/terminal/sessions that
+// app/server/routes.ts flagged for "the route-declaration phase" — this is that phase, and
+// docs/vNext/protocol.md § HTTP conventions already writes the de-doubled form.
 
 export type SendSubmit = 'now' | 'after-ready' | 'draft'
 export type TerminalBridge = {
@@ -22,25 +34,14 @@ export type TerminalBridge = {
   remove(id: string): Promise<boolean>
   resize(id: string, cols: number, rows: number): Promise<boolean>
   sendToAgent(sessionId: string, text: string, submit: SendSubmit): Promise<{ ok: boolean; queued?: boolean; reason?: string }>
-  taskStatuses(): Promise<TaskStatus[]>
-  repoPathGet(owner: string, repo: string): Promise<RepoPath | null>
-  repoPathSet(owner: string, repo: string, path: string): Promise<RepoPathResult>
-  repoPathRunTargets(owner: string, repo: string, runTargets: string): Promise<RepoPathResult>
-  repoPathConfig(owner: string, repo: string, patch: RepoConfigPatch): Promise<RepoPathResult>
-  previewUrl(taskId: string, script: string): Promise<{ ok: boolean; url?: string; reason?: string }>
-  onCreated(taskId: string): Promise<void>
-  useCheckout(taskId: string): Promise<{ worktreePath: string; branch: string } | null>
-  archive(taskId: string, opts: ArchiveOpts): Promise<ArchiveResult>
-  mcpInspect(taskId: string): Promise<{ file: string; servers: McpServerSummary[] }[]>
-  mcpCreateStarter(taskId: string): Promise<{ ok: boolean; reason?: string }>
 }
 
 export const terminalBridgeSlot = bridgeSlot<TerminalBridge>()
 export const setTerminalBridge = terminalBridgeSlot.set
 
-// create spawns a PTY; resize/send/repo-path/preview/archive touch processes or persisted state —
-// all get validated bodies (the privileged-boundary contract). CreateOpts is passed through (the engine re-derives cwd
-// from taskId); we only assert the shape the engine relies on.
+// create spawns a PTY and resize/send touch a live process, so each gets a validated body (the
+// privileged-boundary contract). CreateOpts is passed through — the engine re-derives cwd from
+// taskId — so this asserts only the shape the engine relies on.
 const createBody = z
   .object({
     taskId: z.string().min(1),
@@ -55,99 +56,27 @@ const createBody = z
   .passthrough()
 const resizeBody = z.object({ cols: z.number(), rows: z.number() })
 const sendBody = z.object({ text: z.string().min(1), submit: z.enum(['now', 'after-ready', 'draft']) })
-const repoPathSetBody = z.object({ owner: z.string(), repo: z.string(), path: z.string() })
-const runTargetsBody = z.object({ owner: z.string(), repo: z.string(), runTargets: z.string() })
-const browserRuleSchema = z.object({
-  id: z.string(),
-  enabled: z.boolean(),
-  urlPattern: z.string(),
-  trigger: z.literal('load'),
-  action: z.object({ type: z.literal('fill'), selector: z.string(), value: z.string() }),
-})
-const repoConfigBody = z.object({
-  owner: z.string(),
-  repo: z.string(),
-  patch: z.object({
-    setupScript: z.string().optional(),
-    setupScriptTrigger: z.enum(['off', 'created', 'terminal']).optional(),
-    teardownScript: z.string().optional(),
-    devScript: z.string().optional(),
-    devRestartScript: z.string().optional(),
-    dbUrlScript: z.string().optional(),
-    dbSchemaMode: z.enum(['auto', 'script', 'file']).or(z.literal('')).optional(),
-    dbSchemaValue: z.string().optional(),
-    dbSchemaNotes: z.string().max(8000).optional(),
-    previewMode: z.enum(['url', 'port', 'script']).or(z.literal('')).optional(),
-    previewValue: z.string().optional(),
-    browserRules: z.array(browserRuleSchema).optional(),
-    branchPrefix: z.string().max(60).optional(),
-  }),
-})
-const previewBody = z.object({ script: z.string() })
-const archiveBody = z.object({ deleteWorktree: z.boolean().optional(), force: z.boolean().optional(), skipTeardown: z.boolean().optional() })
 
-const id = (c: { req: { param(k: string): string } }) => c.req.param('id')
 const b = terminalBridgeSlot
 
-// Mounted at the plugin namespace root to carry /terminal/*, /terminal/repo-path, and /tasks/:id/*
-// control verbs — hence the doubled /v2/p/terminal/terminal/* (see app/server/routes.ts).
 export const terminal = new Hono<AppEnv>()
-  // --- sessions ---
-  .get('/terminal/sessions', (c) => viaBridge(c, b, (t) => t.list()))
-  .get('/terminal/profiles', (c) => viaBridge(c, b, (t) => t.profiles()))
-  .get('/terminal/task-statuses', (c) => viaBridge(c, b, (t) => t.taskStatuses()))
-  .post('/terminal/sessions', async (c) => {
+  .get('/sessions', (c) => viaBridge(c, b, (t) => t.list()))
+  .get('/profiles', (c) => viaBridge(c, b, (t) => t.profiles()))
+  .post('/sessions', async (c) => {
     const p = createBody.safeParse(await c.req.json().catch(() => null))
     if (!p.success) return respondError(c, 400, 'bad_request')
     return viaBridge(c, b, (t) => t.create(p.data as CreateOpts))
   })
-  .post('/terminal/sessions/:sid/kill', (c) => viaBridge(c, b, (t) => t.kill(c.req.param('sid'))))
-  .post('/terminal/sessions/:sid/interrupt', (c) => viaBridge(c, b, (t) => t.interrupt(c.req.param('sid'))))
-  .post('/terminal/sessions/:sid/remove', (c) => viaBridge(c, b, (t) => t.remove(c.req.param('sid'))))
-  .post('/terminal/sessions/:sid/resize', async (c) => {
+  .post('/sessions/:sid/kill', (c) => viaBridge(c, b, (t) => t.kill(c.req.param('sid'))))
+  .post('/sessions/:sid/interrupt', (c) => viaBridge(c, b, (t) => t.interrupt(c.req.param('sid'))))
+  .post('/sessions/:sid/remove', (c) => viaBridge(c, b, (t) => t.remove(c.req.param('sid'))))
+  .post('/sessions/:sid/resize', async (c) => {
     const p = resizeBody.safeParse(await c.req.json().catch(() => null))
     if (!p.success) return respondError(c, 400, 'bad_request')
     return viaBridge(c, b, (t) => t.resize(c.req.param('sid'), p.data.cols, p.data.rows))
   })
-  .post('/terminal/sessions/:sid/send', async (c) => {
+  .post('/sessions/:sid/send', async (c) => {
     const p = sendBody.safeParse(await c.req.json().catch(() => null))
     if (!p.success) return respondError(c, 400, 'bad_request')
     return viaBridge(c, b, (t) => t.sendToAgent(c.req.param('sid'), p.data.text, p.data.submit))
   })
-  // --- repo-path mapping (owner/repo-scoped) ---
-  .get('/terminal/repo-path', (c) => {
-    const owner = c.req.query('owner')
-    const repo = c.req.query('repo')
-    if (!owner || !repo) return respondError(c, 400, 'bad_request')
-    return viaBridge(c, b, (t) => t.repoPathGet(owner, repo))
-  })
-  .put('/terminal/repo-path', async (c) => {
-    const p = repoPathSetBody.safeParse(await c.req.json().catch(() => null))
-    if (!p.success) return respondError(c, 400, 'bad_request')
-    return viaBridge(c, b, (t) => t.repoPathSet(p.data.owner, p.data.repo, p.data.path))
-  })
-  .put('/terminal/repo-path/run-targets', async (c) => {
-    const p = runTargetsBody.safeParse(await c.req.json().catch(() => null))
-    if (!p.success) return respondError(c, 400, 'bad_request')
-    return viaBridge(c, b, (t) => t.repoPathRunTargets(p.data.owner, p.data.repo, p.data.runTargets))
-  })
-  .put('/terminal/repo-path/config', async (c) => {
-    const p = repoConfigBody.safeParse(await c.req.json().catch(() => null))
-    if (!p.success) return respondError(c, 400, 'bad_request')
-    return viaBridge(c, b, (t) => t.repoPathConfig(p.data.owner, p.data.repo, p.data.patch))
-  })
-  // --- task lifecycle (task-scoped) ---
-  .post('/tasks/:id/preview-url', async (c) => {
-    const p = previewBody.safeParse(await c.req.json().catch(() => null))
-    if (!p.success) return respondError(c, 400, 'bad_request')
-    return viaBridge(c, b, (t) => t.previewUrl(id(c), p.data.script))
-  })
-  .post('/tasks/:id/on-created', (c) => viaBridge(c, b, async (t) => ((await t.onCreated(id(c))), { ok: true })))
-  .post('/tasks/:id/use-checkout', (c) => viaBridge(c, b, async (t) => ({ result: await t.useCheckout(id(c)) })))
-  .post('/tasks/:id/archive', async (c) => {
-    const p = archiveBody.safeParse(await c.req.json().catch(() => ({})))
-    if (!p.success) return respondError(c, 400, 'bad_request')
-    return viaBridge(c, b, (t) => t.archive(id(c), p.data))
-  })
-  .get('/tasks/:id/mcp', (c) => viaBridge(c, b, (t) => t.mcpInspect(id(c))))
-  .post('/tasks/:id/mcp/starter', (c) => viaBridge(c, b, (t) => t.mcpCreateStarter(id(c))))

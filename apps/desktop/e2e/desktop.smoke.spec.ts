@@ -167,7 +167,7 @@ async function launch(previous?: Pick<RunningApp, 'dataDir' | 'repoDir'>): Promi
 async function seedWorkspace(page: Page, repoDir: string): Promise<void> {
   const workspace = await nodeJson<{ id: string }>(page, '/v2/core/workspaces', { method: 'POST', body: { name: 'Smoke' } })
   await nodeJson(page, `/v2/core/workspaces/${workspace.id}/repos`, { method: 'POST', body: { owner: 'acorn', name: 'smoke' } })
-  await nodeJson(page, '/v2/p/terminal/terminal/repo-path', { method: 'PUT', body: { owner: 'acorn', repo: 'smoke', path: repoDir } })
+  await nodeJson(page, '/v2/core/repos/path', { method: 'PUT', body: { owner: 'acorn', repo: 'smoke', path: repoDir } })
 }
 
 async function seedTask(page: Page, repoDir: string): Promise<{ id: string }> {
@@ -194,7 +194,7 @@ async function openSmokeWorkspace(page: Page): Promise<void> {
 }
 
 async function createTerminalAndCapture(page: Page, taskId: string, command: string): Promise<string> {
-  const session = await nodeJson<{ id: string }>(page, '/v2/p/terminal/terminal/sessions', {
+  const session = await nodeJson<{ id: string }>(page, '/v2/p/terminal/sessions', {
     method: 'POST', body: { taskId, profileId: 'shell', command, title: 'Smoke terminal' },
   })
   // The socket belongs to main too — the bearer rides the upgrade headers, which a page cannot set —
@@ -274,7 +274,7 @@ test('S5 quit tears down a live PTY child', async () => {
   const running = await launch()
   const task = await seedTask(running.page, running.repoDir)
   const pidFile = join(running.repoDir, 'pty.pid')
-  await nodeJson(running.page, '/v2/p/terminal/terminal/sessions', {
+  await nodeJson(running.page, '/v2/p/terminal/sessions', {
     method: 'POST',
     body: { taskId: task.id, profileId: 'shell', command: `echo $$ > '${pidFile}'; sleep 30`, title: 'Quit smoke' },
   })

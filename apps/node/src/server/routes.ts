@@ -60,7 +60,7 @@ registerRoute({ plugin: 'agents', prefix: '', router: managedAgents })
 // Namespace-root routers: each owns a mix of task-scoped and top-level paths (see the doubling note)
 registerRoute({ plugin: 'workflows', prefix: '', router: workflow, note: 'workflow control' })
 registerRoute({ plugin: 'memory', prefix: '', router: knowledge, note: 'notes/memory pane' })
-registerRoute({ plugin: 'terminal', prefix: '', router: terminal, note: 'terminal control' })
+registerRoute({ plugin: 'terminal', prefix: '', router: terminal, note: '/sessions, /profiles — PTY control only' })
 
 // /v2/p/github/repos/* — the GitHub mirror; device-flow connect sits beside it at /auth/*
 registerRoute({ plugin: 'github', prefix: '/repos', router: repos })
