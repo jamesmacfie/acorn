@@ -139,7 +139,7 @@ export class NodeBroker {
         agent: connection.agent,
         signal: controller.signal,
       })
-      this.noteHttpResult(connection, response.status)
+      this.noteHttpResult(connection, response)
       return response
     } catch (error) {
       this.noteHttpFailure(connection, error)
@@ -246,8 +246,18 @@ export class NodeBroker {
     return httpRecent && downFor >= DEGRADED_AFTER_MS ? 'degraded' : 'offline'
   }
 
-  private noteHttpResult(connection: Connection, status: number): void {
-    if (status === 401 || status === 403) {
+  // Only the AUTH GATE's own answer is evidence that this device was revoked, and the gate says exactly
+  // one thing: 401 with `unauthenticated` (server/middleware/requireUser.ts — a revoked token resolves to
+  // no principal, indistinguishably from an unknown one).
+  //
+  // Reading the status alone was wrong, and wrong in the direction that matters. Route-level failures
+  // reuse both codes for a DIFFERENT credential: `provider_not_connected` is a 403 and is what a fresh
+  // node answers for a GitHub integration nobody has connected yet, and `linear_reauth` /
+  // `provider_needs_auth` are 401s about a third-party token. The loopback Host guard also 403s. Any one
+  // of them marked a perfectly healthy node `revoked` — which the fleet UI renders as a security event
+  // and which stops the WebSocket being retried.
+  private noteHttpResult(connection: Connection, response: NodeFetchResponse): void {
+    if (response.status === 401 && errorCodeOf(response) === 'unauthenticated') {
       this.setState(connection, 'revoked', { code: 'unauthorized' })
       return
     }
@@ -324,6 +334,17 @@ export function pinnedTlsOptions(fingerprint: string | undefined, certPem: strin
 export const PIN_MISMATCH_CODE = 'ACORN_PIN_MISMATCH'
 
 export const normalizeFingerprint = (value: string): string => value.replace(/:/g, '').toLowerCase()
+
+// The `error.code` out of the node's error envelope (docs/vNext/protocol.md § Errors), or null if this
+// response is not one. Only consulted for a 401, so parsing a body here costs nothing on the happy path.
+const errorCodeOf = (response: NodeFetchResponse): string | null => {
+  try {
+    const parsed = JSON.parse(new TextDecoder().decode(response.body)) as { error?: { code?: unknown } }
+    return typeof parsed?.error?.code === 'string' ? parsed.error.code : null
+  } catch {
+    return null
+  }
+}
 
 const isPinMismatch = (error: unknown): boolean => {
   for (let e: unknown = error; e; e = (e as { cause?: unknown }).cause) {
