@@ -136,7 +136,7 @@ Electron `safeStorage`; an explicit environment value remains the recovery and `
 | Script | What it does |
 | --- | --- |
 | `pnpm dev` | Build + launch the Electron app (`electron-vite build && electron-vite preview`) |
-| `pnpm --filter @acorn/desktop dev:node` | Run just the Node server (no Electron) on `:4317` |
+| `pnpm dev:node` | Run just the Node service standalone (no Electron) on `:4317` — `@acorn/node` |
 | `pnpm --filter @acorn/desktop build` | Build main/service/MCP/preload/renderer and enforce the renderer budget |
 | `pnpm --filter @acorn/desktop dist` | Run the gated build and produce the `.dmg`/`.zip` |
 | `pnpm lint` | `tsc --noEmit` typecheck |

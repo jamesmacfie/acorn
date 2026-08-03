@@ -13,8 +13,9 @@ enabled on a second loopback port; it is off by default.
 ## Architecture (one local service supervised by Electron)
 
 - The Electron main entry (`apps/desktop/src/app/main/electron.ts`) calls the native composition
-  root (`app/main/bootstrap.ts`), which starts and supervises `app/service/index.ts`.
-  The Electron-free service root (`app/service/runtime.ts`) builds the runtime bindings and
+  root (`app/main/bootstrap.ts`), which forks and supervises the **built** Node artifact
+  `out/main/service.js` — produced by `apps/node` (`src/service/index.ts`), never imported from
+  desktop source. The Electron-free service root (`apps/node/src/service/runtime.ts`) builds the runtime bindings and
   starts the Hono app (`@acorn/node-core/server/index.ts`, a `createApp()` factory) under
   `@hono/node-server` on `http://127.0.0.1:4317`; main then points a hardened `BrowserWindow` at
   that origin. The server serves
@@ -59,6 +60,7 @@ emit and no project references. Consequences worth knowing before you touch a ma
 
 ```text
 apps/desktop/           @acorn/desktop      Electron main + preload + renderer + packaging
+apps/node/              @acorn/node         the Electron-free service composition root + entries
 packages/protocol/      @acorn/protocol     wire contracts (zod only; imports nothing first-party)
 packages/node-core/     @acorn/node-core    server/ main/ mcp/ + Drizzle schema and migrations
 packages/client-core/   @acorn/client-core  renderer runtime: shell, registries, queries, UI kit
@@ -66,15 +68,23 @@ plugins/<name>/         @acorn/plugin-<name>  20 features, each client/ server/ 
 tools/arch/             @acorn/arch-tests   the executable boundary rules
 ```
 
-- `apps/desktop/src/app/` is now the *only* source in the app: `main/` (`electron.ts` entry,
-  `bootstrap.ts` supervision, `serviceHost.ts`, `preload.ts`, `sessionKeyStore.ts`, plus the
-  service-owned `*Wiring.ts` modules), `service/` (Electron-free runtime composition + utility
-  entry), `server/` (`providers.ts`/`routes.ts` register plugin contributions; `devNode.ts` is the
-  `dev:node` entry), `client/` (`index.tsx`, `App.tsx`, `CommandPalette.tsx`, `TaskView.tsx` and
-  contribution activation).
-- `apps/desktop/test/integration/` — tests that need the composition root's registries populated
-  (providers, routes, agent profiles). They live here because importing `app/*` is legal only from
-  an app; doing it from a package is a boundary violation.
+- `apps/desktop/src/app/` holds only Electron-side composition: `main/` (`electron.ts` entry,
+  `bootstrap.ts` supervision, `serviceHost.ts`, `desktopCapabilities.ts`, `preload.ts`,
+  `sessionKeyStore.ts`) and `client/` (`index.tsx`, `App.tsx`, `CommandPalette.tsx`, `TaskView.tsx`
+  and contribution activation).
+- `apps/node/src/` is the service composition root: `service/` (runtime composition + the
+  utility-process entry), `server/` (`providers.ts`/`routes.ts` register plugin contributions;
+  `devNode.ts` is the `dev:node` entry), and `wiring/` — the service-owned glue that used to live in
+  `app/main` (`agentProfiles.ts`, `serverBridges.ts`, `startupSecurity.ts`, `managedWorkflowStep.ts`
+  and the seven `*Wiring.ts`). It is named `wiring`, not `main`, because `main` now means Electron main.
+- `apps/node/test/integration/` — tests that need the composition root's registries populated
+  (providers, routes, agent profiles). They live in the app because importing `app/*` is legal only
+  from an app; doing it from a package is a boundary violation. The three suites left in
+  `apps/desktop/test/integration/` are the client-side conformance ones.
+- **`apps/desktop` must never import `apps/node` source** (`architecture.md`, boundary-tested). The
+  desktop build embeds the built artifact: `apps/node` emits `dist/{service,mcp}.js`, and
+  `electron.vite.config.ts`'s `stageNodeArtifact()` copies them into `out/main/` next to `index.js`,
+  which is where `bootstrap.ts` forks `service.js` and where `mcpRegister` points agent CLIs.
 - `packages/node-core/migrations/` — Drizzle migrations, co-located with `schema.ts`. The desktop
   build stages a copy into `apps/desktop/out/migrations` so the bundled service can find them.
 - **`tools/arch/boundaries.test.ts` is the enforcement.** 12 rules over the package graph: nothing
@@ -101,7 +111,7 @@ tools/arch/             @acorn/arch-tests   the executable boundary rules
 | --- | --- |
 | `pnpm dev` | Build + launch the Electron app (`electron-vite build && electron-vite preview`); window loads `127.0.0.1:4317` |
 | `pnpm dev:node` | Run just the Node server (no Electron) on `:4317` — needs Node-ABI better-sqlite3 (`pnpm rebuild:node`) |
-| `pnpm --filter @acorn/desktop build` | Build main + service + MCP + preload + renderer and enforce the renderer-size budget |
+| `pnpm --filter @acorn/desktop build` | Build Electron main + preload + renderer, stage `apps/node`'s `service.js`/`mcp.js`, and enforce the renderer-size budget |
 | `pnpm --filter @acorn/desktop dist` | Run the gated build, then `electron-builder --mac` to produce `.dmg`/`.zip` |
 | `pnpm lint` | `tsc --noEmit` typecheck |
 | `pnpm test` | Rebuild native modules for Node, then run `vitest` |
@@ -116,7 +126,8 @@ tools/arch/             @acorn/arch-tests   the executable boundary rules
 - **TypeScript strict; no `any`.** Match existing patterns and naming.
 - **Process ownership:** new domain engines belong in the Electron-free service graph; Electron
   main is only for native UI/OS adapters and service supervision. Some service-owned modules retain
-  the historical `core/main`, `plugins/*/main`, or `app/main/*Wiring.ts` paths. Classify them by
+  the historical `core/main` or `plugins/*/main` paths (the `app/main/*Wiring.ts` set now lives in
+  `apps/node/src/wiring/`). Classify them by
   dependency graph and runtime, not the folder label. Keep service↔main payloads serializable and
   task-addressed; use HTTP/WebSocket for renderer-facing product APIs.
 - **Schema change workflow:** edit `packages/node-core/src/server/db/schema.ts` → `db:generate` →
