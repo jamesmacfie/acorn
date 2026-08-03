@@ -664,6 +664,9 @@ importers:
       '@types/pg':
         specifier: ^8.20.0
         version: 8.20.0
+      drizzle-kit:
+        specifier: ^0.31.10
+        version: 0.31.10
       typescript:
         specifier: ^6.0.3
         version: 6.0.3
@@ -697,9 +700,6 @@ importers:
       '@xterm/xterm':
         specifier: ^5.5.0
         version: 5.5.0
-      drizzle-orm:
-        specifier: 'catalog:'
-        version: 0.45.2(@types/better-sqlite3@7.6.13)(@types/pg@8.20.0)(better-sqlite3@12.11.1)(pg@8.22.0)
       hono:
         specifier: 'catalog:'
         version: 4.12.32
@@ -946,6 +946,9 @@ importers:
       '@types/node':
         specifier: ^26.0.0
         version: 26.0.0
+      drizzle-kit:
+        specifier: ^0.31.10
+        version: 0.31.10
       typescript:
         specifier: ^6.0.3
         version: 6.0.3

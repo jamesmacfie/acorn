@@ -24,7 +24,13 @@ describe('context section wiring', () => {
       { id: 'task1', title: 'one', origin: 'local', repoOwner: 'acme', repoName: 'widget', branch: 'one', status: 'active', sort: 0, createdAt: now, updatedAt: now },
       { id: 'task2', title: 'two', origin: 'local', repoOwner: 'acme', repoName: 'widget', branch: 'two', status: 'active', sort: 1, createdAt: now, updatedAt: now },
     ])
-    wireContextSections({ db: testDb.db, notesStore: store, reconciled: async () => {} })
+    // The memory index is the memory plugin's own database; this suite only asserts the notes half, so
+    // the reads answer empty.
+    wireContextSections({
+      db: testDb.db,
+      notesStore: store,
+      memory: { reconciled: async () => {}, list: async () => [], get: async () => null, search: async () => [], indexSlice: async () => [] },
+    })
   })
 
   afterEach(() => {

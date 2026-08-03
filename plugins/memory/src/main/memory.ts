@@ -11,8 +11,8 @@ import { existsSync, mkdirSync } from 'node:fs'
 import { readdir, readFile, rename, stat, unlink, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { and, eq, inArray, sql } from 'drizzle-orm'
-import type { AppDatabase } from '@acorn/node-core/server/db/index.ts'
-import { schema } from '@acorn/node-core/server/db/index.ts'
+import type { PluginDatabase } from '@acorn/node-core/main/pluginStorage.ts'
+import { memories } from '../node/schema'
 
 export type MemoryType = 'convention' | 'architecture' | 'decision' | 'fix' | 'reference' | 'feedback' | 'task' | 'user'
 export const MEMORY_TYPES: readonly MemoryType[] = ['convention', 'architecture', 'decision', 'fix', 'reference', 'feedback', 'task', 'user']
@@ -104,9 +104,9 @@ export async function scanMemoryDir(source: MemorySource): Promise<ScannedMemory
 }
 
 // MEMORY.md: one line per memory — the index injected at agent launch (12 P2).
-export const renderMemoryIndex = (memories: Pick<MemoryFile, 'name' | 'description'>[]): string =>
-  memories.length
-    ? memories
+export const renderMemoryIndex = (entries: Pick<MemoryFile, 'name' | 'description'>[]): string =>
+  entries.length
+    ? entries
         .slice()
         .sort((a, b) => a.name.localeCompare(b.name))
         .map((m) => `- [${m.name}](${m.name}.md) — ${m.description}`)
@@ -142,7 +142,7 @@ export async function writeMemoryFile(dir: string, mem: MemoryFile): Promise<{ p
 
 // --- The derived SQLite index ---
 
-export async function reconcileMemories(db: AppDatabase, sources: MemorySource[]): Promise<void> {
+export async function reconcileMemories(db: PluginDatabase, sources: MemorySource[]): Promise<void> {
   const scanned = (await Promise.all(sources.map(scanMemoryDir))).flat()
   // Same (scope, repo, name) across checkouts → newest updatedAt wins.
   const winners = new Map<string, ScannedMemory>()
@@ -167,33 +167,37 @@ export async function reconcileMemories(db: AppDatabase, sources: MemorySource[]
     updatedAt: Math.round(m.updatedAt),
   }))
   // Full rebuild (ponytail: hundreds of files at most). Preserve access stats by id.
-  const prior = await db.select({ id: schema.memories.id, lastAccessedAt: schema.memories.lastAccessedAt, accessCount: schema.memories.accessCount }).from(schema.memories)
+  const prior = await db.select({ id: memories.id, lastAccessedAt: memories.lastAccessedAt, accessCount: memories.accessCount }).from(memories)
   const stats = new Map(prior.map((p) => [p.id, p]))
-  await db.delete(schema.memories)
+  await db.delete(memories)
   await db.run(sql`DELETE FROM memories_fts`)
   for (const row of rows) {
     const stat0 = stats.get(row.id)
-    await db.insert(schema.memories).values({ ...row, lastAccessedAt: stat0?.lastAccessedAt ?? null, accessCount: stat0?.accessCount ?? 0 }).onConflictDoNothing()
+    await db.insert(memories).values({ ...row, lastAccessedAt: stat0?.lastAccessedAt ?? null, accessCount: stat0?.accessCount ?? 0 }).onConflictDoNothing()
     await db.run(sql`INSERT INTO memories_fts (id, name, description, body) VALUES (${row.id}, ${row.name}, ${row.description}, ${row.body})`)
   }
 }
 
-export type MemoryHit = typeof schema.memories.$inferSelect & { rank: number }
+// One row of the derived index. Named because the contract (contract/knowledge.ts) states it and a
+// bare `typeof memories.$inferSelect` there would import the schema into a type-only file.
+export type MemoryRow = typeof memories.$inferSelect
+
+export type MemoryHit = MemoryRow & { rank: number }
 
 // Recall bookkeeping (docs/notes-and-memory.md): a memory that was actually READ (search hit /
 // memory_get) bumps lastAccessedAt + accessCount — the inputs for future decay/ranking. Listing
 // the index does NOT count as a read. Stats survive reconciles by content-hash id.
-async function touchMemories(db: AppDatabase, ids: string[]): Promise<void> {
+async function touchMemories(db: PluginDatabase, ids: string[]): Promise<void> {
   if (!ids.length) return
   await db
-    .update(schema.memories)
-    .set({ lastAccessedAt: Date.now(), accessCount: sql`${schema.memories.accessCount} + 1` })
-    .where(inArray(schema.memories.id, ids))
+    .update(memories)
+    .set({ lastAccessedAt: Date.now(), accessCount: sql`${memories.accessCount} + 1` })
+    .where(inArray(memories.id, ids))
 }
 
 // FTS5 BM25 search, repo-scoped: repo rows for this repo + private rows. Query terms are quoted so
 // user input can't inject FTS syntax.
-export async function searchMemories(db: AppDatabase, query: string, opts: { repo?: string | null; type?: MemoryType; limit?: number }): Promise<MemoryHit[]> {
+export async function searchMemories(db: PluginDatabase, query: string, opts: { repo?: string | null; type?: MemoryType; limit?: number }): Promise<MemoryHit[]> {
   const terms = query
     .split(/\s+/)
     .map((t) => t.replace(/"/g, ''))
@@ -204,7 +208,7 @@ export async function searchMemories(db: AppDatabase, query: string, opts: { rep
   const matches = await db.all<{ id: string; rank: number }>(sql`SELECT id, rank FROM memories_fts WHERE memories_fts MATCH ${terms} ORDER BY rank LIMIT 50`)
   if (!matches.length) return []
   const rankById = new Map(matches.map((m) => [m.id, m.rank]))
-  const rows = await db.select().from(schema.memories).where(inArray(schema.memories.id, [...rankById.keys()]))
+  const rows = await db.select().from(memories).where(inArray(memories.id, [...rankById.keys()]))
   const hits = rows
     .filter((r) => (opts.repo ? r.repo === opts.repo || r.scope === 'private' : true))
     .filter((r) => (opts.type ? r.type === opts.type : true))
@@ -218,22 +222,22 @@ export async function searchMemories(db: AppDatabase, query: string, opts: { rep
 
 // One memory by name (the memory_get read path), repo-scoped like listMemories. Reading it bumps
 // the recall stats.
-export async function getMemory(db: AppDatabase, opts: { repo?: string | null; name: string }): Promise<typeof schema.memories.$inferSelect | null> {
+export async function getMemory(db: PluginDatabase, opts: { repo?: string | null; name: string }): Promise<MemoryRow | null> {
   const match = (await listMemories(db, { repo: opts.repo })).find((m) => m.name === opts.name) ?? null
   if (match) await touchMemories(db, [match.id])
   return match
 }
 
-export async function listMemories(db: AppDatabase, opts: { repo?: string | null; type?: MemoryType }): Promise<(typeof schema.memories.$inferSelect)[]> {
+export async function listMemories(db: PluginDatabase, opts: { repo?: string | null; type?: MemoryType }): Promise<MemoryRow[]> {
   const rows = await db
     .select()
-    .from(schema.memories)
-    .where(opts.type ? and(eq(schema.memories.type, opts.type)) : undefined)
+    .from(memories)
+    .where(opts.type ? and(eq(memories.type, opts.type)) : undefined)
   return rows.filter((r) => (opts.repo ? r.repo === opts.repo || r.scope === 'private' : true)).sort((a, b) => a.name.localeCompare(b.name))
 }
 
 // The always-safe injection slice (12 P2): the index lines + repo-scoped feedback/convention names.
-export async function memoryIndexSlice(db: AppDatabase, repo: string, cap = 30): Promise<{ name: string; description: string }[]> {
+export async function memoryIndexSlice(db: PluginDatabase, repo: string, cap = 30): Promise<{ name: string; description: string }[]> {
   const rows = await listMemories(db, { repo })
   return rows.slice(0, cap).map((r) => ({ name: r.name, description: r.description }))
 }

@@ -414,48 +414,10 @@ export const taskLinks = sqliteTable(
   (t) => [primaryKey({ columns: [t.taskId, t.integrationId, t.identifier] })],
 )
 
-// Named SQL snippets for the Database pane (docs/pg.md). Repo-scoped, NOT task-scoped: a query
-// written against a repo's schema outlives any one task worktree. Machine-scoped (no user_id) like
-// tasks/review_notes. (owner, repo, name) is unique — saving under an existing name overwrites it,
-// which is also how a query gets edited or renamed (there is no PATCH route).
-export const dbSavedQueries = sqliteTable(
-  'db_saved_queries',
-  {
-    id: text('id').primaryKey(), // opaque uuid
-    repoOwner: text('repo_owner').notNull(),
-    repoName: text('repo_name').notNull(),
-    name: text('name').notNull(),
-    notes: text('notes'), // what it answers / gotchas — sent alongside the SQL as AI-generation context
-    sql: text('sql').notNull(),
-    createdAt: integer('created_at').notNull(),
-    updatedAt: integer('updated_at').notNull(),
-  },
-  (t) => [uniqueIndex('db_saved_queries_repo_name_idx').on(t.repoOwner, t.repoName, t.name)],
-)
+// `db_saved_queries` moved to plugins/database/src/node/schema.ts (docs/vNext/data.md § Plugin DBs).
 
-// Memory index (docs/notes-and-memory.md): markdown files are the TRUTH (<worktree>/.acorn/memory committed,
-// ~/.acorn/memory private); this table is a derived index reconciled on change from all active
-// worktrees + primary checkouts. id = content hash (idempotent across N checkouts); conflicts on
-// (scope, repo, name) resolve newest-updatedAt. Machine-scoped. The companion FTS5 virtual table
-// (memories_fts, porter stemming over name/description/body) is created by hand in the migration —
-// drizzle doesn't model virtual tables.
-export const memories = sqliteTable('memories', {
-  id: text('id').primaryKey(), // sha256(content) prefix
-  scope: text('scope').notNull(), // 'repo' | 'private'
-  repo: text('repo'), // 'owner/name' for repo scope; null for private
-  name: text('name').notNull(),
-  type: text('type').notNull(), // convention|architecture|decision|fix|reference|feedback|task|user
-  description: text('description').notNull(),
-  body: text('body').notNull(),
-  path: text('path').notNull(), // the winning file on disk
-  originSessionId: text('origin_session_id'),
-  commitSha: text('commit_sha'),
-  supersededBy: text('superseded_by'),
-  createdAt: integer('created_at').notNull(),
-  updatedAt: integer('updated_at').notNull(),
-  lastAccessedAt: integer('last_accessed_at'),
-  accessCount: integer('access_count').notNull().default(0),
-})
+// `memories` (and its hand-written `memories_fts` virtual table) moved to
+// plugins/memory/src/node/schema.ts (docs/vNext/data.md § Plugin DBs).
 
 // Durable terminal sessions (docs/workflows.md). Machine-scoped like repo_paths. We persist ONLY tmux-backed
 // sessions: tmux outlives an app restart, so on startup the service reconciles these rows against

@@ -17,7 +17,8 @@ import { schema } from '@acorn/node-core/server/db/index.ts'
 import type { NoteLocation, NoteScope } from '@acorn/protocol/notes.ts'
 import type { BrowserDesktopCapability } from '@acorn/protocol/desktopCapabilities.ts'
 import { gitLog, localChanges, localDiff } from '@acorn/plugin-changes/main/localDiff.ts'
-import { getMemory, listMemories, MEMORY_TYPES, searchMemories, type MemoryType } from '@acorn/plugin-memory/main/memory.ts'
+import type { MemoryIndex } from '@acorn/plugin-memory/main/knowledgeIpc.ts'
+import { MEMORY_TYPES, type MemoryType } from '@acorn/plugin-memory/main/memory.ts'
 import type { MemoryProposalStore } from '@acorn/plugin-memory/main/memoryProposals.ts'
 import type { NotesStore } from '@acorn/plugin-notes/main/notes.ts'
 import type { RuntimeService } from '@acorn/plugin-terminal/main/runtime.ts'
@@ -31,7 +32,9 @@ export type AgentToolsDeps = {
   proposals: MemoryProposalStore
   runtime: RuntimeService
   browser: BrowserDesktopCapability
-  reconciled(): Promise<void>
+  // The memory index reads, bound to the memory plugin's own SQLite file (its `memory.knowledge`
+  // capability). Each one reconciles from the markdown files first — they are the truth.
+  memory: MemoryIndex
 }
 
 const asMemoryType = (type: string | undefined): MemoryType | undefined =>
@@ -56,7 +59,7 @@ async function noteLocationFor(db: AppDatabase, taskId: string, scope: NoteScope
 }
 
 export function buildAgentTools(deps: AgentToolsDeps): AgentToolContribution[] {
-  const { db, notesStore, proposals, runtime, reconciled, browser } = deps
+  const { db, notesStore, proposals, runtime, memory, browser } = deps
   const empty = z.object({})
   const executeRun = async <T>(taskId: string, execute: () => Promise<T>): Promise<T> => {
     try {
@@ -239,9 +242,9 @@ export function buildAgentTools(deps: AgentToolsDeps): AgentToolContribution[] {
       scope: 'task',
       risk: 'read',
       handler: async (a, ctx) => {
-        await reconciled()
+        await memory.reconciled()
         const { query, type } = a as { query: string; type?: string }
-        return searchMemories(db, query, { repo: await repoFor(db, ctx.taskId), type: asMemoryType(type) })
+        return memory.search(query, { repo: await repoFor(db, ctx.taskId), type: asMemoryType(type) })
       },
     },
     {
@@ -251,8 +254,8 @@ export function buildAgentTools(deps: AgentToolsDeps): AgentToolContribution[] {
       scope: 'task',
       risk: 'read',
       handler: async (a, ctx) => {
-        await reconciled()
-        return listMemories(db, { repo: await repoFor(db, ctx.taskId), type: asMemoryType((a as { type?: string }).type) })
+        await memory.reconciled()
+        return memory.list({ repo: await repoFor(db, ctx.taskId), type: asMemoryType((a as { type?: string }).type) })
       },
     },
     {
@@ -262,10 +265,10 @@ export function buildAgentTools(deps: AgentToolsDeps): AgentToolContribution[] {
       scope: 'task',
       risk: 'read',
       handler: async (a, ctx) => {
-        await reconciled()
-        const memory = await getMemory(db, { repo: await repoFor(db, ctx.taskId), name: (a as { name: string }).name })
-        if (!memory) throw new ToolError('not_found', 'no such memory')
-        return memory
+        await memory.reconciled()
+        const found = await memory.get({ repo: await repoFor(db, ctx.taskId), name: (a as { name: string }).name })
+        if (!found) throw new ToolError('not_found', 'no such memory')
+        return found
       },
     },
     {

@@ -1,28 +1,28 @@
 import { Hono } from 'hono'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { DatabaseBridge } from './database'
-import { getDb, schema } from '@acorn/node-core/server/db/index.ts'
+import { schema } from '@acorn/node-core/server/db/index.ts'
+import { createTaskService } from '@acorn/node-core/main/core/tasks.ts'
+import type { GenerateTextRequest, ModelService } from '@acorn/node-core/main/core/index.ts'
 import { ProviderOperationError } from '@acorn/node-core/server/integrations/types.ts'
 import type { AppEnv } from '@acorn/node-core/server/middleware/auth.ts'
 import { requireUser } from '@acorn/node-core/server/middleware/requireUser.ts'
-import { generateTextForConnection } from '@acorn/node-core/server/modelProviders/runtime.ts'
-import { makeTestDb, type TestDb } from '@acorn/node-core/server/routes/testDb.ts'
+import { makeTestDb, makeTestPluginDb, type TestDb, type TestPluginDb } from '@acorn/node-core/server/routes/testDb.ts'
 import type { DbSavedQuery } from '../../shared/database'
-import { database, setDatabaseBridge } from './database'
+import { databaseRoutes, setDatabaseBridge } from './database'
+import { migrationsDir } from '../../node/migrations'
 import type { Env } from '@acorn/node-core/main/bindings.ts'
 
-vi.mock('@acorn/node-core/server/modelProviders/runtime.ts', () => ({
-  generateTextForConnection: vi.fn(),
-}))
-vi.mock('@acorn/node-core/server/db/index.ts', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('@acorn/node-core/server/db/index.ts')>()
-  return { ...actual, getDb: vi.fn() }
-})
-
-// Transport contract for the database routes: auth + body validation + bridge-unavailable. The
-// SQL-injection posture (identifiers validated against the introspected schema), connection-URL
-// non-persistence, and pool teardown on disconnect are properties of main/database.ts that need a
-// live Postgres to exercise — they are verified in the live/integration pass, not here (no test DB).
+// Transport contract for the database routes: auth + body validation + bridge-unavailable, plus the
+// saved-query surface over the plugin's OWN database. The SQL-injection posture (identifiers validated
+// against the introspected schema), connection-URL non-persistence, and pool teardown on disconnect are
+// properties of main/database.ts that need a live Postgres — they are verified in the live/integration
+// pass, not here.
+//
+// Two databases, which is the point: saved queries live in the plugin's file and the task they are
+// scoped through lives in core's. The getDb mock this test used to need is gone, and so is the
+// vi.mock of the model runtime — provider access arrives as CoreServices.models, so a fake object
+// replaces a module mock.
 
 const req = (url: string, method = 'GET', body?: unknown) =>
   new Request(`http://acorn.test${url}`, {
@@ -30,15 +30,6 @@ const req = (url: string, method = 'GET', body?: unknown) =>
     headers: body === undefined ? undefined : { 'content-type': 'application/json' },
     body: body === undefined ? undefined : JSON.stringify(body),
   })
-
-const authed = () => {
-  const app = new Hono<AppEnv>()
-  app.use('/api/*', async (c, next) => {
-    c.set('principal', { kind: 'device', userId: 'james' })
-    await next()
-  })
-  return app.route('/api/tasks', database)
-}
 
 const fake = (over: Partial<DatabaseBridge> = {}): DatabaseBridge => ({
   connect: async () => ({ ok: true, database: 'dev' }),
@@ -54,8 +45,50 @@ const fake = (over: Partial<DatabaseBridge> = {}): DatabaseBridge => ({
   ...over,
 })
 
+// One fixture for both describes: core's DB (tasks), the plugin's DB (saved queries), and a stub for
+// the one core service the routes call out to.
+type Fixture = {
+  core: TestDb
+  plugin: TestPluginDb
+  generateText: ReturnType<typeof vi.fn<ModelService['generateText']>>
+  router: () => Hono<AppEnv>
+  cleanup: () => void
+}
+
+const fixture = (): Fixture => {
+  const core = makeTestDb()
+  const plugin = makeTestPluginDb('database', migrationsDir())
+  const generateText = vi.fn<ModelService['generateText']>()
+  const router = () => databaseRoutes(plugin.db, { tasks: createTaskService(core.db), models: { generateText } })
+  return {
+    core,
+    plugin,
+    generateText,
+    router,
+    cleanup: () => {
+      plugin.cleanup()
+      core.cleanup()
+      setDatabaseBridge(null)
+    },
+  }
+}
+
 describe('database routes', () => {
-  afterEach(() => setDatabaseBridge(null))
+  let f: Fixture
+
+  const authed = () => {
+    const app = new Hono<AppEnv>()
+    app.use('/api/*', async (c, next) => {
+      c.set('principal', { kind: 'device', userId: 'james' })
+      await next()
+    })
+    return app.route('/api/tasks', f.router())
+  }
+
+  beforeEach(() => {
+    f = fixture()
+  })
+  afterEach(() => f.cleanup())
 
   it('connects and lists tables', async () => {
     setDatabaseBridge(fake())
@@ -86,9 +119,9 @@ describe('database routes', () => {
     expect((await app.fetch(req('/api/tasks/task1/database/columns'), {} as Env)).status).toBe(400) // no schema/name
   })
 
-  it('generates SQL through the model runtime with the schema in the system prompt', async () => {
+  it('generates SQL through the model service with the schema in the system prompt', async () => {
     setDatabaseBridge(fake())
-    vi.mocked(generateTextForConnection).mockResolvedValueOnce({
+    f.generateText.mockResolvedValueOnce({
       text: '```sql\nSELECT * FROM users;\n```',
       providerId: 'anthropic',
       connectionId: 'conn1',
@@ -100,7 +133,7 @@ describe('database routes', () => {
     )
     expect(res.status).toBe(200)
     expect(await res.json()).toEqual({ sql: 'SELECT * FROM users;', providerId: 'anthropic', modelId: 'claude-sonnet-5' })
-    const args = vi.mocked(generateTextForConnection).mock.calls[0][0]
+    const args = f.generateText.mock.calls[0][0] as GenerateTextRequest
     expect(args.connectionId).toBe('conn1')
     expect(args.userId).toBe('james')
     expect(args.input.modelId).toBe('claude-sonnet-5')
@@ -116,7 +149,7 @@ describe('database routes', () => {
     expect(await failed.json()).toMatchObject({ error: { code: 'db_schema_unavailable', message: 'Not connected.' } })
 
     setDatabaseBridge(fake())
-    vi.mocked(generateTextForConnection).mockRejectedValueOnce(new ProviderOperationError('provider_needs_auth', 401))
+    f.generateText.mockRejectedValueOnce(new ProviderOperationError('provider_needs_auth', 401))
     const denied = await app.fetch(req('/api/tasks/task1/database/generate', 'POST', { connectionId: 'c', prompt: 'x' }), {} as Env)
     expect(denied.status).toBe(401)
     expect(await denied.json()).toMatchObject({ error: { code: 'provider_needs_auth' } })
@@ -125,16 +158,16 @@ describe('database routes', () => {
   })
 
   it('401s without a principal; 503s without a bridge', async () => {
-    const gated = new Hono<AppEnv>().use('/api/*', requireUser).route('/api/tasks', database)
+    const gated = new Hono<AppEnv>().use('/api/*', requireUser).route('/api/tasks', f.router())
     expect((await gated.fetch(req('/api/tasks/task1/database/tables'), {} as Env)).status).toBe(401)
     expect((await authed().fetch(req('/api/tasks/task1/database/tables'), {} as Env)).status).toBe(503)
   })
 })
 
-// Saved queries are repo-scoped rows addressed through a task, so these need a real DB (unlike the
-// bridge routes above). Two tasks on different repos prove the scoping.
+// Saved queries are repo-scoped rows addressed through a task, so these need both databases. Two tasks
+// on different repos prove the scoping.
 describe('saved queries (docs/pg.md)', () => {
-  let t: TestDb
+  let f: Fixture
   let app: Hono<AppEnv>
 
   const task = (id: string, repoName: string) => ({
@@ -155,15 +188,16 @@ describe('saved queries (docs/pg.md)', () => {
   })
 
   beforeEach(async () => {
-    t = makeTestDb()
-    vi.mocked(getDb).mockReturnValue(t.db)
-    app = authed()
-    await t.db.insert(schema.tasks).values([task('task1', 'widget'), task('other', 'gadget')])
+    f = fixture()
+    app = new Hono<AppEnv>()
+    app.use('/api/*', async (c, next) => {
+      c.set('principal', { kind: 'device', userId: 'james' })
+      await next()
+    })
+    app.route('/api/tasks', f.router())
+    await f.core.db.insert(schema.tasks).values([task('task1', 'widget'), task('other', 'gadget')])
   })
-  afterEach(() => {
-    t.cleanup()
-    setDatabaseBridge(null)
-  })
+  afterEach(() => f.cleanup())
 
   const list = async (taskId = 'task1'): Promise<DbSavedQuery[]> =>
     (await app.fetch(req(`/api/tasks/${taskId}/database/queries`), {} as Env)).json()
@@ -202,14 +236,14 @@ describe('saved queries (docs/pg.md)', () => {
     setDatabaseBridge(fake({ schema: async () => ({ schema: 'SCHEMA', source: 'auto', notes: 'orders.meta holds { coupon }' }) }))
     const picked: DbSavedQuery = await (await save({ name: 'paid orders', notes: 'excludes refunds', sql: 'SELECT 1;' })).json()
     const foreign: DbSavedQuery = await (await save({ name: 'foreign', notes: '', sql: 'SELECT 99;' }, 'other')).json()
-    vi.mocked(generateTextForConnection).mockResolvedValueOnce({ text: 'SELECT 1;', providerId: 'anthropic', connectionId: 'c', modelId: 'm' })
+    f.generateText.mockResolvedValueOnce({ text: 'SELECT 1;', providerId: 'anthropic', connectionId: 'c', modelId: 'm' })
 
     const res = await app.fetch(
       req('/api/tasks/task1/database/generate', 'POST', { connectionId: 'c', prompt: 'p', queryIds: [picked.id, foreign.id, 'ghost'] }),
       {} as Env,
     )
     expect(res.status).toBe(200)
-    const system = vi.mocked(generateTextForConnection).mock.calls.at(-1)![0].input.system ?? ''
+    const system = (f.generateText.mock.calls.at(-1)![0] as GenerateTextRequest).input.system ?? ''
     expect(system).toContain('orders.meta holds { coupon }')
     expect(system).toContain('-- paid orders\n-- excludes refunds\nSELECT 1;')
     expect(system).not.toContain('SELECT 99;')

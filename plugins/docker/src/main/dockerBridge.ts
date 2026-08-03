@@ -3,9 +3,8 @@
 // daemon down/CLI missing → 409 docker_unavailable (info() reports availability for UI gating),
 // anything else → 422 with the stderr tail.
 import { existsSync } from 'node:fs'
-import { eq } from 'drizzle-orm'
 import { BridgeError } from '@acorn/node-core/server/bridge.ts'
-import { schema, type AppDatabase } from '@acorn/node-core/server/db/index.ts'
+import type { CoreServices } from '@acorn/node-core/main/core/index.ts'
 import type { DockerBridge } from '../server/routes/docker'
 import type { DockerComposeAction, DockerContainerAction, DockerContainerSummary, DockerPruneKind, DockerTaskSummary } from '../shared/model'
 import { docker, DockerCliError } from './cli'
@@ -28,18 +27,16 @@ const run = async <T>(fn: () => Promise<T>): Promise<T> => fn().catch(toBridgeEr
 
 const isActive = (c: DockerContainerSummary): boolean => c.state === 'running' || c.state === 'paused' || c.state === 'restarting'
 
-export function dockerBridge(db: AppDatabase): DockerBridge {
+// `tasks` is a CORE table and this plugin owns no tables of its own, so its two task reads — one id,
+// and the whole active set for the rail badge — come through the core service rather than a db handle
+// it should not hold (docs/vNext/data.md § Plugin DBs).
+export type DockerCoreServices = Pick<CoreServices, 'tasks'>
+
+export function dockerBridge(core: DockerCoreServices): DockerBridge {
   const service = getDockerService()
 
-  const activeTasks = () =>
-    db.select({ id: schema.tasks.id, worktreePath: schema.tasks.worktreePath, branch: schema.tasks.branch })
-      .from(schema.tasks)
-      .where(eq(schema.tasks.status, 'active'))
-
   async function linkedContainers(taskId: string): Promise<DockerContainerSummary[]> {
-    const [task] = await db.select({ worktreePath: schema.tasks.worktreePath, branch: schema.tasks.branch })
-      .from(schema.tasks)
-      .where(eq(schema.tasks.id, taskId))
+    const task = await core.tasks.load(taskId)
     if (!task) throw new BridgeError(404, 'task_not_found')
     const overrides = await loadDockerOverrides(task.worktreePath)
     return (await service.containers()).filter((c) => containerMatchesTask(c, task, overrides))
@@ -109,7 +106,7 @@ export function dockerBridge(db: AppDatabase): DockerBridge {
       return { ok: true as const }
     }),
     taskSummary: () => run(async () => {
-      const [tasks, cs] = await Promise.all([activeTasks(), service.containers()])
+      const [tasks, cs] = await Promise.all([core.tasks.active(), service.containers()])
       const out: DockerTaskSummary[] = []
       for (const task of tasks) {
         const overrides = await loadDockerOverrides(task.worktreePath) // 30s-cached per path

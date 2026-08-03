@@ -14,14 +14,20 @@ import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { makeTestDb, type TestDb } from '@acorn/node-core/server/routes/testDb.ts'
 import { schema } from '@acorn/node-core/server/db/index.ts'
+import * as coreFs from '@acorn/node-core/main/core/fs.ts'
+import { createRepoService } from '@acorn/node-core/main/core/repos.ts'
+import { createTaskService } from '@acorn/node-core/main/core/tasks.ts'
 import { RepoConfigTrustError } from '@acorn/node-core/main/repoConfigTrust.ts'
-import { resolveDbUrl } from './database'
+import { resolveDbUrl, type DatabaseCoreServices } from './database'
 
 describe('resolveDbUrl: repo-authored url_script trust gate', () => {
   let testDb: TestDb
   let dir: string
   let repo: string
   let marker: string
+  // The plugin holds no handle to core's database: it resolves the task, the repo row and the trust
+  // gate through CoreServices, so that is what the subject under test is given.
+  let core: DatabaseCoreServices
 
   // The script's only job is to prove it ran. `existsSync(marker)` is therefore an exact "did the
   // untrusted script execute?" oracle — stronger than asserting on an error string.
@@ -30,6 +36,7 @@ describe('resolveDbUrl: repo-authored url_script trust gate', () => {
 
   beforeEach(async () => {
     testDb = makeTestDb()
+    core = { tasks: createTaskService(testDb.db), repos: createRepoService(testDb.db), fs: coreFs }
     dir = mkdtempSync(join(tmpdir(), 'acorn-db-trust-'))
     repo = join(dir, 'repo')
     marker = join(dir, 'EXECUTED')
@@ -50,7 +57,7 @@ describe('resolveDbUrl: repo-authored url_script trust gate', () => {
 
   it('refuses to run an unreviewed committed url_script', async () => {
     writeCommittedUrlScript()
-    await expect(resolveDbUrl(testDb.db, 'task1')).rejects.toBeInstanceOf(RepoConfigTrustError)
+    await expect(resolveDbUrl(core, 'task1')).rejects.toBeInstanceOf(RepoConfigTrustError)
     expect(existsSync(marker)).toBe(false)
   })
 
@@ -60,7 +67,7 @@ describe('resolveDbUrl: repo-authored url_script trust gate', () => {
     // becomes invisible — so assert the throw wins over a perfectly usable fallback.
     writeCommittedUrlScript()
     writeFileSync(join(repo, '.env'), 'DATABASE_URL=postgres://from-dotenv/db\n')
-    await expect(resolveDbUrl(testDb.db, 'task1')).rejects.toBeInstanceOf(RepoConfigTrustError)
+    await expect(resolveDbUrl(core, 'task1')).rejects.toBeInstanceOf(RepoConfigTrustError)
     expect(existsSync(marker)).toBe(false)
   })
 })

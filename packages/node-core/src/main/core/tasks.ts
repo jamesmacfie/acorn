@@ -10,7 +10,9 @@
 // (`agent_sessions ⋈ tasks ⋈ workspace_repos`, the only real cross-DB joins in the codebase). It was
 // written, had no caller — agents is not converted — and was removed. It belongs in the commit that
 // converts agents, where its shape can be driven by the query that needs it rather than guessed.
+import { eq } from 'drizzle-orm'
 import type { AppDatabase } from '../../server/db'
+import { schema } from '../../server/db'
 import { loadTask, taskRoot, type TaskRow } from '../taskWorktree'
 
 export type TaskService = {
@@ -20,11 +22,18 @@ export type TaskService = {
   // The task's worktree root, resolving through the repo→checkout mapping and creating the worktree
   // lazily if needed. null when no checkout is mapped.
   root(taskId: string): Promise<string | null>
+  // Every non-archived task. Two plugins need the whole set rather than one id: docker matches every
+  // live container against every active task's worktree/branch to build the rail badge, and memory
+  // reconciles its file index from every active worktree. Full rows because those two read different
+  // columns (docker: id/worktreePath/branch; memory: worktreePath/repoOwner/repoName) and a narrowed
+  // projection would just be the union of both.
+  active(): Promise<TaskRow[]>
 }
 
 export function createTaskService(db: AppDatabase): TaskService {
   return {
     load: (taskId) => loadTask(db, taskId),
     root: (taskId) => taskRoot(db, taskId),
+    active: () => db.select().from(schema.tasks).where(eq(schema.tasks.status, 'active')),
   }
 }

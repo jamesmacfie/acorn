@@ -2,7 +2,8 @@ import { mkdirSync, mkdtempSync, readFileSync, rmSync, utimesSync, writeFileSync
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import { makeTestDb, type TestDb } from '@acorn/node-core/server/routes/testDb.ts'
+import { makeTestPluginDb, type TestPluginDb } from '@acorn/node-core/server/routes/testDb.ts'
+import { migrationsDir } from '../node/migrations'
 import {
   contentHashId,
   listMemories,
@@ -47,7 +48,7 @@ describe('memory frontmatter round-trip (docs/notes-and-memory.md — the Claude
 
 describe('memory store + index over temp checkouts', () => {
   let dir: string
-  let t: TestDb
+  let t: TestPluginDb
   let checkoutA: string
   let checkoutB: string
   let home: string
@@ -64,7 +65,7 @@ describe('memory store + index over temp checkouts', () => {
     checkoutB = join(dir, 'b')
     home = join(dir, 'home')
     for (const d of [checkoutA, checkoutB, home]) mkdirSync(join(d, '.acorn', 'memory'), { recursive: true })
-    t = makeTestDb()
+    t = makeTestPluginDb('memory', migrationsDir())
   })
 
   afterEach(() => {

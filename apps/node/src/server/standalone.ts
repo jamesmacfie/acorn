@@ -31,11 +31,14 @@ const root = openDataRoot(process.env.ACORN_DATA_DIR || devDataDir())
 const runtime = makeRuntime(root)
 await prepareSecurityState(runtime)
 await runtime.IDEMPOTENCY.cleanupExpired() // reclaim yesterday's replay rows; see service/runtime.ts
-wireServerBridges(runtime.DB, root.dir) // search / editor / database / agent-usage HTTP route bridges
+wireServerBridges(runtime.DB, root.dir) // the agent-usage HTTP route bridge (the rest are plugin-owned)
 // Converted plugins register their own routes and open their own SQLite files here. A standalone node
 // runs the SAME list as the supervised one — the difference is only which engine bridges get filled,
 // so a plugin that needs no DesktopCapabilities works identically over the LAN.
-await initPlugins(nodePlugins(root.dir), {
+// memory's launch injector queues its block into a PTY-backed agent session, and a standalone node has
+// no terminal engine at all (that is the documented degraded mode), so the sender is a no-op here
+// rather than a 503 the plugin would have to special-case.
+await initPlugins(nodePlugins(root.dir, { memory: { sendToAgent: () => {}, currentUserId: () => runtime.ACTIVE_IDENTITY.get() } }), {
   capabilities: new CapabilityRegistry(),
   core: createCoreServices({ secrets: runtime.SECRETS, db: runtime.DB }),
 })
