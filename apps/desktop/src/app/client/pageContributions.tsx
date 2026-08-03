@@ -13,6 +13,7 @@ const TerminalSettings = lazy(() => import('@acorn/plugin-terminal/client/Termin
 const DockerSettings = lazy(() => import('@acorn/plugin-docker/client/DockerSettings.tsx'))
 const ShortcutsSettings = lazy(() => import('@acorn/client-core/settings/ShortcutsSettings.tsx'))
 const HttpVariablesSettings = lazy(() => import('@acorn/plugin-http/client/HttpVariablesSettings.tsx'))
+const NodesSettings = lazy(() => import('@acorn/client-core/settings/NodesSettings.tsx'))
 const StyleGallery = lazy(() => import('@acorn/client-core/settings/StyleGallery.tsx'))
 
 export const settingsPageContributions: SettingsContribution[] = [
@@ -38,6 +39,9 @@ export const settingsPageContributions: SettingsContribution[] = [
   // 'api' is the public automation API's token page (docs/public-api.md); the API *panel*'s
   // variables are a different thing, hence the distinct id and label.
   { id: 'http', label: 'API requests', group: 'general', order: 66, component: () => <HttpVariablesSettings /> },
+  // The slot the deleted Permissions page vacated (order 80). Not `requires: 'desktop'`: the page
+  // renders its own explanation in a browser, where there is no broker and so no fleet.
+  { id: 'nodes', label: 'Nodes', group: 'general', order: 80, component: () => <NodesSettings /> },
   // Dev only: the style-pack authoring surface, not something a user needs.
   ...(import.meta.env.DEV
     ? [{ id: 'gallery', label: 'Style gallery', group: 'general' as const, order: 999, component: () => <StyleGallery /> }]

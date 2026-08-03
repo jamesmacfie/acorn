@@ -1,4 +1,4 @@
-import { createEffect, createSignal, lazy, Match, on, onCleanup, onMount, Show, Switch, untrack } from 'solid-js'
+import { createEffect, createSignal, For, lazy, Match, on, onCleanup, onMount, Show, Switch, untrack } from 'solid-js'
 import { createQuery, useIsRestoring, useQueryClient } from '@tanstack/solid-query'
 import { useMatch, useNavigate, useParams } from '@solidjs/router'
 import { Dynamic } from 'solid-js/web'
@@ -22,7 +22,9 @@ import { activateTaskSignals, pathForTask } from '@acorn/client-core/tasks/activ
 import { taskStatus } from '@acorn/client-core/tasks/taskStatus.ts'
 import { capabilities } from '@acorn/client-core/capabilities.ts'
 import NodeGate from '@acorn/client-core/node/NodeGate.tsx'
-import { nodeReady } from '@acorn/client-core/node/activeNode.ts'
+import NodeChip from '@acorn/client-core/node/NodeChip.tsx'
+import { activeNodeId, nodeReady, setActiveNode } from '@acorn/client-core/node/activeNode.ts'
+import { nodes } from '@acorn/client-core/node/fleet.ts'
 import TaskView from './TaskView'
 import Acorn from '@acorn/client-core/Acorn.tsx'
 import { registerCommands } from '@acorn/client-core/registries/commands.ts'
@@ -347,6 +349,26 @@ export default function App() {
           </Show>
         </div>
         <div class="topbar-side topbar-end">
+          {/* plan.md § 69's "minimal node switcher in the dev UI", and nothing more — the real fleet UX
+              (fleet home, node badges on every row) is Phase 4. Hidden with a single node in a
+              production build, because first-run must never mention nodes (ui.md § New surfaces). */}
+          <Show when={nodes().length > 1 || import.meta.env.DEV}>
+            <select
+              class="ui-input node-switcher"
+              data-width="auto"
+              aria-label="Active node"
+              value={activeNodeId() ?? ''}
+              onChange={(event) => setActiveNode(event.currentTarget.value || null)}
+            >
+              <For each={nodes()}>{(node) => <option value={node.nodeId}>{node.label}</option>}</For>
+            </select>
+          </Show>
+          {/* One of the two places freshness is rendered in Phase 1 (the other is the Nodes settings
+              rows). Keyed on any node-backed query would be arbitrary, so the chip reports the
+              connection alone; per-surface freshness is Phase 4. */}
+          <Show when={activeNodeId()}>
+            {(nodeId) => <NodeChip nodeId={nodeId()} compact={nodes().length <= 1} query={{}} />}
+          </Show>
           <SlotHost slot="topbar.right" context={slotContext()} />
           <AccountMenu onSettings={() => openSettings()} onClearCache={clearCache} />
         </div>
