@@ -49,7 +49,9 @@ peer.register('service.start', async (payload) => {
     desktop: desktopCapabilitiesOverRpc(peer),
     stateChanged,
   })
-  return { state: 'listening' }
+  // The endpoint, identity and bearer the parent needs. V1 returned only `{ state: 'listening' }`
+  // and the parent computed the origin itself from a pinned port.
+  return runtime.started
 })
 
 peer.register('service.preview-rules', async (payload) => {

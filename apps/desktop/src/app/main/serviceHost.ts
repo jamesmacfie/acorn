@@ -5,11 +5,13 @@ import {
   ServiceRpcPeer,
   previewBrowserRuleSchema,
   serviceStartConfigSchema,
+  serviceStartResultSchema,
   serviceStateEventSchema,
   type PreviewBrowserRule,
   type ServiceMessage,
   type ServiceMessageTransport,
   type ServiceStartConfig,
+  type ServiceStartResult,
   type ServiceState,
 } from '@acorn/protocol/serviceProtocol.ts'
 
@@ -32,7 +34,10 @@ export class ServiceHost {
     serviceStartConfigSchema.parse(config)
   }
 
-  async start(): Promise<void> {
+  // Resolves with where the service bound, who it is, and the bearer to reach it with — everything
+  // the connection broker needs. The caller supplies the previously-remembered device token so the
+  // service can reuse it instead of creating a new device row on every launch.
+  async start(rememberedDeviceToken?: string): Promise<ServiceStartResult> {
     if (this.child) throw new Error('Service host is already started')
     this.stopping = false
     const child = utilityProcess.fork(this.entry, [], {
@@ -72,7 +77,10 @@ export class ServiceHost {
     })
     child.on('exit', (code) => this.handleExit(child, code))
     await spawned
-    await peer.request('service.start', this.config, 60_000)
+    const result = await peer.request('service.start', { ...this.config, deviceToken: rememberedDeviceToken }, 60_000)
+    // Parsed, not cast: this is the one place a malformed handoff would otherwise surface much later
+    // as an unreachable node with no explanation.
+    return serviceStartResultSchema.parse(result)
   }
 
   async previewRules(taskId: string): Promise<PreviewBrowserRule[]> {

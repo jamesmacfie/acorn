@@ -5,7 +5,8 @@ import '../server/providers'
 import '../server/routes'
 import '../wiring/agentProfiles'
 import type { DesktopCapabilities } from '@acorn/protocol/desktopCapabilities.ts'
-import type { ServiceStartConfig, ServiceState } from '@acorn/protocol/serviceProtocol.ts'
+import type { ServiceEndpoint, ServiceStartConfig, ServiceStartResult, ServiceState } from '@acorn/protocol/serviceProtocol.ts'
+import type { DeviceService } from '@acorn/node-core/server/auth/deviceTokens.ts'
 import { makeRuntime, startListener } from '@acorn/node-core/main/server.ts'
 import { openDataRoot, type DataRoot } from '@acorn/node-core/main/dataRoot.ts'
 import { launcherSpec, serverName } from '@acorn/node-core/main/mcpRegister.ts'
@@ -40,6 +41,9 @@ import { previewRulesForTask } from '@acorn/plugin-preview/server/previewRules.t
 export type ServiceRuntime = {
   previewRules(taskId: string): ReturnType<typeof previewRulesForTask>
   stop(): Promise<void>
+  // What the parent needs to reach this node: where it bound, who it is, and the bearer to use.
+  // Reported rather than assumed, so a second node on the same machine is just another endpoint.
+  started: ServiceStartResult
 }
 
 type RuntimeOptions = {
@@ -83,6 +87,19 @@ function closeListener(server: ServerType | null): Promise<void> {
   })
 }
 
+// The local bundle pairs without a code: the client spawned this node, which is proof enough of
+// owner intent (docs/vNext/protocol.md § Pairing, "Local bundle: no code").
+//
+// The client passes back the token it remembered, and we reuse it when it still authenticates — so
+// the steady state is ONE device row, not one per launch — and issue a fresh one otherwise (first
+// run, a reset data root, or a device the owner revoked). The service never persists it; custody
+// belongs to the client, which holds it in the OS keychain.
+async function resolveLocalDeviceToken(devices: DeviceService, remembered: string | undefined): Promise<string> {
+  if (remembered && (await devices.authenticate(remembered))) return remembered
+  const { token } = await devices.issue('This computer')
+  return token
+}
+
 // Electron-free composition root. This process exclusively owns SQLite, Hono/WS, PTYs, workflow
 // runners, child processes, caches, and reconciliation. Native UI operations are injected through
 // DesktopCapabilities, so importing this module in a plain Node test never loads Electron.
@@ -95,6 +112,7 @@ export async function startServiceRuntime({ config, desktop, stateChanged }: Run
   )
 
   let server: ServerType | null = null
+  let endpoint: ServiceEndpoint | null = null
   let managedAgents: ReturnType<typeof wireManagedAgents> | null = null
   let reconcileTask: Promise<void> | null = null
   let stopped = false
@@ -179,7 +197,12 @@ export async function startServiceRuntime({ config, desktop, stateChanged }: Run
 
     const worktreesDir = join(config.dataDir, 'worktrees')
     setWorktreesRoot(worktreesDir)
-    const internalApiEnv = { ACORN_API_URL: config.origin, ACORN_API_TOKEN: runtime.INTERNAL_TOKEN }
+    // Mutable on purpose. The listener's origin is not known until it binds, but every consumer of
+    // this object reads it at spawn/call time rather than at wire time (terminal.ts spreads it per
+    // session, seedTaskNotes and workflowWiring read it per call), so seeding the token here and
+    // assigning the URL right after startListener is enough — no restructuring of the wiring order,
+    // which exists for a different reason (bridges must be installed before requests arrive).
+    const internalApiEnv = { ACORN_API_URL: '', ACORN_API_TOKEN: runtime.INTERNAL_TOKEN }
 
     let finishReconcile!: () => void
     const reconciled = new Promise<void>((resolve) => (finishReconcile = resolve))
@@ -227,7 +250,11 @@ export async function startServiceRuntime({ config, desktop, stateChanged }: Run
     })
     mark('install')
 
-    server = await startListener(runtime, { clientDir: config.clientDir })
+    const listener = await startListener(runtime, { clientDir: config.clientDir })
+    server = listener.server
+    endpoint = listener.endpoint
+    internalApiEnv.ACORN_API_URL = endpoint.origin
+    dataRoot.recordPort(endpoint.port)
     stateChanged('listening')
     mark('listener-up')
 
@@ -268,6 +295,12 @@ export async function startServiceRuntime({ config, desktop, stateChanged }: Run
     return {
       previewRules: (taskId) => previewRulesForTask(db, taskId),
       stop,
+      started: {
+        state: 'listening',
+        nodeId: dataRoot.nodeId,
+        endpoint,
+        deviceToken: await resolveLocalDeviceToken(runtime.DEVICES, config.deviceToken),
+      },
     }
   } catch (error) {
     stateChanged('failed', error instanceof Error ? error.message : String(error))

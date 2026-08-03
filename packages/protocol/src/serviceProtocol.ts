@@ -1,6 +1,10 @@
 import { z } from 'zod'
 
-export const SERVICE_PROTOCOL_VERSION = 1
+// Bumped to 2 for vNext: the start config lost `origin` (the service now chooses and reports its
+// own endpoint) and `service.start` resolves a real result instead of `{ state }`. A version bump is
+// a hard break by design — parent and child ship in the same artifact, so there is nothing to
+// negotiate.
+export const SERVICE_PROTOCOL_VERSION = 2
 
 export const serviceStateSchema = z.enum([
   'starting',
@@ -24,13 +28,40 @@ export const serviceStartConfigSchema = z.strictObject({
   // @acorn/node-core, which has no way to locate the desktop app's dist/ and must not try — only
   // the composition root knows the layout around it.
   clientDir: z.string().min(1),
-  origin: z.string().url(),
   version: z.string().min(1),
   isPackaged: z.boolean(),
   electronPath: z.string().min(1),
   mcpEntry: z.string().min(1),
+  // The device token this client remembered from a previous boot, if any. The service reuses it when
+  // it still authenticates, so the local bundle keeps ONE device row instead of accruing one per
+  // launch; anything else (first run, a reset data root, a revoked device) is replaced and the
+  // effective token comes back in the start result. Custody stays with the client — the service
+  // never persists it.
+  deviceToken: z.string().min(1).optional(),
 })
 export type ServiceStartConfig = z.infer<typeof serviceStartConfigSchema>
+
+// What `service.start` resolves with. V1 returned `{ state: 'listening' }` and the parent derived
+// the origin itself from a pinned port; the service now owns its endpoint and identity and reports
+// them, which is what lets two nodes coexist and what carries the TLS pin once there is one.
+export const serviceEndpointSchema = z.strictObject({
+  origin: z.string().url(),
+  port: z.number().int().min(1).max(65535),
+})
+export type ServiceEndpoint = z.infer<typeof serviceEndpointSchema>
+
+export const serviceStartResultSchema = z.strictObject({
+  state: serviceStateSchema,
+  nodeId: z.string().uuid(),
+  endpoint: serviceEndpointSchema,
+  // The bearer the client authenticates with. Never logged.
+  deviceToken: z.string().min(1),
+  // Present only once the listener speaks TLS: the cert to pin and its fingerprint. Absent means
+  // plain http on loopback, which is where this starts.
+  fingerprint: z.string().optional(),
+  certPem: z.string().optional(),
+})
+export type ServiceStartResult = z.infer<typeof serviceStartResultSchema>
 
 export const previewBrowserRuleSchema = z.strictObject({
   id: z.string(),
