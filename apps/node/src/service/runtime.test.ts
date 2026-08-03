@@ -8,10 +8,38 @@ import type { ServiceStartResult, ServiceState } from '@acorn/protocol/servicePr
 
 // A fully validated request against the node's reported pin. `ca` is the node's own self-signed
 // certificate; `rejectUnauthorized` stays true, so the IP:127.0.0.1 SAN has to match too.
-function get(started: ServiceStartResult, path: string): Promise<number> {
+//
+// `expectedFingerprint` replaces hostname verification with the fingerprint comparison, which is what
+// the client's connection broker does (apps/desktop/src/app/main/nodeBroker.ts § pinning). The shape is
+// restated here rather than imported because a package or app may never import an app — so the pin is
+// proved in two halves: this one asserts the NODE really answers under the identity it reported, and
+// nodeBroker.test.ts asserts the BROKER accepts exactly that identity and no other. Neither half is
+// allowed to see the other, and weakening the boundary rule to join them would be the wrong trade.
+function get(started: ServiceStartResult, path: string, expectedFingerprint?: string): Promise<number> {
   return new Promise((resolve, reject) => {
     const req = httpsRequest(
-      { host: '127.0.0.1', port: started.endpoint.port, path, ca: [started.certPem], rejectUnauthorized: true },
+      {
+        host: '127.0.0.1',
+        port: started.endpoint.port,
+        path,
+        ca: [started.certPem],
+        // Never false. In that mode Node skips checkServerIdentity entirely, so the pin below would
+        // silently never be consulted — a failure that fails OPEN.
+        rejectUnauthorized: true,
+        // A fresh connection per call. https.globalAgent keeps sockets alive and keys them on the TLS
+        // options WITHOUT checkServerIdentity, so a pooled socket from an earlier call would serve this
+        // one and the pin would never be evaluated — which is exactly the false pass this test exists
+        // to catch.
+        agent: false,
+        ...(expectedFingerprint
+          ? {
+              checkServerIdentity: (_host: string, cert: { fingerprint256: string }) =>
+                cert.fingerprint256.replace(/:/g, '').toLowerCase() === expectedFingerprint
+                  ? undefined
+                  : new Error('fingerprint mismatch'),
+            }
+          : {}),
+      },
       (res) => {
         res.resume()
         res.on('end', () => resolve(res.statusCode ?? 0))
@@ -113,6 +141,14 @@ describe('Electron-free service runtime', () => {
       // The pre-auth route, over a connection validated against the reported certificate. There is no
       // SPA shell to fetch any more — the node serves no web assets.
       expect(await get(runtime.started, '/v2/node')).toBe(200)
+
+      // The pin, end to end: a client that checks the fingerprint the service reported gets through…
+      expect(await get(runtime.started, '/v2/node', runtime.started.fingerprint)).toBe(200)
+      // …and one expecting any other identity is refused before a byte of the request is sent. A
+      // changed fingerprint is a hard security stop (docs/vNext/security.md), so it must fail CLOSED.
+      const wrong = (runtime.started.fingerprint[0] === '0' ? '1' : '0') + runtime.started.fingerprint.slice(1)
+      await expect(get(runtime.started, '/v2/node', wrong)).rejects.toThrow(/fingerprint mismatch/)
+
       await ready
       expect(states).toEqual(['migrating', 'listening', 'reconciling', 'ready'])
     } finally {

@@ -28,6 +28,7 @@ function probe(listener: Listener, path: string, host?: string): Promise<Probe> 
         method: 'GET',
         ca: [listener.certPem],
         rejectUnauthorized: true,
+        agent: false, // a fresh connection per probe, so no pooled socket carries a previous request's terms
         ...(host ? { headers: { host } } : {}),
       },
       (res) => {
