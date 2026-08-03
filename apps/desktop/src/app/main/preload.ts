@@ -1,7 +1,7 @@
 import { contextBridge, ipcRenderer } from 'electron'
 
-// Narrow capability surface (docs/electron.md §4g): expose only a desktop marker and the validated
-// terminal channels (docs/terminal-and-agents.md) — never raw ipcRenderer.
+// Narrow capability surface (docs/electron.md §4g): a desktop marker, the node-broker primitives, and
+// the validated terminal channels (docs/terminal-and-agents.md) — never raw ipcRenderer.
 contextBridge.exposeInMainWorld('acorn', {
   desktop: true,
   platform: process.platform,
@@ -19,9 +19,27 @@ contextBridge.exposeInMainWorld('acorn', {
     ipcRenderer.on('acorn:will-quit', listener)
     return () => ipcRenderer.removeListener('acorn:will-quit', listener)
   },
-  // The terminal residue now: ONLY the native folder picker (dialog.showOpenDialog — a
-  // true Electron capability, and the renderer's desktop-mode marker). Every request/response verb
-  // is HTTP; every stream (PTY input/output/status, workflow notices) is the WebSocket (wsClient.ts).
+  // Node access, through the connection broker in main (docs/vNext/architecture.md § How the client
+  // talks to nodes). This INVERTS the invariant this file used to state: request/response and streams
+  // both ride IPC now, because main is where the pinned certificate and the device token live and the
+  // renderer must never hold either. Seven primitives only — no closures cross the bridge, so
+  // `nodeSocket()` is assembled on the renderer side from `nodeSend` + `onNodeFrame`.
+  nodeFetch: (nodeId: string, request: unknown) => ipcRenderer.invoke('acorn:node-fetch', nodeId, request),
+  nodeAbort: (requestId: string) => ipcRenderer.send('acorn:node-abort', requestId),
+  nodeSend: (nodeId: string, frame: unknown) => ipcRenderer.send('acorn:node-send', nodeId, frame),
+  onNodeFrame: (cb: (nodeId: string, frame: unknown) => void) => {
+    const listener = (_e: unknown, nodeId: string, frame: unknown) => cb(nodeId, frame)
+    ipcRenderer.on('acorn:node-frame', listener)
+    return () => ipcRenderer.removeListener('acorn:node-frame', listener)
+  },
+  onNodeStatus: (cb: (status: unknown) => void) => {
+    const listener = (_e: unknown, status: unknown) => cb(status)
+    ipcRenderer.on('acorn:node-status', listener)
+    return () => ipcRenderer.removeListener('acorn:node-status', listener)
+  },
+  fleetList: () => ipcRenderer.invoke('acorn:fleet-list'),
+  // The terminal residue: ONLY the native folder picker (dialog.showOpenDialog — a true Electron
+  // capability), plus the renderer's desktop-mode marker.
   terminal: {
     repoPath: {
       // Native folder picker (onboarding / repo mapping). Returns the chosen absolute path or null.

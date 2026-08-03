@@ -1,3 +1,6 @@
+import type { NodeFetchRequest, NodeFetchResponse, NodeRecord, NodeStatus } from '@acorn/protocol/broker.ts'
+import type { WsClientFrame } from '@acorn/protocol/ws.ts'
+
 // What the hosting environment provides (docs/features.md, docs/electron.md §capability-map). The
 // preload is a thin residue (native folder picker, preview view controls, lifecycle callbacks); the
 // data surface is loopback HTTP + one WebSocket, so most panes work in a plain browser (`dev:node`)
@@ -24,6 +27,9 @@ export type TerminalStreamBridge = {
   repoPath: { pick(): Promise<string | null> }
 }
 
+// Re-exported so consumers of the bridge get the wire types without importing protocol themselves.
+export type { NodeFetchRequest, NodeFetchResponse, NodeRecord, NodeStatus } from '@acorn/protocol/broker.ts'
+
 // Chrome state pushed from main for the active preview view (PreviewPane consumes it).
 export type PreviewState = { taskId: string; url: string; loading: boolean; canGoBack: boolean; canGoForward: boolean }
 
@@ -36,6 +42,15 @@ declare global {
       onClosePane?: (cb: () => void) => () => void
       // App quit lifecycle concern collection. Returns an unsubscribe.
       onWillQuit?: (cb: () => boolean | Promise<boolean>) => () => void
+      // Node access via the connection broker in Electron main. The renderer holds no device token
+      // and opens no socket of its own; `nodeSocket` is assembled from these primitives in
+      // node/nodeSocket.ts rather than crossing contextBridge as a closure.
+      nodeFetch?: (nodeId: string, request: NodeFetchRequest) => Promise<NodeFetchResponse>
+      nodeAbort?: (requestId: string) => void
+      nodeSend?: (nodeId: string, frame: WsClientFrame) => void
+      onNodeFrame?: (cb: (nodeId: string, frame: unknown) => void) => () => void
+      onNodeStatus?: (cb: (status: NodeStatus) => void) => () => void
+      fleetList?: () => Promise<{ nodes: NodeRecord[]; statuses: NodeStatus[] }>
       terminal?: TerminalStreamBridge
       // Browser-preview surface: drive the task's main-owned WebContentsView.
       preview?: {
