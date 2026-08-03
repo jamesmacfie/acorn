@@ -7,7 +7,9 @@ export type IntegrationProviderKind =
   | 'model-provider'
   | 'generic'
 
-export type IntegrationAuthKind = 'github-session' | 'api-key' | 'oauth' | 'installation' | 'none'
+// 'github-session' is gone: it described GitHub's token being the login session itself, which stopped
+// being true when GitHub became an ordinary stored connection (it is 'oauth' now, like any other).
+export type IntegrationAuthKind = 'api-key' | 'oauth' | 'installation' | 'none'
 export type IntegrationConnectionStatus = 'connected' | 'needs-auth' | 'degraded' | 'disabled'
 export type ProviderErrorCode =
   | 'provider_not_connected'

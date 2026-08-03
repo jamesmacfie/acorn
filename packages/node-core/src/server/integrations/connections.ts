@@ -55,19 +55,6 @@ export const connectionHasCapability = (
   providers = connectionProviderRegistry,
 ): boolean => resolvedCapabilities(row, providers)[capability] === 'available'
 
-export const githubConnectionSummary = (login: string): Integration => ({
-  id: 'github',
-  providerId: 'github',
-  label: login,
-  status: 'connected',
-  authKind: 'github-session',
-  account: { id: login, label: login, type: 'user' },
-  scopes: [],
-  capabilities: {},
-  createdAt: 0,
-  updatedAt: 0,
-})
-
 export async function listConnections(db: AppDatabase, userId: string): Promise<StoredConnection[]> {
   return db
     .select()
