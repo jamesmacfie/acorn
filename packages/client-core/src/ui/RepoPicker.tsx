@@ -1,5 +1,6 @@
 import { createMemo, createSignal, Show } from 'solid-js'
 import { useQueryClient } from '@tanstack/solid-query'
+import { postJson } from '../apiClient'
 import { setPin } from '../workspaces/mutations'
 import { pinsKey, reposKey, reposRefreshRoute, type Repo } from '../queries'
 import Picker from './Picker'
@@ -37,12 +38,11 @@ export default function RepoPicker(props: {
     setRefreshing(true)
     setRefreshFailed(false)
     try {
-      const res = await fetch(reposRefreshRoute, { method: 'POST' })
-      if (res.status === 401) {
-        window.location.href = '/auth/login'
-        return
-      }
-      if (!res.ok) throw new Error(`${reposRefreshRoute} ${res.status}`)
+      // Through the broker like every other request (apiClient.ts), not raw fetch: this was one of the
+      // last same-origin escape hatches, and nothing is same-origin once the renderer loads from a
+      // custom app scheme. Any failure — including "the GitHub integration is not connected" — is just
+      // the failed flag; there is no session to bounce to any more.
+      await postJson(reposRefreshRoute)
       await queryClient.invalidateQueries({ queryKey: reposKey })
     } catch {
       setRefreshFailed(true)

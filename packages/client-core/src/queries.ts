@@ -46,8 +46,6 @@ import {
   workspaceAssignmentsRoute,
   workspaceAssignmentsKey,
   type RepoAssignment,
-  meKey,
-  meRoute,
   mentionsKey,
   mentionsRoute,
   jobLogKey,
@@ -87,7 +85,6 @@ import {
   type LinearIssuesResponse,
   type LinearProjectsResponse,
   type LinearProjectIssuesResponse,
-  type Me,
   type Pull,
   type RunJobs,
   type Label,
@@ -103,7 +100,6 @@ export {
   fileSummariesKey,
   integrationsKey,
   linearIssueKey,
-  meKey,
   pinsKey,
   prefsKey,
   pullKey,
@@ -117,15 +113,10 @@ export {
   tasksKey,
   workspacesKey,
 } from '@acorn/protocol/api.ts'
-export type { Branch, Check, Comment, Compare, CompareCommit, Integration, IntegrationsResponse, Label, LinearActivity, LinearComment, LinearIssueDetail, LinearIssueState, LinearIssueSummary, Me, Pull, PullCommit, PullDetail, PullFile, Repo, Review, Thread, ThreadComment, Task, TaskLink, TaskSeed, Workspace, WorkspaceProject, WorkspaceRepo } from '@acorn/protocol/api.ts'
+export type { Branch, Check, Comment, Compare, CompareCommit, Integration, IntegrationsResponse, Label, LinearActivity, LinearComment, LinearIssueDetail, LinearIssueState, LinearIssueSummary, Pull, PullCommit, PullDetail, PullFile, Repo, Review, Thread, ThreadComment, Task, TaskLink, TaskSeed, Workspace, WorkspaceProject, WorkspaceRepo } from '@acorn/protocol/api.ts'
 
 type QueryContext = { signal?: AbortSignal }
 type PageQueryContext = QueryContext & { pageParam: number }
-
-export const meOptions = () => ({
-  queryKey: meKey,
-  queryFn: async ({ signal }: QueryContext): Promise<Me | null> => readJson<Me | null>(meRoute, { nullOn401: true, signal }),
-})
 
 export const reposOptions = (enabled: boolean) => ({
   queryKey: reposKey,
@@ -310,13 +301,12 @@ export const jobLogOptions = (owner: string, repo: string, jobId: number, enable
 })
 
 // Connected integrations (gates the Sources rail + settings list). Includes the synthesized GitHub
-// entry. 401 → logged out.
+// entry.
 export const integrationsOptions = (enabled: boolean) => ({
   queryKey: integrationsKey,
   enabled,
   staleTime: 5 * 60 * 1000,
-  queryFn: async ({ signal }: QueryContext): Promise<IntegrationsResponse | null> =>
-    readJson<IntegrationsResponse | null>(integrationsRoute, { nullOn401: true, signal }),
+  queryFn: async ({ signal }: QueryContext): Promise<IntegrationsResponse> => readJson<IntegrationsResponse>(integrationsRoute, { signal }),
 })
 
 // Batch enrichment for the Integrations list (title + status per referenced ticket). Server

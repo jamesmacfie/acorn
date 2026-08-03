@@ -38,6 +38,13 @@ contextBridge.exposeInMainWorld('acorn', {
     return () => ipcRenderer.removeListener('acorn:node-status', listener)
   },
   fleetList: () => ipcRenderer.invoke('acorn:fleet-list'),
+  // Node recovery screen (client-core/node/NodeGate.tsx). Only reachable when there is no node to
+  // talk to, which is also why `quit` cannot go through the renderer's will-quit prompt: the shell
+  // that answers it is not mounted.
+  recovery: {
+    openDataFolder: () => ipcRenderer.send('acorn:open-data-folder'),
+    quit: () => ipcRenderer.send('acorn:force-quit'),
+  },
   // The terminal residue: ONLY the native folder picker (dialog.showOpenDialog — a true Electron
   // capability), plus the renderer's desktop-mode marker.
   terminal: {

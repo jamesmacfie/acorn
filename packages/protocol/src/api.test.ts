@@ -7,8 +7,6 @@ import {
   fileSummariesKey,
   fileSummariesRoute,
   filesKey,
-  meKey,
-  meRoute,
   pullKey,
   pullPrefixKey,
   pullRoute,
@@ -32,7 +30,6 @@ import {
 
 describe('shared API contract helpers', () => {
   it('preserves route strings used by the client fetch layer', () => {
-    expect(meRoute).toBe('/v2/core/me')
     expect(reposRoute).toBe('/v2/p/github/repos')
     expect(reposRefreshRoute).toBe('/v2/p/github/repos/refresh')
     expect(repoRoute('octo', 'repo', 'actions/123/rerun')).toBe('/v2/p/github/repos/octo/repo/actions/123/rerun')
@@ -54,7 +51,7 @@ describe('shared API contract helpers', () => {
 
   // A net under the ~90 route literals above, which were namespaced by hand: every one of them must
   // land in a vNext namespace (docs/vNext/protocol.md § HTTP conventions), because a path outside
-  // /v2/* escapes the server's single csrf/auth/requireUser glob and would 404 into the SPA shell.
+  // /v2/* escapes the server's single auth/requireUser glob and would 404 into the SPA shell.
   // Enumerated from the module rather than listed, so a new builder is covered the day it lands.
   it('namespaces every exported route builder under /v2/core or /v2/p', () => {
     // One dummy that satisfies every parameter shape the builders take: interpolates and
@@ -74,7 +71,6 @@ describe('shared API contract helpers', () => {
   })
 
   it('preserves query key shapes for cache compatibility', () => {
-    expect(meKey).toEqual(['me'])
     expect(reposKey).toEqual(['repos'])
     expect(pullsKey('octo', 'repo', 'closed')).toEqual(['pulls', 'octo', 'repo', 'closed'])
     expect(pullsPrefixKey('octo', 'repo')).toEqual(['pulls', 'octo', 'repo'])

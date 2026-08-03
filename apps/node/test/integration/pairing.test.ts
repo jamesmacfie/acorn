@@ -39,14 +39,14 @@ beforeEach(() => {
 
 afterEach(() => harness.cleanup())
 
-// csrf() guards any non-GET whose content-type is form-submittable — and a request with NO
-// content-type counts as text/plain. So every mutation here declares JSON, exactly as the client does.
-const send = (path: string, init: { method?: string; body?: unknown; token?: string; requestId?: string } = {}) =>
+// Declares JSON like the client does. `contentType: null` drops the header entirely, which is what a
+// bodyless mutation actually looks like on the wire (see the no-content-type test below).
+const send = (path: string, init: { method?: string; body?: unknown; token?: string; requestId?: string; contentType?: string | null } = {}) =>
   app.fetch(
     new Request(`${ORIGIN}${path}`, {
       method: init.method ?? 'GET',
       headers: {
-        'content-type': 'application/json',
+        ...(init.contentType === null ? {} : { 'content-type': init.contentType ?? 'application/json' }),
         ...(init.token ? { authorization: `Bearer ${init.token}` } : {}),
         ...(init.requestId ? { 'x-request-id': init.requestId } : {}),
       },
@@ -159,6 +159,16 @@ describe('device administration', () => {
     const after = await send('/v2/core/devices', { token: paired.deviceToken })
     expect(after.status).toBe(401)
     expect(((await after.json()) as ApiError).error.code).toBe('unauthenticated')
+  })
+
+  // Regression guard for the csrf() removal on /v2 (server/index.ts). hono/csrf treats a MISSING
+  // content-type as form-submittable, so while it was mounted here this exact request — the one the
+  // renderer sends to revoke a device, bodyless and therefore header-less — came back 403 instead of
+  // 204. /v2 is bearer-only, so the Origin check was protecting a credential no browser can attach.
+  it('accepts a bearer DELETE that carries no content-type at all', async () => {
+    const paired = await pairDevice('laptop')
+    const revoke = await send(`/v2/core/devices/${paired.device.id}`, { method: 'DELETE', token: paired.deviceToken, contentType: null })
+    expect(revoke.status).toBe(204)
   })
 
   it('404s a device that never existed, and closes a pairing window idempotently', async () => {

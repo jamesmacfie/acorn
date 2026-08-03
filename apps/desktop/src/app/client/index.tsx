@@ -1,32 +1,24 @@
 /* @refresh reload */
 import { render } from 'solid-js/web'
 import './activate'
-import { QueryClient, QueryCache, MutationCache } from '@tanstack/solid-query'
+import { QueryClient } from '@tanstack/solid-query'
 import { PersistQueryClientProvider } from '@tanstack/solid-query-persist-client'
 import { createAsyncStoragePersister } from '@tanstack/query-async-storage-persister'
 import { Route, Router } from '@solidjs/router'
-import { clear, del, get, set } from 'idb-keyval'
+import { del, get, set } from 'idb-keyval'
 import App from './App'
-import { ApiError } from '@acorn/client-core/apiClient.ts'
 import '@acorn/client-core/styles.css'
 import { shouldPersistQuery } from '@acorn/client-core/persistence/queryPersistence.ts'
-import { acornGlobal } from '@acorn/client-core/capabilities.ts'
-import { setActiveNode } from '@acorn/client-core/node/activeNode.ts'
+import { selectActiveNode } from '@acorn/client-core/node/activeNode.ts'
 import { wsOnReconnect } from '@acorn/client-core/wsClient.ts'
-
-// A revoked/expired token surfaces as a 401 from any read or write → bounce to the OAuth login
-// (docs/authentication.md). Structural: every API failure is an ApiError carrying the response
-// status (apiClient.ts), so no message-text matching. The `me` query returns null on 401
-// (nullOn401 — logged-out) so it never trips this.
-const onError = (err: unknown) => {
-  if (err instanceof ApiError && err.status === 401) window.location.href = '/auth/login?return_to=' + encodeURIComponent(window.location.pathname + window.location.search)
-}
 
 // TanStack Query is the client cache (SWR). App is the layout root and renders the panes from
 // useParams(); these routes exist only to populate the params.
+//
+// There is no global 401 handler any more. A 401 used to mean "the GitHub session expired, bounce to
+// OAuth"; with bearer auth held by the broker it means the device was revoked, which the broker itself
+// observes and reports as a node state (nodeBroker.ts) — not something a query error should navigate on.
 const queryClient = new QueryClient({
-  queryCache: new QueryCache({ onError }),
-  mutationCache: new MutationCache({ onError }),
   // Keep focus refreshes useful without turning every quick app switch into a fan-out across every
   // active query. Domain queries that genuinely need fresher data override this (running checks,
   // integration detail, the one-minute PR-list poll).
@@ -57,16 +49,10 @@ const noop = () => null
 // across every cached query the user cannot currently see.
 wsOnReconnect(() => void queryClient.invalidateQueries({ refetchType: 'active' }))
 
-// Resolve which node to talk to BEFORE the first render. Every request is node-addressed now, so
-// rendering first would fire the shell's queries with no node selected.
-async function selectInitialNode(): Promise<void> {
-  const fleet = await acornGlobal()?.fleetList?.()
-  // Prefer the bundled local node; a fleet UI for choosing among several arrives with Settings → Nodes.
-  const node = fleet?.nodes.find((n) => n.local) ?? fleet?.nodes[0]
-  if (node) setActiveNode(node.nodeId)
-}
-
-await selectInitialNode()
+// Resolve which node to talk to BEFORE the first render. Every request is node-addressed now, and the
+// shell's onMount side effects (session tracking, pollers) do not sit behind NodeGate's <Show>, so
+// rendering first would fire requests with no node selected.
+await selectActiveNode()
 
 render(
   () => (
@@ -88,10 +74,3 @@ render(
   ),
   document.getElementById('root')!,
 )
-
-// Wipe the persisted cache on logout so the next user can't read it (logout posts then reloads).
-window.addEventListener('acorn:logout', () => void clear())
-
-// Unregister any service worker left over from a prior web (Cloudflare Workers) visit to this
-// origin — a stale cached shell would mask app upgrades in the Electron build.
-void navigator.serviceWorker?.getRegistrations().then((rs) => rs.forEach((r) => void r.unregister()))

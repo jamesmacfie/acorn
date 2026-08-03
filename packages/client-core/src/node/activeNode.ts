@@ -1,4 +1,5 @@
 import { createSignal } from 'solid-js'
+import { acornGlobal } from '../capabilities'
 
 // Which node the renderer's ambient requests go to.
 //
@@ -19,4 +20,48 @@ export { activeNodeId }
 
 export function setActiveNode(nodeId: string | null): void {
   setActiveNodeIdSignal(nodeId)
+}
+
+// How far the client has got in finding a node to talk to. This is what the shell gates on, in the
+// place the GitHub session used to be gated: there is no login any more, so the only question left
+// before the app may fetch anything is "which node answers?" (docs/vNext/architecture.md § How the
+// client talks to nodes).
+export type NodeReadiness =
+  | { kind: 'starting' } // asking the broker for the fleet — the bundled local node's whole story
+  | { kind: 'ready' } // a node is selected, or the serving origin IS the node (see below)
+  | { kind: 'unpaired' } // the broker knows no nodes: nothing to talk to until the owner pairs one
+  | { kind: 'failed'; reason: string } // the broker itself could not answer
+
+const [nodeReadiness, setNodeReadiness] = createSignal<NodeReadiness>({ kind: 'starting' })
+
+export { nodeReadiness }
+
+export const nodeReady = (): boolean => nodeReadiness().kind === 'ready'
+
+// Pick the node this window talks to. Called once before the first render, and again by the recovery
+// screen's Retry — which is what makes `starting` a state the user can actually observe.
+export async function selectActiveNode(): Promise<void> {
+  const fleetList = acornGlobal()?.fleetList
+  // No broker at all: the renderer is being served by a node directly (`dev:node` in a browser), so
+  // the origin already IS the node and apiClient's same-origin fallback covers it. Nothing to select,
+  // and gating the shell on a selection would leave that mode staring at the recovery screen forever.
+  if (!fleetList) {
+    setNodeReadiness({ kind: 'ready' })
+    return
+  }
+
+  setNodeReadiness({ kind: 'starting' })
+  try {
+    const fleet = await fleetList()
+    // Prefer the bundled local node; choosing among several arrives with Settings → Nodes.
+    const node = fleet.nodes.find((n) => n.local) ?? fleet.nodes[0]
+    if (!node) {
+      setNodeReadiness({ kind: 'unpaired' })
+      return
+    }
+    setActiveNode(node.nodeId)
+    setNodeReadiness({ kind: 'ready' })
+  } catch (error) {
+    setNodeReadiness({ kind: 'failed', reason: error instanceof Error ? error.message : String(error) })
+  }
 }

@@ -1,11 +1,11 @@
 import { createSignal, onCleanup, onMount, Show } from 'solid-js'
-import type { Me } from './queries'
 
+// The topbar's overflow menu. It stopped being an *account* menu when the GitHub session went away —
+// there is no identity to show and nothing to log out of — but it is still where the two app-level
+// actions live, so the name and the CSS stay rather than churning both for a rename.
 type AccountMenuProps = {
-  user: Me
   onSettings: () => void
   onClearCache: () => void | Promise<void>
-  onLogout: () => void | Promise<void>
 }
 
 export default function AccountMenu(props: AccountMenuProps) {
@@ -34,10 +34,6 @@ export default function AccountMenu(props: AccountMenuProps) {
     window.removeEventListener('keydown', onKey)
   })
 
-  const logout = async () => {
-    close()
-    await props.onLogout()
-  }
   const clearCache = async () => {
     close()
     await props.onClearCache()
@@ -52,29 +48,22 @@ export default function AccountMenu(props: AccountMenuProps) {
       <button
         type="button"
         class="account-menu-button"
-        aria-label="Account menu"
+        aria-label="App menu"
         aria-haspopup="menu"
         aria-expanded={open()}
         onClick={toggle}
       >
-        <img class="avatar" src={props.user.avatar} alt={props.user.login} width="22" height="22" />
         <span class="account-menu-chevron" aria-hidden="true">
           ▾
         </span>
       </button>
       <Show when={open()}>
         <div class="account-menu-popover" role="menu">
-          <div class="account-menu-user" title={props.user.login}>
-            {props.user.login}
-          </div>
           <button class="account-menu-item" role="menuitem" type="button" onClick={settings}>
             Settings
           </button>
           <button class="account-menu-item" role="menuitem" type="button" onClick={clearCache}>
             Clear cache
-          </button>
-          <button class="account-menu-item" role="menuitem" type="button" onClick={logout}>
-            Logout
           </button>
         </div>
       </Show>
