@@ -10,6 +10,9 @@ import App from './App'
 import { ApiError } from '@acorn/client-core/apiClient.ts'
 import '@acorn/client-core/styles.css'
 import { shouldPersistQuery } from '@acorn/client-core/persistence/queryPersistence.ts'
+import { acornGlobal } from '@acorn/client-core/capabilities.ts'
+import { setActiveNode } from '@acorn/client-core/node/activeNode.ts'
+import { wsOnReconnect } from '@acorn/client-core/wsClient.ts'
 
 // A revoked/expired token surfaces as a 401 from any read or write → bounce to the OAuth login
 // (docs/authentication.md). Structural: every API failure is an ApiError carrying the response
@@ -47,6 +50,23 @@ const persister = createAsyncStoragePersister({
   throttleTime: 5_000,
 })
 const noop = () => null
+
+// A WS drop means the client missed events, and there is no cursor into history to replay from — so
+// the remedy is to mark everything stale and let whatever is on screen refetch
+// (docs/vNext/protocol.md § Events). `refetchType: 'active'` is what keeps that from fanning out
+// across every cached query the user cannot currently see.
+wsOnReconnect(() => void queryClient.invalidateQueries({ refetchType: 'active' }))
+
+// Resolve which node to talk to BEFORE the first render. Every request is node-addressed now, so
+// rendering first would fire the shell's queries with no node selected.
+async function selectInitialNode(): Promise<void> {
+  const fleet = await acornGlobal()?.fleetList?.()
+  // Prefer the bundled local node; a fleet UI for choosing among several arrives with Settings → Nodes.
+  const node = fleet?.nodes.find((n) => n.local) ?? fleet?.nodes[0]
+  if (node) setActiveNode(node.nodeId)
+}
+
+await selectInitialNode()
 
 render(
   () => (
