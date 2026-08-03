@@ -109,6 +109,15 @@ const rel = (f: string) => relative(ROOT, f)
 const firstParty = EDGES.filter((e) => e.target.pkg)
 const crossPackage = firstParty.filter((e) => e.target.pkg!.name !== e.fromPkg.name)
 
+// The first path segment of a file inside its package's src/ — 'client', 'server', 'main',
+// 'contract', 'shared', …
+const segment = (pkg: Pkg, file: string): string => relative(pkg.src, file).split('/')[0]
+
+// contract/ is the ONE cross-plugin import surface (docs/vNext/plugins.md § Package shape). A plugin
+// may import another plugin's contract/; anything else is a coupling edge.
+const isContract = (pkg: Pkg | undefined, file: string | null): boolean =>
+  !!pkg && !!file && pkg.kind === 'plugin' && segment(pkg, file) === 'contract'
+
 // Which side of the client/node split a file sits on, from its path inside its package.
 function side(pkg: Pkg, file: string): 'client' | 'node' | 'shared' {
   if (pkg.name === '@acorn/client-core') return 'client'
@@ -236,6 +245,50 @@ describe('architecture boundaries', () => {
     expect([...new Set(cycles)].sort()).toEqual([])
   })
 
+  it('a plugin contract/ never re-exports its own internals', () => {
+    // The contract/ exemption below is only worth having if a contract file cannot smuggle the
+    // internals back in. `export type { X } from '../main/heavy.ts'` is still an import edge, and it
+    // would drag the implementation module into every consumer — turning the sanctioned surface into
+    // a hole. Types a contract needs must LIVE in contract/ (or in shared/, which both sides may use).
+    const leaks = firstParty
+      .filter((e) => isContract(e.fromPkg, e.fromFile))
+      .filter((e) => e.target.pkg!.name === e.fromPkg.name)
+      .filter((e) => ['client', 'server', 'main'].includes(segment(e.fromPkg, e.target.file!)))
+      .map((e) => `${rel(e.fromFile)}: ${e.spec}`)
+    expect([...new Set(leaks)].sort()).toEqual([])
+  })
+
+  it('plugin server code owns its own schema (shrinking baseline)', () => {
+    // Phase 2 moves each plugin's tables into its own package and its own SQLite file
+    // (docs/vNext/data.md § Plugin DBs). Until then, importing core's table definitions is
+    // grandfathered per package. Entries may be removed, never added.
+    //
+    // Matches the TABLE barrel specifically, not the module: `import type { AppDatabase }` from the
+    // same path is fine and stays — a plugin is handed a database handle, it just may not reach into
+    // core's schema to decide what is in it.
+    const SCHEMA_BASELINE = [
+      'agents',
+      'changes',
+      'database',
+      'docker',
+      'editor',
+      'github',
+      'http',
+      'linear',
+      'memory',
+      'model-providers',
+      'notes',
+      'rollbar',
+      'terminal',
+      'workflows',
+    ]
+    const SCHEMA_IMPORT_RE = /\bimport\s+(?:\{[^}]*\bschema\b[^}]*\}|\*\s+as\s+schema)\s+from\s*['"]@acorn\/node-core\/server\/db/
+    const offenders = PACKAGES.filter((p) => p.kind === 'plugin')
+      .filter((p) => walk(p.src).some((file) => SCHEMA_IMPORT_RE.test(readFileSync(file, 'utf8'))))
+      .map((p) => p.name.replace('@acorn/plugin-', ''))
+    expect([...new Set(offenders)].sort()).toEqual([...SCHEMA_BASELINE].sort())
+  })
+
   it('plugin→plugin coupling matches the shrinking baseline', () => {
     // Phase 3 drives this to zero. Entries may be removed, never added.
     const BASELINE = [
@@ -251,6 +304,9 @@ describe('architecture boundaries', () => {
     ]
     const seen = crossPackage
       .filter((e) => e.fromPkg.kind === 'plugin' && e.target.pkg!.kind === 'plugin')
+      // Importing another plugin's contract/ is the sanctioned mechanism, not a coupling: it carries
+      // types and capability/event ids only, and the rule above keeps it that way.
+      .filter((e) => !isContract(e.target.pkg, e.target.file))
       .map((e) => `${e.fromPkg.name} -> ${e.target.pkg!.name}`)
     expect([...new Set(seen)].sort()).toEqual([...BASELINE].sort())
   })

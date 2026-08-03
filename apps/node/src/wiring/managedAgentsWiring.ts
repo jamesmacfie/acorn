@@ -1,6 +1,9 @@
 import { BridgeError } from '@acorn/node-core/server/bridge.ts'
 import type { AppDatabase } from '@acorn/node-core/server/db/index.ts'
+import type { CapabilityRegistry } from '@acorn/node-core/server/plugin/capabilities.ts'
 import { wsBroadcast } from '@acorn/node-core/main/wsHub.ts'
+import { AGENTS_SESSION_EXECUTE } from '@acorn/plugin-agents/contract/sessionExecute.ts'
+import { createSessionExecute } from '@acorn/plugin-agents/main/sessionExecute.ts'
 import { ManagedAgentRuntime } from '@acorn/plugin-agents/main/runtime.ts'
 import { agentDriverRegistry } from '@acorn/plugin-agents/main/drivers/registry.ts'
 import { ClaudeAgentDriver } from '@acorn/plugin-agents/main/drivers/claudeDriver.ts'
@@ -69,6 +72,7 @@ export function wireManagedAgents(options: {
   dataDir: string
   internalApiEnv: Record<string, string>
   encryptionKey: string
+  capabilities: CapabilityRegistry
   currentUserId(): string | null
   memoryReviewTrigger?: (taskId: string, transcriptTail: string) => Promise<void>
 }): ManagedAgentRuntime {
@@ -118,5 +122,9 @@ export function wireManagedAgents(options: {
     search: (query, filter) => guarded(() => runtime.store.searchSessions(query, filter)),
   }
   setManagedAgentsBridge(bridge)
+  // agents.sessionExecute (plugins/agents/src/contract/sessionExecute.ts). Workflows resolves this at
+  // call time and falls back to its own headless runner when it is absent, so a node with the agents
+  // plugin unavailable still runs non-managed workflow steps.
+  options.capabilities.provide(AGENTS_SESSION_EXECUTE, createSessionExecute(runtime))
   return runtime
 }

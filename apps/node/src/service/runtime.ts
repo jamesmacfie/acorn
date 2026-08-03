@@ -7,6 +7,7 @@ import '../wiring/agentProfiles'
 import type { DesktopCapabilities } from '@acorn/protocol/desktopCapabilities.ts'
 import type { ServiceEndpoint, ServiceStartConfig, ServiceStartResult, ServiceState } from '@acorn/protocol/serviceProtocol.ts'
 import { resolveDeviceToken } from '@acorn/node-core/server/auth/deviceTokens.ts'
+import { CapabilityRegistry } from '@acorn/node-core/server/plugin/capabilities.ts'
 import { makeRuntime, startListener } from '@acorn/node-core/main/server.ts'
 import { openDataRoot, type DataRoot } from '@acorn/node-core/main/dataRoot.ts'
 import { launcherSpec, serverName } from '@acorn/node-core/main/mcpRegister.ts'
@@ -14,7 +15,6 @@ import { reconcileWorktrees, setWorktreesRoot } from '@acorn/node-core/main/task
 import { logStorageFootprint } from '@acorn/node-core/main/storageFootprint.ts'
 import { disposeWsHub } from '@acorn/node-core/main/wsHub.ts'
 import { wireManagedAgents } from '../wiring/managedAgentsWiring'
-import { createManagedWorkflowStepRunner } from '../wiring/managedWorkflowStep'
 import { wireServerBridges } from '../wiring/serverBridges'
 import { wireRunBridge } from '../wiring/harnessWiring'
 import { wireAgentTools } from '../wiring/agentToolsWiring'
@@ -218,6 +218,11 @@ export async function startServiceRuntime({ config, desktop, stateChanged }: Run
     let finishReconcile!: () => void
     const reconciled = new Promise<void>((resolve) => (finishReconcile = resolve))
 
+    // The plugin composition seam (docs/vNext/plugins.md § Cross-plugin collaboration). Owned by this
+    // runtime rather than by the module, so a process that starts the service more than once (the
+    // tests do) gets a clean graph each time instead of "capability already provided".
+    const capabilities = new CapabilityRegistry()
+
     const knowledge = registerKnowledgeIpc(db, config.dataDir, {
       sendToAgent,
       currentUserId: () => runtime.ACTIVE_IDENTITY.get(),
@@ -239,17 +244,18 @@ export async function startServiceRuntime({ config, desktop, stateChanged }: Run
       dataDir: config.dataDir,
       internalApiEnv,
       encryptionKey: runtime.SESSION_ENC_KEY,
+      capabilities,
       currentUserId: () => runtime.ACTIVE_IDENTITY.get(),
       memoryReviewTrigger: knowledge.memoryReviewTrigger,
     })
     const workflowRunner = await registerWorkflowIpc(db, {
+      capabilities,
       runtime: runtimeService,
       notesStore: knowledge.notesStore,
       internalApiEnv,
       reconciled,
       currentUserId: () => runtime.ACTIVE_IDENTITY.get(),
       memoryReviewTrigger: knowledge.memoryReviewTrigger,
-      runManagedStep: createManagedWorkflowStepRunner(managedAgents),
     })
     wireServerBridges(db, config.dataDir)
     registerTerminalIpc(db, worktreesDir, {

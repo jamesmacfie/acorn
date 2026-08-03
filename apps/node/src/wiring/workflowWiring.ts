@@ -11,8 +11,10 @@ import { formatContextBlock } from '@acorn/protocol/contextBlock.ts'
 import type { AppDatabase } from '@acorn/node-core/server/db/index.ts'
 import { schema } from '@acorn/node-core/server/db/index.ts'
 import { setWorkflowBridge } from '@acorn/plugin-workflows/server/routes/workflow.ts'
+import type { CapabilityRegistry } from '@acorn/node-core/server/plugin/capabilities.ts'
+import { AGENTS_SESSION_EXECUTE } from '@acorn/plugin-agents/contract/sessionExecute.ts'
 import { DEFAULT_PROFILE_ID } from '@acorn/node-core/main/agentProfiles/index.ts'
-import { buildHeadlessArgv, runHeadless, type HeadlessResult } from '@acorn/node-core/main/headless.ts'
+import { buildHeadlessArgv, runHeadless } from '@acorn/node-core/main/headless.ts'
 import type { NotesStore } from '@acorn/plugin-notes/main/notes.ts'
 import { broadcastStatus, broadcastWorkflowNotice, broadcastWorkflowStepEvent } from '@acorn/node-core/main/notify.ts'
 import { getProfile, requireProfile, resolveCommand } from '@acorn/node-core/main/profiles.ts'
@@ -21,8 +23,7 @@ import type { RuntimeService } from '@acorn/plugin-terminal/main/runtime.ts'
 import { isDir, loadTask, resolveTaskCwd } from '@acorn/node-core/main/taskWorktree.ts'
 import { buildSessionEnv } from '@acorn/node-core/main/taskEnv.ts'
 import { loadWorkflowFiles } from '@acorn/plugin-workflows/main/workflowFiles.ts'
-import { WorkflowRunner, type RunStepOptions, type WorkflowDef } from '@acorn/plugin-workflows/main/workflowRunner.ts'
-import type { WorkflowStepDef } from '@acorn/plugin-workflows/main/workflowContracts.ts'
+import { WorkflowRunner, type WorkflowDef } from '@acorn/plugin-workflows/main/workflowRunner.ts'
 import { encodeToolCeiling } from '@acorn/plugin-workflows/main/workflowTools.ts'
 import { WorkflowValidationError } from '@acorn/plugin-workflows/main/workflowValidation.ts'
 import { assertRepoConfigTrusted, isRepoConfigTrustError } from '@acorn/node-core/main/repoConfigTrust.ts'
@@ -39,11 +40,9 @@ export type WorkflowWiringDeps = {
   reconciled: Promise<void>
   currentUserId: () => string | null
   memoryReviewTrigger?: (taskId: string, transcriptTail: string) => Promise<void>
-  runManagedStep?(
-    taskId: string,
-    def: WorkflowStepDef,
-    opts: RunStepOptions,
-  ): Promise<HeadlessResult | null>
+  // Where agents.sessionExecute is looked up. Optional so a standalone/headless node — which wires no
+  // agents runtime — still runs non-managed workflow steps through the headless fallback below.
+  capabilities?: CapabilityRegistry
 }
 
 export async function failingChecksFor(db: AppDatabase, userId: string | null, taskId: string): Promise<string | null> {
@@ -72,14 +71,30 @@ export async function registerWorkflowIpc(
     reconciled,
     currentUserId,
     memoryReviewTrigger,
-    runManagedStep,
+    capabilities,
   }: WorkflowWiringDeps,
 ): Promise<WorkflowRunner> {
   const activeFailingChecksFor = (taskId: string) => failingChecksFor(db, currentUserId(), taskId)
 
   const workflowRunner = new WorkflowRunner(db, {
     runStep: async (taskId, def, opts) => {
-      const managed = await runManagedStep?.(taskId, def, opts)
+      // Resolved per call, not at wire time: plugin init order is not defined, and reading the
+      // capability once here would cache `undefined` whenever agents happened to initialize second.
+      const managed = await capabilities?.get(AGENTS_SESSION_EXECUTE)?.({
+        taskId,
+        profileId: def.profileId,
+        title: `Workflow: ${def.name}`,
+        prompt: opts.prompt,
+        schema: opts.schema,
+        model: opts.model,
+        tools: opts.tools,
+        timeoutMs: opts.timeoutMs,
+        managedSessionId: opts.managedSessionId,
+        runId: opts.workflowRunId,
+        stepId: opts.workflowStepId,
+        onEvent: opts.onEvent,
+        signal: opts.signal,
+      })
       if (managed) return managed
       const t = await loadTask(db, taskId)
       const mapped = t ? await getRepoPath(db, t.repoOwner, t.repoName) : null
