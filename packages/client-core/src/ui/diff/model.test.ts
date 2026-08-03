@@ -1,6 +1,6 @@
 import { performance } from 'node:perf_hooks'
 import { describe, expect, it } from 'vitest'
-import type { PullFile, Thread } from '@acorn/client-core/queries.ts'
+import type { PullFile, Thread } from '../../queries'
 import {
   buildDiffRows,
   buildRenderableRows,

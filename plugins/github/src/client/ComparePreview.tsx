@@ -3,8 +3,8 @@ import { createQuery } from '@tanstack/solid-query'
 import { useParams, useSearchParams } from '@solidjs/router'
 import { compareOptions, reposOptions } from '@acorn/client-core/queries.ts'
 import { getHighlighter } from '@acorn/client-core/highlight/shiki.ts'
-import { DiffLine, NonCodeRow } from './diff/DiffRows'
-import { createDiffHydrator } from './diff/hydration'
+import { DiffLine, NonCodeRow } from '@acorn/client-core/ui/diff/DiffRows.tsx'
+import { createDiffHydrator } from '@acorn/client-core/ui/diff/hydration.ts'
 import {
   buildDiffRows,
   buildRenderableRows,
@@ -15,7 +15,7 @@ import {
   type ParsedFile,
   type Row,
   type TokenizeLine,
-} from './diff/model'
+} from '@acorn/client-core/ui/diff/model.ts'
 
 // Right (Diff) pane in create mode: read-only base..head preview. Reuses the diff engine
 // (createDiffHydrator + buildRenderableRows + Shiki) and the row components, but with no review

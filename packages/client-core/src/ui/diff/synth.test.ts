@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import gitdiffParser from 'gitdiff-parser'
-import { synth } from './diff'
+import { synth } from './synth'
 
 describe('synth', () => {
   it('prepends a git diff header so a hunks-only patch parses', () => {

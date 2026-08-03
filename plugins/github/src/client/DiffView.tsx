@@ -6,14 +6,14 @@ import { fetchFilePatches, fileBlobOptions, filePatchKey, filesOptions, mentions
 import { addReviewComment, replyReview, resolveThread } from './mutations'
 import { getHighlighter } from '@acorn/client-core/highlight/shiki.ts'
 import { routeKey as makeRouteKey } from './fileNavigation'
-import { DiffLine, FileHead, NonCodeRow, SplitCell, type LineComposerController, type ThreadCollapseController } from './diff/DiffRows'
-import { collectMatches, type FindHighlight } from './diff/find'
+import { DiffLine, FileHead, NonCodeRow, SplitCell, type LineComposerController, type ThreadCollapseController } from '@acorn/client-core/ui/diff/DiffRows.tsx'
+import { collectMatches, type FindHighlight } from '@acorn/client-core/ui/diff/find.ts'
 import { registerCommands } from '@acorn/client-core/registries/commands.ts'
 import { registerKeybindings } from '@acorn/client-core/registries/keybindings.tsx'
 import { clientEvents } from '@acorn/client-core/registries/clientEvents.ts'
-import { createDiffHydrator } from './diff/hydration'
-import { readDraft, writeDraft } from './comments/draftState'
-import { createDiffMeasureSchedulers, createDiffVirtualizer } from './diff/virtualization'
+import { createDiffHydrator } from '@acorn/client-core/ui/diff/hydration.ts'
+import { readDraft, writeDraft } from '@acorn/client-core/lib/draftState.ts'
+import { createDiffMeasureSchedulers, createDiffVirtualizer } from '@acorn/client-core/ui/diff/virtualization.ts'
 import {
   buildDiffRows,
   buildRenderableRows,
@@ -35,7 +35,7 @@ import {
   type SplitBand,
   type TokenizeLine,
   type ViewMode,
-} from './diff/model'
+} from '@acorn/client-core/ui/diff/model.ts'
 import { savePref } from '@acorn/client-core/settings/savePref.ts'
 import { PrefKeys } from '@acorn/client-core/persistence/prefKeys.ts'
 import { createDiffScrollRestoration } from './reviewScrollRestoration'
