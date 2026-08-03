@@ -56,9 +56,11 @@ export const setTaskSessionsBridge = taskSessionsBridgeSlot.set
 // Fired after a task's worktree is first created — the terminal plugin registers the hook that runs
 // the repo's setup script as a background tab (main/taskWorktree.ts's setOnWorktreeCreated). Set by
 // the composition root so `on-created` can seed PR notes without core importing the notes plugin.
+// Nullable so the plugin that fills it can clear it in dispose — the same reason
+// main/taskWorktree.ts's onWorktreeCreated is nullable.
 type TaskCreatedHook = (taskId: string) => Promise<void>
 let onTaskCreated: TaskCreatedHook | null = null
-export const setOnTaskCreated = (hook: TaskCreatedHook): void => void (onTaskCreated = hook)
+export const setOnTaskCreated = (hook: TaskCreatedHook | null): void => void (onTaskCreated = hook)
 
 const repoPathSetBody = z.object({ owner: z.string(), repo: z.string(), path: z.string() })
 const runTargetsBody = z.object({ owner: z.string(), repo: z.string(), runTargets: z.string() })

@@ -5,13 +5,15 @@ import { promisify } from 'node:util'
 import { dirname, resolve } from 'node:path'
 import { homedir } from 'node:os'
 import { eq } from 'drizzle-orm'
-import type { AppDatabase } from '@acorn/node-core/server/db/index.ts'
-import { schema } from '@acorn/node-core/server/db/index.ts'
+import type { CoreServices } from '@acorn/node-core/main/core/index.ts'
+import type { PluginDatabase } from '@acorn/node-core/main/pluginStorage.ts'
+import { terminalSessions } from '../node/schema'
 import { setTerminalBridge } from '../server/routes/terminal'
 import { setOnTaskCreated, setTaskSessionsBridge } from '@acorn/node-core/server/routes/worktree.ts'
 import { setStreamHandlers } from '@acorn/node-core/main/wsHub.ts'
 import type { CreateOpts, ServerMsg, TerminalSession } from '@acorn/protocol/terminal.ts'
-import { AgentSender, type SendSubmit } from './agentSend'
+import type { SendSubmit } from '../shared/send'
+import { AgentSender } from './agentSend'
 import { TEARDOWN_TIMEOUT_MS } from '@acorn/node-core/main/archive.ts'
 import type { InternalEnvFactory } from '@acorn/node-core/server/auth/internalTokens.ts'
 import { buildSessionEnv, childEnv } from '@acorn/node-core/main/taskEnv.ts'
@@ -34,16 +36,7 @@ import { launcherSpec, resolveMcpEntry, serverName, type Launcher } from '@acorn
 import { broadcastStatus } from '@acorn/node-core/main/notify.ts'
 import type { RunSessionGlue } from './runIpc'
 import { TerminalDisplay } from './terminalDisplay'
-import {
-  isDir,
-  loadTask,
-  repoSetup,
-  rendererBaseCheckout,
-  resolveTaskCwd,
-  setOnWorktreeCreated,
-  taskContext,
-  type TaskRow,
-} from '@acorn/node-core/main/taskWorktree.ts'
+import { rendererBaseCheckout, setOnWorktreeCreated, taskContext, type TaskRow } from '@acorn/node-core/main/taskWorktree.ts'
 
 // PTYs live in the Node utility service. Sessions run on one of two backends:
 //  - node-pty: spawn the command directly. Survives a window reload (PTY is in the service), not an app
@@ -74,6 +67,31 @@ const OUTPUT_COALESCE_MS = 16
 
 const sessions = new Map<string, Session>()
 
+// What this engine needs from core, now that it cannot read core's tables at all: resolve a taskId to
+// a row and to the cwd its commands run in, and read the repo's setup script. `proc` and
+// `repos.assertConfigTrusted` are for the run-target service built over this engine (runIpc.ts).
+export type TerminalCoreServices = Pick<CoreServices, 'tasks' | 'repos' | 'proc'>
+
+// This engine is a PROCESS singleton by construction — one PTY table, one idle watch, one session map
+// per node — so its database handle and core services live in module state alongside them rather than
+// being threaded through fourteen signatures. init() installs them; dispose() removes them, so a second
+// startServiceRuntime in one process (the integration tests do this) REPLACES the first boot's handle
+// instead of stacking a second engine beside it.
+//
+// `store` is nulled BEFORE the file is closed, which is what makes the persistence helpers below safe:
+// a tmux PTY that exits after teardown has begun sees no store and writes nothing, rather than throwing
+// from a `void`-called update against a closed SQLite handle.
+let store: PluginDatabase | null = null
+let core: TerminalCoreServices | null = null
+
+// Every caller runs inside a request, a spawn or a reconcile — all strictly after init — so an absent
+// value here is a programming error, not a degraded mode. The HTTP surface's degraded mode is the
+// unfilled bridge slot answering 503, which is a level above this.
+function services(): TerminalCoreServices {
+  if (!core) throw new Error('The terminal engine has not been initialized.')
+  return core
+}
+
 // sendToAgent (docs/panes.md): bracketed-paste delivery into agent PTYs, with 'after-ready'
 // queued on the idle edge below. One instance over the live session map.
 const agentSender = new AgentSender((id) => {
@@ -82,17 +100,18 @@ const agentSender = new AgentSender((id) => {
   return { write: (data: string) => s.pty.write(data), running: () => s.meta.status === 'running', idle: () => s.meta.idle }
 })
 
-// Queue a text block into an agent session on its idle edge (knowledgeIpc's memory injector calls
-// this). Exported so the composition root can hand it to knowledge without knowledge importing the
-// terminal engine — the dependency points one way (composition-root ownership).
+// Queue a text block into an agent session on its idle edge. Published by this plugin's init as the
+// `terminal.sendToAgent` capability (contract/sendToAgent.ts), which is how plugins/memory's launch
+// injector reaches a PTY without importing this engine. It was an app-supplied dep on the memory plugin
+// for one phase because terminal was not a NodePlugin and so could not publish anything.
 export function sendToAgent(sessionId: string, text: string, submit: SendSubmit): void {
   void agentSender.send(sessionId, text, submit)
 }
 
-// The cross-domain hooks the composition root injects at boot (composition-root ownership: setter-injection stays,
-// installation moves to one place). Held as nullable module state only because the handlers close
-// over module scope — TerminalIpcDeps requires all of them, so registerTerminalIpc sets every one
-// before any session can spawn.
+// The cross-domain hooks that arrive as TerminalIpcDeps — supplied by the composition root and installed
+// by this plugin's init. Held as nullable module state only because the handlers close over module scope;
+// TerminalIpcDeps requires all of them, so registerTerminalIpc sets every one before any session can
+// spawn, and dispose resets every one.
 // - launchInjector: push the combined task-context + repo-memory block into a fresh agent session (docs/notes-and-memory.md).
 // - memoryReviewTrigger: fire the auto-generation pass when an agent session exits (docs/notes-and-memory.md).
 // - seedNotes: snapshot PR/ticket context into curatable notes on task creation (docs/notes-and-memory.md).
@@ -176,9 +195,14 @@ function listTmuxSessions(): Set<string> {
 }
 
 // --- SQLite persistence (tmux-backed sessions only) ---
+//
+// This plugin's OWN database (<data-root>/plugins/terminal.sqlite), not core's. Every helper tolerates
+// an absent store: the write path can only be reached after init, but the exit path is driven by a live
+// PTY and can fire at any moment, including after teardown has nulled the handle.
 
-async function persistSession(db: AppDatabase, m: TerminalSession) {
-  await db.insert(schema.terminalSessions).values({
+async function persistSession(m: TerminalSession) {
+  if (!store) return
+  await store.insert(terminalSessions).values({
     id: m.id,
     title: m.title,
     kind: m.kind,
@@ -199,16 +223,27 @@ async function persistSession(db: AppDatabase, m: TerminalSession) {
   })
 }
 
-async function markExited(db: AppDatabase, id: string, exitCode: number | null) {
-  await db
-    .update(schema.terminalSessions)
-    .set({ status: 'exited', exitCode, exitedAt: Date.now() })
-    .where(eq(schema.terminalSessions.id, id))
+// Called with `void` from the PTY's exit handler, so it must not be able to produce an unhandled
+// rejection: a session that exits during teardown races the store being closed under it, and the row it
+// wanted to update is about to be irrelevant either way.
+async function markExited(id: string, exitCode: number | null) {
+  if (!store) return
+  try {
+    await store
+      .update(terminalSessions)
+      .set({ status: 'exited', exitCode, exitedAt: Date.now() })
+      .where(eq(terminalSessions.id, id))
+  } catch (error) {
+    console.warn('[terminal] could not record session exit', id, error)
+  }
 }
 
-const deleteRow = (db: AppDatabase, id: string) => db.delete(schema.terminalSessions).where(eq(schema.terminalSessions.id, id))
+const deleteRow = async (id: string): Promise<void> => {
+  if (!store) return
+  await store.delete(terminalSessions).where(eq(terminalSessions.id, id))
+}
 
-function rowToMeta(row: typeof schema.terminalSessions.$inferSelect, ctx: Pick<TerminalSession, 'repo' | 'pull'>, isWorktree: boolean): TerminalSession {
+function rowToMeta(row: typeof terminalSessions.$inferSelect, ctx: Pick<TerminalSession, 'repo' | 'pull'>, isWorktree: boolean): TerminalSession {
   return {
     id: row.id,
     title: row.title,
@@ -235,7 +270,7 @@ function rowToMeta(row: typeof schema.terminalSessions.$inferSelect, ctx: Pick<T
 
 // --- session lifecycle ---
 
-function wireSession(db: AppDatabase, meta: TerminalSession, pty: IPty): Session {
+function wireSession(meta: TerminalSession, pty: IPty): Session {
   const s: Session = {
     meta,
     pty,
@@ -263,7 +298,7 @@ function wireSession(db: AppDatabase, meta: TerminalSession, pty: IPty): Session
     s.meta.exitCode = exitCode
     agentSender.clear(s.meta.id) // queued sends can never fire now
     emit(s, { type: 'exit', exitCode, signal: signal != null ? String(signal) : null })
-    if (s.meta.backend === 'tmux') void markExited(db, s.meta.id, exitCode)
+    if (s.meta.backend === 'tmux') void markExited(s.meta.id, exitCode)
     // Task-completion trigger (docs/notes-and-memory.md): an agent session ending is the extraction moment.
     if (s.meta.kind === 'agent' && s.meta.title !== 'Teardown') void memoryReviewTrigger?.(s.meta.taskId, s.ring.slice(-10_000))
     broadcastStatus()
@@ -277,7 +312,7 @@ function wireSession(db: AppDatabase, meta: TerminalSession, pty: IPty): Session
 let idleWatch: ReturnType<typeof setInterval> | null = null
 function startIdleWatch() {
   if (idleWatch) return // registered once; a second boot must not stack a second timer
-  idleWatch = setInterval(() => {
+  const timer = setInterval(() => {
     const now = Date.now()
     for (const s of sessions.values()) {
       if (computeIdle(s.meta.kind, s.meta.status, s.lastActivityAt, now, s.sawIdle ? IDLE_MS : FIRST_IDLE_MS) && !s.meta.idle) {
@@ -291,6 +326,11 @@ function startIdleWatch() {
       }
     }
   }, 3000)
+  // unref'd because nothing should be kept alive BY this timer: the node is held open by its HTTPS
+  // listener, and a test that initializes the plugin without tearing it down would otherwise hang
+  // vitest for three seconds at a time, forever.
+  timer.unref?.()
+  idleWatch = timer
 }
 
 // Run the workspace setup script as a "Setup" session in the freshly-created worktree, unless it's
@@ -298,26 +338,25 @@ function startIdleWatch() {
 // exactly once no matter which path creates the worktree (first terminal, editor/changes pane,
 // onCreated eager pre-create, run config, workflows). Ordered before any requested session so a
 // setup spawned from create() is tab #1.
-async function maybeRunSetup(db: AppDatabase, t: TaskRow, cwd: string): Promise<void> {
-  const { script, trigger } = await repoSetup(db, t.repoOwner, t.repoName)
+async function maybeRunSetup(t: TaskRow, cwd: string): Promise<void> {
+  const { script, trigger } = await services().repos.setup(t.repoOwner, t.repoName)
   if (trigger === 'off' || !script?.trim()) return
-  await spawnOne(db, { taskId: t.id, command: script, title: 'Setup' }, cwd, true, taskContext(t), t)
+  await spawnOne({ taskId: t.id, command: script, title: 'Setup' }, cwd, true, taskContext(t), t)
   broadcastStatus() // panel re-lists to show the Setup tab even when no other spawn follows
 }
 
-async function create(db: AppDatabase, opts: CreateOpts): Promise<TerminalSession> {
+async function create(opts: CreateOpts): Promise<TerminalSession> {
   // The renderer passes the base checkout as opts.cwd (validated at the boundary); the worktree is
   // derived from it. Lazy worktree on first terminal, reused after (docs/workspaces-and-tasks.md).
   // A first-ever worktree fires the onWorktreeCreated hook inside resolveTaskCwd → maybeRunSetup.
   const baseCheckout = rendererBaseCheckout(opts.cwd)
-  const t = await loadTask(db, opts.taskId)
-  const { cwd, isWorktree } = await resolveTaskCwd(db, t, baseCheckout)
-  return spawnOne(db, opts, cwd, isWorktree, taskContext(t), t)
+  const t = await services().tasks.load(opts.taskId)
+  const { cwd, isWorktree } = await services().tasks.resolveCwd(t, baseCheckout)
+  return spawnOne(opts, cwd, isWorktree, taskContext(t), t)
 }
 
 // Build the session meta, spawn the PTY (tmux or node-pty) in the already-resolved cwd, and wire it.
 async function spawnOne(
-  db: AppDatabase,
   opts: CreateOpts,
   cwd: string,
   isWorktree: boolean,
@@ -380,14 +419,14 @@ async function spawnOne(
   if (backend === 'tmux') {
     ensureTmuxSession(meta.tmuxSession!, cwd, command, env)
     pty = attachTmuxPty(meta.tmuxSession!, cols, rows)
-    await persistSession(db, meta)
+    await persistSession(meta)
   } else if (opts.command) {
     // No tmux: run the command line through a login shell so PATH/nvm resolve "pnpm" etc.
     pty = spawn(env.SHELL || '/bin/sh', ['-lc', command], { name: 'xterm-256color', cols, rows, cwd, env })
   } else {
     pty = spawn(command, [], { name: 'xterm-256color', cols, rows, cwd, env })
   }
-  wireSession(db, meta, pty)
+  wireSession(meta, pty)
   // A fresh AGENT session gets the combined task-context + repo-memory block queued for its idle edge (docs/notes-and-memory.md).
   if (profile.kind === 'agent') void launchInjector?.(opts.taskId, id)
   return meta
@@ -444,10 +483,11 @@ function killSession(s: Session) {
 // On startup, re-attach tmux sessions that are still alive and drop DB rows whose tmux is gone
 // (docs/terminal-and-agents.md: app restart rediscovers tmux sessions). Run by the composition root's coordinated
 // reconcile() step, off the paint-critical path (composition-root ownership, docs/electron.md §11).
-export async function reconcileTmux(db: AppDatabase) {
-  let rows: (typeof schema.terminalSessions.$inferSelect)[]
+export async function reconcileTmux() {
+  if (!store) return
+  let rows: (typeof terminalSessions.$inferSelect)[]
   try {
-    rows = await db.select().from(schema.terminalSessions)
+    rows = await store.select().from(terminalSessions)
   } catch {
     return
   }
@@ -459,14 +499,14 @@ export async function reconcileTmux(db: AppDatabase) {
     // the composition root, the rest of the reconcile pass).
     try {
       if (row.backend === 'tmux' && row.tmuxSession && alive.has(row.tmuxSession)) {
-        const task = await loadTask(db, row.taskId)
+        const task = await services().tasks.load(row.taskId)
         // isWorktree is derived, not persisted (docs/workspaces-and-tasks.md): tasks.worktreePath is the truth,
         // so recompute it here so a session that survives an app restart keeps its worktree affordance.
         const isWorktree = !!task?.worktreePath && resolve(row.cwd) === resolve(task.worktreePath)
-        wireSession(db, rowToMeta(row, taskContext(task), isWorktree), attachTmuxPty(row.tmuxSession, row.cols, row.rows))
+        wireSession(rowToMeta(row, taskContext(task), isWorktree), attachTmuxPty(row.tmuxSession, row.cols, row.rows))
         reattached++
       } else {
-        await deleteRow(db, row.id)
+        await deleteRow(row.id)
       }
     } catch (e) {
       console.warn('[terminal] tmux reconcile failed for session', row.id, e)
@@ -479,14 +519,14 @@ export async function reconcileTmux(db: AppDatabase) {
 }
 
 // The session-engine glue the run-target service (runIpc) needs: spawn a target's command as a
-// terminal session in the task worktree, and observe/kill it. Exported so the composition root can
-// build the RuntimeService without this engine importing the run domain (composition-root ownership — the run
-// service depends on the engine, not the reverse).
-export function terminalRunGlue(db: AppDatabase): RunSessionGlue {
+// terminal session in the task worktree, and observe/kill it. Exported so the plugin's init can build
+// the RuntimeService without this engine importing the run domain (the run service depends on the
+// engine, not the reverse).
+export function terminalRunGlue(): RunSessionGlue {
   return {
     startSession: async (taskId: string, target: { id: string; command: string }, cwd: string) => {
-      const t = await loadTask(db, taskId)
-      const meta = await spawnOne(db, { taskId, command: target.command, title: `▶ ${target.id}` }, cwd, true, taskContext(t), t)
+      const t = await services().tasks.load(taskId)
+      const meta = await spawnOne({ taskId, command: target.command, title: `▶ ${target.id}` }, cwd, true, taskContext(t), t)
       broadcastStatus()
       return meta.id
     },
@@ -499,9 +539,21 @@ export function terminalRunGlue(db: AppDatabase): RunSessionGlue {
   }
 }
 
-// The cross-domain hooks the composition root injects when it registers this engine. They break the
-// knowledge↔terminal cycle: knowledge is built with the engine's exported sendToAgent, and its
-// memory/notes closures come back in here — so the engine never imports knowledge (composition-root ownership).
+// The four cross-domain hooks the COMPOSITION ROOT still injects, and why each one cannot be a
+// capability this plugin resolves for itself:
+//
+//   - internalEnv mints the loopback credential for one session (server/auth/internalTokens.ts). It
+//     closes over the listener's origin, which does not exist until after every plugin's init has run,
+//     and over `INTERNAL_TOKEN` — the signing key. Putting that key on CoreServices would hand every
+//     plugin the ability to mint a token for any scope, which is the opposite of what scoping the
+//     tokens was for.
+//   - launchInjector, memoryReviewTrigger and seedTaskNotes belong to plugins/memory and plugins/notes.
+//     memory's runtime is published as `memory.knowledge`, but that capability id deliberately lives in
+//     the plugin's main/ rather than a contract/ (its value includes two internal stores), so importing
+//     it here would be a terminal→memory coupling edge — an ADDITION to the plugin→plugin baseline,
+//     which is Phase 3's to shrink, not this batch's to grow. The composition root resolves the
+//     capability at CALL time on this plugin's behalf instead.
+//   - reconciled is the composition root's own post-listener reconcile pass. It has no other owner.
 export type TerminalIpcDeps = {
   internalEnv: InternalEnvFactory
   launchInjector: (taskId: string, sessionId: string) => Promise<void>
@@ -512,30 +564,52 @@ export type TerminalIpcDeps = {
   reconciled: Promise<void>
 }
 
-// Clear the engine's own background work on quit (composition-root ownership). Idempotent — safe to call after a
-// partial boot that never started the idle-watch.
+// Release everything registerTerminalIpc installed. Called from the plugin's dispose (node/index.ts),
+// which runs before the data root's lock is dropped. Idempotent — safe after a partial boot that never
+// started the idle-watch.
+//
+// The session map is CLEARED, which it was not before. Without that, a second startServiceRuntime in one
+// process inherits the previous boot's sessions: `list()` would report PTYs owned by a torn-down engine,
+// and the WS hub's task-scope guard would resolve stream ids against them. The PTYs themselves are
+// deliberately NOT killed — a tmux session outliving the app is the entire point of the tmux backend,
+// and killing the attach PTY of a node-pty session at quit is what process exit does anyway.
 export function disposeTerminal(): void {
   if (idleWatch) {
     clearInterval(idleWatch)
     idleWatch = null
   }
-  for (const session of sessions.values()) session.display.dispose()
+  for (const [id, session] of sessions) {
+    session.display.dispose()
+    agentSender.clear(id) // queued 'after-ready' blocks can never fire against a disposed engine
+  }
+  sessions.clear()
+  // Back to the "never initialized" state, so nothing that survives teardown (a PTY exit callback, a
+  // late bridge call) can reach the previous boot's database handle or core services.
+  store = null
+  core = null
+  internalEnv = () => ({})
+  launchInjector = null
+  memoryReviewTrigger = null
+  seedNotes = null
+  bootReconciled = Promise.resolve()
 }
 
-// Registered once at app start by the service composition root (app/service/runtime.ts). Every payload is
-// validated here because the renderer is the less-trusted side (docs/terminal-and-agents.md).
-// Exited sessions linger until explicitly removed. Cross-feature domains are wired by the
-// composition root.
-export function registerTerminalIpc(db: AppDatabase, worktreesDir: string, deps: TerminalIpcDeps): void {
+// The engine's installation step, called from this plugin's init (node/index.ts) — it used to be called
+// by the composition root with core's database handle. Every payload is validated at the route layer
+// because the renderer is the less-trusted side (docs/terminal-and-agents.md). Exited sessions linger
+// until explicitly removed.
+export function registerTerminalIpc(pluginDb: PluginDatabase, coreServices: TerminalCoreServices, deps: TerminalIpcDeps): void {
+  store = pluginDb
+  core = coreServices
   internalEnv = deps.internalEnv
   launchInjector = deps.launchInjector
   memoryReviewTrigger = deps.memoryReviewTrigger
   seedNotes = deps.seedTaskNotes
   bootReconciled = deps.reconciled
 
-  // Every worktree creation funnels through resolveTaskCwd; this hook makes the setup script run
+  // Every worktree creation funnels through core's resolveTaskCwd; this hook makes the setup script run
   // regardless of which surface (terminal, pane, workflow) created the worktree.
-  setOnWorktreeCreated((t, cwd) => maybeRunSetup(db, t, cwd))
+  setOnWorktreeCreated((t, cwd) => maybeRunSetup(t, cwd))
 
   // The request/response half of the terminal engine, exposed as the TerminalBridge behind the HTTP
   // routes (server/routes/terminal.ts).
@@ -545,7 +619,7 @@ export function registerTerminalIpc(db: AppDatabase, worktreesDir: string, deps:
   setTerminalBridge({
     list: async () => [...sessions.values()].map((s) => s.meta),
     profiles: async () => listProfiles(),
-    create: (opts) => create(db, opts ?? ({} as CreateOpts)),
+    create: (opts) => create(opts ?? ({} as CreateOpts)),
     // sendToAgent (docs/panes.md): bracketed paste into an agent session's PTY with a submit mode.
     sendToAgent: async (sessionId, text, submit) => {
       if (!sessionId || !text) return { ok: false, reason: 'Invalid payload.' }
@@ -570,7 +644,7 @@ export function registerTerminalIpc(db: AppDatabase, worktreesDir: string, deps:
       if (s.meta.status === 'running') killSession(s)
       s.display.dispose()
       sessions.delete(id)
-      if (s.meta.backend === 'tmux') await deleteRow(db, id)
+      if (s.meta.backend === 'tmux') await deleteRow(id)
       return true
     },
     resize: async (id, cols, rows) => {
@@ -604,7 +678,7 @@ export function registerTerminalIpc(db: AppDatabase, worktreesDir: string, deps:
         if (s.meta.taskId === taskId) {
           s.display.dispose()
           sessions.delete(sid)
-          if (s.meta.backend === 'tmux') await deleteRow(db, sid)
+          if (s.meta.backend === 'tmux') await deleteRow(sid)
         }
       }
     },
@@ -612,8 +686,8 @@ export function registerTerminalIpc(db: AppDatabase, worktreesDir: string, deps:
     // result. A ~2 min timeout kills it (exitCode null → surfaced as a timeout).
     //
     runTeardown: async (script, cwd, env, taskId) => {
-      const t = await loadTask(db, taskId)
-      const meta = await spawnOne(db, { taskId, command: script, title: 'Teardown', env }, cwd, true, taskContext(t), t)
+      const t = await services().tasks.load(taskId)
+      const meta = await spawnOne({ taskId, command: script, title: 'Teardown', env }, cwd, true, taskContext(t), t)
       const s = sessions.get(meta.id)
       if (!s) return { exitCode: 1, output: 'Could not start the teardown session.' }
       broadcastStatus()
@@ -630,7 +704,7 @@ export function registerTerminalIpc(db: AppDatabase, worktreesDir: string, deps:
   // Seeding PR/ticket notes on task creation is core's route now, but the notes store is injected
   // here by the composition root — so this hands core the hook rather than moving the dependency.
   setOnTaskCreated(async (taskId) => {
-    const task = await loadTask(db, taskId)
+    const task = await services().tasks.load(taskId)
     if (task) await seedNotes?.(task)
   })
 

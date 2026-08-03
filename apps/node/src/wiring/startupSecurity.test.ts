@@ -7,6 +7,9 @@ import { prepareSecurityState } from './startupSecurity'
 
 const ENC_KEY = '0'.repeat(64)
 
+// One retention path left. The HTTP plaintext migration this file also used to cover moved into
+// plugins/http's init when that plugin took ownership of `http_requests`/`http_variables`; its coverage
+// moved with it (plugins/http/src/server/storage.test.ts).
 describe('pre-listener security reconciliation', () => {
   let testDb: TestDb
 
@@ -16,18 +19,7 @@ describe('pre-listener security reconciliation', () => {
 
   afterEach(() => testDb.cleanup())
 
-  it('protects legacy HTTP data and runs all documented retention paths', async () => {
-    await testDb.db.insert(schema.prefs).values({ userId: 'alice', key: 'theme', value: 'dark' })
-    await testDb.db.insert(schema.httpRequests).values({
-      id: 'legacy',
-      repoOwner: 'acme',
-      repoName: 'web',
-      name: 'Legacy',
-      method: 'GET',
-      url: 'https://example.test?token=plaintext-secret',
-      createdAt: 1,
-      updatedAt: 1,
-    })
+  it('prunes a mirror row whose repo is gone', async () => {
     await testDb.db.insert(schema.comments).values({
       userId: 'alice',
       repoId: 10,
@@ -41,9 +33,6 @@ describe('pre-listener security reconciliation', () => {
       ...testSecretEnv(ENC_KEY),
     } as RuntimeBindings)
 
-    const [request] = await testDb.db.select().from(schema.httpRequests)
-    expect(request).toMatchObject({ userId: 'alice', encrypted: true })
-    expect(request.url).not.toContain('plaintext-secret')
     expect(await testDb.db.select().from(schema.comments)).toEqual([])
   })
 })

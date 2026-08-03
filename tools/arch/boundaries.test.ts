@@ -293,16 +293,15 @@ describe('architecture boundaries', () => {
     // the rule therefore reads "no db-module import at all", type-only included. That is the stricter
     // and more useful reading — a plugin holding core's AppDatabase is exactly the coupling the split
     // removes — so it is left as is rather than loosened to match the comment.
-    // 'changes', 'database', 'docker', 'editor' and 'memory' are off this list: each owns its own
-    // schema (or no tables at all) and takes CoreServices instead of core's database. Eight to go.
+    // 'changes', 'database', 'docker', 'editor', 'http', 'memory' and 'terminal' are off this list: each
+    // owns its own schema (or no tables at all) and takes CoreServices instead of core's database. Six
+    // to go.
     const SCHEMA_BASELINE = [
       'agents',
       'github',
-      'http',
       'linear',
       'notes',
       'rollbar',
-      'terminal',
       'workflows',
     ]
     // Any import FROM core's db module that is not exclusively type-only. The first version matched only

@@ -12,6 +12,7 @@ import type { AppDatabase } from '../../server/db'
 import { schema } from '../../server/db'
 import { getRepoPath } from '../repoPaths'
 import { assertRepoConfigTrusted } from '../repoConfigTrust'
+import { repoSetup, type SetupTrigger } from '../taskWorktree'
 
 // Just the checkout locations, not the whole RepoPath: the one caller (memory's index reconcile)
 // wants "where does each repo live on disk", and returning the full row would mean parsing every
@@ -30,6 +31,10 @@ export type RepoService = {
   // runs a repo-authored `[database].url_script`, so cloning a repo must not be enough to run its
   // commands — the gate has to be reachable from the plugin that executes the script.
   assertConfigTrusted(taskId: string): Promise<void>
+  // The repo's setup script and when to run it (docs/workspaces-and-tasks.md P5). plugins/terminal runs
+  // it as a background "Setup" tab from the onWorktreeCreated hook, so it needs the `repo_paths` columns
+  // that decide whether to run it at all.
+  setup(owner: string, repo: string): Promise<{ script: string | null; trigger: SetupTrigger }>
 }
 
 export function createRepoService(db: AppDatabase): RepoService {
@@ -37,5 +42,6 @@ export function createRepoService(db: AppDatabase): RepoService {
     path: (owner, repo) => getRepoPath(db, owner, repo),
     checkouts: () => db.select({ owner: schema.repoPaths.owner, repo: schema.repoPaths.repo, path: schema.repoPaths.path }).from(schema.repoPaths),
     assertConfigTrusted: (taskId) => assertRepoConfigTrusted(db, taskId),
+    setup: (owner, repo) => repoSetup(db, owner, repo),
   }
 }

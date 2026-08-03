@@ -419,39 +419,7 @@ export const taskLinks = sqliteTable(
 // `memories` (and its hand-written `memories_fts` virtual table) moved to
 // plugins/memory/src/node/schema.ts (docs/vNext/data.md § Plugin DBs).
 
-// Durable terminal sessions (docs/workflows.md). Machine-scoped like repo_paths. We persist ONLY tmux-backed
-// sessions: tmux outlives an app restart, so on startup the service reconciles these rows against
-// `tmux list-sessions` and re-attaches the survivors. node-pty sessions die with the process and
-// live only in the in-memory map. No terminal output is ever stored (docs/terminal-and-agents.md). ponytail: a §7
-// subset — no pid / last_attached_at (we re-derive liveness from tmux, not a stored pid).
-// Bound to a task (docs/workspaces-and-tasks.md/03): repo / branch / PR are derived through the
-// taskId → tasks join, so the loose repo_owner / repo_name / pull_number columns are gone.
-export const terminalSessions = sqliteTable(
-  'terminal_sessions',
-  {
-    id: text('id').primaryKey(),
-    title: text('title').notNull(),
-    kind: text('kind').notNull(), // shell | agent
-    profileId: text('profile_id').notNull(),
-    backend: text('backend').notNull(), // node-pty | tmux (only tmux rows are persisted)
-    status: text('status').notNull(), // running | exited
-    cwd: text('cwd').notNull(),
-    taskId: text('task_id').notNull(), // → tasks.id
-    command: text('command').notNull(),
-    argvJson: text('argv_json').notNull().default('[]'),
-    tmuxSession: text('tmux_session'),
-    cols: integer('cols').notNull(),
-    rows: integer('rows').notNull(),
-    agentSessionId: text('agent_session_id'), // managed-agent handoff/tool-terminal lineage
-    createdAt: integer('created_at').notNull(),
-    exitedAt: integer('exited_at'),
-    exitCode: integer('exit_code'),
-  },
-  (t) => [
-    index('terminal_sessions_task_idx').on(t.taskId),
-    index('terminal_sessions_agent_session_idx').on(t.agentSessionId),
-  ],
-)
+// `terminal_sessions` moved to plugins/terminal/src/node/schema.ts (docs/vNext/data.md § Plugin DBs).
 
 // Managed agent sessions are task-scoped execution records. Provider-specific resumability remains
 // provider-owned (`providerSessionRef`); Acorn owns the normalized local transcript and projections.
@@ -762,69 +730,8 @@ export const issueResources = sqliteTable(
   (t) => [primaryKey({ columns: [t.userId, t.integrationId, t.issueIdentifier, t.resource, t.identifier] })],
 )
 
-// Saved HTTP requests for the API panel (docs/panes.md). Repo-scoped like db_saved_queries — a
-// request written against a repo's API outlives any one task worktree. Credentials make this
-// identity-scoped even on a single-user machine. Sensitive fields are JWE ciphertext whenever
-// `encrypted` is true; startup migrates pre-encryption rows before opening the listener.
-// The `http_` prefix, not `api_`: `api_tokens`/`api_idempotency` already belong to the public
-// automation API (docs/public-api.md), and so does the settings page id `api`.
-export const httpRequests = sqliteTable(
-  'http_requests',
-  {
-    id: text('id').primaryKey(),
-    // The default exists only so Drizzle can rebuild populated legacy tables. Startup claims
-    // legacy rows only when exactly one GitHub identity exists; ambiguous rows stay quarantined.
-    userId: text('user_id').notNull().default('__legacy_unscoped__'),
-    repoOwner: text('repo_owner').notNull(),
-    repoName: text('repo_name').notNull(),
-    // ponytail: a slash path ('auth/login'), not a folders table with parent_id. The client splits
-    // on '/' to build the tree. Renaming a folder is one UPDATE; there are no orphans or cycles to
-    // handle. The one cost is that a folder can't exist while empty.
-    folder: text('folder').notNull().default(''),
-    // Set = an ad-hoc request living with a task (shown in that task's API pane). Null = saved in
-    // the repo tree. "Save this ad-hoc request" clears taskId and sets folder + name. No FK: the
-    // schema declares none anywhere, so an orphan row after a hard task delete is inert.
-    taskId: text('task_id'), // → tasks.id
-    name: text('name').notNull(),
-    method: text('method').notNull(),
-    url: text('url').notNull(), // encrypted raw URL; holds the query string too
-    headers: text('headers').notNull().default('[]'), // encrypted JSON KeyValue[]
-    bodyMode: text('body_mode').notNull().default('none'), // 'none' | 'json' | 'text' | 'form'
-    body: text('body').notNull().default(''), // encrypted raw string / JSON KeyValue[]
-    auth: text('auth').notNull().default('{"mode":"none"}'), // encrypted JSON AuthConfig
-    // Per-request variable overrides: JSON Record<string,string>, plain values only. Secret and
-    // command kinds are repo-level (http_variables) because they need the enc key and a shell.
-    vars: text('vars').notNull().default('{}'), // encrypted JSON Record<string,string>
-    encrypted: integer('encrypted', { mode: 'boolean' }).notNull().default(false),
-    createdAt: integer('created_at').notNull(),
-    updatedAt: integer('updated_at').notNull(),
-  },
-  (t) => [
-    index('http_requests_user_repo_folder_idx').on(t.userId, t.repoOwner, t.repoName, t.folder),
-    index('http_requests_user_task_idx').on(t.userId, t.taskId),
-  ],
-)
-
-// Repo-level variables for the API panel. `command` values are persisted shell commands whose
-// output is resolved at send time and never persisted. Every value kind is JWE ciphertext under
-// SESSION_ENC_KEY; secret plaintext is additionally never sent to the renderer.
-export const httpVariables = sqliteTable(
-  'http_variables',
-  {
-    id: text('id').primaryKey(),
-    userId: text('user_id').notNull().default('__legacy_unscoped__'),
-    repoOwner: text('repo_owner').notNull(),
-    repoName: text('repo_name').notNull(),
-    name: text('name').notNull(),
-    kind: text('kind').notNull(), // 'value' | 'secret' | 'command'
-    value: text('value').notNull(), // JWE ciphertext for plaintext value / secret / shell command
-    encrypted: integer('encrypted', { mode: 'boolean' }).notNull().default(false),
-    enabled: integer('enabled', { mode: 'boolean' }).notNull().default(true),
-    createdAt: integer('created_at').notNull(),
-    updatedAt: integer('updated_at').notNull(),
-  },
-  (t) => [uniqueIndex('http_variables_user_repo_name_idx').on(t.userId, t.repoOwner, t.repoName, t.name)],
-)
+// `http_requests` and `http_variables` moved to plugins/http/src/node/schema.ts
+// (docs/vNext/data.md § Plugin DBs).
 
 // --- Device identity: the vNext auth root (docs/vNext/protocol.md § Pairing) ---
 

@@ -122,15 +122,34 @@ describe('assembled routes', () => {
   // plugin host has run — the same order the composition root uses (routes before the listener binds).
   let core: TestDb
   let dataDir: string
+  let plugins: Awaited<ReturnType<typeof initPlugins>>
   beforeAll(async () => {
     core = makeTestDb()
     dataDir = mkdtempSync(join(tmpdir(), 'acorn-routes-'))
-    await initPlugins(nodePlugins(dataDir, { memory: { sendToAgent: () => {}, currentUserId: () => null } }), {
-      capabilities: new CapabilityRegistry(),
-      core: createCoreServices({ secrets: new SecretService('0'.repeat(64)), db: core.db }),
-    })
+    plugins = await initPlugins(
+      nodePlugins(dataDir, {
+        memory: { currentUserId: () => null },
+        // terminal is `required`, so it initializes here whatever this test asks for. Its four
+        // composition-root deps are inert stubs: this suite asserts the MOUNT TABLE, and nothing it
+        // exercises spawns a pseudo-terminal.
+        terminal: {
+          internalEnv: () => ({}),
+          launchInjector: async () => {},
+          memoryReviewTrigger: async () => {},
+          seedTaskNotes: async () => {},
+          reconciled: Promise.resolve(),
+        },
+      }),
+      {
+        capabilities: new CapabilityRegistry(),
+        core: createCoreServices({ secrets: new SecretService('0'.repeat(64)), db: core.db }),
+      },
+    )
   })
-  afterAll(() => {
+  // Disposed, not just cleaned up: the terminal plugin opens a WAL-mode SQLite file and starts an
+  // idle-watch interval, and the plugin databases have to be closed before their temp dir is removed.
+  afterAll(async () => {
+    await plugins.dispose()
     core.cleanup()
     rmSync(dataDir, { recursive: true, force: true })
   })

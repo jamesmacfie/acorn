@@ -20,7 +20,7 @@ import type { NotesStore } from '@acorn/plugin-notes/main/notes.ts'
 import { broadcastStatus, broadcastWorkflowNotice, broadcastWorkflowStepEvent } from '@acorn/node-core/main/notify.ts'
 import { getProfile, requireProfile, resolveCommand } from '@acorn/node-core/main/profiles.ts'
 import { getRepoPath } from '@acorn/node-core/main/repoPaths.ts'
-import type { RuntimeService } from '@acorn/plugin-terminal/main/runtime.ts'
+import type { TerminalRunTargets } from '@acorn/plugin-terminal/contract/runTargets.ts'
 import { isDir, loadTask, resolveTaskCwd } from '@acorn/node-core/main/taskWorktree.ts'
 import { buildSessionEnv } from '@acorn/node-core/main/taskEnv.ts'
 import { loadWorkflowFiles } from '@acorn/plugin-workflows/main/workflowFiles.ts'
@@ -31,7 +31,9 @@ import { assertRepoConfigTrusted, isRepoConfigTrustError } from '@acorn/node-cor
 import { broadcastRepoConfigTrustNotice } from '@acorn/node-core/main/notify.ts'
 
 export type WorkflowWiringDeps = {
-  runtime: RuntimeService
+  // terminal.runTargets (plugins/terminal/src/contract/runTargets.ts). The plugin builds the service —
+  // it closes over the live session map — and the composition root resolves the capability.
+  runtime: TerminalRunTargets
   notesStore: NotesStore
   // Loopback API access for the context assembler (docs/mcp.md): ACORN_API_URL/ACORN_API_TOKEN.
   internalEnv: InternalEnvFactory

@@ -21,7 +21,7 @@ import type { MemoryIndex } from '@acorn/plugin-memory/main/knowledgeIpc.ts'
 import { MEMORY_TYPES, type MemoryType } from '@acorn/plugin-memory/main/memory.ts'
 import type { MemoryProposalStore } from '@acorn/plugin-memory/main/memoryProposals.ts'
 import type { NotesStore } from '@acorn/plugin-notes/main/notes.ts'
-import type { RuntimeService } from '@acorn/plugin-terminal/main/runtime.ts'
+import type { TerminalRunTargets } from '@acorn/plugin-terminal/contract/runTargets.ts'
 import { loadTask, repoFor, workspaceIdFor } from '@acorn/node-core/main/taskWorktree.ts'
 import { isRepoConfigTrustError } from '@acorn/node-core/main/repoConfigTrust.ts'
 import { broadcastRepoConfigTrustNotice } from '@acorn/node-core/main/notify.ts'
@@ -30,7 +30,9 @@ export type AgentToolsDeps = {
   db: AppDatabase
   notesStore: NotesStore
   proposals: MemoryProposalStore
-  runtime: RuntimeService
+  // terminal.runTargets (plugins/terminal/src/contract/runTargets.ts), resolved by the composition
+  // root — this app no longer constructs the run service, the plugin that owns the PTYs does.
+  runtime: TerminalRunTargets
   browser: BrowserDesktopCapability
   // The memory index reads, bound to the memory plugin's own SQLite file (its `memory.knowledge`
   // capability). Each one reconciles from the markdown files first — they are the truth.

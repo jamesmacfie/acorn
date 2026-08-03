@@ -4,11 +4,10 @@
 import { execFile } from 'node:child_process'
 import { promisify } from 'node:util'
 import { eq, and } from 'drizzle-orm'
-import type { AppDatabase } from '@acorn/node-core/server/db/index.ts'
-import * as schema from '@acorn/node-core/server/db/schema.ts'
-import { loadTask, taskRoot } from '@acorn/node-core/main/taskWorktree.ts'
-import { getRepoPath } from '@acorn/node-core/main/repoPaths.ts'
+import type { CoreServices } from '@acorn/node-core/main/core/index.ts'
+import type { PluginDatabase } from '@acorn/node-core/main/pluginStorage.ts'
 import { buildSessionEnv, type SessionTaskInfo } from '@acorn/node-core/main/taskEnv.ts'
+import { httpVariables } from '../node/schema'
 import {
   applyAuth,
   defaultContentType,
@@ -23,8 +22,13 @@ import {
   type SendResult,
   type TimelineEntry,
 } from '../shared/model'
-import type { SecretService } from '@acorn/node-core/main/core/secrets.ts'
 import { openHttpValue } from './storage'
+
+// What this module needs from core, now that it has no handle to core's database: resolve the execution
+// task and its worktree, find the repo's primary checkout for the fallback cwd, and open its own
+// ciphertext. `tasks.root` is passed the request's identity because creating a worktree consults that
+// login's per-repo base-ref preference.
+export type SendCoreServices = Pick<CoreServices, 'tasks' | 'repos' | 'secrets'>
 
 const exec = promisify(execFile)
 
@@ -83,11 +87,11 @@ export function referencedVariableNames(input: HttpSendInput): Set<string> {
 type ResolvedVariables = { values: Record<string, string>; sensitiveValues: string[] }
 
 async function resolveVarsWithSensitivity(
-  db: AppDatabase,
+  db: PluginDatabase,
+  core: SendCoreServices,
   userId: string,
   repoOwner: string,
   repoName: string,
-  secrets: SecretService,
   input: HttpSendInput,
 ): Promise<ResolvedVariables> {
   const vars: Record<string, string> = {}
@@ -96,39 +100,33 @@ async function resolveVarsWithSensitivity(
   let cwd: string | null = null
   let taskInfo: SessionTaskInfo | null = null
   if (input.executionTaskId) {
-    const task = await loadTask(db, input.executionTaskId)
+    const task = await core.tasks.load(input.executionTaskId)
     if (!task) throw new SendError('The task used to send this request no longer exists')
     if (task.repoOwner !== repoOwner || task.repoName !== repoName) {
       throw new SendError(`The selected task belongs to ${task.repoOwner}/${task.repoName}, not ${repoOwner}/${repoName}`)
     }
     // taskRoot is null until a worktree exists (and always under dev:node) — fall back to the
     // repo checkout, exactly as resolveDbUrl and the preview resolver do.
-    cwd = (await taskRoot(db, input.executionTaskId, userId)) ?? null
+    cwd = (await core.tasks.root(input.executionTaskId, userId)) ?? null
     vars.repo = `${task.repoOwner}/${task.repoName}`
     vars.branch = task.branch
     vars.taskId = task.id
     taskInfo = { repoOwner: task.repoOwner, repoName: task.repoName, branch: task.branch, title: task.title }
   }
-  if (!cwd) cwd = (await getRepoPath(db, repoOwner, repoName))?.path ?? null
+  if (!cwd) cwd = (await core.repos.path(repoOwner, repoName))?.path ?? null
   if (cwd) vars.worktree = cwd
 
   const rows = await db
     .select()
-    .from(schema.httpVariables)
-    .where(
-      and(
-        eq(schema.httpVariables.userId, userId),
-        eq(schema.httpVariables.repoOwner, repoOwner),
-        eq(schema.httpVariables.repoName, repoName),
-      ),
-    )
+    .from(httpVariables)
+    .where(and(eq(httpVariables.userId, userId), eq(httpVariables.repoOwner, repoOwner), eq(httpVariables.repoName, repoName)))
   const referenced = referencedVariableNames(input)
   const enabled = rows.filter((r) => r.enabled && referenced.has(r.name) && !(r.name in input.vars))
 
   const opened = new Map<string, string>()
   for (const row of enabled) {
     try {
-      opened.set(row.id, await openHttpValue(row.value, row.encrypted, secrets))
+      opened.set(row.id, await openHttpValue(row.value, row.encrypted, core.secrets))
     } catch {
       throw new SendError(`Variable "${row.name}" could not be decrypted — re-enter its value`)
     }
@@ -178,14 +176,14 @@ async function resolveVarsWithSensitivity(
 }
 
 export async function resolveVars(
-  db: AppDatabase,
+  db: PluginDatabase,
+  core: SendCoreServices,
   userId: string,
   repoOwner: string,
   repoName: string,
-  secrets: SecretService,
   input: HttpSendInput,
 ): Promise<Record<string, string>> {
-  return (await resolveVarsWithSensitivity(db, userId, repoOwner, repoName, secrets, input)).values
+  return (await resolveVarsWithSensitivity(db, core, userId, repoOwner, repoName, input)).values
 }
 
 // --- execution ----------------------------------------------------------------------------
@@ -254,14 +252,14 @@ export function describeFetchFailure(err: unknown, target: URL): Pick<SendFailur
 }
 
 export async function send(
-  db: AppDatabase,
+  db: PluginDatabase,
+  core: SendCoreServices,
   userId: string,
   repoOwner: string,
   repoName: string,
-  secrets: SecretService,
   input: HttpSendInput,
 ): Promise<SendResult> {
-  const resolved = await resolveVarsWithSensitivity(db, userId, repoOwner, repoName, secrets, input)
+  const resolved = await resolveVarsWithSensitivity(db, core, userId, repoOwner, repoName, input)
   const { target, headers, body } = buildRequest(input, resolved.values)
 
   const started = Date.now()

@@ -9,15 +9,27 @@ import { changesPlugin } from '@acorn/plugin-changes/node/index.ts'
 import { databasePlugin } from '@acorn/plugin-database/node/index.ts'
 import { dockerPlugin } from '@acorn/plugin-docker/node/index.ts'
 import { editorPlugin } from '@acorn/plugin-editor/node/index.ts'
+import { httpPlugin } from '@acorn/plugin-http/node/index.ts'
 import { memoryPlugin, type MemoryPluginDeps } from '@acorn/plugin-memory/node/index.ts'
+import { terminalPlugin, type TerminalPluginDeps } from '@acorn/plugin-terminal/node/index.ts'
 
-// What a converted plugin cannot resolve for itself yet. Only memory needs anything: its launch
-// injector queues a block into a PTY-backed agent session (plugins/terminal's sender — and terminal is
-// not a NodePlugin yet, so it cannot publish a capability to resolve instead), and it needs the node's
-// active GitHub identity from the runtime bindings. Both come from the composition root until those two
-// seams exist; keeping them in one narrow bag is what makes it obvious when they close.
+// What a converted plugin cannot resolve for itself yet. Keeping them in one narrow bag is what makes
+// it obvious when each seam closes — memory's bag lost `sendToAgent` the moment terminal became a
+// NodePlugin able to publish `terminal.sendToAgent`.
+//
+//   - memory.currentUserId — the node's active GitHub identity, which lives in the runtime bindings.
+//   - terminal.internalEnv — mints a per-session loopback credential. It closes over the listener's
+//     origin (which does not exist until after every init has run) and over the internal signing KEY,
+//     which no plugin should be handed.
+//   - terminal's launchInjector / memoryReviewTrigger / seedTaskNotes — plugins/memory's and
+//     plugins/notes'. `memory.knowledge`'s id deliberately lives in that plugin's main/ rather than a
+//     contract/ (its value includes two internal stores), so terminal importing it would ADD a
+//     plugin→plugin coupling edge. The composition root resolves the capability at CALL time instead,
+//     which is why these arrive as thunks rather than as the resolved functions.
+//   - terminal.reconciled — the composition root's own post-listener reconcile pass.
 export type NodePluginDeps = {
   memory: MemoryPluginDeps
+  terminal: TerminalPluginDeps
 }
 
 // `dataDir` is threaded in because a plugin's SQLite file lives under the node's data root, and only
@@ -28,5 +40,7 @@ export const nodePlugins = (dataDir: string, deps: NodePluginDeps): NodePlugin[]
   databasePlugin(dataDir),
   dockerPlugin(),
   editorPlugin(),
+  httpPlugin(dataDir),
   memoryPlugin(dataDir, deps.memory),
+  terminalPlugin(dataDir, deps.terminal),
 ]
