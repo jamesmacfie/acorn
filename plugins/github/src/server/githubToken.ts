@@ -24,6 +24,26 @@ import { decryptSecret } from '@acorn/node-core/server/secretBox.ts'
 
 export const GITHUB_PROVIDER = 'github'
 
+// Deliberately NOT gated to `kind === 'device'`, and that is a change from V1 worth stating plainly.
+//
+// V1's internal principal carried `token: ''`, so an agent-spawned child was structurally unable to
+// call GitHub. Resolving the credential from a stored row for `ownerId(c)` drops that, because the
+// owner is the same for a device and an internal principal — so an agent holding ACORN_API_TOKEN can
+// act on GitHub as the owner. That was verified, and gating it here was tried.
+//
+// It was reverted for two reasons. It buys no real containment: an agent has a shell in the task
+// worktree with the owner's git credentials, so it can already push and open pull requests. And it
+// breaks a first-party caller — seedTaskNotes runs IN the service and uses the internal token over
+// loopback to reuse pullDetail's serve-then-revalidate, so gating it silently stops seeding PR notes
+// whenever the mirror is cold.
+//
+// The real defect underneath is that INTERNAL_TOKEN conflates "the service calling itself" with
+// "a child an agent spawned". protocol.md § Transport already describes the fix — internal tokens
+// that are task-scoped and route-restricted — and that is a Phase 2 change, not a one-line guard.
+// Until then this is a documented divergence, not a guarantee: see docs/vNext/phase1-notes.md.
+//
+// What an agent still CANNOT do is mint a token, pair, or administer devices — see
+// middleware/requireUser.ts's requireDevice, which is where the genuine escalation was.
 export async function githubToken(c: Context<AppEnv>): Promise<string> {
   const db = getDb(c.env)
   const [row] = await db

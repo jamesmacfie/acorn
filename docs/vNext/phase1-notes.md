@@ -140,3 +140,45 @@ For the Phase 1 exit criteria specifically:
 | Streams **re-check within 60 s** | same file — flips `isActive()` without firing `onRevoked`, so the listener cannot be the explanation (interval injected, default 60 s, 20 ms in the test) |
 | Reconnect / backoff / pin failure | `apps/desktop/src/app/main/nodeBroker.test.ts`, against a real TLS server with the node's own `ensureCert` output — not against a spawned node |
 | e2e parity on the local node, with no login flow left to update | `apps/desktop/e2e/desktop.smoke.spec.ts` S1–S8 |
+
+## Adversarial review findings (end of Phase 1)
+
+### Fixed: the internal token was a complete privilege escalation
+
+**Confirmed by running it**, not by reading. `ACORN_API_TOKEN` is injected into every PTY and agent
+session env, and `requireUser` only asserts that *some* principal resolved — which is the right rule
+for product routes and the wrong one for device administration. So anything running in a task terminal
+could:
+
+1. `POST /v2/core/pair/start` → **the pairing code comes back in the response body**;
+2. `POST /v2/pair` with it → a permanent **owner-authority device token**, not task-scoped, surviving
+   the task that leaked it;
+3. `GET /v2/core/devices` → enumerate the owner's devices, and `DELETE` → revoke them.
+
+That contradicts three of the four things `security.md` § Threat model promises an internal token can
+never do (mint tokens, pair, touch device management).
+
+Fix: `requireDevice` in `server/middleware/requireUser.ts`, mounted over `/v2/core/pair*` and
+`/v2/core/devices*`. Regression tests in `apps/node/test/integration/internalPrincipal.test.ts`,
+verified non-vacuous by removing the gate and watching five of seven fail.
+
+### Accepted divergence: an agent CAN use the owner's GitHub credential
+
+V1 enforced the opposite structurally — the internal principal carried `token: ''`, so an
+agent-spawned child could not call GitHub at all, and `docs/mcp.md` and `security.md` both state that
+as a guarantee. Moving the credential into an `integrations` row keyed by owner dropped it, because
+`ownerId(c)` is the same for a `device` and an `internal` principal.
+
+Gating `githubToken()` on `kind === 'device'` was tried and **reverted**, for two reasons:
+
+- It contains nothing. An agent has a shell in the task worktree with the owner's git credentials, so
+  it can already push and open pull requests. The route is not additional capability.
+- It breaks a first-party caller. `seedTaskNotes` runs *inside* the service and uses the internal token
+  over loopback to reuse `pullDetail`'s serve-then-revalidate, so the gate silently stopped seeding PR
+  notes whenever the mirror was cold.
+
+The real defect is that `INTERNAL_TOKEN` conflates "the service calling itself" with "a child an agent
+spawned". `protocol.md` § Transport already specifies the fix — internal tokens that are task-scoped
+and route-restricted — and that is Phase 2 work, not a one-line guard. Until then this is a **documented
+divergence, not a guarantee**, pinned by a test so it cannot change silently, and `security.md`'s
+wording needs revisiting when Phase 2 lands.
