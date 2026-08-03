@@ -10,26 +10,23 @@ import {
 } from '@acorn/protocol/serviceProtocol.ts'
 import { startServiceRuntime, type ServiceRuntime } from './runtime'
 
-// `process.parentPort` is an addition Electron makes to the Node globals for utilityProcess
-// children, and this package compiles against plain Node types by design — it is the Electron-free
-// service (docs/vNext/architecture.md). So describe the handshake structurally rather than pulling
-// in electron's types, exactly as node-core reads `process.resourcesPath`. Phase 1 replaces this
-// transport with child_process + a socket, at which point the shim disappears.
-type ParentPort = {
-  postMessage(message: ServiceMessage): void
-  on(event: 'message', listener: (event: { data: unknown }) => void): void
-  off(event: 'message', listener: (event: { data: unknown }) => void): void
-}
-
-const parentPort = (process as { parentPort?: ParentPort }).parentPort
-if (!parentPort) throw new Error('The acorn service must run as an Electron utility process')
+// The supervision channel is an ordinary Node IPC channel: the parent spawns this file with
+// `stdio: [..., 'ipc']` (apps/desktop/src/app/main/serviceHost.ts), so `process.send` exists and needs
+// no framing of its own.
+//
+// This replaces a structural shim over Electron's `process.parentPort`, which existed only because this
+// package compiles against plain Node types by design — it is the Electron-free service
+// (docs/vNext/architecture.md). With a plain child process there is nothing Electron-shaped left to
+// describe, and the service can now be started by anything that can spawn a Node process.
+const send = process.send?.bind(process)
+if (!send) throw new Error('The acorn service must be spawned with an IPC channel (stdio: [..., "ipc"])')
 
 const transport: ServiceMessageTransport = {
-  send: (message: ServiceMessage) => parentPort.postMessage(message),
+  send: (message: ServiceMessage) => send(message),
   subscribe: (listener) => {
-    const receive = (event: { data: unknown }) => listener(event.data)
-    parentPort.on('message', receive)
-    return () => parentPort.off('message', receive)
+    const receive = (message: unknown) => listener(message)
+    process.on('message', receive)
+    return () => process.off('message', receive)
   },
 }
 

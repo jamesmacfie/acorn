@@ -2,7 +2,7 @@
 // native UI adapters, utility-process supervision, window timing, and ordered shutdown.
 // The Node application runtime (DB, Hono/WS, PTYs, Git/process work, workflows) is composed in
 // app/service/runtime.ts and cannot stall Electron's main event loop.
-import { app, dialog, type BrowserWindow } from 'electron'
+import { app, dialog, shell, type BrowserWindow } from 'electron'
 import { join } from 'node:path'
 import { registerPreviewIpc } from '@acorn/plugin-preview/main/previewService.ts'
 import { registerRepoPickerIpc } from '@acorn/plugin-terminal/main/pickerIpc.ts'
@@ -18,6 +18,15 @@ export type BootstrapOptions = {
 }
 
 const wait = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms))
+
+// docs/vNext/architecture.md § Failure behavior, literally: "Electron restarts it with backoff
+// (1/2/4/8/16s, max 5 in 10 min), then shows a recovery screen". The previous policy was
+// 250·2^(n-1) ms with a >3-in-60s ceiling — much tighter, and tight enough that a service crashing on
+// something durable (a corrupt database, a port it can never bind) burned its budget in under two
+// seconds and quit before a human could read anything.
+const CRASH_BACKOFF_MS = [1_000, 2_000, 4_000, 8_000, 16_000]
+const CRASH_WINDOW_MS = 10 * 60_000
+const MAX_CRASHES_PER_WINDOW = 5
 
 export async function bootstrap({ dataDir, createWindow }: BootstrapOptions): Promise<BrowserWindow> {
   let disposed = false
@@ -93,22 +102,48 @@ export async function bootstrap({ dataDir, createWindow }: BootstrapOptions): Pr
     disposePicker()
   }
 
+  // The recovery screen architecture.md asks for, with its four affordances exactly: Retry /
+  // Diagnostics / Open data folder / Quit. A native dialog rather than a page, because this is the case
+  // where there may be NO window to render into — the renderer's own recovery screen
+  // (client-core/node/NodeGate.tsx) covers the case where there is one, and it cannot cover this one.
+  // ponytail: the designed screen is Phase 4 UI work; four buttons wired to four actions is the whole
+  // behavioural contract, and it needs zero HTML and zero renderer changes.
+  const showRecoveryScreen = async (): Promise<void> => {
+    const { response } = await dialog.showMessageBox({
+      type: 'error',
+      message: 'The acorn background service keeps stopping',
+      detail: `It restarted ${MAX_CRASHES_PER_WINDOW} times in ten minutes, so acorn stopped trying. Your data is untouched — acorn never creates a fresh data root to recover.`,
+      buttons: ['Retry', 'Diagnostics', 'Open data folder', 'Quit'],
+      defaultId: 0,
+      cancelId: 3,
+      noLink: true,
+    })
+    if (response === 1 || response === 2) {
+      // Look-at-it actions: open the folder and ask again, rather than treating a diagnostic click as an
+      // answer to "what should acorn do now".
+      await shell.openPath(response === 1 ? join(dataDir, 'logs') : dataDir)
+      return showRecoveryScreen()
+    }
+    if (response === 3) return void app.exit(1)
+    // Retry: clear the budget so the next failure gets the full backoff again. The owner asking for a
+    // retry is new information — they may have just freed the port or fixed permissions.
+    crashTimes.length = 0
+    recovering = false
+    await recover()
+  }
+
   const recover = async (): Promise<void> => {
     if (recovering || disposed) return
     recovering = true
     const now = Date.now()
     crashTimes.push(now)
-    while (crashTimes[0] != null && crashTimes[0] < now - 60_000) crashTimes.shift()
-    if (crashTimes.length > 3) {
-      dialog.showErrorBox(
-        'acorn service stopped',
-        'The background service exited repeatedly. acorn will close to avoid a restart loop.',
-      )
-      app.exit(1)
+    while (crashTimes[0] != null && crashTimes[0] < now - CRASH_WINDOW_MS) crashTimes.shift()
+    if (crashTimes.length > MAX_CRASHES_PER_WINDOW) {
+      await showRecoveryScreen()
       return
     }
     try {
-      await wait(250 * (2 ** (crashTimes.length - 1)))
+      await wait(CRASH_BACKOFF_MS[Math.min(crashTimes.length - 1, CRASH_BACKOFF_MS.length - 1)]!)
       await startService()
       if (window && !window.isDestroyed()) window.webContents.reload()
       console.log('[service-host] background service recovered')
