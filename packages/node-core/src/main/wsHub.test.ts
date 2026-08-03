@@ -52,7 +52,17 @@ const frames = (ws: WebSocket): WsServerFrame[] => {
   ws.on('message', (d) => out.push(JSON.parse(d.toString()) as WsServerFrame))
   return out
 }
-const tick = () => new Promise((r) => setTimeout(r, 30))
+// Wait for a server-side effect to arrive, rather than sleeping a fixed interval and hoping. A
+// fixed 30ms sleep is what made this file the suite's most frequent load-sensitive failure: 30ms
+// is plenty on an idle machine and not always enough with 6 packages testing concurrently. The
+// timeout is generous because it only bounds a genuine hang, never the happy path.
+const waitFor = async (predicate: () => boolean, label: string, timeoutMs = 5_000): Promise<void> => {
+  const deadline = Date.now() + timeoutMs
+  while (!predicate()) {
+    if (Date.now() > deadline) throw new Error(`timed out waiting for ${label}`)
+    await new Promise((r) => setTimeout(r, 5))
+  }
+}
 
 describe('wsHub auth', () => {
   it('rejects a socket with no cookie and no token', async () => {
@@ -100,17 +110,18 @@ describe('wsHub streaming', () => {
     const ws = await open(await cookieHeaders())
     const got = frames(ws)
     ws.send(JSON.stringify({ channel: 'term:attach', id: 's1' }))
-    await tick()
-    // a live frame after the initial screen
+    // Load-bearing: LIVE must be pushed only after ready+SCREEN have been delivered, or the ordering
+    // assertion below proves nothing.
+    await waitFor(() => got.length >= 2, 'ready + initial screen')
     liveSink!({ type: 'output', data: 'LIVE' } satisfies ServerMsg)
-    await tick()
+    await waitFor(() => got.length >= 3, 'the live frame')
     const outs = got.filter((f) => f.channel === 'term:out') as Extract<WsServerFrame, { channel: 'term:out' }>[]
     expect(outs.map((f) => f.msg.type)).toEqual(['ready', 'output', 'output'])
     expect(outs[1].msg).toMatchObject({ data: 'SCREEN' })
     expect(outs[2].msg).toMatchObject({ data: 'LIVE' }) // live strictly after the screen restore
 
     ws.send(JSON.stringify({ channel: 'term:input', id: 's1', data: 'ls\n' }))
-    await tick()
+    await waitFor(() => inputs.length > 0, 'input to reach the stream handler')
     expect(inputs).toEqual(['ls\n'])
     ws.close()
   })
@@ -130,12 +141,11 @@ describe('wsHub streaming', () => {
     const got = frames(ws)
     ws.send(JSON.stringify({ channel: 'docker:logs:attach', id: 'c1' }))
     ws.send(JSON.stringify({ channel: 'nobody:home' }))
-    await tick()
-    expect(seen).toEqual(['docker:logs:attach'])
+    await waitFor(() => got.length > 0, 'the handler reply to reach the client')
+    expect(seen).toEqual(['docker:logs:attach']) // 'nobody:home' has no handler and is dropped
     expect(got).toEqual([{ channel: 'docker:log', id: 'c1', data: 'hi' }])
     ws.close()
-    await tick()
-    expect(disconnects).toHaveLength(1)
+    await waitFor(() => disconnects.length === 1, 'the hub to signal disconnect')
   })
 
   it('detach removes the sink; status broadcast reaches the socket', async () => {
@@ -144,13 +154,12 @@ describe('wsHub streaming', () => {
     const ws = await open(await cookieHeaders())
     const got = frames(ws)
     ws.send(JSON.stringify({ channel: 'term:attach', id: 's1' }))
-    await tick()
+    await waitFor(() => got.length > 0, 'the attach reply')
     ws.send(JSON.stringify({ channel: 'term:detach', id: 's1' }))
-    await tick()
+    await waitFor(() => detached, 'detach to reach the stream handler')
     expect(detached).toBe(true)
     wsBroadcast({ channel: 'term:status' })
-    await tick()
-    expect(got.some((f) => f.channel === 'term:status')).toBe(true)
+    await waitFor(() => got.some((f) => f.channel === 'term:status'), 'the status broadcast')
     ws.close()
   })
 })
