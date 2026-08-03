@@ -12,6 +12,7 @@ import type { AppDatabase } from '@acorn/node-core/server/db/index.ts'
 import { schema } from '@acorn/node-core/server/db/index.ts'
 import { setWorkflowBridge } from '@acorn/plugin-workflows/server/routes/workflow.ts'
 import type { CapabilityRegistry } from '@acorn/node-core/server/plugin/capabilities.ts'
+import type { InternalEnvFactory } from '@acorn/node-core/server/auth/internalTokens.ts'
 import { AGENTS_SESSION_EXECUTE } from '@acorn/plugin-agents/contract/sessionExecute.ts'
 import { DEFAULT_PROFILE_ID } from '@acorn/node-core/main/agentProfiles/index.ts'
 import { buildHeadlessArgv, runHeadless } from '@acorn/node-core/main/headless.ts'
@@ -33,7 +34,7 @@ export type WorkflowWiringDeps = {
   runtime: RuntimeService
   notesStore: NotesStore
   // Loopback API access for the context assembler (docs/mcp.md): ACORN_API_URL/ACORN_API_TOKEN.
-  internalApiEnv: Record<string, string>
+  internalEnv: InternalEnvFactory
   // Resolves when the composition root's post-window reconcile pass is done (always resolves, even
   // on failure). workflow:start/gate await it: reconcile() sweeps EVERY 'running' step to
   // 'pending', so a run started before the sweep would have its live step re-queued.
@@ -67,7 +68,7 @@ export async function registerWorkflowIpc(
   {
     runtime,
     notesStore,
-    internalApiEnv,
+    internalEnv,
     reconciled,
     currentUserId,
     memoryReviewTrigger,
@@ -114,7 +115,8 @@ export async function registerWorkflowIpc(
         taskId,
         cwd,
         task: t ? { repoOwner: t.repoOwner, repoName: t.repoName, branch: t.branch, title: t.title } : null,
-        env: { ...internalApiEnv, ACORN_TOOL_CEILING: encodeToolCeiling(opts.tools ?? {}) },
+        // 'task'-scoped, bound to the step's own task.
+        env: { ...internalEnv({ scope: 'task', taskId }), ACORN_TOOL_CEILING: encodeToolCeiling(opts.tools ?? {}) },
       })
       return runHeadless(argv, {
         cwd,
@@ -131,8 +133,12 @@ export async function registerWorkflowIpc(
     finishHandoffs: (taskId, runId) => notesStore.setIncluded({ scope: 'task', taskId }, `workflow-handoffs-${runId}`, false),
     assembleContext: async (taskId, runId) => {
       try {
-        const res = await fetch(`${internalApiEnv.ACORN_API_URL}/v2/core/tasks/${taskId}/context?workflowRunId=${encodeURIComponent(runId)}`, {
-          headers: { 'x-acorn-internal': internalApiEnv.ACORN_API_TOKEN ?? '' },
+        // 'service' scope: this is the node calling its own HTTP surface to reuse the context
+        // assembler, not a child process. It keeps full reach precisely so seeding and context assembly
+        // survive the task-scope restriction that now applies to agents.
+        const loopback = internalEnv({ scope: 'service' })
+        const res = await fetch(`${loopback.ACORN_API_URL}/v2/core/tasks/${taskId}/context?workflowRunId=${encodeURIComponent(runId)}`, {
+          headers: { 'x-acorn-internal': loopback.ACORN_API_TOKEN ?? '' },
         })
         if (!res.ok) return ''
         return formatContextBlock((await res.json()) as Parameters<typeof formatContextBlock>[0])

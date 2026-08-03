@@ -6,6 +6,7 @@ import { deviceService } from '@acorn/node-core/server/auth/deviceTokens.ts'
 import { idempotencyStore } from '@acorn/node-core/server/auth/idempotency.ts'
 import { pairingCodes } from '@acorn/node-core/server/auth/pairingCodes.ts'
 import { encryptSecret } from '@acorn/node-core/server/secretBox.ts'
+import { mintInternalToken } from '@acorn/node-core/server/auth/internalTokens.ts'
 import { schema } from '@acorn/node-core/server/db/index.ts'
 import type { Env } from '@acorn/node-core/main/bindings.ts'
 
@@ -21,6 +22,11 @@ import type { Env } from '@acorn/node-core/main/bindings.ts'
 // token, revoke the owner's own devices, and act on GitHub as the owner. requireUser could not catch
 // any of it, because requireUser only asserts that SOME principal resolved — which is the right rule
 // for product routes and the wrong one for these.
+//
+// Phase 2 changed the trust model, and this file changed with it. There is no longer ONE internal
+// token: a credential carries a scope, so 'the service calling itself' and 'a child an agent spawned'
+// are finally distinguishable (server/auth/internalTokens.ts). The GitHub case below therefore flipped
+// from "pinned divergence" to "denied", which is the whole point of the change.
 
 const INTERNAL = 'internal-secret'
 const ENC_KEY = '0'.repeat(64)
@@ -51,7 +57,17 @@ beforeEach(() => {
 
 afterEach(() => harness.cleanup())
 
-const asAgent = { 'x-acorn-internal': INTERNAL, 'content-type': 'application/json' }
+// A child an agent spawned: 'task'-scoped, bound to one task. This is what goes into a PTY env.
+const asAgent = {
+  'x-acorn-internal': mintInternalToken(INTERNAL, { scope: 'task', taskId: 'task-1' }),
+  'content-type': 'application/json',
+}
+// The node calling its own HTTP surface (seedTaskNotes, workflow context assembly). Never placed in a
+// child's environment.
+const asService = {
+  'x-acorn-internal': mintInternalToken(INTERNAL, { scope: 'service' }),
+  'content-type': 'application/json',
+}
 
 const call = (path: string, init: RequestInit = {}) =>
   createApp().fetch(new Request(`http://127.0.0.1${path}`, init), env)
@@ -117,7 +133,7 @@ describe('a device principal still can', () => {
   })
 })
 
-describe('the internal principal CAN reach a provider credential (a documented divergence)', () => {
+describe('scope decides who may spend the owner provider credential', () => {
   beforeEach(async () => {
     await harness.db.insert(schema.integrations).values({
       id: 'i1',
@@ -138,33 +154,63 @@ describe('the internal principal CAN reach a provider credential (a documented d
     })
   })
 
-  // Pinned deliberately, as the counterpart to the gates above. V1 made this impossible (the internal
-  // principal carried token: ''), and gating it here was tried and reverted: it contains nothing an
-  // agent cannot already do with a shell in the worktree, and it silently breaks seedTaskNotes, which
-  // runs in the service and uses the internal token over loopback. The real fix is task-scoped internal
-  // tokens (protocol.md § Transport), which is Phase 2.
-  //
-  // This test exists so the divergence cannot change by accident: if it starts failing, someone has
-  // altered the trust model and should say so.
-  it('resolves the owner GitHub token for BOTH principal kinds', async () => {
+  const probe = async () => {
     const { Hono } = await import('hono')
     const { authMiddleware } = await import('@acorn/node-core/server/middleware/auth.ts')
     const { requireUser } = await import('@acorn/node-core/server/middleware/requireUser.ts')
     const { githubToken } = await import('@acorn/plugin-github/server/githubToken.ts')
-
-    const app = new Hono()
+    return new Hono()
       .use('/v2/*', authMiddleware)
       .use('/v2/*', requireUser)
       .get('/v2/probe', async (c) => c.json({ token: await githubToken(c as never) }))
+  }
 
+  // THE trust-model change. V1 made this impossible (its internal principal carried token: ''); Phase 1
+  // dropped that property when the credential moved to an integrations row keyed by owner, and pinned
+  // the regression deliberately. Scoping restores it: a 'task' credential — everything in a PTY, an
+  // agent session, a workflow step or an MCP server — gets '', which gh()/ghGraphQL() already turn into
+  // the same `reauth` outcome as "never connected", so no call site needed new error plumbing.
+  //
+  // Residual risk, stated rather than hidden: an agent has a shell in the task worktree with the owner's
+  // git credentials, so it can still push and open pull requests that way. This closes the node handing
+  // it a token, not every path to GitHub.
+  it('denies a task-scoped agent credential', async () => {
+    const app = await probe()
     const agent = await app.fetch(new Request('http://127.0.0.1/v2/probe', { headers: asAgent }), env)
-    expect((await agent.json()) as { token: string }).toEqual({ token: 'gho_OWNER_SECRET' })
+    expect((await agent.json()) as { token: string }).toEqual({ token: '' })
+  })
 
+  // The Phase 1 objection that made gating-on-kind wrong: seedTaskNotes runs INSIDE the service and uses
+  // a loopback internal call to reuse pullDetail's serve-then-revalidate, so a blanket gate silently
+  // stopped seeding PR notes whenever the mirror was cold. Scope answers it — the service keeps reach.
+  it('allows the service scope, so loopback seeding still works on a cold mirror', async () => {
+    const app = await probe()
+    const service = await app.fetch(new Request('http://127.0.0.1/v2/probe', { headers: asService }), env)
+    expect((await service.json()) as { token: string }).toEqual({ token: 'gho_OWNER_SECRET' })
+  })
+
+  it('allows a paired device, which is the owner', async () => {
+    const app = await probe()
     const { token } = await devices.issue('laptop')
-    const owner = await app.fetch(
-      new Request('http://127.0.0.1/v2/probe', { headers: { authorization: `Bearer ${token}` } }),
-      env,
-    )
+    const owner = await app.fetch(new Request('http://127.0.0.1/v2/probe', { headers: { authorization: `Bearer ${token}` } }), env)
     expect((await owner.json()) as { token: string }).toEqual({ token: 'gho_OWNER_SECRET' })
+  })
+})
+
+describe('a task-scoped credential is confined to its own task', () => {
+  // The concrete escalation scoping closes. routes/agentTools.ts takes the taskId from the URL, so
+  // before the credential carried one, a token handed to task A's agent could drive task B's tools.
+  // 404 rather than 403, matching every other denial on that surface, so it reveals nothing about which
+  // tasks exist.
+  it('is refused another task tool surface', async () => {
+    const own = await call('/v2/core/tasks/task-1/tools', { headers: asAgent })
+    const other = await call('/v2/core/tasks/task-2/tools', { headers: asAgent })
+    // Own task: 503 (no tool registry wired in this harness) proves it got PAST the scope check.
+    expect(own.status).toBe(503)
+    expect(other.status).toBe(404)
+  })
+
+  it('lets the service scope reach any task, since its calls are not task-specific', async () => {
+    expect((await call('/v2/core/tasks/task-2/tools', { headers: asService })).status).toBe(503)
   })
 })

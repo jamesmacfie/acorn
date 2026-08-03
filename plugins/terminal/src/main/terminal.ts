@@ -13,6 +13,7 @@ import { setStreamHandlers } from '@acorn/node-core/main/wsHub.ts'
 import type { CreateOpts, ServerMsg, TerminalSession } from '@acorn/protocol/terminal.ts'
 import { AgentSender, type SendSubmit } from './agentSend'
 import { TEARDOWN_TIMEOUT_MS } from '@acorn/node-core/main/archive.ts'
+import type { InternalEnvFactory } from '@acorn/node-core/server/auth/internalTokens.ts'
 import { buildSessionEnv, childEnv } from '@acorn/node-core/main/taskEnv.ts'
 import {
   clampDim,
@@ -95,12 +96,14 @@ export function sendToAgent(sessionId: string, text: string, submit: SendSubmit)
 // - launchInjector: push the combined task-context + repo-memory block into a fresh agent session (docs/notes-and-memory.md).
 // - memoryReviewTrigger: fire the auto-generation pass when an agent session exits (docs/notes-and-memory.md).
 // - seedNotes: snapshot PR/ticket context into curatable notes on task creation (docs/notes-and-memory.md).
-// - internalApiEnv: loopback API access (ACORN_API_URL/ACORN_API_TOKEN) inherited by session env.
+// - internalEnv: mints the loopback credential for ONE session (server/auth/internalTokens.ts). Called
+//   per spawn, not once at wire time, so each PTY carries a token scoped to its own task and session
+//   instead of the node-wide string every child used to share.
 // - bootReconciled: the composition root's reconcile pass — archive awaits it (see the handler).
 let launchInjector: ((taskId: string, sessionId: string) => Promise<void>) | null = null
 let memoryReviewTrigger: ((taskId: string, transcriptTail: string) => Promise<void>) | null = null
 let seedNotes: ((task: TaskRow) => Promise<void>) | null = null
-let internalApiEnv: Record<string, string> = {}
+let internalEnv: InternalEnvFactory = () => ({})
 let bootReconciled: Promise<void> = Promise.resolve()
 
 // PTY-tier AgentState (docs/terminal-and-agents.md): shells stay 'unknown'; agents flip working/idle with the
@@ -332,7 +335,7 @@ async function spawnOne(
     taskId: opts.taskId,
     cwd,
     task: task ? { repoOwner: task.repoOwner, repoName: task.repoName, branch: task.branch, title: task.title } : null,
-    env: { ...internalApiEnv, ACORN_SESSION_ID: id, ...(opts.env ?? {}) },
+    env: { ...internalEnv({ scope: 'task', taskId: opts.taskId, sessionId: id }), ACORN_SESSION_ID: id, ...(opts.env ?? {}) },
   })
   const backend = resolveBackend(profile.backendPreference, tmuxAvailable())
   const cols = clampDim(opts.cols, 80)
@@ -500,7 +503,7 @@ export function terminalRunGlue(db: AppDatabase): RunSessionGlue {
 // knowledge↔terminal cycle: knowledge is built with the engine's exported sendToAgent, and its
 // memory/notes closures come back in here — so the engine never imports knowledge (composition-root ownership).
 export type TerminalIpcDeps = {
-  internalApiEnv: Record<string, string>
+  internalEnv: InternalEnvFactory
   launchInjector: (taskId: string, sessionId: string) => Promise<void>
   memoryReviewTrigger: (taskId: string, transcriptTail: string) => Promise<void>
   seedTaskNotes: (task: TaskRow) => Promise<void>
@@ -524,7 +527,7 @@ export function disposeTerminal(): void {
 // Exited sessions linger until explicitly removed. Cross-feature domains are wired by the
 // composition root.
 export function registerTerminalIpc(db: AppDatabase, worktreesDir: string, deps: TerminalIpcDeps): void {
-  internalApiEnv = deps.internalApiEnv
+  internalEnv = deps.internalEnv
   launchInjector = deps.launchInjector
   memoryReviewTrigger = deps.memoryReviewTrigger
   seedNotes = deps.seedTaskNotes

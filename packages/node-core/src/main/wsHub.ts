@@ -3,6 +3,7 @@
 // PTY engine; terminal.ts registers the stream handlers, notify.ts broadcasts the
 // pings through it. Attached to the @hono/node-server http.Server's 'upgrade' event so it shares
 // the loopback listener and its Host guard.
+import { verifyInternalToken, type InternalClaims } from '../server/auth/internalTokens'
 import type { IncomingMessage, Server } from 'node:http'
 import type { Duplex } from 'node:stream'
 import { WebSocketServer, type WebSocket } from 'ws'
@@ -86,7 +87,7 @@ export type WsAuthDeps = {
 
 // What a successful upgrade resolved to. `deviceId` is what makes revocation actionable later: a
 // socket holds no bearer to re-present, so the connection has to remember which device it belongs to.
-type Authorized = { deviceId: string | null }
+type Authorized = { deviceId: string | null; internal?: InternalClaims }
 
 // Upgrade auth (docs/vNext/protocol.md § Events: "token-authenticated at upgrade"): loopback Host
 // guard, then a device bearer OR the internal token. Anything else → 403 before the ws handshake
@@ -107,8 +108,15 @@ async function authorize(req: IncomingMessage, deps: WsAuthDeps): Promise<Author
     return authenticated ? { deviceId: authenticated.deviceId } : null
   }
   const token = req.headers['x-acorn-internal']
-  if (typeof token === 'string' && token && token === deps.internalToken) return { deviceId: null }
-  return null
+  // HMAC-verified, not compared with `===`. Two changes in one: the plain equality leaked the token's
+  // length and a prefix-match position through timing (the HTTP path already used a constant-time
+  // compare, this one did not), and INTERNAL_TOKEN is now a signing key rather than the credential
+  // (server/auth/internalTokens.ts). An internal socket still gets `deviceId: null` — it has no device
+  // row to revoke — but the claims are carried so a future sweep can close a task's sockets when the
+  // task ends.
+  if (typeof token !== 'string' || !token) return null
+  const claims = verifyInternalToken(deps.internalToken, token)
+  return claims ? { deviceId: null, internal: claims } : null
 }
 
 function onConnect(ws: WebSocket, authorized: Authorized): void {

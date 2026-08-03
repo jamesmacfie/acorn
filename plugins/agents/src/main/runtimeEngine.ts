@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto'
 import type { AppDatabase } from '@acorn/node-core/server/db/index.ts'
 import type { SecretService } from '@acorn/node-core/main/core/secrets.ts'
+import type { InternalEnvFactory } from '@acorn/node-core/server/auth/internalTokens.ts'
 import { taskRoot, workspaceIdFor } from '@acorn/node-core/main/taskWorktree.ts'
 import type {
   AgentEventRecord,
@@ -38,7 +39,7 @@ type LiveSession = {
 export type AgentRuntimeOptions = {
   db: AppDatabase
   dataDir: string
-  internalApiEnv: Record<string, string>
+  internalEnv: InternalEnvFactory
   secrets: SecretService
   currentUserId(): string | null
   registry?: AgentDriverRegistry
@@ -73,7 +74,10 @@ export class ManagedAgentEngine {
   readonly artifacts: AgentArtifactStore
   readonly webhooks: AgentWebhookService
   protected readonly db: AppDatabase
-  protected readonly internalApiEnv: Record<string, string>
+  protected readonly internalEnv: InternalEnvFactory
+  // Every internal token this engine has handed to a provider child, so a leaked value can still be
+  // scrubbed out of provider messages and transcripts. Bounded by the number of sessions started.
+  protected readonly mintedSecrets: string[] = []
   protected readonly currentUserId: () => string | null
   protected readonly registry: AgentDriverRegistry
   protected readonly publish?: (frame: AgentWsFrame) => void
@@ -91,7 +95,7 @@ export class ManagedAgentEngine {
 
   constructor(options: AgentRuntimeOptions) {
     this.db = options.db
-    this.internalApiEnv = options.internalApiEnv
+    this.internalEnv = options.internalEnv
     this.currentUserId = options.currentUserId
     this.registry = options.registry ?? agentDriverRegistry
     this.publish = options.publish
@@ -101,10 +105,11 @@ export class ManagedAgentEngine {
     this.store = new AgentStore(options.db)
     this.attachments = new AgentAttachmentStore(options.db, options.dataDir)
     this.artifacts = new AgentArtifactStore(options.db, options.dataDir)
-    this.eventMaterializer = new ProviderEventMaterializer(
-      this.artifacts,
-      secretEnvironmentValues(this.internalApiEnv),
-    )
+    // The redaction list is now COLLECTED rather than computed once: each session gets its own
+    // scoped internal token (server/auth/internalTokens.ts), so there is no single env record whose
+    // secrets stand for every session's. #mintedSecrets accumulates them as sessions start, and the
+    // materializer reads it live — one shared array it keeps a reference to.
+    this.eventMaterializer = new ProviderEventMaterializer(this.artifacts, this.mintedSecrets)
     this.webhooks = new AgentWebhookService(options.db, options.secrets)
     this.providerEvents = new DurableAgentEventBuffer((entry) => this.commitProviderEvent(entry))
   }
@@ -198,10 +203,16 @@ export class ManagedAgentEngine {
     live.stopping = false
     this.live.set(session.id, live)
     const noProviderExecutionHistory = !(await this.store.hasProviderExecutionHistory(session.id))
+    // Scoped to THIS session's task: an agent's credential can no longer drive another task's tools,
+    // and cannot read the owner's provider credentials at all (server/auth/internalTokens.ts).
+    const sessionEnv = this.internalEnv({ scope: 'task', taskId: session.taskId, sessionId: session.id })
+    for (const secret of secretEnvironmentValues(sessionEnv)) if (!this.mintedSecrets.includes(secret)) this.mintedSecrets.push(secret)
     live.startPromise = driver.start({
       session,
       cwd,
-      env: this.internalApiEnv,
+      // Scoped to THIS session's task: an agent's credential can no longer drive another task's tools,
+      // and cannot read the owner's provider credentials at all (server/auth/internalTokens.ts).
+      env: sessionEnv,
       noProviderExecutionHistory,
       onEvent: (event) => this.onProviderEvent(session.id, event),
       onClosed: (error) => this.onProviderClosed(session.id, error),
@@ -219,7 +230,7 @@ export class ManagedAgentEngine {
         message: safeProviderMessage(
           error,
           'Provider session failed to start.',
-          secretEnvironmentValues(this.internalApiEnv),
+          this.mintedSecrets,
         ),
         retryable: false,
       })
@@ -260,7 +271,7 @@ export class ManagedAgentEngine {
     const message = safeProviderMessage(
       error,
       'Provider process closed.',
-      secretEnvironmentValues(this.internalApiEnv),
+      this.mintedSecrets,
     )
     await this.store.interruptActiveTurn(sessionId, message)
     await this.store.expirePendingRequests(sessionId)
@@ -353,7 +364,7 @@ export class ManagedAgentEngine {
                 const message = safeProviderMessage(
                   error,
                   'Safe transient provider failure.',
-                  secretEnvironmentValues(this.internalApiEnv),
+                  this.mintedSecrets,
                 )
                 await this.store.requeueTransientTurn(item.turn.id, message)
                 await this.record(item.session.id, item.turn.id, {
@@ -378,7 +389,7 @@ export class ManagedAgentEngine {
                 message: safeProviderMessage(
                   error,
                   'Provider turn failed.',
-                  secretEnvironmentValues(this.internalApiEnv),
+                  this.mintedSecrets,
                 ),
                 retryable: false,
                 },

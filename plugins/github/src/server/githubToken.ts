@@ -2,7 +2,7 @@ import { and, eq } from 'drizzle-orm'
 import type { Context } from 'hono'
 import { getDb, schema } from '@acorn/node-core/server/db/index.ts'
 import type { AppEnv } from '@acorn/node-core/server/middleware/auth.ts'
-import { ownerId } from '@acorn/node-core/server/middleware/requireUser.ts'
+import { canUseProviderCredential, ownerId } from '@acorn/node-core/server/middleware/requireUser.ts'
 
 // The one place a GitHub credential is read (docs/vNext/plan.md § Phase 1: "GitHub OAuth becomes an
 // integration credential written to the node").
@@ -23,27 +23,22 @@ import { ownerId } from '@acorn/node-core/server/middleware/requireUser.ts'
 
 export const GITHUB_PROVIDER = 'github'
 
-// Deliberately NOT gated to `kind === 'device'`, and that is a change from V1 worth stating plainly.
+// Gated on scope, not on principal KIND (server/middleware/requireUser.ts § canUseProviderCredential).
 //
-// V1's internal principal carried `token: ''`, so an agent-spawned child was structurally unable to
-// call GitHub. Resolving the credential from a stored row for `ownerId(c)` drops that, because the
-// owner is the same for a device and an internal principal — so an agent holding ACORN_API_TOKEN can
-// act on GitHub as the owner. That was verified, and gating it here was tried.
+// A device may read this; so may the 'service' scope, because the node calls its own HTTP surface over
+// loopback to reuse pullDetail's serve-then-revalidate (plugins/notes' seedTaskNotes). A 'task'-scoped
+// token — everything injected into a PTY, an agent session, a workflow step or an MCP server — may not.
 //
-// It was reverted for two reasons. It buys no real containment: an agent has a shell in the task
-// worktree with the owner's git credentials, so it can already push and open pull requests. And it
-// breaks a first-party caller — seedTaskNotes runs IN the service and uses the internal token over
-// loopback to reuse pullDetail's serve-then-revalidate, so gating it silently stops seeding PR notes
-// whenever the mirror is cold.
-//
-// The real defect underneath is that INTERNAL_TOKEN conflates "the service calling itself" with
-// "a child an agent spawned". protocol.md § Transport already describes the fix — internal tokens
-// that are task-scoped and route-restricted — and that is a Phase 2 change, not a one-line guard.
-// Until then this is a documented divergence, not a guarantee: see docs/vNext/phase1-notes.md.
-//
-// What an agent still CANNOT do is mint a token, pair, or administer devices — see
-// middleware/requireUser.ts's requireDevice, which is where the genuine escalation was.
+// That restores what V1 enforced structurally (its internal principal carried `token: ''`) and what
+// docs/vNext/security.md § Threat model promises. Phase 1 tried gating on kind and reverted it, for two
+// reasons that scoping answers: one guard could not tell the service from an agent, so seeding PR notes
+// broke whenever the mirror was cold; and an agent with a shell in the worktree can push using the
+// owner's git credentials anyway. The second is still true, and is not a reason to hand it a token it
+// does not need — the residual risk is documented in docs/vNext/phase2-notes.md rather than papered over.
 export async function githubToken(c: Context<AppEnv>): Promise<string> {
+  // '' is the "not connected" answer gh()/ghGraphQL() already turn into the synthetic 401 that ghError
+  // normalizes to `reauth`, so a denied caller needs no new error plumbing at any of the 34 call sites.
+  if (!canUseProviderCredential(c)) return ''
   const db = getDb(c.env)
   const [row] = await db
     .select({ authRef: schema.integrations.authRef })

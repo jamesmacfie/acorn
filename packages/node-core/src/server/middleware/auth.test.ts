@@ -1,3 +1,4 @@
+import { mintInternalToken } from '../auth/internalTokens'
 import { testSecretEnv } from '../routes/testDb'
 import { Hono } from 'hono'
 import { describe, expect, it, vi } from 'vitest'
@@ -13,7 +14,7 @@ const app = new Hono<AppEnv>()
 describe('machine identity binding', () => {
   it('maps the internal token to the explicit active identity without querying cached rows', async () => {
     const response = await app.fetch(
-      new Request('http://acorn.test/', { headers: { 'x-acorn-internal': 'internal' } }),
+      new Request('http://acorn.test/', { headers: { 'x-acorn-internal': mintInternalToken('internal', { scope: 'service' }) } }),
       {
         INTERNAL_TOKEN: 'internal',
         ACTIVE_IDENTITY: { get: () => 'bob', set: vi.fn(), clear: vi.fn() },
@@ -27,7 +28,7 @@ describe('machine identity binding', () => {
 
   it('fails closed for internal traffic when no identity is bound', async () => {
     const response = await app.fetch(
-      new Request('http://acorn.test/', { headers: { 'x-acorn-internal': 'internal' } }),
+      new Request('http://acorn.test/', { headers: { 'x-acorn-internal': mintInternalToken('internal', { scope: 'service' }) } }),
       {
         INTERNAL_TOKEN: 'internal',
         ACTIVE_IDENTITY: { get: () => null, set: vi.fn(), clear: vi.fn() },
@@ -120,7 +121,7 @@ describe('device bearer', () => {
   it('does not fall back to the internal token when a presented bearer fails', async () => {
     const response = await app.fetch(
       new Request('http://acorn.test/', {
-        headers: { authorization: 'Bearer revoked', 'x-acorn-internal': 'internal' },
+        headers: { authorization: 'Bearer revoked', 'x-acorn-internal': mintInternalToken('internal', { scope: 'service' }) },
       }),
       envWith({ authenticate: vi.fn().mockResolvedValue(null) }),
     )
