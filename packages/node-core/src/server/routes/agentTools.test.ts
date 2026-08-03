@@ -150,14 +150,14 @@ describe('agent-tool harness projection (docs/agent-tools.md)', () => {
   it('rejects bad input against the zod schema (400) before the handler', async () => {
     const res = await post('/api/tasks/t1/tools/write_tool', { slug: 123 })
     expect(res.status).toBe(400)
-    expect(((await res.json()) as ApiError).error).toBe('bad_request')
+    expect(((await res.json()) as ApiError).error.code).toBe('bad_request')
     expect(calls).toHaveLength(0)
   })
 
   it('maps a thrown ToolError kind → status + envelope', async () => {
     const res = await post('/api/tasks/t1/tools/throws_tool', {})
     expect(res.status).toBe(404)
-    expect((await res.json()) as ApiError).toEqual({ error: 'not_found', detail: ['nope'] })
+    expect(((await res.json()) as ApiError).error).toMatchObject({ code: 'not_found', message: 'nope' })
   })
 
   it('404s an unknown tool and an unavailable (`when` false) tool alike', async () => {

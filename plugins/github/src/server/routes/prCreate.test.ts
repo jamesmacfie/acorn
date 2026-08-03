@@ -33,17 +33,17 @@ describe('prCreate auth + ApiError envelope', () => {
   it('401s (ApiError) when logged out', async () => {
     const res = await post(null, { title: 't', base: 'main', head: 'feat' })
     expect(res.status).toBe(401)
-    expect((await res.json()) as ApiError).toEqual({ error: 'unauthenticated' })
+    expect(((await res.json()) as ApiError).error).toMatchObject({ code: 'unauthenticated' })
   })
 
   it('bad_request (ApiError) on missing fields, before any GitHub call', async () => {
     const res = await post(PRINCIPAL, {})
     expect(res.status).toBe(400)
-    expect((await res.json()) as ApiError).toEqual({ error: 'bad_request' })
+    expect(((await res.json()) as ApiError).error).toMatchObject({ code: 'bad_request' })
     expect(gh).not.toHaveBeenCalled()
   })
 
-  it("folds GitHub's 422 prose into detail with a stable validation_failed code", async () => {
+  it("folds GitHub's 422 prose into the envelope message with a stable validation_failed code", async () => {
     vi.mocked(gh).mockResolvedValue(
       new Response(JSON.stringify({ message: 'Validation Failed', errors: [{ message: 'A pull request already exists for acme:feat.' }] }), {
         status: 422,
@@ -52,9 +52,9 @@ describe('prCreate auth + ApiError envelope', () => {
     )
     const res = await post(PRINCIPAL, { title: 't', base: 'main', head: 'feat' })
     expect(res.status).toBe(422)
-    expect((await res.json()) as ApiError).toEqual({
-      error: 'validation_failed',
-      detail: ['A pull request already exists for acme:feat.'],
+    expect(((await res.json()) as ApiError).error).toMatchObject({
+      code: 'validation_failed',
+      message: 'A pull request already exists for acme:feat.',
     })
   })
 })

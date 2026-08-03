@@ -96,6 +96,6 @@ describe('HTTP credential isolation', () => {
   it('rejects the machine internal principal before it can read or send credentials', async () => {
     const response = await call(principal('alice', 'internal'), '/api/http/acme/web/requests')
     expect(response.status).toBe(403)
-    expect(await response.json()).toEqual({ error: 'interactive_user_required' })
+    expect(await response.json()).toMatchObject({ error: { code: 'interactive_user_required' } })
   })
 })

@@ -113,13 +113,13 @@ describe('database routes', () => {
     const app = authed()
     const failed = await app.fetch(req('/api/tasks/task1/database/generate', 'POST', { connectionId: 'c', prompt: 'x' }), {} as Env)
     expect(failed.status).toBe(422)
-    expect(await failed.json()).toMatchObject({ error: 'db_schema_unavailable', detail: ['Not connected.'] })
+    expect(await failed.json()).toMatchObject({ error: { code: 'db_schema_unavailable', message: 'Not connected.' } })
 
     setDatabaseBridge(fake())
     vi.mocked(generateTextForConnection).mockRejectedValueOnce(new ProviderOperationError('provider_needs_auth', 401))
     const denied = await app.fetch(req('/api/tasks/task1/database/generate', 'POST', { connectionId: 'c', prompt: 'x' }), {} as Env)
     expect(denied.status).toBe(401)
-    expect(await denied.json()).toMatchObject({ error: 'provider_needs_auth' })
+    expect(await denied.json()).toMatchObject({ error: { code: 'provider_needs_auth' } })
 
     expect((await app.fetch(req('/api/tasks/task1/database/generate', 'POST', { connectionId: '', prompt: 'x' }), {} as Env)).status).toBe(400)
   })

@@ -22,13 +22,13 @@ describe('harness run surface (auth + error envelope)', () => {
   it('401s (ApiError) when logged out — internal-token surface still gated', async () => {
     const res = await req(null, 'GET', '/api/tasks/t1/run')
     expect(res.status).toBe(401)
-    expect((await res.json()) as ApiError).toEqual({ error: 'unauthenticated' })
+    expect(((await res.json()) as ApiError).error).toMatchObject({ code: 'unauthenticated' })
   })
 
   it('503 bridge-unavailable (no kind) when the main-process bridge is absent (dev:node)', async () => {
     const res = await req(INTERNAL, 'GET', '/api/tasks/t1/run')
     expect(res.status).toBe(503)
-    expect((await res.json()) as ApiError).toEqual({ error: 'bridge-unavailable' })
+    expect(((await res.json()) as ApiError).error).toMatchObject({ code: 'bridge-unavailable' })
   })
 
   it('maps a thrown HarnessError kind → machine code + prose in detail', async () => {
@@ -39,7 +39,7 @@ describe('harness run surface (auth + error envelope)', () => {
     } as unknown as RunBridge)
     const res = await req(INTERNAL, 'GET', '/api/tasks/t1/run/dev/status')
     expect(res.status).toBe(404)
-    expect((await res.json()) as ApiError).toEqual({ error: 'not_found', detail: ['no such target'] })
+    expect(((await res.json()) as ApiError).error).toMatchObject({ code: 'not_found', message: 'no such target' })
   })
 
   it('returns the bridge payload on success', async () => {

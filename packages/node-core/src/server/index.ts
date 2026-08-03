@@ -3,7 +3,7 @@ import { csrf } from 'hono/csrf'
 import { authMiddleware, type AppEnv } from './middleware/auth'
 import { buildIntegrationProviderRoutes } from './integrations/providerRoutes'
 import { requireUser } from './middleware/requireUser'
-import { onServerError } from './respond'
+import { onServerError, requestIdMiddleware } from './respond'
 import { pluginRouteContributions } from './routeRegistry'
 import { auth } from './routes/auth'
 import { integrations } from './routes/integrations'
@@ -28,6 +28,9 @@ export function createApp() {
   // before any router. A router mounted before requireUser would be an unauthenticated hole, so
   // all /api routers stay below this line. See docs/security.md §3.
   const app = new Hono<AppEnv>()
+    // First, unconditionally: every response — success, error, public or authenticated — carries a
+    // request id, so a user-reported failure is findable in the log.
+    .use('*', requestIdMiddleware)
     // /auth is public, but its one mutating route (POST /logout) still needs the Origin check —
     // without it any page the user visits can force-log-them-out. Registered before the router
     // because Hono runs handlers in registration order.
@@ -53,5 +56,5 @@ export function createApp() {
   // csrf/authMiddleware/requireUser envelope). See app/server/routes.ts for the contributions.
   for (const { prefix, router } of pluginRouteContributions()) app.route(prefix, router)
 
-  return app.onError(onServerError) // uncaught throws still speak ApiError on /api (docs/api-reference.md §error-codes)
+  return app.onError(onServerError) // uncaught throws still speak the ApiError envelope (docs/vNext/protocol.md § Errors)
 }

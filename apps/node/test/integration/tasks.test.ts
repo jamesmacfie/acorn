@@ -108,7 +108,7 @@ describe('task links grow/shrink', () => {
       connectionId: 'int-1', providerId: 'rollbar', identifier: 'ENG-42',
     }), {} as Env)
     expect(res.status).toBe(400)
-    expect(await res.json()).toEqual({ error: 'provider_bad_config' })
+    expect(await res.json()).toMatchObject({ error: { code: 'provider_bad_config' } })
     expect(await listLinks(task.id)).toEqual([])
   })
 

@@ -124,7 +124,7 @@ describe('Rollbar source (docs/integrations.md, docs/next/rollbar.md)', () => {
       env(),
     )
     expect(res.status).toBe(401)
-    expect(await res.json()).toEqual({ error: 'provider_needs_auth' })
+    expect(await res.json()).toMatchObject({ error: { code: 'provider_needs_auth' } })
   })
 
   it('items list returns summaries with itemId + label, caches, and serves the cache within TTL', async () => {

@@ -54,7 +54,7 @@ describe('agent usage routes', () => {
   it('503s when the bridge is not wired', async () => {
     const response = await authed().fetch(request('/api/agents/usage'), {} as Env)
     expect(response.status).toBe(503)
-    expect((await response.json()).error).toBe('bridge-unavailable')
+    expect((await response.json()).error.code).toBe('bridge-unavailable')
   })
 
   it('returns provider-local error rows as a successful response', async () => {
@@ -106,7 +106,7 @@ describe('agent usage routes', () => {
         claude: { overrides: [], customModels: [{ model: '', price: {} }] },
       }), env)
       expect(invalid.status).toBe(400)
-      expect((await invalid.json()).error).toBe('bad_request')
+      expect((await invalid.json()).error.code).toBe('bad_request')
       expect(await (await app.fetch(request('/api/agents/pricing'), env)).json()).toEqual(preferences)
     } finally {
       testDb.cleanup()
