@@ -1,4 +1,4 @@
-import { cpSync, existsSync, readFileSync } from 'node:fs'
+import { cpSync, existsSync, readdirSync, readFileSync } from 'node:fs'
 import { isAbsolute, resolve } from 'node:path'
 import { defineConfig, externalizeDepsPlugin } from 'electron-vite'
 import solid from 'vite-plugin-solid'
@@ -30,16 +30,41 @@ const workspacePackages = Object.keys(
 // (not lib mode) is what lets that externalization take effect. The renderer is the existing
 // SolidJS SPA, built to dist/client and served by Electron main's app:// protocol handler
 // (main/appScheme.ts) — no node serves web assets.
-// node-core owns schema.ts and therefore its migrations. The service bundle resolves them by
-// walking ancestors from its own location, so stage a copy above out/main.
+// Every Drizzle chain in the workspace, staged where the bundled service can find it.
+//
+// Core's chain goes to out/migrations (main/bindings.ts walks ancestors from its own location); each
+// plugin's goes to out/migrations/<plugin>, which is where main/pluginMigrations.ts looks first via
+// process.resourcesPath. Phase 2 split one 45-table database into core plus one file per plugin
+// (docs/vNext/data.md § Plugin DBs), so staging only core's chain would ship a packaged app whose
+// plugin databases are never migrated — and, because a chain with no journal applies nothing, it would
+// fail at the first query rather than at boot.
+//
+// Discovered from the filesystem, exactly like scripts/db.mjs, so adding a plugin DB needs no edit
+// here. A plugin with a drizzle.config.ts but no generated chain yet is skipped rather than staged
+// empty.
+const chainDirs = () => {
+  const out: { plugin: string | null; dir: string }[] = []
+  const coreChain = resolve(__dirname, '../../packages/node-core/migrations')
+  if (existsSync(coreChain)) out.push({ plugin: null, dir: coreChain })
+  const pluginsRoot = resolve(__dirname, '../../plugins')
+  for (const entry of readdirSync(pluginsRoot, { withFileTypes: true })) {
+    if (!entry.isDirectory()) continue
+    const dir = resolve(pluginsRoot, entry.name, 'migrations')
+    if (existsSync(resolve(dir, 'meta/_journal.json'))) out.push({ plugin: entry.name, dir })
+  }
+  return out
+}
+
 const stageMigrations = () => ({
   name: 'acorn:stage-migrations',
   closeBundle() {
-    cpSync(
-      resolve(__dirname, '../../packages/node-core/migrations'),
-      resolve(__dirname, 'out/migrations'),
-      { recursive: true },
-    )
+    const staged: string[] = []
+    for (const chain of chainDirs()) {
+      const target = chain.plugin ? resolve(__dirname, 'out/migrations', chain.plugin) : resolve(__dirname, 'out/migrations')
+      cpSync(chain.dir, target, { recursive: true })
+      staged.push(chain.plugin ?? 'core')
+    }
+    console.log(`[stage-migrations] ${staged.length} chain(s): ${staged.join(', ')}`)
   },
 })
 

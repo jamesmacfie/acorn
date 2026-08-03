@@ -1,5 +1,6 @@
-import { describe, expect, it, vi } from 'vitest'
+import { afterAll, describe, expect, it, vi } from 'vitest'
 import { createCoreServices, SecretService } from '../../main/core'
+import { makeTestDb } from '../routes/testDb'
 import { CapabilityRegistry, capabilityId } from './capabilities'
 import { NodeEventBus, nodeEventType } from './events'
 import { initPlugins } from './host'
@@ -86,6 +87,12 @@ describe('node event bus', () => {
 })
 
 describe('plugin host', () => {
+  // One real database for the whole block: CoreServices.tasks needs a handle, and these cases never
+  // touch it — they exercise ordering, disabling and failure propagation.
+  let shared: ReturnType<typeof makeTestDb> | null = null
+  const coreDb = () => (shared ??= makeTestDb()).db
+  afterAll(() => shared?.cleanup())
+
   const plugin = (name: string, opts: Partial<NodePlugin> = {}): NodePlugin => ({
     name,
     init: () => {},
@@ -97,7 +104,7 @@ describe('plugin host', () => {
     initPlugins(plugins, {
       capabilities: new CapabilityRegistry(),
       events: new NodeEventBus(),
-      core: createCoreServices({ secrets: new SecretService('a'.repeat(64)) }),
+      core: createCoreServices({ secrets: new SecretService('a'.repeat(64)), db: coreDb() }),
       disabled,
     })
 

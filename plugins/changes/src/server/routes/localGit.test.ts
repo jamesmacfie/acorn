@@ -1,3 +1,4 @@
+import { createTaskService } from '@acorn/node-core/main/core/tasks.ts'
 import { execFileSync } from 'node:child_process'
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
@@ -48,7 +49,7 @@ describe('local-git routes over a real worktree', () => {
 
   beforeEach(async () => {
     t = makeTestDb()
-    setLocalGitBridge(localGitBridge(t.db))
+    setLocalGitBridge(localGitBridge({ tasks: createTaskService(t.db) }))
     const now = Date.now()
     await t.db.insert(schema.repoPaths).values({ owner: 'acme', repo: 'widget', path: work, createdAt: now, updatedAt: now })
     await t.db.insert(schema.tasks).values({

@@ -22,16 +22,14 @@
 //     current job needs. The consumer that would justify it is moving workflow trigger polling from
 //     the CLIENT to the node so a trigger fires with no window open — a behaviour change, not this
 //     phase's.
-//   - **tasks.** `loadTask`/`taskRoot` already exist in main/taskWorktree.ts and every consumer
-//     reaches them directly. They join CoreServices in W4, when splitting the database is what
-//     actually forces plugins to stop reading core's tables — adding a pass-through facade now would
-//     be a second name for the same function.
 //
 // Recorded in docs/vNext/phase2-notes.md.
+import type { AppDatabase } from '../../server/db'
 import * as fs from './fs'
 import * as git from './git'
 import * as proc from './proc'
 import { SecretService } from './secrets'
+import { createTaskService, type TaskService } from './tasks'
 
 export type CoreServices = {
   // Path confinement for anything a caller names: worktree-relative reads/writes, agent file mentions.
@@ -42,13 +40,18 @@ export type CoreServices = {
   proc: typeof proc
   // Use-scoped credential access; scrubs the plaintext out of anything thrown from its scope.
   secrets: SecretService
+  // Resolve a taskId against core's tables. Once each plugin owns its own SQLite file it cannot query
+  // `tasks` itself, so this is the "validated by the owning plugin when dereferenced" seam
+  // (docs/vNext/data.md § Plugin DBs).
+  tasks: TaskService
 }
 
-export function createCoreServices(options: { secrets: SecretService }): CoreServices {
-  return { fs, git, proc, secrets: options.secrets }
+export function createCoreServices(options: { secrets: SecretService; db: AppDatabase }): CoreServices {
+  return { fs, git, proc, secrets: options.secrets, tasks: createTaskService(options.db) }
 }
 
 export { SecretService }
+export type { TaskService } from './tasks'
 export { SecretUnavailableError, redact } from './secrets'
 export type { ProcResult, ProcSpec } from './proc'
 export type { ConfineFailure, ConfineResult } from './fs'

@@ -2,7 +2,6 @@ import type { HttpBindings } from '@hono/node-server'
 import { randomUUID } from 'node:crypto'
 import { chmodSync, closeSync, existsSync, lstatSync, mkdirSync, openSync, readdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { readFile, writeFile } from 'node:fs/promises'
-import { createRequire } from 'node:module'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { drizzle } from 'drizzle-orm/better-sqlite3'
@@ -13,6 +12,7 @@ import { deviceService, type DeviceService } from '../server/auth/deviceTokens'
 import { idempotencyStore, type IdempotencyStore } from '../server/auth/idempotency'
 import { pairingCodes, type PairingCodes } from '../server/auth/pairingCodes'
 import { SecretService } from './core/secrets'
+import { loadDatabase } from './sqliteLoader'
 import { ensureCert } from './tls'
 
 // The runtime object the routes read via c.env (typed as the global Env in env.d.ts). Built once
@@ -142,25 +142,6 @@ const migrationsFolder = (() => {
     dir = parent
   }
 })()
-
-// better-sqlite3 is a native module built for ONE ABI at a time (Electron vs Node — see
-// docs/local-development.md). Load it lazily so an ABI mismatch surfaces as an actionable error
-// naming the right rebuild script, instead of a bare NODE_MODULE_VERSION stack at import time.
-const nodeRequire = createRequire(import.meta.url)
-function loadDatabase(): typeof import('better-sqlite3') {
-  try {
-    return nodeRequire('better-sqlite3') as typeof import('better-sqlite3')
-  } catch (e) {
-    const msg = e instanceof Error ? e.message : String(e)
-    if (msg.includes('NODE_MODULE_VERSION') || msg.includes('was compiled against a different Node.js version')) {
-      const fix = process.versions.electron
-        ? 'pnpm --filter @acorn/desktop electron:rebuild (this is an Electron process)'
-        : 'pnpm rebuild:node (this is a plain Node process)'
-      throw new Error(`better-sqlite3 is built for the wrong ABI. Run: ${fix}\n\nOriginal error: ${msg}`)
-    }
-    throw e
-  }
-}
 
 export function openDb(dbPath: string): AppDatabase {
   const databasePath = resolve(dbPath)

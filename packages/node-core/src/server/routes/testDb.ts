@@ -6,6 +6,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { openDb } from '../../main/bindings'
 import { SecretService } from '../../main/core/secrets'
+import { openPluginDb, type PluginDatabase } from '../../main/pluginStorage'
 import type { AppDatabase } from '../db'
 
 export type TestDb = { db: AppDatabase; cleanup: () => void }
@@ -36,4 +37,34 @@ export function makeTestDb(): TestDb {
 // credential read, so they are minted as a pair here rather than spelled out at each mount site.
 export function testSecretEnv(hexKey: string): { SESSION_ENC_KEY: string; SECRETS: SecretService } {
   return { SESSION_ENC_KEY: hexKey, SECRETS: new SecretService(hexKey) }
+}
+
+export type TestPluginDb = { db: PluginDatabase; dataDir: string; cleanup: () => void }
+
+// A real per-plugin SQLite file in a temp data root, migrated with that plugin's OWN chain — the
+// plugin-side counterpart of makeTestDb. The caller passes its migrations folder because core cannot
+// import a plugin (main/pluginStorage.ts).
+//
+// Deliberately not "makeTestDb with extra tables": a plugin test that could see core's schema would
+// keep passing after the plugin started reading a table it no longer owns, which is exactly the
+// coupling the split removes.
+export function makeTestPluginDb(plugin: string, migrationsFolder: string): TestPluginDb {
+  const dataDir = mkdtempSync(join(tmpdir(), `acorn-test-${plugin}-`))
+  const db = openPluginDb(dataDir, plugin, { migrationsFolder })
+  return {
+    db,
+    dataDir,
+    cleanup: () => {
+      try {
+        db.close()
+      } catch {
+        // A test may have closed it already.
+      }
+      try {
+        rmSync(dataDir, { recursive: true, force: true })
+      } catch {
+        // best-effort — tmpdir is reaped by the OS anyway
+      }
+    },
+  }
 }

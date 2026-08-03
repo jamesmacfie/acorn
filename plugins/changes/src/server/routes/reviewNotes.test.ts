@@ -1,16 +1,17 @@
 import { Hono } from 'hono'
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import type { ReviewNote } from '@acorn/protocol/api.ts'
-import { getDb, schema } from '@acorn/node-core/server/db/index.ts'
+import { schema } from '@acorn/node-core/server/db/index.ts'
+import { createTaskService } from '@acorn/node-core/main/core/tasks.ts'
 import type { AppEnv } from '@acorn/node-core/server/middleware/auth.ts'
-import { reviewNotes } from './reviewNotes'
-import { makeTestDb, type TestDb } from '@acorn/node-core/server/routes/testDb.ts'
+import { reviewNotesRoutes } from './reviewNotes'
+import { makeTestDb, makeTestPluginDb, type TestDb, type TestPluginDb } from '@acorn/node-core/server/routes/testDb.ts'
+import { migrationsDir } from '../../node/migrations'
 import type { Env } from '@acorn/node-core/main/bindings.ts'
 
-vi.mock('@acorn/node-core/server/db/index.ts', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('@acorn/node-core/server/db/index.ts')>()
-  return { ...actual, getDb: vi.fn() }
-})
+// Two databases, which is the point: review notes live in the plugin's own file and the task they
+// reference lives in core's. The getDb mock this test used to need is gone — the plugin never reads
+// core's database.
 
 const jsonReq = (url: string, method: string, body?: unknown) =>
   new Request(`http://acorn.test${url}`, {
@@ -21,17 +22,18 @@ const jsonReq = (url: string, method: string, body?: unknown) =>
 
 describe('review notes CRUD + sentAt lifecycle (docs/panes.md)', () => {
   let t: TestDb
+  let plugin: TestPluginDb
   let app: Hono<AppEnv>
 
   beforeEach(async () => {
     t = makeTestDb()
-    vi.mocked(getDb).mockReturnValue(t.db)
+    plugin = makeTestPluginDb('changes', migrationsDir())
     app = new Hono<AppEnv>()
     app.use('/api/*', async (c, next) => {
       c.set('principal', { kind: 'device', userId: 'james' })
       await next()
     })
-    app.route('/api/tasks', reviewNotes)
+    app.route('/api/tasks', reviewNotesRoutes(plugin.db, { tasks: createTaskService(t.db) }))
     const now = Date.now()
     await t.db.insert(schema.tasks).values({
       id: 'task1',
@@ -50,7 +52,10 @@ describe('review notes CRUD + sentAt lifecycle (docs/panes.md)', () => {
     })
   })
 
-  afterEach(() => t.cleanup())
+  afterEach(() => {
+    plugin.cleanup()
+    t.cleanup()
+  })
 
   const list = async (): Promise<ReviewNote[]> => (await app.fetch(jsonReq('/api/tasks/task1/review-notes', 'GET'), {} as Env)).json()
 
