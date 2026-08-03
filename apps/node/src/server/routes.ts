@@ -23,12 +23,14 @@ import { docker } from '@acorn/plugin-docker/server/routes/docker.ts'
 import { editor } from '@acorn/plugin-editor/server/routes/editor.ts'
 import { http } from '@acorn/plugin-http/server/routes/http.ts'
 import { knowledge } from '@acorn/plugin-memory/server/routes/knowledge.ts'
-import { localGit } from '@acorn/plugin-changes/server/routes/localGit.ts'
-import { reviewNotes } from '@acorn/plugin-changes/server/routes/reviewNotes.ts'
 import { search } from '@acorn/plugin-editor/server/routes/search.ts'
 import { terminal } from '@acorn/plugin-terminal/server/routes/terminal.ts'
 import { workflow } from '@acorn/plugin-workflows/server/routes/workflow.ts'
 
+// Plugins converted to a NodePlugin register their OWN routes in init() and are absent from this
+// file — see apps/node/src/server/plugins.ts for the list. This module is the remaining
+// not-yet-converted half, and it shrinks to nothing as Phase 2 finishes.
+//
 // Every contribution mounts at /v2/p/<plugin><prefix> (docs/vNext/protocol.md § HTTP conventions).
 // The prefix is the path INSIDE the plugin's namespace, so ownership is declared here rather than
 // encoded in a URL: /api/tasks/:id/* was one flat table shared by core and six plugins, and the
@@ -41,10 +43,8 @@ import { workflow } from '@acorn/plugin-workflows/server/routes/workflow.ts'
 // Rewriting those internal paths is the route-declaration phase's job, not this reshape's.
 
 // /tasks/:id/* sub-resources (order-independent: distinct sub-paths, each under its own namespace)
-registerRoute({ plugin: 'changes', prefix: '/tasks', router: reviewNotes, note: '/:id/review-notes' })
 registerRoute({ plugin: 'editor', prefix: '/tasks', router: search, note: '/:id/search' })
 registerRoute({ plugin: 'editor', prefix: '/tasks', router: editor, note: '/:id/editor/*' })
-registerRoute({ plugin: 'changes', prefix: '/tasks', router: localGit, note: '/:id/local/*' })
 registerRoute({ plugin: 'database', prefix: '/tasks', router: database, note: '/:id/database/*' })
 
 // /v2/p/docker/* — the local docker daemon surface

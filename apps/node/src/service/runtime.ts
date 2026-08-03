@@ -8,6 +8,10 @@ import type { DesktopCapabilities } from '@acorn/protocol/desktopCapabilities.ts
 import type { ServiceEndpoint, ServiceStartConfig, ServiceStartResult, ServiceState } from '@acorn/protocol/serviceProtocol.ts'
 import { resolveDeviceToken } from '@acorn/node-core/server/auth/deviceTokens.ts'
 import { CapabilityRegistry } from '@acorn/node-core/server/plugin/capabilities.ts'
+import { NodeEventBus } from '@acorn/node-core/server/plugin/events.ts'
+import { initPlugins } from '@acorn/node-core/server/plugin/host.ts'
+import { createCoreServices } from '@acorn/node-core/main/core/index.ts'
+import { nodePlugins } from '../server/plugins'
 import { makeRuntime, startListener } from '@acorn/node-core/main/server.ts'
 import { openDataRoot, type DataRoot } from '@acorn/node-core/main/dataRoot.ts'
 import { launcherSpec, serverName } from '@acorn/node-core/main/mcpRegister.ts'
@@ -222,6 +226,12 @@ export async function startServiceRuntime({ config, desktop, stateChanged }: Run
     // runtime rather than by the module, so a process that starts the service more than once (the
     // tests do) gets a clean graph each time instead of "capability already provided".
     const capabilities = new CapabilityRegistry()
+    const events = new NodeEventBus()
+    const core = createCoreServices({ secrets: runtime.SECRETS, db })
+    // Awaited before the listener binds: a plugin's init opens and migrates its own SQLite file, so a
+    // request must not be able to arrive first (server/plugin/host.ts).
+    const plugins = await initPlugins(nodePlugins(config.dataDir), { capabilities, events, core })
+    if (plugins.skipped.length) console.log(`[service:boot] plugins disabled for this node: ${plugins.skipped.join(', ')}`)
 
     const knowledge = registerKnowledgeIpc(db, config.dataDir, {
       sendToAgent,

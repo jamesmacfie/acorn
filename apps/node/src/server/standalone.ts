@@ -14,6 +14,11 @@ import './routes' // register plugin-owned HTTP routers into the core route regi
 import { devDataDir, makeRuntime, startListener } from '@acorn/node-core/main/server.ts'
 import { openDataRoot } from '@acorn/node-core/main/dataRoot.ts'
 import { resolveDeviceToken } from '@acorn/node-core/server/auth/deviceTokens.ts'
+import { createCoreServices } from '@acorn/node-core/main/core/index.ts'
+import { CapabilityRegistry } from '@acorn/node-core/server/plugin/capabilities.ts'
+import { NodeEventBus } from '@acorn/node-core/server/plugin/events.ts'
+import { initPlugins } from '@acorn/node-core/server/plugin/host.ts'
+import { nodePlugins } from './plugins'
 import { wireServerBridges } from '../wiring/serverBridges'
 import { prepareSecurityState } from '../wiring/startupSecurity'
 
@@ -27,7 +32,15 @@ const root = openDataRoot(process.env.ACORN_DATA_DIR || devDataDir())
 const runtime = makeRuntime(root)
 await prepareSecurityState(runtime)
 await runtime.IDEMPOTENCY.cleanupExpired() // reclaim yesterday's replay rows; see service/runtime.ts
-wireServerBridges(runtime.DB, root.dir) // search / editor / local-git / database / agent-usage HTTP route bridges
+wireServerBridges(runtime.DB, root.dir) // search / editor / database / agent-usage HTTP route bridges
+// Converted plugins register their own routes and open their own SQLite files here. A standalone node
+// runs the SAME list as the supervised one — the difference is only which engine bridges get filled,
+// so a plugin that needs no DesktopCapabilities works identically over the LAN.
+await initPlugins(nodePlugins(root.dir), {
+  capabilities: new CapabilityRegistry(),
+  events: new NodeEventBus(),
+  core: createCoreServices({ secrets: runtime.SECRETS, db: runtime.DB }),
+})
 
 // Awaited, not fire-and-forget: there is nothing to hand back until the listener has bound, and a
 // listen failure now exits non-zero with its reason instead of leaving a process alive that answers

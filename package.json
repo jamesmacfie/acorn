@@ -12,13 +12,14 @@
     "rebuild": "pnpm --filter @acorn/desktop electron:rebuild",
     "rebuild:node": "node scripts/rebuild-node-abi.mjs",
     "dev:node": "pnpm --filter @acorn/node dev:node",
-    "db:generate": "pnpm --filter @acorn/node-core db:generate",
+    "db:generate": "node scripts/db.mjs generate",
     "db:locate": "pnpm --filter @acorn/node-core db:locate",
     "db:migrate": "pnpm --filter @acorn/node-core db:migrate",
-    "db:check": "pnpm --filter @acorn/node-core db:check"
+    "db:check": "node scripts/db.mjs check"
   },
   "devDependencies": {
     "better-sqlite3": "^12.11.1",
+    "drizzle-kit": "^0.31.10",
     "node-pty": "^1.0.0",
     "turbo": "^2"
   }

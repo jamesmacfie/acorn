@@ -1,9 +1,18 @@
+import { mkdtempSync, rmSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import { Hono } from 'hono'
-import { describe, expect, it } from 'vitest'
+import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import '../../src/server/providers'
 import '../../src/server/routes'
+import { nodePlugins } from '../../src/server/plugins'
 import { createApp } from '@acorn/node-core/server/index.ts'
+import { createCoreServices, SecretService } from '@acorn/node-core/main/core/index.ts'
 import type { AppEnv } from '@acorn/node-core/server/middleware/auth.ts'
+import { CapabilityRegistry } from '@acorn/node-core/server/plugin/capabilities.ts'
+import { NodeEventBus } from '@acorn/node-core/server/plugin/events.ts'
+import { initPlugins } from '@acorn/node-core/server/plugin/host.ts'
+import { makeTestDb, type TestDb } from '@acorn/node-core/server/routes/testDb.ts'
 import { RouteRegistry, routeMountPath } from '@acorn/node-core/server/routeRegistry.ts'
 
 describe('plugin route registry', () => {
@@ -110,13 +119,31 @@ const MOUNTED_PLUGIN_ROUTES: ReadonlyArray<readonly [method: string, path: strin
 ]
 
 describe('assembled routes', () => {
-  const routes = createApp().routes
+  // Converted plugins register their routes in init(), so the mount table is only complete after the
+  // plugin host has run — the same order the composition root uses (routes before the listener binds).
+  let core: TestDb
+  let dataDir: string
+  beforeAll(async () => {
+    core = makeTestDb()
+    dataDir = mkdtempSync(join(tmpdir(), 'acorn-routes-'))
+    await initPlugins(nodePlugins(dataDir), {
+      capabilities: new CapabilityRegistry(),
+      events: new NodeEventBus(),
+      core: createCoreServices({ secrets: new SecretService('0'.repeat(64)), db: core.db }),
+    })
+  })
+  afterAll(() => {
+    core.cleanup()
+    rmSync(dataDir, { recursive: true, force: true })
+  })
+
+  const routes = () => createApp().routes
 
   it.each([...MOUNTED_CORE_ROUTES, ...MOUNTED_PLUGIN_ROUTES])('mounts %s %s', (method, path) => {
-    expect(routes.some((route) => route.method === method && route.path === path)).toBe(true)
+    expect(routes().some((route) => route.method === method && route.path === path)).toBe(true)
   })
 
   it('leaves nothing behind on the V1 /api prefix', () => {
-    expect(routes.filter((route) => route.path.startsWith('/api'))).toEqual([])
+    expect(routes().filter((route) => route.path.startsWith('/api'))).toEqual([])
   })
 })

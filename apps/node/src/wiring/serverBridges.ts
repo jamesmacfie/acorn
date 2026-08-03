@@ -10,13 +10,11 @@ import { setAgentUsageBridge } from '@acorn/plugin-agents/server/routes/usage.ts
 import { setDatabaseBridge } from '@acorn/plugin-database/server/routes/database.ts'
 import { setDockerBridge } from '@acorn/plugin-docker/server/routes/docker.ts'
 import { setEditorBridge } from '@acorn/plugin-editor/server/routes/editor.ts'
-import { setLocalGitBridge } from '@acorn/plugin-changes/server/routes/localGit.ts'
 import { setSearchBridge } from '@acorn/plugin-editor/server/routes/search.ts'
 import { databaseBridge } from '@acorn/plugin-database/main/database.ts'
 import { dockerBridge } from '@acorn/plugin-docker/main/dockerBridge.ts'
 import { registerDockerWsChannel } from '@acorn/plugin-docker/main/wsChannel.ts'
 import { editorBridge } from '@acorn/plugin-editor/main/editor.ts'
-import { localGitBridge } from '@acorn/plugin-changes/main/localGit.ts'
 import { searchBridge } from '@acorn/plugin-editor/main/search.ts'
 import { createAgentUsageService } from '@acorn/plugin-agents/main/usage/service.ts'
 import { readAgentPricingPreferences } from '@acorn/plugin-agents/server/pricingStore.ts'
@@ -28,7 +26,6 @@ export function wireServerBridges(db: AppDatabase, dataDir: string): void {
   }))
   setSearchBridge(searchBridge(db))
   setEditorBridge(editorBridge(db))
-  setLocalGitBridge(localGitBridge(db))
   setDatabaseBridge(databaseBridge(db))
   setDockerBridge(dockerBridge(db))
   registerDockerWsChannel()
