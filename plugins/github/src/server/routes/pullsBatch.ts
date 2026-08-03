@@ -10,6 +10,7 @@ import { respondError } from '@acorn/node-core/server/respond.ts'
 import { PULLS_STALE_AFTER_MS } from '@acorn/node-core/server/sync/policy.ts'
 import { fetchFiles, mirrorFiles, mirrorPr, PR_FRAGMENT, readComposite, readFiles, type GqlPull } from './prMirror'
 import { resolveRepoForUser } from './repoMirror'
+import { githubToken } from '../githubToken'
 
 // Batch prefetch — warm the mirror for several open PRs at once so client navigation is instant.
 // Detail is one multi-alias GraphQL call for all stale PRs (one GitHub round-trip); files stay N
@@ -26,6 +27,7 @@ const isFilesMode = (value: unknown): value is PullBatchFilesMode =>
 
 export const pullsBatch = new Hono<AppEnv>().post('/:owner/:repo/pulls/batch', async (c) => {
   const user = getUser(c)
+  const token = await githubToken(c)
 
   const owner = c.req.param('owner')
   const repo = c.req.param('repo')
@@ -39,7 +41,7 @@ export const pullsBatch = new Hono<AppEnv>().post('/:owner/:repo/pulls/batch', a
 
   const db = getDb(c.env)
   const userId = user.login
-  const resolved = await resolveRepoForUser(db, user.token, userId, owner, repo)
+  const resolved = await resolveRepoForUser(db, token, userId, owner, repo)
   if (!resolved.ok) return respondError(c, resolved.failure.status, resolved.failure.error)
   const { repoId } = resolved.value
 
@@ -72,7 +74,7 @@ query Batch($owner: String!, $repo: String!, ${varDecls}) {
     const variables: Record<string, unknown> = { owner, repo }
     staleDetail.forEach((n, i) => (variables[`n${i}`] = n))
 
-    const res = await ghGraphQL(user.token, query, variables)
+    const res = await ghGraphQL(token, query, variables)
     const err = ghError(res)
     if (err) return respondError(c, err.status, err.error)
     const json = (await res.json()) as {
@@ -94,7 +96,7 @@ query Batch($owner: String!, $repo: String!, ${varDecls}) {
 
   // Files: parallel REST (can't be aliased); a single failed fetch just omits that PR's files.
   if (staleFiles.length) {
-    const fetched = await Promise.allSettled(staleFiles.map((n) => fetchFiles(user.token, owner, repo, n)))
+    const fetched = await Promise.allSettled(staleFiles.map((n) => fetchFiles(token, owner, repo, n)))
     await Promise.all(
       fetched.map((r, i) => {
         if (r.status !== 'fulfilled' || !r.value.ok) return undefined

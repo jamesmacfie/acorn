@@ -11,6 +11,7 @@ import { type Cached, serveThenRevalidate } from '@acorn/node-core/server/sync/e
 import { PULLS_STALE_AFTER_MS } from '@acorn/node-core/server/sync/policy.ts'
 import { refreshOpenPulls } from './pullRefresh'
 import { resolveRepoForUser } from './repoMirror'
+import { githubToken } from '../githubToken'
 
 // PR list for a repo (docs/caching.md serve-then-revalidate, via server/sync/engine.ts). PR data is
 // "fast-changing": short TTL + conditional If-None-Match. The list ETag lives in sync_state (no
@@ -33,6 +34,7 @@ type GitHubPull = {
 
 export const pulls = new Hono<AppEnv>().get('/:owner/:repo/pulls', async (c) => {
   const user = getUser(c)
+  const token = await githubToken(c)
 
   const db = getDb(c.env)
   const userId = user.login
@@ -41,7 +43,7 @@ export const pulls = new Hono<AppEnv>().get('/:owner/:repo/pulls', async (c) => 
   // open | closed (closed covers merged — GitHub's list reports merged PRs as "closed").
   const state = c.req.query('state') === 'closed' ? 'closed' : 'open'
 
-  const resolved = await resolveRepoForUser(db, user.token, userId, owner, repo)
+  const resolved = await resolveRepoForUser(db, token, userId, owner, repo)
   if (!resolved.ok) return respondError(c, resolved.failure.status, resolved.failure.error)
   const repoId = resolved.value.repoId
 
@@ -51,7 +53,7 @@ export const pulls = new Hono<AppEnv>().get('/:owner/:repo/pulls', async (c) => 
   if (state === 'closed') {
     const page = Math.max(1, Math.trunc(Number(c.req.query('page'))) || 1)
     const res = await gh(
-      user.token,
+      token,
       `/repos/${owner}/${repo}/pulls?state=closed&sort=updated&direction=desc&per_page=${CLOSED_PAGE_SIZE}&page=${page}`,
     )
     const err = ghError(res)
@@ -82,7 +84,7 @@ export const pulls = new Hono<AppEnv>().get('/:owner/:repo/pulls', async (c) => 
     return { data: await readPublicRows(), fetchedAt: sync.fetchedAt }
   }
 
-  const refresh = () => refreshOpenPulls(user.token, db, { userId, repoId, owner, repo })
+  const refresh = () => refreshOpenPulls(token, db, { userId, repoId, owner, repo })
 
   const result = await serveThenRevalidate({
     resource,
