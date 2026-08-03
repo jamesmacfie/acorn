@@ -9,6 +9,9 @@ import { drizzle } from 'drizzle-orm/better-sqlite3'
 import { migrate } from 'drizzle-orm/better-sqlite3/migrator'
 import { type AppDatabase, schema } from '../server/db'
 import { activeIdentityStore, type ActiveIdentityStore } from './activeIdentity'
+import { deviceService, type DeviceService } from '../server/auth/deviceTokens'
+import { idempotencyStore, type IdempotencyStore } from '../server/auth/idempotency'
+import { pairingCodes, type PairingCodes } from '../server/auth/pairingCodes'
 
 // The runtime object the routes read via c.env (typed as the global Env in env.d.ts). Built once
 // at startup and handed to the Hono app at the single app.fetch() seam in main/server.ts.
@@ -31,6 +34,11 @@ export type RuntimeBindings = {
   // clears it. Machine callers fail closed when no identity is bound instead of selecting an
   // arbitrary cached prefs/repo row.
   ACTIVE_IDENTITY: ActiveIdentityStore
+  // vNext auth root (docs/vNext/protocol.md § Pairing): paired devices and their revocable bearer
+  // tokens, the replay store behind Idempotency-Key, and the one-time pairing window.
+  DEVICES: DeviceService
+  IDEMPOTENCY: IdempotencyStore
+  PAIRING_CODES: PairingCodes
 }
 
 // What routes actually see as `c.env`. Was an ambient `declare global { interface Env }` in
@@ -231,5 +239,8 @@ export function makeBindings({ dbPath, blobsDir, nodeId }: BindingsOptions): Run
     GITHUB_CLIENT_SECRET: secret('GITHUB_CLIENT_SECRET'),
     INTERNAL_TOKEN: loadOrCreateInternalToken(dataDir),
     ACTIVE_IDENTITY: activeIdentityStore(dataDir),
+    DEVICES: deviceService(db),
+    IDEMPOTENCY: idempotencyStore(db),
+    PAIRING_CODES: pairingCodes(),
   }
 }
