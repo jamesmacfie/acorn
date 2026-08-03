@@ -7,7 +7,7 @@
     "dev": "turbo run dev",
     "lint": "turbo run lint",
     "test": "node scripts/rebuild-node-abi.mjs && turbo run test --concurrency=6",
-    "dist": "pnpm --filter @acorn/node build && pnpm --filter @acorn/desktop dist",
+    "dist": "pnpm --filter @acorn/desktop dist",
     "release": "pnpm dist",
     "rebuild": "pnpm --filter @acorn/desktop electron:rebuild",
     "rebuild:node": "node scripts/rebuild-node-abi.mjs",

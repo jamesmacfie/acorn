@@ -6,7 +6,7 @@ import '../server/routes'
 import '../wiring/agentProfiles'
 import type { DesktopCapabilities } from '@acorn/protocol/desktopCapabilities.ts'
 import type { ServiceEndpoint, ServiceStartConfig, ServiceStartResult, ServiceState } from '@acorn/protocol/serviceProtocol.ts'
-import type { DeviceService } from '@acorn/node-core/server/auth/deviceTokens.ts'
+import { resolveDeviceToken } from '@acorn/node-core/server/auth/deviceTokens.ts'
 import { makeRuntime, startListener } from '@acorn/node-core/main/server.ts'
 import { openDataRoot, type DataRoot } from '@acorn/node-core/main/dataRoot.ts'
 import { launcherSpec, serverName } from '@acorn/node-core/main/mcpRegister.ts'
@@ -85,19 +85,6 @@ function closeListener(server: ServerType | null): Promise<void> {
     httpServer.closeIdleConnections?.()
     httpServer.closeAllConnections?.()
   })
-}
-
-// The local bundle pairs without a code: the client spawned this node, which is proof enough of
-// owner intent (docs/vNext/protocol.md § Pairing, "Local bundle: no code").
-//
-// The client passes back the token it remembered, and we reuse it when it still authenticates — so
-// the steady state is ONE device row, not one per launch — and issue a fresh one otherwise (first
-// run, a reset data root, or a device the owner revoked). The service never persists it; custody
-// belongs to the client, which holds it in the OS keychain.
-async function resolveLocalDeviceToken(devices: DeviceService, remembered: string | undefined): Promise<string> {
-  if (remembered && (await devices.authenticate(remembered))) return remembered
-  const { token } = await devices.issue('This computer')
-  return token
 }
 
 // Electron-free composition root. This process exclusively owns SQLite, Hono/WS, PTYs, workflow
@@ -324,7 +311,12 @@ export async function startServiceRuntime({ config, desktop, stateChanged }: Run
         nodeId: dataRoot.nodeId,
         endpoint,
         ...identity,
-        deviceToken: await resolveLocalDeviceToken(runtime.DEVICES, config.deviceToken),
+        // The local bundle pairs without a code: the client spawned this node, which is proof enough
+        // of owner intent (docs/vNext/protocol.md § Pairing, "Local bundle: no code"). The client
+        // passes back the token it remembered from the OS keychain, and resolveDeviceToken reuses it
+        // when it still authenticates, so the steady state is ONE device row rather than one per
+        // launch. The service never persists it — custody belongs to the client.
+        deviceToken: await resolveDeviceToken(runtime.DEVICES, config.deviceToken, 'This computer'),
       },
     }
   } catch (error) {

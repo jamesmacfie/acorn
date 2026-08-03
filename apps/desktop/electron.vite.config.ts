@@ -43,21 +43,24 @@ const stageMigrations = () => ({
   },
 })
 
-// service.js and mcp.js are built by @acorn/node, not here: apps/desktop must never import
-// apps/node source (docs/vNext/architecture.md, enforced by tools/arch/boundaries.test.ts), so it
-// embeds the built artifact instead. Copy it next to index.js, which is where main/bootstrap.ts
-// forks it from (`join(import.meta.dirname, 'service.js')`) and where mcpRegister points agents.
-// turbo's `build` task depends on `^build`, and @acorn/node is a devDependency, so the artifact
-// exists by the time this runs.
+// service.js, mcp.js and standalone.js are built by @acorn/node, not here: apps/desktop must never
+// import apps/node source (docs/vNext/architecture.md, enforced by tools/arch/boundaries.test.ts), so
+// it embeds the built artifacts instead. Copy them next to index.js, which is where main/bootstrap.ts
+// spawns service.js from (`join(import.meta.dirname, 'service.js')`) and where mcpRegister points
+// agents.
+//
+// This copies whatever is on disk and can only detect an artifact that is MISSING, never one that is
+// stale — which is why every script that reaches electron-vite (`dev`, `build`, `test:e2e`) runs
+// `build:service` first. Relying on turbo's `^build` edge was not enough: `pnpm --filter
+// @acorn/desktop test:e2e` invokes the package script directly, with no turbo in the chain, and
+// happily staged a 40-minute-old service.js — the e2e suite then tested a service that no longer
+// existed in the source tree.
 const stageNodeArtifact = () => ({
   name: 'acorn:stage-node-artifact',
   closeBundle() {
     const dist = resolve(__dirname, '../node/dist')
     if (!existsSync(resolve(dist, 'service.js'))) {
-      throw new Error(
-        'apps/node/dist/service.js is missing — run `pnpm --filter @acorn/node build` first '
-        + '(turbo does this automatically via the @acorn/node devDependency).',
-      )
+      throw new Error('apps/node/dist/service.js is missing — run `pnpm --filter @acorn/node build` first.')
     }
     cpSync(dist, resolve(__dirname, 'out/main'), { recursive: true })
   },

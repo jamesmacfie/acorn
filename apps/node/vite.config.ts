@@ -7,10 +7,15 @@ import { defineConfig } from 'vite'
 // a child process"), so the two entries the desktop runtime needs are BUILT here and copied into
 // out/main by apps/desktop/electron.vite.config.ts.
 //
-//  - service.js — spawned by Electron main as a child process over ELECTRON_RUN_AS_NODE, with an IPC
-//                 channel on fd 3 (app/main/serviceHost.ts)
-//  - mcp.js     — the acorn MCP server (docs/mcp.md), launched by agents via
-//                 ELECTRON_RUN_AS_NODE=1 <electron> out/main/mcp.js, never by the app itself
+//  - service.js    — spawned by Electron main as a child process over ELECTRON_RUN_AS_NODE, with an
+//                    IPC channel on fd 3 (apps/desktop/src/app/main/serviceHost.ts)
+//  - mcp.js        — the acorn MCP server (docs/mcp.md), launched by agents via
+//                    ELECTRON_RUN_AS_NODE=1 <electron> out/main/mcp.js, never by the app itself
+//  - standalone.js — a node with no supervisor: it opens ACORN_DATA_DIR itself and prints its
+//                    endpoint/pin/token as one JSON line (src/server/standalone.ts). Built here rather
+//                    than run from source so anything that can spawn a Node process can start a node —
+//                    which is what the two-node e2e does, and what the Phase 5 standalone
+//                    distribution needs.
 //
 // Externalization rule, identical to the desktop main build: bundle our own source (relative
 // imports AND @acorn/* workspace packages), keep every other bare/node: specifier external so it
@@ -55,6 +60,7 @@ export default defineConfig({
       input: {
         service: resolve(__dirname, 'src/service/index.ts'),
         mcp: resolve(__dirname, '../../packages/node-core/src/mcp/main.ts'),
+        standalone: resolve(__dirname, 'src/server/standalone.ts'),
       },
       // node: builtins are listed explicitly as well as caught by the predicate, so a bare
       // `import 'path'` (no node: prefix) can never be bundled either.

@@ -5,14 +5,15 @@
   "type": "module",
   "main": "out/main/index.js",
   "scripts": {
-    "dev": "electron-vite build && pnpm run check:runtime-syntax && electron-vite preview",
-    "build": "electron-vite build && pnpm run check:runtime-syntax && node scripts/check-renderer-budget.mjs",
+    "dev": "pnpm run build:service && electron-vite build && pnpm run check:runtime-syntax && electron-vite preview",
+    "build": "pnpm run build:service && electron-vite build && pnpm run check:runtime-syntax && node scripts/check-renderer-budget.mjs",
     "dist": "pnpm run build && electron-builder --mac",
     "electron:dev": "electron-vite dev",
     "electron:rebuild": "electron-rebuild -f -w better-sqlite3,node-pty",
     "lint": "tsc --noEmit",
     "test": "vitest run",
-    "test:e2e": "electron-vite build && pnpm run check:runtime-syntax && electron-rebuild -f -w better-sqlite3,node-pty && playwright test -c playwright.e2e.config.ts",
+    "test:e2e": "pnpm run build:service && electron-vite build && pnpm run check:runtime-syntax && electron-rebuild -f -w better-sqlite3,node-pty && playwright test -c playwright.e2e.config.ts",
+    "build:service": "pnpm --filter @acorn/node build",
     "check:runtime-syntax": "node scripts/check-runtime-syntax.mjs"
   },
   "dependencies": {

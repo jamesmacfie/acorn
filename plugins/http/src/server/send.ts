@@ -1,5 +1,5 @@
 // The API panel's request executor. Runs in the Hono server, which is a plain Node process (under
-// Electron via app/main/bootstrap.ts, under `dev:node` via app/server/devNode.ts) — so this needs no
+// Electron via apps/desktop's main/bootstrap.ts, otherwise via apps/node's server/standalone.ts) — so this needs no
 // bridge. A bridge exists to hold a stateful Node handle (a pg.Pool, a PTY); fetch is stateless.
 import { execFile } from 'node:child_process'
 import { promisify } from 'node:util'
