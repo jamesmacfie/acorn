@@ -25,6 +25,9 @@ nothing until there is a remote node whose link is slow enough to need credit. T
 Phase 4 (plan.md § 118).
 
 **`Idempotency-Key` policy is `optional` everywhere, never `required` per endpoint.**
+> **Still open after Phase 2**, deliberately: no client call site sends a key today, so declaring
+> routes `required` would break create-PR/post-comment/send-agent-turn. The route declaration and the
+> client call sites have to land together.
 protocol.md says endpoints with external side effects (create PR, post comment, send agent turn)
 *require* the header. The middleware honours a key whenever one is present and never demands one
 (`server/middleware/idempotency.ts`). Requiring it per endpoint needs a per-route declaration, and the
@@ -46,6 +49,9 @@ envelope to add and no 34 query factories to unwrap. The server-side `sync_state
 unchanged and still governs serve-then-revalidate.
 
 **The internal principal can now reach GitHub — a posture change, not an oversight.**
+> **Reversed in Phase 2.** A `task`-scoped credential is denied the GitHub credential; the `service`
+> scope keeps it, which is what let the gate land without breaking `seedTaskNotes`. See
+> [phase2-notes.md](./phase2-notes.md).
 V1's internal principal carried a `SessionUser` whose `token` was `''`, so an agent-spawned child was
 *structurally* unable to call GitHub. Moving the credential to a stored `integrations` row removed that
 property: `githubToken(c)` reads the row for `ownerId(c)`, `ownerId` returns `principal.userId` for either
@@ -57,6 +63,9 @@ decision that should be made explicitly rather than inherited. The kind gates th
 `plugins/http`'s `send` (⇒ `device`).
 
 **Internal tokens are still V1's single persisted token, not scoped and expiring.**
+> **Resolved in Phase 2** — scoped `service`/`task` HMAC tokens
+> (`server/auth/internalTokens.ts`). Expiry is still deliberately absent; see
+> [phase2-notes.md](./phase2-notes.md).
 protocol.md § Transport describes internal tokens as "task- or session-scoped, expiring, and
 restricted". What exists is one `INTERNAL_TOKEN` per data root, persisted deliberately so a tmux
 session reattached after a restart keeps working (`main/bindings.ts`). It is route-restricted in the
