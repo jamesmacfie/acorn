@@ -1,7 +1,7 @@
 import { and, eq } from 'drizzle-orm'
 import type { AppDatabase } from '@acorn/node-core/server/db/index.ts'
 import { schema } from '@acorn/node-core/server/db/index.ts'
-import { decryptSecret, encryptSecret } from '@acorn/node-core/server/session.ts'
+import { decryptSecret, encryptSecret } from '@acorn/node-core/server/secretBox.ts'
 
 const LEGACY_USER = '__legacy_unscoped__'
 

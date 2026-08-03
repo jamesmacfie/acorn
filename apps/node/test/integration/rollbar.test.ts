@@ -10,7 +10,7 @@ import type {
 import { getDb, schema } from '@acorn/node-core/server/db/index.ts'
 import type { AppEnv } from '@acorn/node-core/server/middleware/auth.ts'
 import { rollbarFetch } from '@acorn/plugin-rollbar/server/index.ts'
-import { encryptSecret } from '@acorn/node-core/server/session.ts'
+import { encryptSecret } from '@acorn/node-core/server/secretBox.ts'
 import { ROLLBAR_ITEMS_STALE_AFTER_MS } from '@acorn/node-core/server/sync/policy.ts'
 import { settleBackground } from '@acorn/node-core/server/background.ts'
 import { integrations } from '@acorn/node-core/server/routes/integrations.ts'

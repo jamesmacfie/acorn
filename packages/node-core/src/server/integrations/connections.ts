@@ -5,7 +5,7 @@ import type { ExternalRef, ProviderErrorCode } from '@acorn/protocol/integration
 import type { AppDatabase } from '../db'
 import { schema } from '../db'
 import { cascadeDeleteIntegration } from '../db/cascade'
-import { decryptSecret, encryptSecret } from '../session'
+import { decryptSecret, encryptSecret } from '../secretBox'
 import { connectionProviderRegistry } from './connectionRegistry'
 import { integrationProviderRegistry } from './registry'
 import { providerRequestScheduler } from './budgetRuntime'

@@ -7,7 +7,7 @@ import { linearFetch, type LinearNode } from '@acorn/plugin-linear/server/index.
 import { linearProvider, linearRef } from '@acorn/plugin-linear/server/provider.ts'
 import '../../src/server/providers'
 import type { AppEnv } from '@acorn/node-core/server/middleware/auth.ts'
-import { encryptSecret } from '@acorn/node-core/server/session.ts'
+import { encryptSecret } from '@acorn/node-core/server/secretBox.ts'
 import { linear } from '@acorn/plugin-linear/server/routes/linear.ts'
 import { makeTestDb, type TestDb } from '@acorn/node-core/server/routes/testDb.ts'
 import type { Env } from '@acorn/node-core/main/bindings.ts'
