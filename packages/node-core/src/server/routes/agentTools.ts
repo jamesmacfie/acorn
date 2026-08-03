@@ -12,7 +12,7 @@ import {
 } from '../agentTools/registry'
 import { getDb, schema } from '../db'
 import type { AppEnv } from '../middleware/auth'
-import { ownerId } from '../middleware/requireUser'
+import { mayActOnTask, ownerId } from '../middleware/requireUser'
 import { respondError } from '../respond'
 import { decodeToolCeiling, isToolWithinCeiling, type ToolCeiling } from '@acorn/protocol/workflow.ts'
 
@@ -57,14 +57,22 @@ export function mcpInputSchema(input: AgentToolContribution['input']): Record<st
 }
 
 async function invoke(c: Context<AppEnv>, opts: { renderer: boolean }): Promise<Response> {
-  const registry = getAgentTools()
-  if (!registry) return respondError(c, 503, 'bridge-unavailable')
+  // Authorize BEFORE checking whether the registry is wired: a caller with no right to this task must
+  // not learn from a 503 whether the tool surface exists on this node.
   const principal = c.get('principal')
   // 'device' is the interactive owner (the client's broker holds the bearer); 'internal' is a child this
   // node spawned. The two surfaces are mutually exclusive on purpose — an agent must not reach the
   // renderer-only tools, and the renderer must not impersonate an agent. This read 'user' before the
   // session cookie died; 'device' is the same distinction under the credential that replaced it.
   if (opts.renderer ? principal?.kind !== 'device' : principal?.kind !== 'internal') return respondError(c, 404, 'not_found')
+  // Task scope enforced against the CREDENTIAL, not the URL. toolContext() below reads the taskId from
+  // the path, so before internal tokens carried a task a credential minted for task A could invoke task
+  // B's tools — the token said nothing about which task it belonged to
+  // (server/auth/internalTokens.ts). 404, matching every other denial here, so the surface reveals
+  // nothing about which tasks exist.
+  if (!mayActOnTask(c, c.req.param('id')!)) return respondError(c, 404, 'not_found')
+  const registry = getAgentTools()
+  if (!registry) return respondError(c, 503, 'bridge-unavailable')
   const tool = registry.find((candidate) => candidate.name === c.req.param('name'))
   if (!tool || (opts.renderer && !tool.exposeToRenderer)) return respondError(c, 404, 'not_found')
   const perms = await loadPerms(c)
@@ -85,9 +93,11 @@ export const agentTools = new Hono<AppEnv>()
   // MCP/harness projection: INTERNAL_TOKEN only. Cookie-authenticated renderer calls have their
   // own opt-in path below, where exposeToRenderer is enforced.
   .get('/:id/tools', async (c) => {
+    // Same order as invoke(): authorize, then check availability.
+    if (c.get('principal')?.kind !== 'internal') return respondError(c, 404, 'not_found')
+    if (!mayActOnTask(c, c.req.param('id')!)) return respondError(c, 404, 'not_found')
     const registry = getAgentTools()
     if (!registry) return respondError(c, 503, 'bridge-unavailable')
-    if (c.get('principal')?.kind !== 'internal') return respondError(c, 404, 'not_found')
     const perms = await loadPerms(c)
     const ctx = toolContext(c)
     const availability: AvailabilityCache = new Map()

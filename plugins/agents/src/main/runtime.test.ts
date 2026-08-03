@@ -212,7 +212,7 @@ describe('managed agent runtime conformance', () => {
     runtime = new ManagedAgentRuntime({
       db: testDb.db,
       dataDir,
-      internalApiEnv: {},
+      internalEnv: () => ({}),
       secrets: SECRETS,
       currentUserId: () => null,
       registry,
@@ -254,7 +254,7 @@ describe('managed agent runtime conformance', () => {
     runtime = new ManagedAgentRuntime({
       db: testDb.db,
       dataDir,
-      internalApiEnv: {},
+      internalEnv: () => ({}),
       secrets: SECRETS,
       currentUserId: () => null,
       registry,
@@ -292,7 +292,7 @@ describe('managed agent runtime conformance', () => {
     runtime = new ManagedAgentRuntime({
       db: testDb.db,
       dataDir,
-      internalApiEnv: {},
+      internalEnv: () => ({}),
       secrets: SECRETS,
       currentUserId: () => null,
       registry: new AgentDriverRegistry(),
@@ -339,7 +339,7 @@ describe('managed agent runtime conformance', () => {
     runtime = new ManagedAgentRuntime({
       db: testDb.db,
       dataDir,
-      internalApiEnv: {},
+      internalEnv: () => ({}),
       secrets: SECRETS,
       currentUserId: () => null,
       registry,
@@ -366,7 +366,7 @@ describe('managed agent runtime conformance', () => {
     runtime = new ManagedAgentRuntime({
       db: testDb.db,
       dataDir,
-      internalApiEnv: {},
+      internalEnv: () => ({}),
       secrets: SECRETS,
       currentUserId: () => null,
       registry: new AgentDriverRegistry(),
@@ -410,7 +410,7 @@ describe('managed agent runtime conformance', () => {
     runtime = new ManagedAgentRuntime({
       db: testDb.db,
       dataDir,
-      internalApiEnv: {},
+      internalEnv: () => ({}),
       secrets: SECRETS,
       currentUserId: () => null,
       registry,
@@ -448,7 +448,7 @@ describe('managed agent runtime conformance', () => {
     runtime = new ManagedAgentRuntime({
       db: testDb.db,
       dataDir,
-      internalApiEnv: {},
+      internalEnv: () => ({}),
       secrets: SECRETS,
       currentUserId: () => null,
       registry,

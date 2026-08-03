@@ -7,6 +7,7 @@ import '../wiring/agentProfiles'
 import type { DesktopCapabilities } from '@acorn/protocol/desktopCapabilities.ts'
 import type { ServiceEndpoint, ServiceStartConfig, ServiceStartResult, ServiceState } from '@acorn/protocol/serviceProtocol.ts'
 import { resolveDeviceToken } from '@acorn/node-core/server/auth/deviceTokens.ts'
+import { mintInternalToken, type InternalEnvFactory } from '@acorn/node-core/server/auth/internalTokens.ts'
 import { CapabilityRegistry } from '@acorn/node-core/server/plugin/capabilities.ts'
 import { NodeEventBus } from '@acorn/node-core/server/plugin/events.ts'
 import { initPlugins } from '@acorn/node-core/server/plugin/host.ts'
@@ -212,12 +213,31 @@ export async function startServiceRuntime({ config, desktop, stateChanged }: Run
     // NODE_EXTRA_CA_CERTS is how a child trusts the node's self-signed certificate with zero code. The
     // certificate is a CA with an IP:127.0.0.1 SAN (main/tls.ts), so the child validates FULLY — no
     // `rejectUnauthorized: false` anywhere. Ceiling documented in mcp/api.ts.
-    const internalApiEnv = {
-      ACORN_API_URL: '',
-      ACORN_API_TOKEN: runtime.INTERNAL_TOKEN,
+    // One factory, not one record. Every child gets a token minted for ITS scope — a PTY, an agent
+    // session and a workflow step are all 'task'-scoped and bound to their own task, while the node's own
+    // loopback calls are 'service' (server/auth/internalTokens.ts). Before this, all five presented the
+    // same node-wide string, so the auth layer could not tell the service from a child an agent spawned.
+    //
+    // INTERNAL_TOKEN is now the signing KEY rather than the credential. It is still persisted across
+    // boots, and for the same reason: an agent pane runs in tmux and is reattached after a restart,
+    // keeping the environment of the boot that spawned it. A per-boot key would 404 every reattached
+    // session's MCP / notes / memory / context calls.
+    //
+    // ACORN_API_URL is mutable on purpose — the listener's origin is not known until it binds, and every
+    // consumer calls this factory at spawn time rather than at wire time. ACORN_DATA_DIR is the stable
+    // thing a long-lived child needs: mcp/api.ts resolves the current port from <dataDir>/node.json,
+    // because the port is ephemeral now and a baked URL would point at nothing after a restart.
+    //
+    // NODE_EXTRA_CA_CERTS is how a child trusts the node's self-signed certificate with zero code. The
+    // certificate is a CA with an IP:127.0.0.1 SAN (main/tls.ts), so the child validates FULLY — no
+    // `rejectUnauthorized: false` anywhere. Ceiling documented in mcp/api.ts.
+    let apiUrl = ''
+    const internalEnv: InternalEnvFactory = (claims) => ({
+      ACORN_API_URL: apiUrl,
+      ACORN_API_TOKEN: mintInternalToken(runtime.INTERNAL_TOKEN, claims),
       ACORN_DATA_DIR: config.dataDir,
       NODE_EXTRA_CA_CERTS: join(config.dataDir, 'tls', 'cert.pem'),
-    }
+    })
 
     let finishReconcile!: () => void
     const reconciled = new Promise<void>((resolve) => (finishReconcile = resolve))
@@ -252,7 +272,7 @@ export async function startServiceRuntime({ config, desktop, stateChanged }: Run
     managedAgents = wireManagedAgents({
       db,
       dataDir: config.dataDir,
-      internalApiEnv,
+      internalEnv,
       secrets: runtime.SECRETS,
       capabilities,
       currentUserId: () => runtime.ACTIVE_IDENTITY.get(),
@@ -262,17 +282,17 @@ export async function startServiceRuntime({ config, desktop, stateChanged }: Run
       capabilities,
       runtime: runtimeService,
       notesStore: knowledge.notesStore,
-      internalApiEnv,
+      internalEnv,
       reconciled,
       currentUserId: () => runtime.ACTIVE_IDENTITY.get(),
       memoryReviewTrigger: knowledge.memoryReviewTrigger,
     })
     wireServerBridges(db, config.dataDir)
     registerTerminalIpc(db, worktreesDir, {
-      internalApiEnv,
+      internalEnv,
       launchInjector: knowledge.launchInjector,
       memoryReviewTrigger: knowledge.memoryReviewTrigger,
-      seedTaskNotes: (task) => seedTaskNotes(db, knowledge.notesStore, internalApiEnv, task),
+      seedTaskNotes: (task) => seedTaskNotes(db, knowledge.notesStore, internalEnv({ scope: 'service' }), task),
       reconciled,
     })
     mark('install')
@@ -281,7 +301,7 @@ export async function startServiceRuntime({ config, desktop, stateChanged }: Run
     server = listener.server
     endpoint = listener.endpoint
     identity = { fingerprint: listener.fingerprint, certPem: listener.certPem }
-    internalApiEnv.ACORN_API_URL = endpoint.origin
+    apiUrl = endpoint.origin
     stateChanged('listening')
     mark('listener-up')
 

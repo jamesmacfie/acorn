@@ -44,3 +44,37 @@ export const requireDevice = createMiddleware<AppEnv>(async (c, next) => {
   if (principal.kind !== 'device') return respondError(c, 403, 'interactive_user_required')
   await next()
 })
+
+// May this principal use a stored provider credential (a GitHub token, a Linear key)?
+//
+// A device may: every paired device is the owner. The 'service' scope may: the node calls its own HTTP
+// surface over loopback to reuse serve-then-revalidate — plugins/notes' seedTaskNotes does exactly this
+// to warm a cold PR mirror. A 'task'-scoped token may NOT, and that is the posture change Phase 2 makes
+// deliberately.
+//
+// V1 enforced this structurally: the internal principal carried `token: ''`, so an agent-spawned child
+// could not call GitHub at all. Moving the credential into an `integrations` row keyed by owner dropped
+// that property, because ownerId(c) is identical for a device and an internal principal
+// (docs/vNext/phase1-notes.md § "Accepted divergence"). The Phase 1 note recorded two objections to
+// gating it, and scoping answers both: it is no longer "one guard for two different callers" (the
+// service keeps its reach, so seedTaskNotes still works), and while it is true that an agent has a shell
+// with the owner's git credentials and can push anyway, "it could do it another way" is not a reason for
+// the node to hand it a token it never needs.
+export const canUseProviderCredential = (c: Context<AppEnv>): boolean => {
+  const principal = c.get('principal')
+  if (!principal) return false
+  return principal.kind === 'device' || principal.scope === 'service'
+}
+
+// Is this principal entitled to act on `taskId`?
+//
+// A device may act on any task. An internal token may act only on the task it was minted for — and
+// before scoped tokens that comparison was impossible, so routes/agentTools.ts took the taskId from the
+// URL and a credential handed to task A's agent could drive task B's tools. The 'service' scope is
+// unbound because the node's own loopback calls are not task-specific.
+export const mayActOnTask = (c: Context<AppEnv>, taskId: string): boolean => {
+  const principal = c.get('principal')
+  if (!principal) return false
+  if (principal.kind === 'device' || principal.scope === 'service') return true
+  return !!principal.taskId && principal.taskId === taskId
+}

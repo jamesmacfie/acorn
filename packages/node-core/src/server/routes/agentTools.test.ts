@@ -100,7 +100,18 @@ describe('agent-tool harness projection (docs/agent-tools.md)', () => {
     app = new Hono<AppEnv>()
     app.use('/api/*', async (c, next) => {
       const kind = c.req.header('x-test-principal') === 'device' ? 'device' : 'internal'
-      c.set('principal', { kind, userId: 'james' })
+      // An internal principal now carries a scope. These cases address many different task ids, so the
+      // default is the unbound 'service' scope; 'x-test-task' opts into a 'task'-scoped credential bound
+      // to one task, which is what the cross-task case needs.
+      const boundTask = c.req.header('x-test-task')
+      c.set(
+        'principal',
+        kind === 'device'
+          ? { kind, userId: 'james' }
+          : boundTask
+            ? { kind, userId: 'james', scope: 'task' as const, taskId: boundTask }
+            : { kind, userId: 'james', scope: 'service' as const },
+      )
       await next()
     })
     app.route('/api/tasks', agentTools)

@@ -1,14 +1,17 @@
 import { timingSafeEqual } from 'node:crypto'
 import { createMiddleware } from 'hono/factory'
 import type { Env } from '../../main/bindings'
+import { verifyInternalToken, type InternalScope } from '../auth/internalTokens'
 
 // The authenticated caller. Exactly two kinds, and the shape is now the whole of what a route may know
 // about who is asking: an owner id, and (for a device) which device it was.
 //
 //   device   — a paired client's bearer token (docs/vNext/protocol.md § Transport and identity). Full
 //              owner authority, by design: every paired device is the owner.
-//   internal — a child process this node spawned (the MCP server, command-variable executions). Route-
-//              restricted, and structurally unable to reach GitHub because it holds no credential.
+//   internal — a child process this node spawned, or the node calling itself over loopback. Carries a
+//              SCOPE (server/auth/internalTokens.ts): 'service' has full reach, 'task' is bound to one
+//              task and cannot read a provider credential. Before Phase 2 there was one node-wide token
+//              for both, so an agent-spawned child acted with the service's authority.
 //
 // There used to be a third kind, `user`, carrying a whole `SessionUser` decrypted out of a session
 // cookie — including the GitHub token. Both are gone. The cookie is gone because the renderer no longer
@@ -18,32 +21,39 @@ import type { Env } from '../../main/bindings'
 export type PrincipalKind = 'device' | 'internal'
 // `userId` is the owner's login — the scope key for every user-scoped table. `deviceId` is set only for
 // kind 'device'; the internal principal has no device row to revoke.
-export type Principal = { kind: PrincipalKind; userId: string; deviceId?: string }
+export type Principal = {
+  kind: PrincipalKind
+  userId: string
+  deviceId?: string
+  // Set only for kind 'internal'. A route that must not be reachable from an agent-spawned child checks
+  // this rather than the kind — `kind === 'internal'` cannot distinguish the service from an agent.
+  scope?: InternalScope
+  // The task an 'internal' credential is bound to. Route handlers compare it against the task in the
+  // URL; before this existed, a token minted for task A could drive task B's tools.
+  taskId?: string
+  sessionId?: string
+}
 // `requestId` is set by requestIdMiddleware (server/respond.ts) before anything else, and read by
 // every error envelope. It is not optional in practice; a bare test Context is the only way to see
 // it missing, which respondError reports as 'unknown'.
 export type AppEnv = { Bindings: Env; Variables: { principal: Principal | null; requestId: string } }
 
-// Constant-time compare for bearer material. `===` on a secret leaks its length and a prefix-match
-// position through timing; over loopback that is a stretch, but a Node reachable over a LAN
-// (docs/vNext/architecture.md § Topology) makes it a real measurement.
-function secretEquals(presented: string, expected: string): boolean {
-  const a = Buffer.from(presented)
-  const b = Buffer.from(expected)
-  // timingSafeEqual throws on unequal lengths rather than returning false, and the length of a
-  // presented token is not a secret.
-  return a.length === b.length && timingSafeEqual(a, b)
-}
-
-// Internal loopback auth (docs/mcp.md): a child process holds no device token; it sends the persisted
-// INTERNAL_TOKEN instead. The identity is the machine's single owner, resolved from the explicit
-// active-identity binding. Never guess from a first prefs/repo row: after sequential logins that is
-// nondeterministic and can select another identity's mirror — so with nothing bound this fails closed.
+// Internal loopback auth (docs/mcp.md): a child process holds no device token; it presents a scoped
+// internal token instead (server/auth/internalTokens.ts). The identity is the machine's single owner,
+// resolved from the explicit active-identity binding. Never guess from a first prefs/repo row: after
+// sequential logins that is nondeterministic and can select another identity's mirror — so with nothing
+// bound this fails closed.
+//
+// The token is verified by HMAC against INTERNAL_TOKEN, which is now the signing KEY rather than the
+// credential itself. secretEquals is no longer used here; verifyInternalToken does its own
+// constant-time comparison over the signature.
 function internalPrincipal(c: { env: Env; req: { header(name: string): string | undefined } }): Principal | null {
   const token = c.req.header('x-acorn-internal')
-  if (!token || !c.env.INTERNAL_TOKEN || !secretEquals(token, c.env.INTERNAL_TOKEN)) return null
+  if (!token || !c.env.INTERNAL_TOKEN) return null
+  const claims = verifyInternalToken(c.env.INTERNAL_TOKEN, token)
+  if (!claims) return null
   const userId = c.env.ACTIVE_IDENTITY.get()
-  return userId ? { kind: 'internal', userId } : null
+  return userId ? { kind: 'internal', userId, scope: claims.scope, taskId: claims.taskId, sessionId: claims.sessionId } : null
 }
 
 // Device bearer: the client's connection broker in Electron main authenticates with a paired device

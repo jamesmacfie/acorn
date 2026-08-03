@@ -1,3 +1,4 @@
+import { mintInternalToken } from '../server/auth/internalTokens'
 import { createServer, type Server } from 'node:http'
 import type { AddressInfo } from 'node:net'
 import { WebSocket } from 'ws'
@@ -131,13 +132,13 @@ describe('wsHub auth', () => {
   })
 
   it('accepts the internal token', async () => {
-    const ws = await open({ host, 'x-acorn-internal': INTERNAL })
+    const ws = await open({ host, 'x-acorn-internal': mintInternalToken(INTERNAL, { scope: 'service' }) })
     expect(ws.readyState).toBe(WebSocket.OPEN)
     ws.close()
   })
 
   it('rejects a wrong internal token', async () => {
-    await expect(open({ host, 'x-acorn-internal': `${INTERNAL}-wrong` })).rejects.toThrow(/403/)
+    await expect(open({ host, 'x-acorn-internal': `${mintInternalToken(INTERNAL, { scope: 'service' })}-wrong` })).rejects.toThrow(/403/)
   })
 
   it('refuses a revoked bearer at the upgrade itself', async () => {
@@ -147,7 +148,7 @@ describe('wsHub auth', () => {
 
   // A presented-and-rejected credential is a rejection, not an invitation to try the next mechanism.
   it('does not fall back to the internal token when a bearer is present but bad', async () => {
-    await expect(open({ host, authorization: 'Bearer acorn_dt_wrong', 'x-acorn-internal': INTERNAL })).rejects.toThrow(/403/)
+    await expect(open({ host, authorization: 'Bearer acorn_dt_wrong', 'x-acorn-internal': mintInternalToken(INTERNAL, { scope: 'service' }) })).rejects.toThrow(/403/)
   })
 })
 
@@ -196,7 +197,7 @@ describe('wsHub seq and revocation', () => {
   // Revocation is per-device, so an internal-token socket (a child process this node spawned, with no
   // device row) must survive a device being revoked out from under a client.
   it('leaves an internal-token socket alone when a device is revoked', async () => {
-    const ws = await open({ host, 'x-acorn-internal': INTERNAL })
+    const ws = await open({ host, 'x-acorn-internal': mintInternalToken(INTERNAL, { scope: 'service' }) })
     await devices.revoke('d1')
     const got = frames(ws)
     wsBroadcast({ channel: 'term:status' })
