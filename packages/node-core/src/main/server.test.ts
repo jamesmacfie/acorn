@@ -1,4 +1,5 @@
 import { request as httpsRequest } from 'node:https'
+import { createServer as createNetServer } from 'node:net'
 import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -125,5 +126,25 @@ describe('the loopback TLS listener', () => {
 
     const second = await start()
     expect(second.endpoint.port).toBe(port)
+  }, 30_000)
+
+  // …but never at the cost of not starting. The remembered port belongs to whoever holds it now, and an
+  // ephemeral port is a perfectly good endpoint because the client is told where we bound.
+  it('falls back to an ephemeral port when the remembered one is taken', async () => {
+    const first = await start()
+    const port = first.endpoint.port
+    disposeWsHub(first.server as unknown as import('node:http').Server)
+    await new Promise<void>((resolve) => first.server.close(() => resolve()))
+    listener = null
+
+    const squatter = createNetServer()
+    await new Promise<void>((resolve) => squatter.listen(port, '127.0.0.1', resolve))
+    try {
+      const second = await start()
+      expect(second.endpoint.port).not.toBe(port)
+      expect((await probe(second, '/v2/node')).status).toBe(200)
+    } finally {
+      await new Promise<void>((resolve) => squatter.close(() => resolve()))
+    }
   }, 30_000)
 })
