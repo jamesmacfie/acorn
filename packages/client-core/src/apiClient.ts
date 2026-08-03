@@ -155,6 +155,25 @@ export async function readJson<T>(url: string, options: ReadOptions = {}): Promi
   return parseJson<T>(res)
 }
 
+// The one non-JSON read: a download. A route builder's URL can no longer be handed to the browser as
+// an `href` or `src` — under app:// it resolves against the protocol handler, not a node — so a
+// download has to come back as bytes and become a blob URL on this side.
+export async function readBytes(url: string, fallback = 'download failed'): Promise<{ bytes: Uint8Array; type: string; filename: string | null }> {
+  const res = await send(url)
+  if (!res.ok) raise(res, fallback)
+  return {
+    bytes: res.body,
+    type: res.headers['content-type'] ?? 'application/octet-stream',
+    filename: filenameFromDisposition(res.headers['content-disposition']),
+  }
+}
+
+// Only the quoted `filename="…"` form, which is the only form our own routes emit. Anything else is a
+// null and the caller names the file itself — guessing at RFC 5987 for a header we control would be
+// speculative.
+const filenameFromDisposition = (header: string | undefined): string | null =>
+  /filename="([^"]+)"/.exec(header ?? '')?.[1] ?? null
+
 // Reads the error prose out of a failed response. Kept as a separate export because a few call sites
 // want the message without the throw.
 export async function apiError(res: ApiResponse, fallback: string): Promise<string> {

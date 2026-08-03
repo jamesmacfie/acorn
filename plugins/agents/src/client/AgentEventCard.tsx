@@ -12,6 +12,20 @@ const copy = (text: string): void => {
   void navigator.clipboard.writeText(text)
 }
 
+// An artifact used to be a plain `href` to its content route. That only ever worked while the renderer
+// shared an origin with the node; from app:// the URL resolves against the renderer's own protocol
+// handler and 404s into index.html, and the bearer lives in main either way. So fetch the bytes through
+// the broker and hand the browser a blob URL — the same shape AgentPane's transcript export uses.
+async function downloadArtifact(artifactId: string, title: string): Promise<void> {
+  const { bytes, type, filename } = await managedAgentApi.artifactContent(artifactId)
+  const url = URL.createObjectURL(new Blob([bytes as unknown as BlobPart], { type }))
+  const anchor = document.createElement('a')
+  anchor.href = url
+  anchor.download = filename ?? (title.replace(/[^A-Za-z0-9._-]+/g, '-').slice(0, 180) || 'artifact')
+  anchor.click()
+  URL.revokeObjectURL(url)
+}
+
 export default function AgentEventCard(props: { item: AgentConversationItem; taskId: string; turn?: AgentTurn }) {
   const event = () => props.item.event
   const openChanges = () => dispatchLayout(props.taskId, { type: 'show', pane: 'changes' })
@@ -120,17 +134,13 @@ export default function AgentEventCard(props: { item: AgentConversationItem; tas
         {(() => {
           const artifact = event() as Extract<ReturnType<typeof event>, { type: 'artifact' }>
           return (
-            <a
-              class="agent-artifact-link"
-              href={managedAgentApi.artifactContentUrl(artifact.artifactId)}
-              download=""
-            >
+            <Button class="agent-artifact-link" onClick={() => void downloadArtifact(artifact.artifactId, artifact.title)}>
               <span>{artifact.title}</span>
               <span class="muted">
                 {artifact.byteSize == null ? '' : `${Math.max(1, Math.round(artifact.byteSize / 1024)).toLocaleString()} KiB · `}
                 Download →
               </span>
-            </a>
+            </Button>
           )
         })()}
       </Show>
