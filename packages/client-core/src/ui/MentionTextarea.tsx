@@ -15,6 +15,9 @@ function detectFragment(value: string, cursor: number): { atIdx: number; query: 
 
 // Drop-in textarea replacement with @mention autocomplete. Inserts `@login ` on selection;
 // popup appears below the textarea anchored to its bottom-left edge (no cursor math needed).
+// Part of the shared kit because the diff viewer's composers use it (ui/diff/DiffRows.tsx) and
+// client-core may not import a plugin; its `.mention-popup` styling already lived in
+// styles/overlays.css here.
 export default function MentionTextarea(props: {
   value: string
   onInput: (value: string) => void

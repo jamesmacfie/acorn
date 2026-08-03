@@ -6,8 +6,8 @@ import { fileStatusMeta } from '@acorn/client-core/ui/displayMeta.ts'
 import { getHighlighter } from '@acorn/client-core/highlight/shiki.ts'
 import { reviewNotesRoute, type ReviewNote } from '@acorn/protocol/api.ts'
 import { formatReviewPrompt } from '../shared/reviewPrompt'
-import { DiffLine, NonCodeRow, type LineComposerController } from '@acorn/plugin-github/client/diff/DiffRows.tsx'
-import { buildDiffRows, highlighterTokenize, isCodeRow, plainTokenize, type CodeRow, type Row } from '@acorn/plugin-github/client/diff/model.ts'
+import { DiffLine, NonCodeRow, type LineComposerController } from '@acorn/client-core/ui/diff/DiffRows.tsx'
+import { buildDiffRows, highlighterTokenize, isCodeRow, plainTokenize, type CodeRow, type Row } from '@acorn/client-core/ui/diff/model.ts'
 import { formatFileReference, sendReferenceToAgent } from '@acorn/client-core/agent/reference.ts'
 import { taskStatus } from '@acorn/client-core/tasks/taskStatus.ts'
 import { agentSessionsFor } from '@acorn/client-core/tasks/agentSessions.ts'
@@ -17,7 +17,7 @@ import { changeKey, groupChanges, pickSelected, toPullFile } from './model'
 import './changes.css'
 
 // ChangesPane (docs/panes.md): a PR-style "Files changed" view over the task worktree's
-// UNCOMMITTED changes — the existing diff pipeline (diff.ts synth → gitdiff-parser → DiffRows)
+// UNCOMMITTED changes — client-core's shared diff viewer (synth → gitdiff-parser → DiffRows)
 // fed by the local:changes/local:diff IPC instead of GitHub patches. Refreshes on the existing
 // dirty-poll signal (taskStatus). Read-only in P1; stage/commit actions land in P4.
 export default function ChangesPane(props: { task: Task }) {

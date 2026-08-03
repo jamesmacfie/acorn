@@ -13,7 +13,6 @@
   "dependencies": {
     "@acorn/client-core": "workspace:*",
     "@acorn/node-core": "workspace:*",
-    "@acorn/plugin-github": "workspace:*",
     "@acorn/protocol": "workspace:*",
     "drizzle-orm": "catalog:",
     "gitdiff-parser": "^0.3.1",

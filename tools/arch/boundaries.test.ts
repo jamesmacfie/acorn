@@ -335,12 +335,13 @@ describe('architecture boundaries', () => {
 
   it('plugin→plugin coupling matches the shrinking baseline', () => {
     // Phase 3 drives this to zero. Entries may be removed, never added.
+    // 'changes -> github' and 'database -> editor' are off this list: the shared UI kit landed
+    // (packages/client-core/src/ui/diff/* and ui/monacoSetup.ts), so both consumers now import
+    // rendering code from client-core instead of another plugin's client/ internals.
     const BASELINE = [
       '@acorn/plugin-agents -> @acorn/plugin-terminal',
-      '@acorn/plugin-changes -> @acorn/plugin-github',
       '@acorn/plugin-context -> @acorn/plugin-memory',
       '@acorn/plugin-context -> @acorn/plugin-notes',
-      '@acorn/plugin-database -> @acorn/plugin-editor',
       '@acorn/plugin-github -> @acorn/plugin-linear',
       '@acorn/plugin-memory -> @acorn/plugin-notes',
       '@acorn/plugin-preview -> @acorn/plugin-terminal',

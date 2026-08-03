@@ -1,5 +1,5 @@
 import { createSignal } from 'solid-js'
-import type { PullFile } from '@acorn/client-core/queries.ts'
+import type { PullFile } from '../../queries'
 import type { ParsedFile, TokenizeLine } from './model'
 
 export type DiffHydrationStatus = 'idle' | 'queued' | 'loading' | 'loaded' | 'error'

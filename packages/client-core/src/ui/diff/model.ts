@@ -1,9 +1,16 @@
+// The shared diff viewer's row model. It moved out of the github plugin because both `changes` (a
+// worktree's uncommitted diff) and `github` (a PR's patches) render diffs, and the changes pane was
+// reaching across a plugin boundary to get here: sharing rendering code is good, sharing feature
+// internals is what's banned (docs/vNext/plugins.md § Cross-plugin collaboration).
+//
+// It can live here without inverting anything because its two domain types — PullFile and Thread —
+// are already client-core's (queries.ts); the plugin never owned them.
 import { diffWordsWithSpace } from 'diff'
 import gitdiffParser from 'gitdiff-parser'
-import { synth } from '../diff'
-import type { getHighlighter } from '@acorn/client-core/highlight/shiki.ts'
-import { langFor } from '@acorn/client-core/highlight/shiki.ts'
-import type { PullFile, Thread } from '@acorn/client-core/queries.ts'
+import { synth } from './synth'
+import type { getHighlighter } from '../../highlight/shiki'
+import { langFor } from '../../highlight/shiki'
+import type { PullFile, Thread } from '../../queries'
 
 export type Tok = { content: string; light: string; dark: string }
 export type WordTok = { content: string; kind: 'eq' | 'add' | 'del' }

@@ -1,7 +1,7 @@
 import { batch, createMemo, createResource, createSignal, For, onCleanup, onMount, Show } from 'solid-js'
 import { createQuery } from '@tanstack/solid-query'
 import * as monaco from 'monaco-editor'
-import '@acorn/plugin-editor/client/monacoSetup.ts'
+import '@acorn/client-core/ui/monacoSetup.ts'
 import { integrationsOptions, type Task } from '@acorn/client-core/queries.ts'
 import Picker from '@acorn/client-core/ui/Picker.tsx'
 import { availableModelConnections } from '@acorn/protocol/modelProviders.ts'

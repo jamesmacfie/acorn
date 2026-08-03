@@ -18,14 +18,12 @@
     "@solidjs/router": "^0.16.1",
     "@tanstack/solid-query": "^5.101.0",
     "@tanstack/solid-virtual": "^3.13.29",
-    "diff": "^9.0.0",
     "drizzle-orm": "catalog:",
     "gitdiff-parser": "^0.3.1",
     "hono": "catalog:",
     "solid-js": "catalog:"
   },
   "devDependencies": {
-    "@types/diff": "^8.0.0",
     "@types/node": "^26.0.0",
     "typescript": "^6.0.3",
     "vite": "^8.0.16",
