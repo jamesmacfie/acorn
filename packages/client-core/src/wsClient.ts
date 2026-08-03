@@ -1,10 +1,19 @@
-// The renderer end of the one authenticated stream socket (docs/electron.md §12). Replaces the
-// per-session `window.acorn.terminal.attach/write/onStatus` + `workflow.onNotice` IPC. One lazily-
-// opened WebSocket, same-origin so the session cookie rides the upgrade automatically; it
-// reconnects and re-attaches live subscriptions, and fans kind-tagged frames out to local callers.
+// The renderer end of the one authenticated stream socket. It no longer OWNS a socket: Electron main's
+// connection broker holds it, because the device token rides the upgrade request's headers and a
+// browser cannot set those (docs/vNext/architecture.md § How the client talks to nodes).
+//
+// What stayed: the subscription registries, the first-attach/last-detach contract, and the
+// re-attach-on-reconnect behaviour. What went: the URL, the socket lifecycle, the local outbox (main
+// queues frames until its socket is open) and the fixed 1s reconnect timer — backoff now lives in the
+// broker, where the connection does.
+//
+// The dispatch table below is untouched, which is the point of keeping V1's flat channel-tagged frames
+// rather than rewrapping them: all twelve consumers of this module are unchanged.
 import type { DockerStatsSample } from '@acorn/protocol/docker.ts'
 import type { ServerMsg } from '@acorn/protocol/terminal.ts'
-import { WS_PATH, type WsClientFrame, type WsServerFrame } from '@acorn/protocol/ws.ts'
+import type { WsClientFrame, WsServerFrame } from '@acorn/protocol/ws.ts'
+import { acornGlobal } from './capabilities'
+import { activeNodeId } from './node/activeNode'
 
 type OutputCb = (m: ServerMsg) => void
 type NoticeCb = (n: { taskId: string; kind: 'gate' | 'run-done' | 'repo-config-trust'; title: string; action?: 'review-config' }) => void
@@ -29,42 +38,55 @@ const dockerStreamSubs = new Map<string, Set<(event: DockerStreamEvent) => void>
 // the connection — the component shows the exit and the user reopens).
 export type DockerExecEvent = { kind: 'out'; data: string } | { kind: 'exit' }
 const dockerExecSubs = new Map<string, (event: DockerExecEvent) => void>()
-const outbox: WsClientFrame[] = [] // frames queued while the socket isn't OPEN
+const reconnectSubs = new Set<() => void>()
 
-let ws: WebSocket | null = null
-let reconnectTimer: ReturnType<typeof setTimeout> | null = null
-
-const wsUrl = () => `${location.origin.replace(/^http/, 'ws')}${WS_PATH}`
+let bridged = false
+// Whether the broker's socket has been up at least once. A transition to online AFTER that is a
+// reconnect, and reconnect means both re-attach and refetch; the first connect means neither.
+let everOnline = false
 
 function rawSend(frame: WsClientFrame): void {
-  if (ws && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify(frame))
-  else {
-    outbox.push(frame)
-    connect()
-  }
+  const nodeId = activeNodeId()
+  if (!nodeId) return
+  connect()
+  // No local queue: main holds one, so a frame sent before its socket is open is still delivered.
+  acornGlobal()?.nodeSend?.(nodeId, frame)
 }
 
+// Subscribe to the broker's push channels. Idempotent and never torn down: this module is a singleton
+// whose lifetime is the renderer's.
 function connect(): void {
-  if (ws && (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING)) return
-  const sock = new WebSocket(wsUrl())
-  ws = sock
-  sock.onopen = () => {
-    // Re-attach every live subscription so a reconnect (or reload) re-subscribes the PTY and
-    // restores its canonical display snapshot — the server treats attach as idempotent per connection.
-    for (const id of outputSubs.keys()) sock.send(JSON.stringify({ channel: 'term:attach', id } satisfies WsClientFrame))
-    for (const key of dockerStreamSubs.keys()) {
-      const [kind, id] = splitStreamKey(key)
-      sock.send(JSON.stringify({ channel: `docker:${kind}:attach`, id } satisfies WsClientFrame))
-    }
-    for (const frame of outbox.splice(0)) sock.send(JSON.stringify(frame))
-  }
-  sock.onmessage = (e) => {
-    let frame: WsServerFrame
-    try {
-      frame = JSON.parse(typeof e.data === 'string' ? e.data : '') as WsServerFrame
-    } catch {
+  if (bridged) return
+  const bridge = acornGlobal()
+  if (!bridge?.onNodeFrame) return
+  bridged = true
+
+  bridge.onNodeFrame((_nodeId, raw) => dispatch(raw))
+  bridge.onNodeStatus?.((status) => {
+    if (status.state !== 'online') return
+    if (!everOnline) {
+      everOnline = true
       return
     }
+    // Re-attach every live subscription: the node treats attach as idempotent per connection, so this
+    // re-subscribes each PTY and restores its display snapshot.
+    for (const id of outputSubs.keys()) rawSend({ channel: 'term:attach', id })
+    for (const key of dockerStreamSubs.keys()) {
+      const [kind, id] = splitStreamKey(key)
+      rawSend({ channel: `docker:${kind}:attach`, id })
+    }
+    // Reconnect means refetch (docs/vNext/protocol.md § Events): there is no cursor into history, so
+    // the client marks the node's cache stale instead of replaying. The QueryClient lives in the app
+    // shell, so this is announced rather than performed here.
+    reconnectSubs.forEach((cb) => cb())
+  })
+}
+
+function dispatch(raw: unknown): void {
+  if (!raw || typeof raw !== 'object' || typeof (raw as { channel?: unknown }).channel !== 'string') return
+  // `seq` is stripped by the broker's gap detection before we see it; the channel vocabulary is V1's.
+  const frame = raw as WsServerFrame
+  {
     if (frame.channel === 'term:out') outputSubs.get(frame.id)?.forEach((cb) => cb(frame.msg))
     else if (frame.channel === 'term:status') statusSubs.forEach((cb) => cb())
     else if (frame.channel === 'workflow:notice') noticeSubs.forEach((cb) => cb(frame.notice))
@@ -79,21 +101,29 @@ function connect(): void {
     else if (frame.channel === 'docker:exec:out') dockerExecSubs.get(frame.execId)?.({ kind: 'out', data: frame.data })
     else if (frame.channel === 'docker:exec:exit') dockerExecSubs.get(frame.execId)?.({ kind: 'exit' })
   }
-  const drop = () => {
-    if (ws === sock) ws = null
-    scheduleReconnect()
-  }
-  sock.onclose = drop
-  sock.onerror = () => sock.close()
 }
 
-function scheduleReconnect(): void {
-  if (reconnectTimer) return
-  // ponytail: fixed 1s backoff; enough for a hardened loopback listener that only drops on quit.
-  reconnectTimer = setTimeout(() => {
-    reconnectTimer = null
-    if (outputSubs.size || statusSubs.size || noticeSubs.size || stepEventSubs.size || agentFrameSubs.size || dockerChangedSubs.size || dockerStreamSubs.size) connect()
-  }, 1000)
+// Fires when the node's socket comes back after a drop. The app shell uses it to mark that node's
+// queries stale so whatever is on screen refetches.
+export function wsOnReconnect(cb: () => void): () => void {
+  reconnectSubs.add(cb)
+  connect()
+  return () => void reconnectSubs.delete(cb)
+}
+
+// Test seam: this module's singletons outlive a single test otherwise.
+export function _resetWsClient(): void {
+  bridged = false
+  everOnline = false
+  outputSubs.clear()
+  statusSubs.clear()
+  noticeSubs.clear()
+  stepEventSubs.clear()
+  agentFrameSubs.clear()
+  dockerChangedSubs.clear()
+  dockerStreamSubs.clear()
+  dockerExecSubs.clear()
+  reconnectSubs.clear()
 }
 
 // Subscribe to one session's output; returns an unsubscribe. Detaching keeps the PTY running.
