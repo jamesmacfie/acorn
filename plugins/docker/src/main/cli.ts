@@ -13,7 +13,25 @@ const exec = promisify(execFile)
 // (CoreServices.proc) plus the DOCKER_*/COMPOSE_* configuration the CLI genuinely needs to find the
 // daemon: DOCKER_HOST and DOCKER_CONTEXT are how OrbStack/colima/Desktop differ.
 export function dockerEnv(): NodeJS.ProcessEnv {
-  return brokerEnv({ passthrough: ['DOCKER_*', 'COMPOSE_*', 'XDG_CONFIG_HOME'] })
+  return brokerEnv({
+    passthrough: [
+      'DOCKER_*',
+      'COMPOSE_*',
+      'XDG_CONFIG_HOME',
+      // A denylist kept these by accident; an allowlist has to name them. Without the proxy vars
+      // `docker pull` fails behind a corporate proxy, and without the cloud ones the ECR/GCR credential
+      // helpers cannot authenticate — both are configuration the CLI needs, not acorn's secrets.
+      'HTTP_PROXY',
+      'HTTPS_PROXY',
+      'NO_PROXY',
+      'http_proxy',
+      'https_proxy',
+      'no_proxy',
+      'AWS_*',
+      'GOOGLE_APPLICATION_CREDENTIALS',
+      'KUBECONFIG',
+    ],
+  })
 }
 
 export type DockerCliFailure = 'not_installed' | 'daemon_down' | 'failed'

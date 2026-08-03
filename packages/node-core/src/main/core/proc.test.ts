@@ -88,6 +88,33 @@ describe('process-group kill', () => {
     expect(await alive(pid)).toBe(false)
   })
 
+  it('escalates to SIGKILL for a group member that ignores SIGTERM', async () => {
+    // The case the test above cannot see: its grandchild dies on SIGTERM, so the escalation timer is
+    // never needed. Here the grandchild traps TERM and closes its stdio, so the direct child exits,
+    // 'close' fires, and the survivor is only reaped if the escalation timer is still armed. Clearing it
+    // in settle() left this process running indefinitely.
+    const pidFile = join(dir, 'stubborn.pid')
+    // Abort once the grandchild has actually registered itself, rather than after a fixed timeout: a
+    // 300ms deadline raced the fork under full-suite load and the pid file did not exist yet.
+    const controller = new AbortController()
+    const pending = sh(`sh -c 'trap "" TERM; echo $$ > ${pidFile}; exec sleep 30 >/dev/null 2>&1' & sleep 30`, {
+      timeoutMs: 30_000,
+      killGraceMs: 50,
+      signal: controller.signal,
+    })
+    let pid = ''
+    for (let i = 0; i < 400 && !pid; i++) {
+      pid = await readFile(pidFile, 'utf8').then((value) => value.trim()).catch(() => '')
+      if (!pid) await new Promise((r) => setTimeout(r, 25))
+    }
+    expect(pid).toMatch(/^\d+$/)
+    controller.abort()
+    const result = await pending
+    expect(result.aborted).toBe(true)
+    for (let i = 0; i < 400 && (await alive(pid)); i++) await new Promise((r) => setTimeout(r, 25))
+    expect(await alive(pid)).toBe(false)
+  })
+
   it('an aborted signal kills the tree and reports aborted, not timedOut', async () => {
     const controller = new AbortController()
     const pending = sh('sleep 30', { timeoutMs: 10_000, signal: controller.signal })
@@ -108,6 +135,28 @@ describe('bounded capture', () => {
     expect(Buffer.byteLength(result.stdout, 'utf8')).toBeLessThanOrEqual(1024)
     // The side effect still happened: truncation is a reporting decision, not a kill.
     await expect(readFile(marker, 'utf8')).resolves.toBe('')
+  })
+
+  // The existing cap test above passes on ASCII whichever way the bytes are handled, which is how the
+  // first implementation shipped decoding each pipe chunk separately. These three are the cases that
+  // distinguish it.
+  it('does not corrupt a multi-byte character split across pipe chunk boundaries', async () => {
+    // 40 000 box-drawing characters = 120 000 bytes, comfortably more than one 64 KiB pipe read, so a
+    // 3-byte character WILL straddle a boundary. Decoding per chunk produced three U+FFFD here.
+    const count = 40_000
+    const result = await sh(`node -e "process.stdout.write('\u2500'.repeat(${count}))"`, { maxOutputBytes: 1 << 20 })
+    expect(result.code).toBe(0)
+    expect(result.truncated).toBe(false)
+    expect(result.stdout).not.toContain('\uFFFD')
+    expect([...result.stdout].length).toBe(count)
+  })
+
+  it('never exceeds the byte cap, even mid-character', async () => {
+    // Slicing a decoded STRING to a byte length overshot and left a replacement character at the end;
+    // slicing the byte stream cannot.
+    const result = await sh(`node -e "process.stdout.write('\u2500'.repeat(1000))"`, { maxOutputBytes: 20 })
+    expect(result.truncated).toBe(true)
+    expect(Buffer.byteLength(result.stdout, 'utf8')).toBeLessThanOrEqual(20)
   })
 
   it('caps stdout and stderr independently', async () => {

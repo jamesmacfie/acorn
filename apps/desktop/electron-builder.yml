@@ -19,7 +19,14 @@ asarUnpack:
 # Drizzle migrations are read at runtime; ship them as resources so process.resourcesPath/migrations
 # resolves (see migrationsFolder in src/core/main/bindings.ts).
 extraResources:
-  - from: ../../packages/node-core/migrations
+  # `out/migrations`, NOT packages/node-core/migrations directly. Phase 2 split the database into core
+  # plus one file per plugin, and electron.vite.config.ts's stageMigrations already assembles every
+  # chain there: core's at the root, each plugin's under out/migrations/<plugin>. Shipping only
+  # node-core's chain meant main/pluginMigrations.ts found no <resources>/migrations/<plugin>, fell back
+  # to its ancestor walk, and migrated the PLUGIN database with CORE's 40 migrations — `out/` lands
+  # inside app.asar, so the staged copy was never reachable as a resource. Caught by an adversarial
+  # review simulating the walk from out/main/service.js.
+  - from: out/migrations
     to: migrations
 # Never auto-publish from CI; the workflow uploads the dmg as an artifact instead.
 publish: null

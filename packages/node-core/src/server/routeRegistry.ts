@@ -42,6 +42,17 @@ export class RouteRegistry {
   list(): readonly RouteContribution[] {
     return this.#contributions
   }
+
+  // Drop everything a plugin previously contributed. The registry is a module singleton whose entries
+  // arrive by side-effect import, which is fine for a process that boots once — but a plugin registers
+  // its routes inside init(), and a process that starts the service TWICE (the tests do) would append a
+  // second copy closing over the FIRST boot's database handle. Hono resolves to the first match, so the
+  // second boot would serve every request from a closed database.
+  remove(plugin: string): void {
+    for (let i = this.#contributions.length - 1; i >= 0; i--) {
+      if (this.#contributions[i].plugin === plugin) this.#contributions.splice(i, 1)
+    }
+  }
 }
 
 // The mount path createApp() hands to Hono for one contribution.
@@ -57,4 +68,8 @@ export function registerRoute(contribution: RouteContribution): void {
 
 export function pluginRouteContributions(): readonly RouteContribution[] {
   return registry.list()
+}
+
+export function removePluginRoutes(plugin: string): void {
+  registry.remove(plugin)
 }

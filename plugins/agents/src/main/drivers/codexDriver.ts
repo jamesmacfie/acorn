@@ -1,3 +1,5 @@
+import { brokerEnv } from '@acorn/node-core/main/core/proc.ts'
+import { AGENT_TOOL_PASSTHROUGH } from './toolEnv'
 import { execFile } from 'node:child_process'
 import { basename, resolve } from 'node:path'
 import { promisify } from 'node:util'
@@ -147,7 +149,12 @@ export class CodexAgentDriver implements AgentDriver {
       command: descriptor.executable,
       args: ['app-server', '--stdio'],
       cwd: options.cwd,
-      env: { ...process.env, ...options.env },
+      // brokerEnv, not `{ ...process.env }` — the same leak claudeDriver was converted for, and
+      // missed here. The service is spawned with the parent's environment and reads SESSION_ENC_KEY from
+      // it, so spreading process.env handed every Codex session the master encryption key: with that plus
+      // owner-level filesystem access to core.sqlite an agent decrypts every stored provider credential
+      // directly, bypassing canUseProviderCredential and SecretService entirely.
+      env: brokerEnv({ env: options.env, passthrough: [...AGENT_TOOL_PASSTHROUGH, 'CODEX_*'] }),
       onNotification: (notification) => {
         const events = normalizeCodexNotification(notification)
         for (const event of events) {

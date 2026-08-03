@@ -78,3 +78,27 @@ export const mayActOnTask = (c: Context<AppEnv>, taskId: string): boolean => {
   if (principal.kind === 'device' || principal.scope === 'service') return true
   return !!principal.taskId && principal.taskId === taskId
 }
+
+// Middleware form of mayActOnTask, for a whole router whose paths are all `/:id/...` task-scoped.
+//
+// An adversarial review found that mayActOnTask was applied at exactly ONE site (agentTools), so a
+// task-scoped credential could still POST /v2/core/tasks/<other>/preview-url and get arbitrary shell
+// execution in another task's worktree — confirmed by probe. A per-route guard was clearly not going to
+// stay applied; a mounted gate is.
+//
+// 404, not 403, matching the agent-tool surface: the denial reveals nothing about which tasks exist.
+export const requireTaskScope = createMiddleware<AppEnv>(async (c, next) => {
+  const taskId = c.req.param('id')
+  if (taskId && !mayActOnTask(c, taskId)) return respondError(c, 404, 'not_found')
+  await next()
+})
+
+// Gate for routes that administer or spend the owner's provider connections.
+//
+// requireDevice would be too strict — the node's own loopback calls ('service' scope) legitimately reach
+// provider-backed reads to warm a mirror. This is requireDevice ∪ service, i.e. the middleware form of
+// canUseProviderCredential.
+export const requireProviderAccess = createMiddleware<AppEnv>(async (c, next) => {
+  if (!canUseProviderCredential(c)) return respondError(c, 403, 'interactive_user_required')
+  await next()
+})

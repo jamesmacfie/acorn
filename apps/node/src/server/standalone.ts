@@ -16,7 +16,6 @@ import { openDataRoot } from '@acorn/node-core/main/dataRoot.ts'
 import { resolveDeviceToken } from '@acorn/node-core/server/auth/deviceTokens.ts'
 import { createCoreServices } from '@acorn/node-core/main/core/index.ts'
 import { CapabilityRegistry } from '@acorn/node-core/server/plugin/capabilities.ts'
-import { NodeEventBus } from '@acorn/node-core/server/plugin/events.ts'
 import { initPlugins } from '@acorn/node-core/server/plugin/host.ts'
 import { nodePlugins } from './plugins'
 import { wireServerBridges } from '../wiring/serverBridges'
@@ -38,7 +37,6 @@ wireServerBridges(runtime.DB, root.dir) // search / editor / database / agent-us
 // so a plugin that needs no DesktopCapabilities works identically over the LAN.
 await initPlugins(nodePlugins(root.dir), {
   capabilities: new CapabilityRegistry(),
-  events: new NodeEventBus(),
   core: createCoreServices({ secrets: runtime.SECRETS, db: runtime.DB }),
 })
 

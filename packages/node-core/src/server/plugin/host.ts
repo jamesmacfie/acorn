@@ -6,16 +6,14 @@
 // removes a step from the sequence. Cross-plugin needs resolve through the capability registry at
 // CALL time instead, which is why capabilities.get() is documented as late-binding.
 import type { CoreServices } from '../../main/core'
-import { registerRoute } from '../routeRegistry'
+import { registerRoute, removePluginRoutes } from '../routeRegistry'
 import type { CapabilityRegistry } from './capabilities'
-import type { NodeEventBus } from './events'
 import type { NodePlugin, NodePluginContext } from './types'
 
 export type PluginHostOptions = {
   // Owned by the caller, not by this module: see the note in capabilities.ts about why these are not
   // module singletons.
   capabilities: CapabilityRegistry
-  events: NodeEventBus
   core: CoreServices
   // Plugin ids the owner has turned off for this node. `required` plugins ignore it — disabling
   // github, terminal or agents is not a supported configuration, and silently honouring it would
@@ -26,6 +24,9 @@ export type PluginHostOptions = {
 export type PluginHostResult = {
   enabled: readonly string[]
   skipped: readonly string[]
+  // Release every initialized plugin, newest first, before the data root lock is dropped. Never
+  // rejects: one plugin failing to close must not stop the rest, and teardown is already best-effort.
+  dispose(): Promise<void>
 }
 
 export async function initPlugins(plugins: readonly NodePlugin[], options: PluginHostOptions): Promise<PluginHostResult> {
@@ -37,12 +38,17 @@ export async function initPlugins(plugins: readonly NodePlugin[], options: Plugi
   const disabled = new Set(options.disabled ?? [])
   const enabled: string[] = []
   const skipped: string[] = []
+  const started: NodePlugin[] = []
 
   for (const plugin of plugins) {
     if (disabled.has(plugin.name) && !plugin.required) {
       skipped.push(plugin.name)
       continue
     }
+    // Idempotent per boot: clear anything this plugin contributed to the module-singleton route
+    // registry on a previous boot, so a second startServiceRuntime in one process replaces its routes
+    // rather than appending a copy bound to the first boot's (now closed) database.
+    removePluginRoutes(plugin.name)
     const ctx: NodePluginContext = {
       name: plugin.name,
       routes: {
@@ -50,7 +56,6 @@ export async function initPlugins(plugins: readonly NodePlugin[], options: Plugi
           registerRoute({ plugin: plugin.name, prefix: opts?.prefix ?? '', router, note: opts?.note }),
       },
       capabilities: options.capabilities,
-      events: options.events,
       core: options.core,
       log: {
         log: (...args: unknown[]) => console.log(`[plugin:${plugin.name}]`, ...args),
@@ -62,8 +67,21 @@ export async function initPlugins(plugins: readonly NodePlugin[], options: Plugi
     // plugin here is first-party code shipped in the same binary. Failing the boot is the honest
     // outcome — the supervisor surfaces it on the recovery screen.
     await plugin.init(ctx)
+    started.push(plugin)
     enabled.push(plugin.name)
   }
 
-  return { enabled, skipped }
+  return {
+    enabled,
+    skipped,
+    dispose: async () => {
+      for (const plugin of [...started].reverse()) {
+        try {
+          await plugin.dispose?.()
+        } catch (error) {
+          console.warn(`[plugin:${plugin.name}] dispose failed:`, error)
+        }
+      }
+    },
+  }
 }

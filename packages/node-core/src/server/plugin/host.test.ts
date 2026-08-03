@@ -2,7 +2,6 @@ import { afterAll, describe, expect, it, vi } from 'vitest'
 import { createCoreServices, SecretService } from '../../main/core'
 import { makeTestDb } from '../routes/testDb'
 import { CapabilityRegistry, capabilityId } from './capabilities'
-import { NodeEventBus, nodeEventType } from './events'
 import { initPlugins } from './host'
 import type { NodePlugin } from './types'
 
@@ -42,50 +41,6 @@ describe('capability registry', () => {
   })
 })
 
-describe('node event bus', () => {
-  const disconnected = nodeEventType<{ integrationId: string }>('test.integration.disconnected')
-
-  it('delivers to every subscriber and survives one that throws', () => {
-    const bus = new NodeEventBus()
-    const seen: string[] = []
-    const warn = vi.spyOn(console, 'warn').mockImplementation(noop)
-    bus.subscribe(disconnected, () => {
-      throw new Error('boom')
-    })
-    bus.subscribe(disconnected, (payload) => void seen.push(payload.integrationId))
-    bus.publish(disconnected, { integrationId: 'gh-1' })
-    // A subscriber that throws must not stop the ones registered after it: cascade sweeps are
-    // independent per plugin, and one failing DB must not leave the others un-swept.
-    expect(seen).toEqual(['gh-1'])
-    expect(warn).toHaveBeenCalled()
-    warn.mockRestore()
-  })
-
-  it('reports an async listener rejection without rejecting publish', async () => {
-    const bus = new NodeEventBus()
-    const warn = vi.spyOn(console, 'warn').mockImplementation(noop)
-    bus.subscribe(disconnected, async () => {
-      throw new Error('async boom')
-    })
-    expect(() => bus.publish(disconnected, { integrationId: 'gh-1' })).not.toThrow()
-    await Promise.resolve()
-    await Promise.resolve()
-    expect(warn).toHaveBeenCalled()
-    warn.mockRestore()
-  })
-
-  it('unsubscribes without disturbing siblings', () => {
-    const bus = new NodeEventBus()
-    const seen: string[] = []
-    const handle = bus.subscribe(disconnected, () => void seen.push('a'))
-    bus.subscribe(disconnected, () => void seen.push('b'))
-    handle.dispose()
-    bus.publish(disconnected, { integrationId: 'gh-1' })
-    expect(seen).toEqual(['b'])
-    expect(bus.types()).toEqual(['test.integration.disconnected'])
-  })
-})
-
 describe('plugin host', () => {
   // One real database for the whole block: CoreServices.tasks needs a handle, and these cases never
   // touch it — they exercise ordering, disabling and failure propagation.
@@ -103,7 +58,6 @@ describe('plugin host', () => {
   const host = (plugins: readonly NodePlugin[], disabled?: readonly string[]) =>
     initPlugins(plugins, {
       capabilities: new CapabilityRegistry(),
-      events: new NodeEventBus(),
       core: createCoreServices({ secrets: new SecretService('a'.repeat(64)), db: coreDb() }),
       disabled,
     })
@@ -117,7 +71,7 @@ describe('plugin host', () => {
     ])
     expect(order).toEqual(['alpha', 'beta'])
     expect(names).toEqual(['alpha', 'beta'])
-    expect(result).toEqual({ enabled: ['alpha', 'beta'], skipped: [] })
+    expect(result).toMatchObject({ enabled: ['alpha', 'beta'], skipped: [] })
   })
 
   it('hands every plugin the SAME graph, so one can consume what another provided', async () => {
@@ -154,7 +108,27 @@ describe('plugin host', () => {
       ['github', 'docker'],
     )
     expect(started).toEqual(['github'])
-    expect(result).toEqual({ enabled: ['github'], skipped: ['docker'] })
+    expect(result).toMatchObject({ enabled: ['github'], skipped: ['docker'] })
+  })
+
+  it('disposes started plugins newest-first, and one failure does not stop the rest', async () => {
+    const order: string[] = []
+    const warn = vi.spyOn(console, 'warn').mockImplementation(noop)
+    const result = await host([
+      plugin('first', { dispose: () => void order.push('first') }),
+      plugin('bad', {
+        dispose: () => {
+          throw new Error('close failed')
+        },
+      }),
+      plugin('last', { dispose: () => void order.push('last') }),
+    ])
+    await result.dispose()
+    // Reverse order, because a later plugin may depend on an earlier one's resources; and 'first' still
+    // gets disposed despite 'bad' throwing, because teardown must not leave a WAL-mode database open.
+    expect(order).toEqual(['last', 'first'])
+    expect(warn).toHaveBeenCalled()
+    warn.mockRestore()
   })
 
   it('rejects a duplicate plugin name before running any init', async () => {

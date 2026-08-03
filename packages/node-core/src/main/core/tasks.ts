@@ -6,13 +6,11 @@
 //
 // So this is that validation seam: a plugin holds a taskId and asks core to resolve it.
 //
-// `idsForWorkspace` exists for one specific query shape. The agents plugin had three real SQL joins —
-// `agent_sessions ⋈ tasks ⋈ workspace_repos`, all to answer "sessions in workspace X" — and those are
-// the only cross-DB joins in the codebase. They become an id round trip: resolve the workspace's task
-// ids in core, then `inArray` inside the plugin's own database.
-import { and, eq, or } from 'drizzle-orm'
+// Deliberately NOT here yet: an `idsForWorkspace` for the three agents joins
+// (`agent_sessions ⋈ tasks ⋈ workspace_repos`, the only real cross-DB joins in the codebase). It was
+// written, had no caller — agents is not converted — and was removed. It belongs in the commit that
+// converts agents, where its shape can be driven by the query that needs it rather than guessed.
 import type { AppDatabase } from '../../server/db'
-import { schema } from '../../server/db'
 import { loadTask, taskRoot, type TaskRow } from '../taskWorktree'
 
 export type TaskService = {
@@ -22,29 +20,11 @@ export type TaskService = {
   // The task's worktree root, resolving through the repo→checkout mapping and creating the worktree
   // lazily if needed. null when no checkout is mapped.
   root(taskId: string): Promise<string | null>
-  // Task ids belonging to a workspace, via that workspace's repos. Ordered and de-duplicated so a
-  // caller can page over them deterministically.
-  idsForWorkspace(workspaceId: string): Promise<string[]>
 }
 
 export function createTaskService(db: AppDatabase): TaskService {
   return {
     load: (taskId) => loadTask(db, taskId),
     root: (taskId) => taskRoot(db, taskId),
-    idsForWorkspace: async (workspaceId) => {
-      const repos = await db
-        .select({ owner: schema.workspaceRepos.repoOwner, name: schema.workspaceRepos.repoName })
-        .from(schema.workspaceRepos)
-        .where(eq(schema.workspaceRepos.workspaceId, workspaceId))
-      if (!repos.length) return []
-      // One query for the whole workspace rather than one per repo: the pair list is small (a
-      // workspace groups a handful of repos) and `tasks` is indexed on (repo_owner, repo_name).
-      const rows = await db
-        .select({ id: schema.tasks.id })
-        .from(schema.tasks)
-        .where(or(...repos.map((repo) => and(eq(schema.tasks.repoOwner, repo.owner), eq(schema.tasks.repoName, repo.name)))))
-        .orderBy(schema.tasks.createdAt, schema.tasks.id)
-      return rows.map((row) => row.id)
-    },
   }
 }
