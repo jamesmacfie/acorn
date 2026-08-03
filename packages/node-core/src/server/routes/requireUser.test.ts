@@ -11,7 +11,6 @@ import type { Env } from '../../main/bindings'
 // (or a public hole) would not appear here and would silently escape the gate, so keep it
 // exhaustive. (docs/security.md §3, §7 · docs/vNext/protocol.md § HTTP conventions)
 const PROTECTED_PATHS: [string, string][] = [
-  ['GET', '/v2/core/me'],
   ['GET', '/v2/core/pins'],
   ['GET', '/v2/core/prefs'],
   ['GET', '/v2/core/workspaces'],

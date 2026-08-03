@@ -5,7 +5,6 @@ import { Registry } from './registry'
 
 export type SettingsPageContext = {
   workspace?: Workspace
-  onPermissions: () => void | Promise<void>
   onWorkspaceDeleted: () => void
 }
 

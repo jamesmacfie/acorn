@@ -4,7 +4,6 @@ import { randomUUID } from 'node:crypto'
 import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { WS_PATH } from '@acorn/protocol/ws.ts'
 
 const KEY = 'e'.repeat(64)
 const roots: string[] = []
@@ -32,7 +31,10 @@ function seedQueuedAgent(dataDir: string, taskId: string): QueuedAgentSeed {
       ${sqlText(JSON.stringify([{ type: 'text', text: prompt }]))}, '{}',
       ${sqlText(randomUUID())}, 0, ${timestamp + ordinal}
     );`
-  execFileSync('sqlite3', [join(dataDir, 'acorn.sqlite'), `
+  // core.sqlite, not V1's acorn.sqlite (node-core/main/serverPaths.ts). Naming the old file here did
+  // not just miss the tables — `sqlite3` creates what it cannot open, and openDataRoot then refuses a
+  // data root that contains a V1 database, so the next launch would have failed too.
+  execFileSync('sqlite3', [join(dataDir, 'core.sqlite'), `
     BEGIN;
     INSERT INTO agent_sessions (
       id, task_id, provider_id, profile_id, kind, driver_kind, driver_version,
@@ -93,6 +95,40 @@ function seedQueuedAgent(dataDir: string, taskId: string): QueuedAgentSeed {
   return { sessionId, alternateSessionId, firstTurnId, secondTurnId }
 }
 
+// The window holds no credential of its own: every request goes through Electron main's connection
+// broker, which owns the endpoint and the device bearer (docs/vNext/architecture.md § How the client
+// talks to nodes). So the suite seeds through the same bridge the renderer's apiClient uses. Raw
+// `fetch('/v2/…')` from the page worked only because the e2e launch established a session cookie
+// first; there is no login left to establish one.
+type NodeFetchResult = { status: number; body: Uint8Array }
+type PageBridge = {
+  nodeFetch(nodeId: string, request: Record<string, unknown>): Promise<NodeFetchResult>
+  nodeSend(nodeId: string, frame: unknown): void
+  onNodeFrame(cb: (nodeId: string, frame: unknown) => void): () => void
+  fleetList(): Promise<{ nodes: { nodeId: string; local: boolean }[] }>
+}
+type BridgeWindow = Window & { acorn?: PageBridge }
+
+async function nodeJson<T>(page: Page, path: string, init: { method?: string; body?: unknown } = {}): Promise<T> {
+  return page.evaluate(async ({ path, method, body }) => {
+    const bridge = (window as BridgeWindow).acorn
+    if (!bridge) throw new Error('The node broker bridge is missing.')
+    const fleet = await bridge.fleetList()
+    const node = fleet.nodes.find((candidate) => candidate.local) ?? fleet.nodes[0]
+    if (!node) throw new Error('The fleet is empty — main never adopted the local node.')
+    const res = await bridge.nodeFetch(node.nodeId, {
+      requestId: `e2e-${Math.random().toString(36).slice(2)}`,
+      path,
+      method: method ?? 'GET',
+      headers: body === undefined ? {} : { 'content-type': 'application/json' },
+      ...(body === undefined ? {} : { body: { kind: 'bytes', bytes: new TextEncoder().encode(JSON.stringify(body)) } }),
+    })
+    const text = new TextDecoder().decode(res.body)
+    if (res.status < 200 || res.status >= 300) throw new Error(`${path}: ${res.status} ${text}`)
+    return (text ? JSON.parse(text) : undefined) as T
+  }, { path, method: init.method, body: init.body })
+}
+
 async function launch(previous?: Pick<RunningApp, 'dataDir' | 'repoDir'>): Promise<RunningApp> {
   const root = previous ? null : mkdtempSync(join(tmpdir(), 'acorn-e2e-'))
   if (root) roots.push(root)
@@ -123,35 +159,17 @@ async function launch(previous?: Pick<RunningApp, 'dataDir' | 'repoDir'>): Promi
 }
 
 async function seedWorkspace(page: Page, repoDir: string): Promise<void> {
-  await page.evaluate(async ({ repoDir }) => {
-    const json = (url: string, init?: RequestInit) => fetch(url, init).then(async (response) => {
-      if (!response.ok) throw new Error(`${url}: ${response.status} ${await response.text()}`)
-      return response.json()
-    })
-    const workspace = await json('/v2/core/workspaces', {
-      method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ name: 'Smoke' }),
-    })
-    await json(`/v2/core/workspaces/${workspace.id}/repos`, {
-      method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ owner: 'acorn', name: 'smoke' }),
-    })
-    await json('/v2/p/terminal/terminal/repo-path', {
-      method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ owner: 'acorn', repo: 'smoke', path: repoDir }),
-    })
-  }, { repoDir })
+  const workspace = await nodeJson<{ id: string }>(page, '/v2/core/workspaces', { method: 'POST', body: { name: 'Smoke' } })
+  await nodeJson(page, `/v2/core/workspaces/${workspace.id}/repos`, { method: 'POST', body: { owner: 'acorn', name: 'smoke' } })
+  await nodeJson(page, '/v2/p/terminal/terminal/repo-path', { method: 'PUT', body: { owner: 'acorn', repo: 'smoke', path: repoDir } })
 }
 
-async function seedTask(page: Page, repoDir: string) {
+async function seedTask(page: Page, repoDir: string): Promise<{ id: string }> {
   await seedWorkspace(page, repoDir)
-  return page.evaluate(async () => {
-    const json = (url: string, init?: RequestInit) => fetch(url, init).then(async (response) => {
-      if (!response.ok) throw new Error(`${url}: ${response.status} ${await response.text()}`)
-      return response.json()
-    })
-    return json('/v2/core/tasks', {
-      method: 'POST', headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ origin: 'local', repoOwner: 'acorn', repoName: 'smoke', branch: 'main', title: 'Smoke task' }),
-    })
-  }) as Promise<{ id: string }>
+  return nodeJson<{ id: string }>(page, '/v2/core/tasks', {
+    method: 'POST',
+    body: { origin: 'local', repoOwner: 'acorn', repoName: 'smoke', branch: 'main', title: 'Smoke task' },
+  })
 }
 
 async function dismissOnboarding(page: Page): Promise<void> {
@@ -170,28 +188,30 @@ async function openSmokeWorkspace(page: Page): Promise<void> {
 }
 
 async function createTerminalAndCapture(page: Page, taskId: string, command: string): Promise<string> {
-  // wsPath is passed in rather than inlined: the page context cannot import the protocol constant, and
-  // a hardcoded copy is how this suite would silently stop attaching after a path change.
-  return page.evaluate(async ({ taskId, command, wsPath }) => {
-    const response = await fetch('/v2/p/terminal/terminal/sessions', {
-      method: 'POST', headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ taskId, profileId: 'shell', command, title: 'Smoke terminal' }),
-    })
-    if (!response.ok) throw new Error(await response.text())
-    const session = await response.json() as { id: string }
+  const session = await nodeJson<{ id: string }>(page, '/v2/p/terminal/terminal/sessions', {
+    method: 'POST', body: { taskId, profileId: 'shell', command, title: 'Smoke terminal' },
+  })
+  // The socket belongs to main too — the bearer rides the upgrade headers, which a page cannot set —
+  // so attaching is `nodeSend` + `onNodeFrame`, exactly what client-core/wsClient.ts does. That is
+  // also why WS_PATH is no longer needed here: the page never sees the URL.
+  return page.evaluate(async ({ sessionId }) => {
+    const bridge = (window as BridgeWindow).acorn
+    if (!bridge) throw new Error('The node broker bridge is missing.')
+    const fleet = await bridge.fleetList()
+    const node = fleet.nodes.find((candidate) => candidate.local) ?? fleet.nodes[0]
+    if (!node) throw new Error('The fleet is empty — main never adopted the local node.')
     return new Promise<string>((resolve, reject) => {
-      const ws = new WebSocket(`${location.origin.replace(/^http/, 'ws')}${wsPath}`)
       let output = ''
-      const timer = window.setTimeout(() => { ws.close(); reject(new Error(`terminal output timeout: ${output}`)) }, 8_000)
-      ws.onopen = () => ws.send(JSON.stringify({ channel: 'term:attach', id: session.id }))
-      ws.onmessage = (event) => {
-        const frame = JSON.parse(String(event.data))
-        if (frame.channel !== 'term:out' || frame.id !== session.id) return
-        if (frame.msg.type === 'output') output += frame.msg.data
-        if (frame.msg.type === 'exit') { clearTimeout(timer); ws.close(); resolve(output) }
-      }
+      const off = bridge.onNodeFrame((_nodeId, raw) => {
+        const frame = raw as { channel?: string; id?: string; msg?: { type: string; data?: string } }
+        if (frame.channel !== 'term:out' || frame.id !== sessionId || !frame.msg) return
+        if (frame.msg.type === 'output') output += frame.msg.data ?? ''
+        if (frame.msg.type === 'exit') { window.clearTimeout(timer); off(); resolve(output) }
+      })
+      const timer = window.setTimeout(() => { off(); reject(new Error(`terminal output timeout: ${output}`)) }, 8_000)
+      bridge.nodeSend(node.nodeId, { channel: 'term:attach', id: sessionId })
     })
-  }, { taskId, command, wsPath: WS_PATH })
+  }, { sessionId: session.id })
 }
 
 test.afterEach(async () => {
@@ -239,13 +259,10 @@ test('S5 quit tears down a live PTY child', async () => {
   const running = await launch()
   const task = await seedTask(running.page, running.repoDir)
   const pidFile = join(running.repoDir, 'pty.pid')
-  await running.page.evaluate(async ({ taskId, pidFile }) => {
-    const response = await fetch('/v2/p/terminal/terminal/sessions', {
-      method: 'POST', headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ taskId, profileId: 'shell', command: `echo $$ > '${pidFile}'; sleep 30`, title: 'Quit smoke' }),
-    })
-    if (!response.ok) throw new Error(await response.text())
-  }, { taskId: task.id, pidFile })
+  await nodeJson(running.page, '/v2/p/terminal/terminal/sessions', {
+    method: 'POST',
+    body: { taskId: task.id, profileId: 'shell', command: `echo $$ > '${pidFile}'; sleep 30`, title: 'Quit smoke' },
+  })
   await expect.poll(() => existsSync(pidFile)).toBe(true)
   const pid = Number(readFileSync(pidFile, 'utf8').trim())
   await running.app.close()
@@ -268,19 +285,10 @@ test('S6 find-in-files copies paths and double-clicks into the match', async () 
   await running.page.getByPlaceholder('Task title').fill('Smoke task')
   await running.page.getByRole('button', { name: 'Create', exact: true }).click()
   await expect(running.page.locator('.task-layout')).toBeVisible({ timeout: 30_000 })
-  const task = await running.page.evaluate(async () => {
-    const response = await fetch('/v2/core/tasks')
-    if (!response.ok) throw new Error(await response.text())
-    const tasks = await response.json() as { id: string; title: string }[]
-    const task = tasks.find((candidate) => candidate.title === 'Smoke task')
-    if (!task) throw new Error('The current-checkout task was not persisted.')
-    return task
-  })
-  const files = await running.page.evaluate(async (taskId) => {
-    const response = await fetch(`/v2/p/editor/tasks/${taskId}/editor/files`)
-    if (!response.ok) throw new Error(await response.text())
-    return response.json() as Promise<string[]>
-  }, task.id)
+  const tasks = await nodeJson<{ id: string; title: string }[]>(running.page, '/v2/core/tasks')
+  const task = tasks.find((candidate) => candidate.title === 'Smoke task')
+  if (!task) throw new Error('The current-checkout task was not persisted.')
+  const files = await nodeJson<string[]>(running.page, `/v2/p/editor/tasks/${task.id}/editor/files`)
   expect(files).toContain(path)
   await running.page.keyboard.press('Meta+Shift+f')
   await expect(running.page.locator('.search-pane')).toBeVisible()
@@ -307,10 +315,9 @@ test('S6 find-in-files copies paths and double-clicks into the match', async () 
   await expect(running.page.getByRole('textbox', { name: 'Editor content' })).toBeFocused()
   await running.page.keyboard.type('X')
   await running.page.keyboard.press('Meta+s')
-  await expect.poll(() => running.page.evaluate(async ({ taskId, path }) => {
-    const response = await fetch(`/v2/p/editor/tasks/${taskId}/editor/read?path=${encodeURIComponent(path)}`)
-    return (await response.json() as { text: string }).text
-  }, { taskId: task.id, path })).toContain("'XneedleToken'")
+  await expect.poll(async () =>
+    (await nodeJson<{ text: string }>(running.page, `/v2/p/editor/tasks/${task.id}/editor/read?path=${encodeURIComponent(path)}`)).text,
+  ).toContain("'XneedleToken'")
   await running.app.close()
 })
 
@@ -322,12 +329,6 @@ test('S7 loads the Agent Center and combines task agent switching with the conve
   await first.app.close()
   seedQueuedAgent(first.dataDir, task.id)
   const running = await launch(first)
-  const contextResponses: Array<{ status: number; url: string }> = []
-  running.page.on('response', (response) => {
-    if (response.url().includes(`/v2/core/tasks/${task.id}/context`)) {
-      contextResponses.push({ status: response.status(), url: response.url() })
-    }
-  })
   await openSmokeWorkspace(running.page)
   await expect(running.page.getByRole('button', { name: 'Smoke task' })).toBeVisible()
 
@@ -345,7 +346,9 @@ test('S7 loads the Agent Center and combines task agent switching with the conve
     if (!(button instanceof HTMLButtonElement)) throw new Error('Task Agent pane button is missing.')
     button.click()
   })
-  await expect.poll(() => contextResponses).toContainEqual(expect.objectContaining({ status: 200 }))
+  // Task context used to be asserted by watching page responses; broker traffic never touches the page,
+  // so ask the node the same question the pane asks and let the attached chip below prove the pane got it.
+  expect(await nodeJson<{ sections: unknown[] }>(running.page, `/v2/core/tasks/${task.id}/context`)).toBeTruthy()
   await expect.poll(() => running.page.evaluate(() => ({
     pane: !!document.querySelector('.managed-agent-pane'),
     sidebar: !!document.querySelector('.agent-task-sidebar[aria-label="Agents in this task"]'),

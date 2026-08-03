@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { closedPullsInfiniteOptions, compareOptions, fetchFilePatches, filePatchOptions, fileSummariesOptions, filesOptions, forceRefreshPull, meOptions, reposOptions } from './queries'
+import { closedPullsInfiniteOptions, compareOptions, fetchFilePatches, filePatchOptions, fileSummariesOptions, filesOptions, forceRefreshPull, reposOptions } from './queries'
 
 const jsonResponse = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), {
@@ -30,15 +30,6 @@ describe('client query options', () => {
     await closedPullsInfiniteOptions('acorn', 'web', true).queryFn({ pageParam: 3, signal })
 
     expect(fetchMock).toHaveBeenCalledWith('/v2/p/github/repos/acorn/web/pulls?state=closed&page=3', expect.objectContaining({ signal }))
-  })
-
-  it('keeps the logged-out me query as null while still passing AbortSignal', async () => {
-    const fetchMock = vi.fn(async () => jsonResponse({ error: 'unauthenticated' }, 401))
-    vi.stubGlobal('fetch', fetchMock)
-    const signal = new AbortController().signal
-
-    await expect(meOptions().queryFn({ signal })).resolves.toBeNull()
-    expect(fetchMock).toHaveBeenCalledWith('/v2/core/me', expect.objectContaining({ signal }))
   })
 
   it('applies cancellation to heavy PR file and compare reads', async () => {

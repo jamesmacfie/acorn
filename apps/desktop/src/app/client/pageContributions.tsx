@@ -12,7 +12,6 @@ const AppearanceSettings = lazy(() => import('@acorn/client-core/settings/Appear
 const TerminalSettings = lazy(() => import('@acorn/plugin-terminal/client/TerminalSettings.tsx'))
 const DockerSettings = lazy(() => import('@acorn/plugin-docker/client/DockerSettings.tsx'))
 const ShortcutsSettings = lazy(() => import('@acorn/client-core/settings/ShortcutsSettings.tsx'))
-const PermissionsSettings = lazy(() => import('@acorn/client-core/settings/PermissionsSettings.tsx'))
 const HttpVariablesSettings = lazy(() => import('@acorn/plugin-http/client/HttpVariablesSettings.tsx'))
 const StyleGallery = lazy(() => import('@acorn/client-core/settings/StyleGallery.tsx'))
 
@@ -36,10 +35,6 @@ export const settingsPageContributions: SettingsContribution[] = [
   { id: 'terminal', label: 'Terminal', group: 'general', order: 60, requires: 'desktop', component: () => <TerminalSettings /> },
   { id: 'docker', label: 'Docker', group: 'general', order: 65, component: () => <DockerSettings /> },
   { id: 'shortcuts', label: 'Shortcuts', title: 'Keyboard shortcuts', group: 'general', order: 70, component: () => <ShortcutsSettings /> },
-  {
-    id: 'permissions', label: 'Permissions', group: 'general', order: 80,
-    component: (props) => <PermissionsSettings onPermissions={props.context.onPermissions} />,
-  },
   // 'api' is the public automation API's token page (docs/public-api.md); the API *panel*'s
   // variables are a different thing, hence the distinct id and label.
   { id: 'http', label: 'API requests', group: 'general', order: 66, component: () => <HttpVariablesSettings /> },

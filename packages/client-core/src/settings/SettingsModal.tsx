@@ -7,7 +7,7 @@ import { createDismissable } from '../ui/dismissable'
 import { Dynamic } from 'solid-js/web'
 import './settings.css'
 
-export default function SettingsModal(props: { onClose: () => void; initialTab?: string; onPermissions: () => void | Promise<void> }) {
+export default function SettingsModal(props: { onClose: () => void; initialTab?: string }) {
   const workspaces = createQuery(() => workspacesOptions(true))
   const [tab, setTab] = createSignal(props.initialTab ?? 'workspaces')
   const generalPages = () => settingsContributions().filter((page) => page.group === 'general')
@@ -68,7 +68,6 @@ export default function SettingsModal(props: { onClose: () => void; initialTab?:
                   component={page().component}
                   context={{
                     workspace: activeWorkspace(),
-                    onPermissions: props.onPermissions,
                     onWorkspaceDeleted: () => setTab('workspaces'),
                   }}
                 />

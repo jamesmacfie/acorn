@@ -13,7 +13,6 @@ import type {
 // `detail: string[]`; it is now a nested object carrying requestId and retryable too
 // (docs/vNext/protocol.md § Errors).
 export type { ApiError } from './errors.ts'
-export type Me = { login: string; name: string; avatar: string; scopes: string[] }
 export type Repo = {
   id: number
   owner: string
@@ -534,7 +533,6 @@ export const repoRoute = (owner: string, repo: string, child = '') => `/v2/p/git
 export const pullRoute = (owner: string, repo: string, number: string | number, child = '') =>
   repoRoute(owner, repo, `pulls/${number}${child ? `/${child}` : ''}`)
 
-export const meRoute = '/v2/core/me'
 export const reposRoute = '/v2/p/github/repos'
 export const reposRefreshRoute = '/v2/p/github/repos/refresh'
 export const pullsRoute = (owner: string, repo: string, state: 'open' | 'closed') => `${repoRoute(owner, repo)}/pulls?state=${state}`
@@ -596,7 +594,6 @@ export const linearIssueRoute = (identifier: string, connectionId?: string) =>
 export const linearCommentsRoute = (identifier: string, connectionId?: string) =>
   `/v2/p/linear/issues/${encodeURIComponent(identifier)}/comments${connectionId ? `?integration=${encodeURIComponent(connectionId)}` : ''}`
 
-export const meKey = ['me'] as const
 export const reposKey = ['repos'] as const
 export const pullsKey = (owner: string, repo: string, state: 'open' | 'closed') => ['pulls', owner, repo, state] as const
 // Distinct from pullsKey(_, 'closed'): the closed list is now an infinite query ({pages}), so it must

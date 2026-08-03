@@ -4,7 +4,7 @@ import { useMatch, useNavigate, useParams } from '@solidjs/router'
 import { Dynamic } from 'solid-js/web'
 import { clear } from 'idb-keyval'
 import { readJson } from '@acorn/client-core/apiClient.ts'
-import { filesKey, forceRefreshPull, meKey, meOptions, pinsOptions, prefsOptions, pullKey, pullsKey, pullsRoute, pullsPrefixKey, reposKey, reposOptions, reposRefreshRoute, tasksOptions, workspacesKey, workspacesOptions, type Pull } from '@acorn/client-core/queries.ts'
+import { filesKey, forceRefreshPull, pinsOptions, prefsOptions, pullKey, pullsKey, pullsRoute, pullsPrefixKey, reposOptions, tasksOptions, workspacesKey, workspacesOptions, type Pull } from '@acorn/client-core/queries.ts'
 import { bootstrapWorkspaces } from '@acorn/client-core/workspaces/mutations.ts'
 import RepoPicker from '@acorn/client-core/ui/RepoPicker.tsx'
 import WorkspacePicker from '@acorn/client-core/ui/WorkspacePicker.tsx'
@@ -21,6 +21,8 @@ import { isTerminalTarget } from '@acorn/client-core/lib/isTypingTarget.ts'
 import { activateTaskSignals, pathForTask } from '@acorn/client-core/tasks/activate.ts'
 import { taskStatus } from '@acorn/client-core/tasks/taskStatus.ts'
 import { capabilities } from '@acorn/client-core/capabilities.ts'
+import NodeGate from '@acorn/client-core/node/NodeGate.tsx'
+import { nodeReady } from '@acorn/client-core/node/activeNode.ts'
 import TaskView from './TaskView'
 import Acorn from '@acorn/client-core/Acorn.tsx'
 import { registerCommands } from '@acorn/client-core/registries/commands.ts'
@@ -52,7 +54,7 @@ export default function App() {
   const isRestoring = useIsRestoring()
   const [onboardingDismissed, setOnboardingDismissed] = createSignal(false)
   // The Settings page (account menu → Settings): workspace mapping, per-workspace pages,
-  // integrations, shortcuts, permissions. `settingsTab` seeds which tab opens.
+  // integrations, shortcuts. `settingsTab` seeds which tab opens.
   const [settingsOpen, setSettingsOpen] = createSignal(false)
   const [settingsTab, setSettingsTab] = createSignal('workspaces')
   const openSettings = (tab = 'workspaces') => {
@@ -140,12 +142,13 @@ export default function App() {
     onCleanup(initWorkflowNotices())
   })
 
-  const me = createQuery(() => meOptions())
-  const repos = createQuery(() => reposOptions(!!me.data))
-  const prefs = createQuery(() => prefsOptions(!!me.data))
-  const pins = createQuery(() => pinsOptions(!!me.data))
-  const tasks = createQuery(() => tasksOptions(!!me.data))
-  const workspaces = createQuery(() => workspacesOptions(!!me.data))
+  // Gated on having a node to ask, not on an identity: there is no login. NodeGate below holds the
+  // screen until `nodeReady()`, so these only ever fire against a selected node.
+  const repos = createQuery(() => reposOptions(nodeReady()))
+  const prefs = createQuery(() => prefsOptions(nodeReady()))
+  const pins = createQuery(() => pinsOptions(nodeReady()))
+  const tasks = createQuery(() => tasksOptions(nodeReady()))
+  const workspaces = createQuery(() => workspacesOptions(nodeReady()))
   const [collapsed, setCollapsed] = createSignal(false)
 
   createAppStartupRestore({
@@ -166,7 +169,7 @@ export default function App() {
   // the user re-group afterwards.
   let bootstrapped = false
   createEffect(() => {
-    if (bootstrapped || !me.data || !repos.data) return
+    if (bootstrapped || !nodeReady() || !repos.data) return
     bootstrapped = true
     void bootstrapWorkspaces().then(() => queryClient.invalidateQueries({ queryKey: workspacesKey }))
   })
@@ -237,22 +240,10 @@ export default function App() {
   const newMatch = useMatch(() => '/:owner/:repo/new')
   const isNew = () => !!newMatch()
 
-  async function logout() {
-    await fetch('/auth/logout', { method: 'POST' })
-    window.dispatchEvent(new Event('acorn:logout')) // wipe the persisted IndexedDB cache
-    sessionStorage.setItem('acorn:loggedout', '1') // else LoginGate bounces to GitHub and silently re-auths
-    queryClient.clear()
-    await queryClient.invalidateQueries({ queryKey: meKey })
-  }
   async function clearCache() {
     queryClient.clear()
     await clear() // wipe the persisted IndexedDB cache before reload so it can't rehydrate
     window.location.reload()
-  }
-  async function permissions() {
-    await fetch(reposRefreshRoute, { method: 'POST' }).catch(() => {})
-    queryClient.invalidateQueries({ queryKey: reposKey })
-    window.location.href = '/auth/permissions'
   }
 
   const [refreshingPulls, setRefreshingPulls] = createSignal(false)
@@ -285,15 +276,11 @@ export default function App() {
     }
   }
 
-  // Logged out: no chrome, just the mark — bounce straight to GitHub OAuth. While auth is still
-  // unknown (initial load / cache restore) show the bare mark without redirecting, to avoid a flash.
-  const settled = () => !isRestoring() && !me.isPending && !me.data
-  // Settled-logged-out: bounce to GitHub UNLESS the user explicitly logged out (else GitHub silently
-  // re-auths and logout is a no-op). In that case hold the gate and offer a manual Login.
-  const settledLoggedOut = () => settled() && sessionStorage.getItem('acorn:loggedout') !== '1'
-  const didLogout = () => settled() && sessionStorage.getItem('acorn:loggedout') === '1'
+  // Hold the bare gate until there is a node AND the persisted cache has finished rehydrating. The
+  // second half is not about auth — it never was: rendering mid-restore flashes empty panes that fill
+  // in a beat later.
   return (
-    <Show when={me.data} fallback={<LoginGate redirecting={settledLoggedOut()} loggedOut={didLogout()} />}>
+    <Show when={nodeReady() && !isRestoring()} fallback={<NodeGate />}>
     <div class="shell">
     <TabRail />
     <div class="app" classList={{ 'left-collapsed': collapsed() }}>
@@ -361,18 +348,7 @@ export default function App() {
         </div>
         <div class="topbar-side topbar-end">
           <SlotHost slot="topbar.right" context={slotContext()} />
-          <Show
-            when={me.data}
-            fallback={
-              <a class="auth-control" href="/auth/login">
-                Login
-              </a>
-            }
-          >
-            {(user) => (
-              <AccountMenu user={user()} onSettings={() => openSettings()} onClearCache={clearCache} onLogout={logout} />
-            )}
-          </Show>
+          <AccountMenu onSettings={() => openSettings()} onClearCache={clearCache} />
         </div>
       </header>
       <Switch
@@ -453,9 +429,9 @@ export default function App() {
       <KeybindingDispatcher prefs={prefs.data ?? {}} taskActive={inTaskView()} focusedPane={focusedPane(activeTaskId())} />
       <WillConfirmationHost />
       <Show when={settingsOpen()}>
-        <SettingsModal initialTab={settingsTab()} onPermissions={permissions} onClose={() => setSettingsOpen(false)} />
+        <SettingsModal initialTab={settingsTab()} onClose={() => setSettingsOpen(false)} />
       </Show>
-      <Show when={!onboardingDismissed() && !!me.data && prefs.data !== undefined && prefs.data?.[PrefKeys.onboarded] !== '1' && (workspaces.data?.length ?? 0) > 0}>
+      <Show when={!onboardingDismissed() && nodeReady() && prefs.data !== undefined && prefs.data?.[PrefKeys.onboarded] !== '1' && (workspaces.data?.length ?? 0) > 0}>
         <OnboardingModal onClose={() => setOnboardingDismissed(true)} />
       </Show>
       <Show when={termOpen()}>
@@ -466,25 +442,5 @@ export default function App() {
     <RailTips />
     </div>
     </Show>
-  )
-}
-
-// Full-screen mark shown when there's no session. Once auth resolves to logged-out, redirect to
-// the OAuth start; before that just hold the mark so we don't flash a redirect mid-restore.
-function LoginGate(props: { redirecting: boolean; loggedOut: boolean }) {
-  createEffect(() => {
-    if (props.redirecting) window.location.href = '/auth/login?return_to=' + encodeURIComponent(window.location.pathname + window.location.search)
-  })
-  const login = () => {
-    sessionStorage.removeItem('acorn:loggedout')
-    window.location.href = '/auth/login'
-  }
-  return (
-    <main class="login-gate">
-      <Acorn label={props.redirecting ? 'redirecting to github…' : props.loggedOut ? 'logged out' : 'acorn'} />
-      <Show when={props.loggedOut}>
-        <button class="auth-control" type="button" onClick={login}>Login</button>
-      </Show>
-    </main>
   )
 }

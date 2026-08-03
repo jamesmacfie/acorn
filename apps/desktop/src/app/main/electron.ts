@@ -62,28 +62,14 @@ ipcMain.on('acorn:quit-response', (_event, approved: boolean) => {
   app.quit()
 })
 
-// The renderer logs in by navigating to /auth/login, which 302s to github.com. The main window
-// is locked to the loopback origin, so we intercept that and run the whole OAuth dance in a
-// dedicated window that *is* allowed to visit GitHub (docs/electron.md §4f), then refresh.
-function openAuthWindow(parent: BrowserWindow, origin: string, loginUrl: string) {
-  const authWin = new BrowserWindow({
-    parent,
-    modal: true,
-    width: 520,
-    height: 720,
-    autoHideMenuBar: true,
-    webPreferences: { contextIsolation: true, nodeIntegration: false, sandbox: true }, // no preload
-  })
-  // After GitHub redirects back to the loopback /auth/callback, the server sets the session cookie
-  // and redirects to an app route. Landing on a non-/auth loopback URL means login finished.
-  authWin.webContents.on('did-navigate', (_e, url) => {
-    if (url.startsWith(origin) && !url.includes('/auth/')) {
-      authWin.close()
-      parent.webContents.reload() // re-runs /v2/core/me with the new cookie
-    }
-  })
-  void authWin.loadURL(loginUrl)
-}
+// The node recovery screen's two native actions (client-core/node/NodeGate.tsx). `force-quit` skips
+// the renderer will-quit prompt on purpose: that prompt is answered by the app shell, which is not
+// mounted when the gate is showing, so routing through it would hang.
+ipcMain.on('acorn:open-data-folder', () => void shell.openPath(dataDir))
+ipcMain.on('acorn:force-quit', () => {
+  quitApproved = true
+  app.quit()
+})
 
 function hardenNavigation(win: BrowserWindow, origin: string) {
   // Anything leaving the renderer for the OS goes through the scheme allowlist first: the pane
@@ -94,16 +80,11 @@ function hardenNavigation(win: BrowserWindow, origin: string) {
     void shell.openExternal(url)
   }
 
-  // The main window may only ever sit on the loopback origin. External links open in the system
-  // browser; a /auth/login navigation is rerouted into the OAuth window above.
+  // The main window may only ever sit on its own origin; everything else opens in the system browser.
+  // There is no longer an OAuth exception: GitHub is connected by device flow against the node
+  // (POST /v2/p/github/auth/device/start), so no window of ours ever has to visit github.com.
   win.webContents.on('will-navigate', (e, url) => {
-    if (url.startsWith(origin)) {
-      if (url.includes('/auth/login')) {
-        e.preventDefault()
-        openAuthWindow(win, origin, url)
-      }
-      return
-    }
+    if (url.startsWith(origin)) return
     e.preventDefault()
     openExternal(url)
   })
@@ -143,7 +124,9 @@ async function createMainWindow(started: ServiceStartResult) {
     }
   })
   win.once('ready-to-show', () => win.show())
-  await win.loadURL(e2e ? `${origin}/auth/test-login` : origin)
+  // No e2e login detour any more: the window authenticates through the broker's device bearer, so
+  // there is no cookie to establish before the shell can render.
+  await win.loadURL(origin)
   return win
 }
 

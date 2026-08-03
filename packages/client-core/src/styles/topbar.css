@@ -206,17 +206,7 @@
 }
 .repo-picker-name > small { margin-top: var(--space-1); color: var(--text-faint); font-size: var(--fs-2xs); }
 
-/* Auth controls (top-right): Login link, or signed-in account dropdown. */
-.auth-control {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-4);
-  color: var(--text);
-  text-decoration: none;
-  font-size: var(--fs-sm);
-}
-.auth-control:hover { color: var(--text-muted); }
-
+/* Top-right overflow menu (Settings / Clear cache). */
 .account-menu { position: relative; }
 .account-menu-button {
   display: inline-flex;
@@ -228,7 +218,7 @@
   background: var(--bg);
   border: var(--control-bw) solid transparent;
   border-radius: var(--radius);
-  padding: 3px var(--space-3) 3px 3px;
+  padding: 3px var(--space-3);
   cursor: pointer;
 }
 .account-menu-button:hover,
@@ -238,12 +228,6 @@
   border-color: var(--border);
 }
 .account-menu-chevron { flex: none; font-size: var(--fs-2xs); line-height: 1; }
-
-.avatar {
-  border-radius: var(--radius-circle);
-  border: var(--control-bw) solid var(--border);
-  display: block;
-}
 
 .account-menu-popover {
   position: absolute;
@@ -259,16 +243,6 @@
   border: var(--control-border);
   border-radius: var(--radius-popover);
   box-shadow: var(--shadow-5);
-}
-.account-menu-user {
-  min-width: 0;
-  padding: 7px var(--space-4) var(--space-4);
-  border-bottom: var(--chrome-divider);
-  color: var(--text-muted);
-  font-size: var(--fs-sm);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 .account-menu-item {
   display: flex;

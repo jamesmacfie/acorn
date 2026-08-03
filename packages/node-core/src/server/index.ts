@@ -9,7 +9,6 @@ import { CORE_NAMESPACE, PLUGIN_NAMESPACE, pluginRouteContributions, routeMountP
 import { auth } from './routes/auth'
 import { integrations } from './routes/integrations'
 import { pairingRoutes } from './routes/pairing'
-import { me } from './routes/me'
 import { pins } from './routes/pins'
 import { prefs } from './routes/prefs'
 import { harness } from './routes/harness'
@@ -30,15 +29,24 @@ export function createApp() {
   const pairing = pairingRoutes()
 
   // Mount order is the auth invariant: /auth is public (it establishes the session), then every
-  // /v2/* request passes csrf → authMiddleware (resolve principal) → requireUser (enforce it)
-  // before any router. A router mounted before requireUser would be an unauthenticated hole, so
-  // all /v2 routers stay below this line. One glob covers both namespaces, which is why plugin
-  // prefixes are forced to be relative to /v2/p (routeRegistry.ts). See docs/security.md §3.
+  // /v2/* request passes authMiddleware (resolve principal) → requireUser (enforce it) before any
+  // router. A router mounted before requireUser would be an unauthenticated hole, so all /v2 routers
+  // stay below this line. One glob covers both namespaces, which is why plugin prefixes are forced to
+  // be relative to /v2/p (routeRegistry.ts). See docs/security.md §3.
   //
   // The one deliberate exception is `pairing.open` (GET /v2/node + POST /v2/pair): a client that has
   // never paired holds no credential, so those two ARE the way in (docs/vNext/protocol.md § Pairing).
-  // They still sit under csrf + authMiddleware — they are public, not unprotected — and everything
-  // that administers devices stays under /v2/core, below requireUser.
+  // They still sit under authMiddleware — they are public, not unprotected — and everything that
+  // administers devices stays under /v2/core, below requireUser.
+  //
+  // csrf() covers /auth only, NOT /v2. CSRF defends *ambient* credentials: the browser attaches a
+  // cookie to a cross-site request whether or not the page meant to send it. /v2 is bearer-only — the
+  // token lives in Electron main's connection broker, and no cross-site page can make anything attach
+  // it (docs/vNext/architecture.md § How the client talks to nodes). So the Origin check buys nothing
+  // there, and it actively breaks correct callers: hono/csrf treats a *missing* content-type as
+  // form-submittable, so it 403s any bodyless mutation — `DELETE /v2/core/devices/:id` from the
+  // renderer, which sends no content-type because it sends no body. /auth is still cookie-backed
+  // (POST /auth/logout), so it keeps the check.
   const app = new Hono<AppEnv>()
     // First, unconditionally: every response — success, error, public or authenticated — carries a
     // request id, so a user-reported failure is findable in the log.
@@ -48,7 +56,6 @@ export function createApp() {
     // because Hono runs handlers in registration order.
     .use('/auth/*', csrf())
     .route('/auth', auth)
-    .use('/v2/*', csrf()) // Origin / Sec-Fetch-Site check on mutating calls
     .use('/v2/*', authMiddleware) // resolve ctx.principal from device bearer, cookie or internal token
     .route('/v2', pairing.open) // GET /v2/node + POST /v2/pair — pre-auth by construction (see above)
     .use('/v2/*', requireUser) // single 401 gate over the protected router table
@@ -56,7 +63,6 @@ export function createApp() {
     // principal is resolved and enforced (docs/vNext/protocol.md § HTTP conventions).
     .use('/v2/*', idempotency)
     .route(CORE_NAMESPACE, pairing.core) // /pair, /pair/start, /devices — owner-only device administration
-    .route(`${CORE_NAMESPACE}/me`, me)
     .route(`${CORE_NAMESPACE}/pins`, pins)
     .route(`${CORE_NAMESPACE}/prefs`, prefs)
     .route(`${CORE_NAMESPACE}/workspaces`, workspaces)
@@ -73,7 +79,7 @@ export function createApp() {
     .route(PLUGIN_NAMESPACE, buildIntegrationProviderRoutes())
 
   // Plugin-owned routers, projected from the registry AFTER the auth gate above (still inside the
-  // csrf/authMiddleware/requireUser envelope). See app/server/routes.ts for the contributions.
+  // authMiddleware/requireUser envelope). See app/server/routes.ts for the contributions.
   for (const contribution of pluginRouteContributions()) app.route(routeMountPath(contribution), contribution.router)
 
   return app.onError(onServerError) // uncaught throws still speak the ApiError envelope (docs/vNext/protocol.md § Errors)

@@ -51,6 +51,13 @@ declare global {
       onNodeFrame?: (cb: (nodeId: string, frame: unknown) => void) => () => void
       onNodeStatus?: (cb: (status: NodeStatus) => void) => () => void
       fleetList?: () => Promise<{ nodes: NodeRecord[]; statuses: NodeStatus[] }>
+      // The two native actions the node recovery screen offers (node/NodeGate.tsx). Neither is
+      // expressible in the renderer: one reveals a path in Finder, the other has to bypass the
+      // will-quit prompt, whose handler lives in a shell that is not mounted behind the gate.
+      recovery?: {
+        openDataFolder(): void
+        quit(): void
+      }
       terminal?: TerminalStreamBridge
       // Browser-preview surface: drive the task's main-owned WebContentsView.
       preview?: {

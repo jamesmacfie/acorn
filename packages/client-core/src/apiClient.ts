@@ -147,11 +147,10 @@ const raise = (res: ApiResponse, fallback: string): never => {
   })
 }
 
-type ReadOptions = { nullOn401?: boolean; signal?: AbortSignal; nodeId?: string }
+type ReadOptions = { signal?: AbortSignal; nodeId?: string }
 
 export async function readJson<T>(url: string, options: ReadOptions = {}): Promise<T> {
   const res = await send(url, { signal: options.signal, nodeId: options.nodeId })
-  if (options.nullOn401 && res.status === 401) return null as T
   if (!res.ok) raise(res, `${url} ${res.status}`)
   return parseJson<T>(res)
 }

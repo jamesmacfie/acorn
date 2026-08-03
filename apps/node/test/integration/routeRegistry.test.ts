@@ -41,7 +41,6 @@ const MOUNTED_CORE_ROUTES: ReadonlyArray<readonly [method: string, path: string]
   ['DELETE', '/v2/core/pair'],
   ['GET', '/v2/core/devices'],
   ['DELETE', '/v2/core/devices/:id'],
-  ['GET', '/v2/core/me'],
   ['GET', '/v2/core/pins'],
   ['PUT', '/v2/core/prefs'],
   ['GET', '/v2/core/workspaces'],
