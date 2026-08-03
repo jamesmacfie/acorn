@@ -2,7 +2,7 @@ import { Hono } from 'hono'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { ApiError } from '@acorn/protocol/api.ts'
 import { gh } from '..'
-import type { AppEnv, Principal, SessionUser } from '@acorn/node-core/server/middleware/auth.ts'
+import type { AppEnv, Principal } from '@acorn/node-core/server/middleware/auth.ts'
 import { prCreate } from './prCreate'
 import { testGate } from '@acorn/node-core/server/routes/testAuth.ts'
 import type { Env } from '@acorn/node-core/main/bindings.ts'
@@ -12,11 +12,10 @@ vi.mock('..', async (importOriginal) => {
   return { ...actual, gh: vi.fn() }
 })
 
-const USER: SessionUser = { token: 'gh', login: 'james', name: '', avatar: '', scopes: [] }
-const PRINCIPAL: Principal = { kind: 'user', user: USER }
+const PRINCIPAL: Principal = { kind: 'device', userId: 'james', deviceId: 'd1' }
 
-// The route now reads the stored GitHub credential, so it needs a DB. Returning no rows exercises
-// the not-connected path and lets the transitional principal-token fallback supply 'gh'.
+// The route reads the stored GitHub credential, so it needs a DB. Returning no rows is the
+// not-connected path; the token's value is irrelevant here because gh() itself is mocked.
 const noIntegrations = {
   select: () => ({ from: () => ({ where: async () => [] }) }),
   delete: () => ({ where: async () => undefined }),

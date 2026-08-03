@@ -3,7 +3,7 @@ import { Hono, type Context } from 'hono'
 import { schema } from '@acorn/node-core/server/db/index.ts'
 import { gh, ghError, ghGraphQL, ghGraphQLResult } from '..'
 import type { AppEnv } from '@acorn/node-core/server/middleware/auth.ts'
-import { getUser } from '@acorn/node-core/server/middleware/requireUser.ts'
+import { ownerId } from '@acorn/node-core/server/middleware/requireUser.ts'
 import { respondError } from '@acorn/node-core/server/respond.ts'
 import { bustPrSync, resolvePr, setPrState } from './prContext'
 import { githubToken } from '../githubToken'
@@ -245,7 +245,7 @@ export const prActions = new Hono<AppEnv>()
   // Repo-scoped (no PR number): a check's runId is the Actions run, not the PR. No mirror to update —
   // the new run states surface on the next composite refetch.
   .post('/:owner/:repo/actions/:runId/rerun', async (c) => {
-    getUser(c) // gate on auth; the credential itself comes from the stored integration
+    ownerId(c) // gate on auth; the credential itself comes from the stored integration
     const token = await githubToken(c)
     const owner = c.req.param('owner')
     const repo = c.req.param('repo')

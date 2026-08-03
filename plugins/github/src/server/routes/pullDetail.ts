@@ -4,7 +4,7 @@ import type { PullDetail } from '@acorn/protocol/api.ts'
 import { getDb, schema } from '@acorn/node-core/server/db/index.ts'
 import { prResource } from '@acorn/node-core/server/db/resourceKeys.ts'
 import type { AppEnv } from '@acorn/node-core/server/middleware/auth.ts'
-import { getUser } from '@acorn/node-core/server/middleware/requireUser.ts'
+import { ownerId } from '@acorn/node-core/server/middleware/requireUser.ts'
 import { respondError } from '@acorn/node-core/server/respond.ts'
 import { type Cached, serveThenRevalidate } from '@acorn/node-core/server/sync/engine.ts'
 import { PULLS_STALE_AFTER_MS } from '@acorn/node-core/server/sync/policy.ts'
@@ -19,11 +19,11 @@ import { githubToken } from '../githubToken'
 // cache. The mirror logic is shared with the batch route — see prMirror.ts. Files live in
 // pr_files, owned by /files.
 export const pullDetail = new Hono<AppEnv>().get('/:owner/:repo/pulls/:number', async (c) => {
-  const user = getUser(c)
+  const uid = ownerId(c)
   const token = await githubToken(c)
 
   const db = getDb(c.env)
-  const userId = user.login
+  const userId = uid
   const owner = c.req.param('owner')
   const repo = c.req.param('repo')
   const number = Number(c.req.param('number'))

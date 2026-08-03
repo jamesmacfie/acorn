@@ -5,7 +5,7 @@ import { getDb, schema } from '@acorn/node-core/server/db/index.ts'
 import { filesResource, prResource } from '@acorn/node-core/server/db/resourceKeys.ts'
 import { ghError, ghGraphQL } from '..'
 import type { AppEnv } from '@acorn/node-core/server/middleware/auth.ts'
-import { getUser } from '@acorn/node-core/server/middleware/requireUser.ts'
+import { ownerId } from '@acorn/node-core/server/middleware/requireUser.ts'
 import { respondError } from '@acorn/node-core/server/respond.ts'
 import { PULLS_STALE_AFTER_MS } from '@acorn/node-core/server/sync/policy.ts'
 import { fetchFiles, mirrorFiles, mirrorPr, PR_FRAGMENT, readComposite, readFiles, type GqlPull } from './prMirror'
@@ -26,7 +26,7 @@ const isFilesMode = (value: unknown): value is PullBatchFilesMode =>
   value === 'full' || value === 'summary' || value === 'none'
 
 export const pullsBatch = new Hono<AppEnv>().post('/:owner/:repo/pulls/batch', async (c) => {
-  const user = getUser(c)
+  const uid = ownerId(c)
   const token = await githubToken(c)
 
   const owner = c.req.param('owner')
@@ -40,7 +40,7 @@ export const pullsBatch = new Hono<AppEnv>().post('/:owner/:repo/pulls/batch', a
   if (!isFilesMode(filesMode)) return respondError(c, 400, 'bad_files_mode')
 
   const db = getDb(c.env)
-  const userId = user.login
+  const userId = uid
   const resolved = await resolveRepoForUser(db, token, userId, owner, repo)
   if (!resolved.ok) return respondError(c, resolved.failure.status, resolved.failure.error)
   const { repoId } = resolved.value

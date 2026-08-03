@@ -2,7 +2,7 @@ import { Hono } from 'hono'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { ApiError } from '@acorn/protocol/api.ts'
 import { getDb, schema } from '@acorn/node-core/server/db/index.ts'
-import type { AppEnv, Principal, SessionUser } from '@acorn/node-core/server/middleware/auth.ts'
+import type { AppEnv, Principal } from '@acorn/node-core/server/middleware/auth.ts'
 import { prActions } from './prActions'
 import { testGate } from '@acorn/node-core/server/routes/testAuth.ts'
 import { makeTestDb, type TestDb } from '@acorn/node-core/server/routes/testDb.ts'
@@ -13,8 +13,7 @@ vi.mock('@acorn/node-core/server/db/index.ts', async (importOriginal) => {
   return { ...actual, getDb: vi.fn() }
 })
 
-const USER: SessionUser = { token: 'gh', login: 'james', name: '', avatar: '', scopes: [] }
-const PRINCIPAL: Principal = { kind: 'user', user: USER }
+const PRINCIPAL: Principal = { kind: 'device', userId: 'james', deviceId: 'd1' }
 
 const req = (principal: Principal | null, method: string, path: string, body?: unknown) => {
   const app = new Hono<AppEnv>().use('/api/*', ...testGate(principal)).route('/api/repos', prActions)

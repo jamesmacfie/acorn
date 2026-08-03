@@ -11,7 +11,7 @@ import { githubProvider } from '../provider'
 import { connectionProviderRegistry } from '@acorn/node-core/server/integrations/connectionRegistry.ts'
 
 const ENC_KEY = '0'.repeat(64)
-const PRINCIPAL: Principal = { kind: 'device', deviceId: 'd1', user: { token: '', login: 'james', name: '', avatar: '', scopes: [] } }
+const PRINCIPAL: Principal = { kind: 'device', deviceId: 'd1', userId: 'james' }
 
 let harness: TestDb
 let identity: string | null

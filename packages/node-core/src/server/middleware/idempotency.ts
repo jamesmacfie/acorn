@@ -45,11 +45,10 @@ export const idempotency = createMiddleware<AppEnv>(async (c, next) => {
   // GET/HEAD are side-effect-free by the same document's rules, so a key on one means nothing.
   if (!key || c.req.method === 'GET' || c.req.method === 'HEAD') return next()
 
-  // No deviceId → no key space. The internal-token principal is a child process this node spawned and
-  // the cookie principal is a browser on the same origin; neither has a durable device identity to
-  // scope a key to, and keying them together would let one caller's retry replay another's response.
-  // Both are also same-process callers that do not retry across a network, which is what the header is
-  // for. They pass through untouched.
+  // No deviceId → no key space. The internal-token principal is a child process this node spawned: it
+  // has no durable device identity to scope a key to, and keying every such child together would let
+  // one caller's retry replay another's response. It is also a same-machine caller that does not retry
+  // across a network, which is what the header is for. It passes through untouched.
   const deviceId = c.get('principal')?.deviceId
   if (!deviceId) return next()
 

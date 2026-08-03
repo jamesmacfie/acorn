@@ -235,8 +235,8 @@ export const prefs = sqliteTable(
 // user can connect several Linears / Rollbars, so the key is an opaque `id`, not (userId, provider).
 // `label` disambiguates them in the UI ("Linear – work"). authRef is ENCRYPTED at rest (JWE via
 // SESSION_ENC_KEY, see session.ts encryptSecret) and never leaves the server — same posture as the
-// GitHub token. GitHub itself is NOT stored here: it's the identity root (its token is the session
-// cookie, userId is derived from it); it only *appears* as a synthesized entry in the list endpoint.
+// GitHub token. GitHub is the identity root — connecting it is what binds ACTIVE_IDENTITY, and userId
+// is derived from it — so it also *appears* as a synthesized entry in the list endpoint.
 export const integrations = sqliteTable('integrations', {
   id: text('id').primaryKey(), // opaque uuid
   userId: text('user_id').notNull(),

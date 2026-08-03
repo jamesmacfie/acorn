@@ -37,7 +37,7 @@ vi.mock('./prMirror', async (importOriginal) => {
 
 const app = new Hono<AppEnv>()
 app.use('/api/*', async (c, next) => {
-  c.set('principal', { kind: 'user', user: { token: 'token', login: 'james', name: '', avatar: '', scopes: [] } })
+  c.set('principal', { kind: 'device', userId: 'james' })
   await next()
 })
 app.route('/api/repos', pullsBatch)

@@ -7,7 +7,7 @@ import {
 import { bridgeSlot, viaBridge } from '@acorn/node-core/server/bridge.ts'
 import { getDb } from '@acorn/node-core/server/db/index.ts'
 import type { AppEnv } from '@acorn/node-core/server/middleware/auth.ts'
-import { getUser } from '@acorn/node-core/server/middleware/requireUser.ts'
+import { ownerId } from '@acorn/node-core/server/middleware/requireUser.ts'
 import { respondError } from '@acorn/node-core/server/respond.ts'
 import {
   readAgentPricingPreferences,
@@ -23,22 +23,22 @@ export const setAgentUsageBridge = agentUsageBridgeSlot.set
 
 export const agentUsage = new Hono<AppEnv>()
   .get('/pricing', async (c) => {
-    const user = getUser(c)
-    return c.json(await readAgentPricingPreferences(getDb(c.env), user.login))
+    const uid = ownerId(c)
+    return c.json(await readAgentPricingPreferences(getDb(c.env), uid))
   })
   .put('/pricing', async (c) => {
     const body = await c.req.json().catch(() => null) as unknown
     const result = validateAgentPricingPreferences(body)
     if (!result.ok) return respondError(c, 400, 'bad_request', result.errors)
-    const user = getUser(c)
-    await writeAgentPricingPreferences(getDb(c.env), user.login, result.value)
+    const uid = ownerId(c)
+    await writeAgentPricingPreferences(getDb(c.env), uid, result.value)
     return c.json(result.value satisfies AgentPricingPreferences)
   })
   .get('/usage', (c) => {
-    const userId = getUser(c).login
+    const userId = ownerId(c)
     return viaBridge(c, agentUsageBridgeSlot, (bridge) => bridge.read({ userId }))
   })
   .post('/usage/refresh', (c) => {
-    const userId = getUser(c).login
+    const userId = ownerId(c)
     return viaBridge(c, agentUsageBridgeSlot, (bridge) => bridge.read({ userId, force: true }))
   })

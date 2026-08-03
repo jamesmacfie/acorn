@@ -1,12 +1,10 @@
 import { Hono } from 'hono'
-import { csrf } from 'hono/csrf'
 import { authMiddleware, type AppEnv } from './middleware/auth'
 import { buildIntegrationProviderRoutes } from './integrations/providerRoutes'
 import { idempotency } from './middleware/idempotency'
 import { requireUser } from './middleware/requireUser'
 import { onServerError, requestIdMiddleware } from './respond'
 import { CORE_NAMESPACE, PLUGIN_NAMESPACE, pluginRouteContributions, routeMountPath } from './routeRegistry'
-import { auth } from './routes/auth'
 import { integrations } from './routes/integrations'
 import { pairingRoutes } from './routes/pairing'
 import { pins } from './routes/pins'
@@ -18,45 +16,41 @@ import { workspaces } from './routes/workspaces'
 import { tasks } from './routes/tasks'
 import { configTrust } from './routes/configTrust'
 
-// One server, both /auth and /v2. The Node/Electron bootstrap (core/main/server.ts) wraps this with
-// static asset serving + SPA fallback. createApp() is a factory so the bootstrap can build a fresh
-// instance. Core mounts only core routers by name, under /v2/core; every plugin-owned router arrives
-// through the route registry (populated by app/server/routes.ts before this runs) and mounts under
-// /v2/p/<plugin> — core imports no product route module directly (docs/plugins.md).
+// One server, one namespace: /v2. createApp() is a factory so the bootstrap can build a fresh instance.
+// Core mounts only core routers by name, under /v2/core; every plugin-owned router arrives through the
+// route registry (populated by app/server/routes.ts before this runs) and mounts under /v2/p/<plugin> —
+// core imports no product route module directly (docs/plugins.md).
 export function createApp() {
   // Per-instance state (the pairing rate ceiling), so it must be built here rather than imported as a
   // module-level router.
   const pairing = pairingRoutes()
 
-  // Mount order is the auth invariant: /auth is public (it establishes the session), then every
-  // /v2/* request passes authMiddleware (resolve principal) → requireUser (enforce it) before any
-  // router. A router mounted before requireUser would be an unauthenticated hole, so all /v2 routers
-  // stay below this line. One glob covers both namespaces, which is why plugin prefixes are forced to
-  // be relative to /v2/p (routeRegistry.ts). See docs/security.md §3.
+  // Mount order is the auth invariant: every /v2/* request passes authMiddleware (resolve principal) →
+  // requireUser (enforce it) before any router. A router mounted before requireUser would be an
+  // unauthenticated hole, so all /v2 routers stay below this line. One glob covers both namespaces,
+  // which is why plugin prefixes are forced to be relative to /v2/p (routeRegistry.ts). See
+  // docs/security.md §3.
   //
   // The one deliberate exception is `pairing.open` (GET /v2/node + POST /v2/pair): a client that has
   // never paired holds no credential, so those two ARE the way in (docs/vNext/protocol.md § Pairing).
   // They still sit under authMiddleware — they are public, not unprotected — and everything that
   // administers devices stays under /v2/core, below requireUser.
   //
-  // csrf() covers /auth only, NOT /v2. CSRF defends *ambient* credentials: the browser attaches a
-  // cookie to a cross-site request whether or not the page meant to send it. /v2 is bearer-only — the
-  // token lives in Electron main's connection broker, and no cross-site page can make anything attach
-  // it (docs/vNext/architecture.md § How the client talks to nodes). So the Origin check buys nothing
-  // there, and it actively breaks correct callers: hono/csrf treats a *missing* content-type as
-  // form-submittable, so it 403s any bodyless mutation — `DELETE /v2/core/devices/:id` from the
-  // renderer, which sends no content-type because it sends no body. /auth is still cookie-backed
-  // (POST /auth/logout), so it keeps the check.
+  // There is NO csrf(), and its absence is deliberate rather than an omission. CSRF exists to defend
+  // *ambient* credentials: a browser attaches a cookie to a cross-site request whether or not the page
+  // meant to send it, so the server has to ask "did a page I trust initiate this?". This app has no
+  // ambient credential left. Every request carries a bearer that lives in Electron main's connection
+  // broker, and nothing a cross-site page can do makes anything attach it — the renderer holds no token
+  // and, under app://acorn's CSP (`connect-src 'self'`), cannot open a socket to a node at all
+  // (docs/vNext/security.md). The check used to be mounted on /auth only, for the one cookie-backed
+  // mutation (POST /auth/logout); that route and its cookie are gone. Reinstating it over /v2 would
+  // additionally break correct callers, because hono/csrf treats a *missing* content-type as
+  // form-submittable and 403s any bodyless mutation — `DELETE /v2/core/devices/:id`, for one.
   const app = new Hono<AppEnv>()
     // First, unconditionally: every response — success, error, public or authenticated — carries a
     // request id, so a user-reported failure is findable in the log.
     .use('*', requestIdMiddleware)
-    // /auth is public, but its one mutating route (POST /logout) still needs the Origin check —
-    // without it any page the user visits can force-log-them-out. Registered before the router
-    // because Hono runs handlers in registration order.
-    .use('/auth/*', csrf())
-    .route('/auth', auth)
-    .use('/v2/*', authMiddleware) // resolve ctx.principal from device bearer, cookie or internal token
+    .use('/v2/*', authMiddleware) // resolve ctx.principal from a device bearer or the internal token
     .route('/v2', pairing.open) // GET /v2/node + POST /v2/pair — pre-auth by construction (see above)
     .use('/v2/*', requireUser) // single 401 gate over the protected router table
     // Below the gate on purpose: replay is keyed on the caller's deviceId, which only exists once the

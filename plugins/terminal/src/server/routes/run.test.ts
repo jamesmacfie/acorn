@@ -13,7 +13,7 @@ const req = (url: string, method = 'GET') => new Request(`http://acorn.test${url
 const authed = () => {
   const app = new Hono<AppEnv>()
   app.use('/api/*', async (c, next) => {
-    c.set('principal', { kind: 'user', user: { token: 't', login: 'james', name: '', avatar: '', scopes: [] } })
+    c.set('principal', { kind: 'device', userId: 'james' })
     await next()
   })
   return app.route('/api/tasks', harness)

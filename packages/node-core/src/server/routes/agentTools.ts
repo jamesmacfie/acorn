@@ -12,7 +12,7 @@ import {
 } from '../agentTools/registry'
 import { getDb, schema } from '../db'
 import type { AppEnv } from '../middleware/auth'
-import { getUser } from '../middleware/requireUser'
+import { ownerId } from '../middleware/requireUser'
 import { respondError } from '../respond'
 import { decodeToolCeiling, isToolWithinCeiling, type ToolCeiling } from '@acorn/protocol/workflow.ts'
 
@@ -20,7 +20,7 @@ const STATUS: Record<ToolError['kind'], 404 | 400 | 409 | 500> = { not_found: 40
 type AvailabilityCache = Map<NonNullable<AgentToolContribution['when']>, Promise<boolean>>
 
 async function loadPerms(c: Context<AppEnv>) {
-  const login = getUser(c).login
+  const login = ownerId(c)
   const [row] = await getDb(c.env)
     .select({ value: schema.prefs.value })
     .from(schema.prefs)
@@ -29,7 +29,7 @@ async function loadPerms(c: Context<AppEnv>) {
 }
 
 function toolContext(c: Context<AppEnv>): ToolContext {
-  return { taskId: c.req.param('id')!, userLogin: getUser(c).login, sessionId: c.req.header('x-acorn-session-id') }
+  return { taskId: c.req.param('id')!, userLogin: ownerId(c), sessionId: c.req.header('x-acorn-session-id') }
 }
 
 function workflowCeiling(c: Context<AppEnv>): ToolCeiling | undefined {
@@ -60,7 +60,11 @@ async function invoke(c: Context<AppEnv>, opts: { renderer: boolean }): Promise<
   const registry = getAgentTools()
   if (!registry) return respondError(c, 503, 'bridge-unavailable')
   const principal = c.get('principal')
-  if (opts.renderer ? principal?.kind !== 'user' : principal?.kind !== 'internal') return respondError(c, 404, 'not_found')
+  // 'device' is the interactive owner (the client's broker holds the bearer); 'internal' is a child this
+  // node spawned. The two surfaces are mutually exclusive on purpose — an agent must not reach the
+  // renderer-only tools, and the renderer must not impersonate an agent. This read 'user' before the
+  // session cookie died; 'device' is the same distinction under the credential that replaced it.
+  if (opts.renderer ? principal?.kind !== 'device' : principal?.kind !== 'internal') return respondError(c, 404, 'not_found')
   const tool = registry.find((candidate) => candidate.name === c.req.param('name'))
   if (!tool || (opts.renderer && !tool.exposeToRenderer)) return respondError(c, 404, 'not_found')
   const perms = await loadPerms(c)

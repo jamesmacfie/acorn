@@ -4,7 +4,7 @@ import type { Repo } from '@acorn/protocol/api.ts'
 import { getDb, schema } from '@acorn/node-core/server/db/index.ts'
 import { reposResource } from '@acorn/node-core/server/db/resourceKeys.ts'
 import type { AppEnv } from '@acorn/node-core/server/middleware/auth.ts'
-import { getUser } from '@acorn/node-core/server/middleware/requireUser.ts'
+import { ownerId } from '@acorn/node-core/server/middleware/requireUser.ts'
 import { respondError } from '@acorn/node-core/server/respond.ts'
 import { REPOS_STALE_AFTER_MS } from '@acorn/node-core/server/sync/policy.ts'
 import { type Cached, serveThenRevalidate } from '@acorn/node-core/server/sync/engine.ts'
@@ -13,11 +13,11 @@ import { githubToken } from '../githubToken'
 
 export const repos = new Hono<AppEnv>()
   .get('/', async (c) => {
-    const user = getUser(c)
+    const uid = ownerId(c)
     const token = await githubToken(c)
 
     const db = getDb(c.env)
-    const userId = user.login // ponytail: login as the scope key — stable enough; revisit if logins churn.
+    const userId = uid // ponytail: login as the scope key — stable enough; revisit if logins churn.
     const resource = reposResource()
 
     // Freshness comes from sync_state (bumped on every 200/304). A pre-ETag mirror has repo rows but
@@ -44,14 +44,14 @@ export const repos = new Hono<AppEnv>()
     return c.json(result.value)
   })
   .post('/refresh', async (c) => {
-    const user = getUser(c)
+    const uid = ownerId(c)
 
     // Force the next GET stale: zero both freshness sources (sync row + legacy row fetchedAt). The
     // ETag stays, so the refetch can still 304 (nothing changed → cheap re-validate).
     const db = getDb(c.env)
     await db.batch([
-      db.update(schema.repos).set({ fetchedAt: 0 }).where(eq(schema.repos.userId, user.login)),
-      db.update(schema.syncState).set({ fetchedAt: 0 }).where(and(eq(schema.syncState.userId, user.login), eq(schema.syncState.resource, reposResource()))),
+      db.update(schema.repos).set({ fetchedAt: 0 }).where(eq(schema.repos.userId, uid)),
+      db.update(schema.syncState).set({ fetchedAt: 0 }).where(and(eq(schema.syncState.userId, uid), eq(schema.syncState.resource, reposResource()))),
     ])
     return c.body(null, 204)
   })

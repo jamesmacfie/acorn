@@ -1,7 +1,7 @@
 import { Hono } from 'hono'
 import { gh, ghError } from '..'
 import type { AppEnv } from '@acorn/node-core/server/middleware/auth.ts'
-import { getUser } from '@acorn/node-core/server/middleware/requireUser.ts'
+import { ownerId } from '@acorn/node-core/server/middleware/requireUser.ts'
 import { respondError } from '@acorn/node-core/server/respond.ts'
 import type { RunJobs } from '@acorn/protocol/api.ts'
 import { githubToken } from '../githubToken'
@@ -21,7 +21,7 @@ type GhJob = {
 export const actions = new Hono<AppEnv>()
   // A workflow run's jobs + their steps. One cheap call; the panel filters to the clicked job.
   .get('/:owner/:repo/actions/runs/:runId/jobs', async (c) => {
-    getUser(c) // gate on auth; the credential itself comes from the stored integration
+    ownerId(c) // gate on auth; the credential itself comes from the stored integration
     const token = await githubToken(c)
     const owner = c.req.param('owner')
     const repo = c.req.param('repo')
@@ -44,7 +44,7 @@ export const actions = new Hono<AppEnv>()
   // Full plaintext log for one job. GitHub 302-redirects to signed blob storage; follow it
   // manually and re-fetch WITHOUT the auth header (the target rejects/leaks the token otherwise).
   .get('/:owner/:repo/actions/jobs/:jobId/logs', async (c) => {
-    getUser(c) // gate on auth; the credential itself comes from the stored integration
+    ownerId(c) // gate on auth; the credential itself comes from the stored integration
     const token = await githubToken(c)
     const owner = c.req.param('owner')
     const repo = c.req.param('repo')

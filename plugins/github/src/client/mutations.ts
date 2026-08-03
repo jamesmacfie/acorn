@@ -1,4 +1,5 @@
-// PR write actions. Same-origin POST (cookie auth; the server's csrf() checks Origin). Throws the
+// PR write actions. Routed through the broker, which attaches the device bearer in Electron main; no
+// cookie and therefore no CSRF check (server/index.ts explains why). Throws the
 // structured error code on failure so callers can branch (e.g. merge_failed, reauth).
 //
 // GitHub verbs only. Workspace/repo-visibility writes live in core/client/workspaces/mutations.ts,

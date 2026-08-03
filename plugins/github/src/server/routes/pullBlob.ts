@@ -3,7 +3,7 @@ import { fileBodyBlobKey } from '@acorn/node-core/server/blobs.ts'
 import { getDb } from '@acorn/node-core/server/db/index.ts'
 import { gh, ghError } from '..'
 import type { AppEnv } from '@acorn/node-core/server/middleware/auth.ts'
-import { getUser } from '@acorn/node-core/server/middleware/requireUser.ts'
+import { ownerId } from '@acorn/node-core/server/middleware/requireUser.ts'
 import { respondError } from '@acorn/node-core/server/respond.ts'
 import { resolveRepoForUser } from './repoMirror'
 import { githubToken } from '../githubToken'
@@ -16,11 +16,11 @@ const decodeBase64 = (content: string) =>
   new TextDecoder().decode(Uint8Array.from(atob(content.replace(/\n/g, '')), (c) => c.charCodeAt(0)))
 
 export const pullBlob = new Hono<AppEnv>().get('/:owner/:repo/blobs/:sha', async (c) => {
-  const user = getUser(c)
+  const uid = ownerId(c)
   const token = await githubToken(c)
 
   const db = getDb(c.env)
-  const userId = user.login
+  const userId = uid
   const owner = c.req.param('owner')
   const repo = c.req.param('repo')
   const sha = c.req.param('sha')

@@ -3,7 +3,7 @@ import type { Label } from '@acorn/protocol/api.ts'
 import { getDb } from '@acorn/node-core/server/db/index.ts'
 import { gh, ghError } from '..'
 import type { AppEnv } from '@acorn/node-core/server/middleware/auth.ts'
-import { getUser } from '@acorn/node-core/server/middleware/requireUser.ts'
+import { ownerId } from '@acorn/node-core/server/middleware/requireUser.ts'
 import { respondError } from '@acorn/node-core/server/respond.ts'
 import { resolveRepoForUser } from './repoMirror'
 import { githubToken } from '../githubToken'
@@ -14,13 +14,13 @@ type GitHubLabel = {
 }
 
 export const repoLabels = new Hono<AppEnv>().get('/:owner/:repo/labels', async (c) => {
-  const user = getUser(c)
+  const uid = ownerId(c)
   const token = await githubToken(c)
 
   const owner = c.req.param('owner')
   const repo = c.req.param('repo')
   const db = getDb(c.env)
-  const resolved = await resolveRepoForUser(db, token, user.login, owner, repo)
+  const resolved = await resolveRepoForUser(db, token, uid, owner, repo)
   if (!resolved.ok) return respondError(c, resolved.failure.status, resolved.failure.error)
 
   const res = await gh(token, `/repos/${owner}/${repo}/labels?per_page=100`)

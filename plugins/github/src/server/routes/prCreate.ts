@@ -5,7 +5,7 @@ import { pullsResource } from '@acorn/node-core/server/db/resourceKeys.ts'
 import { gh, ghError, ghGraphQL, ghGraphQLResult } from '..'
 import type { Branch, Compare } from '@acorn/protocol/api.ts'
 import type { AppEnv } from '@acorn/node-core/server/middleware/auth.ts'
-import { getUser } from '@acorn/node-core/server/middleware/requireUser.ts'
+import { ownerId } from '@acorn/node-core/server/middleware/requireUser.ts'
 import { respondError } from '@acorn/node-core/server/respond.ts'
 import { githubToken } from '../githubToken'
 
@@ -35,7 +35,7 @@ export const prCreate = new Hono<AppEnv>()
   // return the 100 most-recent. The client gets a small, relevant list to filter rather than every
   // branch. ponytail: scans up to 30 pages (3000 branches) — raise the cap if a repo overflows it.
   .get('/:owner/:repo/branches', async (c) => {
-    getUser(c) // gate on auth; the credential itself comes from the stored integration
+    ownerId(c) // gate on auth; the credential itself comes from the stored integration
     const token = await githubToken(c)
     const owner = c.req.param('owner')
     const repo = c.req.param('repo')
@@ -76,7 +76,7 @@ export const prCreate = new Hono<AppEnv>()
   // Compare base..head → diff preview (PullFile[]) + commits (for title prefill) + aheadBy.
   // Branch names with slashes go straight into the path (GitHub accepts them literally).
   .get('/:owner/:repo/compare', async (c) => {
-    getUser(c) // gate on auth; the credential itself comes from the stored integration
+    ownerId(c) // gate on auth; the credential itself comes from the stored integration
     const token = await githubToken(c)
     const owner = c.req.param('owner')
     const repo = c.req.param('repo')
@@ -104,7 +104,7 @@ export const prCreate = new Hono<AppEnv>()
   // Create the PR. 422 (PR exists / no commits / bad branch) carries GitHub's message — surface it
   // verbatim instead of letting ghError flatten it to github_unavailable.
   .post('/:owner/:repo/pulls', async (c) => {
-    const user = getUser(c)
+    const uid = ownerId(c)
     const owner = c.req.param('owner')
     const repo = c.req.param('repo')
     const { title, body, base, head, draft } = (await c.req.json().catch(() => ({}))) as {
@@ -138,11 +138,11 @@ export const prCreate = new Hono<AppEnv>()
     const [repoRow] = await db
       .select({ id: schema.repos.id })
       .from(schema.repos)
-      .where(and(eq(schema.repos.userId, user.login), eq(schema.repos.owner, owner), eq(schema.repos.name, repo)))
+      .where(and(eq(schema.repos.userId, uid), eq(schema.repos.owner, owner), eq(schema.repos.name, repo)))
     if (repoRow)
       await db
         .delete(schema.syncState)
-        .where(and(eq(schema.syncState.userId, user.login), eq(schema.syncState.resource, pullsResource(repoRow.id, 'open'))))
+        .where(and(eq(schema.syncState.userId, uid), eq(schema.syncState.resource, pullsResource(repoRow.id, 'open'))))
 
     return c.json({ number: created.number })
   })

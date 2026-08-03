@@ -5,7 +5,7 @@ import type { PullFile, PullFilesPatchRequest } from '@acorn/protocol/api.ts'
 import { getDb, schema } from '@acorn/node-core/server/db/index.ts'
 import { filesResource } from '@acorn/node-core/server/db/resourceKeys.ts'
 import type { AppEnv } from '@acorn/node-core/server/middleware/auth.ts'
-import { getUser } from '@acorn/node-core/server/middleware/requireUser.ts'
+import { ownerId } from '@acorn/node-core/server/middleware/requireUser.ts'
 import { respondError } from '@acorn/node-core/server/respond.ts'
 import { type Cached, type RefreshResult, serveThenRevalidate } from '@acorn/node-core/server/sync/engine.ts'
 import { PULLS_STALE_AFTER_MS } from '@acorn/node-core/server/sync/policy.ts'
@@ -38,11 +38,11 @@ const uniqueStringPaths = (paths: unknown): string[] | null => {
 }
 
 const handleFilesRead = async (c: Context<AppEnv>, options: { summaryOnly?: boolean; paths?: string[] } = {}) => {
-  const user = getUser(c)
+  const uid = ownerId(c)
   const token = await githubToken(c)
 
   const db = getDb(c.env)
-  const userId = user.login
+  const userId = uid
   const owner = c.req.param('owner')
   const repo = c.req.param('repo')
   const number = Number(c.req.param('number'))

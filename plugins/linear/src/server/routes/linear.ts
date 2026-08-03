@@ -16,7 +16,7 @@ import {
   linearFetch,
 } from '..'
 import type { AppEnv } from '@acorn/node-core/server/middleware/auth.ts'
-import { getUser } from '@acorn/node-core/server/middleware/requireUser.ts'
+import { ownerId } from '@acorn/node-core/server/middleware/requireUser.ts'
 import { respondError } from '@acorn/node-core/server/respond.ts'
 import { encodeCached, parseCached } from '@acorn/node-core/server/integrations/codec.ts'
 import { connectionHasCapability, forEachConnection, listProviderConnections } from '@acorn/node-core/server/integrations/connections.ts'
@@ -81,8 +81,8 @@ export const linear = new Hono<AppEnv>()
   // Projects across every connected Linear integration, each tagged with its connection so the
   // picker can span multiple Linears (docs/workspaces-and-tasks.md). A failing connection is skipped.
   .get('/projects', async (c) => {
-    const user = getUser(c)
-    const connections = await linearConnections(c, user.login)
+    const uid = ownerId(c)
+    const connections = await linearConnections(c, uid)
     if (!connections.length) return respondError(c, 403, 'provider_not_connected')
     const out: LinearProject[] = []
     for (const { row, key } of connections) {
@@ -99,8 +99,8 @@ export const linear = new Hono<AppEnv>()
   })
   // Active issues for the given project ids within ONE connection (?integration=<id>&ids=).
   .get('/project-issues', async (c) => {
-    const user = getUser(c)
-    const connections = await linearConnections(c, user.login)
+    const uid = ownerId(c)
+    const connections = await linearConnections(c, uid)
     const connection = connections.find(({ row }) => row.id === c.req.query('integration'))
     if (!connection) return respondError(c, 403, 'provider_not_connected')
     const { row, key } = connection
@@ -127,11 +127,11 @@ export const linear = new Hono<AppEnv>()
   // Batch enrichment for referenced tickets: summaries, serve-then-revalidate (10-min TTL). Stale
   // identifiers are resolved across all connections; each result is cached under its connection.
   .post('/issues', async (c) => {
-    const user = getUser(c)
+    const uid = ownerId(c)
     const db = getDb(c.env)
-    const storedConnections = await listProviderConnections(db, user.login, PROVIDER)
+    const storedConnections = await listProviderConnections(db, uid, PROVIDER)
     if (!storedConnections.length) return respondError(c, 403, 'provider_not_connected')
-    const connections = await linearConnections(c, user.login)
+    const connections = await linearConnections(c, uid)
 
     const body = (await c.req.json().catch(() => ({}))) as Partial<LinearIssuesRequest>
     const identifiers = [...new Set((body.identifiers ?? []).filter((s) => typeof s === 'string'))]
@@ -141,7 +141,7 @@ export const linear = new Hono<AppEnv>()
     const cached = await db
       .select()
       .from(schema.issues)
-      .where(and(eq(schema.issues.userId, user.login), eq(schema.issues.provider, PROVIDER), inArray(schema.issues.identifier, identifiers)))
+      .where(and(eq(schema.issues.userId, uid), eq(schema.issues.provider, PROVIDER), inArray(schema.issues.identifier, identifiers)))
     const now = Date.now()
     const byId = new Map<string, ReturnType<NonNullable<typeof linearProvider.codec>['mergeSummary']>>()
     const byConnectionAndId = new Map<string, ReturnType<NonNullable<typeof linearProvider.codec>['mergeSummary']>>()
@@ -184,7 +184,7 @@ export const linear = new Hono<AppEnv>()
           const data = encodeCached(item, linearProvider.budgets.maxCachedItemBytes)
           await db
             .insert(schema.issues)
-            .values({ userId: user.login, integrationId: row.id, provider: PROVIDER, identifier: node.identifier, data, fetchedAt: now })
+            .values({ userId: uid, integrationId: row.id, provider: PROVIDER, identifier: node.identifier, data, fetchedAt: now })
             .onConflictDoUpdate({ target: [schema.issues.userId, schema.issues.integrationId, schema.issues.identifier], set: { data, fetchedAt: now } })
         }
         stale = stale.filter((id) => !found.has(id))
@@ -198,7 +198,7 @@ export const linear = new Hono<AppEnv>()
   })
   // Full detail for the side panel. refresh=1 (panel open) always refetches to stay current.
   .get('/issues/:identifier', async (c) => {
-    const user = getUser(c)
+    const uid = ownerId(c)
     const identifier = c.req.param('identifier')
     const connectionId = c.req.query('integration')
     const refresh = c.req.query('refresh') === '1'
@@ -208,7 +208,7 @@ export const linear = new Hono<AppEnv>()
     if (connectionId) {
       const result = await runProviderResource<LinearResourceInput, LinearIssueDetail>({
         db,
-        userId: user.login,
+        userId: uid,
         encryptionKey: c.env.SESSION_ENC_KEY,
         providerId: PROVIDER,
         connectionId,
@@ -219,12 +219,12 @@ export const linear = new Hono<AppEnv>()
       return result.ok ? c.json(result.value) : respondError(c, result.failure.status, result.failure.error, result.failure.detail)
     }
 
-    const stored = await listProviderConnections(db, user.login, PROVIDER)
+    const stored = await listProviderConnections(db, uid, PROVIDER)
     if (!stored.length) return respondError(c, 403, 'provider_not_connected')
     const cached = await db
       .select()
       .from(schema.issues)
-      .where(and(eq(schema.issues.userId, user.login), eq(schema.issues.provider, PROVIDER), eq(schema.issues.identifier, identifier)))
+      .where(and(eq(schema.issues.userId, uid), eq(schema.issues.provider, PROVIDER), eq(schema.issues.identifier, identifier)))
     const order = new Map(stored.map((connection, index) => [connection.id, index]))
     const cachedRow = cached.sort((a, b) => (order.get(a.integrationId) ?? Number.MAX_SAFE_INTEGER) - (order.get(b.integrationId) ?? Number.MAX_SAFE_INTEGER))[0]
     const cachedItem = cachedRow
@@ -234,7 +234,7 @@ export const linear = new Hono<AppEnv>()
       return c.json(cachedItem.value.detail)
     }
 
-    const connections = await linearConnections(c, user.login)
+    const connections = await linearConnections(c, uid)
     if (!connections.length && cachedItem?.ok && cachedItem.value.detail) return c.json(cachedItem.value.detail)
     if (!connections.length) return respondError(c, 403, 'provider_not_connected')
 
@@ -250,15 +250,15 @@ export const linear = new Hono<AppEnv>()
     const data = encodeCached(item, linearProvider.budgets.maxCachedItemBytes)
     await db
       .insert(schema.issues)
-      .values({ userId: user.login, integrationId: resolved.integrationId, provider: PROVIDER, identifier: detail.identifier, data, fetchedAt: now })
+      .values({ userId: uid, integrationId: resolved.integrationId, provider: PROVIDER, identifier: detail.identifier, data, fetchedAt: now })
       .onConflictDoUpdate({ target: [schema.issues.userId, schema.issues.integrationId, schema.issues.identifier], set: { data, fetchedAt: now } })
     return c.json(detail)
   })
   // Add a comment (or threaded reply via parentId) to a ticket. Client refetches detail after.
   .post('/issues/:identifier/comments', async (c) => {
-    const user = getUser(c)
+    const uid = ownerId(c)
     const requestedConnectionId = c.req.query('integration')
-    const allConnections = await linearConnections(c, user.login)
+    const allConnections = await linearConnections(c, uid)
     const connections = requestedConnectionId
       ? allConnections.filter(({ row }) => row.id === requestedConnectionId)
       : allConnections

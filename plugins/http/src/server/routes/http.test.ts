@@ -21,10 +21,7 @@ const requestBody = {
   vars: { TOKEN: 'override-secret' },
 }
 
-const principal = (login: string, kind: Principal['kind'] = 'user'): Principal => ({
-  kind,
-  user: { token: kind === 'user' ? 'github-token' : '', login, name: login, avatar: '', scopes: [] },
-})
+const principal = (login: string, kind: Principal['kind'] = 'device'): Principal => ({ kind, userId: login })
 
 describe('HTTP credential isolation', () => {
   let testDb: TestDb

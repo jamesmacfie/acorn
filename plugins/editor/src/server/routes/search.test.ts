@@ -20,7 +20,7 @@ const jsonReq = (url: string, method: string, body?: unknown) =>
 const authed = () => {
   const app = new Hono<AppEnv>()
   app.use('/api/*', async (c, next) => {
-    c.set('principal', { kind: 'user', user: { token: 't', login: 'james', name: '', avatar: '', scopes: [] } })
+    c.set('principal', { kind: 'device', userId: 'james' })
     await next()
   })
   return app.route('/api/tasks', search)

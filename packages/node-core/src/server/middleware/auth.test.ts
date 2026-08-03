@@ -1,6 +1,5 @@
 import { Hono } from 'hono'
 import { describe, expect, it, vi } from 'vitest'
-import { sealSession, SESSION_COOKIE } from '../session'
 import { authMiddleware, type AppEnv } from './auth'
 import type { Env } from '../../main/bindings'
 
@@ -22,7 +21,7 @@ describe('machine identity binding', () => {
     )
 
     expect(response.status).toBe(200)
-    expect(await response.json()).toMatchObject({ principal: { kind: 'internal', user: { login: 'bob', token: '' } } })
+    expect(await response.json()).toMatchObject({ principal: { kind: 'internal', userId: 'bob' } })
   })
 
   it('fails closed for internal traffic when no identity is bound', async () => {
@@ -51,11 +50,13 @@ describe('machine identity binding', () => {
     }
   })
 
-  it('updates the binding from a valid cookie session', async () => {
+  // A cookie used to be a third way in, and it was the only credential the middleware could WRITE the
+  // identity binding from. Both are gone: there is no cookie to present, and the binding is written when
+  // a provider account is connected instead.
+  it('ignores a cookie entirely', async () => {
     const set = vi.fn()
-    const sealed = await sealSession({ token: 'github', login: 'alice', name: '', avatar: '', scopes: [] }, ENC_KEY)
     const response = await app.fetch(
-      new Request('http://acorn.test/', { headers: { cookie: `${SESSION_COOKIE}=${sealed}` } }),
+      new Request('http://acorn.test/', { headers: { cookie: 'session=anything-at-all' } }),
       {
         INTERNAL_TOKEN: 'internal',
         ACTIVE_IDENTITY: { get: () => 'bob', set, clear: vi.fn() },
@@ -63,8 +64,8 @@ describe('machine identity binding', () => {
       } as unknown as Env,
     )
 
-    expect(response.status).toBe(200)
-    expect(set).toHaveBeenCalledWith('alice')
+    expect(await response.json()).toEqual({ principal: null })
+    expect(set).not.toHaveBeenCalled()
   })
 })
 
@@ -85,10 +86,10 @@ describe('device bearer', () => {
     const response = await withBearer('Bearer acorn_dt_token', envWith({ authenticate }))
 
     expect(authenticate).toHaveBeenCalledWith('acorn_dt_token')
-    // token: '' — the GitHub credential is not the session any more; the github plugin reads it from
-    // a stored integration rather than off the principal.
+    // No GitHub token on the principal: a device is an identity, and the credential lives in a stored
+    // integration the github plugin reads through its own accessor.
     expect(await response.json()).toMatchObject({
-      principal: { kind: 'device', deviceId: 'dev-1', user: { login: 'bob', token: '' } },
+      principal: { kind: 'device', userId: 'bob', deviceId: 'dev-1' },
     })
   })
 
@@ -113,16 +114,15 @@ describe('device bearer', () => {
     expect(await response.json()).toEqual({ principal: null })
   })
 
-  // Bearer resolves ahead of the cookie, so the cookie branch becomes dead code the moment the
-  // client stops sending one — which is how it gets deleted safely.
-  it('prefers the bearer over a valid cookie', async () => {
-    const sealed = await sealSession({ token: 'github', login: 'alice', name: '', avatar: '', scopes: [] }, ENC_KEY)
+  // A rejected bearer is a rejection, not an invitation to try the next mechanism — so a caller cannot
+  // present a bad device token alongside a valid internal token and be admitted as the machine.
+  it('does not fall back to the internal token when a presented bearer fails', async () => {
     const response = await app.fetch(
       new Request('http://acorn.test/', {
-        headers: { authorization: 'Bearer acorn_dt_token', cookie: `${SESSION_COOKIE}=${sealed}` },
+        headers: { authorization: 'Bearer revoked', 'x-acorn-internal': 'internal' },
       }),
-      envWith({ authenticate: vi.fn().mockResolvedValue({ deviceId: 'dev-1' }) }),
+      envWith({ authenticate: vi.fn().mockResolvedValue(null) }),
     )
-    expect(await response.json()).toMatchObject({ principal: { kind: 'device' } })
+    expect(await response.json()).toEqual({ principal: null })
   })
 })
