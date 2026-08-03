@@ -73,13 +73,15 @@ export function startListener(runtime: RuntimeBindings, options: StartListenerOp
       server.off('error', reject) // listening — later runtime errors are not listen failures
       resolveServer({ server, endpoint: { origin: `http://127.0.0.1:${info.port}`, port: info.port } })
     })
-    // The one authenticated WebSocket (the WebSocket transport) shares this loopback listener via its
-    // 'upgrade' event; the hub re-checks Host + Origin + session cookie before the handshake.
+    // The one authenticated WebSocket (/v2/events) shares this loopback listener via its 'upgrade'
+    // event; the hub re-checks Host plus a device bearer / internal token / session cookie before the
+    // handshake, and holds the device service so a revoked device's sockets close immediately.
     attachWsHub(server as unknown as import('node:http').Server, {
       encKey: runtime.SESSION_ENC_KEY,
       internalToken: runtime.INTERNAL_TOKEN,
       allowedHost,
       origin: `http://${allowedHost}`,
+      devices: runtime.DEVICES,
     })
     server.once('error', reject)
   })

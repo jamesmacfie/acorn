@@ -4,6 +4,7 @@ import { randomUUID } from 'node:crypto'
 import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { WS_PATH } from '@acorn/protocol/ws.ts'
 
 const KEY = 'e'.repeat(64)
 const roots: string[] = []
@@ -169,7 +170,9 @@ async function openSmokeWorkspace(page: Page): Promise<void> {
 }
 
 async function createTerminalAndCapture(page: Page, taskId: string, command: string): Promise<string> {
-  return page.evaluate(async ({ taskId, command }) => {
+  // wsPath is passed in rather than inlined: the page context cannot import the protocol constant, and
+  // a hardcoded copy is how this suite would silently stop attaching after a path change.
+  return page.evaluate(async ({ taskId, command, wsPath }) => {
     const response = await fetch('/v2/p/terminal/terminal/sessions', {
       method: 'POST', headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ taskId, profileId: 'shell', command, title: 'Smoke terminal' }),
@@ -177,7 +180,7 @@ async function createTerminalAndCapture(page: Page, taskId: string, command: str
     if (!response.ok) throw new Error(await response.text())
     const session = await response.json() as { id: string }
     return new Promise<string>((resolve, reject) => {
-      const ws = new WebSocket(`${location.origin.replace(/^http/, 'ws')}/ws`)
+      const ws = new WebSocket(`${location.origin.replace(/^http/, 'ws')}${wsPath}`)
       let output = ''
       const timer = window.setTimeout(() => { ws.close(); reject(new Error(`terminal output timeout: ${output}`)) }, 8_000)
       ws.onopen = () => ws.send(JSON.stringify({ channel: 'term:attach', id: session.id }))
@@ -188,7 +191,7 @@ async function createTerminalAndCapture(page: Page, taskId: string, command: str
         if (frame.msg.type === 'exit') { clearTimeout(timer); ws.close(); resolve(output) }
       }
     })
-  }, { taskId, command })
+  }, { taskId, command, wsPath: WS_PATH })
 }
 
 test.afterEach(async () => {

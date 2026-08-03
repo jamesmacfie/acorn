@@ -7,8 +7,9 @@ import type { IncomingMessage, Server } from 'node:http'
 import type { Duplex } from 'node:stream'
 import { WebSocketServer, type WebSocket } from 'ws'
 import { openSession, SESSION_COOKIE } from '../server/session'
+import type { DeviceService } from '../server/auth/deviceTokens'
 import type { ServerMsg } from '@acorn/protocol/terminal.ts'
-import { WS_PATH, type WsClientFrame, type WsServerFrame } from '@acorn/protocol/ws.ts'
+import { WS_PATH, type WsClientFrame, type WsServerFrame, type WsServerWireFrame } from '@acorn/protocol/ws.ts'
 
 // A sink is one connection's outlet for a session's ServerMsg frames — terminal.ts adds/removes it
 // from a session's subscriber set on attach/detach and calls it to push output.
@@ -40,36 +41,77 @@ export function registerWsChannelHandler(prefix: string, handler: WsChannelHandl
   else channelHandlers.delete(prefix)
 }
 
-type Conn = { ws: WebSocket; sinks: Map<string, StreamSink> }
+// `deviceId` is null for a cookie or internal-token socket — the two credential kinds that have no
+// device row to revoke. `seq` is this connection's own counter (docs/vNext/protocol.md § Events), so a
+// reconnect legitimately restarts at 1 and the client compares only within one socket's lifetime.
+type Conn = { ws: WebSocket; sinks: Map<string, StreamSink>; deviceId: string | null; seq: number }
 const conns = new Set<Conn>()
 const hubDisposers = new WeakMap<Server, () => void>()
 
-function sendFrame(ws: WebSocket, frame: WsServerFrame): void {
-  if (ws.readyState === ws.OPEN) ws.send(JSON.stringify(frame))
+// Per-connection ceiling on unflushed bytes. A remote link that stops draining is the case this
+// exists for: a PTY producing faster than the socket drains would otherwise grow the send buffer
+// without bound inside the service process.
+//
+// ponytail: dropping frames is the crude version of protocol.md § Streams' credit scheme (client
+// grants bytes, server never exceeds outstanding credit), which is the Phase 2 replacement. It is
+// safe in the meantime *because* seq is stamped before the drop: the client sees the gap and does what
+// the protocol says — reconnect and refetch — rather than silently rendering a hole.
+const MAX_BUFFERED_BYTES = 4 * 1024 * 1024
+
+function sendFrame(conn: Conn, frame: WsServerFrame): void {
+  // Increment even when the frame is dropped, so the omission is visible to the client as a gap.
+  conn.seq += 1
+  if (conn.ws.readyState !== conn.ws.OPEN) return
+  if (conn.ws.bufferedAmount > MAX_BUFFERED_BYTES) return
+  conn.ws.send(JSON.stringify({ ...frame, seq: conn.seq } satisfies WsServerWireFrame))
 }
 
 // Session-status pings + workflow notices go to every open socket (notify.ts). Sessions' own output
 // goes only to attached sockets, via their per-session sink.
 export function wsBroadcast(frame: WsServerFrame): void {
-  for (const c of conns) sendFrame(c.ws, frame)
+  for (const c of conns) sendFrame(c, frame)
 }
 
 // True when any socket is connected — notify.ts uses the same "no window layer → no-op" idea for WS.
 export const wsHasClients = (): boolean => conns.size > 0
 
-export type WsAuthDeps = { encKey: string; internalToken: string; allowedHost: string; origin: string }
+export type WsAuthDeps = {
+  encKey: string
+  internalToken: string
+  allowedHost: string
+  origin: string
+  // Resolves the device bearer at upgrade and tells the hub when a device is revoked.
+  devices: DeviceService
+  // How often the backstop sweep re-checks each connection's device. protocol.md § Pairing pins the
+  // production value at 60s; tests inject a short one instead of faking timers.
+  revocationCheckMs?: number
+}
 
-// Upgrade auth (security.md §3/§7): loopback Host guard + exact-Origin + a valid session cookie, OR
-// the internal token (the loopback MCP caller — no cookie/origin). Anything else → 403 before the
-// ws handshake completes.
-async function authorize(req: IncomingMessage, deps: WsAuthDeps): Promise<boolean> {
-  if (req.headers.host !== deps.allowedHost) return false
+// What a successful upgrade resolved to. `deviceId` is what makes revocation actionable later: a
+// socket holds no bearer to re-present, so the connection has to remember which device it belongs to.
+type Authorized = { deviceId: string | null }
+
+// Upgrade auth (docs/vNext/protocol.md § Events: "token-authenticated at upgrade"): loopback Host
+// guard, then a device bearer, OR the internal token (the loopback MCP caller — no cookie/origin), OR
+// exact-Origin + a valid session cookie. Anything else → 403 before the ws handshake completes.
+async function authorize(req: IncomingMessage, deps: WsAuthDeps): Promise<Authorized | null> {
+  if (req.headers.host !== deps.allowedHost) return null
+  const bearer = req.headers.authorization
+  if (bearer?.startsWith('Bearer ')) {
+    // A bearer that fails does NOT fall through to the cookie: presenting a credential and having it
+    // rejected is a rejection, not an invitation to try the next mechanism.
+    const authenticated = await deps.devices.authenticate(bearer.slice('Bearer '.length).trim())
+    return authenticated ? { deviceId: authenticated.deviceId } : null
+  }
   const token = req.headers['x-acorn-internal']
-  if (typeof token === 'string' && token && token === deps.internalToken) return true
-  if (req.headers.origin !== deps.origin) return false // a browser socket must carry the exact origin
+  if (typeof token === 'string' && token && token === deps.internalToken) return { deviceId: null }
+  // The cookie branch. It stays until the renderer stops talking to the node over a browser origin —
+  // the same stage that deletes the login gate and moves the window to app:// (docs/vNext/plan.md);
+  // until then the renderer's socket is a browser socket and must carry the exact origin.
+  if (req.headers.origin !== deps.origin) return null
   const cookie = readCookie(req.headers.cookie, SESSION_COOKIE)
-  if (!cookie) return false
-  return (await openSession(cookie, deps.encKey)) != null
+  if (!cookie) return null
+  return (await openSession(cookie, deps.encKey)) != null ? { deviceId: null } : null
 }
 
 function readCookie(header: string | undefined, name: string): string | null {
@@ -82,8 +124,8 @@ function readCookie(header: string | undefined, name: string): string | null {
   return null
 }
 
-function onConnect(ws: WebSocket): void {
-  const conn: Conn = { ws, sinks: new Map() }
+function onConnect(ws: WebSocket, authorized: Authorized): void {
+  const conn: Conn = { ws, sinks: new Map(), deviceId: authorized.deviceId, seq: 0 }
   conns.add(conn)
   ws.on('message', (raw) => {
     let frame: WsClientFrame
@@ -98,7 +140,7 @@ function onConnect(ws: WebSocket): void {
         if (typeof frame.id === 'string' && typeof frame.data === 'string') handlers.input(frame.id, frame.data)
       } else if (frame.channel === 'term:attach') {
         if (typeof frame.id !== 'string' || conn.sinks.has(frame.id)) return
-        const sink: StreamSink = (msg) => sendFrame(ws, { channel: 'term:out', id: frame.id, msg })
+        const sink: StreamSink = (msg) => sendFrame(conn, { channel: 'term:out', id: frame.id, msg })
         conn.sinks.set(frame.id, sink)
         handlers.attach(frame.id, sink) // engine restores the canonical screen before queued live frames
       } else if (frame.channel === 'term:detach') {
@@ -110,7 +152,7 @@ function onConnect(ws: WebSocket): void {
       }
       return
     }
-    channelHandlers.get(frame.channel.split(':')[0])?.onFrame(frame, (f) => sendFrame(ws, f), conn)
+    channelHandlers.get(frame.channel.split(':')[0])?.onFrame(frame, (f) => sendFrame(conn, f), conn)
   })
   const cleanup = () => {
     if (!conns.delete(conn)) return // 'error' + 'close' can both fire — run once
@@ -122,8 +164,32 @@ function onConnect(ws: WebSocket): void {
   ws.on('error', cleanup)
 }
 
+// Terminate every socket belonging to a revoked device. `terminate()` rather than `close()`: an
+// invalidated credential must not keep a socket alive for a graceful closing handshake
+// (docs/vNext/protocol.md § Pairing: "open sockets are closed, in-flight requests fail").
+function dropDevice(deviceId: string): void {
+  for (const conn of [...conns]) {
+    if (conn.deviceId === deviceId) conn.ws.terminate()
+  }
+}
+
 export function attachWsHub(server: Server, deps: WsAuthDeps): void {
   const wss = new WebSocketServer({ noServer: true })
+  // Immediate path: the revoke that happened in this process tells us directly.
+  const offRevoked = deps.devices.onRevoked(dropDevice)
+  // Backstop for long-lived streams (protocol.md § Pairing, security.md § Transport: "re-check
+  // revocation every 60s"). It covers a revoke this hub never heard about — another process, or a
+  // listener registered after the revoke — which is exactly the case a live socket cannot detect,
+  // since it holds no bearer to re-present.
+  const sweep = setInterval(() => {
+    void (async () => {
+      for (const conn of [...conns]) {
+        if (conn.deviceId && !(await deps.devices.isActive(conn.deviceId))) conn.ws.terminate()
+      }
+    })()
+  }, deps.revocationCheckMs ?? 60_000)
+  // A background sweep must never be the reason the process stays alive.
+  sweep.unref?.()
   const onUpgrade = (req: IncomingMessage, socket: Duplex, head: Buffer): void => {
     // Only claim our path — other upgrades (if any) are left for their own handlers.
     let path: string
@@ -134,18 +200,20 @@ export function attachWsHub(server: Server, deps: WsAuthDeps): void {
       return
     }
     if (path !== WS_PATH) return
-    void authorize(req, deps).then((ok) => {
-      if (!ok) {
+    void authorize(req, deps).then((authorized) => {
+      if (!authorized) {
         socket.write('HTTP/1.1 403 Forbidden\r\n\r\n')
         socket.destroy()
         return
       }
-      wss.handleUpgrade(req, socket, head, (ws) => onConnect(ws))
+      wss.handleUpgrade(req, socket, head, (ws) => onConnect(ws, authorized))
     })
   }
   server.on('upgrade', onUpgrade)
   hubDisposers.set(server, () => {
     server.off('upgrade', onUpgrade)
+    clearInterval(sweep)
+    offRevoked()
     for (const conn of [...conns]) conn.ws.terminate()
     wss.close()
   })

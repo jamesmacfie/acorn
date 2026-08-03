@@ -9,6 +9,7 @@ import { X509Certificate } from 'node:crypto'
 import { WebSocketServer } from 'ws'
 import { afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest'
 import type { NodeStatus } from '@acorn/protocol/broker.ts'
+import { WS_PATH } from '@acorn/protocol/ws.ts'
 import { NodeBroker } from './nodeBroker'
 
 // Drives the real broker against a real http/https server. The pin in particular cannot be
@@ -272,7 +273,7 @@ describe('broker WebSocket', () => {
   it('authenticates the upgrade with the bearer and forwards frames verbatim', async () => {
     const { origin, server } = await listen(false)
     const upgrades: string[] = []
-    const wss = new WebSocketServer({ server, path: '/ws' })
+    const wss = new WebSocketServer({ server, path: WS_PATH })
     wss.on('connection', (socket, req) => {
       upgrades.push(String(req.headers.authorization))
       socket.send(JSON.stringify({ channel: 'term:status', seq: 1 }))
@@ -292,7 +293,7 @@ describe('broker WebSocket', () => {
   it('queues frames sent before the socket opens and flushes them on open', async () => {
     const { origin, server } = await listen(false)
     const inbound: string[] = []
-    const wss = new WebSocketServer({ server, path: '/ws' })
+    const wss = new WebSocketServer({ server, path: WS_PATH })
     wss.on('connection', (socket) => socket.on('message', (d) => inbound.push(d.toString())))
 
     const broker = makeBroker()
@@ -308,7 +309,7 @@ describe('broker WebSocket', () => {
   it('treats a seq gap as loss and reconnects', async () => {
     const { origin, server } = await listen(false)
     let connections = 0
-    const wss = new WebSocketServer({ server, path: '/ws' })
+    const wss = new WebSocketServer({ server, path: WS_PATH })
     wss.on('connection', (socket) => {
       connections += 1
       if (connections === 1) {
