@@ -1,4 +1,4 @@
-import { apiError, readJson, sendForm, writeJson } from '@acorn/client-core/apiClient.ts'
+import { apiError, readBytes, readJson, sendForm, writeJson } from '@acorn/client-core/apiClient.ts'
 import type {
   AgentAttachment,
   AgentArtifact,
@@ -52,8 +52,11 @@ export const managedAgentApi = {
     readJson<AgentArtifact[]>(sessionRoute(sessionId, '/artifacts')),
   artifact: (artifactId: string) =>
     readJson<AgentArtifact>(`${ROOT}/artifacts/${encodeURIComponent(artifactId)}`),
-  artifactContentUrl: (artifactId: string) =>
-    `${ROOT}/artifacts/${encodeURIComponent(artifactId)}/content`,
+  // Bytes, not a URL. There is no origin the browser could fetch an artifact from: under app:// a
+  // route-builder path resolves against the renderer's own protocol handler, and only the broker holds
+  // the device bearer. The caller turns this into a blob URL for the download.
+  artifactContent: (artifactId: string) =>
+    readBytes(`${ROOT}/artifacts/${encodeURIComponent(artifactId)}/content`, 'Unable to download artifact.'),
   sessions: (filter: { taskId?: string; workspaceId?: string; attention?: boolean; archived?: boolean } = {}) => {
     const query = new URLSearchParams()
     if (filter.taskId) query.set('taskId', filter.taskId)

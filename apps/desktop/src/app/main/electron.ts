@@ -1,12 +1,28 @@
-import { app, BrowserWindow, dialog, ipcMain, shell } from 'electron'
+import { app, BrowserWindow, dialog, ipcMain, protocol, shell } from 'electron'
 import { join, resolve } from 'node:path'
+import { APP_ORIGIN, registerAppScheme } from './appScheme'
 import { bootstrap } from './bootstrap'
 import { resolveSessionKey } from './sessionKeyStore'
 import { devDataDir } from '@acorn/node-core/main/serverConfig.ts'
 import { isAllowedExternalUrl } from '@acorn/node-core/main/urlGuards.ts'
-import type { ServiceStartResult } from '@acorn/protocol/serviceProtocol.ts'
 
 const PRELOAD = join(import.meta.dirname, '../preload/index.cjs')
+
+// Must run at module scope, BEFORE app.whenReady(): Chromium reads the privileged-scheme table while
+// it initialises, and registering later is a silent no-op. Every privilege here earns its place:
+//   standard          hierarchical URLs — what makes base:'/', history.pushState and @solidjs/router's
+//                     path routes work at all. Without it every route is an opaque path.
+//   secure            treats the origin as a secure context: IndexedDB (the persisted query cache),
+//                     crypto.subtle, clipboard.
+//   supportFetchAPI   fetch()/module scripts over the scheme — the renderer is ESM, and Monaco loads
+//                     its five ?worker chunks this way.
+//   stream            lets the handler answer with net.fetch's streamed body instead of buffering.
+//   codeCache         V8 code cache across launches, which is most of the startup win.
+// Deliberately NOT corsEnabled (nothing the renderer touches is cross-origin — node traffic is IPC)
+// and NOT allowServiceWorkers (there is no offline story here, and no worker may cache the shell).
+protocol.registerSchemesAsPrivileged([
+  { scheme: 'app', privileges: { standard: true, secure: true, supportFetchAPI: true, stream: true, codeCache: true } },
+])
 
 // Writable app-data root (DB, blobs, worktrees, notes). Packaged builds must not write next to the
 // module (that's the read-only asar) — use the OS-standard userData dir. Dev keeps the repo-local
@@ -38,9 +54,10 @@ process.env.GITHUB_CLIENT_SECRET ??= import.meta.env.MAIN_VITE_GITHUB_CLIENT_SEC
 if (!app.requestSingleInstanceLock()) app.quit()
 
 let mainWindow: BrowserWindow | null = null
-// Where the service actually bound. Not derivable before the child exists — it reports it back from
-// service.start — so a Dock-activate that recreates the window reads the last known result.
-let serviceStarted: ServiceStartResult | null = null
+// Whether the service has started and the broker has adopted the local node. The window used to need
+// the endpoint too; it loads from the app scheme now, so all a Dock-activate has to know is "is there
+// a node to talk to yet".
+let serviceReady = false
 let quitApproved = false
 let quitPromptPending = false
 
@@ -71,7 +88,7 @@ ipcMain.on('acorn:force-quit', () => {
   app.quit()
 })
 
-function hardenNavigation(win: BrowserWindow, origin: string) {
+function hardenNavigation(win: BrowserWindow) {
   // Anything leaving the renderer for the OS goes through the scheme allowlist first: the pane
   // content that produces these links (GitHub bodies, Linear issues/attachments, Rollbar) is
   // third-party, so a `file:`/custom-scheme href would otherwise be an arbitrary-app launch.
@@ -80,11 +97,11 @@ function hardenNavigation(win: BrowserWindow, origin: string) {
     void shell.openExternal(url)
   }
 
-  // The main window may only ever sit on its own origin; everything else opens in the system browser.
-  // There is no longer an OAuth exception: GitHub is connected by device flow against the node
+  // The main window may only ever sit on the bundled app origin; everything else opens in the system
+  // browser. There is no longer an OAuth exception: GitHub is connected by device flow against the node
   // (POST /v2/p/github/auth/device/start), so no window of ours ever has to visit github.com.
   win.webContents.on('will-navigate', (e, url) => {
-    if (url.startsWith(origin)) return
+    if (url.startsWith(APP_ORIGIN)) return
     e.preventDefault()
     openExternal(url)
   })
@@ -97,8 +114,7 @@ function hardenNavigation(win: BrowserWindow, origin: string) {
   // will-attach-webview handler here anymore.
 }
 
-async function createMainWindow(started: ServiceStartResult) {
-  const origin = started.endpoint.origin
+async function createMainWindow() {
   const win = new BrowserWindow({
     width: 1440,
     height: 900,
@@ -111,7 +127,7 @@ async function createMainWindow(started: ServiceStartResult) {
       sandbox: true,
     },
   })
-  hardenNavigation(win, origin)
+  hardenNavigation(win)
   // Cmd/Ctrl+W closes the FOCUSED pane (terminal tab / editor file), not the whole window. We
   // intercept in main because a menu accelerator can't be suppressed from the page — preventing
   // before-input-event disables it (Electron docs). The renderer decides what "focused pane" is;
@@ -124,9 +140,9 @@ async function createMainWindow(started: ServiceStartResult) {
     }
   })
   win.once('ready-to-show', () => win.show())
-  // No e2e login detour any more: the window authenticates through the broker's device bearer, so
-  // there is no cookie to establish before the shell can render.
-  await win.loadURL(origin)
+  // The renderer comes from the app scheme, not from a node. Nothing about the window depends on where
+  // the service bound any more — that endpoint is the broker's business (main/nodeBroker.ts).
+  await win.loadURL(`${APP_ORIGIN}/`)
   return win
 }
 
@@ -135,17 +151,18 @@ app.whenReady().then(async () => {
   // the loopback listener, then creates the window (main/bootstrap.ts owns the order + teardown).
   try {
     resolveSessionKey(dataDir) // safeStorage-backed SESSION_ENC_KEY before any binding reads it
+    registerAppScheme() // protocol.handle must wait for ready; registerSchemesAsPrivileged could not
     mainWindow = await bootstrap({
       dataDir,
-      createWindow: async (started) => {
-        serviceStarted = started
-        return createMainWindow(started)
+      createWindow: async () => {
+        serviceReady = true
+        return createMainWindow()
       },
     })
   } catch (e) {
-    // Boot is all-or-nothing: a failure here (migration, a data root already locked, …) means no
-    // origin to load — surface it and quit rather than sit headless in the dock forever (this
-    // macOS build has no window-all-closed quit).
+    // Boot is all-or-nothing: a failure here (migration, a data root already locked, …) means no node
+    // to talk to — surface it and quit rather than sit headless in the dock forever (this macOS build
+    // has no window-all-closed quit).
     dialog.showErrorBox('acorn failed to start', e instanceof Error ? (e.stack ?? e.message) : String(e))
     app.quit()
   }
@@ -159,11 +176,11 @@ app.on('second-instance', () => {
 })
 
 app.on('activate', () => {
-  // serviceStarted set ⇒ bootstrap finished (listener up) and we know where it bound. Before that, a
-  // Dock-click window would loadURL an origin nothing is serving yet — and bootstrap is about to
-  // create its own window.
-  if (serviceStarted && mainWindow && BrowserWindow.getAllWindows().length === 0) {
-    void createMainWindow(serviceStarted).then((w) => (mainWindow = w))
+  // serviceReady ⇒ bootstrap finished and the broker has adopted the local node. Before that a
+  // Dock-click window would render NodeGate's recovery screen against an empty fleet — and bootstrap is
+  // about to create its own window anyway.
+  if (serviceReady && mainWindow && BrowserWindow.getAllWindows().length === 0) {
+    void createMainWindow().then((w) => (mainWindow = w))
   }
 })
 

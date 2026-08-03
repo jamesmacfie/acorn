@@ -142,7 +142,13 @@ async function launch(previous?: Pick<RunningApp, 'dataDir' | 'repoDir'>): Promi
     execFileSync('git', ['-C', repoDir, 'commit', '--allow-empty', '-qm', 'init'])
   }
   const app = await electron.launch({
-    args: ['out/main/index.js'],
+    // Per-run Chromium profile. The renderer's origin is now the constant app://acorn, so its
+    // IndexedDB bucket — which holds the persisted TanStack cache — is shared by every launch that
+    // shares a userData dir. Under the old http origin the port was random, so each launch got a fresh
+    // bucket by accident; without this, one test's cached (and still-fresh) task list rehydrates into
+    // the next test's window. Keyed to dataDir so a relaunch of the SAME app keeps its cache and its
+    // device token.
+    args: ['out/main/index.js', `--user-data-dir=${join(dataDir, 'chromium')}`],
     env: {
       ...process.env,
       ACORN_E2E: '1',
@@ -318,6 +324,19 @@ test('S6 find-in-files copies paths and double-clicks into the match', async () 
   await expect.poll(async () =>
     (await nodeJson<{ text: string }>(running.page, `/v2/p/editor/tasks/${task.id}/editor/read?path=${encodeURIComponent(path)}`)).text,
   ).toContain("'XneedleToken'")
+  await running.app.close()
+})
+
+test('S8 survives a hard reload of a deep route under the app scheme', async () => {
+  const running = await launch()
+  await seedWorkspace(running.page, running.repoDir)
+  await running.page.goto(new URL('/acorn/smoke/1', running.page.url()).toString())
+  // The regression guard for two things at once: the protocol handler's index.html fallback (a deep
+  // path is a client route, not a file), and base:'/' (a relative base would resolve /assets/* against
+  // /acorn/smoke and fail the module script's MIME check → blank window).
+  await running.page.reload()
+  await expect(running.page.locator('.shell')).toBeVisible()
+  expect(running.page.url()).toBe('app://acorn/acorn/smoke/1')
   await running.app.close()
 })
 

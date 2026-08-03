@@ -95,11 +95,15 @@ export default defineConfig({
     root: __dirname,
     plugins: [
       solid(),
-      // Force an absolute base. The renderer is served over http by the in-process Node server with
-      // client-side deep routes (/:owner/:repo/:number); electron-vite's default relative base ('./')
+      // Force an absolute base. The renderer is served from Electron main's app:// protocol handler
+      // (main/appScheme.ts) — the node serves it only for `dev:node` in a browser — and it has
+      // client-side deep routes (/:owner/:repo/:number). electron-vite's default relative base ('./')
       // makes ./assets/* resolve against the deep path on a hard reload (Cmd/Ctrl+R), 404 to the SPA
       // fallback HTML, and the module script fails its MIME check → blank window. electron-vite's
       // preset (enforce:'pre') force-sets './' in production, so a normal-phase config hook re-sets it.
+      // It stays '/' rather than becoming 'app://acorn/': the scheme is `standard`, so /assets/x.js in a
+      // document at app://acorn/owner/repo/1 already resolves to app://acorn/assets/x.js — and the
+      // emitted HTML keeps the /assets/… literals scripts/check-renderer-budget.mjs parses.
       { name: 'acorn:absolute-base', config: () => ({ base: '/' }) },
     ],
     build: {
