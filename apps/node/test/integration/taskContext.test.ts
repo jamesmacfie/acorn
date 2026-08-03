@@ -1,6 +1,6 @@
 import { Hono } from 'hono'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import '../../src/app/server/providers'
+import '../../src/server/providers'
 import type { TaskContext } from '@acorn/protocol/api.ts'
 import { getDb, schema } from '@acorn/node-core/server/db/index.ts'
 import type { AppEnv } from '@acorn/node-core/server/middleware/auth.ts'
@@ -111,7 +111,9 @@ describe('GET /api/tasks/:id/context (docs/agent-tools.md §4)', () => {
   const fetchCtx = async (qs = '?include=*'): Promise<TaskContext> => {
     const res = await app.fetch(new Request(`http://acorn.test/api/tasks/task1/context${qs}`), {} as Env)
     expect(res.status).toBe(200)
-    return res.json()
+    // Node's Response.json() is typed unknown (the DOM lib types it `any`); this package compiles
+    // against plain Node types, so the route's contract is asserted explicitly.
+    return res.json() as Promise<TaskContext>
   }
 
   it('composes task + PR (from the mirror) + linked issues; note/memory seams return []', async () => {

@@ -5,7 +5,7 @@ import type { LinearIssueDetail, LinearIssueSummary, LinearProjectIssuesResponse
 import { getDb, schema } from '@acorn/node-core/server/db/index.ts'
 import { linearFetch, type LinearNode } from '@acorn/plugin-linear/server/index.ts'
 import { linearProvider, linearRef } from '@acorn/plugin-linear/server/provider.ts'
-import '../../src/app/server/providers'
+import '../../src/server/providers'
 import type { AppEnv } from '@acorn/node-core/server/middleware/auth.ts'
 import { encryptSecret } from '@acorn/node-core/server/session.ts'
 import { linear } from '@acorn/plugin-linear/server/routes/linear.ts'

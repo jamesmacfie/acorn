@@ -75,8 +75,11 @@ describe('Electron-free service runtime', () => {
       config: {
         dataDir,
         // The real built renderer: this test asserts the service serves the SPA shell, so it needs
-        // an actual index.html rather than a stub.
-        clientDir: resolve(import.meta.dirname, '../../../dist/client'),
+        // an actual index.html rather than a stub. The renderer is owned and built by
+        // apps/desktop, so this reaches across to its build output — a filesystem path, not an
+        // import, which is why it does not violate the "apps never import each other" boundary.
+        // It does mean a desktop renderer build must have happened at least once.
+        clientDir: resolve(import.meta.dirname, '../../../desktop/dist/client'),
         origin,
         version: 'test',
         isPackaged: false,

@@ -1,4 +1,4 @@
-import { cpSync, readFileSync } from 'node:fs'
+import { cpSync, existsSync, readFileSync } from 'node:fs'
 import { isAbsolute, resolve } from 'node:path'
 import { defineConfig, externalizeDepsPlugin } from 'electron-vite'
 import solid from 'vite-plugin-solid'
@@ -25,7 +25,7 @@ const workspacePackages = Object.keys(
   }).devDependencies ?? {},
 ).filter(isWorkspacePackage)
 
-// Four targets (docs/electron.md §4i). externalizeDepsPlugin keeps node_modules (notably the
+// Three targets (docs/electron.md §4i). externalizeDepsPlugin keeps node_modules (notably the
 // native better-sqlite3) external — required at runtime, never bundled. Using rollupOptions.input
 // (not lib mode) is what lets that externalization take effect. The renderer is the existing
 // SolidJS SPA — no Cloudflare plugin, since the in-process Node server serves both API and the
@@ -43,20 +43,37 @@ const stageMigrations = () => ({
   },
 })
 
+// service.js and mcp.js are built by @acorn/node, not here: apps/desktop must never import
+// apps/node source (docs/vNext/architecture.md, enforced by tools/arch/boundaries.test.ts), so it
+// embeds the built artifact instead. Copy it next to index.js, which is where main/bootstrap.ts
+// forks it from (`join(import.meta.dirname, 'service.js')`) and where mcpRegister points agents.
+// turbo's `build` task depends on `^build`, and @acorn/node is a devDependency, so the artifact
+// exists by the time this runs.
+const stageNodeArtifact = () => ({
+  name: 'acorn:stage-node-artifact',
+  closeBundle() {
+    const dist = resolve(__dirname, '../node/dist')
+    if (!existsSync(resolve(dist, 'service.js'))) {
+      throw new Error(
+        'apps/node/dist/service.js is missing — run `pnpm --filter @acorn/node build` first '
+        + '(turbo does this automatically via the @acorn/node devDependency).',
+      )
+    }
+    cpSync(dist, resolve(__dirname, 'out/main'), { recursive: true })
+  },
+})
+
 export default defineConfig({
   main: {
-    plugins: [externalizeDepsPlugin({ exclude: workspacePackages }), stageMigrations()],
+    plugins: [externalizeDepsPlugin({ exclude: workspacePackages }), stageMigrations(), stageNodeArtifact()],
     build: {
       outDir: 'out/main',
       rollupOptions: {
         external: externalizeBareImports,
-        // `mcp` is the acorn MCP server (docs/mcp.md) — launched by agents via
-        // ELECTRON_RUN_AS_NODE=1 <electron> out/main/mcp.js, not by the app itself. The input is
-        // the dedicated entry module (packages/node-core/src/mcp/main.ts) that imports and calls main().
+        // Electron main only. `service` and `mcp` are built by @acorn/node and copied in by
+        // stageNodeArtifact() — see its comment.
         input: {
           index: resolve(__dirname, 'src/app/main/electron.ts'),
-          service: resolve(__dirname, 'src/app/service/index.ts'),
-          mcp: resolve(__dirname, '../../packages/node-core/src/mcp/main.ts'),
         },
         output: { entryFileNames: '[name].js', format: 'es' },
       },

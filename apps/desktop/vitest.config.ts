@@ -6,9 +6,9 @@ export default defineConfig({
   test: {
     environment: 'node',
     include: ['src/**/*.test.ts', 'test/**/*.test.ts'],
-    // Register built-in providers/profiles into the core registries before each test file, mirroring
-    // what the app composition roots do at boot (docs/plugins.md foldering).
-    setupFiles: ['./test/registerContributions.ts'],
+    // No setupFiles: registering the built-in agent profiles belongs to the service composition
+    // root, which is @acorn/node — its vitest config owns that setup now. Nothing left here
+    // (Electron main adapters + the client conformance suites) touches the profile registry.
     // Temp-git-repo tests must not inherit the user's global git config (hooks, fsmonitor,
     // templates) — it makes them slow and flaky under parallel workers.
     env: {
