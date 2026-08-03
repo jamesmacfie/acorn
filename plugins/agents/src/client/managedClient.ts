@@ -1,4 +1,4 @@
-import { apiError, readJson, writeJson } from '@acorn/client-core/apiClient.ts'
+import { apiError, readJson, sendForm, writeJson } from '@acorn/client-core/apiClient.ts'
 import type {
   AgentAttachment,
   AgentArtifact,
@@ -35,14 +35,14 @@ export const managedAgentApi = {
   providers: (force = false) =>
     readJson<AgentProviderDescriptor[]>(`${ROOT}/providers${force ? '?force=true' : ''}`),
   async uploadAttachment(taskId: string, file: File): Promise<AgentAttachment> {
-    const body = new FormData()
-    body.set('file', file)
-    const response = await fetch(`${ROOT}/attachments?taskId=${encodeURIComponent(taskId)}`, {
-      method: 'POST',
-      body,
-    })
-    if (!response.ok) throw new Error(await apiError(response, 'Unable to upload attachment.'))
-    return response.json() as Promise<AgentAttachment>
+    // The parts are described rather than encoded: main builds the real multipart body, so nothing
+    // here has to hand-roll a boundary and the upload rides the same pinned connection as every
+    // other request.
+    return sendForm<AgentAttachment>(
+      `${ROOT}/attachments?taskId=${encodeURIComponent(taskId)}`,
+      [{ name: 'file', filename: file.name, type: file.type || 'application/octet-stream', bytes: new Uint8Array(await file.arrayBuffer()) }],
+      'Unable to upload attachment.',
+    )
   },
   attachment: (attachmentId: string) =>
     readJson<AgentAttachment>(`${ROOT}/attachments/${encodeURIComponent(attachmentId)}`),

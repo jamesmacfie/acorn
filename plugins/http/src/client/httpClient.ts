@@ -1,6 +1,6 @@
 // Typed wrapper over the /api/http routes. Goes through core's readJson/writeJson so the CSRF
 // envelope and ApiError decoding stay in one place.
-import { readJson, writeJson } from '@acorn/client-core/apiClient.ts'
+import { readJson, sendJson, writeJson, type WriteInit } from '@acorn/client-core/apiClient.ts'
 import {
   httpRequestRoute,
   httpRequestsRoute,
@@ -17,7 +17,7 @@ import {
 // HttpSendInput instead, whose executionTaskId comes from the panel context.
 export type RequestPayload = Omit<HttpRequest, 'id' | 'repoOwner' | 'repoName' | 'createdAt' | 'updatedAt'>
 
-const json = (method: string, body: unknown): RequestInit => ({
+const json = (method: string, body: unknown): WriteInit => ({
   method,
   headers: { 'Content-Type': 'application/json' },
   body: JSON.stringify(body),
@@ -32,10 +32,8 @@ export const createRequest = (owner: string, repo: string, body: RequestPayload)
 export const updateRequest = (owner: string, repo: string, id: string, body: RequestPayload): Promise<HttpRequest> =>
   writeJson(httpRequestRoute(owner, repo, id), json('PUT', body))
 
-export const deleteRequest = async (owner: string, repo: string, id: string): Promise<void> => {
-  const res = await fetch(httpRequestRoute(owner, repo, id), { method: 'DELETE' })
-  if (!res.ok) throw new Error(`Could not delete request (${res.status})`)
-}
+export const deleteRequest = (owner: string, repo: string, id: string): Promise<void> =>
+  sendJson<void>(httpRequestRoute(owner, repo, id), { method: 'DELETE' }, 'Could not delete request')
 
 export const listVariables = (owner: string, repo: string): Promise<HttpVariable[]> => readJson(httpVariablesRoute(owner, repo))
 
@@ -45,10 +43,8 @@ export const createVariable = (owner: string, repo: string, body: Omit<HttpVaria
 export const updateVariable = (owner: string, repo: string, id: string, body: Omit<HttpVariable, 'id' | 'updatedAt'>): Promise<HttpVariable> =>
   writeJson(httpVariableRoute(owner, repo, id), json('PUT', body))
 
-export const deleteVariable = async (owner: string, repo: string, id: string): Promise<void> => {
-  const res = await fetch(httpVariableRoute(owner, repo, id), { method: 'DELETE' })
-  if (!res.ok) throw new Error(`Could not delete variable (${res.status})`)
-}
+export const deleteVariable = (owner: string, repo: string, id: string): Promise<void> =>
+  sendJson<void>(httpVariableRoute(owner, repo, id), { method: 'DELETE' }, 'Could not delete variable')
 
 export const sendRequest = (owner: string, repo: string, body: HttpSendInput): Promise<SendResult> =>
   writeJson(httpSendRoute(owner, repo), json('POST', body))
