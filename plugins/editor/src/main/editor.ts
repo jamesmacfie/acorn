@@ -4,9 +4,8 @@
 // worktree root from the DB and confines the renderer-supplied relative path with resolveInRoot,
 // so a traversal (`../`) or a symlink pointing outside the worktree is rejected. Pure-Node, so it
 // works in dev:node too; wired in main/serverBridges.ts.
-import { execFile } from 'node:child_process'
+import { gitOrThrow } from '@acorn/node-core/main/core/git.ts'
 import { readdir, readFile, writeFile } from 'node:fs/promises'
-import { promisify } from 'node:util'
 import { BridgeError } from '@acorn/node-core/server/bridge.ts'
 import type { AppDatabase } from '@acorn/node-core/server/db/index.ts'
 import type { EditorBridge, EditorEntry } from '../server/routes/editor'
@@ -42,9 +41,10 @@ export const editorBridge = (db: AppDatabase): EditorBridge => ({
   files: async (taskId) => {
     const root = await taskRoot(db, taskId)
     if (!root) return []
-    const { stdout } = await promisify(execFile)('git', ['-C', root, 'ls-files', '--cached', '--others', '--exclude-standard'], {
-      timeout: 10_000,
-      maxBuffer: 32 * 1024 * 1024,
+    const { stdout } = await gitOrThrow(['ls-files', '--cached', '--others', '--exclude-standard'], {
+      cwd: root,
+      timeoutMs: 10_000,
+      maxOutputBytes: 32 * 1024 * 1024,
     }).catch(() => ({ stdout: '' }))
     return stdout.split('\n').filter(Boolean)
   },

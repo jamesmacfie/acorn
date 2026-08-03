@@ -5,6 +5,7 @@
 // constructed and threaded as deps between calls); here it must NOT be, because a disabled plugin
 // removes a step from the sequence. Cross-plugin needs resolve through the capability registry at
 // CALL time instead, which is why capabilities.get() is documented as late-binding.
+import type { CoreServices } from '../../main/core'
 import { registerRoute } from '../routeRegistry'
 import type { CapabilityRegistry } from './capabilities'
 import type { NodeEventBus } from './events'
@@ -15,6 +16,7 @@ export type PluginHostOptions = {
   // module singletons.
   capabilities: CapabilityRegistry
   events: NodeEventBus
+  core: CoreServices
   // Plugin ids the owner has turned off for this node. `required` plugins ignore it — disabling
   // github, terminal or agents is not a supported configuration, and silently honouring it would
   // produce a node that boots and then fails at the first task.
@@ -49,6 +51,7 @@ export async function initPlugins(plugins: readonly NodePlugin[], options: Plugi
       },
       capabilities: options.capabilities,
       events: options.events,
+      core: options.core,
       log: {
         log: (...args: unknown[]) => console.log(`[plugin:${plugin.name}]`, ...args),
         warn: (...args: unknown[]) => console.warn(`[plugin:${plugin.name}]`, ...args),

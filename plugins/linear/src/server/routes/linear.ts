@@ -47,7 +47,7 @@ type IntegrationRow = typeof schema.integrations.$inferSelect
 // identifier, the first row queried shadows the other. Accepted ceiling until colliding prefixes
 // across connected workspaces is a real case (then route by team prefix).
 const linearConnections = (c: { env: Env }, userId: string) =>
-  forEachConnection(getDb(c.env), userId, PROVIDER, c.env.SESSION_ENC_KEY, async (row, key) => ({ row, key }))
+  forEachConnection(getDb(c.env), userId, PROVIDER, c.env.SECRETS, async (row, key) => ({ row, key }))
 
 const providerFetch = (row: IntegrationRow, key: string, query: string, variables: Record<string, unknown>) =>
   providerRequestScheduler.run(PROVIDER, row.id, linearProvider.budgets, () => linearFetch(key, query, variables))
@@ -209,7 +209,7 @@ export const linear = new Hono<AppEnv>()
       const result = await runProviderResource<LinearResourceInput, LinearIssueDetail>({
         db,
         userId: uid,
-        encryptionKey: c.env.SESSION_ENC_KEY,
+        secrets: c.env.SECRETS,
         providerId: PROVIDER,
         connectionId,
         resourceId: 'linear.issues',

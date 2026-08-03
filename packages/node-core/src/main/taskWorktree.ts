@@ -2,9 +2,9 @@
 // local-git, run, workflow, knowledge). Split out of terminal.ts (docs/terminal-and-agents.md):
 // the taskId — never a renderer-supplied absolute path — is the capability; everything here
 // re-derives paths from the DB per call.
-import { existsSync, realpathSync, statSync } from 'node:fs'
+import { statSync } from 'node:fs'
 import { homedir } from 'node:os'
-import { dirname, isAbsolute, resolve, sep } from 'node:path'
+import { isAbsolute, resolve } from 'node:path'
 import { and, eq, isNotNull } from 'drizzle-orm'
 import type { AppDatabase } from '../server/db'
 import { schema } from '../server/db'
@@ -183,24 +183,9 @@ export async function taskRoot(db: AppDatabase, taskId: string, userId: string |
   return resolve(cwd)
 }
 
-// Confine a renderer-supplied relative path to within `root`; null on any escape. Two gates: a
-// lexical one (rejects `..`/absolute paths) and a symlink one — resolve the real path of the nearest
-// existing ancestor (the target itself may not exist yet on a new-file write) and require it to stay
-// within root's real path, so a symlink inside the worktree can't point the read/write outside it
-// (worktrees can hold arbitrary checked-out content, including hostile symlinks).
-export function resolveInRoot(root: string, relPath: string): string | null {
-  const abs = resolve(root, relPath)
-  if (abs !== root && !abs.startsWith(root + sep)) return null
-  try {
-    const realRoot = realpathSync(root)
-    let probe = abs
-    while (probe !== root && !existsSync(probe)) probe = dirname(probe)
-    const real = realpathSync(probe)
-    return real === realRoot || real.startsWith(realRoot + sep) ? abs : null
-  } catch {
-    return null
-  }
-}
+// Path confinement now lives in main/core/fs.ts — CoreServices.fs (docs/vNext/plan.md § Phase 2).
+// Re-exported so the ~10 existing importers keep working; there is one implementation, not two.
+export { resolveInRoot } from './core/fs'
 
 // The setup script + when-to-run configured for this repo (docs/workspaces-and-tasks.md P5; repo-level-settings
 // moved these off the workspace). trigger: 'off' never runs, 'created' pre-creates the worktree at

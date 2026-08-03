@@ -1,5 +1,4 @@
-import { realpath, stat } from 'node:fs/promises'
-import { isAbsolute, relative, resolve } from 'node:path'
+import { confineExistingFile } from '@acorn/node-core/main/core/fs.ts'
 import type { AgentInputPart } from '@acorn/protocol/managedAgents.ts'
 import { MAX_AGENT_CONTEXT_BYTES } from '@acorn/protocol/agentContext.ts'
 
@@ -27,26 +26,19 @@ export async function validateAgentInputFiles(cwd: string, input: AgentInputPart
   if (contextBytes > MAX_AGENT_CONTEXT_BYTES) {
     throw new Error('Acorn context snapshots are limited to 512 KiB per turn.')
   }
-  const root = await realpath(cwd)
+  // Confinement is CoreServices.fs's job (one implementation, symlink-aware, tested against a
+  // symlinked leaf and a symlinked directory). This kept its own realpath+relative pass; only the
+  // user-facing wording is agents', which is why confineExistingFile returns a classified reason
+  // instead of throwing.
   for (const part of input) {
     if (part.type !== 'file') continue
-    if (isAbsolute(part.path)) throw new Error(`File mentions must be relative to the task worktree: ${part.path}`)
-    const candidate = resolve(root, part.path)
-    const lexicalRelative = relative(root, candidate)
-    if (lexicalRelative === '..' || lexicalRelative.startsWith('../') || isAbsolute(lexicalRelative)) {
-      throw new Error(`File mention escapes the task worktree: ${part.path}`)
+    const confined = await confineExistingFile(cwd, part.path)
+    if (!confined.ok) {
+      if (confined.reason === 'absolute') throw new Error(`File mentions must be relative to the task worktree: ${part.path}`)
+      if (confined.reason === 'escapes') throw new Error(`File mention escapes the task worktree: ${part.path}`)
+      if (confined.reason === 'missing') throw new Error(`Mentioned file does not exist in the task worktree: ${part.path}`)
+      throw new Error(`Mentioned path is not a file: ${part.path}`)
     }
-    let resolved: string
-    try {
-      resolved = await realpath(candidate)
-    } catch {
-      throw new Error(`Mentioned file does not exist in the task worktree: ${part.path}`)
-    }
-    const resolvedRelative = relative(root, resolved)
-    if (resolvedRelative === '..' || resolvedRelative.startsWith('../') || isAbsolute(resolvedRelative)) {
-      throw new Error(`Mentioned file resolves outside the task worktree: ${part.path}`)
-    }
-    if (!(await stat(resolved)).isFile()) throw new Error(`Mentioned path is not a file: ${part.path}`)
     if (part.lineStart && part.lineEnd && part.lineEnd < part.lineStart) {
       throw new Error(`File mention has an invalid line range: ${part.path}`)
     }

@@ -23,6 +23,7 @@ import {
   type SendResult,
   type TimelineEntry,
 } from '../shared/model'
+import type { SecretService } from '@acorn/node-core/main/core/secrets.ts'
 import { openHttpValue } from './storage'
 
 const exec = promisify(execFile)
@@ -86,7 +87,7 @@ async function resolveVarsWithSensitivity(
   userId: string,
   repoOwner: string,
   repoName: string,
-  encKey: string | undefined,
+  secrets: SecretService,
   input: HttpSendInput,
 ): Promise<ResolvedVariables> {
   const vars: Record<string, string> = {}
@@ -126,9 +127,8 @@ async function resolveVarsWithSensitivity(
 
   const opened = new Map<string, string>()
   for (const row of enabled) {
-    if (!encKey) throw new SendError(`Cannot read secret variable "${row.name}": no session key`)
     try {
-      opened.set(row.id, await openHttpValue(row.value, row.encrypted, encKey))
+      opened.set(row.id, await openHttpValue(row.value, row.encrypted, secrets))
     } catch {
       throw new SendError(`Variable "${row.name}" could not be decrypted — re-enter its value`)
     }
@@ -182,10 +182,10 @@ export async function resolveVars(
   userId: string,
   repoOwner: string,
   repoName: string,
-  encKey: string | undefined,
+  secrets: SecretService,
   input: HttpSendInput,
 ): Promise<Record<string, string>> {
-  return (await resolveVarsWithSensitivity(db, userId, repoOwner, repoName, encKey, input)).values
+  return (await resolveVarsWithSensitivity(db, userId, repoOwner, repoName, secrets, input)).values
 }
 
 // --- execution ----------------------------------------------------------------------------
@@ -258,10 +258,10 @@ export async function send(
   userId: string,
   repoOwner: string,
   repoName: string,
-  encKey: string | undefined,
+  secrets: SecretService,
   input: HttpSendInput,
 ): Promise<SendResult> {
-  const resolved = await resolveVarsWithSensitivity(db, userId, repoOwner, repoName, encKey, input)
+  const resolved = await resolveVarsWithSensitivity(db, userId, repoOwner, repoName, secrets, input)
   const { target, headers, body } = buildRequest(input, resolved.values)
 
   const started = Date.now()

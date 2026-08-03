@@ -5,7 +5,7 @@ import type { ExternalRef, ProviderErrorCode } from '@acorn/protocol/integration
 import type { AppDatabase } from '../db'
 import { schema } from '../db'
 import { cascadeDeleteIntegration } from '../db/cascade'
-import { decryptSecret, encryptSecret } from '../secretBox'
+import { SecretUnavailableError, type SecretService } from '../../main/core/secrets'
 import { connectionProviderRegistry } from './connectionRegistry'
 import { integrationProviderRegistry } from './registry'
 import { providerRequestScheduler } from './budgetRuntime'
@@ -84,7 +84,7 @@ export async function connectProvider(
   db: AppDatabase,
   userId: string,
   request: ConnectIntegrationRequest,
-  encryptionKey: string,
+  secrets: SecretService,
 ): Promise<Integration> {
   const provider = connectionProviderRegistry.get(request.providerId)
   if (!provider?.connection.connectable) throw new ProviderOperationError('provider_bad_config', 400)
@@ -107,7 +107,7 @@ export async function connectProvider(
         userId,
         provider: provider.id,
         label: normalized.label,
-        authRef: await encryptSecret(normalized.secret, encryptionKey),
+        authRef: await secrets.seal(normalized.secret),
         authKind: provider.connection.authKind,
         account: normalized.account ? JSON.stringify(normalized.account) : null,
         scopes: JSON.stringify(normalized.scopes),
@@ -130,7 +130,7 @@ export async function rotateConnection(
   userId: string,
   id: string,
   request: RotateIntegrationRequest,
-  encryptionKey: string,
+  secrets: SecretService,
 ): Promise<Integration> {
   const row = await getConnection(db, userId, id)
   if (!row) throw new ProviderOperationError('provider_not_connected', 404)
@@ -143,7 +143,7 @@ export async function rotateConnection(
   await db
     .update(schema.integrations)
     .set({
-      authRef: await encryptSecret(normalized.secret, encryptionKey),
+      authRef: await secrets.seal(normalized.secret),
       authKind: provider.connection.authKind,
       account: normalized.account ? JSON.stringify(normalized.account) : null,
       scopes: JSON.stringify(normalized.scopes),
@@ -170,19 +170,22 @@ export async function rotateConnection(
   })
 }
 
-export async function testConnection(db: AppDatabase, userId: string, id: string, encryptionKey: string): Promise<Integration> {
+export async function testConnection(db: AppDatabase, userId: string, id: string, secrets: SecretService): Promise<Integration> {
   const row = await getConnection(db, userId, id)
   if (!row) throw new ProviderOperationError('provider_not_connected', 404)
-  const secret = await decryptSecret(row.authRef, encryptionKey)
-  if (!secret) {
-    const now = Date.now()
-    await db.update(schema.integrations).set({ status: 'needs-auth', lastValidatedAt: now, lastError: 'provider_secret_unreadable', updatedAt: now }).where(eq(schema.integrations.id, id))
-    throw new ProviderOperationError('provider_secret_unreadable', 400)
-  }
   const provider = connectionProviderRegistry.require(row.provider)
-  const health = await providerRequestScheduler.run(provider.id, row.id, provider.budgets, () =>
-    provider.connection.test(secret, json(row.config, {})),
-  )
+  // The provider's own "test connection" call runs inside the secret scope, so a provider that echoes
+  // the credential in its failure response has it scrubbed before this becomes lastError or a log line.
+  const health = await secrets
+    .use(row.authRef, `${row.provider}: test connection`, (secret) =>
+      providerRequestScheduler.run(provider.id, row.id, provider.budgets, () => provider.connection.test(secret, json(row.config, {}))),
+    )
+    .catch(async (error: unknown) => {
+      if (!(error instanceof SecretUnavailableError)) throw error
+      const now = Date.now()
+      await db.update(schema.integrations).set({ status: 'needs-auth', lastValidatedAt: now, lastError: 'provider_secret_unreadable', updatedAt: now }).where(eq(schema.integrations.id, id))
+      throw new ProviderOperationError('provider_secret_unreadable', 400)
+    })
   const now = Date.now()
   const status = health.ok ? 'connected' : health.error === 'provider_needs_auth' ? 'needs-auth' : 'degraded'
   await db
@@ -213,7 +216,7 @@ export async function forEachConnection<T>(
   db: AppDatabase,
   userId: string,
   providerId: string,
-  encryptionKey: string,
+  secrets: SecretService,
   visit: (connection: StoredConnection, secret: string) => Promise<T | undefined>,
 ): Promise<T[]> {
   connectionProviderRegistry.require(providerId)
@@ -221,13 +224,16 @@ export async function forEachConnection<T>(
   const out: T[] = []
   for (const row of rows) {
     if (row.status === 'disabled' || row.status === 'needs-auth') continue
-    const secret = await decryptSecret(row.authRef, encryptionKey)
-    if (!secret) {
+    let value: T | undefined
+    try {
+      // The visitor — which is what actually calls the provider — runs inside the scope.
+      value = await secrets.use(row.authRef, `${row.provider}: use connection`, (secret) => visit(row, secret))
+    } catch (error) {
+      if (!(error instanceof SecretUnavailableError)) throw error
       const now = Date.now()
       await db.update(schema.integrations).set({ status: 'needs-auth', lastError: 'provider_secret_unreadable', updatedAt: now }).where(eq(schema.integrations.id, row.id))
       continue
     }
-    const value = await visit(row, secret)
     if (value !== undefined) out.push(value)
   }
   return out

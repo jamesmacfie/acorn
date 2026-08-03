@@ -3,17 +3,17 @@
 // Docker Desktop / OrbStack / colima — whatever `docker context` points at.
 import { execFile } from 'node:child_process'
 import { promisify } from 'node:util'
+import { brokerEnv } from '@acorn/node-core/main/core/proc.ts'
 
 const exec = promisify(execFile)
 
-// Same posture as the terminal execution service: never leak acorn's own secrets into children.
-// ponytail: keep in sync with plugins/terminal/main/executionService.ts SECRET_ENV_KEYS (frozen plugin boundary).
-const SECRET_ENV_KEYS = new Set(['INTERNAL_TOKEN', 'SESSION_ENC_KEY', 'GITHUB_CLIENT_ID', 'GITHUB_CLIENT_SECRET', 'ACORN_API_TOKEN', 'ACORN_INTERNAL_TOKEN'])
-
+// The env the docker CLI sees. This was a DENYLIST of six known secret names, whose "keep in sync"
+// comment pointed at plugins/terminal/main/executionService.ts — a file that no longer exists. A
+// denylist leaks every binding nobody remembered to add to it, so it is now the broker's allowlist
+// (CoreServices.proc) plus the DOCKER_*/COMPOSE_* configuration the CLI genuinely needs to find the
+// daemon: DOCKER_HOST and DOCKER_CONTEXT are how OrbStack/colima/Desktop differ.
 export function dockerEnv(): NodeJS.ProcessEnv {
-  const out: NodeJS.ProcessEnv = {}
-  for (const [k, v] of Object.entries(process.env)) if (!SECRET_ENV_KEYS.has(k)) out[k] = v
-  return out
+  return brokerEnv({ passthrough: ['DOCKER_*', 'COMPOSE_*', 'XDG_CONFIG_HOME'] })
 }
 
 export type DockerCliFailure = 'not_installed' | 'daemon_down' | 'failed'

@@ -1,3 +1,4 @@
+import { testSecretEnv } from '../routes/testDb'
 import { Hono } from 'hono'
 import { describe, expect, it, vi } from 'vitest'
 import { authMiddleware, type AppEnv } from './auth'
@@ -16,7 +17,7 @@ describe('machine identity binding', () => {
       {
         INTERNAL_TOKEN: 'internal',
         ACTIVE_IDENTITY: { get: () => 'bob', set: vi.fn(), clear: vi.fn() },
-        SESSION_ENC_KEY: ENC_KEY,
+        ...testSecretEnv(ENC_KEY),
       } as unknown as Env,
     )
 
@@ -30,7 +31,7 @@ describe('machine identity binding', () => {
       {
         INTERNAL_TOKEN: 'internal',
         ACTIVE_IDENTITY: { get: () => null, set: vi.fn(), clear: vi.fn() },
-        SESSION_ENC_KEY: ENC_KEY,
+        ...testSecretEnv(ENC_KEY),
       } as unknown as Env,
     )
 
@@ -44,7 +45,7 @@ describe('machine identity binding', () => {
       const response = await app.fetch(new Request('http://acorn.test/', { headers: { 'x-acorn-internal': presented } }), {
         INTERNAL_TOKEN: 'internal',
         ACTIVE_IDENTITY: { get: () => 'bob', set: vi.fn(), clear: vi.fn() },
-        SESSION_ENC_KEY: ENC_KEY,
+        ...testSecretEnv(ENC_KEY),
       } as unknown as Env)
       expect(await response.json()).toEqual({ principal: null })
     }
@@ -60,7 +61,7 @@ describe('machine identity binding', () => {
       {
         INTERNAL_TOKEN: 'internal',
         ACTIVE_IDENTITY: { get: () => 'bob', set, clear: vi.fn() },
-        SESSION_ENC_KEY: ENC_KEY,
+        ...testSecretEnv(ENC_KEY),
       } as unknown as Env,
     )
 
@@ -74,7 +75,7 @@ describe('device bearer', () => {
     ({
       INTERNAL_TOKEN: 'internal',
       ACTIVE_IDENTITY: { get: () => identity, set: vi.fn(), clear: vi.fn() },
-      SESSION_ENC_KEY: ENC_KEY,
+      ...testSecretEnv(ENC_KEY),
       DEVICES: devices,
     }) as unknown as Env
 

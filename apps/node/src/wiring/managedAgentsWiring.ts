@@ -1,6 +1,7 @@
 import { BridgeError } from '@acorn/node-core/server/bridge.ts'
 import type { AppDatabase } from '@acorn/node-core/server/db/index.ts'
 import type { CapabilityRegistry } from '@acorn/node-core/server/plugin/capabilities.ts'
+import type { SecretService } from '@acorn/node-core/main/core/secrets.ts'
 import { wsBroadcast } from '@acorn/node-core/main/wsHub.ts'
 import { AGENTS_SESSION_EXECUTE } from '@acorn/plugin-agents/contract/sessionExecute.ts'
 import { createSessionExecute } from '@acorn/plugin-agents/main/sessionExecute.ts'
@@ -71,7 +72,7 @@ export function wireManagedAgents(options: {
   db: AppDatabase
   dataDir: string
   internalApiEnv: Record<string, string>
-  encryptionKey: string
+  secrets: SecretService
   capabilities: CapabilityRegistry
   currentUserId(): string | null
   memoryReviewTrigger?: (taskId: string, transcriptTail: string) => Promise<void>

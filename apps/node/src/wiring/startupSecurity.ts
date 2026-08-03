@@ -6,6 +6,6 @@ import { protectLegacyHttpStorage } from '@acorn/plugin-http/server/storage.ts'
 // roots. HTTP plaintext migration must succeed before the listener opens. Retention repairs are
 // also pre-listener so an expired payload cannot win a race with its first request after boot.
 export async function prepareSecurityState(runtime: RuntimeBindings): Promise<void> {
-  await protectLegacyHttpStorage(runtime.DB, runtime.SESSION_ENC_KEY)
+  await protectLegacyHttpStorage(runtime.DB, runtime.SECRETS)
   await pruneOrphanedGithubMirror(runtime.DB)
 }

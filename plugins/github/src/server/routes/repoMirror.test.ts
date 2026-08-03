@@ -1,3 +1,4 @@
+import { testSecretEnv } from '@acorn/node-core/server/routes/testDb.ts'
 import { Hono } from 'hono'
 import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { settleBackground } from '@acorn/node-core/server/background.ts'
@@ -169,7 +170,7 @@ describe('pull files stale-while-revalidate', () => {
     const response = await Promise.race([
       app.fetch(
         new Request('http://acorn.test/api/repos/Runn-Fast/runn/pulls/12/files?summary=1'),
-        { BLOBS: { get: blobGet, put: vi.fn() }, SESSION_ENC_KEY: ENC_KEY } as unknown as Env,
+        { BLOBS: { get: blobGet, put: vi.fn() }, ...testSecretEnv(ENC_KEY) } as unknown as Env,
       ),
       new Promise<null>((resolve) => setTimeout(() => resolve(null), 20)),
     ])
@@ -227,7 +228,7 @@ describe('pull files stale-while-revalidate', () => {
     app.route('/api/repos', pullFiles)
     const response = await app.fetch(
       new Request('http://acorn.test/api/repos/Runn-Fast/runn/pulls/12/files?force=true'),
-      { BLOBS: { get: vi.fn(async () => '@@'), put: vi.fn(async () => undefined) }, SESSION_ENC_KEY: ENC_KEY } as unknown as Env,
+      { BLOBS: { get: vi.fn(async () => '@@'), put: vi.fn(async () => undefined) }, ...testSecretEnv(ENC_KEY) } as unknown as Env,
     )
 
     expect(response.status).toBe(200)
@@ -287,7 +288,7 @@ describe('pull files stale-while-revalidate', () => {
           headers: { 'content-type': 'application/json' },
           body: JSON.stringify({ paths: ['src/a.ts', 'src/b.ts'] }),
         }),
-        { BLOBS: { get: blobGet, put: vi.fn() }, SESSION_ENC_KEY: ENC_KEY } as unknown as Env,
+        { BLOBS: { get: blobGet, put: vi.fn() }, ...testSecretEnv(ENC_KEY) } as unknown as Env,
       ),
       new Promise<null>((resolve) => setTimeout(() => resolve(null), 20)),
     ])

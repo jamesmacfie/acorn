@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
+import { createCoreServices, SecretService } from '../../main/core'
 import { CapabilityRegistry, capabilityId } from './capabilities'
 import { NodeEventBus, nodeEventType } from './events'
 import { initPlugins } from './host'
@@ -93,7 +94,12 @@ describe('plugin host', () => {
 
   // A fresh graph per call, mirroring how startServiceRuntime owns one per boot.
   const host = (plugins: readonly NodePlugin[], disabled?: readonly string[]) =>
-    initPlugins(plugins, { capabilities: new CapabilityRegistry(), events: new NodeEventBus(), disabled })
+    initPlugins(plugins, {
+      capabilities: new CapabilityRegistry(),
+      events: new NodeEventBus(),
+      core: createCoreServices({ secrets: new SecretService('a'.repeat(64)) }),
+      disabled,
+    })
 
   it('initializes plugins in declaration order and binds each context to its own name', async () => {
     const order: string[] = []

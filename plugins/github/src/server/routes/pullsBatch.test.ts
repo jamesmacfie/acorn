@@ -1,3 +1,4 @@
+import { testSecretEnv } from '@acorn/node-core/server/routes/testDb.ts'
 import { Hono } from 'hono'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { getDb } from '@acorn/node-core/server/db/index.ts'
@@ -89,7 +90,7 @@ describe('pulls batch route', () => {
   })
 
   it('returns summary-mode file rows without reading patch bodies', async () => {
-    const res = await app.fetch(jsonRequest({ numbers: [42], files: 'summary' }), {} as Env)
+    const res = await app.fetch(jsonRequest({ numbers: [42], files: 'summary' }), testSecretEnv('0'.repeat(64)) as unknown as Env)
 
     expect(res.status).toBe(200)
     expect(await res.json()).toEqual([
@@ -113,7 +114,7 @@ describe('pulls batch route', () => {
   })
 
   it('keeps full file payloads as the backward-compatible default', async () => {
-    const res = await app.fetch(jsonRequest({ numbers: [42] }), {} as Env)
+    const res = await app.fetch(jsonRequest({ numbers: [42] }), testSecretEnv('0'.repeat(64)) as unknown as Env)
 
     expect(res.status).toBe(200)
     expect(readFiles).toHaveBeenCalledWith(expect.anything(), expect.anything(), { userId: 'james', repoId: 19847, number: 42 }, { includePatches: true })

@@ -37,7 +37,7 @@ export const integrations = new Hono<AppEnv>()
     if (!providerId) return respondError(c, 400, 'provider_bad_config')
     const request: ConnectIntegrationRequest = { providerId, credentials: credentialsFromBody(body) }
     try {
-      const integration = await connectProvider(getDb(c.env), ownerId(c), request, c.env.SESSION_ENC_KEY)
+      const integration = await connectProvider(getDb(c.env), ownerId(c), request, c.env.SECRETS)
       return c.json({ integration })
     } catch (error) {
       return providerError(c, error)
@@ -47,7 +47,7 @@ export const integrations = new Hono<AppEnv>()
     const body = await c.req.json().catch(() => ({}))
     const request: RotateIntegrationRequest = { credentials: credentialsFromBody(body) }
     try {
-      const integration = await rotateConnection(getDb(c.env), ownerId(c), c.req.param('id'), request, c.env.SESSION_ENC_KEY)
+      const integration = await rotateConnection(getDb(c.env), ownerId(c), c.req.param('id'), request, c.env.SECRETS)
       return c.json({ integration })
     } catch (error) {
       return providerError(c, error)
@@ -55,7 +55,7 @@ export const integrations = new Hono<AppEnv>()
   })
   .post('/:id/test', async (c) => {
     try {
-      const integration = await testConnection(getDb(c.env), ownerId(c), c.req.param('id'), c.env.SESSION_ENC_KEY)
+      const integration = await testConnection(getDb(c.env), ownerId(c), c.req.param('id'), c.env.SECRETS)
       return c.json({ integration })
     } catch (error) {
       return providerError(c, error)

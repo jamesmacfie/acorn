@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import { schema, type AppDatabase } from '@acorn/node-core/server/db/index.ts'
-import { encryptSecret } from '@acorn/node-core/server/secretBox.ts'
+import { SecretService } from '@acorn/node-core/main/core/secrets.ts'
 import { GITHUB_PROVIDER } from './githubToken'
 
 // The credential half of the mount contract for github route tests, alongside node-core's testDb and
@@ -24,7 +24,7 @@ export async function seedGithubIntegration(
     userId,
     provider: GITHUB_PROVIDER,
     label: userId,
-    authRef: await encryptSecret(token, encryptionKey),
+    authRef: await new SecretService(encryptionKey).seal(token),
     authKind: 'oauth',
     createdAt: now,
     updatedAt: now,

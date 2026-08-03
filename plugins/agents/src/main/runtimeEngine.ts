@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import type { AppDatabase } from '@acorn/node-core/server/db/index.ts'
+import type { SecretService } from '@acorn/node-core/main/core/secrets.ts'
 import { taskRoot, workspaceIdFor } from '@acorn/node-core/main/taskWorktree.ts'
 import type {
   AgentEventRecord,
@@ -38,7 +39,7 @@ export type AgentRuntimeOptions = {
   db: AppDatabase
   dataDir: string
   internalApiEnv: Record<string, string>
-  encryptionKey: string
+  secrets: SecretService
   currentUserId(): string | null
   registry?: AgentDriverRegistry
   publish?(frame: AgentWsFrame): void
@@ -104,7 +105,7 @@ export class ManagedAgentEngine {
       this.artifacts,
       secretEnvironmentValues(this.internalApiEnv),
     )
-    this.webhooks = new AgentWebhookService(options.db, options.encryptionKey)
+    this.webhooks = new AgentWebhookService(options.db, options.secrets)
     this.providerEvents = new DurableAgentEventBuffer((entry) => this.commitProviderEvent(entry))
   }
 

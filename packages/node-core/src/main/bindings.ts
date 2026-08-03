@@ -12,6 +12,7 @@ import { activeIdentityStore, type ActiveIdentityStore } from './activeIdentity'
 import { deviceService, type DeviceService } from '../server/auth/deviceTokens'
 import { idempotencyStore, type IdempotencyStore } from '../server/auth/idempotency'
 import { pairingCodes, type PairingCodes } from '../server/auth/pairingCodes'
+import { SecretService } from './core/secrets'
 import { ensureCert } from './tls'
 
 // The runtime object the routes read via c.env (typed as the global Env in env.d.ts). Built once
@@ -39,7 +40,16 @@ export type RuntimeBindings = {
   // (server/secretBox.ts), so it is now simply "the key this node encrypts secrets with".
   // ponytail: docs/vNext/data.md wants it renamed `secrets.key`. That is main/sessionKeyStore.ts, the
   // docs, and every developer's .env, for zero behavioural gain — deferred deliberately.
+  //
+  // Read by exactly two things now: SECRETS below, and the legacy HTTP-storage migration in
+  // apps/node/src/wiring/startupSecurity.ts. No plugin touches it — a plugin uses SECRETS, which is
+  // the difference between holding the key and being able to use one credential for one purpose
+  // (docs/vNext/security.md § Secrets, "No getSecret() free-for-all").
   SESSION_ENC_KEY: string
+  // Use-scoped credential access (main/core/secrets.ts). On c.env deliberately: it is strictly less
+  // dangerous than the raw SESSION_ENC_KEY that was already here, and it is the seam that scrubs a
+  // credential out of a provider error before it reaches a log or a client.
+  SECRETS: SecretService
   GITHUB_CLIENT_ID: string
   // Retained deliberately, and nothing reads it. The device authorization grant exchanges on client_id
   // alone (plugins/github/server/routes/deviceAuth.ts), so the last reader left with routes/auth.ts. It
@@ -235,6 +245,7 @@ export function makeBindings({ dbPath, blobsDir, nodeId, appVersion }: BindingsO
     APP_VERSION: appVersion,
     BLOBS: diskBlobCache(blobCachePath),
     SESSION_ENC_KEY: encKey,
+    SECRETS: new SecretService(encKey),
     GITHUB_CLIENT_ID: secret('GITHUB_CLIENT_ID'),
     // `optional`, not `secret`: nothing reads this any more (see the type above), so demanding it would
     // make a fresh checkout fail to boot over a value with no consumer.

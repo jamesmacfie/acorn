@@ -100,7 +100,7 @@ export const githubDeviceAuth = new Hono<AppEnv>()
         getDb(c.env),
         userId,
         { providerId: GITHUB_PROVIDER, credentials: { accessToken: body.access_token } },
-        c.env.SESSION_ENC_KEY,
+        c.env.SECRETS,
       )
       // Bind the machine identity so internal callers (MCP, agents) resolve to this account.
       c.env.ACTIVE_IDENTITY.set(integration.label)

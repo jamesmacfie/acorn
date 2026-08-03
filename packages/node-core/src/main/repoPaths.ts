@@ -1,7 +1,6 @@
-import { execFile } from 'node:child_process'
+import { gitOrThrow } from './core/git'
 import { existsSync, statSync } from 'node:fs'
 import { isAbsolute, join } from 'node:path'
-import { promisify } from 'node:util'
 import { eq, and } from 'drizzle-orm'
 import type { AppDatabase } from '../server/db'
 import { schema } from '../server/db'
@@ -10,7 +9,6 @@ import { isValidBrowserRule, parseBrowserRules } from '@acorn/protocol/browserRu
 import type { BrowserRule, DbSchemaMode, PreviewMode, SetupTrigger } from '@acorn/protocol/api.ts'
 import type { RepoConfigPatch, RepoPath, RepoPathResult } from '@acorn/protocol/terminal.ts'
 
-const exec = promisify(execFile)
 
 export async function getRepoPath(db: AppDatabase, owner: string, repo: string): Promise<RepoPath | null> {
   const rows = await db
@@ -139,7 +137,7 @@ export async function setRepoPath(db: AppDatabase, owner: string, repo: string, 
 
   let remotes: string
   try {
-    const { stdout } = await exec('git', ['-C', path, 'remote', '-v'], { timeout: 5000 })
+    const { stdout } = await gitOrThrow(['remote', '-v'], { cwd: path, timeoutMs: 5_000 })
     remotes = stdout
   } catch {
     return { ok: false, reason: 'Could not read git remotes.' }

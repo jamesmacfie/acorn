@@ -3,7 +3,6 @@ import type { Context } from 'hono'
 import { getDb, schema } from '@acorn/node-core/server/db/index.ts'
 import type { AppEnv } from '@acorn/node-core/server/middleware/auth.ts'
 import { ownerId } from '@acorn/node-core/server/middleware/requireUser.ts'
-import { decryptSecret } from '@acorn/node-core/server/secretBox.ts'
 
 // The one place a GitHub credential is read (docs/vNext/plan.md § Phase 1: "GitHub OAuth becomes an
 // integration credential written to the node").
@@ -51,7 +50,10 @@ export async function githubToken(c: Context<AppEnv>): Promise<string> {
     .from(schema.integrations)
     .where(and(eq(schema.integrations.userId, ownerId(c)), eq(schema.integrations.provider, GITHUB_PROVIDER)))
   if (row) {
-    const token = await decryptSecret(row.authRef, c.env.SESSION_ENC_KEY)
+    // useOptional: "not connected" and "credential unreadable" both fall through to '' below, which
+    // is the convergence this accessor is built around. The credential is read through
+    // CoreServices.secrets, so the github plugin never holds SESSION_ENC_KEY.
+    const token = await c.env.SECRETS.useOptional(row.authRef, 'github: api call', (value) => value)
     if (token) return token
   }
   // No fallback. There was a transitional one to the session cookie's token, so the accessor could land

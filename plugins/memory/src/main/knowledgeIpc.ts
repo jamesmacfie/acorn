@@ -3,7 +3,7 @@
 // terminal.ts (docs/notes-and-memory.md). registerKnowledgeIpc still constructs and returns the shared
 // stores/closures the harness bridges and workflow wiring reuse; HTTP routing moved the `memory:*` /
 // `notes:*` IPC channels to the KnowledgeBridge (server/routes/knowledge.ts).
-import { execFile } from 'node:child_process'
+import { gitOrThrow } from '@acorn/node-core/main/core/git.ts'
 import { existsSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
@@ -127,7 +127,7 @@ export function registerKnowledgeIpc(db: AppDatabase, dataRoot: string, deps: Kn
         },
         taskDiff: async () => {
           try {
-            const { stdout } = await promisify(execFile)('git', ['-C', worktree, 'diff', 'HEAD'], { timeout: 15_000, maxBuffer: 10 * 1024 * 1024 })
+            const { stdout } = await gitOrThrow(['diff', 'HEAD'], { cwd: worktree, timeoutMs: 15_000 })
             return stdout
           } catch {
             return ''
@@ -187,7 +187,7 @@ export function registerKnowledgeIpc(db: AppDatabase, dataRoot: string, deps: Kn
         let commitSha: string | null = null
         if (t?.worktreePath && isDir(t.worktreePath)) {
           try {
-            const { stdout } = await promisify(execFile)('git', ['-C', t.worktreePath, 'rev-parse', 'HEAD'], { timeout: 5000 })
+            const { stdout } = await gitOrThrow(['rev-parse', 'HEAD'], { cwd: t.worktreePath, timeoutMs: 5_000 })
             commitSha = stdout.trim()
           } catch {
             // no commit yet — fine

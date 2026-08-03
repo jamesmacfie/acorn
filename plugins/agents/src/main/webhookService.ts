@@ -6,7 +6,7 @@ import { isIP } from 'node:net'
 import { and, asc, desc, eq, inArray, isNull, lte, or } from 'drizzle-orm'
 import type { AppDatabase } from '@acorn/node-core/server/db/index.ts'
 import { schema } from '@acorn/node-core/server/db/index.ts'
-import { decryptSecret, encryptSecret } from '@acorn/node-core/server/secretBox.ts'
+import { SecretUnavailableError, type SecretService } from '@acorn/node-core/main/core/secrets.ts'
 import type { AgentWsFrame } from '@acorn/protocol/managedAgents.ts'
 
 export type AgentWebhookEventType = 'completion' | 'attention'
@@ -165,14 +165,14 @@ function postWebhook(
 
 export class AgentWebhookService {
   readonly #db: AppDatabase
-  readonly #encryptionKey: string
+  readonly #secrets: SecretService
   #timer: ReturnType<typeof setTimeout> | null = null
   #pumping = false
   #stopped = false
 
-  constructor(db: AppDatabase, encryptionKey: string) {
+  constructor(db: AppDatabase, secrets: SecretService) {
     this.#db = db
-    this.#encryptionKey = encryptionKey
+    this.#secrets = secrets
   }
 
   async create(input: {
@@ -199,7 +199,7 @@ export class AgentWebhookService {
       taskId: input.taskId ?? null,
       url,
       eventsJson: JSON.stringify(events),
-      secretEnc: await encryptSecret(signingSecret, this.#encryptionKey),
+      secretEnc: await this.#secrets.seal(signingSecret),
       enabled: true,
       createdAt: timestamp,
       updatedAt: timestamp,
@@ -347,7 +347,12 @@ export class AgentWebhookService {
         .where(eq(schema.agentWebhookDeliveries.id, delivery.id))
       return
     }
-    const secret = await decryptSecret(webhook.secretEnc, this.#encryptionKey)
+    // reveal(): the signature is computed below over the delivery body, outside any scope this
+    // could bracket. SecretUnavailable reads as the same null the old decrypt returned.
+    const secret = await this.#secrets.reveal(webhook.secretEnc, 'agent webhook: sign delivery').catch((error: unknown) => {
+      if (error instanceof SecretUnavailableError) return null
+      throw error
+    })
     if (!secret) {
       await this.#failAttempt(delivery, null, 'Webhook signing secret cannot be decrypted.', false)
       return

@@ -243,7 +243,7 @@ export async function startServiceRuntime({ config, desktop, stateChanged }: Run
       db,
       dataDir: config.dataDir,
       internalApiEnv,
-      encryptionKey: runtime.SESSION_ENC_KEY,
+      secrets: runtime.SECRETS,
       capabilities,
       currentUserId: () => runtime.ACTIVE_IDENTITY.get(),
       memoryReviewTrigger: knowledge.memoryReviewTrigger,

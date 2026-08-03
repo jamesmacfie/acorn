@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto'
+import { SecretService } from '@acorn/node-core/main/core/secrets.ts'
 import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -16,6 +17,7 @@ import { FakeAgentDriver } from './drivers/fake'
 import { ManagedAgentRuntime } from './runtime'
 
 const ENCRYPTION_KEY = '11'.repeat(32)
+const SECRETS = new SecretService(ENCRYPTION_KEY)
 
 type Seed = {
   taskId: string
@@ -211,7 +213,7 @@ describe('managed agent runtime conformance', () => {
       db: testDb.db,
       dataDir,
       internalApiEnv: {},
-      encryptionKey: ENCRYPTION_KEY,
+      secrets: SECRETS,
       currentUserId: () => null,
       registry,
       publish: (frame) => {
@@ -253,7 +255,7 @@ describe('managed agent runtime conformance', () => {
       db: testDb.db,
       dataDir,
       internalApiEnv: {},
-      encryptionKey: ENCRYPTION_KEY,
+      secrets: SECRETS,
       currentUserId: () => null,
       registry,
     })
@@ -291,7 +293,7 @@ describe('managed agent runtime conformance', () => {
       db: testDb.db,
       dataDir,
       internalApiEnv: {},
-      encryptionKey: ENCRYPTION_KEY,
+      secrets: SECRETS,
       currentUserId: () => null,
       registry: new AgentDriverRegistry(),
     })
@@ -338,7 +340,7 @@ describe('managed agent runtime conformance', () => {
       db: testDb.db,
       dataDir,
       internalApiEnv: {},
-      encryptionKey: ENCRYPTION_KEY,
+      secrets: SECRETS,
       currentUserId: () => null,
       registry,
     })
@@ -365,7 +367,7 @@ describe('managed agent runtime conformance', () => {
       db: testDb.db,
       dataDir,
       internalApiEnv: {},
-      encryptionKey: ENCRYPTION_KEY,
+      secrets: SECRETS,
       currentUserId: () => null,
       registry: new AgentDriverRegistry(),
     })
@@ -409,7 +411,7 @@ describe('managed agent runtime conformance', () => {
       db: testDb.db,
       dataDir,
       internalApiEnv: {},
-      encryptionKey: ENCRYPTION_KEY,
+      secrets: SECRETS,
       currentUserId: () => null,
       registry,
     })
@@ -447,7 +449,7 @@ describe('managed agent runtime conformance', () => {
       db: testDb.db,
       dataDir,
       internalApiEnv: {},
-      encryptionKey: ENCRYPTION_KEY,
+      secrets: SECRETS,
       currentUserId: () => null,
       registry,
     })

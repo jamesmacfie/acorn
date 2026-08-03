@@ -1,5 +1,4 @@
-import { execFile } from 'node:child_process'
-import { promisify } from 'node:util'
+import { gitOrThrow } from '@acorn/node-core/main/core/git.ts'
 import { Hono } from 'hono'
 import type { PullConflicts } from '@acorn/protocol/api.ts'
 import { getDb } from '@acorn/node-core/server/db/index.ts'
@@ -8,7 +7,6 @@ import type { AppEnv } from '@acorn/node-core/server/middleware/auth.ts'
 import { ownerId } from '@acorn/node-core/server/middleware/requireUser.ts'
 import { respondError } from '@acorn/node-core/server/respond.ts'
 
-const exec = promisify(execFile)
 
 // GitHub exposes no per-file conflict data — only the `mergeable` enum on the PR. To list the files
 // that conflict we run a trial merge with `git merge-tree` in the repo's mapped local checkout
@@ -53,14 +51,14 @@ export const pullConflicts = new Hono<AppEnv>().get('/:owner/:repo/pulls/:number
   const baseRef = `refs/acorn/conflict/${number}/base`
   const headRef = `refs/acorn/conflict/${number}/head`
   try {
-    await exec('git', ['-C', checkout, 'fetch', '--no-tags', '--quiet', 'origin', `+refs/heads/${base}:${baseRef}`, `+refs/pull/${number}/head:${headRef}`], { timeout: 60_000 })
+    await gitOrThrow(['fetch', '--no-tags', '--quiet', 'origin', `+refs/heads/${base}:${baseRef}`, `+refs/pull/${number}/head:${headRef}`], { cwd: checkout, timeoutMs: 60_000 })
   } catch {
     return c.json(unavailable)
   }
 
   try {
     // Exit 0 → the trial merge is clean (GitHub's CONFLICTING was stale); no conflicting files.
-    await exec('git', ['-C', checkout, 'merge-tree', '--write-tree', '--name-only', baseRef, headRef], { timeout: 30_000, maxBuffer: 16 * 1024 * 1024 })
+    await gitOrThrow(['merge-tree', '--write-tree', '--name-only', baseRef, headRef], { cwd: checkout, timeoutMs: 30_000 })
     return c.json({ available: true, files: [] } satisfies PullConflicts)
   } catch (e) {
     // Exit 1 → conflicts; the conflicting paths are on stdout. Anything else → couldn't compute.

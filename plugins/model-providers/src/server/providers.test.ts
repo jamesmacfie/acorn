@@ -3,7 +3,7 @@ import { schema } from '@acorn/node-core/server/db/index.ts'
 import { connectionProviderRegistry } from '@acorn/node-core/server/integrations/connectionRegistry.ts'
 import { connectProvider, rotateConnection, testConnection } from '@acorn/node-core/server/integrations/connections.ts'
 import { makeTestDb, type TestDb } from '@acorn/node-core/server/routes/testDb.ts'
-import { decryptSecret } from '@acorn/node-core/server/secretBox.ts'
+import { SecretService } from '@acorn/node-core/main/core/secrets.ts'
 import {
   ANTHROPIC_MODELS,
   ANTHROPIC_RECOMMENDED_MODEL_ID,
@@ -18,6 +18,7 @@ import {
 } from './openai'
 
 const ENCRYPTION_KEY = '33'.repeat(32)
+const SECRETS = new SecretService(ENCRYPTION_KEY)
 
 const openAI = {
   listModels: vi.fn(async () => ({ data: [{ id: OPENAI_RECOMMENDED_MODEL_ID }] })),
@@ -102,7 +103,7 @@ describe('model provider connections', () => {
       testDb.db,
       'alice',
       { providerId: 'openai', credentials: { apiKey: ' plaintext-key ' } },
-      ENCRYPTION_KEY,
+      SECRETS,
     )
 
     expect(openAI.listModels).toHaveBeenCalledOnce()
@@ -113,7 +114,7 @@ describe('model provider connections', () => {
     })
     const [row] = await testDb.db.select().from(schema.integrations)
     expect(row.authRef).not.toContain('plaintext-key')
-    expect(await decryptSecret(row.authRef, ENCRYPTION_KEY)).toBe('plaintext-key')
+    expect(await SECRETS.reveal(row.authRef, 'test')).toBe('plaintext-key')
     expect(JSON.stringify({ ...row, authRef: undefined })).not.toContain('plaintext-key')
   })
 
@@ -122,21 +123,21 @@ describe('model provider connections', () => {
       testDb.db,
       'alice',
       { providerId: 'anthropic', credentials: { apiKey: 'first-key' } },
-      ENCRYPTION_KEY,
+      SECRETS,
     )
     await rotateConnection(
       testDb.db,
       'alice',
       connected.id,
       { credentials: { apiKey: 'rotated-key' } },
-      ENCRYPTION_KEY,
+      SECRETS,
     )
-    const summary = await testConnection(testDb.db, 'alice', connected.id, ENCRYPTION_KEY)
+    const summary = await testConnection(testDb.db, 'alice', connected.id, SECRETS)
 
     expect(anthropic.listModels).toHaveBeenCalledTimes(3)
     expect(summary.status).toBe('connected')
     const [row] = await testDb.db.select().from(schema.integrations)
-    expect(await decryptSecret(row.authRef, ENCRYPTION_KEY)).toBe('rotated-key')
+    expect(await SECRETS.reveal(row.authRef, 'test')).toBe('rotated-key')
   })
 
   it.each([

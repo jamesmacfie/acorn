@@ -2,8 +2,10 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { schema } from '@acorn/node-core/server/db/index.ts'
 import { makeTestDb, type TestDb } from '@acorn/node-core/server/routes/testDb.ts'
 import { openHttpValue, protectLegacyHttpStorage } from './storage'
+import { SecretService } from '@acorn/node-core/main/core/secrets.ts'
 
 const ENC_KEY = '0'.repeat(64)
+const SECRETS = new SecretService(ENC_KEY)
 
 describe('legacy HTTP storage protection', () => {
   let testDb: TestDb
@@ -32,12 +34,12 @@ describe('legacy HTTP storage protection', () => {
       updatedAt: 1,
     })
 
-    await protectLegacyHttpStorage(testDb.db, ENC_KEY)
+    await protectLegacyHttpStorage(testDb.db, SECRETS)
 
     const [row] = await testDb.db.select().from(schema.httpRequests)
     expect(row).toMatchObject({ userId: 'alice', encrypted: true })
     expect(JSON.stringify(row)).not.toContain('Bearer secret')
-    expect(await openHttpValue(row.url, row.encrypted, ENC_KEY)).toBe('https://example.test?token=secret')
+    expect(await openHttpValue(row.url, row.encrypted, SECRETS)).toBe('https://example.test?token=secret')
   })
 
   it('leaves ownership quarantined when more than one identity exists', async () => {
@@ -56,7 +58,7 @@ describe('legacy HTTP storage protection', () => {
       updatedAt: 1,
     })
 
-    await protectLegacyHttpStorage(testDb.db, ENC_KEY)
+    await protectLegacyHttpStorage(testDb.db, SECRETS)
 
     const [row] = await testDb.db.select().from(schema.httpVariables)
     expect(row).toMatchObject({ userId: '__legacy_unscoped__', encrypted: true })

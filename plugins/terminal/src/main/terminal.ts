@@ -15,6 +15,7 @@ import type { ArchiveOpts, ArchiveResult, CreateOpts, ServerMsg, TerminalSession
 import { AgentSender, type SendSubmit } from './agentSend'
 import { archiveTask, TEARDOWN_TIMEOUT_MS } from '@acorn/node-core/main/archive.ts'
 import { buildSessionEnv, childEnv } from '@acorn/node-core/main/taskEnv.ts'
+import { runProcess } from '@acorn/node-core/main/core/proc.ts'
 import {
   clampDim,
   computeIdle,
@@ -600,13 +601,27 @@ export function registerTerminalIpc(db: AppDatabase, worktreesDir: string, deps:
       if (!script) return { ok: false, reason: 'no script configured' }
       const cwd = await taskRoot(db, taskId)
       if (!cwd) return { ok: false, reason: 'no worktree yet — open a terminal first' }
-      try {
-        const { stdout } = await promisify(execFile)('/bin/sh', ['-c', script], { cwd, timeout: 10_000 })
-        const url = stdout.split('\n').map((l) => l.trim()).filter(Boolean).pop()
-        return url ? { ok: true, url } : { ok: false, reason: 'script produced no output' }
-      } catch (err) {
-        return { ok: false, reason: err instanceof Error ? err.message : 'script failed' }
-      }
+      // Through the process broker (CoreServices.proc). This call used to pass NO `env` option at
+      // all, so a repo-configured capture command inherited the node's entire environment —
+      // SESSION_ENC_KEY and INTERNAL_TOKEN included — and had no output cap. It also gets a
+      // process-group kill now, which matters because a URL script commonly starts a dev server.
+      const t = await loadTask(db, taskId)
+      const result = await runProcess({
+        file: '/bin/sh',
+        args: ['-c', script],
+        cwd,
+        env: buildSessionEnv({
+          taskId,
+          cwd,
+          task: t ? { repoOwner: t.repoOwner, repoName: t.repoName, branch: t.branch, title: t.title } : null,
+        }),
+        timeoutMs: 10_000,
+      })
+      if (result.spawnError) return { ok: false, reason: result.spawnError }
+      if (result.timedOut) return { ok: false, reason: 'script timed out' }
+      if (result.code !== 0) return { ok: false, reason: result.stderr.trim().slice(0, 200) || 'script failed' }
+      const url = result.stdout.split('\n').map((l) => l.trim()).filter(Boolean).pop()
+      return url ? { ok: true, url } : { ok: false, reason: 'script produced no output' }
     },
     // Notified by the client right after a task is created. If its workspace runs the setup script on
     // task creation (trigger 'created') and the repo checkout is mapped, eagerly create the worktree

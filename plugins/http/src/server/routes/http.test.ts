@@ -1,3 +1,4 @@
+import { testSecretEnv } from '@acorn/node-core/server/routes/testDb.ts'
 import { Hono } from 'hono'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { schema } from '@acorn/node-core/server/db/index.ts'
@@ -29,7 +30,7 @@ describe('HTTP credential isolation', () => {
 
   beforeEach(() => {
     testDb = makeTestDb()
-    env = { DB: testDb.db, SESSION_ENC_KEY: ENC_KEY } as unknown as Env
+    env = { DB: testDb.db, ...testSecretEnv(ENC_KEY) } as unknown as Env
   })
 
   afterEach(() => testDb.cleanup())

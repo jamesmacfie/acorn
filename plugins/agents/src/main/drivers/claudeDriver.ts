@@ -12,6 +12,7 @@ import { createRequire } from 'node:module'
 import { Readable, Writable } from 'node:stream'
 import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process'
 import { pathToFileURL } from 'node:url'
+import { brokerEnv } from '@acorn/node-core/main/core/proc.ts'
 import type { AgentConfigOption, AgentInputPart, AgentProviderDescriptor } from '@acorn/protocol/managedAgents.ts'
 import { resolveUsageCommand, usageProcessEnv } from '../usage/processRunner'
 import { normalizeAcpCommands, normalizeAcpConfig, normalizeAcpPermission, normalizeAcpUpdate } from './acpNormalizer'
@@ -139,9 +140,12 @@ export class ClaudeAgentDriver implements AgentDriver {
 
     const child: ChildProcessWithoutNullStreams = spawn(process.execPath, [adapterEntry()], {
       cwd: options.cwd,
+      // brokerEnv, not `{ ...process.env }` (CoreServices.proc). Spreading the parent environment
+      // handed every agent session the node's own bindings — SESSION_ENC_KEY, INTERNAL_TOKEN,
+      // GITHUB_CLIENT_* — on top of the task env it was already given deliberately. The agent CLI
+      // needs its own config directories, so those pass through by name.
       env: {
-        ...process.env,
-        ...options.env,
+        ...brokerEnv({ env: options.env, passthrough: ['CLAUDE_*', 'ANTHROPIC_*', 'XDG_CONFIG_HOME', 'npm_config_prefix'] }),
         ELECTRON_RUN_AS_NODE: '1',
         CLAUDE_CODE_EXECUTABLE: descriptor.executable,
       },
