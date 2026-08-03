@@ -24,6 +24,7 @@ export const githubProvider = publicProvider({
   kind: 'identity',
   connection: {
     authKind: 'oauth',
+    kind: 'device-flow',
     fields: [],
     connectable: true,
     disconnectable: true,

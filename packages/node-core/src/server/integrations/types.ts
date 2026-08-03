@@ -38,6 +38,8 @@ export type ConnectionHealth = { ok: true } | { ok: false; error: ProviderErrorC
 
 export type TypedConnectionContract<TValidated> = {
   authKind: IntegrationAuthKind
+  // Projected onto the public descriptor; see PublicIntegrationProvider. Absent means 'fields'.
+  kind?: 'fields' | 'device-flow'
   fields: CredentialField[]
   connectable: boolean
   disconnectable: boolean

@@ -14,6 +14,7 @@ import { rowHeight } from '@acorn/client-core/ui/metrics.ts'
 import { watchAppearance } from '@acorn/client-core/ui/appearance.ts'
 import { scanLinearRefs } from '@acorn/plugin-linear/client/scanLinearRefs.ts'
 import { activateTaskSignals, pathForTask } from '@acorn/client-core/tasks/activate.ts'
+import { clientEvents } from '@acorn/client-core/registries/clientEvents.ts'
 import { registerCommands } from '@acorn/client-core/registries/commands.ts'
 import { registerKeybindings } from '@acorn/client-core/registries/keybindings.tsx'
 
@@ -43,6 +44,11 @@ export default function PullList() {
   const list = () => (tab() === 'open' ? (openPulls.data ?? []) : closedRows())
   const ready = () => (tab() === 'open' ? openPulls.data !== undefined : closedPulls.data !== undefined)
   const isError = () => (tab() === 'open' ? openPulls.isError : closedPulls.isError)
+  // Whether this node holds a GitHub credential at all. The list already reads the integrations query
+  // (for the Linear seeding below), so this costs nothing extra.
+  const integrations = createQuery(() => integrationsOptions(true))
+  const githubConnected = () =>
+    (integrations.data?.integrations ?? []).some((connection) => connection.providerId === 'github' && connection.status === 'connected')
 
   // Once the repo is known on the repo overview, warm per-PR caches so navigating is instant.
   // Direct PR routes skip first-load warm-up so detail/files own the critical path.
@@ -189,7 +195,28 @@ export default function PullList() {
       {/* Scroll element stays mounted from first render so the virtualizer always observes it —
           publish the ref after layout so the first observed rect has the flexed pane height. */}
       <div class="pr-list-scroll" ref={publishScrollEl}>
-        <Show when={ready()} fallback={<p class="placeholder">{isError() ? 'Failed to load PRs.' : 'Loading…'}</p>}>
+        <Show
+          when={ready()}
+          fallback={
+            // GitHub is an integration now, not the login. A node with no GitHub connection makes every
+            // github query fail with `reauth`, and "Failed to load PRs." would be a lie about a node
+            // that is working exactly as configured — so the un-connected case gets its own state.
+            // Phase 1 minimum: an empty state and a deep link. The attention-inbox item ui.md describes
+            // is Phase 4.
+            <Show when={!githubConnected() && (isError() || repoKnown())} fallback={<p class="placeholder">{isError() ? 'Failed to load PRs.' : 'Loading…'}</p>}>
+              <div class="placeholder pr-list-connect">
+                <p>acorn is not connected to GitHub on this node.</p>
+                <button
+                  type="button"
+                  class="ui-btn"
+                  onClick={() => clientEvents.emit('presentation:open-settings', { tab: 'integrations' })}
+                >
+                  Connect GitHub
+                </button>
+              </div>
+            </Show>
+          }
+        >
           <Show when={shown().length} fallback={<p class="placeholder">No matching PRs.</p>}>
             <div class="pr-list" style={{ height: `${virt.getTotalSize()}px`, position: 'relative' }}>
               <For each={virtualRows()}>

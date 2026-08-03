@@ -18,6 +18,7 @@ const descriptorFor = (provider: ConnectionProviderContribution): PublicIntegrat
   glyph: provider.glyph,
   connection: {
     authKind: provider.connection.authKind,
+    ...(provider.connection.kind === undefined ? {} : { kind: provider.connection.kind }),
     fields: provider.connection.fields.map(publicCredentialField),
     connectable: provider.connection.connectable,
     disconnectable: provider.connection.disconnectable,

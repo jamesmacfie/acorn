@@ -27,6 +27,7 @@ import { activeNodeId, nodeReady, setActiveNode } from '@acorn/client-core/node/
 import { nodes } from '@acorn/client-core/node/fleet.ts'
 import TaskView from './TaskView'
 import Acorn from '@acorn/client-core/Acorn.tsx'
+import { clientEvents } from '@acorn/client-core/registries/clientEvents.ts'
 import { registerCommands } from '@acorn/client-core/registries/commands.ts'
 import { KeybindingDispatcher, registerKeybindings } from '@acorn/client-core/registries/keybindings.tsx'
 import { confirmWillEvent, registerWillHandler, WillConfirmationHost } from '@acorn/client-core/registries/willPhase.tsx'
@@ -63,6 +64,9 @@ export default function App() {
     setSettingsTab(tab)
     setSettingsOpen(true)
   }
+  // Panes deep-link here rather than receiving an `openSettings` prop: the modal is the shell's, and
+  // threading a callback through every pane that might ever want one is worse than one event.
+  onMount(() => onCleanup(clientEvents.on('presentation:open-settings', ({ tab }) => openSettings(tab))))
   // The terminal drawer belongs to a task, not the app: it's shown only in the Task view (a Source
   // browse like Pull requests has no terminal) and its open/closed state is tracked per task, so
   // switching tabs swaps it. `termOpen` reflects the active task's state within the Task view.

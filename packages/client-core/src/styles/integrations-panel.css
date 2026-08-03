@@ -343,6 +343,27 @@
 .integration-add-label { font-size: var(--fs-sm); color: var(--text); }
 .integration-add-hint { font-size: var(--fs-sm); margin: 0; }
 
+/* Device authorization grant (IntegrationsSettings.tsx): the code the owner types at the provider.
+   Big and monospaced because it is read off the screen and typed elsewhere, and its copy button is
+   always visible rather than hover-revealed for the same reason. */
+.integration-device { display: flex; flex-direction: column; align-items: flex-start; gap: var(--space-4); }
+.integration-device-code {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-5);
+  border: var(--control-border);
+  border-radius: var(--radius);
+  background: var(--bg);
+}
+.integration-device-code code {
+  font-family: var(--font-mono);
+  font-size: var(--fs-lg);
+  letter-spacing: 0.12em;
+  color: var(--text);
+}
+.integration-device-code .copy-btn { opacity: 1; }
+
 /* Clickable ticket row in the PR detail Integrations list. */
 .integration-row {
   display: flex;

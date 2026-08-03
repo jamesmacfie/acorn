@@ -1,6 +1,9 @@
-import { createMemo, createSignal, For, Show } from 'solid-js'
+import { createMemo, createSignal, For, onCleanup, Show } from 'solid-js'
 import { createQuery, useQueryClient } from '@tanstack/solid-query'
 import type { PublicIntegrationProvider } from '@acorn/protocol/integrations.ts'
+import { githubDevicePollRoute, githubDeviceStartRoute, type GithubDevicePoll, type GithubDeviceStart } from '@acorn/protocol/api.ts'
+import { postJson } from '../apiClient'
+import CopyButton from '../ui/CopyButton'
 import Icon from '../ui/Icon'
 import {
   connectIntegration,
@@ -40,6 +43,66 @@ export default function IntegrationsSettings() {
   const [credentials, setCredentials] = createSignal<Record<string, string>>({})
   const [busy, setBusy] = createSignal(false)
   const [error, setError] = createSignal('')
+
+  // --- Device authorization grant (RFC 8628), for a provider whose descriptor says `kind:
+  // 'device-flow'`. Currently only GitHub, and one branch here rather than a page of its own: this
+  // component is already descriptor-driven, so "how the credential is obtained" is one more thing the
+  // descriptor answers.
+  const [device, setDevice] = createSignal<GithubDeviceStart | null>(null)
+  let poller: ReturnType<typeof setTimeout> | undefined
+  const stopPolling = () => clearTimeout(poller)
+  onCleanup(stopPolling)
+
+  const startDeviceFlow = async () => {
+    setBusy(true)
+    setError('')
+    try {
+      const started = await postJson<GithubDeviceStart>(githubDeviceStartRoute)
+      setDevice(started)
+      // The node performs the exchange; the client only paces it. `interval` is GitHub's, honoured
+      // exactly — polling faster earns a slow_down and, eventually, nothing.
+      poll(started, started.interval * 1000)
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'Could not start the connection.')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const poll = (started: GithubDeviceStart, delay: number, deadline = Date.now() + started.expiresIn * 1000) => {
+    stopPolling()
+    poller = setTimeout(async () => {
+      if (Date.now() > deadline) {
+        setDevice(null)
+        setError('That code expired. Start again.')
+        return
+      }
+      try {
+        const result = await postJson<GithubDevicePoll>(githubDevicePollRoute, { deviceCode: started.deviceCode })
+        if (result.status === 'connected') {
+          setDevice(null)
+          setAdding(false)
+          await refresh()
+          return
+        }
+        if (result.status !== 'pending') {
+          setDevice(null)
+          setError(result.status === 'denied' ? 'That request was declined.' : 'That code expired. Start again.')
+          return
+        }
+        // slow_down is a directive, not an error: GitHub adds 5s to the interval and expects us to keep it.
+        poll(started, result.slowDown ? delay + 5_000 : delay, deadline)
+      } catch (cause) {
+        setDevice(null)
+        setError(cause instanceof Error ? cause.message : 'Could not finish connecting.')
+      }
+    }, delay)
+  }
+
+  const cancelDeviceFlow = () => {
+    stopPolling()
+    setDevice(null)
+  }
 
   const refresh = () => qc.invalidateQueries({ queryKey: integrationsKey })
   const valueFor = (id: string) => credentials()[id] ?? ''
@@ -116,7 +179,12 @@ export default function IntegrationsSettings() {
                 <div class="integration-actions">
                   <Show when={provider()?.connection.disconnectable} fallback={<span class="integration-badge">Connected</span>}>
                     <button type="button" class="integration-remove" onClick={() => void test(connection.id)} disabled={busy()}>Test</button>
-                    <button type="button" class="integration-remove" onClick={() => { setProviderId(connection.providerId); setRotationId(connection.id); setCredentials({}); setAdding(true) }} disabled={busy()}>Rotate</button>
+                    {/* Rotation means "submit a new credential for this connection", which a device flow
+                        has no shape for — the owner never holds the token. Disconnect and connect again
+                        is the honest path, so the button is simply absent. */}
+                    <Show when={provider()?.connection.kind !== 'device-flow'}>
+                      <button type="button" class="integration-remove" onClick={() => { setProviderId(connection.providerId); setRotationId(connection.id); setCredentials({}); setAdding(true) }} disabled={busy()}>Rotate</button>
+                    </Show>
                     <button type="button" class="integration-remove" onClick={() => void setDisabled(connection.id, connection.status !== 'disabled')} disabled={busy()}>
                       {connection.status === 'disabled' ? 'Enable' : 'Disable'}
                     </button>
@@ -144,27 +212,61 @@ export default function IntegrationsSettings() {
               )}
             </For>
           </div>
-          <For each={selectedProvider()?.connection.fields ?? []}>
-            {(field) => (
-              <label class="integration-add-label">
-                {field.label}
-                <div class="integration-key-row">
-                  <input
-                    class="ui-input"
-                    type={field.type}
-                    placeholder={field.placeholder}
-                    value={valueFor(field.id)}
-                    onInput={(event) => setValue(field.id, event.currentTarget.value)}
-                    onKeyDown={(event) => event.key === 'Enter' && void add()}
-                  />
+          <Show
+            when={selectedProvider()?.connection.kind === 'device-flow'}
+            fallback={
+              <>
+                <For each={selectedProvider()?.connection.fields ?? []}>
+                  {(field) => (
+                    <label class="integration-add-label">
+                      {field.label}
+                      <div class="integration-key-row">
+                        <input
+                          class="ui-input"
+                          type={field.type}
+                          placeholder={field.placeholder}
+                          value={valueFor(field.id)}
+                          onInput={(event) => setValue(field.id, event.currentTarget.value)}
+                          onKeyDown={(event) => event.key === 'Enter' && void add()}
+                        />
+                      </div>
+                      <Show when={field.hint}><p class="integration-add-hint muted">{field.hint}</p></Show>
+                    </label>
+                  )}
+                </For>
+                <button type="button" class="ui-btn" onClick={() => void add()} disabled={busy() || !complete()}>
+                  {busy() ? 'Saving…' : rotationId() ? 'Rotate credentials' : 'Connect new'}
+                </button>
+              </>
+            }
+          >
+            <Show
+              when={device()}
+              fallback={
+                <button type="button" class="ui-btn" onClick={() => void startDeviceFlow()} disabled={busy()}>
+                  {busy() ? 'Starting…' : `Connect ${selectedProvider()?.label ?? ''}`}
+                </button>
+              }
+            >
+              {(started) => (
+                <div class="integration-device">
+                  <p class="integration-add-hint muted">Enter this code at the provider, then leave this page open.</p>
+                  <div class="integration-device-code copyable">
+                    <code>{started().userCode}</code>
+                    <CopyButton text={() => started().userCode} title="Copy the code" />
+                  </div>
+                  {/* A real link, not a fetch: main's setWindowOpenHandler routes it through
+                      isAllowedExternalUrl → shell.openExternal, so it opens in the owner's browser.
+                      CSP-safe because it is a navigation, not a frame or a connect-src. */}
+                  <a class="ui-btn" href={started().verificationUri} target="_blank" rel="noopener noreferrer">
+                    Open {new URL(started().verificationUri).host}
+                  </a>
+                  <p class="integration-add-hint muted">Waiting for approval…</p>
+                  <button type="button" class="integration-remove" onClick={cancelDeviceFlow}>Cancel</button>
                 </div>
-                <Show when={field.hint}><p class="integration-add-hint muted">{field.hint}</p></Show>
-              </label>
-            )}
-          </For>
-          <button type="button" class="ui-btn" onClick={() => void add()} disabled={busy() || !complete()}>
-            {busy() ? 'Saving…' : rotationId() ? 'Rotate credentials' : 'Connect new'}
-          </button>
+              )}
+            </Show>
+          </Show>
           <Show when={error()}><div class="action-error">{error()}</div></Show>
         </div>
       </div>
