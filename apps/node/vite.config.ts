@@ -7,7 +7,8 @@ import { defineConfig } from 'vite'
 // a child process"), so the two entries the desktop runtime needs are BUILT here and copied into
 // out/main by apps/desktop/electron.vite.config.ts.
 //
-//  - service.js — forked by Electron main as a utilityProcess (app/main/serviceHost.ts)
+//  - service.js — spawned by Electron main as a child process over ELECTRON_RUN_AS_NODE, with an IPC
+//                 channel on fd 3 (app/main/serviceHost.ts)
 //  - mcp.js     — the acorn MCP server (docs/mcp.md), launched by agents via
 //                 ELECTRON_RUN_AS_NODE=1 <electron> out/main/mcp.js, never by the app itself
 //
