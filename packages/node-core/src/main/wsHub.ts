@@ -21,6 +21,10 @@ export type StreamHandlers = {
   input(id: string, data: string): void
   attach(id: string, sink: StreamSink): void
   detach(id: string, sink: StreamSink): void
+  // Which task a stream belongs to, or null/undefined when the id is unknown. Required for the
+  // task-scope check in onConnect: a task-scoped internal credential may only drive its OWN task's
+  // streams, and only the engine that owns the sessions can answer that question.
+  streamTaskId(id: string): string | null | undefined
 }
 
 let handlers: StreamHandlers | null = null
@@ -44,7 +48,17 @@ export function registerWsChannelHandler(prefix: string, handler: WsChannelHandl
 // `deviceId` is null for an internal-token socket — the one credential kind with no device row to
 // revoke. `seq` is this connection's own counter (docs/vNext/protocol.md § Events), so a
 // reconnect legitimately restarts at 1 and the client compares only within one socket's lifetime.
-type Conn = { ws: WebSocket; sinks: Map<string, StreamSink>; deviceId: string | null; seq: number }
+type Conn = {
+  ws: WebSocket
+  sinks: Map<string, StreamSink>
+  deviceId: string | null
+  seq: number
+  // The claims of an internal credential, when this socket authenticated with one. Retained rather than
+  // discarded at the door: without it a 'task'-scoped token could attach to, and type into, ANY task's
+  // pseudo-terminal — arbitrary command execution as the owner in another task's shell, which is
+  // exactly what scoping the token was supposed to prevent.
+  internal?: InternalClaims
+}
 const conns = new Set<Conn>()
 const hubDisposers = new WeakMap<Server, () => void>()
 
@@ -119,8 +133,18 @@ async function authorize(req: IncomingMessage, deps: WsAuthDeps): Promise<Author
   return claims ? { deviceId: null, internal: claims } : null
 }
 
+// May this connection address the stream `id`?
+//
+// Device sockets and the 'service' scope: yes. A 'task'-scoped internal socket: only when the stream
+// belongs to that task. The engine answers the ownership question because it owns the session map.
+function mayDriveStream(conn: Conn, id: string | null): boolean {
+  if (!conn.internal || conn.internal.scope === 'service') return true
+  if (!id || !conn.internal.taskId) return false
+  return handlers?.streamTaskId(id) === conn.internal.taskId
+}
+
 function onConnect(ws: WebSocket, authorized: Authorized): void {
-  const conn: Conn = { ws, sinks: new Map(), deviceId: authorized.deviceId, seq: 0 }
+  const conn: Conn = { ws, sinks: new Map(), deviceId: authorized.deviceId, seq: 0, internal: authorized.internal }
   conns.add(conn)
   ws.on('message', (raw) => {
     let frame: WsClientFrame
@@ -131,6 +155,12 @@ function onConnect(ws: WebSocket, authorized: Authorized): void {
     }
     if (frame.channel.startsWith('term:')) {
       if (!handlers) return
+      // Scope check BEFORE any handler runs. A device socket is the owner and may drive anything; an
+      // internal socket may drive only the streams of the task its credential names. An unknown stream
+      // id is refused for a task-scoped caller rather than allowed — failing open here would make the
+      // check trivially bypassable by racing session creation.
+      const streamId = (frame as { id?: unknown }).id
+      if (!mayDriveStream(conn, typeof streamId === 'string' ? streamId : null)) return
       if (frame.channel === 'term:input') {
         if (typeof frame.id === 'string' && typeof frame.data === 'string') handlers.input(frame.id, frame.data)
       } else if (frame.channel === 'term:attach') {

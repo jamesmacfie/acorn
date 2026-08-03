@@ -37,6 +37,7 @@ const authed = () => {
 }
 
 const sessions = (over: Partial<TaskSessionsBridge> = {}): TaskSessionsBridge => ({
+  ready: async () => {},
   runningCount: () => 0,
   killRunning: () => {},
   dropTaskSessions: async () => {},

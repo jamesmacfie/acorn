@@ -2,7 +2,7 @@ import { Hono } from 'hono'
 import { authMiddleware, type AppEnv } from './middleware/auth'
 import { buildIntegrationProviderRoutes } from './integrations/providerRoutes'
 import { idempotency } from './middleware/idempotency'
-import { requireDevice, requireUser } from './middleware/requireUser'
+import { requireDevice, requireProviderAccess, requireTaskScope, requireUser } from './middleware/requireUser'
 import { onServerError, requestIdMiddleware } from './respond'
 import { CORE_NAMESPACE, PLUGIN_NAMESPACE, pluginRouteContributions, routeMountPath } from './routeRegistry'
 import { integrations } from './routes/integrations'
@@ -66,6 +66,18 @@ export function createApp() {
     .use(`${CORE_NAMESPACE}/pair/*`, requireDevice)
     .use(`${CORE_NAMESPACE}/devices`, requireDevice)
     .use(`${CORE_NAMESPACE}/devices/*`, requireDevice)
+    // Task scope, enforced by MOUNT rather than per handler. A 'task'-scoped internal credential may act
+    // only on the task it names (server/auth/internalTokens.ts). An adversarial review confirmed that a
+    // per-route guard had been applied at one site out of six, leaving arbitrary shell execution in
+    // another task's worktree reachable via /tasks/<other>/preview-url — so the gate sits here, above
+    // every task-scoped core router, where a newly added route inherits it instead of forgetting it.
+    .use(`${CORE_NAMESPACE}/tasks/:id`, requireTaskScope)
+    .use(`${CORE_NAMESPACE}/tasks/:id/*`, requireTaskScope)
+    // Administering or spending the owner's provider connections: device or the service scope, never a
+    // task-scoped child. Without this an agent could list, rotate, test and DELETE the owner's
+    // integrations (confirmed by probe), which is squarely what security.md forbids it.
+    .use(`${CORE_NAMESPACE}/integrations`, requireProviderAccess)
+    .use(`${CORE_NAMESPACE}/integrations/*`, requireProviderAccess)
     .route(CORE_NAMESPACE, pairing.core) // /pair, /pair/start, /devices — owner-only device administration
     .route(`${CORE_NAMESPACE}/pins`, pins)
     .route(`${CORE_NAMESPACE}/prefs`, prefs)
@@ -84,6 +96,11 @@ export function createApp() {
     // Provider-owned routes projected from the integration registry. Mounted at the plugin namespace
     // root, not a core one: the projection already prefixes each router with its provider id, which
     // IS the plugin id for the integration plugins (server/integrations/providerRoutes.ts).
+    //
+    // The provider-credential gate lives INSIDE that projection, not as a `/v2/p/:provider/*` mount
+    // here: such a mount would match every plugin route (terminal's sessions, the editor's files), and
+    // Hono applies `.use()` by path regardless of registration order, so it would have locked
+    // task-scoped agents out of surfaces they legitimately use.
     .route(PLUGIN_NAMESPACE, buildIntegrationProviderRoutes())
 
   // Plugin-owned routers, projected from the registry AFTER the auth gate above (still inside the

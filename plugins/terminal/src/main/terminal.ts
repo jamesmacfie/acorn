@@ -592,6 +592,8 @@ export function registerTerminalIpc(db: AppDatabase, worktreesDir: string, deps:
   // teardown output into a "Teardown" tab. An unfilled slot answers 503, which is exactly what
   // dev:node did before when the whole terminal bridge was unset.
   setTaskSessionsBridge({
+    // The reconcile gate the route awaits before the running-session guard (see TaskSessionsBridge).
+    ready: () => bootReconciled,
     runningCount: (taskId) => [...sessions.values()].filter((s) => s.meta.taskId === taskId && s.meta.status === 'running').length,
     killRunning: (taskId) => {
       for (const s of sessions.values()) if (s.meta.taskId === taskId && s.meta.status === 'running') killSession(s)
@@ -609,12 +611,7 @@ export function registerTerminalIpc(db: AppDatabase, worktreesDir: string, deps:
     // Teardown streams to the task drawer as a "Teardown" tab; its exit code + ring buffer are the
     // result. A ~2 min timeout kills it (exitCode null → surfaced as a timeout).
     //
-    // Archive right after relaunch must wait for tmux reconcile: before it the sessions map is empty,
-    // so the running-session guard would pass vacuously and the task's live tmux session would
-    // survive (and be re-attached) past its deleted worktree. Awaiting here rather than in the route
-    // keeps that constraint next to the map it protects.
     runTeardown: async (script, cwd, env, taskId) => {
-      await bootReconciled
       const t = await loadTask(db, taskId)
       const meta = await spawnOne(db, { taskId, command: script, title: 'Teardown', env }, cwd, true, taskContext(t), t)
       const s = sessions.get(meta.id)
@@ -641,6 +638,9 @@ export function registerTerminalIpc(db: AppDatabase, worktreesDir: string, deps:
   // ride the one authenticated WebSocket (main/wsHub.ts) instead of per-session IPC channels. The
   // hub routes client frames here and hands each attachment a sink to fan output to.
   setStreamHandlers({
+    // Which task owns a session, so the WS hub can refuse a task-scoped internal credential that tries
+    // to attach to (or type into) another task's pseudo-terminal (main/wsHub.ts § mayDriveStream).
+    streamTaskId: (id) => sessions.get(id)?.meta.taskId ?? null,
     input: (id, data) => {
       const s = sessions.get(id)
       if (s && s.meta.status === 'running' && typeof data === 'string') s.pty.write(data)

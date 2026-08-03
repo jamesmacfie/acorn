@@ -19,6 +19,7 @@
 // more than the allowlist declares it (`passthrough: ['DOCKER_*']`) — visible in the call, reviewable,
 // and additive rather than "everything except what we remembered".
 import { spawn } from 'node:child_process'
+import { StringDecoder } from 'node:string_decoder'
 import { childEnv } from '../taskEnv'
 
 // Per stream, not combined: matches the cap plugins/http already enforces on command variables.
@@ -44,6 +45,10 @@ export type ProcSpec = {
   maxOutputBytes?: number
   signal?: AbortSignal
   stdin?: string
+  // How long a group member gets between SIGTERM and SIGKILL. Overridable mainly so the escalation path
+  // can be tested deterministically under load — a 2s default plus scheduling makes a full-suite run
+  // flaky, and loosening the ASSERTION instead would be testing nothing.
+  killGraceMs?: number
 }
 
 export type ProcResult = {
@@ -68,6 +73,9 @@ export function brokerEnv(spec: Pick<ProcSpec, 'env' | 'passthrough'>, parent: N
   for (const rule of spec.passthrough ?? []) {
     if (rule.endsWith('*')) {
       const prefix = rule.slice(0, -1)
+      // A bare '*' would copy the whole parent environment, secrets included — i.e. quietly restore the
+      // behaviour this allowlist exists to remove. Refuse it rather than trust that no caller writes it.
+      if (!prefix) throw new Error("brokerEnv passthrough must name a prefix; a bare '*' would defeat the allowlist.")
       for (const [key, value] of Object.entries(parent)) if (key.startsWith(prefix) && value) out[key] = value
     } else {
       const value = parent[rule]
@@ -91,8 +99,6 @@ export function runProcess(spec: ProcSpec): Promise<ProcResult> {
       detached: true,
     })
 
-    let stdout = ''
-    let stderr = ''
     let truncated = false
     let timedOut = false
     let aborted = false
@@ -116,7 +122,7 @@ export function runProcess(spec: ProcSpec): Promise<ProcResult> {
 
     const killTree = (): void => {
       signalGroup('SIGTERM')
-      escalation ??= setTimeout(() => signalGroup('SIGKILL'), KILL_GRACE_MS)
+      escalation ??= setTimeout(() => signalGroup('SIGKILL'), spec.killGraceMs ?? KILL_GRACE_MS)
       escalation.unref?.()
     }
 
@@ -132,20 +138,37 @@ export function runProcess(spec: ProcSpec): Promise<ProcResult> {
     if (spec.signal?.aborted) abort()
     else spec.signal?.addEventListener('abort', abort, { once: true })
 
-    // Stop APPENDING at the cap rather than killing: truncation is reported, and a caller that only
-    // samples output still gets the process's side effect.
-    const capture = (current: string, chunk: Buffer): string => {
-      if (Buffer.byteLength(current, 'utf8') >= maxOutputBytes) {
+    // Bytes first, decode once at the end.
+    //
+    // Decoding each chunk with `chunk.toString()` corrupts any multi-byte character that straddles a
+    // pipe chunk boundary — a 64 KiB read can split a 3-byte character in half and each half decodes to
+    // U+FFFD. Every call site this broker replaced used execFile, which sets stream.setEncoding('utf8')
+    // and therefore carries partial sequences across chunks via a StringDecoder; the first version of
+    // this function did not, and silently mangled `git show` file bodies and `git diff` patches over
+    // 64 KiB. Confirmed: 40 000 box-drawing characters came back with three replacement characters.
+    //
+    // Accumulating Buffers also makes the cap exact. Slicing a decoded STRING to a byte length cut
+    // mid-character, so the result could exceed maxOutputBytes and end in U+FFFD; slicing the byte
+    // stream cannot overshoot.
+    const buffers: { out: Buffer[]; err: Buffer[] } = { out: [], err: [] }
+    const sizes = { out: 0, err: 0 }
+    const capture = (which: 'out' | 'err', chunk: Buffer): void => {
+      const remaining = maxOutputBytes - sizes[which]
+      if (remaining <= 0) {
         truncated = true
-        return current
+        return
       }
-      const next = current + chunk.toString()
-      if (Buffer.byteLength(next, 'utf8') <= maxOutputBytes) return next
-      truncated = true
-      return Buffer.from(next, 'utf8').subarray(0, maxOutputBytes).toString()
+      if (chunk.byteLength > remaining) {
+        truncated = true
+        buffers[which].push(chunk.subarray(0, remaining))
+        sizes[which] = maxOutputBytes
+        return
+      }
+      buffers[which].push(chunk)
+      sizes[which] += chunk.byteLength
     }
-    child.stdout?.on('data', (chunk: Buffer) => void (stdout = capture(stdout, chunk)))
-    child.stderr?.on('data', (chunk: Buffer) => void (stderr = capture(stderr, chunk)))
+    child.stdout?.on('data', (chunk: Buffer) => capture('out', chunk))
+    child.stderr?.on('data', (chunk: Buffer) => capture('err', chunk))
 
     if (spec.stdin !== undefined && child.stdin) {
       child.stdin.on('error', () => {
@@ -158,9 +181,20 @@ export function runProcess(spec: ProcSpec): Promise<ProcResult> {
       if (settled) return
       settled = true
       clearTimeout(timer)
-      if (escalation) clearTimeout(escalation)
+      // The SIGKILL escalation is NOT cleared here. The direct child exiting is exactly the case where a
+      // group member that ignored SIGTERM is still alive: its parent is gone, the pipes closed, 'close'
+      // fired — and clearing the timer at that moment left the survivor running forever. Confirmed with
+      // a grandchild that traps TERM. The timer is unref'd, so letting it run costs nothing and cannot
+      // hold the process open.
       spec.signal?.removeEventListener('abort', abort)
-      resolve({ ...result, stdout, stderr, timedOut, aborted, truncated })
+      resolve({
+        ...result,
+        stdout: decode(buffers.out),
+        stderr: decode(buffers.err),
+        timedOut,
+        aborted,
+        truncated,
+      })
     }
 
     child.on('error', (error: NodeJS.ErrnoException) => {
@@ -170,6 +204,17 @@ export function runProcess(spec: ProcSpec): Promise<ProcResult> {
       settle({ code, signal, spawnError: null })
     })
   })
+}
+
+// Decode accumulated chunks as one stream. StringDecoder carries a partial multi-byte sequence across
+// chunk boundaries, which is the property `chunk.toString()` lacked; and `.end()` is deliberately NOT
+// called, so a sequence left incomplete by the output cap is DROPPED rather than flushed as U+FFFD.
+// Dropping it is what keeps the result both valid UTF-8 and within maxOutputBytes.
+function decode(chunks: readonly Buffer[]): string {
+  const decoder = new StringDecoder('utf8')
+  let out = ''
+  for (const chunk of chunks) out += decoder.write(chunk)
+  return out
 }
 
 export class ProcessError extends Error {
@@ -189,6 +234,13 @@ export async function runProcessOrThrow(spec: ProcSpec): Promise<ProcResult> {
   const result = await runProcess(spec)
   if (result.spawnError) throw new ProcessError(result, `${spec.file}: ${result.spawnError}`)
   if (result.timedOut) throw new ProcessError(result, `${spec.file} timed out after ${spec.timeoutMs ?? DEFAULT_TIMEOUT_MS}ms`)
+  // Truncation is a FAILURE for a caller that wanted the whole output. execFile used to raise ENOBUFS
+  // past maxBuffer, loudly; silently returning a truncated file body or patch is worse than either, and
+  // git.ts's own comment promises byte-exactness. A caller that only samples output uses runProcess()
+  // and reads `truncated` itself.
+  if (result.truncated) {
+    throw new ProcessError(result, `${spec.file} produced more than ${spec.maxOutputBytes ?? DEFAULT_MAX_OUTPUT_BYTES} bytes of output`)
+  }
   if (result.code !== 0) {
     throw new ProcessError(result, `${spec.file} exited ${result.code ?? result.signal}: ${result.stderr.trim().slice(0, 500)}`)
   }

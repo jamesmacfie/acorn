@@ -9,7 +9,6 @@ import type { ServiceEndpoint, ServiceStartConfig, ServiceStartResult, ServiceSt
 import { resolveDeviceToken } from '@acorn/node-core/server/auth/deviceTokens.ts'
 import { mintInternalToken, type InternalEnvFactory } from '@acorn/node-core/server/auth/internalTokens.ts'
 import { CapabilityRegistry } from '@acorn/node-core/server/plugin/capabilities.ts'
-import { NodeEventBus } from '@acorn/node-core/server/plugin/events.ts'
 import { initPlugins } from '@acorn/node-core/server/plugin/host.ts'
 import { createCoreServices } from '@acorn/node-core/main/core/index.ts'
 import { nodePlugins } from '../server/plugins'
@@ -109,6 +108,7 @@ export async function startServiceRuntime({ config, desktop, stateChanged }: Run
   // disk here, so there is exactly one place that decides what identity this node is answering with.
   let identity: { fingerprint: string; certPem: string } | null = null
   let managedAgents: ReturnType<typeof wireManagedAgents> | null = null
+  let disposePlugins: (() => Promise<void>) | null = null
   let reconcileTask: Promise<void> | null = null
   let stopped = false
   let dbClosed = false
@@ -166,6 +166,13 @@ export async function startServiceRuntime({ config, desktop, stateChanged }: Run
       await endDbPools()
     } catch (error) {
       console.warn('[service:stop] database pools close failed:', error)
+    }
+    // Before core's DB and before the root lock: each plugin owns a WAL-mode SQLite file of its own
+    // (main/pluginStorage.ts), and the invariant below applies to those too.
+    try {
+      await disposePlugins?.()
+    } catch (error) {
+      console.warn('[service:stop] plugin dispose failed:', error)
     }
     if (!dbClosed) {
       dbClosed = true
@@ -246,11 +253,11 @@ export async function startServiceRuntime({ config, desktop, stateChanged }: Run
     // runtime rather than by the module, so a process that starts the service more than once (the
     // tests do) gets a clean graph each time instead of "capability already provided".
     const capabilities = new CapabilityRegistry()
-    const events = new NodeEventBus()
     const core = createCoreServices({ secrets: runtime.SECRETS, db })
     // Awaited before the listener binds: a plugin's init opens and migrates its own SQLite file, so a
     // request must not be able to arrive first (server/plugin/host.ts).
-    const plugins = await initPlugins(nodePlugins(config.dataDir), { capabilities, events, core })
+    const plugins = await initPlugins(nodePlugins(config.dataDir), { capabilities, core })
+    disposePlugins = plugins.dispose
     if (plugins.skipped.length) console.log(`[service:boot] plugins disabled for this node: ${plugins.skipped.join(', ')}`)
 
     const knowledge = registerKnowledgeIpc(db, config.dataDir, {

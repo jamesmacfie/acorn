@@ -15,24 +15,29 @@ plan.md names four. Honestly assessed:
 | every plugin initializes through the plugin API with its own DB | **partial** — the mechanism ships and one plugin (changes) is through it; eleven are not |
 | core services have direct unit/integration tests (confinement, env allowlists, kill trees, secret non-disclosure) | **done** — all four, plus the process-broker taxonomy |
 | the terminal scope-shed is complete | **done** |
-| boundary baseline shrinks to only the edges scheduled for phase 3 | **not started** — still the nine Phase 1 entries; the two Phase 2 was to remove need the UI-kit extraction |
+| boundary baseline shrinks to only the edges scheduled for phase 3 | **not met** — the plugin→plugin ledger is byte-identical at nine entries. The node-side capability win is invisible to it because `workflows -> agents` survives via a *client* edge, and the two entries Phase 2 was to remove need the UI-kit extraction. The schema-import ratchet did shrink, 14 → 12. |
 
 So Phase 3 can start on the coupling map, but "every plugin initializes through the plugin API" is not
 true yet, and the client half of the plugin host does not exist.
 
 ## What shipped
 
-**The plugin host.** `NodePlugin` / `NodePluginContext`, a host that runs `init` in declaration order
-and awaits it, a `CapabilityRegistry` and a `NodeEventBus`
-(`packages/node-core/src/server/plugin/`). Both registries are owned by the service **runtime**, not
-module singletons — the tests start `startServiceRuntime` three times in one process, and a shared
-registry threw "capability already provided" on the second boot. They are also kept off `Env`,
-because `c.env` reaches every route and capabilities are a plugin-composition seam, not something a
-route handler should be able to enumerate.
+**The plugin host.** `NodePlugin` / `NodePluginContext`, a host that runs `init` in declaration order,
+awaits it, and disposes newest-first at teardown, plus a `CapabilityRegistry`
+(`packages/node-core/src/server/plugin/`). The registry is owned by the service **runtime**, not a
+module singleton — the tests start `startServiceRuntime` three times in one process, and a shared
+registry threw "capability already provided" on the second boot. It is also kept off `Env`, because
+`c.env` reaches every route and capabilities are a plugin-composition seam, not something a route
+handler should be able to enumerate. (The same reasoning had to be applied to the route registry after
+the review; it is still a module singleton, so the host now clears a plugin's contributions before
+re-registering them.)
 
-**`agents.sessionExecute`, the first capability.** It paid for itself immediately:
-`apps/node/src/wiring/managedWorkflowStep.ts` (234 lines) is deleted. Those lines lived in the app for
-exactly one reason — workflows could not import agents — and the registry is what removes the reason.
+**`agents.sessionExecute`, the first capability.** `apps/node/src/wiring/managedWorkflowStep.ts` is
+gone, but be precise about what that bought: the implementation MOVED into
+`plugins/agents/src/main/sessionExecute.ts` (it is a rename in the diffstat), and it was replaced by two
+new app-layer contract imports. **Net app glue removed is roughly zero.** What changed is ownership —
+the code now lives in the plugin whose runtime it drives, and workflows resolves it without an import —
+not line count. An earlier commit message claimed the deletion as the win; that was overstated.
 The signature lives in `plugins/agents/src/contract/sessionExecute.ts`, restated as the narrow set of
 fields the implementation reads rather than workflows' `RunStepOptions`, because plugins.md puts a
 capability's signature in the *provider's* contract.
@@ -51,7 +56,12 @@ Consolidating surfaced three real leaks, each now closed and tested:
   pointed at `plugins/terminal/main/executionService.ts` — a file that no longer exists. A denylist
   leaks every binding nobody remembered to add to it.
 
-`main/core/proc.ts` is now the one child-process path: allowlisted env with explicit
+`main/core/proc.ts` is **intended** as the one child-process path, and is not yet: roughly sixteen
+`node:child_process` call sites remain (`main/profiles.ts`, `main/archive.ts`, `main/tls.ts`,
+`main/mcpRegister.ts`, `main/headless.ts`, the terminal engine's PTY spawn, `plugins/database`,
+`plugins/docker`'s exec/spawn, all four agent drivers, `plugins/http`'s send, `plugins/editor`'s
+search). Docker and the agent drivers adopted `brokerEnv` only, so they get the env allowlist but
+neither the output cap nor the group kill. What did land: allowlisted env with explicit
 `passthrough: ['DOCKER_*']`-style declarations, process-group kill with SIGTERM→SIGKILL escalation
 (exactly one of ~16 sites did this before), and bounded capture that truncates without killing.
 `main/core/git.ts` adds two things no individual git site had: `GIT_TERMINAL_PROMPT=0`, so an expired
@@ -174,18 +184,81 @@ These are Phase 2 scope that has **not** landed. Do not assume any of it.
   to plugins are still defined in the app (`taskPaneContributions.tsx` contains a whole `LinearTaskPane`;
   `providerContributions.tsx` contains linear/rollbar promotion logic).
 
+## Fixed after an adversarial review
+
+A hostile review of the phase found twenty issues, six of them holes in the very posture the
+scoped-token commit claimed. Worth recording because the pattern is instructive: the *mechanism* was
+sound and the *enforcement* was applied at one site each time.
+
+- **A task-scoped token could drive any task's PTY.** `authorize()` verified the token and returned its
+  claims; `onConnect` built the connection without them, so they were discarded at the door and
+  `term:*` frames routed purely by session id. Confirmed by probe: attach to another task's session,
+  then `term:input` a shell command into it — arbitrary execution as the owner in another task's shell.
+  Fixed with `mayDriveStream` + `StreamHandlers.streamTaskId`, and the guard is verified non-vacuous.
+- **`canUseProviderCredential` guarded one plugin of five.** A task-scoped token still reached
+  `/v2/core/integrations` (list, rotate, test, DELETE the owner's connections), `/v2/p/linear/*`,
+  `/v2/p/rollbar/*` and the database plugin's AI-SQL route, spending the owner's keys. Now gated by
+  mount — `requireProviderAccess` over the integrations router and inside the provider projection, so a
+  newly registered provider is covered the day it is added.
+- **`mayActOnTask` guarded one router of six.** `POST /v2/core/tasks/<other>/preview-url` gave arbitrary
+  shell execution in another task's worktree (confirmed by probe), and config-trust could be
+  self-acknowledged. Now a `requireTaskScope` middleware mounted over `/v2/core/tasks/:id*`, so a new
+  task-scoped route inherits the gate instead of forgetting it.
+- **`codexDriver` still spread `process.env`,** handing every Codex session `SESSION_ENC_KEY` — with
+  which an agent decrypts every stored credential directly, bypassing the whole use-scoping design.
+  `claudeDriver` had been converted in the same commit; Codex was missed. Also removed
+  `ANTHROPIC_*`/`CODEX_*` credential globs from the passthrough.
+- **The process broker corrupted UTF-8** at pipe chunk boundaries, because each chunk was decoded
+  independently where `execFile` had used a `StringDecoder`. Confirmed: 40 000 box-drawing characters
+  came back with three replacement characters — silent corruption of `git show` file bodies and `git
+  diff` patches over 64 KiB, in a function whose comment promised byte-exactness. Now accumulates bytes
+  and decodes once; the cap is enforced on bytes so it can no longer be exceeded, and `.end()` is
+  deliberately not called so a cut trailing sequence is dropped rather than flushed as U+FFFD.
+- **The SIGKILL escalation was cancelled by `settle()`** — exactly when it was needed, since the direct
+  child exiting is what leaves a TERM-ignoring group member behind. The existing kill-tree test used a
+  grandchild that dies on SIGTERM, so the escalation path was never exercised: the "kill trees" exit
+  criterion was passing vacuously.
+- **`scrub()` could become the leak.** Assigning to a frozen Error's `message` throws a `TypeError`
+  whose own message embeds the original error's stringification — the secret — from inside `use()`'s
+  catch where no caller can intercept it. A circular `cause` chain blew the stack. Both confirmed, both
+  fixed.
+- **The packaged build would have migrated the plugin database with core's chain.** `extraResources`
+  still shipped only `packages/node-core/migrations`, so `pluginMigrationsFolder` found no
+  `<resources>/migrations/<plugin>` and fell back to its ancestor walk. Masked by the next item.
+- **`review_notes` existed in both databases** — core's chain was never regenerated, so no `DROP TABLE`
+  was emitted and `pnpm db:check` passed happily. The two bugs hid each other.
+- **Archive lost `await bootReconciled`.** The move to core left the await inside `runTeardown`, which
+  runs *after* the running-session guard, so `skipTeardown` (or a repo with no teardown script) let the
+  guard pass vacuously and a live tmux session could survive its deleted worktree.
+- **Plugin databases were never closed,** violating the composition root's own stated invariant about
+  dropping the data-root lock only after SQLite is closed. `NodePlugin.dispose` now exists.
+- **The route registry appended on every boot,** so a second `startServiceRuntime` in one process would
+  serve requests from the first boot's closed database handle. Same class of bug the capability registry
+  was already made per-runtime to avoid.
+- **Both new boundary ratchets were bypassable.** The contract-purity rule checked only direct edges, so
+  one hop through `shared/` defeated it; the schema ratchet's regex missed named table imports and
+  namespace access. Both widened, and the schema ratchet now excludes test files so it can actually
+  reach zero.
+- **Env allowlists dropped legitimate configuration** — proxy variables, GPG for signed commits, cloud
+  credential helpers for ECR/GCR. Inverting a denylist means naming what tools need, and the first pass
+  named too little.
+
+Also removed as speculative: the `NodeEventBus` (threaded through the host, the context and both
+composition roots, with zero publishers and zero subscribers) and `CoreServices.tasks.idsForWorkspace`
+(written for the agents joins, but agents is not converted, so it had no caller).
+
 ## Known gaps worth stating plainly
 
-- **A task-scoped token is confined on the tool surface, not everywhere.** `canUseProviderCredential`
-  gates `githubToken()`. Other credential paths were not audited route by route in this phase — the
-  linear, rollbar, database and model-provider credential reads still resolve for any authenticated
-  principal. `plugins/http`'s router was already `device`-only, which covers the worst of it.
-- **The WS hub captures internal claims but enforces nothing on them.** An internal socket still gets
-  `deviceId: null` and can address `term:*` frames for any session id. The claims are carried so a
-  future sweep can close a task's sockets when the task ends; today they are inert there.
-- **`spawn(process.execPath, [asarPath])` is still the one surface no test covers.** The packaging
-  change in this phase (staging every migration chain, not just core's) was verified by
-  `pnpm --filter @acorn/desktop build` printing both chains, **not** by a real DMG launch.
+- **The credential gates are mounted, not audited.** `requireProviderAccess` covers the integrations
+  router and the provider projection; the database plugin's AI-SQL route is gated explicitly. A
+  route-by-route audit of every credential path was not done, so a plugin that starts spending a
+  credential from a route outside those mounts would not be covered.
+- **Internal tokens still do not expire, and there is no per-session revocation.** `sessionId` is
+  carried in the claims and nothing enforces on it. Rotating the signing key is the only revocation.
+- **`spawn(process.execPath, [asarPath])` is still the one surface no test covers.** The packaging fixes
+  in this phase were verified by `pnpm --filter @acorn/desktop build` and by simulating
+  `pluginMigrationsFolder`'s resolution, **not** by a real DMG launch. Do that before trusting the
+  packaged plugin-database path.
 
 ## What is covered by tests
 
@@ -201,6 +274,11 @@ These are Phase 2 scope that has **not** landed. Do not assume any of it.
 | internal tokens: round trip, base64url separator, wrong key, tampered payload/signature, unknown scope | `packages/node-core/src/server/auth/internalTokens.test.ts` |
 | a task-scoped credential is denied GitHub and confined to its own task; service scope keeps reach | `apps/node/test/integration/internalPrincipal.test.ts` |
 | the moved worktree routes: repo-config validation, preview capture + env hygiene, MCP masking, archive 503 without the PTY slot | `packages/node-core/src/server/routes/worktree.test.ts` |
+| a task-scoped socket cannot attach to or type into another task's PTY; unknown stream ids fail closed | `packages/node-core/src/main/wsHub.test.ts` (verified non-vacuous by neutering the guard) |
+| SIGKILL escalation reaps a group member that ignores SIGTERM | `packages/node-core/src/main/core/proc.test.ts` (verified by restoring the `clearTimeout`) |
+| multi-byte characters survive pipe chunk boundaries; the byte cap is never exceeded | same file |
+| `scrub` cannot leak through a frozen error or loop on a circular cause | `packages/node-core/src/main/core/secrets.test.ts` |
+| plugins dispose newest-first, and one failure does not strand the others | `packages/node-core/src/server/plugin/host.test.ts` |
 | the moved routes are GONE from the terminal plugin | `plugins/terminal/src/server/routes/terminal.test.ts` |
 | the assembled mount table, including plugin-host-registered routes | `apps/node/test/integration/routeRegistry.test.ts` |
 | a plugin owning its own migrated SQLite file, alongside core's | `plugins/changes/src/server/routes/reviewNotes.test.ts` |

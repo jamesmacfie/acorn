@@ -13,7 +13,6 @@ import type { Hono } from 'hono'
 import type { CoreServices } from '../../main/core'
 import type { AppEnv } from '../middleware/auth'
 import type { CapabilityRegistry } from './capabilities'
-import type { NodeEventBus } from './events'
 
 // Prefixed console. A plugin's warnings should be attributable without every call site restating
 // its own name; nothing here needs levels, transports or structured fields yet.
@@ -36,7 +35,6 @@ export type NodePluginContext = {
   readonly name: string
   routes: PluginRouteRegistry
   capabilities: CapabilityRegistry
-  events: NodeEventBus
   // Path confinement, git, the process broker and use-scoped secrets (main/core/). A plugin consumes
   // core capability through this, rather than deep-importing whichever core module has the helper.
   core: CoreServices
@@ -51,4 +49,9 @@ export type NodePlugin = {
   // startupSecurity.ts migrates plaintext HTTP-client fields, and a request served before that
   // finishes would read half-migrated rows.
   init(ctx: NodePluginContext): void | Promise<void>
+  // Release what init() opened. Awaited during teardown BEFORE the data root's lock is dropped, because
+  // a plugin's SQLite file is in WAL mode and the composition root's own invariant is "only drop the
+  // root lock once SQLite is closed, or a restart could open the database while this process still holds
+  // its WAL". Without this the plugin database was never closed at all.
+  dispose?(): void | Promise<void>
 }

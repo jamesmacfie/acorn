@@ -8,7 +8,7 @@ import { bridgeSlot, viaBridge } from '@acorn/node-core/server/bridge.ts'
 import { type AppDatabase, getDb, schema } from '@acorn/node-core/server/db/index.ts'
 import { ProviderOperationError } from '@acorn/node-core/server/integrations/types.ts'
 import type { AppEnv } from '@acorn/node-core/server/middleware/auth.ts'
-import { ownerId } from '@acorn/node-core/server/middleware/requireUser.ts'
+import { canUseProviderCredential, ownerId } from '@acorn/node-core/server/middleware/requireUser.ts'
 import { generateTextForConnection } from '@acorn/node-core/server/modelProviders/runtime.ts'
 import { respondError } from '@acorn/node-core/server/respond.ts'
 import { buildSystemPrompt, GENERATE_MAX_OUTPUT_TOKENS, stripSqlFences } from '../generateSql'
@@ -185,6 +185,9 @@ export const database = new Hono<AppEnv>()
     if (!p.success) return respondError(c, 400, 'bad_request')
     const bridge = databaseBridgeSlot.get()
     if (!bridge) return respondError(c, 503, 'bridge-unavailable')
+    // AI SQL generation spends the owner's OpenAI/Anthropic key, billed to the owner. A task-scoped
+    // agent credential must not reach it (server/middleware/requireUser.ts § canUseProviderCredential).
+    if (!canUseProviderCredential(c)) return respondError(c, 403, 'interactive_user_required')
     const schemaRes = await bridge.schema(id(c))
     if ('error' in schemaRes) return respondError(c, 422, 'db_schema_unavailable', [schemaRes.error])
     const db = getDb(c.env)

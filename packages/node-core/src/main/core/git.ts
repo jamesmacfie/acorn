@@ -33,7 +33,24 @@ const spec = (args: readonly string[], opts: GitOptions) => ({
   args,
   cwd: opts.cwd,
   env: { GIT_TERMINAL_PROMPT: '0', ...(opts.env ?? {}) },
-  passthrough: ['GIT_*', 'SSH_AUTH_SOCK', 'XDG_CONFIG_HOME'] as const,
+  // Proxy and GPG entries are not optional extras: an allowlist that omits them silently breaks
+  // `git fetch` behind a corporate proxy and every signed commit. Inverting a denylist means naming
+  // what tools legitimately need, and forgetting one is a real regression rather than a hardening win.
+  passthrough: [
+    'GIT_*',
+    'SSH_AUTH_SOCK',
+    'XDG_CONFIG_HOME',
+    'GNUPGHOME',
+    'GPG_TTY',
+    'HTTP_PROXY',
+    'HTTPS_PROXY',
+    'NO_PROXY',
+    'http_proxy',
+    'https_proxy',
+    'no_proxy',
+    'SSL_CERT_FILE',
+    'SSL_CERT_DIR',
+  ] as const,
   timeoutMs: opts.timeoutMs ?? GIT_TIMEOUT_MS,
   maxOutputBytes: opts.maxOutputBytes ?? GIT_MAX_OUTPUT_BYTES,
   signal: opts.signal,

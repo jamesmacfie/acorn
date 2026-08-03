@@ -250,11 +250,33 @@ describe('architecture boundaries', () => {
     // internals back in. `export type { X } from '../main/heavy.ts'` is still an import edge, and it
     // would drag the implementation module into every consumer — turning the sanctioned surface into
     // a hole. Types a contract needs must LIVE in contract/ (or in shared/, which both sides may use).
-    const leaks = firstParty
-      .filter((e) => isContract(e.fromPkg, e.fromFile))
-      .filter((e) => e.target.pkg!.name === e.fromPkg.name)
-      .filter((e) => ['client', 'server', 'main'].includes(segment(e.fromPkg, e.target.file!)))
-      .map((e) => `${rel(e.fromFile)}: ${e.spec}`)
+    // TRANSITIVELY, not just the direct edge. `contract/x.ts -> shared/y.ts -> main/heavy.ts` reaches the
+    // implementation in one extra hop, and `side()` classifies `shared` as 'shared' so no other rule
+    // stops it — which made the direct-edge version of this check cosmetic.
+    const internal = (pkg: Pkg, file: string) => ['client', 'server', 'main'].includes(segment(pkg, file))
+    const withinPkg = new Map<string, { file: string; spec: string }[]>()
+    for (const e of firstParty) {
+      if (e.target.pkg!.name !== e.fromPkg.name) continue
+      const list = withinPkg.get(e.fromFile) ?? []
+      list.push({ file: e.target.file!, spec: e.spec })
+      withinPkg.set(e.fromFile, list)
+    }
+    const leaks: string[] = []
+    for (const start of firstParty.filter((e) => isContract(e.fromPkg, e.fromFile))) {
+      const pkg = start.fromPkg
+      const seen = new Set<string>()
+      const queue: { file: string; path: string }[] = [{ file: start.target.file!, path: start.spec }]
+      while (queue.length) {
+        const step = queue.shift()!
+        if (seen.has(step.file)) continue
+        seen.add(step.file)
+        if (internal(pkg, step.file)) {
+          leaks.push(`${rel(start.fromFile)}: ${step.path} (${rel(step.file)})`)
+          continue
+        }
+        for (const next of withinPkg.get(step.file) ?? []) queue.push({ file: next.file, path: `${step.path} -> ${next.spec}` })
+      }
+    }
     expect([...new Set(leaks)].sort()).toEqual([])
   })
 
@@ -266,9 +288,9 @@ describe('architecture boundaries', () => {
     // Matches the TABLE barrel specifically, not the module: `import type { AppDatabase }` from the
     // same path is fine and stays — a plugin is handed a database handle, it just may not reach into
     // core's schema to decide what is in it.
+    // 'changes' is off this list: it owns its tables and its own SQLite file now. Twelve to go.
     const SCHEMA_BASELINE = [
       'agents',
-      'changes',
       'database',
       'docker',
       'editor',
@@ -276,15 +298,37 @@ describe('architecture boundaries', () => {
       'http',
       'linear',
       'memory',
-      'model-providers',
       'notes',
       'rollbar',
       'terminal',
       'workflows',
     ]
-    const SCHEMA_IMPORT_RE = /\bimport\s+(?:\{[^}]*\bschema\b[^}]*\}|\*\s+as\s+schema)\s+from\s*['"]@acorn\/node-core\/server\/db/
+    // Any import FROM core's db module that is not exclusively type-only. The first version matched only
+    // `{ schema }` / `* as schema`, so `import * as db from '.../db/index.ts'` + `db.schema.tasks`, or
+    // `import { tasks } from '.../db/schema.ts'` — the natural form once the barrel is off-limits — both
+    // slipped through. Type-only imports (`import type { AppDatabase }`) are legitimate and stay.
+    const DB_IMPORT_RE = /\bimport\s+(?!type\b)([^;]*?)\s+from\s*['"]@acorn\/node-core\/server\/db[^'"]*['"]/g
+    const importsCoreTables = (text: string): boolean => {
+      DB_IMPORT_RE.lastIndex = 0
+      let m: RegExpExecArray | null
+      while ((m = DB_IMPORT_RE.exec(text))) {
+        // A named clause of only `type X` entries is type-only in substance.
+        const clause = m[1].trim()
+        const named = clause.match(/^\{([\s\S]*)\}$/)
+        if (named && named[1].split(',').every((part) => !part.trim() || /^type\s/.test(part.trim()))) continue
+        return true
+      }
+      return false
+    }
+    // Production code only. A TEST that seeds core's `tasks`/`repo_paths` to build a fixture is
+    // legitimate and always will be — counting those would make this ratchet impossible to drive to
+    // zero, which is the one thing it exists to do.
     const offenders = PACKAGES.filter((p) => p.kind === 'plugin')
-      .filter((p) => walk(p.src).some((file) => SCHEMA_IMPORT_RE.test(readFileSync(file, 'utf8'))))
+      .filter((p) =>
+        walk(p.src)
+          .filter((file) => !/\.test\.tsx?$/.test(file))
+          .some((file) => importsCoreTables(readFileSync(file, 'utf8'))),
+      )
       .map((p) => p.name.replace('@acorn/plugin-', ''))
     expect([...new Set(offenders)].sort()).toEqual([...SCHEMA_BASELINE].sort())
   })

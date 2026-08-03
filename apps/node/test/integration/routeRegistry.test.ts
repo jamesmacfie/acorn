@@ -10,7 +10,6 @@ import { createApp } from '@acorn/node-core/server/index.ts'
 import { createCoreServices, SecretService } from '@acorn/node-core/main/core/index.ts'
 import type { AppEnv } from '@acorn/node-core/server/middleware/auth.ts'
 import { CapabilityRegistry } from '@acorn/node-core/server/plugin/capabilities.ts'
-import { NodeEventBus } from '@acorn/node-core/server/plugin/events.ts'
 import { initPlugins } from '@acorn/node-core/server/plugin/host.ts'
 import { makeTestDb, type TestDb } from '@acorn/node-core/server/routes/testDb.ts'
 import { RouteRegistry, routeMountPath } from '@acorn/node-core/server/routeRegistry.ts'
@@ -128,7 +127,6 @@ describe('assembled routes', () => {
     dataDir = mkdtempSync(join(tmpdir(), 'acorn-routes-'))
     await initPlugins(nodePlugins(dataDir), {
       capabilities: new CapabilityRegistry(),
-      events: new NodeEventBus(),
       core: createCoreServices({ secrets: new SecretService('0'.repeat(64)), db: core.db }),
     })
   })

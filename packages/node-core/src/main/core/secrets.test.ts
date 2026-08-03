@@ -130,3 +130,40 @@ describe('seal', () => {
     warn.mockRestore()
   })
 })
+
+// Two edge cases an adversarial review confirmed by probe. Both matter more than they look: this is the
+// one function whose entire job is non-disclosure, so a failure mode that leaks is worse than the leak
+// it was preventing.
+describe('scrub cannot become the leak', () => {
+  it('does not let a FROZEN error turn the redaction into a disclosure', async () => {
+    const ref = await service.seal(TOKEN)
+    // Assigning to a frozen Error's message throws a TypeError whose own message embeds the original
+    // error's stringification — including the token — and it is thrown from inside use()'s catch, where
+    // no caller can intercept it.
+    const failure = await service
+      .use(ref, 'github', () => {
+        throw Object.freeze(new Error(`leaked ${TOKEN}`))
+      })
+      .catch((e: unknown) => e)
+    expect(failure).toBeInstanceOf(Error)
+    expect((failure as Error).message).not.toContain(TOKEN)
+    expect((failure as Error).message).toContain('[redacted]')
+    expect(String(failure)).not.toContain(TOKEN)
+  })
+
+  it('survives a circular cause chain instead of blowing the stack', async () => {
+    const ref = await service.seal(TOKEN)
+    const failure = await service
+      .use(ref, 'github', () => {
+        const outer = new Error(`outer ${TOKEN}`)
+        const inner = new Error(`inner ${TOKEN}`)
+        ;(outer as { cause?: unknown }).cause = inner
+        ;(inner as { cause?: unknown }).cause = outer
+        throw outer
+      })
+      .catch((e: unknown) => e)
+    expect(failure).toBeInstanceOf(Error)
+    expect((failure as Error).message).not.toContain(TOKEN)
+    expect(((failure as Error).cause as Error).message).not.toContain(TOKEN)
+  })
+})

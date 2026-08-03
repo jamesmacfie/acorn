@@ -41,17 +41,44 @@ export function redact(text: string, secrets: readonly string[]): string {
   return out
 }
 
-function scrub(error: unknown, secrets: readonly string[]): unknown {
+// Mutate rather than re-wrap: callers branch on error CLASS (DockerCliError, BridgeError, ApiError), and
+// replacing the instance with a generic Error would change control flow to fix a string.
+//
+// Every write is guarded, because the one function whose job is non-disclosure must not become a leak
+// amplifier. A frozen or sealed Error, or one whose `message` is a getter-only accessor, makes the
+// assignment throw a TypeError — and that TypeError's own message embeds the original error's
+// stringification, i.e. THE SECRET, and it is thrown from inside this catch where no caller can recover
+// it. Confirmed against `Object.freeze(new Error(...))`. When a field cannot be rewritten, the error is
+// replaced by a redacted plain Error: losing the class is bad, and leaking the credential is worse.
+//
+// `seen` breaks a circular cause chain, which otherwise recursed until RangeError (also confirmed).
+function scrub(error: unknown, secrets: readonly string[], seen: Set<unknown> = new Set()): unknown {
   if (!(error instanceof Error)) {
     return typeof error === 'string' ? redact(error, secrets) : error
   }
-  // Mutate rather than re-wrap: callers branch on error CLASS (DockerCliError, BridgeError,
-  // ApiError), and replacing the instance with a generic Error would change control flow to fix a
-  // string.
-  error.message = redact(error.message, secrets)
-  if (error.stack) error.stack = redact(error.stack, secrets)
+  if (seen.has(error)) return error
+  seen.add(error)
+  const message = redact(error.message, secrets)
+  const stack = error.stack ? redact(error.stack, secrets) : undefined
+  try {
+    error.message = message
+    if (stack !== undefined) error.stack = stack
+  } catch {
+    // Unwritable (frozen/sealed/getter-only). Fall back to a redacted copy rather than let the
+    // assignment's own TypeError carry the plaintext out of this scope.
+    const replacement = new Error(message)
+    if (stack !== undefined) replacement.stack = stack
+    return replacement
+  }
   const cause = (error as { cause?: unknown }).cause
-  if (cause !== undefined) (error as { cause?: unknown }).cause = scrub(cause, secrets)
+  if (cause !== undefined) {
+    const scrubbed = scrub(cause, secrets, seen)
+    try {
+      ;(error as { cause?: unknown }).cause = scrubbed
+    } catch {
+      // A frozen cause chain is already scrubbed in place where it could be; nothing further to do.
+    }
+  }
   return error
 }
 

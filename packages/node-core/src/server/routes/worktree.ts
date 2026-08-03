@@ -37,6 +37,13 @@ import { respondError } from '../respond'
 // main/archive.ts's archiveTask already takes, so filling this slot is a pass-through in the plugin
 // rather than a new adapter.
 export type TaskSessionsBridge = {
+  // Resolves when the engine's startup reconcile has run. Archive MUST await this before anything else:
+  // before the sweep the session map is empty, so runningCount() returns 0, the guard passes vacuously,
+  // killRunning kills nothing — and the task's live tmux session survives its deleted worktree and gets
+  // re-attached. The old implementation awaited it at the top of archive; the move to core left the await
+  // inside runTeardown, which runs AFTER the guard, so `skipTeardown` or a repo with no teardown script
+  // skipped it entirely.
+  ready(): Promise<void>
   runningCount(taskId: string): number
   killRunning(taskId: string): void
   dropTaskSessions(taskId: string): Promise<void>
@@ -156,6 +163,7 @@ async function useCheckout(db: ReturnType<typeof getDb>, taskId: string): Promis
 // live-session half comes from the slot.
 async function archive(db: ReturnType<typeof getDb>, taskId: string, opts: ArchiveOpts, sessions: TaskSessionsBridge): Promise<ArchiveResult> {
   if (!taskId) return { ok: false, reason: 'Invalid task.' }
+  await sessions.ready()
   return archiveTask(db, taskId, opts, {
     isDir,
     runningCount: sessions.runningCount,
