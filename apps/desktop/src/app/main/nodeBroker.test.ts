@@ -1,15 +1,15 @@
-import { execFileSync } from 'node:child_process'
 import { createServer as createHttpServer, type Server } from 'node:http'
 import { createServer as createHttpsServer, type Server as HttpsServer } from 'node:https'
 import { mkdtempSync, readFileSync, rmSync } from 'node:fs'
 import type { AddressInfo } from 'node:net'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { X509Certificate } from 'node:crypto'
+import { execFileSync } from 'node:child_process'
 import { WebSocketServer } from 'ws'
-import { afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest'
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest'
 import type { NodeStatus } from '@acorn/protocol/broker.ts'
 import { WS_PATH } from '@acorn/protocol/ws.ts'
+import { ensureCert } from '@acorn/node-core/main/tls.ts'
 import { NodeBroker } from './nodeBroker'
 
 // Drives the real broker against a real http/https server. The pin in particular cannot be
@@ -22,21 +22,16 @@ let certPem: string
 let keyPem: string
 let fingerprint: string
 
-// One self-signed cert for the whole file. Generated the same way the node generates its own, so this
-// also proves the openssl invocation produces something Node can pin against.
+// The node's OWN certificate machinery, not a lookalike: ensureCert is what a real node mints, so a
+// change to its extensions (the SAN, CA:TRUE) has to keep the broker working or this file goes red.
+// Importing across apps would be a boundary violation; node-core is a package, so this is legal — and
+// it is the closest a desktop-side test can legitimately get to the real thing.
 beforeAll(() => {
   certDir = mkdtempSync(join(tmpdir(), 'acorn-broker-cert-'))
-  execFileSync('openssl', [
-    'req', '-x509', '-newkey', 'rsa:2048', '-nodes', '-days', '3',
-    '-keyout', join(certDir, 'key.pem'),
-    '-out', join(certDir, 'cert.pem'),
-    '-subj', '/CN=acorn-node',
-    '-addext', 'subjectAltName=IP:127.0.0.1,DNS:localhost',
-    '-addext', 'basicConstraints=critical,CA:TRUE',
-  ])
-  certPem = readFileSync(join(certDir, 'cert.pem'), 'utf8')
-  keyPem = readFileSync(join(certDir, 'key.pem'), 'utf8')
-  fingerprint = new X509Certificate(certPem).fingerprint256
+  const cert = ensureCert(certDir)
+  certPem = cert.certPem
+  keyPem = cert.keyPem
+  fingerprint = cert.fingerprint
 })
 
 const brokers: NodeBroker[] = []
@@ -56,6 +51,8 @@ afterEach(() => {
   for (const server of servers.splice(0)) server.close()
 })
 
+afterAll(() => rmSync(certDir, { recursive: true, force: true }))
+
 const handler = (req: import('node:http').IncomingMessage, res: import('node:http').ServerResponse) => {
   const chunks: Buffer[] = []
   req.on('data', (c: Buffer) => chunks.push(c))
@@ -68,7 +65,11 @@ const handler = (req: import('node:http').IncomingMessage, res: import('node:htt
 }
 
 async function listen(secure: boolean): Promise<{ origin: string; server: Server | HttpsServer }> {
-  const server = secure ? createHttpsServer({ key: keyPem, cert: certPem }, handler) : createHttpServer(handler)
+  // minVersion matches the node's listener (node-core/main/server.ts), so this also proves the
+  // broker's https.Agent negotiates TLS 1.3 rather than silently needing a lower floor.
+  const server = secure
+    ? createHttpsServer({ key: keyPem, cert: certPem, minVersion: 'TLSv1.3' }, handler)
+    : createHttpServer(handler)
   servers.push(server)
   await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve))
   const { port } = server.address() as AddressInfo
@@ -235,7 +236,8 @@ describe('broker TLS pinning', () => {
   it('refuses a certificate that does not match the pin, and reports identity_mismatch', async () => {
     const { origin } = await listen(true)
     const broker = makeBroker()
-    const wrong = fingerprint.replace(/^../, fingerprint.startsWith('AA') ? 'BB' : 'AA')
+    // Deterministically different in the first nibble, whatever this run's certificate happens to be.
+    const wrong = (fingerprint[0] === '0' ? '1' : '0') + fingerprint.slice(1)
     broker.upsert({ nodeId: 'n1', label: 'local', endpoint: origin, local: true, token: 't', fingerprint: wrong, certPem })
 
     await expect(broker.fetch('n1', { requestId: 'r1', path: '/v2/node' })).rejects.toThrow()

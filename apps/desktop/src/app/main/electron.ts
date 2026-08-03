@@ -88,6 +88,12 @@ ipcMain.on('acorn:force-quit', () => {
   app.quit()
 })
 
+// There is deliberately NO app.on('certificate-error') handler for the node's self-signed certificate.
+// That event only fires for requests Chromium makes, and nothing in this process asks Chromium to talk
+// to a node: the window loads app://acorn, and every byte to or from a node goes through the broker's
+// own node:https agent, which does the pinning itself (main/nodeBroker.ts). Adding one "just in case"
+// would install a certificate-override path for a trust decision that is made somewhere else entirely.
+
 function hardenNavigation(win: BrowserWindow) {
   // Anything leaving the renderer for the OS goes through the scheme allowlist first: the pane
   // content that produces these links (GitHub bodies, Linear issues/attachments, Rollbar) is
