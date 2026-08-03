@@ -130,7 +130,7 @@ export async function startServiceRuntime({ config, desktop, stateChanged }: Run
     throw error
   }
   try {
-    runtime = makeRuntime(dataRoot)
+    runtime = makeRuntime(dataRoot, config.version)
   } catch (error) {
     dataRoot.release()
     stateChanged('failed', error instanceof Error ? error.message : String(error))

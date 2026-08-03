@@ -1,5 +1,6 @@
 import { createHash, randomBytes, randomUUID, timingSafeEqual } from 'node:crypto'
 import { eq } from 'drizzle-orm'
+import type { PairedDevice } from '@acorn/protocol/node.ts'
 import type { AppDatabase } from '../db'
 import { schema } from '../db'
 
@@ -21,13 +22,9 @@ const LAST_SEEN_THROTTLE_MS = 5 * 60_000
 
 const sha256 = (input: string): Buffer => createHash('sha256').update(input).digest()
 
-export type DeviceSummary = {
-  id: string
-  name: string
-  createdAt: number
-  lastSeenAt: number | null
-  revokedAt: number | null
-}
+// The wire shape lives in @acorn/protocol because the device list is an owner-facing response
+// (GET /v2/core/devices); this alias keeps the name every call site here already uses.
+export type DeviceSummary = PairedDevice
 
 export type IssuedDevice = { token: string; device: DeviceSummary }
 

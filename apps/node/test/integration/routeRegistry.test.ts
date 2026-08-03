@@ -33,6 +33,14 @@ describe('plugin route registry', () => {
 // table below, this file is the proof of the vNext mount shape: core answers under /v2/core, plugins
 // under /v2/p/<plugin>, and nothing is left at the V1 /api prefix.
 const MOUNTED_CORE_ROUTES: ReadonlyArray<readonly [method: string, path: string]> = [
+  // The two pre-auth pairing routes. Core-owned but deliberately outside /v2/core, because that
+  // namespace is the gated one and these are how an unpaired client gets a credential at all.
+  ['GET', '/v2/node'],
+  ['POST', '/v2/pair'],
+  ['POST', '/v2/core/pair/start'],
+  ['DELETE', '/v2/core/pair'],
+  ['GET', '/v2/core/devices'],
+  ['DELETE', '/v2/core/devices/:id'],
   ['GET', '/v2/core/me'],
   ['GET', '/v2/core/pins'],
   ['PUT', '/v2/core/prefs'],

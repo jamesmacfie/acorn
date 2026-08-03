@@ -19,6 +19,9 @@ const PROTECTED_PATHS: [string, string][] = [
   ['GET', '/v2/core/tasks/t1/context'],
   ['GET', '/v2/core/tasks/t1/tools'], // harness — internal-token surface, still gated
   ['GET', '/v2/core/integrations'],
+  // Device administration sits BELOW the gate even though pairing sits above it: a device route that
+  // drifted above requireUser would be an unauthenticated hole (routes/pairing.ts).
+  ['GET', '/v2/core/devices'],
   ['GET', '/v2/p/changes/tasks/t1/review-notes'],
   ['GET', '/v2/p/memory/tasks/t1/notes'],
   ['GET', '/v2/p/linear/projects'],
@@ -38,6 +41,14 @@ describe('requireUser gate over the protected router table', () => {
     const res = await createApp().fetch(new Request(`http://127.0.0.1:4317${path}`, { method }), {} as Env)
     expect(res.status).toBe(401)
     expect(((await res.json()) as ApiError).error).toMatchObject({ code: 'unauthenticated' })
+  })
+
+  it('leaves the two pairing routes outside the gate (they are how a client gets a credential)', async () => {
+    // GET /v2/node is the one /v2 route an unpaired client may read; it answers 200 with the
+    // pairing-only projection. Behaviour lives in apps/node/test/integration/pairing.test.ts — here we
+    // only assert it is not behind requireUser, because that is this file's contract.
+    const res = await createApp().fetch(new Request('http://127.0.0.1:4317/v2/node'), {} as Env)
+    expect(res.status).toBe(200)
   })
 
   it('leaves /auth outside the gate (public by construction)', async () => {

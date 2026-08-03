@@ -17,3 +17,42 @@ export const nodeIdentitySchema = z.strictObject({
 })
 
 export type NodeIdentity = z.infer<typeof nodeIdentitySchema>
+
+// GET /v2/node. Unauthenticated it carries only what pairing needs — which protocol to speak and
+// which certificate to expect; `nodeId`/`appVersion` appear only for an authenticated caller
+// (docs/vNext/protocol.md § Versioning), because anything that can reach the port can read the
+// unauthenticated form.
+//
+// `fingerprint` is null while the listener is plain http on loopback: there is no certificate to
+// fingerprint yet. It is not optional, so a client can tell "this node has no pin" from "this field
+// was forgotten".
+export type NodeInfo = {
+  protocolVersion: number
+  fingerprint: string | null
+  nodeId?: string
+  appVersion?: string
+}
+
+// POST /v2/pair. Validated with zod rather than hand-checked because this is the one route an
+// unpaired caller can reach: unknown fields are rejected (strictObject) and the lengths are bounded
+// before the code ever reaches the pairing window.
+export const pairRequestSchema = z.strictObject({
+  code: z.string().min(1).max(256),
+  deviceName: z.string().min(1).max(120),
+})
+export type PairRequest = z.infer<typeof pairRequestSchema>
+
+// A paired device as the owner sees it. Never carries the token or its hash — the raw token is
+// returned exactly once, in PairResult.
+export type PairedDevice = {
+  id: string
+  name: string
+  createdAt: number
+  lastSeenAt: number | null
+  revokedAt: number | null
+}
+
+export type PairResult = { deviceToken: string; nodeId: string; device: PairedDevice }
+export type DevicesResponse = { devices: PairedDevice[] }
+// POST /v2/core/pair/start: the code the node displays (QR + text) and how long it lives.
+export type PairingWindow = { code: string; expiresInMs: number }

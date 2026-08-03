@@ -9,7 +9,9 @@ import { randomBytes, timingSafeEqual } from 'node:crypto'
 //
 // This replaces V1's oauthStateStore, which had the same shape for the same reason.
 
-const WINDOW_MS = 10 * 60_000
+// Exported because the route that opens a window has to tell the client how long the code it is
+// about to display stays valid, and two constants would drift.
+export const PAIRING_WINDOW_MS = 10 * 60_000
 const MAX_ATTEMPTS = 5
 
 export type PairingCodes = {
@@ -32,7 +34,7 @@ export function pairingCodes(now: () => number = () => Date.now()): PairingCodes
   return {
     issue() {
       const code = randomBytes(16) // 128-bit
-      open = { code, expiresAt: now() + WINDOW_MS, attempts: 0 }
+      open = { code, expiresAt: now() + PAIRING_WINDOW_MS, attempts: 0 }
       return code.toString('base64url')
     },
 
