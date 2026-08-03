@@ -1,11 +1,9 @@
-import { execFile } from 'node:child_process'
+import { gitOrThrow } from './core/git'
 import { copyFileSync, existsSync, mkdirSync } from 'node:fs'
 import { dirname, isAbsolute, join, resolve } from 'node:path'
-import { promisify } from 'node:util'
 import type { WorktreeResult } from '@acorn/protocol/terminal.ts'
 import { isContainedPath, isDirty, worktreeBranchDirName } from './pathGuards'
 
-const exec = promisify(execFile)
 
 // Workspace worktrees (docs/workspaces-and-tasks.md): a workspace edits its branch in an isolated git
 // worktree instead of dirtying the main checkout, and we get a clean cleanup affordance. Worktrees
@@ -15,7 +13,7 @@ const exec = promisify(execFile)
 
 async function branchExists(checkout: string, branch: string): Promise<boolean> {
   try {
-    await exec('git', ['-C', checkout, 'rev-parse', '--verify', '--quiet', `refs/heads/${branch}`], { timeout: 10_000 })
+    await gitOrThrow(['rev-parse', '--verify', '--quiet', `refs/heads/${branch}`], { cwd: checkout, timeoutMs: 10_000 })
     return true
   } catch {
     return false
@@ -26,7 +24,7 @@ async function branchExists(checkout: string, branch: string): Promise<boolean> 
 async function refExists(checkout: string, ref: string): Promise<boolean> {
   if (ref.startsWith('-')) return false // never let a ref be read as a flag
   try {
-    await exec('git', ['-C', checkout, 'rev-parse', '--verify', '--quiet', `${ref}^{commit}`], { timeout: 10_000 })
+    await gitOrThrow(['rev-parse', '--verify', '--quiet', `${ref}^{commit}`], { cwd: checkout, timeoutMs: 10_000 })
     return true
   } catch {
     return false
@@ -77,16 +75,16 @@ export async function ensureWorktree(
     // commit — new branch from FETCH_HEAD, or reuse the branch if it already exists locally.
     // `--` ends option parsing before positionals.
     try {
-      await exec('git', ['-C', checkout, 'fetch', 'origin', `pull/${pullNumber}/head`], { timeout: 60_000 })
+      await gitOrThrow(['fetch', 'origin', `pull/${pullNumber}/head`], { cwd: checkout, timeoutMs: 60_000 })
     } catch {
       return { ok: false, reason: `Could not fetch pull/${pullNumber}/head.` }
     }
     const exists = await branchExists(checkout, branch)
     const args = exists
-      ? ['-C', checkout, 'worktree', 'add', '--', path, branch]
-      : ['-C', checkout, 'worktree', 'add', '-b', branch, '--', path, 'FETCH_HEAD']
+      ? ['worktree', 'add', '--', path, branch]
+      : ['worktree', 'add', '-b', branch, '--', path, 'FETCH_HEAD']
     try {
-      await exec('git', args, { timeout: 60_000 })
+      await gitOrThrow(args, { cwd: checkout, timeoutMs: 60_000 })
     } catch {
       return { ok: false, reason: 'Could not create the worktree.' }
     }
@@ -99,10 +97,10 @@ export async function ensureWorktree(
   const exists = await branchExists(checkout, branch)
   const baseRef = exists ? null : await resolveBaseRef(checkout, preferredBaseRef)
   const args = exists
-    ? ['-C', checkout, 'worktree', 'add', '--', path, branch]
-    : ['-C', checkout, 'worktree', 'add', '-b', branch, '--', path, ...(baseRef ? [baseRef] : [])]
+    ? ['worktree', 'add', '--', path, branch]
+    : ['worktree', 'add', '-b', branch, '--', path, ...(baseRef ? [baseRef] : [])]
   try {
-    await exec('git', args, { timeout: 60_000 })
+    await gitOrThrow(args, { cwd: checkout, timeoutMs: 60_000 })
   } catch {
     return { ok: false, reason: `Could not create a worktree for ${branch}.` }
   }
@@ -148,7 +146,7 @@ export function copyWorktreeFiles(checkout: string, worktree: string, entries: s
 
 export async function worktreeDirty(path: string): Promise<boolean> {
   try {
-    const { stdout } = await exec('git', ['-C', path, 'status', '--porcelain'], { timeout: 10_000 })
+    const { stdout } = await gitOrThrow(['status', '--porcelain'], { cwd: path, timeoutMs: 10_000 })
     return isDirty(stdout)
   } catch {
     return false
@@ -158,7 +156,7 @@ export async function worktreeDirty(path: string): Promise<boolean> {
 // Dirty flag + changed-file count for the live rail/footer markers (docs/workspaces-and-tasks.md/05).
 export async function worktreePorcelain(path: string): Promise<{ dirty: boolean; count: number }> {
   try {
-    const { stdout } = await exec('git', ['-C', path, 'status', '--porcelain'], { timeout: 10_000 })
+    const { stdout } = await gitOrThrow(['status', '--porcelain'], { cwd: path, timeoutMs: 10_000 })
     const count = stdout.split('\n').filter((l) => l.trim().length > 0).length
     return { dirty: count > 0, count }
   } catch {
@@ -170,7 +168,7 @@ export async function worktreePorcelain(path: string): Promise<{ dirty: boolean;
 // Used to seed a "current-checkout" task with the branch it actually borrows.
 export async function currentBranch(checkout: string): Promise<string | null> {
   try {
-    const { stdout } = await exec('git', ['-C', checkout, 'branch', '--show-current'], { timeout: 10_000 })
+    const { stdout } = await gitOrThrow(['branch', '--show-current'], { cwd: checkout, timeoutMs: 10_000 })
     return stdout.trim() || null
   } catch {
     return null
@@ -183,9 +181,9 @@ export async function removeWorktree(checkout: string, path: string, force = fal
   if (!force && (await worktreeDirty(path))) {
     return { ok: false, reason: 'Worktree has uncommitted changes — confirm to discard.' }
   }
-  const args = ['-C', checkout, 'worktree', 'remove', ...(force ? ['--force'] : []), path]
+  const args = ['worktree', 'remove', ...(force ? ['--force'] : []), path]
   try {
-    await exec('git', args, { timeout: 30_000 })
+    await gitOrThrow(args, { cwd: checkout, timeoutMs: 30_000 })
   } catch {
     return { ok: false, reason: 'Could not remove the worktree.' }
   }

@@ -1,3 +1,4 @@
+import { testSecretEnv } from '@acorn/node-core/server/routes/testDb.ts'
 import { Hono } from 'hono'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type {
@@ -88,7 +89,7 @@ describe('Rollbar source (docs/integrations.md, docs/next/rollbar.md)', () => {
     t.cleanup()
   })
 
-  const env = () => ({ SESSION_ENC_KEY: ENC_KEY }) as unknown as Env
+  const env = () => ({ ...testSecretEnv(ENC_KEY) }) as unknown as Env
 
   const connect = async (name = 'acme-api'): Promise<string> => {
     vi.mocked(rollbarFetch).mockResolvedValueOnce(rollbarJson({ id: 7, name }))

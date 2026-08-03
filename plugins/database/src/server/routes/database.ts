@@ -194,7 +194,7 @@ export const database = new Hono<AppEnv>()
       const result = await generateTextForConnection({
         db,
         userId: ownerId(c),
-        encryptionKey: c.env.SESSION_ENC_KEY,
+        secrets: c.env.SECRETS,
         connectionId: p.data.connectionId,
         input: {
           system: buildSystemPrompt(schemaRes.schema, { ...(schemaRes.notes ? { notes: schemaRes.notes } : {}), examples }),

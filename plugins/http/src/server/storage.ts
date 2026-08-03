@@ -1,28 +1,35 @@
 import { and, eq } from 'drizzle-orm'
 import type { AppDatabase } from '@acorn/node-core/server/db/index.ts'
 import { schema } from '@acorn/node-core/server/db/index.ts'
-import { decryptSecret, encryptSecret } from '@acorn/node-core/server/secretBox.ts'
+import { SecretUnavailableError, type SecretService } from '@acorn/node-core/main/core/secrets.ts'
 
 const LEGACY_USER = '__legacy_unscoped__'
 
 export class HttpStorageError extends Error {}
 
-export async function protectHttpValue(value: string, encryptionKey: string): Promise<string> {
-  return encryptSecret(value, encryptionKey)
+export async function protectHttpValue(value: string, secrets: SecretService): Promise<string> {
+  return secrets.seal(value)
 }
 
-export async function openHttpValue(value: string, encrypted: boolean, encryptionKey: string): Promise<string> {
+// reveal(), and deliberately so: this is the API panel's OWN saved data being handed back to the
+// owner who typed it. docs/vNext/security.md § Secrets names that exemption explicitly ("The
+// user-facing HTTP client pane is exempt by design… but is owner-invoked only"), and the router
+// enforces the owner-invoked half by requiring a `device` principal.
+export async function openHttpValue(value: string, encrypted: boolean, secrets: SecretService): Promise<string> {
   if (!encrypted) throw new HttpStorageError('Saved HTTP data has not been encrypted')
-  const plaintext = await decryptSecret(value, encryptionKey)
-  if (plaintext === null) throw new HttpStorageError('Saved HTTP data could not be decrypted')
-  return plaintext
+  try {
+    return await secrets.reveal(value, 'http panel: saved request field')
+  } catch (error) {
+    if (error instanceof SecretUnavailableError) throw new HttpStorageError('Saved HTTP data could not be decrypted')
+    throw error
+  }
 }
 
 // Pre-listener upgrade for rows written by releases that stored HTTP drafts in plaintext. All
 // sensitive fields are encrypted in one row update after their ciphertexts are ready. Legacy
 // ownership can be recovered only when the database contains exactly one GitHub identity;
 // otherwise the sentinel remains and no authenticated identity can query those rows.
-export async function protectLegacyHttpStorage(db: AppDatabase, encryptionKey: string): Promise<void> {
+export async function protectLegacyHttpStorage(db: AppDatabase, secrets: SecretService): Promise<void> {
   const [prefUsers, repoUsers] = await Promise.all([
     db.selectDistinct({ userId: schema.prefs.userId }).from(schema.prefs),
     db.selectDistinct({ userId: schema.repos.userId }).from(schema.repos),
@@ -37,11 +44,11 @@ export async function protectLegacyHttpStorage(db: AppDatabase, encryptionKey: s
     requests.map(async (row) => ({
       id: row.id,
       userId: row.userId === LEGACY_USER && soleIdentity ? soleIdentity : row.userId,
-      url: await protectHttpValue(row.url, encryptionKey),
-      headers: await protectHttpValue(row.headers, encryptionKey),
-      body: await protectHttpValue(row.body, encryptionKey),
-      auth: await protectHttpValue(row.auth, encryptionKey),
-      vars: await protectHttpValue(row.vars, encryptionKey),
+      url: await protectHttpValue(row.url, secrets),
+      headers: await protectHttpValue(row.headers, secrets),
+      body: await protectHttpValue(row.body, secrets),
+      auth: await protectHttpValue(row.auth, secrets),
+      vars: await protectHttpValue(row.vars, secrets),
     })),
   )
   const variableUpdates = await Promise.all(
@@ -50,14 +57,14 @@ export async function protectLegacyHttpStorage(db: AppDatabase, encryptionKey: s
       // Secret variables were the one legacy kind already encrypted. Open and re-seal them so all
       // values now have exactly one encryption layer and corrupt credentials fail boot closed.
       if (row.kind === 'secret') {
-        const opened = await decryptSecret(row.value, encryptionKey)
+        const opened = await secrets.reveal(row.value, 'http panel: legacy migration').catch(() => null)
         if (opened === null) throw new HttpStorageError(`Secret HTTP variable "${row.name}" could not be decrypted`)
         plaintext = opened
       }
       return {
         id: row.id,
         userId: row.userId === LEGACY_USER && soleIdentity ? soleIdentity : row.userId,
-        value: await protectHttpValue(plaintext, encryptionKey),
+        value: await protectHttpValue(plaintext, secrets),
       }
     }),
   )

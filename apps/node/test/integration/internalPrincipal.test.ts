@@ -1,3 +1,4 @@
+import { testSecretEnv } from '@acorn/node-core/server/routes/testDb.ts'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { createApp } from '@acorn/node-core/server/index.ts'
 import { makeTestDb, type TestDb } from '@acorn/node-core/server/routes/testDb.ts'
@@ -36,7 +37,7 @@ beforeEach(() => {
     NODE_ID: 'node-1',
     APP_VERSION: 'test',
     NODE_FINGERPRINT: 'ff'.repeat(32),
-    SESSION_ENC_KEY: ENC_KEY,
+    ...testSecretEnv(ENC_KEY),
     GITHUB_CLIENT_ID: 'client-id',
     GITHUB_CLIENT_SECRET: '',
     INTERNAL_TOKEN: INTERNAL,

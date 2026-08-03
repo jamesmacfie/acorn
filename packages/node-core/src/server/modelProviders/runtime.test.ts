@@ -9,8 +9,10 @@ import { encryptSecret } from '../secretBox'
 import { ModelProviderRegistry } from './registry'
 import { generateTextForConnection } from './runtime'
 import type { ModelProviderAdapter, ModelProviderAdapterResult } from './types'
+import { SecretService } from '../../main/core/secrets'
 
 const ENCRYPTION_KEY = '22'.repeat(32)
+const SECRETS = new SecretService(ENCRYPTION_KEY)
 const PROVIDER_ID = 'runtime-model-test'
 
 const provider = publicConnectionProvider({
@@ -88,7 +90,7 @@ describe('generateTextForConnection', () => {
   const args = () => ({
     db: testDb.db,
     userId: 'alice',
-    encryptionKey: ENCRYPTION_KEY,
+    secrets: SECRETS,
     connectionId: 'connection-1',
     input,
   })

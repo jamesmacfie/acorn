@@ -2,7 +2,7 @@ import type { ProviderErrorCode } from '@acorn/protocol/integrations.ts'
 import { eq } from 'drizzle-orm'
 import type { AppDatabase } from '../db'
 import { schema } from '../db'
-import { decryptSecret } from '../secretBox'
+import { SecretUnavailableError, type SecretService } from '../../main/core/secrets'
 import { serveThenRevalidate, type RouteFailure, type RouteResult } from '../sync/engine'
 import { getConnection } from './connections'
 import { providerRequestScheduler } from './budgetRuntime'
@@ -17,7 +17,7 @@ const failure = (error: ProviderErrorCode, status: RouteFailure['status']): Rout
 export async function runProviderResource<TInput, TOutput>(args: {
   db: AppDatabase
   userId: string
-  encryptionKey: string
+  secrets: SecretService
   providerId: string
   connectionId: string
   resourceId: string
@@ -63,17 +63,23 @@ export async function runProviderResource<TInput, TOutput>(args: {
     force: args.force,
     read,
     refresh: async () => {
-      const secret = await decryptSecret(connection.authRef, args.encryptionKey)
-      if (!secret) {
+      try {
+        // The provider call runs INSIDE the secret scope, which is the point: a provider that echoes
+        // the credential back in an error body gets it scrubbed here, before this failure is logged
+        // or surfaced (main/core/secrets.ts).
+        return await args.secrets.use(connection.authRef, `${connection.provider}: read ${resource.id}`, (secret) =>
+          providerRequestScheduler.run(provider.id, connection.id, provider.budgets, () =>
+            resource.refresh({ ...context(), secret }, args.input),
+          ),
+        )
+      } catch (error) {
+        if (!(error instanceof SecretUnavailableError)) throw error
         await args.db
           .update(schema.integrations)
           .set({ status: 'needs-auth', lastError: 'provider_secret_unreadable', updatedAt: Date.now() })
           .where(eq(schema.integrations.id, connection.id))
         return { ok: false, failure: { error: 'provider_secret_unreadable', status: 401 } }
       }
-      return providerRequestScheduler.run(provider.id, connection.id, provider.budgets, () =>
-        resource.refresh({ ...context(), secret }, args.input),
-      )
     },
   })
   return !result.ok && fallback ? { ok: true, value: fallback.data } : result

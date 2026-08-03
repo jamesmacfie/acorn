@@ -7,6 +7,7 @@ import { makeTestDb, type TestDb } from '@acorn/node-core/server/routes/testDb.t
 import type { HttpSendInput } from '../shared/model'
 import { SendError, buildRequest, describeFetchFailure, readCapped, referencedVariableNames, resolveVars, send } from './send'
 import { protectHttpValue } from './storage'
+import { SecretService } from '@acorn/node-core/main/core/secrets.ts'
 
 // buildRequest is where interpolation, auth compilation and the scheme check land — the parts that
 // would silently send the wrong thing. The fetch call itself and the DB read around it are thin.
@@ -24,6 +25,7 @@ const input = (patch: Partial<HttpSendInput> = {}): HttpSendInput => ({
 })
 const USER = 'octocat'
 const ENC_KEY = '0'.repeat(64)
+const SECRETS = new SecretService(ENC_KEY)
 
 describe('buildRequest — scheme', () => {
   it('rejects anything that is not http or https', () => {
@@ -214,14 +216,14 @@ describe('resolveVars — command execution context', () => {
       repoName: 'widget',
       name: 'BASE_URL',
       kind: 'command',
-      value: await protectHttpValue(`printf 'shell startup noise\\n%s|%s|%s\\n' "$PWD" "$ACORN_TASK_ID" "$ACORN_BRANCH"`, ENC_KEY),
+      value: await protectHttpValue(`printf 'shell startup noise\\n%s|%s|%s\\n' "$PWD" "$ACORN_TASK_ID" "$ACORN_BRANCH"`, SECRETS),
       encrypted: true,
       enabled: true,
       createdAt: 0,
       updatedAt: 0,
     })
 
-    const vars = await resolveVars(testDb.db, USER, 'acme', 'widget', ENC_KEY, input({ url: '{{BASE_URL}}/health', executionTaskId: 'task-1' }))
+    const vars = await resolveVars(testDb.db, USER, 'acme', 'widget', SECRETS, input({ url: '{{BASE_URL}}/health', executionTaskId: 'task-1' }))
 
     const [commandCwd, taskId, branch] = vars.BASE_URL.split('|')
     expect(realpathSync(commandCwd)).toBe(realpathSync(worktree))
@@ -250,7 +252,7 @@ describe('resolveVars — command execution context', () => {
       archivedAt: null,
     })
 
-    await expect(resolveVars(testDb.db, USER, 'acme', 'widget', ENC_KEY, input({ executionTaskId: 'task-2' }))).rejects.toThrow(
+    await expect(resolveVars(testDb.db, USER, 'acme', 'widget', SECRETS, input({ executionTaskId: 'task-2' }))).rejects.toThrow(
       'The selected task belongs to acme/other',
     )
   })
@@ -264,16 +266,16 @@ describe('resolveVars — command execution context', () => {
       repoName: 'widget',
       name: 'BASE_URL',
       kind: 'command',
-      value: await protectHttpValue('exit 17', ENC_KEY),
+      value: await protectHttpValue('exit 17', SECRETS),
       encrypted: true,
       enabled: true,
       createdAt: 0,
       updatedAt: 0,
     })
 
-    await expect(resolveVars(testDb.db, USER, 'acme', 'widget', ENC_KEY, input())).resolves.not.toHaveProperty('BASE_URL')
+    await expect(resolveVars(testDb.db, USER, 'acme', 'widget', SECRETS, input())).resolves.not.toHaveProperty('BASE_URL')
     await expect(
-      resolveVars(testDb.db, USER, 'acme', 'widget', ENC_KEY, input({ url: '{{BASE_URL}}/health', vars: { BASE_URL: 'http://override.test' } })),
+      resolveVars(testDb.db, USER, 'acme', 'widget', SECRETS, input({ url: '{{BASE_URL}}/health', vars: { BASE_URL: 'http://override.test' } })),
     ).resolves.toMatchObject({ BASE_URL: 'http://override.test' })
   })
 })
@@ -303,7 +305,7 @@ describe('send — transport outcomes', () => {
     const cause = Object.assign(new Error('getaddrinfo ENOTFOUND missing.test'), { code: 'ENOTFOUND' })
     vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new TypeError('fetch failed', { cause })))
 
-    const result = await send(testDb.db, USER, 'acme', 'widget', ENC_KEY, input({ url: 'http://missing.test/health' }))
+    const result = await send(testDb.db, USER, 'acme', 'widget', SECRETS, input({ url: 'http://missing.test/health' }))
 
     expect(result).toMatchObject({
       ok: false,
@@ -321,7 +323,7 @@ describe('send — transport outcomes', () => {
     testDb = makeTestDb()
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response('server broke', { status: 500, statusText: 'Internal Server Error' })))
 
-    const result = await send(testDb.db, USER, 'acme', 'widget', ENC_KEY, input({ url: 'http://api.test/fail' }))
+    const result = await send(testDb.db, USER, 'acme', 'widget', SECRETS, input({ url: 'http://api.test/fail' }))
 
     expect(result.ok).toBe(true)
     if (!result.ok) throw new Error('Expected an HTTP response')
@@ -338,7 +340,7 @@ describe('send — transport outcomes', () => {
       repoName: 'widget',
       name: 'TOKEN',
       kind: 'secret',
-      value: await protectHttpValue('server-only-secret', ENC_KEY),
+      value: await protectHttpValue('server-only-secret', SECRETS),
       encrypted: true,
       enabled: true,
       createdAt: 1,
@@ -352,7 +354,7 @@ describe('send — transport outcomes', () => {
       USER,
       'acme',
       'widget',
-      ENC_KEY,
+      SECRETS,
       input({
         url: 'https://api.test/items/server-only-secret?token={{TOKEN}}',
         headers: [{ name: 'X-API-Key', value: '{{TOKEN}}', enabled: true }],

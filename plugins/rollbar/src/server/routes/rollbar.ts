@@ -50,7 +50,7 @@ export const rollbar = new Hono<AppEnv>()
       const result = await runProviderResource<RollbarResourceInput, RollbarListResult>({
         db,
         userId: uid,
-        encryptionKey: c.env.SESSION_ENC_KEY,
+        secrets: c.env.SECRETS,
         providerId: PROVIDER,
         connectionId: connection.id,
         resourceId: RESOURCE,
@@ -73,7 +73,7 @@ export const rollbar = new Hono<AppEnv>()
     if (!connectionId) return respondError(c, 400, 'bad_request')
     const uid = ownerId(c)
     const result = await runProviderResource<RollbarResourceInput, RollbarItemMetadata>({
-      db: getDb(c.env), userId: uid, encryptionKey: c.env.SESSION_ENC_KEY,
+      db: getDb(c.env), userId: uid, secrets: c.env.SECRETS,
       providerId: PROVIDER, connectionId, resourceId: RESOURCE,
       input: { kind: 'detail', identifier: c.req.param('identifier') },
       force: c.req.query('refresh') === 'true',
@@ -85,7 +85,7 @@ export const rollbar = new Hono<AppEnv>()
     if (!connectionId) return respondError(c, 400, 'bad_request')
     const uid = ownerId(c)
     const result = await runProviderResource<RollbarOccurrencesInput, RollbarOccurrencesResponse>({
-      db: getDb(c.env), userId: uid, encryptionKey: c.env.SESSION_ENC_KEY,
+      db: getDb(c.env), userId: uid, secrets: c.env.SECRETS,
       providerId: PROVIDER, connectionId, resourceId: ROLLBAR_OCCURRENCES_RESOURCE,
       input: { identifier: c.req.param('identifier') },
       force: c.req.query('refresh') === 'true',
@@ -97,7 +97,7 @@ export const rollbar = new Hono<AppEnv>()
     if (!connectionId) return respondError(c, 400, 'bad_request')
     const uid = ownerId(c)
     const result = await runProviderResource<RollbarOccurrenceInput, RollbarOccurrenceDetail>({
-      db: getDb(c.env), userId: uid, encryptionKey: c.env.SESSION_ENC_KEY,
+      db: getDb(c.env), userId: uid, secrets: c.env.SECRETS,
       providerId: PROVIDER, connectionId, resourceId: ROLLBAR_OCCURRENCE_RESOURCE,
       input: { identifier: c.req.param('identifier'), occurrenceId: c.req.param('occurrenceId') },
       force: c.req.query('refresh') === 'true',
@@ -112,7 +112,7 @@ export const rollbar = new Hono<AppEnv>()
     const metadata = await runProviderResource<RollbarResourceInput, RollbarItemMetadata>({
       db: getDb(c.env),
       userId: uid,
-      encryptionKey: c.env.SESSION_ENC_KEY,
+      secrets: c.env.SECRETS,
       providerId: PROVIDER,
       connectionId,
       resourceId: RESOURCE,
@@ -125,14 +125,14 @@ export const rollbar = new Hono<AppEnv>()
     // they did when latest occurrence was bundled into the item request.
     let latestOccurrence: RollbarOccurrenceDetail | null = null
     const occurrences = await runProviderResource<RollbarOccurrencesInput, RollbarOccurrencesResponse>({
-      db: getDb(c.env), userId: uid, encryptionKey: c.env.SESSION_ENC_KEY,
+      db: getDb(c.env), userId: uid, secrets: c.env.SECRETS,
       providerId: PROVIDER, connectionId, resourceId: ROLLBAR_OCCURRENCES_RESOURCE,
       input: { identifier: c.req.param('identifier') }, force,
     })
     const latest = occurrences.ok ? occurrences.value.occurrences[0] : undefined
     if (latest) {
       const detail = await runProviderResource<RollbarOccurrenceInput, RollbarOccurrenceDetail>({
-        db: getDb(c.env), userId: uid, encryptionKey: c.env.SESSION_ENC_KEY,
+        db: getDb(c.env), userId: uid, secrets: c.env.SECRETS,
         providerId: PROVIDER, connectionId, resourceId: ROLLBAR_OCCURRENCE_RESOURCE,
         input: { identifier: c.req.param('identifier'), occurrenceId: latest.id }, force,
       })

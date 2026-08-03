@@ -1,3 +1,4 @@
+import { testSecretEnv } from '@acorn/node-core/server/routes/testDb.ts'
 import { Hono } from 'hono'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { AppEnv, Principal } from '@acorn/node-core/server/middleware/auth.ts'
@@ -33,7 +34,7 @@ afterEach(() => {
 const env = () =>
   ({
     DB: harness.db,
-    SESSION_ENC_KEY: ENC_KEY,
+    ...testSecretEnv(ENC_KEY),
     GITHUB_CLIENT_ID: 'client-id',
     ACTIVE_IDENTITY: {
       get: () => identity,

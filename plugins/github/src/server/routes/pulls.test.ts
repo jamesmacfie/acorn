@@ -1,3 +1,4 @@
+import { testSecretEnv } from '@acorn/node-core/server/routes/testDb.ts'
 import { eq } from 'drizzle-orm'
 import { Hono } from 'hono'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -78,7 +79,7 @@ describe('pulls list (serve-then-revalidate via the sync engine)', () => {
 
   afterEach(() => t.cleanup())
 
-  const getOpen = () => app.fetch(new Request('http://acorn.test/api/repos/Runn-Fast/runn/pulls'), { SESSION_ENC_KEY: ENC_KEY } as Env)
+  const getOpen = () => app.fetch(new Request('http://acorn.test/api/repos/Runn-Fast/runn/pulls'), { ...testSecretEnv(ENC_KEY) } as Env)
 
   it('cold: blocks on GitHub, mirrors the list, and adopts a matching local task (Flow B)', async () => {
     // A local-first task on the same branch with no PR yet — the refresh should adopt PR #42.

@@ -6,6 +6,7 @@ import { and, asc, eq, isNull } from 'drizzle-orm'
 import { z } from 'zod'
 import { getDb } from '@acorn/node-core/server/db/index.ts'
 import * as schema from '@acorn/node-core/server/db/schema.ts'
+import type { SecretService } from '@acorn/node-core/main/core/secrets.ts'
 import type { AppEnv } from '@acorn/node-core/server/middleware/auth.ts'
 import { ownerId } from '@acorn/node-core/server/middleware/requireUser.ts'
 import { respondError } from '@acorn/node-core/server/respond.ts'
@@ -65,13 +66,13 @@ const parseJson = <T>(raw: string, fallback: T): T => {
   }
 }
 
-const toRequest = async (row: typeof schema.httpRequests.$inferSelect, encryptionKey: string): Promise<HttpRequest> => {
+const toRequest = async (row: typeof schema.httpRequests.$inferSelect, secrets: SecretService): Promise<HttpRequest> => {
   const [url, headers, body, auth, vars] = await Promise.all([
-    openHttpValue(row.url, row.encrypted, encryptionKey),
-    openHttpValue(row.headers, row.encrypted, encryptionKey),
-    openHttpValue(row.body, row.encrypted, encryptionKey),
-    openHttpValue(row.auth, row.encrypted, encryptionKey),
-    openHttpValue(row.vars, row.encrypted, encryptionKey),
+    openHttpValue(row.url, row.encrypted, secrets),
+    openHttpValue(row.headers, row.encrypted, secrets),
+    openHttpValue(row.body, row.encrypted, secrets),
+    openHttpValue(row.auth, row.encrypted, secrets),
+    openHttpValue(row.vars, row.encrypted, secrets),
   ])
   return {
     id: row.id,
@@ -94,11 +95,11 @@ const toRequest = async (row: typeof schema.httpRequests.$inferSelect, encryptio
 
 // Secret values never leave the server. The renderer gets '' and shows a "set" placeholder; saving
 // an unchanged secret means sending '' back, which the PUT handler treats as "keep what's stored".
-const toVariable = async (row: typeof schema.httpVariables.$inferSelect, encryptionKey: string): Promise<HttpVariable> => ({
+const toVariable = async (row: typeof schema.httpVariables.$inferSelect, secrets: SecretService): Promise<HttpVariable> => ({
   id: row.id,
   name: row.name,
   kind: row.kind as HttpVariable['kind'],
-  value: row.kind === 'secret' ? '' : await openHttpValue(row.value, row.encrypted, encryptionKey),
+  value: row.kind === 'secret' ? '' : await openHttpValue(row.value, row.encrypted, secrets),
   enabled: row.enabled,
   updatedAt: row.updatedAt,
 })
@@ -109,13 +110,13 @@ const inRepo = (userId: string, owner: string, repo: string) =>
 const variablesInRepo = (userId: string, owner: string, repo: string) =>
   and(eq(schema.httpVariables.userId, userId), eq(schema.httpVariables.repoOwner, owner), eq(schema.httpVariables.repoName, repo))
 
-const protectedRequestFields = async (d: z.infer<typeof requestBody>, encryptionKey: string) => {
+const protectedRequestFields = async (d: z.infer<typeof requestBody>, secrets: SecretService) => {
   const [url, headers, body, auth, vars] = await Promise.all([
-    protectHttpValue(d.url, encryptionKey),
-    protectHttpValue(JSON.stringify(d.headers), encryptionKey),
-    protectHttpValue(d.body, encryptionKey),
-    protectHttpValue(JSON.stringify(d.auth), encryptionKey),
-    protectHttpValue(JSON.stringify(d.vars), encryptionKey),
+    protectHttpValue(d.url, secrets),
+    protectHttpValue(JSON.stringify(d.headers), secrets),
+    protectHttpValue(d.body, secrets),
+    protectHttpValue(JSON.stringify(d.auth), secrets),
+    protectHttpValue(JSON.stringify(d.vars), secrets),
   ])
   return { url, headers, body, auth, vars }
 }
@@ -142,7 +143,7 @@ export const http = new Hono<AppEnv>()
       .from(schema.httpRequests)
       .where(and(inRepo(userId, owner, repo), taskId ? eq(schema.httpRequests.taskId, taskId) : isNull(schema.httpRequests.taskId)))
       .orderBy(asc(schema.httpRequests.folder), asc(schema.httpRequests.name))
-    return c.json(await Promise.all(rows.map((row) => toRequest(row, c.env.SESSION_ENC_KEY))))
+    return c.json(await Promise.all(rows.map((row) => toRequest(row, c.env.SECRETS))))
   })
 
   .post('/:owner/:repo/requests', async (c) => {
@@ -150,7 +151,7 @@ export const http = new Hono<AppEnv>()
     const parsed = requestBody.safeParse(await c.req.json().catch(() => null))
     if (!parsed.success) return respondError(c, 400, 'bad_request', parsed.error.issues.map((i) => i.message))
     const d = parsed.data
-    const protectedFields = await protectedRequestFields(d, c.env.SESSION_ENC_KEY)
+    const protectedFields = await protectedRequestFields(d, c.env.SECRETS)
     const row = {
       id: crypto.randomUUID(),
       userId: ownerId(c),
@@ -171,7 +172,7 @@ export const http = new Hono<AppEnv>()
       updatedAt: now(),
     }
     await getDb(c.env).insert(schema.httpRequests).values(row)
-    return c.json(await toRequest(row, c.env.SESSION_ENC_KEY), 201)
+    return c.json(await toRequest(row, c.env.SECRETS), 201)
   })
 
   .put('/:owner/:repo/requests/:id', async (c) => {
@@ -181,7 +182,7 @@ export const http = new Hono<AppEnv>()
     const d = parsed.data
     const db = getDb(c.env)
     const userId = ownerId(c)
-    const protectedFields = await protectedRequestFields(d, c.env.SESSION_ENC_KEY)
+    const protectedFields = await protectedRequestFields(d, c.env.SECRETS)
     // Scope the update to this repo so an id from another repo can't be smuggled in.
     const updated = await db
       .update(schema.httpRequests)
@@ -202,7 +203,7 @@ export const http = new Hono<AppEnv>()
       .where(and(inRepo(userId, owner, repo), eq(schema.httpRequests.id, c.req.param('id'))))
       .returning()
     if (!updated.length) return respondError(c, 404, 'not_found')
-    return c.json(await toRequest(updated[0], c.env.SESSION_ENC_KEY))
+    return c.json(await toRequest(updated[0], c.env.SECRETS))
   })
 
   .delete('/:owner/:repo/requests/:id', async (c) => {
@@ -226,7 +227,7 @@ export const http = new Hono<AppEnv>()
       .from(schema.httpVariables)
       .where(variablesInRepo(userId, owner, repo))
       .orderBy(asc(schema.httpVariables.name))
-    return c.json(await Promise.all(rows.map((row) => toVariable(row, c.env.SESSION_ENC_KEY))))
+    return c.json(await Promise.all(rows.map((row) => toVariable(row, c.env.SECRETS))))
   })
 
   .post('/:owner/:repo/vars', async (c) => {
@@ -235,7 +236,7 @@ export const http = new Hono<AppEnv>()
     if (!parsed.success) return respondError(c, 400, 'bad_request', parsed.error.issues.map((i) => i.message))
     const d = parsed.data
     const userId = ownerId(c)
-    const value = await protectHttpValue(d.value, c.env.SESSION_ENC_KEY)
+    const value = await protectHttpValue(d.value, c.env.SECRETS)
     const row = {
       id: crypto.randomUUID(),
       userId,
@@ -254,7 +255,7 @@ export const http = new Hono<AppEnv>()
     } catch {
       return respondError(c, 409, 'duplicate_name', [`A variable named "${d.name}" already exists for this repo`])
     }
-    return c.json(await toVariable(row, c.env.SESSION_ENC_KEY), 201)
+    return c.json(await toVariable(row, c.env.SECRETS), 201)
   })
 
   .put('/:owner/:repo/vars/:id', async (c) => {
@@ -273,14 +274,14 @@ export const http = new Hono<AppEnv>()
 
     // The renderer never sees a secret's plaintext, so it sends '' to mean "leave it alone".
     const unchangedSecret = d.kind === 'secret' && existing[0].kind === 'secret' && d.value === ''
-    const value = unchangedSecret ? existing[0].value : await protectHttpValue(d.value, c.env.SESSION_ENC_KEY)
+    const value = unchangedSecret ? existing[0].value : await protectHttpValue(d.value, c.env.SECRETS)
 
     const updated = await db
       .update(schema.httpVariables)
       .set({ name: d.name, kind: d.kind, value, encrypted: true, enabled: d.enabled, updatedAt: now() })
       .where(and(variablesInRepo(userId, owner, repo), eq(schema.httpVariables.id, id)))
       .returning()
-    return c.json(await toVariable(updated[0], c.env.SESSION_ENC_KEY))
+    return c.json(await toVariable(updated[0], c.env.SECRETS))
   })
 
   .delete('/:owner/:repo/vars/:id', async (c) => {
@@ -302,7 +303,7 @@ export const http = new Hono<AppEnv>()
     const parsed = sendBody.safeParse(await c.req.json().catch(() => null))
     if (!parsed.success) return respondError(c, 400, 'bad_request', parsed.error.issues.map((i) => i.message))
     try {
-      return c.json(await send(getDb(c.env), ownerId(c), owner, repo, c.env.SESSION_ENC_KEY, parsed.data))
+      return c.json(await send(getDb(c.env), ownerId(c), owner, repo, c.env.SECRETS, parsed.data))
     } catch (err) {
       // Preparation failures (invalid resolved URL, command/secret resolution) have no attempted
       // request to display, so they stay a 422. Network attempts return a typed SendFailure above.

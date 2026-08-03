@@ -10,6 +10,7 @@
 // Phase 0 shipped without one and every plugin already depends on @acorn/node-core, so a fourth
 // package would add a manifest and nothing else. Recorded in docs/vNext/phase2-notes.md.
 import type { Hono } from 'hono'
+import type { CoreServices } from '../../main/core'
 import type { AppEnv } from '../middleware/auth'
 import type { CapabilityRegistry } from './capabilities'
 import type { NodeEventBus } from './events'
@@ -36,6 +37,9 @@ export type NodePluginContext = {
   routes: PluginRouteRegistry
   capabilities: CapabilityRegistry
   events: NodeEventBus
+  // Path confinement, git, the process broker and use-scoped secrets (main/core/). A plugin consumes
+  // core capability through this, rather than deep-importing whichever core module has the helper.
+  core: CoreServices
   log: PluginLogger
 }
 

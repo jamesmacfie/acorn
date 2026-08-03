@@ -3,11 +3,10 @@
 // HUNKS-ONLY bodies (like GitHub's per-file `patch`), so the renderer's existing diff.ts/synth +
 // gitdiff-parser path works unchanged. execFile with arg arrays only; repo-relative paths are
 // validated at this boundary (reject `..`/absolute — the editor-IPC discipline).
-import { execFile } from 'node:child_process'
-import { promisify } from 'node:util'
+
+import { git, gitOrThrow, gitText } from '@acorn/node-core/main/core/git.ts'
 import type { LocalChange } from '@acorn/protocol/terminal.ts'
 
-const exec = promisify(execFile)
 
 export type { LocalChange } from '@acorn/protocol/terminal.ts'
 type LocalChangeStatus = LocalChange['status']
@@ -78,14 +77,14 @@ export function mergeNumstat(changes: LocalChange[], numstat: string, staged: bo
 }
 
 export async function localChanges(worktree: string): Promise<LocalChange[]> {
-  const { stdout } = await exec('git', ['-C', worktree, 'status', '--porcelain=v2'], { timeout: 15_000, maxBuffer: 10 * 1024 * 1024 })
+  const stdout = await gitText(['status', '--porcelain=v2'], { cwd: worktree, timeoutMs: 15_000 })
   let changes = parsePorcelainV2(stdout)
   try {
     const [unstaged, staged] = await Promise.all([
-      exec('git', ['-C', worktree, 'diff', '--numstat'], { timeout: 15_000, maxBuffer: 10 * 1024 * 1024 }),
-      exec('git', ['-C', worktree, 'diff', '--staged', '--numstat'], { timeout: 15_000, maxBuffer: 10 * 1024 * 1024 }),
+      gitText(['diff', '--numstat'], { cwd: worktree, timeoutMs: 15_000 }),
+      gitText(['diff', '--staged', '--numstat'], { cwd: worktree, timeoutMs: 15_000 }),
     ])
-    changes = mergeNumstat(mergeNumstat(changes, unstaged.stdout, false), staged.stdout, true)
+    changes = mergeNumstat(mergeNumstat(changes, unstaged, false), staged, true)
   } catch {
     // stats are decoration — the list still renders
   }
@@ -107,21 +106,17 @@ export async function localDiff(worktree: string, path: string, scope: LocalScop
   const ctx = context != null && Number.isInteger(context) && context >= 0 ? [`-U${context}`] : []
   // Untracked files aren't in the index: render an all-additions patch via --no-index (exits 1 on
   // "differences found" — that IS success for a diff).
-  const tracked = await exec('git', ['-C', worktree, 'ls-files', '--error-unmatch', '--', path], { timeout: 10_000 })
-    .then(() => true)
-    .catch(() => false)
+  const tracked = (await git(['ls-files', '--error-unmatch', '--', path], { cwd: worktree, timeoutMs: 10_000 })).code === 0
   if (!tracked && scope === 'unstaged') {
-    try {
-      const { stdout } = await exec('git', ['-C', worktree, 'diff', '--no-index', ...ctx, '--', '/dev/null', path], { timeout: 15_000, maxBuffer: 50 * 1024 * 1024 })
-      return { patch: stripToHunks(stdout) }
-    } catch (err) {
-      const e = err as { code?: number; stdout?: string }
-      if (e.code === 1 && typeof e.stdout === 'string') return { patch: stripToHunks(e.stdout) }
-      throw err
-    }
+    // --no-index exits 1 on "differences found", which IS success for a diff. The broker returns the
+    // exit code as data, so this no longer needs a catch that inspects an exec error's shape.
+    const result = await git(['diff', '--no-index', ...ctx, '--', '/dev/null', path], { cwd: worktree, timeoutMs: 15_000 })
+    if (result.code !== 0 && result.code !== 1) throw new Error(result.stderr.trim() || 'git diff failed')
+    return { patch: stripToHunks(result.stdout) }
   }
-  const args = ['-C', worktree, 'diff', ...(scope === 'staged' ? ['--staged'] : []), ...ctx, '--', path]
-  const { stdout } = await exec('git', args, { timeout: 15_000, maxBuffer: 50 * 1024 * 1024 })
+  const args = ['diff', ...(scope === 'staged' ? ['--staged'] : []), ...ctx, '--', path]
+  // gitOrThrow, not gitText: a patch is content, and gitText trims.
+  const { stdout } = await gitOrThrow(args, { cwd: worktree, timeoutMs: 15_000 })
   return { patch: stripToHunks(stdout) }
 }
 
@@ -131,13 +126,11 @@ export async function localDiff(worktree: string, path: string, scope: LocalScop
 export type GitActionResult = { ok: true } | { ok: false; reason: string }
 
 const run = async (worktree: string, args: string[]): Promise<GitActionResult> => {
-  try {
-    await exec('git', ['-C', worktree, ...args], { timeout: 30_000 })
-    return { ok: true }
-  } catch (err) {
-    const e = err as { stderr?: string; message?: string }
-    return { ok: false, reason: (e.stderr || e.message || 'git failed').trim().slice(0, 400) }
-  }
+  const result = await git(args, { cwd: worktree, timeoutMs: 30_000 })
+  if (result.spawnError) return { ok: false, reason: result.spawnError }
+  if (result.timedOut) return { ok: false, reason: 'git timed out' }
+  if (result.code !== 0) return { ok: false, reason: (result.stderr || 'git failed').trim().slice(0, 400) }
+  return { ok: true }
 }
 
 export async function stageFile(worktree: string, path: string): Promise<GitActionResult> {
@@ -196,7 +189,7 @@ export function parseGitLog(stdout: string): GitLogEntry[] {
 
 export async function gitLog(worktree: string, n = 10): Promise<GitLogEntry[]> {
   const count = Number.isInteger(n) && n > 0 && n <= 100 ? n : 10
-  const { stdout } = await exec('git', ['-C', worktree, 'log', `-n${count}`, '--pretty=format:%h\x1f%s\x1f%an\x1f%ct'], { timeout: 15_000 })
+  const stdout = await gitText(['log', `-n${count}`, '--pretty=format:%h\x1f%s\x1f%an\x1f%ct'], { cwd: worktree, timeoutMs: 15_000 })
   return parseGitLog(stdout)
 }
 
@@ -205,6 +198,7 @@ export async function gitLog(worktree: string, n = 10): Promise<GitLogEntry[]> {
 export async function localFileBlob(worktree: string, path: string, ref = 'HEAD'): Promise<{ text: string }> {
   if (!isValidRelPath(path)) throw new Error('Invalid path.')
   if (ref.startsWith('-') || ref.includes(':')) throw new Error('Invalid ref.')
-  const { stdout } = await exec('git', ['-C', worktree, 'show', `${ref}:${path}`], { timeout: 15_000, maxBuffer: 50 * 1024 * 1024 })
+  // gitOrThrow, not gitText: a file body must be byte-exact, trailing newline included.
+  const { stdout } = await gitOrThrow(['show', `${ref}:${path}`], { cwd: worktree, timeoutMs: 15_000 })
   return { text: stdout }
 }

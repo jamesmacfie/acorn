@@ -1,3 +1,4 @@
+import { testSecretEnv } from '@acorn/node-core/server/routes/testDb.ts'
 import { Hono } from 'hono'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { ApiError } from '@acorn/protocol/api.ts'
@@ -29,7 +30,7 @@ const post = (principal: Principal | null, body: unknown) => {
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify(body),
     }),
-    { DB: noIntegrations, SESSION_ENC_KEY: '0'.repeat(64) } as Env,
+    { DB: noIntegrations, ...testSecretEnv('0'.repeat(64)) } as Env,
   )
 }
 

@@ -1,3 +1,4 @@
+import { testSecretEnv } from '@acorn/node-core/server/routes/testDb.ts'
 import { Hono } from 'hono'
 import { eq } from 'drizzle-orm'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -23,7 +24,7 @@ vi.mock('@acorn/plugin-linear/server/index.ts', async (importOriginal) => {
 })
 
 const ENC_KEY = 'b'.repeat(64)
-const env = () => ({ SESSION_ENC_KEY: ENC_KEY }) as unknown as Env
+const env = () => ({ ...testSecretEnv(ENC_KEY) }) as unknown as Env
 const graphQl = (data: unknown) => new Response(JSON.stringify({ data }), { headers: { 'content-type': 'application/json' } })
 
 const node = (title: string, overrides: Partial<LinearNode> = {}): LinearNode => ({

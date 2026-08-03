@@ -1,7 +1,7 @@
 import { eq } from 'drizzle-orm'
 import type { AppDatabase } from '../db'
 import { schema } from '../db'
-import { decryptSecret } from '../secretBox'
+import { redact, SecretUnavailableError, type SecretService } from '../../main/core/secrets'
 import {
   connectionProviderRegistry,
   type ConnectionProviderRegistry,
@@ -35,7 +35,7 @@ const defaultDependencies: RuntimeDependencies = {
 export type GenerateTextForConnectionArgs = {
   db: AppDatabase
   userId: string
-  encryptionKey: string
+  secrets: SecretService
   connectionId: string
   input: GenerateTextInput
   timeoutMs?: number
@@ -108,7 +108,14 @@ export async function generateTextForConnection(
     throw new ProviderOperationError('provider_bad_config', 400)
   }
 
-  const secret = await decryptSecret(connection.authRef, args.encryptionKey)
+  // reveal(), not use(): the generation below is a long AbortController/timeout dance whose result is
+  // raced, and bracketing all of it inside a secret scope would tie the credential's lifetime to a
+  // promise race rather than to the call that needs it. The scrub is applied explicitly at the one
+  // place a provider error escapes (see the catch below).
+  const secret = await args.secrets.reveal(connection.authRef, `${connection.provider}: generate text`).catch((error: unknown) => {
+    if (error instanceof SecretUnavailableError) return null
+    throw error
+  })
   if (!secret) {
     await markNeedsAuth(args.db, connection.id, 'provider_secret_unreadable')
     throw new ProviderOperationError('provider_secret_unreadable', 400)
@@ -151,6 +158,9 @@ export async function generateTextForConnection(
       if (error.code === 'provider_needs_auth') {
         await markNeedsAuth(args.db, connection.id, 'provider_needs_auth')
       }
+      // An adapter builds this message from the provider's response, which can echo the API key back.
+      // Everything else is collapsed to a generic failure below, so this is the one escaping path.
+      error.message = redact(error.message, [secret])
       throw error
     }
     throw new ProviderOperationError('provider_unavailable', 502)

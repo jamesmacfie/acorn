@@ -1,3 +1,4 @@
+import { testSecretEnv } from '@acorn/node-core/server/routes/testDb.ts'
 import { and, eq } from 'drizzle-orm'
 import { Hono } from 'hono'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -59,7 +60,7 @@ describe('repos list (serve-then-revalidate via the sync engine)', () => {
 
   afterEach(() => t.cleanup())
 
-  const get = () => app.fetch(new Request('http://acorn.test/api/repos'), { SESSION_ENC_KEY: ENC_KEY } as Env)
+  const get = () => app.fetch(new Request('http://acorn.test/api/repos'), { ...testSecretEnv(ENC_KEY) } as Env)
   const syncRow = () =>
     t.db.select().from(schema.syncState).where(and(eq(schema.syncState.userId, 'james'), eq(schema.syncState.resource, reposResource())))
 
@@ -104,7 +105,7 @@ describe('repos list (serve-then-revalidate via the sync engine)', () => {
     await t.db.insert(schema.repos).values({ userId: 'james', ...publicRepo, pushedAt: publicRepo.pushedAt, fetchedAt: Date.now() })
     await t.db.insert(schema.syncState).values({ userId: 'james', resource: reposResource(), etag: '"repos-v1"', fetchedAt: Date.now() })
 
-    const res = await app.fetch(new Request('http://acorn.test/api/repos/refresh', { method: 'POST' }), { SESSION_ENC_KEY: ENC_KEY } as Env)
+    const res = await app.fetch(new Request('http://acorn.test/api/repos/refresh', { method: 'POST' }), { ...testSecretEnv(ENC_KEY) } as Env)
     expect(res.status).toBe(204)
     const [sync] = await syncRow()
     expect(sync.fetchedAt).toBe(0)

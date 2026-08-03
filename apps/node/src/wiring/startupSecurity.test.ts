@@ -1,3 +1,4 @@
+import { testSecretEnv } from '@acorn/node-core/server/routes/testDb.ts'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import type { RuntimeBindings } from '@acorn/node-core/main/bindings.ts'
 import { schema } from '@acorn/node-core/server/db/index.ts'
@@ -37,7 +38,7 @@ describe('pre-listener security reconciliation', () => {
 
     await prepareSecurityState({
       DB: testDb.db,
-      SESSION_ENC_KEY: ENC_KEY,
+      ...testSecretEnv(ENC_KEY),
     } as RuntimeBindings)
 
     const [request] = await testDb.db.select().from(schema.httpRequests)

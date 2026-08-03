@@ -13,8 +13,10 @@ import {
 } from './connections'
 import { publicConnectionProvider } from './providers/shared'
 import { ProviderOperationError } from './types'
+import { SecretService } from '../../main/core/secrets'
 
 const ENCRYPTION_KEY = '11'.repeat(32)
+const SECRETS = new SecretService(ENCRYPTION_KEY)
 const PROVIDER_ID = 'connection-only-test'
 
 const connectionOnlyProvider = publicConnectionProvider({
@@ -75,7 +77,7 @@ describe('connection-only provider lifecycle', () => {
       testDb.db,
       'alice',
       { providerId: PROVIDER_ID, credentials: { apiKey: 'first-key' } },
-      ENCRYPTION_KEY,
+      SECRETS,
     )
 
     expect(connected).toMatchObject({
@@ -86,14 +88,14 @@ describe('connection-only provider lifecycle', () => {
 
     const [stored] = await testDb.db.select().from(schema.integrations)
     expect(stored.authRef).not.toContain('first-key')
-    expect(await decryptSecret(stored.authRef, ENCRYPTION_KEY)).toBe('first-key')
+    expect(await SECRETS.reveal(stored.authRef, 'test')).toBe('first-key')
     expect(stored.config).toBe('{"safe":true}')
 
     await expect(connectProvider(
       testDb.db,
       'alice',
       { providerId: PROVIDER_ID, credentials: { apiKey: 'second-key' } },
-      ENCRYPTION_KEY,
+      SECRETS,
     )).rejects.toMatchObject({ code: 'provider_bad_config' })
 
     await rotateConnection(
@@ -101,12 +103,12 @@ describe('connection-only provider lifecycle', () => {
       'alice',
       connected.id,
       { credentials: { apiKey: 'rotated-key' } },
-      ENCRYPTION_KEY,
+      SECRETS,
     )
     const [rotated] = await testDb.db.select().from(schema.integrations)
-    expect(await decryptSecret(rotated.authRef, ENCRYPTION_KEY)).toBe('rotated-key')
+    expect(await SECRETS.reveal(rotated.authRef, 'test')).toBe('rotated-key')
 
-    await expect(testConnection(testDb.db, 'alice', connected.id, ENCRYPTION_KEY)).resolves.toMatchObject({
+    await expect(testConnection(testDb.db, 'alice', connected.id, SECRETS)).resolves.toMatchObject({
       status: 'connected',
     })
     await expect(setConnectionDisabled(testDb.db, 'alice', connected.id, true)).resolves.toMatchObject({
@@ -128,13 +130,13 @@ describe('connection-only provider lifecycle', () => {
         testDb.db,
         'alice',
         { providerId: PROVIDER_ID, credentials: { apiKey: 'first-key' } },
-        ENCRYPTION_KEY,
+        SECRETS,
       ),
       connectProvider(
         testDb.db,
         'alice',
         { providerId: PROVIDER_ID, credentials: { apiKey: 'second-key' } },
-        ENCRYPTION_KEY,
+        SECRETS,
       ),
     ])
 
