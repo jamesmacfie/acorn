@@ -2,13 +2,13 @@ import { and, eq } from 'drizzle-orm'
 import type { Context } from 'hono'
 import { getDb, schema } from '@acorn/node-core/server/db/index.ts'
 import type { AppEnv } from '@acorn/node-core/server/middleware/auth.ts'
-import { getUser } from '@acorn/node-core/server/middleware/requireUser.ts'
+import { ownerId } from '@acorn/node-core/server/middleware/requireUser.ts'
 import { decryptSecret } from '@acorn/node-core/server/secretBox.ts'
 
 // The one place a GitHub credential is read (docs/vNext/plan.md § Phase 1: "GitHub OAuth becomes an
 // integration credential written to the node").
 //
-// It used to come off the principal — `getUser(c).token`, decrypted from the session cookie, at 34
+// It used to come off the principal — `ownerId(c).token`, decrypted from the session cookie, at 34
 // call sites. That cannot survive the auth swap: a device-token principal has no GitHub token,
 // because a device is an identity, not a provider credential. So the credential moves to a stored
 // `integrations` row, encrypted at rest, and every caller reads it through here.
@@ -29,13 +29,14 @@ export async function githubToken(c: Context<AppEnv>): Promise<string> {
   const [row] = await db
     .select({ authRef: schema.integrations.authRef })
     .from(schema.integrations)
-    .where(and(eq(schema.integrations.userId, getUser(c).login), eq(schema.integrations.provider, GITHUB_PROVIDER)))
+    .where(and(eq(schema.integrations.userId, ownerId(c)), eq(schema.integrations.provider, GITHUB_PROVIDER)))
   if (row) {
     const token = await decryptSecret(row.authRef, c.env.SESSION_ENC_KEY)
     if (token) return token
   }
-  // ponytail: transitional fallback to the session cookie's token, so this can land BEFORE the
-  // renderer switches to bearer auth. REMOVE IT with routes/auth.ts — past that point a device
-  // principal carries `token: ''` and this line only ever yields ''.
-  return getUser(c).token || ''
+  // No fallback. There was a transitional one to the session cookie's token, so the accessor could land
+  // before the renderer switched to bearer auth; keeping it past the cookie's deletion would make a
+  // MISSING credential ("GitHub was never connected") indistinguishable from a revoked one, which is a
+  // materially different thing to tell the user.
+  return ''
 }

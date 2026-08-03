@@ -8,7 +8,7 @@ import { ICON_NAME_RE, type Task, type TaskLink, type TaskLinkSeed, type TaskSee
 import type { ExternalRef } from '@acorn/protocol/integrations.ts'
 import { externalRefForConnection, getConnection } from '../integrations/connections'
 import { ProviderOperationError } from '../integrations/types'
-import { getUser } from '../middleware/requireUser'
+import { ownerId } from '../middleware/requireUser'
 import { integrationProviderRegistry } from '../integrations/registry'
 
 // Tasks (docs/workspaces-and-tasks.md): the single-repo unit of work. Machine-scoped like repo_paths /
@@ -95,11 +95,11 @@ export const tasks = new Hono<AppEnv>()
     const seed = (await c.req.json().catch(() => ({}))) as Partial<TaskSeed>
     if (!seed.origin || !seed.repoOwner || !seed.repoName || !seed.branch) return respondError(c, 400, 'bad_request')
     const db = getDb(c.env)
-    const user = getUser(c)
+    const uid = ownerId(c)
     const linkInputs = Array.isArray(seed.links) ? (seed.links as LinkInput[]) : []
     let links: TaskLink[]
     try {
-      links = await Promise.all(linkInputs.map((link) => stampedLink(db, user.login, link)))
+      links = await Promise.all(linkInputs.map((link) => stampedLink(db, uid, link)))
     } catch (error) {
       if (error instanceof ProviderOperationError) return respondError(c, error.status, error.code)
       throw error
@@ -172,7 +172,7 @@ export const tasks = new Hono<AppEnv>()
     if (!t) return respondError(c, 404, 'not_found')
     let link: TaskLink
     try {
-      link = await stampedLink(db, getUser(c).login, body)
+      link = await stampedLink(db, ownerId(c), body)
     } catch (error) {
       if (error instanceof ProviderOperationError) return respondError(c, error.status, error.code)
       throw error

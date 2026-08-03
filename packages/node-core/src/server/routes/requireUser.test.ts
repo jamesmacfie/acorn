@@ -50,21 +50,17 @@ describe('requireUser gate over the protected router table', () => {
     expect(res.status).toBe(200)
   })
 
-  it('leaves /auth outside the gate (public by construction)', async () => {
-    // /auth/logout clears cookies and 204s without any session — proves /auth never hits requireUser.
-    // It carries the same-origin Origin the renderer's fetch sends, since /auth is CSRF-guarded below.
-    const req = new Request('http://127.0.0.1:4317/auth/logout', { method: 'POST', headers: { origin: 'http://127.0.0.1:4317' } })
-    const res = await createApp().fetch(req, {} as Env)
-    expect(res.status).not.toBe(401)
-  })
-
-  it('CSRF-guards /auth too — a foreign page cannot force a logout', async () => {
-    // /auth is public, but public is not the same as unprotected: POST /auth/logout mutates session
-    // state, so it must reject a cross-origin caller like every /v2/* mutation does.
-    const foreign = new Request('http://127.0.0.1:4317/auth/logout', { method: 'POST', headers: { origin: 'http://evil.example.com' } })
-    expect((await createApp().fetch(foreign, {} as Env)).status).toBe(403)
-    // No Origin at all is equally untrusted — a browser always sends one on a POST.
-    const bare = new Request('http://127.0.0.1:4317/auth/logout', { method: 'POST' })
-    expect((await createApp().fetch(bare, {} as Env)).status).toBe(403)
+  // There is no /auth namespace at all any more. It existed for the GitHub OAuth web flow and the
+  // session cookie it sealed; GitHub is connected by device flow against /v2 now, and the cookie is
+  // gone — so this asserts absence rather than being deleted, because a route reappearing there would
+  // be a public, unauthenticated surface and nothing else in the suite would notice.
+  it.each([
+    ['POST', '/auth/logout'],
+    ['GET', '/auth/login'],
+    ['GET', '/auth/callback'],
+    ['GET', '/auth/test-login'],
+  ])('%s %s → 404: the /auth namespace is gone', async (method, path) => {
+    const res = await createApp().fetch(new Request(`http://127.0.0.1:4317${path}`, { method }), {} as Env)
+    expect(res.status).toBe(404)
   })
 })

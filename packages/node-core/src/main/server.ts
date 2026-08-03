@@ -82,18 +82,16 @@ export function startListener(runtime: RuntimeBindings, root: DataRoot): Promise
   })
 
   // The one authenticated WebSocket (/v2/events) shares this listener via its 'upgrade' event; the hub
-  // re-checks Host plus a device bearer / internal token / session cookie before the handshake, and
-  // holds the device service so a revoked device's sockets close immediately. https.Server extends
-  // http.Server, so the hub's node:http typing still describes it exactly.
+  // re-checks Host plus a device bearer or the internal token before the handshake, and holds the device
+  // service so a revoked device's sockets close immediately. https.Server extends http.Server, so the
+  // hub's node:http typing still describes it exactly.
   //
-  // `allowedHost`/`origin` are read at upgrade time by the hub's authorize(), so they are filled in
-  // once the port is known — the same "mutable on purpose, read per call" shape service/runtime.ts
-  // uses for internalApiEnv.
+  // `allowedHost` is read at upgrade time by the hub's authorize(), so it is filled in once the port is
+  // known — the same "mutable on purpose, read per call" shape service/runtime.ts uses for
+  // internalApiEnv.
   const wsDeps: WsAuthDeps = {
-    encKey: runtime.SESSION_ENC_KEY,
     internalToken: runtime.INTERNAL_TOKEN,
     allowedHost: '',
-    origin: '',
     devices: runtime.DEVICES,
   }
   attachWsHub(server as unknown as import('node:http').Server, wsDeps)
@@ -122,7 +120,6 @@ export function startListener(runtime: RuntimeBindings, root: DataRoot): Promise
       if (!address || typeof address === 'string') return reject(new Error('acorn server bound no TCP port'))
       allowedHost = `127.0.0.1:${address.port}`
       wsDeps.allowedHost = allowedHost
-      wsDeps.origin = `https://${allowedHost}`
       root.recordPort(address.port)
       console.log(`acorn server on https://${allowedHost}`)
       server.off('error', onError) // listening — later runtime errors are not listen failures

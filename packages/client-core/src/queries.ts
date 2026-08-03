@@ -1,5 +1,5 @@
 // Shared TanStack Query definitions. Two consumers each (dropdown + PR list both read repos),
-// so the options live here to avoid drift. All reads are same-origin cookie-auth; 401 on /me
+// so the options live here to avoid drift. Every read goes through the broker's device bearer; 401 on /me
 // is a valid logged-out state, elsewhere it's an error.
 import { readJson, writeJson } from './apiClient'
 import {

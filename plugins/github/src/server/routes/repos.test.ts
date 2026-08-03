@@ -10,6 +10,7 @@ import type { AppEnv } from '@acorn/node-core/server/middleware/auth.ts'
 import { REPOS_STALE_AFTER_MS } from '@acorn/node-core/server/sync/policy.ts'
 import { repos } from './repos'
 import { makeTestDb, type TestDb } from '@acorn/node-core/server/routes/testDb.ts'
+import { seedGithubIntegration } from '../testGithubToken'
 import type { Env } from '@acorn/node-core/main/bindings.ts'
 
 vi.mock('@acorn/node-core/server/db/index.ts', async (importOriginal) => {
@@ -31,6 +32,8 @@ const ghRepo = {
   owner: { login: 'Runn-Fast' },
 }
 
+const ENC_KEY = '0'.repeat(64)
+
 const publicRepo: Repo = { id: 19847, owner: 'Runn-Fast', name: 'runn', private: true, defaultBranch: 'main', pushedAt: Date.parse('2026-06-25T01:00:00Z') }
 
 const responseJson = (body: unknown, init?: ResponseInit) =>
@@ -40,13 +43,15 @@ describe('repos list (serve-then-revalidate via the sync engine)', () => {
   let t: TestDb
   let app: Hono<AppEnv>
 
-  beforeEach(() => {
+  beforeEach(async () => {
     vi.clearAllMocks()
     t = makeTestDb()
     vi.mocked(getDb).mockReturnValue(t.db)
+    // The GitHub token comes from a stored integration row now, not from the caller's identity.
+    await seedGithubIntegration(t.db, 'james', 'token', ENC_KEY)
     app = new Hono<AppEnv>()
     app.use('/api/*', async (c, next) => {
-      c.set('principal', { kind: 'user', user: { token: 'token', login: 'james', name: '', avatar: '', scopes: [] } })
+      c.set('principal', { kind: 'device', userId: 'james' })
       await next()
     })
     app.route('/api/repos', repos)
@@ -54,7 +59,7 @@ describe('repos list (serve-then-revalidate via the sync engine)', () => {
 
   afterEach(() => t.cleanup())
 
-  const get = () => app.fetch(new Request('http://acorn.test/api/repos'), {} as Env)
+  const get = () => app.fetch(new Request('http://acorn.test/api/repos'), { SESSION_ENC_KEY: ENC_KEY } as Env)
   const syncRow = () =>
     t.db.select().from(schema.syncState).where(and(eq(schema.syncState.userId, 'james'), eq(schema.syncState.resource, reposResource())))
 
@@ -99,7 +104,7 @@ describe('repos list (serve-then-revalidate via the sync engine)', () => {
     await t.db.insert(schema.repos).values({ userId: 'james', ...publicRepo, pushedAt: publicRepo.pushedAt, fetchedAt: Date.now() })
     await t.db.insert(schema.syncState).values({ userId: 'james', resource: reposResource(), etag: '"repos-v1"', fetchedAt: Date.now() })
 
-    const res = await app.fetch(new Request('http://acorn.test/api/repos/refresh', { method: 'POST' }), {} as Env)
+    const res = await app.fetch(new Request('http://acorn.test/api/repos/refresh', { method: 'POST' }), { SESSION_ENC_KEY: ENC_KEY } as Env)
     expect(res.status).toBe(204)
     const [sync] = await syncRow()
     expect(sync.fetchedAt).toBe(0)

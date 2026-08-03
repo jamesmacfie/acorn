@@ -1,13 +1,12 @@
 import { Hono } from 'hono'
 import { afterEach, describe, expect, it } from 'vitest'
 import type { ApiError } from '@acorn/protocol/api.ts'
-import type { AppEnv, Principal, SessionUser } from '../middleware/auth'
+import type { AppEnv, Principal } from '../middleware/auth'
 import { harness, HarnessError, type RunBridge, setRunBridge } from './harness'
 import { testGate } from './testAuth'
 import type { Env } from '../../main/bindings'
 
-const USER: SessionUser = { token: '', login: 'local', name: '', avatar: '', scopes: [] }
-const INTERNAL: Principal = { kind: 'internal', user: USER }
+const INTERNAL: Principal = { kind: 'internal', userId: 'local' }
 
 // The run bridge is the last harness domain (notes/memory/browser moved to the agent-tool registry
 // in the agent-tool registry). This proves the shared auth gate + error envelope over what remains.

@@ -3,7 +3,7 @@ import { getDb } from '@acorn/node-core/server/db/index.ts'
 import { connectProvider } from '@acorn/node-core/server/integrations/connections.ts'
 import { providerError } from '@acorn/node-core/server/integrations/respondProvider.ts'
 import type { AppEnv } from '@acorn/node-core/server/middleware/auth.ts'
-import { getUser } from '@acorn/node-core/server/middleware/requireUser.ts'
+import { ownerId } from '@acorn/node-core/server/middleware/requireUser.ts'
 import { respondError } from '@acorn/node-core/server/respond.ts'
 import { GITHUB_PROVIDER } from '../githubToken'
 
@@ -12,7 +12,8 @@ import { GITHUB_PROVIDER } from '../githubToken'
 // Chosen over the redirect web flow for three reasons, in order of weight:
 //   1. No client secret. The web flow needs one to exchange the code, and a secret shipped inside a
 //      distributed binary is recoverable — a caveat V1 documented and could not fix. The device flow
-//      exchanges on `client_id` alone, so GITHUB_CLIENT_SECRET stops existing.
+//      exchanges on `client_id` alone, so nothing reads GITHUB_CLIENT_SECRET any more. (The binding is
+//      still declared, read optionally, at the owner's explicit request — see main/bindings.ts.)
 //   2. No redirect URI. The renderer no longer has a server-served origin to redirect back to, and a
 //      remote node would need its own registered callback URL. Device flow has neither problem, so
 //      local and remote nodes run the identical code path.
@@ -50,7 +51,7 @@ export const githubDeviceAuth = new Hono<AppEnv>()
   // client rather than held server-side — it authorizes nothing on this node and keeping per-owner
   // pending state would only add a lifecycle to get wrong.
   .post('/auth/device/start', async (c) => {
-    getUser(c) // owner-gated: only the owner may begin connecting an account
+    ownerId(c) // owner-gated: only the owner may begin connecting an account
     const response = await fetch(DEVICE_CODE_URL, form({ client_id: c.env.GITHUB_CLIENT_ID, scope: SCOPES }))
     if (!response.ok) return respondError(c, 502, 'provider_unavailable', ['GitHub did not issue a device code.'])
     const body = (await response.json().catch(() => ({}))) as Partial<DeviceCodeResponse>
@@ -69,7 +70,7 @@ export const githubDeviceAuth = new Hono<AppEnv>()
   // Poll once. The client drives the interval, so this is a single attempt and never blocks:
   // long-polling here would tie up a request slot for up to 15 minutes per pending connection.
   .post('/auth/device/poll', async (c) => {
-    const userId = getUser(c).login
+    const userId = ownerId(c)
     const { deviceCode } = (await c.req.json().catch(() => ({}))) as { deviceCode?: string }
     if (!deviceCode) return respondError(c, 400, 'bad_request')
 

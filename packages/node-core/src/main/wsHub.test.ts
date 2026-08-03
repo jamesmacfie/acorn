@@ -2,19 +2,17 @@ import { createServer, type Server } from 'node:http'
 import type { AddressInfo } from 'node:net'
 import { WebSocket } from 'ws'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import { sealSession, SESSION_COOKIE } from '../server/session'
 import type { DeviceService } from '../server/auth/deviceTokens'
 import type { ServerMsg } from '@acorn/protocol/terminal.ts'
 import { WS_PATH, type WsServerWireFrame } from '@acorn/protocol/ws.ts'
 import { _resetWsHub, attachWsHub, disposeWsHub, registerWsChannelHandler, setStreamHandlers, wsBroadcast, type StreamSink } from './wsHub'
 
 // Headless verification of the delicate transport bits the smoke suite (S4) can't cover in a unit:
-// upgrade auth (device bearer / cookie / internal-token / origin / host), per-connection seq,
+// upgrade auth (device bearer / internal-token / host), per-connection seq,
 // revocation (immediate and by sweep), deterministic replay-before-live ordering on attach, input
 // routing, detach, and status broadcast. Drives a real `ws` client against a real http.Server with
 // the hub attached — no Electron, no GUI.
 
-const KEY = 'a'.repeat(64) // 64 hex chars, as session.ts requires
 const INTERNAL = 'internal-token-xyz'
 const DEVICE_TOKEN = 'acorn_dt_stub'
 
@@ -65,7 +63,7 @@ beforeEach(async () => {
   devices = stubDevices()
   // 20ms sweep everywhere: the interval is injected rather than faked, so the sweep runs for real and
   // the assertion is about the socket closing, not about a timer having been scheduled.
-  attachWsHub(server, { encKey: KEY, internalToken: INTERNAL, allowedHost: host, origin, devices, revocationCheckMs: 20 })
+  attachWsHub(server, { internalToken: INTERNAL, allowedHost: host, devices, revocationCheckMs: 20 })
 })
 
 afterEach(() => {
@@ -86,7 +84,9 @@ function open(headers: Record<string, string>): Promise<WebSocket> {
   })
 }
 
-const cookieHeaders = async () => ({ host, origin, cookie: `${SESSION_COOKIE}=${await sealSession({ token: 't', login: 'james', name: '', avatar: '', scopes: [] }, KEY)}` })
+// The ordinary authenticated socket: a device bearer. It used to be a session cookie plus an exact
+// Origin, back when the renderer's socket was a browser socket on the node's own origin.
+const authHeaders = () => ({ host, authorization: `Bearer ${DEVICE_TOKEN}` })
 
 const frames = (ws: WebSocket): WsServerWireFrame[] => {
   const out: WsServerWireFrame[] = []
@@ -109,40 +109,35 @@ const waitFor = async (predicate: () => boolean, label: string, timeoutMs = 5_00
 }
 
 describe('wsHub auth', () => {
-  it('rejects a socket with no cookie and no token', async () => {
-    await expect(open({ host, origin })).rejects.toThrow(/403/)
+  it('rejects a socket with no token at all', async () => {
+    await expect(open({ host })).rejects.toThrow(/403/)
   })
 
   it('rejects a mismatched Host (DNS-rebinding guard)', async () => {
-    await expect(open({ ...(await cookieHeaders()), host: 'evil.example.com' })).rejects.toThrow()
+    await expect(open({ ...authHeaders(), host: 'evil.example.com' })).rejects.toThrow()
   })
 
-  it('rejects a mismatched Origin', async () => {
-    await expect(open({ ...(await cookieHeaders()), origin: 'http://evil.example.com' })).rejects.toThrow(/403/)
-  })
-
-  it('accepts a valid session cookie', async () => {
-    const ws = await open(await cookieHeaders())
+  // docs/vNext/protocol.md § Events: the socket is token-authenticated at upgrade. No cookie and no
+  // Origin — a broker socket from Electron main is not a browser socket, and there is no ambient
+  // credential left for an Origin check to defend.
+  it('accepts a device bearer, and does not care what Origin says', async () => {
+    const ws = await open({ ...authHeaders(), origin: 'http://evil.example.com' })
     expect(ws.readyState).toBe(WebSocket.OPEN)
     ws.close()
   })
 
-  it('accepts the internal token with no cookie/origin', async () => {
+  it('rejects a session cookie, which is no longer a credential', async () => {
+    await expect(open({ host, origin, cookie: 'session=anything-at-all' })).rejects.toThrow(/403/)
+  })
+
+  it('accepts the internal token', async () => {
     const ws = await open({ host, 'x-acorn-internal': INTERNAL })
     expect(ws.readyState).toBe(WebSocket.OPEN)
     ws.close()
   })
 
-  it('rejects a wrong internal token when no valid browser session is present', async () => {
+  it('rejects a wrong internal token', async () => {
     await expect(open({ host, 'x-acorn-internal': `${INTERNAL}-wrong` })).rejects.toThrow(/403/)
-  })
-
-  // docs/vNext/protocol.md § Events: the socket is token-authenticated at upgrade. No Origin and no
-  // cookie — a broker socket from Electron main is not a browser socket.
-  it('accepts a device bearer with no cookie and no origin', async () => {
-    const ws = await open({ host, authorization: `Bearer ${DEVICE_TOKEN}` })
-    expect(ws.readyState).toBe(WebSocket.OPEN)
-    ws.close()
   })
 
   it('refuses a revoked bearer at the upgrade itself', async () => {
@@ -150,16 +145,15 @@ describe('wsHub auth', () => {
     await expect(open({ host, authorization: `Bearer ${DEVICE_TOKEN}` })).rejects.toThrow(/403/)
   })
 
-  // A presented-and-rejected credential is a rejection. Falling through to the cookie would let a
-  // revoked device keep a socket for as long as it also held a session.
-  it('does not fall back to the cookie when a bearer is present but bad', async () => {
-    await expect(open({ ...(await cookieHeaders()), authorization: 'Bearer acorn_dt_wrong' })).rejects.toThrow(/403/)
+  // A presented-and-rejected credential is a rejection, not an invitation to try the next mechanism.
+  it('does not fall back to the internal token when a bearer is present but bad', async () => {
+    await expect(open({ host, authorization: 'Bearer acorn_dt_wrong', 'x-acorn-internal': INTERNAL })).rejects.toThrow(/403/)
   })
 })
 
 describe('wsHub seq and revocation', () => {
   it('stamps a per-connection seq from 1, and restarts at 1 on a fresh socket', async () => {
-    const first = await open(await cookieHeaders())
+    const first = await open(authHeaders())
     const got = frames(first)
     wsBroadcast({ channel: 'term:status' })
     wsBroadcast({ channel: 'term:status' })
@@ -170,7 +164,7 @@ describe('wsHub seq and revocation', () => {
 
     // seq is per-connection, not per-node: a reconnect starts over, which is why the broker compares
     // only within one socket's lifetime.
-    const second = await open(await cookieHeaders())
+    const second = await open(authHeaders())
     const again = frames(second)
     wsBroadcast({ channel: 'term:status' })
     await waitFor(() => again.length >= 1, 'a broadcast on the new socket')
@@ -199,8 +193,10 @@ describe('wsHub seq and revocation', () => {
     expect(ws.readyState).toBe(WebSocket.CLOSED)
   })
 
-  it('leaves a cookie socket alone when a device is revoked', async () => {
-    const ws = await open(await cookieHeaders())
+  // Revocation is per-device, so an internal-token socket (a child process this node spawned, with no
+  // device row) must survive a device being revoked out from under a client.
+  it('leaves an internal-token socket alone when a device is revoked', async () => {
+    const ws = await open({ host, 'x-acorn-internal': INTERNAL })
     await devices.revoke('d1')
     const got = frames(ws)
     wsBroadcast({ channel: 'term:status' })
@@ -223,7 +219,7 @@ describe('wsHub streaming', () => {
       },
       detach: () => {},
     })
-    const ws = await open(await cookieHeaders())
+    const ws = await open(authHeaders())
     const got = frames(ws)
     ws.send(JSON.stringify({ channel: 'term:attach', id: 's1' }))
     // Load-bearing: LIVE must be pushed only after ready+SCREEN have been delivered, or the ordering
@@ -253,7 +249,7 @@ describe('wsHub streaming', () => {
       onDisconnect: (conn) => disconnects.push(conn),
     })
     // Terminal handlers untouched: term frames still need setStreamHandlers, unknown prefixes are dropped.
-    const ws = await open(await cookieHeaders())
+    const ws = await open(authHeaders())
     const got = frames(ws)
     ws.send(JSON.stringify({ channel: 'docker:logs:attach', id: 'c1' }))
     ws.send(JSON.stringify({ channel: 'nobody:home' }))
@@ -267,7 +263,7 @@ describe('wsHub streaming', () => {
   it('detach removes the sink; status broadcast reaches the socket', async () => {
     let detached = false
     setStreamHandlers({ input: () => {}, attach: (_id, sink) => sink({ type: 'ready', session: { id: 's1' } as never, replayed: false }), detach: () => (detached = true) })
-    const ws = await open(await cookieHeaders())
+    const ws = await open(authHeaders())
     const got = frames(ws)
     ws.send(JSON.stringify({ channel: 'term:attach', id: 's1' }))
     await waitFor(() => got.length > 0, 'the attach reply')

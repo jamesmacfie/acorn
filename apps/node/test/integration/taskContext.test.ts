@@ -28,7 +28,7 @@ describe('GET /api/tasks/:id/context (docs/agent-tools.md §4)', () => {
     vi.mocked(getDb).mockReturnValue(t.db)
     app = new Hono<AppEnv>()
     app.use('/api/*', async (c, next) => {
-      c.set('principal', { kind: 'user', user: { token: 'token', login: 'james', name: '', avatar: '', scopes: [] } })
+      c.set('principal', { kind: 'device', userId: 'james' })
       await next()
     })
     app.route('/api/tasks', taskContext)

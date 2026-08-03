@@ -1,5 +1,5 @@
 import { Hono } from 'hono'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { settleBackground } from '@acorn/node-core/server/background.ts'
 import { getDb } from '@acorn/node-core/server/db/index.ts'
 import { gh } from '..'
@@ -9,6 +9,7 @@ import { pullFiles } from './pullFiles'
 import { resolveRepoForUser } from './repoMirror'
 import type { Env } from '@acorn/node-core/main/bindings.ts'
 import { schema } from '@acorn/node-core/server/db/index.ts'
+import { encryptSecret } from '@acorn/node-core/server/secretBox.ts'
 
 vi.mock('@acorn/node-core/server/db/index.ts', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@acorn/node-core/server/db/index.ts')>()
@@ -55,7 +56,7 @@ const makePullFilesDb = (selectRows: unknown[][]) => {
     // that same read, so answering it from the positional queue would silently shift every
     // expectation in this file the next time a route gains a query.
     from: vi.fn((table: unknown) => ({
-      where: vi.fn(async () => (table === schema.integrations ? [] : (queue.shift() ?? []))),
+      where: vi.fn(async () => (table === schema.integrations ? [{ authRef: sealedToken }] : (queue.shift() ?? []))),
     })),
   }))
   const db = {
@@ -70,6 +71,16 @@ const makePullFilesDb = (selectRows: unknown[][]) => {
   }
   return db as never
 }
+
+// The stored GitHub credential, sealed with the same secret box production uses. It is a real
+// ciphertext rather than a stub string because githubToken() decrypts it — a placeholder would make the
+// route see no credential and call gh() with an empty token, which is precisely the failure these
+// assertions are for.
+const ENC_KEY = '0'.repeat(64)
+let sealedToken: string
+beforeAll(async () => {
+  sealedToken = await encryptSecret('token', ENC_KEY)
+})
 
 describe('resolveRepoForUser', () => {
   it('uses the user-scoped mirrored repo row when present', async () => {
@@ -148,7 +159,7 @@ describe('pull files stale-while-revalidate', () => {
 
     const app = new Hono<AppEnv>()
     app.use('/api/*', async (c, next) => {
-      c.set('principal', { kind: 'user', user: { token: 'token', login: 'james', name: '', avatar: '', scopes: [] } })
+      c.set('principal', { kind: 'device', userId: 'james' })
       await next()
     })
     app.route('/api/repos', pullFiles)
@@ -158,7 +169,7 @@ describe('pull files stale-while-revalidate', () => {
     const response = await Promise.race([
       app.fetch(
         new Request('http://acorn.test/api/repos/Runn-Fast/runn/pulls/12/files?summary=1'),
-        { BLOBS: { get: blobGet, put: vi.fn() } } as unknown as Env,
+        { BLOBS: { get: blobGet, put: vi.fn() }, SESSION_ENC_KEY: ENC_KEY } as unknown as Env,
       ),
       new Promise<null>((resolve) => setTimeout(() => resolve(null), 20)),
     ])
@@ -210,13 +221,13 @@ describe('pull files stale-while-revalidate', () => {
 
     const app = new Hono<AppEnv>()
     app.use('/api/*', async (c, next) => {
-      c.set('principal', { kind: 'user', user: { token: 'token', login: 'james', name: '', avatar: '', scopes: [] } })
+      c.set('principal', { kind: 'device', userId: 'james' })
       await next()
     })
     app.route('/api/repos', pullFiles)
     const response = await app.fetch(
       new Request('http://acorn.test/api/repos/Runn-Fast/runn/pulls/12/files?force=true'),
-      { BLOBS: { get: vi.fn(async () => '@@'), put: vi.fn(async () => undefined) } } as unknown as Env,
+      { BLOBS: { get: vi.fn(async () => '@@'), put: vi.fn(async () => undefined) }, SESSION_ENC_KEY: ENC_KEY } as unknown as Env,
     )
 
     expect(response.status).toBe(200)
@@ -262,7 +273,7 @@ describe('pull files stale-while-revalidate', () => {
 
     const app = new Hono<AppEnv>()
     app.use('/api/*', async (c, next) => {
-      c.set('principal', { kind: 'user', user: { token: 'token', login: 'james', name: '', avatar: '', scopes: [] } })
+      c.set('principal', { kind: 'device', userId: 'james' })
       await next()
     })
     app.route('/api/repos', pullFiles)
@@ -276,7 +287,7 @@ describe('pull files stale-while-revalidate', () => {
           headers: { 'content-type': 'application/json' },
           body: JSON.stringify({ paths: ['src/a.ts', 'src/b.ts'] }),
         }),
-        { BLOBS: { get: blobGet, put: vi.fn() } } as unknown as Env,
+        { BLOBS: { get: blobGet, put: vi.fn() }, SESSION_ENC_KEY: ENC_KEY } as unknown as Env,
       ),
       new Promise<null>((resolve) => setTimeout(() => resolve(null), 20)),
     ])

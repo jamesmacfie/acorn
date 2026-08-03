@@ -3,7 +3,7 @@ import type { Context } from 'hono'
 import { getDb, schema } from '@acorn/node-core/server/db/index.ts'
 import { prResource } from '@acorn/node-core/server/db/resourceKeys.ts'
 import type { AppEnv } from '@acorn/node-core/server/middleware/auth.ts'
-import { getUser } from '@acorn/node-core/server/middleware/requireUser.ts'
+import { ownerId } from '@acorn/node-core/server/middleware/requireUser.ts'
 import { githubToken } from '../githubToken'
 
 type Db = ReturnType<typeof getDb>
@@ -29,7 +29,7 @@ type PrContext = {
 // already mirrored; a miss here means the client skipped the read path, and 404 is the honest
 // answer rather than lazily mirroring on a write.
 export async function resolvePr(c: Context<AppEnv>): Promise<PrFailure | PrContext> {
-  const userId = getUser(c).login // auth is enforced by requireUser upstream
+  const userId = ownerId(c) // auth is enforced by requireUser upstream
   const db = getDb(c.env)
   const owner = c.req.param('owner')!
   const repo = c.req.param('repo')!

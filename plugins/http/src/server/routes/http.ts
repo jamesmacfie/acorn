@@ -1,5 +1,5 @@
 // Routes for the API panel, mounted at /v2/p/http (app/server/routes.ts). The core stack applies
-// csrf → authMiddleware → requireUser; this router adds an interactive-principal gate because its
+// authMiddleware → requireUser; this router adds an interactive-principal gate because its
 // outbound-request and secret-resolution powers must not be reachable through the internal token.
 import { Hono } from 'hono'
 import { and, asc, eq, isNull } from 'drizzle-orm'
@@ -7,7 +7,7 @@ import { z } from 'zod'
 import { getDb } from '@acorn/node-core/server/db/index.ts'
 import * as schema from '@acorn/node-core/server/db/schema.ts'
 import type { AppEnv } from '@acorn/node-core/server/middleware/auth.ts'
-import { getUser } from '@acorn/node-core/server/middleware/requireUser.ts'
+import { ownerId } from '@acorn/node-core/server/middleware/requireUser.ts'
 import { respondError } from '@acorn/node-core/server/respond.ts'
 import { bodyModes, httpMethods, variableKinds, type AuthConfig, type BodyMode, type HttpRequest, type HttpVariable, type KeyValue } from '../../shared/model'
 import { SendError, send } from '../send'
@@ -125,7 +125,9 @@ export const http = new Hono<AppEnv>()
   // token is deliberately insufficient: agent/MCP child processes must never use it as a secret
   // decryption oracle.
   .use('*', async (c, next) => {
-    if (c.get('principal')?.kind !== 'user') return respondError(c, 403, 'interactive_user_required')
+    // 'device' is the owner at a client, which is the only principal allowed to drive this pane — it was
+    // 'user' while that meant a session cookie. An internal token must never reach it.
+    if (c.get('principal')?.kind !== 'device') return respondError(c, 403, 'interactive_user_required')
     await next()
   })
 
@@ -133,7 +135,7 @@ export const http = new Hono<AppEnv>()
   // repo tree; the two sets are disjoint by construction (taskId null vs set).
   .get('/:owner/:repo/requests', async (c) => {
     const { owner, repo } = scope(c)
-    const userId = getUser(c).login
+    const userId = ownerId(c)
     const taskId = c.req.query('taskId')
     const rows = await getDb(c.env)
       .select()
@@ -151,7 +153,7 @@ export const http = new Hono<AppEnv>()
     const protectedFields = await protectedRequestFields(d, c.env.SESSION_ENC_KEY)
     const row = {
       id: crypto.randomUUID(),
-      userId: getUser(c).login,
+      userId: ownerId(c),
       repoOwner: owner,
       repoName: repo,
       folder: d.folder,
@@ -178,7 +180,7 @@ export const http = new Hono<AppEnv>()
     if (!parsed.success) return respondError(c, 400, 'bad_request', parsed.error.issues.map((i) => i.message))
     const d = parsed.data
     const db = getDb(c.env)
-    const userId = getUser(c).login
+    const userId = ownerId(c)
     const protectedFields = await protectedRequestFields(d, c.env.SESSION_ENC_KEY)
     // Scope the update to this repo so an id from another repo can't be smuggled in.
     const updated = await db
@@ -205,7 +207,7 @@ export const http = new Hono<AppEnv>()
 
   .delete('/:owner/:repo/requests/:id', async (c) => {
     const { owner, repo } = scope(c)
-    const userId = getUser(c).login
+    const userId = ownerId(c)
     const deleted = await getDb(c.env)
       .delete(schema.httpRequests)
       .where(and(inRepo(userId, owner, repo), eq(schema.httpRequests.id, c.req.param('id'))))
@@ -218,7 +220,7 @@ export const http = new Hono<AppEnv>()
 
   .get('/:owner/:repo/vars', async (c) => {
     const { owner, repo } = scope(c)
-    const userId = getUser(c).login
+    const userId = ownerId(c)
     const rows = await getDb(c.env)
       .select()
       .from(schema.httpVariables)
@@ -232,7 +234,7 @@ export const http = new Hono<AppEnv>()
     const parsed = variableBody.safeParse(await c.req.json().catch(() => null))
     if (!parsed.success) return respondError(c, 400, 'bad_request', parsed.error.issues.map((i) => i.message))
     const d = parsed.data
-    const userId = getUser(c).login
+    const userId = ownerId(c)
     const value = await protectHttpValue(d.value, c.env.SESSION_ENC_KEY)
     const row = {
       id: crypto.randomUUID(),
@@ -261,7 +263,7 @@ export const http = new Hono<AppEnv>()
     if (!parsed.success) return respondError(c, 400, 'bad_request', parsed.error.issues.map((i) => i.message))
     const d = parsed.data
     const db = getDb(c.env)
-    const userId = getUser(c).login
+    const userId = ownerId(c)
     const id = c.req.param('id')
     const existing = await db
       .select()
@@ -283,7 +285,7 @@ export const http = new Hono<AppEnv>()
 
   .delete('/:owner/:repo/vars/:id', async (c) => {
     const { owner, repo } = scope(c)
-    const userId = getUser(c).login
+    const userId = ownerId(c)
     const deleted = await getDb(c.env)
       .delete(schema.httpVariables)
       .where(and(variablesInRepo(userId, owner, repo), eq(schema.httpVariables.id, c.req.param('id'))))
@@ -300,7 +302,7 @@ export const http = new Hono<AppEnv>()
     const parsed = sendBody.safeParse(await c.req.json().catch(() => null))
     if (!parsed.success) return respondError(c, 400, 'bad_request', parsed.error.issues.map((i) => i.message))
     try {
-      return c.json(await send(getDb(c.env), getUser(c).login, owner, repo, c.env.SESSION_ENC_KEY, parsed.data))
+      return c.json(await send(getDb(c.env), ownerId(c), owner, repo, c.env.SESSION_ENC_KEY, parsed.data))
     } catch (err) {
       // Preparation failures (invalid resolved URL, command/secret resolution) have no attempted
       // request to display, so they stay a 422. Network attempts return a typed SendFailure above.

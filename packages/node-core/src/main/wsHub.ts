@@ -6,7 +6,6 @@
 import type { IncomingMessage, Server } from 'node:http'
 import type { Duplex } from 'node:stream'
 import { WebSocketServer, type WebSocket } from 'ws'
-import { openSession, SESSION_COOKIE } from '../server/session'
 import type { DeviceService } from '../server/auth/deviceTokens'
 import type { ServerMsg } from '@acorn/protocol/terminal.ts'
 import { WS_PATH, type WsClientFrame, type WsServerFrame, type WsServerWireFrame } from '@acorn/protocol/ws.ts'
@@ -41,8 +40,8 @@ export function registerWsChannelHandler(prefix: string, handler: WsChannelHandl
   else channelHandlers.delete(prefix)
 }
 
-// `deviceId` is null for a cookie or internal-token socket — the two credential kinds that have no
-// device row to revoke. `seq` is this connection's own counter (docs/vNext/protocol.md § Events), so a
+// `deviceId` is null for an internal-token socket — the one credential kind with no device row to
+// revoke. `seq` is this connection's own counter (docs/vNext/protocol.md § Events), so a
 // reconnect legitimately restarts at 1 and the client compares only within one socket's lifetime.
 type Conn = { ws: WebSocket; sinks: Map<string, StreamSink>; deviceId: string | null; seq: number }
 const conns = new Set<Conn>()
@@ -76,10 +75,8 @@ export function wsBroadcast(frame: WsServerFrame): void {
 export const wsHasClients = (): boolean => conns.size > 0
 
 export type WsAuthDeps = {
-  encKey: string
   internalToken: string
   allowedHost: string
-  origin: string
   // Resolves the device bearer at upgrade and tells the hub when a device is revoked.
   devices: DeviceService
   // How often the backstop sweep re-checks each connection's device. protocol.md § Pairing pins the
@@ -92,35 +89,25 @@ export type WsAuthDeps = {
 type Authorized = { deviceId: string | null }
 
 // Upgrade auth (docs/vNext/protocol.md § Events: "token-authenticated at upgrade"): loopback Host
-// guard, then a device bearer, OR the internal token (the loopback MCP caller — no cookie/origin), OR
-// exact-Origin + a valid session cookie. Anything else → 403 before the ws handshake completes.
+// guard, then a device bearer OR the internal token. Anything else → 403 before the ws handshake
+// completes.
+//
+// There used to be a third branch — exact-Origin plus a valid session cookie — for the days when the
+// renderer's socket was a browser socket on the node's own origin. The renderer loads from app://acorn
+// now and every frame crosses IPC to the broker in Electron main, which presents a device bearer like
+// any other client. No cookie means no Origin check either: Origin was how a cookie-bearing browser
+// socket was distinguished from a cross-site one, and there is no ambient credential left to defend.
 async function authorize(req: IncomingMessage, deps: WsAuthDeps): Promise<Authorized | null> {
   if (req.headers.host !== deps.allowedHost) return null
   const bearer = req.headers.authorization
   if (bearer?.startsWith('Bearer ')) {
-    // A bearer that fails does NOT fall through to the cookie: presenting a credential and having it
-    // rejected is a rejection, not an invitation to try the next mechanism.
+    // A bearer that fails does NOT fall through to the internal token: presenting a credential and
+    // having it rejected is a rejection, not an invitation to try the next mechanism.
     const authenticated = await deps.devices.authenticate(bearer.slice('Bearer '.length).trim())
     return authenticated ? { deviceId: authenticated.deviceId } : null
   }
   const token = req.headers['x-acorn-internal']
   if (typeof token === 'string' && token && token === deps.internalToken) return { deviceId: null }
-  // The cookie branch. It stays until the renderer stops talking to the node over a browser origin —
-  // the same stage that deletes the login gate and moves the window to app:// (docs/vNext/plan.md);
-  // until then the renderer's socket is a browser socket and must carry the exact origin.
-  if (req.headers.origin !== deps.origin) return null
-  const cookie = readCookie(req.headers.cookie, SESSION_COOKIE)
-  if (!cookie) return null
-  return (await openSession(cookie, deps.encKey)) != null ? { deviceId: null } : null
-}
-
-function readCookie(header: string | undefined, name: string): string | null {
-  if (!header) return null
-  for (const part of header.split(';')) {
-    const eq = part.indexOf('=')
-    if (eq < 0) continue
-    if (part.slice(0, eq).trim() === name) return decodeURIComponent(part.slice(eq + 1).trim())
-  }
   return null
 }
 

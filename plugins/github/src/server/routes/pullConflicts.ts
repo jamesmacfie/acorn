@@ -5,7 +5,7 @@ import type { PullConflicts } from '@acorn/protocol/api.ts'
 import { getDb } from '@acorn/node-core/server/db/index.ts'
 import { getRepoPath } from '@acorn/node-core/main/repoPaths.ts'
 import type { AppEnv } from '@acorn/node-core/server/middleware/auth.ts'
-import { getUser } from '@acorn/node-core/server/middleware/requireUser.ts'
+import { ownerId } from '@acorn/node-core/server/middleware/requireUser.ts'
 import { respondError } from '@acorn/node-core/server/respond.ts'
 
 const exec = promisify(execFile)
@@ -34,7 +34,7 @@ export function parseConflictNames(stdout: string): string[] {
 }
 
 export const pullConflicts = new Hono<AppEnv>().get('/:owner/:repo/pulls/:number/conflicts', async (c) => {
-  getUser(c) // gate on auth, like the other /v2/p/github/repos reads
+  ownerId(c) // gate on auth, like the other /v2/p/github/repos reads
   const db = getDb(c.env)
   const owner = c.req.param('owner')
   const repo = c.req.param('repo')

@@ -5,7 +5,7 @@ import { pullsResource } from '@acorn/node-core/server/db/resourceKeys.ts'
 import { gh, ghError } from '..'
 import type { ClosedPullsPage, Pull } from '@acorn/protocol/api.ts'
 import type { AppEnv } from '@acorn/node-core/server/middleware/auth.ts'
-import { getUser } from '@acorn/node-core/server/middleware/requireUser.ts'
+import { ownerId } from '@acorn/node-core/server/middleware/requireUser.ts'
 import { respondError } from '@acorn/node-core/server/respond.ts'
 import { type Cached, serveThenRevalidate } from '@acorn/node-core/server/sync/engine.ts'
 import { PULLS_STALE_AFTER_MS } from '@acorn/node-core/server/sync/policy.ts'
@@ -33,11 +33,11 @@ type GitHubPull = {
 }
 
 export const pulls = new Hono<AppEnv>().get('/:owner/:repo/pulls', async (c) => {
-  const user = getUser(c)
+  const uid = ownerId(c)
   const token = await githubToken(c)
 
   const db = getDb(c.env)
-  const userId = user.login
+  const userId = uid
   const owner = c.req.param('owner')
   const repo = c.req.param('repo')
   // open | closed (closed covers merged — GitHub's list reports merged PRs as "closed").

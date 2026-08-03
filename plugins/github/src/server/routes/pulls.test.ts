@@ -10,6 +10,7 @@ import type { AppEnv } from '@acorn/node-core/server/middleware/auth.ts'
 import { PULLS_STALE_AFTER_MS } from '@acorn/node-core/server/sync/policy.ts'
 import { pulls } from './pulls'
 import { makeTestDb, type TestDb } from '@acorn/node-core/server/routes/testDb.ts'
+import { seedGithubIntegration } from '../testGithubToken'
 import type { Env } from '@acorn/node-core/main/bindings.ts'
 
 vi.mock('@acorn/node-core/server/db/index.ts', async (importOriginal) => {
@@ -53,6 +54,8 @@ const publicPull: Pull = {
 const responseJson = (body: unknown, init?: ResponseInit) =>
   new Response(JSON.stringify(body), { ...init, headers: { 'content-type': 'application/json', ...init?.headers } })
 
+const ENC_KEY = '0'.repeat(64)
+
 describe('pulls list (serve-then-revalidate via the sync engine)', () => {
   let t: TestDb
   let app: Hono<AppEnv>
@@ -61,11 +64,13 @@ describe('pulls list (serve-then-revalidate via the sync engine)', () => {
     vi.clearAllMocks()
     t = makeTestDb()
     vi.mocked(getDb).mockReturnValue(t.db)
+    // The GitHub token comes from a stored integration row now, not from the caller's identity.
+    await seedGithubIntegration(t.db, 'james', 'token', ENC_KEY)
     // Seed the repo so resolveRepoForUser hits the mirror (no GitHub round-trip for resolution).
     await t.db.insert(schema.repos).values({ userId: 'james', id: REPO_ID, owner: 'Runn-Fast', name: 'runn', private: true, defaultBranch: 'main', pushedAt: 0, fetchedAt: Date.now() })
     app = new Hono<AppEnv>()
     app.use('/api/*', async (c, next) => {
-      c.set('principal', { kind: 'user', user: { token: 'token', login: 'james', name: '', avatar: '', scopes: [] } })
+      c.set('principal', { kind: 'device', userId: 'james' })
       await next()
     })
     app.route('/api/repos', pulls)
@@ -73,7 +78,7 @@ describe('pulls list (serve-then-revalidate via the sync engine)', () => {
 
   afterEach(() => t.cleanup())
 
-  const getOpen = () => app.fetch(new Request('http://acorn.test/api/repos/Runn-Fast/runn/pulls'), {} as Env)
+  const getOpen = () => app.fetch(new Request('http://acorn.test/api/repos/Runn-Fast/runn/pulls'), { SESSION_ENC_KEY: ENC_KEY } as Env)
 
   it('cold: blocks on GitHub, mirrors the list, and adopts a matching local task (Flow B)', async () => {
     // A local-first task on the same branch with no PR yet — the refresh should adopt PR #42.

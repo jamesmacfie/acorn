@@ -3,7 +3,7 @@ import { and, eq, inArray, max } from 'drizzle-orm'
 import { Hono } from 'hono'
 import { getDb, schema } from '../db'
 import type { AppEnv } from '../middleware/auth'
-import { getUser } from '../middleware/requireUser'
+import { ownerId } from '../middleware/requireUser'
 import { respondError } from '../respond'
 import type { Workspace, WorkspaceProject, WorkspaceProjectsResponse, WorkspaceRepo, WorkspaceSeed } from '@acorn/protocol/api.ts'
 import { isValidWorkspaceColor, isValidWorkspaceIcon, parseWorkspaceIcon, serializeWorkspaceIcon } from '@acorn/protocol/workspaceIdentity.ts'
@@ -59,10 +59,10 @@ export const workspaces = new Hono<AppEnv>()
   })
   // Idempotent first-run setup: create Default and assign every mirrored repo not yet in a workspace.
   .post('/bootstrap', async (c) => {
-    const user = getUser(c)
+    const uid = ownerId(c)
     const db = getDb(c.env)
     const defaultId = await ensureDefault(db)
-    const repos = await db.select().from(schema.repos).where(eq(schema.repos.userId, user.login))
+    const repos = await db.select().from(schema.repos).where(eq(schema.repos.userId, uid))
     const mapped = await db.select().from(schema.workspaceRepos)
     const ignored = await ignoredRepoSet(db)
     const skip = new Set([...mapped.map((m) => `${m.repoOwner}/${m.repoName}`), ...ignored])
@@ -165,11 +165,11 @@ export const workspaces = new Hono<AppEnv>()
   })
   // Hide / show every mirrored repo at once (the onboarding master toggle).
   .post('/ignore-all', async (c) => {
-    const user = getUser(c)
+    const uid = ownerId(c)
     const body = (await c.req.json().catch(() => ({}))) as { ignored?: boolean }
     const db = getDb(c.env)
     if (body.ignored) {
-      const repos = await db.select().from(schema.repos).where(eq(schema.repos.userId, user.login))
+      const repos = await db.select().from(schema.repos).where(eq(schema.repos.userId, uid))
       if (repos.length) {
         const now = Date.now()
         await db.insert(schema.ignoredRepos).values(repos.map((r) => ({ owner: r.owner, repo: r.name, createdAt: now }))).onConflictDoNothing()
@@ -190,9 +190,9 @@ export const workspaces = new Hono<AppEnv>()
     const body = (await c.req.json().catch(() => ({}))) as { projects?: WorkspaceProject[] }
     const projects = (body.projects ?? []).filter((p) => p && typeof p.integrationId === 'string' && typeof p.externalId === 'string' && p.integrationId && p.externalId)
     const db = getDb(c.env)
-    const user = getUser(c)
+    const uid = ownerId(c)
     for (const project of projects) {
-      if (!(await getConnection(db, user.login, project.integrationId))) return respondError(c, 403, 'provider_not_connected')
+      if (!(await getConnection(db, uid, project.integrationId))) return respondError(c, 403, 'provider_not_connected')
     }
     const now = Date.now()
     // Replace the whole set (composite key ⇒ simplest correct: clear then insert). ponytail.

@@ -61,8 +61,9 @@ const makeApp = (principal: Principal, gate = idempotency) =>
       return c.body(null, 204)
     })
 
-const device: Principal = { kind: 'device', user: { token: '', login: 'james', name: '', avatar: '', scopes: [] }, deviceId: DEVICE_ID }
-const cookie: Principal = { kind: 'user', user: { token: 't', login: 'james', name: '', avatar: '', scopes: [] } }
+const device: Principal = { kind: 'device', userId: 'james', deviceId: DEVICE_ID }
+// The internal principal: a child process this node spawned. No device row, so no deviceId.
+const internal: Principal = { kind: 'internal', userId: 'james' }
 
 beforeEach(() => {
   harness = makeTestDb()
@@ -159,13 +160,13 @@ describe('Idempotency-Key on /v2', () => {
     expect(await harness.db.select().from((await import('@acorn/node-core/server/db/index.ts')).schema.idempotency)).toEqual([])
   })
 
-  // A cookie or internal-token principal has no device identity to scope a key to, so the header is
-  // ignored rather than keyed on something shared.
+  // An internal-token principal has no device identity to scope a key to, so the header is ignored
+  // rather than keyed on something shared between every child this node spawns.
   it('passes a principal with no deviceId straight through', async () => {
-    const cookieApp = makeApp(cookie)
+    const internalApp = makeApp(internal)
     const key = randomUUID()
-    await post('/v2/core/things', key, { name: 'widget' }, cookieApp)
-    await post('/v2/core/things', key, { name: 'widget' }, cookieApp)
+    await post('/v2/core/things', key, { name: 'widget' }, internalApp)
+    await post('/v2/core/things', key, { name: 'widget' }, internalApp)
     expect(executions).toBe(2)
   })
 

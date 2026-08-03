@@ -2,13 +2,13 @@ import { and, eq } from 'drizzle-orm'
 import { Hono } from 'hono'
 import { getDb, schema } from '@acorn/node-core/server/db/index.ts'
 import type { AppEnv } from '@acorn/node-core/server/middleware/auth.ts'
-import { getUser } from '@acorn/node-core/server/middleware/requireUser.ts'
+import { ownerId } from '@acorn/node-core/server/middleware/requireUser.ts'
 
 // Participant logins for @-mention autocomplete, read straight from the mirror tables. Mirror-only
 // and best-effort: an unmirrored repo yields an empty list (the client just gets no suggestions),
 // so this deliberately keeps its own lookup rather than resolveRepoForUser's live-fetch-on-miss.
 export const mentions = new Hono<AppEnv>().get('/:owner/:repo/mentions', async (c) => {
-  const user = getUser(c)
+  const uid = ownerId(c)
   const db = getDb(c.env)
   const owner = c.req.param('owner')!
   const repo = c.req.param('repo')!
@@ -16,11 +16,10 @@ export const mentions = new Hono<AppEnv>().get('/:owner/:repo/mentions', async (
   const [repoRow] = await db
     .select({ id: schema.repos.id })
     .from(schema.repos)
-    .where(and(eq(schema.repos.userId, user.login), eq(schema.repos.owner, owner), eq(schema.repos.name, repo)))
+    .where(and(eq(schema.repos.userId, uid), eq(schema.repos.owner, owner), eq(schema.repos.name, repo)))
   if (!repoRow) return c.json([] as string[])
 
   const rid = repoRow.id
-  const uid = user.login
 
   const [prAuthors, reviewAuthors, commentAuthors, threadAuthors] = await Promise.all([
     db.selectDistinct({ login: schema.pullRequests.author }).from(schema.pullRequests)

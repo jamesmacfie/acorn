@@ -99,8 +99,8 @@ describe('agent-tool harness projection (docs/agent-tools.md)', () => {
     setAgentTools(FIXTURE)
     app = new Hono<AppEnv>()
     app.use('/api/*', async (c, next) => {
-      const kind = c.req.header('x-test-principal') === 'user' ? 'user' : 'internal'
-      c.set('principal', { kind, user: { token: '', login: 'james', name: '', avatar: '', scopes: [] } })
+      const kind = c.req.header('x-test-principal') === 'device' ? 'device' : 'internal'
+      c.set('principal', { kind, userId: 'james' })
       await next()
     })
     app.route('/api/tasks', agentTools)
@@ -166,9 +166,9 @@ describe('agent-tool harness projection (docs/agent-tools.md)', () => {
   })
 
   it('keeps the harness internal-only and renderer-projects only opted-in tools', async () => {
-    expect((await get('/api/tasks/t1/tools', { 'x-test-principal': 'user' })).status).toBe(404)
-    expect((await post('/api/tasks/t1/renderer-tools/write_tool', { slug: 'x' }, { 'x-test-principal': 'user' })).status).toBe(404)
-    expect((await post('/api/tasks/t1/renderer-tools/read_tool', {}, { 'x-test-principal': 'user' })).status).toBe(200)
+    expect((await get('/api/tasks/t1/tools', { 'x-test-principal': 'device' })).status).toBe(404)
+    expect((await post('/api/tasks/t1/renderer-tools/write_tool', { slug: 'x' }, { 'x-test-principal': 'device' })).status).toBe(404)
+    expect((await post('/api/tasks/t1/renderer-tools/read_tool', {}, { 'x-test-principal': 'device' })).status).toBe(200)
   })
 
   it('permission toggle removes a tool from the manifest AND rejects the call (tier then per-tool)', async () => {

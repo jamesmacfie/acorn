@@ -33,18 +33,27 @@ export type RuntimeBindings = {
   // (docs/vNext/protocol.md § Versioning). Injected rather than read from a package.json, because the
   // service is a bundled artifact by then and only the composition root knows the real version.
   APP_VERSION: string
-  OAUTH_STATE: OauthStateStore
   BLOBS: BlobCache
+  // The secret-box key. Named for the session cookie it used to seal; that cookie is gone, but the key
+  // outlived it — integration credentials and HTTP-client fields are encrypted at rest with it
+  // (server/secretBox.ts), so it is now simply "the key this node encrypts secrets with".
+  // ponytail: docs/vNext/data.md wants it renamed `secrets.key`. That is main/sessionKeyStore.ts, the
+  // docs, and every developer's .env, for zero behavioural gain — deferred deliberately.
   SESSION_ENC_KEY: string
   GITHUB_CLIENT_ID: string
+  // Retained deliberately, and nothing reads it. The device authorization grant exchanges on client_id
+  // alone (plugins/github/server/routes/deviceAuth.ts), so the last reader left with routes/auth.ts. It
+  // stays at the owner's explicit request pending their decision, which is why it is now read
+  // OPTIONALLY — a fresh checkout needs no value for it — rather than removed.
   GITHUB_CLIENT_SECRET: string
-  // Per-app-run bearer for loopback callers that hold no session cookie — the acorn MCP server
-  // (docs/mcp.md). Injected into task session env (ACORN_API_TOKEN) so agent-spawned servers
-  // inherit it; auth middleware maps it to the machine's single user.
+  // Bearer for loopback callers that hold no device token — the acorn MCP server and other spawned
+  // children (docs/mcp.md). Injected into task session env (ACORN_API_TOKEN) so agent-spawned servers
+  // inherit it; auth middleware maps it to the machine's single owner. Persisted across boots, because
+  // a tmux-reattached agent keeps the environment of the boot that spawned it.
   INTERNAL_TOKEN: string
-  // Explicit identity bound to INTERNAL_TOKEN. Cookie-authenticated traffic updates it; logout
-  // clears it. Machine callers fail closed when no identity is bound instead of selecting an
-  // arbitrary cached prefs/repo row.
+  // The machine's bound owner identity. Set when a provider account is connected (the github plugin's
+  // device flow), and read by every principal — a device inherits it, and a machine caller fails closed
+  // without it rather than selecting an arbitrary cached prefs/repo row.
   ACTIVE_IDENTITY: ActiveIdentityStore
   // vNext auth root (docs/vNext/protocol.md § Pairing): paired devices and their revocable bearer
   // tokens, the replay store behind Idempotency-Key, and the one-time pairing window.
@@ -62,31 +71,6 @@ export type RuntimeBindings = {
 // HttpBindings is Partial because the @hono/node-server adapter only spreads raw incoming/outgoing
 // at the app.fetch() seam (main/server.ts); tests and non-HTTP callers don't provide them.
 export type Env = RuntimeBindings & Partial<HttpBindings>
-
-// One-time OAuth CSRF states (docs/authentication.md): /auth/login issues a state, /auth/callback
-// consumes it. TTL is internal — states are short-lived and never persisted.
-export type OauthStateStore = {
-  issue(state: string): void
-  // True when the state was live (issued, unexpired, not yet consumed). Consuming removes it.
-  consume(state: string): boolean
-}
-
-// In-memory with lazy expiry. The TTL matches the /auth state cookie's maxAge (routes/auth.ts).
-const OAUTH_STATE_TTL_MS = 5 * 60_000
-export function oauthStateStore(ttlMs = OAUTH_STATE_TTL_MS): OauthStateStore {
-  const store = new Map<string, number>() // state → expiresAt
-  return {
-    issue(state) {
-      store.set(state, Date.now() + ttlMs)
-    },
-    consume(state) {
-      const expiresAt = store.get(state)
-      if (expiresAt == null) return false
-      store.delete(state)
-      return expiresAt >= Date.now()
-    },
-  }
-}
 
 // Immutable blob/patch bodies keyed by sha (docs/caching.md) — content never changes for a key, so
 // there is no TTL and no delete. One file per key under `dir`; keys are `filebody:<sha>` /
@@ -249,11 +233,12 @@ export function makeBindings({ dbPath, blobsDir, nodeId, appVersion }: BindingsO
     // bindings ever touching the private key.
     NODE_FINGERPRINT: ensureCert(dataDir).fingerprint,
     APP_VERSION: appVersion,
-    OAUTH_STATE: oauthStateStore(),
     BLOBS: diskBlobCache(blobCachePath),
     SESSION_ENC_KEY: encKey,
     GITHUB_CLIENT_ID: secret('GITHUB_CLIENT_ID'),
-    GITHUB_CLIENT_SECRET: secret('GITHUB_CLIENT_SECRET'),
+    // `optional`, not `secret`: nothing reads this any more (see the type above), so demanding it would
+    // make a fresh checkout fail to boot over a value with no consumer.
+    GITHUB_CLIENT_SECRET: process.env.GITHUB_CLIENT_SECRET ?? '',
     INTERNAL_TOKEN: loadOrCreateInternalToken(dataDir),
     ACTIVE_IDENTITY: activeIdentityStore(dataDir),
     DEVICES: deviceService(db),
