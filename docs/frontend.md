@@ -8,10 +8,13 @@ and its state model.
 ## Overview
 
 The client is a SolidJS single-page app composed from `packages/client-core/src/`,
-`apps/desktop/src/plugins/*/client/`, and `apps/desktop/src/app/client/`. It is served as static
-assets by the Hono server (running in Electron's Node utility process on
-`http://127.0.0.1:4317`) and talks to that same origin over cookie-authenticated `fetch` — the
-GitHub token never reaches the browser (see [authentication.md](./authentication.md)).
+`plugins/*/src/client/`, and `apps/desktop/src/app/client/`. It ships **inside** the Electron app and
+loads from the bundled `app://acorn` origin, served by Electron main's own protocol handler
+(`main/appScheme.ts`) — nodes serve no web assets. It reaches a node only through
+`window.acorn.nodeFetch` / `nodeSend` over the preload bridge, and main's connection broker performs
+the real pinned HTTPS with the device bearer attached. So the renderer holds no credential at all:
+not a device token, not a certificate, and not the GitHub token
+(see [authentication.md](./authentication.md)).
 
 State is deliberately split three ways, with no other store:
 
@@ -19,31 +22,43 @@ State is deliberately split three ways, with no other store:
 | --- | --- | --- |
 | Server data (PRs, repos, tasks, workspaces, Linear/Rollbar) | [TanStack Query](./caching.md) cache | Yes — persisted to IndexedDB |
 | Transient UI (popovers, drag, focus/maximize, active terminal) | module-level / component SolidJS signals | No |
-| Durable view state (last repo, layouts, theme, shortcuts) | server-persisted `prefs` (the `/api/prefs` key/value store) | Yes — round-trips through GitHub-scoped SQLite |
+| Durable view state (last repo, layouts, theme, shortcuts) | node-persisted `prefs` (the `/v2/core/prefs` key/value store, addressed at the **home** node — see the divergence note in `queries.ts`) | Yes — round-trips through owner-scoped SQLite |
 
 ## Entry point (`index.tsx`)
 
 `index.tsx` mounts the app and owns cross-cutting cache concerns:
 
-- Constructs a **single** `QueryClient` with `refetchOnWindowFocus: true`, a 30s default
-  `staleTime`, and `gcTime: 24h`. The freshness window prevents a quick app switch from refetching
-  every active query; genuinely live resources override it. The long `gcTime` lets persisted
-  entries outlive a session and survive reload.
-- Wraps the tree in `PersistQueryClientProvider`, persisting the bounded cache to **IndexedDB** via
-  `idb-keyval` under key `acorn-cache` (`maxAge` 24h, 5s write throttle). File bodies and
-  patch-bearing queries are excluded because the loopback API/on-disk blob cache reconstructs them;
+- `await selectActiveNode()` **before the first render**. Every request is node-addressed now, and
+  the shell's `onMount` side effects do not sit behind the node gate, so rendering first would fire
+  requests with no node selected.
+- Mounts the tree inside `<Show when={activeCacheId()} keyed>`. The `keyed` is load-bearing:
+  switching nodes must REMOUNT the provider and the shell under it, so a query started against node
+  A cannot resolve into node B's cache.
+- Wraps that in `PersistQueryClientProvider` with the active node's client and persister. It no
+  longer constructs either: there is **one `QueryClient` + one IndexedDB persister per node**, built
+  lazily in `packages/client-core/src/node/fleet.ts`, and only the active node's provider is mounted.
+  The defaults are unchanged — `refetchOnWindowFocus: true`, a 30s `staleTime`, `gcTime: 24h`. The
+  freshness window prevents a quick app switch from refetching every active query; genuinely live
+  resources override it. The long `gcTime` lets persisted entries outlive a session.
+- Persistence is `idb-keyval` under **`acorn-cache:<nodeId>`** — one key per node, so node A's
+  snapshot can never rehydrate into node B (`maxAge` 24h, 5s write throttle). File bodies and
+  patch-bearing queries are excluded because the node API/on-disk blob cache reconstructs them;
   TanStack's successful-query-only gate also excludes pending and failed queries. A per-query 24h
   age gate prevents regularly rewritten snapshots from carrying old PR data forward indefinitely.
-- A global `QueryCache`/`MutationCache` `onError` bounces to `/auth/login?return_to=…` whenever an
-  error message matches `/\b401\b|reauth|unauthenticated/` — a revoked/expired token surfaces as a
-  401 from any read or write. The `me` query returns `null` on 401 (the valid logged-out state) so
-  it never trips this (`index.tsx:14`).
-- Wipes the persisted cache on the `acorn:logout` window event, so the next user can't read it
-  (`index.tsx:51`), and unregisters any service worker left over from a prior web (Cloudflare
-  Workers) visit to this origin (`index.tsx:55`).
+- Registers `wsOnReconnect(…)` to invalidate the active node's queries with
+  `refetchType: 'active'`. A WS drop means the client missed events and there is no cursor into
+  history, so the remedy is to mark what is on screen stale — and only the active node has a mounted
+  query to refetch.
 - Mounts `<Router root={App}>` with four routes whose components are all `noop` — **routes exist
   only to populate `useParams()`**; `App` is the layout root and renders the actual UI from those
-  params (`index.tsx:39`).
+  params.
+
+There is deliberately **no global 401 handler**. A 401 used to mean "the GitHub session expired,
+bounce to OAuth"; with the bearer held by the broker it means the device was revoked, which the
+broker observes itself and reports as a node connection state — not something a query error should
+navigate on. There is likewise no `acorn:logout` cache wipe, because there is no logout: per-node
+eviction is `dropNode(nodeId)` (`fleet.ts`), which clears the in-memory client *and* deletes that
+node's IndexedDB key.
 
 ### Routes
 
@@ -60,8 +75,9 @@ The active **workspace** carries no URL dimension — it is derived from the cur
 
 ## Layout shell (`App.tsx`)
 
-`App` is the router root. It gates on auth (`<Show when={me.data}>`, else `LoginGate`), applies the
-theme, and lays out a left `TabRail` beside a topbar + a main-area `Switch`:
+`App` is the router root. It gates on **having a node to ask** — `<Show when={nodeReady() && !isRestoring()} fallback={<NodeGate />}>`,
+not on an identity, because there is no login — applies the theme, and lays out a left `TabRail`
+beside a topbar + a main-area `Switch`:
 
 ```
 ┌──────┬───────────────────────────────────────────────────────────────┐
@@ -91,7 +107,7 @@ is a CSS grid of `var(--topbar-h) 1fr` — topbar over the main switch. See
 | --- | --- |
 | Left (`.topbar-side`) | Collapse toggle (`«`/`»`, drives the `left_collapsed` pref); `WorkspacePicker` (selecting a workspace navigates to its first repo); `RepoPicker` (scoped to the active workspace, **disabled inside a task view** since the repo is fixed to that worktree). |
 | Center (`.breadcrumb`) | `owner / repo / #number` crumbs (the `#n` crumb links out to GitHub), or the `acorn` brand when no repo is routed. |
-| Right (`.topbar-end`) | `NotificationBell`; a terminal toggle `▣` (only when `terminalEnabled` and in a task view); `AccountMenu` (Settings / Clear cache / Logout) or a `Login` link. |
+| Right (`.topbar-end`) | `NotificationBell`; a terminal toggle `▣` (only when `terminalEnabled` and in a task view); the minimal **node switcher** and the `NodeChip` freshness badge (plan.md § 69's dev switcher — hidden with a single node in a production build, since first-run must never mention nodes); `AccountMenu` (Settings / Clear cache). There is no Logout and no Login link. |
 
 ### Main modes
 
@@ -122,12 +138,15 @@ critical HTML script/modulepreload and stylesheet budgets in
 component scope before the replacement mounts. The archive lifecycle event then performs final
 T3/T4 eviction after component cleanup has published any last session-only view state.
 
-### Login gate + appearance
+### Node gate + appearance
 
-`LoginGate` shows the bare `Acorn` mark while auth is unknown (initial load / cache restore) to
-avoid a redirect flash, then bounces to GitHub OAuth once settled-logged-out — unless the user
-explicitly logged out (`sessionStorage['acorn:loggedout']`), in which case it holds and offers a
-manual Login (else GitHub silently re-auths and logout is a no-op) (`App.tsx:269`, `464`).
+`NodeGate` (`packages/client-core/src/node/NodeGate.tsx`) occupies the slot `LoginGate` used to. It
+answers one question — *which node answers?* — and renders the bare `Acorn` mark while that is still
+`starting` (initial load / cache restore) to avoid a flash. `unpaired` means the broker knows no
+nodes, so there is nothing to talk to until the owner pairs one; `failed` means the broker itself
+could not answer, and offers Retry plus the native Diagnostics / Open data folder / Quit actions
+(the last two go straight to main, because the shell that would answer a renderer quit prompt is not
+mounted). There is no OAuth bounce and no `acorn:loggedout` special case, because there is no login.
 
 Appearance is two orthogonal axes, both written by the startup-state service onto `<html>`
 (`persistence/appStartup.ts`):
@@ -180,10 +199,13 @@ writes serialize per key, and failures roll back and surface as notices.
 
 Query option factories live in `queries.ts` so multiple consumers share one definition (e.g. the
 `RepoPicker` dropdown and `PullList` both read `repos`). Route builders, response types, and
-query-key factories live in `../shared/api.ts`; `queries.ts` imports them and keeps the runtime
-path as plain same-origin cookie `fetch` via the thin `apiClient.ts` (`readJson`/`writeJson`,
-where `readJson(..., { nullOn401: true })` powers the logged-out `me` state). Writes live in
-`mutations.ts` and POST/PUT/DELETE to the same route builders (the server checks `Origin` for CSRF).
+query-key factories live in `@acorn/protocol/api.ts`; `queries.ts` imports them and keeps the runtime
+path in the thin `apiClient.ts` (`readJson`/`writeJson`, whose options are `{ signal, nodeId }` —
+omitting `nodeId` means the ambient active node). Under the desktop app that is
+`window.acorn.nodeFetch`; the raw same-origin `fetch` branch exists only when there is no broker at
+all. Writes live in `mutations.ts` and POST/PUT/DELETE to the same route builders. There is no
+`Origin`/CSRF check on the server, and no need for one — see
+[authentication.md](./authentication.md).
 
 Refetch behaviour starts with the 30s default freshness window and is tightened per query:
 
@@ -238,30 +260,41 @@ inputs only. Focus and maximize remain session-only. Pane internals are document
 
 ## Client transport and desktop capabilities
 
-Normal renderer requests use the same-origin HTTP API, and live terminal/workflow/Docker events use
-one authenticated WebSocket. Search, editor, local changes, database, HTTP requests, notes, memory,
-terminal control, run targets, workflows, and MCP settings do not have feature-specific preload
-APIs.
+Every renderer request and every live frame crosses the preload bridge to Electron main's connection
+broker, which performs the pinned HTTPS and owns the one authenticated WebSocket per node
+(`/v2/events`). This **inverts** what this file used to say — "every request/response verb is HTTP,
+every stream is the WebSocket" — because main is where the pinned certificate and the device token
+live and the renderer must never hold either. It is also what lets the renderer's CSP say
+`connect-src 'self'`: it needs no network permission at all. Search, editor, local changes, database,
+HTTP requests, notes, memory, terminal control, run targets, workflows and MCP settings still have no
+feature-specific preload APIs — they are ordinary `/v2` routes carried over that one channel.
 
-The Electron preload (`packages/node-core/src/main/preload.ts`) exposes only operations that truly
-need Electron:
+The Electron preload (`apps/desktop/src/app/main/preload.ts`) exposes:
 
+- the node-broker primitives — `nodeFetch`, `nodeAbort`, `nodeSend`, `onNodeFrame`, `onNodeStatus`,
+  `fleetList`, and the owner-initiated fleet mutations (`nodeProbe`, `nodePair`, `nodeRename`,
+  `nodeForget`, `nodeReconnect`). No closure crosses the bridge, so `nodeSocket()` is assembled on
+  the renderer side from `nodeSend` + `onNodeFrame`. No token and no certificate ever crosses back;
 - desktop/platform markers and the close-pane/quit lifecycle callbacks;
+- the node recovery screen's two native actions (open data folder, force quit);
 - the native repository folder picker;
 - preview `WebContentsView` lifecycle, bounds, navigation, and chrome-state events.
 
 `capabilities()` (`packages/client-core/src/capabilities.ts`) reports `{ desktop, terminal }`
 from that surface. The terminal drawer, agents, run targets, and workflows are available whenever
 the desktop terminal capability exists; `dev:node` remains a deliberate degraded mode for features
-whose utility-service engine is unavailable.
+whose node-side engine is unavailable — and note it can no longer serve the SPA to a browser at all,
+since the node serves no web assets.
 
 ## Source
 
-Key files: `apps/desktop/src/app/client/index.tsx`,
-`packages/client-core/src/{App.tsx,apiClient.ts,queries.ts}`,
+Key files: `apps/desktop/src/app/client/{index.tsx,App.tsx}`,
+`packages/client-core/src/{apiClient.ts,wsClient.ts,queries.ts}`,
+`packages/client-core/src/node/{fleet.ts,activeNode.ts,freshness.ts,NodeGate.tsx,NodeChip.tsx}`,
 `packages/client-core/src/tabs/TabRail.tsx`,
-`packages/client-core/src/tasks/{tasks.ts,layout.ts,activate.ts,TaskView.tsx}`, and feature-owned
-client code under `apps/desktop/src/plugins/*/client/`.
+`packages/client-core/src/tasks/{tasks.ts,layout.ts,activate.ts,TaskView.tsx}`,
+`apps/desktop/src/app/main/{preload.ts,nodeBroker.ts,appScheme.ts}`, and feature-owned
+client code under `plugins/*/src/client/`.
 
 See also: [panes.md](./panes.md) (the pane catalog), [workspaces-and-tasks.md](./workspaces-and-tasks.md)
 (the rail + task model), [diff-rendering.md](./diff-rendering.md), [caching.md](./caching.md),
@@ -278,6 +311,6 @@ See also: [panes.md](./panes.md) (the pane catalog), [workspaces-and-tasks.md](.
   `dispatchLayout(taskId, action)` / `layoutForTask(taskId)` with an explicit task id.
 - `last_source` keeps unknown contribution ids inert and round-trippable. A temporarily missing
   provider therefore does not destroy the user's selection; choosing another source replaces it.
-- API failures are typed: `apiClient.ts` throws `ApiError` (message + HTTP `status`); the auth
-  bounce in `index.tsx` is structural (`err instanceof ApiError && err.status === 401`), not
-  message-text matching.
+- API failures are typed: `apiClient.ts` throws `ApiError` carrying the node's error envelope —
+  `status`, `code`, `requestId`, `retryable` — so a consumer branches on a machine code rather than
+  on message text. Nothing bounces on a 401 any more (see the entry-point section).

@@ -28,8 +28,8 @@ const workspacePackages = Object.keys(
 // Three targets (docs/electron.md §4i). externalizeDepsPlugin keeps node_modules (notably the
 // native better-sqlite3) external — required at runtime, never bundled. Using rollupOptions.input
 // (not lib mode) is what lets that externalization take effect. The renderer is the existing
-// SolidJS SPA — no Cloudflare plugin, since the in-process Node server serves both API and the
-// renderer build out of dist/client.
+// SolidJS SPA, built to dist/client and served by Electron main's app:// protocol handler
+// (main/appScheme.ts) — no node serves web assets.
 // node-core owns schema.ts and therefore its migrations. The service bundle resolves them by
 // walking ancestors from its own location, so stage a copy above out/main.
 const stageMigrations = () => ({
@@ -73,7 +73,7 @@ export default defineConfig({
       outDir: 'out/main',
       rollupOptions: {
         external: externalizeBareImports,
-        // Electron main only. `service` and `mcp` are built by @acorn/node and copied in by
+        // Electron main only. `service`, `mcp` and `standalone` are built by @acorn/node and copied in by
         // stageNodeArtifact() — see its comment.
         input: {
           index: resolve(__dirname, 'src/app/main/electron.ts'),
@@ -99,9 +99,9 @@ export default defineConfig({
     plugins: [
       solid(),
       // Force an absolute base. The renderer is served from Electron main's app:// protocol handler
-      // (main/appScheme.ts) — the node serves it only for `dev:node` in a browser — and it has
+      // (main/appScheme.ts) — no node serves it at all — and it has
       // client-side deep routes (/:owner/:repo/:number). electron-vite's default relative base ('./')
-      // makes ./assets/* resolve against the deep path on a hard reload (Cmd/Ctrl+R), 404 to the SPA
+      // makes ./assets/* resolve against the deep path on a hard reload (Cmd/Ctrl+R), 404 to the app-scheme
       // fallback HTML, and the module script fails its MIME check → blank window. electron-vite's
       // preset (enforce:'pre') force-sets './' in production, so a normal-phase config hook re-sets it.
       // It stays '/' rather than becoming 'app://acorn/': the scheme is `standard`, so /assets/x.js in a

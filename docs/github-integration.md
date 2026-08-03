@@ -35,10 +35,17 @@ export const ghGraphQL = (token, query, variables) =>
 These deliberately stay in `plugins/github/src/server/` rather than being promoted to
 a shared package until a third consumer justifies it.
 
-Two calls deliberately bypass the clients: the OAuth code→token exchange
-(`routes/auth.ts` — it targets `github.com/login/oauth`, not the API host) and
-the signed log-blob fetch in `routes/actions.ts` (the redirect target must be
-fetched **without** the auth header).
+Two calls deliberately bypass the clients: the device-flow code request and token
+exchange (`routes/deviceAuth.ts` — they target `github.com/login/device/code` and
+`github.com/login/oauth/access_token`, not the API host, and there is no token yet
+to send) and the signed log-blob fetch in `routes/actions.ts` (the redirect target
+must be fetched **without** the auth header).
+
+The token every call above takes comes from `githubToken(c)`
+(`plugins/github/src/server/githubToken.ts`): one encrypted `integrations` row per
+owner, resolved for `ownerId(c)`. An absent row yields `''`, which `gh()`/`ghGraphQL()`
+turn into the same synthetic `401` a rejected token produces — so "never connected"
+and "credential revoked" land on one path.
 
 ## REST vs GraphQL — the decision
 
@@ -126,11 +133,11 @@ The client layers optimistic updates / invalidation on top. See
 
 ### Explicit PR refreshes
 
-The cookie-authenticated UI and bearer-authenticated automation API share the same mirror refresh
-operations. The UI uses forced internal detail/files reads; the public API exposes write-scoped POST
-operations for one repository's open list or one PR's composite plus files. Single-PR refresh fetches
-both upstream representations before starting mirror writes, while open-list refresh preserves ETag
-`304` handling, atomic pruning/upsert, and local-task PR-number backfill.
+A forced refresh reuses the same mirror refresh operations a normal read does
+(`routes/pullRefresh.ts`): a forced detail/files read for one PR, or a forced open-list read for one
+repository. Single-PR refresh fetches both upstream representations before starting mirror writes,
+while open-list refresh preserves ETag `304` handling, atomic pruning/upsert, and local-task
+PR-number backfill.
 
 ## ETags and rate limits
 
@@ -141,11 +148,12 @@ both upstream representations before starting mirror writes, while open-list ref
   TTL gate. All of this runs behind the sync engine (`server/sync/engine.ts`);
   the 304 branch lives in each route's `refresh` because it is specific to the
   `sync_state` ETag store.
-- A shared `ghError(res)` helper in `server/github/index.ts` maps any non-OK GitHub
-  REST/GraphQL response to a normalized `{ error, status }`, applied uniformly across
-  every route:
-  - **`401`** (revoked/expired token) → `{ error: 'reauth' }`, so the client bounces
-    to re-login (see [authentication](./authentication.md#the-401--reauth-bounce)).
+- A shared `ghError(res)` helper in `plugins/github/src/server/index.ts` maps any non-OK
+  GitHub REST/GraphQL response to a normalized `{ error, status }`, applied uniformly
+  across every route:
+  - **`401`** (revoked/expired token, or GitHub never connected) → `{ error: 'reauth' }`,
+    so the client prompts to reconnect
+    (see [authentication](./authentication.md#the-401--reauth-bounce)).
   - **rate limit** (`403`/`429` with `x-ratelimit-remaining: 0`, or any `retry-after`)
     → `429 { error: 'rate_limited' }`.
   - **SAML SSO** (`403` with `x-github-sso`) → `403 { error: 'sso' }`.
@@ -158,7 +166,8 @@ both upstream representations before starting mirror writes, while open-list ref
   `kind: 'graphql'` result with the messages, so callers apply only their
   endpoint-specific mapping (prActions maps auto-merge-enable errors to
   `422 auto_merge_not_allowed`; most others map to `502`; pullDetail surfaces
-  the messages as `502 { error: 'graphql', detail }`).
+  the messages as a `502` with code `graphql`, the GraphQL messages joined into
+  the envelope's `message`).
 - REST helpers that feed the mirror return the same normalized
   `RouteResult<T>` shape (`{ ok: true, value } | { ok: false, failure }`) —
   `refreshRepos`, `resolveRepoForUser`, and `fetchFiles` in

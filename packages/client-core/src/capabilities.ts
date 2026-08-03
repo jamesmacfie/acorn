@@ -9,9 +9,10 @@ import type {
 import type { WsClientFrame } from '@acorn/protocol/ws.ts'
 
 // What the hosting environment provides (docs/features.md, docs/electron.md §capability-map). The
-// preload is a thin residue (native folder picker, preview view controls, lifecycle callbacks); the
-// data surface is loopback HTTP + one WebSocket, so most panes work in a plain browser (`dev:node`)
-// too. `desktop` still marks the Electron build; `terminal` marks that the main-process engine is
+// preload carries the node broker plus a thin native residue (folder picker, preview view controls,
+// lifecycle callbacks). The data surface is one WebSocket and ordinary /v2 routes, so most panes need
+// nothing Electron-specific — but the node serves no web assets, so `dev:node` is no longer a way to
+// open the UI in a browser; it is an API-only node. `desktop` still marks the Electron build; `terminal` marks that the main-process engine is
 // present — the surfaces that genuinely need it (terminal drawer, agents, run targets, workflows,
 // the PTY streams) key off it and degrade with a visible reason where it's absent. Consumers that
 // *invoke* the bridge use the typed accessors (terminalApi() etc.); this answers "is it available?".

@@ -65,7 +65,12 @@ persistence model, now keyed by `(nodeId, queryKey)`):
   state and `observedAt`.
 - Client-durable state that is *not* cache: fleet membership (node endpoints, pinned fingerprints,
   labels), layouts and pane weights (keyed by nodeId + task), presentation prefs, drafts. Device
-  tokens live in the OS keychain.
+  tokens live in the OS keychain — **satisfied by Electron `safeStorage`**, which on macOS stores its
+  key in the Keychain and encrypts with it. So this line needs no `keytar`-class native dependency;
+  `apps/desktop/src/app/main/deviceTokenStore.ts` is one 0600 `safeStorage` blob per scope, where a
+  scope is a nodeId (plus the constant `local` for the bundled node, whose token must be read before
+  its nodeId is knowable). Membership lives beside it in `fleet.json` rather than inside it, so a
+  machine with no usable keychain keeps its fleet and simply re-pairs instead of losing both.
 
 The partition is implemented as **one `QueryClient` + one IndexedDB persister key per node**
 (`client-core/node/fleet.ts`), not as a nodeId prefix on every query key. Same guarantee — two nodes

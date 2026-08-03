@@ -1,10 +1,12 @@
 # Local development
 
 > **Runtime note:** acorn migrated from Cloudflare Workers to a local Electron app (see
-> [electron.md](./electron.md)). `pnpm dev` now builds + launches the Electron app; secrets live in
-> `apps/desktop/.env`; migrations apply on startup or via `pnpm db:migrate`.
+> [electron.md](./electron.md)), and its transport is now `/v2` over HTTPS with device tokens (see
+> [vNext/phase1-notes.md](./vNext/phase1-notes.md) for what shipped). `pnpm dev` builds + launches the
+> Electron app; secrets live in `apps/desktop/.env`; migrations apply on startup or via
+> `pnpm db:migrate`.
 
-Clone → running → logged-in runbook for acorn. For the system design behind it, see
+Clone → running → GitHub-connected runbook for acorn. For the system design behind it, see
 [architecture-overview.md](./architecture-overview.md).
 
 ## Prerequisites
@@ -12,40 +14,42 @@ Clone → running → logged-in runbook for acorn. For the system design behind 
 - **Node** ≥ 20 (developed on 24).
 - **pnpm 11** — the repo pins `packageManager: pnpm@11.0.0`. Run `corepack enable` to get
   the pinned version automatically.
-- A **GitHub OAuth App** dedicated to the desktop app (an OAuth App allows one callback URL).
+- A **GitHub OAuth App** with **Device Flow** enabled.
 - **macOS** to produce a packaged build (`pnpm dist`); `pnpm dev` runs anywhere Electron does.
 
 ## 1. Create a GitHub OAuth App
 
-A GitHub OAuth App allows exactly **one** callback URL, so the desktop app wants its own.
+acorn connects to GitHub with the **OAuth device authorization grant** (RFC 8628), so there is no
+callback URL to register and no client secret to exchange — the grant is issued against the
+`client_id` alone.
 
 - GitHub → Settings → Developer settings → **OAuth Apps** → **New OAuth App**.
-- **Homepage URL:** `http://127.0.0.1:4317`
-- **Authorization callback URL:** `http://127.0.0.1:4317/auth/callback` — use the `127.0.0.1`
-  form (GitHub treats it as distinct from `localhost`).
-- Copy the **Client ID** and generate a **Client Secret**.
+- Name it whatever you like. The **Homepage URL** is unused; GitHub still requires a value.
+- Leave the **Authorization callback URL** alone — nothing redirects back to acorn.
+- Tick **Enable Device Flow**. Without it GitHub refuses to issue a device code.
+- Copy the **Client ID**. You do not need a client secret.
 
-The app origin is pinned to port `4317` (`ACORN_PORT` in `packages/node-core/src/main/serverConfig.ts`; an
-`ACORN_PORT` environment variable overrides it, at the cost of a fresh IndexedDB origin) so the
-browser storage and OAuth callback stay stable. The OAuth flow requests the scopes
-`repo read:org read:user`.
+The node binds an **ephemeral** loopback port, so there is nothing origin-shaped to keep stable
+(`packages/node-core/src/main/serverConfig.ts`: `configuredPort()` returns undefined unless you set
+`ACORN_PORT`, and the last bound port is remembered in the data root's `node.json`). The device flow
+requests the scopes `repo read:org read:user`.
 
 ## 2. Configure local secrets — `apps/desktop/.env`
 
 Dev secrets live in `apps/desktop/.env`, loaded by Electron main (`process.loadEnvFile`) before it
-forks the utility service, and separately by `dev:node`. Packaged Electron builds use `safeStorage`
-for `SESSION_ENC_KEY`; main resolves that key and passes it to the service through its controlled
-environment. GitHub OAuth
-credentials resolve from `<userData>/.env`, then process environment, then the
-`MAIN_VITE_GITHUB_CLIENT_*` fallback embedded by release CI.
+spawns the node, and separately by `dev:node`. Packaged Electron builds use `safeStorage`
+for `SESSION_ENC_KEY`; main resolves that key and passes it to the node through its controlled
+environment. `GITHUB_CLIENT_ID` resolves from `<userData>/.env`, then process environment, then the
+`MAIN_VITE_GITHUB_CLIENT_ID` fallback embedded by release CI.
 
 ```bash
 cp apps/desktop/.env.example apps/desktop/.env
 ```
 
-For `dev:node`, generate the session encryption key. `SESSION_ENC_KEY` must be **exactly 64 hex characters**
-(32 bytes / 256-bit) — it is the key for the AES-256-GCM (JWE `dir`) session cookie, and
-`packages/node-core/src/server/session.ts` rejects anything not matching `^[0-9a-fA-F]{64}$`:
+For `dev:node`, generate the secret-box key. `SESSION_ENC_KEY` must be **exactly 64 hex characters**
+(32 bytes / 256-bit) — it is the AES-256-GCM (JWE `dir`) key that encrypts secrets **at rest**
+(integration credentials, HTTP-client fields), and
+`packages/node-core/src/server/secretBox.ts` rejects anything not matching `^[0-9a-fA-F]{64}$`:
 
 ```bash
 openssl rand -hex 32
@@ -54,10 +58,15 @@ openssl rand -hex 32
 Then fill `apps/desktop/.env`:
 
 ```
-GITHUB_CLIENT_ID=<from your OAuth App>
-GITHUB_CLIENT_SECRET=<from your OAuth App>
+GITHUB_CLIENT_ID=<from your OAuth App; required — a node refuses to boot without it>
+GITHUB_CLIENT_SECRET=<optional; the device flow needs no secret and nothing reads this>
 SESSION_ENC_KEY=<the 64-hex-char openssl output; optional for Electron, required by dev:node>
 ```
+
+> **The name outlived the cookie.** `SESSION_ENC_KEY` was the key for the sealed session cookie.
+> There is no cookie and no session any more, but the key stayed: it is what integration credentials
+> are encrypted with, so losing it strands every stored provider token
+> (`packages/node-core/src/main/bindings.ts`).
 
 `.env` is gitignored — **never commit it**.
 
@@ -68,39 +77,56 @@ SESSION_ENC_KEY=<the 64-hex-char openssl output; optional for Electron, required
 pnpm install
 
 # better-sqlite3 and node-pty are native: build them against Electron's ABI before
-# `pnpm dev` (and back to the Node ABI with `node:rebuild` if you use dev:node / db:migrate).
-pnpm --filter @acorn/desktop electron:rebuild
+# `pnpm dev` (and back to the Node ABI with `pnpm rebuild:node` if you use dev:node / db:migrate).
+pnpm run rebuild
 
-# Build + launch the Electron app. Migrations apply automatically on startup
-# (openDb); the SQLite DB and blob cache live under apps/desktop/.acorn/.
+# Build the node artifact + Electron bundles, then launch. Migrations apply automatically
+# on startup (openDb); the SQLite DB and blob cache live under apps/node/.acorn/.
 pnpm dev
 ```
 
-The Electron window opens on `http://127.0.0.1:4317`; log in with GitHub.
+The Electron window opens on `app://acorn` — the renderer is bundled with the app and served by
+Electron main's protocol handler (`apps/desktop/src/app/main/appScheme.ts`), not by the node. Connect
+GitHub from **Settings → Integrations**: acorn shows a code, you type it at github.com, and it polls
+until the grant lands.
 
-> **Cookie note.** The session cookie is plain `session` (no `__Host-` prefix, no `Secure` flag) —
-> the server only ever runs on loopback http, so the HTTPS cookie branch was removed
-> (`SESSION_COOKIE` in `session.ts`); no action needed.
+> **No login gate.** There are no accounts, sessions or cookies. The renderer reaches the node
+> through the connection broker in Electron main (`main/nodeBroker.ts`) over preload IPC, holding a
+> device token and pinning the node's self-signed certificate — so there is nothing to log in to and
+> nothing origin-shaped to keep stable.
 
-> **Desktop-only features.** The terminal drawer, agent sessions, run targets, and workflows are
-> always on in the Electron app; they require utility-service engines, so they're absent in a
-> plain browser via `dev:node` (`capabilities()` in `packages/client-core/src/capabilities.ts`).
-> Docker and the HTTP client use pure-Node server bridges and also work in `dev:node`.
+> **Desktop-only features.** The terminal drawer, agent sessions, run targets, and workflows need the
+> Electron main-process engines, and `capabilities()`
+> (`packages/client-core/src/capabilities.ts`) is what every surface keys off to degrade with a visible
+> reason where they are absent. A `dev:node` node has no UI of its own — it serves no web assets — so
+> it is a node for a client to pair with, not a browser build.
 
-## Local data — `apps/desktop/.acorn/`
+## Local data — `apps/node/.acorn/`
 
-In development, all server-side state lives under `apps/desktop/.acorn/` (gitignored), resolved by
-the Node runtime rather than from `process.cwd()`. Packaged builds use Electron's
-`app.getPath('userData')`:
+In development, all node-side state lives under `apps/node/.acorn/` (gitignored), resolved from the
+module's own location rather than `process.cwd()`
+(`packages/node-core/src/main/serverPaths.ts` — Electron uses the same `devDataDir()`). Packaged
+builds use Electron's `app.getPath('userData')`:
 
-- `acorn.sqlite` (+ WAL files) — the Drizzle/SQLite database: the GitHub mirror *and* acorn's own
+- `core.sqlite` (+ WAL files) — the Drizzle/SQLite database: the GitHub mirror *and* acorn's own
   app-state (workspaces, tasks, review notes, prefs, encrypted integration tokens, the memory
   index).
+- `node.json` / `node.lock` — the node's identity (`nodeId`, protocol version, last bound port) and
+  its exclusive lock. Opening the root is what makes a directory a node.
+- `tls/` — the self-signed certificate and key the HTTPS listener presents, and clients pin.
 - `blobs/` — immutable file/patch bodies keyed by SHA (the `BLOBS` cache).
 - `worktrees/` — per-task git worktrees created by the terminal/agent features.
+- `logs/` — the node's log directory.
 - `notes/` and `memory-proposals/` — file-backed working notes and pending human-gated memories.
 - `internal-token` / `active-identity` — mode-`0600` loopback-child credential and its explicit
   current identity binding.
+- `session.key` — present once `safeStorage` has minted or migrated `SESSION_ENC_KEY`
+  (`apps/desktop/src/app/main/sessionKeyStore.ts`).
+
+> **A V1 root is refused, not upgraded.** `openDataRoot` throws if the directory holds V1's
+> `acorn.sqlite` rather than quietly opening a second database beside it
+> (`packages/node-core/src/main/dataRoot.ts`) — vNext never migrates V1 data. Point it at a fresh
+> root; the old files stay untouched.
 
 The mirror tables are disposable (they re-sync from GitHub on demand), but the same database file
 holds app-state acorn owns — so deleting `.acorn/` wholesale resets *everything*: workspaces,
@@ -110,29 +136,32 @@ fetch.
 
 ## Common scripts
 
-Run from the repo root via Turborepo, or per-package with `--filter @acorn/desktop`.
+Run from the repo root via Turborepo, or per-package with `--filter`. The db scripts belong to
+`@acorn/node-core`; the root aliases delegate to it.
 
 | Script | What it does |
 | --- | --- |
-| `pnpm dev` | `electron-vite build && electron-vite preview` — build + launch the Electron app |
-| `pnpm --filter @acorn/desktop dev:node` | Run just the Node server (no Electron) on `:4317` — needs the Node ABI, and a prior `build` (it serves `dist/client` and reads `index.html` at startup) |
-| `pnpm --filter @acorn/desktop build` | Build main + utility service + MCP proxy + preload + renderer, then enforce the renderer budget |
-| `pnpm --filter @acorn/desktop dist` | Run the gated build and package the `.dmg`/`.zip` |
-| `pnpm --filter @acorn/desktop electron:dev` | `electron-vite dev` — watch mode for main/preload; the window still loads `:4317` (renderer comes from the last-built `dist/client`, never the vite dev server) |
-| `pnpm --filter @acorn/desktop electron:rebuild` / `node:rebuild` | switch the native ABI of better-sqlite3 + node-pty (Electron ↔ Node) |
+| `pnpm dev` | `build:service && electron-vite build && check:runtime-syntax && electron-vite preview` — build the node artifact + Electron bundles, then launch the app |
+| `pnpm dev:node` | `pnpm --filter @acorn/node dev:node` — run just the node (no Electron) from `src/server/standalone.ts`. Needs the Node ABI, `SESSION_ENC_KEY` and `GITHUB_CLIENT_ID`. Binds an ephemeral port, takes its data root from `ACORN_DATA_DIR` or the dev root, and prints one JSON line: `{nodeId, endpoint, fingerprint, certPem, deviceToken}` |
+| `pnpm --filter @acorn/desktop build` | Build the node artifact (`service.js`/`mcp.js`/`standalone.js` from `apps/node`), then Electron main + preload + renderer, stage `packages/node-core/migrations` into `out/migrations`, and enforce the renderer budget |
+| `pnpm dist` | Run the gated build and package the `.dmg`/`.zip` |
+| `pnpm --filter @acorn/desktop electron:dev` | `electron-vite dev` — watch mode for main/preload; the renderer comes from the last-built `dist/client`, never the vite dev server |
+| `pnpm run rebuild` / `pnpm rebuild:node` | switch the native ABI of better-sqlite3 + node-pty (Electron ↔ Node) |
 | `pnpm lint` | `tsc --noEmit` typecheck |
 | `pnpm test` | Rebuild native modules for Node, then run the complete Vitest suite |
-| `pnpm --filter @acorn/desktop test:e2e` | Build/rebuild for Electron and run Playwright desktop smoke tests |
-| `pnpm --filter @acorn/desktop db:generate` | `drizzle-kit generate` — emit a migration from the schema, then replay the full chain on a fresh throwaway DB (`scripts/check-migrations.ts`) |
-| `pnpm --filter @acorn/desktop db:check` | Just the fresh-DB migration replay — catches the NOT-NULL table-rebuild quirk below |
+| `pnpm --filter @acorn/desktop test:e2e` | Rebuild the node artifact, build, rebuild native modules for the Electron ABI, then run the 9 Playwright tests (`e2e/desktop.smoke.spec.ts` S1–S8 + `e2e/twoNode.spec.ts`) |
+| `pnpm db:generate` | `drizzle-kit generate` — emit a migration from the schema, then replay the full chain on a fresh throwaway DB (`scripts/check-migrations.ts`) |
+| `pnpm db:check` | Just the fresh-DB migration replay — catches the NOT-NULL table-rebuild quirk below |
 | `pnpm db:locate` | Print the absolute path to this worktree's local SQLite database |
-| `pnpm --filter @acorn/desktop db:migrate` | `tsx scripts/migrate.ts` — apply migrations to local SQLite |
+| `pnpm db:migrate` | `tsx scripts/migrate.ts` — apply migrations to local SQLite |
 
 `pnpm dev`, `pnpm build`, `pnpm lint`, and `pnpm test` all proxy through Turborepo at the root.
+`dev`, `build` and `test:e2e` each run `build:service` first, because staging can only detect a
+node artifact that is *missing*, never one that is stale.
 
 `dev:node` and `db:migrate` run under plain Node, so they need the **Node ABI**
-(`node:rebuild`) — after either, run `electron:rebuild` again before `pnpm dev`. `db:migrate`
-targets `apps/desktop/.acorn/acorn.sqlite` by default; set `ACORN_DB_PATH` to point it elsewhere.
+(`pnpm rebuild:node`) — after either, run `pnpm run rebuild` again before `pnpm dev`. `db:migrate`
+targets `apps/node/.acorn/core.sqlite` by default; set `ACORN_DB_PATH` to point it elsewhere.
 A wrong-ABI better-sqlite3 no longer dies with a bare `NODE_MODULE_VERSION` stack: `openDb`
 (`packages/node-core/src/main/bindings.ts`) catches the native load error and rethrows naming the right rebuild
 script for the runtime you're in.
@@ -150,11 +179,11 @@ The schema lives in `packages/node-core/src/server/db/schema.ts` (Drizzle, SQLit
 ```bash
 # 1. Edit packages/node-core/src/server/db/schema.ts
 
-# 2. Generate the SQL migration into apps/desktop/migrations/
-pnpm --filter @acorn/desktop db:generate
+# 2. Generate the SQL migration into packages/node-core/migrations/
+pnpm db:generate
 
 # 3. Apply it to the local SQLite DB (also applied automatically on app startup)
-pnpm --filter @acorn/desktop db:migrate
+pnpm db:migrate
 ```
 
 > **Drizzle quirk — NOT NULL columns on populated tables.** When you add a `NOT NULL` column
@@ -172,7 +201,7 @@ pnpm --filter @acorn/desktop db:migrate
 
 For packaging the app into a `.dmg`/`.zip`, see [Packaging](../README.md#packaging-macos) in the
 root README and [electron.md](./electron.md) §4i. Packaged builds resolve their data root to
-`app.getPath('userData')` (dev keeps the repo-local `.acorn/`). `SESSION_ENC_KEY` is generated or
-migrated into `safeStorage`. Packaged OAuth credentials can come from `<userData>/.env`, process
-environment, or the release build's embedded fallback. The fallback is convenient but recoverable
-from the binary; device flow is the future distribution model.
+`app.getPath('userData')` (dev keeps the repo-local `apps/node/.acorn/`). `SESSION_ENC_KEY` is
+generated or migrated into `safeStorage`. A packaged `GITHUB_CLIENT_ID` can come from
+`<userData>/.env`, process environment, or the release build's embedded `MAIN_VITE_GITHUB_CLIENT_ID`
+fallback — a client id is not a secret, and the device flow needs nothing else.

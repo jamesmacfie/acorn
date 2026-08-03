@@ -5,7 +5,7 @@
 > `oauth_accounts`, `api_tokens`, `api_idempotency` and `command_executions`. Passages below
 > that describe it are historical. See [vNext/plan.md](./vNext/plan.md).
 
-The keystone doc for acorn: what it is, the one-server model, the two kinds of
+The keystone doc for acorn: what it is, the client/node model, the two kinds of
 state it holds, the three caches reads pass through, and how a request flows end
 to end. See the [documentation index](#documentation-index) at the bottom for
 everything else.
@@ -17,90 +17,117 @@ macOS agent workspace**: a keyboard-driven desktop app for reviewing PRs *and*
 driving coding agents (Claude Code, Codex, aider) against your repositories, each
 in its own git worktree.
 
-It is a SolidJS single-page app served by one Hono server running in an Electron
-utility process (via `@hono/node-server`), backed by a local SQLite read-model
-mirror of GitHub, an on-disk blob cache, and IndexedDB client persistence.
-Everything runs on one machine for one user. acorn started life as a Cloudflare
-Worker and migrated to Electron; the app design (Hono app, Drizzle schema,
-SolidJS UI) is unchanged, only the host — see [electron.md](./electron.md) for
-that history, and note that any lingering references to Workers / D1 / KV /
-wrangler describe the *prior* runtime.
+It is a SolidJS single-page app that ships **inside** the Electron app and loads
+from the bundled `app://acorn` origin. It talks to one or more **nodes** — a Hono
+server (via `@hono/node-server`) over HTTPS, each owning a data root with a local
+SQLite read-model mirror of GitHub and an on-disk blob cache — through a
+connection broker in Electron main. IndexedDB persists the client query cache, one
+partition per node. acorn started life as a Cloudflare Worker and migrated to
+Electron; the app design (Hono app, Drizzle schema, SolidJS UI) is unchanged, only
+the host — see [electron.md](./electron.md) for that history, and note that any
+lingering references to Workers / D1 / KV / wrangler describe the *prior* runtime.
+
+One user, but no longer necessarily one machine: the client is deliberately
+multi-node (vNext Phase 1), and a node is reachable over a LAN. The steady state
+for most people is still exactly one node — the bundled local one — and nothing in
+first-run mentions nodes at all.
 
 The two halves of the product share a spine. PR review reads GitHub into a local
 mirror and renders it fast; the agent workspace opens a git worktree per unit of
-work and gives an agent task-scoped context over the same loopback server. Both
-are the same app: one origin, one database, one window.
+work and gives an agent task-scoped context over the same node. Both are the same
+app: one window, one database per node.
 
-## One local server, one origin
+## A client, and N nodes
 
 The Electron main process boots through a thin native composition root
 (`apps/desktop/src/app/main/bootstrap.ts`, called once from `electron.ts`). It
-starts and supervises one Node utility process, installs the native preview and
-folder-picker adapters, then creates the window after the service reports that
-its listener is up. The utility-process composition root
-(`apps/desktop/src/app/service/runtime.ts`) migrates the DB, constructs domain
-services, installs bridge-backed capabilities, then starts a single Hono app
-(`packages/node-core/src/server/index.ts`, a
-`createApp()` factory) under `@hono/node-server` on `http://127.0.0.1:4317` (the
-port is pinned for a stable browser-storage origin; `ACORN_PORT` in the
-environment overrides it).
-The Electron host then points a hardened `BrowserWindow` at that origin.
-Durable-state reconciliation continues in the utility process after the listener
-is available, off the window paint path. `will-quit` asks the service to drain
-its listeners and process-backed resources before Electron terminates it.
-Unexpected exits are retried with bounded exponential backoff (see
-[electron.md](./electron.md) §11). The server serves three things from the same
-origin:
+spawns and supervises one Node **child process** — `spawn(process.execPath, [entry],
+{ env: { ELECTRON_RUN_AS_NODE: '1' }, stdio: [..., 'ipc'] })`, an ordinary Node IPC
+channel rather than Electron's `utilityProcess` — installs the native preview and
+folder-picker adapters and the connection broker, then creates the window once the
+service reports that its listener is up. The node's composition root
+(`apps/node/src/service/runtime.ts`) migrates the DB, constructs domain services,
+installs bridge-backed capabilities, then starts a single Hono app
+(`packages/node-core/src/server/index.ts`, a `createApp()` factory) under
+`@hono/node-server`.
 
-- the SPA shell and static assets (`dist/client`),
-- the `/api/*` JSON API, and
-- the `/auth/*` OAuth flow.
+That listener is **HTTPS with `minVersion: 'TLSv1.3'` on an ephemeral port**. The
+pinned `4317` existed so the renderer's browser origin — and therefore its
+IndexedDB — stayed stable; the renderer has no origin on the node any more, and a
+pinned port makes two nodes on one machine impossible. `service.start` reports
+`{ nodeId, endpoint, deviceToken, fingerprint, certPem }` back to main, so the
+client is *told* where the node bound rather than assuming. `ACORN_PORT` still
+forces a port for tests and `dev:node`; otherwise the last bound port is remembered
+in `node.json` and falls back to ephemeral when something else has taken it.
 
-Routing lives in `packages/node-core/src/main/server.ts`: a static-file middleware
-serves the built assets, and a `notFound` handler returns 404s for unmatched
-`/api/*` and `/auth/*` but falls back to `index.html` for other paths so the
-client router can handle deep links (`/:owner/:repo/:number`). A loopback Host
-guard rejects unexpected `Host` headers (only `127.0.0.1:4317` is accepted —
-`localhost` was deliberately dropped; everything standardises on the
-`127.0.0.1` form) so a DNS-rebinding page can't reach the local API as some
-other origin.
+Durable-state reconciliation continues in the node after the listener is
+available, off the window paint path. `will-quit` asks the service to drain its
+listener and process-backed resources before Electron terminates it. Unexpected
+exits are retried with bounded exponential backoff (see
+[electron.md](./electron.md) §11).
+
+**The node serves no web assets** — not the shell, not `dist/client`, and it has no
+SPA fallback; an unmatched path gets Hono's plain 404. The renderer's bytes belong
+to Electron main: `main/appScheme.ts` registers the `app://acorn` protocol over
+`dist/client`, serves `index.html` for any path that is not a file on disk (so
+client-side deep routes like `/:owner/:repo/:number` survive a hard reload), and
+sets the CSP as a response header. A loopback **Host** guard on the node rejects any
+`Host` other than the `127.0.0.1:<bound port>` it actually bound, so a
+DNS-rebinding page cannot reach the local API as some other origin.
+
+So the node serves exactly one thing: `/v2`. `/v2/core/*` for core routers,
+`/v2/p/<plugin>/*` for registry-projected plugin routers, plus one authenticated
+WebSocket at `/v2/events`.
 
 The process boundary is deliberately narrower than the HTTP application boundary:
 
-- **Utility service owns domain/runtime state:** SQLite and migrations, both HTTP listeners,
+- **The node owns domain/runtime state:** SQLite and migrations, the HTTP listener,
   WebSocket fan-out, PTYs/tmux, worktrees, Git and child processes, workflows, Docker, Postgres
   pools, notes/memory/context, agent tools, reconciliation, and shutdown draining.
-- **Electron main owns native state:** `BrowserWindow`, `WebContentsView`, folder dialogs,
-  `safeStorage`, navigation/keyboard policy, and service supervision.
-- **Typed service RPC connects them:** `@acorn/protocol/serviceProtocol.ts` validates versioned
+- **Electron main owns native state and the connection broker:** `BrowserWindow`,
+  `WebContentsView`, folder dialogs, `safeStorage`, navigation/keyboard policy, service
+  supervision — and every node endpoint, pinned certificate, device token and `fleet.json`
+  (`main/nodeBroker.ts`, `fleetStore.ts`, `deviceTokenStore.ts`, `nodePairing.ts`).
+- **Typed RPC connects them:** `@acorn/protocol/serviceProtocol.ts` validates versioned
   request/response/event envelopes in both processes. `@acorn/protocol/desktopCapabilities.ts` exposes
-  only narrow task-addressed preview/browser operations. No DB handle, process object, or
-  `webContents` identifier crosses the boundary.
+  only narrow task-addressed preview/browser operations. `@acorn/protocol/broker.ts` carries the
+  renderer↔main node contract. No DB handle, process object, or `webContents` identifier crosses
+  the boundary.
 
 Main waits for `service.start` before opening the window. If the child exits unexpectedly after
-startup it applies bounded exponential restart, reloads the renderer after recovery, and fails
-closed after more than three crashes in one minute. This supervision protocol is lifecycle and
-native-capability plumbing; renderer product data still uses HTTP/WebSocket.
+startup it applies bounded exponential restart, reloads the renderer after recovery, and shows a
+recovery screen once the crash budget is spent. This supervision protocol is lifecycle and
+native-capability plumbing; product data rides HTTP/WebSocket from main outward.
 
-All server-side local state — the SQLite DB (`acorn.sqlite`), the `blobs/`
-cache, per-task `worktrees/`, notes/proposals, and the internal-token/active-identity
-files — lives under one data root:
-`app.getPath('userData')` in packaged builds, `apps/desktop/.acorn/`
-(gitignored).
+### How the client reaches a node
 
-Because the API and the app share an origin, the session is a plain same-origin
-cookie — no CORS, no bearer tokens in the browser, no token storage on the client
-at all. See [authentication](./authentication.md). (A separate, opt-in
-public automation API runs a second `127.0.0.1` listener on
-its own port with bearer-token auth; it is disabled by default and does not
-change the SPA origin.)
+The renderer holds **no credential and no certificate**, and under `app://acorn`'s CSP
+(`connect-src 'self'`) it cannot open a connection to a node at all. Instead it calls
+`window.acorn.nodeFetch(nodeId, request)` / `nodeSend(nodeId, frame)` over the preload bridge;
+Electron main performs the real HTTPS with a pinned `https.Agent` and attaches the device bearer
+itself. Certificate pinning becomes a short comparison in Node rather than a fight with Chromium's
+certificate store, and the token stays where the renderer cannot read it. This inverts what the
+preload file used to say — request/response *and* streams both ride IPC now.
+
+All server-side local state for a node — `core.sqlite` (**not** V1's `acorn.sqlite`), the `blobs/`
+cache, per-task `worktrees/`, `tls/`, `logs/`, `node.json`, `node.lock`, notes/proposals, and the
+internal-token/active-identity files — lives under one data root:
+`app.getPath('userData')` in packaged builds, `apps/node/.acorn/` in a checkout (gitignored).
+`openDataRoot` mints the `nodeId`, takes an exclusive pidfile lock, and refuses a directory holding a
+V1 database outright — vNext never migrates V1 data.
+
+Authentication is a **device token** bearer, not a cookie: there is no session, no login and no CSRF
+middleware, because there is no ambient credential left to defend. See
+[authentication](./authentication.md).
 
 The HTTP API contract is mirrored into shared TypeScript, not a runtime RPC
 client. `packages/protocol/src/api.ts` owns response types, route builders, and
-query-key factories that the SPA consumes through plain same-origin `fetch`.
-That keeps the route and cache contracts typed without adding client bundle
+query-key factories that the SPA consumes through the thin `apiClient.ts` over the
+broker. That keeps the route and cache contracts typed without adding client bundle
 weight or extra per-request abstraction. See
-[api-reference](./api-reference.md) for the full route map.
+[api-reference](./api-reference.md) for the full route map, and
+[vNext/phase1-notes.md](./vNext/phase1-notes.md) for where the shipped transport
+deliberately stops short of the vNext design docs.
 
 ## The product model
 
@@ -191,8 +218,8 @@ These back the product model above and the agent spine:
 | Tasks | `tasks`, `task_links` |
 | Review | `review_notes` (inline notes on uncommitted changes), `viewed_files` |
 | Agents / memory | `agent_sessions`, `agent_turns`, `agent_events` (+ FTS5), `agent_requests`, `agent_attachments`, `agent_artifacts`, `agent_operations`, `agent_webhooks`, `agent_webhook_deliveries`, `memories` (+ FTS5), `terminal_sessions` |
-| Automation | `workflow_runs`, `workflow_steps`, `command_executions`, `config_acks` |
-| Public API | `api_tokens`, on-demand `oauth_accounts`, `api_idempotency` (bearer automation API) |
+| Automation | `workflow_runs`, `workflow_steps`, `config_acks` |
+| Transport | `devices` (paired clients, secret hashed), `idempotency` (device-keyed replay rows, 24h) |
 | HTTP client | identity-scoped `http_requests`, `http_variables` (sensitive values encrypted at rest) |
 | Database | repo-scoped `db_saved_queries` |
 | Prefs / misc | `prefs`, `pinned_repos`, `integrations`, `repo_paths` |
@@ -225,13 +252,16 @@ PRs. See [caching](./caching.md).
 A cold read of a PR list, top to bottom:
 
 ```
-Browser (SolidJS SPA)
-  │  TanStack Query: render from IndexedDB if present, then fetch
+Renderer (SolidJS SPA on app://acorn)
+  │  TanStack Query (one client per node): render from IndexedDB if present, then fetch
   ▼
-GET /api/repos/:owner/:repo/pulls           (same-origin cookie)
+window.acorn.nodeFetch(nodeId, '/v2/p/github/repos/:owner/:repo/pulls')
   │
-Hono server (Node utility process)
-  │  csrf() + authMiddleware: decrypt session cookie in-CPU → ctx.user
+Electron main: connection broker
+  │  pinned https.Agent + Authorization: Bearer acorn_dt_…
+  ▼
+Hono app on the node (HTTPS, TLS 1.3, ephemeral port)
+  │  authMiddleware → requireUser → idempotency: bearer → principal.userId
   ▼
 SQLite mirror
   │  sync_state fresh within TTL? ──► yes ──► serve mirror rows  ─┐
@@ -260,21 +290,24 @@ so a read inside the TTL window reflects the change. See
 ## The agent spine
 
 When a task first needs a working tree, acorn creates a **git worktree per task**
-under `apps/desktop/.acorn/worktrees/`, so several agents can work different
+under `<dataRoot>/worktrees/` (`apps/node/.acorn/worktrees/` in a checkout), so several agents can work different
 branches of the same repo without colliding. **Managed Claude/Codex sessions** are structured
-protocol processes owned by the Agents plugin in the Node utility service. Their normalized,
+protocol processes owned by the Agents plugin in the node. Their normalized,
 append-only event ledger and query projections share the app's SQLite connection. Raw shell/agent
-sessions remain PTYs managed by `plugins/terminal/main/terminal.ts`.
+sessions remain PTYs managed by `plugins/terminal/src/main/terminal.ts`.
 
 Managed turns receive immutable context snapshots through pane contribution registries; raw agents
 also get task-scoped tools through the **acorn MCP server**
-(`packages/node-core/src/mcp/server.ts`) over loopback. The stdio MCP proxy runs as a spawned child
-process and calls the running app rather than opening the database itself. Because it holds
-no session cookie, the utility service loads or creates one persistent mode-`0600`
-`INTERNAL_TOKEN` and injects it (with the other `ACORN_*` env vars) into each task session. The
-token is bound to the explicit `active-identity` written by cookie-authenticated traffic, so the
-agent's MCP calls authenticate back to the current machine user without acquiring a live GitHub
-token. Through that channel the
+(`packages/node-core/src/mcp/server.ts`) over loopback HTTPS. The stdio MCP proxy runs as a spawned
+child process and calls the running node rather than opening the database itself. Because it holds
+no device token, the node loads or creates one persistent mode-`0600`
+`INTERNAL_TOKEN` and injects it (with the other `ACORN_*` env vars) into each task session —
+alongside `ACORN_DATA_DIR`, from which the child resolves the node's *current* port out of
+`node.json`, and `NODE_EXTRA_CA_CERTS`, which is how it validates the node's certificate fully with
+no code of its own. The token is bound to the explicit `active-identity` written when GitHub is
+connected, so the agent's MCP calls authenticate back to the current machine owner. Note that this
+principal now *can* reach GitHub — see the posture note in
+[vNext/phase1-notes.md](./vNext/phase1-notes.md). Through that channel the
 agent reads the assembled task context, the current PR/changes, and the
 notes/memory that carry a handoff from the reviewer: `review_notes` become an
 agent prompt, and the `memories` index (markdown files are the truth; the table
@@ -291,15 +324,18 @@ projection itself is transport-neutral.
 
 - **No remote ingestion jobs or hosted daemon** — GitHub mirror reads remain demand-driven.
   Local managed-agent scheduling, workflow reconciliation and optional outbound attention/completion
-  webhook delivery run only while the desktop utility service is alive.
-- **No server-side session store** — the session lives entirely in an encrypted
-  cookie, decrypted per request.
-- **No GitHub token in the browser** — only public profile fields cross the wire.
-- **No second domain backend** — one utility service owns data and domain operations; its internal
-  SPA listener and opt-in public listener project the same registries/services. Electron main is a
-  native UI/supervision host and the stdio MCP child is a thin proxy, not a database owner.
-- **Single machine, single user** — no multi-tenancy, no shared storage to
-  protect; locally-owned tables are machine-scoped accordingly.
+  webhook delivery run only while the node is alive.
+- **No session and no login** — there is no cookie, no session store and no accounts. A client
+  presents a device-token bearer per request; the node holds `devices` rows and nothing else about
+  who is asking.
+- **No credential in the renderer** — no device token, no certificate, no GitHub token. Under
+  `app://acorn`'s CSP the renderer cannot reach a node directly at all.
+- **No second listener and no second domain backend** — one node owns data and domain operations
+  behind one `/v2` listener. Electron main is a native UI/supervision host plus the connection
+  broker, and the stdio MCP child is a thin proxy, not a database owner.
+- **Single user, no multi-tenancy** — no shared storage to protect; locally-owned tables are
+  machine-scoped accordingly. Single *machine* is no longer part of the claim: the client is
+  multi-node, though every node still belongs to the same one owner.
 
 ## Documentation index
 
@@ -359,11 +395,9 @@ projection itself is transport-neutral.
 - [electron](./electron.md) — the Cloudflare Workers → Electron migration: the
   runtime, bindings, packaging, and what changed (and didn't).
 - [local-development](./local-development.md) — building and launching the app,
-  OAuth callback setup, local SQLite/blob state, the ABI gotcha.
-- [authentication](./authentication.md) — GitHub OAuth web flow, the encrypted
-  stateless session cookie, CSRF protections, the 401 → reauth bounce.
+  GitHub OAuth App setup for the device flow, local SQLite/blob state, the ABI gotcha.
+- [authentication](./authentication.md) — device tokens, pairing, TLS pinning, the GitHub device
+  flow, and why there is no cookie and no CSRF middleware.
 - [security](./security.md) — loopback threat model, authentication boundaries,
   filesystem containment, secret handling, and tool permissions.
-- public-api — the opt-in bearer-authenticated HTTP + WebSocket
-  automation API: dedicated listener, token model, schema-first endpoints, OpenAPI.
 - [testing](./testing.md) — test suites, architecture checks, and validation commands.

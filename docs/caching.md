@@ -14,7 +14,7 @@ scope and lifetime. The whole design follows one principle:
 | --- | --- | --- | --- |
 | SQLite mirror | Local server / SQLite | Per user | All GitHub projections (repos, PRs, files, reviews, comments, checks, labels, threads) plus external issues (Linear, Rollbar → `issues`) |
 | `BLOBS` cache | Local server / on-disk | Per device | Immutable patch bodies + full file bodies keyed by blob SHA |
-| IndexedDB | Browser | Per user / device | Filtered TanStack Query cache (last API responses, excluding file bodies/patches) |
+| IndexedDB | Browser | Per device, partitioned per node | Filtered TanStack Query cache (last API responses, excluding file bodies/patches) |
 
 See [data-layer](./data-layer.md) for the schema behind layer 1. Layer 3
 (the IndexedDB-persisted TanStack Query cache, below) powers offline browsing
@@ -64,7 +64,7 @@ reads none of these stores directly — the caller's `read()` reports the cached
 data plus its `fetchedAt`, so the freshness backend stays opaque. There is no
 per-row `staleAfter` column.
 
-The batch-prefetch route (`routes/pullsBatch.ts`) warms detail + files for up to
+The batch-prefetch route (`plugins/github/src/server/routes/pullsBatch.ts`) warms detail + files for up to
 10 PRs at once and applies the same per-PR `sync_state` gates, so already-fresh
 PRs cost no GitHub calls.
 
@@ -143,27 +143,26 @@ stale), and the Linear/Rollbar reads (multi-connection fan-out with partial
 results and per-item freshness). They share the engine's TTLs from `policy.ts`
 but own their own flow.
 
-Explicit forced paths bypass the TTL: `POST /api/repos/refresh` zeroes
+Explicit forced paths bypass the TTL: `POST /v2/p/github/repos/refresh` zeroes
 both the repo rows' and the repos `sync_state` row's `fetchedAt` (the ETag is
 kept so the refetch can still `304`), and PR mutations bust the PR's
-`sync_state` row (`bustPrSync` in `routes/prContext.ts`) so the next read
-refetches. Internal PR detail/files reads accept `?force=true`; the public GitHub plugin's
-write-scoped refresh POSTs invoke the same open-list, detail, and file mirror operations directly.
+`sync_state` row (`bustPrSync` in `plugins/github/src/server/routes/prContext.ts`) so the next read
+refetches. PR detail/files reads accept `?force=true`.
 
 How the 200 path rewrites the mirror differs per resource:
 
-- **Repos** (`refreshRepos`, `routes/repoMirror.ts`): delete-then-insert in one
+- **Repos** (`refreshRepos`, `plugins/github/src/server/routes/repoMirror.ts`): delete-then-insert in one
   `db.batch([...])` (emulated via a better-sqlite3 transaction — see
   [electron.md](./electron.md) §4c) so repos the user lost access to drop out
   atomically.
-- **Open PR list** (`routes/pulls.ts`): chunked **upsert** of list-level fields
+- **Open PR list** (`plugins/github/src/server/routes/pulls.ts`): chunked **upsert** of list-level fields
   only — preserving detail-owned columns like `body` that the GraphQL detail
   route fetched — followed by a prune of rows whose `fetchedAt` predates the
   refresh, the Flow B task updates, and the `sync_state` upsert, all in one
   `db.batch` (a single transaction), so a mid-refresh failure leaves the
   previous mirror + stale sync intact and the next request retries.
 - **PR detail children** (`mirrorPr`) and **`pr_files`** (`mirrorFiles`), both in
-  `routes/prMirror.ts`: delete-then-insert in one `db.batch`.
+  `plugins/github/src/server/routes/prMirror.ts`: delete-then-insert in one `db.batch`.
 
 Inserts are chunked by column count (`chunkRowsByColumnBudget`,
 `packages/node-core/src/server/db/batch.ts`) to keep each statement under a conservative
@@ -177,8 +176,8 @@ The `BLOBS` cache holds **patch/diff bodies** and **full file bodies** (for
 expanding unchanged context around diff hunks), keyed by the file's blob `sha`.
 It's a local directory — `<dataDir>/blobs/`, where the data root is
 `app.getPath('userData')` in packaged builds and the repo-local
-`apps/desktop/.acorn/` in dev (`main/electron.ts` / `devDataDir` in
-`packages/node-core/src/main/server.ts`) — one file per key, implemented by `diskBlobCache`
+`apps/node/.acorn/` in dev (`main/electron.ts` / `devDataDir`, defined in
+`packages/node-core/src/main/serverConfig.ts` and re-exported from `main/server.ts`) — one file per key, implemented by `diskBlobCache`
 (the typed `BlobCache { get, put }`) in `packages/node-core/src/main/bindings.ts`
 (non-filename-safe chars are sanitized to `_`, so `patch:<sha>` lands on disk
 as `patch_<sha>`). Immutable content means no TTL and no delete. Both key
@@ -205,13 +204,18 @@ patch: includePatches && f.sha ? await env.BLOBS.get(patchBlobKey(f.sha)) : null
 
 (The old public-only rule existed because Workers KV was *shared* across users; a
 local single-user cache has no such constraint, and the `if (!repoRow.private)`
-guard has been removed from `pullBlob.ts`/`prMirror.ts` — see
+guard has been removed from `plugins/github/src/server/routes/`'s
+`pullBlob.ts`/`prMirror.ts` — see
 [electron.md](./electron.md) §5.)
 
 ## Layer 3 — Client IndexedDB (TanStack Query persistence)
 
 The SPA uses TanStack Query as a stale-while-revalidate cache and persists it to
-IndexedDB via `idb-keyval`. From `apps/desktop/src/app/client/index.tsx`:
+IndexedDB via `idb-keyval`. There is **one `QueryClient` and one IndexedDB persister per node**,
+both built lazily by `clientFor(nodeId)` in `packages/client-core/src/node/fleet.ts` — the only place
+a `QueryClient` is constructed in production. `apps/desktop/src/app/client/index.tsx` mounts just the
+*active* node's provider, keyed on the node id, so switching nodes remounts against a different
+cache rather than mixing two nodes' data. The defaults come from `fleet.ts`:
 
 ```ts
 defaultOptions: {
@@ -231,17 +235,20 @@ defaultOptions: {
 - **`refetchOnWindowFocus: true`** — refocusing revalidates data once it is stale, keeping the
   serve-then-revalidate feel without a request burst on every focus edge.
 
-The persister stores under key `acorn-cache` with `maxAge` 24h and a 5-second write throttle.
+The persister stores under key `acorn-cache:<nodeId>` (`cacheKeyFor` in `fleet.ts` — one IndexedDB
+key per node, so one node's snapshot can never rehydrate into another) with `maxAge` 24h and a
+5-second write throttle.
 It keeps TanStack's successful-query-only dehydration gate; pending Promises and failed queries are
 never serialized. `persistence/queryPersistence.ts` additionally excludes immutable file bodies and
-every patch-bearing files query because those payloads are reconstructable from the loopback API and
+every patch-bearing files query because those payloads are reconstructable from the node API and
 on-disk blob cache. It also applies a per-query 24h cutoff: `maxAge` alone timestamps the whole
 snapshot, so a regularly used app could otherwise rewrite the snapshot and preserve long-dead PR
 entries forever. On render the app shows the remaining last-known data instantly, then refetches.
 
-This cache is **per-user and private**. On logout the app wipes it
-(`window.addEventListener('acorn:logout', () => void clear())`) so the next
-user can't read it.
+This cache is **per-node and private**. Eviction is `dropNode(nodeId)` in `fleet.ts`, which runs when
+a node is removed from the fleet: it drops the in-memory client *and* deletes that node's IndexedDB
+key, because the two tiers are independent — deleting only the key would leave a live cache that
+re-persists itself on the next write. The account menu also exposes a manual **Clear cache** action.
 
 ## Locality {#public-private-rule}
 
@@ -252,13 +259,14 @@ All three layers are now local to one machine and one user, so the old
   multi-tenant design. See [data-layer](./data-layer.md#user-scoping-rule).
 - The `BLOBS` cache is an on-disk dir private to your machine — it caches all
   bodies by sha, public or private (the public-only guard is gone from the code).
-- IndexedDB is per-device and per-user, and is cleared on logout.
+- IndexedDB is per-device and partitioned per node, and a node's partition is deleted when that node
+  leaves the fleet.
 
 ## Maintenance and measurement
 
 Startup performs one correctness repair before serving: orphaned GitHub mirror children left by
-older non-atomic refreshes are pruned. It also expires public-API idempotency/command rows through
-their bounded maintenance paths. Derived mirror/provider/blob data does not yet have a general
+older non-atomic refreshes are pruned. It also sweeps the one device-scoped `idempotency` table via
+`runtime.IDEMPOTENCY.cleanupExpired()`. Derived mirror/provider/blob data does not yet have a general
 age/size retention sweep. Instead `@acorn/node-core/main/storageFootprint.ts` logs the SQLite and blob footprint
 at startup so that sweep is triggered by measured growth rather than speculation. See
 [next/performance.md](./next/performance.md).

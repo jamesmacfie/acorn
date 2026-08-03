@@ -390,7 +390,7 @@ hover/focus. Workspace-wide history remains in Agent Center. Full detail in
 - Task view & switcher: `apps/desktop/apps/desktop/src/app/client/TaskView.tsx`
 - Pane shortcuts: `packages/client-core/src/tasks/paneShortcuts.ts`
 - Recipes: `plugins/terminal/src/client/recipes.ts`
-- Pane bodies: `apps/desktop/src/plugins/*/client/`; the shell/host lives in
+- Pane bodies: `plugins/*/src/client/`; the shell/host lives in
   `packages/client-core/src/tasks/`
 
 See also: [frontend.md](./frontend.md) · [diff-rendering.md](./diff-rendering.md) ·

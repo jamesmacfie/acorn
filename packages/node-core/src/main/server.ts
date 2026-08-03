@@ -11,7 +11,8 @@ import { ensureCert } from './tls'
 import { attachWsHub, type WsAuthDeps } from './wsHub'
 import type { Env } from './bindings'
 
-// DEV data root: the repo-local apps/desktop/.acorn (gitignored). Only valid while running from a
+// DEV data root: the repo-local apps/node/.acorn (gitignored) — it belongs to apps/node because the
+// node owns SQLite, blobs and the node identity (./serverPaths.ts). Only valid while running from a
 // checkout — a packaged app's module dir is the read-only asar, so electron.ts passes an
 // app.getPath('userData') root into bootstrap() instead when app.isPackaged.
 export { devDataDir }

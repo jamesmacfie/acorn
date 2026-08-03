@@ -145,7 +145,7 @@ function loadDatabase(): typeof import('better-sqlite3') {
     if (msg.includes('NODE_MODULE_VERSION') || msg.includes('was compiled against a different Node.js version')) {
       const fix = process.versions.electron
         ? 'pnpm --filter @acorn/desktop electron:rebuild (this is an Electron process)'
-        : 'pnpm --filter @acorn/desktop node:rebuild (this is a plain Node process)'
+        : 'pnpm rebuild:node (this is a plain Node process)'
       throw new Error(`better-sqlite3 is built for the wrong ABI. Run: ${fix}\n\nOriginal error: ${msg}`)
     }
     throw e
@@ -212,8 +212,8 @@ function loadOrCreateInternalToken(dataDir: string): string {
 export type BindingsOptions = { dbPath: string; blobsDir: string; nodeId: string; appVersion: string }
 
 // Build the bindings object once at startup. Electron resolves the data root in electron.ts
-// (app.getPath('userData') when packaged, the repo-local apps/desktop/.acorn in dev) and passes
-// the paths in; the Node-only entry (dev:node) defaults to the repo-local dir in server.ts.
+// (app.getPath('userData') when packaged, the repo-local apps/node/.acorn in dev) and passes
+// the paths in; the standalone entry takes ACORN_DATA_DIR or that same dev root.
 export function makeBindings({ dbPath, blobsDir, nodeId, appVersion }: BindingsOptions): RuntimeBindings {
   const secret = (name: string): string => {
     const value = process.env[name]

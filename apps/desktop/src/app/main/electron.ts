@@ -26,7 +26,8 @@ protocol.registerSchemesAsPrivileged([
 
 // Writable app-data root (DB, blobs, worktrees, notes). Packaged builds must not write next to the
 // module (that's the read-only asar) — use the OS-standard userData dir. Dev keeps the repo-local
-// apps/desktop/.acorn so a checkout's data stays with the checkout.
+// apps/node/.acorn so a checkout's data stays with the checkout; it belongs to apps/node because the
+// node owns SQLite, blobs and the node identity (node-core/main/serverPaths.ts).
 const e2e = process.env.ACORN_E2E === '1'
 const dataDir = e2e && process.env.ACORN_E2E_DATA_DIR
   ? resolve(process.env.ACORN_E2E_DATA_DIR)
