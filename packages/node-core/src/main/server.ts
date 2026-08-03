@@ -1,4 +1,5 @@
 import { serve, type Http2Bindings, type HttpBindings, type ServerType } from '@hono/node-server'
+import type { ServiceEndpoint } from '@acorn/protocol/serviceProtocol.ts'
 import { serveStatic } from '@hono/node-server/serve-static'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
@@ -19,11 +20,16 @@ export { ACORN_PORT }
 
 export type StartListenerOptions = { clientDir?: string }
 
+// What the listener bound. Returned rather than assumed by the caller: the parent used to compute
+// the origin from a pinned port before the child existed, which cannot survive two nodes on one
+// machine (docs/vNext/architecture.md § Topology).
+export type Listener = { server: ServerType; endpoint: ServiceEndpoint }
+
 // Start the loopback HTTP listener over an already-built runtime. Split from startServer so the
 // service composition root (app/service/runtime.ts) can wire the harness/context bridges into the route modules
 // BEFORE the listener accepts requests (composition-root ownership boot-order fix). Resolves once listening so
 // callers can safely loadURL the origin.
-export function startListener(runtime: RuntimeBindings, options: StartListenerOptions = {}): Promise<ServerType> {
+export function startListener(runtime: RuntimeBindings, options: StartListenerOptions = {}): Promise<Listener> {
   // Every bridge (pure-Node domain bridges AND the stateful harness/context bridges) is installed by
   // the composition root (app/service/runtime.ts under Electron, app/server/devNode.ts under dev:node)
   // BEFORE this is called — core no longer imports plugin bridge wiring (docs/plugins.md).
@@ -65,7 +71,7 @@ export function startListener(runtime: RuntimeBindings, options: StartListenerOp
     const server = serve({ fetch, hostname: '127.0.0.1', port: ACORN_PORT }, (info) => {
       console.log(`acorn server on http://127.0.0.1:${info.port}`)
       server.off('error', reject) // listening — later runtime errors are not listen failures
-      resolveServer(server)
+      resolveServer({ server, endpoint: { origin: `http://127.0.0.1:${info.port}`, port: info.port } })
     })
     // The one authenticated WebSocket (the WebSocket transport) shares this loopback listener via its
     // 'upgrade' event; the hub re-checks Host + Origin + session cookie before the handshake.
@@ -97,6 +103,6 @@ export function makeRuntime(root: DataRoot): RuntimeBindings {
 // entry (app/server/devNode.ts) has no composition root, so it needs all three. Kept in core (pure
 // engine); the dev:node entry lives in app/ because choosing to auto-start + registering plugin
 // providers is composition, not engine.
-export function startServer(dataDir: string = devDataDir()): Promise<ServerType> {
+export function startServer(dataDir: string = devDataDir()): Promise<Listener> {
   return startListener(makeRuntime(openDataRoot(dataDir)))
 }

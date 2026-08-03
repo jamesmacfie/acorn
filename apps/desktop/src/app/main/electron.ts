@@ -2,10 +2,10 @@ import { app, BrowserWindow, dialog, ipcMain, shell } from 'electron'
 import { join, resolve } from 'node:path'
 import { bootstrap } from './bootstrap'
 import { resolveSessionKey } from './sessionKeyStore'
-import { ACORN_PORT, devDataDir } from '@acorn/node-core/main/serverConfig.ts'
+import { devDataDir } from '@acorn/node-core/main/serverConfig.ts'
 import { isAllowedExternalUrl } from '@acorn/node-core/main/urlGuards.ts'
+import type { ServiceStartResult } from '@acorn/protocol/serviceProtocol.ts'
 
-const ORIGIN = `http://127.0.0.1:${ACORN_PORT}`
 const PRELOAD = join(import.meta.dirname, '../preload/index.cjs')
 
 // Writable app-data root (DB, blobs, worktrees, notes). Packaged builds must not write next to the
@@ -32,11 +32,15 @@ for (const envFile of [join(import.meta.dirname, '../../.env'), join(dataDir, '.
 process.env.GITHUB_CLIENT_ID ??= import.meta.env.MAIN_VITE_GITHUB_CLIENT_ID
 process.env.GITHUB_CLIENT_SECRET ??= import.meta.env.MAIN_VITE_GITHUB_CLIENT_SECRET
 
-// Single-instance: a second launch focuses the existing window. A pinned port means only one
-// process can own the app origin (docs/electron.md §9) — fail fast rather than fight over it.
+// Single-instance: a second launch focuses the existing window. The data root's exclusive lock
+// (node-core/main/dataRoot.ts) is the real mutual exclusion; this keeps a second launch from getting
+// as far as fighting over it.
 if (!app.requestSingleInstanceLock()) app.quit()
 
 let mainWindow: BrowserWindow | null = null
+// Where the service actually bound. Not derivable before the child exists — it reports it back from
+// service.start — so a Dock-activate that recreates the window reads the last known result.
+let serviceStarted: ServiceStartResult | null = null
 let quitApproved = false
 let quitPromptPending = false
 
@@ -61,7 +65,7 @@ ipcMain.on('acorn:quit-response', (_event, approved: boolean) => {
 // The renderer logs in by navigating to /auth/login, which 302s to github.com. The main window
 // is locked to the loopback origin, so we intercept that and run the whole OAuth dance in a
 // dedicated window that *is* allowed to visit GitHub (docs/electron.md §4f), then refresh.
-function openAuthWindow(parent: BrowserWindow, loginUrl: string) {
+function openAuthWindow(parent: BrowserWindow, origin: string, loginUrl: string) {
   const authWin = new BrowserWindow({
     parent,
     modal: true,
@@ -73,7 +77,7 @@ function openAuthWindow(parent: BrowserWindow, loginUrl: string) {
   // After GitHub redirects back to the loopback /auth/callback, the server sets the session cookie
   // and redirects to an app route. Landing on a non-/auth loopback URL means login finished.
   authWin.webContents.on('did-navigate', (_e, url) => {
-    if (url.startsWith(ORIGIN) && !url.includes('/auth/')) {
+    if (url.startsWith(origin) && !url.includes('/auth/')) {
       authWin.close()
       parent.webContents.reload() // re-runs /api/me with the new cookie
     }
@@ -81,7 +85,7 @@ function openAuthWindow(parent: BrowserWindow, loginUrl: string) {
   void authWin.loadURL(loginUrl)
 }
 
-function hardenNavigation(win: BrowserWindow) {
+function hardenNavigation(win: BrowserWindow, origin: string) {
   // Anything leaving the renderer for the OS goes through the scheme allowlist first: the pane
   // content that produces these links (GitHub bodies, Linear issues/attachments, Rollbar) is
   // third-party, so a `file:`/custom-scheme href would otherwise be an arbitrary-app launch.
@@ -93,10 +97,10 @@ function hardenNavigation(win: BrowserWindow) {
   // The main window may only ever sit on the loopback origin. External links open in the system
   // browser; a /auth/login navigation is rerouted into the OAuth window above.
   win.webContents.on('will-navigate', (e, url) => {
-    if (url.startsWith(ORIGIN)) {
+    if (url.startsWith(origin)) {
       if (url.includes('/auth/login')) {
         e.preventDefault()
-        openAuthWindow(win, url)
+        openAuthWindow(win, origin, url)
       }
       return
     }
@@ -112,7 +116,8 @@ function hardenNavigation(win: BrowserWindow) {
   // will-attach-webview handler here anymore.
 }
 
-async function createMainWindow() {
+async function createMainWindow(started: ServiceStartResult) {
+  const origin = started.endpoint.origin
   const win = new BrowserWindow({
     width: 1440,
     height: 900,
@@ -125,7 +130,7 @@ async function createMainWindow() {
       sandbox: true,
     },
   })
-  hardenNavigation(win)
+  hardenNavigation(win, origin)
   // Cmd/Ctrl+W closes the FOCUSED pane (terminal tab / editor file), not the whole window. We
   // intercept in main because a menu accelerator can't be suppressed from the page — preventing
   // before-input-event disables it (Electron docs). The renderer decides what "focused pane" is;
@@ -138,7 +143,7 @@ async function createMainWindow() {
     }
   })
   win.once('ready-to-show', () => win.show())
-  await win.loadURL(e2e ? `${ORIGIN}/auth/test-login` : ORIGIN)
+  await win.loadURL(e2e ? `${origin}/auth/test-login` : origin)
   return win
 }
 
@@ -147,9 +152,15 @@ app.whenReady().then(async () => {
   // the loopback listener, then creates the window (main/bootstrap.ts owns the order + teardown).
   try {
     resolveSessionKey(dataDir) // safeStorage-backed SESSION_ENC_KEY before any binding reads it
-    mainWindow = await bootstrap({ dataDir, origin: ORIGIN, createWindow: createMainWindow })
+    mainWindow = await bootstrap({
+      dataDir,
+      createWindow: async (started) => {
+        serviceStarted = started
+        return createMainWindow(started)
+      },
+    })
   } catch (e) {
-    // Boot is all-or-nothing: a failure here (migration, EADDRINUSE on the pinned port, …) means no
+    // Boot is all-or-nothing: a failure here (migration, a data root already locked, …) means no
     // origin to load — surface it and quit rather than sit headless in the dock forever (this
     // macOS build has no window-all-closed quit).
     dialog.showErrorBox('acorn failed to start', e instanceof Error ? (e.stack ?? e.message) : String(e))
@@ -165,9 +176,12 @@ app.on('second-instance', () => {
 })
 
 app.on('activate', () => {
-  // mainWindow set ⇒ bootstrap finished (listener up). Before that, a Dock-click window would
-  // loadURL an origin nothing is serving yet — and bootstrap is about to create its own window.
-  if (mainWindow && BrowserWindow.getAllWindows().length === 0) void createMainWindow().then((w) => (mainWindow = w))
+  // serviceStarted set ⇒ bootstrap finished (listener up) and we know where it bound. Before that, a
+  // Dock-click window would loadURL an origin nothing is serving yet — and bootstrap is about to
+  // create its own window.
+  if (serviceStarted && mainWindow && BrowserWindow.getAllWindows().length === 0) {
+    void createMainWindow(serviceStarted).then((w) => (mainWindow = w))
+  }
 })
 
 // macOS-only build; standard behavior is to stay alive until Cmd-Q (no window-all-closed quit).

@@ -6,30 +6,39 @@ import { app, dialog, type BrowserWindow } from 'electron'
 import { join } from 'node:path'
 import { registerPreviewIpc } from '@acorn/plugin-preview/main/previewService.ts'
 import { registerRepoPickerIpc } from '@acorn/plugin-terminal/main/pickerIpc.ts'
-import type { ServiceState } from '@acorn/protocol/serviceProtocol.ts'
+import type { ServiceStartResult, ServiceState } from '@acorn/protocol/serviceProtocol.ts'
+import { readLocalDeviceToken, writeLocalDeviceToken } from './deviceTokenStore'
 import { ServiceHost } from './serviceHost'
 
 export type BootstrapOptions = {
   dataDir: string
-  origin: string
-  createWindow: () => Promise<BrowserWindow>
+  createWindow: (started: ServiceStartResult) => Promise<BrowserWindow>
 }
 
 const wait = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms))
 
-export async function bootstrap({ dataDir, origin, createWindow }: BootstrapOptions): Promise<BrowserWindow> {
+export async function bootstrap({ dataDir, createWindow }: BootstrapOptions): Promise<BrowserWindow> {
   let disposed = false
   let bootComplete = false
   let recovering = false
   let window: BrowserWindow | null = null
   const crashTimes: number[] = []
+  const userDataDir = app.getPath('userData')
+
+  // Start the service and persist whatever token it ended up using. Reused on every start, including
+  // crash recovery — a restart must not mint a new device row, and the endpoint can change across
+  // restarts, so the caller always takes the fresh result rather than caching the first one.
+  const startService = async (): Promise<ServiceStartResult> => {
+    const started = await service.start(readLocalDeviceToken(userDataDir))
+    writeLocalDeviceToken(userDataDir, started.deviceToken)
+    return started
+  }
 
   const service = new ServiceHost(
     join(import.meta.dirname, 'service.js'),
     {
       dataDir,
       clientDir: join(import.meta.dirname, '../../dist/client'),
-      origin,
       version: app.getVersion(),
       isPackaged: app.isPackaged,
       electronPath: process.execPath,
@@ -76,7 +85,7 @@ export async function bootstrap({ dataDir, origin, createWindow }: BootstrapOpti
     }
     try {
       await wait(250 * (2 ** (crashTimes.length - 1)))
-      await service.start()
+      await startService()
       if (window && !window.isDestroyed()) window.webContents.reload()
       console.log('[service-host] background service recovered')
     } catch (error) {
@@ -98,8 +107,8 @@ export async function bootstrap({ dataDir, origin, createWindow }: BootstrapOpti
   try {
     // The service start request resolves when migrations, bridge installation, and the loopback
     // listener are complete. Durable reconciliation continues there in the background.
-    await service.start()
-    window = await createWindow()
+    const started = await startService()
+    window = await createWindow(started)
     bootComplete = true
     return window
   } catch (error) {
