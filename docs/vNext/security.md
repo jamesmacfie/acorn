@@ -27,6 +27,10 @@ restricted — and can never read secrets back, mint tokens, or use the Node as 
   client, revocable per device. Streams re-check revocation every 60s.
 - Pairing: one-time 10-minute single-use code, 5 attempts, rate-limited, owner-initiated on both
   ends (see protocol.md). Failures are uniform — no oracle for "right code, wrong something".
+- The renderer has **no network permission at all**: it loads from `app://acorn` under a
+  Content-Security-Policy whose `connect-src` is `'self'`, and every byte to or from a node crosses
+  IPC to the broker in Electron main. A cross-site page cannot reach a node, and a compromised
+  renderer cannot open a socket to anywhere — including the node it is already talking to.
 - The bundled Node binds loopback by default. Exposing a Node beyond loopback is an explicit
   owner action, and the recommended remote path is the user's own VPN/tailnet rather than a
   public bind.

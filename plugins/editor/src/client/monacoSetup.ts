@@ -1,6 +1,7 @@
 // Monaco needs its language services in web workers. Wire them via Vite's `?worker` imports (the
-// documented Vite pattern) so they bundle as separate chunks and load from the loopback origin — no
-// CSP is set, so this works. Import this module once before creating an editor.
+// documented Vite pattern) so they bundle as separate chunks and load from the renderer's own origin,
+// which is what `worker-src 'self'` in the app:// CSP (main/appScheme.ts) permits. Import this module
+// once before creating an editor.
 // ponytail: full monaco, trim languages only if bundle size ever bites.
 import EditorWorker from 'monaco-editor/esm/vs/editor/editor.worker?worker'
 import JsonWorker from 'monaco-editor/esm/vs/language/json/json.worker?worker'
