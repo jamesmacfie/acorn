@@ -14,6 +14,7 @@ import type { Env } from '@acorn/node-core/main/bindings.ts'
 // then works everywhere a session does — and stops working the instant the device is revoked.
 
 const NODE_ID = '11111111-2222-3333-4444-555555555555'
+const FINGERPRINT = 'a'.repeat(64)
 const ORIGIN = 'http://127.0.0.1:4317'
 
 let harness: TestDb
@@ -29,6 +30,7 @@ beforeEach(() => {
     DB: harness.db,
     NODE_ID,
     APP_VERSION: '9.9.9-test',
+    NODE_FINGERPRINT: FINGERPRINT,
     DEVICES: deviceService(harness.db),
     PAIRING_CODES: pairingCodes(),
     ACTIVE_IDENTITY: { get: (): string | null => 'james', set: () => {}, clear: () => {} },
@@ -81,13 +83,13 @@ describe('GET /v2/node', () => {
     // Key-exact, not a subset match: the point of this route is what it does NOT say to anything that
     // can reach the port.
     expect(Object.keys(info).sort()).toEqual(['fingerprint', 'protocolVersion'])
-    expect(info).toEqual({ protocolVersion: NODE_PROTOCOL_VERSION, fingerprint: null })
+    expect(info).toEqual({ protocolVersion: NODE_PROTOCOL_VERSION, fingerprint: FINGERPRINT })
   })
 
   it('adds the node identity and app version once authenticated', async () => {
     const { deviceToken } = await pairDevice()
     const info = (await (await send('/v2/node', { token: deviceToken })).json()) as NodeInfo
-    expect(info).toEqual({ protocolVersion: NODE_PROTOCOL_VERSION, fingerprint: null, nodeId: NODE_ID, appVersion: '9.9.9-test' })
+    expect(info).toEqual({ protocolVersion: NODE_PROTOCOL_VERSION, fingerprint: FINGERPRINT, nodeId: NODE_ID, appVersion: '9.9.9-test' })
   })
 })
 

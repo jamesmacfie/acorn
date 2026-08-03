@@ -1,20 +1,24 @@
-import { createServer } from 'node:net'
+import { request as httpsRequest } from 'node:https'
 import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
-import { join, resolve } from 'node:path'
+import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 import type { DesktopCapabilities } from '@acorn/protocol/desktopCapabilities.ts'
-import type { ServiceState } from '@acorn/protocol/serviceProtocol.ts'
+import type { ServiceStartResult, ServiceState } from '@acorn/protocol/serviceProtocol.ts'
 
-function unusedPort(): Promise<number> {
+// A fully validated request against the node's reported pin. `ca` is the node's own self-signed
+// certificate; `rejectUnauthorized` stays true, so the IP:127.0.0.1 SAN has to match too.
+function get(started: ServiceStartResult, path: string): Promise<number> {
   return new Promise((resolve, reject) => {
-    const server = createServer()
-    server.once('error', reject)
-    server.listen(0, '127.0.0.1', () => {
-      const address = server.address()
-      if (!address || typeof address === 'string') return reject(new Error('No test port assigned'))
-      server.close(() => resolve(address.port))
-    })
+    const req = httpsRequest(
+      { host: '127.0.0.1', port: started.endpoint.port, path, ca: [started.certPem], rejectUnauthorized: true },
+      (res) => {
+        res.resume()
+        res.on('end', () => resolve(res.statusCode ?? 0))
+      },
+    )
+    req.on('error', reject)
+    req.end()
   })
 }
 
@@ -58,19 +62,11 @@ describe('Electron-free service runtime', () => {
     dataDir = null
   })
 
-  // The real built renderer: this test asserts the service serves the SPA shell, so it needs an
-  // actual index.html rather than a stub. The renderer is owned and built by apps/desktop, so this
-  // reaches across to its build output — a filesystem path, not an import, which is why it does not
-  // violate the "apps never import each other" boundary. It does mean a desktop renderer build must
-  // have happened at least once.
-  const clientDir = resolve(import.meta.dirname, '../../../desktop/dist/client')
-
   const startRuntime = async (opts: { dataDir: string; deviceToken?: string; onState?: (s: ServiceState) => void }) => {
     const { startServiceRuntime } = await import('./runtime')
     return startServiceRuntime({
       config: {
         dataDir: opts.dataDir,
-        clientDir,
         version: 'test',
         isPackaged: false,
         electronPath: process.execPath,
@@ -82,17 +78,17 @@ describe('Electron-free service runtime', () => {
     })
   }
 
-  const seedEnv = async (): Promise<number> => {
-    const port = await unusedPort()
-    process.env.ACORN_PORT = String(port)
+  // No ACORN_PORT: the service picks its own port now. Pinning one here would test a configuration the
+  // app never uses.
+  const seedEnv = (): void => {
+    delete process.env.ACORN_PORT
     process.env.SESSION_ENC_KEY = '0'.repeat(64)
     process.env.GITHUB_CLIENT_ID = 'test-client'
     process.env.GITHUB_CLIENT_SECRET = 'test-secret'
-    return port
   }
 
-  it('migrates, serves the SPA, reconciles, and drains without Electron or GitHub', async () => {
-    const port = await seedEnv()
+  it('migrates, listens over TLS, reconciles, and drains without Electron or GitHub', async () => {
+    seedEnv()
     dataDir = mkdtempSync(join(tmpdir(), 'acorn-service-'))
 
     const states: ServiceState[] = []
@@ -107,39 +103,61 @@ describe('Electron-free service runtime', () => {
     })
 
     try {
-      // The endpoint is reported, not assumed: the parent no longer computes an origin before the
-      // child exists, which is what lets two nodes coexist on one machine.
-      expect(runtime.started.endpoint).toEqual({ origin: `http://127.0.0.1:${port}`, port })
+      // The endpoint AND the pin are reported, not assumed: the parent no longer computes an origin
+      // before the child exists, which is what lets two nodes coexist on one machine.
+      expect(runtime.started.endpoint.origin).toBe(`https://127.0.0.1:${runtime.started.endpoint.port}`)
       expect(runtime.started.nodeId).toMatch(/^[0-9a-f-]{36}$/)
       expect(runtime.started.deviceToken).toMatch(/^acorn_dt_/)
+      expect(runtime.started.fingerprint).toMatch(/^[0-9a-f]{64}$/)
 
-      const response = await fetch(runtime.started.endpoint.origin)
-      expect(response.status).toBe(200)
-      expect(await response.text()).toContain('<!doctype html>')
+      // The pre-auth route, over a connection validated against the reported certificate. There is no
+      // SPA shell to fetch any more — the node serves no web assets.
+      expect(await get(runtime.started, '/v2/node')).toBe(200)
       await ready
       expect(states).toEqual(['migrating', 'listening', 'reconciling', 'ready'])
     } finally {
       await runtime.stop()
     }
     expect(states.at(-1)).toBe('stopped')
-  }, 15_000)
+  }, 20_000)
+
+  // Two nodes on one machine is an ordinary case now (docs/vNext/architecture.md § Topology), and the
+  // pinned port made it impossible.
+  it('binds a different port, and a different identity, per data root', async () => {
+    seedEnv()
+    dataDir = mkdtempSync(join(tmpdir(), 'acorn-service-a-'))
+    const other = mkdtempSync(join(tmpdir(), 'acorn-service-b-'))
+    const first = await startRuntime({ dataDir })
+    try {
+      const second = await startRuntime({ dataDir: other })
+      try {
+        expect(second.started.endpoint.port).not.toBe(first.started.endpoint.port)
+        expect(second.started.fingerprint).not.toBe(first.started.fingerprint)
+      } finally {
+        await second.stop()
+      }
+    } finally {
+      await first.stop()
+      rmSync(other, { recursive: true, force: true })
+    }
+  }, 30_000)
 
   // Without reuse the bundled client would accrue one device row per launch, and the device list
   // would be useless within a week.
   it('reuses a remembered device token across restarts, and replaces an unknown one', async () => {
-    await seedEnv()
+    seedEnv()
     dataDir = mkdtempSync(join(tmpdir(), 'acorn-service-'))
 
     const first = await startRuntime({ dataDir })
     const token = first.started.deviceToken
     await first.stop()
 
-    await seedEnv()
+    seedEnv()
     const second = await startRuntime({ dataDir, deviceToken: token })
     expect(second.started.deviceToken).toBe(token)
     await second.stop()
 
-    await seedEnv()
+    seedEnv()
     const third = await startRuntime({ dataDir, deviceToken: 'acorn_dt_not-a-real-token' })
     expect(third.started.deviceToken).not.toBe('acorn_dt_not-a-real-token')
     expect(third.started.deviceToken).toMatch(/^acorn_dt_/)

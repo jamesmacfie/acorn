@@ -41,7 +41,6 @@ export async function bootstrap({ dataDir, createWindow }: BootstrapOptions): Pr
     join(import.meta.dirname, 'service.js'),
     {
       dataDir,
-      clientDir: join(import.meta.dirname, '../../dist/client'),
       version: app.getVersion(),
       isPackaged: app.isPackaged,
       electronPath: process.execPath,

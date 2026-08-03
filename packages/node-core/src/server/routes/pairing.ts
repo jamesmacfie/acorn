@@ -63,9 +63,11 @@ export function pairingRoutes(): { open: Hono<AppEnv>; core: Hono<AppEnv> } {
       const authenticated = c.get('principal') !== null
       const info: NodeInfo = {
         protocolVersion: NODE_PROTOCOL_VERSION,
-        // ponytail: null until the listener speaks TLS — there is no certificate to fingerprint yet.
-        // The TLS stage fills this in, and it is the value a client pins against.
-        fingerprint: null,
+        // The certificate a client pins against (docs/vNext/protocol.md § Pairing step 2: the new client
+        // "verifies the TLS cert matches the advertised fingerprint"). Advertising it here is not what
+        // makes the pin trustworthy — reading it over the very connection being authenticated proves
+        // nothing. It is the value the owner compares against the code shown on the node.
+        fingerprint: c.env.NODE_FINGERPRINT,
         ...(authenticated ? { nodeId: c.env.NODE_ID, appVersion: c.env.APP_VERSION } : {}),
       }
       return c.json(info)

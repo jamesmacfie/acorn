@@ -23,12 +23,11 @@ export type NodeIdentity = z.infer<typeof nodeIdentitySchema>
 // (docs/vNext/protocol.md § Versioning), because anything that can reach the port can read the
 // unauthenticated form.
 //
-// `fingerprint` is null while the listener is plain http on loopback: there is no certificate to
-// fingerprint yet. It is not optional, so a client can tell "this node has no pin" from "this field
-// was forgotten".
+// `fingerprint` is the sha256 of the node's self-signed certificate (lowercase hex). Always present:
+// the listener is TLS unconditionally, and an optional pin is a pin that silently is not one.
 export type NodeInfo = {
   protocolVersion: number
-  fingerprint: string | null
+  fingerprint: string
   nodeId?: string
   appVersion?: string
 }

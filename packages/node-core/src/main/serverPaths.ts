@@ -23,19 +23,15 @@ export function findWorkspaceRoot(startDir: string): string {
   }
 }
 
-// Dev-checkout paths. Only meaningful when running from a source checkout; a packaged app passes
-// its own dataDir and clientDir in through ServiceStartConfig instead.
+// The dev-checkout data root. Only meaningful when running from a source checkout; a packaged app
+// passes its own dataDir in through ServiceStartConfig instead.
 //
-// The dev data root belongs to apps/node — it is the service that owns SQLite, blobs and the node
-// identity, and `dev:node` must be able to run without apps/desktop existing at all. clientDir
-// still points into apps/desktop because the node currently serves the built renderer; that leaves
-// with the app:// origin move, at which point clientDir stops travelling to the node entirely.
-export function resolveServerPaths(moduleDir: string): { clientDir: string; devDataDir: string } {
-  const root = findWorkspaceRoot(moduleDir)
-  return {
-    clientDir: resolve(root, 'apps/desktop/dist/client'),
-    devDataDir: resolve(root, 'apps/node/.acorn'),
-  }
+// It belongs to apps/node — the service owns SQLite, blobs and the node identity, and `dev:node` must
+// be able to run without apps/desktop existing at all. This used to return a `clientDir` under
+// apps/desktop too, because the node served the built renderer; that left with the app:// origin move
+// (main/appScheme.ts owns the renderer's bytes now, and the node serves no web assets).
+export function resolveServerPaths(moduleDir: string): { devDataDir: string } {
+  return { devDataDir: resolve(findWorkspaceRoot(moduleDir), 'apps/node/.acorn') }
 }
 
 export function resolveDatabasePath(dataDir: string): string {

@@ -24,10 +24,9 @@ export const serviceStateEventSchema = z.strictObject({
 
 export const serviceStartConfigSchema = z.strictObject({
   dataDir: z.string().min(1),
-  // Where the built renderer lives. Passed in rather than derived: the service graph lives in
-  // @acorn/node-core, which has no way to locate the desktop app's dist/ and must not try — only
-  // the composition root knows the layout around it.
-  clientDir: z.string().min(1),
+  // No clientDir: the node serves no web assets (docs/vNext/architecture.md). The renderer ships with
+  // the desktop app and loads from app://acorn, so there is nothing about the renderer's layout the
+  // service needs to be told.
   version: z.string().min(1),
   isPackaged: z.boolean(),
   electronPath: z.string().min(1),
@@ -56,10 +55,11 @@ export const serviceStartResultSchema = z.strictObject({
   endpoint: serviceEndpointSchema,
   // The bearer the client authenticates with. Never logged.
   deviceToken: z.string().min(1),
-  // Present only once the listener speaks TLS: the cert to pin and its fingerprint. Absent means
-  // plain http on loopback, which is where this starts.
-  fingerprint: z.string().optional(),
-  certPem: z.string().optional(),
+  // The node's transport identity: the self-signed certificate to pin and its sha256 fingerprint
+  // (docs/vNext/protocol.md § Transport and identity). Required, not optional — the listener is TLS
+  // unconditionally, and an optional pin is a pin that silently is not one.
+  fingerprint: z.string().min(1),
+  certPem: z.string().min(1),
 })
 export type ServiceStartResult = z.infer<typeof serviceStartResultSchema>
 

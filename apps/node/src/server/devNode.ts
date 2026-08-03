@@ -17,4 +17,4 @@ const runtime = makeRuntime(root)
 await prepareSecurityState(runtime)
 await runtime.IDEMPOTENCY.cleanupExpired() // reclaim yesterday's replay rows; see service/runtime.ts
 wireServerBridges(runtime.DB, dataDir) // search / editor / local-git / database / agent-usage HTTP route bridges
-void startListener(runtime)
+void startListener(runtime, root)
