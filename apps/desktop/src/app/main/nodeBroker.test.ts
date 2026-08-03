@@ -201,15 +201,41 @@ describe('broker HTTP', () => {
     await expect(makeBroker().fetch('nope', { requestId: 'r1', path: '/x' })).rejects.toThrow(/Unknown node/)
   })
 
-  it('marks a node revoked on a 401 so it stops being retried', async () => {
+  it('marks a node revoked on the auth gate\'s 401 so it stops being retried', async () => {
     const { origin } = await listen(false)
-    respond = () => ({ status: 401, body: '{}' })
+    respond = () => ({ status: 401, body: '{"error":{"code":"unauthenticated","message":"unauthenticated","requestId":"r","retryable":false}}' })
     const broker = makeBroker()
     broker.upsert({ nodeId: 'n1', label: 'local', endpoint: origin, local: true, token: 'stale' })
 
     await broker.fetch('n1', { requestId: 'r1', path: '/x' })
     await waitFor(() => statuses.some((s) => s.state === 'revoked'), 'the revoked transition')
     expect(statuses.at(-1)).toMatchObject({ state: 'revoked', error: { code: 'unauthorized' } })
+  })
+
+  // The regression this exists for: reading the STATUS alone, a fresh node was marked `revoked` — a
+  // security state that also stops the socket being retried — by the ordinary 403 a never-connected
+  // GitHub integration answers with. The two-node e2e caught it as "the local node is revoked" seconds
+  // after a clean boot. Route-level 401s (`linear_reauth`, `provider_needs_auth`) are the same mistake
+  // one status code over, so both are asserted.
+  it('leaves the node alone for a route-level 401/403 about a third-party credential', async () => {
+    const { origin } = await listen(false)
+    // Scoped to the two paths under test. Answering the /v2/events upgrade with a 401 as well would
+    // trip the WS's own (correct) revocation path and prove nothing about the HTTP one.
+    respond = (path) => {
+      if (path === '/provider-403') {
+        return { status: 403, body: '{"error":{"code":"provider_not_connected","message":"provider_not_connected","requestId":"r","retryable":false}}' }
+      }
+      if (path === '/provider-401') {
+        return { status: 401, body: '{"error":{"code":"linear_reauth","message":"linear_reauth","requestId":"r","retryable":false}}' }
+      }
+      return { status: 200, body: '{"ok":true}', headers: { 'content-type': 'application/json' } }
+    }
+    const broker = makeBroker()
+    broker.upsert({ nodeId: 'n1', label: 'local', endpoint: origin, local: true, token: 'acorn_dt_good' })
+
+    expect((await broker.fetch('n1', { requestId: 'r1', path: '/provider-403' })).status).toBe(403)
+    expect((await broker.fetch('n1', { requestId: 'r2', path: '/provider-401' })).status).toBe(401)
+    expect(statuses.map((s) => s.state)).not.toContain('revoked')
   })
 
   it('never exposes the token in the fleet projection', async () => {
