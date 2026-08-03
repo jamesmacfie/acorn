@@ -881,3 +881,45 @@ export const httpVariables = sqliteTable(
   },
   (t) => [uniqueIndex('http_variables_user_repo_name_idx').on(t.userId, t.repoOwner, t.repoName, t.name)],
 )
+
+// --- Device identity: the vNext auth root (docs/vNext/protocol.md § Pairing) ---
+
+// One row per paired client. Every paired device has full owner authority — a disclosed product
+// decision (docs/vNext/security.md § Threat model), so there are no scopes and no per-device
+// authorization; the row exists to name a device and to be revocable.
+//
+// Only sha256(secret) is stored. A 256-bit random secret makes offline hash guessing infeasible, so
+// nothing reversible is layered on and the plaintext is returned exactly once, at pairing.
+export const devices = sqliteTable(
+  'devices',
+  {
+    id: text('id').primaryKey(), // opaque uuid, also the public half of the token
+    name: text('name').notNull(), // user-supplied ("James's laptop")
+    secretHash: blob('secret_hash').notNull(), // sha256 of the token secret — never the secret
+    createdAt: integer('created_at').notNull(),
+    // Best-effort telemetry for the device list, written at most once per throttle window and off
+    // the request path; a failed write must never fail authentication.
+    lastSeenAt: integer('last_seen_at'),
+    // Set once, never unset. Revocation is permanent: the row stays so the device list can show
+    // what was revoked and when, and so a replayed token can never be resurrected.
+    revokedAt: integer('revoked_at'),
+  },
+  (t) => [index('devices_revoked_idx').on(t.revokedAt)],
+)
+
+// Idempotency replay (docs/vNext/protocol.md § HTTP conventions). Stores (deviceId, key) → request
+// hash + response for 24h: the same request replays the stored response, a different request under
+// the same key is a 409, and 5xx is never stored so a genuine retry re-executes.
+export const idempotency = sqliteTable(
+  'idempotency',
+  {
+    deviceId: text('device_id').notNull(),
+    key: text('key').notNull(), // client-minted UUIDv7 from the Idempotency-Key header
+    requestHash: text('request_hash').notNull(), // sha256(method \n path \n rawBody)
+    responseStatus: integer('response_status').notNull(),
+    responseBody: text('response_body').notNull(),
+    createdAt: integer('created_at').notNull(),
+    expiresAt: integer('expires_at').notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.deviceId, t.key] }), index('idempotency_expiry_idx').on(t.expiresAt)],
+)
