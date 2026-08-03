@@ -9,10 +9,12 @@ import { respondError } from '@acorn/node-core/server/respond.ts'
 import { REPOS_STALE_AFTER_MS } from '@acorn/node-core/server/sync/policy.ts'
 import { type Cached, serveThenRevalidate } from '@acorn/node-core/server/sync/engine.ts'
 import { readCachedRepos, refreshRepos, toPublicRepo } from './repoMirror'
+import { githubToken } from '../githubToken'
 
 export const repos = new Hono<AppEnv>()
   .get('/', async (c) => {
     const user = getUser(c)
+    const token = await githubToken(c)
 
     const db = getDb(c.env)
     const userId = user.login // ponytail: login as the scope key — stable enough; revisit if logins churn.
@@ -36,7 +38,7 @@ export const repos = new Hono<AppEnv>()
       userId,
       ttlMs: REPOS_STALE_AFTER_MS,
       read,
-      refresh: () => refreshRepos(user.token, db, userId),
+      refresh: () => refreshRepos(token, db, userId),
     })
     if (!result.ok) return respondError(c, result.failure.status, result.failure.error, result.failure.detail)
     return c.json(result.value)

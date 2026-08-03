@@ -11,6 +11,7 @@ import { type Cached, type RefreshResult, serveThenRevalidate } from '@acorn/nod
 import { PULLS_STALE_AFTER_MS } from '@acorn/node-core/server/sync/policy.ts'
 import { fetchFiles, mirrorFiles, readFiles } from './prMirror'
 import { resolveRepoForUser } from './repoMirror'
+import { githubToken } from '../githubToken'
 
 const MAX_PATCH_PATHS = 20
 
@@ -38,6 +39,7 @@ const uniqueStringPaths = (paths: unknown): string[] | null => {
 
 const handleFilesRead = async (c: Context<AppEnv>, options: { summaryOnly?: boolean; paths?: string[] } = {}) => {
   const user = getUser(c)
+  const token = await githubToken(c)
 
   const db = getDb(c.env)
   const userId = user.login
@@ -47,7 +49,7 @@ const handleFilesRead = async (c: Context<AppEnv>, options: { summaryOnly?: bool
   if (!owner || !repo) return respondError(c, 404, 'repo_not_found')
   if (!Number.isInteger(number)) return respondError(c, 400, 'bad_number')
 
-  const resolved = await resolveRepoForUser(db, user.token, userId, owner, repo)
+  const resolved = await resolveRepoForUser(db, token, userId, owner, repo)
   if (!resolved.ok) return respondError(c, resolved.failure.status, resolved.failure.error)
   const { repoId } = resolved.value
   const key = { userId, repoId, number }
@@ -69,7 +71,7 @@ const handleFilesRead = async (c: Context<AppEnv>, options: { summaryOnly?: bool
   }
 
   const refresh = async (): Promise<RefreshResult> => {
-    const files = await fetchFiles(user.token, owner, repo, number)
+    const files = await fetchFiles(token, owner, repo, number)
     if (!files.ok) return files
     await mirrorFiles(c.env.BLOBS, db, key, files.value)
     return { ok: true }

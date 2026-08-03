@@ -6,6 +6,7 @@ import type { AppEnv } from '@acorn/node-core/server/middleware/auth.ts'
 import { getUser } from '@acorn/node-core/server/middleware/requireUser.ts'
 import { respondError } from '@acorn/node-core/server/respond.ts'
 import { bustPrSync, resolvePr, setPrState } from './prContext'
+import { githubToken } from '../githubToken'
 
 // PR write actions (docs/github-integration.md). Each calls GitHub, updates the local mirror so
 // a read within the TTL window reflects the change, and returns the canonical bit. The client
@@ -17,7 +18,7 @@ export const prActions = new Hono<AppEnv>()
     const r = await resolvePr(c)
     if ('error' in r) return respondError(c, r.status, r.error)
     const { method } = (await c.req.json().catch(() => ({}))) as { method?: string }
-    const res = await gh(r.user.token, `/repos/${r.owner}/${r.repo}/pulls/${r.number}/merge`, {
+    const res = await gh(r.token, `/repos/${r.owner}/${r.repo}/pulls/${r.number}/merge`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ merge_method: method ?? 'merge' }),
@@ -25,7 +26,7 @@ export const prActions = new Hono<AppEnv>()
     if (res.status === 405 || res.status === 409) return respondError(c, 409, 'merge_failed')
     const err = ghError(res)
     if (err) return respondError(c, err.status, err.error)
-    await setPrState(r.db, r.user.login, r.repoId, r.number, 'merged')
+    await setPrState(r.db, r.userId, r.repoId, r.number, 'merged')
     return c.json({ state: 'merged' })
   })
   // Enable auto-merge: GraphQL enablePullRequestAutoMerge (no REST endpoint exists). Needs the PR
@@ -36,7 +37,7 @@ export const prActions = new Hono<AppEnv>()
     if (!r.nodeId) return respondError(c, 409, 'node_id_unknown') // open the PR first to mirror its node id
     const { method } = (await c.req.json().catch(() => ({}))) as { method?: string }
     const res = await ghGraphQL(
-      r.user.token,
+      r.token,
       `mutation($id:ID!,$m:PullRequestMergeMethod!){ enablePullRequestAutoMerge(input:{pullRequestId:$id, mergeMethod:$m}){ clientMutationId } }`,
       { id: r.nodeId, m: (method ?? 'merge').toUpperCase() },
     )
@@ -49,7 +50,7 @@ export const prActions = new Hono<AppEnv>()
     await r.db
       .update(schema.pullRequests)
       .set({ autoMergeEnabled: true })
-      .where(and(eq(schema.pullRequests.userId, r.user.login), eq(schema.pullRequests.repoId, r.repoId), eq(schema.pullRequests.number, r.number)))
+      .where(and(eq(schema.pullRequests.userId, r.userId), eq(schema.pullRequests.repoId, r.repoId), eq(schema.pullRequests.number, r.number)))
     return c.json({ autoMergeEnabled: true })
   })
   // Disable auto-merge: GraphQL disablePullRequestAutoMerge (no REST endpoint exists).
@@ -57,7 +58,7 @@ export const prActions = new Hono<AppEnv>()
     const r = await resolvePr(c)
     if ('error' in r) return respondError(c, r.status, r.error)
     if (!r.nodeId) return respondError(c, 409, 'node_id_unknown')
-    const res = await ghGraphQL(r.user.token, `mutation($id:ID!){ disablePullRequestAutoMerge(input:{pullRequestId:$id}){ clientMutationId } }`, {
+    const res = await ghGraphQL(r.token, `mutation($id:ID!){ disablePullRequestAutoMerge(input:{pullRequestId:$id}){ clientMutationId } }`, {
       id: r.nodeId,
     })
     const result = await ghGraphQLResult(res)
@@ -68,7 +69,7 @@ export const prActions = new Hono<AppEnv>()
     await r.db
       .update(schema.pullRequests)
       .set({ autoMergeEnabled: false })
-      .where(and(eq(schema.pullRequests.userId, r.user.login), eq(schema.pullRequests.repoId, r.repoId), eq(schema.pullRequests.number, r.number)))
+      .where(and(eq(schema.pullRequests.userId, r.userId), eq(schema.pullRequests.repoId, r.repoId), eq(schema.pullRequests.number, r.number)))
     return c.json({ autoMergeEnabled: false })
   })
   // Close / reopen: PATCH /pulls/{n} { state }.
@@ -76,14 +77,14 @@ export const prActions = new Hono<AppEnv>()
     const r = await resolvePr(c)
     if ('error' in r) return respondError(c, r.status, r.error)
     const state = c.req.param('action') === 'close' ? 'closed' : 'open'
-    const res = await gh(r.user.token, `/repos/${r.owner}/${r.repo}/pulls/${r.number}`, {
+    const res = await gh(r.token, `/repos/${r.owner}/${r.repo}/pulls/${r.number}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ state }),
     })
     const err = ghError(res)
     if (err) return respondError(c, err.status, err.error)
-    await setPrState(r.db, r.user.login, r.repoId, r.number, state)
+    await setPrState(r.db, r.userId, r.repoId, r.number, state)
     return c.json({ state })
   })
   // Draft ↔ ready: GraphQL only, needs the PR node id.
@@ -95,7 +96,7 @@ export const prActions = new Hono<AppEnv>()
     const mutation = draft
       ? `mutation($id:ID!){ convertPullRequestToDraft(input:{pullRequestId:$id}){ clientMutationId } }`
       : `mutation($id:ID!){ markPullRequestReadyForReview(input:{pullRequestId:$id}){ clientMutationId } }`
-    const res = await ghGraphQL(r.user.token, mutation, { id: r.nodeId })
+    const res = await ghGraphQL(r.token, mutation, { id: r.nodeId })
     const result = await ghGraphQLResult(res)
     if (!result.ok) {
       if (result.kind === 'graphql') return respondError(c, 502, 'github_unavailable')
@@ -106,7 +107,7 @@ export const prActions = new Hono<AppEnv>()
       .set({ draft: !!draft })
       .where(
         and(
-          eq(schema.pullRequests.userId, r.user.login),
+          eq(schema.pullRequests.userId, r.userId),
           eq(schema.pullRequests.repoId, r.repoId),
           eq(schema.pullRequests.number, r.number),
         ),
@@ -119,7 +120,7 @@ export const prActions = new Hono<AppEnv>()
     if ('error' in r) return respondError(c, r.status, r.error)
     const { body } = (await c.req.json().catch(() => ({}))) as { body?: string }
     if (!body?.trim()) return respondError(c, 400, 'empty_body')
-    const res = await gh(r.user.token, `/repos/${r.owner}/${r.repo}/issues/${r.number}/comments`, {
+    const res = await gh(r.token, `/repos/${r.owner}/${r.repo}/issues/${r.number}/comments`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Accept: 'application/vnd.github.full+json' },
       body: JSON.stringify({ body }),
@@ -128,7 +129,7 @@ export const prActions = new Hono<AppEnv>()
     if (err) return respondError(c, err.status, err.error)
     const ct = (await res.json()) as { node_id: string; user: { login: string } | null; body_html?: string; created_at: string }
     const row = {
-      userId: r.user.login,
+      userId: r.userId,
       repoId: r.repoId,
       number: r.number,
       id: ct.node_id,
@@ -149,9 +150,9 @@ export const prActions = new Hono<AppEnv>()
     if ('error' in r) return respondError(c, r.status, r.error)
     const { path, viewed } = (await c.req.json().catch(() => ({}))) as { path?: string; viewed?: boolean }
     if (!path) return respondError(c, 400, 'bad_request')
-    const key = { userId: r.user.login, repoId: r.repoId, number: r.number, path }
+    const key = { userId: r.userId, repoId: r.repoId, number: r.number, path }
     const where = and(
-      eq(schema.viewedFiles.userId, r.user.login),
+      eq(schema.viewedFiles.userId, r.userId),
       eq(schema.viewedFiles.repoId, r.repoId),
       eq(schema.viewedFiles.number, r.number),
       eq(schema.viewedFiles.path, path),
@@ -172,14 +173,14 @@ export const prActions = new Hono<AppEnv>()
       side?: string
     }
     if (!body?.trim() || !path || !line) return respondError(c, 400, 'bad_request')
-    const res = await gh(r.user.token, `/repos/${r.owner}/${r.repo}/pulls/${r.number}/comments`, {
+    const res = await gh(r.token, `/repos/${r.owner}/${r.repo}/pulls/${r.number}/comments`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ body, commit_id: r.headSha, path, line, side: side ?? 'RIGHT' }),
     })
     const err = ghError(res)
     if (err) return respondError(c, err.status, err.error)
-    await bustPrSync(r.db, r.user.login, r.repoId, r.number)
+    await bustPrSync(r.db, r.userId, r.repoId, r.number)
     return c.json({ ok: true })
   })
   // Reply to an existing thread: POST /pulls/{n}/comments/{comment_id}/replies. id = numeric databaseId.
@@ -189,14 +190,14 @@ export const prActions = new Hono<AppEnv>()
     const commentId = c.req.param('commentId')
     const { body } = (await c.req.json().catch(() => ({}))) as { body?: string }
     if (!body?.trim()) return respondError(c, 400, 'empty_body')
-    const res = await gh(r.user.token, `/repos/${r.owner}/${r.repo}/pulls/${r.number}/comments/${commentId}/replies`, {
+    const res = await gh(r.token, `/repos/${r.owner}/${r.repo}/pulls/${r.number}/comments/${commentId}/replies`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ body }),
     })
     const err = ghError(res)
     if (err) return respondError(c, err.status, err.error)
-    await bustPrSync(r.db, r.user.login, r.repoId, r.number)
+    await bustPrSync(r.db, r.userId, r.repoId, r.number)
     return c.json({ ok: true })
   })
   // Resolve / unresolve a thread (GraphQL, by thread node id).
@@ -206,7 +207,7 @@ export const prActions = new Hono<AppEnv>()
     const threadId = c.req.param('threadId')
     const { resolved } = (await c.req.json().catch(() => ({}))) as { resolved?: boolean }
     const field = resolved ? 'resolveReviewThread' : 'unresolveReviewThread'
-    const res = await ghGraphQL(r.user.token, `mutation($id:ID!){ ${field}(input:{threadId:$id}){ thread { id } } }`, {
+    const res = await ghGraphQL(r.token, `mutation($id:ID!){ ${field}(input:{threadId:$id}){ thread { id } } }`, {
       id: threadId,
     })
     const result = await ghGraphQLResult(res)
@@ -214,7 +215,7 @@ export const prActions = new Hono<AppEnv>()
       if (result.kind === 'graphql') return respondError(c, 502, 'github_unavailable')
       return respondError(c, result.failure.status, result.failure.error)
     }
-    await bustPrSync(r.db, r.user.login, r.repoId, r.number)
+    await bustPrSync(r.db, r.userId, r.repoId, r.number)
     return c.json({ resolved: !!resolved })
   })
   // Submit a PR review: POST /pulls/{n}/reviews { event, body }.
@@ -226,14 +227,14 @@ export const prActions = new Hono<AppEnv>()
       return respondError(c, 400, 'bad_request')
     if ((event === 'REQUEST_CHANGES' || event === 'COMMENT') && !body?.trim())
       return respondError(c, 400, 'body_required')
-    const res = await gh(r.user.token, `/repos/${r.owner}/${r.repo}/pulls/${r.number}/reviews`, {
+    const res = await gh(r.token, `/repos/${r.owner}/${r.repo}/pulls/${r.number}/reviews`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ body: body?.trim() ?? '', event }),
     })
     const err = ghError(res)
     if (err) return respondError(c, err.status, err.error)
-    await bustPrSync(r.db, r.user.login, r.repoId, r.number)
+    await bustPrSync(r.db, r.userId, r.repoId, r.number)
     return c.json({ ok: true })
   })
   // Request a reviewer: POST /pulls/{n}/requested_reviewers { reviewers }. Remove: DELETE same.
@@ -244,11 +245,12 @@ export const prActions = new Hono<AppEnv>()
   // Repo-scoped (no PR number): a check's runId is the Actions run, not the PR. No mirror to update —
   // the new run states surface on the next composite refetch.
   .post('/:owner/:repo/actions/:runId/rerun', async (c) => {
-    const user = getUser(c)
+    getUser(c) // gate on auth; the credential itself comes from the stored integration
+    const token = await githubToken(c)
     const owner = c.req.param('owner')
     const repo = c.req.param('repo')
     const runId = c.req.param('runId')
-    const res = await gh(user.token, `/repos/${owner}/${repo}/actions/runs/${runId}/rerun-failed-jobs`, { method: 'POST' })
+    const res = await gh(token, `/repos/${owner}/${repo}/actions/runs/${runId}/rerun-failed-jobs`, { method: 'POST' })
     const err = ghError(res)
     if (err) return respondError(c, err.status, err.error)
     return c.json({ ok: true })
@@ -259,7 +261,7 @@ async function mutateReviewers(c: Context<AppEnv>, op: 'add' | 'remove') {
   if ('error' in r) return respondError(c, r.status, r.error)
   const { login } = (await c.req.json().catch(() => ({}))) as { login?: string }
   if (!login?.trim()) return respondError(c, 400, 'empty_login')
-  const res = await gh(r.user.token, `/repos/${r.owner}/${r.repo}/pulls/${r.number}/requested_reviewers`, {
+  const res = await gh(r.token, `/repos/${r.owner}/${r.repo}/pulls/${r.number}/requested_reviewers`, {
     method: op === 'add' ? 'POST' : 'DELETE',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ reviewers: [login] }),
@@ -269,9 +271,9 @@ async function mutateReviewers(c: Context<AppEnv>, op: 'add' | 'remove') {
   // GitHub returns the PR with its full requested_reviewers set → replace the mirror so a
   // within-TTL read (the client's refetch) reflects the change immediately. ponytail: users only.
   const pr = (await res.json()) as { requested_reviewers?: { login: string }[] }
-  const rows = (pr.requested_reviewers ?? []).map((u) => ({ userId: r.user.login, repoId: r.repoId, number: r.number, login: u.login }))
+  const rows = (pr.requested_reviewers ?? []).map((u) => ({ userId: r.userId, repoId: r.repoId, number: r.number, login: u.login }))
   const where = and(
-    eq(schema.reviewRequests.userId, r.user.login),
+    eq(schema.reviewRequests.userId, r.userId),
     eq(schema.reviewRequests.repoId, r.repoId),
     eq(schema.reviewRequests.number, r.number),
   )
@@ -286,20 +288,20 @@ async function mutateLabels(c: Context<AppEnv>, op: 'add' | 'remove') {
   if (!name?.trim()) return respondError(c, 400, 'empty_name')
   const res =
     op === 'add'
-      ? await gh(r.user.token, `/repos/${r.owner}/${r.repo}/issues/${r.number}/labels`, {
+      ? await gh(r.token, `/repos/${r.owner}/${r.repo}/issues/${r.number}/labels`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ labels: [name] }),
         })
-      : await gh(r.user.token, `/repos/${r.owner}/${r.repo}/issues/${r.number}/labels/${encodeURIComponent(name)}`, {
+      : await gh(r.token, `/repos/${r.owner}/${r.repo}/issues/${r.number}/labels/${encodeURIComponent(name)}`, {
           method: 'DELETE',
         })
   const err = ghError(res)
   if (err) return respondError(c, err.status, err.error)
   const labels = (await res.json()) as { name: string; color: string | null }[]
-  const rows = labels.map((l) => ({ userId: r.user.login, repoId: r.repoId, number: r.number, name: l.name, color: l.color }))
+  const rows = labels.map((l) => ({ userId: r.userId, repoId: r.repoId, number: r.number, name: l.name, color: l.color }))
   const where = and(
-    eq(schema.prLabels.userId, r.user.login),
+    eq(schema.prLabels.userId, r.userId),
     eq(schema.prLabels.repoId, r.repoId),
     eq(schema.prLabels.number, r.number),
   )

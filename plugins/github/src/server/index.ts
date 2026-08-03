@@ -10,20 +10,34 @@ const ghHeaders = (token: string) => ({
   'User-Agent': 'acorn',
 })
 
+// No credential means GitHub is not connected (githubToken.ts returns '' for that). Answer locally
+// with the response GitHub itself would give, rather than spending a round trip to be told: ghError
+// maps 401 to `reauth`, which is already the client's "reconnect GitHub" path, so "never connected"
+// and "credential revoked" converge on one user-visible outcome and no call site needs a new branch.
+const notConnected = (): Response =>
+  new Response(JSON.stringify({ message: 'GitHub is not connected' }), {
+    status: 401,
+    headers: { 'content-type': 'application/json' },
+  })
+
 // REST.
 export const gh = (token: string, path: string, init?: RequestInit) =>
-  fetch(`https://api.github.com${path}`, {
-    ...init,
-    headers: { ...ghHeaders(token), ...init?.headers },
-  })
+  token
+    ? fetch(`https://api.github.com${path}`, {
+        ...init,
+        headers: { ...ghHeaders(token), ...init?.headers },
+      })
+    : Promise.resolve(notConnected())
 
 // GraphQL — POST to /graphql. No ETag support (docs/caching.md); callers self-cache by TTL.
 export const ghGraphQL = (token: string, query: string, variables: Record<string, unknown>) =>
-  fetch('https://api.github.com/graphql', {
-    method: 'POST',
-    headers: { ...ghHeaders(token), 'Content-Type': 'application/json' },
-    body: JSON.stringify({ query, variables }),
-  })
+  token
+    ? fetch('https://api.github.com/graphql', {
+        method: 'POST',
+        headers: { ...ghHeaders(token), 'Content-Type': 'application/json' },
+        body: JSON.stringify({ query, variables }),
+      })
+    : Promise.resolve(notConnected())
 
 // Normalize a non-OK GitHub REST/GraphQL Response to a client error code + HTTP status, or null
 // when the response is OK (2xx). Callers handle endpoint-specific statuses (e.g. merge 405/409,

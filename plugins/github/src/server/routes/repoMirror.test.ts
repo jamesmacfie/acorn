@@ -8,6 +8,7 @@ import { PULLS_STALE_AFTER_MS as FILES_STALE_AFTER_MS } from '@acorn/node-core/s
 import { pullFiles } from './pullFiles'
 import { resolveRepoForUser } from './repoMirror'
 import type { Env } from '@acorn/node-core/main/bindings.ts'
+import { schema } from '@acorn/node-core/server/db/index.ts'
 
 vi.mock('@acorn/node-core/server/db/index.ts', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@acorn/node-core/server/db/index.ts')>()
@@ -50,8 +51,11 @@ const makeResolverDb = (rows: unknown[] = []) => {
 const makePullFilesDb = (selectRows: unknown[][]) => {
   const queue = [...selectRows]
   const select = vi.fn(() => ({
-    from: vi.fn(() => ({
-      where: vi.fn(async () => queue.shift() ?? []),
+    // Dispatch on the table, not on call order, for the GitHub-credential lookup: every route makes
+    // that same read, so answering it from the positional queue would silently shift every
+    // expectation in this file the next time a route gains a query.
+    from: vi.fn((table: unknown) => ({
+      where: vi.fn(async () => (table === schema.integrations ? [] : (queue.shift() ?? []))),
     })),
   }))
   const db = {

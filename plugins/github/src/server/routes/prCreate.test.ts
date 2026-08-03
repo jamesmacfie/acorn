@@ -15,6 +15,13 @@ vi.mock('..', async (importOriginal) => {
 const USER: SessionUser = { token: 'gh', login: 'james', name: '', avatar: '', scopes: [] }
 const PRINCIPAL: Principal = { kind: 'user', user: USER }
 
+// The route now reads the stored GitHub credential, so it needs a DB. Returning no rows exercises
+// the not-connected path and lets the transitional principal-token fallback supply 'gh'.
+const noIntegrations = {
+  select: () => ({ from: () => ({ where: async () => [] }) }),
+  delete: () => ({ where: async () => undefined }),
+} as unknown as Env['DB']
+
 const post = (principal: Principal | null, body: unknown) => {
   const app = new Hono<AppEnv>().use('/api/*', ...testGate(principal)).route('/api/repos', prCreate)
   return app.fetch(
@@ -23,7 +30,7 @@ const post = (principal: Principal | null, body: unknown) => {
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify(body),
     }),
-    {} as Env,
+    { DB: noIntegrations, SESSION_ENC_KEY: '0'.repeat(64) } as Env,
   )
 }
 

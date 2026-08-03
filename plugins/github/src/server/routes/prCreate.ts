@@ -7,6 +7,7 @@ import type { Branch, Compare } from '@acorn/protocol/api.ts'
 import type { AppEnv } from '@acorn/node-core/server/middleware/auth.ts'
 import { getUser } from '@acorn/node-core/server/middleware/requireUser.ts'
 import { respondError } from '@acorn/node-core/server/respond.ts'
+import { githubToken } from '../githubToken'
 
 // Open-a-PR support: branch list + base..head compare (both read-only proxies, no local mirror —
 // branches/compare change too often and are cheap to fetch) and the create POST. Creating busts
@@ -34,7 +35,8 @@ export const prCreate = new Hono<AppEnv>()
   // return the 100 most-recent. The client gets a small, relevant list to filter rather than every
   // branch. ponytail: scans up to 30 pages (3000 branches) — raise the cap if a repo overflows it.
   .get('/:owner/:repo/branches', async (c) => {
-    const user = getUser(c)
+    getUser(c) // gate on auth; the credential itself comes from the stored integration
+    const token = await githubToken(c)
     const owner = c.req.param('owner')
     const repo = c.req.param('repo')
     const query = `query($owner:String!,$repo:String!,$after:String){
@@ -48,7 +50,7 @@ export const prCreate = new Hono<AppEnv>()
     const collected: { name: string; date: number }[] = []
     let after: string | null = null
     for (let page = 0; page < 30; page++) {
-      const res = await ghGraphQL(user.token, query, { owner, repo, after })
+      const res = await ghGraphQL(token, query, { owner, repo, after })
       const result = await ghGraphQLResult<{
         repository?: {
           refs?: {
@@ -74,13 +76,14 @@ export const prCreate = new Hono<AppEnv>()
   // Compare base..head → diff preview (PullFile[]) + commits (for title prefill) + aheadBy.
   // Branch names with slashes go straight into the path (GitHub accepts them literally).
   .get('/:owner/:repo/compare', async (c) => {
-    const user = getUser(c)
+    getUser(c) // gate on auth; the credential itself comes from the stored integration
+    const token = await githubToken(c)
     const owner = c.req.param('owner')
     const repo = c.req.param('repo')
     const base = c.req.query('base')
     const head = c.req.query('head')
     if (!base || !head) return respondError(c, 400, 'bad_request')
-    const res = await gh(user.token, `/repos/${owner}/${repo}/compare/${base}...${head}?per_page=100`)
+    const res = await gh(token, `/repos/${owner}/${repo}/compare/${base}...${head}?per_page=100`)
     const err = ghError(res)
     if (err) return respondError(c, err.status, err.error)
     const data = (await res.json()) as GitHubCompare
@@ -112,7 +115,9 @@ export const prCreate = new Hono<AppEnv>()
       draft?: boolean
     }
     if (!title?.trim() || !base || !head) return respondError(c, 400, 'bad_request')
-    const res = await gh(user.token, `/repos/${owner}/${repo}/pulls`, {
+    // Resolved after validation: a request we are about to reject should not cost a credential read.
+    const token = await githubToken(c)
+    const res = await gh(token, `/repos/${owner}/${repo}/pulls`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ title: title.trim(), body: body ?? '', base, head, draft: !!draft }),

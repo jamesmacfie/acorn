@@ -11,6 +11,7 @@ import { PULLS_STALE_AFTER_MS } from '@acorn/node-core/server/sync/policy.ts'
 import { readComposite } from './prMirror'
 import { refreshPullDetail } from './pullRefresh'
 import { resolveRepoForUser } from './repoMirror'
+import { githubToken } from '../githubToken'
 
 // PR detail — the composite GraphQL read (docs/github-integration.md), the primary read for the
 // PR screen: PR + reviews + comments + checks in one round-trip. GraphQL has no ETag, so
@@ -19,6 +20,7 @@ import { resolveRepoForUser } from './repoMirror'
 // pr_files, owned by /files.
 export const pullDetail = new Hono<AppEnv>().get('/:owner/:repo/pulls/:number', async (c) => {
   const user = getUser(c)
+  const token = await githubToken(c)
 
   const db = getDb(c.env)
   const userId = user.login
@@ -27,7 +29,7 @@ export const pullDetail = new Hono<AppEnv>().get('/:owner/:repo/pulls/:number', 
   const number = Number(c.req.param('number'))
   if (!Number.isInteger(number)) return respondError(c, 400, 'bad_number')
 
-  const resolved = await resolveRepoForUser(db, user.token, userId, owner, repo)
+  const resolved = await resolveRepoForUser(db, token, userId, owner, repo)
   if (!resolved.ok) return respondError(c, resolved.failure.status, resolved.failure.error)
   const repoId = resolved.value.repoId
   const key = { userId, repoId, number }
@@ -47,7 +49,7 @@ export const pullDetail = new Hono<AppEnv>().get('/:owner/:repo/pulls/:number', 
     return { data: composite, fetchedAt: sync.fetchedAt }
   }
 
-  const refresh = () => refreshPullDetail(user.token, db, { userId, repoId, owner, repo, number })
+  const refresh = () => refreshPullDetail(token, db, { userId, repoId, owner, repo, number })
 
   const result = await serveThenRevalidate({
     resource,

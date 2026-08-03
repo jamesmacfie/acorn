@@ -2,13 +2,18 @@ import { and, eq } from 'drizzle-orm'
 import type { Context } from 'hono'
 import { getDb, schema } from '@acorn/node-core/server/db/index.ts'
 import { prResource } from '@acorn/node-core/server/db/resourceKeys.ts'
-import type { AppEnv, SessionUser } from '@acorn/node-core/server/middleware/auth.ts'
+import type { AppEnv } from '@acorn/node-core/server/middleware/auth.ts'
 import { getUser } from '@acorn/node-core/server/middleware/requireUser.ts'
+import { githubToken } from '../githubToken'
 
 type Db = ReturnType<typeof getDb>
 type PrFailure = { error: 'bad_number'; status: 400 } | { error: 'repo_not_found'; status: 404 }
 type PrContext = {
-  user: SessionUser
+  // The two things every write path actually needs, instead of a whole SessionUser: the GitHub
+  // credential (now a stored integration, not a field on the principal) and the row-ownership scope.
+  // Splitting them is what let all 14 `r.user.token` reads in prActions.ts move at once.
+  token: string
+  userId: string
   db: Db
   owner: string
   repo: string
@@ -24,7 +29,7 @@ type PrContext = {
 // already mirrored; a miss here means the client skipped the read path, and 404 is the honest
 // answer rather than lazily mirroring on a write.
 export async function resolvePr(c: Context<AppEnv>): Promise<PrFailure | PrContext> {
-  const user = getUser(c) // auth is enforced by requireUser upstream
+  const userId = getUser(c).login // auth is enforced by requireUser upstream
   const db = getDb(c.env)
   const owner = c.req.param('owner')!
   const repo = c.req.param('repo')!
@@ -33,19 +38,29 @@ export async function resolvePr(c: Context<AppEnv>): Promise<PrFailure | PrConte
   const [repoRow] = await db
     .select({ id: schema.repos.id })
     .from(schema.repos)
-    .where(and(eq(schema.repos.userId, user.login), eq(schema.repos.owner, owner), eq(schema.repos.name, repo)))
+    .where(and(eq(schema.repos.userId, userId), eq(schema.repos.owner, owner), eq(schema.repos.name, repo)))
   if (!repoRow) return { error: 'repo_not_found' as const, status: 404 as const }
   const [pr] = await db
     .select({ nodeId: schema.pullRequests.nodeId, headSha: schema.pullRequests.headSha })
     .from(schema.pullRequests)
     .where(
       and(
-        eq(schema.pullRequests.userId, user.login),
+        eq(schema.pullRequests.userId, userId),
         eq(schema.pullRequests.repoId, repoRow.id),
         eq(schema.pullRequests.number, number),
       ),
     )
-  return { user, db, owner, repo, number, repoId: repoRow.id, nodeId: pr?.nodeId ?? null, headSha: pr?.headSha ?? null }
+  return {
+    token: await githubToken(c),
+    userId,
+    db,
+    owner,
+    repo,
+    number,
+    repoId: repoRow.id,
+    nodeId: pr?.nodeId ?? null,
+    headSha: pr?.headSha ?? null,
+  }
 }
 
 export const bustPrSync = (db: ReturnType<typeof getDb>, userId: string, repoId: number, number: number) =>

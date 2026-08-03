@@ -4,6 +4,7 @@ import type { AppEnv } from '@acorn/node-core/server/middleware/auth.ts'
 import { getUser } from '@acorn/node-core/server/middleware/requireUser.ts'
 import { respondError } from '@acorn/node-core/server/respond.ts'
 import type { RunJobs } from '@acorn/protocol/api.ts'
+import { githubToken } from '../githubToken'
 
 // Read-only Actions endpoints for the checks side panel. Writes (rerun) live in prActions.ts.
 // Deliberately uncached on the server — no mirror table, no BLOBS entry: the client query cache
@@ -20,11 +21,12 @@ type GhJob = {
 export const actions = new Hono<AppEnv>()
   // A workflow run's jobs + their steps. One cheap call; the panel filters to the clicked job.
   .get('/:owner/:repo/actions/runs/:runId/jobs', async (c) => {
-    const user = getUser(c)
+    getUser(c) // gate on auth; the credential itself comes from the stored integration
+    const token = await githubToken(c)
     const owner = c.req.param('owner')
     const repo = c.req.param('repo')
     const runId = c.req.param('runId')
-    const res = await gh(user.token, `/repos/${owner}/${repo}/actions/runs/${runId}/jobs?per_page=100`)
+    const res = await gh(token, `/repos/${owner}/${repo}/actions/runs/${runId}/jobs?per_page=100`)
     const err = ghError(res)
     if (err) return respondError(c, err.status, err.error)
     const json = (await res.json()) as { jobs?: GhJob[] }
@@ -42,11 +44,12 @@ export const actions = new Hono<AppEnv>()
   // Full plaintext log for one job. GitHub 302-redirects to signed blob storage; follow it
   // manually and re-fetch WITHOUT the auth header (the target rejects/leaks the token otherwise).
   .get('/:owner/:repo/actions/jobs/:jobId/logs', async (c) => {
-    const user = getUser(c)
+    getUser(c) // gate on auth; the credential itself comes from the stored integration
+    const token = await githubToken(c)
     const owner = c.req.param('owner')
     const repo = c.req.param('repo')
     const jobId = c.req.param('jobId')
-    const res = await gh(user.token, `/repos/${owner}/${repo}/actions/jobs/${jobId}/logs`, { redirect: 'manual' })
+    const res = await gh(token, `/repos/${owner}/${repo}/actions/jobs/${jobId}/logs`, { redirect: 'manual' })
     const location = res.headers.get('location')
     if (res.status >= 300 && res.status < 400 && location) {
       const blob = await fetch(location)
