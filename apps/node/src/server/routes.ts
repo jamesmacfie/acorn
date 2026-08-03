@@ -6,6 +6,7 @@ import { registerRoute } from '@acorn/node-core/server/routeRegistry.ts'
 import { agentUsage } from '@acorn/plugin-agents/server/routes/usage.ts'
 import { managedAgents } from '@acorn/plugin-agents/server/routes/managed.ts'
 import { actions } from '@acorn/plugin-github/server/routes/actions.ts'
+import { githubDeviceAuth } from '@acorn/plugin-github/server/routes/deviceAuth.ts'
 import { prActions } from '@acorn/plugin-github/server/routes/prActions.ts'
 import { prCreate } from '@acorn/plugin-github/server/routes/prCreate.ts'
 import { pullBlob } from '@acorn/plugin-github/server/routes/pullBlob.ts'
@@ -64,6 +65,7 @@ registerRoute({ prefix: '/api/repos', router: prActions })
 registerRoute({ prefix: '/api/repos', router: actions })
 registerRoute({ prefix: '/api/repos', router: prCreate })
 registerRoute({ prefix: '/api/repos', router: mentions })
+registerRoute({ prefix: '/api/github', router: githubDeviceAuth, note: 'OAuth device-flow connect (github)' })
 
 // Provider-owned HTTP routers (linear/rollbar) are registered in app/server/providers.ts via the
 // integration provider registry, mounted through buildIntegrationProviderRoutes() in createApp().

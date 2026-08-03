@@ -6,22 +6,16 @@ import {
   connectionSummary,
   credentialsFromBody,
   disconnectConnection,
-  githubConnectionSummary,
   listConnections,
   rotateConnection,
   setConnectionDisabled,
   testConnection,
 } from '../integrations/connections'
 import { connectionProviderRegistry } from '../integrations/connectionRegistry'
-import { ProviderOperationError } from '../integrations/types'
+import { providerError } from '../integrations/respondProvider'
 import type { AppEnv } from '../middleware/auth'
 import { getUser } from '../middleware/requireUser'
 import { respondError } from '../respond'
-
-const providerError = (c: Parameters<typeof respondError>[0], error: unknown) => {
-  if (error instanceof ProviderOperationError) return respondError(c, error.status, error.code)
-  return respondError(c, 502, 'provider_unavailable')
-}
 
 // Core-owned provider connection lifecycle. Provider descriptors validate and normalize credentials;
 // this route alone encrypts, stores, rotates, tests, disables, and disconnects connection rows.
@@ -31,7 +25,10 @@ export const integrations = new Hono<AppEnv>()
     const rows = await listConnections(getDb(c.env), user.login)
     return c.json({
       providers: connectionProviderRegistry.list().map((provider) => provider.toPublic()),
-      integrations: [githubConnectionSummary(user.login), ...rows.map(connectionSummary)],
+      // GitHub is an ordinary stored connection now. It used to be synthesized here because its
+      // token WAS the session cookie and there was no row to list; leaving the synthesizer in place
+      // alongside the real row would list GitHub twice.
+      integrations: rows.map(connectionSummary),
     } satisfies IntegrationsResponse)
   })
   .post('/', async (c) => {
