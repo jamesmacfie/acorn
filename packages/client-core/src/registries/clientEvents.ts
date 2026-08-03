@@ -13,6 +13,10 @@ export type ClientEventMap = {
   'presentation:pane-intent': { taskId: string; paneId: string; intent: PaneIntent }
   'presentation:terminal-focus': { taskId: string; sessionId: string }
   'presentation:file-scroll': { routeKey: string; path: string }
+  // Deep-link into a settings page from a pane. The shell owns the modal, and a pane cannot reach the
+  // UiSlotContext's `openSettings` — so the request is an event rather than a prop threaded through
+  // every pane that might ever need one.
+  'presentation:open-settings': { tab: string }
   'runtime:task-archived': { taskId: string }
   'runtime:workspace-removed': { workspaceId: string }
   // A node left the fleet (unpaired or revoked). Emitted by the renderer AFTER main confirms the

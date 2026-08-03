@@ -91,4 +91,19 @@ describe('ConnectionProviderRegistry', () => {
     })
     expect(JSON.stringify(descriptor)).not.toContain('plaintext')
   })
+
+  it('projects connection.kind, and omits it when the provider renders a form', () => {
+    // How the settings UI OBTAINS the credential has to reach the public descriptor, or a device-flow
+    // provider renders an empty form. It travels through TWO independent copies of the projection —
+    // shared.ts's toPublic and this registry's descriptorFor, which cross-check each other — so a field
+    // added to one and not the other fails registration rather than silently disappearing.
+    expect(provider().toPublic().connection.kind).toBeUndefined()
+
+    const deviceFlow = provider('device-flow-provider')
+    deviceFlow.connection.kind = 'device-flow'
+    const registry = new ConnectionProviderRegistry()
+
+    expect(() => registry.register(deviceFlow)).not.toThrow()
+    expect(registry.require('device-flow-provider').toPublic().connection.kind).toBe('device-flow')
+  })
 })

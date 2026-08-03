@@ -40,6 +40,7 @@ export const publicConnectionProvider = <TValidated>(
       glyph: provider.glyph,
       connection: {
         authKind: connection.authKind,
+        ...(connection.kind === undefined ? {} : { kind: connection.kind }),
         fields: connection.fields.map(publicCredentialField),
         connectable: connection.connectable,
         disconnectable: connection.disconnectable,

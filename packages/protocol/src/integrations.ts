@@ -68,6 +68,13 @@ export type PublicIntegrationProvider = {
   glyph: string
   connection: {
     authKind: IntegrationAuthKind
+    // How the settings UI OBTAINS the credential, which is a different question from `authKind` (what
+    // the credential is). 'fields' renders the descriptor's form — the default, and what every provider
+    // but one does. 'device-flow' means the owner supplies nothing by hand: the node fetches a code
+    // from the provider, the owner approves it in a browser, and `fields` is legitimately empty.
+    //
+    // Defaulted rather than required so adding this did not touch five providers to say "as before".
+    kind?: 'fields' | 'device-flow'
     fields: CredentialField[]
     connectable: boolean
     disconnectable: boolean
