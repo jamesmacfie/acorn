@@ -8,6 +8,8 @@ import { registerPreviewIpc } from '@acorn/plugin-preview/main/previewService.ts
 import { registerRepoPickerIpc } from '@acorn/plugin-terminal/main/pickerIpc.ts'
 import type { ServiceStartResult, ServiceState } from '@acorn/protocol/serviceProtocol.ts'
 import { readLocalDeviceToken, writeLocalDeviceToken } from './deviceTokenStore'
+import { NodeBroker } from './nodeBroker'
+import { brokerPushTargets, registerNodeBrokerIpc } from './nodeBrokerIpc'
 import { ServiceHost } from './serviceHost'
 
 export type BootstrapOptions = {
@@ -31,6 +33,7 @@ export async function bootstrap({ dataDir, createWindow }: BootstrapOptions): Pr
   const startService = async (): Promise<ServiceStartResult> => {
     const started = await service.start(readLocalDeviceToken(userDataDir))
     writeLocalDeviceToken(userDataDir, started.deviceToken)
+    adoptLocalNode(started)
     return started
   }
 
@@ -61,10 +64,32 @@ export async function bootstrap({ dataDir, createWindow }: BootstrapOptions): Pr
   const disposePicker = registerRepoPickerIpc()
   const disposePreview = registerPreviewIpc((taskId) => service.previewRules(taskId))
 
+  // The connection broker, likewise installed before the renderer: its first act on load is to ask
+  // for the fleet, so the handler must already exist.
+  const push = brokerPushTargets(() => window)
+  const broker = new NodeBroker({ frame: push.frame, status: push.status })
+  const disposeBrokerIpc = registerNodeBrokerIpc(broker)
+
+  // Register (or re-register, after a crash restart) the local node. The endpoint can change between
+  // starts now that the port is not pinned, so this is driven by each start result rather than cached.
+  const adoptLocalNode = (started: ServiceStartResult): void => {
+    broker.upsert({
+      nodeId: started.nodeId,
+      label: 'This computer',
+      endpoint: started.endpoint.origin,
+      local: true,
+      token: started.deviceToken,
+      ...(started.fingerprint ? { fingerprint: started.fingerprint } : {}),
+      ...(started.certPem ? { certPem: started.certPem } : {}),
+    })
+  }
+
   const dispose = async (): Promise<void> => {
     if (disposed) return
     disposed = true
     await service.stop()
+    broker.dispose()
+    disposeBrokerIpc()
     disposePreview()
     disposePicker()
   }
