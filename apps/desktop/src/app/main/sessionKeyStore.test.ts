@@ -72,14 +72,14 @@ describe('resolveSessionKey', () => {
   })
 
   it('refuses to mint a second identity beside an existing database', () => {
-    writeFileSync(join(dir, 'acorn.sqlite'), Buffer.alloc(0))
+    writeFileSync(join(dir, 'core.sqlite'), Buffer.alloc(0))
     expect(() => resolveSessionKey(dir)).toThrow(/restore the original SESSION_ENC_KEY/)
     expect(process.env.SESSION_ENC_KEY).toBeUndefined()
     expect(existsSync(join(dir, 'session.key'))).toBe(false)
   })
 
   it('uses an env key to migrate an existing database safely', () => {
-    writeFileSync(join(dir, 'acorn.sqlite'), Buffer.alloc(0))
+    writeFileSync(join(dir, 'core.sqlite'), Buffer.alloc(0))
     process.env.SESSION_ENC_KEY = ENV_KEY
     resolveSessionKey(dir)
     delete process.env.SESSION_ENC_KEY

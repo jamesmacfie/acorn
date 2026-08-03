@@ -5,11 +5,15 @@
 import './providers' // register built-in integration providers into the core registry
 import './routes' // register plugin-owned HTTP routers into the core route registry
 import { devDataDir, makeRuntime, startListener } from '@acorn/node-core/main/server.ts'
+import { openDataRoot } from '@acorn/node-core/main/dataRoot.ts'
 import { wireServerBridges } from '../wiring/serverBridges'
 import { prepareSecurityState } from '../wiring/startupSecurity'
 
-const dataDir = devDataDir()
-const runtime = makeRuntime(dataDir)
+// Takes the data root's exclusive lock, so `dev:node` and a running desktop app now refuse to share
+// one root explicitly instead of racing over SQLite and colliding on the listener port.
+const root = openDataRoot(devDataDir())
+const dataDir = root.dir
+const runtime = makeRuntime(root)
 await prepareSecurityState(runtime)
 wireServerBridges(runtime.DB, dataDir) // search / editor / local-git / database / agent-usage HTTP route bridges
 void startListener(runtime)

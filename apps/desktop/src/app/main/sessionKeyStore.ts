@@ -15,7 +15,7 @@ import { dirname, join } from 'node:path'
 // fresh data root may mint a new identity.
 
 const KEY_FILE = 'session.key' // safeStorage-encrypted 64-hex-char key, mode 0600, under the data root
-const DB_FILE = 'acorn.sqlite'
+const DB_FILE = 'core.sqlite' // must match serverPaths.ts's DATABASE_FILENAME
 const VALID_KEY = /^[0-9a-fA-F]{64}$/
 
 function assertValidKey(key: string, source: string): void {

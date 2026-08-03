@@ -7,6 +7,7 @@ import '../wiring/agentProfiles'
 import type { DesktopCapabilities } from '@acorn/protocol/desktopCapabilities.ts'
 import type { ServiceStartConfig, ServiceState } from '@acorn/protocol/serviceProtocol.ts'
 import { makeRuntime, startListener } from '@acorn/node-core/main/server.ts'
+import { openDataRoot, type DataRoot } from '@acorn/node-core/main/dataRoot.ts'
 import { launcherSpec, serverName } from '@acorn/node-core/main/mcpRegister.ts'
 import { reconcileWorktrees, setWorktreesRoot } from '@acorn/node-core/main/taskWorktree.ts'
 import { logStorageFootprint } from '@acorn/node-core/main/storageFootprint.ts'
@@ -100,10 +101,20 @@ export async function startServiceRuntime({ config, desktop, stateChanged }: Run
   let dbClosed = false
 
   stateChanged('migrating')
+  let dataRoot: DataRoot
   let runtime: ReturnType<typeof makeRuntime>
   try {
-    runtime = makeRuntime(config.dataDir)
+    // Mints/reads the nodeId and takes the root's exclusive lock. A second node on the same root
+    // fails here with an actionable message rather than corrupting it.
+    dataRoot = openDataRoot(config.dataDir)
   } catch (error) {
+    stateChanged('failed', error instanceof Error ? error.message : String(error))
+    throw error
+  }
+  try {
+    runtime = makeRuntime(dataRoot)
+  } catch (error) {
+    dataRoot.release()
     stateChanged('failed', error instanceof Error ? error.message : String(error))
     throw error
   }
@@ -150,6 +161,13 @@ export async function startServiceRuntime({ config, desktop, stateChanged }: Run
       } catch (error) {
         console.warn('[service:stop] SQLite close failed:', error)
       }
+    }
+    // Last: only drop the root lock once SQLite is closed, or a restart could open the database
+    // while this process still holds its WAL.
+    try {
+      dataRoot.release()
+    } catch (error) {
+      console.warn('[service:stop] data root release failed:', error)
     }
     stateChanged('stopped')
     mark('teardown')

@@ -4,6 +4,7 @@ import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { createApp } from '../server/index'
 import { makeBindings, type RuntimeBindings } from './bindings'
+import { openDataRoot, type DataRoot } from './dataRoot'
 import { resolveDatabasePath } from './serverPaths'
 import { ACORN_PORT, devClientDir, devDataDir } from './serverConfig'
 import { attachWsHub } from './wsHub'
@@ -78,19 +79,24 @@ export function startListener(runtime: RuntimeBindings, options: StartListenerOp
   })
 }
 
-// One definition of the on-disk app-data layout under `dataDir` (DB, blobs) — Electron's utility
+// One definition of the on-disk app-data layout under a data root (DB, blobs) — Electron's utility
 // service and the plain-Node `dev:node` entry both build their runtime through it.
-export function makeRuntime(dataDir: string): RuntimeBindings {
+//
+// It takes an already-opened DataRoot rather than a path because the root carries the nodeId AND the
+// exclusive lock. The lock's lifetime is the process's, so acquiring it belongs to whoever owns
+// teardown (the composition root), not to a bindings factory that has no stop() to hook.
+export function makeRuntime(root: DataRoot): RuntimeBindings {
   return makeBindings({
-    dbPath: resolveDatabasePath(dataDir),
-    blobsDir: resolve(dataDir, 'blobs'),
+    dbPath: resolveDatabasePath(root.dir),
+    blobsDir: resolve(root.dir, 'blobs'),
+    nodeId: root.nodeId,
   })
 }
 
-// Build the runtime bindings AND start listening in one call — the plain-Node `dev:node` entry
-// (app/server/devNode.ts) has no composition root, so it needs both. Kept in core (pure engine);
-// the dev:node entry lives in app/ because choosing to auto-start + registering plugin providers
-// is composition, not engine.
+// Open the data root, build the runtime AND start listening in one call — the plain-Node `dev:node`
+// entry (app/server/devNode.ts) has no composition root, so it needs all three. Kept in core (pure
+// engine); the dev:node entry lives in app/ because choosing to auto-start + registering plugin
+// providers is composition, not engine.
 export function startServer(dataDir: string = devDataDir()): Promise<ServerType> {
-  return startListener(makeRuntime(dataDir))
+  return startListener(makeRuntime(openDataRoot(dataDir)))
 }
