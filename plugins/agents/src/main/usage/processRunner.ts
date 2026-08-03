@@ -17,6 +17,9 @@ export type PromptResponse = {
 }
 
 export type PtyProcess = Pick<IPty, 'onData' | 'onExit' | 'write' | 'kill'>
+
+// Grace period between the polite SIGHUP that node-pty's kill() sends and an unconditional SIGKILL.
+const KILL_ESCALATION_MS = 2_000
 export type PtySpawner = (
   executable: string,
   args: string[],
@@ -38,6 +41,8 @@ export type PtyCaptureOptions = {
   timeoutMs?: number
   maxBytes?: number
   spawnPty?: PtySpawner
+  /** Test seam: shorten the SIGHUP -> SIGKILL grace period. */
+  killEscalationMs?: number
   resolveCommand?: (command: string, env: NodeJS.ProcessEnv) => string | null
 }
 
@@ -128,6 +133,7 @@ export function capturePty(options: PtyCaptureOptions): Promise<PtyCaptureResult
   const cols = options.cols ?? 160
   const rows = options.rows ?? 50
   const idleMs = options.idleMs ?? 3_000
+  const killEscalationMs = options.killEscalationMs ?? KILL_ESCALATION_MS
   const timeoutMs = options.timeoutMs ?? 20_000
   const maxBytes = options.maxBytes ?? 2 * 1024 * 1024
   const env = { ...usageProcessEnv(), ...options.env }
@@ -164,14 +170,31 @@ export function capturePty(options: PtyCaptureOptions): Promise<PtyCaptureResult
       if (startupTimer) clearTimeout(startupTimer)
       dataDisposable.dispose()
       exitDisposable.dispose()
+      if (escalation) clearTimeout(escalation)
     }
+
+    // Two-stage teardown. node-pty's kill() sends SIGHUP, which a CLI sitting on a prompt can
+    // ignore — a `claude /usage` probe was found still alive as an orphan (ppid 1) four days after
+    // the run that spawned it, holding a deleted temp dir and contributing to machine load. Escalate
+    // to SIGKILL if the child has not reported exit shortly after the polite signal.
+    let exited = false
+    let escalation: ReturnType<typeof setTimeout> | undefined
 
     const stop = () => {
       try {
         process.kill()
       } catch {
-        // The process may already have exited.
+        return // already gone
       }
+      escalation = setTimeout(() => {
+        if (exited) return
+        try {
+          process.kill('SIGKILL')
+        } catch {
+          // raced with a real exit — nothing to do
+        }
+      }, killEscalationMs)
+      escalation.unref?.()
     }
 
     const fail = (error: UsageProcessError) => {
@@ -215,7 +238,11 @@ export function capturePty(options: PtyCaptureOptions): Promise<PtyCaptureResult
       }
       if (hasMeaningfulOutput(chunk)) resetIdle()
     })
-    const exitDisposable = process.onExit(({ exitCode }) => finish(exitCode))
+    const exitDisposable = process.onExit(({ exitCode }) => {
+      exited = true
+      if (escalation) clearTimeout(escalation)
+      finish(exitCode)
+    })
     const timeoutTimer = setTimeout(
       () => fail(new UsageProcessError('timeout', `${options.command} did not finish within ${timeoutMs}ms.`)),
       timeoutMs,

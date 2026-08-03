@@ -22,8 +22,11 @@ class FakePty implements PtyProcess {
     this.writes.push(data.toString())
   }
 
-  kill(): void {
+  readonly signals: (string | undefined)[] = []
+
+  kill(signal?: string): void {
     this.killCount += 1
+    this.signals.push(signal)
   }
 
   emitData(data: string): void {
@@ -121,5 +124,27 @@ describe('capturePty', () => {
     pty.emitData('5h limit 90% left')
     await vi.advanceTimersByTimeAsync(11)
     await result
+  })
+
+  // Regression: a `claude /usage` probe was found alive as an orphan (ppid 1) four days after its
+  // run. node-pty's kill() sends SIGHUP, which a CLI parked on a prompt can ignore, so teardown now
+  // escalates. Without the escalation the child is left running and only the SIGHUP is ever sent.
+  it('escalates to SIGKILL when the child ignores the polite signal', async () => {
+    const pty = new FakePty()
+    const spawnPty: PtySpawner = () => pty
+    const capture = capturePty({
+      command: 'claude',
+      args: ['/usage'],
+      cwd: '/tmp',
+      idleMs: 5,
+      killEscalationMs: 10,
+      resolveCommand: () => '/bin/claude',
+      spawnPty,
+    })
+    pty.emitData('usage output\n')
+    // Deliberately never emitExit(): this is the ignored-SIGHUP case.
+    await capture
+    expect(pty.signals).toEqual([undefined]) // SIGHUP only, so far
+    await vi.waitFor(() => expect(pty.signals).toEqual([undefined, 'SIGKILL']))
   })
 })
