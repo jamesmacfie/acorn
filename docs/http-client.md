@@ -1,14 +1,10 @@
 # HTTP client
 
-> **Removed.** The bearer-authenticated public automation API (`/api/v1`), its tokens,
-> idempotency store and second listener were deleted in vNext Phase 0 — along with
-> `oauth_accounts`, `api_tokens`, `api_idempotency` and `command_executions`. Passages below
-> that describe it are historical. See [vNext/plan.md](./vNext/plan.md).
-
 The API Requests plugin is a compact, Bruno-inspired HTTP client with an always-visible repo Source
-and a task pane. Both presentations share the same server routes and database rows. It is separate
-from acorn's public automation API: `/api/http/*` sends user-authored outbound
-requests, while `/api/v1/*` lets external automation control acorn.
+and a task pane. Both presentations share the same server routes and database rows. Its routes are
+ordinary plugin routes under `/v2/p/http/*` (registered in `apps/node/src/server/routes.ts`) and they
+send user-authored **outbound** requests — this plugin is a client acorn drives, not a surface
+external automation drives.
 
 ## Scope and storage
 
@@ -19,7 +15,8 @@ than entities, so an empty folder does not exist and rename/move cannot create o
 Sensitive request fields—URL, headers, body, auth, and per-request variables—are AES-256-GCM JWE
 ciphertext under `SESSION_ENC_KEY`. Every repo-variable value is encrypted, including ordinary
 values and command text. Secret-variable plaintext is never returned to the renderer. Startup
-protects legacy plaintext rows before opening either listener, and renderer activation deletes
+protects legacy plaintext rows before the listener opens (`apps/node/src/wiring/startupSecurity.ts`),
+and renderer activation deletes
 legacy `http-draft:*` localStorage. Unsaved drafts now exist only in memory.
 
 ## Request model
@@ -50,10 +47,11 @@ is never persisted.
 ## Sending and security
 
 The Hono route executes requests with Node's `fetch`; no injected stateful engine bridge is needed, so
-the client works in `dev:node`. Sending is restricted to an interactive cookie-authenticated
-principal. The internal `x-acorn-internal` principal used by agents/MCP receives
-`403 interactive_user_required`, preventing the route from becoming a secret-decryption or SSRF
-oracle for child processes.
+the client works in `dev:node`. Sending is restricted to `principal.kind === 'device'` — the owner at
+a paired client, authenticated by its device bearer token. The internal `x-acorn-internal` principal
+used by agents/MCP receives `403 interactive_user_required`, preventing the route from becoming a
+secret-decryption or SSRF oracle for child processes. This is one of only two kind-based gates in the
+tree; see [vNext/phase1-notes.md](./vNext/phase1-notes.md).
 
 Only `http:` and `https:` URLs are accepted. Requests time out after 30 seconds and response bodies
 are capped at 5 MiB, with a truncation flag. Redirects use undici's standard `follow` behavior so
@@ -62,12 +60,12 @@ their headers/body; DNS, connection, TLS, and timeout failures return a typed fa
 Authorization, Cookie, secret values, and command outputs are redacted from the response timeline
 and error text.
 
-This is intentionally an arbitrary outbound client for the signed-in human; it is not an SSRF-safe
-fetch proxy for untrusted callers.
+This is intentionally an arbitrary outbound client for the human at a paired client; it is not an
+SSRF-safe fetch proxy for untrusted callers.
 
 ## Internal routes
 
-All routes are under `/api/http/:owner/:repo`:
+All routes are under `/v2/p/http/:owner/:repo`:
 
 | Method and suffix | Purpose |
 | --- | --- |
@@ -81,7 +79,7 @@ All routes are under `/api/http/:owner/:repo`:
 | `DELETE /vars/:id` | Delete a variable |
 | `POST /send` | Resolve variables and execute one draft |
 
-Rows are always constrained by the authenticated login and route repo; opaque ids cannot cross
+Rows are always constrained by the principal's owner id (`ownerId(c)`) and route repo; opaque ids cannot cross
 that boundary. Duplicate names return `duplicate_name`; network/setup failures return
 `send_failed`; non-interactive callers return `interactive_user_required`.
 

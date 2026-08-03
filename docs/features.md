@@ -1,7 +1,7 @@
 # Features
 
 A capabilities tour: what acorn can do, where each feature lives in the UI, and the deeper doc for
-each. For system design (the one-server model, caches, request flow) read
+each. For system design (the client/node model, caches, request flow) read
 [architecture-overview.md](./architecture-overview.md) instead — this doc is the feature map.
 
 ## What acorn is
@@ -9,8 +9,10 @@ each. For system design (the one-server model, caches, request flow) read
 acorn began as a **GitHub pull-request review tool** and has grown into a **local macOS agent
 workspace**: a keyboard-driven desktop app for reviewing PRs *and* driving coding agents (Claude
 Code, Codex, aider) against your repositories, each in its own git worktree. It is a SolidJS
-single-page app served by one Hono server running in Electron's Node utility process, backed by
-a local SQLite mirror of GitHub. Everything runs on one machine for one user.
+single-page app that loads from its own `app://acorn` origin inside Electron and talks to a Hono
+service — a spawned Node child process, listening over TLS on an ephemeral loopback port — through a
+connection broker in Electron main, backed by a local SQLite mirror of GitHub. Everything runs on one
+machine for one user.
 
 The UI is token-driven: colour themes compose independently with style packs that control
 typography, shape, density, chrome, and motion. See [ui-design.md](./ui-design.md).
@@ -107,7 +109,8 @@ The always-visible API Requests Source and task pane share a server-side HTTP cl
 requests belong to a repo; new task-pane requests can remain task-local until filed. URLs, headers,
 bodies, auth, request variables, and repo variables are encrypted at rest. Variables can be plain,
 secret, or command-backed, resolve only when referenced, and redact from the response timeline.
-Only an interactive cookie-authenticated user may send requests.
+Only a device principal — an interactive client, never an agent or other internal caller — may send
+requests.
 
 → [http-client.md](./http-client.md)
 
@@ -221,12 +224,11 @@ Reached from the account menu. A left tab rail:
 | Agent pricing | Provider/model pricing overrides used for local usage estimates |
 | Docker | Daemon status, stopped-container visibility, destructive confirmations |
 | API requests | HTTP-client behavior and stored-variable controls |
-| API | Opt-in public automation listener and bearer-token administration |
 | MCP | MCP server config |
 | Workflows | Read-only workflow inspector |
 | Terminal | Default profile when the terminal button is clicked |
 | Shortcuts | Editable per-pane keys + the global shortcut reference |
-| Permissions | Re-request GitHub access |
+| Nodes | Paired nodes: pairing, fingerprint, rename, forget/revoke, connection state |
 
 ---
 
@@ -246,12 +248,12 @@ Be aware of what's real today:
 
 ## Source
 
-- Client shell: `apps/desktop/apps/desktop/src/app/client/App.tsx`; capabilities: `@acorn/client-core/capabilities.ts`
+- Client shell: `apps/desktop/src/app/client/App.tsx`; capabilities: `@acorn/client-core/capabilities.ts`
 - TabRail: `packages/client-core/src/tabs/{TabRail.tsx,sources.ts,railOrder.ts}`
 - Task view + panes: `packages/client-core/src/tasks/{TaskView.tsx,layout.ts}`
 - Write actions: PR verbs in `plugins/github/src/client/mutations.ts`; workspace/repo and
   task/review-note writes in `@acorn/client-core/{workspaces,tasks}/mutations.ts`
-- Palette / shortcuts: `packages/client-core/src/palette/model.ts`, `plugins/github/client/Shortcuts.tsx`
+- Palette / shortcuts: `packages/client-core/src/palette/model.ts`, `plugins/github/src/client/Shortcuts.tsx`
 - Settings shell: `packages/client-core/src/settings/`; contributed pages live with plugins
 - MCP server: `packages/node-core/src/mcp/server.ts`
 

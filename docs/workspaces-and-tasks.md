@@ -346,7 +346,7 @@ without it.
 ## Source
 
 Client shell: `packages/client-core/src/{tabs,tasks,workspaces}/`; provider browse views and
-onboarding live under `apps/desktop/src/plugins/{linear,rollbar,onboarding}/client/`.
+onboarding live under `plugins/{linear,rollbar,onboarding}/src/client/`.
 Server: `packages/node-core/src/server/routes/{workspaces.ts,tasks.ts}`, PR inheritance in
 `plugins/github/src/server/routes/pullRefresh.ts`.
 Shared: `packages/protocol/src/{workspaceIdentity.ts,branch.ts}`. Schema:

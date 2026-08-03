@@ -6,22 +6,23 @@ app-state.
 
 > **Runtime note:** acorn migrated from Cloudflare Workers to a local Electron app (see
 > [electron.md](./electron.md)). The read-model mirror is unchanged but now lives in local SQLite
-> (better-sqlite3 + Drizzle) under `apps/desktop/.acorn/`, not D1. `db.batch()` is emulated via a
-> transaction (electron.md §4c). Read any lingering "D1" as "the local SQLite DB".
+> (better-sqlite3 + Drizzle) as `core.sqlite` in the node's data root — `apps/node/.acorn/` in a dev
+> checkout — not D1. `db.batch()` is emulated via a transaction (electron.md §4c). Read any lingering
+> "D1" as "the local SQLite DB".
 
 The schema has three ownership classes:
 
 - **Mirror tables** — cached projections of GitHub (and, generically, of external issue providers)
   data. Disposable, revalidated, populated on read. The SQLite mirror is a *cache of GitHub, not a
   source of truth* (see [architecture-overview](./architecture-overview.md)).
-- **App-state tables, identity-scoped** — data GitHub does not have but which must follow the signed-in
-  identity: prefs, pins, viewed-file state, integration credentials, public API credentials, and
-  encrypted HTTP requests/variables. Keyed by `userId`; acorn owns them.
+- **App-state tables, identity-scoped** — data GitHub does not have but which must follow the active
+  identity: prefs, pins, viewed-file state, integration credentials, and encrypted HTTP
+  requests/variables. Keyed by `userId`; acorn owns them.
 - **App-state tables, machine-scoped** — data that describes *this machine* (local checkouts,
   worktrees, tasks, terminals, notes, memory). No `userId` — they exist outside any GitHub user
   context. acorn owns them.
 
-Source: `apps/desktop/packages/node-core/src/server/db/schema.ts` (fully commented — the source of truth for every
+Source: `packages/node-core/src/server/db/schema.ts` (fully commented — the source of truth for every
 column), `packages/node-core/src/server/db/index.ts`, `packages/node-core/src/server/db/resourceKeys.ts`,
 `packages/node-core/migrations/`.
 
@@ -47,12 +48,12 @@ alone is *not* unique — the primary key includes `userId`.
 > revisit if logins churn."
 
 **Machine-scoped** app-state tables (`repo_paths`, `workspaces`, `tasks`, …) deliberately have *no*
-`userId`. They describe the local filesystem and the user's work on it — the terminal service in the
-Electron utility process reads them outside any GitHub user context, and on a single-user machine there
+`userId`. They describe the local filesystem and the user's work on it — the terminal engine in the
+node service process reads them outside any GitHub user context, and on a single-user machine there
 is no second user to isolate from. See [user- vs machine-scoping](#user--vs-machine-scoping) below.
 
 Patch/blob bodies are the one thing kept outside the tables entirely: the on-disk `BLOBS` cache
-(under `apps/desktop/.acorn/blobs/`) holds immutable bodies keyed by sha. On a single-user machine
+(`blobs/` in the data root) holds immutable bodies keyed by sha. On a single-user machine
 the cache is private to you, so there is no public/private split. See [caching](./caching.md).
 
 ---
@@ -182,8 +183,8 @@ Per-user pinned repos for the selector. PK `(userId, repoId)`. Ordered by `sort`
 
 #### `prefs`
 
-Per-user key→value preferences. PK `(userId, key)`. `GET /api/prefs` returns a key→value map; `PUT`
-upserts one key.
+Per-user key→value preferences. PK `(userId, key)`. `GET /v2/core/prefs` returns a key→value map;
+`PUT` upserts one key.
 
 | Column | Type | Note |
 | --- | --- | --- |
@@ -209,9 +210,12 @@ disambiguates them in the UI ("Linear – work").
 | `lastValidatedAt`, `lastError` | integer / text | health state |
 | `createdAt`, `updatedAt` | integer | epoch ms |
 
-> GitHub itself is **not** stored here: it is the identity root (its token is the session cookie,
-> `userId` derives from it). It only *appears* as a synthesized entry in the integrations list
-> endpoint. See [integrations](./integrations.md), [authentication](./authentication.md).
+> GitHub **is** stored here — one row per owner under provider `github`, written by the device-flow
+> connect route and read only through `githubToken(c)`
+> (`plugins/github/src/server/githubToken.ts`). It is still the identity root: `userId` is the GitHub
+> login every other user-scoped table is keyed by, and GitHub also *appears* as a synthesized entry in
+> the integrations list endpoint. See [integrations](./integrations.md),
+> [authentication](./authentication.md).
 
 ### Group 3 — App-state tables, machine-scoped (no userId)
 
@@ -249,7 +253,8 @@ The lifecycle/build/db/preview columns above are the machine-local DB fallback b
 `.acorn/config.toml` (`main/runConfig.ts` `loadRepoConfig` precedence: committed repo toml → user
 `~/.acorn/config.toml` → these columns). They **moved off `workspaces` (repo-level-settings)**: a
 workspace groups repos, but this config describes one repo. `browserRules` is DB-only (dev-login
-autofill selectors are machine/personal, not committed). Write via `PUT /api/terminal/repo-path/config`.
+autofill selectors are machine/personal, not committed). Write via
+`PUT /v2/p/terminal/terminal/repo-path/config`.
 
 #### `workspaces`
 
@@ -446,7 +451,7 @@ transactional query projections. Full contracts and state vocabularies are in
 #### `terminal_sessions`
 
 Durable terminal sessions. PK opaque `id`. Machine-scoped. **Desktop-only** — the terminal drawer
-requires the utility-service terminal capability and is always on in the Electron app (`capabilities()`,
+requires the node service's terminal capability and is always on in the Electron app (`capabilities()`,
 `packages/client-core/src/capabilities.ts`).
 Only **tmux-backed** sessions are persisted (tmux outlives an app restart; node-pty sessions die with
 the process and live only in the in-memory map). No terminal output is ever stored. Bound to a task —
@@ -471,7 +476,7 @@ repo/branch/PR are derived through the `taskId → tasks` join.
 
 #### `workflow_runs`
 
-The durable checkpoint for the utility-service workflow state machine — every transition is persisted so
+The durable checkpoint for the node service's workflow state machine — every transition is persisted so
 a run survives an app restart. PK opaque `id`. Machine-scoped. The registry-backed runtime supports
 gates, joins, branching, bounded fan-out, cancellation, tool ceilings, and reconciliation; it is
 desktop-capability-gated. See [workflows](./workflows.md).
@@ -516,43 +521,33 @@ Steps carry a first-class working context (`worktreePath`); structured output is
 | `error` | text | |
 | `createdAt`, `updatedAt` | integer | epoch ms |
 
-### Group 4 — Public API, command capture, and encrypted HTTP state
+### Group 4 — Device identity, replay, and encrypted HTTP state
 
-These tables share a platform/security lifecycle rather than one physical scope. Public API tokens
-and HTTP-client rows follow a GitHub identity; idempotency and command-capture rows key through
-their owning token/task.
+These tables share a platform/security lifecycle rather than one physical scope. Device rows and the
+replay store belong to the node itself and carry no `userId`; HTTP-client rows follow a GitHub
+identity.
 
-#### `api_tokens`
+#### `devices`
 
-Bearer tokens for the opt-in public automation API. The raw `acorn_<id>_<secret>` value is shown
-once; only its prefix and SHA-256 secret hash are stored. `userId` binds issuance and upstream
-credentials to the interactive identity. `lastUsedAt` is write-throttled, `expiresAt` is optional,
-and revocation stamps `revokedAt`.
+One row per paired client — the authentication root. PK opaque `id`, which is also the public half of
+the bearer token `acorn_dt_<id>_<secret>`. Only `secretHash` (sha256 of the secret) is stored; the
+plaintext is returned exactly once, at pairing. `name` is user-supplied, `lastSeenAt` is best-effort
+telemetry written at most once per throttle window and off the request path, and `revokedAt` is set
+once and never unset — revocation is permanent, so the row survives to show what was revoked and
+when, and a replayed token can never be resurrected. There are no scopes: every paired device has
+full owner authority. See [security](./security.md).
 
-#### `oauth_accounts`
+#### `idempotency`
 
-The encrypted GitHub credential retained only while a user has an active public API bearer. One row
-per `userId`; the access token is JWE ciphertext and is removed on logout or last-token revocation.
-It lets the separate listener call GitHub without borrowing a browser cookie.
-
-#### `api_idempotency`
-
-24-hour replay rows keyed by `(tokenId, operationId, key)`. A retry with the same request hash gets
-the stored response; reusing a key for different input returns an idempotency conflict. Expired rows
-are swept during maintenance.
-
-#### `command_executions`
-
-Captured public-API command runs keyed to a task. Status covers queued/running/terminal states;
-stdout/stderr are bounded and carry an `outputTruncated` bit so clients can reconnect after an app
-restart. Records expire after 24 hours.
+24-hour replay rows keyed by `(deviceId, key)`, where `key` is the client-minted `Idempotency-Key`
+header. A retry carrying the same `requestHash` (`sha256(method \n path \n rawBody)`) replays the
+stored status and body; reusing a key for different input is an idempotency conflict. A `5xx` is never
+stored, so a genuine retry re-executes. `expiresAt` is indexed for the sweep.
 
 #### `http_requests` — saved requests for the API panel
 
 Repo-scoped and GitHub-user-scoped: a request written against a repo's API outlives any one task
-worktree but never crosses a sequential login switch. Named `http_*`, not `api_*`, because
-`api_tokens` / `api_idempotency` already belong to the public automation API. See
-[http-client.md](./http-client.md).
+worktree but never crosses a sequential identity switch. See [http-client.md](./http-client.md).
 
 | Column | Type | Note |
 | --- | --- | --- |
@@ -654,7 +649,6 @@ tasks(id)
   │    ├─ agent_requests(sessionId)
   │    └─ agent_artifacts(sessionId)
   ├─ terminal_sessions(taskId)
-  ├─ command_executions(taskId)
   └─ workflow_runs(taskId)
         └─ workflow_steps(runId)                     -- parentStepId fan-out; agentSessionId managed lineage
 tasks.parentId → tasks.id                            -- task tree (fan-out children)
@@ -678,12 +672,13 @@ Why some tables have `userId` and some do not:
   cross users, so `userId` is part of the PK.
 - **`userId` absent** (machine-scoped app-state): the data describes *this machine* — a local
   checkout path (`repo_paths`), a worktree-backed task (`tasks`), a tmux session
-  (`terminal_sessions`), a memory file on disk (`memories`). It is read by utility-service domain
+  (`terminal_sessions`), a memory file on disk (`memories`). It is read by the node's domain
   engines outside any GitHub request context. On a single-user machine
   there is no second user to isolate from, so adding `userId` would be dead weight.
 
-`integrations`, encrypted HTTP-client rows, bearer tokens, and retained OAuth credentials sit on the
-identity-scoped side. Integration dependents that describe local work — `task_links`,
+`integrations` (including the GitHub credential) and the encrypted HTTP-client rows sit on the
+identity-scoped side. `devices` and `idempotency` sit on neither: they describe *this node's* paired
+clients, not an upstream account. Integration dependents that describe local work — `task_links`,
 `workspace_projects` — reference it by `integrationId` from the machine-scoped side.
 
 ## Staleness / ETag bookkeeping
@@ -722,7 +717,7 @@ Exact TTL values and the ETag/304 flow are in [caching](./caching.md).
 
 `pr_files` rows carry only file metadata and the blob `sha`. The actual patch/file bodies —
 immutable, addressable by sha — live in the on-disk `BLOBS` directory
-(`apps/desktop/.acorn/blobs/`), not in SQLite, under two key prefixes owned by
+(`blobs/` in the node's data root), not in SQLite, under two key prefixes owned by
 `packages/node-core/src/server/blobs.ts`: `patch:<sha>` (written by `routes/prMirror.ts`) and `filebody:<sha>` for
 full file bodies (`routes/pullBlob.ts`). This keeps
 the DB small and lets identical blobs across PRs share one cached body. (The old
@@ -737,7 +732,7 @@ connects to a database.
 ```ts
 export default defineConfig({
   dialect: 'sqlite',
-  schema: './packages/node-core/src/server/db/schema.ts',
+  schema: './src/server/db/schema.ts',
   out: './migrations',
 })
 ```
@@ -745,14 +740,15 @@ export default defineConfig({
 Workflow:
 
 ```bash
-# 1. edit apps/desktop/packages/node-core/src/server/db/schema.ts
-pnpm --filter @acorn/desktop db:generate   # drizzle-kit generate → new SQL in packages/node-core/migrations/
-pnpm --filter @acorn/desktop db:migrate    # tsx scripts/migrate.ts → apply (also runs on app startup)
+# 1. edit packages/node-core/src/server/db/schema.ts
+pnpm db:generate   # drizzle-kit generate → new SQL in packages/node-core/migrations/, then replay-check
+pnpm db:migrate    # tsx scripts/migrate.ts → apply (also runs on app startup)
 ```
 
-After changing the **bindings** shape, update the hand-written `Env` in `apps/desktop/src/env.d.ts`.
+After changing the **bindings** shape, update the exported `Env`/`RuntimeBindings` in
+`packages/node-core/src/main/bindings.ts`.
 
-Migrations live in `packages/node-core/migrations/` (`0000_*.sql` … `0032_*.sql` at time of writing, plus a
+Migrations live in `packages/node-core/migrations/` (`0000_*.sql` … `0038_*.sql` at time of writing, plus a
 `meta/` snapshot dir) and are applied by `drizzle-orm/better-sqlite3/migrator` — automatically on app
 startup (`openDb` in `packages/node-core/src/main/bindings.ts`) and via `db:migrate`.
 
@@ -765,7 +761,7 @@ startup (`openDb` in `packages/node-core/src/main/bindings.ts`) and via `db:migr
   migrates them. `CREATE VIRTUAL TABLE` lives hand-written in migration `0011`; if the indexed
   columns change, edit the migration/DDL yourself and keep the sync code in step.
 - **better-sqlite3 ABI:** `db:migrate` runs under plain Node, so it needs the Node ABI build
-  (`pnpm --filter @acorn/desktop node:rebuild`); Electron needs the Electron ABI. See the root
+  (`pnpm rebuild:node`); Electron needs the Electron ABI. See the root
   `CLAUDE.md`.
 
 ---

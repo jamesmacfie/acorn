@@ -32,8 +32,9 @@ remain intentionally outside the current runtime.
 
 ### Where they live
 
-Notes are gitignored markdown files under `apps/desktop/.acorn/notes/`. They have three first-class
-locations, represented by the shared `NoteLocation` union:
+Notes are gitignored markdown files under `notes/` in the node's data root (`apps/node/.acorn/notes/`
+in a dev checkout). They have three first-class locations, represented by the shared `NoteLocation`
+union:
 
 | Scope | Directory | Shared by |
 | --- | --- | --- |
@@ -54,7 +55,8 @@ Each note carries an `author` (`user | agent | workflow`) and a `kind`
 ### The Notes pane
 
 `plugins/notes/src/client/NotesPane.tsx` — the registered `notes` layout pane, whose client
-uses task/workspace-scoped HTTP routes. The backing file store is utility-service-owned, so those routes
+uses the task/workspace-scoped routes under `/v2/p/memory` (`/tasks/:id/notes*`,
+`/workspaces/:wsId/notes*`). The backing file store is service-owned, so those routes
 return a clean `503 bridge-unavailable` under `dev:node`. Layout:
 
 - A scratchpad is the landing surface. Until the first keystroke it is virtual; typing creates the
@@ -74,7 +76,7 @@ already mounted it consumes the live event; otherwise it consumes the retained i
 
 Agents reach notes over the **loopback harness routes** (`packages/node-core/src/server/routes/harness.ts`),
 which are keyed by **task id** (the store resolves task → workspace internally). The routes delegate to
-the utility-service `NotesStore` through the injected `HarnessBridge` (`harness.ts:10-36`):
+the service-owned `NotesStore` through the injected `HarnessBridge` (`harness.ts:10-36`):
 
 | Route | Bridge method | MCP tool |
 | --- | --- | --- |
@@ -142,7 +144,7 @@ in-flight and dropped on completion.
 Memory has no pane of its own. `plugins/memory/src/client/MemorySection.tsx` renders
 inline inside the Context pane's Memory section, so proposals/manual creation sit beside the exact
 memory inventory and inclusion state they affect. The client in
-`plugins/memory/client/memoryClient.ts` calls loopback HTTP. Two surfaces:
+`plugins/memory/src/client/memoryClient.ts` calls the `/v2/p/memory` routes. Two surfaces:
 
 1. **Memory proposals — the human gate.** Pending proposals are listed with an editable
    description and **Accept / Reject** buttons; structural verification `flags` (e.g. a
@@ -155,7 +157,7 @@ memory inventory and inclusion state they affect. The client in
 
    Proposals arrive from two sources and land in one store: an agent's `memory_write` (the MCP
    propose path) and the **auto-generation pass** (below). The store is JSON files under
-   `apps/desktop/.acorn/memory-proposals/` — visible, greppable, crash-safe, no schema
+   `memory-proposals/` in the node's data root — visible, greppable, crash-safe, no schema
    (`MemoryProposalStore`, `plugins/memory/src/main/memoryProposals.ts`).
 2. **Manual "+ memory"**: a form with name (kebab-cased), type, scope (`repo (worktree,
    committed)` vs `private (~/.acorn)`), one-line description, and body. Writes directly on the
@@ -226,13 +228,13 @@ memory bodies on demand.
 Both memory (repo scope) and notes reference a **single `.acorn/` directory**, not a dotfile per
 feature. In a repo/worktree it holds `config.toml` (run targets, editor — see
 [workflows.md](./workflows.md)), `memory/`, and workflow assets; committed content is
-team-shared, while acorn's own local state lives under `apps/desktop/.acorn/` (gitignored: the client
-query cache, blob cache, and workspace notes).
+team-shared, while acorn's own local state lives in the node's data root — `apps/node/.acorn/` in a
+dev checkout (gitignored: the SQLite database, blob cache, and workspace notes).
 
 ## Availability and limits
 
-- **File-backed paths need the utility service.** Human-facing HTTP routes delegate through an injected
-  `KnowledgeBridge`. Without it — e.g.
+- **File-backed paths need the supervised service.** Human-facing HTTP routes delegate through an
+  injected `KnowledgeBridge`. Without it — e.g.
   `dev:node` running just the Hono server with no Electron — every route degrades to a clean **503**
   (`bridge-unavailable`) rather than crashing.
 - **The full proposal loop is implemented** — the human gate (Accept/Reject, manual add,
@@ -249,7 +251,7 @@ query cache, blob cache, and workspace notes).
   `review_notes` for the separate anchored store)
 - Shared note shapes: `packages/protocol/src/notes.ts` (canonical `Note`/`NoteSummary` +
   author/kind unions, imported by main and client)
-- Stores (utility service; historical `main` paths):
+- Stores (service-owned; historical `main` paths):
   `plugins/notes/src/main/notes.ts` (`NotesStore` — the `.md` files),
   `plugins/memory/src/main/memory.ts` (memory files + derived index + `MEMORY.md`),
   `plugins/memory/src/main/memoryProposals.ts` (proposal JSON store),

@@ -1,64 +1,86 @@
 # Security model
 
-> **Removed.** The bearer-authenticated public automation API (`/api/v1`), its tokens,
-> idempotency store and second listener were deleted in vNext Phase 0 — along with
-> `oauth_accounts`, `api_tokens`, `api_idempotency` and `command_executions`. Passages below
-> that describe it are historical. See [vNext/plan.md](./vNext/plan.md).
-
-acorn is a local, single-user Electron application, but its loopback server and renderer are still
-separate trust boundaries. The security posture is defense in depth: bind locally, authenticate
-every API route, validate inputs again at the privileged boundary, and never expose general Node or
-Electron capabilities to the renderer.
+acorn is a local, single-user Electron application, but the renderer and the node are separate trust
+boundaries — and, since the renderer moved to its own `app://acorn` origin, separate origins too. The
+security posture is defense in depth: bind locally, authenticate every route, validate inputs again
+at the privileged boundary, and never expose general Node or Electron capabilities to the renderer.
 
 ## Loopback server
 
-- The listener binds `127.0.0.1`, not all interfaces.
-- A Host-header guard accepts only the configured `127.0.0.1:<port>` origin, limiting DNS-rebinding
-  attacks.
-- `/auth/*` is public because it establishes the session. Every `/api/*` request passes `csrf()`,
-  `authMiddleware`, and `requireUser` before core or contributed routers run.
-- `/auth/*` also passes `csrf()`. Public is not unprotected: `POST /auth/logout` mutates session
-  state, so a foreign page must not be able to force it.
-- Browser callers use the encrypted, HTTP-only, same-site session cookie. Internal MCP callers use
-  the private persisted `INTERNAL_TOKEN`; it maps to the explicit active identity but carries no
-  GitHub token and fails closed when logout clears that identity.
-- The HTTP-client router is cookie-principal-only even inside `/api/*`: internal MCP/agent callers
-  cannot read encrypted request material, resolve variables, or use the outbound sender as a secret
-  oracle.
-- The WebSocket upgrade rechecks Host, Origin, and either the session cookie or internal token.
+- The listener binds `127.0.0.1`, not all interfaces, on an **ephemeral** port, and speaks **TLS 1.3
+  only**. The self-signed certificate is minted into `<data root>/tls`; the client pins its sha256
+  fingerprint at pairing and a fingerprint change is a hard stop.
+- A Host-header guard accepts only the `127.0.0.1:<bound port>` origin, limiting DNS-rebinding
+  attacks. Before the kernel has assigned the port there is no allowed Host, so the guard rejects
+  everything — the safe direction for that sliver of time.
+- The node serves **no web assets and has no SPA fallback**: there is no browser origin on it to
+  defend, and nothing invites a page to treat it as one. Unmatched paths get a plain `404`.
+- Every `/v2/*` request passes `authMiddleware` (resolve the principal) then `requireUser` (enforce
+  it) before any core or plugin router runs. The two pairing routes — `GET /v2/node` and
+  `POST /v2/pair` — sit above that gate by construction: a client that has never paired holds no
+  credential, so they are the way in. They are public, not unprotected, and everything that
+  *administers* devices stays under `/v2/core/devices`, below the gate.
+- There is **no CSRF middleware, and its absence is deliberate**. CSRF defends *ambient* credentials
+  — a cookie a browser attaches whether or not the page meant to send it — and no ambient credential
+  is left. Every request carries a bearer held in Electron main, nothing a cross-site page can do
+  makes anything attach it, and the renderer cannot open a socket to a node at all (below).
+- The HTTP-client router is **device-principal-only**: internal MCP/agent callers cannot read
+  encrypted request material, resolve variables, or use the outbound sender as a secret oracle.
+- The WebSocket upgrade (`/v2/events`) rechecks Host and either a device bearer or the internal
+  token, and it holds the device service so a revoked device's sockets close immediately.
 
-## Public automation API
+## Principals
 
-The optional public automation API is a **separate loopback listener** (its own
-port, `127.0.0.1`-only, Host-guarded before Hono) so its port is independent of the SPA origin. It is
-**disabled by default** and exposes nothing until a token is minted.
+There are exactly two principals, and `Principal` — `{ kind: 'device' | 'internal'; userId;
+deviceId? }` — is the whole of what a route may know about who is asking. `ownerId(c)` returns the
+owner's GitHub login, the scope key for every user-scoped table.
 
-- Every route and the WebSocket upgrade require a **bearer token**; the public app rejects cookie and
-  internal-token auth. Tokens are stored only as `SHA-256(secret)`, shown once, and revocable with
-  immediate effect (next HTTP call `401`; live sockets closed).
-- Two scopes only: `read` and `read + write`. **A `write` token can run arbitrary commands, edit
-  files, and mutate Git/GitHub as the local user** — the Settings page states this explicitly, and it
-  is the single highest-impact capability in the app. Loopback-only bind, show-once random secret, no
-  request-body/command logging, and immediate revocation are the mitigations.
-- Token issuance is a cookie-authenticated interactive ceremony; a bearer cannot mint bearers. The
-  GitHub credential a bearer needs is stored encrypted in `oauth_accounts` only while active
-  bearers exist, and is removed on logout (never returned).
+- **`device`** — a paired client's bearer token, `acorn_dt_<uuid>_<base64url32>`. Stored only as
+  `SHA-256(secret)`, returned exactly once at pairing, revocable with immediate effect (next HTTP
+  call `401`; live sockets closed, and streams re-check within 60s). Every paired device has **full
+  owner authority**: single-owner software has no roles or scopes, and pairing discloses that.
+  Pairing is a short-lived single-use code with a bounded attempt budget and a rate ceiling, and its
+  failures are uniform — there is no oracle for "right code, wrong something".
+- **`internal`** — a child process this node spawned (the MCP server, command-variable executions,
+  headless workflow steps). It presents the persisted mode-`0600` `INTERNAL_TOKEN` in the
+  `x-acorn-internal` header and resolves to the machine's explicitly bound active identity, failing
+  closed when nothing is bound rather than guessing from a first prefs/repo row.
 
-## Renderer, service process, and Electron
+A presented bearer that fails is a rejection, not an invitation to fall through to the internal
+token. There is no session state on the node at all: a credential is presented per request.
 
-The window uses context isolation and a sandboxed preload; raw `ipcRenderer` is never exposed.
-Normal data and commands use authenticated HTTP, and streams use the authenticated WebSocket.
-Preload IPC is reserved for native capabilities: close/quit lifecycle, the folder picker, and the
-main-owned preview `WebContentsView`.
+The renderer holds **no credential of its own**. Electron main's connection broker owns each node's
+endpoint, pinned certificate and device token, keeps the token in `safeStorage`, and is the only
+thing that speaks to a node.
 
-The privileged Node/domain runtime is isolated from Electron main in a supervised utility process.
-Its dependency graph is required to remain Electron-free, while main is forbidden from importing
-service-owned engines. The bidirectional protocol is versioned and Zod-validated at both endpoints;
-pending calls have timeouts and reject when the peer closes. Service-to-main capabilities accept
-serializable, task-addressed inputs only. Database handles, process objects, and `webContents`
-identifiers never cross this boundary. Main exposes only native preview/browser adapters and owns
-restart/fail-closed policy; the service owns filesystem/process/database operations and graceful
-resource draining.
+**The internal principal can reach GitHub.** The GitHub credential lives in an encrypted
+`integrations` row read through `githubToken(c)`, which resolves it for `ownerId(c)` — the same owner
+for either principal kind — and nothing in the github plugin's routers gates on kind. So an
+agent-spawned child *can* spend the owner's GitHub credential; it is no longer structurally unable
+to. That is a deliberate consequence of moving the credential off the principal, recorded in
+[vNext/phase1-notes.md](./vNext/phase1-notes.md). The kind gates that do exist are the agent-tool
+projections (renderer ⇒ `device`, MCP ⇒ `internal`) and the HTTP client's `send` (⇒ `device`).
+
+## Renderer, node process, and Electron
+
+The window uses context isolation and a sandboxed preload; raw `ipcRenderer` is never exposed. The
+renderer loads from `app://acorn`, served by Electron main from the bundled client, under a
+Content-Security-Policy set as a response header whose `connect-src` is `'self'` — so it has **no
+network permission at all**. Every byte to or from a node, request/response and stream alike, crosses
+preload IPC to the broker in main, which holds the pinned certificate and the device token. A
+cross-site page cannot reach a node, and a compromised renderer cannot open a socket to anywhere.
+Preload also carries the native capabilities: close/quit lifecycle, the folder picker, fleet
+administration requests, and the main-owned preview `WebContentsView`.
+
+The privileged Node/domain runtime is isolated from Electron main in a supervised **spawned Node
+child process** (`process.execPath` with `ELECTRON_RUN_AS_NODE=1`), not an Electron `utilityProcess`
+— which is what lets the same service run without Electron at all. Its dependency graph is required
+to remain Electron-free, while main is forbidden from importing service-owned engines. The
+bidirectional protocol is versioned and Zod-validated at both endpoints; pending calls have timeouts
+and reject when the peer closes. Service-to-main capabilities accept serializable, task-addressed
+inputs only. Database handles, process objects, and `webContents` identifiers never cross this
+boundary. Main exposes only native preview/browser adapters and owns restart/fail-closed policy; the
+service owns filesystem/process/database operations and graceful resource draining.
 
 Unexpected navigation and window creation are blocked or opened externally by the main process.
 Anything handed to the OS via `shell.openExternal` passes a scheme allowlist first (`http`, `https`,
@@ -68,27 +90,33 @@ anchor's `href` is untrusted, and `openExternal` resolves schemes through the OS
 restricted to `http(s)`, and its `webContents` identifier never crosses to the renderer. Browser
 automation binds inside main and is exposed to agents through permission-checked tools.
 
-## Secrets and sessions
+## Secrets
 
-- GitHub access tokens stay inside the encrypted session cookie and server bindings; public user
-  responses never include them.
+- The GitHub access token is an integration credential like any other: one encrypted `integrations`
+  row per owner, read only through `githubToken(c)`. It never reaches the renderer, and public
+  responses never include it.
 - Integration credentials are encrypted at rest with `SESSION_ENC_KEY` and are never returned to
   the renderer after submission.
+- GitHub connects by the OAuth **device authorization grant**, so there is no client secret in the
+  exchange, no redirect URI, and no callback URL to register. `GITHUB_CLIENT_ID` is required to boot
+  a node; `GITHUB_CLIENT_SECRET` is still declared but read optionally and consumed by nothing.
 - Electron stores `SESSION_ENC_KEY` through `safeStorage`. An explicit environment value wins and
   can recover or migrate an existing identity. Decryption failure is fatal rather than silently
-  minting a replacement that would strand sessions and provider tokens.
-- Child processes receive a controlled environment. GitHub and session secrets are not inherited;
-  task identity and the persistent mode-`0600` internal API token are injected explicitly.
-- The data root and blob/worktree directories are created mode `0700`; SQLite, WAL/SHM, blob files,
-  `internal-token`, and `active-identity` are normalized to mode `0600`.
-- HTTP-client request fields and all variable values are encrypted under the session key. Only the
-  interactive user principal may open/send them; agent/internal principals are rejected.
+  minting a replacement that would strand provider tokens.
+- Child processes receive a controlled environment. GitHub credentials are not inherited; the node's
+  endpoint, its TLS certificate path, task identity, and the persistent mode-`0600` internal API
+  token are injected explicitly.
+- The data root and blob/worktree directories are created mode `0700` and hold an exclusive process
+  lock; SQLite, WAL/SHM, blob files, the TLS key/cert, `internal-token`, `node.json`, and
+  `active-identity` are normalized to mode `0600`.
+- HTTP-client request fields and all variable values are encrypted under `SESSION_ENC_KEY`. Only the
+  device principal may open/send them; internal agent principals are rejected.
 
 ## External occurrence data (Rollbar)
 
 Rollbar occurrence payloads can carry secrets and personal data even when an SDK scrubbed common
-keys, so Acorn applies its **own** allowlist in `plugins/rollbar/server/normalize.ts` before anything
-is persisted or rendered. Only a fixed set of normalized fields survive — exception class/message,
+keys, so Acorn applies its **own** allowlist in `plugins/rollbar/src/server/normalize.ts` before
+anything is persisted or rendered. Only a fixed set of normalized fields survive — exception class/message,
 stack frames with bounded code context, request method+URL, application context, code version,
 platform/language/framework, server host/branch, notifier name/version, and a minimal person id/
 username/email. Everything else is dropped at the boundary: raw request headers, cookies, query
@@ -102,7 +130,7 @@ or sent to the renderer; tests use synthetic fixtures only.
 ## Filesystem, processes, and database
 
 Task-scoped file operations re-derive the worktree root from `taskId`, reject traversal and symlink
-escapes, and validate request bodies before reaching utility-service bridges. Process-spawning routes
+escapes, and validate request bodies before reaching the service bridges. Process-spawning routes
 validate their inputs and use the task worktree as the capability boundary.
 
 The Postgres pane never persists connection URLs. Generated DML parameterizes values and validates
@@ -134,9 +162,13 @@ The declarative Docker `[docker]` table contains only project names, label keys,
 matcher. It is not executable and therefore does not require this trust ceremony; Docker-start
 commands remain ordinary trust-gated run targets.
 
-Security-relevant source: `app/main/{serviceHost,desktopCapabilities,startupSecurity}.ts`,
-`app/service/runtime.ts`, `@acorn/protocol/{serviceProtocol,desktopCapabilities}.ts`,
-`@acorn/node-core/main/server.ts`, `@acorn/node-core/main/preload.ts`, `@acorn/node-core/main/sessionKeyStore.ts`,
-`@acorn/node-core/main/repoConfigTrust.ts`, `@acorn/node-core/main/urlGuards.ts`, `@acorn/node-core/main/pathGuards.ts`, `@acorn/node-core/server/index.ts`,
-`@acorn/node-core/server/middleware/`, `@acorn/node-core/server/agentTools/`, feature route validators under
-`plugins/*/server/routes/`, and the public API under `core/{server,main}/publicApi/`.
+Security-relevant source:
+`apps/desktop/src/app/main/{serviceHost,desktopCapabilities,appScheme,nodeBroker,preload,sessionKeyStore}.ts`,
+`apps/node/src/wiring/startupSecurity.ts`, `apps/node/src/service/runtime.ts`,
+`@acorn/protocol/{serviceProtocol,desktopCapabilities}.ts`,
+`@acorn/node-core/main/{server,tls,dataRoot,bindings}.ts`,
+`@acorn/node-core/main/repoConfigTrust.ts`, `@acorn/node-core/main/urlGuards.ts`,
+`@acorn/node-core/main/pathGuards.ts`, `@acorn/node-core/server/index.ts`,
+`@acorn/node-core/server/{middleware,auth}/`, `@acorn/node-core/server/agentTools/`,
+`plugins/github/src/server/{githubToken.ts,routes/deviceAuth.ts}`, and feature route validators under
+`plugins/*/src/server/routes/`.

@@ -70,6 +70,12 @@ tests against a real node process on a temp data root; e2e parity suite green on
 (with login flows updated for the auth swap); revoking a device closes its open sockets
 immediately and streams re-check within 60 s (both tested).
 
+> **Phase 1 is done.** What shipped, where it deliberately stops short of the designs in this folder,
+> and which test proves each exit criterion: [phase1-notes.md](./phase1-notes.md). Read it before
+> "fixing" anything in Phase 1 that looks unfinished — several of those gaps are decisions with
+> scheduled homes, and two (the internal principal's GitHub reach, and a standalone node wiring only
+> the pure-Node bridges) are consequences a reader should know about before building on them.
+
 ## Phase 2 — core services and the plugin host
 
 Build the seams plugins need, and pay down the V1 ownership debts:

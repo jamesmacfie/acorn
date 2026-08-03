@@ -8,17 +8,17 @@ registry, not the source of tool definitions.
 
 > Maturity: the MCP server and its Settings surface are wired and used when the desktop app is
 > running (the agent/terminal features it depends on are desktop-only and always on; see
-> [terminal-and-agents.md](./terminal-and-agents.md)). The tool surface requires the utility-service
+> [terminal-and-agents.md](./terminal-and-agents.md)). The tool surface requires the node-side
 > registry and degrades to a clean `503` without it (e.g. `dev:node`).
 
 ## 1. What it is
 
 The server is a stdio MCP server named **`acorn`** (`acorn-dev` in unpackaged builds), built on
 `@modelcontextprotocol/sdk` in `packages/node-core/src/mcp/server.ts` (the stdio entry is the dedicated
-`packages/node-core/src/mcp/main.ts`, and the loopback HTTP client lives in `packages/node-core/src/mcp/api.ts`).
+`packages/node-core/src/mcp/main.ts`, and the loopback HTTPS client lives in `packages/node-core/src/mcp/api.ts`).
 It defines **no tools of its own** — it is a generic proxy over the agent-tool registry: it fetches
-the manifest (`GET /api/tasks/:id/tools`) to serve `tools/list`, and proxies each `tools/call` to
-`POST /api/tasks/:id/tools/:name`. Dynamic availability rides through: the server polls the manifest
+the manifest (`GET /v2/core/tasks/:id/tools`) to serve `tools/list`, and proxies each `tools/call` to
+`POST /v2/core/tasks/:id/tools/:name`. Dynamic availability rides through: the server polls the manifest
 and emits `tools/list_changed` when the available set changes (e.g. `run_*` appearing once a repo
 gains run targets). Two properties define it:
 
@@ -38,33 +38,59 @@ The server therefore reads its identity from the env it inherits (`packages/node
 | Env var | Meaning |
 | --- | --- |
 | `ACORN_TASK_ID` | which task this session belongs to (empty = no task) |
-| `ACORN_API_URL` | loopback base into the running app's Hono API (default `http://127.0.0.1:4317`) |
+| `ACORN_DATA_DIR` | the node's data root; the client reads `<dataDir>/node.json` and resolves `https://127.0.0.1:<port>` from it |
+| `ACORN_API_URL` | a fixed origin used **only** when there is no `ACORN_DATA_DIR` (tests, hand-wiring). No default |
 | `ACORN_API_TOKEN` | the private persisted internal token sent as `x-acorn-internal` |
 | `ACORN_SESSION_ID` | this terminal session's id, sent as `x-acorn-session-id` and stamped on notes/memory writes for provenance |
+| `NODE_EXTRA_CA_CERTS` | `<dataDir>/tls/cert.pem` — how the child trusts the node's certificate with zero code |
+
+The endpoint is resolved from the **data root**, not from a baked URL, and that shape is deliberate:
+this process can outlive the node that spawned it (agent panes run in tmux and are reattached after
+an acorn restart, keeping the environment of the boot that created the session). The internal token
+survives that because it is persisted, but the listening port is ephemeral, so a baked
+`ACORN_API_URL` would point at nothing. `node.json` is the one thing both stable in location and
+current in content, so `api.ts` re-reads it on every miss — and a connection failure forgets the
+cached endpoint and asks again once before reporting `acorn-not-running`.
 
 These are injected into every task-scoped terminal session by the utility service
 (`buildSessionEnv`, `packages/node-core/src/main/taskEnv.ts`, plus `internalApiEnv` and
 `ACORN_SESSION_ID` in `spawnOne`, `plugins/terminal/src/main/terminal.ts`). See
 [terminal-and-agents.md](./terminal-and-agents.md) for the full `ACORN_*` injection story.
 
-## 2. The key design property: everything goes over loopback
+## 2. The key design property: everything goes over the node's HTTPS API
 
 The tools **never open their own SQLite DB or GitHub client.** Every call goes through the running
-app over loopback with `x-acorn-internal: <ACORN_API_TOKEN>` (`apiCall` in
+node over loopback HTTPS with `x-acorn-internal: <ACORN_API_TOKEN>` (`apiCall` in
 `packages/node-core/src/mcp/api.ts`); the tool handlers run in the app's utility service against the same
 local mirror the UI reads — including the git tools, which resolve the task's worktree server-side
 (no more `ACORN_WORKTREE_PATH` in the MCP process).
 
-That token is matched by `internalUser` in `packages/node-core/src/server/middleware/auth.ts`: a
-request bearing the correct `INTERNAL_TOKEN` is resolved to the explicit active GitHub identity
-persisted by cookie-authenticated traffic. Logout clears that binding and internal traffic then
-fails closed. Two consequences follow:
+The node is **TLS-only**, and the child needs no TLS code to talk to it. The node's self-signed
+certificate is a CA with an `IP:127.0.0.1` SAN (`packages/node-core/src/main/tls.ts`) and the service
+exports `NODE_EXTRA_CA_CERTS` pointing at it (`apps/node/src/service/runtime.ts`), so `fetch()`
+validates **fully** — there is no `rejectUnauthorized: false` anywhere. The ceiling of that trick is
+documented in `api.ts`: the variable is read once at process start, so a certificate replaced
+mid-life needs a restart, and only Node/Electron children honour it.
+
+That token is matched by `internalPrincipal` in `packages/node-core/src/server/middleware/auth.ts`: a
+request bearing the correct `INTERNAL_TOKEN` resolves to a `Principal` of kind `internal` carrying
+the machine's active GitHub identity. That identity is bound by the GitHub **device-flow connect**
+(`plugins/github/src/server/routes/deviceAuth.ts`, the only writer of `ACTIVE_IDENTITY`); while it is
+unbound, internal traffic fails closed. Two consequences follow:
 
 - **An agent sees exactly what the UI sees.** Both read the same local mirror through the same Hono
   routes, so there is one source of truth and no drift.
-- **The internal user has an empty GitHub token** (`{ token: '', login, … }`). Internal callers can
-  read the local mirrors but can **never** call GitHub. An agent cannot exfiltrate or spend your
-  GitHub credentials through the MCP surface.
+- **The internal principal is not walled off from GitHub.** A `Principal` has no token field; the
+  GitHub credential lives in the encrypted `integrations` row keyed by `ownerId(c)`
+  (`plugins/github/src/server/githubToken.ts`), `ownerId` returns `principal.userId` for either kind,
+  and `requireUser` admits both. Nothing in the github plugin's routers gates on principal kind, so
+  the older guarantee that "an agent cannot exfiltrate or spend your GitHub credentials through the
+  MCP surface" **no longer holds**. The only kind-based gates in the tree are
+  `packages/node-core/src/server/routes/agentTools.ts` (the renderer projection requires `device`,
+  the MCP projection requires `internal`) and `plugins/http/src/server/routes/http.ts`, where `send`
+  requires `device` and answers an internal caller `403 interactive_user_required`. This is a
+  recorded consequence of moving the credential off the principal — see
+  [vNext/phase1-notes.md](./vNext/phase1-notes.md).
 
 **Graceful degradation is structural, never a protocol error** (`packages/node-core/src/mcp/server.ts`):
 
@@ -100,7 +126,8 @@ value whose key looks like a credential (`*_TOKEN`/`*_KEY`/`*_SECRET`/…) or wh
 known prefix (`sk-`, `ghp_`, `xox…`), keeping keys intact so the user sees *what* is configured
 without leaking the value (`packages/protocol/src/mcp.ts:16-29`).
 
-The inspector and **Create `.mcp.json`** action use task-scoped loopback HTTP routes. In normal use
+The inspector and **Create `.mcp.json`** action use task-scoped plugin routes
+(`/v2/p/terminal/tasks/:id/mcp` and `…/mcp/starter`). In normal use
 acorn's own server is auto-registered whenever a Claude Code / Codex terminal launches, via the
 agent's CLI and the idempotent launcher in `packages/node-core/src/main/mcpRegister.ts`. To opt out,
 remove the registration with the corresponding agent CLI.
@@ -108,12 +135,13 @@ remove the registration with the corresponding agent CLI.
 ## 5. Maturity & operational notes
 
 - The **tool surface** is served by `packages/node-core/src/server/routes/agentTools.ts` from the registry
-  installed by the utility runtime through the historically named
-  `apps/desktop/src/app/main/agentToolsWiring.ts`. Without the registry — e.g. running the
+  installed by the utility runtime through `apps/node/src/wiring/agentToolsWiring.ts`.
+  Without the registry — e.g. running the
   server alone with `dev:node`, no Electron — the tool routes return a clean
-  `503 { error: 'bridge-unavailable' }` and the MCP server reports an empty `tools/list`, rather than
-  crashing. A handler's typed `ToolError` becomes the machine `error` code
-  (`not_found`/`bad_request`/`failed` → 404/400/500, human message in `detail`), so a domain error
+  `503 { error: { code: 'bridge-unavailable', message, requestId, retryable } }` and the MCP server
+  reports an empty `tools/list`, rather than
+  crashing. A handler's typed `ToolError` becomes the machine `error.code`
+  (`not_found`/`bad_request`/`failed` → 404/400/500, human message in `error.message`), so a domain error
   like an unknown run target no longer reads as service-unavailable. Run keeps its own renderer routes
   in `harness.ts` (the run pane / preview home); the context/repo-info routes (`taskContext.ts`) do
   not need the registry.
@@ -128,10 +156,10 @@ remove the registration with the corresponding agent CLI.
 ## Source
 
 - MCP proxy server: `packages/node-core/src/mcp/server.ts` (entry: `packages/node-core/src/mcp/main.ts`, loopback
-  client: `packages/node-core/src/mcp/api.ts`)
+  HTTPS client: `packages/node-core/src/mcp/api.ts`)
 - Tool registry + projection: `packages/node-core/src/server/agentTools/`,
   `packages/node-core/src/server/routes/agentTools.ts` (contributions wired by
-  `apps/desktop/src/app/main/agentToolsWiring.ts`) — see [agent-tools.md](./agent-tools.md)
+  `apps/node/src/wiring/agentToolsWiring.ts`) — see [agent-tools.md](./agent-tools.md)
 - Run renderer routes + context: `packages/node-core/src/server/routes/harness.ts`,
   `packages/node-core/src/server/routes/taskContext.ts`
 - Internal-loopback auth: `packages/node-core/src/server/middleware/auth.ts`

@@ -26,10 +26,10 @@ images are rejected.
 
 ## Ownership and boundaries
 
-The Electron-free utility service owns the complete runtime: provider processes, scheduling,
+The Electron-free node service owns the complete runtime: provider processes, scheduling,
 session state, SQLite transactions, the object stores, HTTP routes and WebSocket publication.
-Electron main remains limited to native windows, dialogs, notifications, safe storage and narrow
-task-addressed OS capabilities.
+Electron main remains limited to native windows, dialogs, notifications, safe storage, the node
+connection broker and narrow task-addressed OS capabilities.
 
 Across core and `plugins/agents`:
 
@@ -43,8 +43,7 @@ Across core and `plugins/agents`:
   `main/runtime.ts` owns user-facing lifecycle commands and controller leases.
 - `main/providerEventMaterializer.ts` bounds provider display data and promotes large output to
   artifacts before persistence.
-- `server/routes/managed.ts` exposes the cookie-authenticated desktop API.
-- `server/publicApi.ts` contributes the bearer automation API.
+- `server/routes/managed.ts` exposes the plugin's HTTP surface under `/v2/p/agents`.
 - `client/` owns Agent Center, the task pane, composer, transcript and request UI.
 
 Three explicit contribution seams prevent the Agents plugin from absorbing specialist features:
@@ -191,15 +190,19 @@ driver conformance suite.
 
 ## Automation and webhooks
 
-The public plugin surface is `/api/v1/plugins/agents`. It separates:
+The plugin's whole HTTP surface is `/v2/p/agents`, reached with a device token like every other route.
+It covers:
 
-- `agents:read` — provider health, history, search, status, events, artifacts and waits;
-- `agents:write` — session/turn/lifecycle operations and webhook management;
-- `agents:approve` — provider permissions, questions, elicitations and workflow gates.
+- reads — provider health, history, search, status, events, artifacts and waits;
+- writes — session/turn/lifecycle operations and webhook management;
+- approvals — provider permissions, questions, elicitations and workflow gates.
 
-Mutating calls use normal public-API idempotency. `/sessions/:id/wait` supports `ready`,
-`attention`, `turn_completed` and `stopped` with a sequence cursor. The public WebSocket publishes
-durably committed session/event/deletion frames.
+There are no per-capability scopes: every paired device carries full owner authority (see
+[security.md](./security.md)), so the split above is a description of the surface, not an
+authorization boundary. Mutating calls honour the shared `Idempotency-Key` replay store.
+`/sessions/:sessionId/wait` supports `ready`, `attention`, `turn_completed` and `stopped` with a
+sequence cursor. The one authenticated WebSocket (`/v2/events`) publishes durably committed
+session/event/deletion frames.
 
 Optional signed webhooks emit only content-free completion/attention envelopes. Secrets are
 generated once, encrypted at rest and used for HMAC-SHA256 signatures. Targets must be HTTPS

@@ -23,12 +23,19 @@ provider plugin is disabled.
   viewed-files, pinned repos; patch/blob bodies in the shared blob store.
 - **Depends**: core git + http + secrets; linear *(opt)* for the PR reference panel.
 - **Tricky**: GitHub OAuth stops being app login — the GitHub identity becomes a per-node
-  integration credential; Acorn auth is device tokens. Credential acquisition: the **client**
-  runs the OAuth flow (it can receive the loopback callback on the user's machine, same
-  registered redirect URI as V1) and writes the resulting token to the owning node via the
-  write-only secrets API — works identically for local and remote nodes; GitHub device flow is
-  the fallback for CLI-only setup of a headless node. Never serve a pre-write mirror value as
-  fresh after a successful provider write.
+  integration credential; Acorn auth is device tokens. Credential acquisition, **as shipped in
+  Phase 1**: the **node** runs the OAuth **device authorization grant** (RFC 8628) and stores the
+  resulting token in its own encrypted `integrations` row — `POST /v2/p/github/auth/device/start`
+  and `/poll` (`plugins/github/src/server/routes/deviceAuth.ts`); the client only renders the user
+  code and polls. This inverts what this document originally specified (a client-run
+  loopback-redirect flow, with device flow as "the fallback for CLI-only setup of a headless
+  node"), and the inversion is the point: the device flow needs **no client secret** — so a secret
+  recoverable from a distributed binary stops being a caveat — and **no redirect URI**, so a local
+  node and a remote one run byte-identical code. The renderer has no server-served origin to
+  redirect back to any more, and a remote node would have needed its own registered callback URL.
+  It also deletes the auth `BrowserWindow` and the navigation-intercept dance in Electron main.
+  The cost is one extra user action: read a code, type it at github.com/login/device. Never serve a
+  pre-write mirror value as fresh after a successful provider write.
 
 ### terminal
 - **Does**: task-scoped terminals — shell + agent profiles, ephemeral PTY or durable tmux,
