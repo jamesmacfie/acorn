@@ -68,8 +68,8 @@ declare global {
 }
 
 export const capabilities = (): Capabilities => ({
-  desktop: !!window.acorn?.desktop,
-  terminal: !!window.acorn?.terminal,
+  desktop: !!acornGlobal()?.desktop,
+  terminal: !!acornGlobal()?.terminal,
 })
 
 export const hasClientCapability = (requirement: ClientCapabilityRequirement = 'none'): boolean =>
@@ -81,4 +81,7 @@ export const hasClientCapability = (requirement: ClientCapabilityRequirement = '
 // consumer compiling a module that merely says `window.acorn` — taskBridge.ts did — sees a bare
 // Window and fails once it is compiled from another package. Reaching for the global through this
 // function makes the augmentation travel with the import graph.
-export const acornGlobal = (): Window['acorn'] => window.acorn
+// Guards `window` because there isn't always one: the whole suite runs in a node environment (no DOM,
+// no Solid plugin — see docs/testing.md), and apiClient now consults this on every request rather than
+// only inside desktop-only branches. A bare `window.acorn` here threw ReferenceError in six tests.
+export const acornGlobal = (): Window['acorn'] => (typeof window === 'undefined' ? undefined : window.acorn)

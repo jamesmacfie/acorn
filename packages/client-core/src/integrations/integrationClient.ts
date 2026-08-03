@@ -1,4 +1,4 @@
-import { ApiError, apiError, writeJson } from '../apiClient'
+import { sendJson, writeJson } from '../apiClient'
 import {
   type ConnectIntegrationRequest,
   type Integration,
@@ -37,7 +37,4 @@ export const setIntegrationDisabled = (id: string, disabled: boolean) =>
     body: JSON.stringify({ disabled }),
   })
 
-export const deleteIntegration = async (id: string): Promise<void> => {
-  const response = await fetch(integrationRoute(id), { method: 'DELETE' })
-  if (!response.ok) throw new ApiError(await apiError(response, `${response.status}`), response.status)
-}
+export const deleteIntegration = (id: string): Promise<void> => sendJson<void>(integrationRoute(id), { method: 'DELETE' })

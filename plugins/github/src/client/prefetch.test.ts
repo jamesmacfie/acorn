@@ -3,6 +3,10 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { fileSummariesKey, filesKey, pullKey } from '@acorn/protocol/api.ts'
 import { INITIAL_PREFETCH_LIMIT, prefetchOpenPulls, prefetchPullSummary } from './prefetch'
 
+// Bodies cross the transport as bytes now, so assert the decoded payload rather than a JSON string.
+const batchBodyOf = (mock: { mock: { calls: unknown[][] } }, call: number): unknown =>
+  JSON.parse(new TextDecoder().decode((mock.mock.calls[call][1] as { body: Uint8Array }).body))
+
 const jsonResponse = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), {
     status,
@@ -60,13 +64,13 @@ describe('open PR warmup', () => {
 
     await prefetchOpenPulls(queryClient, 'acorn', 'web', signal)
 
-    expect(fetchMock).toHaveBeenNthCalledWith(1, '/api/repos/acorn/web/pulls?state=open', { signal: expect.any(AbortSignal) })
-    expect(fetchMock).toHaveBeenNthCalledWith(2, '/api/repos/acorn/web/pulls/batch', {
+    expect(fetchMock).toHaveBeenNthCalledWith(1, '/api/repos/acorn/web/pulls?state=open', expect.objectContaining({ signal: expect.any(AbortSignal) }))
+    expect(fetchMock).toHaveBeenNthCalledWith(2, '/api/repos/acorn/web/pulls/batch', expect.objectContaining({
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ numbers: [42], files: 'summary' }),
+      headers: { 'content-type': 'application/json' },
       signal,
-    })
+    }))
+    expect(batchBodyOf(fetchMock, 1)).toEqual({ numbers: [42], files: 'summary' })
     expect(queryClient.getQueryData(pullKey('acorn', 'web', '42'))).toEqual(detail)
     expect(queryClient.getQueryData(fileSummariesKey('acorn', 'web', '42'))).toEqual(files)
     expect(queryClient.getQueryData(filesKey('acorn', 'web', '42'))).toBeUndefined()
@@ -81,12 +85,12 @@ describe('open PR warmup', () => {
 
     await prefetchPullSummary(queryClient, 'acorn', 'web', 42, signal)
 
-    expect(fetchMock).toHaveBeenCalledWith('/api/repos/acorn/web/pulls/batch', {
+    expect(fetchMock).toHaveBeenCalledWith('/api/repos/acorn/web/pulls/batch', expect.objectContaining({
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ numbers: [42], files: 'summary' }),
+      headers: { 'content-type': 'application/json' },
       signal,
-    })
+    }))
+    expect(batchBodyOf(fetchMock, 0)).toEqual({ numbers: [42], files: 'summary' })
     expect(queryClient.getQueryData(pullKey('acorn', 'web', '42'))).toEqual(detail)
     expect(queryClient.getQueryData(fileSummariesKey('acorn', 'web', '42'))).toEqual(files)
     expect(queryClient.getQueryData(filesKey('acorn', 'web', '42'))).toBeUndefined()
@@ -118,7 +122,7 @@ describe('open PR warmup', () => {
     await prefetchOpenPulls(queryClient, 'acorn', 'web', new AbortController().signal)
 
     expect(fetchMock).toHaveBeenCalledTimes(2)
-    expect(JSON.parse(fetchMock.mock.calls[1]![1]!.body as string)).toEqual({
+    expect(batchBodyOf(fetchMock, 1)).toEqual({
       numbers: [1, 2, 3, 4, 5],
       files: 'summary',
     })

@@ -4,7 +4,7 @@
 // GitHub verbs only. Workspace/repo-visibility writes live in core/client/workspaces/mutations.ts,
 // task and review-note writes in core/client/tasks/mutations.ts, and prefs behind
 // core/client/settings/savePref.ts — none of those are GitHub concepts.
-import { ApiError, apiError, postJson } from '@acorn/client-core/apiClient.ts'
+import { postJson, writeJson } from '@acorn/client-core/apiClient.ts'
 import {
   autoMergeRoute,
   createPullRoute,
@@ -19,11 +19,7 @@ export const createPr = (o: string, r: string, input: { title: string; body: str
 
 export const mergePr = (o: string, r: string, n: string, method: string) => postJson(pullRoute(o, r, n, 'merge'), { method })
 export const enableAutoMerge = (o: string, r: string, n: string, method: string) => postJson(autoMergeRoute(o, r, n), { method })
-export const disableAutoMerge = async (o: string, r: string, n: string) => {
-  const res = await fetch(autoMergeRoute(o, r, n), { method: 'DELETE' })
-  if (!res.ok) throw new ApiError(await apiError(res, `${res.status}`), res.status)
-  return res.json()
-}
+export const disableAutoMerge = (o: string, r: string, n: string) => writeJson(autoMergeRoute(o, r, n), { method: 'DELETE' })
 export const closePr = (o: string, r: string, n: string) => postJson(pullRoute(o, r, n, 'close'))
 export const reopenPr = (o: string, r: string, n: string) => postJson(pullRoute(o, r, n, 'reopen'))
 export const setDraft = (o: string, r: string, n: string, draft: boolean) => postJson(pullRoute(o, r, n, 'draft'), { draft })
@@ -32,27 +28,21 @@ export const submitReview = (o: string, r: string, n: string, event: string, bod
   postJson(pullRoute(o, r, n, 'reviews'), { event, body })
 
 export const addLabel = (o: string, r: string, n: string, name: string) => postJson(pullRoute(o, r, n, 'labels'), { name })
-export const removeLabel = async (o: string, r: string, n: string, name: string) => {
-  const res = await fetch(pullRoute(o, r, n, 'labels'), {
+export const removeLabel = (o: string, r: string, n: string, name: string) =>
+  writeJson(pullRoute(o, r, n, 'labels'), {
     method: 'DELETE',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ name }),
   })
-  if (!res.ok) throw new ApiError(await apiError(res, `${res.status}`), res.status)
-  return res.json()
-}
 
 export const requestReviewer = (o: string, r: string, n: string, login: string) =>
   postJson(requestedReviewersRoute(o, r, n), { login })
-export const removeReviewer = async (o: string, r: string, n: string, login: string) => {
-  const res = await fetch(requestedReviewersRoute(o, r, n), {
+export const removeReviewer = (o: string, r: string, n: string, login: string) =>
+  writeJson(requestedReviewersRoute(o, r, n), {
     method: 'DELETE',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ login }),
   })
-  if (!res.ok) throw new ApiError(await apiError(res, `${res.status}`), res.status)
-  return res.json()
-}
 
 // Inline review threads.
 export const addReviewComment = (o: string, r: string, n: string, body: string, path: string, line: number, side: string) =>

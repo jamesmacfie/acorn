@@ -8,6 +8,7 @@
 import type { QueryClient } from '@tanstack/solid-query'
 import { fileSummariesKey, pullKey, pullsBatchRoute, type PullBatchItem, type PullBatchRequest } from '@acorn/protocol/api.ts'
 import { pullsOptions } from '@acorn/client-core/queries.ts'
+import { writeJson } from '@acorn/client-core/apiClient.ts'
 
 const CHUNK = 5 // PRs per batch request (one GitHub GraphQL round-trip server-side)
 const CONCURRENCY = 2 // batch requests in flight at once
@@ -101,14 +102,15 @@ async function fetchPullSummaries(
   signal: AbortSignal,
 ) {
   const requestStartedAt = Date.now()
-  const res = await fetch(pullsBatchRoute(owner, repo), {
+  // Prefetch is best-effort: a failure only means first paint is not instant, so it swallows errors
+  // rather than surfacing them.
+  const items = await writeJson<PullBatchItem[]>(pullsBatchRoute(owner, repo), {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ numbers, files: 'summary' } satisfies PullBatchRequest),
     signal,
-  })
-  if (!res.ok) return
-  const items = (await res.json()) as PullBatchItem[]
+  }).catch(() => null)
+  if (!items) return
   // Seed summary-level caches. PullDetail's own queries (staleTime 0) still revalidate on
   // visit, so this only makes first paint instant — it doesn't suppress on-visit refresh.
   for (const { number, detail, files } of items) {
