@@ -38,6 +38,14 @@ contextBridge.exposeInMainWorld('acorn', {
     return () => ipcRenderer.removeListener('acorn:node-status', listener)
   },
   fleetList: () => ipcRenderer.invoke('acorn:fleet-list'),
+  // Owner-initiated fleet mutations (client-core/settings/NodesSettings.tsx). Every one of them is a
+  // request, never a write: main owns fleet.json and the safeStorage tokens, and no device token or
+  // certificate crosses back over this bridge.
+  nodeProbe: (endpoint: string) => ipcRenderer.invoke('acorn:node-probe', { endpoint }),
+  nodePair: (request: unknown) => ipcRenderer.invoke('acorn:node-pair', request),
+  nodeRename: (nodeId: string, label: string) => ipcRenderer.invoke('acorn:node-rename', { nodeId, label }),
+  nodeForget: (nodeId: string, revoke: boolean) => ipcRenderer.invoke('acorn:node-forget', { nodeId, revoke }),
+  nodeReconnect: (nodeId: string) => ipcRenderer.send('acorn:node-reconnect', nodeId),
   // Node recovery screen (client-core/node/NodeGate.tsx). Only reachable when there is no node to
   // talk to, which is also why `quit` cannot go through the renderer's will-quit prompt: the shell
   // that answers it is not mounted.

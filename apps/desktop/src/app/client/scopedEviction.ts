@@ -1,4 +1,5 @@
 import { clientEvents, evictPendingIntents } from '@acorn/client-core/registries/clientEvents.ts'
+import { dropNode } from '@acorn/client-core/node/fleet.ts'
 import { evictContextSelection } from '@acorn/plugin-context/client/selectionState.ts'
 import { evictSyncState } from '@acorn/plugin-context/client/syncState.ts'
 import { evictNotesPaneState } from '@acorn/plugin-notes/client/notesPaneState.ts'
@@ -30,7 +31,12 @@ export function activateScopedStateEviction(): () => void {
     evictWorkspaceView(workspaceId)
     evictPrFilter(workspaceId)
   })
+  // ONE evictor, where task-archival needs ten. That is the per-node QueryClient paying off: every
+  // piece of a node's cached data lives in that node's client and nowhere else, so there is exactly one
+  // thing to drop and no per-plugin evictor to forget when a plugin is added.
+  const offNode = clientEvents.on('runtime:node-removed', ({ nodeId }) => dropNode(nodeId))
   return () => {
+    offNode()
     offWorkspace()
     offTask()
   }

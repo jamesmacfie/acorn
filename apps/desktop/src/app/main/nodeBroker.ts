@@ -290,32 +290,40 @@ export class NodeBroker {
     }
   }
 
-  // Certificate pinning (docs/vNext/protocol.md § Transport and identity: "No CA, no hostname
-  // validation — the pin is the identity").
-  //
-  // `rejectUnauthorized` MUST stay true. In false mode Node does not call checkServerIdentity at all,
-  // so the pin would silently never be checked — a failure that fails OPEN. Supplying the node's own
-  // self-signed certificate as the CA is what makes the chain valid; the override then replaces
-  // hostname verification with the fingerprint comparison.
-  private pinning(node: BrokerNode): { ca?: string[]; rejectUnauthorized: boolean; checkServerIdentity?: HttpsAgentIdentityCheck } {
-    if (!node.fingerprint || !node.certPem) return { rejectUnauthorized: true }
-    const expected = normalizeFingerprint(node.fingerprint)
-    return {
-      ca: [node.certPem],
-      rejectUnauthorized: true,
-      checkServerIdentity: (_host, cert) =>
-        normalizeFingerprint(cert.fingerprint256) === expected
-          ? undefined
-          : Object.assign(new Error('acorn: node certificate fingerprint mismatch'), { code: PIN_MISMATCH_CODE }),
-    }
+  private pinning(node: BrokerNode): PinnedTlsOptions {
+    return pinnedTlsOptions(node.fingerprint, node.certPem)
   }
 }
 
 type HttpsAgentIdentityCheck = (host: string, cert: { fingerprint256: string }) => Error | undefined
+export type PinnedTlsOptions = { ca?: string[]; rejectUnauthorized: boolean; checkServerIdentity?: HttpsAgentIdentityCheck }
+
+// Certificate pinning (docs/vNext/protocol.md § Transport and identity: "No CA, no hostname
+// validation — the pin is the identity").
+//
+// `rejectUnauthorized` MUST stay true. In false mode Node does not call checkServerIdentity at all,
+// so the pin would silently never be checked — a failure that fails OPEN. Supplying the node's own
+// self-signed certificate as the CA is what makes the chain valid; the override then replaces
+// hostname verification with the fingerprint comparison.
+//
+// Exported because pairing performs the very first authenticated request to a node before the broker
+// has heard of it (nodePairing.ts), and a second copy of this would be a second thing to get wrong.
+export function pinnedTlsOptions(fingerprint: string | undefined, certPem: string | undefined): PinnedTlsOptions {
+  if (!fingerprint || !certPem) return { rejectUnauthorized: true }
+  const expected = normalizeFingerprint(fingerprint)
+  return {
+    ca: [certPem],
+    rejectUnauthorized: true,
+    checkServerIdentity: (_host, cert) =>
+      normalizeFingerprint(cert.fingerprint256) === expected
+        ? undefined
+        : Object.assign(new Error('acorn: node certificate fingerprint mismatch'), { code: PIN_MISMATCH_CODE }),
+  }
+}
 
 export const PIN_MISMATCH_CODE = 'ACORN_PIN_MISMATCH'
 
-const normalizeFingerprint = (value: string): string => value.replace(/:/g, '').toLowerCase()
+export const normalizeFingerprint = (value: string): string => value.replace(/:/g, '').toLowerCase()
 
 const isPinMismatch = (error: unknown): boolean => {
   for (let e: unknown = error; e; e = (e as { cause?: unknown }).cause) {
