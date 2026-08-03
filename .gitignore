@@ -13,3 +13,6 @@ release/
 .playwright-mcp/*
 
 references/
+# Playwright failure artifacts (screenshots, error-context.md)
+test-results/
+playwright-report/
