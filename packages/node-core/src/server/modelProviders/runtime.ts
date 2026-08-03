@@ -1,7 +1,7 @@
 import { eq } from 'drizzle-orm'
 import type { AppDatabase } from '../db'
 import { schema } from '../db'
-import { decryptSecret } from '../session'
+import { decryptSecret } from '../secretBox'
 import {
   connectionProviderRegistry,
   type ConnectionProviderRegistry,

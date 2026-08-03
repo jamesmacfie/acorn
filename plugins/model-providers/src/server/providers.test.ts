@@ -3,7 +3,7 @@ import { schema } from '@acorn/node-core/server/db/index.ts'
 import { connectionProviderRegistry } from '@acorn/node-core/server/integrations/connectionRegistry.ts'
 import { connectProvider, rotateConnection, testConnection } from '@acorn/node-core/server/integrations/connections.ts'
 import { makeTestDb, type TestDb } from '@acorn/node-core/server/routes/testDb.ts'
-import { decryptSecret } from '@acorn/node-core/server/session.ts'
+import { decryptSecret } from '@acorn/node-core/server/secretBox.ts'
 import {
   ANTHROPIC_MODELS,
   ANTHROPIC_RECOMMENDED_MODEL_ID,

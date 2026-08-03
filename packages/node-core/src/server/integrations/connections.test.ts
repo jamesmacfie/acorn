@@ -1,7 +1,7 @@
 import { afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest'
 import { schema } from '../db'
 import { makeTestDb, type TestDb } from '../routes/testDb'
-import { decryptSecret } from '../session'
+import { decryptSecret } from '../secretBox'
 import { connectionProviderRegistry } from './connectionRegistry'
 import {
   connectProvider,
