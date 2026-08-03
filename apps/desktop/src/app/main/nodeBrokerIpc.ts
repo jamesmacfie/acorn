@@ -1,10 +1,21 @@
 import { ipcMain, type BrowserWindow } from 'electron'
-import { nodeFetchRequestSchema } from '@acorn/protocol/broker.ts'
+import {
+  nodeFetchRequestSchema,
+  nodeForgetRequestSchema,
+  nodePairRequestSchema,
+  nodeProbeRequestSchema,
+  nodeRenameRequestSchema,
+  type NodeProbeResult,
+  type NodeRecord,
+} from '@acorn/protocol/broker.ts'
 import type { WsClientFrame } from '@acorn/protocol/ws.ts'
+import { toNodeRecord, type FleetStore } from './fleetStore'
 import type { NodeBroker } from './nodeBroker'
+import { pairWithNode, probeNode } from './nodePairing'
 
-// The IPC projection of the broker. Deliberately thin: every decision lives in nodeBroker.ts, which
-// is Electron-free and therefore testable, and this file only validates and forwards.
+// The IPC projection of the broker and the fleet store. Deliberately thin: every decision lives in
+// nodeBroker.ts / fleetStore.ts / nodePairing.ts, which are Electron-free and therefore testable, and
+// this file only validates and forwards.
 //
 // Requests from the renderer are Zod-parsed here rather than trusted. The renderer is our own code,
 // but it is also the only part of the system that renders third-party content, so treating its
@@ -18,8 +29,24 @@ export const NODE_SEND = 'acorn:node-send'
 export const NODE_FRAME = 'acorn:node-frame'
 export const NODE_STATUS = 'acorn:node-status'
 export const FLEET_LIST = 'acorn:fleet-list'
+export const NODE_PROBE = 'acorn:node-probe'
+export const NODE_PAIR = 'acorn:node-pair'
+export const NODE_RENAME = 'acorn:node-rename'
+export const NODE_FORGET = 'acorn:node-forget'
+export const NODE_RECONNECT = 'acorn:node-reconnect'
 
-export function registerNodeBrokerIpc(broker: NodeBroker): () => void {
+export function registerNodeBrokerIpc(broker: NodeBroker, fleet: FleetStore): () => void {
+  // Bring a remembered node's connection up (or back up). Idempotent: `upsert` tears down any existing
+  // connection first, so this doubles as the Reconnect button's implementation.
+  const connect = (nodeId: string): void => {
+    const node = fleet.get(nodeId)
+    const token = node && fleet.tokenFor(nodeId)
+    // No token means no keychain on this machine (deviceTokenStore.ts). The node stays listed so the
+    // owner can see it and re-pair; it just has no connection, which reads as `offline`.
+    if (!node || !token) return
+    broker.upsert({ ...toNodeRecord(node), token, ...(node.certPem ? { certPem: node.certPem } : {}) })
+  }
+
   ipcMain.handle(NODE_FETCH, async (_event, nodeId: unknown, raw: unknown) => {
     if (typeof nodeId !== 'string') throw new Error('nodeFetch: nodeId must be a string')
     const request = nodeFetchRequestSchema.parse(raw)
@@ -40,13 +67,91 @@ export function registerNodeBrokerIpc(broker: NodeBroker): () => void {
     broker.send(nodeId, raw as WsClientFrame)
   })
 
-  ipcMain.handle(FLEET_LIST, () => ({ nodes: broker.list(), statuses: broker.statuses() }))
+  // Membership from the fleet store, connection state from the broker. The store is the authority on
+  // "which nodes do I know" — a node whose token could not be remembered has no broker connection but
+  // must still be listed, or the owner would have no way to re-pair it.
+  ipcMain.handle(FLEET_LIST, () => ({ nodes: fleet.list().map(toNodeRecord), statuses: broker.statuses() }))
+
+  // The probe is remembered here, not returned to the renderer: the certificate stays in main, and
+  // making `pair` refer to a completed probe is what forces the fingerprint confirmation to be a step
+  // rather than a parameter the renderer could skip.
+  let pending: Awaited<ReturnType<typeof probeNode>> | null = null
+
+  ipcMain.handle(NODE_PROBE, async (_event, raw: unknown): Promise<NodeProbeResult> => {
+    const { endpoint } = nodeProbeRequestSchema.parse(raw)
+    const probe = await probeNode(endpoint)
+    pending = probe
+    const { certPem: _certPem, ...result } = probe
+    return result
+  })
+
+  ipcMain.handle(NODE_PAIR, async (_event, raw: unknown): Promise<NodeRecord> => {
+    const request = nodePairRequestSchema.parse(raw)
+    const probe = pending
+    if (!probe) throw new Error('Confirm the node fingerprint before pairing.')
+    if (!probe.compatible) throw new Error('That node speaks a different protocol version.')
+    const result = await pairWithNode(probe, { code: request.code, deviceName: request.deviceName })
+    pending = null
+    const node = fleet.remember(
+      {
+        nodeId: result.nodeId,
+        label: request.label,
+        endpoint: probe.endpoint,
+        fingerprint: probe.fingerprint,
+        certPem: probe.certPem,
+        deviceId: result.device.id,
+        local: false,
+      },
+      result.deviceToken,
+    )
+    connect(node.nodeId)
+    return toNodeRecord(node)
+  })
+
+  ipcMain.handle(NODE_RENAME, (_event, raw: unknown): NodeRecord | null => {
+    const { nodeId, label } = nodeRenameRequestSchema.parse(raw)
+    const node = fleet.rename(nodeId, label)
+    if (!node) return null
+    // The label rides in the broker's record too (it is part of NodeRecord), so keep the live
+    // connection's copy in step rather than waiting for the next launch.
+    connect(nodeId)
+    return toNodeRecord(node)
+  })
+
+  ipcMain.handle(NODE_FORGET, async (_event, raw: unknown): Promise<void> => {
+    const { nodeId, revoke } = nodeForgetRequestSchema.parse(raw)
+    const node = fleet.get(nodeId)
+    if (!node) return
+    // The local node is this app's own data root, not a pairing (docs/vNext/architecture.md § Fleet
+    // semantics: "Exactly one, and it cannot be unpaired").
+    if (node.local) throw new Error('The local node cannot be removed.')
+    if (revoke && node.deviceId) {
+      // Ask the node to forget this client, through the broker — this is the last request that will ever
+      // authenticate, and it closes our own socket. A failure here must NOT abort the local forget: the
+      // owner asked to stop using this node, and the usual reason revoke fails is that it is offline.
+      await broker
+        .fetch(nodeId, { requestId: `forget-${nodeId}`, path: `/v2/core/devices/${node.deviceId}`, method: 'DELETE', headers: {} })
+        .catch((error: unknown) => console.warn(`[fleet] could not revoke this device on ${nodeId}:`, error))
+    }
+    broker.remove(nodeId)
+    fleet.forget(nodeId)
+  })
+
+  ipcMain.on(NODE_RECONNECT, (_event, nodeId: unknown) => {
+    if (typeof nodeId === 'string') connect(nodeId)
+  })
+
+  // Bring up every node remembered from a previous launch. The local one is adopted separately, from
+  // the service start handoff, because its endpoint is only known once it has bound a port.
+  for (const node of fleet.list()) if (!node.local) connect(node.nodeId)
 
   return () => {
-    ipcMain.removeHandler(NODE_FETCH)
-    ipcMain.removeHandler(FLEET_LIST)
+    for (const channel of [NODE_FETCH, FLEET_LIST, NODE_PROBE, NODE_PAIR, NODE_RENAME, NODE_FORGET]) {
+      ipcMain.removeHandler(channel)
+    }
     ipcMain.removeAllListeners(NODE_ABORT)
     ipcMain.removeAllListeners(NODE_SEND)
+    ipcMain.removeAllListeners(NODE_RECONNECT)
   }
 }
 

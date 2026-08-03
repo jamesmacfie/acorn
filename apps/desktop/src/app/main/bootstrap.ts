@@ -7,7 +7,8 @@ import { join } from 'node:path'
 import { registerPreviewIpc } from '@acorn/plugin-preview/main/previewService.ts'
 import { registerRepoPickerIpc } from '@acorn/plugin-terminal/main/pickerIpc.ts'
 import type { ServiceStartResult, ServiceState } from '@acorn/protocol/serviceProtocol.ts'
-import { readLocalDeviceToken, writeLocalDeviceToken } from './deviceTokenStore'
+import { LOCAL_TOKEN_SCOPE, readDeviceToken } from './deviceTokenStore'
+import { FleetStore, toNodeRecord } from './fleetStore'
 import { NodeBroker } from './nodeBroker'
 import { brokerPushTargets, registerNodeBrokerIpc } from './nodeBrokerIpc'
 import { ServiceHost } from './serviceHost'
@@ -40,8 +41,7 @@ export async function bootstrap({ dataDir, createWindow }: BootstrapOptions): Pr
   // crash recovery — a restart must not mint a new device row, and the endpoint can change across
   // restarts, so the caller always takes the fresh result rather than caching the first one.
   const startService = async (): Promise<ServiceStartResult> => {
-    const started = await service.start(readLocalDeviceToken(userDataDir))
-    writeLocalDeviceToken(userDataDir, started.deviceToken)
+    const started = await service.start(readDeviceToken(userDataDir, LOCAL_TOKEN_SCOPE))
     adoptLocalNode(started)
     return started
   }
@@ -73,22 +73,33 @@ export async function bootstrap({ dataDir, createWindow }: BootstrapOptions): Pr
   const disposePreview = registerPreviewIpc((taskId) => service.previewRules(taskId))
 
   // The connection broker, likewise installed before the renderer: its first act on load is to ask
-  // for the fleet, so the handler must already exist.
+  // for the fleet, so the handler must already exist. Registering the IPC also reconnects every node
+  // remembered from a previous launch — membership survives restarts, the local node included.
   const push = brokerPushTargets(() => window)
   const broker = new NodeBroker({ frame: push.frame, status: push.status })
-  const disposeBrokerIpc = registerNodeBrokerIpc(broker)
+  const fleet = new FleetStore(userDataDir)
+  const disposeBrokerIpc = registerNodeBrokerIpc(broker, fleet)
 
-  // Register (or re-register, after a crash restart) the local node. The endpoint can change between
-  // starts now that the port is not pinned, so this is driven by each start result rather than cached.
+  // Record (or re-record, after a crash restart) the local node and bring its connection up. The
+  // endpoint, the certificate and even the token can change between starts now that the port is
+  // ephemeral, so this is driven by each start result rather than cached — but the LABEL is the
+  // owner's, so a rename survives.
   const adoptLocalNode = (started: ServiceStartResult): void => {
+    const node = fleet.remember(
+      {
+        nodeId: started.nodeId,
+        label: fleet.get(started.nodeId)?.label ?? 'This computer',
+        endpoint: started.endpoint.origin,
+        local: true,
+        ...(started.fingerprint ? { fingerprint: started.fingerprint } : {}),
+        ...(started.certPem ? { certPem: started.certPem } : {}),
+      },
+      started.deviceToken,
+    )
     broker.upsert({
-      nodeId: started.nodeId,
-      label: 'This computer',
-      endpoint: started.endpoint.origin,
-      local: true,
+      ...toNodeRecord(node),
       token: started.deviceToken,
-      ...(started.fingerprint ? { fingerprint: started.fingerprint } : {}),
-      ...(started.certPem ? { certPem: started.certPem } : {}),
+      ...(node.certPem ? { certPem: node.certPem } : {}),
     })
   }
 

@@ -90,3 +90,55 @@ export const nodeRecordSchema = z.strictObject({
   local: z.boolean(),
 })
 export type NodeRecord = z.infer<typeof nodeRecordSchema>
+
+// --- Owner-initiated fleet mutations ---
+//
+// Membership is main's to change, so the renderer asks. Each of these is Zod-parsed in
+// nodeBrokerIpc.ts exactly like nodeFetchRequest: cheap, and it removes a whole class of "what if a
+// compromised renderer asked for…" reasoning about the files that hold device tokens.
+//
+// There is deliberately no "add this node with this token" shape. The only route into the fleet is
+// probe-then-pair, which is what forces the fingerprint confirmation to happen.
+
+export const nodeProbeRequestSchema = z.strictObject({ endpoint: z.string().url() })
+export type NodeProbeRequest = z.infer<typeof nodeProbeRequestSchema>
+
+// What the owner is asked to compare against the fingerprint the node itself displays. That
+// out-of-band comparison IS the security of pairing (docs/vNext/protocol.md § Pairing) — reading a
+// fingerprint over the very connection being authenticated proves nothing on its own.
+//
+// The certificate stays in main and is never part of this reply: main remembers the probe, so `pair`
+// refers to it rather than round-tripping cert material through the renderer.
+export type NodeProbeResult = {
+  endpoint: string
+  fingerprint: string
+  protocolVersion: number
+  // False for a protocol major the client cannot speak — the `incompatible` state, decided before
+  // pairing rather than after (docs/vNext/architecture.md § Fleet semantics).
+  compatible: boolean
+}
+
+// Completes the probe. No endpoint or fingerprint: pairing against anything other than the endpoint
+// whose fingerprint the owner just confirmed would defeat the confirmation.
+export const nodePairRequestSchema = z.strictObject({
+  code: z.string().min(1).max(256),
+  deviceName: z.string().min(1).max(120),
+  label: z.string().min(1).max(120),
+})
+export type NodePairRequest = z.infer<typeof nodePairRequestSchema>
+
+export const nodeRenameRequestSchema = z.strictObject({
+  nodeId: z.string().min(1),
+  label: z.string().min(1).max(120),
+})
+export type NodeRenameRequest = z.infer<typeof nodeRenameRequestSchema>
+
+// Unpair vs revoke, the distinction ui.md § Node management insists is labeled: `revoke: false` is
+// this client forgetting the node, `revoke: true` also asks the node to forget this client. Confusing
+// them loses access to a remote node, so the two are one flag on one route rather than two verbs that
+// look alike.
+export const nodeForgetRequestSchema = z.strictObject({
+  nodeId: z.string().min(1),
+  revoke: z.boolean(),
+})
+export type NodeForgetRequest = z.infer<typeof nodeForgetRequestSchema>

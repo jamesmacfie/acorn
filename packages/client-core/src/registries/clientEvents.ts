@@ -15,6 +15,9 @@ export type ClientEventMap = {
   'presentation:file-scroll': { routeKey: string; path: string }
   'runtime:task-archived': { taskId: string }
   'runtime:workspace-removed': { workspaceId: string }
+  // A node left the fleet (unpaired or revoked). Emitted by the renderer AFTER main confirms the
+  // removal, because main is the authority on membership.
+  'runtime:node-removed': { nodeId: string }
 }
 
 type Listener<T> = (payload: T) => void

@@ -1,4 +1,11 @@
-import type { NodeFetchRequest, NodeFetchResponse, NodeRecord, NodeStatus } from '@acorn/protocol/broker.ts'
+import type {
+  NodeFetchRequest,
+  NodeFetchResponse,
+  NodePairRequest,
+  NodeProbeResult,
+  NodeRecord,
+  NodeStatus,
+} from '@acorn/protocol/broker.ts'
 import type { WsClientFrame } from '@acorn/protocol/ws.ts'
 
 // What the hosting environment provides (docs/features.md, docs/electron.md §capability-map). The
@@ -28,7 +35,14 @@ export type TerminalStreamBridge = {
 }
 
 // Re-exported so consumers of the bridge get the wire types without importing protocol themselves.
-export type { NodeFetchRequest, NodeFetchResponse, NodeRecord, NodeStatus } from '@acorn/protocol/broker.ts'
+export type {
+  NodeFetchRequest,
+  NodeFetchResponse,
+  NodePairRequest,
+  NodeProbeResult,
+  NodeRecord,
+  NodeStatus,
+} from '@acorn/protocol/broker.ts'
 
 // Chrome state pushed from main for the active preview view (PreviewPane consumes it).
 export type PreviewState = { taskId: string; url: string; loading: boolean; canGoBack: boolean; canGoForward: boolean }
@@ -51,6 +65,14 @@ declare global {
       onNodeFrame?: (cb: (nodeId: string, frame: unknown) => void) => () => void
       onNodeStatus?: (cb: (status: NodeStatus) => void) => () => void
       fleetList?: () => Promise<{ nodes: NodeRecord[]; statuses: NodeStatus[] }>
+      // Fleet membership mutations. All of them are requests to main, which owns fleet.json and the
+      // safeStorage-encrypted device tokens; `nodeProbe` must precede `nodePair`, because main only
+      // pairs against the endpoint whose fingerprint the owner has just been shown (Settings → Nodes).
+      nodeProbe?: (endpoint: string) => Promise<NodeProbeResult>
+      nodePair?: (request: NodePairRequest) => Promise<NodeRecord>
+      nodeRename?: (nodeId: string, label: string) => Promise<NodeRecord | null>
+      nodeForget?: (nodeId: string, revoke: boolean) => Promise<void>
+      nodeReconnect?: (nodeId: string) => void
       // The two native actions the node recovery screen offers (node/NodeGate.tsx). Neither is
       // expressible in the renderer: one reveals a path in Finder, the other has to bypass the
       // will-quit prompt, whose handler lives in a shell that is not mounted behind the gate.
