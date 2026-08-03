@@ -8,9 +8,11 @@ import type {
   PublicIntegrationProvider,
 } from './integrations'
 
-// The one error envelope every /api route returns. `error` is a stable machine code
-// (see docs/api-reference.md §error-codes); `detail` carries human/upstream prose.
-export type ApiError = { error: string; detail?: string[] }
+// The one error envelope every route returns — defined in ./errors.ts, re-exported here because
+// `ApiError` is the name 250-odd call sites already know. `error` was a bare string with a sibling
+// `detail: string[]`; it is now a nested object carrying requestId and retryable too
+// (docs/vNext/protocol.md § Errors).
+export type { ApiError } from './errors.ts'
 export type Me = { login: string; name: string; avatar: string; scopes: string[] }
 export type Repo = {
   id: number

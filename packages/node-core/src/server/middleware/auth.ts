@@ -13,7 +13,10 @@ export type SessionUser = SessionData
 // third principal kind (external caller) actually lands, not before.
 export type PrincipalKind = 'user' | 'internal'
 export type Principal = { kind: PrincipalKind; user: SessionUser }
-export type AppEnv = { Bindings: Env; Variables: { principal: Principal | null } }
+// `requestId` is set by requestIdMiddleware (server/respond.ts) before anything else, and read by
+// every error envelope. It is not optional in practice; a bare test Context is the only way to see
+// it missing, which respondError reports as 'unknown'.
+export type AppEnv = { Bindings: Env; Variables: { principal: Principal | null; requestId: string } }
 
 // Internal loopback auth (docs/mcp.md): the acorn MCP server holds no session cookie; it sends
 // the per-app-run INTERNAL_TOKEN instead. The identity is the machine's single user (this is a

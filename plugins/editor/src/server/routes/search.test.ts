@@ -77,6 +77,6 @@ describe('search route (POST /api/tasks/:id/search)', () => {
   it('503s when the bridge is unavailable (dev:node / pre-wire)', async () => {
     const res = await authed().fetch(jsonReq('/api/tasks/task1/search', 'POST', { query: 'foo' }), {} as Env)
     expect(res.status).toBe(503)
-    expect((await res.json()).error).toBe('bridge-unavailable')
+    expect((await res.json()).error.code).toBe('bridge-unavailable')
   })
 })

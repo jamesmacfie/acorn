@@ -34,7 +34,7 @@ describe('requireUser gate over the protected router table', () => {
   it.each(PROTECTED_PATHS)('%s %s → 401 unauthenticated when logged out', async (method, path) => {
     const res = await createApp().fetch(new Request(`http://127.0.0.1:4317${path}`, { method }), {} as Env)
     expect(res.status).toBe(401)
-    expect((await res.json()) as ApiError).toEqual({ error: 'unauthenticated' })
+    expect(((await res.json()) as ApiError).error).toMatchObject({ code: 'unauthenticated' })
   })
 
   it('leaves /auth outside the gate (public by construction)', async () => {

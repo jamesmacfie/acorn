@@ -74,7 +74,7 @@ describe('repos list (serve-then-revalidate via the sync engine)', () => {
     vi.mocked(gh).mockResolvedValueOnce(new Response('nope', { status: 401 }))
     const res = await get()
     expect(res.status).toBe(401)
-    expect(await res.json()).toEqual({ error: 'reauth' })
+    expect(await res.json()).toMatchObject({ error: { code: 'reauth' } })
   })
 
   it('stale: serves the mirror immediately, then revalidates with If-None-Match → 304 keeps rows', async () => {

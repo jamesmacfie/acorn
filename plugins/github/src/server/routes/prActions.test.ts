@@ -41,25 +41,25 @@ describe('prActions auth + ApiError envelope (no GitHub call paths)', () => {
   it('401s (ApiError) when logged out', async () => {
     const res = await req(null, 'POST', '/api/repos/acme/widget/pulls/1/merge', { method: 'merge' })
     expect(res.status).toBe(401)
-    expect((await res.json()) as ApiError).toEqual({ error: 'unauthenticated' })
+    expect(((await res.json()) as ApiError).error).toMatchObject({ code: 'unauthenticated' })
   })
 
   it('repo_not_found (ApiError) when the repo is not mirrored — resolvePr fails before GitHub', async () => {
     const res = await req(PRINCIPAL, 'POST', '/api/repos/other/repo/pulls/1/merge', { method: 'merge' })
     expect(res.status).toBe(404)
-    expect((await res.json()) as ApiError).toEqual({ error: 'repo_not_found' })
+    expect(((await res.json()) as ApiError).error).toMatchObject({ code: 'repo_not_found' })
   })
 
   it('bad_number (ApiError) for a non-integer PR number', async () => {
     const res = await req(PRINCIPAL, 'POST', '/api/repos/acme/widget/pulls/abc/merge', { method: 'merge' })
     expect(res.status).toBe(400)
-    expect((await res.json()) as ApiError).toEqual({ error: 'bad_number' })
+    expect(((await res.json()) as ApiError).error).toMatchObject({ code: 'bad_number' })
   })
 
   it('empty_body (ApiError) — resolvePr succeeds, validation rejects before GitHub', async () => {
     const res = await req(PRINCIPAL, 'POST', '/api/repos/acme/widget/pulls/1/comments', {})
     expect(res.status).toBe(400)
-    expect((await res.json()) as ApiError).toEqual({ error: 'empty_body' })
+    expect(((await res.json()) as ApiError).error).toMatchObject({ code: 'empty_body' })
   })
 
   it('viewed toggle is app-state only → typed success, no GitHub call', async () => {

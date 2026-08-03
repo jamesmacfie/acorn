@@ -25,6 +25,6 @@ describe('GET /api/me', () => {
   it('401s with the ApiError envelope when no principal is resolved', async () => {
     const res = await get(null)
     expect(res.status).toBe(401)
-    expect((await res.json()) as ApiError).toEqual({ error: 'unauthenticated' })
+    expect(((await res.json()) as ApiError).error).toMatchObject({ code: 'unauthenticated' })
   })
 })
