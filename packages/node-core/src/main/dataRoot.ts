@@ -19,8 +19,8 @@ export type DataRoot = {
   dir: string
   nodeId: string
   // Last bound listener port, if this root has ever bound one. Callers prefer it and fall back to
-  // an ephemeral port when it is taken.
-  preferredPort: number | undefined
+  // an ephemeral port when it is taken. Reflects recordPort within this process.
+  readonly preferredPort: number | undefined
   recordPort(port: number): void
   release(): void
 }
@@ -158,7 +158,12 @@ export function openDataRoot(dir: string): DataRoot {
     return {
       dir,
       nodeId: identity.nodeId,
-      preferredPort: identity.port,
+      // A getter, not a snapshot: recordPort replaces `identity`, and a field captured here would keep
+      // reporting whatever was on disk when the root was opened. That is invisible in production (one
+      // open per process) and wrong for anything that rebinds within one process.
+      get preferredPort() {
+        return identity.port
+      },
       recordPort(port) {
         if (port === identity.port || !Number.isInteger(port) || port < 1) return
         identity = { ...identity, port }

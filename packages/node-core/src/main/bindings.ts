@@ -12,6 +12,7 @@ import { activeIdentityStore, type ActiveIdentityStore } from './activeIdentity'
 import { deviceService, type DeviceService } from '../server/auth/deviceTokens'
 import { idempotencyStore, type IdempotencyStore } from '../server/auth/idempotency'
 import { pairingCodes, type PairingCodes } from '../server/auth/pairingCodes'
+import { ensureCert } from './tls'
 
 // The runtime object the routes read via c.env (typed as the global Env in env.d.ts). Built once
 // at startup and handed to the Hono app at the single app.fetch() seam in main/server.ts.
@@ -21,6 +22,13 @@ export type RuntimeBindings = {
   // resource a client caches is keyed (nodeId, id), so two nodes holding the same UUID never
   // collide (docs/vNext/architecture.md § Fleet semantics).
   NODE_ID: string
+  // The sha256 of this node's TLS certificate — the value a client pins (docs/vNext/protocol.md
+  // § Transport and identity), advertised at GET /v2/node.
+  //
+  // The fingerprint, NOT the certificate and emphatically not the private key: c.env reaches every
+  // core and plugin route, so anything placed here is readable by all of them. The key material stays
+  // inside main/tls.ts and main/server.ts, which are the only modules that need it.
+  NODE_FINGERPRINT: string
   // The app version this node is running, reported at GET /v2/node to an authenticated caller
   // (docs/vNext/protocol.md § Versioning). Injected rather than read from a package.json, because the
   // service is a bundled artifact by then and only the composition root knows the real version.
@@ -236,6 +244,10 @@ export function makeBindings({ dbPath, blobsDir, nodeId, appVersion }: BindingsO
   return {
     DB: db,
     NODE_ID: nodeId,
+    // ensureCert is idempotent, so calling it here AND in startListener is not two certificates — it is
+    // the same one read twice, which is what lets the routes hold the public fingerprint without the
+    // bindings ever touching the private key.
+    NODE_FINGERPRINT: ensureCert(dataDir).fingerprint,
     APP_VERSION: appVersion,
     OAUTH_STATE: oauthStateStore(),
     BLOBS: diskBlobCache(blobCachePath),

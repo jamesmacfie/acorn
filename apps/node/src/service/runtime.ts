@@ -113,6 +113,9 @@ export async function startServiceRuntime({ config, desktop, stateChanged }: Run
 
   let server: ServerType | null = null
   let endpoint: ServiceEndpoint | null = null
+  // The pin the parent hands to its connection broker. Reported by the listener rather than read from
+  // disk here, so there is exactly one place that decides what identity this node is answering with.
+  let identity: { fingerprint: string; certPem: string } | null = null
   let managedAgents: ReturnType<typeof wireManagedAgents> | null = null
   let reconcileTask: Promise<void> | null = null
   let stopped = false
@@ -254,11 +257,11 @@ export async function startServiceRuntime({ config, desktop, stateChanged }: Run
     })
     mark('install')
 
-    const listener = await startListener(runtime, { clientDir: config.clientDir })
+    const listener = await startListener(runtime, dataRoot)
     server = listener.server
     endpoint = listener.endpoint
+    identity = { fingerprint: listener.fingerprint, certPem: listener.certPem }
     internalApiEnv.ACORN_API_URL = endpoint.origin
-    dataRoot.recordPort(endpoint.port)
     stateChanged('listening')
     mark('listener-up')
 
@@ -303,6 +306,7 @@ export async function startServiceRuntime({ config, desktop, stateChanged }: Run
         state: 'listening',
         nodeId: dataRoot.nodeId,
         endpoint,
+        ...identity,
         deviceToken: await resolveLocalDeviceToken(runtime.DEVICES, config.deviceToken),
       },
     }
