@@ -2,7 +2,7 @@ import { Hono } from 'hono'
 import { authMiddleware, type AppEnv } from './middleware/auth'
 import { buildIntegrationProviderRoutes } from './integrations/providerRoutes'
 import { idempotency } from './middleware/idempotency'
-import { requireUser } from './middleware/requireUser'
+import { requireDevice, requireUser } from './middleware/requireUser'
 import { onServerError, requestIdMiddleware } from './respond'
 import { CORE_NAMESPACE, PLUGIN_NAMESPACE, pluginRouteContributions, routeMountPath } from './routeRegistry'
 import { integrations } from './routes/integrations'
@@ -56,6 +56,15 @@ export function createApp() {
     // Below the gate on purpose: replay is keyed on the caller's deviceId, which only exists once the
     // principal is resolved and enforced (docs/vNext/protocol.md § HTTP conventions).
     .use('/v2/*', idempotency)
+    // Device-only, not merely authenticated: these mint credentials and administer devices, which
+    // docs/vNext/security.md forbids an internal (agent-spawned) caller from touching. requireUser
+    // accepts either kind by design, so the narrower gate has to be explicit and has to sit here,
+    // before the router — an agent that reaches pair/start can read the code out of the response and
+    // mint itself an owner-authority token.
+    .use(`${CORE_NAMESPACE}/pair`, requireDevice)
+    .use(`${CORE_NAMESPACE}/pair/*`, requireDevice)
+    .use(`${CORE_NAMESPACE}/devices`, requireDevice)
+    .use(`${CORE_NAMESPACE}/devices/*`, requireDevice)
     .route(CORE_NAMESPACE, pairing.core) // /pair, /pair/start, /devices — owner-only device administration
     .route(`${CORE_NAMESPACE}/pins`, pins)
     .route(`${CORE_NAMESPACE}/prefs`, prefs)
