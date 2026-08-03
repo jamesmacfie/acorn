@@ -7,6 +7,7 @@ import { onServerError, requestIdMiddleware } from './respond'
 import { CORE_NAMESPACE, PLUGIN_NAMESPACE, pluginRouteContributions, routeMountPath } from './routeRegistry'
 import { auth } from './routes/auth'
 import { integrations } from './routes/integrations'
+import { pairingRoutes } from './routes/pairing'
 import { me } from './routes/me'
 import { pins } from './routes/pins'
 import { prefs } from './routes/prefs'
@@ -23,11 +24,20 @@ import { configTrust } from './routes/configTrust'
 // through the route registry (populated by app/server/routes.ts before this runs) and mounts under
 // /v2/p/<plugin> — core imports no product route module directly (docs/plugins.md).
 export function createApp() {
+  // Per-instance state (the pairing rate ceiling), so it must be built here rather than imported as a
+  // module-level router.
+  const pairing = pairingRoutes()
+
   // Mount order is the auth invariant: /auth is public (it establishes the session), then every
   // /v2/* request passes csrf → authMiddleware (resolve principal) → requireUser (enforce it)
   // before any router. A router mounted before requireUser would be an unauthenticated hole, so
   // all /v2 routers stay below this line. One glob covers both namespaces, which is why plugin
   // prefixes are forced to be relative to /v2/p (routeRegistry.ts). See docs/security.md §3.
+  //
+  // The one deliberate exception is `pairing.open` (GET /v2/node + POST /v2/pair): a client that has
+  // never paired holds no credential, so those two ARE the way in (docs/vNext/protocol.md § Pairing).
+  // They still sit under csrf + authMiddleware — they are public, not unprotected — and everything
+  // that administers devices stays under /v2/core, below requireUser.
   const app = new Hono<AppEnv>()
     // First, unconditionally: every response — success, error, public or authenticated — carries a
     // request id, so a user-reported failure is findable in the log.
@@ -38,8 +48,10 @@ export function createApp() {
     .use('/auth/*', csrf())
     .route('/auth', auth)
     .use('/v2/*', csrf()) // Origin / Sec-Fetch-Site check on mutating calls
-    .use('/v2/*', authMiddleware) // resolve ctx.principal from cookie or internal token
+    .use('/v2/*', authMiddleware) // resolve ctx.principal from device bearer, cookie or internal token
+    .route('/v2', pairing.open) // GET /v2/node + POST /v2/pair — pre-auth by construction (see above)
     .use('/v2/*', requireUser) // single 401 gate over the protected router table
+    .route(CORE_NAMESPACE, pairing.core) // /pair, /pair/start, /devices — owner-only device administration
     .route(`${CORE_NAMESPACE}/me`, me)
     .route(`${CORE_NAMESPACE}/pins`, pins)
     .route(`${CORE_NAMESPACE}/prefs`, prefs)
