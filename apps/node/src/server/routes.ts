@@ -29,43 +29,54 @@ import { search } from '@acorn/plugin-editor/server/routes/search.ts'
 import { terminal } from '@acorn/plugin-terminal/server/routes/terminal.ts'
 import { workflow } from '@acorn/plugin-workflows/server/routes/workflow.ts'
 
-// /api/tasks/:id/* sub-resources (order-independent: distinct sub-paths under the core tasks router)
-registerRoute({ prefix: '/api/tasks', router: reviewNotes, note: '/:id/review-notes (changes)' })
-registerRoute({ prefix: '/api/tasks', router: search, note: '/:id/search (editor)' })
-registerRoute({ prefix: '/api/tasks', router: editor, note: '/:id/editor/* (editor)' })
-registerRoute({ prefix: '/api/tasks', router: localGit, note: '/:id/local/* (changes)' })
-registerRoute({ prefix: '/api/tasks', router: database, note: '/:id/database/* (database)' })
+// Every contribution mounts at /v2/p/<plugin><prefix> (docs/vNext/protocol.md § HTTP conventions).
+// The prefix is the path INSIDE the plugin's namespace, so ownership is declared here rather than
+// encoded in a URL: /api/tasks/:id/* was one flat table shared by core and six plugins, and the
+// split below is what lets a node enable or disable a plugin's whole route surface at once.
+//
+// Deliberate segment doubling: three routers state their own top-level segment internally
+// (workflow's `/workflows/runs/...`, knowledge's `/memory`, terminal's `/terminal/sessions`), so
+// under their namespace it repeats — /v2/p/memory/memory, /v2/p/terminal/terminal/sessions. The
+// task-scoped routers double the same way one level down (/v2/p/editor/tasks/:id/editor/root).
+// Rewriting those internal paths is the route-declaration phase's job, not this reshape's.
 
-// /api/docker/* — the local docker daemon surface (docker)
-registerRoute({ prefix: '/api/docker', router: docker })
+// /tasks/:id/* sub-resources (order-independent: distinct sub-paths, each under its own namespace)
+registerRoute({ plugin: 'changes', prefix: '/tasks', router: reviewNotes, note: '/:id/review-notes' })
+registerRoute({ plugin: 'editor', prefix: '/tasks', router: search, note: '/:id/search' })
+registerRoute({ plugin: 'editor', prefix: '/tasks', router: editor, note: '/:id/editor/*' })
+registerRoute({ plugin: 'changes', prefix: '/tasks', router: localGit, note: '/:id/local/*' })
+registerRoute({ plugin: 'database', prefix: '/tasks', router: database, note: '/:id/database/*' })
 
-// /api/http/:owner/:repo/* — the API panel's saved requests, variables and send (http).
-// Not /api/api/*: 'api' already means the public automation API here (docs/public-api.md).
-registerRoute({ prefix: '/api/http', router: http, note: '/:owner/:repo/* (http)' })
+// /v2/p/docker/* — the local docker daemon surface
+registerRoute({ plugin: 'docker', prefix: '', router: docker })
 
-// /api/agents/* — account-scoped local provider usage (agents)
-registerRoute({ prefix: '/api/agents', router: agentUsage })
-registerRoute({ prefix: '/api/agents', router: managedAgents })
+// /v2/p/http/:owner/:repo/* — the API panel's saved requests, variables and send
+registerRoute({ plugin: 'http', prefix: '', router: http, note: '/:owner/:repo/*' })
 
-// /api catch-alls
-registerRoute({ prefix: '/api', router: workflow, note: 'workflow control (workflows)' })
-registerRoute({ prefix: '/api', router: knowledge, note: 'notes/memory pane (memory)' })
-registerRoute({ prefix: '/api', router: terminal, note: 'terminal control (terminal)' })
+// /v2/p/agents/* — account-scoped local provider usage
+registerRoute({ plugin: 'agents', prefix: '', router: agentUsage })
+registerRoute({ plugin: 'agents', prefix: '', router: managedAgents })
 
-// /api/repos/* (github)
-registerRoute({ prefix: '/api/repos', router: repos })
-registerRoute({ prefix: '/api/repos', router: repoLabels, note: '/:owner/:repo/labels' })
-registerRoute({ prefix: '/api/repos', router: pulls })
-registerRoute({ prefix: '/api/repos', router: pullDetail })
-registerRoute({ prefix: '/api/repos', router: pullConflicts, note: '/:owner/:repo/pulls/:number/conflicts' })
-registerRoute({ prefix: '/api/repos', router: pullFiles })
-registerRoute({ prefix: '/api/repos', router: pullBlob })
-registerRoute({ prefix: '/api/repos', router: pullsBatch })
-registerRoute({ prefix: '/api/repos', router: prActions })
-registerRoute({ prefix: '/api/repos', router: actions })
-registerRoute({ prefix: '/api/repos', router: prCreate })
-registerRoute({ prefix: '/api/repos', router: mentions })
-registerRoute({ prefix: '/api/github', router: githubDeviceAuth, note: 'OAuth device-flow connect (github)' })
+// Namespace-root routers: each owns a mix of task-scoped and top-level paths (see the doubling note)
+registerRoute({ plugin: 'workflows', prefix: '', router: workflow, note: 'workflow control' })
+registerRoute({ plugin: 'memory', prefix: '', router: knowledge, note: 'notes/memory pane' })
+registerRoute({ plugin: 'terminal', prefix: '', router: terminal, note: 'terminal control' })
+
+// /v2/p/github/repos/* — the GitHub mirror; device-flow connect sits beside it at /auth/*
+registerRoute({ plugin: 'github', prefix: '/repos', router: repos })
+registerRoute({ plugin: 'github', prefix: '/repos', router: repoLabels, note: '/:owner/:repo/labels' })
+registerRoute({ plugin: 'github', prefix: '/repos', router: pulls })
+registerRoute({ plugin: 'github', prefix: '/repos', router: pullDetail })
+registerRoute({ plugin: 'github', prefix: '/repos', router: pullConflicts, note: '/:owner/:repo/pulls/:number/conflicts' })
+registerRoute({ plugin: 'github', prefix: '/repos', router: pullFiles })
+registerRoute({ plugin: 'github', prefix: '/repos', router: pullBlob })
+registerRoute({ plugin: 'github', prefix: '/repos', router: pullsBatch })
+registerRoute({ plugin: 'github', prefix: '/repos', router: prActions })
+registerRoute({ plugin: 'github', prefix: '/repos', router: actions })
+registerRoute({ plugin: 'github', prefix: '/repos', router: prCreate })
+registerRoute({ plugin: 'github', prefix: '/repos', router: mentions })
+registerRoute({ plugin: 'github', prefix: '', router: githubDeviceAuth, note: '/auth/device/* — OAuth device-flow connect' })
 
 // Provider-owned HTTP routers (linear/rollbar) are registered in app/server/providers.ts via the
-// integration provider registry, mounted through buildIntegrationProviderRoutes() in createApp().
+// integration provider registry, mounted at /v2/p/<providerId> through
+// buildIntegrationProviderRoutes() in createApp().

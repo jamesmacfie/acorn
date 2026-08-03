@@ -89,7 +89,8 @@ const archiveBody = z.object({ deleteWorktree: z.boolean().optional(), force: z.
 const id = (c: { req: { param(k: string): string } }) => c.req.param('id')
 const b = terminalBridgeSlot
 
-// Mounted at /api to carry /terminal/*, /terminal/repo-path, and /tasks/:id/* control verbs.
+// Mounted at the plugin namespace root to carry /terminal/*, /terminal/repo-path, and /tasks/:id/*
+// control verbs — hence the doubled /v2/p/terminal/terminal/* (see app/server/routes.ts).
 export const terminal = new Hono<AppEnv>()
   // --- sessions ---
   .get('/terminal/sessions', (c) => viaBridge(c, b, (t) => t.list()))

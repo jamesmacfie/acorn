@@ -9,7 +9,8 @@ import { respondError } from '@acorn/node-core/server/respond.ts'
 // `memory:*` and `notes:*` IPC channels. Distinct from the harness memory/notes
 // bridges (the MCP agent surface): this is the human-facing pane (manual add, the proposal gate,
 // note CRUD + inclusion). Backed by the same NotesStore + memory index in the main process, so it
-// 503s under dev:node. Mounted at /api to carry both /memory* and /workspaces/:wsId/notes* paths.
+// 503s under dev:node. Mounted at the plugin namespace root to carry /memory*, /tasks/:id/notes* and
+// /workspaces/:wsId/notes* alike — hence the doubled /v2/p/memory/memory (see app/server/routes.ts).
 
 export type KnowledgeBridge = {
   memoryList(repo?: string): Promise<unknown>

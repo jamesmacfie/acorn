@@ -31,6 +31,6 @@ describe('buildCommentsBody', () => {
 
   it('keeps the linked Linear connection in note-seeding reads', () => {
     expect(linearIssueSeedUrl('http://127.0.0.1:1234', { integrationId: 'work/team', identifier: 'ENG-42' }))
-      .toBe('http://127.0.0.1:1234/api/linear/issues/ENG-42?refresh=1&integration=work%2Fteam')
+      .toBe('http://127.0.0.1:1234/v2/p/linear/issues/ENG-42?refresh=1&integration=work%2Fteam')
   })
 })

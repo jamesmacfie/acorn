@@ -1,5 +1,5 @@
-export const agentUsageRoute = '/api/agents/usage'
-export const agentUsageRefreshRoute = '/api/agents/usage/refresh'
+export const agentUsageRoute = '/v2/p/agents/usage'
+export const agentUsageRefreshRoute = '/v2/p/agents/usage/refresh'
 
 export type AgentUsageProviderId = 'claude' | 'codex'
 export type AgentUsageHealth = 'healthy' | 'warning' | 'critical' | 'depleted' | 'unknown'

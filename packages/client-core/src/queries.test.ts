@@ -19,7 +19,7 @@ describe('client query options', () => {
 
     await reposOptions(true).queryFn({ signal })
 
-    expect(fetchMock).toHaveBeenCalledWith('/api/repos', expect.objectContaining({ signal }))
+    expect(fetchMock).toHaveBeenCalledWith('/v2/p/github/repos', expect.objectContaining({ signal }))
   })
 
   it('passes TanStack query AbortSignal into infinite reads', async () => {
@@ -29,7 +29,7 @@ describe('client query options', () => {
 
     await closedPullsInfiniteOptions('acorn', 'web', true).queryFn({ pageParam: 3, signal })
 
-    expect(fetchMock).toHaveBeenCalledWith('/api/repos/acorn/web/pulls?state=closed&page=3', expect.objectContaining({ signal }))
+    expect(fetchMock).toHaveBeenCalledWith('/v2/p/github/repos/acorn/web/pulls?state=closed&page=3', expect.objectContaining({ signal }))
   })
 
   it('keeps the logged-out me query as null while still passing AbortSignal', async () => {
@@ -38,7 +38,7 @@ describe('client query options', () => {
     const signal = new AbortController().signal
 
     await expect(meOptions().queryFn({ signal })).resolves.toBeNull()
-    expect(fetchMock).toHaveBeenCalledWith('/api/me', expect.objectContaining({ signal }))
+    expect(fetchMock).toHaveBeenCalledWith('/v2/core/me', expect.objectContaining({ signal }))
   })
 
   it('applies cancellation to heavy PR file and compare reads', async () => {
@@ -49,8 +49,8 @@ describe('client query options', () => {
     await compareOptions('acorn', 'web', 'main', 'feature', true).queryFn({ signal })
     await filesOptions('acorn', 'web', '42', true).queryFn({ signal })
 
-    expect(fetchMock).toHaveBeenNthCalledWith(1, '/api/repos/acorn/web/compare?base=main&head=feature', expect.objectContaining({ signal }))
-    expect(fetchMock).toHaveBeenNthCalledWith(2, '/api/repos/acorn/web/pulls/42/files', expect.objectContaining({ signal }))
+    expect(fetchMock).toHaveBeenNthCalledWith(1, '/v2/p/github/repos/acorn/web/compare?base=main&head=feature', expect.objectContaining({ signal }))
+    expect(fetchMock).toHaveBeenNthCalledWith(2, '/v2/p/github/repos/acorn/web/pulls/42/files', expect.objectContaining({ signal }))
   })
 
   it('force-refreshes PR detail and changed files together', async () => {
@@ -59,8 +59,8 @@ describe('client query options', () => {
     vi.stubGlobal('fetch', fetchMock)
 
     await expect(forceRefreshPull('acorn', 'web', '42')).resolves.toEqual({ detail, files: [] })
-    expect(fetchMock).toHaveBeenNthCalledWith(1, '/api/repos/acorn/web/pulls/42?force=true', expect.anything())
-    expect(fetchMock).toHaveBeenNthCalledWith(2, '/api/repos/acorn/web/pulls/42/files?force=true', expect.anything())
+    expect(fetchMock).toHaveBeenNthCalledWith(1, '/v2/p/github/repos/acorn/web/pulls/42?force=true', expect.anything())
+    expect(fetchMock).toHaveBeenNthCalledWith(2, '/v2/p/github/repos/acorn/web/pulls/42/files?force=true', expect.anything())
   })
 
   it('fetches file summaries and a single patch through distinct cache entries', async () => {
@@ -79,11 +79,11 @@ describe('client query options', () => {
 
     expect(fileSummariesOptions('acorn', 'web', '42', true).queryKey).toEqual(['files', 'acorn', 'web', '42', 'summary'])
     expect(filePatchOptions('acorn', 'web', '42', 'src/app file.ts').queryKey).toEqual(['files', 'acorn', 'web', '42', 'patch', 'src/app file.ts'])
-    expect(fetchMock).toHaveBeenNthCalledWith(1, '/api/repos/acorn/web/pulls/42/files?summary=1', expect.objectContaining({ signal }))
-    expect(fetchMock).toHaveBeenNthCalledWith(2, '/api/repos/acorn/web/pulls/42/files?path=src%2Fapp%20file.ts', expect.objectContaining({ signal }))
+    expect(fetchMock).toHaveBeenNthCalledWith(1, '/v2/p/github/repos/acorn/web/pulls/42/files?summary=1', expect.objectContaining({ signal }))
+    expect(fetchMock).toHaveBeenNthCalledWith(2, '/v2/p/github/repos/acorn/web/pulls/42/files?path=src%2Fapp%20file.ts', expect.objectContaining({ signal }))
     expect(fetchMock).toHaveBeenNthCalledWith(
       3,
-      '/api/repos/acorn/web/pulls/42/files/patches',
+      '/v2/p/github/repos/acorn/web/pulls/42/files/patches',
       expect.objectContaining({
         method: 'POST',
         headers: { 'content-type': 'application/json' },

@@ -121,9 +121,12 @@ export type MirroredResourceContribution<TInput = unknown, TOutput = unknown> = 
   refresh(context: ProviderResourceRefreshContext, input: TInput): Promise<RefreshResult>
 }
 
+// A provider-owned HTTP router. `prefix` is relative to the provider's own plugin namespace
+// (`/v2/p/<providerId>`), so it is empty for a provider that owns its whole namespace — the
+// namespace segment comes from the declared providerId, never from the prefix string.
 export type ProviderRouteContribution = {
   providerId: string
-  prefix: `/${string}`
+  prefix: '' | `/${string}`
   router: Hono<AppEnv>
 }
 

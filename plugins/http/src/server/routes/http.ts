@@ -1,4 +1,4 @@
-// Routes for the API panel, mounted at /api/http (app/server/routes.ts). The core stack applies
+// Routes for the API panel, mounted at /v2/p/http (app/server/routes.ts). The core stack applies
 // csrf → authMiddleware → requireUser; this router adds an interactive-principal gate because its
 // outbound-request and secret-resolution powers must not be reachable through the internal token.
 import { Hono } from 'hono'

@@ -1,19 +1,40 @@
 import type { Hono } from 'hono'
 import type { AppEnv } from './middleware/auth'
 
+// The two vNext HTTP namespaces (docs/vNext/protocol.md § HTTP conventions). Core owns
+// `/v2/core/*`; every plugin gets `/v2/p/<plugin>/*`. Both live under the one `/v2/*` middleware
+// envelope, so a route cannot be added outside the auth gate by choosing a prefix.
+export const CORE_NAMESPACE = '/v2/core'
+export const PLUGIN_NAMESPACE = '/v2/p'
+
+const PLUGIN_ID_RE = /^[a-z][a-z0-9-]*$/
+
 // Plugin-owned HTTP routers, projected into the app after the auth gate. A plugin server part
-// contributes { prefix, router }; the app activation module (app/server/routes.ts) registers them
-// before createApp() runs, and createApp() iterates this registry — core never imports a product
-// route module directly (docs/plugins.md). Prefixes are the same Hono mount prefixes the
-// hand-written table used; distinct sub-paths mean registration order is not load-bearing.
-export type RouteContribution = { prefix: string; router: Hono<AppEnv>; note?: string }
+// contributes { plugin, prefix, router }; the app activation module (app/server/routes.ts) registers
+// them before createApp() runs, and createApp() iterates this registry — core never imports a
+// product route module directly (docs/plugins.md).
+//
+// `plugin` is DECLARED rather than parsed back out of the prefix: the effective mount is
+// `/v2/p/${plugin}${prefix}`, so a later phase can enable/disable a plugin per node by filtering
+// this registry on one field instead of pattern-matching URLs. `prefix` is whatever path the plugin
+// wants under its own namespace — empty for a router that owns the whole namespace, `/tasks` for the
+// task-scoped sub-resources. Distinct sub-paths mean registration order is not load-bearing.
+export type RouteContribution = { plugin: string; prefix: string; router: Hono<AppEnv>; note?: string }
 
 export class RouteRegistry {
   readonly #contributions: RouteContribution[] = []
 
   register(contribution: RouteContribution): void {
-    if (contribution.prefix !== '/api' && !contribution.prefix.startsWith('/api/')) {
-      throw new Error(`Plugin route prefix must stay inside the authenticated /api namespace: '${contribution.prefix}'.`)
+    if (!PLUGIN_ID_RE.test(contribution.plugin)) {
+      throw new Error(`Plugin route id must match ${PLUGIN_ID_RE.source}: '${contribution.plugin}'.`)
+    }
+    // Relative, and never re-stating the namespace: an absolute-looking '/v2/...' prefix would mount
+    // at /v2/p/<plugin>/v2/... — silently unreachable rather than loudly wrong.
+    if (contribution.prefix !== '' && !contribution.prefix.startsWith('/')) {
+      throw new Error(`Plugin route prefix must be empty or start with '/': '${contribution.prefix}'.`)
+    }
+    if (contribution.prefix.startsWith('/v2')) {
+      throw new Error(`Plugin route prefix is relative to ${PLUGIN_NAMESPACE}/<plugin>, so it must not repeat '/v2': '${contribution.prefix}'.`)
     }
     this.#contributions.push(contribution)
   }
@@ -21,6 +42,11 @@ export class RouteRegistry {
   list(): readonly RouteContribution[] {
     return this.#contributions
   }
+}
+
+// The mount path createApp() hands to Hono for one contribution.
+export function routeMountPath(contribution: RouteContribution): string {
+  return `${PLUGIN_NAMESPACE}/${contribution.plugin}${contribution.prefix}`
 }
 
 const registry = new RouteRegistry()

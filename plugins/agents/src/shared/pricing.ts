@@ -1,4 +1,4 @@
-export const agentPricingRoute = '/api/agents/pricing'
+export const agentPricingRoute = '/v2/p/agents/pricing'
 export const agentPricingPreferenceKey = 'agents:pricing:v1'
 
 const MAX_CUSTOM_MODELS = 100

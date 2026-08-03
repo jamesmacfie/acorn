@@ -258,17 +258,17 @@ export type RollbarItemsResponse = {
   failures: Array<{ integrationId: string; code: string }>
   cappedIntegrationIds: string[]
 }
-export const rollbarItemsRoute = '/api/rollbar/items'
+export const rollbarItemsRoute = '/v2/p/rollbar/items'
 export const rollbarItemsForConnectionsRoute = (integrationIds: readonly string[]) =>
   `${rollbarItemsRoute}?integrations=${encodeURIComponent([...new Set(integrationIds)].sort().join(','))}`
 export const rollbarItemRoute = (integrationId: string, identifier: string, refresh = false) =>
-  `/api/rollbar/items/${encodeURIComponent(identifier)}?integration=${encodeURIComponent(integrationId)}${refresh ? '&refresh=true' : ''}`
+  `/v2/p/rollbar/items/${encodeURIComponent(identifier)}?integration=${encodeURIComponent(integrationId)}${refresh ? '&refresh=true' : ''}`
 export const rollbarItemMetadataRoute = (integrationId: string, identifier: string, refresh = false) =>
-  `/api/rollbar/items/${encodeURIComponent(identifier)}/detail?integration=${encodeURIComponent(integrationId)}${refresh ? '&refresh=true' : ''}`
+  `/v2/p/rollbar/items/${encodeURIComponent(identifier)}/detail?integration=${encodeURIComponent(integrationId)}${refresh ? '&refresh=true' : ''}`
 export const rollbarOccurrencesRoute = (integrationId: string, identifier: string, refresh = false) =>
-  `/api/rollbar/items/${encodeURIComponent(identifier)}/occurrences?integration=${encodeURIComponent(integrationId)}${refresh ? '&refresh=true' : ''}`
+  `/v2/p/rollbar/items/${encodeURIComponent(identifier)}/occurrences?integration=${encodeURIComponent(integrationId)}${refresh ? '&refresh=true' : ''}`
 export const rollbarOccurrenceRoute = (integrationId: string, identifier: string, occurrenceId: string, refresh = false) =>
-  `/api/rollbar/items/${encodeURIComponent(identifier)}/occurrences/${encodeURIComponent(occurrenceId)}?integration=${encodeURIComponent(integrationId)}${refresh ? '&refresh=true' : ''}`
+  `/v2/p/rollbar/items/${encodeURIComponent(identifier)}/occurrences/${encodeURIComponent(occurrenceId)}?integration=${encodeURIComponent(integrationId)}${refresh ? '&refresh=true' : ''}`
 export const rollbarItemsKey = (integrationIds: readonly string[]) =>
   ['rollbar-items', 'connections', ...[...new Set(integrationIds)].sort()] as const
 export const rollbarItemKey = (integrationId: string, identifier: string) => ['rollbar-item', integrationId, identifier] as const
@@ -404,38 +404,38 @@ export type TaskContext = {
   memory: { name: string; description: string }[]
 }
 export const taskContextRoute = (id: string, include?: TaskContextInclude[] | 'all') =>
-  `/api/tasks/${id}/context${include === 'all' ? '?include=*' : include?.length ? `?include=${include.join(',')}` : ''}`
+  `/v2/core/tasks/${id}/context${include === 'all' ? '?include=*' : include?.length ? `?include=${include.join(',')}` : ''}`
 
 // Agent tools (docs/agent-tools.md): the registry projects to the harness HTTP surface below and to
 // the MCP server. The permissions page reads the static catalog and persists per-tier/per-tool
 // toggles as ONE prefs slice under this key (JSON `{ tiers?, tools? }`).
 export type ToolRisk = 'read' | 'write' | 'execute'
 export const AGENT_TOOLS_PERMS_PREF_KEY = 'agentTools.perms'
-export const agentToolsCatalogRoute = '/api/agent-tools'
+export const agentToolsCatalogRoute = '/v2/core/agent-tools'
 export type AgentToolCatalogEntry = { name: string; description: string; risk: ToolRisk; availability?: string }
-export const rendererAgentToolRoute = (taskId: string, name: string) => `/api/tasks/${taskId}/renderer-tools/${encodeURIComponent(name)}`
+export const rendererAgentToolRoute = (taskId: string, name: string) => `/v2/core/tasks/${taskId}/renderer-tools/${encodeURIComponent(name)}`
 
 // Find-in-files (docs/panes.md): POST because it spawns ripgrep and the query is arbitrary body,
 // not a path segment. Was the `search:findInFiles` IPC channel.
-export const searchRoute = (taskId: string) => `/api/tasks/${taskId}/search`
+export const searchRoute = (taskId: string) => `/v2/p/editor/tasks/${taskId}/search`
 
 // Editor pane (docs/workspaces-and-tasks.md): read/write/list worktree files. Was the `editor:*` IPC channels.
 // relPath rides a query param so a nested path never collides with the route segments.
 export type EditorEntry = { name: string; dir: boolean }
 export type EditorWriteResult = { ok: boolean; reason?: string }
-export const editorRootRoute = (taskId: string) => `/api/tasks/${taskId}/editor/root`
-export const editorFilesRoute = (taskId: string) => `/api/tasks/${taskId}/editor/files`
-export const editorListRoute = (taskId: string, relPath: string) => `/api/tasks/${taskId}/editor/list?path=${encodeURIComponent(relPath)}`
-export const editorReadRoute = (taskId: string, relPath: string) => `/api/tasks/${taskId}/editor/read?path=${encodeURIComponent(relPath)}`
-export const editorWriteRoute = (taskId: string) => `/api/tasks/${taskId}/editor/file`
+export const editorRootRoute = (taskId: string) => `/v2/p/editor/tasks/${taskId}/editor/root`
+export const editorFilesRoute = (taskId: string) => `/v2/p/editor/tasks/${taskId}/editor/files`
+export const editorListRoute = (taskId: string, relPath: string) => `/v2/p/editor/tasks/${taskId}/editor/list?path=${encodeURIComponent(relPath)}`
+export const editorReadRoute = (taskId: string, relPath: string) => `/v2/p/editor/tasks/${taskId}/editor/read?path=${encodeURIComponent(relPath)}`
+export const editorWriteRoute = (taskId: string) => `/v2/p/editor/tasks/${taskId}/editor/file`
 
 // Run targets (docs/workflows.md §2): the renderer shares the RunBridge routes the MCP run tools use
 // (server/routes/harness.ts). Was the `run:*` IPC channels.
-export const runTargetsRoute = (taskId: string) => `/api/tasks/${taskId}/run`
-export const runDefaultUrlRoute = (taskId: string) => `/api/tasks/${taskId}/run/default-url`
-export const runStartRoute = (taskId: string, targetId: string) => `/api/tasks/${taskId}/run/${encodeURIComponent(targetId)}/start`
-export const runStopRoute = (taskId: string, targetId: string) => `/api/tasks/${taskId}/run/${encodeURIComponent(targetId)}/stop`
-export const runStatusRoute = (taskId: string, targetId: string) => `/api/tasks/${taskId}/run/${encodeURIComponent(targetId)}/status`
+export const runTargetsRoute = (taskId: string) => `/v2/core/tasks/${taskId}/run`
+export const runDefaultUrlRoute = (taskId: string) => `/v2/core/tasks/${taskId}/run/default-url`
+export const runStartRoute = (taskId: string, targetId: string) => `/v2/core/tasks/${taskId}/run/${encodeURIComponent(targetId)}/start`
+export const runStopRoute = (taskId: string, targetId: string) => `/v2/core/tasks/${taskId}/run/${encodeURIComponent(targetId)}/stop`
+export const runStatusRoute = (taskId: string, targetId: string) => `/v2/core/tasks/${taskId}/run/${encodeURIComponent(targetId)}/status`
 
 export type RepoConfigTrustReview = {
   taskId: string
@@ -444,76 +444,76 @@ export type RepoConfigTrustReview = {
   current: { hash: string; text: string; files: Array<{ path: string; content: string }> } | null
   previous: { hash: string; text: string; ackedAt: number } | null
 }
-export const repoConfigTrustRoute = (taskId: string) => `/api/tasks/${taskId}/config-trust`
+export const repoConfigTrustRoute = (taskId: string) => `/v2/core/tasks/${taskId}/config-trust`
 
 // Workflow control (docs/workflows.md): task-scoped defs/start/runs and run-scoped steps/gates.
 // Commands use HTTP; workflow notices and step events use the shared WebSocket.
-export const workflowDefsRoute = (taskId: string) => `/api/tasks/${taskId}/workflows`
-export const workflowStartRoute = (taskId: string) => `/api/tasks/${taskId}/workflows`
-export const workflowRunsRoute = (taskId: string) => `/api/tasks/${taskId}/workflows/runs`
-export const workflowStepsRoute = (runId: string) => `/api/workflows/runs/${runId}/steps`
-export const workflowGateRoute = (runId: string) => `/api/workflows/runs/${runId}/gate`
-export const workflowCancelRoute = (runId: string) => `/api/workflows/runs/${runId}/cancel`
-export const workflowKillRoute = (runId: string) => `/api/workflows/runs/${runId}/kill`
-export const workflowTriggerPollRoute = '/api/workflows/triggers/poll'
+export const workflowDefsRoute = (taskId: string) => `/v2/p/workflows/tasks/${taskId}/workflows`
+export const workflowStartRoute = (taskId: string) => `/v2/p/workflows/tasks/${taskId}/workflows`
+export const workflowRunsRoute = (taskId: string) => `/v2/p/workflows/tasks/${taskId}/workflows/runs`
+export const workflowStepsRoute = (runId: string) => `/v2/p/workflows/workflows/runs/${runId}/steps`
+export const workflowGateRoute = (runId: string) => `/v2/p/workflows/workflows/runs/${runId}/gate`
+export const workflowCancelRoute = (runId: string) => `/v2/p/workflows/workflows/runs/${runId}/cancel`
+export const workflowKillRoute = (runId: string) => `/v2/p/workflows/workflows/runs/${runId}/kill`
+export const workflowTriggerPollRoute = '/v2/p/workflows/workflows/triggers/poll'
 
 // Local-changes review (docs/panes.md): working-tree status/diff/blob + stage/commit/discard/push.
 // Was the `local:*` IPC channels.
-export const localChangesRoute = (taskId: string) => `/api/tasks/${taskId}/local/changes`
+export const localChangesRoute = (taskId: string) => `/v2/p/changes/tasks/${taskId}/local/changes`
 export const localDiffRoute = (taskId: string, path: string, scope: 'unstaged' | 'staged') =>
-  `/api/tasks/${taskId}/local/diff?path=${encodeURIComponent(path)}&scope=${scope}`
+  `/v2/p/changes/tasks/${taskId}/local/diff?path=${encodeURIComponent(path)}&scope=${scope}`
 export const localBlobRoute = (taskId: string, path: string, ref?: string) =>
-  `/api/tasks/${taskId}/local/blob?path=${encodeURIComponent(path)}${ref ? `&ref=${encodeURIComponent(ref)}` : ''}`
+  `/v2/p/changes/tasks/${taskId}/local/blob?path=${encodeURIComponent(path)}${ref ? `&ref=${encodeURIComponent(ref)}` : ''}`
 export const localActionRoute = (taskId: string, action: 'stage' | 'unstage' | 'discard' | 'commit' | 'stage-all' | 'unstage-all' | 'discard-all' | 'push') =>
-  `/api/tasks/${taskId}/local/${action}`
+  `/v2/p/changes/tasks/${taskId}/local/${action}`
 
 // Database pane (docs/pg.md): per-task Postgres browse/edit. Was the `db:*` IPC channels.
-export const databaseTablesRoute = (taskId: string) => `/api/tasks/${taskId}/database/tables`
+export const databaseTablesRoute = (taskId: string) => `/v2/p/database/tasks/${taskId}/database/tables`
 export const databaseColumnsRoute = (taskId: string, schema: string, name: string) =>
-  `/api/tasks/${taskId}/database/columns?schema=${encodeURIComponent(schema)}&name=${encodeURIComponent(name)}`
+  `/v2/p/database/tasks/${taskId}/database/columns?schema=${encodeURIComponent(schema)}&name=${encodeURIComponent(name)}`
 export const databaseRowsRoute = (taskId: string, schema: string, name: string, offset?: number) =>
-  `/api/tasks/${taskId}/database/rows?schema=${encodeURIComponent(schema)}&name=${encodeURIComponent(name)}${offset ? `&offset=${offset}` : ''}`
+  `/v2/p/database/tasks/${taskId}/database/rows?schema=${encodeURIComponent(schema)}&name=${encodeURIComponent(name)}${offset ? `&offset=${offset}` : ''}`
 export const databaseActionRoute = (taskId: string, action: 'connect' | 'disconnect' | 'query' | 'update' | 'insert' | 'delete' | 'generate') =>
-  `/api/tasks/${taskId}/database/${action}`
+  `/v2/p/database/tasks/${taskId}/database/${action}`
 // Saved queries: repo-scoped rows, addressed through the task (the repo is resolved server-side).
-export const databaseQueriesRoute = (taskId: string) => `/api/tasks/${taskId}/database/queries`
-export const databaseQueryRoute = (taskId: string, queryId: string) => `/api/tasks/${taskId}/database/queries/${queryId}`
+export const databaseQueriesRoute = (taskId: string) => `/v2/p/database/tasks/${taskId}/database/queries`
+export const databaseQueryRoute = (taskId: string, queryId: string) => `/v2/p/database/tasks/${taskId}/database/queries/${queryId}`
 
 // Notes + memory pane (docs/notes-and-memory.md). These routes replaced the old feature-specific IPC surface.
-export const memoryListRoute = (repo?: string) => `/api/memory${repo ? `?repo=${encodeURIComponent(repo)}` : ''}`
+export const memoryListRoute = (repo?: string) => `/v2/p/memory/memory${repo ? `?repo=${encodeURIComponent(repo)}` : ''}`
 export const memorySearchRoute = (query: string, repo?: string, type?: string) =>
-  `/api/memory/search?q=${encodeURIComponent(query)}${repo ? `&repo=${encodeURIComponent(repo)}` : ''}${type ? `&type=${encodeURIComponent(type)}` : ''}`
-export const memoryAddRoute = (taskId: string) => `/api/tasks/${taskId}/memory`
-export const memoryProposalsRoute = (taskId?: string) => `/api/memory/proposals${taskId ? `?task=${encodeURIComponent(taskId)}` : ''}`
-export const memoryResolveProposalRoute = (id: string) => `/api/memory/proposals/${encodeURIComponent(id)}/resolve`
+  `/v2/p/memory/memory/search?q=${encodeURIComponent(query)}${repo ? `&repo=${encodeURIComponent(repo)}` : ''}${type ? `&type=${encodeURIComponent(type)}` : ''}`
+export const memoryAddRoute = (taskId: string) => `/v2/p/memory/tasks/${taskId}/memory`
+export const memoryProposalsRoute = (taskId?: string) => `/v2/p/memory/memory/proposals${taskId ? `?task=${encodeURIComponent(taskId)}` : ''}`
+export const memoryResolveProposalRoute = (id: string) => `/v2/p/memory/memory/proposals/${encodeURIComponent(id)}/resolve`
 // Existing workspace/global URLs stay stable; task scope adds its reserved subtree without moving
 // persisted files. `global` remains the reserved workspace-key URL for compatibility.
 export const notesListRoute = (location: NoteLocation) =>
   location.scope === 'task'
-    ? `/api/tasks/${encodeURIComponent(location.taskId)}/notes`
-    : `/api/workspaces/${encodeURIComponent(location.scope === 'global' ? 'global' : location.workspaceId)}/notes`
+    ? `/v2/p/memory/tasks/${encodeURIComponent(location.taskId)}/notes`
+    : `/v2/p/memory/workspaces/${encodeURIComponent(location.scope === 'global' ? 'global' : location.workspaceId)}/notes`
 export const noteRoute = (location: NoteLocation, slug: string) => `${notesListRoute(location)}/${encodeURIComponent(slug)}`
 export const noteIncludedRoute = (location: NoteLocation, slug: string) => `${noteRoute(location, slug)}/included`
 export const noteTitleRoute = (location: NoteLocation, slug: string) => `${noteRoute(location, slug)}/title`
 
 // Terminal control (docs/terminal-and-agents.md): request/response routes for the main-process
 // engine. Input/output/status use the WebSocket; only the native folder picker stays on preload IPC.
-export const terminalSessionsRoute = '/api/terminal/sessions'
-export const terminalProfilesRoute = '/api/terminal/profiles'
-export const terminalTaskStatusesRoute = '/api/terminal/task-statuses'
+export const terminalSessionsRoute = '/v2/p/terminal/terminal/sessions'
+export const terminalProfilesRoute = '/v2/p/terminal/terminal/profiles'
+export const terminalTaskStatusesRoute = '/v2/p/terminal/terminal/task-statuses'
 export const terminalSessionActionRoute = (sid: string, action: 'kill' | 'interrupt' | 'remove' | 'resize' | 'send') =>
-  `/api/terminal/sessions/${encodeURIComponent(sid)}/${action}`
+  `/v2/p/terminal/terminal/sessions/${encodeURIComponent(sid)}/${action}`
 export const terminalRepoPathRoute = (owner: string, repo: string) =>
-  `/api/terminal/repo-path?owner=${encodeURIComponent(owner)}&repo=${encodeURIComponent(repo)}`
-export const terminalRepoPathSetRoute = '/api/terminal/repo-path'
-export const terminalRepoPathRunTargetsRoute = '/api/terminal/repo-path/run-targets'
-export const terminalRepoPathConfigRoute = '/api/terminal/repo-path/config'
-export const taskArchiveRoute = (id: string) => `/api/tasks/${id}/archive`
-export const taskPreviewUrlRoute = (id: string) => `/api/tasks/${id}/preview-url`
-export const taskOnCreatedRoute = (id: string) => `/api/tasks/${id}/on-created`
-export const taskUseCheckoutRoute = (id: string) => `/api/tasks/${id}/use-checkout`
-export const taskMcpRoute = (id: string) => `/api/tasks/${id}/mcp`
-export const taskMcpStarterRoute = (id: string) => `/api/tasks/${id}/mcp/starter`
+  `/v2/p/terminal/terminal/repo-path?owner=${encodeURIComponent(owner)}&repo=${encodeURIComponent(repo)}`
+export const terminalRepoPathSetRoute = '/v2/p/terminal/terminal/repo-path'
+export const terminalRepoPathRunTargetsRoute = '/v2/p/terminal/terminal/repo-path/run-targets'
+export const terminalRepoPathConfigRoute = '/v2/p/terminal/terminal/repo-path/config'
+export const taskArchiveRoute = (id: string) => `/v2/p/terminal/tasks/${id}/archive`
+export const taskPreviewUrlRoute = (id: string) => `/v2/p/terminal/tasks/${id}/preview-url`
+export const taskOnCreatedRoute = (id: string) => `/v2/p/terminal/tasks/${id}/on-created`
+export const taskUseCheckoutRoute = (id: string) => `/v2/p/terminal/tasks/${id}/use-checkout`
+export const taskMcpRoute = (id: string) => `/v2/p/terminal/tasks/${id}/mcp`
+export const taskMcpStarterRoute = (id: string) => `/v2/p/terminal/tasks/${id}/mcp/starter`
 
 // Local review notes (docs/panes.md): inline annotations on uncommitted changes, acorn-owned.
 export type ReviewNote = {
@@ -530,13 +530,13 @@ export type ReviewNote = {
 }
 export type ReviewNoteSeed = Pick<ReviewNote, 'path' | 'side' | 'startLine' | 'endLine' | 'body'> & { snippet?: string | null }
 
-export const repoRoute = (owner: string, repo: string, child = '') => `/api/repos/${owner}/${repo}${child ? `/${child}` : ''}`
+export const repoRoute = (owner: string, repo: string, child = '') => `/v2/p/github/repos/${owner}/${repo}${child ? `/${child}` : ''}`
 export const pullRoute = (owner: string, repo: string, number: string | number, child = '') =>
   repoRoute(owner, repo, `pulls/${number}${child ? `/${child}` : ''}`)
 
-export const meRoute = '/api/me'
-export const reposRoute = '/api/repos'
-export const reposRefreshRoute = '/api/repos/refresh'
+export const meRoute = '/v2/core/me'
+export const reposRoute = '/v2/p/github/repos'
+export const reposRefreshRoute = '/v2/p/github/repos/refresh'
 export const pullsRoute = (owner: string, repo: string, state: 'open' | 'closed') => `${repoRoute(owner, repo)}/pulls?state=${state}`
 export const closedPullsRoute = (owner: string, repo: string, page: number) => `${pullsRoute(owner, repo, 'closed')}&page=${page}`
 export const pullsBatchRoute = (owner: string, repo: string) => `${repoRoute(owner, repo)}/pulls/batch`
@@ -563,38 +563,38 @@ export const jobLogRoute = (owner: string, repo: string, jobId: number) => repoR
 export const mentionsRoute = (owner: string, repo: string) => repoRoute(owner, repo, 'mentions')
 export const requestedReviewersRoute = (owner: string, repo: string, number: string | number) =>
   pullRoute(owner, repo, number, 'requested-reviewers')
-export const pinsRoute = '/api/pins'
-export const prefsRoute = '/api/prefs'
+export const pinsRoute = '/v2/core/pins'
+export const prefsRoute = '/v2/core/prefs'
 // Workspaces (named groups of repos) — the top-level unit.
-export const workspacesRoute = '/api/workspaces'
-export const workspaceRoute = (id: string) => `/api/workspaces/${id}`
-export const workspaceBootstrapRoute = '/api/workspaces/bootstrap'
-export const workspaceReposRoute = (id: string) => `/api/workspaces/${id}/repos`
-export const workspaceIgnoreRepoRoute = '/api/workspaces/ignore-repo'
-export const workspaceUnignoreRepoRoute = '/api/workspaces/unignore-repo'
-export const workspaceIgnoreAllRoute = '/api/workspaces/ignore-all'
-export const workspaceAssignmentsRoute = '/api/workspaces/assignments'
-export const workspaceProjectsRoute = (id: string) => `/api/workspaces/${id}/projects`
+export const workspacesRoute = '/v2/core/workspaces'
+export const workspaceRoute = (id: string) => `/v2/core/workspaces/${id}`
+export const workspaceBootstrapRoute = '/v2/core/workspaces/bootstrap'
+export const workspaceReposRoute = (id: string) => `/v2/core/workspaces/${id}/repos`
+export const workspaceIgnoreRepoRoute = '/v2/core/workspaces/ignore-repo'
+export const workspaceUnignoreRepoRoute = '/v2/core/workspaces/unignore-repo'
+export const workspaceIgnoreAllRoute = '/v2/core/workspaces/ignore-all'
+export const workspaceAssignmentsRoute = '/v2/core/workspaces/assignments'
+export const workspaceProjectsRoute = (id: string) => `/v2/core/workspaces/${id}/projects`
 // Tasks (single-repo units of work) — rail rows.
-export const tasksRoute = '/api/tasks'
-export const taskRoute = (id: string) => `/api/tasks/${id}`
-export const taskLinksRoute = (id: string) => `/api/tasks/${id}/links`
-export const reviewNotesRoute = (taskId: string) => `/api/tasks/${taskId}/review-notes`
-export const reviewNoteRoute = (taskId: string, noteId: string) => `/api/tasks/${taskId}/review-notes/${noteId}`
-export const reviewNotesSentRoute = (taskId: string) => `/api/tasks/${taskId}/review-notes/sent`
+export const tasksRoute = '/v2/core/tasks'
+export const taskRoute = (id: string) => `/v2/core/tasks/${id}`
+export const taskLinksRoute = (id: string) => `/v2/core/tasks/${id}/links`
+export const reviewNotesRoute = (taskId: string) => `/v2/p/changes/tasks/${taskId}/review-notes`
+export const reviewNoteRoute = (taskId: string, noteId: string) => `/v2/p/changes/tasks/${taskId}/review-notes/${noteId}`
+export const reviewNotesSentRoute = (taskId: string) => `/v2/p/changes/tasks/${taskId}/review-notes/sent`
 export const reviewNotesKey = (taskId: string) => ['review-notes', taskId] as const
-export const integrationsRoute = '/api/integrations'
-export const integrationRoute = (id: string) => `/api/integrations/${id}`
-export const integrationTestRoute = (id: string) => `/api/integrations/${id}/test`
-export const linearIssuesRoute = '/api/linear/issues'
-export const linearProjectsRoute = '/api/linear/projects'
+export const integrationsRoute = '/v2/core/integrations'
+export const integrationRoute = (id: string) => `/v2/core/integrations/${id}`
+export const integrationTestRoute = (id: string) => `/v2/core/integrations/${id}/test`
+export const linearIssuesRoute = '/v2/p/linear/issues'
+export const linearProjectsRoute = '/v2/p/linear/projects'
 export const linearProjectIssuesRoute = (integrationId: string, projectIds: string[]) =>
-  `/api/linear/project-issues?integration=${encodeURIComponent(integrationId)}&ids=${encodeURIComponent(projectIds.join(','))}`
+  `/v2/p/linear/project-issues?integration=${encodeURIComponent(integrationId)}&ids=${encodeURIComponent(projectIds.join(','))}`
 const connectionQuery = (connectionId?: string) => (connectionId ? `&integration=${encodeURIComponent(connectionId)}` : '')
 export const linearIssueRoute = (identifier: string, connectionId?: string) =>
-  `/api/linear/issues/${encodeURIComponent(identifier)}?refresh=1${connectionQuery(connectionId)}`
+  `/v2/p/linear/issues/${encodeURIComponent(identifier)}?refresh=1${connectionQuery(connectionId)}`
 export const linearCommentsRoute = (identifier: string, connectionId?: string) =>
-  `/api/linear/issues/${encodeURIComponent(identifier)}/comments${connectionId ? `?integration=${encodeURIComponent(connectionId)}` : ''}`
+  `/v2/p/linear/issues/${encodeURIComponent(identifier)}/comments${connectionId ? `?integration=${encodeURIComponent(connectionId)}` : ''}`
 
 export const meKey = ['me'] as const
 export const reposKey = ['repos'] as const

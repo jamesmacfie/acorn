@@ -2,7 +2,7 @@ import type { Context } from 'hono'
 import type { AppEnv } from './middleware/auth'
 import { respondError } from './respond'
 
-// A domain bridge is the service-process backing for an /api route family whose work needs a runtime
+// A domain bridge is the service-process backing for a /v2 route family whose work needs a runtime
 // handle the server layer doesn't own — a PTY engine, git, ripgrep, a pg pool, the worktree
 // resolver. The route holds a slot; the composition root (main/bootstrap.ts) or the server bridge
 // wiring (app/main/serverBridges.ts, composed by app/service/runtime.ts) fills it at boot. dev:node

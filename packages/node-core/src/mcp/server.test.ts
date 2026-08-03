@@ -109,7 +109,7 @@ describe('acorn MCP server projects the agent-tool registry over stdio (docs/age
         })
         return
       }
-      if (url.startsWith('/api/tasks/t1/tools')) return json(MANIFEST)
+      if (url.startsWith('/v2/core/tasks/t1/tools')) return json(MANIFEST)
       res.statusCode = 404
       res.end('{}')
     })

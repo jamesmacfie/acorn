@@ -41,11 +41,11 @@ export function startListener(runtime: RuntimeBindings, options: StartListenerOp
   const indexHtml = readFileSync(resolve(clientDir, 'index.html'), 'utf8')
 
   // Serve the built SPA, and fall back to the shell only for non-API/auth navigations — so
-  // unmatched /api/* and /auth/* still return JSON/text 404s rather than the HTML shell.
+  // unmatched /v2/* and /auth/* still return JSON/text 404s rather than the HTML shell.
   app.use('/*', serveStatic({ root: clientDir }))
   app.notFound((c) => {
     const path = new URL(c.req.url).pathname
-    if (path.startsWith('/api/') || path.startsWith('/auth/')) return c.text('Not found', 404)
+    if (path.startsWith('/v2/') || path.startsWith('/auth/')) return c.text('Not found', 404)
     return c.html(indexHtml)
   })
 

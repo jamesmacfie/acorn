@@ -38,5 +38,7 @@ for (const provider of builtInModelProviders) {
   modelProviderRegistry.register(provider)
 }
 
-integrationProviderRegistry.registerRoute({ providerId: 'linear', prefix: '/linear', router: linear })
-integrationProviderRegistry.registerRoute({ providerId: 'rollbar', prefix: '/rollbar', router: rollbar })
+// Both routers own their provider's whole namespace, so the prefix is empty: the mount path is
+// /v2/p/<providerId> (buildIntegrationProviderRoutes), derived from the declared provider id.
+integrationProviderRegistry.registerRoute({ providerId: 'linear', prefix: '', router: linear })
+integrationProviderRegistry.registerRoute({ providerId: 'rollbar', prefix: '', router: rollbar })

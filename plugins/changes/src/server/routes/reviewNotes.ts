@@ -8,7 +8,7 @@ import { respondError } from '@acorn/node-core/server/respond.ts'
 
 // Local review notes (docs/panes.md): CRUD over the machine-scoped review_notes table. The send
 // loop: create (unsent) → deliver via sendToAgent → POST /sent stamps sentAt → an edit clears it,
-// so the UI always shows sent/unsent truthfully. Mounted under /api/tasks.
+// so the UI always shows sent/unsent truthfully. Mounted under /v2/p/changes/tasks.
 
 type Row = typeof schema.reviewNotes.$inferSelect
 

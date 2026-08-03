@@ -127,13 +127,13 @@ async function seedWorkspace(page: Page, repoDir: string): Promise<void> {
       if (!response.ok) throw new Error(`${url}: ${response.status} ${await response.text()}`)
       return response.json()
     })
-    const workspace = await json('/api/workspaces', {
+    const workspace = await json('/v2/core/workspaces', {
       method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ name: 'Smoke' }),
     })
-    await json(`/api/workspaces/${workspace.id}/repos`, {
+    await json(`/v2/core/workspaces/${workspace.id}/repos`, {
       method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ owner: 'acorn', name: 'smoke' }),
     })
-    await json('/api/terminal/repo-path', {
+    await json('/v2/p/terminal/terminal/repo-path', {
       method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ owner: 'acorn', repo: 'smoke', path: repoDir }),
     })
   }, { repoDir })
@@ -146,7 +146,7 @@ async function seedTask(page: Page, repoDir: string) {
       if (!response.ok) throw new Error(`${url}: ${response.status} ${await response.text()}`)
       return response.json()
     })
-    return json('/api/tasks', {
+    return json('/v2/core/tasks', {
       method: 'POST', headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ origin: 'local', repoOwner: 'acorn', repoName: 'smoke', branch: 'main', title: 'Smoke task' }),
     })
@@ -170,7 +170,7 @@ async function openSmokeWorkspace(page: Page): Promise<void> {
 
 async function createTerminalAndCapture(page: Page, taskId: string, command: string): Promise<string> {
   return page.evaluate(async ({ taskId, command }) => {
-    const response = await fetch('/api/terminal/sessions', {
+    const response = await fetch('/v2/p/terminal/terminal/sessions', {
       method: 'POST', headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ taskId, profileId: 'shell', command, title: 'Smoke terminal' }),
     })
@@ -237,7 +237,7 @@ test('S5 quit tears down a live PTY child', async () => {
   const task = await seedTask(running.page, running.repoDir)
   const pidFile = join(running.repoDir, 'pty.pid')
   await running.page.evaluate(async ({ taskId, pidFile }) => {
-    const response = await fetch('/api/terminal/sessions', {
+    const response = await fetch('/v2/p/terminal/terminal/sessions', {
       method: 'POST', headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ taskId, profileId: 'shell', command: `echo $$ > '${pidFile}'; sleep 30`, title: 'Quit smoke' }),
     })
@@ -266,7 +266,7 @@ test('S6 find-in-files copies paths and double-clicks into the match', async () 
   await running.page.getByRole('button', { name: 'Create', exact: true }).click()
   await expect(running.page.locator('.task-layout')).toBeVisible({ timeout: 30_000 })
   const task = await running.page.evaluate(async () => {
-    const response = await fetch('/api/tasks')
+    const response = await fetch('/v2/core/tasks')
     if (!response.ok) throw new Error(await response.text())
     const tasks = await response.json() as { id: string; title: string }[]
     const task = tasks.find((candidate) => candidate.title === 'Smoke task')
@@ -274,7 +274,7 @@ test('S6 find-in-files copies paths and double-clicks into the match', async () 
     return task
   })
   const files = await running.page.evaluate(async (taskId) => {
-    const response = await fetch(`/api/tasks/${taskId}/editor/files`)
+    const response = await fetch(`/v2/p/editor/tasks/${taskId}/editor/files`)
     if (!response.ok) throw new Error(await response.text())
     return response.json() as Promise<string[]>
   }, task.id)
@@ -305,7 +305,7 @@ test('S6 find-in-files copies paths and double-clicks into the match', async () 
   await running.page.keyboard.type('X')
   await running.page.keyboard.press('Meta+s')
   await expect.poll(() => running.page.evaluate(async ({ taskId, path }) => {
-    const response = await fetch(`/api/tasks/${taskId}/editor/read?path=${encodeURIComponent(path)}`)
+    const response = await fetch(`/v2/p/editor/tasks/${taskId}/editor/read?path=${encodeURIComponent(path)}`)
     return (await response.json() as { text: string }).text
   }, { taskId: task.id, path })).toContain("'XneedleToken'")
   await running.app.close()
@@ -321,7 +321,7 @@ test('S7 loads the Agent Center and combines task agent switching with the conve
   const running = await launch(first)
   const contextResponses: Array<{ status: number; url: string }> = []
   running.page.on('response', (response) => {
-    if (response.url().includes(`/api/tasks/${task.id}/context`)) {
+    if (response.url().includes(`/v2/core/tasks/${task.id}/context`)) {
       contextResponses.push({ status: response.status(), url: response.url() })
     }
   })
