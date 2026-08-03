@@ -1,0 +1,160 @@
+/* Node freshness chip (NodeChip.tsx) and Settings → Nodes (settings/NodesSettings.tsx).
+   Co-located with the components, per the manifest note in styles.css. */
+
+/* The six-value vocabulary from docs/vNext/ui.md § Connection and staleness — mapped here, so the
+   component derives the state and the stylesheet owns how it reads. */
+.node-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 2px var(--space-3);
+  border-radius: var(--radius-pill-fixed);
+  border: var(--control-border);
+  background: var(--bg-subtle);
+  font-size: var(--fs-sm);
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+.node-chip.compact .node-chip-state,
+.node-chip.compact .node-chip-age {
+  display: none;
+}
+.node-chip-label {
+  color: var(--text);
+}
+.node-chip-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: var(--radius-circle);
+  background: currentColor;
+  flex: none;
+}
+.node-chip[data-freshness='live'] .node-chip-dot { color: var(--success); }
+.node-chip[data-freshness='refreshing'] .node-chip-dot { color: var(--accent); }
+.node-chip[data-freshness='stale'] .node-chip-dot { color: var(--warn); }
+.node-chip[data-freshness='offline'] .node-chip-dot { color: var(--text-muted); }
+.node-chip[data-freshness='disabled'] .node-chip-dot { color: var(--text-muted); }
+.node-chip[data-freshness='error'] .node-chip-dot { color: var(--danger); }
+
+/* Dev-only node switcher (plan.md § 69: "a minimal node switcher in the dev UI"). */
+.node-switcher {
+  max-width: 180px;
+}
+
+.nodes-settings {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+.nodes-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+.node-row {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--pane-pad);
+  border: var(--surface-border);
+  border-radius: var(--radius-surface);
+  background: var(--bg-subtle);
+}
+.node-row-alarm {
+  border-color: var(--danger);
+}
+.node-meta {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+}
+.node-title {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-weight: 600;
+  color: var(--text);
+}
+.node-badge {
+  font-size: var(--fs-sm);
+  font-weight: 400;
+  color: var(--text-muted);
+  padding: 1px var(--space-2);
+  border: var(--control-border);
+  border-radius: var(--radius-pill-fixed);
+}
+.node-sub {
+  font-family: var(--font-mono);
+  font-size: var(--fs-sm);
+  color: var(--text-muted);
+}
+.node-rename {
+  max-width: 260px;
+}
+.node-actions,
+.node-step-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+.node-danger {
+  color: var(--danger);
+}
+.node-alarm {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--pane-pad);
+  border: var(--control-border);
+  border-color: var(--danger);
+  border-radius: var(--radius-surface);
+}
+.node-alarm p {
+  color: var(--text-muted);
+  font-size: var(--fs-sm);
+}
+.node-fingerprints {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: var(--space-2) var(--space-3);
+  margin: 0;
+}
+.node-fingerprints dt {
+  color: var(--text-muted);
+  font-size: var(--fs-sm);
+}
+.node-fingerprints dd,
+.node-fingerprint {
+  margin: 0;
+  font-family: var(--font-mono);
+  font-size: var(--fs-sm);
+  color: var(--text);
+  overflow-wrap: anywhere;
+}
+.node-fingerprint {
+  display: block;
+  padding: var(--space-3);
+  border: var(--control-border);
+  border-radius: var(--radius-surface);
+  background: var(--bg);
+}
+
+.node-step {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--pane-pad);
+  border: var(--surface-border);
+  border-radius: var(--radius-surface);
+}
+.node-step-label {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  font-size: var(--fs-sm);
+  color: var(--text-muted);
+}
+.node-step-label .ui-input {
+  color: var(--text);
+}
