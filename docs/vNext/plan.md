@@ -97,6 +97,13 @@ direct unit/integration tests (confinement, env allowlists, kill trees, secret n
 the terminal scope-shed is complete; boundary baseline shrinks to only the edges scheduled for
 phase 3.
 
+> **Phase 2 is PARTIALLY complete.** Core services, the terminal scope-shed and scoped internal tokens
+> are done; the plugin host works and one plugin is through it; eleven plugin databases, the `tools`
+> contribution point, the UI kit and `ClientPlugin` are not.
+> [phase2-notes.md](./phase2-notes.md) states exactly which, and records the divergences (no
+> `plugin-api` package, no http-allowlist or scheduler service, no token expiry) plus one **breaking
+> trust-model change**: an agent-spawned child can no longer spend the owner's GitHub credential.
+
 ## Phase 3 — break the coupling map
 
 Work through the ~25 V1 cross-feature edges (table in plugins.md), in dependency order:

@@ -11,8 +11,12 @@ partitioned per node. V1's bearer-authenticated `/api/v1` automation listener is
 > **For architecture/domain detail, read [docs/architecture-overview.md](./docs/architecture-overview.md) first.**
 > For the Cloudflare-Workers→Electron migration history and rationale, see
 > [docs/electron.md](./docs/electron.md); current topic docs describe the shipped Electron runtime.
-> vNext Phase 1 landed the protocol v2 / fleet spine — its deliberate divergences from the design docs
-> are recorded in [docs/vNext/phase1-notes.md](./docs/vNext/phase1-notes.md).
+> vNext Phase 1 landed the protocol v2 / fleet spine, and Phase 2 is **partially** done (core services,
+> the terminal scope-shed, scoped internal tokens, and the plugin host with one plugin through it).
+> Deliberate divergences and — importantly — what has NOT landed are recorded in
+> [docs/vNext/phase1-notes.md](./docs/vNext/phase1-notes.md) and
+> [docs/vNext/phase2-notes.md](./docs/vNext/phase2-notes.md). Read the Phase 2 notes before assuming a
+> plugin owns its database or that `apps/node/src/wiring/` is gone; most of it is still there.
 
 ## Architecture (a client, and N nodes)
 
@@ -36,8 +40,23 @@ partitioned per node. V1's bearer-authenticated `/api/v1` automation listener is
   traffic is IPC through the broker — the renderer needs no network permission at all. Unmatched paths
   under `app://` serve `index.html` (client-side deep routes); on the node, an unmatched path is a plain
   404.
+- **The plugin host** (`packages/node-core/src/server/plugin/`) is how a node plugin is assembled:
+  `NodePlugin.init(ctx)` gets `{routes, capabilities, events, core, log}` and its own migrated SQLite
+  handle, and `apps/node/src/server/plugins.ts` is the list — a plugin absent from it does not exist.
+  Cross-plugin collaboration is a `CapabilityRegistry` (typed, late-bound, optional-by-default) and a
+  `NodeEventBus`, both owned by the service runtime rather than module singletons. `contract/` is the
+  only cross-plugin import surface, boundary-tested. **Migration is partial** — one plugin is through
+  the host, eleven still wire through `apps/node/src/wiring/*.ts`.
+- **CoreServices** (`packages/node-core/src/main/core/`) is what a plugin consumes instead of
+  deep-importing core: `fs` (one symlink-aware confinement), `git` (one seam, `GIT_TERMINAL_PROMPT=0`,
+  `SSH_AUTH_SOCK` passthrough), `proc` (**the** process broker: allowlisted env, process-group kill,
+  bounded capture), `secrets` (use-scoped, scrubs credentials out of anything thrown in scope), `tasks`
+  (resolve a taskId now that plugins cannot query core's tables). No child process should call
+  `spawn`/`execFile` directly any more.
 - Routes are `/v2/core/*` (core-owned) and `/v2/p/<plugin>/*` (registry-projected, each contribution
-  declaring its `plugin` id). Every error is the envelope
+  declaring its `plugin` id). Worktree/repo-config/task-lifecycle routes are **core's** as of Phase 2
+  (`server/routes/worktree.ts`) — the terminal plugin serves `/v2/p/terminal/sessions*` and
+  `/profiles` and nothing else. Every error is the envelope
   `{error:{code,message,requestId,retryable,details?}}` built in one place (`server/respond.ts`).
   `Idempotency-Key` is honoured on `/v2` mutations, keyed on the caller's `deviceId`.
 - One authenticated WebSocket per node at **`/v2/events`** (`@acorn/protocol/ws.ts`), device bearer
@@ -56,8 +75,9 @@ partitioned per node. V1's bearer-authenticated `/api/v1` automation listener is
 - Data: GitHub → local SQLite (via Drizzle, `better-sqlite3`) read-model mirror with ETag/TTL
   serve-then-revalidate; an on-disk dir caches immutable blob/patch bodies by SHA for all repos; IndexedDB
   persists the client query cache (one key per node, `acorn-cache:<nodeId>`). A node's data root holds
-  `core.sqlite` (**not** V1's `acorn.sqlite`), `node.json` (nodeId + last port), `node.lock`, `tls/`,
-  `blobs/`, `logs/` and `worktrees/`; `openDataRoot` mints the identity, takes an exclusive pidfile
+  `core.sqlite` (**not** V1's `acorn.sqlite`), `plugins/<name>.sqlite` (one per table-owning plugin —
+  Phase 2, `main/pluginStorage.ts`; only `changes` so far), `node.json` (nodeId + last port),
+  `node.lock`, `tls/`, `blobs/`, `logs/` and `worktrees/`; `openDataRoot` mints the identity, takes an exclusive pidfile
   lock and **refuses a V1 root outright**. It lives at `apps/node/.acorn/` in development (gitignored)
   and Electron's `userData` root when packaged.
 - Bindings: `packages/node-core/src/main/bindings.ts` builds the object routes read via `c.env` (DB,
@@ -68,7 +88,7 @@ partitioned per node. V1's bearer-authenticated `/api/v1` automation listener is
 - Auth: **there is no session cookie and no login**. `session.ts`, `routes/auth.ts` and `csrf()` are
   deleted. A client authenticates with a **device token** (`acorn_dt_<uuid>_<base64url32>`, sha256 at
   rest, revocable, uniform-null on every failure) held by the broker in main + `safeStorage`, and the
-  node holds no session state. `Principal` is `{kind:'device'|'internal', userId, deviceId?}`; every
+  node holds no session state. `Principal` is `{kind:'device'|'internal', userId, deviceId?, scope?, taskId?}`; every
   paired device has full owner authority. A client gets its first token by **pairing**: `GET /v2/node`
   and `POST /v2/pair` are the only pre-auth routes; `POST /v2/core/pair/start`,
   `GET|DELETE /v2/core/devices*` and `DELETE /v2/core/pair` administer it below the gate. The bundled
@@ -79,11 +99,16 @@ partitioned per node. V1's bearer-authenticated `/api/v1` automation listener is
 - GitHub is an ordinary stored `integrations` row connected by **OAuth device flow**
   (`/v2/p/github/auth/device/{start,poll}`) — no redirect URI, no client secret, no auth
   `BrowserWindow`. `githubToken(c)` is the single read site, keyed on `ownerId(c)`.
-  **Posture change worth knowing:** V1's internal principal carried an empty GitHub token, so an
-  agent-spawned child structurally *could not* call GitHub. `githubToken(c)` reads the stored row for
-  whatever `ownerId(c)` resolves to, and that is the same owner for both principal kinds — so an
-  internal caller now reaches GitHub exactly as a device caller does. Nothing gates the github plugin's
-  routers by principal kind. See [docs/vNext/phase1-notes.md](./docs/vNext/phase1-notes.md).
+  **Internal tokens are SCOPED** (Phase 2, `server/auth/internalTokens.ts`): a stateless HMAC token
+  carrying `{scope, taskId?, sessionId?}`, where `INTERNAL_TOKEN` is the signing *key*, not the
+  credential. `scope: 'service'` is the node calling its own HTTP surface over loopback and keeps full
+  reach; `scope: 'task'` is everything injected into a child's env (PTYs, agent sessions, workflow
+  steps, MCP servers) and is bound to one task. A task-scoped caller is **denied the owner's GitHub
+  credential** (`canUseProviderCredential`) and is confined to its own task on the agent-tool surface —
+  Phase 1's opposite posture is reversed. Tokens do not expire, deliberately: a tmux-reattached agent
+  keeps the env of the boot that spawned it, so rotating the key is the revocation lever. Other
+  providers' credential reads (linear, rollbar, database, model-providers) are **not** yet gated. See
+  [docs/vNext/phase2-notes.md](./docs/vNext/phase2-notes.md).
 
 ## Repo map
 
@@ -172,8 +197,8 @@ tools/arch/             @acorn/arch-tests   the executable boundary rules
 | `pnpm lint` | `tsc --noEmit` typecheck |
 | `pnpm test` | Rebuild native modules for Node, then run `vitest` |
 | `pnpm --filter @acorn/desktop test:e2e` | Rebuild the node artifact, build/rebuild for Electron, and run the Playwright suite (`desktop.smoke.spec.ts` S1–S8 + `twoNode.spec.ts`) |
-| `pnpm db:generate` | Generate a migration and replay-check the migration chain (runs in `@acorn/node-core`) |
-| `pnpm db:check` | Replay all migrations against a fresh SQLite database |
+| `pnpm db:generate` | Generate migrations and replay-check **every** chain — `scripts/db.mjs` discovers each package with a `drizzle.config.ts` (core plus one per table-owning plugin) |
+| `pnpm db:check` | Replay every chain against a fresh SQLite database |
 | `pnpm db:locate` | Print the absolute path to this worktree's local SQLite database |
 | `pnpm db:migrate` | Apply migrations to the dev data root's DB (`apps/node/.acorn/core.sqlite`; override with `ACORN_DB_PATH`) |
 
@@ -219,7 +244,8 @@ tools/arch/             @acorn/arch-tests   the executable boundary rules
   the github plugin's `pullBlob.ts`/`prMirror.ts`; blobs are cached for all repos. See
   [docs/caching.md](./docs/caching.md).
 - **Repo config trust:** executable `.acorn/config.toml` and workflow changes are hash-gated. Review
-  and acknowledge the exact snapshot through `/v2/core/tasks/:id/config-trust`; Docker matching config
+  and acknowledge the exact snapshot through `/v2/core/tasks/:id/config-trust`; the *authoring* surface
+  for the same executable content is `PUT /v2/core/repos/path/config`, beside it in core; Docker matching config
   is declarative and is deliberately outside that executable-config gate.
 - **Turbo caching is load-bearing and easy to get wrong.** Source-only packages have no `build`
   script, so `dependsOn: ["^build"]` resolves to nothing — hence the `topo` transit node, which is
