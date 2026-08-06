@@ -1,10 +1,14 @@
 import type { ProviderErrorCode } from '@acorn/protocol/integrations.ts'
 import { eq } from 'drizzle-orm'
+import type { Context } from 'hono'
 import type { AppDatabase } from '../db'
-import { schema } from '../db'
+import { getDb, schema } from '../db'
+import type { AppEnv } from '../middleware/auth'
+import { ownerId } from '../middleware/requireUser'
 import { SecretUnavailableError, type SecretService } from '../../main/core/secrets'
 import { serveThenRevalidate, type RouteFailure, type RouteResult } from '../sync/engine'
 import { getConnection } from './connections'
+import { createExternalItemStore } from './itemStore'
 import { providerRequestScheduler } from './budgetRuntime'
 import { integrationProviderRegistry } from './registry'
 import type { MirroredResourceContribution, ProviderResourceContext } from './types'
@@ -33,8 +37,11 @@ export async function runProviderResource<TInput, TOutput>(args: {
   const connection = await getConnection(args.db, args.userId, args.connectionId)
   if (!connection || connection.provider !== args.providerId) return failure('provider_not_connected', 403)
 
+  // Built once per call and scoped to this owner. The provider sees only its six operations against
+  // core's external-item tables (integrations/itemStore.ts), never core's database handle.
+  const items = createExternalItemStore(args.db, args.userId)
   const context = (): ProviderResourceContext => ({
-    db: args.db,
+    items,
     userId: args.userId,
     connection,
     now: Date.now(),
@@ -84,3 +91,14 @@ export async function runProviderResource<TInput, TOutput>(args: {
   })
   return !result.ok && fallback ? { ok: true, value: fallback.data } : result
 }
+
+// The request-context form, for a provider plugin's routes. Same function; core keeps the database
+// handle, the owner id and the secret service instead of making eight call sites in linear and rollbar
+// assemble them by hand from `getDb(c.env)` / `ownerId(c)` / `c.env.SECRETS`. That assembly is what put
+// both plugins on the schema ratchet, and getting the owner id wrong at any one of those sites would
+// have read another owner's cached items.
+export const providerResource = <TInput, TOutput>(
+  c: Context<AppEnv>,
+  args: { providerId: string; connectionId: string; resourceId: string; input: TInput; force?: boolean },
+): Promise<RouteResult<TOutput>> =>
+  runProviderResource<TInput, TOutput>({ db: getDb(c.env), userId: ownerId(c), secrets: c.env.SECRETS, ...args })

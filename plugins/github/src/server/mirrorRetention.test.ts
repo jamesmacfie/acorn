@@ -1,21 +1,25 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import { schema } from '@acorn/node-core/server/db/index.ts'
-import { makeTestDb, type TestDb } from '@acorn/node-core/server/routes/testDb.ts'
+import { makeTestPluginDb, type TestPluginDb } from '@acorn/node-core/server/routes/testDb.ts'
+import { migrationsDir } from '../node/migrations'
 import { deleteRepoMirrorStatements, pruneOrphanedGithubMirror } from './mirrorRetention'
+import { checks, comments, prFiles, pullRequests, repos, reviews } from '../node/schema'
 
 const USER = 'octocat'
 
+// This plugin's OWN migrated SQLite file, not core's: retention only ever touches github's mirror
+// tables, which live in <data-root>/plugins/github.sqlite now. Core's handle would not even have the
+// tables to seed.
 describe('GitHub mirror retention repair', () => {
-  let testDb: TestDb
+  let testDb: TestPluginDb
 
   beforeEach(() => {
-    testDb = makeTestDb()
+    testDb = makeTestPluginDb('github', migrationsDir())
   })
 
   afterEach(() => testDb.cleanup())
 
   it('deletes children without a PR and PR lineages without a repository', async () => {
-    await testDb.db.insert(schema.repos).values({
+    await testDb.db.insert(repos).values({
       userId: USER,
       id: 1,
       owner: 'acme',
@@ -23,16 +27,16 @@ describe('GitHub mirror retention repair', () => {
       private: true,
       fetchedAt: 1,
     })
-    await testDb.db.insert(schema.pullRequests).values([
+    await testDb.db.insert(pullRequests).values([
       { userId: USER, repoId: 1, number: 1, state: 'open', title: 'valid', fetchedAt: 1 },
       { userId: USER, repoId: 999, number: 3, state: 'open', title: 'orphan repo', fetchedAt: 1 },
     ])
-    await testDb.db.insert(schema.comments).values([
+    await testDb.db.insert(comments).values([
       { userId: USER, repoId: 1, number: 1, id: 'valid', body: 'keep' },
       { userId: USER, repoId: 1, number: 2, id: 'orphan-pr', body: 'remove' },
       { userId: USER, repoId: 999, number: 3, id: 'orphan-repo', body: 'remove' },
     ])
-    await testDb.db.insert(schema.checks).values({
+    await testDb.db.insert(checks).values({
       userId: USER,
       repoId: 1,
       number: 2,
@@ -42,13 +46,13 @@ describe('GitHub mirror retention repair', () => {
 
     expect(await pruneOrphanedGithubMirror(testDb.db)).toEqual({ removedPulls: 2 })
 
-    expect((await testDb.db.select().from(schema.pullRequests)).map((row) => row.number)).toEqual([1])
-    expect((await testDb.db.select().from(schema.comments)).map((row) => row.id)).toEqual(['valid'])
-    expect(await testDb.db.select().from(schema.checks)).toEqual([])
+    expect((await testDb.db.select().from(pullRequests)).map((row) => row.number)).toEqual([1])
+    expect((await testDb.db.select().from(comments)).map((row) => row.id)).toEqual(['valid'])
+    expect(await testDb.db.select().from(checks)).toEqual([])
   })
 
   it('deletes the full PR lineage when a repository leaves the refreshed repo list', async () => {
-    await testDb.db.insert(schema.pullRequests).values({
+    await testDb.db.insert(pullRequests).values({
       userId: USER,
       repoId: 99,
       number: 4,
@@ -56,13 +60,13 @@ describe('GitHub mirror retention repair', () => {
       title: 'removed repo',
       fetchedAt: 1,
     })
-    await testDb.db.insert(schema.prFiles).values({
+    await testDb.db.insert(prFiles).values({
       userId: USER,
       repoId: 99,
       number: 4,
       path: 'private.ts',
     })
-    await testDb.db.insert(schema.reviews).values({
+    await testDb.db.insert(reviews).values({
       userId: USER,
       repoId: 99,
       number: 4,
@@ -73,8 +77,8 @@ describe('GitHub mirror retention repair', () => {
     const statements = deleteRepoMirrorStatements(testDb.db, USER, [99])
     await testDb.db.batch(statements as [typeof statements[number], ...typeof statements[number][]])
 
-    expect(await testDb.db.select().from(schema.pullRequests)).toEqual([])
-    expect(await testDb.db.select().from(schema.prFiles)).toEqual([])
-    expect(await testDb.db.select().from(schema.reviews)).toEqual([])
+    expect(await testDb.db.select().from(pullRequests)).toEqual([])
+    expect(await testDb.db.select().from(prFiles)).toEqual([])
+    expect(await testDb.db.select().from(reviews)).toEqual([])
   })
 })

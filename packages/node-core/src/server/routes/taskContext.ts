@@ -2,6 +2,7 @@ import { and, eq } from 'drizzle-orm'
 import { Hono } from 'hono'
 import { assembleContext, parseInclude } from '../agentTools/contextSections'
 import { getDb, schema } from '../db'
+import { repoMirrorSource } from '../repoMirror'
 import type { AppEnv } from '../middleware/auth'
 import { ownerId } from '../middleware/requireUser'
 import { respondError } from '../respond'
@@ -13,17 +14,17 @@ import { respondError } from '../respond'
 // for the repo_info tool.
 
 export const taskContext = new Hono<AppEnv>()
-  // Repo facts for the repo_info tool (docs/mcp.md): owner/name/defaultBranch off the mirror.
+  // Repo facts for the repo_info tool (docs/mcp.md): owner/name/branch/worktree off core's `tasks`, plus
+  // the default branch, which only GitHub knows and which therefore comes from the mirror slot
+  // (server/repoMirror.ts). `null` already had to be a valid answer here — an unmirrored repo produced no
+  // row before — so a cold mirror or a disabled github plugin degrades into a case the tool handles.
   .get('/:id/repo-info', async (c) => {
     const uid = ownerId(c)
     const db = getDb(c.env)
     const [t] = await db.select().from(schema.tasks).where(eq(schema.tasks.id, c.req.param('id')))
     if (!t) return respondError(c, 404, 'not_found')
-    const [repoRow] = await db
-      .select()
-      .from(schema.repos)
-      .where(and(eq(schema.repos.userId, uid), eq(schema.repos.owner, t.repoOwner), eq(schema.repos.name, t.repoName)))
-    return c.json({ owner: t.repoOwner, name: t.repoName, defaultBranch: repoRow?.defaultBranch ?? null, branch: t.branch, worktreePath: t.worktreePath })
+    const defaultBranch = await repoMirrorSource().defaultBranch(uid, t.repoOwner, t.repoName)
+    return c.json({ owner: t.repoOwner, name: t.repoName, defaultBranch, branch: t.branch, worktreePath: t.worktreePath })
   })
   .get('/:id/context', async (c) => {
     const ctx = await assembleContext(getDb(c.env), ownerId(c), c.req.param('id'), parseInclude(c.req.query('include')), {

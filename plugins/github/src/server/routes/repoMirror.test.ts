@@ -1,21 +1,15 @@
-import { testSecretEnv } from '@acorn/node-core/server/routes/testDb.ts'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { makeTestDb, testSecretEnv, type TestDb } from '@acorn/node-core/server/routes/testDb.ts'
 import { Hono } from 'hono'
-import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { settleBackground } from '@acorn/node-core/server/background.ts'
-import { getDb } from '@acorn/node-core/server/db/index.ts'
 import { gh } from '..'
 import type { AppEnv } from '@acorn/node-core/server/middleware/auth.ts'
 import { PULLS_STALE_AFTER_MS as FILES_STALE_AFTER_MS } from '@acorn/node-core/server/sync/policy.ts'
 import { pullFiles } from './pullFiles'
 import { resolveRepoForUser } from './repoMirror'
 import type { Env } from '@acorn/node-core/main/bindings.ts'
-import { schema } from '@acorn/node-core/server/db/index.ts'
-import { encryptSecret } from '@acorn/node-core/server/secretBox.ts'
-
-vi.mock('@acorn/node-core/server/db/index.ts', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('@acorn/node-core/server/db/index.ts')>()
-  return { ...actual, getDb: vi.fn() }
-})
+import type { PluginDatabase } from '@acorn/node-core/main/pluginStorage.ts'
+import { seedGithubIntegration } from '../testGithubToken'
 
 vi.mock('..', async (importOriginal) => {
   const actual = await importOriginal<typeof import('..')>()
@@ -50,14 +44,15 @@ const makeResolverDb = (rows: unknown[] = []) => {
   return { db: { select, insert } as never, inserted, insert }
 }
 
+// A stand-in for THIS PLUGIN's github.sqlite handle, which the router is now a factory over. Every entry
+// in the queue is one of github's own tables — the GitHub-credential lookup used to be answered here too
+// and is not any more: `integrations` is core's table, read off `env.DB` through the core seam, so this
+// fake never sees it and the queue no longer needs to dispatch on the table to skip it.
 const makePullFilesDb = (selectRows: unknown[][]) => {
   const queue = [...selectRows]
   const select = vi.fn(() => ({
-    // Dispatch on the table, not on call order, for the GitHub-credential lookup: every route makes
-    // that same read, so answering it from the positional queue would silently shift every
-    // expectation in this file the next time a route gains a query.
-    from: vi.fn((table: unknown) => ({
-      where: vi.fn(async () => (table === schema.integrations ? [{ authRef: sealedToken }] : (queue.shift() ?? []))),
+    from: vi.fn(() => ({
+      where: vi.fn(async () => queue.shift() ?? []),
     })),
   }))
   const db = {
@@ -70,18 +65,15 @@ const makePullFilesDb = (selectRows: unknown[][]) => {
     })),
     batch: vi.fn(async () => []),
   }
-  return db as never
+  return db as unknown as PluginDatabase
 }
 
-// The stored GitHub credential, sealed with the same secret box production uses. It is a real
-// ciphertext rather than a stub string because githubToken() decrypts it — a placeholder would make the
-// route see no credential and call gh() with an empty token, which is precisely the failure these
-// assertions are for.
+// CORE's real migrated database, holding the stored GitHub credential. It is seeded through
+// seedGithubIntegration rather than stubbed because githubToken() DECRYPTS the row — a placeholder would
+// make the route see no credential and call gh() with an empty token, which is precisely the failure the
+// `gh` expectations below are for.
 const ENC_KEY = '0'.repeat(64)
-let sealedToken: string
-beforeAll(async () => {
-  sealedToken = await encryptSecret('token', ENC_KEY)
-})
+let core: TestDb
 
 describe('resolveRepoForUser', () => {
   it('uses the user-scoped mirrored repo row when present', async () => {
@@ -127,9 +119,12 @@ describe('resolveRepoForUser', () => {
 })
 
 describe('pull files stale-while-revalidate', () => {
-  beforeEach(() => {
+  beforeEach(async () => {
     vi.clearAllMocks()
+    core = makeTestDb()
+    await seedGithubIntegration(core.db, 'james', 'token', ENC_KEY)
   })
+  afterEach(() => core.cleanup())
 
   it('returns stale file summaries immediately and refreshes in the background without reading patch blobs', async () => {
     const fileRow = {
@@ -150,7 +145,6 @@ describe('pull files stale-while-revalidate', () => {
       [fileRow],
       [],
     ])
-    vi.mocked(getDb).mockReturnValue(db)
 
     let resolveGh!: (res: Response) => void
     const ghPromise = new Promise<Response>((resolve) => {
@@ -163,14 +157,14 @@ describe('pull files stale-while-revalidate', () => {
       c.set('principal', { kind: 'device', userId: 'james' })
       await next()
     })
-    app.route('/api/repos', pullFiles)
+    app.route('/api/repos', pullFiles(db))
 
     const blobGet = vi.fn()
 
     const response = await Promise.race([
       app.fetch(
         new Request('http://acorn.test/api/repos/Runn-Fast/runn/pulls/12/files?summary=1'),
-        { BLOBS: { get: blobGet, put: vi.fn() }, ...testSecretEnv(ENC_KEY) } as unknown as Env,
+        { DB: core.db, BLOBS: { get: blobGet, put: vi.fn() }, ...testSecretEnv(ENC_KEY) } as unknown as Env,
       ),
       new Promise<null>((resolve) => setTimeout(() => resolve(null), 20)),
     ])
@@ -215,7 +209,6 @@ describe('pull files stale-while-revalidate', () => {
       [fileRow],
       [],
     ])
-    vi.mocked(getDb).mockReturnValue(db)
     vi.mocked(gh).mockResolvedValueOnce(
       responseJson([{ filename: 'src/app.ts', status: 'modified', additions: 3, deletions: 1, sha: 'abc123', patch: '@@' }]),
     )
@@ -225,10 +218,10 @@ describe('pull files stale-while-revalidate', () => {
       c.set('principal', { kind: 'device', userId: 'james' })
       await next()
     })
-    app.route('/api/repos', pullFiles)
+    app.route('/api/repos', pullFiles(db))
     const response = await app.fetch(
       new Request('http://acorn.test/api/repos/Runn-Fast/runn/pulls/12/files?force=true'),
-      { BLOBS: { get: vi.fn(async () => '@@'), put: vi.fn(async () => undefined) }, ...testSecretEnv(ENC_KEY) } as unknown as Env,
+      { DB: core.db, BLOBS: { get: vi.fn(async () => '@@'), put: vi.fn(async () => undefined) }, ...testSecretEnv(ENC_KEY) } as unknown as Env,
     )
 
     expect(response.status).toBe(200)
@@ -264,7 +257,6 @@ describe('pull files stale-while-revalidate', () => {
       [rowA, rowB],
       [],
     ])
-    vi.mocked(getDb).mockReturnValue(db)
 
     let resolveGh!: (res: Response) => void
     const ghPromise = new Promise<Response>((resolve) => {
@@ -277,7 +269,7 @@ describe('pull files stale-while-revalidate', () => {
       c.set('principal', { kind: 'device', userId: 'james' })
       await next()
     })
-    app.route('/api/repos', pullFiles)
+    app.route('/api/repos', pullFiles(db))
 
     const blobGet = vi.fn(async (key: string) => (key === 'patch:sha-a' ? '@@ a' : '@@ b'))
 
@@ -288,7 +280,7 @@ describe('pull files stale-while-revalidate', () => {
           headers: { 'content-type': 'application/json' },
           body: JSON.stringify({ paths: ['src/a.ts', 'src/b.ts'] }),
         }),
-        { BLOBS: { get: blobGet, put: vi.fn() }, ...testSecretEnv(ENC_KEY) } as unknown as Env,
+        { DB: core.db, BLOBS: { get: blobGet, put: vi.fn() }, ...testSecretEnv(ENC_KEY) } as unknown as Env,
       ),
       new Promise<null>((resolve) => setTimeout(() => resolve(null), 20)),
     ])

@@ -817,6 +817,9 @@ importers:
       '@types/node':
         specifier: ^26.0.0
         version: 26.0.0
+      drizzle-kit:
+        specifier: ^0.31.10
+        version: 0.31.10
       typescript:
         specifier: ^6.0.3
         version: 6.0.3

@@ -1,12 +1,12 @@
 import { Hono } from 'hono'
 import { fileBodyBlobKey } from '@acorn/node-core/server/blobs.ts'
-import { getDb } from '@acorn/node-core/server/db/index.ts'
 import { gh, ghError } from '..'
 import type { AppEnv } from '@acorn/node-core/server/middleware/auth.ts'
 import { ownerId } from '@acorn/node-core/server/middleware/requireUser.ts'
 import { respondError } from '@acorn/node-core/server/respond.ts'
 import { resolveRepoForUser } from './repoMirror'
 import { githubToken } from '../githubToken'
+import type { PluginDatabase } from '@acorn/node-core/main/pluginStorage.ts'
 
 // Full file body at an immutable blob sha — used to expand unchanged context around diff hunks.
 // The sha keys immutable content, so bodies cache forever in the local on-disk BLOBS dir
@@ -15,11 +15,15 @@ import { githubToken } from '../githubToken'
 const decodeBase64 = (content: string) =>
   new TextDecoder().decode(Uint8Array.from(atob(content.replace(/\n/g, '')), (c) => c.charCodeAt(0)))
 
-export const pullBlob = new Hono<AppEnv>().get('/:owner/:repo/blobs/:sha', async (c) => {
+// A FACTORY over this plugin's own database, not a module-scope router reading getDb(c.env). The tables
+// live in <data-root>/plugins/github.sqlite now, and `c.env` deliberately carries no per-plugin handles
+// (docs/vNext/data.md § Plugin DBs). The handle arrives at plugin init, so no request can reach an
+// unmigrated database — and a second startServiceRuntime in one process builds fresh routers over its own
+// handle instead of inheriting a closed one.
+export const pullBlob = (db: PluginDatabase) => new Hono<AppEnv>().get('/:owner/:repo/blobs/:sha', async (c) => {
   const uid = ownerId(c)
   const token = await githubToken(c)
 
-  const db = getDb(c.env)
   const userId = uid
   const owner = c.req.param('owner')
   const repo = c.req.param('repo')

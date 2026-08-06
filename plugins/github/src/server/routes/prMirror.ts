@@ -2,12 +2,13 @@ import { and, eq, inArray } from 'drizzle-orm'
 import type { SQLiteColumn } from 'drizzle-orm/sqlite-core'
 import type { Check, Comment, Label, PullCommit, PullDetail, PullFile, Review, Thread } from '@acorn/protocol/api.ts'
 import { patchBlobKey } from '@acorn/node-core/server/blobs.ts'
-import { getDb, schema } from '@acorn/node-core/server/db/index.ts'
-import { chunkRowsByColumnBudget } from '@acorn/node-core/server/db/batch.ts'
-import { filesResource, prResource } from '@acorn/node-core/server/db/resourceKeys.ts'
+import { chunkRowsByColumnBudget } from '@acorn/node-core/server/rows.ts'
+import { filesResource, prResource } from '../resourceKeys'
 import { gh, ghError } from '..'
 import type { RouteResult } from '@acorn/node-core/server/sync/engine.ts'
 import type { Env } from '@acorn/node-core/main/bindings.ts'
+import { checks as checksTable, comments as commentsTable, prCommits as prCommitsTable, prFiles as prFilesTable, prLabels as prLabelsTable, pullRequests as pullRequestsTable, reviewRequests as reviewRequestsTable, reviewThreads as reviewThreadsTable, reviews as reviewsTable, syncState as syncStateTable, viewedFiles as viewedFilesTable } from '../../node/schema'
+import type { PluginDatabase } from '@acorn/node-core/main/pluginStorage.ts'
 
 // Shared PR mirror helpers: the GraphQL detail mirror and the REST files mirror (SQLite rows +
 // on-disk patch blobs), plus their read-backs. Both the single-PR routes (pullDetail / pullFiles)
@@ -15,7 +16,9 @@ import type { Env } from '@acorn/node-core/main/bindings.ts'
 // once to avoid drift. PR data is "fast-changing" (docs/caching.md) — freshness is a TTL gate in
 // sync_state (PULLS_STALE_AFTER_MS, server/sync/policy.ts).
 
-type Db = ReturnType<typeof getDb>
+// Every exported helper here already took the handle as a parameter, which is why this module needed no
+// reshaping when the tables moved — only the type of the thing being passed in changed.
+type Db = PluginDatabase
 export type PrKey = { userId: string; repoId: number; number: number }
 
 // ─── Detail (GraphQL composite) ──────────────────────────────────────────────
@@ -44,7 +47,7 @@ fragment PrFields on PullRequest {
   mergeStateStatus
   autoMergeRequest { mergeMethod }
 }`
-// ponytail: first-page only (reviews,comments 50) — cursor pagination deferred.
+// ponytail: first-page only (reviewsTable,comments 50) — cursor pagination deferred.
 
 export type GqlPull = {
   id: string
@@ -193,34 +196,34 @@ export const mirrorPr = async (db: Db, key: PrKey, pr: GqlPull, now: number) => 
   const resource = prResource(key.repoId, key.number)
   await db.batch([
     db
-      .insert(schema.pullRequests)
+      .insert(pullRequestsTable)
       .values(pullRow)
       .onConflictDoUpdate({
-        target: [schema.pullRequests.userId, schema.pullRequests.repoId, schema.pullRequests.number],
+        target: [pullRequestsTable.userId, pullRequestsTable.repoId, pullRequestsTable.number],
         set: pullRow,
       }),
-    db.delete(schema.prLabels).where(childWhere(schema.prLabels, key)),
-    db.delete(schema.reviews).where(childWhere(schema.reviews, key)),
-    db.delete(schema.reviewRequests).where(childWhere(schema.reviewRequests, key)),
-    db.delete(schema.comments).where(childWhere(schema.comments, key)),
-    db.delete(schema.prCommits).where(childWhere(schema.prCommits, key)),
-    db.delete(schema.checks).where(childWhere(schema.checks, key)),
-    db.delete(schema.reviewThreads).where(childWhere(schema.reviewThreads, key)),
-    ...chunk(schema.prLabels, labelRows),
-    ...chunk(schema.reviews, reviewRows),
-    ...chunk(schema.reviewRequests, reviewRequestRows),
-    ...chunk(schema.comments, commentRows),
-    ...chunk(schema.prCommits, commitRows),
-    ...chunk(schema.checks, checkRows),
-    ...chunk(schema.reviewThreads, threadRows),
+    db.delete(prLabelsTable).where(childWhere(prLabelsTable, key)),
+    db.delete(reviewsTable).where(childWhere(reviewsTable, key)),
+    db.delete(reviewRequestsTable).where(childWhere(reviewRequestsTable, key)),
+    db.delete(commentsTable).where(childWhere(commentsTable, key)),
+    db.delete(prCommitsTable).where(childWhere(prCommitsTable, key)),
+    db.delete(checksTable).where(childWhere(checksTable, key)),
+    db.delete(reviewThreadsTable).where(childWhere(reviewThreadsTable, key)),
+    ...chunk(prLabelsTable, labelRows),
+    ...chunk(reviewsTable, reviewRows),
+    ...chunk(reviewRequestsTable, reviewRequestRows),
+    ...chunk(commentsTable, commentRows),
+    ...chunk(prCommitsTable, commitRows),
+    ...chunk(checksTable, checkRows),
+    ...chunk(reviewThreadsTable, threadRows),
     db
-      .insert(schema.syncState)
+      .insert(syncStateTable)
       .values({ userId: key.userId, resource, etag: null, fetchedAt: now })
-      .onConflictDoUpdate({ target: [schema.syncState.userId, schema.syncState.resource], set: { fetchedAt: now } }),
+      .onConflictDoUpdate({ target: [syncStateTable.userId, syncStateTable.resource], set: { fetchedAt: now } }),
   ])
 }
 
-const toThread = (row: typeof schema.reviewThreads.$inferSelect) =>
+const toThread = (row: typeof reviewThreadsTable.$inferSelect) =>
   ({
     threadId: row.threadId,
     path: row.path,
@@ -230,7 +233,7 @@ const toThread = (row: typeof schema.reviewThreads.$inferSelect) =>
     comments: [] as Thread['comments'],
   }) satisfies Thread
 
-const toPublicPull = (p: typeof schema.pullRequests.$inferSelect) =>
+const toPublicPull = (p: typeof pullRequestsTable.$inferSelect) =>
   ({
     number: p.number,
     title: p.title,
@@ -250,19 +253,19 @@ const toPublicPull = (p: typeof schema.pullRequests.$inferSelect) =>
 // Read one PR's detail composite back out of the mirror tables.
 export const readComposite = async (db: Db, key: PrKey): Promise<PullDetail> => {
   const prWhere = and(
-    eq(schema.pullRequests.userId, key.userId),
-    eq(schema.pullRequests.repoId, key.repoId),
-    eq(schema.pullRequests.number, key.number),
+    eq(pullRequestsTable.userId, key.userId),
+    eq(pullRequestsTable.repoId, key.repoId),
+    eq(pullRequestsTable.number, key.number),
   )
-  const [pull] = await db.select().from(schema.pullRequests).where(prWhere)
-  const [labels, reviews, reviewRequests, comments, commits, checks, threadRows] = await Promise.all([
-    db.select().from(schema.prLabels).where(childWhere(schema.prLabels, key)),
-    db.select().from(schema.reviews).where(childWhere(schema.reviews, key)),
-    db.select().from(schema.reviewRequests).where(childWhere(schema.reviewRequests, key)),
-    db.select().from(schema.comments).where(childWhere(schema.comments, key)),
-    db.select().from(schema.prCommits).where(childWhere(schema.prCommits, key)),
-    db.select().from(schema.checks).where(childWhere(schema.checks, key)),
-    db.select().from(schema.reviewThreads).where(childWhere(schema.reviewThreads, key)),
+  const [pull] = await db.select().from(pullRequestsTable).where(prWhere)
+  const [labels, reviewRows, reviewRequestRows, commentRows, commits, checkRows, threadRows] = await Promise.all([
+    db.select().from(prLabelsTable).where(childWhere(prLabelsTable, key)),
+    db.select().from(reviewsTable).where(childWhere(reviewsTable, key)),
+    db.select().from(reviewRequestsTable).where(childWhere(reviewRequestsTable, key)),
+    db.select().from(commentsTable).where(childWhere(commentsTable, key)),
+    db.select().from(prCommitsTable).where(childWhere(prCommitsTable, key)),
+    db.select().from(checksTable).where(childWhere(checksTable, key)),
+    db.select().from(reviewThreadsTable).where(childWhere(reviewThreadsTable, key)),
   ])
   const tmap = new Map<string, ReturnType<typeof toThread>>()
   for (const row of threadRows) {
@@ -273,11 +276,11 @@ export const readComposite = async (db: Db, key: PrKey): Promise<PullDetail> => 
   return {
     pull: pull ? toPublicPull(pull) : null,
     labels: labels.map((l) => ({ name: l.name, color: l.color }) satisfies Label),
-    reviews: reviews.map((r) => ({ id: r.id, author: r.author, state: r.state, body: r.body, submittedAt: r.submittedAt }) satisfies Review),
-    requestedReviewers: reviewRequests.map((r) => r.login),
-    comments: comments.map((m) => ({ id: m.id, author: m.author, body: m.body, createdAt: m.createdAt }) satisfies Comment),
+    reviews: reviewRows.map((r) => ({ id: r.id, author: r.author, state: r.state, body: r.body, submittedAt: r.submittedAt }) satisfies Review),
+    requestedReviewers: reviewRequestRows.map((r) => r.login),
+    comments: commentRows.map((m) => ({ id: m.id, author: m.author, body: m.body, createdAt: m.createdAt }) satisfies Comment),
     commits: commits.map((m) => ({ sha: m.sha, message: m.message, author: m.author, authorLogin: m.authorLogin, committedAt: m.committedAt }) satisfies PullCommit),
-    checks: checks.map((k) => ({ name: k.name, status: k.status, url: k.url, runId: k.runId }) satisfies Check),
+    checks: checkRows.map((k) => ({ name: k.name, status: k.status, url: k.url, runId: k.runId }) satisfies Check),
     threads: [...tmap.values()],
   }
 }
@@ -319,15 +322,15 @@ export const mirrorFiles = async (blobs: PatchBlobStore, db: Db, key: PrKey, bod
     deletions: f.deletions,
     sha: f.sha,
   }))
-  const fileWhere = and(eq(schema.prFiles.userId, key.userId), eq(schema.prFiles.repoId, key.repoId), eq(schema.prFiles.number, key.number))
+  const fileWhere = and(eq(prFilesTable.userId, key.userId), eq(prFilesTable.repoId, key.repoId), eq(prFilesTable.number, key.number))
   const resource = filesResource(key.repoId, key.number)
   await db.batch([
-    db.delete(schema.prFiles).where(fileWhere),
-    ...rows.map((r) => db.insert(schema.prFiles).values(r)),
+    db.delete(prFilesTable).where(fileWhere),
+    ...rows.map((r) => db.insert(prFilesTable).values(r)),
     db
-      .insert(schema.syncState)
+      .insert(syncStateTable)
       .values({ userId: key.userId, resource, etag: null, fetchedAt: now })
-      .onConflictDoUpdate({ target: [schema.syncState.userId, schema.syncState.resource], set: { fetchedAt: now } }),
+      .onConflictDoUpdate({ target: [syncStateTable.userId, syncStateTable.resource], set: { fetchedAt: now } }),
   ])
 }
 
@@ -340,15 +343,15 @@ export const readFiles = async (env: Env, db: Db, key: PrKey, options: ReadFiles
   const includePatches = options.includePatches ?? true
   const paths = options.paths?.length ? Array.from(new Set(options.paths)) : undefined
   const fileWhere = and(
-    eq(schema.prFiles.userId, key.userId),
-    eq(schema.prFiles.repoId, key.repoId),
-    eq(schema.prFiles.number, key.number),
-    ...(paths ? [inArray(schema.prFiles.path, paths)] : []),
+    eq(prFilesTable.userId, key.userId),
+    eq(prFilesTable.repoId, key.repoId),
+    eq(prFilesTable.number, key.number),
+    ...(paths ? [inArray(prFilesTable.path, paths)] : []),
   )
-  const viewedWhere = and(eq(schema.viewedFiles.userId, key.userId), eq(schema.viewedFiles.repoId, key.repoId), eq(schema.viewedFiles.number, key.number))
+  const viewedWhere = and(eq(viewedFilesTable.userId, key.userId), eq(viewedFilesTable.repoId, key.repoId), eq(viewedFilesTable.number, key.number))
   const [files, viewed] = await Promise.all([
-    db.select().from(schema.prFiles).where(fileWhere),
-    db.select({ path: schema.viewedFiles.path }).from(schema.viewedFiles).where(viewedWhere),
+    db.select().from(prFilesTable).where(fileWhere),
+    db.select({ path: viewedFilesTable.path }).from(viewedFilesTable).where(viewedWhere),
   ])
   const seen = new Set(viewed.map((v) => v.path))
   return Promise.all(

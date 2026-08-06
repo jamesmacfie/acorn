@@ -590,7 +590,11 @@ export const jobLogRoute = (owner: string, repo: string, jobId: number) => repoR
 export const mentionsRoute = (owner: string, repo: string) => repoRoute(owner, repo, 'mentions')
 export const requestedReviewersRoute = (owner: string, repo: string, number: string | number) =>
   pullRoute(owner, repo, number, 'requested-reviewers')
-export const pinsRoute = '/v2/core/pins'
+// Pinned repos are the github plugin's, not core's: the table is keyed by a GitHub repo id, which
+// nothing outside that mirror can resolve (plugins/github/src/node/schema.ts). Phase 2 moved the table
+// and the route together, so this is `/v2/p/github/pins` rather than the `/v2/core/pins` it was through
+// Phase 1. The repo selector is the only caller.
+export const pinsRoute = '/v2/p/github/pins'
 export const prefsRoute = '/v2/core/prefs'
 // Workspaces (named groups of repos) — the top-level unit.
 export const workspacesRoute = '/v2/core/workspaces'

@@ -2,8 +2,7 @@ import { and, eq } from 'drizzle-orm'
 import type { Context } from 'hono'
 import { Hono } from 'hono'
 import type { PullFile, PullFilesPatchRequest } from '@acorn/protocol/api.ts'
-import { getDb, schema } from '@acorn/node-core/server/db/index.ts'
-import { filesResource } from '@acorn/node-core/server/db/resourceKeys.ts'
+import { filesResource } from '../resourceKeys'
 import type { AppEnv } from '@acorn/node-core/server/middleware/auth.ts'
 import { ownerId } from '@acorn/node-core/server/middleware/requireUser.ts'
 import { respondError } from '@acorn/node-core/server/respond.ts'
@@ -12,6 +11,8 @@ import { PULLS_STALE_AFTER_MS } from '@acorn/node-core/server/sync/policy.ts'
 import { fetchFiles, mirrorFiles, readFiles } from './prMirror'
 import { resolveRepoForUser } from './repoMirror'
 import { githubToken } from '../githubToken'
+import { syncState } from '../../node/schema'
+import type { PluginDatabase } from '@acorn/node-core/main/pluginStorage.ts'
 
 const MAX_PATCH_PATHS = 20
 
@@ -37,11 +38,10 @@ const uniqueStringPaths = (paths: unknown): string[] | null => {
   return out
 }
 
-const handleFilesRead = async (c: Context<AppEnv>, options: { summaryOnly?: boolean; paths?: string[] } = {}) => {
+const handleFilesRead = async (db: PluginDatabase, c: Context<AppEnv>, options: { summaryOnly?: boolean; paths?: string[] } = {}) => {
   const uid = ownerId(c)
   const token = await githubToken(c)
 
-  const db = getDb(c.env)
   const userId = uid
   const owner = c.req.param('owner')
   const repo = c.req.param('repo')
@@ -64,8 +64,8 @@ const handleFilesRead = async (c: Context<AppEnv>, options: { summaryOnly?: bool
   const read = async (): Promise<Cached<PullFile[]> | null> => {
     const [sync] = await db
       .select()
-      .from(schema.syncState)
-      .where(and(eq(schema.syncState.userId, userId), eq(schema.syncState.resource, resource)))
+      .from(syncState)
+      .where(and(eq(syncState.userId, userId), eq(syncState.resource, resource)))
     if (!sync) return null
     return { data: await readCached(), fetchedAt: sync.fetchedAt }
   }
@@ -92,15 +92,20 @@ const handleFilesRead = async (c: Context<AppEnv>, options: { summaryOnly?: bool
 // PR changed-files + patches. REST /pulls/{n}/files is the single writer of pr_files (it carries
 // path/status/+/−/sha/patch in one call — richer than the GraphQL composite, which dropped files).
 // Mirror logic is shared with the batch route — see prMirror.ts.
-export const pullFiles = new Hono<AppEnv>().get('/:owner/:repo/pulls/:number/files', async (c) => {
+// A FACTORY over this plugin's own database, not a module-scope router reading getDb(c.env). The tables
+// live in <data-root>/plugins/github.sqlite now, and `c.env` deliberately carries no per-plugin handles
+// (docs/vNext/data.md § Plugin DBs). The handle arrives at plugin init, so no request can reach an
+// unmigrated database — and a second startServiceRuntime in one process builds fresh routers over its own
+// handle instead of inheriting a closed one.
+export const pullFiles = (db: PluginDatabase) => new Hono<AppEnv>().get('/:owner/:repo/pulls/:number/files', async (c) => {
   const path = c.req.query('path')
   const summaryOnly = c.req.query('summary') === '1' && !path
-  return handleFilesRead(c, { summaryOnly, paths: path ? [path] : undefined })
+  return handleFilesRead(db, c, { summaryOnly, paths: path ? [path] : undefined })
 }).post('/:owner/:repo/pulls/:number/files/patches', async (c) => {
   const body = (await c.req.json().catch(() => null)) as PullFilesPatchRequest | null
   const paths = uniqueStringPaths(body?.paths)
   if (!paths) return respondError(c, 400, 'bad_paths')
   if (paths.length > MAX_PATCH_PATHS) return respondError(c, 400, 'too_many_paths')
   if (paths.length === 0) return c.json([])
-  return handleFilesRead(c, { paths })
+  return handleFilesRead(db, c, { paths })
 })

@@ -1,13 +1,14 @@
 import { and, eq } from 'drizzle-orm'
 import { Hono } from 'hono'
-import { getDb, schema } from '@acorn/node-core/server/db/index.ts'
-import { pullsResource } from '@acorn/node-core/server/db/resourceKeys.ts'
+import { pullsResource } from '../resourceKeys'
 import { gh, ghError, ghGraphQL, ghGraphQLResult } from '..'
 import type { Branch, Compare } from '@acorn/protocol/api.ts'
 import type { AppEnv } from '@acorn/node-core/server/middleware/auth.ts'
 import { ownerId } from '@acorn/node-core/server/middleware/requireUser.ts'
 import { respondError } from '@acorn/node-core/server/respond.ts'
 import { githubToken } from '../githubToken'
+import { repos, syncState } from '../../node/schema'
+import type { PluginDatabase } from '@acorn/node-core/main/pluginStorage.ts'
 
 // Open-a-PR support: branch list + base..head compare (both read-only proxies, no local mirror —
 // branches/compare change too often and are cheap to fetch) and the create POST. Creating busts
@@ -28,7 +29,12 @@ type GitHubCompare = {
   commits?: { sha: string; commit: { message: string } }[]
 }
 
-export const prCreate = new Hono<AppEnv>()
+// A FACTORY over this plugin's own database, not a module-scope router reading getDb(c.env). The tables
+// live in <data-root>/plugins/github.sqlite now, and `c.env` deliberately carries no per-plugin handles
+// (docs/vNext/data.md § Plugin DBs). The handle arrives at plugin init, so no request can reach an
+// unmigrated database — and a second startServiceRuntime in one process builds fresh routers over its own
+// handle instead of inheriting a closed one.
+export const prCreate = (db: PluginDatabase) => new Hono<AppEnv>()
   // Branch names for the head/base pickers, newest-first. GitHub can't sort branches by date
   // (RefOrderField.TAG_COMMIT_DATE only applies to refs/tags/ — on branches it falls back to
   // alphabetical), so page through the branch refs with each tip's committedDate, sort here, and
@@ -134,15 +140,14 @@ export const prCreate = new Hono<AppEnv>()
     const created = (await res.json()) as { number: number }
 
     // Bust the open-PR list cache so it refetches with the new PR on navigation.
-    const db = getDb(c.env)
     const [repoRow] = await db
-      .select({ id: schema.repos.id })
-      .from(schema.repos)
-      .where(and(eq(schema.repos.userId, uid), eq(schema.repos.owner, owner), eq(schema.repos.name, repo)))
+      .select({ id: repos.id })
+      .from(repos)
+      .where(and(eq(repos.userId, uid), eq(repos.owner, owner), eq(repos.name, repo)))
     if (repoRow)
       await db
-        .delete(schema.syncState)
-        .where(and(eq(schema.syncState.userId, uid), eq(schema.syncState.resource, pullsResource(repoRow.id, 'open'))))
+        .delete(syncState)
+        .where(and(eq(syncState.userId, uid), eq(syncState.resource, pullsResource(repoRow.id, 'open'))))
 
     return c.json({ number: created.number })
   })

@@ -7,7 +7,6 @@ import { onServerError, requestIdMiddleware } from './respond'
 import { CORE_NAMESPACE, PLUGIN_NAMESPACE, pluginRouteContributions, routeMountPath } from './routeRegistry'
 import { integrations } from './routes/integrations'
 import { pairingRoutes } from './routes/pairing'
-import { pins } from './routes/pins'
 import { prefs } from './routes/prefs'
 import { harness } from './routes/harness'
 import { agentTools, agentToolsCatalog } from './routes/agentTools'
@@ -79,7 +78,6 @@ export function createApp() {
     .use(`${CORE_NAMESPACE}/integrations`, requireProviderAccess)
     .use(`${CORE_NAMESPACE}/integrations/*`, requireProviderAccess)
     .route(CORE_NAMESPACE, pairing.core) // /pair, /pair/start, /devices — owner-only device administration
-    .route(`${CORE_NAMESPACE}/pins`, pins)
     .route(`${CORE_NAMESPACE}/prefs`, prefs)
     .route(`${CORE_NAMESPACE}/workspaces`, workspaces)
     .route(`${CORE_NAMESPACE}/tasks`, tasks)

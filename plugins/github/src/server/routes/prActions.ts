@@ -1,21 +1,27 @@
 import { and, eq } from 'drizzle-orm'
 import { Hono, type Context } from 'hono'
-import { schema } from '@acorn/node-core/server/db/index.ts'
 import { gh, ghError, ghGraphQL, ghGraphQLResult } from '..'
 import type { AppEnv } from '@acorn/node-core/server/middleware/auth.ts'
 import { ownerId } from '@acorn/node-core/server/middleware/requireUser.ts'
 import { respondError } from '@acorn/node-core/server/respond.ts'
 import { bustPrSync, resolvePr, setPrState } from './prContext'
 import { githubToken } from '../githubToken'
+import { comments, prLabels, pullRequests, reviewRequests, viewedFiles } from '../../node/schema'
+import type { PluginDatabase } from '@acorn/node-core/main/pluginStorage.ts'
 
 // PR write actions (docs/github-integration.md). Each calls GitHub, updates the local mirror so
 // a read within the TTL window reflects the change, and returns the canonical bit. The client
 // layers optimistic updates / invalidation on top.
 
-export const prActions = new Hono<AppEnv>()
+// A FACTORY over this plugin's own database, not a module-scope router reading getDb(c.env). The tables
+// live in <data-root>/plugins/github.sqlite now, and `c.env` deliberately carries no per-plugin handles
+// (docs/vNext/data.md § Plugin DBs). The handle arrives at plugin init, so no request can reach an
+// unmigrated database — and a second startServiceRuntime in one process builds fresh routers over its own
+// handle instead of inheriting a closed one.
+export const prActions = (db: PluginDatabase) => new Hono<AppEnv>()
   // Merge: PUT /pulls/{n}/merge. 405 = not mergeable, 409 = head moved.
   .post('/:owner/:repo/pulls/:number/merge', async (c) => {
-    const r = await resolvePr(c)
+    const r = await resolvePr(db, c)
     if ('error' in r) return respondError(c, r.status, r.error)
     const { method } = (await c.req.json().catch(() => ({}))) as { method?: string }
     const res = await gh(r.token, `/repos/${r.owner}/${r.repo}/pulls/${r.number}/merge`, {
@@ -32,7 +38,7 @@ export const prActions = new Hono<AppEnv>()
   // Enable auto-merge: GraphQL enablePullRequestAutoMerge (no REST endpoint exists). Needs the PR
   // node id; mergeMethod is the PullRequestMergeMethod enum (MERGE|SQUASH|REBASE).
   .post('/:owner/:repo/pulls/:number/auto-merge', async (c) => {
-    const r = await resolvePr(c)
+    const r = await resolvePr(db, c)
     if ('error' in r) return respondError(c, r.status, r.error)
     if (!r.nodeId) return respondError(c, 409, 'node_id_unknown') // open the PR first to mirror its node id
     const { method } = (await c.req.json().catch(() => ({}))) as { method?: string }
@@ -48,14 +54,14 @@ export const prActions = new Hono<AppEnv>()
       return respondError(c, result.failure.status, result.failure.error)
     }
     await r.db
-      .update(schema.pullRequests)
+      .update(pullRequests)
       .set({ autoMergeEnabled: true })
-      .where(and(eq(schema.pullRequests.userId, r.userId), eq(schema.pullRequests.repoId, r.repoId), eq(schema.pullRequests.number, r.number)))
+      .where(and(eq(pullRequests.userId, r.userId), eq(pullRequests.repoId, r.repoId), eq(pullRequests.number, r.number)))
     return c.json({ autoMergeEnabled: true })
   })
   // Disable auto-merge: GraphQL disablePullRequestAutoMerge (no REST endpoint exists).
   .delete('/:owner/:repo/pulls/:number/auto-merge', async (c) => {
-    const r = await resolvePr(c)
+    const r = await resolvePr(db, c)
     if ('error' in r) return respondError(c, r.status, r.error)
     if (!r.nodeId) return respondError(c, 409, 'node_id_unknown')
     const res = await ghGraphQL(r.token, `mutation($id:ID!){ disablePullRequestAutoMerge(input:{pullRequestId:$id}){ clientMutationId } }`, {
@@ -67,14 +73,14 @@ export const prActions = new Hono<AppEnv>()
       return respondError(c, result.failure.status, result.failure.error)
     }
     await r.db
-      .update(schema.pullRequests)
+      .update(pullRequests)
       .set({ autoMergeEnabled: false })
-      .where(and(eq(schema.pullRequests.userId, r.userId), eq(schema.pullRequests.repoId, r.repoId), eq(schema.pullRequests.number, r.number)))
+      .where(and(eq(pullRequests.userId, r.userId), eq(pullRequests.repoId, r.repoId), eq(pullRequests.number, r.number)))
     return c.json({ autoMergeEnabled: false })
   })
   // Close / reopen: PATCH /pulls/{n} { state }.
   .post('/:owner/:repo/pulls/:number/:action{close|reopen}', async (c) => {
-    const r = await resolvePr(c)
+    const r = await resolvePr(db, c)
     if ('error' in r) return respondError(c, r.status, r.error)
     const state = c.req.param('action') === 'close' ? 'closed' : 'open'
     const res = await gh(r.token, `/repos/${r.owner}/${r.repo}/pulls/${r.number}`, {
@@ -89,7 +95,7 @@ export const prActions = new Hono<AppEnv>()
   })
   // Draft ↔ ready: GraphQL only, needs the PR node id.
   .post('/:owner/:repo/pulls/:number/draft', async (c) => {
-    const r = await resolvePr(c)
+    const r = await resolvePr(db, c)
     if ('error' in r) return respondError(c, r.status, r.error)
     if (!r.nodeId) return respondError(c, 409, 'node_id_unknown') // open the PR first to mirror its node id
     const { draft } = (await c.req.json().catch(() => ({}))) as { draft?: boolean }
@@ -103,20 +109,20 @@ export const prActions = new Hono<AppEnv>()
       return respondError(c, result.failure.status, result.failure.error)
     }
     await r.db
-      .update(schema.pullRequests)
+      .update(pullRequests)
       .set({ draft: !!draft })
       .where(
         and(
-          eq(schema.pullRequests.userId, r.userId),
-          eq(schema.pullRequests.repoId, r.repoId),
-          eq(schema.pullRequests.number, r.number),
+          eq(pullRequests.userId, r.userId),
+          eq(pullRequests.repoId, r.repoId),
+          eq(pullRequests.number, r.number),
         ),
       )
     return c.json({ draft: !!draft })
   })
   // Add a discussion comment: POST /issues/{n}/comments. full+json returns body_html.
   .post('/:owner/:repo/pulls/:number/comments', async (c) => {
-    const r = await resolvePr(c)
+    const r = await resolvePr(db, c)
     if ('error' in r) return respondError(c, r.status, r.error)
     const { body } = (await c.req.json().catch(() => ({}))) as { body?: string }
     if (!body?.trim()) return respondError(c, 400, 'empty_body')
@@ -137,33 +143,33 @@ export const prActions = new Hono<AppEnv>()
       body: ct.body_html ?? body,
       createdAt: Date.parse(ct.created_at),
     }
-    await r.db.insert(schema.comments).values(row).onConflictDoNothing()
+    await r.db.insert(comments).values(row).onConflictDoNothing()
     return c.json({ id: row.id, author: row.author, body: row.body, createdAt: row.createdAt })
   })
   // Add a label: POST /issues/{n}/labels. Remove a label: DELETE /issues/{n}/labels/{name}.
   // Both return the PR's full label set → replace the pr_labels mirror so a within-TTL read is fresh.
-  .post('/:owner/:repo/pulls/:number/labels', (c) => mutateLabels(c, 'add'))
-  .delete('/:owner/:repo/pulls/:number/labels', (c) => mutateLabels(c, 'remove'))
+  .post('/:owner/:repo/pulls/:number/labels', (c) => mutateLabels(db, c, 'add'))
+  .delete('/:owner/:repo/pulls/:number/labels', (c) => mutateLabels(db, c, 'remove'))
   // Toggle a file's "viewed" checkbox (app-state, no GitHub call).
   .post('/:owner/:repo/pulls/:number/viewed', async (c) => {
-    const r = await resolvePr(c)
+    const r = await resolvePr(db, c)
     if ('error' in r) return respondError(c, r.status, r.error)
     const { path, viewed } = (await c.req.json().catch(() => ({}))) as { path?: string; viewed?: boolean }
     if (!path) return respondError(c, 400, 'bad_request')
     const key = { userId: r.userId, repoId: r.repoId, number: r.number, path }
     const where = and(
-      eq(schema.viewedFiles.userId, r.userId),
-      eq(schema.viewedFiles.repoId, r.repoId),
-      eq(schema.viewedFiles.number, r.number),
-      eq(schema.viewedFiles.path, path),
+      eq(viewedFiles.userId, r.userId),
+      eq(viewedFiles.repoId, r.repoId),
+      eq(viewedFiles.number, r.number),
+      eq(viewedFiles.path, path),
     )
-    if (viewed) await r.db.insert(schema.viewedFiles).values({ ...key, viewedAt: Date.now() }).onConflictDoNothing()
-    else await r.db.delete(schema.viewedFiles).where(where)
+    if (viewed) await r.db.insert(viewedFiles).values({ ...key, viewedAt: Date.now() }).onConflictDoNothing()
+    else await r.db.delete(viewedFiles).where(where)
     return c.json({ path, viewed: !!viewed })
   })
   // Start a new inline review comment on a line: POST /pulls/{n}/comments { commit_id, path, line, side }.
   .post('/:owner/:repo/pulls/:number/review-comments', async (c) => {
-    const r = await resolvePr(c)
+    const r = await resolvePr(db, c)
     if ('error' in r) return respondError(c, r.status, r.error)
     if (!r.headSha) return respondError(c, 409, 'head_sha_unknown') // open the PR first to mirror head sha
     const { body, path, line, side } = (await c.req.json().catch(() => ({}))) as {
@@ -185,7 +191,7 @@ export const prActions = new Hono<AppEnv>()
   })
   // Reply to an existing thread: POST /pulls/{n}/comments/{comment_id}/replies. id = numeric databaseId.
   .post('/:owner/:repo/pulls/:number/review-comments/:commentId/replies', async (c) => {
-    const r = await resolvePr(c)
+    const r = await resolvePr(db, c)
     if ('error' in r) return respondError(c, r.status, r.error)
     const commentId = c.req.param('commentId')
     const { body } = (await c.req.json().catch(() => ({}))) as { body?: string }
@@ -202,7 +208,7 @@ export const prActions = new Hono<AppEnv>()
   })
   // Resolve / unresolve a thread (GraphQL, by thread node id).
   .post('/:owner/:repo/pulls/:number/threads/:threadId/resolve', async (c) => {
-    const r = await resolvePr(c)
+    const r = await resolvePr(db, c)
     if ('error' in r) return respondError(c, r.status, r.error)
     const threadId = c.req.param('threadId')
     const { resolved } = (await c.req.json().catch(() => ({}))) as { resolved?: boolean }
@@ -220,7 +226,7 @@ export const prActions = new Hono<AppEnv>()
   })
   // Submit a PR review: POST /pulls/{n}/reviews { event, body }.
   .post('/:owner/:repo/pulls/:number/reviews', async (c) => {
-    const r = await resolvePr(c)
+    const r = await resolvePr(db, c)
     if ('error' in r) return respondError(c, r.status, r.error)
     const { body, event } = (await c.req.json().catch(() => ({}))) as { body?: string; event?: string }
     if (!event || !['APPROVE', 'REQUEST_CHANGES', 'COMMENT'].includes(event))
@@ -239,8 +245,8 @@ export const prActions = new Hono<AppEnv>()
   })
   // Request a reviewer: POST /pulls/{n}/requested_reviewers { reviewers }. Remove: DELETE same.
   // bustPrSync so the next composite refetch picks up the changed request set.
-  .post('/:owner/:repo/pulls/:number/requested-reviewers', (c) => mutateReviewers(c, 'add'))
-  .delete('/:owner/:repo/pulls/:number/requested-reviewers', (c) => mutateReviewers(c, 'remove'))
+  .post('/:owner/:repo/pulls/:number/requested-reviewers', (c) => mutateReviewers(db, c, 'add'))
+  .delete('/:owner/:repo/pulls/:number/requested-reviewers', (c) => mutateReviewers(db, c, 'remove'))
   // Rerun a workflow run's failed jobs: POST /actions/runs/{runId}/rerun-failed-jobs (GitHub → 201).
   // Repo-scoped (no PR number): a check's runId is the Actions run, not the PR. No mirror to update —
   // the new run states surface on the next composite refetch.
@@ -256,8 +262,8 @@ export const prActions = new Hono<AppEnv>()
     return c.json({ ok: true })
   })
 
-async function mutateReviewers(c: Context<AppEnv>, op: 'add' | 'remove') {
-  const r = await resolvePr(c)
+async function mutateReviewers(db: PluginDatabase, c: Context<AppEnv>, op: 'add' | 'remove') {
+  const r = await resolvePr(db, c)
   if ('error' in r) return respondError(c, r.status, r.error)
   const { login } = (await c.req.json().catch(() => ({}))) as { login?: string }
   if (!login?.trim()) return respondError(c, 400, 'empty_login')
@@ -273,16 +279,16 @@ async function mutateReviewers(c: Context<AppEnv>, op: 'add' | 'remove') {
   const pr = (await res.json()) as { requested_reviewers?: { login: string }[] }
   const rows = (pr.requested_reviewers ?? []).map((u) => ({ userId: r.userId, repoId: r.repoId, number: r.number, login: u.login }))
   const where = and(
-    eq(schema.reviewRequests.userId, r.userId),
-    eq(schema.reviewRequests.repoId, r.repoId),
-    eq(schema.reviewRequests.number, r.number),
+    eq(reviewRequests.userId, r.userId),
+    eq(reviewRequests.repoId, r.repoId),
+    eq(reviewRequests.number, r.number),
   )
-  await r.db.batch([r.db.delete(schema.reviewRequests).where(where), ...rows.map((row) => r.db.insert(schema.reviewRequests).values(row))])
+  await r.db.batch([r.db.delete(reviewRequests).where(where), ...rows.map((row) => r.db.insert(reviewRequests).values(row))])
   return c.json(rows.map((row) => row.login))
 }
 
-async function mutateLabels(c: Context<AppEnv>, op: 'add' | 'remove') {
-  const r = await resolvePr(c)
+async function mutateLabels(db: PluginDatabase, c: Context<AppEnv>, op: 'add' | 'remove') {
+  const r = await resolvePr(db, c)
   if ('error' in r) return respondError(c, r.status, r.error)
   const { name } = (await c.req.json().catch(() => ({}))) as { name?: string }
   if (!name?.trim()) return respondError(c, 400, 'empty_name')
@@ -301,10 +307,10 @@ async function mutateLabels(c: Context<AppEnv>, op: 'add' | 'remove') {
   const labels = (await res.json()) as { name: string; color: string | null }[]
   const rows = labels.map((l) => ({ userId: r.userId, repoId: r.repoId, number: r.number, name: l.name, color: l.color }))
   const where = and(
-    eq(schema.prLabels.userId, r.userId),
-    eq(schema.prLabels.repoId, r.repoId),
-    eq(schema.prLabels.number, r.number),
+    eq(prLabels.userId, r.userId),
+    eq(prLabels.repoId, r.repoId),
+    eq(prLabels.number, r.number),
   )
-  await r.db.batch([r.db.delete(schema.prLabels).where(where), ...rows.map((row) => r.db.insert(schema.prLabels).values(row))])
+  await r.db.batch([r.db.delete(prLabels).where(where), ...rows.map((row) => r.db.insert(prLabels).values(row))])
   return c.json(rows.map((row) => ({ name: row.name, color: row.color })))
 }

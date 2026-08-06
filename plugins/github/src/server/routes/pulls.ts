@@ -1,7 +1,6 @@
 import { and, desc, eq } from 'drizzle-orm'
 import { Hono } from 'hono'
-import { getDb, schema } from '@acorn/node-core/server/db/index.ts'
-import { pullsResource } from '@acorn/node-core/server/db/resourceKeys.ts'
+import { pullsResource } from '../resourceKeys'
 import { gh, ghError } from '..'
 import type { ClosedPullsPage, Pull } from '@acorn/protocol/api.ts'
 import type { AppEnv } from '@acorn/node-core/server/middleware/auth.ts'
@@ -12,6 +11,9 @@ import { PULLS_STALE_AFTER_MS } from '@acorn/node-core/server/sync/policy.ts'
 import { refreshOpenPulls } from './pullRefresh'
 import { resolveRepoForUser } from './repoMirror'
 import { githubToken } from '../githubToken'
+import { pullRequests, syncState } from '../../node/schema'
+import type { PluginDatabase } from '@acorn/node-core/main/pluginStorage.ts'
+import type { CoreServices } from '@acorn/node-core/main/core/index.ts'
 
 // PR list for a repo (docs/caching.md serve-then-revalidate, via server/sync/engine.ts). PR data is
 // "fast-changing": short TTL + conditional If-None-Match. The list ETag lives in sync_state (no
@@ -32,11 +34,15 @@ type GitHubPull = {
   updated_at: string | null
 }
 
-export const pulls = new Hono<AppEnv>().get('/:owner/:repo/pulls', async (c) => {
+// A FACTORY over this plugin's own database, not a module-scope router reading getDb(c.env). The tables
+// live in <data-root>/plugins/github.sqlite now, and `c.env` deliberately carries no per-plugin handles
+// (docs/vNext/data.md § Plugin DBs). The handle arrives at plugin init, so no request can reach an
+// unmigrated database — and a second startServiceRuntime in one process builds fresh routers over its own
+// handle instead of inheriting a closed one.
+export const pulls = (db: PluginDatabase, core: Pick<CoreServices, 'tasks'>) => new Hono<AppEnv>().get('/:owner/:repo/pulls', async (c) => {
   const uid = ownerId(c)
   const token = await githubToken(c)
 
-  const db = getDb(c.env)
   const userId = uid
   const owner = c.req.param('owner')
   const repo = c.req.param('repo')
@@ -65,16 +71,16 @@ export const pulls = new Hono<AppEnv>().get('/:owner/:repo/pulls', async (c) => 
 
   const resource = pullsResource(repoId, 'open')
   const scope = and(
-    eq(schema.pullRequests.userId, userId),
-    eq(schema.pullRequests.repoId, repoId),
-    eq(schema.pullRequests.state, 'open'),
+    eq(pullRequests.userId, userId),
+    eq(pullRequests.repoId, repoId),
+    eq(pullRequests.state, 'open'),
   )
 
   const readRows = () =>
-    db.select().from(schema.pullRequests).where(scope).orderBy(desc(schema.pullRequests.updatedAt))
+    db.select().from(pullRequests).where(scope).orderBy(desc(pullRequests.updatedAt))
   const readPublicRows = async () => (await readRows()).map(toPublic)
   const readSync = async () =>
-    (await db.select().from(schema.syncState).where(and(eq(schema.syncState.userId, userId), eq(schema.syncState.resource, resource))))[0]
+    (await db.select().from(syncState).where(and(eq(syncState.userId, userId), eq(syncState.resource, resource))))[0]
 
   // Cold only when the list was never fetched (no sync row). A synced-but-empty repo returns
   // `{ data: [], fetchedAt }` so it serves as fresh/stale, never re-blocks.
@@ -84,7 +90,7 @@ export const pulls = new Hono<AppEnv>().get('/:owner/:repo/pulls', async (c) => 
     return { data: await readPublicRows(), fetchedAt: sync.fetchedAt }
   }
 
-  const refresh = () => refreshOpenPulls(token, db, { userId, repoId, owner, repo })
+  const refresh = () => refreshOpenPulls(token, db, core, { userId, repoId, owner, repo })
 
   const result = await serveThenRevalidate({
     resource,
@@ -117,7 +123,7 @@ const ghToPublic = (p: GitHubPull) =>
 
 // Public projection — the fields the SPA PR list needs; no staleness bookkeeping. Reads the full
 // mirror row so merge state (owned by the detail route) rides along.
-const toPublic = (r: typeof schema.pullRequests.$inferSelect) =>
+const toPublic = (r: typeof pullRequests.$inferSelect) =>
   ({
     number: r.number,
     title: r.title,

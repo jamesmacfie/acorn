@@ -3,7 +3,7 @@
 // What the composition root used to do by hand: plugins/memory's registerKnowledgeIpc constructed the
 // NotesStore, apps/node/src/service/runtime.ts pulled that instance back out of the `memory.knowledge`
 // capability and threaded it into three separate wiring calls (contextSectionsWiring, agentToolsWiring,
-// workflowWiring) plus the task-note seeder, and the four `notes_*` agent tools were declared in an
+// the workflow wiring) plus the task-note seeder, and the four `notes_*` agent tools were declared in an
 // app-layer file holding every unconvertible plugin's deps in one bag. All of that is here now.
 //
 // **No database.** Notes are plain markdown files with a frontmatter block under

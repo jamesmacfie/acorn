@@ -6,7 +6,10 @@ import { getDb, schema } from '@acorn/node-core/server/db/index.ts'
 import type { AppEnv } from '@acorn/node-core/server/middleware/auth.ts'
 import { buildContextSections, setContextSections, type ContextMemorySource, type ContextNotesSource } from '@acorn/node-core/server/agentTools/contextSections.ts'
 import { taskContext } from '@acorn/node-core/server/routes/taskContext.ts'
-import { makeTestDb, type TestDb } from '@acorn/node-core/server/routes/testDb.ts'
+import { makeTestDb, makeTestPluginDb, type TestDb, type TestPluginDb } from '@acorn/node-core/server/routes/testDb.ts'
+import { migrationsDir as githubMigrationsDir } from '@acorn/plugin-github/node/migrations.ts'
+import { mirroredPullRequest } from '@acorn/plugin-github/server/mirrorQueries.ts'
+import { pullRequests, prFiles, repos } from '@acorn/plugin-github/node/schema.ts'
 import type { Env } from '@acorn/node-core/main/bindings.ts'
 
 vi.mock('@acorn/node-core/server/db/index.ts', async (importOriginal) => {
@@ -16,15 +19,28 @@ vi.mock('@acorn/node-core/server/db/index.ts', async (importOriginal) => {
 
 describe('GET /api/tasks/:id/context (docs/agent-tools.md §4)', () => {
   let t: TestDb
+  // The github mirror is a SECOND database now (docs/vNext/data.md § Plugin DBs), so the `pr` section's
+  // fixture is seeded into the plugin's own migrated file and reaches the section through the same
+  // injected source production uses. Two handles in one test is the honest shape: the assertions below
+  // still exercise `mirroredPullRequest` for real rather than a hand-written stand-in, which is what keeps
+  // them able to catch a drift between the section's contract and the mirror's columns.
+  let gh: TestPluginDb
   let app: Hono<AppEnv>
   let notesSource: ContextNotesSource
   let memorySource: ContextMemorySource
 
   beforeEach(async () => {
     t = makeTestDb()
+    gh = makeTestPluginDb('github', githubMigrationsDir())
     notesSource = async () => []
     memorySource = async () => []
-    setContextSections(buildContextSections({ notes: (...args) => notesSource(...args), memory: (...args) => memorySource(...args) }))
+    setContextSections(
+      buildContextSections({
+        notes: (...args) => notesSource(...args),
+        memory: (...args) => memorySource(...args),
+        pullRequest: (userId, owner, name, number) => mirroredPullRequest(gh.db, userId, owner, name, number),
+      }),
+    )
     vi.mocked(getDb).mockReturnValue(t.db)
     app = new Hono<AppEnv>()
     app.use('/api/*', async (c, next) => {
@@ -48,7 +64,7 @@ describe('GET /api/tasks/:id/context (docs/agent-tools.md §4)', () => {
       updatedAt: now,
       archivedAt: null,
     })
-    await t.db.insert(schema.repos).values({
+    await gh.db.insert(repos).values({
       userId: 'james',
       id: 99,
       owner: 'acme',
@@ -58,7 +74,7 @@ describe('GET /api/tasks/:id/context (docs/agent-tools.md §4)', () => {
       pushedAt: null,
       fetchedAt: now,
     })
-    await t.db.insert(schema.pullRequests).values({
+    await gh.db.insert(pullRequests).values({
       userId: 'james',
       repoId: 99,
       number: 813,
@@ -77,7 +93,7 @@ describe('GET /api/tasks/:id/context (docs/agent-tools.md §4)', () => {
       autoMergeEnabled: false,
       fetchedAt: now,
     })
-    await t.db.insert(schema.prFiles).values([
+    await gh.db.insert(prFiles).values([
       { userId: 'james', repoId: 99, number: 813, path: 'src/auth/login.ts', status: 'modified', additions: 3, deletions: 1, sha: 's1' },
       { userId: 'james', repoId: 99, number: 813, path: 'src/auth/token.ts', status: 'modified', additions: 1, deletions: 0, sha: 's2' },
     ])
@@ -104,7 +120,8 @@ describe('GET /api/tasks/:id/context (docs/agent-tools.md §4)', () => {
   })
 
   afterEach(() => {
-    setContextSections(buildContextSections({ notes: async () => [], memory: async () => [] }))
+    setContextSections(buildContextSections({ notes: async () => [], memory: async () => [], pullRequest: async () => null }))
+    gh.cleanup()
     t.cleanup()
   })
 

@@ -12,10 +12,10 @@ plan.md names four. Honestly assessed:
 
 | Exit criterion | State |
 | --- | --- |
-| every plugin initializes through the plugin API with its own DB | **partial** — ten plugins are through it (agents, changes, database, memory, docker, editor, terminal, http, notes, workflows). Three are not: github, and linear/rollbar — which SHARE the `issues` table, so neither moves until that ownership is decided |
+| every plugin initializes through the plugin API with its own DB | **substantially done** — eleven plugins are `NodePlugin`s; **no plugin reads core's schema any more** (the ratchet is at zero, verified non-vacuous). `linear` and `rollbar` are the literal exception: they own no tables and no routes of their own, registering through the integration-provider registry, so a `NodePlugin` shell would carry nothing |
 | core services have direct unit/integration tests (confinement, env allowlists, kill trees, secret non-disclosure) | **done** — all four, plus the process-broker taxonomy |
 | the terminal scope-shed is complete | **done** |
-| boundary baseline shrinks to only the edges scheduled for phase 3 | **partly** — the plugin→plugin ledger is 9 → 6. The UI-kit extraction removed `changes -> github` and `database -> editor` (the two Phase 2 owned); the `notes.store` capability removed `memory -> notes`, which plugins.md had listed as Phase 3's. The remaining six are Phase 3's. The schema-import ratchet went 14 → 4. |
+| boundary baseline shrinks to only the edges scheduled for phase 3 | **done** — the plugin→plugin ledger is 9 → 6, and every remaining entry is a Phase 3 client edge. The UI-kit extraction removed `changes -> github` and `database -> editor` (the two Phase 2 owned); the `notes.store` capability removed `memory -> notes`, which plugins.md had listed as Phase 3's. The remaining six are Phase 3's. The schema-import ratchet went 14 → 4. |
 
 So Phase 3 can start on the coupling map — its seven edges are exactly what is left — but "every plugin
 initializes through the plugin API" is not true yet, and the client half of the plugin host
@@ -157,15 +157,15 @@ an existing root opening.
 
 These are Phase 2 scope that has **not** landed. Do not assume any of it.
 
-- **Three plugin conversions.** Converted with their own schema, chain and SQLite file: `agents`,
-  `changes`, `database`, `memory`, `terminal`, `http`, `workflows`. Converted with no database because they own no
+- **Nothing, for the database split.** The schema-import ratchet is at **zero**: no plugin imports
+  core's table barrel. Own schema, chain and SQLite file: `agents`, `changes`, `database`, `github`,
+  `memory`, `terminal`, `http`, `workflows`. Converted with no database because they own no
   tables — the honest outcome, not a gap: `docker`, `editor`, `notes` (notes are markdown files with a
   frontmatter block under `<data-root>/notes/`, so there is nothing to migrate and deliberately no
-  `dispose`). Outstanding: `github` (twelve mirror tables, and core's
-  `contextSections.ts`/`storageFootprint.ts` read them), and `linear` + `rollbar`, which SHARE the
-  `issues` table — that shared ownership needs deciding before either can move, and it is the reason
-  they are last rather than a matter of effort. The schema-import ratchet records the remaining three
-  packages, so progress is measurable and cannot regress.
+  `dispose`). The literal gap: `linear` and `rollbar` are still not
+  `NodePlugin`s. They own no tables (see the `issues` decision below) and no routes of their own — they
+  register through the integration-provider registry — so the shell would hold nothing. Named rather
+  than papered over.
 - **The cross-boundary reads that block the hard three.** Still outstanding: core's
   `agentTools/contextSections.ts` reads github's `repos`/`pull_requests`/`pr_files` and linear/rollbar's
   `issues`; `main/storageFootprint.ts` counts rows in four plugin tables; `routes/pins.ts` owns
@@ -173,11 +173,14 @@ These are Phase 2 scope that has **not** landed. Do not assume any of it.
   agents' three `agent_* ⋈ tasks ⋈ workspace_repos` joins are the only real cross-DB joins in the
   codebase. `CoreServices.tasks.idsForWorkspace()` exists for that last one but has **no caller yet**.
 - **Part of `apps/node/src/wiring/`.** Deleted, each into the plugin whose engine it drove:
-  `managedWorkflowStep.ts`, `harnessWiring.ts`, `serverBridges.ts`, `managedAgentsWiring.ts`. Still
-  present, each for a stated reason: `agentToolsWiring.ts` (core's own tools plus `browser_*`),
-  `workflowWiring.ts` (44 lines — one github-mirror query), `contextSectionsWiring.ts` (core's
-  single-slot context assembler), `startupSecurity.ts` (github's mirror prune), `configTrustWiring.ts`,
-  and `agentProfiles.ts` — which is **core's, deliberately**: it registers three separate plugins
+  `managedWorkflowStep.ts`, `harnessWiring.ts`, `serverBridges.ts`, `managedAgentsWiring.ts`,
+  `workflowWiring.ts` (its one github-mirror query became a `github.mirror` capability),
+  `startupSecurity.ts` (the mirror prune moved into github's pre-listener `init`). And
+  `apps/node/src/server/routes.ts` is now **empty** — the app names no product route module at all,
+  which is that file's Phase 2 exit condition. Still present, each for a stated reason:
+  `agentToolsWiring.ts` (core's own tools plus `browser_*`), `contextSectionsWiring.ts` (core's
+  single-slot context assembler), `configTrustWiring.ts`, and `agentProfiles.ts` — which is **core's,
+  deliberately**: it registers three separate plugins
   (`profiles-claude`, `profiles-codex`, `profiles-aider`) into a core registry consumed by terminal,
   workflows and agents. Moving it into agents would make agents own three other plugins' registration
   and add three ledger edges.
@@ -328,7 +331,7 @@ Two things this did NOT finish, both stated rather than glossed:
 
 ## Data loss on upgrade, stated once and plainly
 
-Six plugins moved tables out of `core.sqlite` this phase, and every one of them did it with a
+Eight plugins moved tables out of `core.sqlite` this phase, and every one of them did it with a
 generated `DROP TABLE` in core's chain and an empty `CREATE` in the plugin's. **Nothing copies the
 rows.** An existing pre-release data root therefore loses its review notes, saved queries, memories,
 terminal session rows, HTTP-panel requests, workflow runs and — the one that will be noticed — its
@@ -338,6 +341,42 @@ That is consistent with plan.md § Phase 1's "data roots created during phases 1
 with the recorded decision to keep a DROP rather than reset core's chain. It is a deliberate trade-off,
 not an oversight. It is called out here because six separate commits each made it quietly, and anyone
 reading them one at a time would not see the aggregate.
+
+## `issues` stays a core table, and that is the decision
+
+`linear` and `rollbar` both wrote core's `issues`, and two plugins cannot own one table. The resolution
+is that neither does: `issues` and `issue_resources` are **core's**, and the coupling removed was the
+database HANDLE, not the storage. Four reasons, in the order that actually decided it:
+
+1. **The shape is core's.** One opaque JSON `data` column keyed `(userId, integrationId, identifier)`,
+   where `integrationId` points at core's `integrations`. Nothing in the column list says "linear" or
+   "rollbar" — a third provider adds rows, not a table.
+2. **`task_links` is core's, and its primary-key tail is deliberately the same
+   `(integrationId, identifier)`** so a link resolves straight to cached detail. Core's context
+   assembler walks exactly that join. Moving `issues` turns "what external items is this task about?"
+   into a per-provider fan-out that returns *nothing* for a disabled plugin — the section would
+   silently shrink rather than fail, which is the worst available failure mode. A copy per plugin makes
+   the question have no single answer at all.
+3. **Disconnecting an integration stays atomic.** `db/cascade.ts` deletes `workspace_projects`,
+   `issues`, `issue_resources`, the `provider:%` freshness markers, `task_links` and `integrations` in
+   one `db.batch`. Keeping these in core keeps all six in one file, so it is still a transaction.
+   Splitting them would need data.md's `operations` saga table, which has no other consumer.
+4. **Core already owned the machinery.** `server/integrations/resourceRuntime.ts` runs
+   serve-then-revalidate for provider resources; the plugins never opened a database, they were *handed*
+   core's handle.
+
+So the fix is a seam: `ExternalItemStore` (`server/integrations/itemStore.ts`), scoped to one owner at
+construction and carrying only the six operations the two providers perform. A provider sees its six
+operations, never a database handle. **A direct payoff: no event bus was needed.** `cascade.ts` is
+untouched and still spans one file, so the bus that was written and deleted in W1 stays deleted.
+
+## One atomicity loss, named rather than hidden
+
+`pullRefresh` used to write core's `tasks` INSIDE its mirror `db.batch` — adopting a PR number onto a
+matching local task in the same transaction as the mirror rows. Those are now two files, so that is
+gone. `CoreServices.tasks.adoptPullNumbers` runs after the batch, is idempotent (fills only a NULL
+`pullNumber`), and self-heals on the next refresh. Two tests pin that it never runs before the fetch and
+never overwrites an existing PR number.
 
 ## Known gaps worth stating plainly
 

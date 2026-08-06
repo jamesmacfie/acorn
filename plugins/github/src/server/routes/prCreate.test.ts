@@ -1,10 +1,11 @@
-import { testSecretEnv } from '@acorn/node-core/server/routes/testDb.ts'
+import { makeTestPluginDb, testSecretEnv, type TestPluginDb } from '@acorn/node-core/server/routes/testDb.ts'
 import { Hono } from 'hono'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { ApiError } from '@acorn/protocol/api.ts'
 import { gh } from '..'
 import type { AppEnv, Principal } from '@acorn/node-core/server/middleware/auth.ts'
 import { prCreate } from './prCreate'
+import { migrationsDir } from '../../node/migrations'
 import { testGate } from '@acorn/node-core/server/routes/testAuth.ts'
 import type { Env } from '@acorn/node-core/main/bindings.ts'
 
@@ -15,15 +16,23 @@ vi.mock('..', async (importOriginal) => {
 
 const PRINCIPAL: Principal = { kind: 'device', userId: 'james', deviceId: 'd1' }
 
-// The route reads the stored GitHub credential, so it needs a DB. Returning no rows is the
-// not-connected path; the token's value is irrelevant here because gh() itself is mocked.
+// TWO handles, for two different tables in two different files, which is the shape every github route
+// test has now:
+//   - `plugin.db` is this plugin's migrated github.sqlite, which the router is a factory over. None of
+//     the paths asserted below reach it (each returns before the sync-state bust), but it is a real
+//     migrated handle rather than a stub so the router cannot silently stop touching it unnoticed.
+//   - `env.DB` is CORE's, because the stored GitHub credential lives in core's `integrations` table and
+//     is read through the core seam. Returning no rows is the not-connected path; the token's value is
+//     irrelevant here because gh() itself is mocked.
 const noIntegrations = {
   select: () => ({ from: () => ({ where: async () => [] }) }),
   delete: () => ({ where: async () => undefined }),
 } as unknown as Env['DB']
 
+let plugin: TestPluginDb
+
 const post = (principal: Principal | null, body: unknown) => {
-  const app = new Hono<AppEnv>().use('/api/*', ...testGate(principal)).route('/api/repos', prCreate)
+  const app = new Hono<AppEnv>().use('/api/*', ...testGate(principal)).route('/api/repos', prCreate(plugin.db))
   return app.fetch(
     new Request('http://acorn.test/api/repos/acme/widget/pulls', {
       method: 'POST',
@@ -35,7 +44,11 @@ const post = (principal: Principal | null, body: unknown) => {
 }
 
 describe('prCreate auth + ApiError envelope', () => {
-  beforeEach(() => vi.mocked(gh).mockReset())
+  beforeEach(() => {
+    plugin = makeTestPluginDb('github', migrationsDir())
+    vi.mocked(gh).mockReset()
+  })
+  afterEach(() => plugin.cleanup())
 
   it('401s (ApiError) when logged out', async () => {
     const res = await post(null, { title: 't', base: 'main', head: 'feat' })

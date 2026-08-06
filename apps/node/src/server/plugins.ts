@@ -10,6 +10,7 @@ import { changesPlugin } from '@acorn/plugin-changes/node/index.ts'
 import { databasePlugin } from '@acorn/plugin-database/node/index.ts'
 import { dockerPlugin } from '@acorn/plugin-docker/node/index.ts'
 import { editorPlugin } from '@acorn/plugin-editor/node/index.ts'
+import { githubPlugin } from '@acorn/plugin-github/node/index.ts'
 import { httpPlugin } from '@acorn/plugin-http/node/index.ts'
 import { memoryPlugin, type MemoryPluginDeps } from '@acorn/plugin-memory/node/index.ts'
 import { notesPlugin } from '@acorn/plugin-notes/node/index.ts'
@@ -36,13 +37,14 @@ import { workflowsPlugin, type WorkflowsPluginDeps } from '@acorn/plugin-workflo
 //     which is why these arrive as thunks rather than as the resolved functions.
 //   - terminal.reconciled / workflows.reconciled — the composition root's own post-listener reconcile
 //     pass.
-//   - workflows.failingChecks — re-derives CI state from github's `repos`/`checks` mirror tables. github
-//     is not a NodePlugin, so there is no `github.checkState` capability to resolve. Left in
-//     wiring/workflowWiring.ts rather than moved to CoreServices, because it is github's question, not
-//     core's, and putting it on CoreServices now would mean moving it again when github converts.
+//   - workflows.failingChecks — re-derives CI state from github's `repos`/`checks`. This one CLOSED: it
+//     is `github.mirror.failingChecks` now, resolved from the registry at call time, and
+//     wiring/workflowWiring.ts is deleted. It arrives as a dep only because the composition root also has
+//     to supply the node's active GitHub identity, which is not a plugin's to read.
 //
-// plugins/notes takes NO deps: it owns its note files outright and everything it reads about a task
-// arrives through CoreServices.
+// plugins/github and plugins/notes take NO deps. github owns thirteen tables, thirteen routers and one
+// capability, and everything it needs about a task arrives through CoreServices; notes owns its note
+// files outright on the same terms.
 export type NodePluginDeps = {
   agents: AgentsPluginDeps
   memory: MemoryPluginDeps
@@ -59,6 +61,7 @@ export const nodePlugins = (dataDir: string, deps: NodePluginDeps): NodePlugin[]
   databasePlugin(dataDir),
   dockerPlugin(),
   editorPlugin(),
+  githubPlugin(dataDir),
   httpPlugin(dataDir),
   memoryPlugin(dataDir, deps.memory),
   notesPlugin(dataDir),

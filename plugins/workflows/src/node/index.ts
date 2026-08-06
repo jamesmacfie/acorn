@@ -10,7 +10,8 @@
 // surface resolves anything this plugin provides. The one consumer of its capability — the composition
 // root's reconcile pass — uses `get`, not `require`.
 //
-// Five deps could NOT move, and each has a real blocker rather than an unfinished edge:
+// Four deps could NOT move, and each has a real blocker rather than an unfinished edge. The fifth,
+// `failingChecks`, CLOSED when github converted — see the note at the end of this list:
 //
 //   - `internalEnv` mints the loopback credential a step runs under. It closes over the listener's
 //     origin, which does not exist until after every plugin's init has run, and over INTERNAL_TOKEN —
@@ -23,12 +24,16 @@
 //     plugin's main/ rather than a contract/ (its value still exposes an internal store), so importing
 //     it here would ADD a workflows→memory coupling edge — an addition to the plugin→plugin baseline
 //     that Phase 3 exists to shrink. The composition root resolves it at CALL time instead.
-//   - `failingChecks` reads github's `repos` and `checks` mirror tables. github is NOT converted, so
-//     there is no `github.checkState` capability to resolve and no owner to publish one. A
-//     CoreServices member would be the wrong answer: "are this PR's checks green" is github's question,
-//     not core's, and enshrining it on CoreServices now would mean moving it again the day github
-//     converts. So the query stays in apps/node/src/wiring/workflowWiring.ts and arrives as a dep —
-//     the app is allowed to read both, which is exactly what an unconverted plugin's data needs.
+//
+// `failingChecks` used to be the fifth, and it is the one this phase resolved. It re-derives CI state from
+// github's `repos` and `checks`, and it lived in apps/node/src/wiring/workflowWiring.ts purely because
+// github was not a NodePlugin and so could not publish the capability. It can now: the query is
+// `github.mirror.failingChecks` (plugins/github/src/contract/mirror.ts) and that wiring file is deleted.
+// It still arrives here as a DEP rather than being resolved in this file, and that is not a leftover —
+// the call needs the node's active GitHub identity, which lives in the runtime bindings and is not a
+// plugin's to read, so the composition root resolves the capability and supplies the identity together.
+// A CoreServices member would still have been the wrong answer: "are this PR's checks green" is github's
+// question, not core's.
 import { homedir } from 'node:os'
 import { formatContextBlock } from '@acorn/protocol/contextBlock.ts'
 import { AGENTS_SESSION_EXECUTE } from '@acorn/plugin-agents/contract/sessionExecute.ts'

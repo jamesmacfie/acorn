@@ -8,6 +8,7 @@ import { respondError } from '../respond'
 import type { Workspace, WorkspaceProject, WorkspaceProjectsResponse, WorkspaceRepo, WorkspaceSeed } from '@acorn/protocol/api.ts'
 import { isValidWorkspaceColor, isValidWorkspaceIcon, parseWorkspaceIcon, serializeWorkspaceIcon } from '@acorn/protocol/workspaceIdentity.ts'
 import { getConnection } from '../integrations/connections'
+import { repoMirrorSource } from '../repoMirror'
 
 // Workspaces (docs/workspaces-and-tasks.md): named GROUPS of repos — the top-level unit. Machine-scoped (no
 // user_id) like tasks / repo_paths, but auth-gated. A repo belongs to exactly one workspace
@@ -62,7 +63,10 @@ export const workspaces = new Hono<AppEnv>()
     const uid = ownerId(c)
     const db = getDb(c.env)
     const defaultId = await ensureDefault(db)
-    const repos = await db.select().from(schema.repos).where(eq(schema.repos.userId, uid))
+    // The candidate list is github's mirror, not a core table any more (server/repoMirror.ts). Bootstrap is
+    // idempotent by design, so an empty answer from a cold mirror means "nothing to assign yet" and the
+    // next run picks the repos up — which is exactly what it already did before the first sync.
+    const repos = await repoMirrorSource().list(uid)
     const mapped = await db.select().from(schema.workspaceRepos)
     const ignored = await ignoredRepoSet(db)
     const skip = new Set([...mapped.map((m) => `${m.repoOwner}/${m.repoName}`), ...ignored])
@@ -169,7 +173,7 @@ export const workspaces = new Hono<AppEnv>()
     const body = (await c.req.json().catch(() => ({}))) as { ignored?: boolean }
     const db = getDb(c.env)
     if (body.ignored) {
-      const repos = await db.select().from(schema.repos).where(eq(schema.repos.userId, uid))
+      const repos = await repoMirrorSource().list(uid)
       if (repos.length) {
         const now = Date.now()
         await db.insert(schema.ignoredRepos).values(repos.map((r) => ({ owner: r.owner, repo: r.name, createdAt: now }))).onConflictDoNothing()

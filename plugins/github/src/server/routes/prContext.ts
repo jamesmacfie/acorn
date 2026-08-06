@@ -1,12 +1,15 @@
 import { and, eq } from 'drizzle-orm'
 import type { Context } from 'hono'
-import { getDb, schema } from '@acorn/node-core/server/db/index.ts'
-import { prResource } from '@acorn/node-core/server/db/resourceKeys.ts'
+import { prResource } from '../resourceKeys'
 import type { AppEnv } from '@acorn/node-core/server/middleware/auth.ts'
 import { ownerId } from '@acorn/node-core/server/middleware/requireUser.ts'
 import { githubToken } from '../githubToken'
+import { pullRequests, repos, syncState } from '../../node/schema'
+import type { PluginDatabase } from '@acorn/node-core/main/pluginStorage.ts'
 
-type Db = ReturnType<typeof getDb>
+// The write paths reach the mirror through the handle resolvePr was given, which is what keeps prActions
+// and friends from needing one of their own.
+type Db = PluginDatabase
 type PrFailure = { error: 'bad_number'; status: 400 } | { error: 'repo_not_found'; status: 404 }
 type PrContext = {
   // The two things every write path actually needs, instead of a whole SessionUser: the GitHub
@@ -28,26 +31,25 @@ type PrContext = {
 // Every PR write targets a PR the user is looking at, so its repo (and usually the PR row) is
 // already mirrored; a miss here means the client skipped the read path, and 404 is the honest
 // answer rather than lazily mirroring on a write.
-export async function resolvePr(c: Context<AppEnv>): Promise<PrFailure | PrContext> {
+export async function resolvePr(db: PluginDatabase, c: Context<AppEnv>): Promise<PrFailure | PrContext> {
   const userId = ownerId(c) // auth is enforced by requireUser upstream
-  const db = getDb(c.env)
   const owner = c.req.param('owner')!
   const repo = c.req.param('repo')!
   const number = Number(c.req.param('number'))
   if (!Number.isInteger(number)) return { error: 'bad_number' as const, status: 400 as const }
   const [repoRow] = await db
-    .select({ id: schema.repos.id })
-    .from(schema.repos)
-    .where(and(eq(schema.repos.userId, userId), eq(schema.repos.owner, owner), eq(schema.repos.name, repo)))
+    .select({ id: repos.id })
+    .from(repos)
+    .where(and(eq(repos.userId, userId), eq(repos.owner, owner), eq(repos.name, repo)))
   if (!repoRow) return { error: 'repo_not_found' as const, status: 404 as const }
   const [pr] = await db
-    .select({ nodeId: schema.pullRequests.nodeId, headSha: schema.pullRequests.headSha })
-    .from(schema.pullRequests)
+    .select({ nodeId: pullRequests.nodeId, headSha: pullRequests.headSha })
+    .from(pullRequests)
     .where(
       and(
-        eq(schema.pullRequests.userId, userId),
-        eq(schema.pullRequests.repoId, repoRow.id),
-        eq(schema.pullRequests.number, number),
+        eq(pullRequests.userId, userId),
+        eq(pullRequests.repoId, repoRow.id),
+        eq(pullRequests.number, number),
       ),
     )
   return {
@@ -63,13 +65,13 @@ export async function resolvePr(c: Context<AppEnv>): Promise<PrFailure | PrConte
   }
 }
 
-export const bustPrSync = (db: ReturnType<typeof getDb>, userId: string, repoId: number, number: number) =>
+export const bustPrSync = (db: PluginDatabase, userId: string, repoId: number, number: number) =>
   db
-    .delete(schema.syncState)
-    .where(and(eq(schema.syncState.userId, userId), eq(schema.syncState.resource, prResource(repoId, number))))
+    .delete(syncState)
+    .where(and(eq(syncState.userId, userId), eq(syncState.resource, prResource(repoId, number))))
 
-export const setPrState = (db: ReturnType<typeof getDb>, userId: string, repoId: number, number: number, state: string) =>
+export const setPrState = (db: PluginDatabase, userId: string, repoId: number, number: number, state: string) =>
   db
-    .update(schema.pullRequests)
+    .update(pullRequests)
     .set({ state })
-    .where(and(eq(schema.pullRequests.userId, userId), eq(schema.pullRequests.repoId, repoId), eq(schema.pullRequests.number, number)))
+    .where(and(eq(pullRequests.userId, userId), eq(pullRequests.repoId, repoId), eq(pullRequests.number, number)))

@@ -1,10 +1,8 @@
-import { and, eq } from 'drizzle-orm'
 import type {
   RollbarItemMetadata,
   RollbarOccurrenceDetail,
   RollbarOccurrencesResponse,
 } from '@acorn/protocol/api.ts'
-import { schema } from '@acorn/node-core/server/db/index.ts'
 import { isRecord, parseJson } from '@acorn/node-core/server/integrations/codec.ts'
 import type {
   MirroredResourceContribution,
@@ -48,21 +46,16 @@ const resourceKey = (
   identifier: string,
 ) => `provider:rollbar:${connectionId}:${resource}:${issueIdentifier}:${identifier}`
 
+// Both wrappers survive the move to the external-item store for one reason: the store types `resource`
+// as a bare string, and `ChildResource` is what stops an occurrence list and an occurrence detail from
+// ever being written under each other's key. They also hold the two constants — the connection scope and
+// the 'rollbar' provider tag — that every call site would otherwise repeat.
 const resourceRow = (
-  context: Pick<ProviderResourceContext, 'db' | 'userId' | 'connection'>,
+  context: Pick<ProviderResourceContext, 'items' | 'connection'>,
   issueIdentifier: string,
   resource: ChildResource,
   identifier: string,
-) => context.db
-  .select()
-  .from(schema.issueResources)
-  .where(and(
-    eq(schema.issueResources.userId, context.userId),
-    eq(schema.issueResources.integrationId, context.connection.id),
-    eq(schema.issueResources.issueIdentifier, issueIdentifier),
-    eq(schema.issueResources.resource, resource),
-    eq(schema.issueResources.identifier, identifier),
-  ))
+) => context.items.readResource(context.connection.id, issueIdentifier, resource, identifier)
 
 async function writeResource(
   context: ProviderResourceRefreshContext,
@@ -74,29 +67,18 @@ async function writeResource(
   // Version the storage envelope independently from the public contract (see
   // CHILD_CACHE_SCHEMA_VERSION above for the current version's rationale).
   const data = JSON.stringify({ schemaVersion: CHILD_CACHE_SCHEMA_VERSION, value })
+  // Checked here rather than in the store: refusing the write is a RESULT this caller reports upward as
+  // `provider_response_too_large`, not a storage-layer error.
   if (Buffer.byteLength(data, 'utf8') > context.limits.maxCachedItemBytes) return false
-  await context.db
-    .insert(schema.issueResources)
-    .values({
-      userId: context.userId,
-      integrationId: context.connection.id,
-      provider: 'rollbar',
-      issueIdentifier,
-      resource,
-      identifier,
-      data,
-      fetchedAt: context.now,
-    })
-    .onConflictDoUpdate({
-      target: [
-        schema.issueResources.userId,
-        schema.issueResources.integrationId,
-        schema.issueResources.issueIdentifier,
-        schema.issueResources.resource,
-        schema.issueResources.identifier,
-      ],
-      set: { data, fetchedAt: context.now },
-    })
+  await context.items.writeResource({
+    connectionId: context.connection.id,
+    provider: 'rollbar',
+    issueIdentifier,
+    resource,
+    identifier,
+    data,
+    fetchedAt: context.now,
+  })
   return true
 }
 
@@ -121,7 +103,7 @@ export function createRollbarOccurrenceResources(dependencies: Dependencies) {
     merge: 'replace',
     key: (connectionId, input) => resourceKey(connectionId, input.identifier, 'occurrence-list', 'list'),
     async read(context, input) {
-      const [row] = await resourceRow(context, input.identifier, 'occurrence-list', 'list')
+      const row = await resourceRow(context, input.identifier, 'occurrence-list', 'list')
       if (!row) return null
       const value = readVersioned(row.data)
       return isOccurrences(value) ? { data: value, fetchedAt: row.fetchedAt } : null
@@ -161,7 +143,7 @@ export function createRollbarOccurrenceResources(dependencies: Dependencies) {
     merge: 'replace',
     key: (connectionId, input) => resourceKey(connectionId, input.identifier, 'occurrence', input.occurrenceId),
     async read(context, input) {
-      const [row] = await resourceRow(context, input.identifier, 'occurrence', input.occurrenceId)
+      const row = await resourceRow(context, input.identifier, 'occurrence', input.occurrenceId)
       if (!row) return null
       const value = readVersioned(row.data)
       return isOccurrence(value) ? { data: value, fetchedAt: row.fetchedAt } : null

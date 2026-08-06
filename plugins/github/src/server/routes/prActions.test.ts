@@ -1,41 +1,48 @@
 import { Hono } from 'hono'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { ApiError } from '@acorn/protocol/api.ts'
-import { getDb, schema } from '@acorn/node-core/server/db/index.ts'
 import type { AppEnv, Principal } from '@acorn/node-core/server/middleware/auth.ts'
 import { prActions } from './prActions'
 import { testGate } from '@acorn/node-core/server/routes/testAuth.ts'
-import { makeTestDb, type TestDb } from '@acorn/node-core/server/routes/testDb.ts'
+import { makeTestDb, makeTestPluginDb, testSecretEnv, type TestDb, type TestPluginDb } from '@acorn/node-core/server/routes/testDb.ts'
+import { migrationsDir } from '../../node/migrations'
 import type { Env } from '@acorn/node-core/main/bindings.ts'
+import { repos } from '../../node/schema'
 
-vi.mock('@acorn/node-core/server/db/index.ts', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('@acorn/node-core/server/db/index.ts')>()
-  return { ...actual, getDb: vi.fn() }
-})
+// TWO handles, deliberately, and the getDb mock this test used to need is gone with them. `repos` is this
+// plugin's table in <data-root>/plugins/github.sqlite and the router is a factory over that handle;
+// `env.DB` is CORE's, because resolvePr finishes by reading the stored GitHub credential out of core's
+// `integrations` table through the core seam. No integration is seeded — the token resolves to '' and
+// every path asserted below returns before it would be spent.
+const ENC_KEY = '0'.repeat(64)
 
 const PRINCIPAL: Principal = { kind: 'device', userId: 'james', deviceId: 'd1' }
 
+let core: TestDb
+let plugin: TestPluginDb
+
 const req = (principal: Principal | null, method: string, path: string, body?: unknown) => {
-  const app = new Hono<AppEnv>().use('/api/*', ...testGate(principal)).route('/api/repos', prActions)
+  const app = new Hono<AppEnv>().use('/api/*', ...testGate(principal)).route('/api/repos', prActions(plugin.db))
   return app.fetch(
     new Request(`http://acorn.test${path}`, {
       method,
       headers: body === undefined ? undefined : { 'content-type': 'application/json' },
       body: body === undefined ? undefined : JSON.stringify(body),
     }),
-    {} as Env,
+    { DB: core.db, ...testSecretEnv(ENC_KEY) } as Env,
   )
 }
 
 describe('prActions auth + ApiError envelope (no GitHub call paths)', () => {
-  let t: TestDb
-
   beforeEach(async () => {
-    t = makeTestDb()
-    vi.mocked(getDb).mockReturnValue(t.db)
-    await t.db.insert(schema.repos).values({ userId: 'james', id: 1, owner: 'acme', name: 'widget', fetchedAt: Date.now() })
+    core = makeTestDb()
+    plugin = makeTestPluginDb('github', migrationsDir())
+    await plugin.db.insert(repos).values({ userId: 'james', id: 1, owner: 'acme', name: 'widget', fetchedAt: Date.now() })
   })
-  afterEach(() => t.cleanup())
+  afterEach(() => {
+    plugin.cleanup()
+    core.cleanup()
+  })
 
   it('401s (ApiError) when logged out', async () => {
     const res = await req(null, 'POST', '/api/repos/acme/widget/pulls/1/merge', { method: 'merge' })

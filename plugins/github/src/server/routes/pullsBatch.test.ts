@@ -1,18 +1,13 @@
 import { testSecretEnv } from '@acorn/node-core/server/routes/testDb.ts'
 import { Hono } from 'hono'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { getDb } from '@acorn/node-core/server/db/index.ts'
 import type { AppEnv } from '@acorn/node-core/server/middleware/auth.ts'
 import { PULLS_STALE_AFTER_MS as STALE_AFTER_MS } from '@acorn/node-core/server/sync/policy.ts'
 import { readComposite, readFiles } from './prMirror'
 import { pullsBatch } from './pullsBatch'
 import { resolveRepoForUser } from './repoMirror'
 import type { Env } from '@acorn/node-core/main/bindings.ts'
-
-vi.mock('@acorn/node-core/server/db/index.ts', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('@acorn/node-core/server/db/index.ts')>()
-  return { ...actual, getDb: vi.fn() }
-})
+import type { PluginDatabase } from '@acorn/node-core/main/pluginStorage.ts'
 
 vi.mock('..', async (importOriginal) => {
   const actual = await importOriginal<typeof import('..')>()
@@ -36,13 +31,6 @@ vi.mock('./prMirror', async (importOriginal) => {
   }
 })
 
-const app = new Hono<AppEnv>()
-app.use('/api/*', async (c, next) => {
-  c.set('principal', { kind: 'device', userId: 'james' })
-  await next()
-})
-app.route('/api/repos', pullsBatch)
-
 const jsonRequest = (body: unknown) =>
   new Request('http://acorn.test/api/repos/acorn/web/pulls/batch', {
     method: 'POST',
@@ -50,21 +38,40 @@ const jsonRequest = (body: unknown) =>
     body: JSON.stringify(body),
   })
 
-const makeDb = () => ({
-  select: vi.fn(() => ({
-    from: vi.fn(() => ({
-      where: vi.fn(async () => [
-        { resource: 'pr:19847:42', fetchedAt: Date.now() - STALE_AFTER_MS + 1000 },
-        { resource: 'files:19847:42', fetchedAt: Date.now() - STALE_AFTER_MS + 1000 },
-      ]),
+// The plugin handle the router is a factory over. It answers exactly one query — the per-PR `sync_state`
+// freshness read — because every mirror read/write around it is mocked above; both resources come back
+// fresh so nothing reaches GitHub. It is handed to the factory directly now instead of through a getDb
+// mock, which is why that mock is gone.
+const makeDb = () =>
+  ({
+    select: vi.fn(() => ({
+      from: vi.fn(() => ({
+        where: vi.fn(async () => [
+          { resource: 'pr:19847:42', fetchedAt: Date.now() - STALE_AFTER_MS + 1000 },
+          { resource: 'files:19847:42', fetchedAt: Date.now() - STALE_AFTER_MS + 1000 },
+        ]),
+      })),
     })),
-  })),
-})
+  }) as unknown as PluginDatabase
+
+// CORE's handle, on `env.DB`: the stored GitHub credential lives in core's `integrations` table and is
+// read through the core seam. No rows is the not-connected path, and the token is never spent here
+// because the batch is fully fresh.
+const noIntegrations = { select: () => ({ from: () => ({ where: async () => [] }) }) } as unknown as Env['DB']
+
+const env = () => ({ DB: noIntegrations, ...testSecretEnv('0'.repeat(64)) }) as unknown as Env
+
+let app: Hono<AppEnv>
 
 describe('pulls batch route', () => {
   beforeEach(() => {
     vi.clearAllMocks()
-    vi.mocked(getDb).mockReturnValue(makeDb() as never)
+    app = new Hono<AppEnv>()
+    app.use('/api/*', async (c, next) => {
+      c.set('principal', { kind: 'device', userId: 'james' })
+      await next()
+    })
+    app.route('/api/repos', pullsBatch(makeDb()))
     vi.mocked(resolveRepoForUser).mockResolvedValue({ ok: true, value: { repoId: 19847 } })
     vi.mocked(readComposite).mockResolvedValue({
       pull: null,
@@ -90,7 +97,7 @@ describe('pulls batch route', () => {
   })
 
   it('returns summary-mode file rows without reading patch bodies', async () => {
-    const res = await app.fetch(jsonRequest({ numbers: [42], files: 'summary' }), testSecretEnv('0'.repeat(64)) as unknown as Env)
+    const res = await app.fetch(jsonRequest({ numbers: [42], files: 'summary' }), env())
 
     expect(res.status).toBe(200)
     expect(await res.json()).toEqual([
@@ -114,7 +121,7 @@ describe('pulls batch route', () => {
   })
 
   it('keeps full file payloads as the backward-compatible default', async () => {
-    const res = await app.fetch(jsonRequest({ numbers: [42] }), testSecretEnv('0'.repeat(64)) as unknown as Env)
+    const res = await app.fetch(jsonRequest({ numbers: [42] }), env())
 
     expect(res.status).toBe(200)
     expect(readFiles).toHaveBeenCalledWith(expect.anything(), expect.anything(), { userId: 'james', repoId: 19847, number: 42 }, { includePatches: true })
