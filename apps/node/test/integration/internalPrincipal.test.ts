@@ -8,6 +8,7 @@ import { pairingCodes } from '@acorn/node-core/server/auth/pairingCodes.ts'
 import { encryptSecret } from '@acorn/node-core/server/secretBox.ts'
 import { mintInternalToken } from '@acorn/node-core/server/auth/internalTokens.ts'
 import { schema } from '@acorn/node-core/server/db/index.ts'
+import type { AppEnv } from '@acorn/node-core/server/middleware/auth.ts'
 import type { Env } from '@acorn/node-core/main/bindings.ts'
 
 // What an agent-spawned child may NOT do.
@@ -212,5 +213,62 @@ describe('a task-scoped credential is confined to its own task', () => {
 
   it('lets the service scope reach any task, since its calls are not task-specific', async () => {
     expect((await call('/v2/core/tasks/task-2/tools', { headers: asService })).status).toBe(503)
+  })
+})
+
+// The gate over the PLUGIN namespace, which Phase 2 left open: `requireTaskScope` was mounted only over
+// /v2/core/tasks/:id*, and zero of the sixteen plugin route files that read a taskId checked ownership.
+//
+// Asserted through a SYNTHETIC plugin rather than by walking the real ones, because the invariant is the
+// mount, not the plugin list: "any task-addressed path under /v2/p is gated". A per-plugin test would
+// pass while the next plugin to add a task route forgot the gate — which is exactly how this hole was
+// created at the core door and missed at the plugin one. Each plugin's own suite covers its handlers.
+describe('the task-scope gate covers the plugin namespace', () => {
+  const probeRoutes = async (prefix: string, path: string) => {
+    const { Hono } = await import('hono')
+    const { registerRoute, removePluginRoutes } = await import('@acorn/node-core/server/routeRegistry.ts')
+    removePluginRoutes('probe')
+    const router = new Hono<AppEnv>().get(path, (c) => c.json({ reached: c.req.param('id') }))
+    registerRoute({ plugin: 'probe', prefix, router })
+    return () => removePluginRoutes('probe')
+  }
+
+  // The two mount shapes real plugins use: `prefix: '/tasks'` with `/:id/...` (changes, database,
+  // editor) and `prefix: ''` with `/tasks/:id/...` (memory, workflows, docker).
+  for (const [label, prefix, path] of [
+    ["a '/tasks' prefix router", '/tasks', '/:id/thing'],
+    ['a root router with task paths', '', '/tasks/:id/thing'],
+  ] as const) {
+    it(`confines a task-scoped credential on ${label}`, async () => {
+      const cleanup = await probeRoutes(prefix, path)
+      try {
+        const own = await call('/v2/p/probe/tasks/task-1/thing', { headers: asAgent })
+        expect(own.status).toBe(200)
+        expect((await own.json()) as { reached: string }).toEqual({ reached: 'task-1' })
+        // The hole: before the mount this was a 200 into another task's resource.
+        expect((await call('/v2/p/probe/tasks/task-2/thing', { headers: asAgent })).status).toBe(404)
+        // A device is the owner and the service scope is unbound — both reach either task.
+        const { token } = await devices.issue('laptop')
+        for (const headers of [asService, { authorization: `Bearer ${token}` }]) {
+          expect((await call('/v2/p/probe/tasks/task-2/thing', { headers })).status).toBe(200)
+        }
+      } finally {
+        cleanup()
+      }
+    })
+  }
+
+  // What the mount deliberately does NOT reach, so the limit is recorded rather than assumed: a route
+  // addressed by an opaque id carries no `:id`, so the middleware never matches and the router itself
+  // has to resolve the owning task (terminal's /sessions/:sid, agents' /sessions/:sessionId, workflows'
+  // /runs/:runId). If this ever starts returning 404, a mount has begun covering these by accident and
+  // the in-router checks are no longer the thing being relied on.
+  it('does not reach an opaque-id route, which is why those resolve their own owner', async () => {
+    const cleanup = await probeRoutes('', '/widgets/:wid/act')
+    try {
+      expect((await call('/v2/p/probe/widgets/w1/act', { headers: asAgent })).status).toBe(200)
+    } finally {
+      cleanup()
+    }
   })
 })

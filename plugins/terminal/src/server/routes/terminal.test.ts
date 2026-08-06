@@ -19,18 +19,26 @@ const req = (url: string, method = 'GET', body?: unknown) =>
     body: body === undefined ? undefined : JSON.stringify(body),
   })
 
-const authed = () => {
+const as = (principal: unknown) => {
   const app = new Hono<AppEnv>()
   app.use('/api/*', async (c, next) => {
-    c.set('principal', { kind: 'device', userId: 'james' })
+    c.set('principal', principal as never)
     await next()
   })
   return app.route('/api', terminal)
 }
+const authed = () => as({ kind: 'device', userId: 'james' })
+// A child an agent spawned inside task1: the credential that lives in every PTY's environment.
+const asTask1 = () => as({ kind: 'internal', userId: 'james', scope: 'task', taskId: 'task1' })
+// The node calling its own loopback surface — unconfined by construction.
+const asService = () => as({ kind: 'internal', userId: 'james', scope: 'service' })
 
 const session = { id: 's1', taskId: 'task1', title: 'sh', kind: 'shell', status: 'running', backend: 'pty', cols: 80, rows: 24 }
+// A second task's session, for the ownership tests below. Same engine, different owner.
+const otherSession = { ...session, id: 's2', taskId: 'task2', title: 'other' }
 const fake = (over: Partial<TerminalBridge> = {}): TerminalBridge => ({
-  list: async () => [session as never],
+  taskIdFor: (id) => (id === session.id ? session.taskId : id === otherSession.id ? otherSession.taskId : null),
+  list: async () => [session as never, otherSession as never],
   profiles: async () => [],
   create: async () => session as never,
   kill: async () => true,
@@ -89,5 +97,74 @@ describe('terminal control routes', () => {
     const gated = new Hono<AppEnv>().use('/api/*', requireUser).route('/api', terminal)
     expect((await gated.fetch(req('/api/sessions'), {} as Env)).status).toBe(401)
     expect((await authed().fetch(req('/api/sessions'), {} as Env)).status).toBe(503)
+  })
+})
+
+// A PTY is arbitrary command execution as the owner. main/wsHub.ts refuses a task-scoped socket that
+// addresses another task's stream; until Phase 3 this router — one directory away — refused nothing, so
+// POST /sessions/<any sid>/send typed a shell command into any task's terminal. requireTaskScope cannot
+// be mounted over these paths because the session id is opaque, so the checks live in the router.
+describe('a task-scoped credential is confined to its own task PTYs', () => {
+  afterEach(() => setTerminalBridge(null))
+
+  it('cannot drive another task session, and cannot tell it exists', async () => {
+    const typed: string[] = []
+    setTerminalBridge(fake({ sendToAgent: async (id, text) => (typed.push(`${id}:${text}`), { ok: true }) }))
+    const app = asTask1()
+    // The original probe, verbatim: type a shell command into another task's shell.
+    const foreign = await app.fetch(req('/api/sessions/s2/send', 'POST', { text: 'rm -rf ~', submit: 'now' }), {} as Env)
+    expect(foreign.status).toBe(404)
+    // An id that exists nowhere gets the SAME answer, so the surface is not a session-id oracle.
+    expect((await app.fetch(req('/api/sessions/nope/send', 'POST', { text: 'x', submit: 'now' }), {} as Env)).status).toBe(404)
+    // Nothing reached the engine.
+    expect(typed).toEqual([])
+    // Its OWN session still works — the guard confines, it does not break the agent.
+    expect((await app.fetch(req('/api/sessions/s1/send', 'POST', { text: 'ls', submit: 'now' }), {} as Env)).status).toBe(200)
+    expect(typed).toEqual(['s1:ls'])
+  })
+
+  it('cannot kill, interrupt, remove or resize another task session', async () => {
+    const touched: string[] = []
+    setTerminalBridge(fake({
+      kill: async (id) => (touched.push(`kill:${id}`), true),
+      interrupt: async (id) => (touched.push(`interrupt:${id}`), true),
+      remove: async (id) => (touched.push(`remove:${id}`), true),
+      resize: async (id) => (touched.push(`resize:${id}`), true),
+    }))
+    const app = asTask1()
+    for (const verb of ['kill', 'interrupt', 'remove'] as const) {
+      expect((await app.fetch(req(`/api/sessions/s2/${verb}`, 'POST'), {} as Env)).status).toBe(404)
+    }
+    expect((await app.fetch(req('/api/sessions/s2/resize', 'POST', { cols: 1, rows: 1 }), {} as Env)).status).toBe(404)
+    expect(touched).toEqual([])
+  })
+
+  it('cannot spawn a PTY in another task worktree', async () => {
+    const spawned: string[] = []
+    setTerminalBridge(fake({ create: async (opts) => (spawned.push(opts.taskId), session as never) }))
+    const app = asTask1()
+    // The taskId is in the BODY here, not the path, so this is the one check a mount could never make.
+    expect((await app.fetch(req('/api/sessions', 'POST', { taskId: 'task2' }), {} as Env)).status).toBe(404)
+    expect(spawned).toEqual([])
+    expect((await app.fetch(req('/api/sessions', 'POST', { taskId: 'task1' }), {} as Env)).status).toBe(200)
+    expect(spawned).toEqual(['task1'])
+  })
+
+  it('sees only its own task sessions in the roster', async () => {
+    setTerminalBridge(fake())
+    const mine = (await (await asTask1().fetch(req('/api/sessions'), {} as Env)).json()) as { id: string }[]
+    expect(mine.map((s) => s.id)).toEqual(['s1'])
+    // A device and the service scope see the whole node, unchanged.
+    for (const app of [authed(), asService()]) {
+      const all = (await (await app.fetch(req('/api/sessions'), {} as Env)).json()) as { id: string }[]
+      expect(all.map((s) => s.id)).toEqual(['s1', 's2'])
+    }
+  })
+
+  it('still answers 503 rather than 404 when the PTY engine is not wired', async () => {
+    // dev:node's degraded mode. "No engine" and "not your session" are different answers, and the
+    // client's degraded-mode handling keys on the former — so the guard must not shadow it.
+    expect((await asTask1().fetch(req('/api/sessions/s1/kill', 'POST'), {} as Env)).status).toBe(503)
+    expect((await asTask1().fetch(req('/api/sessions/s2/kill', 'POST'), {} as Env)).status).toBe(503)
   })
 })

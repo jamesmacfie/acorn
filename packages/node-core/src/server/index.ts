@@ -72,6 +72,20 @@ export function createApp() {
     // every task-scoped core router, where a newly added route inherits it instead of forgetting it.
     .use(`${CORE_NAMESPACE}/tasks/:id`, requireTaskScope)
     .use(`${CORE_NAMESPACE}/tasks/:id/*`, requireTaskScope)
+    // The same gate over the plugin namespace, which Phase 2 left open. It was the previous review's
+    // finding fixed at one door out of two: `wsHub.ts` refuses a task-scoped socket that addresses
+    // another task's PTY stream, and NONE of the sixteen plugin route files that read a taskId checked
+    // ownership at all. `:plugin` is a wildcard on purpose — the invariant is "a task-scoped path under
+    // /v2/p is gated", not "these six plugins are gated", so a plugin that adds a task route tomorrow
+    // inherits it. Covers changes (/:id/review-notes*, /:id/local/*), database (/:id/database/*),
+    // editor (/:id/editor/*, /:id/search), memory (/tasks/:id/notes*, /tasks/:id/memory), workflows
+    // (/tasks/:id/workflows*) and docker (/tasks/:id/containers, /tasks/:id/teardown).
+    //
+    // What a mount CANNOT reach is a route addressed by an opaque id — terminal's /sessions/:sid,
+    // agents' /sessions/:sessionId, workflows' /runs/:runId — because the task is not in the path.
+    // Those resolve the owning task themselves; see each router.
+    .use(`${PLUGIN_NAMESPACE}/:plugin/tasks/:id`, requireTaskScope)
+    .use(`${PLUGIN_NAMESPACE}/:plugin/tasks/:id/*`, requireTaskScope)
     // Administering or spending the owner's provider connections: device or the service scope, never a
     // task-scoped child. Without this an agent could list, rotate, test and DELETE the owner's
     // integrations (confirmed by probe), which is squarely what security.md forbids it.

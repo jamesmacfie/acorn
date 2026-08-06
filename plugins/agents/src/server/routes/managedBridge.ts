@@ -33,7 +33,19 @@ const guarded = async <T>(operation: () => Promise<T>): Promise<T> => {
 }
 
 export function managedAgentsBridge(runtime: ManagedAgentRuntime): ManagedAgentsBridge {
+  // Deliberately NOT wrapped in `guarded`: these answer the router's authorization question, and
+  // bridgeFailure turns a "not found" into a thrown BridgeError(404). That would be the right status by
+  // accident and the wrong control flow — the guard needs a value it can compare, and a 404 raised from
+  // inside the resolver would bypass the comparison entirely.
+  const taskIdForSession = async (sessionId: string) => (await runtime.store.getSession(sessionId))?.taskId ?? null
   return {
+    taskIdForSession,
+    taskIdForAttachment: async (attachmentId) => (await runtime.attachments.get(attachmentId))?.taskId ?? null,
+    // Two hops: an artifact belongs to a session, and the session names the task.
+    taskIdForArtifact: async (artifactId) => {
+      const sessionId = (await runtime.artifacts.get(artifactId))?.sessionId
+      return sessionId ? await taskIdForSession(sessionId) : null
+    },
     providers: (force) => guarded(() => runtime.providers(force)),
     uploadAttachment: (taskId, filename, mediaType, bytes) =>
       guarded(() => runtime.attachments.upload(taskId, filename, mediaType, bytes)),
