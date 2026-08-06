@@ -18,6 +18,7 @@ import { setOnTaskCreated, setTaskSessionsBridge } from '@acorn/node-core/server
 import { setOnWorktreeCreated } from '@acorn/node-core/main/taskWorktree.ts'
 import { TERMINAL_RUN_TARGETS } from '../contract/runTargets'
 import { TERMINAL_SEND_TO_AGENT } from '../contract/sendToAgent'
+import { runAgentTools } from '../main/agentTools'
 import { createRuntimeService } from '../main/runIpc'
 import { disposeTerminal, registerTerminalIpc, sendToAgent, terminalRunGlue, type TerminalIpcDeps } from '../main/terminal'
 import { setTerminalBridge, terminal } from '../server/routes/terminal'
@@ -60,6 +61,9 @@ export const terminalPlugin = (dataDir: string, deps: TerminalPluginDeps): NodeP
         defaultUrl: (taskId) => runTargets.defaultUrl(taskId),
       })
       ctx.capabilities.provide(TERMINAL_RUN_TARGETS, runTargets)
+      // The five run_* agent tools, over the service built two lines up. The capability stays published
+      // because the workflow runner's `run` step still resolves it from apps/node/src/wiring/.
+      for (const tool of runAgentTools(runTargets)) ctx.tools.register(tool)
       // terminal.sendToAgent (contract/sendToAgent.ts): the PTY delivery primitive plugins/memory's
       // launch injector needs. Published rather than exported into a dep bag, so memory resolves it at
       // call time and degrades to a no-op when this plugin is absent.

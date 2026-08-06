@@ -30,10 +30,18 @@ type AgentToolContribution = {
 A handler returns **domain data or throws a `ToolError`** (`not_found` / `bad_request` / `failed`).
 It never knows which surface invoked it — if a handler inspects the caller's surface, the boundary is
 wrong. `ctx` carries only invocation-scoped identity (`taskId`, resolved `userLogin`, and the agent
-`sessionId` used to stamp write provenance); every domain dependency is closed over when the
-registry is built in the utility service. The wiring retains its historical path at
-`apps/desktop/src/app/main/agentToolsWiring.ts`, but is imported by `app/service/runtime.ts` and
-must remain Electron-free.
+`sessionId` used to stamp write provenance); every domain dependency is closed over where the
+contribution is declared.
+
+Tools are a **contribution point**, registered incrementally into one registry
+(`packages/node-core/src/server/agentTools/registry.ts`), and a converted plugin declares its own
+inside `init` via `ctx.tools.register` — beside the engine each tool drives, so nothing has to hold
+another plugin's deps to declare a tool. Duplicate names throw, because the winner would otherwise
+depend on plugin init order. `plugins/changes` owns the local-git tools, `plugins/memory` the
+`memory_*` tools and `plugins/terminal` the `run_*` tools. The remainder — core's task/PR reads, plus
+`notes_*` and `browser_*`, whose plugins are not converted yet — is declared by
+`apps/node/src/wiring/agentToolsWiring.ts` under the owner `core`. That wiring must remain
+Electron-free; the browser driver reaches it as an injected `DesktopCapability`.
 
 ## 2. Projections
 

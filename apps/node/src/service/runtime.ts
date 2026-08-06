@@ -262,14 +262,11 @@ export async function startServiceRuntime({ config, desktop, stateChanged }: Run
     const runTargets = capabilities.require(TERMINAL_RUN_TARGETS)
     wireConfigTrust(db)
     wireContextSections({ db, notesStore: knowledge.notesStore, memory: knowledge })
-    wireAgentTools({
-      db,
-      notesStore: knowledge.notesStore,
-      proposals: knowledge.proposals,
-      runtime: runTargets,
-      memory: knowledge,
-      browser: desktop.browser,
-    })
+    // Only the tools no plugin can own yet: core's task/PR reads, notes (plugins/notes is not a
+    // NodePlugin) and the browser (plugins/preview runs in Electron main). changes, memory and terminal
+    // register their own inside initPlugins above — which is why this bag no longer holds the memory
+    // index, the proposal store or the run service.
+    wireAgentTools({ db, notesStore: knowledge.notesStore, browser: desktop.browser })
     managedAgents = wireManagedAgents({
       db,
       dataDir: config.dataDir,

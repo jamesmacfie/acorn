@@ -6,6 +6,7 @@
 // removes a step from the sequence. Cross-plugin needs resolve through the capability registry at
 // CALL time instead, which is why capabilities.get() is documented as late-binding.
 import type { CoreServices } from '../../main/core'
+import { registerAgentTool, removeAgentTools } from '../agentTools/registry'
 import { registerRoute, removePluginRoutes } from '../routeRegistry'
 import type { CapabilityRegistry } from './capabilities'
 import type { NodePlugin, NodePluginContext } from './types'
@@ -45,16 +46,22 @@ export async function initPlugins(plugins: readonly NodePlugin[], options: Plugi
       skipped.push(plugin.name)
       continue
     }
-    // Idempotent per boot: clear anything this plugin contributed to the module-singleton route
-    // registry on a previous boot, so a second startServiceRuntime in one process replaces its routes
-    // rather than appending a copy bound to the first boot's (now closed) database.
+    // Idempotent per boot: clear anything this plugin contributed to the two module-singleton
+    // registries on a previous boot, so a second startServiceRuntime in one process REPLACES its
+    // contributions rather than appending copies bound to the first boot's (now closed) database. For
+    // routes that silently served every request from a closed handle; for tools it would throw on the
+    // duplicate name and fail the whole boot.
     removePluginRoutes(plugin.name)
+    removeAgentTools(plugin.name)
     const ctx: NodePluginContext = {
       name: plugin.name,
       routes: {
         register: (router, opts) =>
           registerRoute({ plugin: plugin.name, prefix: opts?.prefix ?? '', router, note: opts?.note }),
       },
+      // The owner is bound here, not passed by the plugin: a plugin cannot contribute a tool under
+      // another plugin's name, and cannot remove another plugin's tools.
+      tools: { register: (tool) => registerAgentTool(plugin.name, tool) },
       capabilities: options.capabilities,
       core: options.core,
       log: {

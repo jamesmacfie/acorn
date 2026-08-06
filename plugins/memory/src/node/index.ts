@@ -13,6 +13,7 @@
 import type { NodePlugin } from '@acorn/node-core/server/plugin/types.ts'
 import { openPluginDb } from '@acorn/node-core/main/pluginStorage.ts'
 import { TERMINAL_SEND_TO_AGENT } from '@acorn/plugin-terminal/contract/sendToAgent.ts'
+import { memoryAgentTools } from '../main/agentTools'
 import { MEMORY_KNOWLEDGE, registerKnowledgeIpc, type KnowledgeDeps } from '../main/knowledgeIpc'
 import { knowledge, setKnowledgeBridge } from '../server/routes/knowledge'
 import { migrationsDir } from './migrations'
@@ -56,6 +57,10 @@ export const memoryPlugin = (dataDir: string, deps: MemoryPluginDeps): NodePlugi
       const runtime = registerKnowledgeIpc(db, dataDir, ctx.core, { ...deps, sendToAgent })
       ctx.capabilities.provide(MEMORY_KNOWLEDGE, runtime)
       ctx.routes.register(knowledge, { prefix: '', note: 'notes/memory pane' })
+      // memory_search / memory_list / memory_get / memory_write, over the SAME index and proposal queue
+      // the routes above serve. The app used to hold both in a dep bag to declare these; it no longer
+      // needs to see either.
+      for (const tool of memoryAgentTools(runtime, runtime.proposals, ctx.core)) ctx.tools.register(tool)
     },
     // The plugin's SQLite file is in WAL mode, so it has to be closed before the data root's lock is
     // dropped — the composition root's own teardown invariant.

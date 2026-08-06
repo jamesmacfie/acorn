@@ -11,6 +11,7 @@
 // package would add a manifest and nothing else. Recorded in docs/vNext/phase2-notes.md.
 import type { Hono } from 'hono'
 import type { CoreServices } from '../../main/core'
+import type { AgentToolContribution } from '../agentTools/registry'
 import type { AppEnv } from '../middleware/auth'
 import type { CapabilityRegistry } from './capabilities'
 
@@ -31,9 +32,17 @@ export type PluginRouteRegistry = {
   register(router: Hono<AppEnv>, options?: PluginRouteOptions): void
 }
 
+export type PluginToolRegistry = {
+  // The agent-tool contribution point (docs/vNext/plugins.md § Agent tools and MCP). One tool at a
+  // time, so a plugin's tools live with the engine they drive instead of in an app-layer file holding
+  // every plugin's deps in one bag. The owner is bound by the host, like a route's plugin id.
+  register(tool: AgentToolContribution): void
+}
+
 export type NodePluginContext = {
   readonly name: string
   routes: PluginRouteRegistry
+  tools: PluginToolRegistry
   capabilities: CapabilityRegistry
   // Path confinement, git, the process broker and use-scoped secrets (main/core/). A plugin consumes
   // core capability through this, rather than deep-importing whichever core module has the helper.
