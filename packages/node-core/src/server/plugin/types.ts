@@ -14,6 +14,7 @@ import type { CoreServices } from '../../main/core'
 import type { ConnectionProviderContribution, IntegrationProviderContribution } from '../integrations/types'
 import type { ModelProviderAdapter } from '../modelProviders/types'
 import type { AgentToolContribution } from '../agentTools/registry'
+import type { PluginContextSection } from '../agentTools/contextSections'
 import type { AppEnv } from '../middleware/auth'
 import type { CapabilityRegistry } from './capabilities'
 
@@ -39,6 +40,18 @@ export type PluginToolRegistry = {
   // time, so a plugin's tools live with the engine they drive instead of in an app-layer file holding
   // every plugin's deps in one bag. The owner is bound by the host, like a route's plugin id.
   register(tool: AgentToolContribution): void
+}
+
+export type PluginContextSectionRegistry = {
+  // One section of the assembled task context (docs/vNext/plan.md § Phase 3, item 3). Replaces core's
+  // single `setContextSections(buildContextSections({ notes, memory, pullRequest }))` slot, which had to be
+  // filled with every plugin's source at once and therefore forced the composition root to hold three
+  // plugins' seams — the reason apps/node/src/wiring/contextSectionsWiring.ts existed at all.
+  //
+  // The section a plugin registers cannot reach core's database handle: see PluginContextSection. Core keeps
+  // the budget/legacy/format contract, so a plugin declares where its rows come from and nothing about how
+  // the block is rendered. Owner-bound by the host, like routes and tools.
+  register(section: PluginContextSection): void
 }
 
 // Connection / integration / model providers, contributed by the plugin that implements them
@@ -68,6 +81,7 @@ export type NodePluginContext = {
   readonly name: string
   routes: PluginRouteRegistry
   tools: PluginToolRegistry
+  contextSections: PluginContextSectionRegistry
   providers: PluginProviderRegistry
   capabilities: CapabilityRegistry
   // Path confinement, git, the process broker and use-scoped secrets (main/core/). A plugin consumes

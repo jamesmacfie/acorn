@@ -29,7 +29,13 @@
 // name — the same idempotency the plugin host gives a plugin.
 import { and, eq } from 'drizzle-orm'
 import { z } from 'zod'
-import { assembleContext, parseInclude } from '@acorn/node-core/server/agentTools/contextSections.ts'
+import {
+  assembleContext,
+  linkedIssuesSection,
+  parseInclude,
+  registerContextSection,
+  removeContextSections,
+} from '@acorn/node-core/server/agentTools/contextSections.ts'
 import { registerAgentTool, removeAgentTools, ToolError, type AgentToolContribution, type ToolContext } from '@acorn/node-core/server/agentTools/registry.ts'
 import type { AppDatabase } from '@acorn/node-core/server/db/index.ts'
 import { schema } from '@acorn/node-core/server/db/index.ts'
@@ -55,9 +61,9 @@ export function buildAgentTools(deps: AgentToolsDeps): AgentToolContribution[] {
   const { db } = deps
   const empty = z.object({})
 
-  // The context-read tools compose from the shared section registry (contextSections.ts). Its
-  // notes/memory seams are filled once, in contextSectionsWiring — the /context route and these tools
-  // read the same assembler, so nothing to wire here.
+  // The context-read tools compose from the shared section registry (contextSections.ts). Each section is
+  // registered by whoever owns its rows — core's `issues` below, and `pr`/`notes`/`memory` by their plugins
+  // — and the /context route reads the same assembler, so nothing to wire here.
 
   return [
     // ── Context-read (read tier): compose from the shared section registry, no self-fetch ──────────
@@ -132,4 +138,11 @@ export function buildAgentTools(deps: AgentToolsDeps): AgentToolContribution[] {
 export function wireAgentTools(deps: AgentToolsDeps): void {
   removeAgentTools(OWNER)
   for (const tool of buildAgentTools(deps)) registerAgentTool(OWNER, tool)
+  // Core's own context section, registered here rather than by a plugin because `task_links` and `issues`
+  // are core's tables — the two provider plugins that fill them go through the ExternalItemStore seam and
+  // do not own the storage (server/integrations/itemStore.ts). The other three sections (`pr`, `notes`,
+  // `memory`) are registered by the plugins whose SQLite files hold their rows, which is what let
+  // wiring/contextSectionsWiring.ts be deleted.
+  removeContextSections(OWNER)
+  registerContextSection(OWNER, linkedIssuesSection)
 }

@@ -37,6 +37,13 @@ export const serviceStartConfigSchema = z.strictObject({
   // effective token comes back in the start result. Custody stays with the client — the service
   // never persists it.
   deviceToken: z.string().min(1).optional(),
+  // Plugin ids the owner has turned off for this node. Both plugin hosts have honoured a `disabled` list
+  // since Phase 2 and nothing populated it; this is the wire half, so Settings → Plugins (Phase 4) is a list
+  // rather than a refactor. A `required` plugin ignores it (server/plugin/host.ts).
+  //
+  // Per NODE, not per client: which plugins a node runs decides which routes exist and which SQLite files are
+  // opened, so it belongs to the service's own start config rather than to renderer state.
+  disabledPlugins: z.array(z.string().min(1)).optional(),
 })
 export type ServiceStartConfig = z.infer<typeof serviceStartConfigSchema>
 

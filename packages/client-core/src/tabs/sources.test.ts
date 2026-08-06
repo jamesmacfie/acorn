@@ -19,6 +19,12 @@ const integration = (providerId: string, connected = true): Integration => ({
 describe('availableSources (docs/integrations.md — gated by integration rows)', () => {
   const disposables: { dispose(): void }[] = []
   beforeAll(() => {
+    // github is a REGISTERED source as of Phase 3, not a hardcoded literal inside availableSources, so the
+    // fixture has to register it like any other. It carries no `providerId` (it must be visible before GitHub
+    // is connected) and no `promotion` (its browse creates tasks inline), which is exactly the real
+    // contribution's shape — and registering it FIRST is what puts it at the head of the rail, since this
+    // registry's order is registration order.
+    disposables.push(sourceRegistry.register({ id: 'github', glyph: '◇', label: 'GitHub' }))
     for (const id of ['linear', 'rollbar']) {
       disposables.push(sourceRegistry.register({
         id, providerId: id, glyph: id === 'linear' ? '◷' : '◍', label: id === 'linear' ? 'Linear' : 'Rollbar',
@@ -39,7 +45,6 @@ describe('availableSources (docs/integrations.md — gated by integration rows)'
   it('local sources (no providerId) are always shown', () => {
     const local = sourceRegistry.register({
       id: 'docker-test', glyph: '◧', label: 'Docker',
-      promotion: { canPromote: () => false, prepare: () => Promise.reject(new Error('n/a')), create: () => Promise.reject(new Error('n/a')) },
     })
     try {
       expect(availableSources(undefined).map((s) => s.id)).toContain('docker-test')
@@ -49,7 +54,7 @@ describe('availableSources (docs/integrations.md — gated by integration rows)'
     }
   })
 
-  it('GitHub always; Linear/Rollbar iff connected', () => {
+  it('an ungated source is always shown; Linear/Rollbar appear iff connected', () => {
     expect(availableSources(undefined).map((s) => s.id)).toEqual(['github'])
     expect(availableSources([integration('linear')]).map((s) => s.id)).toEqual(['github', 'linear'])
     expect(availableSources([integration('rollbar')]).map((s) => s.id)).toEqual(['github', 'rollbar'])

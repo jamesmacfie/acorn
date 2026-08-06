@@ -8,9 +8,13 @@
 // ownership, duplicate and idempotency rules are worth pinning — have a unit test.
 import type { Component } from 'solid-js'
 import type { ClientCapabilityRequirement } from '../capabilities'
+import type { Task } from '../queries'
 import { Registry } from './registry'
 
-export type UiSlotId = 'topbar.left' | 'topbar.right' | 'task.switcher.extra' | 'overlay'
+// 'drawer' is Phase 3's addition, for the terminal drawer the shell used to render itself. It is NOT
+// 'overlay': the drawer sits below the routed surface in document order and the overlay host sits after it,
+// so CSS stacking is load-bearing and merging the two would put the drawer above every dialog.
+export type UiSlotId = 'topbar.left' | 'topbar.right' | 'task.switcher.extra' | 'overlay' | 'drawer'
 
 export type UiSlotContext = {
   taskActive: boolean
@@ -18,6 +22,10 @@ export type UiSlotContext = {
   toggleTerminal: () => void
   openSettings: (tab?: string) => void
   selectTask: (taskId: string) => void
+  // The task the drawer belongs to, or null outside a task view. Added with the 'drawer' slot: a shell slot
+  // gets the whole context (unlike a TaskSlot, which gets only a taskId), and the terminal drawer needs the
+  // task's branch and worktree path, not just its id.
+  activeTask: Task | null
 }
 
 export type UiSlotContribution = {

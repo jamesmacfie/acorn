@@ -7,6 +7,7 @@
 // CALL time instead, which is why capabilities.get() is documented as late-binding.
 import type { CoreServices } from '../../main/core'
 import { registerAgentTool, removeAgentTools } from '../agentTools/registry'
+import { asContextSection, registerContextSection, removeContextSections } from '../agentTools/contextSections'
 import { registerRoute, removePluginRoutes } from '../routeRegistry'
 import { connectionProviderRegistry } from '../integrations/connectionRegistry'
 import { integrationProviderRegistry } from '../integrations/registry'
@@ -59,6 +60,7 @@ export async function initPlugins(plugins: readonly NodePlugin[], options: Plugi
     // duplicate name and fail the whole boot.
     removePluginRoutes(plugin.name)
     removeAgentTools(plugin.name)
+    removeContextSections(plugin.name)
     // The provider registries are the same class of module singleton, and now written from init too. A
     // second boot would otherwise hit their duplicate-id guards and fail the whole boot rather than
     // silently serving stale contributions. Model adapters first: an adapter is validated against a
@@ -79,6 +81,10 @@ export async function initPlugins(plugins: readonly NodePlugin[], options: Plugi
       // The owner is bound here, not passed by the plugin: a plugin cannot contribute a tool under
       // another plugin's name, and cannot remove another plugin's tools.
       tools: { register: (tool) => registerAgentTool(plugin.name, tool) },
+      // asContextSection is where core's database handle is DROPPED rather than merely left unused: core's
+      // own `issues` section keeps it, a plugin-registered one can never see it, and neither side has to be
+      // trusted to remember.
+      contextSections: { register: (section) => registerContextSection(plugin.name, asContextSection(section)) },
       // Owner-bound like routes and tools: a plugin cannot contribute a provider under another plugin's
       // name, and so cannot have its contributions cleared by another plugin's re-init.
       providers: {

@@ -4,7 +4,17 @@ import '../registerProviders'
 import type { TaskContext } from '@acorn/protocol/api.ts'
 import { getDb, schema } from '@acorn/node-core/server/db/index.ts'
 import type { AppEnv } from '@acorn/node-core/server/middleware/auth.ts'
-import { buildContextSections, setContextSections, type ContextMemorySource, type ContextNotesSource } from '@acorn/node-core/server/agentTools/contextSections.ts'
+import {
+  asContextSection,
+  linkedIssuesSection,
+  memorySection,
+  notesSection,
+  pullRequestSection,
+  registerContextSection,
+  removeContextSections,
+  type ContextMemorySource,
+  type ContextNotesSource,
+} from '@acorn/node-core/server/agentTools/contextSections.ts'
 import { taskContext } from '@acorn/node-core/server/routes/taskContext.ts'
 import { makeTestDb, makeTestPluginDb, type TestDb, type TestPluginDb } from '@acorn/node-core/server/routes/testDb.ts'
 import { migrationsDir as githubMigrationsDir } from '@acorn/plugin-github/node/migrations.ts'
@@ -34,13 +44,16 @@ describe('GET /api/tasks/:id/context (docs/agent-tools.md §4)', () => {
     gh = makeTestPluginDb('github', githubMigrationsDir())
     notesSource = async () => []
     memorySource = async () => []
-    setContextSections(
-      buildContextSections({
-        notes: (...args) => notesSource(...args),
-        memory: (...args) => memorySource(...args),
-        pullRequest: (userId, owner, name, number) => mirroredPullRequest(gh.db, userId, owner, name, number),
-      }),
-    )
+    // Sections are registered per owner now (server/plugin/types.ts § PluginContextSectionRegistry), so the
+    // fixture registers them the way production does: core's `issues` under 'core', and the three
+    // plugin-owned ones under the plugin that owns their rows. `PluginContextSection.assemble` takes no `db`,
+    // which is why these three read only what their source gives them.
+    removeContextSections('core')
+    for (const owner of ['github', 'notes', 'memory']) removeContextSections(owner)
+    registerContextSection('core', linkedIssuesSection)
+    registerContextSection('github', asContextSection(pullRequestSection((userId, owner, name, number) => mirroredPullRequest(gh.db, userId, owner, name, number))))
+    registerContextSection('notes', asContextSection(notesSection((...args) => notesSource(...args))))
+    registerContextSection('memory', asContextSection(memorySection((...args) => memorySource(...args))))
     vi.mocked(getDb).mockReturnValue(t.db)
     app = new Hono<AppEnv>()
     app.use('/api/*', async (c, next) => {
@@ -120,7 +133,7 @@ describe('GET /api/tasks/:id/context (docs/agent-tools.md §4)', () => {
   })
 
   afterEach(() => {
-    setContextSections(buildContextSections({ notes: async () => [], memory: async () => [], pullRequest: async () => null }))
+    for (const owner of ['core', 'github', 'notes', 'memory']) removeContextSections(owner)
     gh.cleanup()
     t.cleanup()
   })

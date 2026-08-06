@@ -596,12 +596,6 @@ importers:
       '@acorn/client-core':
         specifier: workspace:*
         version: link:../../packages/client-core
-      '@acorn/plugin-memory':
-        specifier: workspace:*
-        version: link:../memory
-      '@acorn/plugin-notes':
-        specifier: workspace:*
-        version: link:../notes
       '@acorn/protocol':
         specifier: workspace:*
         version: link:../../packages/protocol
@@ -1072,9 +1066,6 @@ importers:
       '@acorn/node-core':
         specifier: workspace:*
         version: link:../../packages/node-core
-      '@acorn/plugin-terminal':
-        specifier: workspace:*
-        version: link:../terminal
       '@acorn/protocol':
         specifier: workspace:*
         version: link:../../packages/protocol

@@ -6,6 +6,7 @@
 // this file needs to know about. What makes linear VISIBLE is entirely here: a rail source and a pane.
 import type { ClientPlugin } from '@acorn/client-core/registries/plugin.ts'
 import { linearPaneContribution } from './paneContribution'
+import { linearRefPanelContribution } from './refPanelContribution'
 import { linearSourceContribution } from './sourceContribution'
 
 export const linearClientPlugin: ClientPlugin = {
@@ -13,5 +14,8 @@ export const linearClientPlugin: ClientPlugin = {
   init: (ctx) => {
     ctx.sources.register(linearSourceContribution)
     ctx.panes.register(linearPaneContribution)
+    // How plugins/github shows a ticket it found in a PR body without importing this plugin — the last
+    // plugin→plugin edge on the boundary ledger (registries/refPanels.ts states the full argument).
+    ctx.refPanels.register(linearRefPanelContribution)
   },
 }

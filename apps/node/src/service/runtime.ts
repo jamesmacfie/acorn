@@ -19,7 +19,6 @@ import { logStorageFootprint } from '@acorn/node-core/main/storageFootprint.ts'
 import { GITHUB_MIRROR } from '@acorn/plugin-github/contract/mirror.ts'
 import { disposeWsHub } from '@acorn/node-core/main/wsHub.ts'
 import { wireAgentTools } from '../wiring/agentToolsWiring'
-import { wireContextSections } from '../wiring/contextSectionsWiring'
 import { wireConfigTrust } from '../wiring/configTrustWiring'
 import { AGENTS_RUNTIME } from '@acorn/plugin-agents/main/runtime.ts'
 import { MEMORY_KNOWLEDGE } from '@acorn/plugin-memory/main/knowledgeIpc.ts'
@@ -271,16 +270,17 @@ export async function startServiceRuntime({ config, desktop, stateChanged }: Run
             (await capabilities.get(GITHUB_MIRROR)?.failingChecks(runtime.ACTIVE_IDENTITY.get(), taskId)) ?? null,
         },
       }),
-      { capabilities, core },
+      { capabilities, core, disabled: config.disabledPlugins },
     )
     disposePlugins = plugins.dispose
     if (plugins.skipped.length) console.log(`[service:boot] plugins disabled for this node: ${plugins.skipped.join(', ')}`)
 
-    // Published by a plugin's init rather than constructed here. `require`, not `get`: memory and notes
-    // are `required` plugins, so absence is a bug rather than a configuration.
-    const knowledge = knowledgeAt()
     wireConfigTrust(db)
-    wireContextSections({ db, notesStore: notesAt(), memory: knowledge, mirror: () => capabilities.get(GITHUB_MIRROR) })
+    // wireContextSections is GONE. Context sections are a per-plugin contribution point now
+    // (server/plugin/types.ts § PluginContextSectionRegistry): github registers `pr`, notes registers
+    // `notes`, memory registers `memory`, and wireAgentTools below registers core's own `issues`. This call
+    // was the last place that had to hold three plugins' seams at once, which was the whole reason neither
+    // notes nor memory could own its own half.
     // Only the tools no plugin can own, which after preview's conversion is core's own six alone: the
     // context-read group and the two repo reads. changes, memory, notes, preview, terminal and workflows
     // register their own inside initPlugins above — which is why this bag no longer holds the memory index,

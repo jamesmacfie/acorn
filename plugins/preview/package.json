@@ -13,7 +13,6 @@
   "dependencies": {
     "@acorn/client-core": "workspace:*",
     "@acorn/node-core": "workspace:*",
-    "@acorn/plugin-terminal": "workspace:*",
     "@acorn/protocol": "workspace:*",
     "solid-js": "catalog:",
     "zod": "catalog:"

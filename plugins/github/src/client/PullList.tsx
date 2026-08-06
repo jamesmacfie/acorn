@@ -12,7 +12,7 @@ import { workspaceForRepo } from '@acorn/client-core/workspaces/activeWorkspace.
 import { createTask } from '@acorn/client-core/tasks/mutations.ts'
 import { rowHeight } from '@acorn/client-core/ui/metrics.ts'
 import { watchAppearance } from '@acorn/client-core/ui/appearance.ts'
-import { scanLinearRefs } from '@acorn/plugin-linear/client/scanLinearRefs.ts'
+import { scanLinearRefs } from '@acorn/plugin-linear/contract/scanRefs.ts'
 import { activateTaskSignals, pathForTask } from '@acorn/client-core/tasks/activate.ts'
 import { clientEvents } from '@acorn/client-core/registries/clientEvents.ts'
 import { registerCommands } from '@acorn/client-core/registries/commands.ts'

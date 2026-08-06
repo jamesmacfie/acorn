@@ -15,6 +15,7 @@ import { openPluginDb } from '@acorn/node-core/main/pluginStorage.ts'
 import { NOTES_STORE } from '@acorn/plugin-notes/contract/store.ts'
 import { TERMINAL_SEND_TO_AGENT } from '@acorn/plugin-terminal/contract/sendToAgent.ts'
 import { memoryAgentTools } from '../main/agentTools'
+import { memorySection } from '@acorn/node-core/server/agentTools/contextSections.ts'
 import { MEMORY_KNOWLEDGE, registerKnowledgeIpc, type KnowledgeDeps } from '../main/knowledgeIpc'
 import { knowledge, setKnowledgeBridge } from '../server/routes/knowledge'
 import { migrationsDir } from './migrations'
@@ -67,6 +68,19 @@ export const memoryPlugin = (dataDir: string, deps: MemoryPluginDeps): NodePlugi
       // the routes above serve. The app used to hold both in a dep bag to declare these; it no longer
       // needs to see either.
       for (const tool of memoryAgentTools(runtime, runtime.proposals, ctx.core)) ctx.tools.register(tool)
+      // The `memory` context section — this plugin's index, over this plugin's SQLite file. Two lines that
+      // used to live in apps/node/src/wiring/contextSectionsWiring.ts, where core had to be handed a
+      // `MemoryIndex` because it has no handle to memory.sqlite. It never needed the index; it needed the
+      // slice, and now it does not need either.
+      //
+      // `reconciled()` first, exactly as before: the index is rebuilt from files on boot, and a slice read
+      // before that finishes reports a repo as having no memories at all.
+      ctx.contextSections.register(
+        memorySection(async (_taskId, repo) => {
+          await runtime.reconciled()
+          return runtime.indexSlice(repo)
+        }),
+      )
     },
     // The plugin's SQLite file is in WAL mode, so it has to be closed before the data root's lock is
     // dropped — the composition root's own teardown invariant.

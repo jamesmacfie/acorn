@@ -42,6 +42,7 @@
 import type { NodePlugin } from '@acorn/node-core/server/plugin/types.ts'
 import { openPluginDb } from '@acorn/node-core/main/pluginStorage.ts'
 import { setRepoMirrorSource } from '@acorn/node-core/server/repoMirror.ts'
+import { pullRequestSection } from '@acorn/node-core/server/agentTools/contextSections.ts'
 import { GITHUB_MIRROR } from '../contract/mirror'
 import { actions } from '../server/routes/actions'
 import { githubDeviceAuth } from '../server/routes/deviceAuth'
@@ -140,6 +141,18 @@ export const githubPlugin = (dataDir: string): NodePlugin => {
         failingChecks: (userId, taskId) => failingChecksFor(store, ctx.core, userId, taskId),
         footprint: () => mirrorFootprint(store),
       })
+
+      // The `pr` context section. Its rows are this plugin's — `repos ⋈ pull_requests ⋈ pr_files` lives in
+      // github.sqlite — so github registers it, and core keeps the section's budget/legacy/format contract
+      // (server/agentTools/contextSections.ts). Straight to the query, not through GITHUB_MIRROR: resolving
+      // its own capability out of the registry would be a plugin asking the graph about itself.
+      //
+      // The previous shape was a THUNK the composition root injected, precisely so an absent capability could
+      // render an empty section instead of throwing. That safety is now structural: if github's init never
+      // runs, the section is never registered, and `parseInclude` simply has no `pr` id to include.
+      ctx.contextSections.register(pullRequestSection((userId, repoOwner, repoName, pullNumber) =>
+        mirroredPullRequest(store, userId, repoOwner, repoName, pullNumber),
+      ))
 
       // Core's own three reads of the mirror — workspace bootstrap, the `repo_info` tool's default branch,
       // and the sole-identity check — go through a slot rather than the capability registry, because two of

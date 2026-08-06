@@ -2,13 +2,14 @@
 //
 // `required: true`, matching the node half.
 //
-// No PANE: the terminal is a drawer under the pane row, not a pane in it, and App.tsx still renders
-// TerminalPanel directly. That is Phase 3's second coupling-table row ("terminal contributes the drawer
-// + run integration via slots/capabilities") and it needs a drawer slot the shell does not have yet.
-// What this plugin CAN own today is the toggle and its settings page.
+// No PANE: the terminal is a drawer under the pane row, not a pane in it. Phase 3 added the shell's
+// 'drawer' slot, so the drawer itself is a contribution now (drawerContribution.tsx) rather than something
+// App.tsx imports and decides when to show — the second row of plugins.md's coupling table.
 import { lazy } from 'solid-js'
 import type { ClientPlugin } from '@acorn/client-core/registries/plugin.ts'
 import { terminalAgentContextContribution } from './agentContextContribution'
+import { terminalDrawerContribution } from './drawerContribution'
+import { terminalPaletteRowSource } from './paletteRowSource'
 import { terminalToggleSlotContribution } from './slotContribution'
 
 const TerminalSettings = lazy(() => import('./TerminalSettings'))
@@ -18,6 +19,8 @@ export const terminalClientPlugin: ClientPlugin = {
   required: true,
   init: (ctx) => {
     ctx.slots.register(terminalToggleSlotContribution)
+    ctx.slots.register(terminalDrawerContribution)
+    ctx.paletteRows.register(terminalPaletteRowSource)
     ctx.agentContexts.register(terminalAgentContextContribution)
     ctx.settingsPages.register({
       id: 'terminal', label: 'Terminal', group: 'general', order: 60, requires: 'desktop',

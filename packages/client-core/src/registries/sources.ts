@@ -26,7 +26,11 @@ export type SourceContribution<Item = unknown> = {
   component?: Component
   defaultPane?: string
   requiredCapability?: string
-  promotion: SourcePromotion<Item>
+  // OPTIONAL as of Phase 3, when `github` became an ordinary source. Every other source is browsed through
+  // PromoteToTaskModal, which reads this; github's browse creates a task inline from its PR list (seeding
+  // provider links as it goes), so it has no registry-driven promotion and declaring an unused one would be
+  // a required field satisfied by dead code. The modal is only ever opened for a source that has one.
+  promotion?: SourcePromotion<Item>
 }
 
 export const sourceRegistry = new Registry<SourceContribution<any>>('source')

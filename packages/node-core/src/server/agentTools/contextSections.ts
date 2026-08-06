@@ -26,6 +26,18 @@ export type ContextSectionContribution = {
   jump?: (item: ContextItem) => ContextItem['jump']
 }
 
+// What a PLUGIN registers. Identical except that `assemble` never sees `db`.
+//
+// That omission is the point, not a convenience. `AssembleArgs.db` is core's own handle, and handing it to
+// a plugin would re-open exactly what Phase 2's database split closed — a plugin reading tables that no
+// longer live in its file. It costs nothing to withhold: of the four sections that exist, only core's own
+// `issues` touches `db` at all, and the three that moved out (`pr`, `notes`, `memory`) read nothing but
+// `task`, `repo`, `userLogin` and `workflowRunId`. A plugin section that finds it needs a core query wants
+// a CoreServices call, not this handle.
+export type PluginContextSection = Omit<ContextSectionContribution, 'assemble'> & {
+  assemble: (args: Omit<AssembleArgs, 'db'>) => Promise<ContextDraft>
+}
+
 export type ContextNotesSource = (
   taskId: string,
   repo: string,
@@ -96,162 +108,224 @@ const formatOmitted = (omitted: number) => (omitted ? `\n- … ${omitted} more o
 // the client assemble the exact send block from a single `include=*` inventory by filtering ctx.sections
 // and calling formatContextBlock — no second curated fetch. A new section that reads sibling inclusion
 // state into its compact breaks that byte-exactness silently. Don't.
-export function buildContextSections(sources: {
-  notes: ContextNotesSource
-  memory: ContextMemorySource
-  pullRequest: ContextPullRequestSource
-}): ContextSectionContribution[] {
-  return [
-    {
-      id: 'pr',
-      label: 'Pull request',
-      defaultIncluded: false,
-      budget: { maxItems: 1, maxBytesPerItem: 2_000, overflow: 'truncate-tail' },
-      async assemble({ userLogin, task }) {
-        if (task.pullNumber == null) return { items: [] }
-        // The three-table join this used to run against core's database is now one capability call into
-        // plugins/github (which sorts the changed-file list, as the join's ORDER did). Core keeps the
-        // budgeting, the `legacy` projection and the compact formatter — those are the section contract,
-        // not the storage.
-        const pr = await sources.pullRequest(userLogin, task.repoOwner, task.repoName, task.pullNumber)
-        if (!pr) return { items: [] }
-        const changedFiles = pr.changedFiles
-        const legacy = { number: pr.number, title: pr.title, body: pr.body, changedFiles }
-        return {
-          items: [{ id: `pr:${pr.number}`, kind: 'PR', label: `#${pr.number} ${pr.title}`, body: pr.body ?? undefined, details: changedFiles }],
-          legacy: { pr: legacy },
-        }
-      },
-      format(items) {
-        const item = items[0]
-        if (!item) return ''
-        const lines = [`## PR ${item.label}`]
-        const body = item.body?.replace(/<[^>]+>/g, '').trim()
-        if (body) lines.push(truncateBytes(body, 600))
-        const files = item.details ?? []
-        if (files.length) {
-          const shown = files.slice(0, 30)
-          const more = files.length - shown.length
-          lines.push(`Changed files (${files.length}): ${shown.join(', ')}${more > 0 ? `, +${more} more` : ''}`)
-        }
-        return lines.join('\n')
-      },
-    },
-    {
-      id: 'issues',
-      label: 'Linked issues',
-      defaultIncluded: true,
-      budget: { maxItems: 50, maxBytesPerItem: 1_000, overflow: 'omit-with-marker' },
-      async assemble({ db, userLogin, task }) {
-        const links = (await db.select().from(schema.taskLinks).where(eq(schema.taskLinks.taskId, task.id))).sort(
-          (a, b) => a.provider.localeCompare(b.provider) || a.createdAt - b.createdAt,
-        )
-        const issues: TaskContext['issues'] = []
-        const items: ContextItem[] = []
-        const providerCounts = new Map<string, number>()
-        let missing = 0
-        for (const link of links) {
-          const provider = integrationProviderRegistry.get(link.provider)
-          const count = providerCounts.get(link.provider) ?? 0
-          if (count >= (provider?.budgets.maxContextItems ?? 50)) continue
-          providerCounts.set(link.provider, count + 1)
-          let ref: ExternalRef = { providerId: link.provider, connectionId: link.integrationId, displayId: link.identifier }
-          try {
-            if (link.refJson) ref = provider?.externalIds.parse(JSON.parse(link.refJson), ref) ?? ref
-          } catch {
-            // Invalid refs degrade to the identifier-only fallback below.
-          }
-          const [row] = await db
-            .select()
-            .from(schema.issues)
-            .where(and(eq(schema.issues.userId, userLogin), eq(schema.issues.integrationId, link.integrationId), eq(schema.issues.identifier, link.identifier)))
-          const parsed = row && provider?.codec ? parseCached(provider.codec, row.data, ref) : null
-          const state = !row ? 'missing' : !parsed?.ok ? 'malformed' : parsed.value.deletedAt ? 'deleted' : row.fetchedAt + (provider?.resources[0]?.ttlMs ?? 0) < Date.now() ? 'stale' : 'fresh'
-          if (state === 'missing' || state === 'malformed') missing++
-          const item = provider?.taskContext?.summarize(ref, parsed?.ok ? parsed.value : null, state) ?? {
-            id: `${link.provider}:${link.integrationId}:${link.identifier}`,
-            kind: link.provider,
-            label: link.identifier,
-            details: [`Cache: ${state}`],
-          }
-          items.push(item)
-          const title = item.label.includes(' — ') ? item.label.slice(item.label.indexOf(' — ') + 3) : link.identifier
-          issues.push({ provider: link.provider, identifier: link.identifier, title, detail: item.details?.[0] ?? '', cache: parsed?.ok ? 'present' : 'missing' })
-        }
-        return {
-          items,
-          legacy: { issues },
-          absent: missing ? { reason: 'missing-cache', detail: `${missing} linked item${missing === 1 ? '' : 's'} missing cached provider detail.` } : undefined,
-        }
-      },
-      format(items, omitted, absent) {
-        if (!items.length && !absent) return ''
-        const lines = ['## Linked issues', ...items.map((item) => `- [${item.kind}] ${item.label}${item.details?.[0] ? ` (${item.details[0]})` : ''}`)]
-        if (absent) lines.push(`- ⚠ ${absent.detail}`)
-        return lines.join('\n') + formatOmitted(omitted)
-      },
-    },
-    {
-      id: 'notes',
-      label: 'Notes',
-      defaultIncluded: true,
-      budget: { maxItems: 10, maxBytesPerItem: 2_000, overflow: 'truncate-tail' },
-      async assemble({ task, repo, workflowRunId }) {
-        const allNotes = await sources.notes(task.id, repo)
-        const notes = workflowRunId
-          ? allNotes.filter((note) => !note.slug.startsWith('workflow-handoffs-') || note.slug === `workflow-handoffs-${workflowRunId}`)
-          : allNotes
-        return {
-          items: notes.map((note) => ({ id: `${note.scope}:${note.slug}`, kind: note.kind, label: note.title, body: note.body, details: [note.scope], origin: { author: note.author } })),
-          legacy: { notes: notes.map((note) => ({ slug: note.slug, scope: note.scope, title: note.title, body: note.body })) },
-        }
-      },
-      format(items, omitted) {
-        if (!items.length) return ''
-        return ['## Notes', ...items.flatMap((item) => [`### ${item.label}`, item.body?.trim() ?? ''])].join('\n') + formatOmitted(omitted)
-      },
-      jump: (item) => ({ pane: 'notes', itemId: item.id.slice(item.id.indexOf(':') + 1), noteScope: item.id.slice(0, item.id.indexOf(':')) as NoteScope }),
-    },
-    {
-      id: 'memory',
-      label: 'Repo memory',
-      defaultIncluded: false,
-      budget: { maxItems: 30, overflow: 'index-only' },
-      async assemble({ task, repo }) {
-        const memories = await sources.memory(task.id, repo)
-        return {
-          items: memories.map((memory) => ({ id: memory.name, kind: 'memory', label: memory.name, details: [memory.description] })),
-          legacy: { memory: memories },
-        }
-      },
-      format(items, omitted) {
-        if (!items.length) return ''
-        return ['## Repo memory (index — ask for bodies via memory_get)', ...items.map((item) => `- ${item.label} — ${item.details?.[0] ?? ''}`)].join('\n') + formatOmitted(omitted)
-      },
-    },
-  ]
-}
 
-// The default registry every section source answers empty. It is what a node serves before
-// wireContextSections runs, and what a test that never wires sources sees.
-let registry = buildContextSections({ notes: async () => [], memory: async () => [], pullRequest: async () => null })
+// ─── The sections ───────────────────────────────────────────────────────────────────────────────
+//
+// Four builders where there was one `buildContextSections({ notes, memory, pullRequest })`. The split is
+// by DATA OWNER: `issues` reads core's own `task_links` and `issues` tables, so it stays core's; the other
+// three read a plugin's SQLite file through that plugin's capability, so each is registered by the plugin
+// that owns the rows (plugins/github, plugins/notes, plugins/memory).
+//
+// What deliberately did NOT move is the section CONTRACT — `budget`, the `legacy` projection and `format`.
+// Those decide the assembled block's bytes, the invariant above depends on them being computed one way, and
+// every consumer reads them: the route, the client's Manifest preview, the local send assembly. A plugin
+// owns where rows come from; core owns what a section looks like on the wire.
 
-export function setContextSections(sections: ContextSectionContribution[]): void {
-  const ids = new Set<string>()
-  for (const section of sections) {
-    if (ids.has(section.id)) throw new Error(`Duplicate context section '${section.id}'.`)
-    ids.add(section.id)
+export function pullRequestSection(source: ContextPullRequestSource): PluginContextSection {
+  return {
+    id: 'pr',
+    label: 'Pull request',
+    defaultIncluded: false,
+    budget: { maxItems: 1, maxBytesPerItem: 2_000, overflow: 'truncate-tail' },
+    async assemble({ userLogin, task }) {
+      if (task.pullNumber == null) return { items: [] }
+      // The three-table join this used to run against core's database is one capability call into
+      // plugins/github (which sorts the changed-file list, as the join's ORDER did).
+      const pr = await source(userLogin, task.repoOwner, task.repoName, task.pullNumber)
+      if (!pr) return { items: [] }
+      const changedFiles = pr.changedFiles
+      const legacy = { number: pr.number, title: pr.title, body: pr.body, changedFiles }
+      return {
+        items: [{ id: `pr:${pr.number}`, kind: 'PR', label: `#${pr.number} ${pr.title}`, body: pr.body ?? undefined, details: changedFiles }],
+        legacy: { pr: legacy },
+      }
+    },
+    format(items) {
+      const item = items[0]
+      if (!item) return ''
+      const lines = [`## PR ${item.label}`]
+      const body = item.body?.replace(/<[^>]+>/g, '').trim()
+      if (body) lines.push(truncateBytes(body, 600))
+      const files = item.details ?? []
+      if (files.length) {
+        const shown = files.slice(0, 30)
+        const more = files.length - shown.length
+        lines.push(`Changed files (${files.length}): ${shown.join(', ')}${more > 0 ? `, +${more} more` : ''}`)
+      }
+      return lines.join('\n')
+    },
   }
-  registry = sections
 }
 
-export const getContextSections = (): readonly ContextSectionContribution[] => registry
+// CORE's own: `task_links` and `issues` are core tables and stay core's — plugins/linear and plugins/rollbar
+// write them through the ExternalItemStore seam rather than owning them (server/integrations/itemStore.ts
+// states the full argument). This is also the only section that reads `db`, which is why PluginContextSection
+// can withhold the handle without costing anything.
+export const linkedIssuesSection: ContextSectionContribution = {
+  id: 'issues',
+  label: 'Linked issues',
+  defaultIncluded: true,
+  budget: { maxItems: 50, maxBytesPerItem: 1_000, overflow: 'omit-with-marker' },
+  async assemble({ db, userLogin, task }) {
+    const links = (await db.select().from(schema.taskLinks).where(eq(schema.taskLinks.taskId, task.id))).sort(
+      (a, b) => a.provider.localeCompare(b.provider) || a.createdAt - b.createdAt,
+    )
+    const issues: TaskContext['issues'] = []
+    const items: ContextItem[] = []
+    const providerCounts = new Map<string, number>()
+    let missing = 0
+    for (const link of links) {
+      const provider = integrationProviderRegistry.get(link.provider)
+      const count = providerCounts.get(link.provider) ?? 0
+      if (count >= (provider?.budgets.maxContextItems ?? 50)) continue
+      providerCounts.set(link.provider, count + 1)
+      let ref: ExternalRef = { providerId: link.provider, connectionId: link.integrationId, displayId: link.identifier }
+      try {
+        if (link.refJson) ref = provider?.externalIds.parse(JSON.parse(link.refJson), ref) ?? ref
+      } catch {
+        // Invalid refs degrade to the identifier-only fallback below.
+      }
+      const [row] = await db
+        .select()
+        .from(schema.issues)
+        .where(and(eq(schema.issues.userId, userLogin), eq(schema.issues.integrationId, link.integrationId), eq(schema.issues.identifier, link.identifier)))
+      const parsed = row && provider?.codec ? parseCached(provider.codec, row.data, ref) : null
+      const state = !row ? 'missing' : !parsed?.ok ? 'malformed' : parsed.value.deletedAt ? 'deleted' : row.fetchedAt + (provider?.resources[0]?.ttlMs ?? 0) < Date.now() ? 'stale' : 'fresh'
+      if (state === 'missing' || state === 'malformed') missing++
+      const item = provider?.taskContext?.summarize(ref, parsed?.ok ? parsed.value : null, state) ?? {
+        id: `${link.provider}:${link.integrationId}:${link.identifier}`,
+        kind: link.provider,
+        label: link.identifier,
+        details: [`Cache: ${state}`],
+      }
+      items.push(item)
+      const title = item.label.includes(' — ') ? item.label.slice(item.label.indexOf(' — ') + 3) : link.identifier
+      issues.push({ provider: link.provider, identifier: link.identifier, title, detail: item.details?.[0] ?? '', cache: parsed?.ok ? 'present' : 'missing' })
+    }
+    return {
+      items,
+      legacy: { issues },
+      absent: missing ? { reason: 'missing-cache', detail: `${missing} linked item${missing === 1 ? '' : 's'} missing cached provider detail.` } : undefined,
+    }
+  },
+  format(items, omitted, absent) {
+    if (!items.length && !absent) return ''
+    const lines = ['## Linked issues', ...items.map((item) => `- [${item.kind}] ${item.label}${item.details?.[0] ? ` (${item.details[0]})` : ''}`)]
+    if (absent) lines.push(`- ⚠ ${absent.detail}`)
+    return lines.join('\n') + formatOmitted(omitted)
+  },
+}
+
+export function notesSection(source: ContextNotesSource): PluginContextSection {
+  return {
+    id: 'notes',
+    label: 'Notes',
+    defaultIncluded: true,
+    budget: { maxItems: 10, maxBytesPerItem: 2_000, overflow: 'truncate-tail' },
+    async assemble({ task, repo, workflowRunId }) {
+      const allNotes = await source(task.id, repo)
+      const notes = workflowRunId
+        ? allNotes.filter((note) => !note.slug.startsWith('workflow-handoffs-') || note.slug === `workflow-handoffs-${workflowRunId}`)
+        : allNotes
+      return {
+        items: notes.map((note) => ({ id: `${note.scope}:${note.slug}`, kind: note.kind, label: note.title, body: note.body, details: [note.scope], origin: { author: note.author } })),
+        legacy: { notes: notes.map((note) => ({ slug: note.slug, scope: note.scope, title: note.title, body: note.body })) },
+      }
+    },
+    format(items, omitted) {
+      if (!items.length) return ''
+      return ['## Notes', ...items.flatMap((item) => [`### ${item.label}`, item.body?.trim() ?? ''])].join('\n') + formatOmitted(omitted)
+    },
+    jump: (item) => ({ pane: 'notes', itemId: item.id.slice(item.id.indexOf(':') + 1), noteScope: item.id.slice(0, item.id.indexOf(':')) as NoteScope }),
+  }
+}
+
+export function memorySection(source: ContextMemorySource): PluginContextSection {
+  return {
+    id: 'memory',
+    label: 'Repo memory',
+    defaultIncluded: false,
+    budget: { maxItems: 30, overflow: 'index-only' },
+    async assemble({ task, repo }) {
+      const memories = await source(task.id, repo)
+      return {
+        items: memories.map((memory) => ({ id: memory.name, kind: 'memory', label: memory.name, details: [memory.description] })),
+        legacy: { memory: memories },
+      }
+    },
+    format(items, omitted) {
+      if (!items.length) return ''
+      return ['## Repo memory (index — ask for bodies via memory_get)', ...items.map((item) => `- ${item.label} — ${item.details?.[0] ?? ''}`)].join('\n') + formatOmitted(omitted)
+    },
+  }
+}
+
+// ─── The contribution point ─────────────────────────────────────────────────────────────────────
+
+// Was `setContextSections(buildContextSections({ notes, memory, pullRequest }))`: ONE slot that had to be
+// filled with every source at once, which meant apps/node/src/wiring/contextSectionsWiring.ts was the only
+// place allowed to hold three different plugins' seams — and so neither notes nor memory could own its own
+// half. That file is gone; each plugin registers its own section in its own `init`.
+//
+// Same shape as AgentToolRegistry above, for the same three reasons: an owner id so a contribution can be
+// REMOVED as a unit, a duplicate-id throw rather than last-write-wins (two sections under one id would
+// resolve by plugin init order, which host.ts explicitly refuses to make load-bearing), and a `remove` the
+// plugin host calls before re-registering, because a process that starts the service twice would otherwise
+// keep sections closed over the first boot's handles.
+type Registration = { owner: string; section: ContextSectionContribution }
+
+class ContextSectionRegistry {
+  readonly #registrations: Registration[] = []
+
+  register(owner: string, section: ContextSectionContribution): void {
+    const clash = this.#registrations.find((r) => r.section.id === section.id)
+    if (clash) throw new Error(`Duplicate context section '${section.id}': already registered by '${clash.owner}', now by '${owner}'.`)
+    this.#registrations.push({ owner, section })
+  }
+
+  remove(owner: string): void {
+    for (let i = this.#registrations.length - 1; i >= 0; i--) {
+      if (this.#registrations[i].owner === owner) this.#registrations.splice(i, 1)
+    }
+  }
+
+  // ORDER IS THE WIRE ORDER of the assembled block, so it cannot be registration order: `pr`, `issues`,
+  // `notes`, `memory` is what every existing prompt, the client's Manifest preview and the byte-exactness
+  // invariant above all assume. Sections sort on this list, and anything unlisted follows in registration
+  // order — the same "sort on a declared field, never on when you registered" rule the client-side pane and
+  // slot registries follow.
+  list(): readonly ContextSectionContribution[] {
+    const rank = (id: string) => {
+      const index = SECTION_ORDER.indexOf(id)
+      return index === -1 ? SECTION_ORDER.length : index
+    }
+    return this.#registrations.map((r) => r.section).sort((a, b) => rank(a.id) - rank(b.id))
+  }
+}
+
+const SECTION_ORDER = ['pr', 'issues', 'notes', 'memory']
+
+const registry = new ContextSectionRegistry()
+
+// Widen a plugin's `db`-less section to the registry's shape by DROPPING the handle. One helper rather
+// than an inline lambda at the plugin host, so the place the handle is withheld is a named thing a reader
+// can find — and so a test registering a plugin-shaped section goes through the same path production does.
+export const asContextSection = (section: PluginContextSection): ContextSectionContribution => ({
+  ...section,
+  assemble: ({ db: _db, ...rest }) => section.assemble(rest),
+})
+
+export const registerContextSection = (owner: string, section: ContextSectionContribution): void =>
+  registry.register(owner, section)
+export const removeContextSections = (owner: string): void => registry.remove(owner)
+export const getContextSections = (): readonly ContextSectionContribution[] => registry.list()
 
 export function parseInclude(raw: string | undefined): Set<string> {
-  if (raw === '*') return new Set(registry.map((section) => section.id))
-  if (!raw?.trim()) return new Set(registry.filter((section) => section.defaultIncluded).map((section) => section.id))
+  const sections = registry.list()
+  if (raw === '*') return new Set(sections.map((section) => section.id))
+  if (!raw?.trim()) return new Set(sections.filter((section) => section.defaultIncluded).map((section) => section.id))
   const tokens = new Set(raw.split(',').map((token) => token.trim()).filter(Boolean))
-  return new Set(registry.map((section) => section.id).filter((id) => tokens.has(id)))
+  return new Set(sections.map((section) => section.id).filter((id) => tokens.has(id)))
 }
 
 export async function assembleContext(
@@ -271,7 +345,7 @@ export async function assembleContext(
     notes: [],
     memory: [],
   }
-  for (const contribution of registry) {
+  for (const contribution of registry.list()) {
     if (!include.has(contribution.id)) continue
     const draft = await contribution.assemble({ db, userLogin, task, repo, workflowRunId: opts.workflowRunId })
     const budgeted = applyBudget(draft.items, contribution.budget)

@@ -10,7 +10,6 @@ import RepoPicker from '@acorn/client-core/ui/RepoPicker.tsx'
 import WorkspacePicker from '@acorn/client-core/ui/WorkspacePicker.tsx'
 import { workspaceForRepo } from '@acorn/client-core/workspaces/activeWorkspace.ts'
 import { planWorkspaceViewTransition } from '@acorn/client-core/workspaces/workspaceViewTransition.ts'
-import PullList from '@acorn/plugin-github/client/PullList.tsx'
 import AccountMenu from '@acorn/client-core/AccountMenu.tsx'
 import { initWorkflowNotices } from '@acorn/client-core/notifications/notifications.ts'
 import { initSessions, sessions } from '@acorn/client-core/tasks/agentSessions.ts'
@@ -34,19 +33,12 @@ import { confirmWillEvent, registerWillHandler, WillConfirmationHost } from '@ac
 import { startClientPollers } from '@acorn/client-core/registries/pollers.ts'
 import { SlotHost, type UiSlotContext } from '@acorn/client-core/registries/uiSlots.tsx'
 import { createAppStartupRestore } from '@acorn/client-core/persistence/appStartup.ts'
-import { PrefKeys } from '@acorn/client-core/persistence/prefKeys.ts'
 import { sourceRegistry } from '@acorn/client-core/registries/sources.ts'
 
 // The shell and PR list are the startup path. Heavy/conditional surfaces stay behind their actual
 // navigation intent so Monaco, xterm, Shiki/diff rendering, settings plugins, and onboarding do not
 // compete with the first interactive paint.
-const OnboardingModal = lazy(() => import('@acorn/plugin-onboarding/client/OnboardingModal.tsx'))
-const PullDetail = lazy(() => import('@acorn/plugin-github/client/PullDetail.tsx'))
-const CreatePullForm = lazy(() => import('@acorn/plugin-github/client/CreatePullForm.tsx'))
-const ComparePreview = lazy(() => import('@acorn/plugin-github/client/ComparePreview.tsx'))
-const DiffView = lazy(() => import('@acorn/plugin-github/client/DiffView.tsx'))
 const SettingsModal = lazy(() => import('@acorn/client-core/settings/SettingsModal.tsx'))
-const TerminalPanel = lazy(() => import('@acorn/plugin-terminal/client/TerminalPanel.tsx'))
 
 // Layout root (Router root): top bar + three panes. Panes are params-driven — PullList (left)
 // and PullDetail (mid) read useParams() directly; routes exist only to populate params.
@@ -55,7 +47,6 @@ export default function App() {
   const params = useParams()
   const navigate = useNavigate()
   const isRestoring = useIsRestoring()
-  const [onboardingDismissed, setOnboardingDismissed] = createSignal(false)
   // The Settings page (account menu → Settings): workspace mapping, per-workspace pages,
   // integrations, shortcuts. `settingsTab` seeds which tab opens.
   const [settingsOpen, setSettingsOpen] = createSignal(false)
@@ -231,6 +222,7 @@ export default function App() {
     terminalOpen: termOpen(),
     toggleTerminal: toggleTerm,
     openSettings,
+    activeTask: activeTask(),
     selectTask: (taskId) => {
       const task = tasks.data?.find((candidate) => candidate.id === taskId)
       if (!task) return
@@ -377,61 +369,12 @@ export default function App() {
           <AccountMenu onSettings={() => openSettings()} onClearCache={clearCache} />
         </div>
       </header>
-      <Switch
-        fallback={
-          <Show when={params.owner} fallback={<main class="panes panes-empty"><Acorn /></main>}>
-        <main class="panes">
-          <section class="pane pane-left">
-            <div class="section-header">
-              Reviews
-              <button type="button" class="new-pr-btn" title="New pull request" onClick={() => navigate(`/${params.owner}/${params.repo}/new`)}>
-                + New PR
-              </button>
-              <button type="button" class="section-refresh" title="Refresh reviews" aria-label="Refresh reviews" disabled={refreshingPulls()} onClick={refreshAllPulls}>
-                {refreshingPulls() ? '...' : '↻'}
-              </button>
-            </div>
-            <PullList />
-          </section>
-          <Show
-            when={isNew()}
-            fallback={
-              <Show
-                when={params.number}
-                fallback={
-                  <section class="pane pane-mid pane-empty" style={{ 'grid-column': '2 / -1' }}>
-                    <Acorn />
-                  </section>
-                }
-              >
-                <section class="pane pane-mid">
-                  <div class="section-header">Navigator</div>
-                  <PullDetail />
-                </section>
-                <section class="pane pane-right">
-                  <div class="section-header">
-                    Diff
-                    <button type="button" class="section-refresh" style={{ 'margin-left': 'auto' }} title="Refresh diff" aria-label="Refresh diff" disabled={refreshingPull()} onClick={refreshCurrentPull}>
-                      {refreshingPull() ? '...' : '↻'}
-                    </button>
-                  </div>
-                  <DiffView />
-                </section>
-              </Show>
-            }
-          >
-            <section class="pane pane-mid">
-              <div class="section-header">New pull request</div>
-              <CreatePullForm />
-            </section>
-            <section class="pane pane-right">
-              <div class="section-header">Compare</div>
-              <ComparePreview />
-            </section>
-          </Show>
-        </main>
-          </Show>
-        }
+      {/* The GitHub browse surface used to live HERE, as this Switch's fallback: three panes, five imported
+          components and two force-refresh handlers, because tabs/sources.ts hardcoded `github` ahead of the
+          source registry. It is an ordinary source contribution now (plugins/github's GithubBrowse.tsx), so
+          the first Match below renders it exactly as it renders Linear, Docker or Agents — and the fallback
+          is what it always should have been: no source selected and no task open. */}
+      <Switch fallback={<main class="panes panes-empty"><Acorn /></main>}
       >
         <Match when={sourceRegistry.get(selectedSource() ?? '')?.component}>
           {(component) => <Dynamic component={component()} />}
@@ -457,12 +400,11 @@ export default function App() {
       <Show when={settingsOpen()}>
         <SettingsModal initialTab={settingsTab()} onClose={() => setSettingsOpen(false)} />
       </Show>
-      <Show when={!onboardingDismissed() && nodeReady() && prefs.data !== undefined && prefs.data?.[PrefKeys.onboarded] !== '1' && (workspaces.data?.length ?? 0) > 0}>
-        <OnboardingModal onClose={() => setOnboardingDismissed(true)} />
-      </Show>
-      <Show when={termOpen()}>
-        <TerminalPanel onClose={() => { const id = activeTaskId(); if (id) setTerminalOpen(id, false) }} task={activeTask()} />
-      </Show>
+      {/* The terminal drawer arrives as a contribution (plugins/terminal's drawerContribution.tsx). The
+          shell still owns the per-task `terminalOpen` flag — the tab rail and topbar badge read it too — and
+          passes it through slotContext; it no longer knows what fills the drawer. Order matters: this host
+          sits BEFORE the overlay host, so a dialog still paints above the drawer. */}
+      <SlotHost slot="drawer" context={slotContext()} />
       <SlotHost slot="overlay" context={slotContext()} />
     </div>
     <RailTips />

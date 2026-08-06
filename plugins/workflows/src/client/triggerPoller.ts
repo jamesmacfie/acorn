@@ -1,5 +1,5 @@
 import type { PollerContribution } from '@acorn/client-core/registries/pollers.ts'
-import { workflowApi } from './workflowClient'
+import { workflowApi } from '@acorn/client-core/tasks/workflowClient.ts'
 
 // Trigger predicates live with their main-process source/provider contributions. The client poll
 // scheduler supplies the app-open, visibility-paused clock; it does not duplicate predicates.

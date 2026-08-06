@@ -10,7 +10,6 @@ import { activateManagedAgentNotifications } from './managedStore'
 import { agentPaneContribution } from './paneContribution'
 import { activateManagedAgentReferences } from './referenceContribution'
 import { agentCenterSourceContribution } from './sourceContribution'
-import { workflowTriggerPollerContribution } from './triggerPoller'
 
 const AgentPricingSettings = lazy(() => import('./AgentPricingSettings'))
 
@@ -20,7 +19,8 @@ export const agentsClientPlugin: ClientPlugin = {
   init: (ctx) => {
     ctx.panes.register(agentPaneContribution)
     ctx.sources.register(agentCenterSourceContribution)
-    ctx.pollers.register(workflowTriggerPollerContribution)
+    // The `workflows.triggers` poller used to be registered here. It is workflows' — its id said so —
+    // and it now lives in that plugin's client part.
     ctx.settingsPages.register({
       id: 'agent-pricing', label: 'Agent pricing', group: 'general', order: 45, requires: 'desktop',
       component: AgentPricingSettings,

@@ -18,6 +18,8 @@
 // and then fail at the first task, which is not a configuration worth supporting.
 import { join } from 'node:path'
 import type { NodePlugin } from '@acorn/node-core/server/plugin/types.ts'
+import { notesSection } from '@acorn/node-core/server/agentTools/contextSections.ts'
+import type { NoteAuthor, NoteLocation, NoteScope } from '@acorn/protocol/notes.ts'
 import { NOTES_STORE } from '../contract/store'
 import { notesAgentTools } from '../main/agentTools'
 import { NotesStore } from '../main/notes'
@@ -37,5 +39,42 @@ export const notesPlugin = (dataDir: string): NodePlugin => ({
     // notes_list / notes_read / notes_write / notes_append, over the SAME store the pane and the context
     // assembler read. An agent appending a finding and the human reading it are looking at one file.
     for (const tool of notesAgentTools(store, ctx.core)) ctx.tools.register(tool)
+    // The `notes` context section. This closure is the whole body of what
+    // apps/node/src/wiring/contextSectionsWiring.ts held on this plugin's behalf — the three-scope walk,
+    // the empty-note skip and the workspace-note compatibility filter — moved verbatim to the plugin that
+    // owns the files. Core keeps the section's budget and compact formatter.
+    ctx.contextSections.register(
+      notesSection(async (taskId) => {
+        // `tasks` and `workspace_repos` are CORE's tables and this plugin has no handle to either, so the
+        // workspace arrives through CoreServices rather than a query.
+        //
+        // CAUGHT, not propagated, and the catch is the behaviour rather than defensive noise.
+        // `CoreServices.tasks.workspaceId` THROWS for an unknown task and for a task whose repo is in no
+        // workspace; the wiring this replaces called `workspaceIdForRepo`, which returned null and simply
+        // skipped the workspace scope. Letting it throw would fail prompt assembly for a repo the user has
+        // not put in a workspace yet — a degraded section turning into a hard error.
+        const workspaceId = await ctx.core.tasks.workspaceId(taskId).catch(() => null)
+        const locations: { scope: NoteScope; location: NoteLocation }[] = [
+          { scope: 'task', location: { scope: 'task', taskId } },
+          ...(workspaceId ? [{ scope: 'workspace' as const, location: { scope: 'workspace' as const, workspaceId } }] : []),
+          { scope: 'global', location: { scope: 'global' } },
+        ]
+        const out: { slug: string; scope: NoteScope; title: string; kind: string; body: string; author: NoteAuthor }[] = []
+        for (const { scope, location } of locations) {
+          for (const summary of await store.list(location)) {
+            if (!summary.included) continue
+            // Compatibility for pre-Phase-4 seeded workspace notes: keep the current task's rows, exclude
+            // siblings. New task notes are isolated structurally by their directory.
+            if (scope === 'workspace' && summary.originTaskId && summary.originTaskId !== taskId) continue
+            const note = await store.read(location, summary.slug).catch(() => null)
+            // Skip empty notes (an untouched scratchpad): they contribute only a `### title` of noise.
+            if (note && note.body.trim()) {
+              out.push({ slug: summary.slug, scope, title: `${note.title} (${note.kind})`, kind: note.kind, body: note.body, author: note.author })
+            }
+          }
+        }
+        return out
+      }),
+    )
   },
 })
