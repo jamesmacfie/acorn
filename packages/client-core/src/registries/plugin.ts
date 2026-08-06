@@ -17,11 +17,16 @@
 //   slots           → registries/uiSlots.tsx — TWO registries, because the doc's single `slots` name
 //                     covers two different props contracts: shell slots get the whole UiSlotContext,
 //                     task slots get just a taskId. Hence `slots` and `taskSlots`.
-//   palette         → LEFT OUT. Commands and keybindings are registered at COMPONENT MOUNT (nine
-//                     sites) and disposed on unmount, which is correct: a pane's shortcuts should
-//                     exist only while the pane does. There is no init-time caller to serve.
-//   contextSections → LEFT OUT. No such registry exists on the client; core's context assembler is
-//                     still one node-side slot (apps/node/src/wiring/contextSectionsWiring.ts).
+//   palette         → registries/paletteRows.ts, as `paletteRows`. Commands and keybindings still register at
+//                     COMPONENT MOUNT (nine sites) and that stays correct — a pane's shortcuts should exist
+//                     only while the pane does. What mount-time registration cannot serve is the palette's
+//                     other half: rows FETCHED per task from repo config (run targets, layout recipes,
+//                     committed workflows), which CommandPalette used to read by importing two plugins.
+//   contextSections → registries/contextSections.ts. Was LEFT OUT in Phase 2 for having no consumer; it
+//                     has one now. plugins/context's pane used to render plugins/memory's section by
+//                     importing it, which was both a coupling edge and the reason memory had no
+//                     ClientPlugin. Note this is the CLIENT registry — extra controls rendered under a
+//                     section — not the node one that supplies a section's data.
 //                     `agentContexts` below is a different thing and is included on its own merits.
 //   attention       → LEFT OUT. The attention inbox is Phase 4; there is nothing to register into.
 //   api             → LEFT OUT. Plugins already call the typed fetchers in client-core directly; a
@@ -31,13 +36,18 @@
 //   desktop         → LEFT OUT. There is no DesktopServices object; native residue is reached
 //                     through client-core's typed `window.acorn` accessors (capabilities.ts).
 //
-// And four registries the doc does not name but which have real plugin contributions today, so they
-// are here: `agentContexts`, `agentToolRenderers`, `pollers`, `persistedState`.
+// And five registries the doc does not name but which have real plugin contributions today, so they are
+// here: `agentContexts`, `agentToolRenderers`, `pollers`, `persistedState`, and `refPanels` — which the doc
+// describes as "linear registers a panel into github's PR-detail slot"; it is keyed on providerId instead, so
+// github asks who renders a ref rather than hosting a hole named after one plugin (registries/refPanels.ts).
 import type { AgentContextContribution } from '@acorn/protocol/agentContext.ts'
 import { persistedStateRegistry, type PersistedStateSlice } from '../persistence/persistedState'
 import { agentContextRegistry } from './agentContexts'
 import { agentToolRendererRegistry, type AgentToolRendererContribution } from './agentToolRenderers'
+import { contextSectionRegistry, type ContextSectionContribution } from './contextSections'
+import { paletteRowRegistry, type PaletteRowSource } from './paletteRows'
 import { paneRegistry, type PaneContribution } from './panes'
+import { refPanelRegistry, type RefPanelContribution } from './refPanels'
 import { pollerRegistry, type PollerContribution } from './pollers'
 import type { Disposable, Registry } from './registry'
 import { settingsRegistry, type SettingsContribution } from './settings'
@@ -61,6 +71,9 @@ export type ClientPluginContext = {
   settingsPages: ClientContributionPoint<SettingsContribution>
   slots: ClientContributionPoint<UiSlotContribution>
   taskSlots: ClientContributionPoint<TaskSlotContribution>
+  contextSections: ClientContributionPoint<ContextSectionContribution>
+  refPanels: ClientContributionPoint<RefPanelContribution>
+  paletteRows: ClientContributionPoint<PaletteRowSource>
   agentContexts: ClientContributionPoint<AgentContextContribution>
   agentToolRenderers: ClientContributionPoint<AgentToolRendererContribution>
   pollers: ClientContributionPoint<PollerContribution>
@@ -131,6 +144,9 @@ function makeContext(name: string, record: (disposable: Disposable) => void): Cl
     settingsPages: own(settingsRegistry),
     slots: own(uiSlotRegistry),
     taskSlots: own(taskSlotRegistry),
+    contextSections: own(contextSectionRegistry),
+    refPanels: own(refPanelRegistry),
+    paletteRows: own(paletteRowRegistry),
     agentContexts: own(agentContextRegistry),
     agentToolRenderers: own(agentToolRendererRegistry),
     pollers: own(pollerRegistry),

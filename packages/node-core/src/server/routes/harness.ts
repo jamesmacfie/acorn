@@ -3,7 +3,7 @@ import type { AppEnv } from '../middleware/auth'
 import { respondError } from '../respond'
 
 // Run-target routes (docs/workflows.md §2): the RENDERER's run surface — the run pane and preview home
-// call these (client/features/tasks/runClient.ts). The agent-facing run_* verbs are the same
+// call these (packages/client-core/src/tasks/runClient.ts). The agent-facing run_* verbs are the same
 // runtime, projected instead through the agent-tool registry (main/agentToolsWiring.ts); notes,
 // memory and the drivable browser moved there wholesale in the agent-tool registry. What's left here is one bridge:
 // the run service, filled by the terminal plugin's init (plugins/terminal/src/node/index.ts) — a run

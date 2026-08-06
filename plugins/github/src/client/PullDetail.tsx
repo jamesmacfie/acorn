@@ -1,4 +1,5 @@
 import { createEffect, createMemo, createSignal, For, Show } from 'solid-js'
+import { Dynamic } from 'solid-js/web'
 import { createMutation, createQuery, useQueryClient } from '@tanstack/solid-query'
 import { useNavigate, useParams } from '@solidjs/router'
 import { useChangedFiles } from './changedFiles'
@@ -14,8 +15,8 @@ import { addComment, addLabel, closePr, disableAutoMerge, enableAutoMerge, merge
 import { UserAvatar } from '@acorn/client-core/ui/UserAvatar.tsx'
 import { ConversationEntryItem } from './pullDetail/Conversation'
 import ChecksPanel from './checks/ChecksPanel'
-import LinearIssuePanel from '@acorn/plugin-linear/client/LinearIssuePanel.tsx'
-import { scanLinearRefs } from '@acorn/plugin-linear/client/scanLinearRefs.ts'
+import { scanLinearRefs } from '@acorn/plugin-linear/contract/scanRefs.ts'
+import { refPanelFor } from '@acorn/client-core/registries/refPanels.ts'
 import { linkifyLinearIds, makeContentLinkHandler, splitLinearIds } from './contentLinks'
 import { buildConversationEntries, buildThreadSnippetIndex } from './pullDetail/model'
 import { persistDraft } from '@acorn/client-core/lib/draftState.ts'
@@ -567,8 +568,20 @@ export default function PullDetail(props: { task?: Task } = {}) {
             <Show when={openCheck()}>
               {(c) => <ChecksPanel owner={o()} repo={r()} runId={c().runId} jobName={c().name} onClose={() => setOpenCheck(null)} />}
             </Show>
-            <Show when={openIssue()}>
-              {(id) => <LinearIssuePanel target={{ identifier: id() }} onClose={() => setOpenIssue(null)} onContentClick={onContentClick} />}
+            {/* The referenced item's own plugin renders it. Was `<LinearIssuePanel …>` — the last
+                plugin→plugin import on the boundary ledger — and the fix is not the indirection but the
+                ownership: a PR body can reference any provider's item, and the plugin that reviews pull
+                requests should not gain a dependency per provider. `refPanelFor` returning undefined (that
+                plugin disabled) renders nothing, which is the right degradation for a detail overlay. */}
+            <Show when={openIssue() ? refPanelFor('linear') : undefined}>
+              {(panel) => (
+                <Dynamic
+                  component={panel().component}
+                  ref={{ providerId: 'linear', displayId: openIssue()! }}
+                  onClose={() => setOpenIssue(null)}
+                  onContentClick={onContentClick}
+                />
+              )}
             </Show>
           </>
         )}

@@ -26,7 +26,10 @@ export function PromoteToTaskModal(props: {
   const params = useParams()
   const promotion = () => {
     const source = sourceRegistry.get(props.providerId)
-    if (!source) throw new Error(`No source registered for provider '${props.providerId}'`)
+    // A source with no promotion cannot be promoted through this modal, and nothing opens it for one — the
+    // rail's promote affordance is rendered by each browse surface. Throwing names the real mistake rather
+    // than failing later on `undefined.prepare`.
+    if (!source?.promotion) throw new Error(`No promotable source registered for provider '${props.providerId}'`)
     return source.promotion
   }
 

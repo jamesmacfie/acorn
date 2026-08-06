@@ -5,10 +5,12 @@ import { setTerminalOpen } from '@acorn/client-core/tasks/tasks.ts'
 import { Badge, Button, Row } from '@acorn/client-core/ui/primitives.tsx'
 import type { AgentSession } from '@acorn/protocol/managedAgents.ts'
 import type { WorkflowStepRow } from '@acorn/protocol/workflow.ts'
-import { terminalApi } from '@acorn/plugin-terminal/client/terminalClient.ts'
+import { capabilities } from '@acorn/client-core/capabilities.ts'
+import { wsOnStatus } from '@acorn/client-core/wsClient.ts'
+import { terminalSessions } from '@acorn/plugin-terminal/contract/sessionsClient.ts'
 import { buildRoster, resumeCommandFor, type RosterRow } from './model'
 import { managedAgentStore } from './managedStore'
-import { workflowApi } from './workflowClient'
+import { workflowApi } from '@acorn/client-core/tasks/workflowClient.ts'
 import './agent-task-sidebar.css'
 
 const RUNTIME_GLYPH: Record<string, string> = {
@@ -43,11 +45,13 @@ export default function AgentTaskSidebar(props: {
   onSelectSession: (sessionId: string, requestId?: string) => void
   onError: (message: string) => void
 }) {
-  const api = terminalApi()
+  // The desktop probe, on the capability rather than on a PTY accessor's null return — the same thing
+  // `terminalApi()` was being used for here, said directly. CommandPalette already reads it this way.
+  const hasEngine = () => capabilities().terminal
   const [workflowData, { refetch }] = createResource(
     () => props.task.id,
     async (taskId) => {
-      if (!api) return { runs: [], steps: [] as WorkflowStepRow[] }
+      if (!hasEngine()) return { runs: [], steps: [] as WorkflowStepRow[] }
       const runs = await workflowApi.runs(taskId)
       const steps = (await Promise.all(runs.map((run) => workflowApi.steps(run.id)))).flat()
       return { runs, steps }
@@ -62,8 +66,10 @@ export default function AgentTaskSidebar(props: {
     buildRoster(props.task.id, sessions(), workflowData().steps, workflowData().runs))
 
   onMount(() => {
-    const offStatus = api?.onStatus(() => void refetch())
-    onCleanup(() => offStatus?.())
+    // `terminalApi().onStatus` WAS `wsOnStatus`, forwarded verbatim — the session-status frame is
+    // client-core's WebSocket, not anything terminal owns.
+    const offStatus = wsOnStatus(() => void refetch())
+    onCleanup(offStatus)
   })
 
   const attentionLoaded = new Map<string, number>()
@@ -77,7 +83,7 @@ export default function AgentTaskSidebar(props: {
   })
 
   async function openLegacy(row: RosterRow) {
-    if (!api) return
+    if (!hasEngine()) return
     if (row.kind === 'session') {
       setTerminalOpen(props.task.id, true)
       requestTerminalFocus(props.task.id, row.session.id)
@@ -89,7 +95,7 @@ export default function AgentTaskSidebar(props: {
       return
     }
     try {
-      const terminal = await api.create({
+      const terminal = await terminalSessions.create({
         taskId: props.task.id,
         profileId: row.step.profileId ?? 'claude-code',
         command: resume,

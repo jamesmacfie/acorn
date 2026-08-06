@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { scanLinearRefs } from './scanLinearRefs'
+import { scanLinearRefs } from './scanRefs'
 
 describe('scanLinearRefs', () => {
   it('matches linear.app issue URLs and ignores bare identifiers', () => {

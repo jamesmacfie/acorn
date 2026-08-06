@@ -8,9 +8,10 @@ import { registerCommands } from '@acorn/client-core/registries/commands.ts'
 import { registerKeybindings, resolveKeybindings, keybindingRegistry } from '@acorn/client-core/registries/keybindings.tsx'
 import { workspaceForRepo } from '@acorn/client-core/workspaces/activeWorkspace.ts'
 import { addSession, refreshSessions, requestTerminalFocus } from '@acorn/client-core/tasks/agentSessions.ts'
-import { terminalApi } from '@acorn/plugin-terminal/client/terminalClient.ts'
+import { capabilities } from '@acorn/client-core/capabilities.ts'
+import { terminalSessions } from '@acorn/plugin-terminal/contract/sessionsClient.ts'
 import { taskBridge } from '@acorn/client-core/tasks/taskBridge.ts'
-import { runApi } from '@acorn/plugin-terminal/client/runClient.ts'
+import { runApi } from '@acorn/client-core/tasks/runClient.ts'
 import { dispatchLayout, layoutForTask, maximizedPane, setActiveTaskId, setMaximizedPane, setSelectedSource } from '@acorn/client-core/tasks/tasks.ts'
 import { activateTaskSignals, pathForTask } from '@acorn/client-core/tasks/activate.ts'
 import { formatChord } from '@acorn/client-core/tasks/paneShortcuts.ts'
@@ -28,7 +29,10 @@ export default function TaskView(props: {
   onToggleTerminal: () => void
   onOpenTerminal: () => void
 }) {
-  const api = terminalApi()
+  // The desktop probe, on the capability rather than on a PTY accessor's null return. `terminalSessions` is
+  // terminal's CONTRACT surface (create + list), not its renderer client — the shell has no business holding
+  // write/attach/kill/resize, which is what importing client/terminalClient handed it.
+  const hasEngine = () => capabilities().terminal
   const bridge = taskBridge()
   const navigate = useNavigate()
   const queryClient = useQueryClient()
@@ -41,7 +45,7 @@ export default function TaskView(props: {
   const [runTargets, { refetch: refetchTargets }] = createResource(
     () => props.task.id,
     async (id) => {
-      if (!api) return []
+      if (!hasEngine()) return []
       const result = await runApi.targets(id)
       return 'targets' in result ? result.targets : []
     },
@@ -50,7 +54,7 @@ export default function TaskView(props: {
   // (edited in a separate resource in settings), so there's no shared signal to live-watch here.
   const [runError, setRunError] = createSignal('')
   async function toggleTarget(id: string, running: boolean) {
-    if (!api) return
+    if (!hasEngine()) return
     setRunError('')
     const result = running ? await runApi.stop(props.task.id, id) : await runApi.start(props.task.id, id)
     if (!result.ok) setRunError(result.reason ?? `Unable to ${running ? 'stop' : 'start'} ${id}`)
@@ -86,8 +90,8 @@ export default function TaskView(props: {
   }
 
   async function openProfile(profileId: string) {
-    if (!api) return
-    const session = await api.create({ taskId: props.task.id, profileId })
+    if (!hasEngine()) return
+    const session = await terminalSessions.create({ taskId: props.task.id, profileId })
     props.onOpenTerminal()
     addSession(session) // create returns the session — no list round trip before focusing it
     requestTerminalFocus(props.task.id, session.id)

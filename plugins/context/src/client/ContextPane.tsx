@@ -1,11 +1,11 @@
 import { createEffect, createMemo, createResource, createSignal, For, onCleanup, onMount, Show } from 'solid-js'
+import { Dynamic } from 'solid-js/web'
 import { readJson } from '@acorn/client-core/apiClient.ts'
 import type { Task } from '@acorn/client-core/queries.ts'
 import { taskContextRoute, type ContextItem, type TaskContext } from '@acorn/protocol/api.ts'
 import { agentSessionsFor } from '@acorn/client-core/tasks/agentSessions.ts'
 import { taskBridge } from '@acorn/client-core/tasks/taskBridge.ts'
-import MemorySection from '@acorn/plugin-memory/client/MemorySection.tsx'
-import { requestNoteOpen } from '@acorn/plugin-notes/client/notesClient.ts'
+import { contextSectionContributions } from '@acorn/client-core/registries/contextSections.ts'
 import { clientEvents, consumePaneIntent, openPane, type PaneIntent } from '@acorn/client-core/registries/clientEvents.ts'
 import Picker from '@acorn/client-core/ui/Picker.tsx'
 import type { TerminalSession } from '@acorn/protocol/terminal.ts'
@@ -23,7 +23,11 @@ export default function ContextPane(props: { task: Task }) {
   const api = taskBridge()
   const [msg, setMsg] = createSignal('')
   const [expanded, setExpanded] = createSignal<Set<string>>(new Set())
-  const [pendingMemory, setPendingMemory] = createSignal(0)
+  // Pending-item counts reported UP by section contributions, keyed by section id. Was a single
+  // `pendingMemory` signal, which named the one plugin that happens to have any — so a second contributor
+  // would have silently overwritten the first's count in the header.
+  const [pending, setPending] = createSignal<Record<string, number>>({})
+  const pendingFor = (sectionId: string) => pending()[sectionId] ?? 0
   const [previewOpen, setPreviewOpen] = createSignal(false)
 
   // The pane needs the full inventory; contribution defaults only seed the initial selection.
@@ -45,9 +49,14 @@ export default function ContextPane(props: { task: Task }) {
   const assembled = createMemo(() => (ctx() ? assembleBlockFrom(ctx()!, effective()) : null))
 
   // An empty section (no items, no ⚠ absent) is noise — hide it, so "Linked issues" vanishes when
-  // there are none and a PR section appears only when the task has a PR. Memory is always shown: it
-  // hosts the add-memory form and proposals even with an empty index.
-  const visibleSections = createMemo(() => (ctx()?.sections ?? []).filter((s) => s.id === 'memory' || s.items.length > 0 || !!s.absent))
+  // there are none and a PR section appears only when the task has a PR. A section with a registered
+  // CONTRIBUTION always shows, because the contribution is interactive and hiding it would hide the only
+  // way to add the thing that would make the section non-empty. That rule used to read
+  // `s.id === 'memory'`, with a comment explaining that memory hosts the add form — true, and exactly the
+  // hardcoding the registry removes: it is now "has something to render", not "is memory".
+  const visibleSections = createMemo(() =>
+    (ctx()?.sections ?? []).filter((s) => contextSectionContributions(s.id).length > 0 || s.items.length > 0 || !!s.absent),
+  )
 
   const isOpen = (id: string) => expanded().has(id)
   const toggleOpen = (id: string) =>
@@ -79,8 +88,12 @@ export default function ContextPane(props: { task: Task }) {
 
   function followJump(item: ContextItem) {
     if (!item.jump?.itemId) return
+    // The same call notes' own `requestNoteOpen` makes. Inlined rather than imported: `openPane` and the
+    // `notes:open` PaneIntent variant are both client-core's, so borrowing notes' one-line wrapper was
+    // the entire context → notes coupling edge — a plugin dependency for a function that reaches nothing
+    // of that plugin's. Every other jump below already goes straight through openPane.
     if (item.jump.pane === 'notes' && item.jump.noteScope) {
-      requestNoteOpen(props.task.id, item.jump.itemId, item.jump.noteScope)
+      openPane(props.task.id, 'notes', { kind: 'notes:open', slug: item.jump.itemId, scope: item.jump.noteScope })
       return
     }
     if (item.jump.ref) {
@@ -145,7 +158,7 @@ export default function ContextPane(props: { task: Task }) {
                     <div class="context-tray-row">
                       <input type="checkbox" checked={effective()[section.id] ?? false} onChange={() => toggleSection(section.id)} />
                       <span class="context-tray-kind">{section.label}</span>
-                      <Show when={section.id === 'memory' && pendingMemory()}><span class="muted">· {pendingMemory()} pending</span></Show>
+                      <Show when={pendingFor(section.id)}><span class="muted">· {pendingFor(section.id)} pending</span></Show>
                       <Show when={section.omitted}><span class="muted">+{section.omitted} omitted</span></Show>
                       <span class="context-size">{formatSize(size())}</span>
                     </div>
@@ -182,9 +195,20 @@ export default function ContextPane(props: { task: Task }) {
                         )
                       }}
                     </For>
-                    <Show when={section.id === 'memory'}>
-                      <MemorySection task={props.task} onChanged={() => void refreshContext()} onPendingChange={setPendingMemory} />
-                    </Show>
+                    {/* Extra controls a plugin renders under its own section — memory's add form and
+                        proposal queue today. Was a hardcoded `section.id === 'memory'` branch importing
+                        plugins/memory directly; the pane now asks the registry and does not know which
+                        plugins answer. */}
+                    <For each={contextSectionContributions(section.id)}>
+                      {(contribution) => (
+                        <Dynamic
+                          component={contribution.component}
+                          task={props.task}
+                          onChanged={() => void refreshContext()}
+                          onPendingChange={(count: number) => setPending((prev) => ({ ...prev, [section.id]: count }))}
+                        />
+                      )}
+                    </For>
                   </div>
                 )
               }}

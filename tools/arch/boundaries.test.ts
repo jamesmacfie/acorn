@@ -49,6 +49,13 @@ const pkgOf = (file: string): Pkg | undefined => PACKAGES.find((p) => file.start
 
 // Every import form, including side-effect `import '…'` and the vi.mock family — a mock path is a
 // real dependency edge, and missing them is how the database -> editor edge went undeclared.
+//
+// It does NOT strip comments, and that is a real sharp edge rather than a theoretical one: a comment
+// containing `import('@acorn/plugin-x/…')` — the natural way to describe code you just moved — becomes a
+// phantom edge, and if the path is a placeholder or has since moved it fails the resolver rule below.
+// Deliberately left as is: stripping comments means parsing, the false positive is loud and immediate rather
+// than silent, and the alternative failure mode (missing a real edge hidden after a `//`) is worse. Describe
+// a moved import in prose, not in a form that parses.
 const IMPORT_RE =
   /(?:\bfrom\s*|\bimport\s*|\brequire\s*\(\s*|\bimport\s*\(\s*|\bvi\.(?:mock|doMock|importActual|importMock)\s*\(\s*)(['"])([^'"\n]+)\1/g
 
@@ -354,33 +361,47 @@ describe('architecture boundaries', () => {
     expect([...new Set(offenders)].sort()).toEqual([...SCHEMA_BASELINE].sort())
   })
 
-  it('plugin→plugin coupling matches the shrinking baseline', () => {
-    // Phase 3 drives this to zero. Entries may be removed, never added.
-    // 'changes -> github' and 'database -> editor' are off this list: the shared UI kit landed
-    // (packages/client-core/src/ui/diff/* and ui/monacoSetup.ts), so both consumers now import
-    // rendering code from client-core instead of another plugin's client/ internals.
+  it('no plugin imports another outside contract/', () => {
+    // ZERO, as of Phase 3 (docs/vNext/plan.md § Phase 3 exit). This is an INVARIANT now, not a ratchet —
+    // the same transition the schema rule above already made. A new entry here is not a debt to record, it
+    // is a plugin reaching into another plugin's internals, and the fix is one of the four mechanisms the
+    // phase established rather than a line in this array.
     //
-    // 'memory -> notes' is off it too, and by the mechanism this ledger exists to reward rather than by a
-    // move: notes is a NodePlugin that publishes its store as `notes.store` from its contract/, so memory
-    // imports a capability id and a signature instead of the NotesStore class it used to CONSTRUCT.
+    // What each of the six V1 edges turned into, because the pattern is the useful part and it was NOT
+    // "add an abstraction" in four of the six cases:
     //
-    // '@acorn/plugin-context -> @acorn/plugin-notes' survives as a CLIENT edge (ContextPane imports
-    // notesClient's requestNoteOpen) and '@acorn/plugin-workflows -> @acorn/plugin-agents' as another
-    // (WorkflowsSettings.tsx). Both are Phase 3's, with ClientPlugin.
-    const BASELINE = [
-      '@acorn/plugin-agents -> @acorn/plugin-terminal',
-      '@acorn/plugin-context -> @acorn/plugin-memory',
-      '@acorn/plugin-context -> @acorn/plugin-notes',
-      '@acorn/plugin-github -> @acorn/plugin-linear',
-      '@acorn/plugin-preview -> @acorn/plugin-terminal',
-      '@acorn/plugin-workflows -> @acorn/plugin-agents',
-    ]
+    //   THREE were a file in the wrong package, reaching nothing of the plugin they were imported from.
+    //     'context -> notes'      `requestNoteOpen`, one line over client-core's own openPane. Inlined.
+    //     'preview -> terminal'   runClient.ts, a fetcher for /v2/core routes. Moved to client-core.
+    //     'workflows -> agents'   workflowClient.ts, a fetcher for workflows' OWN routes. Moved to
+    //                             client-core — NOT into plugins/workflows, because workflows already
+    //                             imports agents' sessionExecute contract and the reverse edge would close
+    //                             a package cycle the acyclicity rule above rejects.
+    //   ONE was a surface that was too wide. 'agents -> terminal' needed `create`; importing
+    //     client/terminalClient also handed it write/attach/kill/resize. Terminal published the narrow
+    //     client twin of its existing `terminal.sessions` capability instead.
+    //   TWO were real UI composition, and each got the contribution point plugins.md already named:
+    //     'context -> memory'     the client context-section registry. Also gave memory its first
+    //                             ClientPlugin — "client code but nothing registrable" was why it had none.
+    //     'github -> linear'      `scanLinearRefs` to linear's contract/ (a pure function over strings),
+    //                             and the panel through a providerId-keyed ref-panel registry, so the
+    //                             plugin that reviews pull requests names no provider plugin at all.
+    //
+    // Two came off in PHASE 2 and are recorded here because they show the same split: 'changes -> github' and
+    // 'database -> editor' were rendering code, so the shared UI kit landed and both consumers import
+    // client-core (ui/diff/*, ui/monacoSetup.ts); 'memory -> notes' was an OWNERSHIP problem — memory
+    // CONSTRUCTED the NotesStore — so notes became a NodePlugin publishing `notes.store` from its contract/.
+    //
+    // One residual ownership question survives with no import behind it, stated so it is not mistaken for
+    // done: plugins/agents' task sidebar still fetches workflow runs and steps to merge into its own roster.
+    // plugins.md puts that in a task-activity slot both plugins contribute to. It is slot work, and the
+    // fetcher's home in client-core is what stands in for it meanwhile.
     const seen = crossPackage
       .filter((e) => e.fromPkg.kind === 'plugin' && e.target.pkg!.kind === 'plugin')
       // Importing another plugin's contract/ is the sanctioned mechanism, not a coupling: it carries
       // types and capability/event ids only, and the rule above keeps it that way.
       .filter((e) => !isContract(e.target.pkg, e.target.file))
       .map((e) => `${e.fromPkg.name} -> ${e.target.pkg!.name}`)
-    expect([...new Set(seen)].sort()).toEqual([...BASELINE].sort())
+    expect([...new Set(seen)].sort()).toEqual([])
   })
 })

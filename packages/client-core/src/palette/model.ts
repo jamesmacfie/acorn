@@ -11,23 +11,23 @@ export type PaletteItem =
   | { kind: 'error'; id: string; label: string } // config parse errors (13 §B) — visible, not invocable
 
 export type PaletteSources = {
-  targets: { id: string; command: string; running: boolean }[]
-  layouts?: { id: string }[]
-  workflows?: { id: string; name: string; steps: unknown[] }[]
+  // Rows built by `paletteRows` contributions (registries/paletteRows.ts), already in source order. This used
+  // to be three typed fields — `targets`, `layouts`, `workflows` — which meant core knew what a run target and
+  // a workflow were, and adding a fourth kind of contributed row meant editing this file.
+  rows?: PaletteItem[]
   tasks?: { id: string; label: string; hint?: string }[]
   workspaces?: { id: string; label: string; hint?: string }[]
   errors: { source: string; message: string }[]
   actions: { id: string; label: string; hint?: string }[]
 }
 
-// Errors first (they explain why a target might be missing), then run targets, layouts, workflows,
-// actions (panes/terminal/archive), then Go-to-task rows last (they're navigation, not commands).
+// Errors first — they explain why a row someone expected is missing, and that is a property of the WHOLE list,
+// so no single contributing source can produce it. Then contributed rows, then actions
+// (panes/terminal/archive), then switch-workspace and Go-to-task last: those are navigation, not commands.
 export function composeItems(src: PaletteSources): PaletteItem[] {
   return [
     ...src.errors.map((e, i): PaletteItem => ({ kind: 'error', id: `error:${i}`, label: `config error (${e.source}): ${e.message}` })),
-    ...src.targets.map((t): PaletteItem => ({ kind: 'run', id: `run:${t.id}`, label: `${t.running ? 'Stop' : 'Run'}: ${t.id}`, hint: t.command, running: t.running })),
-    ...(src.layouts ?? []).map((l): PaletteItem => ({ kind: 'layout', id: `layout:${l.id}`, label: `Layout: ${l.id}`, hint: 'open panes + start target' })),
-    ...(src.workflows ?? []).map((w): PaletteItem => ({ kind: 'workflow', id: `workflow:${w.id}`, label: `Workflow: ${w.name}`, hint: `${w.steps.length} steps` })),
+    ...(src.rows ?? []),
     ...src.actions.map((a): PaletteItem => ({ kind: 'action', id: a.id, label: a.label, hint: a.hint })),
     ...(src.workspaces ?? []).map((w): PaletteItem => ({ kind: 'workspace', id: `workspace:${w.id}`, label: w.label, hint: w.hint })),
     ...(src.tasks ?? []).map((t): PaletteItem => ({ kind: 'task', id: `task:${t.id}`, label: t.label, hint: t.hint })),
