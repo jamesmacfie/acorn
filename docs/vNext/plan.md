@@ -97,7 +97,9 @@ direct unit/integration tests (confinement, env allowlists, kill trees, secret n
 the terminal scope-shed is complete; boundary baseline shrinks to only the edges scheduled for
 phase 3.
 
-> **Phase 2 is PARTIALLY complete.** Core services, the terminal scope-shed and scoped internal tokens
+> **Phase 2 is complete as of Phase 3's first work item.** Its one outstanding finding — no task-scope check
+> on any plugin route — is fixed (phase3-notes.md § "The security fix, done first").
+> Core services, the terminal scope-shed and scoped internal tokens
 > are done; the plugin host works and one plugin is through it; eleven plugin databases, the `tools`
 > contribution point, the UI kit and `ClientPlugin` are not.
 > [phase2-notes.md](./phase2-notes.md) states exactly which, and records the divergences (no
@@ -117,6 +119,15 @@ Work through the ~25 V1 cross-feature edges (table in plugins.md), in dependency
 **Exit**: boundary-test baseline is zero — no plugin imports another outside `contract/`;
 disabling any non-required plugin at startup leaves the rest working (automated test cycles
 through each plugin disabled); per-plugin vitest suites pass against real temp data roots.
+
+> **Phase 3 is done**, with one criterion met in part. Baseline is zero and the rule is now an invariant
+> rather than a ratchet; the shell imports no feature UI; context sections are a per-plugin contribution
+> point. The disabled-plugin cycle is proven on the NODE side against the real fifteen-plugin list and is
+> **not** proven on the client side — vitest cannot import the client plugin list at all (no Solid transform,
+> no DOM), and the fix is a dependency decision rather than a test.
+> [phase3-notes.md](./phase3-notes.md) records that, the six edges and what each one actually was (four of
+> the six were a file in the wrong package, not feature coupling), the divergences, and the one security gap
+> left open on purpose: **a task-scoped agent can still prune the Docker daemon**.
 
 ## Phase 4 — fleet product surfaces
 

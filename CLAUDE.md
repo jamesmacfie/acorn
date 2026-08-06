@@ -11,12 +11,15 @@ partitioned per node. V1's bearer-authenticated `/api/v1` automation listener is
 > **For architecture/domain detail, read [docs/architecture-overview.md](./docs/architecture-overview.md) first.**
 > For the Cloudflare-Workers→Electron migration history and rationale, see
 > [docs/electron.md](./docs/electron.md); current topic docs describe the shipped Electron runtime.
-> vNext Phase 1 landed the protocol v2 / fleet spine, and Phase 2 is **partially** done (core services,
-> the terminal scope-shed, scoped internal tokens, and the plugin host, with the database split COMPLETE — no plugin reads core's schema).
+> vNext Phase 1 landed the protocol v2 / fleet spine; Phase 2 landed core services, the terminal scope-shed,
+> scoped internal tokens, the plugin host and the database split; **Phase 3 is done** — the plugin→plugin
+> baseline is ZERO, the shell imports no feature UI, and context sections are a per-plugin contribution point.
 > Deliberate divergences and — importantly — what has NOT landed are recorded in
-> [docs/vNext/phase1-notes.md](./docs/vNext/phase1-notes.md) and
-> [docs/vNext/phase2-notes.md](./docs/vNext/phase2-notes.md). Read the Phase 2 notes before assuming a
-> plugin owns its database or that `apps/node/src/wiring/` is gone; most of it is still there.
+> [docs/vNext/phase1-notes.md](./docs/vNext/phase1-notes.md),
+> [docs/vNext/phase2-notes.md](./docs/vNext/phase2-notes.md) and
+> [docs/vNext/phase3-notes.md](./docs/vNext/phase3-notes.md). Read the Phase 3 notes before touching the
+> client registries or assuming a disabled plugin is safe on the client — that half is unproven, and one
+> security gap (a task-scoped agent can prune the Docker daemon) is open on purpose.
 
 ## Architecture (a client, and N nodes)
 
@@ -43,9 +46,10 @@ partitioned per node. V1's bearer-authenticated `/api/v1` automation listener is
 - **The plugin host** (`packages/node-core/src/server/plugin/`) is how a node plugin is assembled:
   `NodePlugin.init(ctx)` gets `{routes, capabilities, events, core, log}` and its own migrated SQLite
   handle, and `apps/node/src/server/plugins.ts` is the list — a plugin absent from it does not exist.
-  Cross-plugin collaboration is a `CapabilityRegistry` (typed, late-bound, optional-by-default) and a
-  `NodeEventBus`, both owned by the service runtime rather than module singletons. `contract/` is the
-  only cross-plugin import surface, boundary-tested. Both halves exist: `ClientPlugin`
+  Cross-plugin collaboration is a `CapabilityRegistry` (typed, late-bound, optional-by-default), owned by the
+  service runtime rather than a module singleton. `contract/` is the only cross-plugin import surface, and as
+  of Phase 3 the boundary test asserts **zero** non-contract plugin→plugin edges rather than a shrinking
+  baseline. Both halves exist: `ClientPlugin`
   (`packages/client-core/src/registries/plugin.ts`) mirrors it over the nine client registries that have
   real contributions, with `apps/desktop/src/app/client/plugins.ts` as the list. Every plugin with a node
   part is through the host and
@@ -147,15 +151,19 @@ tools/arch/             @acorn/arch-tests   the executable boundary rules
   `bootstrap.ts` supervision, `serviceHost.ts`, `appScheme.ts`, `desktopCapabilities.ts`, `preload.ts`,
   `sessionKeyStore.ts`, and the broker set `nodeBroker.ts` / `nodeBrokerIpc.ts` / `nodeRequest.ts` /
   `nodePairing.ts` / `fleetStore.ts` / `deviceTokenStore.ts`) and `client/` (`index.tsx`, `App.tsx`,
-  `CommandPalette.tsx`, `TaskView.tsx` and contribution activation).
+  `CommandPalette.tsx`, `TaskView.tsx` and contribution activation). As of Phase 3 none of these imports a
+  plugin's UI: the GitHub browse is a source contribution, the terminal drawer and the onboarding modal are
+  slot contributions, and the palette's per-task rows come from a `paletteRows` registry.
 - `apps/node/src/` is the service composition root: `service/` (runtime composition + the
   supervised-child entry), `server/` (`providers.ts`/`routes.ts` register plugin contributions;
   `standalone.ts` is the Electron-free entry behind `dev:node`), and `wiring/` — the service-owned glue
-  that used to live in `app/main` (`agentProfiles.ts`, `configTrustWiring.ts` and the two
-  remaining `*Wiring.ts`). It is named `wiring`, not `main`, because `main` now means Electron main.
+  that used to live in `app/main`. Three files left: `agentProfiles.ts` (core's, deliberately — it registers
+  three separate profile plugins into a core registry consumed by terminal, workflows and agents),
+  `agentToolsWiring.ts` (core's own six tools plus core's `issues` context section) and
+  `configTrustWiring.ts`. It is named `wiring`, not `main`, because `main` now means Electron main.
   `managedWorkflowStep.ts`, `harnessWiring.ts`, `serverBridges.ts`, `managedAgentsWiring.ts`,
-  `workflowWiring.ts` and `startupSecurity.ts` are gone
-  — each one's contents moved into the plugin whose engine it drove.
+  `workflowWiring.ts`, `startupSecurity.ts` and — as of Phase 3 — `contextSectionsWiring.ts` are gone;
+  each one's contents moved into the plugin whose engine or data it drove.
 - `apps/node/test/integration/` — tests that need the composition root's registries populated
   (providers, routes, agent profiles). They live in the app because importing `app/*` is legal only
   from an app; doing it from a package is a boundary violation. The three suites left in
@@ -172,8 +180,9 @@ tools/arch/             @acorn/arch-tests   the executable boundary rules
   build stages a copy into `apps/desktop/out/migrations` so the bundled service can find them.
 - **`tools/arch/boundaries.test.ts` is the enforcement.** 14 rules over the package graph: nothing
   imports an app, no app→app, no relative import escapes its package, declared ⊇ used, protocol
-  purity, the client/node split, the enumerated Electron surface, no package cycles, and a shrinking
-  plugin→plugin ledger. It resolves bare `@acorn/*` specifiers *and* `vi.mock` paths, and it asserts
+  purity, the client/node split, the enumerated Electron surface, no package cycles, and **zero**
+  non-contract plugin→plugin edges. Its scanner does not strip comments, so a comment containing an
+  `import('@acorn/…')` expression becomes a phantom edge — describe a moved import in prose. It resolves bare `@acorn/*` specifiers *and* `vi.mock` paths, and it asserts
   up front that it can still see a non-trivial graph — the previous version matched only relative
   specifiers and would have passed vacuously after the split.
 - Detail docs: [docs/frontend.md](./docs/frontend.md), [docs/diff-rendering.md](./docs/diff-rendering.md),
