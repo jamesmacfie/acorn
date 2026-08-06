@@ -4,6 +4,9 @@ import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { schema } from '@acorn/node-core/server/db/index.ts'
 import { makeTestDb, type TestDb } from '@acorn/node-core/server/routes/testDb.ts'
+import { localGitAgentTools } from '@acorn/plugin-changes/main/agentTools.ts'
+import { memoryAgentTools } from '@acorn/plugin-memory/main/agentTools.ts'
+import { runAgentTools } from '@acorn/plugin-terminal/main/agentTools.ts'
 import { buildAgentTools } from './agentToolsWiring'
 import { NotesStore } from '@acorn/plugin-notes/main/notes.ts'
 
@@ -31,9 +34,6 @@ describe('agent note contributions', () => {
     const tools = buildAgentTools({
       db: testDb.db,
       notesStore,
-      proposals: { propose: async () => ({}) } as never,
-      runtime: { targets: async () => ({ targets: [] }) } as never,
-      memory: { reconciled: async () => {}, list: async () => [], get: async () => null, search: async () => [], indexSlice: async () => [] },
       browser: {
         navigate: async () => ({ ok: false }),
         snapshot: async () => ({}),
@@ -54,5 +54,60 @@ describe('agent note contributions', () => {
       body: 'replaced', author: 'agent', originSessionId: 'session-1', originTaskId: 'task1',
     })
     await expect(notesStore.read({ scope: 'global' }, 'handoff')).rejects.toThrow()
+  })
+})
+
+// The manifest is now assembled from FOUR sources — core's remainder here plus one set per converted
+// plugin — and the failure mode that makes it worth pinning is silent: a tool dropped on the way out of
+// this file is invisible until an agent tries to call it and gets a 404. This suite is the only place
+// that may see all four, because importing a plugin's internals is legal from an app and nowhere else.
+//
+// Names, not shapes: risk tiers, schemas and the three projections are covered by
+// packages/node-core/src/server/routes/agentTools.test.ts and mcp/server.test.ts over a fixture.
+describe('the full agent-tool manifest', () => {
+  const CORE_TOOLS = [
+    'task_current',
+    'task_context',
+    'pr_current',
+    'pr_changed_files',
+    'linked_issues',
+    'repo_info',
+    'notes_list',
+    'notes_read',
+    'notes_write',
+    'notes_append',
+    'browser_navigate',
+    'browser_snapshot',
+    'browser_click',
+    'browser_fill',
+    'browser_screenshot',
+    'browser_console',
+  ]
+  const CHANGES_TOOLS = ['local_changes', 'local_diff', 'git_log']
+  const MEMORY_TOOLS = ['memory_search', 'memory_list', 'memory_get', 'memory_write']
+  const TERMINAL_TOOLS = ['run_targets', 'run_start', 'run_stop', 'run_restart', 'run_status']
+
+  it('is the same set of tool names whichever contributor declares them', () => {
+    const testDb = makeTestDb()
+    try {
+      const core = { tasks: { load: async () => undefined } } as never
+      const names = [
+        ...buildAgentTools({ db: testDb.db, notesStore: {} as never, browser: {} as never }).map((tool) => tool.name),
+        ...localGitAgentTools(core).map((tool) => tool.name),
+        ...memoryAgentTools({} as never, {} as never, core).map((tool) => tool.name),
+        ...runAgentTools({} as never).map((tool) => tool.name),
+      ]
+      // No duplicates: the registry throws on one, so a collision would break the boot, not a call.
+      expect(new Set(names).size).toBe(names.length)
+      expect([...names].sort()).toEqual([...CORE_TOOLS, ...CHANGES_TOOLS, ...MEMORY_TOOLS, ...TERMINAL_TOOLS].sort())
+    } finally {
+      testDb.cleanup()
+    }
+  })
+
+  it('leaves each moved group owned by exactly one plugin', () => {
+    expect(localGitAgentTools({ tasks: {} } as never).map((tool) => tool.name)).toEqual(CHANGES_TOOLS)
+    expect(memoryAgentTools({} as never, {} as never, {} as never).map((tool) => tool.name)).toEqual(MEMORY_TOOLS)
+    expect(runAgentTools({} as never).map((tool) => tool.name)).toEqual(TERMINAL_TOOLS)
   })
 })

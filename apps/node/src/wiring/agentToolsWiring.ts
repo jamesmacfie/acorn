@@ -1,57 +1,55 @@
-// Builds the agent-tool registry (docs/agent-tools.md, docs/agent-tools.md): every agent capability
-// as ONE AgentToolContribution, with its domain dep closed over. Installed via setAgentTools, so the
-// server route (GET/POST /v2/core/tasks/:id/tools) and the MCP server (which fetches the manifest and
-// proxies calls) both project from this one list. Replaces the notes/memory/browser harness bridges
-// and the 25 hand-written MCP tool bodies. Run targets keep their dedicated renderer routes
-// (server/routes/harness.ts) — run appears here only as the agent-facing run_* tools.
+// The agent tools NO plugin can own yet (docs/agent-tools.md).
 //
-// Provenance: notes/memory writes stamp author: agent + the agent session id (ctx.sessionId, from
-// the x-acorn-session-id header). memory_write is PROPOSE-only — the human gate is the sole writer
-// of accepted memory (the agent-tool registry invariant; docs/notes-and-memory.md §1).
+// `tools` is a contribution point now (server/plugin/types.ts § PluginToolRegistry): a converted plugin
+// declares its own tools inside init, beside the engine each one drives. Three sets have moved —
+// local_changes/local_diff/git_log to plugins/changes, memory_* to plugins/memory, run_* to
+// plugins/terminal — and what is left here is the remainder, with the specific blocker per group:
+//
+//   - **task_*/pr_*/linked_issues/repo_info** are CORE's, not a plugin's: they read core's task/PR
+//     mirror through the shared section registry (server/agentTools/contextSections.ts) and core's
+//     `repos` table directly. They have no plugin to move to until github is converted, and even then
+//     the mirror stays core's.
+//   - **notes_*** belong to plugins/notes, which is not a NodePlugin. Two things block the move, not
+//     one: the NotesStore INSTANCE is constructed by plugins/memory's registerKnowledgeIpc (one store
+//     for the pane, the tools and the context assembler), and the 'workspace' note scope needs
+//     `workspaceIdFor` over core's `workspace_repos` table, for which CoreServices has no seam. Adding
+//     one with a single speculative caller is what this phase is supposed to stop doing.
+//   - **browser_*** belong to plugins/preview, which has NO node-side part at all: previewService.ts and
+//     browserService.ts import `electron` and run in Electron MAIN, and the driver arrives here as an
+//     injected DesktopCapability. Converting it is not a tool move, it is a process-boundary change.
+//
+// Registered under the owner 'core' and cleared first, so a process that starts the service more than
+// once (service/runtime.test.ts does, four times) replaces these rather than throwing on the duplicate
+// name — the same idempotency the plugin host gives a plugin.
+//
+// Provenance: notes writes stamp author: agent + the agent session id (ctx.sessionId, from the
+// x-acorn-session-id header).
 import { and, eq } from 'drizzle-orm'
 import { z } from 'zod'
 import { assembleContext, parseInclude } from '@acorn/node-core/server/agentTools/contextSections.ts'
-import { setAgentTools, ToolError, type AgentToolContribution, type ToolContext } from '@acorn/node-core/server/agentTools/registry.ts'
+import { registerAgentTool, removeAgentTools, ToolError, type AgentToolContribution, type ToolContext } from '@acorn/node-core/server/agentTools/registry.ts'
 import type { AppDatabase } from '@acorn/node-core/server/db/index.ts'
 import { schema } from '@acorn/node-core/server/db/index.ts'
 import type { NoteLocation, NoteScope } from '@acorn/protocol/notes.ts'
 import type { BrowserDesktopCapability } from '@acorn/protocol/desktopCapabilities.ts'
-import { gitLog, localChanges, localDiff } from '@acorn/plugin-changes/main/localDiff.ts'
-import type { MemoryIndex } from '@acorn/plugin-memory/main/knowledgeIpc.ts'
-import { MEMORY_TYPES, type MemoryType } from '@acorn/plugin-memory/main/memory.ts'
-import type { MemoryProposalStore } from '@acorn/plugin-memory/main/memoryProposals.ts'
 import type { NotesStore } from '@acorn/plugin-notes/main/notes.ts'
-import type { TerminalRunTargets } from '@acorn/plugin-terminal/contract/runTargets.ts'
-import { loadTask, repoFor, workspaceIdFor } from '@acorn/node-core/main/taskWorktree.ts'
-import { isRepoConfigTrustError } from '@acorn/node-core/main/repoConfigTrust.ts'
-import { broadcastRepoConfigTrustNotice } from '@acorn/node-core/main/notify.ts'
+import { loadTask, workspaceIdFor } from '@acorn/node-core/main/taskWorktree.ts'
+
+// The owner id these contributions are registered under. Not a plugin namespace: the tools below are
+// core's own, plus two groups being held by an unconverted plugin. It exists so they can be removed as a
+// unit on a second boot, exactly as a plugin's are.
+const OWNER = 'core'
 
 export type AgentToolsDeps = {
   db: AppDatabase
   notesStore: NotesStore
-  proposals: MemoryProposalStore
-  // terminal.runTargets (plugins/terminal/src/contract/runTargets.ts), resolved by the composition
-  // root — this app no longer constructs the run service, the plugin that owns the PTYs does.
-  runtime: TerminalRunTargets
   browser: BrowserDesktopCapability
-  // The memory index reads, bound to the memory plugin's own SQLite file (its `memory.knowledge`
-  // capability). Each one reconciles from the markdown files first — they are the truth.
-  memory: MemoryIndex
 }
-
-const asMemoryType = (type: string | undefined): MemoryType | undefined =>
-  MEMORY_TYPES.includes(type as MemoryType) ? (type as MemoryType) : undefined
-
-const NO_WORKTREE = { status: 'no-worktree', hint: 'This task has no worktree — git tools need a checked-out worktree.' }
 
 async function assemble(deps: AgentToolsDeps, ctx: ToolContext, include: Set<string>) {
   const result = await assembleContext(deps.db, ctx.userLogin, ctx.taskId, include)
   if (!result) throw new ToolError('not_found', 'no such task')
   return result
-}
-
-async function worktreeFor(db: AppDatabase, taskId: string): Promise<string | null> {
-  return (await loadTask(db, taskId))?.worktreePath ?? null
 }
 
 async function noteLocationFor(db: AppDatabase, taskId: string, scope: NoteScope = 'task'): Promise<NoteLocation> {
@@ -61,23 +59,14 @@ async function noteLocationFor(db: AppDatabase, taskId: string, scope: NoteScope
 }
 
 export function buildAgentTools(deps: AgentToolsDeps): AgentToolContribution[] {
-  const { db, notesStore, proposals, runtime, memory, browser } = deps
+  const { db, notesStore, browser } = deps
   const empty = z.object({})
-  const executeRun = async <T>(taskId: string, execute: () => Promise<T>): Promise<T> => {
-    try {
-      return await execute()
-    } catch (error) {
-      if (!isRepoConfigTrustError(error)) throw error
-      broadcastRepoConfigTrustNotice(taskId)
-      throw new ToolError('needs-trust', 'Repo configuration must be reviewed and trusted before it can run.')
-    }
-  }
 
   // The context-read tools compose from the shared section registry (contextSections.ts). Its
   // notes/memory seams are filled once, in knowledgeIpc — the /context route and these tools read
   // the same assembler, so nothing to wire here.
 
-  const tools: AgentToolContribution[] = [
+  return [
     // ── Context-read (read tier): compose from the shared section registry, no self-fetch ──────────
     {
       name: 'task_current',
@@ -143,47 +132,6 @@ export function buildAgentTools(deps: AgentToolsDeps): AgentToolContribution[] {
       },
     },
 
-    // ── Read-only git over the task worktree (read tier): the same localDiff module the UI uses ────
-    {
-      name: 'local_changes',
-      description: 'Uncommitted changes in the task worktree (git status): staged/unstaged/untracked file list.',
-      input: empty,
-      scope: 'task',
-      risk: 'read',
-      handler: async (_a, ctx) => {
-        const wt = await worktreeFor(db, ctx.taskId)
-        return wt ? localChanges(wt) : NO_WORKTREE
-      },
-    },
-    {
-      name: 'local_diff',
-      description: 'The unified diff of one uncommitted file in the task worktree.',
-      input: z.object({ path: z.string().describe('repo-relative file path'), scope: z.enum(['unstaged', 'staged']).optional() }),
-      scope: 'task',
-      risk: 'read',
-      handler: async (a, ctx) => {
-        const wt = await worktreeFor(db, ctx.taskId)
-        if (!wt) return NO_WORKTREE
-        const { path, scope } = a as { path: string; scope?: 'unstaged' | 'staged' }
-        try {
-          return (await localDiff(wt, path, scope ?? 'unstaged')).patch || '(no diff)'
-        } catch (e) {
-          throw new ToolError('failed', e instanceof Error ? e.message : String(e))
-        }
-      },
-    },
-    {
-      name: 'git_log',
-      description: "Recent commits on the task's branch.",
-      input: z.object({ n: z.number().int().min(1).max(100).optional() }),
-      scope: 'task',
-      risk: 'read',
-      handler: async (a, ctx) => {
-        const wt = await worktreeFor(db, ctx.taskId)
-        return wt ? gitLog(wt, (a as { n?: number }).n ?? 10) : NO_WORKTREE
-      },
-    },
-
     // ── Notes (read + write tiers): one store, provenance stamped from tool scope (author: agent) ──
     {
       name: 'notes_list',
@@ -233,71 +181,6 @@ export function buildAgentTools(deps: AgentToolsDeps): AgentToolContribution[] {
         const { slug, text, scope } = a as { slug: string; text: string; scope?: NoteScope }
         await notesStore.append(await noteLocationFor(db, ctx.taskId, scope), slug, text, { author: 'agent', originSessionId: ctx.sessionId, originTaskId: ctx.taskId })
         return { ok: true }
-      },
-    },
-
-    // ── Memory (read + write tiers): search/read the committed repo memory; memory_write PROPOSES ──
-    {
-      name: 'memory_search',
-      description: 'Search repo memory (conventions, architecture, past fixes) — ranked, repo-scoped.',
-      input: z.object({ query: z.string(), type: z.string().optional() }),
-      scope: 'task',
-      risk: 'read',
-      handler: async (a, ctx) => {
-        await memory.reconciled()
-        const { query, type } = a as { query: string; type?: string }
-        return memory.search(query, { repo: await repoFor(db, ctx.taskId), type: asMemoryType(type) })
-      },
-    },
-    {
-      name: 'memory_list',
-      description: 'The repo memory index (name + description per memory).',
-      input: z.object({ type: z.string().optional() }),
-      scope: 'task',
-      risk: 'read',
-      handler: async (a, ctx) => {
-        await memory.reconciled()
-        return memory.list({ repo: await repoFor(db, ctx.taskId), type: asMemoryType((a as { type?: string }).type) })
-      },
-    },
-    {
-      name: 'memory_get',
-      description: 'Read one memory in full (body + file path).',
-      input: z.object({ name: z.string() }),
-      scope: 'task',
-      risk: 'read',
-      handler: async (a, ctx) => {
-        await memory.reconciled()
-        const found = await memory.get({ repo: await repoFor(db, ctx.taskId), name: (a as { name: string }).name })
-        if (!found) throw new ToolError('not_found', 'no such memory')
-        return found
-      },
-    },
-    {
-      name: 'memory_write',
-      description: 'PROPOSE a new memory (convention/architecture/decision/fix/reference/feedback). A human reviews before it lands — nothing is written directly.',
-      input: z.object({ name: z.string(), type: z.string(), description: z.string(), body: z.string() }),
-      scope: 'task',
-      risk: 'write',
-      handler: async (a, ctx) => {
-        const p = a as { name: string; type: string; description: string; body: string }
-        try {
-          return {
-            ok: true,
-            proposal: await proposals.propose({
-              taskId: ctx.taskId,
-              repo: await repoFor(db, ctx.taskId).catch(() => null),
-              name: p.name,
-              type: p.type as MemoryType,
-              description: p.description,
-              body: p.body,
-              originSessionId: ctx.sessionId ?? null,
-            }),
-          }
-        } catch (e) {
-          // Propose validation (bad name/type) is the caller's fault, not a server fault.
-          throw new ToolError('bad_request', e instanceof Error ? e.message : 'invalid proposal')
-        }
       },
     },
 
@@ -364,74 +247,9 @@ export function buildAgentTools(deps: AgentToolsDeps): AgentToolContribution[] {
       handler: async (_a, ctx) => browser.console(ctx.taskId),
     },
   ]
-
-  // ── Run targets (execute tier): only available when the task actually has run targets. The `when`
-  //    predicate re-evaluates per manifest fetch, so run_* appear mid-session (tools/list_changed). ──
-  const hasRunTargets = async (ctx: ToolContext): Promise<boolean> => {
-    const t = await runtime.targets(ctx.taskId)
-    return 'targets' in t && t.targets.length > 0
-  }
-  tools.push(
-    {
-      name: 'run_targets',
-      description: "The repo's declared run targets with live status.",
-      input: empty,
-      scope: 'task',
-      risk: 'execute',
-      exposeToRenderer: true,
-      when: hasRunTargets,
-      whenDescription: 'Only available in tasks with run targets.',
-      handler: (_a, ctx) => runtime.targets(ctx.taskId),
-    },
-    {
-      name: 'run_start',
-      description: 'Start a run target in the task worktree.',
-      input: z.object({ id: z.string() }),
-      scope: 'task',
-      risk: 'execute',
-      exposeToRenderer: true,
-      when: hasRunTargets,
-      whenDescription: 'Only available in tasks with run targets.',
-      handler: (a, ctx) => executeRun(ctx.taskId, () => runtime.start(ctx.taskId, (a as { id: string }).id)),
-    },
-    {
-      name: 'run_stop',
-      description: "Stop a run target (runs its declared 'stop' first).",
-      input: z.object({ id: z.string() }),
-      scope: 'task',
-      risk: 'execute',
-      exposeToRenderer: true,
-      when: hasRunTargets,
-      whenDescription: 'Only available in tasks with run targets.',
-      handler: (a, ctx) => runtime.stop(ctx.taskId, (a as { id: string }).id),
-    },
-    {
-      name: 'run_restart',
-      description: 'Restart a run target: runs its declared restart command if it has one, else stops and starts it.',
-      input: z.object({ id: z.string() }),
-      scope: 'task',
-      risk: 'execute',
-      exposeToRenderer: true,
-      when: hasRunTargets,
-      whenDescription: 'Only available in tasks with run targets.',
-      handler: (a, ctx) => executeRun(ctx.taskId, () => runtime.restart(ctx.taskId, (a as { id: string }).id)),
-    },
-    {
-      name: 'run_status',
-      description: "A run target's status: { running, url?, exitCode? }.",
-      input: z.object({ id: z.string() }),
-      scope: 'task',
-      risk: 'execute',
-      exposeToRenderer: true,
-      when: hasRunTargets,
-      whenDescription: 'Only available in tasks with run targets.',
-      handler: (a, ctx) => runtime.status(ctx.taskId, (a as { id: string }).id),
-    },
-  )
-
-  return tools
 }
 
 export function wireAgentTools(deps: AgentToolsDeps): void {
-  setAgentTools(buildAgentTools(deps))
+  removeAgentTools(OWNER)
+  for (const tool of buildAgentTools(deps)) registerAgentTool(OWNER, tool)
 }

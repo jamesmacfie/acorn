@@ -2,7 +2,7 @@ import { and, eq } from 'drizzle-orm'
 import { Hono, type Context } from 'hono'
 import { z } from 'zod'
 import {
-  getAgentTools,
+  agentToolContributions,
   isToolPermitted,
   parseToolPerms,
   TOOL_PERMS_PREF_KEY,
@@ -35,6 +35,17 @@ function toolContext(c: Context<AppEnv>): ToolContext {
 function workflowCeiling(c: Context<AppEnv>): ToolCeiling | undefined {
   const raw = c.req.header('x-acorn-tool-ceiling')
   return raw ? (decodeToolCeiling(raw) ?? { allow: [] }) : undefined
+}
+
+// The registry, or null when nothing has contributed a tool.
+//
+// An EMPTY registry is the case a null registry used to signal: no contributor assembled a tool surface
+// on this node. Every projection answers 503 'bridge-unavailable' for it rather than an empty manifest,
+// because an agent handed `{tools:[]}` cannot tell a node whose tool surface failed to assemble from one
+// that deliberately exposes none — and the MCP proxy's degradation path is keyed on that status.
+function contributions(): readonly AgentToolContribution[] | null {
+  const tools = agentToolContributions()
+  return tools.length ? tools : null
 }
 
 async function available(tool: AgentToolContribution, ctx: ToolContext, cache: AvailabilityCache): Promise<boolean> {
@@ -71,7 +82,7 @@ async function invoke(c: Context<AppEnv>, opts: { renderer: boolean }): Promise<
   // (server/auth/internalTokens.ts). 404, matching every other denial here, so the surface reveals
   // nothing about which tasks exist.
   if (!mayActOnTask(c, c.req.param('id')!)) return respondError(c, 404, 'not_found')
-  const registry = getAgentTools()
+  const registry = contributions()
   if (!registry) return respondError(c, 503, 'bridge-unavailable')
   const tool = registry.find((candidate) => candidate.name === c.req.param('name'))
   if (!tool || (opts.renderer && !tool.exposeToRenderer)) return respondError(c, 404, 'not_found')
@@ -96,7 +107,7 @@ export const agentTools = new Hono<AppEnv>()
     // Same order as invoke(): authorize, then check availability.
     if (c.get('principal')?.kind !== 'internal') return respondError(c, 404, 'not_found')
     if (!mayActOnTask(c, c.req.param('id')!)) return respondError(c, 404, 'not_found')
-    const registry = getAgentTools()
+    const registry = contributions()
     if (!registry) return respondError(c, 503, 'bridge-unavailable')
     const perms = await loadPerms(c)
     const ctx = toolContext(c)
@@ -113,7 +124,7 @@ export const agentTools = new Hono<AppEnv>()
   .post('/:id/renderer-tools/:name', (c) => invoke(c, { renderer: true }))
 
 export const agentToolsCatalog = new Hono<AppEnv>().get('/', (c) => {
-  const registry = getAgentTools()
+  const registry = contributions()
   if (!registry) return respondError(c, 503, 'bridge-unavailable')
   return c.json({
     tools: registry.map((tool) => ({ name: tool.name, description: tool.description, risk: tool.risk, availability: tool.whenDescription })),

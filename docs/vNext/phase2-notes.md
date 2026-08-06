@@ -176,9 +176,17 @@ These are Phase 2 scope that has **not** landed. Do not assume any of it.
   deleted rather than kept as an empty hook when agents converts. Still present:
   `contextSectionsWiring.ts`, `agentProfiles.ts`, `startupSecurity.ts` (one call left — github's mirror
   prune), `managedAgentsWiring.ts`, `workflowWiring.ts`.
-- **The `tools` contribution point (W6).** `setAgentTools(list)` is still a whole-list swap, and
-  `agentToolsWiring.ts` still defines all 30 tools in one app-layer file with a single
-  `AgentToolsDeps` bag.
+- **Part of the `tools` contribution point (W6).** The mechanism landed: `setAgentTools(list)` is gone,
+  replaced by an incremental `registerAgentTool(owner, tool)` exposed as `ctx.tools` and cleared per
+  boot beside `removePluginRoutes` (a duplicate name throws, so without that a second
+  `startServiceRuntime` in one process would fail the whole boot). Twelve tools moved to the plugins
+  that own them — `local_*`/`git_log` to changes, `memory_*` to memory, `run_*` to terminal. Sixteen
+  remain in `apps/node/src/wiring/agentToolsWiring.ts` (437 → 246 lines), each with a real blocker:
+  `task_*`/`pr_*`/`linked_issues`/`repo_info` are **core's own** and have no plugin to move to;
+  `notes_*` needs notes converted AND a workspace-id seam on `CoreServices` (the `NotesStore` instance
+  is constructed by memory's knowledge runtime); `browser_*` needs `plugins/preview` to have a
+  node-side part at all — today it is Electron-main only, so moving them is a process-boundary change,
+  not a tool move.
 - **Per-endpoint `Idempotency-Key` (the other half of phase1-notes' second item).** `RouteContribution`
   still carries no idempotency declaration. This was deliberately not half-landed: **no client call
   site sends an idempotency key today** (`postJson` accepts one; nothing passes it), so declaring
@@ -265,6 +273,16 @@ queries its own rows before the listener binds. The packaged path was already pl
 why packaging was correct and the unpackaged build was not. Fixed by checking the plugin-scoped
 candidate first at every level, pinned by `pluginMigrations.test.ts`.
 
+**The standalone node's agent-tool surface changed.** `standalone.ts` never called `wireAgentTools`, so
+`dev:node` answered a flat 503 for every tool. Now that changes/memory/terminal register their own in
+`init`, it serves those twelve and 404s the rest. Consistent with the terminal change below, but it is a
+behaviour change, not a no-op.
+
+Related, and deliberate: an EMPTY tool registry is now treated as the old null registry — the three
+projections answer 503 `bridge-unavailable` rather than `{tools: []}`. An agent cannot distinguish a
+surface that failed to assemble from one that is deliberately empty, and the MCP proxy's degradation is
+keyed on that status.
+
 **`dev:node` now runs a real terminal engine.** `terminal` is `required`, and a required plugin ignores
 the disabled list by design, so the "PTY bridge unfilled → clean 503" degraded mode that
 phase1-notes.md described for a standalone node is **gone**. `standalone.ts` gets the same deps as the
@@ -306,6 +324,7 @@ running-session guard would pass vacuously against an empty session map, which i
 | plugins dispose newest-first, and one failure does not strand the others | `packages/node-core/src/server/plugin/host.test.ts` |
 | the moved routes are GONE from the terminal plugin | `plugins/terminal/src/server/routes/terminal.test.ts` |
 | the assembled mount table, including plugin-host-registered routes | `apps/node/test/integration/routeRegistry.test.ts` |
+| the full 28-tool agent manifest is unchanged by the W6 split, has no duplicates, and each moved group has exactly one owner | `apps/node/src/wiring/agentToolsWiring.test.ts` (calls the real builders, asserts against an explicit list — a dropped tool fails it) |
 | a plugin owning its own migrated SQLite file, alongside core's | `plugins/changes/src/server/routes/reviewNotes.test.ts` |
 
 `pnpm lint` 26/26, `pnpm test` 26/26, e2e 9/9 at every commit in the phase.

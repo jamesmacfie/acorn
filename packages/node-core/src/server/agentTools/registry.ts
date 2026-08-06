@@ -5,10 +5,11 @@
 // returns domain data or throws a ToolError; the projections translate to their own envelopes. A
 // handler that inspects which surface invoked it is a boundary bug (the agent-tool registry guardrail).
 //
-// Contributions are BUILT in the main process with their domain deps closed over (notes store,
-// memory index, runtime service, browser driver, localDiff) and installed via setAgentTools —
-// the same setter-injection seam the harness bridges used, so dev:node (no main) degrades to a
-// clean 503 and tests can install a fake registry.
+// Contributions are BUILT where their domain deps live — inside the owning plugin's init for a
+// converted plugin (`ctx.tools.register`), or in apps/node's remaining wiring for the tools whose
+// plugin is not converted yet — and registered INCREMENTALLY. `tools` is the contribution point
+// docs/vNext/plan.md § Phase 2 asks for, so it has to behave like `routes`: many independent
+// contributors, each owning its own entries, none able to see or replace another's.
 import type { z } from 'zod'
 import { AGENT_TOOLS_PERMS_PREF_KEY, type ToolRisk as SharedToolRisk } from '@acorn/protocol/api.ts'
 
@@ -76,18 +77,43 @@ export function isToolPermitted(tool: Pick<AgentToolContribution, 'name' | 'risk
   return perms.tools?.[tool.name] ?? perms.tiers?.[tool.risk] ?? true
 }
 
-// ─── Registry install seam ──────────────────────────────────────────────────────────────────────
+// ─── The contribution point ─────────────────────────────────────────────────────────────────────
 
-let registry: AgentToolContribution[] | null = null
+// Who contributed a tool. A plugin id for a converted plugin (bound by the plugin host, so a plugin
+// cannot register on another's behalf), or 'core' for the tools apps/node still assembles itself.
+// Not projected anywhere: it exists so a contributor can be REMOVED as a unit, which is the whole
+// reason routes carry a `plugin` field too.
+type Registration = { owner: string; tool: AgentToolContribution }
 
-export const setAgentTools = (tools: AgentToolContribution[] | null): void => {
-  if (tools) {
-    const names = new Set<string>()
-    for (const tool of tools) {
-      if (names.has(tool.name)) throw new Error(`Duplicate agent tool '${tool.name}'.`)
-      names.add(tool.name)
+class AgentToolRegistry {
+  readonly #registrations: Registration[] = []
+
+  // Duplicate names throw, exactly as CapabilityRegistry.provide and the client-side Registry do: two
+  // tools answering to one name means the winner depends on plugin init order, which nothing
+  // guarantees. A silent last-write-wins here would be an agent calling a tool it did not mean to.
+  register(owner: string, tool: AgentToolContribution): void {
+    const clash = this.#registrations.find((r) => r.tool.name === tool.name)
+    if (clash) throw new Error(`Duplicate agent tool '${tool.name}': already registered by '${clash.owner}', now by '${owner}'.`)
+    this.#registrations.push({ owner, tool })
+  }
+
+  // Drop everything one owner contributed. Same reason routeRegistry.remove exists: this registry is a
+  // module singleton, but registration now happens inside a plugin's init, and a process that starts the
+  // service TWICE (apps/node/src/service/runtime.test.ts does, four times) would otherwise either throw
+  // on the duplicate name or keep handlers closed over the FIRST boot's database handle.
+  remove(owner: string): void {
+    for (let i = this.#registrations.length - 1; i >= 0; i--) {
+      if (this.#registrations[i].owner === owner) this.#registrations.splice(i, 1)
     }
   }
-  registry = tools
+
+  list(): readonly AgentToolContribution[] {
+    return this.#registrations.map((r) => r.tool)
+  }
 }
-export const getAgentTools = (): AgentToolContribution[] | null => registry
+
+const registry = new AgentToolRegistry()
+
+export const registerAgentTool = (owner: string, tool: AgentToolContribution): void => registry.register(owner, tool)
+export const removeAgentTools = (owner: string): void => registry.remove(owner)
+export const agentToolContributions = (): readonly AgentToolContribution[] => registry.list()

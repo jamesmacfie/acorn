@@ -3,7 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { z } from 'zod'
 import type { ApiError } from '@acorn/protocol/api.ts'
 import { encodeToolCeiling } from '@acorn/protocol/workflow.ts'
-import { setAgentTools, ToolError, TOOL_PERMS_PREF_KEY, type AgentToolContribution, type ToolPerms } from '../agentTools/registry'
+import { registerAgentTool, removeAgentTools, ToolError, TOOL_PERMS_PREF_KEY, type AgentToolContribution, type ToolPerms } from '../agentTools/registry'
 import { getDb, schema } from '../db'
 import type { AppEnv } from '../middleware/auth'
 import { agentTools, agentToolsCatalog } from './agentTools'
@@ -18,6 +18,7 @@ vi.mock('../db', async (importOriginal) => {
 // One fixture registry drives BOTH projections' tests (the agent-tool registry acceptance: "covered by table-driven
 // tests from the same contribution fixture"). The MCP projection is proven in mcp/server.test.ts;
 // this is the harness HTTP projection over the identical shapes.
+const OWNER = 'test'
 const calls: { name: string; args: unknown; taskId: string; session?: string }[] = []
 let availabilityCalls = 0
 const dynamicWhen = async (ctx: { taskId: string }) => {
@@ -96,7 +97,10 @@ describe('agent-tool harness projection (docs/agent-tools.md)', () => {
     availabilityCalls = 0
     t = makeTestDb()
     vi.mocked(getDb).mockReturnValue(t.db)
-    setAgentTools(FIXTURE)
+    // Incremental registration under one owner, which is what a plugin's init does through ctx.tools.
+    // Removed first so the fixture is idempotent across cases — the registry is a module singleton.
+    removeAgentTools(OWNER)
+    for (const tool of FIXTURE) registerAgentTool(OWNER, tool)
     app = new Hono<AppEnv>()
     app.use('/api/*', async (c, next) => {
       const kind = c.req.header('x-test-principal') === 'device' ? 'device' : 'internal'
@@ -119,7 +123,7 @@ describe('agent-tool harness projection (docs/agent-tools.md)', () => {
   })
 
   afterEach(() => {
-    setAgentTools(null)
+    removeAgentTools(OWNER)
     t.cleanup()
   })
 
@@ -127,10 +131,27 @@ describe('agent-tool harness projection (docs/agent-tools.md)', () => {
   const post = (path: string, body: unknown, headers?: Record<string, string>) =>
     app.fetch(new Request(`http://acorn.test${path}`, { method: 'POST', headers: { 'content-type': 'application/json', ...headers }, body: JSON.stringify(body) }), {} as Env)
 
-  it('503s when no registry is installed (dev:node)', async () => {
-    setAgentTools(null)
+  // An EMPTY registry is what a null registry used to mean: no contributor assembled a tool surface on
+  // this node. It must NOT read as an empty manifest — an agent handed `{tools:[]}` cannot tell a node
+  // whose tool surface failed to assemble from one that deliberately exposes none.
+  it('503s when nothing has contributed a tool', async () => {
+    removeAgentTools(OWNER)
     expect((await get('/api/tasks/t1/tools')).status).toBe(503)
     expect((await post('/api/tasks/t1/tools/read_tool', {})).status).toBe(503)
+  })
+
+  it('rejects a duplicate tool name rather than letting init order pick the winner', () => {
+    expect(() => registerAgentTool('other', FIXTURE[0])).toThrow(/Duplicate agent tool 'read_tool'/)
+  })
+
+  // The idempotency the plugin host relies on: a second boot in one process re-registers, and without
+  // per-owner removal it would either throw on the duplicate name or leave handlers closed over the
+  // first boot's (now closed) database.
+  it('replaces an owner’s tools on re-registration instead of appending them', async () => {
+    removeAgentTools(OWNER)
+    for (const tool of FIXTURE) registerAgentTool(OWNER, tool)
+    const catalog = (await (await get('/api/agent-tools')).json()) as { tools: { name: string }[] }
+    expect(catalog.tools.map((tool) => tool.name)).toEqual(FIXTURE.map((tool) => tool.name))
   })
 
   it('manifest lists available tools with JSON schema; dynamic `when` gates a tool per task', async () => {

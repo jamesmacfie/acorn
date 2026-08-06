@@ -6,10 +6,11 @@
 //
 // It exists because the RuntimeService is now CONSTRUCTED by the plugin's init — it closes over the
 // live session map and the plugin's own database, neither of which the composition root can reach any
-// more. Three consumers still need it after init (the agent-tool projection's five run_* tools and the
-// workflow runner's `run` step in apps/node/src/wiring/, plus the harness RunBridge, which the plugin
-// now fills itself). Publishing it is how they keep working without terminal exporting a second mutable
-// module global for the app to reach into.
+// more. Two consumers still need it after init: the workflow runner's `run` step in
+// apps/node/src/wiring/, and the harness RunBridge, which the plugin now fills itself. (The five run_*
+// agent tools used to be a third; W6 moved them into this plugin, so they take the service directly.)
+// Publishing it is how those keep working without terminal exporting a second mutable module global for
+// the app to reach into.
 //
 // The signature is the six methods those consumers actually call, restated here so it belongs to the
 // provider rather than being defined by RuntimeService's class shape — a contract may not name the

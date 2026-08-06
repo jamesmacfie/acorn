@@ -74,8 +74,11 @@ export type MemoryKnowledge = MemoryIndex & {
 // and ids only and may not name the plugin's internals (tools/arch/boundaries.test.ts), and this
 // capability's value legitimately INCLUDES two internal stores. It is also not a cross-plugin surface:
 // the only consumer is apps/node's composition root, which may import a plugin's internals by design.
-// When W6 moves the memory tool definitions into this plugin, the MemoryIndex slice becomes the
-// cross-plugin part and can move to a contract/ then.
+//
+// W6 moved the memory tool definitions into this plugin (main/agentTools.ts), which removed one consumer
+// but not the reason this stays out of contract/: the remaining consumers are still the composition root
+// (contextSectionsWiring, managedAgentsWiring, workflowWiring) rather than another plugin, and the value
+// still includes two internal stores. Nothing to promote until those move.
 export const MEMORY_KNOWLEDGE = capabilityId<MemoryKnowledge>('memory.knowledge')
 
 // The headless profile the memory-review pass runs on: the FIRST installed agent profile with a
