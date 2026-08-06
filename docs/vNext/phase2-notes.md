@@ -12,7 +12,7 @@ plan.md names four. Honestly assessed:
 
 | Exit criterion | State |
 | --- | --- |
-| every plugin initializes through the plugin API with its own DB | **partial** — nine plugins are through it (changes, database, memory, docker, editor, terminal, http, notes, workflows). Four are not: agents, github, and linear/rollbar (which SHARE the `issues` table, so neither moves until that is decided) |
+| every plugin initializes through the plugin API with its own DB | **partial** — ten plugins are through it (agents, changes, database, memory, docker, editor, terminal, http, notes, workflows). Three are not: github, and linear/rollbar — which SHARE the `issues` table, so neither moves until that ownership is decided |
 | core services have direct unit/integration tests (confinement, env allowlists, kill trees, secret non-disclosure) | **done** — all four, plus the process-broker taxonomy |
 | the terminal scope-shed is complete | **done** |
 | boundary baseline shrinks to only the edges scheduled for phase 3 | **partly** — the plugin→plugin ledger is 9 → 6. The UI-kit extraction removed `changes -> github` and `database -> editor` (the two Phase 2 owned); the `notes.store` capability removed `memory -> notes`, which plugins.md had listed as Phase 3's. The remaining six are Phase 3's. The schema-import ratchet went 14 → 4. |
@@ -157,26 +157,30 @@ an existing root opening.
 
 These are Phase 2 scope that has **not** landed. Do not assume any of it.
 
-- **Three plugin conversions.** Converted with their own schema, chain and SQLite file: `changes`,
-  `database`, `memory`, `terminal`, `http`, `workflows`. Converted with no database because they own no
+- **Three plugin conversions.** Converted with their own schema, chain and SQLite file: `agents`,
+  `changes`, `database`, `memory`, `terminal`, `http`, `workflows`. Converted with no database because they own no
   tables — the honest outcome, not a gap: `docker`, `editor`, `notes` (notes are markdown files with a
   frontmatter block under `<data-root>/notes/`, so there is nothing to migrate and deliberately no
-  `dispose`). Outstanding: `agents` (ten tables and the only real cross-DB joins in the codebase),
-  `github` (twelve mirror tables, and core's `contextSections.ts`/`storageFootprint.ts` read them), and
-  `linear` + `rollbar`, which SHARE the `issues` table — that shared ownership needs deciding before
-  either can move, and it is the reason they are last rather than a matter of effort. The schema-import
-  ratchet records the remaining four packages, so progress is measurable and cannot regress.
+  `dispose`). Outstanding: `github` (twelve mirror tables, and core's
+  `contextSections.ts`/`storageFootprint.ts` read them), and `linear` + `rollbar`, which SHARE the
+  `issues` table — that shared ownership needs deciding before either can move, and it is the reason
+  they are last rather than a matter of effort. The schema-import ratchet records the remaining three
+  packages, so progress is measurable and cannot regress.
 - **The cross-boundary reads that block the hard three.** Still outstanding: core's
   `agentTools/contextSections.ts` reads github's `repos`/`pull_requests`/`pr_files` and linear/rollbar's
   `issues`; `main/storageFootprint.ts` counts rows in four plugin tables; `routes/pins.ts` owns
   github-shaped `pinned_repos`; `db/cascade.ts` is one `db.batch` spanning four future databases; and
   agents' three `agent_* ⋈ tasks ⋈ workspace_repos` joins are the only real cross-DB joins in the
   codebase. `CoreServices.tasks.idsForWorkspace()` exists for that last one but has **no caller yet**.
-- **Part of `apps/node/src/wiring/`.** `managedWorkflowStep.ts` and `harnessWiring.ts` are gone, and
-  `serverBridges.ts` is down to a single bridge (agents' usage service) with a comment saying it is
-  deleted rather than kept as an empty hook when agents converts. Still present:
-  `contextSectionsWiring.ts`, `agentProfiles.ts`, `startupSecurity.ts` (one call left — github's mirror
-  prune), `managedAgentsWiring.ts`, `workflowWiring.ts`.
+- **Part of `apps/node/src/wiring/`.** Deleted, each into the plugin whose engine it drove:
+  `managedWorkflowStep.ts`, `harnessWiring.ts`, `serverBridges.ts`, `managedAgentsWiring.ts`. Still
+  present, each for a stated reason: `agentToolsWiring.ts` (core's own tools plus `browser_*`),
+  `workflowWiring.ts` (44 lines — one github-mirror query), `contextSectionsWiring.ts` (core's
+  single-slot context assembler), `startupSecurity.ts` (github's mirror prune), `configTrustWiring.ts`,
+  and `agentProfiles.ts` — which is **core's, deliberately**: it registers three separate plugins
+  (`profiles-claude`, `profiles-codex`, `profiles-aider`) into a core registry consumed by terminal,
+  workflows and agents. Moving it into agents would make agents own three other plugins' registration
+  and add three ledger edges.
 - **Part of the `tools` contribution point (W6).** The mechanism landed: `setAgentTools(list)` is gone,
   replaced by an incremental `registerAgentTool(owner, tool)` exposed as `ctx.tools` and cleared per
   boot beside `removePluginRoutes` (a duplicate name throws, so without that a second
@@ -273,6 +277,10 @@ queries its own rows before the listener binds. The packaged path was already pl
 why packaging was correct and the unpackaged build was not. Fixed by checking the plugin-scoped
 candidate first at every level, pinned by `pluginMigrations.test.ts`.
 
+**`dev:node` now serves the managed-agent routes too.** `standalone.ts` never wired managed agents, so
+every `/v2/p/agents/sessions*` route answered 503. `agents` is `required`, so a standalone node runs the
+full runtime — the third instance of this same change, after terminal's and workflows'.
+
 **`dev:node` now serves workflow routes too.** `standalone.ts` never called `registerWorkflowIpc`, so
 every workflow route answered a flat 503. The shared plugin list means it runs the engine now, with a
 `workflows.runner` reconcile pass before `reconciled` resolves — the sweep-ordering invariant has to hold
@@ -317,6 +325,19 @@ Two things this did NOT finish, both stated rather than glossed:
 - **`contextSectionsWiring.ts` still fills one slot with both seams at once**
   (`setContextSections(buildContextSections({ notes, memory }))`). That is core's side, not a plugin's:
   until context sections become a per-section contribution point, neither plugin can fill its own half.
+
+## Data loss on upgrade, stated once and plainly
+
+Six plugins moved tables out of `core.sqlite` this phase, and every one of them did it with a
+generated `DROP TABLE` in core's chain and an empty `CREATE` in the plugin's. **Nothing copies the
+rows.** An existing pre-release data root therefore loses its review notes, saved queries, memories,
+terminal session rows, HTTP-panel requests, workflow runs and — the one that will be noticed — its
+**agent transcripts**.
+
+That is consistent with plan.md § Phase 1's "data roots created during phases 1–4 are disposable" and
+with the recorded decision to keep a DROP rather than reset core's chain. It is a deliberate trade-off,
+not an oversight. It is called out here because six separate commits each made it quietly, and anyone
+reading them one at a time would not see the aggregate.
 
 ## Known gaps worth stating plainly
 

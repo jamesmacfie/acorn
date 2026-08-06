@@ -2,25 +2,33 @@ import { randomUUID } from 'node:crypto'
 import { SecretService } from '@acorn/node-core/main/core/secrets.ts'
 import { eq } from 'drizzle-orm'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import { schema } from '@acorn/node-core/server/db/index.ts'
-import { makeTestDb, type TestDb } from '@acorn/node-core/server/routes/testDb.ts'
+import { createCoreServices } from '@acorn/node-core/main/core/index.ts'
+import { makeTestDb, makeTestPluginDb, type TestDb, type TestPluginDb } from '@acorn/node-core/server/routes/testDb.ts'
+import * as schema from '../node/schema'
+import { migrationsDir } from '../node/migrations'
 import { AgentWebhookService } from './webhookService'
 
 const ENCRYPTION_KEY = '22'.repeat(32)
 const SECRETS = new SecretService(ENCRYPTION_KEY)
 
 describe('managed-agent signed webhooks', () => {
-  let testDb: TestDb
+  // The webhook and delivery rows live in this plugin's file; `coreDb` exists only so the create-time
+  // "does this task exist" guard has a real core database to fail against — which is what the last case
+  // in this file asserts.
+  let testDb: TestPluginDb
+  let coreDb: TestDb
   let service: AgentWebhookService
 
   beforeEach(() => {
-    testDb = makeTestDb()
-    service = new AgentWebhookService(testDb.db, SECRETS)
+    testDb = makeTestPluginDb('agents', migrationsDir())
+    coreDb = makeTestDb()
+    service = new AgentWebhookService(testDb.db, SECRETS, createCoreServices({ secrets: SECRETS, db: coreDb.db }))
   })
 
   afterEach(async () => {
     await service.stop()
     testDb.cleanup()
+    coreDb.cleanup()
   })
 
   it('shows a signing secret once and stores only its encrypted form', async () => {

@@ -5,12 +5,7 @@
 // Cross-plugin references are plain IDs, validated by the owning plugin when dereferenced").
 //
 // So this is that validation seam: a plugin holds a taskId and asks core to resolve it.
-//
-// Deliberately NOT here yet: an `idsForWorkspace` for the three agents joins
-// (`agent_sessions ⋈ tasks ⋈ workspace_repos`, the only real cross-DB joins in the codebase). It was
-// written, had no caller — agents is not converted — and was removed. It belongs in the commit that
-// converts agents, where its shape can be driven by the query that needs it rather than guessed.
-import { eq, max } from 'drizzle-orm'
+import { and, eq, max } from 'drizzle-orm'
 import { randomUUID } from 'node:crypto'
 import { dedupeBranch, slugifyBranch } from '@acorn/protocol/branch.ts'
 import type { LayoutRecipe, RunTarget } from '../runConfig'
@@ -76,6 +71,22 @@ export type TaskService = {
   // This is the seam whose absence was the second of the two blockers recorded against moving those
   // tools out of apps/node/src/wiring/agentToolsWiring.ts.
   workspaceId(taskId: string): Promise<string>
+  // The inverse of `workspaceId`: every task id in a workspace, resolved workspace → `workspace_repos`
+  // → `tasks`. This is what replaced the only real cross-DB JOINs in the codebase. plugins/agents had
+  // three queries answering "sessions in workspace X" as `agent_sessions ⋈ tasks ⋈ workspace_repos`,
+  // which stopped being expressible the moment `agent_*` moved into its own SQLite file. Each is now an
+  // id round trip: resolve the workspace's task ids here, then `inArray` inside the plugin's own
+  // database.
+  //
+  // Ids, not rows: the three call sites only ever used `tasks` as a join hop to reach
+  // `workspace_repos`, never reading a task column, so returning rows would hand a plugin data it has
+  // no use for. An empty array is a real answer (a workspace with no tasks yet) and the callers treat
+  // it as "no sessions" rather than as "unfiltered" — which is the one way this seam could go wrong.
+  //
+  // Deliberately NOT status-filtered. The joins it replaces had no `status` predicate either: an
+  // archived task's agent transcripts still belong to the workspace, and the session's own
+  // `archivedAt` is what the list and search queries filter on.
+  idsForWorkspace(workspaceId: string): Promise<string[]>
   // The external tickets/errors linked to a task (`task_links`). plugins/notes' seeding pass renders one
   // note per linked Linear ticket, and it needs the connection id as well as the identifier: the same
   // ticket reachable through two Linear connections is two different rows, and refetching it needs to
@@ -103,6 +114,20 @@ export function createTaskService(db: AppDatabase): TaskService {
     runConfig: (taskId) => taskRunConfig(db, taskId),
     active: () => db.select().from(schema.tasks).where(eq(schema.tasks.status, 'active')),
     workspaceId: (taskId) => workspaceIdFor(db, taskId),
+    idsForWorkspace: async (workspaceId) =>
+      (
+        await db
+          .selectDistinct({ id: schema.tasks.id })
+          .from(schema.tasks)
+          .innerJoin(
+            schema.workspaceRepos,
+            and(
+              eq(schema.workspaceRepos.repoOwner, schema.tasks.repoOwner),
+              eq(schema.workspaceRepos.repoName, schema.tasks.repoName),
+            ),
+          )
+          .where(eq(schema.workspaceRepos.workspaceId, workspaceId))
+      ).map((row) => row.id),
     links: (taskId) =>
       db
         .select({ provider: schema.taskLinks.provider, integrationId: schema.taskLinks.integrationId, identifier: schema.taskLinks.identifier })

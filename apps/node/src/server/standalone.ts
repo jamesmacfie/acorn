@@ -20,6 +20,7 @@ import { createCoreServices } from '@acorn/node-core/main/core/index.ts'
 import { CapabilityRegistry } from '@acorn/node-core/server/plugin/capabilities.ts'
 import { initPlugins } from '@acorn/node-core/server/plugin/host.ts'
 import { setWorktreesRoot } from '@acorn/node-core/main/taskWorktree.ts'
+import { AGENTS_RUNTIME } from '@acorn/plugin-agents/main/runtime.ts'
 import { MEMORY_KNOWLEDGE } from '@acorn/plugin-memory/main/knowledgeIpc.ts'
 import { NOTES_STORE } from '@acorn/plugin-notes/contract/store.ts'
 import { seedTaskNotes } from '@acorn/plugin-notes/main/seedTaskNotes.ts'
@@ -27,7 +28,6 @@ import { reconcileTmux } from '@acorn/plugin-terminal/main/terminal.ts'
 import { WORKFLOWS_RUNNER } from '@acorn/plugin-workflows/main/workflowRunner.ts'
 import { nodePlugins } from './plugins'
 import { failingChecksFor } from '../wiring/workflowWiring'
-import { wireServerBridges } from '../wiring/serverBridges'
 import { prepareSecurityState } from '../wiring/startupSecurity'
 
 // ACORN_DATA_DIR names the root explicitly. It is the same variable this node hands its own child
@@ -40,10 +40,9 @@ const root = openDataRoot(process.env.ACORN_DATA_DIR || devDataDir())
 const runtime = makeRuntime(root)
 await prepareSecurityState(runtime)
 await runtime.IDEMPOTENCY.cleanupExpired() // reclaim yesterday's replay rows; see service/runtime.ts
-wireServerBridges(runtime.DB, root.dir) // the agent-usage HTTP route bridge (the rest are plugin-owned)
 setWorktreesRoot(join(root.dir, 'worktrees'))
 
-// The same four deps the supervised composition root supplies (service/runtime.ts explains why each one
+// The same deps the supervised composition root supplies (service/runtime.ts explains why each one
 // cannot be a capability). A standalone node now runs a REAL terminal engine rather than leaving the PTY
 // bridge unfilled at 503: `terminal` is a `required` plugin, and a required plugin ignoring the disabled
 // list is the whole point of the flag — a node that answers /v2/core/tasks/:id/archive has to be able to
@@ -69,6 +68,14 @@ const core = createCoreServices({ secrets: runtime.SECRETS, db: runtime.DB })
 // so a plugin that needs no DesktopCapabilities works identically over the LAN.
 await initPlugins(
   nodePlugins(root.dir, {
+    // A standalone node runs the managed agent runtime too, which is another BEHAVIOUR CHANGE of the same
+    // kind as the workflow one below: this entry never wired managed agents, so `dev:node` answered a flat
+    // 503 for every /v2/p/agents/sessions* route. `agents` is a `required` plugin, so it serves them now.
+    agents: {
+      internalEnv,
+      currentUserId: () => runtime.ACTIVE_IDENTITY.get(),
+      memoryReviewTrigger: (taskId, transcriptTail) => knowledgeAt().memoryReviewTrigger(taskId, transcriptTail),
+    },
     memory: { currentUserId: () => runtime.ACTIVE_IDENTITY.get() },
     terminal: {
       internalEnv,
@@ -112,6 +119,14 @@ try {
   await capabilities.get(WORKFLOWS_RUNNER)?.reconcile()
 } catch (error) {
   console.warn('[node] workflow reconcile failed:', error)
+}
+// The agent sweep: interrupt every turn that was active when this node last exited, expire its pending
+// requests, collect orphaned attachments and re-arm webhook delivery. After the listener binds, because a
+// resumed session's tools call the node's own loopback surface.
+try {
+  await capabilities.require(AGENTS_RUNTIME).reconcile()
+} catch (error) {
+  console.warn('[node] managed agent reconcile failed:', error)
 } finally {
   finishReconcile()
 }

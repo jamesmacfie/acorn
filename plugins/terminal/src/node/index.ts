@@ -18,9 +18,10 @@ import { setOnTaskCreated, setTaskSessionsBridge } from '@acorn/node-core/server
 import { setOnWorktreeCreated } from '@acorn/node-core/main/taskWorktree.ts'
 import { TERMINAL_RUN_TARGETS } from '../contract/runTargets'
 import { TERMINAL_SEND_TO_AGENT } from '../contract/sendToAgent'
+import { TERMINAL_SESSIONS } from '../contract/sessions'
 import { runAgentTools } from '../main/agentTools'
 import { createRuntimeService } from '../main/runIpc'
-import { disposeTerminal, registerTerminalIpc, sendToAgent, terminalRunGlue, type TerminalIpcDeps } from '../main/terminal'
+import { disposeTerminal, registerTerminalIpc, sendToAgent, sessionControl, terminalRunGlue, type TerminalIpcDeps } from '../main/terminal'
 import { setTerminalBridge, terminal } from '../server/routes/terminal'
 import { migrationsDir } from './migrations'
 
@@ -68,6 +69,11 @@ export const terminalPlugin = (dataDir: string, deps: TerminalPluginDeps): NodeP
       // launch injector needs. Published rather than exported into a dep bag, so memory resolves it at
       // call time and degrades to a no-op when this plugin is absent.
       ctx.capabilities.provide(TERMINAL_SEND_TO_AGENT, sendToAgent)
+      // terminal.sessions (contract/sessions.ts): spawn + enumerate, for plugins/agents' terminal
+      // handoff. Published rather than left as an app-layer reach into `terminalBridgeSlot`, which is
+      // what apps/node/src/wiring/managedAgentsWiring.ts did before agents became a plugin able to
+      // resolve a capability of its own.
+      ctx.capabilities.provide(TERMINAL_SESSIONS, sessionControl)
     },
     // Everything init reached out and touched, in reverse: the engine's idle-watch timer, its session
     // displays and session map, the four slots it filled, and its own WAL-mode SQLite file — which has

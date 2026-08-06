@@ -5,6 +5,7 @@
 // server/routes.ts, a setXBridge call in wiring/serverBridges.ts, and (for plugins with tables) core
 // owning their schema. Everything a plugin needs now arrives through NodePluginContext.
 import type { NodePlugin } from '@acorn/node-core/server/plugin/types.ts'
+import { agentsPlugin, type AgentsPluginDeps } from '@acorn/plugin-agents/node/index.ts'
 import { changesPlugin } from '@acorn/plugin-changes/node/index.ts'
 import { databasePlugin } from '@acorn/plugin-database/node/index.ts'
 import { dockerPlugin } from '@acorn/plugin-docker/node/index.ts'
@@ -19,7 +20,12 @@ import { workflowsPlugin, type WorkflowsPluginDeps } from '@acorn/plugin-workflo
 // it obvious when each seam closes — memory's bag lost `sendToAgent` the moment terminal became a
 // NodePlugin able to publish `terminal.sendToAgent`.
 //
-//   - memory.currentUserId — the node's active GitHub identity, which lives in the runtime bindings.
+//   - agents.currentUserId / memory.currentUserId — the node's active GitHub identity, which lives in
+//     the runtime bindings.
+//   - agents.internalEnv — the same blocker terminal's has, below: it closes over the listener origin
+//     and the internal signing KEY.
+//   - agents.memoryReviewTrigger — plugins/memory's, as a thunk, for the same capability-id reason
+//     terminal's three have.
 //   - terminal.internalEnv — mints a per-session loopback credential. It closes over the listener's
 //     origin (which does not exist until after every init has run) and over the internal signing KEY,
 //     which no plugin should be handed.
@@ -38,6 +44,7 @@ import { workflowsPlugin, type WorkflowsPluginDeps } from '@acorn/plugin-workflo
 // plugins/notes takes NO deps: it owns its note files outright and everything it reads about a task
 // arrives through CoreServices.
 export type NodePluginDeps = {
+  agents: AgentsPluginDeps
   memory: MemoryPluginDeps
   terminal: TerminalPluginDeps
   workflows: WorkflowsPluginDeps
@@ -47,6 +54,7 @@ export type NodePluginDeps = {
 // the composition root knows where that is. Declaration order is init order, and nothing here may rely
 // on it — cross-plugin needs resolve through the capability registry at CALL time (server/plugin/host.ts).
 export const nodePlugins = (dataDir: string, deps: NodePluginDeps): NodePlugin[] => [
+  agentsPlugin(dataDir, deps.agents),
   changesPlugin(dataDir),
   databasePlugin(dataDir),
   dockerPlugin(),

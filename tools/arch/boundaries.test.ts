@@ -293,12 +293,18 @@ describe('architecture boundaries', () => {
     // the rule therefore reads "no db-module import at all", type-only included. That is the stricter
     // and more useful reading — a plugin holding core's AppDatabase is exactly the coupling the split
     // removes — so it is left as is rather than loosened to match the comment.
-    // 'changes', 'database', 'docker', 'editor', 'http', 'memory', 'notes', 'terminal' and 'workflows'
-    // are off this list: each owns its own schema (or, for docker/editor/notes, no tables at all) and
-    // takes CoreServices instead of core's database. Four to go — and 'linear'/'rollbar' are one
-    // decision, because they SHARE the `issues` table.
+    // 'agents', 'changes', 'database', 'docker', 'editor', 'http', 'memory', 'notes', 'terminal' and
+    // 'workflows' are off this list: each owns its own schema (or, for docker/editor/notes, no tables at
+    // all) and takes CoreServices instead of core's database.
+    //
+    // 'agents' was the hard one and is worth recording, because it is the case this rule exists to catch.
+    // It did not merely IMPORT core's tables, it JOINED them: three queries answering "sessions in
+    // workspace X" ran `agent_sessions ⋈ tasks ⋈ workspace_repos`, which a per-plugin SQLite file makes
+    // unexpressible rather than merely impolite. They are id round trips through
+    // `CoreServices.tasks.idsForWorkspace()` now.
+    //
+    // Three to go — and 'linear'/'rollbar' are one decision, because they SHARE the `issues` table.
     const SCHEMA_BASELINE = [
-      'agents',
       'github',
       'linear',
       'rollbar',

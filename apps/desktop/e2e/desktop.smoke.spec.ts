@@ -31,10 +31,15 @@ function seedQueuedAgent(dataDir: string, taskId: string): QueuedAgentSeed {
       ${sqlText(JSON.stringify([{ type: 'text', text: prompt }]))}, '{}',
       ${sqlText(randomUUID())}, 0, ${timestamp + ordinal}
     );`
-  // core.sqlite, not V1's acorn.sqlite (node-core/main/serverPaths.ts). Naming the old file here did
-  // not just miss the tables — `sqlite3` creates what it cannot open, and openDataRoot then refuses a
-  // data root that contains a V1 database, so the next launch would have failed too.
-  execFileSync('sqlite3', [join(dataDir, 'core.sqlite'), `
+  // plugins/agents.sqlite, NOT core.sqlite. The ten `agent_*` tables moved into the agents plugin's own
+  // database in Phase 2 (docs/vNext/data.md § Plugin DBs, main/pluginStorage.ts), so this is where they
+  // live now — and naming the wrong file is worse than a miss, because `sqlite3` CREATES what it cannot
+  // open: seeding core.sqlite would have silently produced an empty Agent Center, and seeding V1's
+  // acorn.sqlite would have made openDataRoot refuse the whole data root on the next launch.
+  //
+  // The `tasks` row this references is still core's, seeded elsewhere. That split is the point: the ids
+  // cross the boundary, the query does not.
+  execFileSync('sqlite3', [join(dataDir, 'plugins', 'agents.sqlite'), `
     BEGIN;
     INSERT INTO agent_sessions (
       id, task_id, provider_id, profile_id, kind, driver_kind, driver_version,

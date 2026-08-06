@@ -3,8 +3,6 @@
 // imports it before createApp() runs, so core/server/index.ts never names a product route module
 // (docs/plugins.md). Adding a plugin route is a one-line edit here, not a core edit.
 import { registerRoute } from '@acorn/node-core/server/routeRegistry.ts'
-import { agentUsage } from '@acorn/plugin-agents/server/routes/usage.ts'
-import { managedAgents } from '@acorn/plugin-agents/server/routes/managed.ts'
 import { actions } from '@acorn/plugin-github/server/routes/actions.ts'
 import { githubDeviceAuth } from '@acorn/plugin-github/server/routes/deviceAuth.ts'
 import { prActions } from '@acorn/plugin-github/server/routes/prActions.ts'
@@ -33,10 +31,6 @@ import { repoLabels } from '@acorn/plugin-github/server/routes/repoLabels.ts'
 // plugin — but converted plugins double the same way from their own init (memory's `/memory`,
 // workflows'). Rewriting those internal paths is the route-declaration phase's job, not this reshape's;
 // terminal's was de-doubled when it converted.
-
-// /v2/p/agents/* — account-scoped local provider usage
-registerRoute({ plugin: 'agents', prefix: '', router: agentUsage })
-registerRoute({ plugin: 'agents', prefix: '', router: managedAgents })
 
 // /v2/p/github/repos/* — the GitHub mirror; device-flow connect sits beside it at /auth/*
 registerRoute({ plugin: 'github', prefix: '/repos', router: repos })

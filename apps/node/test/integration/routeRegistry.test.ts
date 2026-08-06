@@ -128,6 +128,10 @@ describe('assembled routes', () => {
     dataDir = mkdtempSync(join(tmpdir(), 'acorn-routes-'))
     plugins = await initPlugins(
       nodePlugins(dataDir, {
+        // agents is `required` too, so it initializes here as well. Same treatment as terminal below: the
+        // deps are inert, because this suite asserts the MOUNT TABLE and nothing it exercises starts a
+        // provider child.
+        agents: { internalEnv: () => ({}), currentUserId: () => null },
         memory: { currentUserId: () => null },
         // terminal is `required`, so it initializes here whatever this test asks for. Its four
         // composition-root deps are inert stubs: this suite asserts the MOUNT TABLE, and nothing it

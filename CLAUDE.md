@@ -12,7 +12,7 @@ partitioned per node. V1's bearer-authenticated `/api/v1` automation listener is
 > For the Cloudflare-Workers→Electron migration history and rationale, see
 > [docs/electron.md](./docs/electron.md); current topic docs describe the shipped Electron runtime.
 > vNext Phase 1 landed the protocol v2 / fleet spine, and Phase 2 is **partially** done (core services,
-> the terminal scope-shed, scoped internal tokens, and the plugin host with one plugin through it).
+> the terminal scope-shed, scoped internal tokens, and the plugin host, with ten of thirteen plugins through it).
 > Deliberate divergences and — importantly — what has NOT landed are recorded in
 > [docs/vNext/phase1-notes.md](./docs/vNext/phase1-notes.md) and
 > [docs/vNext/phase2-notes.md](./docs/vNext/phase2-notes.md). Read the Phase 2 notes before assuming a
@@ -45,9 +45,8 @@ partitioned per node. V1's bearer-authenticated `/api/v1` automation listener is
   handle, and `apps/node/src/server/plugins.ts` is the list — a plugin absent from it does not exist.
   Cross-plugin collaboration is a `CapabilityRegistry` (typed, late-bound, optional-by-default) and a
   `NodeEventBus`, both owned by the service runtime rather than module singletons. `contract/` is the
-  only cross-plugin import surface, boundary-tested. **Migration is partial** — seven plugins are through
-  the host; agents, github, linear, rollbar, workflows and notes still wire through
-  `apps/node/src/wiring/*.ts`.
+  only cross-plugin import surface, boundary-tested. **Migration is partial** — ten plugins are through
+  the host; github, linear and rollbar still wire through `apps/node/src/wiring/*.ts`.
 - **CoreServices** (`packages/node-core/src/main/core/`) is what a plugin consumes instead of
   deep-importing core: `fs` (one symlink-aware confinement), `git` (one seam, `GIT_TERMINAL_PROMPT=0`,
   `SSH_AUTH_SOCK` passthrough), `proc` (**the** process broker: allowlisted env, process-group kill,
@@ -77,7 +76,8 @@ partitioned per node. V1's bearer-authenticated `/api/v1` automation listener is
   serve-then-revalidate; an on-disk dir caches immutable blob/patch bodies by SHA for all repos; IndexedDB
   persists the client query cache (one key per node, `acorn-cache:<nodeId>`). A node's data root holds
   `core.sqlite` (**not** V1's `acorn.sqlite`), `plugins/<name>.sqlite` (one per table-owning plugin —
-  Phase 2, `main/pluginStorage.ts`; changes, database, memory, terminal and http so far), `node.json` (nodeId + last port),
+  Phase 2, `main/pluginStorage.ts`; agents, changes, database, http, memory, terminal and workflows so
+  far), `node.json` (nodeId + last port),
   `node.lock`, `tls/`, `blobs/`, `logs/` and `worktrees/`; `openDataRoot` mints the identity, takes an exclusive pidfile
   lock and **refuses a V1 root outright**. It lives at `apps/node/.acorn/` in development (gitignored)
   and Electron's `userData` root when packaged.
@@ -146,9 +146,10 @@ tools/arch/             @acorn/arch-tests   the executable boundary rules
 - `apps/node/src/` is the service composition root: `service/` (runtime composition + the
   supervised-child entry), `server/` (`providers.ts`/`routes.ts` register plugin contributions;
   `standalone.ts` is the Electron-free entry behind `dev:node`), and `wiring/` — the service-owned glue
-  that used to live in `app/main` (`agentProfiles.ts`, `serverBridges.ts`, `startupSecurity.ts`,
-  `managedWorkflowStep.ts`
-  and the seven `*Wiring.ts`). It is named `wiring`, not `main`, because `main` now means Electron main.
+  that used to live in `app/main` (`agentProfiles.ts`, `startupSecurity.ts` and the remaining
+  `*Wiring.ts`). It is named `wiring`, not `main`, because `main` now means Electron main.
+  `managedWorkflowStep.ts`, `harnessWiring.ts`, `serverBridges.ts` and `managedAgentsWiring.ts` are gone
+  — each one's contents moved into the plugin whose engine it drove.
 - `apps/node/test/integration/` — tests that need the composition root's registries populated
   (providers, routes, agent profiles). They live in the app because importing `app/*` is legal only
   from an app; doing it from a package is a boundary violation. The three suites left in

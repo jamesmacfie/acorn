@@ -30,6 +30,7 @@ import * as fs from './fs'
 import * as git from './git'
 import { createIdentityService, type IdentityService } from './identity'
 import { createModelService, type ModelService } from './models'
+import { createPrefService, type PrefService } from './prefs'
 import * as proc from './proc'
 import { createRepoService, type RepoService } from './repos'
 import { SecretService } from './secrets'
@@ -57,6 +58,10 @@ export type CoreServices = {
   // Text generation through a stored model-provider connection. The plugin owns the prompt; core owns
   // credential resolution and the provider adapters.
   models: ModelService
+  // One (userId, key) row of core's `prefs` table. The server-side half of a preference whose value
+  // the node itself has to read — today only plugins/agents' model-pricing overrides, which the usage
+  // service needs before it can price a token count.
+  prefs: PrefService
   // "Which owner identities does this node know about?" — the question plugins/http's legacy-row
   // migration has to answer and must not answer by scanning core's and github's tables itself.
   identity: IdentityService
@@ -72,6 +77,7 @@ export function createCoreServices(options: { secrets: SecretService; db: AppDat
     repos: createRepoService(options.db),
     context: createContextService(options.db),
     models: createModelService(options.db, options.secrets),
+    prefs: createPrefService(options.db),
     identity: createIdentityService(options.db),
   }
 }
@@ -81,6 +87,7 @@ export type { ChildTaskSeed, TaskLinkRef, TaskRunConfig, TaskService } from './t
 export type { IdentityService } from './identity'
 export type { RepoCheckout, RepoService } from './repos'
 export type { ContextService } from './context'
+export type { PrefService } from './prefs'
 export type { GenerateTextRequest, ModelService } from './models'
 export { SecretUnavailableError, redact } from './secrets'
 export type { ProcResult, ProcSpec } from './proc'

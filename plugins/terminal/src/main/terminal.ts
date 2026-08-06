@@ -108,6 +108,21 @@ export function sendToAgent(sessionId: string, text: string, submit: SendSubmit)
   void agentSender.send(sessionId, text, submit)
 }
 
+// Spawn and enumerate, published by this plugin's init as the `terminal.sessions` capability
+// (contract/sessions.ts). Exported as a two-method object rather than by reaching into the
+// TerminalBridge, because the bridge is the ROUTE layer's dependency: it exists to be nulled on
+// dispose, and a capability consumer resolving it would be reading this plugin's HTTP wiring.
+//
+// Its one consumer is plugins/agents' terminal handoff — the only cross-plugin caller that needs to
+// start a PTY. Same list/create implementations the bridge exposes, deliberately not the other six
+// methods (contract/sessions.ts says why).
+// Named `sessionControl`, not `terminalSessions`: that name is already the Drizzle table this module
+// imports, and shadowing it here would silently rebind every query below.
+export const sessionControl = {
+  create: (opts: CreateOpts): Promise<TerminalSession> => create(opts),
+  list: async (): Promise<TerminalSession[]> => [...sessions.values()].map((s) => s.meta),
+}
+
 // The cross-domain hooks that arrive as TerminalIpcDeps — supplied by the composition root and installed
 // by this plugin's init. Held as nullable module state only because the handlers close over module scope;
 // TerminalIpcDeps requires all of them, so registerTerminalIpc sets every one before any session can

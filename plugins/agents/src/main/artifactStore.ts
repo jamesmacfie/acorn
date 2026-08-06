@@ -3,8 +3,8 @@ import { constants } from 'node:fs'
 import { lstat, mkdir, open, readFile, unlink } from 'node:fs/promises'
 import { join } from 'node:path'
 import { and, asc, eq, ne } from 'drizzle-orm'
-import type { AppDatabase } from '@acorn/node-core/server/db/index.ts'
-import { schema } from '@acorn/node-core/server/db/index.ts'
+import type { PluginDatabase } from '@acorn/node-core/main/pluginStorage.ts'
+import * as schema from '../node/schema'
 import type { AgentArtifact, AgentArtifactKind } from '@acorn/protocol/managedAgents.ts'
 
 export type RemovedArtifactObject = { id: string; storageKey: string | null }
@@ -25,7 +25,7 @@ export class AgentArtifactStore {
   readonly root: string
 
   constructor(
-    private readonly db: AppDatabase,
+    private readonly db: PluginDatabase,
     dataDir: string,
   ) {
     this.root = join(dataDir, 'agent-artifacts')

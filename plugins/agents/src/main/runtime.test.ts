@@ -4,8 +4,10 @@ import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { createCoreServices, type CoreServices } from '@acorn/node-core/main/core/index.ts'
 import { schema } from '@acorn/node-core/server/db/index.ts'
-import { makeTestDb, type TestDb } from '@acorn/node-core/server/routes/testDb.ts'
+import { makeTestDb, makeTestPluginDb, type TestDb, type TestPluginDb } from '@acorn/node-core/server/routes/testDb.ts'
+import { migrationsDir } from '../node/migrations'
 import type { AgentProviderDescriptor } from '@acorn/protocol/managedAgents.ts'
 import type {
   AgentDriver,
@@ -188,18 +190,31 @@ class FailingStartDriver implements AgentDriver {
 }
 
 describe('managed agent runtime conformance', () => {
+  // Two real databases, because that is now the shape of the thing under test. `testDb` is CORE's — it
+  // holds the workspaces/repo_paths/tasks rows seedTask writes, and it is what the runtime reaches
+  // through CoreServices. `pluginDb` is this plugin's own migrated file, holding every `agent_*` table
+  // and the `agent_events_fts` virtual table the workspace search case exercises.
+  //
+  // The workspace-scoping case below is the load-bearing one: before the split it passed through a SQL
+  // JOIN across these two, and it still passes through an id round trip. If `idsForWorkspace` ever
+  // returned the wrong set, or fell back to "unfiltered" on an empty workspace, this is what fails.
   let testDb: TestDb
+  let pluginDb: TestPluginDb
+  let core: CoreServices
   let dataDir: string
   let runtime: ManagedAgentRuntime | null
 
   beforeEach(async () => {
     testDb = makeTestDb()
+    pluginDb = makeTestPluginDb('agents', migrationsDir())
+    core = createCoreServices({ secrets: SECRETS, db: testDb.db })
     dataDir = await mkdtemp(join(tmpdir(), 'acorn-managed-runtime-'))
     runtime = null
   })
 
   afterEach(async () => {
     await runtime?.stop()
+    pluginDb.cleanup()
     testDb.cleanup()
     await rm(dataDir, { recursive: true, force: true })
   })
@@ -210,8 +225,9 @@ describe('managed agent runtime conformance', () => {
     registry.register('fake', () => new FakeAgentDriver())
     const published: number[] = []
     runtime = new ManagedAgentRuntime({
-      db: testDb.db,
+      db: pluginDb.db,
       dataDir,
+      core,
       internalEnv: () => ({}),
       secrets: SECRETS,
       currentUserId: () => null,
@@ -252,8 +268,9 @@ describe('managed agent runtime conformance', () => {
     const driver = new FailingStartDriver()
     registry.register(driver.providerId, () => driver)
     runtime = new ManagedAgentRuntime({
-      db: testDb.db,
+      db: pluginDb.db,
       dataDir,
+      core,
       internalEnv: () => ({}),
       secrets: SECRETS,
       currentUserId: () => null,
@@ -290,8 +307,9 @@ describe('managed agent runtime conformance', () => {
   it('edits, reorders, and removes durable queued turns', async () => {
     const seed = await seedTask(testDb, dataDir)
     runtime = new ManagedAgentRuntime({
-      db: testDb.db,
+      db: pluginDb.db,
       dataDir,
+      core,
       internalEnv: () => ({}),
       secrets: SECRETS,
       currentUserId: () => null,
@@ -337,8 +355,9 @@ describe('managed agent runtime conformance', () => {
     const driver = new FailingStartDriver()
     registry.register(driver.providerId, () => driver)
     runtime = new ManagedAgentRuntime({
-      db: testDb.db,
+      db: pluginDb.db,
       dataDir,
+      core,
       internalEnv: () => ({}),
       secrets: SECRETS,
       currentUserId: () => null,
@@ -364,8 +383,9 @@ describe('managed agent runtime conformance', () => {
     const firstSeed = await seedTask(testDb, dataDir, 'workspace-one')
     const secondSeed = await seedTask(testDb, dataDir, 'workspace-two')
     runtime = new ManagedAgentRuntime({
-      db: testDb.db,
+      db: pluginDb.db,
       dataDir,
+      core,
       internalEnv: () => ({}),
       secrets: SECRETS,
       currentUserId: () => null,
@@ -408,8 +428,9 @@ describe('managed agent runtime conformance', () => {
     const driver = new RequestDriver()
     registry.register(driver.providerId, () => driver)
     runtime = new ManagedAgentRuntime({
-      db: testDb.db,
+      db: pluginDb.db,
       dataDir,
+      core,
       internalEnv: () => ({}),
       secrets: SECRETS,
       currentUserId: () => null,
@@ -446,8 +467,9 @@ describe('managed agent runtime conformance', () => {
     const driver = new SafeRetryDriver()
     registry.register(driver.providerId, () => driver)
     runtime = new ManagedAgentRuntime({
-      db: testDb.db,
+      db: pluginDb.db,
       dataDir,
+      core,
       internalEnv: () => ({}),
       secrets: SECRETS,
       currentUserId: () => null,
