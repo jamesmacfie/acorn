@@ -77,7 +77,7 @@ export function createCoreServices(options: { secrets: SecretService; db: AppDat
 }
 
 export { SecretService }
-export type { TaskRunConfig, TaskService } from './tasks'
+export type { ChildTaskSeed, TaskLinkRef, TaskRunConfig, TaskService } from './tasks'
 export type { IdentityService } from './identity'
 export type { RepoCheckout, RepoService } from './repos'
 export type { ContextService } from './context'

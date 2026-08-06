@@ -92,7 +92,7 @@ const MOUNTED_PLUGIN_ROUTES: ReadonlyArray<readonly [method: string, path: strin
   ['GET', '/v2/p/http/:owner/:repo/requests'],
   ['GET', '/v2/p/agents/usage'],
   ['GET', '/v2/p/agents/sessions'],
-  ['GET', '/v2/p/workflows/tasks/:id/workflows'],
+  ['GET', '/v2/p/workflows/tasks/:id/workflows'], // registered by the plugin's own init since Phase 2
   ['GET', '/v2/p/workflows/workflows/runs/:runId/steps'], // doubled: the router owns '/workflows/*'
   ['GET', '/v2/p/memory/memory'], // doubled: the router owns '/memory'
   ['GET', '/v2/p/memory/tasks/:id/notes'],
@@ -138,6 +138,14 @@ describe('assembled routes', () => {
           memoryReviewTrigger: async () => {},
           seedTaskNotes: async () => {},
           reconciled: Promise.resolve(),
+        },
+        // Same treatment: this suite asserts the MOUNT TABLE, so nothing here starts a run. `failingChecks`
+        // answers null — "no PR to check" — which is the honest inert value rather than a fake green.
+        workflows: {
+          internalEnv: () => ({}),
+          reconciled: Promise.resolve(),
+          currentUserId: () => null,
+          failingChecks: async () => null,
         },
       }),
       {

@@ -640,59 +640,11 @@ export const agentWebhookDeliveries = sqliteTable(
   ],
 )
 
-// Workflow runs (docs/workflows.md): the durable checkpoint for the main-process state machine —
-// every transition is persisted so a run survives an app restart (LangGraph-style checkpoint = the
-// rows; reconciliation mirrors the tmux pattern). Machine-scoped like tasks.
-export const workflowRuns = sqliteTable(
-  'workflow_runs',
-  {
-    id: text('id').primaryKey(),
-    taskId: text('task_id').notNull(), // → tasks.id (the worktree/agent scope)
-    name: text('name').notNull(),
-    status: text('status').notNull(), // running | gated | cancelling | done | failed | safety-rail | cancelled
-    posture: text('posture').notNull().default('gated'), // gated (default) | autonomous (14 §posture)
-    trigger: text('trigger').notNull().default('manual'),
-    defJson: text('def_json').notNull(), // the WorkflowDef this run executes (frozen at start)
-    error: text('error'),
-    createdAt: integer('created_at').notNull(),
-    updatedAt: integer('updated_at').notNull(),
-  },
-  (table) => [index('workflow_runs_task_created_idx').on(table.taskId, table.createdAt), index('workflow_runs_status_idx').on(table.status)],
-)
-
-// One step of a run. Steps carry a FIRST-CLASS working context (worktreePath — bargain-bull's
-// hardest lesson); structured output is the edge currency (branch/join material).
-export const workflowSteps = sqliteTable(
-  'workflow_steps',
-  {
-    id: text('id').primaryKey(),
-    runId: text('run_id').notNull(), // → workflow_runs.id
-    idx: integer('idx').notNull(), // sequence position
-    name: text('name').notNull(),
-    kind: text('kind').notNull().default('agent'), // registry id; built-ins include agent/gates/ci-loop/fan-out/join/decide
-    mode: text('mode').notNull().default('headless'), // headless | ai | interactive
-    profileId: text('profile_id'),
-    model: text('model'),
-    status: text('status').notNull(), // pending | running | waiting-gate | done | failed | skipped | safety-rail | cancelled
-    worktreePath: text('worktree_path'),
-    inputsJson: text('inputs_json'), // the assembled bundle handed to the step
-    resultJson: text('result_json'), // the captured HeadlessResult (sans events)
-    structuredJson: text('structured_json'), // the schema-conforming output — the edge currency
-    sessionId: text('session_id'), // for --resume (open in terminal, 15 P2)
-    agentSessionId: text('agent_session_id'), // normalized managed-agent history/attention lineage
-    costUsd: real('cost_usd'),
-    iteration: integer('iteration').notNull().default(0), // loop bound bookkeeping (14 §loop)
-    parentStepId: text('parent_step_id'), // fan-out lineage (14 P4)
-    error: text('error'),
-    createdAt: integer('created_at').notNull(),
-    updatedAt: integer('updated_at').notNull(),
-  },
-  (table) => [
-    index('workflow_steps_run_idx_idx').on(table.runId, table.idx),
-    index('workflow_steps_parent_created_idx').on(table.parentStepId, table.createdAt),
-    index('workflow_steps_agent_session_idx').on(table.agentSessionId),
-  ],
-)
+// `workflow_runs` and `workflow_steps` moved to plugins/workflows/src/node/schema.ts in Phase 2
+// (docs/vNext/data.md § Plugin DBs). They are the workflow engine's durable checkpoint and nothing
+// outside that plugin ever read them; `workflow_steps.task_id`/`agent_session_id` were always plain
+// IDs across what are now database files, never joins. Core keeps the generated DROP TABLE migration
+// rather than resetting its 42-file chain — see docs/vNext/phase2-notes.md.
 
 // Per-user cache of fetched external issues (generic across providers, parallels integrations).
 // Keyed by `integrationId` so the same identifier fetched via two different connections doesn't

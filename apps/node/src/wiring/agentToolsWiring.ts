@@ -9,31 +9,26 @@
 //     mirror through the shared section registry (server/agentTools/contextSections.ts) and core's
 //     `repos` table directly. They have no plugin to move to until github is converted, and even then
 //     the mirror stays core's.
-//   - **notes_*** belong to plugins/notes, which is not a NodePlugin. Two things block the move, not
-//     one: the NotesStore INSTANCE is constructed by plugins/memory's registerKnowledgeIpc (one store
-//     for the pane, the tools and the context assembler), and the 'workspace' note scope needs
-//     `workspaceIdFor` over core's `workspace_repos` table, for which CoreServices has no seam. Adding
-//     one with a single speculative caller is what this phase is supposed to stop doing.
 //   - **browser_*** belong to plugins/preview, which has NO node-side part at all: previewService.ts and
 //     browserService.ts import `electron` and run in Electron MAIN, and the driver arrives here as an
 //     injected DesktopCapability. Converting it is not a tool move, it is a process-boundary change.
 //
+// The FOUR notes_* tools that used to sit here are gone: plugins/notes is a NodePlugin now, so it owns
+// its store and declares them itself (plugins/notes/src/main/agentTools.ts). Both recorded blockers were
+// closed in the same change — the NotesStore instance is the plugin's rather than plugins/memory's, and
+// `CoreServices.tasks.workspaceId` is the `workspace_repos` seam the 'workspace' scope needed.
+//
 // Registered under the owner 'core' and cleared first, so a process that starts the service more than
 // once (service/runtime.test.ts does, four times) replaces these rather than throwing on the duplicate
 // name — the same idempotency the plugin host gives a plugin.
-//
-// Provenance: notes writes stamp author: agent + the agent session id (ctx.sessionId, from the
-// x-acorn-session-id header).
 import { and, eq } from 'drizzle-orm'
 import { z } from 'zod'
 import { assembleContext, parseInclude } from '@acorn/node-core/server/agentTools/contextSections.ts'
 import { registerAgentTool, removeAgentTools, ToolError, type AgentToolContribution, type ToolContext } from '@acorn/node-core/server/agentTools/registry.ts'
 import type { AppDatabase } from '@acorn/node-core/server/db/index.ts'
 import { schema } from '@acorn/node-core/server/db/index.ts'
-import type { NoteLocation, NoteScope } from '@acorn/protocol/notes.ts'
 import type { BrowserDesktopCapability } from '@acorn/protocol/desktopCapabilities.ts'
-import type { NotesStore } from '@acorn/plugin-notes/main/notes.ts'
-import { loadTask, workspaceIdFor } from '@acorn/node-core/main/taskWorktree.ts'
+import { loadTask } from '@acorn/node-core/main/taskWorktree.ts'
 
 // The owner id these contributions are registered under. Not a plugin namespace: the tools below are
 // core's own, plus two groups being held by an unconverted plugin. It exists so they can be removed as a
@@ -42,7 +37,6 @@ const OWNER = 'core'
 
 export type AgentToolsDeps = {
   db: AppDatabase
-  notesStore: NotesStore
   browser: BrowserDesktopCapability
 }
 
@@ -52,19 +46,13 @@ async function assemble(deps: AgentToolsDeps, ctx: ToolContext, include: Set<str
   return result
 }
 
-async function noteLocationFor(db: AppDatabase, taskId: string, scope: NoteScope = 'task'): Promise<NoteLocation> {
-  if (scope === 'task') return { scope, taskId }
-  if (scope === 'global') return { scope }
-  return { scope, workspaceId: await workspaceIdFor(db, taskId) }
-}
-
 export function buildAgentTools(deps: AgentToolsDeps): AgentToolContribution[] {
-  const { db, notesStore, browser } = deps
+  const { db, browser } = deps
   const empty = z.object({})
 
   // The context-read tools compose from the shared section registry (contextSections.ts). Its
-  // notes/memory seams are filled once, in knowledgeIpc — the /context route and these tools read
-  // the same assembler, so nothing to wire here.
+  // notes/memory seams are filled once, in contextSectionsWiring — the /context route and these tools
+  // read the same assembler, so nothing to wire here.
 
   return [
     // ── Context-read (read tier): compose from the shared section registry, no self-fetch ──────────
@@ -129,58 +117,6 @@ export function buildAgentTools(deps: AgentToolsDeps): AgentToolContribution[] {
           .from(schema.repos)
           .where(and(eq(schema.repos.userId, ctx.userLogin), eq(schema.repos.owner, t.repoOwner), eq(schema.repos.name, t.repoName)))
         return { owner: t.repoOwner, name: t.repoName, defaultBranch: repoRow?.defaultBranch ?? null, branch: t.branch, worktreePath: t.worktreePath }
-      },
-    },
-
-    // ── Notes (read + write tiers): one store, provenance stamped from tool scope (author: agent) ──
-    {
-      name: 'notes_list',
-      description: 'Workspace notes for the current task (slug, title, kind, author).',
-      input: z.object({ scope: z.enum(['task', 'workspace', 'global']).optional() }),
-      scope: 'task',
-      risk: 'read',
-      handler: async (a, ctx) => notesStore.list(await noteLocationFor(db, ctx.taskId, (a as { scope?: NoteScope }).scope)),
-    },
-    {
-      name: 'notes_read',
-      description: 'Read one workspace note.',
-      input: z.object({ slug: z.string(), scope: z.enum(['task', 'workspace', 'global']).optional() }),
-      scope: 'task',
-      risk: 'read',
-      handler: async (a, ctx) => {
-        try {
-          const { slug, scope } = a as { slug: string; scope?: NoteScope }
-          return await notesStore.read(await noteLocationFor(db, ctx.taskId, scope), slug)
-        } catch {
-          throw new ToolError('not_found', 'no such note')
-        }
-      },
-    },
-    {
-      name: 'notes_write',
-      description: 'Replace a note body (creates the note if missing, attributed to this agent).',
-      input: z.object({ slug: z.string(), body: z.string(), scope: z.enum(['task', 'workspace', 'global']).optional() }),
-      scope: 'task',
-      risk: 'write',
-      handler: async (a, ctx) => {
-        const { slug, body, scope } = a as { slug: string; body: string; scope?: NoteScope }
-        const location = await noteLocationFor(db, ctx.taskId, scope)
-        const exists = await notesStore.read(location, slug).catch(() => null)
-        if (exists) await notesStore.write(location, slug, body, { author: 'agent', originSessionId: ctx.sessionId, originTaskId: ctx.taskId })
-        else await notesStore.append(location, slug, body, { author: 'agent', originSessionId: ctx.sessionId, originTaskId: ctx.taskId })
-        return { ok: true }
-      },
-    },
-    {
-      name: 'notes_append',
-      description: 'Append to a note (findings, plans, handoffs) — creates it if missing, attributed to this agent.',
-      input: z.object({ slug: z.string(), text: z.string(), scope: z.enum(['task', 'workspace', 'global']).optional() }),
-      scope: 'task',
-      risk: 'write',
-      handler: async (a, ctx) => {
-        const { slug, text, scope } = a as { slug: string; text: string; scope?: NoteScope }
-        await notesStore.append(await noteLocationFor(db, ctx.taskId, scope), slug, text, { author: 'agent', originSessionId: ctx.sessionId, originTaskId: ctx.taskId })
-        return { ok: true }
       },
     },
 

@@ -3,9 +3,11 @@ import { tmpdir } from 'node:os'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { makeTestDb, type TestDb } from '@acorn/node-core/server/routes/testDb.ts'
+import { makeTestDb, makeTestPluginDb, type TestDb, type TestPluginDb } from '@acorn/node-core/server/routes/testDb.ts'
 import { buildHeadlessArgv, runHeadless } from '@acorn/node-core/main/headless.ts'
 import { NotesStore } from '@acorn/plugin-notes/main/notes.ts'
+import { migrationsDir } from '@acorn/plugin-workflows/node/migrations.ts'
+import { workflowRuns, workflowSteps } from '@acorn/plugin-workflows/node/schema.ts'
 import { WorkflowRunner, type RunnerDeps, type WorkflowDef } from '@acorn/plugin-workflows/main/workflowRunner.ts'
 import '../../src/wiring/agentProfiles' // profiles come from the composition root
 
@@ -14,7 +16,12 @@ const FAKE_AGENT = resolve(dirname(fileURLToPath(import.meta.url)), '../fixtures
 // Real fake-agent steps over a real DB + a real NotesStore: the handoff substrate is exercised,
 // not stubbed. Only policy/checks/notify are test doubles.
 describe('WorkflowRunner (docs/workflows.md)', () => {
+  // TWO databases, because there are two databases now: the runner writes its runs and steps into the
+  // workflows plugin's own file, and core's holds the `tasks` rows the fan-out test asserts over. A test
+  // that could reach both through one handle would keep passing after the plugin started reading a table
+  // it no longer owns.
   let t: TestDb
+  let wf: TestPluginDb
   let dir: string
   let notes: NotesStore
   const stepInputs: Record<string, string> = {}
@@ -49,6 +56,7 @@ describe('WorkflowRunner (docs/workflows.md)', () => {
 
   beforeEach(() => {
     t = makeTestDb()
+    wf = makeTestPluginDb('workflows', migrationsDir())
     dir = mkdtempSync(join(tmpdir(), 'acorn-wf-'))
     notes = new NotesStore(join(dir, 'notes'))
     structuredByStep = {}
@@ -57,6 +65,7 @@ describe('WorkflowRunner (docs/workflows.md)', () => {
   })
 
   afterEach(() => {
+    wf.cleanup()
     t.cleanup()
     rmSync(dir, { recursive: true, force: true })
   })
@@ -81,7 +90,7 @@ describe('WorkflowRunner (docs/workflows.md)', () => {
 
   it('2-step sequential run: every transition persisted, handoff rides into step B', async () => {
     structuredByStep = { build: '{"summary":"guarded the null token","files":["src/auth/login.ts"]}' }
-    const runner = new WorkflowRunner(t.db, deps())
+    const runner = new WorkflowRunner(wf.db, deps())
     const runId = await runner.start('task1', DEF)
     const run = await waitDone(runner, runId)
     expect(run.status).toBe('done')
@@ -106,7 +115,7 @@ describe('WorkflowRunner (docs/workflows.md)', () => {
 
   it('a failing step fails the run cleanly and stops the sequence', async () => {
     structuredByStep = { build: 'FAIL' }
-    const runner = new WorkflowRunner(t.db, deps())
+    const runner = new WorkflowRunner(wf.db, deps())
     const runId = await runner.start('task1', DEF)
     const run = await waitDone(runner, runId)
     expect(run.status).toBe('failed')
@@ -117,7 +126,7 @@ describe('WorkflowRunner (docs/workflows.md)', () => {
 
   it('human gate pauses the run until an approval command; rejection fails cleanly', async () => {
     const d = deps()
-    const runner = new WorkflowRunner(t.db, d)
+    const runner = new WorkflowRunner(wf.db, d)
     const def: WorkflowDef = {
       name: 'gated-ship',
       steps: [
@@ -156,7 +165,7 @@ describe('WorkflowRunner (docs/workflows.md)', () => {
   it('autonomous posture skips human gates but policy gates still bind', async () => {
     const d = deps()
     d.evaluatePolicy = vi.fn(async () => ({ pass: false, detail: 'CI red' }))
-    const runner = new WorkflowRunner(t.db, d)
+    const runner = new WorkflowRunner(wf.db, d)
     const runId = await runner.start('task1', {
       name: 'auto',
       posture: 'autonomous',
@@ -178,7 +187,7 @@ describe('WorkflowRunner (docs/workflows.md)', () => {
     structuredByStep = { build: '{"ci":"green","trust_me":true}' }
     const d = deps()
     d.evaluatePolicy = vi.fn(async () => ({ pass: false, detail: 'checks mirror says failing' }))
-    const runner = new WorkflowRunner(t.db, d)
+    const runner = new WorkflowRunner(wf.db, d)
     const runId = await runner.start('task1', {
       name: 'no-trust',
       steps: [
@@ -199,7 +208,7 @@ describe('WorkflowRunner (docs/workflows.md)', () => {
     let polls = 0
     const d = deps()
     d.failingChecks = vi.fn(async () => (++polls <= 2 ? '- test: failure' : ''))
-    const runner = new WorkflowRunner(t.db, d)
+    const runner = new WorkflowRunner(wf.db, d)
     const runId = await runner.start('task1', { name: 'ci', steps: [{ name: 'ci-fix', kind: 'ci-loop', maxIterations: 3 }] })
     const run = await waitDone(runner, runId)
     expect(run.status).toBe('done')
@@ -209,7 +218,7 @@ describe('WorkflowRunner (docs/workflows.md)', () => {
     // Never green → the bound is a first-class terminal state.
     const d2 = deps()
     d2.failingChecks = vi.fn(async () => '- test: failure')
-    const runner2 = new WorkflowRunner(t.db, d2)
+    const runner2 = new WorkflowRunner(wf.db, d2)
     const runId2 = await runner2.start('task1', { name: 'ci2', steps: [{ name: 'ci-fix', kind: 'ci-loop', maxIterations: 2 }] })
     const run2 = await waitDone(runner2, runId2)
     expect(run2.status).toBe('safety-rail')
@@ -253,7 +262,7 @@ describe('WorkflowRunner (docs/workflows.md)', () => {
       }
     }
 
-    const runner = new WorkflowRunner(t.db, d)
+    const runner = new WorkflowRunner(wf.db, d)
     const usageRunId = await runner.start('task1', {
       name: 'usage-rail',
       budget: { maxCostUsd: 1, maxInputTokens: 2000 },
@@ -346,7 +355,7 @@ describe('WorkflowRunner (docs/workflows.md)', () => {
     }
 
     // Happy path: all three children succeed.
-    const runner = new WorkflowRunner(t.db, d)
+    const runner = new WorkflowRunner(wf.db, d)
     const runId = await runner.start('task1', DEF_FAN)
     const run = await waitDone(runner, runId)
     expect(run.status).toBe('done')
@@ -385,7 +394,7 @@ describe('WorkflowRunner (docs/workflows.md)', () => {
   it("requires_run: the runner starts the target and hands its URL to the step (docs/workflows.md)", async () => {
     const d = deps()
     d.startRunTarget = vi.fn(async () => ({ ok: true, url: 'http://localhost:8080' }))
-    const runner = new WorkflowRunner(t.db, d)
+    const runner = new WorkflowRunner(wf.db, d)
     const runId = await runner.start('task1', {
       name: 'e2e',
       steps: [{ name: 'verify', prompt: 'Check the login page.', requiresRun: 'dev' }],
@@ -398,7 +407,7 @@ describe('WorkflowRunner (docs/workflows.md)', () => {
     // A target that cannot start fails the step cleanly.
     const d2 = deps()
     d2.startRunTarget = vi.fn(async () => ({ ok: false }))
-    const runner2 = new WorkflowRunner(t.db, d2)
+    const runner2 = new WorkflowRunner(wf.db, d2)
     const runId2 = await runner2.start('task1', { name: 'e2e2', steps: [{ name: 'verify', prompt: 'x', requiresRun: 'dev' }] })
     expect((await waitDone(runner2, runId2)).status).toBe('failed')
   })
@@ -408,7 +417,7 @@ describe('WorkflowRunner (docs/workflows.md)', () => {
       plan: '{"recommendation":"fix"}',
       route: '{"verdict":"fix"}',
     }
-    const runner = new WorkflowRunner(t.db, deps())
+    const runner = new WorkflowRunner(wf.db, deps())
     const runId = await runner.start('task1', {
       name: 'branch',
       steps: [
@@ -431,7 +440,7 @@ describe('WorkflowRunner (docs/workflows.md)', () => {
 
   it('an unmatched decide verdict fails unless a default branch exists', async () => {
     structuredByStep = { route: '{"verdict":"unknown"}' }
-    const runner = new WorkflowRunner(t.db, deps())
+    const runner = new WorkflowRunner(wf.db, deps())
     const runId = await runner.start('task1', {
       name: 'unmatched',
       steps: [
@@ -479,7 +488,7 @@ describe('WorkflowRunner (docs/workflows.md)', () => {
         )
       })
     }
-    const runner = new WorkflowRunner(t.db, d)
+    const runner = new WorkflowRunner(wf.db, d)
     const runId = await runner.start('task1', {
       name: 'cancel-tree',
       steps: [
@@ -502,7 +511,7 @@ describe('WorkflowRunner (docs/workflows.md)', () => {
   })
 
   it('registered step kinds, policies, and triggers execute without core ladders and persist trigger ids', async () => {
-    const runner = new WorkflowRunner(t.db, deps())
+    const runner = new WorkflowRunner(wf.db, deps())
     runner.contributions.registerStepKind('custom', async () => ({ status: 'done', result: { custom: true } }))
     runner.contributions.registerPolicy('always', async () => ({ pass: true }))
     runner.registerTrigger({
@@ -515,27 +524,24 @@ describe('WorkflowRunner (docs/workflows.md)', () => {
       ],
     })
     expect(await runner.pollTriggers()).toEqual({ started: 1, errors: [] })
-    const [run] = await t.db.select().from((await import('@acorn/node-core/server/db/index.ts')).schema.workflowRuns)
+    const [run] = await wf.db.select().from(workflowRuns)
     expect(run.trigger).toBe('source.pr-opened')
     expect((await waitDone(runner, run.id)).status).toBe('done')
   })
 
   it('kill-and-reconstruct over the same DB mid-run → resumes from the persisted step', async () => {
-    const runner = new WorkflowRunner(t.db, deps())
+    const runner = new WorkflowRunner(wf.db, deps())
     const runId = await runner.start('task1', DEF)
     await waitDone(runner, runId)
 
     // Simulate a crash mid-run: force step B back to 'running' with the run 'running', as if the
     // app died while it executed, then reconstruct a FRESH runner over the same DB.
     const steps = await runner.steps(runId)
-    await t.db.update((await import('@acorn/node-core/server/db/index.ts')).schema.workflowSteps).set({ status: 'running' }).where(
-      (await import('drizzle-orm')).eq((await import('@acorn/node-core/server/db/index.ts')).schema.workflowSteps.id, steps[1].id),
-    )
-    await t.db.update((await import('@acorn/node-core/server/db/index.ts')).schema.workflowRuns).set({ status: 'running' }).where(
-      (await import('drizzle-orm')).eq((await import('@acorn/node-core/server/db/index.ts')).schema.workflowRuns.id, runId),
-    )
+    const { eq } = await import('drizzle-orm')
+    await wf.db.update(workflowSteps).set({ status: 'running' }).where(eq(workflowSteps.id, steps[1].id))
+    await wf.db.update(workflowRuns).set({ status: 'running' }).where(eq(workflowRuns.id, runId))
 
-    const revived = new WorkflowRunner(t.db, deps())
+    const revived = new WorkflowRunner(wf.db, deps())
     await revived.reconcile()
     const run = await waitDone(revived, runId)
     expect(run.status).toBe('done')

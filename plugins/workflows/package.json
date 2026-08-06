@@ -15,6 +15,7 @@
     "@acorn/node-core": "workspace:*",
     "@acorn/plugin-agents": "workspace:*",
     "@acorn/plugin-notes": "workspace:*",
+    "@acorn/plugin-terminal": "workspace:*",
     "@acorn/protocol": "workspace:*",
     "drizzle-orm": "catalog:",
     "hono": "catalog:",
@@ -24,6 +25,7 @@
   },
   "devDependencies": {
     "@types/node": "^26.0.0",
+    "drizzle-kit": "^0.31.10",
     "typescript": "^6.0.3",
     "vite": "^8.0.16",
     "vite-plugin-solid": "^2.11.12",

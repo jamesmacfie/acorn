@@ -12,6 +12,7 @@
 // which is not a configuration worth supporting.
 import type { NodePlugin } from '@acorn/node-core/server/plugin/types.ts'
 import { openPluginDb } from '@acorn/node-core/main/pluginStorage.ts'
+import { NOTES_STORE } from '@acorn/plugin-notes/contract/store.ts'
 import { TERMINAL_SEND_TO_AGENT } from '@acorn/plugin-terminal/contract/sendToAgent.ts'
 import { memoryAgentTools } from '../main/agentTools'
 import { MEMORY_KNOWLEDGE, registerKnowledgeIpc, type KnowledgeDeps } from '../main/knowledgeIpc'
@@ -23,8 +24,9 @@ import { migrationsDir } from './migrations'
 // be able to set. It is supplied by the composition root until that seam exists.
 //
 // `sendToAgent` used to be here too, with a comment saying it could not become a capability because
-// terminal was not a NodePlugin. It is one now, so this resolves through the capability registry below.
-export type MemoryPluginDeps = Omit<KnowledgeDeps, 'sendToAgent'>
+// terminal was not a NodePlugin. It is one now, so this resolves through the capability registry below —
+// and so does `notes`, which used to be worse than a dep: this plugin CONSTRUCTED the notes store.
+export type MemoryPluginDeps = Omit<KnowledgeDeps, 'sendToAgent' | 'notes'>
 
 export const memoryPlugin = (dataDir: string, deps: MemoryPluginDeps): NodePlugin => {
   let db: ReturnType<typeof openPluginDb> | null = null
@@ -54,7 +56,11 @@ export const memoryPlugin = (dataDir: string, deps: MemoryPluginDeps): NodePlugi
         }
         send(sessionId, text, submit)
       }
-      const runtime = registerKnowledgeIpc(db, dataDir, ctx.core, { ...deps, sendToAgent })
+      // notes.store, also resolved at CALL time and for the same reason. Unlike sendToAgent this one
+      // does NOT degrade: notes is a `required` plugin, and a notes pane that silently answered "no
+      // notes" because a capability was missing would look exactly like data loss.
+      const notes = () => ctx.capabilities.require(NOTES_STORE)
+      const runtime = registerKnowledgeIpc(db, dataDir, ctx.core, { ...deps, sendToAgent, notes })
       ctx.capabilities.provide(MEMORY_KNOWLEDGE, runtime)
       ctx.routes.register(knowledge, { prefix: '', note: 'notes/memory pane' })
       // memory_search / memory_list / memory_get / memory_write, over the SAME index and proposal queue

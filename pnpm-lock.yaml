@@ -1007,12 +1007,12 @@ importers:
       '@tanstack/solid-query':
         specifier: ^5.101.0
         version: 5.101.0(solid-js@1.9.13)
-      drizzle-orm:
-        specifier: 'catalog:'
-        version: 0.45.2(@types/better-sqlite3@7.6.13)(@types/pg@8.20.0)(better-sqlite3@12.11.1)(pg@8.22.0)
       solid-js:
         specifier: 'catalog:'
         version: 1.9.13
+      zod:
+        specifier: 'catalog:'
+        version: 4.4.3
     devDependencies:
       '@types/node':
         specifier: ^26.0.0
@@ -1270,6 +1270,9 @@ importers:
       '@acorn/plugin-notes':
         specifier: workspace:*
         version: link:../notes
+      '@acorn/plugin-terminal':
+        specifier: workspace:*
+        version: link:../terminal
       '@acorn/protocol':
         specifier: workspace:*
         version: link:../../packages/protocol
@@ -1292,6 +1295,9 @@ importers:
       '@types/node':
         specifier: ^26.0.0
         version: 26.0.0
+      drizzle-kit:
+        specifier: ^0.31.10
+        version: 0.31.10
       typescript:
         specifier: ^6.0.3
         version: 6.0.3

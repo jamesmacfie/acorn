@@ -2,8 +2,9 @@
 // class alone owns validation, ordering, persistence, branching, cancellation, and reconciliation.
 import { randomUUID } from 'node:crypto'
 import { asc, eq, inArray } from 'drizzle-orm'
-import type { AppDatabase } from '@acorn/node-core/server/db/index.ts'
-import { schema } from '@acorn/node-core/server/db/index.ts'
+import type { PluginDatabase } from '@acorn/node-core/main/pluginStorage.ts'
+import { capabilityId } from '@acorn/node-core/server/plugin/capabilities.ts'
+import * as schema from '../node/schema'
 import { agentProfileRegistry, DEFAULT_PROFILE_ID } from '@acorn/node-core/main/agentProfiles/index.ts'
 import type { HeadlessOpts, HeadlessResult, StreamEvent } from '@acorn/node-core/main/headless.ts'
 import type {
@@ -56,6 +57,21 @@ export type RunnerDeps = {
   cancelChildTask?(taskId: string): Promise<void>
   authorizeRepoConfig?(taskId: string): Promise<void>
 }
+
+// workflows.runner — the ONE method the composition root needs off the runner after init.
+//
+// Reconciliation cannot happen inside init and must not: it sweeps every 'running' step back to
+// 'pending' and re-ticks its run, so it has to run AFTER the listener binds (a resumed step calls the
+// node's own loopback context route) and BEFORE the composition root resolves its `reconciled` promise,
+// which `start`/`gate`/`cancel` all await precisely so a run cannot be started into the sweep. That
+// ordering lives in the composition root's reconcile pass, alongside tmux and worktree reconciliation,
+// and this is how it still reaches a runner the plugin now constructs.
+//
+// Deliberately NOT in contract/, on the same reasoning as `memory.knowledge`: the only consumer is
+// apps/node's composition root, which may import a plugin's internals by design, and an id in contract/
+// is importable by every plugin. Nothing cross-plugin needs to drive reconciliation.
+export type WorkflowsRunnerHandle = { reconcile(): Promise<void> }
+export const WORKFLOWS_RUNNER = capabilityId<WorkflowsRunnerHandle>('workflows.runner')
 
 const TERMINAL_RUN = new Set(['done', 'failed', 'safety-rail', 'cancelled'])
 const TERMINAL_STEP = new Set(['done', 'failed', 'skipped', 'safety-rail', 'cancelled'])
@@ -122,7 +138,7 @@ export class WorkflowRunner {
   readonly #headless = new Semaphore(MAX_CONCURRENT_HEADLESS)
 
   constructor(
-    private readonly db: AppDatabase,
+    private readonly db: PluginDatabase,
     private readonly deps: RunnerDeps,
   ) {
     registerBuiltinWorkflowContributions(this.contributions, {
