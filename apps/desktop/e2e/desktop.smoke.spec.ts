@@ -243,6 +243,19 @@ test('S1 boots the authenticated desktop shell with no console errors', async ()
   await running.page.reload()
   await expect(running.page.locator('.brand')).toContainText('acorn')
   expect(errors).toEqual([])
+  // The rail's Sources, which is the only place a client plugin's registration is observable before a
+  // task exists — and the only registry whose visible order is registration order rather than a sorted
+  // `order` field (client-core/tabs/sources.ts appends unsorted). GitHub is the shell's own; Docker, API
+  // and Agents are contributed by three separate plugins' init and are the always-visible local sources
+  // (Linear and Rollbar need a connected integration, which a fresh smoke root has none of).
+  //
+  // This is deliberately an ORDER assertion, not a membership one: with the plugin list in
+  // apps/desktop/src/app/client/plugins.ts, reordering it silently reorders the rail, and vitest cannot
+  // catch that — the plugin entrypoints import .tsx modules it has no transform for.
+  await expect(running.page.locator('.tabrail-source').first()).toBeVisible()
+  const railSources = await running.page.locator('.tabrail-source')
+    .evaluateAll((buttons) => buttons.map((button) => button.getAttribute('aria-label')))
+  expect(railSources).toEqual(['GitHub', 'Docker', 'API', 'Agents'])
   await running.app.close()
 })
 
@@ -264,6 +277,18 @@ test('S3 opens a task from the rail', async () => {
   await openSmokeWorkspace(running.page)
   await running.page.getByRole('button', { name: 'Smoke task' }).click()
   await expect(running.page.locator('.task-layout')).toBeVisible()
+  // Every pane a LOCAL task can show, in ui.md's order (agents 15, changes 20, notes 30, context 40,
+  // editor 50, search 60, database 70, http 76, preview 80), contributed by nine separate plugins'
+  // init. Absent by their own `when` predicate rather than by failing to register: pr (needs a PR
+  // number), docker (needs a linked container), linear and rollbar (need a task link).
+  //
+  // The tail of this row is `extraButtons` (run targets, the terminal toggle) followed by the close
+  // button, hence the slice — the assertion is about the switcher, not the whole toolbar.
+  const paneLabels = await running.page.locator('.pane-switch-btn')
+    .evaluateAll((buttons) => buttons.map((button) => button.getAttribute('aria-label')))
+  expect(paneLabels.slice(0, 9)).toEqual([
+    'Agent', 'Changes', 'Notes', 'Context', 'Editor', 'Find in Files', 'Database', 'API', 'Browser preview',
+  ])
   await running.app.close()
 })
 

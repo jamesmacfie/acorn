@@ -35,8 +35,9 @@ const positiveInteger = (value: number): boolean => Number.isInteger(value) && v
 
 export class ConnectionProviderRegistry {
   readonly #providers = new Map<string, ConnectionProviderContribution>()
+  readonly #owners = new Map<string, string>() // providerId → owning plugin; see registry.ts's header
 
-  register(provider: ConnectionProviderContribution): void {
+  register(provider: ConnectionProviderContribution, owner?: string): void {
     if (!provider.id.trim()) throw new Error('Connection provider id must not be empty.')
     if (this.#providers.has(provider.id)) throw new Error(`Duplicate connection provider '${provider.id}'.`)
 
@@ -68,6 +69,15 @@ export class ConnectionProviderRegistry {
     }
 
     this.#providers.set(provider.id, provider)
+    if (owner) this.#owners.set(provider.id, owner)
+  }
+
+  removeForPlugin(plugin: string): void {
+    for (const [id, owner] of [...this.#owners.entries()]) {
+      if (owner !== plugin) continue
+      this.#providers.delete(id)
+      this.#owners.delete(id)
+    }
   }
 
   require(id: string): ConnectionProviderContribution {

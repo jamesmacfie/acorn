@@ -10,6 +10,7 @@ import { runAgentTools } from '@acorn/plugin-terminal/main/agentTools.ts'
 import { buildAgentTools } from './agentToolsWiring'
 import { notesAgentTools } from '@acorn/plugin-notes/main/agentTools.ts'
 import { NotesStore } from '@acorn/plugin-notes/main/notes.ts'
+import { browserAgentTools } from '@acorn/plugin-preview/server/agentTools.ts'
 
 // The notes_* tools moved into plugins/notes with the plugin's conversion, so this suite exercises them
 // through THEIR owner rather than through the app-layer remainder. What it pins is unchanged and is the
@@ -61,13 +62,10 @@ describe('the full agent-tool manifest', () => {
     'pr_changed_files',
     'linked_issues',
     'repo_info',
-    'browser_navigate',
-    'browser_snapshot',
-    'browser_click',
-    'browser_fill',
-    'browser_screenshot',
-    'browser_console',
   ]
+  // The sixth group to leave this file. Its blocker was "preview has no node-side part to own them", not the
+  // Electron boundary — the driver is still in Electron main and still arrives as an injected capability.
+  const PREVIEW_TOOLS = ['browser_navigate', 'browser_snapshot', 'browser_click', 'browser_fill', 'browser_screenshot', 'browser_console']
   const CHANGES_TOOLS = ['local_changes', 'local_diff', 'git_log']
   const NOTES_TOOLS = ['notes_list', 'notes_read', 'notes_write', 'notes_append']
   const MEMORY_TOOLS = ['memory_search', 'memory_list', 'memory_get', 'memory_write']
@@ -78,7 +76,8 @@ describe('the full agent-tool manifest', () => {
     try {
       const core = { tasks: { load: async () => undefined } } as never
       const names = [
-        ...buildAgentTools({ db: testDb.db, browser: {} as never }).map((tool) => tool.name),
+        ...buildAgentTools({ db: testDb.db }).map((tool) => tool.name),
+        ...browserAgentTools({} as never).map((tool) => tool.name),
         ...localGitAgentTools(core).map((tool) => tool.name),
         ...memoryAgentTools({} as never, {} as never, core).map((tool) => tool.name),
         ...notesAgentTools({} as never, core).map((tool) => tool.name),
@@ -86,7 +85,7 @@ describe('the full agent-tool manifest', () => {
       ]
       // No duplicates: the registry throws on one, so a collision would break the boot, not a call.
       expect(new Set(names).size).toBe(names.length)
-      expect([...names].sort()).toEqual([...CORE_TOOLS, ...CHANGES_TOOLS, ...MEMORY_TOOLS, ...NOTES_TOOLS, ...TERMINAL_TOOLS].sort())
+      expect([...names].sort()).toEqual([...CORE_TOOLS, ...CHANGES_TOOLS, ...MEMORY_TOOLS, ...NOTES_TOOLS, ...PREVIEW_TOOLS, ...TERMINAL_TOOLS].sort())
     } finally {
       testDb.cleanup()
     }
@@ -97,5 +96,6 @@ describe('the full agent-tool manifest', () => {
     expect(memoryAgentTools({} as never, {} as never, {} as never).map((tool) => tool.name)).toEqual(MEMORY_TOOLS)
     expect(notesAgentTools({} as never, {} as never).map((tool) => tool.name)).toEqual(NOTES_TOOLS)
     expect(runAgentTools({} as never).map((tool) => tool.name)).toEqual(TERMINAL_TOOLS)
+    expect(browserAgentTools({} as never).map((tool) => tool.name)).toEqual(PREVIEW_TOOLS)
   })
 })

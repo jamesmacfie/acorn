@@ -1,7 +1,7 @@
 import { Hono } from 'hono'
 import { randomUUID } from 'node:crypto'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import '../../src/server/providers'
+import '../registerProviders'
 import '../../src/server/routes'
 import type { ApiError } from '@acorn/protocol/api.ts'
 import type { PairingWindow } from '@acorn/protocol/node.ts'

@@ -40,11 +40,12 @@ an edge requires removing its baseline entry.
 
 | Surface | Registry or contract | Activation home |
 | --- | --- | --- |
-| Panes | `@acorn/client-core/registries/panes.ts` | `app/client/activate.ts`, provider contributions, and feature pane modules |
-| Sources | `@acorn/client-core/registries/sources.ts` | `app/client/activate.ts` and `providerContributions.tsx` |
-| Commands / keybindings | `@acorn/client-core/registries/{commands,keybindings}.tsx` | `app/client/activate.ts` |
-| Settings pages | `@acorn/client-core/registries/settings.ts` | `app/client/pageContributions.tsx` |
-| UI slots, notices, pollers, themes | `@acorn/client-core/registries/` | `app/client/activate.ts` |
+| Panes | `@acorn/client-core/registries/panes.ts` | each plugin's `client/index.ts` (`ctx.panes`) |
+| Sources | `@acorn/client-core/registries/sources.ts` | each plugin's `client/index.ts` (`ctx.sources`) |
+| Commands / keybindings | `@acorn/client-core/registries/{commands,keybindings}.tsx` | the component that owns them, at MOUNT — a pane's shortcuts exist only while it does |
+| Settings pages | `@acorn/client-core/registries/settings.ts` | `ctx.settingsPages`; core's own in `app/client/pageContributions.tsx` |
+| UI slots, task slots, agent contexts, agent tool renderers, pollers, persisted state | `@acorn/client-core/registries/` | `ctx.{slots,taskSlots,agentContexts,agentToolRenderers,pollers,persistedState}`; core's own in `app/client/{slotContributions,activate}.ts` |
+| Notices, themes, styles | `@acorn/client-core/registries/` | core-owned; no plugin contributes one, so they are not on `ClientPluginContext` |
 | HTTP routes (internal) | `@acorn/node-core/server/routeRegistry.ts` | `app/server/routes.ts` |
 | Public API endpoints | `@acorn/node-core/server/publicApi/` (schema-first `PluginApiContribution`) | `app/server/publicApi.ts` |
 | Provider connections | `@acorn/node-core/server/integrations/connectionRegistry.ts` | `app/server/providers.ts` |

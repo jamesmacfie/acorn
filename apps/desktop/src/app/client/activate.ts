@@ -1,91 +1,41 @@
-import { paneRegistry } from '@acorn/client-core/registries/panes.ts'
-import { prPaneContribution } from '@acorn/plugin-github/client/pullDetail/PrPane.tsx'
-import { clientIntegrationProviders, registerIntegrationProvider } from './providerContributions'
-import { changesPaneContribution } from '@acorn/plugin-changes/client/paneContribution.ts'
-import { notesPaneContribution } from '@acorn/plugin-notes/client/NotesTaskPane.tsx'
-import { agentPaneContribution } from '@acorn/plugin-agents/client/paneContribution.ts'
-import { contextPaneContribution } from '@acorn/plugin-context/client/paneContribution.ts'
-import { editorPaneContribution } from '@acorn/plugin-editor/client/paneContribution.ts'
-import { searchPaneContribution } from '@acorn/plugin-editor/client/search/paneContribution.ts'
-import { databasePaneContribution } from '@acorn/plugin-database/client/paneContribution.ts'
-import { previewPaneContribution } from '@acorn/plugin-preview/client/PreviewTaskPane.tsx'
-import { activatePreviewEvents } from '@acorn/plugin-preview/client/PreviewPane.tsx'
-import { settingsRegistry } from '@acorn/client-core/registries/settings.ts'
-import { settingsPageContributions } from './pageContributions'
-import { noticeKindRegistry } from '@acorn/client-core/registries/notices.ts'
+// Renderer activation: register CORE's contributions, then run every client plugin's init.
+//
+// This file used to name all fourteen plugins' contribution modules by hand and push them into fifteen
+// registries — 91 lines in which adding a pane meant editing the app, and turning a plugin off meant
+// deleting lines. Both halves of that are gone: the plugin list is plugins.ts, and each plugin says what
+// it contributes in its own client/index.ts. What is left below is what genuinely belongs to the
+// composition root — core's own contributions, which no plugin owns.
+//
+// Ordering: core first, then plugins. That is not load-bearing (core contributes no rail source, and
+// every other registry sorts), but it keeps the shell's own overlays and pollers registered before any
+// plugin can observe the registries.
+import { initClientPlugins } from '@acorn/client-core/registries/plugin.ts'
 import { noticeKindContributions } from '@acorn/client-core/notifications/kindContributions.ts'
-import { pollerRegistry } from '@acorn/client-core/registries/pollers.ts'
-import { taskStatusPollerContribution } from '@acorn/client-core/tasks/taskStatus.ts'
-import { workflowTriggerPollerContribution } from '@acorn/plugin-agents/client/triggerPoller.ts'
-import { uiSlotRegistry } from '@acorn/client-core/registries/uiSlots.tsx'
-import { shellSlotContributions } from './slotContributions'
-import { sourceRegistry } from '@acorn/client-core/registries/sources.ts'
-import { dockerSourceContribution } from '@acorn/plugin-docker/client/sourceContribution.tsx'
-import { dockerPaneContribution } from '@acorn/plugin-docker/client/paneContribution.ts'
-import { dockerTaskPollerContribution } from '@acorn/plugin-docker/client/dockerStore.ts'
-import { dockerFooterSlotContribution, dockerRailSlotContribution } from '@acorn/plugin-docker/client/slotContribution.ts'
-import { httpSourceContribution } from '@acorn/plugin-http/client/sourceContribution.tsx'
-import { httpPaneContribution } from '@acorn/plugin-http/client/paneContribution.ts'
-import { purgeStoredHttpDrafts } from '@acorn/plugin-http/client/draft.ts'
-import { registerDockerArchiveConcern } from '@acorn/plugin-docker/client/archiveConcern.ts'
-import { taskSlotRegistry } from '@acorn/client-core/registries/uiSlots.tsx'
+import { directPreferenceSlices } from '@acorn/client-core/persistence/preferenceSlices.ts'
 import { persistedStateRegistry } from '@acorn/client-core/persistence/persistedState.ts'
-import { persistedSliceContributions } from './persistedSliceContributions'
+import { coreStateSlices } from '@acorn/client-core/persistence/stateSlices.ts'
+import { noticeKindRegistry } from '@acorn/client-core/registries/notices.ts'
+import { pollerRegistry } from '@acorn/client-core/registries/pollers.ts'
+import { settingsRegistry } from '@acorn/client-core/registries/settings.ts'
+import { uiSlotRegistry } from '@acorn/client-core/registries/uiSlots.tsx'
+import { taskStatusPollerContribution } from '@acorn/client-core/tasks/taskStatus.ts'
+import { settingsPageContributions } from './pageContributions'
+import { clientPlugins } from './plugins'
 import { activateScopedStateEviction } from './scopedEviction'
-import { agentContextRegistry } from '@acorn/client-core/registries/agentContexts.ts'
-import { taskContextAgentContribution } from '@acorn/plugin-context/client/agentContextContribution.ts'
-import { terminalAgentContextContribution } from '@acorn/plugin-terminal/client/agentContextContribution.ts'
-import { databaseAgentContextContribution } from '@acorn/plugin-database/client/agentContextContribution.ts'
-import { dockerAgentContextContribution } from '@acorn/plugin-docker/client/agentContextContribution.ts'
-import { httpAgentContextContribution } from '@acorn/plugin-http/client/agentContextContribution.ts'
-import { activateManagedAgentReferences } from '@acorn/plugin-agents/client/referenceContribution.ts'
-import { agentCenterSourceContribution } from '@acorn/plugin-agents/client/sourceContribution.tsx'
-import { agentToolRendererRegistry } from '@acorn/client-core/registries/agentToolRenderers.ts'
-import { changesAgentToolRenderer } from '@acorn/plugin-changes/client/agentToolRenderer.tsx'
-import { activateManagedAgentNotifications } from '@acorn/plugin-agents/client/managedStore.ts'
-import { activateManagedAgentNoticeTargets } from '@acorn/plugin-agents/client/managedSelection.ts'
+import { shellSlotContributions } from './slotContributions'
 
-const panes = [
-  prPaneContribution,
-  agentPaneContribution,
-  changesPaneContribution,
-  notesPaneContribution,
-  contextPaneContribution,
-  editorPaneContribution,
-  searchPaneContribution,
-  databasePaneContribution,
-  previewPaneContribution,
-  dockerPaneContribution,
-  httpPaneContribution,
-]
-
-for (const pane of panes) paneRegistry.register(pane)
-for (const contribution of [
-  taskContextAgentContribution,
-  terminalAgentContextContribution,
-  databaseAgentContextContribution,
-  dockerAgentContextContribution,
-  httpAgentContextContribution,
-]) agentContextRegistry.register(contribution)
-agentToolRendererRegistry.register(changesAgentToolRenderer)
-activateManagedAgentReferences()
-activateManagedAgentNotifications()
-activateManagedAgentNoticeTargets()
-for (const provider of clientIntegrationProviders) registerIntegrationProvider(provider)
-// Local sources (no integration row): docker and the API panel are always visible in the rail.
-sourceRegistry.register(dockerSourceContribution)
-sourceRegistry.register(httpSourceContribution)
-sourceRegistry.register(agentCenterSourceContribution)
-purgeStoredHttpDrafts()
-for (const page of settingsPageContributions) settingsRegistry.register(page)
-activatePreviewEvents()
 for (const kind of noticeKindContributions) noticeKindRegistry.register(kind)
-pollerRegistry.register(taskStatusPollerContribution)
-pollerRegistry.register(workflowTriggerPollerContribution)
-pollerRegistry.register(dockerTaskPollerContribution)
-taskSlotRegistry.register(dockerFooterSlotContribution)
-taskSlotRegistry.register(dockerRailSlotContribution)
-registerDockerArchiveConcern()
+for (const page of settingsPageContributions) settingsRegistry.register(page)
 for (const contribution of shellSlotContributions) uiSlotRegistry.register(contribution)
-for (const slice of persistedSliceContributions) persistedStateRegistry.register(slice)
+// Core's own persisted state: the shell slices (selection, layouts, drawer height, notices) plus the
+// direct preference slices. Which FEATURES persist state is each plugin's own declaration now, through
+// ctx.persistedState — the app no longer holds a list of four plugin slices it does not own.
+for (const slice of [...coreStateSlices, ...directPreferenceSlices]) persistedStateRegistry.register(slice)
+pollerRegistry.register(taskStatusPollerContribution)
 activateScopedStateEviction()
+
+// `disabled` is deliberately not passed: Settings → Plugins is Phase 4, and neither half of the host has
+// a populated list yet (apps/node/src/service/runtime.ts is in the same position). The mechanism is
+// where it has to be for that UI to be a list rather than a refactor.
+const activated = initClientPlugins(clientPlugins)
+if (activated.skipped.length) console.log(`[client:boot] plugins disabled: ${activated.skipped.join(', ')}`)

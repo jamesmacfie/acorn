@@ -7,8 +7,11 @@ reference discovery, and mutations. Model providers such as OpenAI and Anthropic
 text generation behind a server-only runtime.
 
 The implementation lives under `packages/node-core/src/server/integrations/`. Public cross-process types
-live in `packages/protocol/src/integrations.ts`; client source, pane, and link contributions live in
-`apps/desktop/src/app/client/providerContributions.tsx`.
+live in `packages/protocol/src/integrations.ts`; client source and pane contributions live in the
+provider's own plugin (`plugins/{linear,rollbar}/src/client/index.ts`), registered through
+`ClientPluginContext`. The plugin host asserts that a contribution's `providerId` is its own plugin's
+name — the check the deleted app-level `registerIntegrationProvider` used to make. In-app link
+recognisers stay in `plugins/github/src/client/contentLinks.ts`, which owns that registry.
 
 ## Connection, integration, and model registries
 

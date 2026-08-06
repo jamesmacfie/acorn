@@ -4,7 +4,7 @@ import { hydratePrFilter, prFilters, type PrFilter } from './filterState'
 
 // The PR list's own persisted-state descriptor: tab + text filter, per workspace. Owned here rather
 // than in core so core never has to know which features persist state (docs/plugins.md); registered
-// by the composition root in app/client/persistedSliceContributions.ts.
+// by this plugin's own ClientPlugin init (client/index.ts).
 const parsePrFilter = (raw: unknown): PrFilter => {
   const value = parseJson(raw)
   if (!value || typeof value !== 'object' || Array.isArray(value)) return { tab: 'open', filter: '' }

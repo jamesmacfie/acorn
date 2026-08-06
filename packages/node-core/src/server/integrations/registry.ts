@@ -1,10 +1,20 @@
 import type { IntegrationProviderContribution, ProviderRouteContribution } from './types'
 
+// A MODULE SINGLETON, like routeRegistry and unlike the capability registry, because a provider
+// contribution is a static descriptor rather than a per-boot object bound to a database handle. But it is
+// now written by plugin INIT rather than by a one-time side-effect import, and that changes one thing:
+// `startServiceRuntime` can run several times in one process (its own test does it four times), so a
+// second boot would hit the duplicate-id guards below and fail the whole boot. Hence `removePluginProviders`
+// — the exact counterpart of `removePluginRoutes`, called by the plugin host before each init.
+//
+// Owner is tracked rather than inferred from the id: a plugin may contribute several providers
+// (model-providers registers two), and the ids are not derived from the plugin name.
 class IntegrationProviderRegistry {
   readonly #providers = new Map<string, IntegrationProviderContribution>()
+  readonly #owners = new Map<string, string>() // providerId → owning plugin
   readonly #routes: ProviderRouteContribution[] = []
 
-  register(provider: IntegrationProviderContribution): void {
+  register(provider: IntegrationProviderContribution, owner?: string): void {
     if (this.#providers.has(provider.id)) throw new Error(`Duplicate integration provider '${provider.id}'.`)
     if (provider.capabilities.comments === 'write') {
       const mutation = provider.mutations?.find((item) => item.capability === 'comments')
@@ -26,6 +36,22 @@ class IntegrationProviderRegistry {
     }
     if (provider.codec && !provider.conformance) throw new Error(`Provider '${provider.id}' has a codec without conformance fixtures.`)
     this.#providers.set(provider.id, provider)
+    if (owner) this.#owners.set(provider.id, owner)
+  }
+
+  // Drop everything `plugin` contributed on a previous boot, providers and their routers alike. Routes go
+  // first: a route contribution is validated against a REGISTERED provider, so removing the provider first
+  // would leave a router referring to nothing.
+  removeForPlugin(plugin: string): void {
+    const ids = [...this.#owners.entries()].filter(([, owner]) => owner === plugin).map(([id]) => id)
+    if (!ids.length) return
+    for (let i = this.#routes.length - 1; i >= 0; i--) {
+      if (ids.includes(this.#routes[i]!.providerId)) this.#routes.splice(i, 1)
+    }
+    for (const id of ids) {
+      this.#providers.delete(id)
+      this.#owners.delete(id)
+    }
   }
 
   require(id: string): IntegrationProviderContribution {

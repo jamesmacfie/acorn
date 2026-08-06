@@ -3,7 +3,6 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { Hono } from 'hono'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
-import '../../src/server/providers'
 import '../../src/server/routes'
 import { nodePlugins } from '../../src/server/plugins'
 import { createApp } from '@acorn/node-core/server/index.ts'
@@ -123,6 +122,9 @@ const MOUNTED_PLUGIN_ROUTES: ReadonlyArray<readonly [method: string, path: strin
 describe('assembled routes', () => {
   // Converted plugins register their routes in init(), so the mount table is only complete after the
   // plugin host has run — the same order the composition root uses (routes before the listener binds).
+  // That now includes the PROVIDER routers (/v2/p/linear, /v2/p/rollbar): they used to arrive from a
+  // side-effect import of src/server/providers.ts, which is deleted. Nothing here registers a provider by
+  // hand, which is what makes this suite able to catch a provider plugin that stops contributing its own.
   let core: TestDb
   let dataDir: string
   let plugins: Awaited<ReturnType<typeof initPlugins>>
@@ -136,6 +138,8 @@ describe('assembled routes', () => {
         // provider child.
         agents: { internalEnv: () => ({}), currentUserId: () => null },
         memory: { currentUserId: () => null },
+        // Inert: this suite asserts the MOUNT TABLE, and preview contributes agent tools, not routes.
+        preview: { browser: {} as never },
         // terminal is `required`, so it initializes here whatever this test asks for. Its four
         // composition-root deps are inert stubs: this suite asserts the MOUNT TABLE, and nothing it
         // exercises spawns a pseudo-terminal.

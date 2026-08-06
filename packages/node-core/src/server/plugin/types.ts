@@ -11,6 +11,8 @@
 // package would add a manifest and nothing else. Recorded in docs/vNext/phase2-notes.md.
 import type { Hono } from 'hono'
 import type { CoreServices } from '../../main/core'
+import type { ConnectionProviderContribution, IntegrationProviderContribution } from '../integrations/types'
+import type { ModelProviderAdapter } from '../modelProviders/types'
 import type { AgentToolContribution } from '../agentTools/registry'
 import type { AppEnv } from '../middleware/auth'
 import type { CapabilityRegistry } from './capabilities'
@@ -39,10 +41,34 @@ export type PluginToolRegistry = {
   register(tool: AgentToolContribution): void
 }
 
+// Connection / integration / model providers, contributed by the plugin that implements them
+// (docs/vNext/plugins.md § Cross-plugin collaboration). This is what let apps/node/src/server/providers.ts
+// be deleted: a provider used to be registered by a side-effect import in the composition root, which
+// meant the app named every provider plugin and the registration happened once per PROCESS rather than
+// once per boot.
+//
+// `integration` deliberately registers into BOTH registries and mounts the router in one call, because
+// that triple was always performed together and getting it partly right is a broken provider: the
+// connection registry backs connect/rotate/test, the integration registry backs the mirrored resources,
+// and the route projection is validated against the integration entry. Splitting them into three
+// members would let a plugin register a provider whose routes 404 or whose credential cannot be rotated.
+export type PluginProviderRegistry = {
+  // `route` is the provider's own router, mounted at /v2/p/<provider.id> through
+  // buildIntegrationProviderRoutes(). It stays gated by `requireProviderAccess` inside that projection —
+  // this seam changes who declares the provider, not who may reach it.
+  integration(provider: IntegrationProviderContribution, route?: Hono<AppEnv>): void
+  // A provider that owns credentials but contributes no mirrored resources (the model providers).
+  connection(provider: ConnectionProviderContribution): void
+  // A text-generation adapter for an already-registered connection provider. Register the connection
+  // first; the registry refuses an adapter naming an unknown provider.
+  model(adapter: ModelProviderAdapter): void
+}
+
 export type NodePluginContext = {
   readonly name: string
   routes: PluginRouteRegistry
   tools: PluginToolRegistry
+  providers: PluginProviderRegistry
   capabilities: CapabilityRegistry
   // Path confinement, git, the process broker and use-scoped secrets (main/core/). A plugin consumes
   // core capability through this, rather than deep-importing whichever core module has the helper.

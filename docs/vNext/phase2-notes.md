@@ -17,9 +17,14 @@ plan.md names four. Honestly assessed:
 | the terminal scope-shed is complete | **done** |
 | boundary baseline shrinks to only the edges scheduled for phase 3 | **done** — the plugin→plugin ledger is 9 → 6, and every remaining entry is a Phase 3 client edge. The UI-kit extraction removed `changes -> github` and `database -> editor` (the two Phase 2 owned); the `notes.store` capability removed `memory -> notes`, which plugins.md had listed as Phase 3's. The remaining six are Phase 3's. The schema-import ratchet went 14 → 4. |
 
-So Phase 3 can start on the coupling map — its seven edges are exactly what is left — but "every plugin
-initializes through the plugin API" is not true yet, and the client half of the plugin host
-(`ClientPlugin`) does not exist at all.
+Both halves of the plugin host now exist. `ClientPlugin` mirrors `NodePlugin` deliberately — same
+`name`/`required`/`init(ctx)`/`disabled` vocabulary, ownership bound by the host, duplicate ids rejected
+— so there is one idiom to learn rather than two. `activate.ts` went 91 → 41 lines and is now core's own
+contributions plus one `initClientPlugins(clientPlugins)` call.
+
+Phase 3 can start on the coupling map. All six remaining edges are inside COMPONENT BODIES
+(`ContextPane` → notes/memory, `WorkflowsSettings` → agents), which registration ownership does not
+touch — that is precisely Phase 3's shape of work.
 
 ## What shipped
 
@@ -199,11 +204,19 @@ These are Phase 2 scope that has **not** landed. Do not assume any of it.
   site sends an idempotency key today** (`postJson` accepts one; nothing passes it), so declaring
   routes `required` would break create-PR, post-comment and send-agent-turn immediately. The route
   declaration and the client call sites have to land together.
-- **The shared UI kit and `ClientPlugin` (W8).** The diff viewer and Monaco setup are still in
-  `plugins/github` and `plugins/editor`, so the `changes -> github` and `database -> editor` boundary
-  edges remain. `apps/desktop/src/app/client/activate.ts` is unchanged, and contributions that belong
-  to plugins are still defined in the app (`taskPaneContributions.tsx` contains a whole `LinearTaskPane`;
-  `providerContributions.tsx` contains linear/rollbar promotion logic).
+- **Six plugins have no `ClientPlugin`, for two different reasons.** `model-providers`,
+  `profiles-aider`, `profiles-claude`, `profiles-codex` have no `client/` directory at all — nothing to
+  register. `memory` and `onboarding` have client code but nothing registrable: memory renders inside
+  context's pane (one of the six ledger edges), and `App.tsx` renders `OnboardingModal` against its own
+  first-run signal. Both need a shell change, which is Phase 3's coupling-table row 1, not a
+  registration change. A shell with an empty `init` would be ceremony.
+- **The shell still imports feature UI directly.** `App.tsx` names `PullList`, `PullDetail`,
+  `CreatePullForm`, `ComparePreview`, `DiffView`, `TerminalPanel`, `OnboardingModal`; `CommandPalette`
+  imports terminal recipes and the workflow client; `TaskView` imports terminal clients. That is
+  plugins.md's coupling table row 1 verbatim, and it is Phase 3's — the terminal has no pane and no
+  drawer slot to contribute into yet.
+- **Nothing populates `disabled`** on either half. Settings → Plugins is Phase 4; both hosts honour the
+  flag already, so that UI is a list rather than a refactor.
 
 ## Fixed after an adversarial review
 
@@ -377,6 +390,32 @@ matching local task in the same transaction as the mirror rows. Those are now tw
 gone. `CoreServices.tasks.adoptPullNumbers` runs after the batch, is idempotent (fills only a NULL
 `pullNumber`), and self-heals on the next refresh. Two tests pin that it never runs before the fetch and
 never overwrites an existing PR number.
+
+## The client half, and what it deliberately does not include
+
+plugins.md's `ClientPluginContext` names ten members. Nine registries carry real contributions and are
+on the context: `panes`, `sources`, `settingsPages`, `slots` + `taskSlots` (the doc's single `slots` name
+covers two registries with different props contracts), `agentContexts`, `agentToolRenderers`, `pollers`,
+`persistedState`.
+
+Six of the doc's names are **left out for having no consumer**, the same standard that got the
+`NodeEventBus` deleted in W1: `palette` (commands and keybindings register at component mount, which is
+correct — a pane's shortcuts should exist only while it is mounted), `contextSections` (no client
+registry exists; core's assembler is still one node-side slot), `attention` (Phase 4), `api` (plugins
+call client-core's typed fetchers directly), `events` (imported at mount, not init), and `desktop`
+(there is no `DesktopServices`; native residue goes through client-core's `window.acorn` accessors).
+
+Ownership is enforced differently from the node side, and the reason is worth recording: contribution
+ids **cannot** be namespaced, because `pr` / `notes` / `palette.files` are persisted layout keys and
+chord targets and ui.md says panes keep their ids. So the host binds `providerId` instead — a
+contribution naming a provider must name its own plugin. That reproduces the validation the deleted
+`registerIntegrationProvider` did for two plugins, and now covers all fourteen.
+
+Order is preserved by construction, not by luck: panes, settings pages and slots all SORT on an `order`
+field, so registration order cannot affect them, and every order number and chord moved verbatim.
+Sources are the one order-sensitive registry (`tabs/sources.ts` prepends GitHub and appends the registry
+unsorted), so an e2e assertion pins the rail order `['GitHub','Docker','API','Agents']` — verified
+non-vacuous by removing docker from the list and watching S1 fail.
 
 ## Known gaps worth stating plainly
 

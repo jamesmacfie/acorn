@@ -8,6 +8,9 @@
 import type { CoreServices } from '../../main/core'
 import { registerAgentTool, removeAgentTools } from '../agentTools/registry'
 import { registerRoute, removePluginRoutes } from '../routeRegistry'
+import { connectionProviderRegistry } from '../integrations/connectionRegistry'
+import { integrationProviderRegistry } from '../integrations/registry'
+import { modelProviderRegistry } from '../modelProviders/registry'
 import type { CapabilityRegistry } from './capabilities'
 import type { NodePlugin, NodePluginContext } from './types'
 
@@ -53,6 +56,13 @@ export async function initPlugins(plugins: readonly NodePlugin[], options: Plugi
     // duplicate name and fail the whole boot.
     removePluginRoutes(plugin.name)
     removeAgentTools(plugin.name)
+    // The provider registries are the same class of module singleton, and now written from init too. A
+    // second boot would otherwise hit their duplicate-id guards and fail the whole boot rather than
+    // silently serving stale contributions. Model adapters first: an adapter is validated against a
+    // registered connection provider, so removing the provider first would strand it.
+    modelProviderRegistry.removeForPlugin(plugin.name)
+    integrationProviderRegistry.removeForPlugin(plugin.name)
+    connectionProviderRegistry.removeForPlugin(plugin.name)
     const ctx: NodePluginContext = {
       name: plugin.name,
       routes: {
@@ -62,6 +72,17 @@ export async function initPlugins(plugins: readonly NodePlugin[], options: Plugi
       // The owner is bound here, not passed by the plugin: a plugin cannot contribute a tool under
       // another plugin's name, and cannot remove another plugin's tools.
       tools: { register: (tool) => registerAgentTool(plugin.name, tool) },
+      // Owner-bound like routes and tools: a plugin cannot contribute a provider under another plugin's
+      // name, and so cannot have its contributions cleared by another plugin's re-init.
+      providers: {
+        integration: (provider, route) => {
+          connectionProviderRegistry.register(provider, plugin.name)
+          integrationProviderRegistry.register(provider, plugin.name)
+          if (route) integrationProviderRegistry.registerRoute({ providerId: provider.id, prefix: '', router: route })
+        },
+        connection: (provider) => connectionProviderRegistry.register(provider, plugin.name),
+        model: (adapter) => modelProviderRegistry.register(adapter, plugin.name),
+      },
       capabilities: options.capabilities,
       core: options.core,
       log: {
