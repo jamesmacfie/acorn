@@ -295,6 +295,13 @@
       "when": 1785793523017,
       "tag": "0041_tiny_ezekiel_stane",
       "breakpoints": true
+    },
+    {
+      "idx": 42,
+      "version": "6",
+      "when": 1785994919121,
+      "tag": "0042_famous_christian_walker",
+      "breakpoints": true
     }
   ]
 }

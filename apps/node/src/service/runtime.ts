@@ -22,11 +22,12 @@ import { wireManagedAgents } from '../wiring/managedAgentsWiring'
 import { wireServerBridges } from '../wiring/serverBridges'
 import { wireAgentTools } from '../wiring/agentToolsWiring'
 import { wireContextSections } from '../wiring/contextSectionsWiring'
-import { registerWorkflowIpc } from '../wiring/workflowWiring'
+import { failingChecksFor } from '../wiring/workflowWiring'
 import { wireConfigTrust } from '../wiring/configTrustWiring'
 import { prepareSecurityState } from '../wiring/startupSecurity'
 import { MEMORY_KNOWLEDGE } from '@acorn/plugin-memory/main/knowledgeIpc.ts'
-import { TERMINAL_RUN_TARGETS } from '@acorn/plugin-terminal/contract/runTargets.ts'
+import { NOTES_STORE } from '@acorn/plugin-notes/contract/store.ts'
+import { WORKFLOWS_RUNNER } from '@acorn/plugin-workflows/main/workflowRunner.ts'
 import { configureTerminalMcp, reconcileTmux, refreshAcornMcpRegistrations } from '@acorn/plugin-terminal/main/terminal.ts'
 import { seedTaskNotes } from '@acorn/plugin-notes/main/seedTaskNotes.ts'
 import { previewRulesForTask } from '@acorn/plugin-preview/server/previewRules.ts'
@@ -238,6 +239,10 @@ export async function startServiceRuntime({ config, desktop, stateChanged }: Run
     // CALL time — which is also the only order that can work, since terminal's init runs inside
     // initPlugins and memory's may not have run yet when the deps below are constructed.
     const knowledgeAt = () => capabilities.require(MEMORY_KNOWLEDGE)
+    // plugins/notes' store, resolved the same way and for the same reason. It used to be reached as
+    // `knowledgeAt().notesStore`, because plugins/memory constructed it; notes owns it now and publishes
+    // it as `notes.store` from its contract/ (plugins/notes/src/contract/store.ts).
+    const notesAt = () => capabilities.require(NOTES_STORE)
     // Awaited before the listener binds: a plugin's init opens and migrates its own SQLite file, so a
     // request must not be able to arrive first (server/plugin/host.ts).
     const plugins = await initPlugins(
@@ -247,8 +252,19 @@ export async function startServiceRuntime({ config, desktop, stateChanged }: Run
           internalEnv,
           launchInjector: (taskId, sessionId) => knowledgeAt().launchInjector(taskId, sessionId),
           memoryReviewTrigger: (taskId, transcriptTail) => knowledgeAt().memoryReviewTrigger(taskId, transcriptTail),
-          seedTaskNotes: (task) => seedTaskNotes(db, knowledgeAt().notesStore, internalEnv({ scope: 'service' }), task),
+          // 'service' scope, deliberately: seeding calls the node's own loopback surface to read the PR
+          // mirror and the linked Linear tickets, so it must keep the reach a task-scoped child is denied.
+          seedTaskNotes: (task) => seedTaskNotes(core, notesAt(), internalEnv({ scope: 'service' }), task),
           reconciled,
+        },
+        workflows: {
+          internalEnv,
+          reconciled,
+          currentUserId: () => runtime.ACTIVE_IDENTITY.get(),
+          memoryReviewTrigger: (taskId, transcriptTail) => knowledgeAt().memoryReviewTrigger(taskId, transcriptTail),
+          // github's mirror tables, read here because github is not a NodePlugin — see
+          // wiring/workflowWiring.ts for why this is not a CoreServices member.
+          failingChecks: (taskId) => failingChecksFor(db, runtime.ACTIVE_IDENTITY.get(), taskId),
         },
       }),
       { capabilities, core },
@@ -256,32 +272,22 @@ export async function startServiceRuntime({ config, desktop, stateChanged }: Run
     disposePlugins = plugins.dispose
     if (plugins.skipped.length) console.log(`[service:boot] plugins disabled for this node: ${plugins.skipped.join(', ')}`)
 
-    // Both published by a plugin's init rather than constructed here. `require`, not `get`: memory and
-    // terminal are `required` plugins, so absence is a bug rather than a configuration.
+    // Published by a plugin's init rather than constructed here. `require`, not `get`: memory and notes
+    // are `required` plugins, so absence is a bug rather than a configuration.
     const knowledge = knowledgeAt()
-    const runTargets = capabilities.require(TERMINAL_RUN_TARGETS)
     wireConfigTrust(db)
-    wireContextSections({ db, notesStore: knowledge.notesStore, memory: knowledge })
-    // Only the tools no plugin can own yet: core's task/PR reads, notes (plugins/notes is not a
-    // NodePlugin) and the browser (plugins/preview runs in Electron main). changes, memory and terminal
-    // register their own inside initPlugins above — which is why this bag no longer holds the memory
-    // index, the proposal store or the run service.
-    wireAgentTools({ db, notesStore: knowledge.notesStore, browser: desktop.browser })
+    wireContextSections({ db, notesStore: notesAt(), memory: knowledge })
+    // Only the tools no plugin can own yet: core's task/PR reads and the browser (plugins/preview runs in
+    // Electron main). changes, memory, notes, terminal and workflows register their own inside initPlugins
+    // above — which is why this bag no longer holds the memory index, the proposal store, the run service
+    // or the notes store.
+    wireAgentTools({ db, browser: desktop.browser })
     managedAgents = wireManagedAgents({
       db,
       dataDir: config.dataDir,
       internalEnv,
       secrets: runtime.SECRETS,
       capabilities,
-      currentUserId: () => runtime.ACTIVE_IDENTITY.get(),
-      memoryReviewTrigger: knowledge.memoryReviewTrigger,
-    })
-    const workflowRunner = await registerWorkflowIpc(db, {
-      capabilities,
-      runtime: runTargets,
-      notesStore: knowledge.notesStore,
-      internalEnv,
-      reconciled,
       currentUserId: () => runtime.ACTIVE_IDENTITY.get(),
       memoryReviewTrigger: knowledge.memoryReviewTrigger,
     })
@@ -315,7 +321,11 @@ export async function startServiceRuntime({ config, desktop, stateChanged }: Run
         console.warn('[service:boot] reconcile worktrees failed:', error)
       }
       try {
-        await workflowRunner.reconcile()
+        // The workflows plugin builds the runner; the ordering stays the composition root's. It must run
+        // after the listener binds (a resumed step calls the node's own loopback context route) and before
+        // finishReconcile() below, because start/gate/cancel all await that promise so a run cannot be
+        // started into the sweep. `get`, not `require`: workflows is not a required plugin.
+        await capabilities.get(WORKFLOWS_RUNNER)?.reconcile()
         mark('reconcile.workflow')
       } catch (error) {
         console.warn('[service:boot] reconcile workflow failed:', error)

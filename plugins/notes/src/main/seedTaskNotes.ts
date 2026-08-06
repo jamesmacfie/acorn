@@ -4,11 +4,15 @@
 // ticket — each tagged with the task id so the context assembler scopes them to this task alone.
 // Best-effort and idempotent per task: a failure never blocks task/worktree setup, and a re-fire
 // no-ops once any note carries this task's id.
-import { eq } from 'drizzle-orm'
-import type { AppDatabase } from '@acorn/node-core/server/db/index.ts'
-import { schema } from '@acorn/node-core/server/db/index.ts'
-import type { NotesStore } from './notes'
+import type { CoreServices } from '@acorn/node-core/main/core/index.ts'
 import type { TaskRow } from '@acorn/node-core/main/taskWorktree.ts'
+import type { NotesStoreCapability } from '../contract/store'
+
+// The one core read this pass makes. It used to be `db.select().from(schema.taskLinks)` against core's
+// handle; `task_links` is a CORE table, so once each plugin owns its own SQLite file the read has to come
+// through the seam that resolves a plain task id (docs/vNext/data.md § Plugin DBs). Narrowed to `tasks`
+// so the signature says exactly which core surface note seeding touches.
+export type SeedCoreServices = Pick<CoreServices, 'tasks'>
 
 // The slices of the mirror composites we render into notes (bodies are sanitized bodyHTML / markdown).
 type PrComment = { author: string | null; body: string | null; createdAt: number | null }
@@ -61,7 +65,7 @@ async function fetchJson<T>(url: string, token: string): Promise<T | null> {
 
 // Seed the PR + ticket notes for a freshly created task. Silent no-op when there's no PR/links or
 // the task was already seeded.
-export async function seedTaskNotes(db: AppDatabase, notesStore: NotesStore, internalApiEnv: Record<string, string>, task: TaskRow): Promise<void> {
+export async function seedTaskNotes(core: SeedCoreServices, notesStore: NotesStoreCapability, internalApiEnv: Record<string, string>, task: TaskRow): Promise<void> {
   const base = internalApiEnv.ACORN_API_URL
   const token = internalApiEnv.ACORN_API_TOKEN ?? ''
   if (!base) return
@@ -86,7 +90,7 @@ export async function seedTaskNotes(db: AppDatabase, notesStore: NotesStore, int
     }
   }
 
-  const links = await db.select().from(schema.taskLinks).where(eq(schema.taskLinks.taskId, task.id))
+  const links = await core.tasks.links(task.id)
   for (const link of links.filter((l) => l.provider === 'linear')) {
     // refresh=1 forces a live refetch so the description is current at seed time.
     const issue = await fetchJson<LinearDetail>(linearIssueSeedUrl(base, link), token)

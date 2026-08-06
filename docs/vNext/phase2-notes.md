@@ -12,10 +12,10 @@ plan.md names four. Honestly assessed:
 
 | Exit criterion | State |
 | --- | --- |
-| every plugin initializes through the plugin API with its own DB | **partial** — seven of twelve table-owning plugins are through it (changes, database, memory, docker, editor, terminal, http); five are not (agents, github, linear, notes, rollbar, workflows — six names, five conversions, since linear/rollbar share a table) |
+| every plugin initializes through the plugin API with its own DB | **partial** — nine plugins are through it (changes, database, memory, docker, editor, terminal, http, notes, workflows). Four are not: agents, github, and linear/rollbar (which SHARE the `issues` table, so neither moves until that is decided) |
 | core services have direct unit/integration tests (confinement, env allowlists, kill trees, secret non-disclosure) | **done** — all four, plus the process-broker taxonomy |
 | the terminal scope-shed is complete | **done** |
-| boundary baseline shrinks to only the edges scheduled for phase 3 | **partly** — the plugin→plugin ledger is 9 → 7: the UI-kit extraction removed `changes -> github` and `database -> editor`, which were the two Phase 2 owned. The remaining seven are Phase 3's by plan. The schema-import ratchet went 14 → 6. |
+| boundary baseline shrinks to only the edges scheduled for phase 3 | **partly** — the plugin→plugin ledger is 9 → 6. The UI-kit extraction removed `changes -> github` and `database -> editor` (the two Phase 2 owned); the `notes.store` capability removed `memory -> notes`, which plugins.md had listed as Phase 3's. The remaining six are Phase 3's. The schema-import ratchet went 14 → 4. |
 
 So Phase 3 can start on the coupling map — its seven edges are exactly what is left — but "every plugin
 initializes through the plugin API" is not true yet, and the client half of the plugin host
@@ -157,14 +157,15 @@ an existing root opening.
 
 These are Phase 2 scope that has **not** landed. Do not assume any of it.
 
-- **Five plugin conversions.** Converted: `changes`, `database`, `memory`, `terminal`, `http` (own
-  schema + own chain + own SQLite file) and `docker`, `editor` (no tables, so a NodePlugin and no
-  database — the honest outcome, not a gap). Outstanding: `agents` (ten tables and the only real
-  cross-DB joins), `github` (twelve mirror tables, and core's `contextSections.ts`/`storageFootprint.ts`
-  read them), `linear` + `rollbar` (they SHARE the `issues` table, which needs a decision before either
-  can move), `workflows` (its runner re-derives CI state from github's `repos`/`checks`), and `notes`
-  (owns nothing but is consumed through a plugin→plugin import that Phase 3 resolves). The
-  schema-import ratchet records the remaining six packages, so progress is measurable and cannot regress.
+- **Three plugin conversions.** Converted with their own schema, chain and SQLite file: `changes`,
+  `database`, `memory`, `terminal`, `http`, `workflows`. Converted with no database because they own no
+  tables — the honest outcome, not a gap: `docker`, `editor`, `notes` (notes are markdown files with a
+  frontmatter block under `<data-root>/notes/`, so there is nothing to migrate and deliberately no
+  `dispose`). Outstanding: `agents` (ten tables and the only real cross-DB joins in the codebase),
+  `github` (twelve mirror tables, and core's `contextSections.ts`/`storageFootprint.ts` read them), and
+  `linear` + `rollbar`, which SHARE the `issues` table — that shared ownership needs deciding before
+  either can move, and it is the reason they are last rather than a matter of effort. The schema-import
+  ratchet records the remaining four packages, so progress is measurable and cannot regress.
 - **The cross-boundary reads that block the hard three.** Still outstanding: core's
   `agentTools/contextSections.ts` reads github's `repos`/`pull_requests`/`pr_files` and linear/rollbar's
   `issues`; `main/storageFootprint.ts` counts rows in four plugin tables; `routes/pins.ts` owns
@@ -183,10 +184,9 @@ These are Phase 2 scope that has **not** landed. Do not assume any of it.
   that own them — `local_*`/`git_log` to changes, `memory_*` to memory, `run_*` to terminal. Sixteen
   remain in `apps/node/src/wiring/agentToolsWiring.ts` (437 → 246 lines), each with a real blocker:
   `task_*`/`pr_*`/`linked_issues`/`repo_info` are **core's own** and have no plugin to move to;
-  `notes_*` needs notes converted AND a workspace-id seam on `CoreServices` (the `NotesStore` instance
-  is constructed by memory's knowledge runtime); `browser_*` needs `plugins/preview` to have a
-  node-side part at all — today it is Electron-main only, so moving them is a process-boundary change,
-  not a tool move.
+  `browser_*` needs `plugins/preview` to have a node-side part at all — today it is Electron-main only,
+  so moving them is a process-boundary change, not a tool move. The `notes_*` blocker is closed: notes
+  owns its tools now.
 - **Per-endpoint `Idempotency-Key` (the other half of phase1-notes' second item).** `RouteContribution`
   still carries no idempotency declaration. This was deliberately not half-landed: **no client call
   site sends an idempotency key today** (`postJson` accepts one; nothing passes it), so declaring
@@ -273,6 +273,11 @@ queries its own rows before the listener binds. The packaged path was already pl
 why packaging was correct and the unpackaged build was not. Fixed by checking the plugin-scoped
 candidate first at every level, pinned by `pluginMigrations.test.ts`.
 
+**`dev:node` now serves workflow routes too.** `standalone.ts` never called `registerWorkflowIpc`, so
+every workflow route answered a flat 503. The shared plugin list means it runs the engine now, with a
+`workflows.runner` reconcile pass before `reconciled` resolves — the sweep-ordering invariant has to hold
+there as much as in the supervised root, because reconcile moves every `running` step back to `pending`.
+
 **The standalone node's agent-tool surface changed.** `standalone.ts` never called `wireAgentTools`, so
 `dev:node` answered a flat 503 for every tool. Now that changes/memory/terminal register their own in
 `init`, it serves those twelve and 404s the rest. Consistent with the terminal change below, but it is a
@@ -289,6 +294,29 @@ phase1-notes.md described for a standalone node is **gone**. `standalone.ts` get
 supervised root plus a `reconcileTmux()` pass before `reconciled` resolves — without that, archive's
 running-session guard would pass vacuously against an empty session map, which is the exact hazard
 `TaskSessionsBridge.ready()` exists to prevent.
+
+## The notes/memory split, and why it was the real work
+
+plugins.md lists `memory -> notes` under Phase 3 ("notes owns its storage; memory consumes `notes.read`
+capability"). It came out in Phase 2 instead, because the entanglement was not an import — it was that
+the `NotesStore` INSTANCE was constructed by memory's `registerKnowledgeIpc`, and one shared instance
+served the notes pane, the `notes_*` agent tools and core's context assembler.
+
+Notes' `init` now builds the one instance and publishes it as `notes.store`
+(`plugins/notes/src/contract/store.ts`). Named `store`, not plugins.md's `read`: three of the five
+consumers write, so a read-only id would have left the write path exactly where it was — in an app-layer
+dep bag. Memory resolves it through a thunk per call rather than caching at init, because plugin init
+order is undefined and caching could capture `undefined`.
+
+Two things this did NOT finish, both stated rather than glossed:
+
+- **The notes HTTP routes still answer under memory's namespace** (`/v2/p/memory/tasks/:id/notes`,
+  `/workspaces/:wsId/notes`), with memory's `KnowledgeBridge` now a pass-through onto the capability.
+  Moving them to `/v2/p/notes/*` changes `api.ts`'s route builders, the client and the mount table — a
+  wire-surface change. It is the one thing left between this and memory not depending on notes at all.
+- **`contextSectionsWiring.ts` still fills one slot with both seams at once**
+  (`setContextSections(buildContextSections({ notes, memory }))`). That is core's side, not a plugin's:
+  until context sections become a per-section contribution point, neither plugin can fill its own half.
 
 ## Known gaps worth stating plainly
 

@@ -11,7 +11,9 @@ import { dockerPlugin } from '@acorn/plugin-docker/node/index.ts'
 import { editorPlugin } from '@acorn/plugin-editor/node/index.ts'
 import { httpPlugin } from '@acorn/plugin-http/node/index.ts'
 import { memoryPlugin, type MemoryPluginDeps } from '@acorn/plugin-memory/node/index.ts'
+import { notesPlugin } from '@acorn/plugin-notes/node/index.ts'
 import { terminalPlugin, type TerminalPluginDeps } from '@acorn/plugin-terminal/node/index.ts'
+import { workflowsPlugin, type WorkflowsPluginDeps } from '@acorn/plugin-workflows/node/index.ts'
 
 // What a converted plugin cannot resolve for itself yet. Keeping them in one narrow bag is what makes
 // it obvious when each seam closes — memory's bag lost `sendToAgent` the moment terminal became a
@@ -26,10 +28,19 @@ import { terminalPlugin, type TerminalPluginDeps } from '@acorn/plugin-terminal/
 //     contract/ (its value includes two internal stores), so terminal importing it would ADD a
 //     plugin→plugin coupling edge. The composition root resolves the capability at CALL time instead,
 //     which is why these arrive as thunks rather than as the resolved functions.
-//   - terminal.reconciled — the composition root's own post-listener reconcile pass.
+//   - terminal.reconciled / workflows.reconciled — the composition root's own post-listener reconcile
+//     pass.
+//   - workflows.failingChecks — re-derives CI state from github's `repos`/`checks` mirror tables. github
+//     is not a NodePlugin, so there is no `github.checkState` capability to resolve. Left in
+//     wiring/workflowWiring.ts rather than moved to CoreServices, because it is github's question, not
+//     core's, and putting it on CoreServices now would mean moving it again when github converts.
+//
+// plugins/notes takes NO deps: it owns its note files outright and everything it reads about a task
+// arrives through CoreServices.
 export type NodePluginDeps = {
   memory: MemoryPluginDeps
   terminal: TerminalPluginDeps
+  workflows: WorkflowsPluginDeps
 }
 
 // `dataDir` is threaded in because a plugin's SQLite file lives under the node's data root, and only
@@ -42,5 +53,7 @@ export const nodePlugins = (dataDir: string, deps: NodePluginDeps): NodePlugin[]
   editorPlugin(),
   httpPlugin(dataDir),
   memoryPlugin(dataDir, deps.memory),
+  notesPlugin(dataDir),
   terminalPlugin(dataDir, deps.terminal),
+  workflowsPlugin(dataDir, deps.workflows),
 ]

@@ -2,12 +2,20 @@ import { buildContextSections, setContextSections } from '@acorn/node-core/serve
 import type { AppDatabase } from '@acorn/node-core/server/db/index.ts'
 import type { NoteAuthor, NoteLocation, NoteScope } from '@acorn/protocol/notes.ts'
 import type { MemoryIndex } from '@acorn/plugin-memory/main/knowledgeIpc.ts'
-import type { NotesStore } from '@acorn/plugin-notes/main/notes.ts'
+import type { NotesStoreCapability } from '@acorn/plugin-notes/contract/store.ts'
 import { loadTask, workspaceIdForRepo } from '@acorn/node-core/main/taskWorktree.ts'
 
+// Still an app-layer wiring call, and the blocker is core's side of the seam, not the plugins': core
+// exposes ONE `setContextSections(buildContextSections({ notes, memory }))` slot that has to be filled
+// with both seams at once (server/agentTools/contextSections.ts). Until that becomes a per-section
+// contribution point a plugin can register into, neither notes nor memory can fill its own half, and the
+// composition root is the only place that may hold both plugins' surfaces.
 export type ContextSectionsDeps = {
   db: AppDatabase
-  notesStore: NotesStore
+  // plugins/notes' store (its `notes.store` capability). The app resolves it from the registry after the
+  // plugin host has run, rather than constructing one: two instances over the same directory would be
+  // two independent atomic-write schemes racing on one set of files.
+  notesStore: NotesStoreCapability
   // The memory index reads, bound to the memory plugin's own SQLite file (its `memory.knowledge`
   // capability). The app cannot query that database itself — it has no handle to it.
   memory: MemoryIndex

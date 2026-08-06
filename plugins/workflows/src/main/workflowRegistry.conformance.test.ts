@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { makeTestDb } from '@acorn/node-core/server/routes/testDb.ts'
+import { makeTestPluginDb } from '@acorn/node-core/server/routes/testDb.ts'
+import { migrationsDir } from '../node/migrations'
 import { WorkflowRunner, type RunnerDeps } from './workflowRunner'
 
 const deps: RunnerDeps = {
@@ -13,7 +14,8 @@ const deps: RunnerDeps = {
 
 describe('workflow registry conformance', () => {
   it('every registered step kind has a handler and its descriptor validation is projected', () => {
-    const testDb = makeTestDb()
+    // This plugin's OWN migrated SQLite file, not core's: the runner cannot see core's tables any more.
+    const testDb = makeTestPluginDb('workflows', migrationsDir())
     try {
       const runner = new WorkflowRunner(testDb.db, deps)
       for (const [id, descriptor] of runner.contributions.stepKinds.entries()) {

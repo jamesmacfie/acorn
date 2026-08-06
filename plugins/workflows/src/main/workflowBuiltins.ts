@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto'
-import type { AppDatabase } from '@acorn/node-core/server/db/index.ts'
-import { schema } from '@acorn/node-core/server/db/index.ts'
+import type { PluginDatabase } from '@acorn/node-core/main/pluginStorage.ts'
+import * as schema from '../node/schema'
 import type { HeadlessResult } from '@acorn/node-core/main/headless.ts'
 import { DEFAULT_PROFILE_ID } from '@acorn/node-core/main/agentProfiles/index.ts'
 import type { StepHandler, StepHandlerContext, StepHandlerOutcome, StepValidator, WorkflowStepDef, WorkflowStepRow } from './workflowContracts'
@@ -43,7 +43,7 @@ export const BUILTIN_STEP_VALIDATORS: Partial<Record<(typeof BUILTIN_STEP_KINDS)
 }
 
 type BuiltinServices = {
-  db: AppDatabase
+  db: PluginDatabase
   deps: RunnerDeps
   runHeadless(taskId: string, def: WorkflowStepDef, opts: RunStepOptions, ctx: StepHandlerContext): Promise<HeadlessResult>
   setStep(stepId: string, patch: Partial<WorkflowStepRow>): Promise<void>

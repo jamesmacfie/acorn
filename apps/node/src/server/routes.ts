@@ -18,7 +18,6 @@ import { pullsBatch } from '@acorn/plugin-github/server/routes/pullsBatch.ts'
 import { mentions } from '@acorn/plugin-github/server/routes/mentions.ts'
 import { repos } from '@acorn/plugin-github/server/routes/repos.ts'
 import { repoLabels } from '@acorn/plugin-github/server/routes/repoLabels.ts'
-import { workflow } from '@acorn/plugin-workflows/server/routes/workflow.ts'
 
 // Plugins converted to a NodePlugin register their OWN routes in init() and are absent from this
 // file — see apps/node/src/server/plugins.ts for the list. This module is the remaining
@@ -29,18 +28,15 @@ import { workflow } from '@acorn/plugin-workflows/server/routes/workflow.ts'
 // encoded in a URL: /api/tasks/:id/* was one flat table shared by core and six plugins, and the
 // split below is what lets a node enable or disable a plugin's whole route surface at once.
 //
-// Deliberate segment doubling: one router left here states its own top-level segment internally
-// (workflow's `/workflows/runs/...`), so under its namespace it repeats —
-// /v2/p/workflows/workflows/runs/:runId. Converted plugins double the same way from their own init
-// (memory's `/memory`). Rewriting those internal paths is the route-declaration phase's job, not this
-// reshape's; terminal's was de-doubled when it converted.
+// Deliberate segment doubling: a router that states its own top-level segment internally repeats it
+// under its namespace. None is left in this file — workflows' `/workflows/runs/...` moved with the
+// plugin — but converted plugins double the same way from their own init (memory's `/memory`,
+// workflows'). Rewriting those internal paths is the route-declaration phase's job, not this reshape's;
+// terminal's was de-doubled when it converted.
 
 // /v2/p/agents/* — account-scoped local provider usage
 registerRoute({ plugin: 'agents', prefix: '', router: agentUsage })
 registerRoute({ plugin: 'agents', prefix: '', router: managedAgents })
-
-// Namespace-root router: owns a mix of task-scoped and top-level paths (see the doubling note)
-registerRoute({ plugin: 'workflows', prefix: '', router: workflow, note: 'workflow control' })
 
 // /v2/p/github/repos/* — the GitHub mirror; device-flow connect sits beside it at /auth/*
 registerRoute({ plugin: 'github', prefix: '/repos', router: repos })

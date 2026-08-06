@@ -4,10 +4,11 @@
 // to the KnowledgeBridge (server/routes/knowledge.ts).
 //
 // Called from the plugin's init (node/index.ts), not from the app: what it returns is published as the
-// `memory.knowledge` capability (contract/knowledge.ts) for the consumers that used to be handed it by
-// the composition root. Its two database arguments say the whole story of the split — the DERIVED index
-// is this plugin's own SQLite file, and everything it needs from core's tables (the task set, the
-// checkout list, the injection pref, the context assembler) arrives as CoreServices.
+// `memory.knowledge` capability for the consumers that used to be handed it by the composition root. Its
+// arguments say the whole story of the split — the DERIVED index is this plugin's own SQLite file,
+// everything it needs from core's tables (the task set, the checkout list, the injection pref, the
+// context assembler) arrives as CoreServices, and the note files it no longer owns arrive as another
+// plugin's capability.
 import { gitOrThrow } from '@acorn/node-core/main/core/git.ts'
 import { existsSync } from 'node:fs'
 import { homedir } from 'node:os'
@@ -19,7 +20,8 @@ import { buildHeadlessArgv, runHeadless } from '@acorn/node-core/main/headless.t
 import { formatMemoryInjection, getMemory, listMemories, memoryIndexSlice, memorySources, MEMORY_TYPES, reconcileMemories, searchMemories, writeMemoryFile, type MemoryType } from './memory'
 import { acceptProposal, generateMemoryProposals, rejectProposal } from './memoryGen'
 import { MemoryProposalStore } from './memoryProposals'
-import { NotesStore, type NoteKind } from '@acorn/plugin-notes/main/notes.ts'
+import type { NotesStoreCapability } from '@acorn/plugin-notes/contract/store.ts'
+import type { NoteKind } from '@acorn/protocol/notes.ts'
 import { broadcastWorkflowNotice } from '@acorn/node-core/main/notify.ts'
 import { listProfileDefs, profileAvailable, resolveCommand, type ProfileDef } from '@acorn/node-core/main/profiles.ts'
 import { isDir } from '@acorn/node-core/main/taskWorktree.ts'
@@ -32,6 +34,16 @@ export type KnowledgeDeps = {
   // Queue a text block into an agent session on its idle edge (agentSender in terminal.ts).
   sendToAgent(sessionId: string, text: string, submit: 'after-ready'): void
   currentUserId(): string | null
+  // plugins/notes' store (its `notes.store` capability). A THUNK, not the value: capabilities resolve at
+  // call time because plugin init order is undefined, and this plugin's init runs before it can know
+  // whether notes' has. It throws when notes is absent — notes is a `required` plugin, so absence is a
+  // boot bug rather than a configuration, and the notes half of the pane has no degraded mode worth
+  // serving (an empty note list looks like data loss).
+  //
+  // This replaces `new NotesStore(join(dataRoot, 'notes'))`, which is why the store used to be reachable
+  // as `memory.knowledge.notesStore`: one instance had to exist somewhere, and memory happened to be the
+  // plugin that got converted first.
+  notes(): NotesStoreCapability
 }
 
 // Four core reads, each replacing a `db.select()` this file used to make against a core table:
@@ -55,9 +67,11 @@ export type MemoryIndex = {
 }
 
 export type MemoryKnowledge = MemoryIndex & {
-  // Workspace/task notes. Owned by plugins/notes and constructed here because the human-facing pane, the
-  // agent tools and the context assembler must all read ONE store (docs/notes-and-memory.md).
-  notesStore: NotesStore
+  // `notesStore` used to be here, and its absence is the point of this batch: notes is a NodePlugin now
+  // and publishes its own store as `notes.store`, so the four consumers that used to reach it through
+  // THIS capability resolve it from the registry directly (docs/vNext/plugins.md § Cross-plugin
+  // collaboration). Memory is one of those consumers, not the owner.
+  //
   // The human gate's pending proposals, on disk under the data root.
   proposals: MemoryProposalStore
   // Push the combined launch block (task context + repo memory) into a fresh agent session
@@ -72,13 +86,14 @@ export type MemoryKnowledge = MemoryIndex & {
 //
 // Deliberately NOT in a `contract/` entrypoint, unlike agents.sessionExecute. A contract carries types
 // and ids only and may not name the plugin's internals (tools/arch/boundaries.test.ts), and this
-// capability's value legitimately INCLUDES two internal stores. It is also not a cross-plugin surface:
-// the only consumer is apps/node's composition root, which may import a plugin's internals by design.
+// capability's value still exposes one — the proposal store. It is also not a cross-plugin surface: the
+// only consumer is apps/node's composition root, which may import a plugin's internals by design.
 //
-// W6 moved the memory tool definitions into this plugin (main/agentTools.ts), which removed one consumer
-// but not the reason this stays out of contract/: the remaining consumers are still the composition root
-// (contextSectionsWiring, managedAgentsWiring, workflowWiring) rather than another plugin, and the value
-// still includes two internal stores. Nothing to promote until those move.
+// W6 moved the memory tool definitions into this plugin (main/agentTools.ts) and the notes conversion
+// removed `notesStore` from the value, so it is down from two internal stores to one. Two consumers are
+// left, both the composition root (contextSectionsWiring, managedAgentsWiring) plus one thunk each for
+// terminal and workflows. Nothing to promote until those move, and the cost of promoting it is a real
+// coupling: an id in contract/ is importable by every plugin, which is what makes it worth withholding.
 export const MEMORY_KNOWLEDGE = capabilityId<MemoryKnowledge>('memory.knowledge')
 
 // The headless profile the memory-review pass runs on: the FIRST installed agent profile with a
@@ -91,9 +106,6 @@ export function memoryReviewProfile(): ProfileDef | null {
 }
 
 export function registerKnowledgeIpc(db: PluginDatabase, dataRoot: string, core: KnowledgeCoreServices, deps: KnowledgeDeps): MemoryKnowledge {
-  // Workspace notes (docs/notes-and-memory.md): files under <dataDir>/notes/<workspaceId>/, beside the
-  // worktrees dir. ONE store — the UI reads it here; the MCP notes_* tools reuse it (harness).
-  const notesStore = new NotesStore(join(dataRoot, 'notes'))
   const proposals = new MemoryProposalStore(join(dataRoot, 'memory-proposals'))
 
   const guard = async <T>(fn: () => Promise<T>): Promise<T | { error: string }> => {
@@ -256,27 +268,33 @@ export function registerKnowledgeIpc(db: PluginDatabase, dataRoot: string, core:
       return acceptProposal(proposals, proposal.id, t?.worktreePath ?? null, reconciled, edited as { name: string; type: MemoryType; description: string; body: string } | undefined)
     },
     // --- notes ---
-    notesList: (location) => guard(() => notesStore.list(location)),
-    notesRead: (location, slug) => guard(() => notesStore.read(location, slug)),
-    notesCreate: (location, title, kind) => guard(() => notesStore.create(location, title, { kind: kind as NoteKind | undefined })),
+    //
+    // Delegated to plugins/notes' `notes.store` capability, resolved per call. These routes stay in THIS
+    // plugin's namespace (/v2/p/memory/tasks/:id/notes) even though the data is notes'. Moving them to
+    // /v2/p/notes/* would be the tidier mount, but it is a change to the wire surface — api.ts's route
+    // builders, the notes client, the mount table — and this batch's job was the storage ownership, not
+    // the URL. Recorded as an outstanding item rather than half-done.
+    notesList: (location) => guard(() => deps.notes().list(location)),
+    notesRead: (location, slug) => guard(() => deps.notes().read(location, slug)),
+    notesCreate: (location, title, kind) => guard(() => deps.notes().create(location, title, { kind: kind as NoteKind | undefined })),
     notesWrite: (location, slug, body) =>
       guard(async () => {
-        await notesStore.write(location, slug, body)
+        await deps.notes().write(location, slug, body)
         return { ok: true }
       }),
     notesSetIncluded: (location, slug, included) =>
       guard(async () => {
-        await notesStore.setIncluded(location, slug, included)
+        await deps.notes().setIncluded(location, slug, included)
         return { ok: true }
       }),
     notesSetTitle: (location, slug, title) =>
       guard(async () => {
-        await notesStore.setTitle(location, slug, title)
+        await deps.notes().setTitle(location, slug, title)
         return { ok: true }
       }),
     notesRemove: (location, slug) =>
       guard(async () => {
-        await notesStore.remove(location, slug)
+        await deps.notes().remove(location, slug)
         return { ok: true }
       }),
   })
@@ -284,7 +302,6 @@ export function registerKnowledgeIpc(db: PluginDatabase, dataRoot: string, core:
   // Published as `memory.knowledge`. The four index reads are bound to THIS plugin's database, which
   // is what lets the agent-tool and context-section wiring keep working without a handle to it.
   return {
-    notesStore,
     proposals,
     reconciled,
     launchInjector,

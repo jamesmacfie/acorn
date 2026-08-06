@@ -21,9 +21,12 @@ import { CapabilityRegistry } from '@acorn/node-core/server/plugin/capabilities.
 import { initPlugins } from '@acorn/node-core/server/plugin/host.ts'
 import { setWorktreesRoot } from '@acorn/node-core/main/taskWorktree.ts'
 import { MEMORY_KNOWLEDGE } from '@acorn/plugin-memory/main/knowledgeIpc.ts'
+import { NOTES_STORE } from '@acorn/plugin-notes/contract/store.ts'
 import { seedTaskNotes } from '@acorn/plugin-notes/main/seedTaskNotes.ts'
 import { reconcileTmux } from '@acorn/plugin-terminal/main/terminal.ts'
+import { WORKFLOWS_RUNNER } from '@acorn/plugin-workflows/main/workflowRunner.ts'
 import { nodePlugins } from './plugins'
+import { failingChecksFor } from '../wiring/workflowWiring'
 import { wireServerBridges } from '../wiring/serverBridges'
 import { prepareSecurityState } from '../wiring/startupSecurity'
 
@@ -58,6 +61,8 @@ const capabilities = new CapabilityRegistry()
 // Resolved at CALL time, never here: `memory.knowledge` is published by memory's init, which has not run
 // when this object is built, and terminal may not import it (see service/runtime.ts).
 const knowledgeAt = () => capabilities.require(MEMORY_KNOWLEDGE)
+const notesAt = () => capabilities.require(NOTES_STORE)
+const core = createCoreServices({ secrets: runtime.SECRETS, db: runtime.DB })
 
 // Converted plugins register their own routes and open their own SQLite files here. A standalone node
 // runs the SAME list as the supervised one — the difference is only which engine bridges get filled,
@@ -69,11 +74,22 @@ await initPlugins(
       internalEnv,
       launchInjector: (taskId, sessionId) => knowledgeAt().launchInjector(taskId, sessionId),
       memoryReviewTrigger: (taskId, transcriptTail) => knowledgeAt().memoryReviewTrigger(taskId, transcriptTail),
-      seedTaskNotes: (task) => seedTaskNotes(runtime.DB, knowledgeAt().notesStore, internalEnv({ scope: 'service' }), task),
+      seedTaskNotes: (task) => seedTaskNotes(core, notesAt(), internalEnv({ scope: 'service' }), task),
       reconciled,
     },
+    // A standalone node now runs the workflow engine too, which is a BEHAVIOUR CHANGE: this entry never
+    // called registerWorkflowIpc, so `dev:node` answered a flat 503 for every workflow route. It serves
+    // them now, on the same terms as the supervised root — including the github-mirror CI read, which the
+    // app supplies because github is not a NodePlugin.
+    workflows: {
+      internalEnv,
+      reconciled,
+      currentUserId: () => runtime.ACTIVE_IDENTITY.get(),
+      memoryReviewTrigger: (taskId, transcriptTail) => knowledgeAt().memoryReviewTrigger(taskId, transcriptTail),
+      failingChecks: (taskId) => failingChecksFor(runtime.DB, runtime.ACTIVE_IDENTITY.get(), taskId),
+    },
   }),
-  { capabilities, core: createCoreServices({ secrets: runtime.SECRETS, db: runtime.DB }) },
+  { capabilities, core },
 )
 
 // Awaited, not fire-and-forget: there is nothing to hand back until the listener has bound, and a
@@ -89,6 +105,13 @@ try {
   await reconcileTmux()
 } catch (error) {
   console.warn('[node] tmux reconcile failed:', error)
+}
+// Before finishReconcile(), like the supervised root: the sweep re-queues every 'running' step, and
+// start/gate/cancel await that promise precisely so a run cannot be started into it.
+try {
+  await capabilities.get(WORKFLOWS_RUNNER)?.reconcile()
+} catch (error) {
+  console.warn('[node] workflow reconcile failed:', error)
 } finally {
   finishReconcile()
 }

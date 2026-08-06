@@ -293,16 +293,15 @@ describe('architecture boundaries', () => {
     // the rule therefore reads "no db-module import at all", type-only included. That is the stricter
     // and more useful reading — a plugin holding core's AppDatabase is exactly the coupling the split
     // removes — so it is left as is rather than loosened to match the comment.
-    // 'changes', 'database', 'docker', 'editor', 'http', 'memory' and 'terminal' are off this list: each
-    // owns its own schema (or no tables at all) and takes CoreServices instead of core's database. Six
-    // to go.
+    // 'changes', 'database', 'docker', 'editor', 'http', 'memory', 'notes', 'terminal' and 'workflows'
+    // are off this list: each owns its own schema (or, for docker/editor/notes, no tables at all) and
+    // takes CoreServices instead of core's database. Four to go — and 'linear'/'rollbar' are one
+    // decision, because they SHARE the `issues` table.
     const SCHEMA_BASELINE = [
       'agents',
       'github',
       'linear',
-      'notes',
       'rollbar',
-      'workflows',
     ]
     // Any import FROM core's db module that is not exclusively type-only. The first version matched only
     // `{ schema }` / `* as schema`, so `import * as db from '.../db/index.ts'` + `db.schema.tasks`, or
@@ -344,12 +343,19 @@ describe('architecture boundaries', () => {
     // 'changes -> github' and 'database -> editor' are off this list: the shared UI kit landed
     // (packages/client-core/src/ui/diff/* and ui/monacoSetup.ts), so both consumers now import
     // rendering code from client-core instead of another plugin's client/ internals.
+    //
+    // 'memory -> notes' is off it too, and by the mechanism this ledger exists to reward rather than by a
+    // move: notes is a NodePlugin that publishes its store as `notes.store` from its contract/, so memory
+    // imports a capability id and a signature instead of the NotesStore class it used to CONSTRUCT.
+    //
+    // '@acorn/plugin-context -> @acorn/plugin-notes' survives as a CLIENT edge (ContextPane imports
+    // notesClient's requestNoteOpen) and '@acorn/plugin-workflows -> @acorn/plugin-agents' as another
+    // (WorkflowsSettings.tsx). Both are Phase 3's, with ClientPlugin.
     const BASELINE = [
       '@acorn/plugin-agents -> @acorn/plugin-terminal',
       '@acorn/plugin-context -> @acorn/plugin-memory',
       '@acorn/plugin-context -> @acorn/plugin-notes',
       '@acorn/plugin-github -> @acorn/plugin-linear',
-      '@acorn/plugin-memory -> @acorn/plugin-notes',
       '@acorn/plugin-preview -> @acorn/plugin-terminal',
       '@acorn/plugin-workflows -> @acorn/plugin-agents',
     ]

@@ -1,4 +1,7 @@
-import type { schema } from '@acorn/node-core/server/db/index.ts'
+// The two row types come from THIS plugin's schema now (node/schema.ts), not core's. `$inferSelect`
+// against the local tables is what keeps every handler, the bridge and the client's row shape in step
+// with one migration chain.
+import type * as schema from '../node/schema'
 import type { ToolCeiling, ToolRisk } from '@acorn/protocol/workflow.ts'
 
 export type WorkflowPosture = 'gated' | 'autonomous'
