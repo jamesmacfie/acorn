@@ -164,7 +164,7 @@ commands remain ordinary trust-gated run targets.
 
 Security-relevant source:
 `apps/desktop/src/app/main/{serviceHost,desktopCapabilities,appScheme,nodeBroker,preload,sessionKeyStore}.ts`,
-`apps/node/src/wiring/startupSecurity.ts`, `apps/node/src/service/runtime.ts`,
+`apps/node/src/service/runtime.ts`,
 `@acorn/protocol/{serviceProtocol,desktopCapabilities}.ts`,
 `@acorn/node-core/main/{server,tls,dataRoot,bindings}.ts`,
 `@acorn/node-core/main/repoConfigTrust.ts`, `@acorn/node-core/main/urlGuards.ts`,

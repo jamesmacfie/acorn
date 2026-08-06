@@ -48,9 +48,9 @@ an edge requires removing its baseline entry.
 | Notices, themes, styles | `@acorn/client-core/registries/` | core-owned; no plugin contributes one, so they are not on `ClientPluginContext` |
 | HTTP routes (internal) | `@acorn/node-core/server/routeRegistry.ts` | `app/server/routes.ts` |
 | Public API endpoints | `@acorn/node-core/server/publicApi/` (schema-first `PluginApiContribution`) | `app/server/publicApi.ts` |
-| Provider connections | `@acorn/node-core/server/integrations/connectionRegistry.ts` | `app/server/providers.ts` |
-| External-item integrations | `@acorn/node-core/server/integrations/registry.ts` | `app/server/providers.ts` |
-| Model generation adapters | `@acorn/node-core/server/modelProviders/registry.ts` | `app/server/providers.ts` |
+| Provider connections | `@acorn/node-core/server/integrations/connectionRegistry.ts` | the plugin's `init`, via `ctx.providers` |
+| External-item integrations | `@acorn/node-core/server/integrations/registry.ts` | the plugin's `init`, via `ctx.providers` |
+| Model generation adapters | `@acorn/node-core/server/modelProviders/registry.ts` | the plugin's `init`, via `ctx.providers` |
 | Agent tools and context | `@acorn/node-core/server/agentTools/` | service runtime imports `app/main/{agentToolsWiring,contextSectionsWiring}.ts` |
 | Agent profiles | `@acorn/node-core/main/agentProfiles/` | service runtime imports `app/main/agentProfiles.ts` |
 | Workflow steps, policies, triggers | `plugins/workflows/main/workflowRegistry.ts` | service runtime imports `app/main/workflowWiring.ts` |

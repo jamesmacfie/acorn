@@ -258,5 +258,5 @@ uninstall, and multi-secret credentials are intentionally deferred until a provi
 new work must extend the connection/resource contracts rather than bypass them.
 
 A new model provider instead adds a connection descriptor and model adapter under
-`plugins/model-providers/server/`, then registers both in `app/server/providers.ts`. It must not add
+`plugins/model-providers/server/`, then contributes both from its plugin's `init` through `ctx.providers`. It must not add
 external ids, mirrored resources, task links, or a generic prompt route.

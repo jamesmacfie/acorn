@@ -183,11 +183,13 @@ compares against the code the node displays. See [vNext/security.md](./vNext/sec
 
 ---
 
-## Pins (`/v2/core/pins`)
+## Pins (`/v2/p/github/pins`)
 
-`packages/node-core/src/server/routes/pins.ts`. Pinned repos for the selector — **App-state**, user-scoped.
+`plugins/github/src/server/routes/pins.ts`. Pinned repos for the selector — **App-state**, user-scoped.
+Moved out of core with the `pinned_repos` table in Phase 2: a pinned repo is github-shaped data, so it
+lives in the github plugin's own database (docs/vNext/data.md § Plugin DBs).
 
-### `GET /v2/core/pins`
+### `GET /v2/p/github/pins`
 
 This user's pinned repo ids, in pin order (the `sort` column, ascending — a new pin appends at
 `max(sort) + 1`).
@@ -197,7 +199,7 @@ This user's pinned repo ids, in pin order (the `sort` column, ascending — a ne
 401 → 'unauthenticated'
 ```
 
-### `PUT /v2/core/pins`
+### `PUT /v2/p/github/pins`
 
 Pin or unpin one repo. Body `{ repoId: number, pinned: boolean }`.
 

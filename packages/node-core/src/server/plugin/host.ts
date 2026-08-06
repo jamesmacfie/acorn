@@ -43,13 +43,16 @@ export async function initPlugins(plugins: readonly NodePlugin[], options: Plugi
   const enabled: string[] = []
   const skipped: string[] = []
   const started: NodePlugin[] = []
+  // Kept so the ready pass below hands each plugin the SAME context its init got.
+  const contexts = new Map<string, NodePluginContext>()
 
   for (const plugin of plugins) {
-    if (disabled.has(plugin.name) && !plugin.required) {
-      skipped.push(plugin.name)
-      continue
-    }
-    // Idempotent per boot: clear anything this plugin contributed to the two module-singleton
+    // Clearing happens BEFORE the disabled check, not after. These registries are module singletons, so
+    // a plugin DISABLED on the second boot of one process would otherwise keep the first boot's routes,
+    // tools and providers — served through a database handle its dispose already closed. That is the
+    // trap the disable flag exists to avoid, so the flag has to be honoured on the clear path too.
+    //
+    // Idempotent per boot: clear anything this plugin contributed to the module-singleton
     // registries on a previous boot, so a second startServiceRuntime in one process REPLACES its
     // contributions rather than appending copies bound to the first boot's (now closed) database. For
     // routes that silently served every request from a closed handle; for tools it would throw on the
@@ -63,6 +66,10 @@ export async function initPlugins(plugins: readonly NodePlugin[], options: Plugi
     modelProviderRegistry.removeForPlugin(plugin.name)
     integrationProviderRegistry.removeForPlugin(plugin.name)
     connectionProviderRegistry.removeForPlugin(plugin.name)
+    if (disabled.has(plugin.name) && !plugin.required) {
+      skipped.push(plugin.name)
+      continue
+    }
     const ctx: NodePluginContext = {
       name: plugin.name,
       routes: {
@@ -91,25 +98,50 @@ export async function initPlugins(plugins: readonly NodePlugin[], options: Plugi
         error: (...args: unknown[]) => console.error(`[plugin:${plugin.name}]`, ...args),
       },
     }
-    // Not caught: a plugin that cannot initialize leaves the node in an unknown state, and every
-    // plugin here is first-party code shipped in the same binary. Failing the boot is the honest
-    // outcome — the supervisor surfaces it on the recovery screen.
-    await plugin.init(ctx)
+    // A failing init still fails the boot — every plugin here is first-party code in the same binary, so
+    // a node that cannot assemble should say so rather than run degraded. But the plugins that ALREADY
+    // initialized have to be torn down first, and that is not cosmetic: each holds a WAL-mode SQLite
+    // handle, and the composition root's catch releases the data-root lock. Without this, a throw from
+    // plugin five of fifteen dropped the lock with fourteen open handles, a live idle-watch interval and
+    // running provider children — precisely the invariant this file's `dispose` contract promises.
+    //
+    // The caller cannot do it: it only receives the dispose closure from a RESOLVED result.
+    try {
+      await plugin.init(ctx)
+    } catch (error) {
+      await disposeStarted(started)
+      throw error
+    }
+    contexts.set(plugin.name, ctx)
     started.push(plugin)
     enabled.push(plugin.name)
   }
 
-  return {
-    enabled,
-    skipped,
-    dispose: async () => {
-      for (const plugin of [...started].reverse()) {
-        try {
-          await plugin.dispose?.()
-        } catch (error) {
-          console.warn(`[plugin:${plugin.name}] dispose failed:`, error)
-        }
-      }
-    },
+  // The second pass, after every init: a plugin that must read another plugin's contributions runs here
+  // rather than depending on where it happens to sit in the list. Still before the listener binds, and a
+  // failure tears down exactly as an init failure does.
+  for (const plugin of started) {
+    if (!plugin.ready) continue
+    try {
+      await plugin.ready(contexts.get(plugin.name)!)
+    } catch (error) {
+      await disposeStarted(started)
+      throw error
+    }
+  }
+
+  return { enabled, skipped, dispose: () => disposeStarted(started) }
+}
+
+// Reverse order, because a later plugin may depend on an earlier one's resources. Never rejects: one
+// plugin failing to close must not strand the rest with an open WAL file, and teardown is already
+// best-effort everywhere else.
+async function disposeStarted(started: readonly NodePlugin[]): Promise<void> {
+  for (const plugin of [...started].reverse()) {
+    try {
+      await plugin.dispose?.()
+    } catch (error) {
+      console.warn(`[plugin:${plugin.name}] dispose failed:`, error)
+    }
   }
 }

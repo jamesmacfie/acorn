@@ -27,8 +27,19 @@ export const httpPlugin = (dataDir: string): NodePlugin => {
       //
       // A failure is deliberately NOT caught: a secret variable that will not decrypt means the node's
       // encryption key changed, and continuing would silently re-seal garbage.
-      await protectLegacyHttpStorage(db, ctx.core.secrets, ctx.core.identity)
       ctx.routes.register(httpRoutes(db, ctx.core), { prefix: '', note: '/:owner/:repo/*' })
+    },
+    // In `ready`, not `init`, and that is the whole point: the claim asks core's identity service whether
+    // this node knows exactly ONE owner, and that answer is only correct once github has filled core's
+    // mirror slot from its own init. In `init` it worked by alphabetical luck — github sorts before http
+    // in the plugin list — and reordering that list by domain would have silently stopped claiming the
+    // owner's saved API requests. Fail-closed, so never a wrong write, but invisible data.
+    //
+    // Still before the listener binds (server/plugin/host.ts runs this pass first), which is the guarantee
+    // this migration had when it lived in apps/node/src/wiring/startupSecurity.ts.
+    ready: async (ctx) => {
+      if (!db) return
+      await protectLegacyHttpStorage(db, ctx.core.secrets, ctx.core.identity)
     },
     // One resource, this plugin's own WAL-mode SQLite file — closed before the data root's lock is
     // dropped (the composition root's teardown invariant). There is no bridge slot to clear: the router

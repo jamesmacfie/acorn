@@ -85,6 +85,18 @@ export type NodePlugin = {
   // mirror rows in its own. A request served before either finished would read half-migrated rows, or a PR
   // whose parent repo row was about to be deleted.
   init(ctx: NodePluginContext): void | Promise<void>
+  // A second pass, run after EVERY plugin's init and still before the listener binds.
+  //
+  // It exists because `init` order is explicitly not load-bearing (server/plugin/host.ts says so), and
+  // one real piece of work needs the whole graph assembled rather than one plugin's: plugins/http's
+  // legacy-row claim asks "does this node know exactly one owner identity", which only answers correctly
+  // once github has filled core's mirror slot. That worked by ALPHABETICAL LUCK — github sorts before
+  // http in the plugin list — and reordering the list by domain would have silently stopped claiming the
+  // owner's saved API requests, fail-closed and invisible.
+  //
+  // Anything a plugin can do alone belongs in `init`. This is only for work that reads another plugin's
+  // contributions.
+  ready?(ctx: NodePluginContext): void | Promise<void>
   // Release what init() opened. Awaited during teardown BEFORE the data root's lock is dropped, because
   // a plugin's SQLite file is in WAL mode and the composition root's own invariant is "only drop the
   // root lock once SQLite is closed, or a restart could open the database while this process still holds

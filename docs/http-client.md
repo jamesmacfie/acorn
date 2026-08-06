@@ -15,7 +15,7 @@ than entities, so an empty folder does not exist and rename/move cannot create o
 Sensitive request fields—URL, headers, body, auth, and per-request variables—are AES-256-GCM JWE
 ciphertext under `SESSION_ENC_KEY`. Every repo-variable value is encrypted, including ordinary
 values and command text. Secret-variable plaintext is never returned to the renderer. Startup
-protects legacy plaintext rows before the listener opens (`apps/node/src/wiring/startupSecurity.ts`),
+protects legacy plaintext rows before the listener opens (the http plugin's `init`, pre-listener),
 and renderer activation deletes
 legacy `http-draft:*` localStorage. Unsaved drafts now exist only in memory.
 

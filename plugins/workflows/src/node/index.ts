@@ -76,6 +76,8 @@ export type WorkflowsPluginDeps = {
 
 export const workflowsPlugin = (dataDir: string, deps: WorkflowsPluginDeps): NodePlugin => {
   let db: ReturnType<typeof openPluginDb> | null = null
+  // Held so dispose can abort in-flight steps before the database closes (see dispose below).
+  let live: WorkflowRunner | null = null
   return {
     name: 'workflows',
     init: (ctx) => {
@@ -200,6 +202,8 @@ export const workflowsPlugin = (dataDir: string, deps: WorkflowsPluginDeps): Nod
         cancelChildTask: (taskId) => core.tasks.cancel(taskId),
         authorizeRepoConfig: (taskId) => core.repos.assertConfigTrusted(taskId),
       })
+      // Kept so dispose can abort in-flight steps before the database closes.
+      live = runner
 
       setWorkflowBridge({
         // Declared workflows for a task (docs/workflows.md): `.acorn/workflows/*.toml` from the
@@ -269,7 +273,12 @@ export const workflowsPlugin = (dataDir: string, deps: WorkflowsPluginDeps): Nod
     // dropped — the composition root's own teardown invariant. The bridge slot is cleared explicitly
     // rather than trusting teardown order: a second startServiceRuntime in one process would otherwise
     // serve workflow requests through the first boot's closed database handle.
+    // Abort in-flight steps BEFORE closing the handle. A headless child outliving its database wrote its
+    // outcome onto a closed connection; the run rows stay 'running' and reconcile() sweeps them to
+    // 'pending' on the next boot, which is what that sweep exists for.
     dispose: () => {
+      live?.stop()
+      live = null
       setWorkflowBridge(null)
       db?.close()
       db = null

@@ -151,9 +151,10 @@ tools/arch/             @acorn/arch-tests   the executable boundary rules
 - `apps/node/src/` is the service composition root: `service/` (runtime composition + the
   supervised-child entry), `server/` (`providers.ts`/`routes.ts` register plugin contributions;
   `standalone.ts` is the Electron-free entry behind `dev:node`), and `wiring/` — the service-owned glue
-  that used to live in `app/main` (`agentProfiles.ts`, `startupSecurity.ts` and the remaining
-  `*Wiring.ts`). It is named `wiring`, not `main`, because `main` now means Electron main.
-  `managedWorkflowStep.ts`, `harnessWiring.ts`, `serverBridges.ts` and `managedAgentsWiring.ts` are gone
+  that used to live in `app/main` (`agentProfiles.ts`, `configTrustWiring.ts` and the two
+  remaining `*Wiring.ts`). It is named `wiring`, not `main`, because `main` now means Electron main.
+  `managedWorkflowStep.ts`, `harnessWiring.ts`, `serverBridges.ts`, `managedAgentsWiring.ts`,
+  `workflowWiring.ts` and `startupSecurity.ts` are gone
   — each one's contents moved into the plugin whose engine it drove.
 - `apps/node/test/integration/` — tests that need the composition root's registries populated
   (providers, routes, agent profiles). They live in the app because importing `app/*` is legal only
@@ -169,7 +170,7 @@ tools/arch/             @acorn/arch-tests   the executable boundary rules
   suite pass against a service that no longer existed in the source tree.
 - `packages/node-core/migrations/` — Drizzle migrations, co-located with `schema.ts`. The desktop
   build stages a copy into `apps/desktop/out/migrations` so the bundled service can find them.
-- **`tools/arch/boundaries.test.ts` is the enforcement.** 12 rules over the package graph: nothing
+- **`tools/arch/boundaries.test.ts` is the enforcement.** 14 rules over the package graph: nothing
   imports an app, no app→app, no relative import escapes its package, declared ⊇ used, protocol
   purity, the client/node split, the enumerated Electron surface, no package cycles, and a shrinking
   plugin→plugin ledger. It resolves bare `@acorn/*` specifiers *and* `vi.mock` paths, and it asserts
