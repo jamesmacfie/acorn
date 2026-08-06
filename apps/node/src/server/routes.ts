@@ -9,7 +9,7 @@
 // The file is kept rather than deleted because it is still the sanctioned place for a route that belongs
 // to no plugin, and because the composition roots import it for its side effect; deleting it would move
 // that decision into whichever root noticed first. Provider-owned routers (linear/rollbar) register in
-// apps/node/src/server/providers.ts via the integration provider registry, mounted at /v2/p/<providerId>
+// each provider plugin's own `init` via `ctx.providers`, mounted at /v2/p/<providerId>
 // through buildIntegrationProviderRoutes() in createApp() — that projection is gated by
 // `requireProviderAccess`, which is why it is deliberately not folded into this file.
 export {}

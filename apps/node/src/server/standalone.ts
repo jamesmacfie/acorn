@@ -78,7 +78,7 @@ const unavailableBrowser: BrowserDesktopCapability = {
 // Converted plugins register their own routes and open their own SQLite files here. A standalone node
 // runs the SAME list as the supervised one — the difference is only which engine bridges get filled,
 // so a plugin that needs no DesktopCapabilities works identically over the LAN.
-await initPlugins(
+const plugins = await initPlugins(
   nodePlugins(root.dir, {
     // A standalone node runs the managed agent runtime too, which is another BEHAVIOUR CHANGE of the same
     // kind as the workflow one below: this entry never wired managed agents, so `dev:node` answered a flat
@@ -159,3 +159,32 @@ console.log(
     deviceToken: await resolveDeviceToken(runtime.DEVICES, process.env.ACORN_DEVICE_TOKEN, 'Standalone node launcher'),
   }),
 )
+
+// Ctrl-C is how `dev:node` ends, so it is the ONLY teardown path this entry has — and it had none.
+// Eight plugins own WAL-mode SQLite files now and the data root holds an exclusive pidfile lock, so
+// exiting without this left journals unflushed and the lock held, which the next `dev:node` refuses to
+// take. The supervised root has done this since Phase 1 (service/runtime.ts's stop()); this entry simply
+// never grew the equivalent, and the plugin conversions are what made it matter.
+//
+// Same order as the supervised root, for the same reason: plugins before core's database, core's database
+// before the root lock, because a restart must not open a database this process still holds a WAL for.
+let stopping = false
+const shutdown = async (signal: NodeJS.Signals): Promise<void> => {
+  if (stopping) return
+  stopping = true
+  console.log(`[node] ${signal} — draining`)
+  for (const [label, step] of [
+    ['plugins', () => plugins.dispose()],
+    ['sqlite', async () => runtime.DB.close()],
+    ['data root', async () => root.release()],
+  ] as const) {
+    try {
+      await step()
+    } catch (error) {
+      console.warn(`[node] ${label} teardown failed:`, error)
+    }
+  }
+  process.exit(0)
+}
+process.once('SIGINT', (signal) => void shutdown(signal))
+process.once('SIGTERM', (signal) => void shutdown(signal))

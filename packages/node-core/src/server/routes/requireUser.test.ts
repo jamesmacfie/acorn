@@ -11,7 +11,6 @@ import type { Env } from '../../main/bindings'
 // (or a public hole) would not appear here and would silently escape the gate, so keep it
 // exhaustive. (docs/security.md §3, §7 · docs/vNext/protocol.md § HTTP conventions)
 const PROTECTED_PATHS: [string, string][] = [
-  ['GET', '/v2/core/pins'],
   ['GET', '/v2/core/prefs'],
   ['GET', '/v2/core/workspaces'],
   ['GET', '/v2/core/tasks'],
@@ -25,6 +24,10 @@ const PROTECTED_PATHS: [string, string][] = [
   ['GET', '/v2/p/memory/tasks/t1/notes'],
   ['GET', '/v2/p/linear/projects'],
   ['GET', '/v2/p/rollbar/items'],
+  // Moved out of core with `pinned_repos` in Phase 2 — it was ['GET', '/v2/core/pins'] through Phase 1.
+  // Kept in the table rather than dropped: requireUser is a `/v2/*` glob that 401s before routing, so a
+  // path that no longer exists is indistinguishable from a gated one and the stale entry asserted nothing.
+  ['GET', '/v2/p/github/pins'],
   ['GET', '/v2/p/github/repos'],
   ['GET', '/v2/p/github/repos/o/r/labels'],
   ['GET', '/v2/p/github/repos/o/r/pulls'],

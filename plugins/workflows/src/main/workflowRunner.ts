@@ -135,6 +135,21 @@ export class WorkflowRunner {
   readonly contributions = new WorkflowContributionRegistry()
   readonly #activeRuns = new Set<string>()
   readonly #activeHandlers = new Map<string, Map<string, AbortController>>()
+
+  // Abort every in-flight step, for teardown. Not a cancel: cancelling a RUN is a user action that
+  // writes 'cancelled' and is meant to be visible next launch, whereas this is the process going away
+  // mid-run — the rows stay 'running' and reconcile() sweeps them back to 'pending' on the next boot,
+  // which is exactly what that sweep is for.
+  //
+  // Without it, dispose() closed the plugin's SQLite handle while headless children kept running, and
+  // their persistOutcome/setStep writes landed on a closed database as unhandled rejections.
+  stop(): void {
+    for (const handlers of this.#activeHandlers.values()) {
+      for (const controller of handlers.values()) controller.abort()
+    }
+    this.#activeHandlers.clear()
+    this.#activeRuns.clear()
+  }
   readonly #headless = new Semaphore(MAX_CONCURRENT_HEADLESS)
 
   constructor(

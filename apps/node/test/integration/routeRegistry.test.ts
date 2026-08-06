@@ -10,6 +10,9 @@ import { createCoreServices, SecretService } from '@acorn/node-core/main/core/in
 import type { AppEnv } from '@acorn/node-core/server/middleware/auth.ts'
 import { CapabilityRegistry } from '@acorn/node-core/server/plugin/capabilities.ts'
 import { initPlugins } from '@acorn/node-core/server/plugin/host.ts'
+import { connectionProviderRegistry } from '@acorn/node-core/server/integrations/connectionRegistry.ts'
+import { integrationProviderRegistry } from '@acorn/node-core/server/integrations/registry.ts'
+import { modelProviderRegistry } from '@acorn/node-core/server/modelProviders/registry.ts'
 import { makeTestDb, type TestDb } from '@acorn/node-core/server/routes/testDb.ts'
 import { RouteRegistry, routeMountPath } from '@acorn/node-core/server/routeRegistry.ts'
 
@@ -181,5 +184,29 @@ describe('assembled routes', () => {
 
   it('leaves nothing behind on the V1 /api prefix', () => {
     expect(routes().filter((route) => route.path.startsWith('/api'))).toEqual([])
+  })
+
+  // Every built-in provider is registered BY ITS PLUGIN, asserted from the real plugin list.
+  //
+  // This is the test whose absence let a critical defect ship: deleting
+  // apps/node/src/server/providers.ts moved provider registration into each plugin's init, and github's
+  // was simply forgotten. `connectProvider` looks the provider up in the connection registry, so the
+  // device-flow poll answered `provider_bad_config` and GitHub could never be connected on a fresh data
+  // root — while an already-authenticated machine kept working, because githubToken() reads the stored
+  // row and never consults the registry. Only an empty data root revealed it.
+  //
+  // It has to assert BOTH registries, because `ctx.providers.integration` fills them together and a
+  // provider present in one is broken in a different way: absent from `connection` breaks
+  // connect/rotate/test, absent from `integration` breaks the mirrored resources and the route
+  // projection. And it must NOT go through apps/node/test/registerProviders.ts — that shim registers
+  // these by hand, which is exactly how the defect passed conformance in CI while being absent at
+  // runtime.
+  it('registers every built-in provider from its own plugin, in both registries', () => {
+    const expected = ['anthropic', 'github', 'linear', 'openai', 'rollbar']
+    expect(connectionProviderRegistry.list().map((p) => p.id).sort()).toEqual(expected)
+    // The integration registry holds only providers with mirrored resources — the model providers
+    // contribute credentials and adapters, not resources.
+    expect(integrationProviderRegistry.list().map((p) => p.id).sort()).toEqual(['github', 'linear', 'rollbar'])
+    expect(modelProviderRegistry.list().map((a) => a.providerId).sort()).toEqual(['anthropic', 'openai'])
   })
 })

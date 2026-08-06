@@ -417,6 +417,67 @@ Sources are the one order-sensitive registry (`tabs/sources.ts` prepends GitHub 
 unsorted), so an e2e assertion pins the rail order `['GitHub','Docker','API','Agents']` — verified
 non-vacuous by removing docker from the list and watching S1 fail.
 
+## Second adversarial review — findings and fixes
+
+A second hostile review covered the phase's back half (the eight commits after the first review). It
+could NOT break the database split — it replayed all ten chains into real SQLite, diffed 78 removed core
+objects against the plugin chains object by object, verified all 34 moved indexes byte-identical, checked
+both hand-written FTS tables and all three triggers in both directions, and ran a populated-database
+upgrade with `pragma integrity_check` clean. That part of the work stands.
+
+It found one critical defect and five real ones. All fixed:
+
+- **CRITICAL: `githubProvider` was registered nowhere in production.** Deleting
+  `apps/node/src/server/providers.ts` moved provider registration into each plugin's `init`, and github's
+  was simply forgotten. `connectProvider` looks a provider up in the connection registry, so the
+  device-flow poll answered `provider_bad_config` and **GitHub could never be connected on a fresh data
+  root** — while an already-authenticated machine kept working, because `githubToken()` reads the stored
+  row and never consults the registry. That asymmetry is why it passed every review and every manual
+  check. Worse, it passed *conformance in CI*, because that suite imports a test-only registration shim.
+  Fixed, and `routeRegistry.test.ts` now asserts the whole provider set from the REAL plugin list — the
+  test whose absence let it ship.
+- **No partial-init teardown.** The dispose closure is only reachable through a resolved result, so a
+  throw from plugin five of fifteen released the data-root lock with fourteen open WAL handles, a live
+  idle-watch interval and running provider children — the exact invariant `NodePlugin.dispose` promises.
+  The host now disposes what started, in reverse, before rethrowing.
+- **A DISABLED plugin kept the previous boot's contributions.** The `continue` sat above the five
+  `removeX` calls, so a plugin disabled on a second boot in one process kept its old routes, tools and
+  providers, served through a handle its own dispose had closed. That is the trap the disable flag exists
+  to avoid, set for the Phase 4 feature that will first use it.
+- **`workflows.dispose` abandoned in-flight runs.** It nulled a bridge and closed the database while
+  headless children kept running, so their outcome writes landed on a closed connection.
+  `WorkflowRunner.stop()` now aborts every in-flight step first; the rows stay `running` and the boot
+  sweep moves them to `pending`, which is what that sweep is for.
+- **`dev:node` disposed nothing at all** — no signal handler, no `db.close()`, no `root.release()` in 161
+  lines. It exited with eight WAL files open and the pidfile lock held, which the next `dev:node`
+  refuses to take. It now drains in the same order as the supervised root.
+- **Ordering luck.** `plugins/http`'s legacy claim asks core whether this node knows exactly one identity,
+  which is only correct once github has filled core's mirror slot — and it worked because github sorts
+  before http alphabetically. `host.ts` explicitly says order "must NOT be load-bearing". `NodePlugin`
+  gained a `ready()` pass that runs after every `init` and before the listener; the claim moved there.
+
+### One finding NOT fixed, and it is the most serious thing left
+
+**The terminal plugin's HTTP routes have no task-scope check.** `wsHub.ts` correctly refuses a
+task-scoped socket that addresses another task's stream, with a comment explaining it is arbitrary
+command execution as the owner. The HTTP router one directory away has no equivalent: `POST /sessions`
+takes `taskId` from the body, and `POST /sessions/:sid/send` — typing into a session — is keyed on an
+opaque session id with no ownership check at all. `requireTaskScope` is mounted only over
+`/v2/core/tasks/:id*`; **zero of the sixteen plugin route files that read a taskId** reference
+`mayActOnTask`.
+
+This is PRE-EXISTING, not a regression of this phase — the diff on that file is two lines of an unrelated
+type re-export. It is the previous review's finding fixed at one door out of two. `editor`, `changes`,
+`database`, `memory`, `workflows` and `http` all take a taskId under the same absent gate and need the
+same audit. It is left for a dedicated pass rather than bolted on here, because the honest fix is a
+mounted gate over `/v2/p/*` task-scoped paths plus an audit of all sixteen, not one `if`.
+
+### Also left, deliberately
+
+`forEachConnection` has zero callers (27 lines) and `storageFootprint` measures `blobs/` but not the
+eight new `plugins/*.sqlite` files — the one thing the split should have added to it. Both are cleanup,
+neither is a defect.
+
 ## Known gaps worth stating plainly
 
 - **The credential gates are mounted, not audited.** `requireProviderAccess` covers the integrations

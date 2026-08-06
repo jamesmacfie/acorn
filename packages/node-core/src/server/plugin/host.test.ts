@@ -2,6 +2,11 @@ import { afterAll, describe, expect, it, vi } from 'vitest'
 import { createCoreServices, SecretService } from '../../main/core'
 import { makeTestDb } from '../routes/testDb'
 import { CapabilityRegistry, capabilityId } from './capabilities'
+import { Hono } from 'hono'
+import { z } from 'zod'
+import { agentToolContributions } from '../agentTools/registry'
+import type { AppEnv } from '../middleware/auth'
+import { pluginRouteContributions } from '../routeRegistry'
 import { initPlugins } from './host'
 import type { NodePlugin } from './types'
 
@@ -152,5 +157,77 @@ describe('plugin host', () => {
       ]),
     ).rejects.toThrow('nope')
     expect(started).toEqual([])
+  })
+
+  it('disposes the plugins that DID initialize when a later init throws', async () => {
+    // The caller cannot do this itself: it only gets the dispose closure from a resolved result, so
+    // before this the composition root's catch released the data-root lock with every already-opened
+    // WAL-mode SQLite handle still open, plus live intervals and provider children.
+    const disposed: string[] = []
+    await expect(
+      host([
+        plugin('first', { dispose: () => void disposed.push('first') }),
+        plugin('second', { dispose: () => void disposed.push('second') }),
+        plugin('bad', {
+          init: () => {
+            throw new Error('nope')
+          },
+        }),
+        plugin('never', { dispose: () => void disposed.push('never') }),
+      ]),
+    ).rejects.toThrow('nope')
+    // Reverse order, and the plugin that never initialized is not disposed.
+    expect(disposed).toEqual(['second', 'first'])
+  })
+
+  it('runs every ready() only after every init, so cross-plugin reads do not depend on list order', async () => {
+    // The hazard this closes: plugins/http's legacy-row claim reads a slot github fills in its own init,
+    // and in `init` that worked only because github sorts before http alphabetically. Reordering the list
+    // by domain would have silently stopped claiming the owner's saved API requests.
+    const order: string[] = []
+    await host([
+      plugin('early', {
+        init: () => void order.push('init:early'),
+        ready: () => void order.push('ready:early'),
+      }),
+      plugin('late', { init: () => void order.push('init:late') }),
+    ])
+    expect(order).toEqual(['init:early', 'init:late', 'ready:early'])
+  })
+
+  it('disposes started plugins when a ready() throws, exactly as an init failure does', async () => {
+    const disposed: string[] = []
+    await expect(
+      host([
+        plugin('first', { dispose: () => void disposed.push('first') }),
+        plugin('bad', {
+          ready: () => {
+            throw new Error('not ready')
+          },
+        }),
+      ]),
+    ).rejects.toThrow('not ready')
+    expect(disposed).toEqual(['first'])
+  })
+
+  it('clears a plugin contributions even when it is DISABLED on this boot', async () => {
+    // The clear has to happen before the disabled check. Otherwise a plugin disabled on the second boot
+    // of one process keeps the FIRST boot's routes and tools — served through a handle its own dispose
+    // already closed. That is the exact trap the disable flag exists to avoid.
+    const router = new Hono<AppEnv>()
+    const tool = { name: 'probe_tool', title: 'Probe', risk: 'read', input: z.object({}), handler: async () => null } as never
+    const contribute = plugin('docker', {
+      init: (ctx) => {
+        ctx.routes.register(router)
+        ctx.tools.register(tool)
+      },
+    })
+    await host([contribute])
+    expect(pluginRouteContributions().some((c) => c.plugin === 'docker')).toBe(true)
+    expect(agentToolContributions().some((c) => c.name === 'probe_tool')).toBe(true)
+
+    await host([contribute], ['docker'])
+    expect(pluginRouteContributions().some((c) => c.plugin === 'docker')).toBe(false)
+    expect(agentToolContributions().some((c) => c.name === 'probe_tool')).toBe(false)
   })
 })

@@ -45,6 +45,7 @@ import { setRepoMirrorSource } from '@acorn/node-core/server/repoMirror.ts'
 import { GITHUB_MIRROR } from '../contract/mirror'
 import { actions } from '../server/routes/actions'
 import { githubDeviceAuth } from '../server/routes/deviceAuth'
+import { githubProvider } from '../server/provider'
 import { mentions } from '../server/routes/mentions'
 import { pins } from '../server/routes/pins'
 import { prActions } from '../server/routes/prActions'
@@ -86,6 +87,17 @@ export const githubPlugin = (dataDir: string): NodePlugin => {
       // as it was when the composition root owned it — see the ordering note in this file's header.
       const { removedPulls } = await pruneOrphanedGithubMirror(store)
       if (removedPulls) ctx.log.log(`[github] pruned ${removedPulls} orphaned mirrored pull request(s)`)
+
+      // The provider itself, into the connection AND integration registries. NOT optional and not
+      // cosmetic: `connectProvider` looks github up in the connection registry, so without this the
+      // device-flow poll fails `provider_bad_config` and GitHub can NEVER be connected — while an
+      // already-authenticated machine keeps working, because githubToken() reads the stored row and
+      // never consults the registry. That asymmetry is exactly why it went unnoticed when
+      // apps/node/src/server/providers.ts was deleted: only a FRESH data root reveals it.
+      //
+      // The router is registered separately below rather than passed here, because github's device-flow
+      // routes live under its own namespace alongside twelve mirror routers whose order is load-bearing.
+      ctx.providers.integration(githubProvider)
 
       // /v2/p/github/repos/* — the mirror. The `/repos` prefix and the router order are carried over
       // verbatim from apps/node/src/server/routes.ts: several of these declare overlapping paths under
