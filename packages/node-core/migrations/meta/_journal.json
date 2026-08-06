@@ -302,6 +302,13 @@
       "when": 1785994919121,
       "tag": "0042_famous_christian_walker",
       "breakpoints": true
+    },
+    {
+      "idx": 43,
+      "version": "6",
+      "when": 1785996129853,
+      "tag": "0043_workable_black_panther",
+      "breakpoints": true
     }
   ]
 }

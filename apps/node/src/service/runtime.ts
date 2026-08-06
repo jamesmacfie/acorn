@@ -18,13 +18,12 @@ import { launcherSpec, serverName } from '@acorn/node-core/main/mcpRegister.ts'
 import { reconcileWorktrees, setWorktreesRoot } from '@acorn/node-core/main/taskWorktree.ts'
 import { logStorageFootprint } from '@acorn/node-core/main/storageFootprint.ts'
 import { disposeWsHub } from '@acorn/node-core/main/wsHub.ts'
-import { wireManagedAgents } from '../wiring/managedAgentsWiring'
-import { wireServerBridges } from '../wiring/serverBridges'
 import { wireAgentTools } from '../wiring/agentToolsWiring'
 import { wireContextSections } from '../wiring/contextSectionsWiring'
 import { failingChecksFor } from '../wiring/workflowWiring'
 import { wireConfigTrust } from '../wiring/configTrustWiring'
 import { prepareSecurityState } from '../wiring/startupSecurity'
+import { AGENTS_RUNTIME } from '@acorn/plugin-agents/main/runtime.ts'
 import { MEMORY_KNOWLEDGE } from '@acorn/plugin-memory/main/knowledgeIpc.ts'
 import { NOTES_STORE } from '@acorn/plugin-notes/contract/store.ts'
 import { WORKFLOWS_RUNNER } from '@acorn/plugin-workflows/main/workflowRunner.ts'
@@ -97,7 +96,6 @@ export async function startServiceRuntime({ config, desktop, stateChanged }: Run
   // The pin the parent hands to its connection broker. Reported by the listener rather than read from
   // disk here, so there is exactly one place that decides what identity this node is answering with.
   let identity: { fingerprint: string; certPem: string } | null = null
-  let managedAgents: ReturnType<typeof wireManagedAgents> | null = null
   let disposePlugins: (() => Promise<void>) | null = null
   let reconcileTask: Promise<void> | null = null
   let stopped = false
@@ -133,20 +131,16 @@ export async function startServiceRuntime({ config, desktop, stateChanged }: Run
       console.warn('[service:stop] listener close failed:', error)
     }
     try {
-      await managedAgents?.stop()
-    } catch (error) {
-      console.warn('[service:stop] managed agents close failed:', error)
-    }
-    try {
       await reconcileTask
     } catch (error) {
       console.warn('[service:stop] reconciliation drain failed:', error)
     }
     // Before core's DB and before the root lock: each plugin owns a WAL-mode SQLite file of its own
     // (main/pluginStorage.ts), and the invariant below applies to those too. This is also where the
-    // terminal engine's idle watch and session displays, the docker streams and the database plugin's
-    // pg pools are closed — each in its own plugin's dispose, rather than in a list here that a new
-    // plugin has to remember to join.
+    // terminal engine's idle watch and session displays, the docker streams, the database plugin's pg
+    // pools and the agent runtime's live provider children / reconnect timers / webhook pump are closed
+    // — each in its own plugin's dispose, rather than in a list here that a new plugin has to remember
+    // to join.
     try {
       await disposePlugins?.()
     } catch (error) {
@@ -247,6 +241,11 @@ export async function startServiceRuntime({ config, desktop, stateChanged }: Run
     // request must not be able to arrive first (server/plugin/host.ts).
     const plugins = await initPlugins(
       nodePlugins(config.dataDir, {
+        agents: {
+          internalEnv,
+          currentUserId: () => runtime.ACTIVE_IDENTITY.get(),
+          memoryReviewTrigger: (taskId, transcriptTail) => knowledgeAt().memoryReviewTrigger(taskId, transcriptTail),
+        },
         memory: { currentUserId: () => runtime.ACTIVE_IDENTITY.get() },
         terminal: {
           internalEnv,
@@ -282,16 +281,6 @@ export async function startServiceRuntime({ config, desktop, stateChanged }: Run
     // above — which is why this bag no longer holds the memory index, the proposal store, the run service
     // or the notes store.
     wireAgentTools({ db, browser: desktop.browser })
-    managedAgents = wireManagedAgents({
-      db,
-      dataDir: config.dataDir,
-      internalEnv,
-      secrets: runtime.SECRETS,
-      capabilities,
-      currentUserId: () => runtime.ACTIVE_IDENTITY.get(),
-      memoryReviewTrigger: knowledge.memoryReviewTrigger,
-    })
-    wireServerBridges(db, config.dataDir)
     mark('install')
 
     const listener = await startListener(runtime, dataRoot)
@@ -331,7 +320,11 @@ export async function startServiceRuntime({ config, desktop, stateChanged }: Run
         console.warn('[service:boot] reconcile workflow failed:', error)
       }
       try {
-        await managedAgents?.reconcile()
+        // Same shape as the workflow sweep above and for the same reason: the plugin builds the runtime,
+        // the ordering stays here. It has to run after the listener binds (a resumed session's tools call
+        // the node's own loopback surface) and before finishReconcile(). `require`, not `get`: agents is
+        // a required plugin.
+        await capabilities.require(AGENTS_RUNTIME).reconcile()
         mark('reconcile.agents')
       } catch (error) {
         console.warn('[service:boot] reconcile managed agents failed:', error)

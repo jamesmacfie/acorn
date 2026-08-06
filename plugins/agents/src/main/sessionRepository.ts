@@ -1,7 +1,8 @@
 import { randomUUID } from 'node:crypto'
 import { and, asc, eq, inArray, isNull, like, or, sql } from 'drizzle-orm'
-import type { AppDatabase } from '@acorn/node-core/server/db/index.ts'
-import { schema } from '@acorn/node-core/server/db/index.ts'
+import type { PluginDatabase } from '@acorn/node-core/main/pluginStorage.ts'
+import type { CoreServices } from '@acorn/node-core/main/core/index.ts'
+import * as schema from '../node/schema'
 import type {
   AgentEventRecord,
   AgentNormalizedEvent,
@@ -28,9 +29,27 @@ type SessionSearchFilter = {
  * The append-only event transaction lives here because it is the authority that advances the
  * session sequence and all query projections atomically. Turn queue operations remain in
  * AgentStore; both slices share one inherited database handle.
+ *
+ * `core` is here for exactly one question: which tasks belong to a workspace. Three queries in this
+ * file and one in AgentStore used to answer "sessions in workspace X" by JOINing `agent_sessions` to
+ * core's `tasks` and `workspace_repos` — the only real cross-database joins in the codebase. They now
+ * resolve the workspace's task ids through `CoreServices.tasks.idsForWorkspace()` and filter with
+ * `inArray` inside this plugin's own file, which is what data.md means by "cross-plugin references are
+ * plain IDs, validated by the owning plugin when dereferenced".
  */
 export class AgentSessionRepository {
-  constructor(protected readonly db: AppDatabase) {}
+  constructor(
+    protected readonly db: PluginDatabase,
+    protected readonly core: CoreServices,
+  ) {}
+
+  // The workspace filter, resolved once per query. `null` means "no workspace filter"; an empty array
+  // means "this workspace has no tasks", which is a real answer and must narrow to nothing rather than
+  // fall through to unfiltered — the one way an id round trip can go wrong where a JOIN could not.
+  protected async workspaceTaskIds(workspaceId: string | undefined): Promise<string[] | null> {
+    if (!workspaceId) return null
+    return this.core.tasks.idsForWorkspace(workspaceId)
+  }
 
   async getSession(id: string): Promise<AgentSession | null> {
     const [row] = await this.db.select().from(schema.agentSessions).where(eq(schema.agentSessions.id, id)).limit(1)
@@ -96,7 +115,7 @@ export class AgentSessionRepository {
   }
 
   private applyEventProjection(
-    tx: Parameters<Parameters<AppDatabase['transaction']>[0]>[0],
+    tx: Parameters<Parameters<PluginDatabase['transaction']>[0]>[0],
     sessionId: string,
     turnId: string | null,
     event: AgentNormalizedEvent,
@@ -310,18 +329,27 @@ export class AgentSessionRepository {
       .join(' ')
     if (!terms) return []
     const escapedLike = `%${query.replace(/[%_]/g, '\\$&')}%`
+    // The workspace scope, resolved ONCE and shared by all three queries below. It used to be three
+    // separate `⋈ tasks ⋈ workspace_repos` joins, one per query, which is also why they could not
+    // survive the split: an FTS5 MATCH, a LIKE over artifacts and the session page each reached across
+    // a database boundary to answer the same sub-question.
+    const taskIds = await this.workspaceTaskIds(filter.workspaceId)
+    if (taskIds?.length === 0) return []
+    // A reusable `task_id IN (…)` chunk for the one query that has to be raw SQL: FTS5 MATCH has no
+    // Drizzle expression, so `agent_events_fts` is only reachable through sql``. Values are still bound
+    // parameters, never interpolated text.
+    const taskIdFilter = taskIds
+      ? sql` AND agent_sessions.task_id IN (${sql.join(taskIds.map((id) => sql`${id}`), sql`, `)})`
+      : sql``
     const [eventMatches, artifactMatches] = await Promise.all([
-      filter.workspaceId
-        ? this.db.all<{ sessionId: string; rank: number }>(sql`
+      taskIds
+        ? // The join to `agent_sessions` stays: it is this plugin's own table, and it is what carries
+          // the task id the filter needs. What left is the pair of core tables behind it.
+          this.db.all<{ sessionId: string; rank: number }>(sql`
             SELECT agent_events_fts.session_id AS sessionId, min(agent_events_fts.rank) AS rank
             FROM agent_events_fts
             INNER JOIN agent_sessions ON agent_sessions.id = agent_events_fts.session_id
-            INNER JOIN tasks ON tasks.id = agent_sessions.task_id
-            INNER JOIN workspace_repos
-              ON workspace_repos.repo_owner = tasks.repo_owner
-              AND workspace_repos.repo_name = tasks.repo_name
-            WHERE agent_events_fts MATCH ${terms}
-              AND workspace_repos.workspace_id = ${filter.workspaceId}
+            WHERE agent_events_fts MATCH ${terms}${taskIdFilter}
             GROUP BY agent_events_fts.session_id
             ORDER BY rank
             LIMIT 200
@@ -334,21 +362,13 @@ export class AgentSessionRepository {
             ORDER BY rank
             LIMIT 200
           `),
-      filter.workspaceId
+      taskIds
         ? this.db
             .selectDistinct({ sessionId: schema.agentArtifacts.sessionId })
             .from(schema.agentArtifacts)
             .innerJoin(schema.agentSessions, eq(schema.agentSessions.id, schema.agentArtifacts.sessionId))
-            .innerJoin(schema.tasks, eq(schema.tasks.id, schema.agentSessions.taskId))
-            .innerJoin(
-              schema.workspaceRepos,
-              and(
-                eq(schema.workspaceRepos.repoOwner, schema.tasks.repoOwner),
-                eq(schema.workspaceRepos.repoName, schema.tasks.repoName),
-              ),
-            )
             .where(and(
-              eq(schema.workspaceRepos.workspaceId, filter.workspaceId),
+              inArray(schema.agentSessions.taskId, taskIds),
               or(
                 like(schema.agentArtifacts.title, escapedLike),
                 like(schema.agentArtifacts.metadataJson, escapedLike),
@@ -372,31 +392,19 @@ export class AgentSessionRepository {
     const textMatch = matchedIds.length
       ? or(like(schema.agentSessions.title, escapedLike), inArray(schema.agentSessions.id, matchedIds))
       : like(schema.agentSessions.title, escapedLike)
-    const baseWhere = and(
-      isNull(schema.agentSessions.archivedAt),
-      filter.taskId ? eq(schema.agentSessions.taskId, filter.taskId) : undefined,
-      textMatch,
-    )
-    const rows = filter.workspaceId
-      ? (await this.db
-          .select({ session: schema.agentSessions })
-          .from(schema.agentSessions)
-          .innerJoin(schema.tasks, eq(schema.tasks.id, schema.agentSessions.taskId))
-          .innerJoin(
-            schema.workspaceRepos,
-            and(
-              eq(schema.workspaceRepos.repoOwner, schema.tasks.repoOwner),
-              eq(schema.workspaceRepos.repoName, schema.tasks.repoName),
-            ),
-          )
-          .where(and(baseWhere, eq(schema.workspaceRepos.workspaceId, filter.workspaceId)))
-          .limit(200))
-          .map((item) => item.session)
-      : await this.db
-          .select()
-          .from(schema.agentSessions)
-          .where(baseWhere)
-          .limit(200)
+    // One query now, not two. The workspace-scoped branch existed only to reach `workspace_repos`
+    // through `tasks`; with the ids in hand the filter is an ordinary predicate on this plugin's own
+    // column, so the join, the `{ session: … }` projection and the `.map` that unwrapped it all go.
+    const rows = await this.db
+      .select()
+      .from(schema.agentSessions)
+      .where(and(
+        isNull(schema.agentSessions.archivedAt),
+        filter.taskId ? eq(schema.agentSessions.taskId, filter.taskId) : undefined,
+        taskIds ? inArray(schema.agentSessions.taskId, taskIds) : undefined,
+        textMatch,
+      ))
+      .limit(200)
     return rows
       .sort((a, b) => {
         const aRank = rankBySession.get(a.id) ?? Number.POSITIVE_INFINITY

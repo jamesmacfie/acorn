@@ -1,8 +1,8 @@
 import { randomUUID } from 'node:crypto'
-import type { AppDatabase } from '@acorn/node-core/server/db/index.ts'
+import type { PluginDatabase } from '@acorn/node-core/main/pluginStorage.ts'
+import type { CoreServices } from '@acorn/node-core/main/core/index.ts'
 import type { SecretService } from '@acorn/node-core/main/core/secrets.ts'
 import type { InternalEnvFactory } from '@acorn/node-core/server/auth/internalTokens.ts'
-import { taskRoot, workspaceIdFor } from '@acorn/node-core/main/taskWorktree.ts'
 import type {
   AgentEventRecord,
   AgentNormalizedEvent,
@@ -37,8 +37,14 @@ type LiveSession = {
 }
 
 export type AgentRuntimeOptions = {
-  db: AppDatabase
+  // This plugin's OWN SQLite file (main/pluginStorage.ts), not core's handle. Everything the engine
+  // reads and writes is in the ten `agent_*` tables now (node/schema.ts).
+  db: PluginDatabase
   dataDir: string
+  // The three questions this engine has to ask about a task and can no longer answer itself: where its
+  // worktree is, which workspace it belongs to (the pump's per-workspace concurrency limit), and
+  // whether a webhook's task exists.
+  core: CoreServices
   internalEnv: InternalEnvFactory
   secrets: SecretService
   currentUserId(): string | null
@@ -73,7 +79,8 @@ export class ManagedAgentEngine {
   readonly attachments: AgentAttachmentStore
   readonly artifacts: AgentArtifactStore
   readonly webhooks: AgentWebhookService
-  protected readonly db: AppDatabase
+  protected readonly db: PluginDatabase
+  protected readonly core: CoreServices
   protected readonly internalEnv: InternalEnvFactory
   // Every internal token this engine has handed to a provider child, so a leaked value can still be
   // scrubbed out of provider messages and transcripts. Bounded by the number of sessions started.
@@ -85,6 +92,12 @@ export class ManagedAgentEngine {
   protected readonly terminalHandoffRunning?: (sessionId: string) => Promise<boolean>
   protected readonly onCompletedTurn?: (taskId: string, transcriptTail: string) => Promise<void>
   protected readonly live = new Map<string, LiveSession>()
+  // Every in-flight provider reconnect delay (onProviderClosed schedules up to three per session).
+  // Tracked so stop() can cancel them: an untracked timer fires up to five seconds AFTER teardown and
+  // calls ensureSession, which would spawn a provider child and query a closed SQLite handle. It is a
+  // real failure and not a theoretical one — apps/node/src/service/runtime.test.ts starts the whole
+  // runtime four times in ONE process, so a leaked timer from boot 1 lands inside boot 2.
+  protected readonly reconnectTimers = new Set<ReturnType<typeof setTimeout>>()
   protected readonly listeners = new Set<RuntimeListener>()
   protected readonly providerEvents: DurableAgentEventBuffer
   protected readonly eventMaterializer: ProviderEventMaterializer
@@ -95,6 +108,7 @@ export class ManagedAgentEngine {
 
   constructor(options: AgentRuntimeOptions) {
     this.db = options.db
+    this.core = options.core
     this.internalEnv = options.internalEnv
     this.currentUserId = options.currentUserId
     this.registry = options.registry ?? agentDriverRegistry
@@ -102,15 +116,15 @@ export class ManagedAgentEngine {
     this.startTerminalHandoff = options.startTerminalHandoff
     this.terminalHandoffRunning = options.terminalHandoffRunning
     this.onCompletedTurn = options.onCompletedTurn
-    this.store = new AgentStore(options.db)
-    this.attachments = new AgentAttachmentStore(options.db, options.dataDir)
+    this.store = new AgentStore(options.db, options.core)
+    this.attachments = new AgentAttachmentStore(options.db, options.dataDir, options.core)
     this.artifacts = new AgentArtifactStore(options.db, options.dataDir)
     // The redaction list is now COLLECTED rather than computed once: each session gets its own
     // scoped internal token (server/auth/internalTokens.ts), so there is no single env record whose
     // secrets stand for every session's. #mintedSecrets accumulates them as sessions start, and the
     // materializer reads it live — one shared array it keeps a reference to.
     this.eventMaterializer = new ProviderEventMaterializer(this.artifacts, this.mintedSecrets)
-    this.webhooks = new AgentWebhookService(options.db, options.secrets)
+    this.webhooks = new AgentWebhookService(options.db, options.secrets, options.core)
     this.providerEvents = new DurableAgentEventBuffer((entry) => this.commitProviderEvent(entry))
   }
 
@@ -164,16 +178,28 @@ export class ManagedAgentEngine {
     await this.webhooks.reconcile()
   }
 
+  // Release everything this engine holds, in the order that cannot resurrect any of it: cancel the
+  // pending reconnects FIRST (each one would otherwise call ensureSession and repopulate `live`), then
+  // stop the live sessions, flush the durable event buffer's own per-session timers, and stop the
+  // webhook pump. Called from the plugin's dispose (node/index.ts) before the database is closed,
+  // because every step above may still write a final row.
   async stop(): Promise<void> {
     this.stopped = true
+    for (const timer of this.reconnectTimers) clearTimeout(timer)
+    this.reconnectTimers.clear()
     await Promise.all([...this.live.keys()].map((sessionId) => this.stopLive(sessionId)))
     await this.providerEvents.flushAll()
     await this.webhooks.stop()
     this.listeners.clear()
     this.eventMaterializer.clear()
+    this.providerCache = null
   }
 
   protected async ensureSession(session: AgentSession): Promise<LiveSession> {
+    // Checked here rather than only at the call sites: this is the ONE door into spawning or
+    // reconnecting a provider child, and after stop() the database handle is about to close. Without
+    // it, a turn already in flight through pump() could start a provider during teardown.
+    if (this.stopped) throw new Error('The managed agent runtime is shutting down.')
     const existing = this.live.get(session.id)
     if (existing?.handle) return existing
     if (existing?.startPromise) {
@@ -181,9 +207,9 @@ export class ManagedAgentEngine {
       return existing
     }
     if (session.controller !== 'acorn') throw new Error(`Session input is controlled by ${session.controller}.`)
-    const cwd = await taskRoot(this.db, session.taskId, this.currentUserId())
+    const cwd = await this.core.tasks.root(session.taskId, this.currentUserId())
     if (!cwd) throw new Error('The task has no mapped checkout.')
-    const workspaceId = await workspaceIdFor(this.db, session.taskId)
+    const workspaceId = await this.core.tasks.workspaceId(session.taskId)
     const driver = this.registry.create(session.providerId)
     if (!driver) throw new Error(`Managed provider is not registered: ${session.providerId}`)
     const live: LiveSession = existing ?? {
@@ -284,11 +310,17 @@ export class ManagedAgentEngine {
       return
     }
     await this.record(sessionId, null, { type: 'session_state', state: 'reconnecting', detail: message })
-    setTimeout(() => {
+    // Tracked and unref'd. Tracked so stop() cancels it; unref'd so a node draining between two
+    // reconnect attempts is not held open by a delay nobody is waiting on.
+    const timer = setTimeout(() => {
+      this.reconnectTimers.delete(timer)
+      if (this.stopped) return
       void this.store.requireSession(sessionId)
         .then((session) => this.ensureSession(session))
         .catch(() => undefined)
     }, RECONNECT_DELAYS_MS[attempt])
+    timer.unref?.()
+    this.reconnectTimers.add(timer)
   }
 
   protected async pump(): Promise<void> {

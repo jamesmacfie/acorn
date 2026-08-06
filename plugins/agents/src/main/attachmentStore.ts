@@ -3,8 +3,9 @@ import { constants } from 'node:fs'
 import { lstat, mkdir, open, readFile, unlink } from 'node:fs/promises'
 import { basename, join } from 'node:path'
 import { and, eq, isNotNull, isNull, lt, or } from 'drizzle-orm'
-import type { AppDatabase } from '@acorn/node-core/server/db/index.ts'
-import { schema } from '@acorn/node-core/server/db/index.ts'
+import type { PluginDatabase } from '@acorn/node-core/main/pluginStorage.ts'
+import type { CoreServices } from '@acorn/node-core/main/core/index.ts'
+import * as schema from '../node/schema'
 import type { AgentAttachment } from '@acorn/protocol/managedAgents.ts'
 
 const MAX_ATTACHMENT_BYTES = 10 * 1024 * 1024
@@ -66,9 +67,13 @@ function validatedMediaType(filename: string, supplied: string, bytes: Uint8Arra
 export class AgentAttachmentStore {
   readonly root: string
 
+  // `tasks` is core's, so the "does this task exist" guard below dereferences the plain id through
+  // CoreServices instead of joining. Only `upload` needs it — every other method here keys on an
+  // attachment id this file owns.
   constructor(
-    private readonly db: AppDatabase,
+    private readonly db: PluginDatabase,
     dataDir: string,
+    private readonly core: CoreServices,
   ) {
     this.root = join(dataDir, 'agent-objects')
   }
@@ -76,8 +81,7 @@ export class AgentAttachmentStore {
   async upload(taskId: string, filename: string, suppliedMediaType: string, bytes: Uint8Array): Promise<AgentAttachment> {
     if (!bytes.byteLength) throw new Error('Empty attachments are not supported.')
     if (bytes.byteLength > MAX_ATTACHMENT_BYTES) throw new Error('Attachments are limited to 10 MiB each.')
-    const [task] = await this.db.select({ id: schema.tasks.id }).from(schema.tasks).where(eq(schema.tasks.id, taskId)).limit(1)
-    if (!task) throw new Error('Task not found.')
+    if (!(await this.core.tasks.load(taskId))) throw new Error('Task not found.')
     const safeFilename = basename(filename).replace(/[\u0000-\u001f\u007f]/g, '').slice(0, 500) || 'attachment'
     const validated = validatedMediaType(safeFilename, suppliedMediaType.toLowerCase(), bytes)
     const hash = createHash('sha256').update(bytes).digest('hex')

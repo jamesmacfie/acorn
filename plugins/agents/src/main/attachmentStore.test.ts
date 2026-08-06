@@ -2,18 +2,26 @@ import { mkdtemp, rm, symlink } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { SecretService } from '@acorn/node-core/main/core/secrets.ts'
+import { createCoreServices } from '@acorn/node-core/main/core/index.ts'
 import { schema } from '@acorn/node-core/server/db/index.ts'
-import { makeTestDb, type TestDb } from '@acorn/node-core/server/routes/testDb.ts'
+import { makeTestDb, makeTestPluginDb, type TestDb, type TestPluginDb } from '@acorn/node-core/server/routes/testDb.ts'
+import { migrationsDir } from '../node/migrations'
 import { AgentAttachmentStore } from './attachmentStore'
 
-let testDb: TestDb
+// TWO databases, which is the point of the exercise: the attachment rows are in this plugin's file and
+// the `tasks` row the upload guard checks is in CORE's. The store cannot join them any more, so the test
+// seeds each through its own handle and hands the store a real CoreServices over core's.
+let coreDb: TestDb
+let pluginDb: TestPluginDb
 let dataDir: string
 let store: AgentAttachmentStore
 
 beforeEach(async () => {
-  testDb = makeTestDb()
+  coreDb = makeTestDb()
+  pluginDb = makeTestPluginDb('agents', migrationsDir())
   dataDir = await mkdtemp(join(tmpdir(), 'acorn-agent-objects-'))
-  await testDb.db.insert(schema.tasks).values({
+  await coreDb.db.insert(schema.tasks).values({
     id: 'task',
     title: 'Task',
     origin: 'local',
@@ -25,11 +33,16 @@ beforeEach(async () => {
     createdAt: 1,
     updatedAt: 1,
   })
-  store = new AgentAttachmentStore(testDb.db, dataDir)
+  store = new AgentAttachmentStore(
+    pluginDb.db,
+    dataDir,
+    createCoreServices({ secrets: new SecretService('11'.repeat(32)), db: coreDb.db }),
+  )
 })
 
 afterEach(async () => {
-  testDb.cleanup()
+  pluginDb.cleanup()
+  coreDb.cleanup()
   await rm(dataDir, { recursive: true, force: true })
 })
 

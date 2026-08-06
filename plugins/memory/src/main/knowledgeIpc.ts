@@ -91,8 +91,8 @@ export type MemoryKnowledge = MemoryIndex & {
 //
 // W6 moved the memory tool definitions into this plugin (main/agentTools.ts) and the notes conversion
 // removed `notesStore` from the value, so it is down from two internal stores to one. Two consumers are
-// left, both the composition root (contextSectionsWiring, managedAgentsWiring) plus one thunk each for
-// terminal and workflows. Nothing to promote until those move, and the cost of promoting it is a real
+// left: the composition root's contextSectionsWiring, plus one thunk each for agents, terminal and
+// workflows. Nothing to promote until those move, and the cost of promoting it is a real
 // coupling: an id in contract/ is importable by every plugin, which is what makes it worth withholding.
 export const MEMORY_KNOWLEDGE = capabilityId<MemoryKnowledge>('memory.knowledge')
 

@@ -3,16 +3,20 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { eq } from 'drizzle-orm'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import { schema } from '@acorn/node-core/server/db/index.ts'
-import { makeTestDb, type TestDb } from '@acorn/node-core/server/routes/testDb.ts'
+import { makeTestPluginDb, type TestPluginDb } from '@acorn/node-core/server/routes/testDb.ts'
+import * as schema from '../node/schema'
+import { migrationsDir } from '../node/migrations'
 import { AgentArtifactStore } from './artifactStore'
 
-let testDb: TestDb
+// This plugin's OWN migrated SQLite file, not core's. Deliberately not "makeTestDb with extra tables":
+// a test that could still see core's schema would keep passing after this store started reading a table
+// it no longer owns (server/routes/testDb.ts).
+let testDb: TestPluginDb
 let dataDir: string
 let store: AgentArtifactStore
 
 beforeEach(async () => {
-  testDb = makeTestDb()
+  testDb = makeTestPluginDb('agents', migrationsDir())
   dataDir = await mkdtemp(join(tmpdir(), 'acorn-agent-artifacts-'))
   store = new AgentArtifactStore(testDb.db, dataDir)
 })

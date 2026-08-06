@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto'
-import { taskRoot } from '@acorn/node-core/main/taskWorktree.ts'
+import { capabilityId } from '@acorn/node-core/server/plugin/capabilities.ts'
 import type {
   AgentDeleteResult,
   AgentRequest,
@@ -46,7 +46,7 @@ export class ManagedAgentRuntime extends ManagedAgentEngine {
     if (input.profileId !== provider.profileId) {
       throw new Error(`Provider '${provider.id}' requires profile '${provider.profileId}'.`)
     }
-    if (!(await taskRoot(this.db, input.taskId, this.currentUserId()))) {
+    if (!(await this.core.tasks.root(input.taskId, this.currentUserId()))) {
       throw new Error('The task has no mapped checkout.')
     }
     const session = await this.store.createSession(input, provider)
@@ -67,7 +67,7 @@ export class ManagedAgentRuntime extends ManagedAgentEngine {
     if (provider.profileId !== input.profileId) {
       throw new Error(`Provider '${provider.id}' requires profile '${provider.profileId}'.`)
     }
-    if (!(await taskRoot(this.db, input.taskId, this.currentUserId()))) {
+    if (!(await this.core.tasks.root(input.taskId, this.currentUserId()))) {
       throw new Error('The task has no mapped checkout.')
     }
     const parsed = parseAgentTranscript(input.content)
@@ -148,7 +148,7 @@ export class ManagedAgentRuntime extends ManagedAgentEngine {
     const session = await this.store.requireSession(sessionId)
     if (session.controller !== 'acorn') throw new Error(`Session input is controlled by ${session.controller}.`)
     if (session.archivedAt) throw new Error('Archived sessions cannot accept turns.')
-    const cwd = await taskRoot(this.db, session.taskId, this.currentUserId())
+    const cwd = await this.core.tasks.root(session.taskId, this.currentUserId())
     if (!cwd) throw new Error('The task has no mapped checkout.')
     await validateAgentInputFiles(cwd, input.input)
     assertBoundedJson('Effective agent policy', input.effectivePolicy, MAX_AGENT_POLICY_BYTES)
@@ -214,7 +214,7 @@ export class ManagedAgentRuntime extends ManagedAgentEngine {
   ): Promise<AgentTurn> {
     if (patch.input) {
       const session = await this.store.requireSession(sessionId)
-      const cwd = await taskRoot(this.db, session.taskId, this.currentUserId())
+      const cwd = await this.core.tasks.root(session.taskId, this.currentUserId())
       if (!cwd) throw new Error('The task has no mapped checkout.')
       await validateAgentInputFiles(cwd, patch.input)
     }
@@ -471,5 +471,18 @@ export class ManagedAgentRuntime extends ManagedAgentEngine {
 
 
 }
+
+// agents.runtime — the post-listener reconcile pass, exactly as `workflows.runner` is.
+//
+// Deliberately in main/ rather than contract/: its only consumer is the composition root, and an app may
+// import any plugin. A contract/ file is for the surface ANOTHER PLUGIN may import, and no plugin has any
+// business sweeping this one's unsettled sessions.
+//
+// One method, not the runtime object. reconcile() has to run after the listener binds (a resumed
+// session's tools call the node's own loopback surface) and before the root resolves its `reconciled`
+// promise, because the sweep interrupts every active turn and expires every pending request — anything
+// started before it would be clobbered. That ordering is the composition root's to own; publishing the
+// whole runtime would let it own rather more than that.
+export const AGENTS_RUNTIME = capabilityId<{ reconcile(): Promise<void> }>('agents.runtime')
 
 export type { AgentRuntimeOptions }

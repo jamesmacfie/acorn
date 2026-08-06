@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import { and, asc, desc, eq, gt, inArray, isNotNull, isNull, like, lt, or, sql } from 'drizzle-orm'
-import { schema } from '@acorn/node-core/server/db/index.ts'
+import * as schema from '../node/schema'
 import type {
   AgentEventPage,
   AgentEventRecord,
@@ -92,40 +92,28 @@ export class AgentStore extends AgentSessionRepository {
 
   async listSessions(filter: SessionListFilter = {}): Promise<AgentSessionList> {
     const limit = Math.min(Math.max(filter.limit ?? 50, 1), 100)
+    // The fourth of the workspace joins (sessionRepository.ts holds the other three). Resolved to task
+    // ids through core rather than joined, because `tasks` and `workspace_repos` are in core's database
+    // file and this table is in the plugin's. An empty workspace narrows to nothing — deliberately not
+    // to "unfiltered", which is how an id round trip could silently leak another workspace's sessions
+    // into the Agent Center.
+    const taskIds = await this.workspaceTaskIds(filter.workspaceId)
+    if (taskIds?.length === 0) return { sessions: [], nextCursor: null }
     const conditions = [
       filter.taskId ? eq(schema.agentSessions.taskId, filter.taskId) : undefined,
+      taskIds ? inArray(schema.agentSessions.taskId, taskIds) : undefined,
       filter.archived ? sql`${schema.agentSessions.archivedAt} IS NOT NULL` : isNull(schema.agentSessions.archivedAt),
       filter.attention ? sql`${schema.agentSessions.attention} NOT IN ('none', 'unread')` : undefined,
       filter.cursor ? lt(schema.agentSessions.updatedAt, filter.cursor) : undefined,
       filter.search ? like(schema.agentSessions.title, `%${filter.search.replace(/[%_]/g, '\\$&')}%`) : undefined,
     ].filter((item): item is Exclude<typeof item, undefined> => item != null)
 
-    const baseWhere = conditions.length ? and(...conditions) : undefined
-    let rows: Array<typeof schema.agentSessions.$inferSelect>
-    if (filter.workspaceId) {
-      const joined = await this.db
-        .select({ session: schema.agentSessions })
-        .from(schema.agentSessions)
-        .innerJoin(schema.tasks, eq(schema.tasks.id, schema.agentSessions.taskId))
-        .innerJoin(
-          schema.workspaceRepos,
-          and(
-            eq(schema.workspaceRepos.repoOwner, schema.tasks.repoOwner),
-            eq(schema.workspaceRepos.repoName, schema.tasks.repoName),
-          ),
-        )
-        .where(and(baseWhere, eq(schema.workspaceRepos.workspaceId, filter.workspaceId)))
-        .orderBy(desc(schema.agentSessions.updatedAt))
-        .limit(limit + 1)
-      rows = joined.map((item) => item.session)
-    } else {
-      rows = await this.db
-        .select()
-        .from(schema.agentSessions)
-        .where(baseWhere)
-        .orderBy(desc(schema.agentSessions.updatedAt))
-        .limit(limit + 1)
-    }
+    const rows = await this.db
+      .select()
+      .from(schema.agentSessions)
+      .where(conditions.length ? and(...conditions) : undefined)
+      .orderBy(desc(schema.agentSessions.updatedAt))
+      .limit(limit + 1)
     const hasMore = rows.length > limit
     const page = rows.slice(0, limit).map(mapAgentSession)
     return { sessions: page, nextCursor: hasMore ? String(page.at(-1)?.updatedAt ?? '') : null }

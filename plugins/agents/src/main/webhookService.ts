@@ -4,9 +4,10 @@ import { request as requestHttp } from 'node:http'
 import { request as requestHttps } from 'node:https'
 import { isIP } from 'node:net'
 import { and, asc, desc, eq, inArray, isNull, lte, or } from 'drizzle-orm'
-import type { AppDatabase } from '@acorn/node-core/server/db/index.ts'
-import { schema } from '@acorn/node-core/server/db/index.ts'
+import type { PluginDatabase } from '@acorn/node-core/main/pluginStorage.ts'
+import * as schema from '../node/schema'
 import { SecretUnavailableError, type SecretService } from '@acorn/node-core/main/core/secrets.ts'
+import type { CoreServices } from '@acorn/node-core/main/core/index.ts'
 import type { AgentWsFrame } from '@acorn/protocol/managedAgents.ts'
 
 export type AgentWebhookEventType = 'completion' | 'attention'
@@ -164,15 +165,21 @@ function postWebhook(
 }
 
 export class AgentWebhookService {
-  readonly #db: AppDatabase
+  readonly #db: PluginDatabase
   readonly #secrets: SecretService
+  // Only for the create-time "does this task exist" guard: `tasks` is core's table, so the plain id is
+  // dereferenced through the owner rather than joined. The URL validation below is untouched — it
+  // resolves DNS and rejects non-loopback plain http, credentials in the URL and non-https targets,
+  // which is a stronger guard than any host allowlist and is deliberately not moved to core.
+  readonly #core: CoreServices
   #timer: ReturnType<typeof setTimeout> | null = null
   #pumping = false
   #stopped = false
 
-  constructor(db: AppDatabase, secrets: SecretService) {
+  constructor(db: PluginDatabase, secrets: SecretService, core: CoreServices) {
     this.#db = db
     this.#secrets = secrets
+    this.#core = core
   }
 
   async create(input: {
@@ -180,13 +187,8 @@ export class AgentWebhookService {
     url: string
     events: AgentWebhookEventType[]
   }): Promise<{ webhook: AgentWebhook; signingSecret: string }> {
-    if (input.taskId) {
-      const [task] = await this.#db
-        .select({ id: schema.tasks.id })
-        .from(schema.tasks)
-        .where(eq(schema.tasks.id, input.taskId))
-        .limit(1)
-      if (!task) throw new Error('Webhook task not found.')
+    if (input.taskId && !(await this.#core.tasks.load(input.taskId))) {
+      throw new Error('Webhook task not found.')
     }
     const url = await validatedWebhookUrl(input.url)
     const events = [...new Set(input.events)]
