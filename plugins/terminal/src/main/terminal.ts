@@ -632,6 +632,8 @@ export function registerTerminalIpc(pluginDb: PluginDatabase, coreServices: Term
   // hub (setStreamHandlers below). The native repo picker is registered separately through preload.
   // The bridge closes over the engine internals (sessions map, agentSender, …).
   setTerminalBridge({
+    // Same lookup the WS hub gets as `streamTaskId` below, off the same map — see TerminalBridge.
+    taskIdFor: (id) => sessions.get(id)?.meta.taskId ?? null,
     list: async () => [...sessions.values()].map((s) => s.meta),
     profiles: async () => listProfiles(),
     create: (opts) => create(opts ?? ({} as CreateOpts)),

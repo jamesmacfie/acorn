@@ -1,8 +1,11 @@
+import type { Context } from 'hono'
 import { Hono } from 'hono'
 import { bodyLimit } from 'hono/body-limit'
+import { createMiddleware } from 'hono/factory'
 import { z } from 'zod'
 import { bridgeSlot, viaBridge } from '@acorn/node-core/server/bridge.ts'
 import type { AppEnv } from '@acorn/node-core/server/middleware/auth.ts'
+import { isTaskConfined, mayActOnTask } from '@acorn/node-core/server/middleware/requireUser.ts'
 import { respondError } from '@acorn/node-core/server/respond.ts'
 import type {
   AgentEventPage,
@@ -30,6 +33,16 @@ import {
 } from '../../shared/schemas'
 
 export type ManagedAgentsBridge = {
+  // Ownership resolvers, for the task-scope guard below. Three, because this surface is addressed by
+  // three different opaque ids and every one of them is a path to another task's agent: a session id
+  // (turns, cancel, fork, handoff, export), an attachment id, an artifact id. `null` = no such row,
+  // which the guard treats identically to "not yours" so the surface is not an id oracle.
+  //
+  // Narrow reads on purpose. The obvious alternative — resolve through `snapshot()` — loads every turn,
+  // event and request for a session just to read one column, on every request.
+  taskIdForSession(sessionId: string): Promise<string | null>
+  taskIdForAttachment(attachmentId: string): Promise<string | null>
+  taskIdForArtifact(artifactId: string): Promise<string | null>
   providers(force?: boolean): Promise<AgentProviderDescriptor[]>
   uploadAttachment(taskId: string, filename: string, mediaType: string, bytes: Uint8Array): Promise<AgentAttachment>
   attachment(attachmentId: string): Promise<AgentAttachment | null>
@@ -96,16 +109,62 @@ const idempotencyKey = (headers: Headers): string | null => {
   return key && key.length >= 8 && key.length <= 200 ? key : null
 }
 
+// A managed agent session drives a provider CLI in a task's worktree, so reaching another task's
+// session is the same class of hole `requireTaskScope` closes for core: read its transcript, enqueue a
+// turn, fork it, hand it to a terminal. None of these paths carries a taskId, so the mount over
+// /v2/p/:plugin/tasks/:id cannot see them and the router resolves the owner itself.
+//
+// One factory over three id kinds rather than three middlewares, because the shape is identical and only
+// the resolver differs.
+const owns = (param: string, resolve: (b: ManagedAgentsBridge, id: string) => Promise<string | null>) =>
+  createMiddleware<AppEnv>(async (c, next) => {
+    const id = c.req.param(param)
+    if (!id || !isTaskConfined(c)) return next()
+    const bridge = managedAgentsBridgeSlot.get()
+    if (!bridge) return next() // let viaBridge answer 503 — "no runtime" is not "not yours"
+    const taskId = await resolve(bridge, id)
+    if (!taskId || !mayActOnTask(c, taskId)) return respondError(c, 404, 'not_found')
+    await next()
+  })
+
+const ownsSession = owns('sessionId', (b, id) => b.taskIdForSession(id))
+
+// Pin a list/search filter to a confined caller's own task. Returns null when the caller explicitly
+// asked for a DIFFERENT task, which the route turns into the same 404 every other denial uses — silently
+// rewriting that request would answer a question nobody asked.
+const confineFilter = <F extends { taskId?: string }>(c: Context<AppEnv>, filter: F): F | null => {
+  const principal = c.get('principal')
+  if (!isTaskConfined(c)) return filter
+  const own = principal?.taskId
+  if (!own) return null // a confined principal with no task can see nothing
+  if (filter.taskId && filter.taskId !== own) return null
+  return { ...filter, taskId: own }
+}
+
 export const managedAgents = new Hono<AppEnv>()
   .use('*', bodyLimit({
     maxSize: 12 * 1024 * 1024,
     onError: (c) => respondError(c, 413, 'request_too_large'),
   }))
+  // ONE mount per id kind, not a bare/`/*` pair: measured, Hono's trailing `/*` matches zero segments, so
+  // `/sessions/:sessionId/*` already covers `/sessions/:sessionId` itself. (Core's index.ts registers both
+  // forms; that redundancy is harmless and pre-existing, and is not worth reproducing here.)
+  //
+  // The same zero-segment match is why `/sessions/search` needs an explicit skip: it is a STATIC sibling
+  // of `/sessions/:sessionId`, Hono applies `.use()` by path regardless of registration order, and
+  // without the skip the guard resolves a session literally named "search", gets null, and 404s a
+  // legitimate query for every confined caller — a working feature broken by its own guard. The search
+  // handler confines its own filter instead (below).
+  .use('/sessions/:sessionId/*', (c, next) => (c.req.param('sessionId') === 'search' ? next() : ownsSession(c, next)))
+  .use('/attachments/:attachmentId/*', owns('attachmentId', (b, id) => b.taskIdForAttachment(id)))
+  .use('/artifacts/:artifactId/*', owns('artifactId', (b, id) => b.taskIdForArtifact(id)))
   .get('/providers', (c) =>
     viaBridge(c, managedAgentsBridgeSlot, (bridge) => bridge.providers(c.req.query('force') === 'true')))
   .post('/attachments', async (c) => {
     const parsed = attachmentQuerySchema.safeParse(c.req.query())
     if (!parsed.success) return respondError(c, 400, 'bad_request')
+    // taskId is a QUERY param here, so no mount and no resolver reaches it.
+    if (!mayActOnTask(c, parsed.data.taskId)) return respondError(c, 404, 'not_found')
     const declaredSize = Number(c.req.header('content-length') ?? 0)
     if (!Number.isFinite(declaredSize) || declaredSize < 0) return respondError(c, 400, 'bad_content_length')
     if (declaredSize > 11 * 1024 * 1024) return respondError(c, 413, 'attachment_too_large')
@@ -148,10 +207,16 @@ export const managedAgents = new Hono<AppEnv>()
       'cache-control': 'private, no-store',
     })
   })
+  // Both list surfaces take an OPTIONAL taskId filter, so for a confined caller the filter is the
+  // authorization: omit it (or name another task) and the answer spans the node. Overriding it is
+  // narrower than 404ing the call — an agent legitimately lists and searches its own task's sessions,
+  // and `workspaceId` is left alone because the taskId pin already bounds the result either way.
   .get('/sessions', (c) => {
     const parsed = listQuerySchema.safeParse(c.req.query())
     if (!parsed.success) return respondError(c, 400, 'bad_request')
-    return viaBridge(c, managedAgentsBridgeSlot, (bridge) => bridge.listSessions(parsed.data))
+    const filter = confineFilter(c, parsed.data)
+    if (!filter) return respondError(c, 404, 'not_found')
+    return viaBridge(c, managedAgentsBridgeSlot, (bridge) => bridge.listSessions(filter))
   })
   .get('/sessions/search', (c) => {
     const parsed = z.object({
@@ -161,7 +226,9 @@ export const managedAgents = new Hono<AppEnv>()
       limit: z.coerce.number().int().min(1).max(100).optional(),
     }).safeParse(c.req.query())
     if (!parsed.success) return respondError(c, 400, 'bad_request')
-    const { q, ...filter } = parsed.data
+    const { q, ...rest } = parsed.data
+    const filter = confineFilter(c, rest)
+    if (!filter) return respondError(c, 404, 'not_found')
     return viaBridge(c, managedAgentsBridgeSlot, (bridge) => bridge.search(q, filter))
   })
   .post('/sessions', async (c) => {
@@ -169,11 +236,15 @@ export const managedAgents = new Hono<AppEnv>()
     if (!key) return respondError(c, 400, 'idempotency_key_required')
     const parsed = createAgentSessionSchema.safeParse(await c.req.json().catch(() => null))
     if (!parsed.success) return respondError(c, 400, 'bad_request')
+    // Spawning a provider CLI in a worktree: the taskId is in the body, so this is the check no mount
+    // can make. Without it a task-scoped agent starts sessions in any task.
+    if (!mayActOnTask(c, parsed.data.taskId)) return respondError(c, 404, 'not_found')
     return viaBridge(c, managedAgentsBridgeSlot, (bridge) => bridge.createSession(parsed.data, key))
   })
   .post('/transcript-imports', async (c) => {
     const parsed = importAgentTranscriptSchema.safeParse(await c.req.json().catch(() => null))
     if (!parsed.success) return respondError(c, 400, 'bad_request')
+    if (!mayActOnTask(c, parsed.data.taskId)) return respondError(c, 404, 'not_found')
     return viaBridge(c, managedAgentsBridgeSlot, (bridge) => bridge.importTranscript(parsed.data))
   })
   .get('/sessions/:sessionId', (c) => {

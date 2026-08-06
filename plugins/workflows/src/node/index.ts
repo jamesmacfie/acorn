@@ -206,6 +206,11 @@ export const workflowsPlugin = (dataDir: string, deps: WorkflowsPluginDeps): Nod
       live = runner
 
       setWorkflowBridge({
+        // One column off this plugin's own runs table — see WorkflowBridge for why the router needs it.
+        taskIdForRun: async (runId) => {
+          const [row] = await store.select({ taskId: workflowRuns.taskId }).from(workflowRuns).where(eq(workflowRuns.id, runId)).limit(1)
+          return row?.taskId ?? null
+        },
         // Declared workflows for a task (docs/workflows.md): `.acorn/workflows/*.toml` from the
         // worktree/checkout + ~/.acorn, parse/cycle errors surfaced as palette rows (13 §B).
         defs: async (taskId) => {

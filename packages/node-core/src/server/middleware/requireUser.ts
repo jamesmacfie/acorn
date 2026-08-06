@@ -79,6 +79,29 @@ export const mayActOnTask = (c: Context<AppEnv>, taskId: string): boolean => {
   return !!principal.taskId && principal.taskId === taskId
 }
 
+// Is this principal confined to a single task? The companion to mayActOnTask, for the two things the
+// per-task boolean cannot express on its own:
+//
+//   - FILTERING a list. `GET /v2/p/terminal/sessions` returns every PTY on the node, so a confined
+//     caller has to be handed a filtered roster rather than a yes/no about the whole call.
+//   - Deciding whether to RESOLVE at all. The opaque-id routes (a PTY session, an agent session, a
+//     workflow run) must look the owning task up before they can check it, and an unconfined caller
+//     should skip that lookup rather than pay for it.
+//
+// Deliberately a boolean and not "the task this principal is bound to". The id-returning form has to
+// use `null` for "unconfined", which collides with a `task`-scoped principal that somehow carries no
+// taskId — and those two must produce OPPOSITE answers (allow everything vs allow nothing). Today
+// verifyInternalToken rejects that token outright (server/auth/internalTokens.ts), so the collision is
+// unreachable; a guard whose correctness rests on an invariant two files away is still the wrong shape.
+// Pair this with mayActOnTask per item and the malformed case denies rather than admits.
+//
+// Both call sites were first written as `mayActOnTask(c, '')` — true for a device, false for a
+// task-scoped token, correct by accident and unreadable. Say the thing instead.
+export const isTaskConfined = (c: Context<AppEnv>): boolean => {
+  const principal = c.get('principal')
+  return !!principal && principal.kind !== 'device' && principal.scope !== 'service'
+}
+
 // Middleware form of mayActOnTask, for a whole router whose paths are all `/:id/...` task-scoped.
 //
 // An adversarial review found that mayActOnTask was applied at exactly ONE site (agentTools), so a
