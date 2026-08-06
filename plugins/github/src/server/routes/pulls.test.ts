@@ -4,20 +4,18 @@ import { Hono } from 'hono'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { Pull } from '@acorn/protocol/api.ts'
 import { settleBackground } from '@acorn/node-core/server/background.ts'
-import { getDb, schema } from '@acorn/node-core/server/db/index.ts'
-import { pullsResource } from '@acorn/node-core/server/db/resourceKeys.ts'
+import { pullsResource } from '../resourceKeys'
 import { gh } from '..'
 import type { AppEnv } from '@acorn/node-core/server/middleware/auth.ts'
 import { PULLS_STALE_AFTER_MS } from '@acorn/node-core/server/sync/policy.ts'
 import { pulls } from './pulls'
-import { makeTestDb, type TestDb } from '@acorn/node-core/server/routes/testDb.ts'
+import { makeTestDb, makeTestPluginDb, type TestDb, type TestPluginDb } from '@acorn/node-core/server/routes/testDb.ts'
+import { migrationsDir } from '../../node/migrations'
+import { createTaskService } from '@acorn/node-core/main/core/tasks.ts'
+import { schema } from '@acorn/node-core/server/db/index.ts'
 import { seedGithubIntegration } from '../testGithubToken'
 import type { Env } from '@acorn/node-core/main/bindings.ts'
-
-vi.mock('@acorn/node-core/server/db/index.ts', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('@acorn/node-core/server/db/index.ts')>()
-  return { ...actual, getDb: vi.fn() }
-})
+import { pullRequests, repos, syncState } from '../../node/schema'
 
 vi.mock('..', async (importOriginal) => {
   const actual = await importOriginal<typeof import('..')>()
@@ -57,33 +55,41 @@ const responseJson = (body: unknown, init?: ResponseInit) =>
 
 const ENC_KEY = '0'.repeat(64)
 
+// TWO handles, which is the point of this route's new signature. The PR mirror (`repos`,
+// `pull_requests`, `sync_state`) is this plugin's, in <data-root>/plugins/github.sqlite; `tasks` is
+// CORE's, so the Flow-B adoption assertion below reads core's handle and the route reaches it through
+// CoreServices.tasks rather than a query. The getDb mock that used to serve both is gone.
 describe('pulls list (serve-then-revalidate via the sync engine)', () => {
-  let t: TestDb
+  let core: TestDb
+  let plugin: TestPluginDb
   let app: Hono<AppEnv>
 
   beforeEach(async () => {
     vi.clearAllMocks()
-    t = makeTestDb()
-    vi.mocked(getDb).mockReturnValue(t.db)
+    core = makeTestDb()
+    plugin = makeTestPluginDb('github', migrationsDir())
     // The GitHub token comes from a stored integration row now, not from the caller's identity.
-    await seedGithubIntegration(t.db, 'james', 'token', ENC_KEY)
+    await seedGithubIntegration(core.db, 'james', 'token', ENC_KEY)
     // Seed the repo so resolveRepoForUser hits the mirror (no GitHub round-trip for resolution).
-    await t.db.insert(schema.repos).values({ userId: 'james', id: REPO_ID, owner: 'Runn-Fast', name: 'runn', private: true, defaultBranch: 'main', pushedAt: 0, fetchedAt: Date.now() })
+    await plugin.db.insert(repos).values({ userId: 'james', id: REPO_ID, owner: 'Runn-Fast', name: 'runn', private: true, defaultBranch: 'main', pushedAt: 0, fetchedAt: Date.now() })
     app = new Hono<AppEnv>()
     app.use('/api/*', async (c, next) => {
       c.set('principal', { kind: 'device', userId: 'james' })
       await next()
     })
-    app.route('/api/repos', pulls)
+    app.route('/api/repos', pulls(plugin.db, { tasks: createTaskService(core.db) }))
   })
 
-  afterEach(() => t.cleanup())
+  afterEach(() => {
+    plugin.cleanup()
+    core.cleanup()
+  })
 
-  const getOpen = () => app.fetch(new Request('http://acorn.test/api/repos/Runn-Fast/runn/pulls'), { ...testSecretEnv(ENC_KEY) } as Env)
+  const getOpen = () => app.fetch(new Request('http://acorn.test/api/repos/Runn-Fast/runn/pulls'), { DB: core.db, ...testSecretEnv(ENC_KEY) } as Env)
 
   it('cold: blocks on GitHub, mirrors the list, and adopts a matching local task (Flow B)', async () => {
     // A local-first task on the same branch with no PR yet — the refresh should adopt PR #42.
-    await t.db.insert(schema.tasks).values({
+    await core.db.insert(schema.tasks).values({
       id: 'task-1', title: 'wip', origin: 'local', repoOwner: 'Runn-Fast', repoName: 'runn', branch: 'feature-x', status: 'active', createdAt: 0, updatedAt: 0,
     })
     vi.mocked(gh).mockResolvedValueOnce(responseJson([ghPull], { headers: { etag: '"pulls-v1"' } }))
@@ -93,17 +99,17 @@ describe('pulls list (serve-then-revalidate via the sync engine)', () => {
     expect(await res.json()).toEqual([publicPull])
     expect(gh).toHaveBeenCalledWith('token', '/repos/Runn-Fast/runn/pulls?state=open&sort=updated&direction=desc&per_page=100', { headers: {} })
 
-    const [task] = await t.db.select().from(schema.tasks).where(eq(schema.tasks.id, 'task-1'))
+    const [task] = await core.db.select().from(schema.tasks).where(eq(schema.tasks.id, 'task-1'))
     expect(task.pullNumber).toBe(42) // Flow B: task inherited the freshly-opened PR
 
-    const [sync] = await t.db.select().from(schema.syncState).where(eq(schema.syncState.resource, pullsResource(REPO_ID, 'open')))
+    const [sync] = await plugin.db.select().from(syncState).where(eq(syncState.resource, pullsResource(REPO_ID, 'open')))
     expect(sync.etag).toBe('"pulls-v1"')
   })
 
   it('stale: serves the mirror immediately, then revalidates with If-None-Match → 304 keeps rows', async () => {
     const stale = Date.now() - PULLS_STALE_AFTER_MS - 1
-    await t.db.insert(schema.pullRequests).values({ userId: 'james', repoId: REPO_ID, number: 42, nodeId: 'PR_kw42', state: 'open', draft: false, title: 'Add sync engine', headRef: 'feature-x', baseRef: 'main', author: 'james', updatedAt: publicPull.updatedAt, fetchedAt: stale })
-    await t.db.insert(schema.syncState).values({ userId: 'james', resource: pullsResource(REPO_ID, 'open'), etag: '"pulls-v1"', fetchedAt: stale })
+    await plugin.db.insert(pullRequests).values({ userId: 'james', repoId: REPO_ID, number: 42, nodeId: 'PR_kw42', state: 'open', draft: false, title: 'Add sync engine', headRef: 'feature-x', baseRef: 'main', author: 'james', updatedAt: publicPull.updatedAt, fetchedAt: stale })
+    await plugin.db.insert(syncState).values({ userId: 'james', resource: pullsResource(REPO_ID, 'open'), etag: '"pulls-v1"', fetchedAt: stale })
     vi.mocked(gh).mockResolvedValueOnce(new Response(null, { status: 304 }))
 
     const res = await getOpen()
@@ -112,8 +118,8 @@ describe('pulls list (serve-then-revalidate via the sync engine)', () => {
 
     await settleBackground()
     expect(gh).toHaveBeenCalledWith('token', '/repos/Runn-Fast/runn/pulls?state=open&sort=updated&direction=desc&per_page=100', { headers: { 'If-None-Match': '"pulls-v1"' } })
-    expect(await t.db.select().from(schema.pullRequests).where(eq(schema.pullRequests.repoId, REPO_ID))).toHaveLength(1)
-    const [sync] = await t.db.select().from(schema.syncState).where(eq(schema.syncState.resource, pullsResource(REPO_ID, 'open')))
+    expect(await plugin.db.select().from(pullRequests).where(eq(pullRequests.repoId, REPO_ID))).toHaveLength(1)
+    const [sync] = await plugin.db.select().from(syncState).where(eq(syncState.resource, pullsResource(REPO_ID, 'open')))
     expect(sync.fetchedAt).toBeGreaterThan(stale)
   })
 })

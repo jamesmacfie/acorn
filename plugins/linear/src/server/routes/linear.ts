@@ -1,6 +1,4 @@
-import { and, eq, inArray } from 'drizzle-orm'
-import { Hono } from 'hono'
-import { getDb, schema } from '@acorn/node-core/server/db/index.ts'
+import { Hono, type Context } from 'hono'
 import {
   ISSUE_DETAIL_QUERY,
   ISSUE_ID_QUERY,
@@ -16,10 +14,15 @@ import {
   linearFetch,
 } from '..'
 import type { AppEnv } from '@acorn/node-core/server/middleware/auth.ts'
-import { ownerId } from '@acorn/node-core/server/middleware/requireUser.ts'
 import { respondError } from '@acorn/node-core/server/respond.ts'
 import { encodeCached, parseCached } from '@acorn/node-core/server/integrations/codec.ts'
-import { connectionHasCapability, forEachConnection, listProviderConnections } from '@acorn/node-core/server/integrations/connections.ts'
+import {
+  connectionHasCapability,
+  ownedConnections,
+  ownedExternalItems,
+  withOwnedConnections,
+  type StoredConnection,
+} from '@acorn/node-core/server/integrations/connections.ts'
 import {
   linearNodeToDetail,
   linearProvider,
@@ -27,11 +30,10 @@ import {
   linearSummaryOf,
   type LinearResourceInput,
 } from '../provider'
-import { runProviderResource } from '@acorn/node-core/server/integrations/resourceRuntime.ts'
+import { providerResource } from '@acorn/node-core/server/integrations/resourceRuntime.ts'
 import { providerRequestScheduler } from '@acorn/node-core/server/integrations/budgetRuntime.ts'
 import { ProviderOperationError } from '@acorn/node-core/server/integrations/types.ts'
 import type { LinearIssueDetail, LinearIssuesRequest, LinearIssuesResponse, LinearProject, LinearProjectIssue, LinearProjectIssuesResponse, LinearProjectsResponse } from '@acorn/protocol/api.ts'
-import type { Env } from '@acorn/node-core/main/bindings.ts'
 
 // TTL centralized in server/sync/policy.ts. Linear's reads fan out across all connected
 // integrations with partial results and per-item (`issues.fetchedAt`) freshness, so they do NOT use
@@ -40,26 +42,27 @@ import type { Env } from '@acorn/node-core/main/bindings.ts'
 const PROVIDER = 'linear'
 const ISSUES_TTL_MS = linearProvider.resources.find((resource) => resource.id === 'linear.issues')!.ttlMs
 
-type IntegrationRow = typeof schema.integrations.$inferSelect
-
 // Every connected Linear integration for the user (0..n). A bare identifier is resolved by trying
 // these in turn (see resolveIssues). ponytail: first-hit-wins — if two Linears both own an
 // identifier, the first row queried shadows the other. Accepted ceiling until colliding prefixes
 // across connected workspaces is a real case (then route by team prefix).
-const linearConnections = (c: { env: Env }, userId: string) =>
-  forEachConnection(getDb(c.env), userId, PROVIDER, c.env.SECRETS, async (row, key) => ({ row, key }))
+//
+// The owner comes from the request, not from a threaded `userId` argument: core reads it off the
+// principal inside the wrapper, so every handler below stopped needing to fetch and pass it, and the
+// plugin stopped needing core's database handle to get at the `integrations` rows in the first place.
+const linearConnections = (c: Context<AppEnv>) =>
+  withOwnedConnections(c, PROVIDER, async (row, key) => ({ row, key }))
 
-const providerFetch = (row: IntegrationRow, key: string, query: string, variables: Record<string, unknown>) =>
+const providerFetch = (row: StoredConnection, key: string, query: string, variables: Record<string, unknown>) =>
   providerRequestScheduler.run(PROVIDER, row.id, linearProvider.budgets, () => linearFetch(key, query, variables))
 
 // Run an issues-shaped query (ISSUES/DETAIL/ID) against each connection until one returns nodes.
 // Returns the resolving connection so results can be cached/commented under the right integrationId.
 async function resolveIssues(
-  c: { env: Env },
-  connections: { row: IntegrationRow; key: string }[],
+  connections: { row: StoredConnection; key: string }[],
   query: string,
   variables: Record<string, unknown>,
-): Promise<{ integrationId: string; key: string; nodes: LinearNode[]; row: IntegrationRow } | null> {
+): Promise<{ integrationId: string; key: string; nodes: LinearNode[]; row: StoredConnection } | null> {
   for (const { row, key } of connections) {
     const res = await providerFetch(row, key, query, variables)
     if (linearError(res)) continue
@@ -81,8 +84,7 @@ export const linear = new Hono<AppEnv>()
   // Projects across every connected Linear integration, each tagged with its connection so the
   // picker can span multiple Linears (docs/workspaces-and-tasks.md). A failing connection is skipped.
   .get('/projects', async (c) => {
-    const uid = ownerId(c)
-    const connections = await linearConnections(c, uid)
+    const connections = await linearConnections(c)
     if (!connections.length) return respondError(c, 403, 'provider_not_connected')
     const out: LinearProject[] = []
     for (const { row, key } of connections) {
@@ -99,8 +101,7 @@ export const linear = new Hono<AppEnv>()
   })
   // Active issues for the given project ids within ONE connection (?integration=<id>&ids=).
   .get('/project-issues', async (c) => {
-    const uid = ownerId(c)
-    const connections = await linearConnections(c, uid)
+    const connections = await linearConnections(c)
     const connection = connections.find(({ row }) => row.id === c.req.query('integration'))
     if (!connection) return respondError(c, 403, 'provider_not_connected')
     const { row, key } = connection
@@ -127,21 +128,21 @@ export const linear = new Hono<AppEnv>()
   // Batch enrichment for referenced tickets: summaries, serve-then-revalidate (10-min TTL). Stale
   // identifiers are resolved across all connections; each result is cached under its connection.
   .post('/issues', async (c) => {
-    const uid = ownerId(c)
-    const db = getDb(c.env)
-    const storedConnections = await listProviderConnections(db, uid, PROVIDER)
+    const storedConnections = await ownedConnections(c, PROVIDER)
     if (!storedConnections.length) return respondError(c, 403, 'provider_not_connected')
-    const connections = await linearConnections(c, uid)
+    const connections = await linearConnections(c)
 
     const body = (await c.req.json().catch(() => ({}))) as Partial<LinearIssuesRequest>
     const identifiers = [...new Set((body.identifiers ?? []).filter((s) => typeof s === 'string'))]
       .slice(0, linearProvider.budgets.maxResolutionBatch)
     if (!identifiers.length) return c.json({ issues: [] } satisfies LinearIssuesResponse)
 
-    const cached = await db
-      .select()
-      .from(schema.issues)
-      .where(and(eq(schema.issues.userId, uid), eq(schema.issues.provider, PROVIDER), inArray(schema.issues.identifier, identifiers)))
+    // Deliberately NOT scoped to one connection: a bare `ENG-42` has not been resolved to a workspace
+    // yet, so the cache read spans every connected Linear and the sort below is what picks the winner.
+    // `listByIdentifier` is the store's one read with that shape, and it absorbs the empty-list case
+    // that `inArray` turns into a SQL error.
+    const items = ownedExternalItems(c)
+    const cached = await items.listByIdentifier(PROVIDER, identifiers)
     const now = Date.now()
     const byId = new Map<string, ReturnType<NonNullable<typeof linearProvider.codec>['mergeSummary']>>()
     const byConnectionAndId = new Map<string, ReturnType<NonNullable<typeof linearProvider.codec>['mergeSummary']>>()
@@ -182,10 +183,7 @@ export const linear = new Hono<AppEnv>()
           byConnectionAndId.set(`${row.id}:${node.identifier}`, item)
           found.add(node.identifier)
           const data = encodeCached(item, linearProvider.budgets.maxCachedItemBytes)
-          await db
-            .insert(schema.issues)
-            .values({ userId: uid, integrationId: row.id, provider: PROVIDER, identifier: node.identifier, data, fetchedAt: now })
-            .onConflictDoUpdate({ target: [schema.issues.userId, schema.issues.integrationId, schema.issues.identifier], set: { data, fetchedAt: now } })
+          await items.write({ connectionId: row.id, provider: PROVIDER, identifier: node.identifier, data, fetchedAt: now })
         }
         stale = stale.filter((id) => !found.has(id))
       } catch {
@@ -198,18 +196,15 @@ export const linear = new Hono<AppEnv>()
   })
   // Full detail for the side panel. refresh=1 (panel open) always refetches to stay current.
   .get('/issues/:identifier', async (c) => {
-    const uid = ownerId(c)
     const identifier = c.req.param('identifier')
     const connectionId = c.req.query('integration')
     const refresh = c.req.query('refresh') === '1'
-    const db = getDb(c.env)
     const now = Date.now()
 
+    // A known connection is a single-resource read, so it goes through the sync runtime; core assembles
+    // the database handle, the owner and the secret service from the request behind `providerResource`.
     if (connectionId) {
-      const result = await runProviderResource<LinearResourceInput, LinearIssueDetail>({
-        db,
-        userId: uid,
-        secrets: c.env.SECRETS,
+      const result = await providerResource<LinearResourceInput, LinearIssueDetail>(c, {
         providerId: PROVIDER,
         connectionId,
         resourceId: 'linear.issues',
@@ -219,12 +214,11 @@ export const linear = new Hono<AppEnv>()
       return result.ok ? c.json(result.value) : respondError(c, result.failure.status, result.failure.error, result.failure.detail)
     }
 
-    const stored = await listProviderConnections(db, uid, PROVIDER)
+    const items = ownedExternalItems(c)
+    const stored = await ownedConnections(c, PROVIDER)
     if (!stored.length) return respondError(c, 403, 'provider_not_connected')
-    const cached = await db
-      .select()
-      .from(schema.issues)
-      .where(and(eq(schema.issues.userId, uid), eq(schema.issues.provider, PROVIDER), eq(schema.issues.identifier, identifier)))
+    // One identifier, still every connection: which workspace owns it is exactly what is unknown here.
+    const cached = await items.listByIdentifier(PROVIDER, [identifier])
     const order = new Map(stored.map((connection, index) => [connection.id, index]))
     const cachedRow = cached.sort((a, b) => (order.get(a.integrationId) ?? Number.MAX_SAFE_INTEGER) - (order.get(b.integrationId) ?? Number.MAX_SAFE_INTEGER))[0]
     const cachedItem = cachedRow
@@ -234,13 +228,13 @@ export const linear = new Hono<AppEnv>()
       return c.json(cachedItem.value.detail)
     }
 
-    const connections = await linearConnections(c, uid)
+    const connections = await linearConnections(c)
     if (!connections.length && cachedItem?.ok && cachedItem.value.detail) return c.json(cachedItem.value.detail)
     if (!connections.length) return respondError(c, 403, 'provider_not_connected')
 
     const filter = issuesFilter([identifier])
     if (!filter) return respondError(c, 404, 'provider_resource_not_found')
-    const resolved = await resolveIssues(c, connections, ISSUE_DETAIL_QUERY, { filter })
+    const resolved = await resolveIssues(connections, ISSUE_DETAIL_QUERY, { filter })
     if (!resolved) {
       if (cachedItem?.ok && cachedItem.value.detail) return c.json(cachedItem.value.detail)
       return respondError(c, 404, 'provider_resource_not_found')
@@ -248,17 +242,13 @@ export const linear = new Hono<AppEnv>()
     const detail = linearNodeToDetail(resolved.nodes[0])
     const item = linearProvider.codec!.withDetail(linearRef(resolved.integrationId, detail.identifier, detail.url), linearSummaryOf(detail), detail, now)
     const data = encodeCached(item, linearProvider.budgets.maxCachedItemBytes)
-    await db
-      .insert(schema.issues)
-      .values({ userId: uid, integrationId: resolved.integrationId, provider: PROVIDER, identifier: detail.identifier, data, fetchedAt: now })
-      .onConflictDoUpdate({ target: [schema.issues.userId, schema.issues.integrationId, schema.issues.identifier], set: { data, fetchedAt: now } })
+    await items.write({ connectionId: resolved.integrationId, provider: PROVIDER, identifier: detail.identifier, data, fetchedAt: now })
     return c.json(detail)
   })
   // Add a comment (or threaded reply via parentId) to a ticket. Client refetches detail after.
   .post('/issues/:identifier/comments', async (c) => {
-    const uid = ownerId(c)
     const requestedConnectionId = c.req.query('integration')
-    const allConnections = await linearConnections(c, uid)
+    const allConnections = await linearConnections(c)
     const connections = requestedConnectionId
       ? allConnections.filter(({ row }) => row.id === requestedConnectionId)
       : allConnections
@@ -271,7 +261,7 @@ export const linear = new Hono<AppEnv>()
     // commentCreate keys off the internal issue UUID; resolve it (and the owning connection's key).
     const filter = issuesFilter([identifier])
     if (!filter) return respondError(c, 404, 'provider_resource_not_found')
-    const resolved = await resolveIssues(c, connections, ISSUE_ID_QUERY, { filter })
+    const resolved = await resolveIssues(connections, ISSUE_ID_QUERY, { filter })
     const issueId = resolved?.nodes[0]?.id
     if (!resolved || !issueId) return respondError(c, 404, 'provider_resource_not_found')
     if (!connectionHasCapability(resolved.row, 'comments')) return respondError(c, 403, 'provider_missing_scope')

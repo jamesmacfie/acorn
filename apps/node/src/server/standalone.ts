@@ -26,9 +26,8 @@ import { NOTES_STORE } from '@acorn/plugin-notes/contract/store.ts'
 import { seedTaskNotes } from '@acorn/plugin-notes/main/seedTaskNotes.ts'
 import { reconcileTmux } from '@acorn/plugin-terminal/main/terminal.ts'
 import { WORKFLOWS_RUNNER } from '@acorn/plugin-workflows/main/workflowRunner.ts'
+import { GITHUB_MIRROR } from '@acorn/plugin-github/contract/mirror.ts'
 import { nodePlugins } from './plugins'
-import { failingChecksFor } from '../wiring/workflowWiring'
-import { prepareSecurityState } from '../wiring/startupSecurity'
 
 // ACORN_DATA_DIR names the root explicitly. It is the same variable this node hands its own child
 // processes (service/runtime.ts's internalApiEnv), so one spelling of "which root" covers the whole
@@ -38,7 +37,6 @@ import { prepareSecurityState } from '../wiring/startupSecurity'
 // share one root explicitly instead of racing over SQLite.
 const root = openDataRoot(process.env.ACORN_DATA_DIR || devDataDir())
 const runtime = makeRuntime(root)
-await prepareSecurityState(runtime)
 await runtime.IDEMPOTENCY.cleanupExpired() // reclaim yesterday's replay rows; see service/runtime.ts
 setWorktreesRoot(join(root.dir, 'worktrees'))
 
@@ -86,14 +84,15 @@ await initPlugins(
     },
     // A standalone node now runs the workflow engine too, which is a BEHAVIOUR CHANGE: this entry never
     // called registerWorkflowIpc, so `dev:node` answered a flat 503 for every workflow route. It serves
-    // them now, on the same terms as the supervised root — including the github-mirror CI read, which the
-    // app supplies because github is not a NodePlugin.
+    // them now, on the same terms as the supervised root — including the github-mirror CI read, which is
+    // that plugin's own capability, resolved at call time.
     workflows: {
       internalEnv,
       reconciled,
       currentUserId: () => runtime.ACTIVE_IDENTITY.get(),
       memoryReviewTrigger: (taskId, transcriptTail) => knowledgeAt().memoryReviewTrigger(taskId, transcriptTail),
-      failingChecks: (taskId) => failingChecksFor(runtime.DB, runtime.ACTIVE_IDENTITY.get(), taskId),
+      failingChecks: async (taskId) =>
+        (await capabilities.get(GITHUB_MIRROR)?.failingChecks(runtime.ACTIVE_IDENTITY.get(), taskId)) ?? null,
     },
   }),
   { capabilities, core },

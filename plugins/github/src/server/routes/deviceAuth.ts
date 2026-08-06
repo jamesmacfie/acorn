@@ -1,5 +1,4 @@
 import { Hono } from 'hono'
-import { getDb } from '@acorn/node-core/server/db/index.ts'
 import { connectProvider } from '@acorn/node-core/server/integrations/connections.ts'
 import { providerError } from '@acorn/node-core/server/integrations/respondProvider.ts'
 import type { AppEnv } from '@acorn/node-core/server/middleware/auth.ts'
@@ -97,7 +96,11 @@ export const githubDeviceAuth = new Hono<AppEnv>()
     // core connection routes use.
     try {
       const integration = await connectProvider(
-        getDb(c.env),
+        // CORE's handle, deliberately: this writes core's `integrations` row through core's own
+        // connectProvider, and touches none of this plugin's tables. `c.env.DB` rather than getDb() only
+        // because importing from server/db is what the schema ratchet measures, and there is nothing about
+        // github's schema in this call.
+        c.env.DB,
         userId,
         { providerId: GITHUB_PROVIDER, credentials: { accessToken: body.access_token } },
         c.env.SECRETS,

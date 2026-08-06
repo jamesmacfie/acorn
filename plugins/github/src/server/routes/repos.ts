@@ -1,8 +1,7 @@
 import { and, eq } from 'drizzle-orm'
 import { Hono } from 'hono'
 import type { Repo } from '@acorn/protocol/api.ts'
-import { getDb, schema } from '@acorn/node-core/server/db/index.ts'
-import { reposResource } from '@acorn/node-core/server/db/resourceKeys.ts'
+import { reposResource } from '../resourceKeys'
 import type { AppEnv } from '@acorn/node-core/server/middleware/auth.ts'
 import { ownerId } from '@acorn/node-core/server/middleware/requireUser.ts'
 import { respondError } from '@acorn/node-core/server/respond.ts'
@@ -10,13 +9,19 @@ import { REPOS_STALE_AFTER_MS } from '@acorn/node-core/server/sync/policy.ts'
 import { type Cached, serveThenRevalidate } from '@acorn/node-core/server/sync/engine.ts'
 import { readCachedRepos, refreshRepos, toPublicRepo } from './repoMirror'
 import { githubToken } from '../githubToken'
+import { repos as reposTable, syncState } from '../../node/schema'
+import type { PluginDatabase } from '@acorn/node-core/main/pluginStorage.ts'
 
-export const repos = new Hono<AppEnv>()
+// A FACTORY over this plugin's own database, not a module-scope router reading getDb(c.env). The tables
+// live in <data-root>/plugins/github.sqlite now, and `c.env` deliberately carries no per-plugin handles
+// (docs/vNext/data.md § Plugin DBs). The handle arrives at plugin init, so no request can reach an
+// unmigrated database — and a second startServiceRuntime in one process builds fresh routers over its own
+// handle instead of inheriting a closed one.
+export const repos = (db: PluginDatabase) => new Hono<AppEnv>()
   .get('/', async (c) => {
     const uid = ownerId(c)
     const token = await githubToken(c)
 
-    const db = getDb(c.env)
     const userId = uid // ponytail: login as the scope key — stable enough; revisit if logins churn.
     const resource = reposResource()
 
@@ -25,7 +30,7 @@ export const repos = new Hono<AppEnv>()
     // self-heals on the first refresh. Cold only when nothing was ever fetched.
     const read = async (): Promise<Cached<Repo[]> | null> => {
       const [[sync], rows] = await Promise.all([
-        db.select().from(schema.syncState).where(and(eq(schema.syncState.userId, userId), eq(schema.syncState.resource, resource))),
+        db.select().from(syncState).where(and(eq(syncState.userId, userId), eq(syncState.resource, resource))),
         readCachedRepos(db, userId),
       ])
       if (!sync && rows.length === 0) return null
@@ -48,10 +53,9 @@ export const repos = new Hono<AppEnv>()
 
     // Force the next GET stale: zero both freshness sources (sync row + legacy row fetchedAt). The
     // ETag stays, so the refetch can still 304 (nothing changed → cheap re-validate).
-    const db = getDb(c.env)
     await db.batch([
-      db.update(schema.repos).set({ fetchedAt: 0 }).where(eq(schema.repos.userId, uid)),
-      db.update(schema.syncState).set({ fetchedAt: 0 }).where(and(eq(schema.syncState.userId, uid), eq(schema.syncState.resource, reposResource()))),
+      db.update(reposTable).set({ fetchedAt: 0 }).where(eq(reposTable.userId, uid)),
+      db.update(syncState).set({ fetchedAt: 0 }).where(and(eq(syncState.userId, uid), eq(syncState.resource, reposResource()))),
     ])
     return c.body(null, 204)
   })

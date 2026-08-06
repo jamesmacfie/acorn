@@ -30,11 +30,14 @@ describe('context section wiring', () => {
       db: testDb.db,
       notesStore: store,
       memory: { reconciled: async () => {}, list: async () => [], get: async () => null, search: async () => [], indexSlice: async () => [] },
+      // This suite is about the NOTES seam; the github mirror is absent, which is the degraded case the
+      // `pr` section is built to render as an empty section rather than an error.
+      mirror: () => undefined,
     })
   })
 
   afterEach(() => {
-    setContextSections(buildContextSections({ notes: async () => [], memory: async () => [] }))
+    setContextSections(buildContextSections({ notes: async () => [], memory: async () => [], pullRequest: async () => null }))
     testDb.cleanup()
     rmSync(dir, { recursive: true, force: true })
   })

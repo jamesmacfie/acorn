@@ -54,9 +54,10 @@ export type NodePlugin = {
   name: string
   // github, terminal and agents: core assumes their capabilities exist, so they cannot be disabled.
   required?: boolean
-  // Awaited before the listener binds. That is not a convenience: apps/node/src/wiring/
-  // startupSecurity.ts migrates plaintext HTTP-client fields, and a request served before that
-  // finishes would read half-migrated rows.
+  // Awaited before the listener binds. That is not a convenience, and there are now two plugins relying on
+  // it: plugins/http migrates plaintext credential fields in its init, and plugins/github prunes orphaned
+  // mirror rows in its own. A request served before either finished would read half-migrated rows, or a PR
+  // whose parent repo row was about to be deleted.
   init(ctx: NodePluginContext): void | Promise<void>
   // Release what init() opened. Awaited during teardown BEFORE the data root's lock is dropped, because
   // a plugin's SQLite file is in WAL mode and the composition root's own invariant is "only drop the

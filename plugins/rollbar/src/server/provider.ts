@@ -1,7 +1,5 @@
-import { and, eq } from 'drizzle-orm'
 import type { RollbarItemMetadata, RollbarItemSummary } from '@acorn/protocol/api.ts'
 import type { ExternalRef } from '@acorn/protocol/integrations.ts'
-import { schema } from '@acorn/node-core/server/db/index.ts'
 import {
   itemByCounterPath,
   itemByIdPath,
@@ -170,23 +168,21 @@ const rollbarCodec: CachedItemCodec<RollbarItemSummary, RollbarItemMetadata, Rol
 const resourceKey = (connectionId: string, input: RollbarResourceInput) =>
   `provider:rollbar:${connectionId}:items:${input.kind === 'list' ? 'list' : input.identifier}`
 
-const issueRow = (context: Pick<RefreshCtx, 'db' | 'userId'>, integrationId: string, identifier: string) =>
-  context.db
-    .select()
-    .from(schema.issues)
-    .where(and(eq(schema.issues.userId, context.userId), eq(schema.issues.integrationId, integrationId), eq(schema.issues.identifier, identifier)))
-
 type RefreshCtx = ProviderResourceRefreshContext
 
+// The read-modify-write below is the reason every persist path reads first: an item's cached envelope
+// carries BOTH list membership and detail freshness, and each refresh only owns one of them. The store
+// exposes exactly that read/upsert pair over core's `issues` table, already scoped to this owner
+// (integrations/itemStore.ts explains why the table is core's and not rollbar's).
 async function upsertIssue(context: RefreshCtx, summary: RollbarItemSummary, cached: RollbarCached): Promise<void> {
   const data = encodeCached(cached, context.limits.maxCachedItemBytes)
-  await context.db
-    .insert(schema.issues)
-    .values({ userId: context.userId, integrationId: summary.integrationId, provider: 'rollbar', identifier: summary.identifier, data, fetchedAt: context.now })
-    .onConflictDoUpdate({
-      target: [schema.issues.userId, schema.issues.integrationId, schema.issues.identifier],
-      set: { data, fetchedAt: context.now },
-    })
+  await context.items.write({
+    connectionId: summary.integrationId,
+    provider: 'rollbar',
+    identifier: summary.identifier,
+    data,
+    fetchedAt: context.now,
+  })
 }
 
 function refForSummary(summary: RollbarItemSummary): ExternalRef {
@@ -195,7 +191,7 @@ function refForSummary(summary: RollbarItemSummary): ExternalRef {
 
 async function persistSummary(context: RefreshCtx, summary: RollbarItemSummary): Promise<void> {
   const ref = refForSummary(summary)
-  const [previous] = await issueRow(context, summary.integrationId, summary.identifier)
+  const previous = await context.items.read(summary.integrationId, summary.identifier)
   const parsed = previous ? parseCached(rollbarCodec, previous.data, ref) : null
   await upsertIssue(context, summary, rollbarCodec.mergeSummary(parsed?.ok ? parsed.value : null, ref, summary, context.now))
 }
@@ -203,7 +199,7 @@ async function persistSummary(context: RefreshCtx, summary: RollbarItemSummary):
 async function persistDetail(context: RefreshCtx, detail: RollbarItemMetadata): Promise<void> {
   const summary = summaryOf(detail)
   const ref = { ...refForSummary(summary), ...(detail.url ? { url: detail.url } : {}) }
-  const [previous] = await issueRow(context, detail.integrationId, detail.identifier)
+  const previous = await context.items.read(detail.integrationId, detail.identifier)
   const parsed = previous ? parseCached(rollbarCodec, previous.data, ref) : null
   const base = rollbarCodec.withDetail(ref, summary, detail, context.now)
   // Detail write must NOT touch list membership (docs/caching.md): preserve the existing listFetchedAt.
@@ -225,7 +221,7 @@ const rollbarItemsResource: MirroredResourceContribution<RollbarResourceInput, R
   key: resourceKey,
   async read(context, input) {
     if (input.kind === 'detail') {
-      const [row] = await issueRow(context, context.connection.id, input.identifier)
+      const row = await context.items.read(context.connection.id, input.identifier)
       if (!row) return null
       const parsed = parseCached(rollbarCodec, row.data, { providerId: 'rollbar', connectionId: context.connection.id, displayId: input.identifier })
       // Only a real detail read counts as cached; its freshness is detailFetchedAt (never the list's).
@@ -235,15 +231,13 @@ const rollbarItemsResource: MirroredResourceContribution<RollbarResourceInput, R
     }
 
     const key = resourceKey(context.connection.id, input)
-    const [state, rows] = await Promise.all([
-      context.db.select().from(schema.syncState).where(and(eq(schema.syncState.userId, context.userId), eq(schema.syncState.resource, key))),
-      context.db.select().from(schema.issues).where(and(
-        eq(schema.issues.userId, context.userId),
-        eq(schema.issues.integrationId, context.connection.id),
-        eq(schema.issues.provider, 'rollbar'),
-      )),
+    // A list has no row of its own to carry its fetch time, so the marker and the membership are two
+    // reads that must agree; the store keeps them adjacent (`readMarker` hands back the timestamp
+    // rather than a row, because a marker is nothing but a timestamp).
+    const [listAt, rows] = await Promise.all([
+      context.items.readMarker(key),
+      context.items.listForConnection(context.connection.id, 'rollbar'),
     ])
-    const listAt = state[0]?.fetchedAt ?? null
     if (listAt == null) return null // never listed → cold, force a refresh
     // Current membership is exact: only rows stamped with THIS list's fetch time (docs/caching.md).
     const items = rows.flatMap((row) => {
@@ -256,7 +250,7 @@ const rollbarItemsResource: MirroredResourceContribution<RollbarResourceInput, R
     const label = context.connection.label
     try {
       if (input.kind === 'detail') {
-        const [row] = await issueRow(context, context.connection.id, input.identifier)
+        const row = await context.items.read(context.connection.id, input.identifier)
         const cachedItemId = row
           ? (() => {
               const p = parseCached(rollbarCodec, row.data, { providerId: 'rollbar', connectionId: context.connection.id, displayId: input.identifier })
@@ -286,10 +280,9 @@ const rollbarItemsResource: MirroredResourceContribution<RollbarResourceInput, R
       // Absent rows are NOT deleted — they may still be linked to a task; they simply drop out of the
       // list because they no longer carry the current listFetchedAt.
       for (const summary of summaries) await persistSummary(context, summary)
-      await context.db
-        .insert(schema.syncState)
-        .values({ userId: context.userId, resource: resourceKey(context.connection.id, input), fetchedAt: context.now })
-        .onConflictDoUpdate({ target: [schema.syncState.userId, schema.syncState.resource], set: { fetchedAt: context.now } })
+      // Stamped LAST, and only on success: the marker is what `read` compares each row's listFetchedAt
+      // against, so writing it before the rows would publish a membership that is still being filled in.
+      await context.items.writeMarker(resourceKey(context.connection.id, input), context.now)
       return { ok: true }
     } catch {
       return { ok: false, failure: { error: 'provider_unavailable', status: 502 } }
@@ -298,7 +291,7 @@ const rollbarItemsResource: MirroredResourceContribution<RollbarResourceInput, R
 }
 
 async function cachedItemId(context: ProviderResourceContext, identifier: string): Promise<string | null> {
-  const [row] = await issueRow(context, context.connection.id, identifier)
+  const row = await context.items.read(context.connection.id, identifier)
   if (!row) return null
   const parsed = parseCached(rollbarCodec, row.data, {
     providerId: 'rollbar', connectionId: context.connection.id, displayId: identifier,

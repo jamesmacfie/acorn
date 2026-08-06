@@ -12,7 +12,7 @@ partitioned per node. V1's bearer-authenticated `/api/v1` automation listener is
 > For the Cloudflare-Workers→Electron migration history and rationale, see
 > [docs/electron.md](./docs/electron.md); current topic docs describe the shipped Electron runtime.
 > vNext Phase 1 landed the protocol v2 / fleet spine, and Phase 2 is **partially** done (core services,
-> the terminal scope-shed, scoped internal tokens, and the plugin host, with ten of thirteen plugins through it).
+> the terminal scope-shed, scoped internal tokens, and the plugin host, with the database split COMPLETE — no plugin reads core's schema).
 > Deliberate divergences and — importantly — what has NOT landed are recorded in
 > [docs/vNext/phase1-notes.md](./docs/vNext/phase1-notes.md) and
 > [docs/vNext/phase2-notes.md](./docs/vNext/phase2-notes.md). Read the Phase 2 notes before assuming a
@@ -45,8 +45,10 @@ partitioned per node. V1's bearer-authenticated `/api/v1` automation listener is
   handle, and `apps/node/src/server/plugins.ts` is the list — a plugin absent from it does not exist.
   Cross-plugin collaboration is a `CapabilityRegistry` (typed, late-bound, optional-by-default) and a
   `NodeEventBus`, both owned by the service runtime rather than module singletons. `contract/` is the
-  only cross-plugin import surface, boundary-tested. **Migration is partial** — ten plugins are through
-  the host; github, linear and rollbar still wire through `apps/node/src/wiring/*.ts`.
+  only cross-plugin import surface, boundary-tested. Eleven plugins are through the host and
+  `apps/node/src/server/routes.ts` is empty — the app names no product route module. `linear` and
+  `rollbar` are not `NodePlugin`s because they own no tables and no routes of their own; they register
+  through the integration-provider registry.
 - **CoreServices** (`packages/node-core/src/main/core/`) is what a plugin consumes instead of
   deep-importing core: `fs` (one symlink-aware confinement), `git` (one seam, `GIT_TERMINAL_PROMPT=0`,
   `SSH_AUTH_SOCK` passthrough), `proc` (**the** process broker: allowlisted env, process-group kill,
@@ -76,8 +78,8 @@ partitioned per node. V1's bearer-authenticated `/api/v1` automation listener is
   serve-then-revalidate; an on-disk dir caches immutable blob/patch bodies by SHA for all repos; IndexedDB
   persists the client query cache (one key per node, `acorn-cache:<nodeId>`). A node's data root holds
   `core.sqlite` (**not** V1's `acorn.sqlite`), `plugins/<name>.sqlite` (one per table-owning plugin —
-  Phase 2, `main/pluginStorage.ts`; agents, changes, database, http, memory, terminal and workflows so
-  far), `node.json` (nodeId + last port),
+  Phase 2, `main/pluginStorage.ts`; agents, changes, database, github, http, memory, terminal,
+  workflows), `node.json` (nodeId + last port),
   `node.lock`, `tls/`, `blobs/`, `logs/` and `worktrees/`; `openDataRoot` mints the identity, takes an exclusive pidfile
   lock and **refuses a V1 root outright**. It lives at `apps/node/.acorn/` in development (gitignored)
   and Electron's `userData` root when packaged.

@@ -49,7 +49,6 @@ const MOUNTED_CORE_ROUTES: ReadonlyArray<readonly [method: string, path: string]
   ['DELETE', '/v2/core/pair'],
   ['GET', '/v2/core/devices'],
   ['DELETE', '/v2/core/devices/:id'],
-  ['GET', '/v2/core/pins'],
   ['PUT', '/v2/core/prefs'],
   ['GET', '/v2/core/workspaces'],
   ['GET', '/v2/core/workspaces/:id/projects'],
@@ -112,6 +111,10 @@ const MOUNTED_PLUGIN_ROUTES: ReadonlyArray<readonly [method: string, path: strin
   ['POST', '/v2/p/github/repos/:owner/:repo/pulls'], // prCreate
   ['GET', '/v2/p/github/repos/:owner/:repo/branches'],
   ['GET', '/v2/p/github/repos/:owner/:repo/mentions'],
+  // Moved out of core with `pinned_repos` in Phase 2: this was ['GET', '/v2/core/pins'] through Phase 1.
+  // The table is keyed by a GitHub repo id, which nothing outside the mirror can resolve.
+  ['GET', '/v2/p/github/pins'],
+  ['PUT', '/v2/p/github/pins'],
   ['POST', '/v2/p/github/auth/device/start'],
   ['GET', '/v2/p/linear/projects'],
   ['GET', '/v2/p/rollbar/items'],

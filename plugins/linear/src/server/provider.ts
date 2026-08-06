@@ -1,7 +1,5 @@
-import { and, eq } from 'drizzle-orm'
 import type { LinearActivity, LinearAttachment, LinearComment, LinearIssueDetail, LinearIssueSummary, LinearRelatedIssue, LinearRelation, LinearRelationKind } from '@acorn/protocol/api.ts'
 import type { ExternalRef } from '@acorn/protocol/integrations.ts'
-import { schema } from '@acorn/node-core/server/db/index.ts'
 import {
   COMMENT_CREATE,
   ISSUE_DETAIL_QUERY,
@@ -194,15 +192,11 @@ const linearIssuesResource: MirroredResourceContribution<LinearResourceInput, Li
   ttlMs: 10 * 60_000,
   merge: 'summary-preserves-detail',
   key: (connectionId, input) => `provider:linear:${connectionId}:issues:${input.identifier}`,
+  // The cached row comes from the external-item store rather than a query against core's `issues`
+  // table: the store is already scoped to this owner, so the `userId` clause every one of these reads
+  // used to carry by hand cannot be forgotten or pointed at somebody else (integrations/itemStore.ts).
   async read(context, input) {
-    const [row] = await context.db
-      .select()
-      .from(schema.issues)
-      .where(and(
-        eq(schema.issues.userId, context.userId),
-        eq(schema.issues.integrationId, context.connection.id),
-        eq(schema.issues.identifier, input.identifier),
-      ))
+    const row = await context.items.read(context.connection.id, input.identifier)
     if (!row) return null
     const parsed = parseCached(linearCodec, row.data, refForIdentifier(context.connection.id, input.identifier))
     return parsed.ok && parsed.value.detail ? { data: parsed.value.detail, fetchedAt: row.fetchedAt } : null
@@ -220,13 +214,9 @@ const linearIssuesResource: MirroredResourceContribution<LinearResourceInput, Li
       const detail = linearNodeToDetail(node)
       const ref = refForIdentifier(context.connection.id, detail.identifier, detail.url)
       const data = encodeCached(linearCodec.withDetail(ref, linearSummaryOf(detail), detail, context.now), context.limits.maxCachedItemBytes)
-      await context.db
-        .insert(schema.issues)
-        .values({ userId: context.userId, integrationId: context.connection.id, provider: 'linear', identifier: detail.identifier, data, fetchedAt: context.now })
-        .onConflictDoUpdate({
-          target: [schema.issues.userId, schema.issues.integrationId, schema.issues.identifier],
-          set: { data, fetchedAt: context.now },
-        })
+      // `write` is an upsert keyed on (owner, connection, identifier) — the same conflict target the
+      // raw statement declared, kept in one place now that two providers share the table.
+      await context.items.write({ connectionId: context.connection.id, provider: 'linear', identifier: detail.identifier, data, fetchedAt: context.now })
       return { ok: true }
     } catch {
       return { ok: false, failure: { error: 'provider_unavailable', status: 502 } }

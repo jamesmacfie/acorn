@@ -13,9 +13,9 @@ import type {
   ProviderErrorCode,
   PublicIntegrationProvider,
 } from '@acorn/protocol/integrations.ts'
-import type { AppDatabase } from '../db'
-import { schema } from '../db'
 import type { AppEnv } from '../middleware/auth'
+import type { StoredConnection } from './connections'
+import type { ExternalItemStore } from './itemStore'
 import type { Cached, RefreshResult } from '../sync/engine'
 
 export type ProviderCredentials = Record<string, string>
@@ -105,9 +105,14 @@ export type ProviderMutation = {
 }
 
 export type ProviderResourceContext = {
-  db: AppDatabase
+  // The external-item read model, NOT core's database handle. A provider plugin gets exactly the six
+  // reads/writes it performs against core's `issues` / `issue_resources` / freshness markers
+  // (integrations/itemStore.ts explains why those tables stayed core's and this store exists instead of
+  // a per-plugin migration). Handing over `db: AppDatabase` was the coupling: it let a provider write
+  // any core table, and it is what kept linear and rollbar on the schema ratchet.
+  items: ExternalItemStore
   userId: string
-  connection: typeof schema.integrations.$inferSelect
+  connection: StoredConnection
   now: number
   limits: Pick<ProviderBudgets, 'maxPages' | 'maxCachedItemBytes'>
 }

@@ -32,6 +32,21 @@ export type ContextNotesSource = (
 ) => Promise<{ slug: string; scope: NoteScope; title: string; kind: string; body: string; author: NoteAuthor }[]>
 export type ContextMemorySource = (taskId: string, repo: string) => Promise<{ name: string; description: string }[]>
 
+// The `pr` section's source, injected for the same reason `notes` and `memory` already were: the data
+// lives in a plugin's own SQLite file and core has no handle to it. github's mirror moved out of core's
+// schema in Phase 2, so the section that used to join `repos ⋈ pull_requests ⋈ pr_files` here now asks
+// the plugin (plugins/github/src/contract/mirror.ts § pullRequest).
+//
+// `null` covers three cases the section must render identically — no PR on the task, the repo is not
+// mirrored, the PR is not cached yet — and one more the injected form adds: github disabled entirely.
+// All four produce an empty section rather than an error, which is what the section did before.
+export type ContextPullRequestSource = (
+  userId: string,
+  repoOwner: string,
+  repoName: string,
+  pullNumber: number,
+) => Promise<{ number: number; title: string; body: string | null; changedFiles: string[] } | null>
+
 const truncateBytes = (value: string, max: number): string => {
   if (Buffer.byteLength(value, 'utf8') <= max) return value
   let bytes = Buffer.from(value, 'utf8').subarray(0, Math.max(0, max - Buffer.byteLength('…')))
@@ -81,30 +96,26 @@ const formatOmitted = (omitted: number) => (omitted ? `\n- … ${omitted} more o
 // the client assemble the exact send block from a single `include=*` inventory by filtering ctx.sections
 // and calling formatContextBlock — no second curated fetch. A new section that reads sibling inclusion
 // state into its compact breaks that byte-exactness silently. Don't.
-export function buildContextSections(sources: { notes: ContextNotesSource; memory: ContextMemorySource }): ContextSectionContribution[] {
+export function buildContextSections(sources: {
+  notes: ContextNotesSource
+  memory: ContextMemorySource
+  pullRequest: ContextPullRequestSource
+}): ContextSectionContribution[] {
   return [
     {
       id: 'pr',
       label: 'Pull request',
       defaultIncluded: false,
       budget: { maxItems: 1, maxBytesPerItem: 2_000, overflow: 'truncate-tail' },
-      async assemble({ db, userLogin, task }) {
+      async assemble({ userLogin, task }) {
         if (task.pullNumber == null) return { items: [] }
-        const [repoRow] = await db
-          .select()
-          .from(schema.repos)
-          .where(and(eq(schema.repos.userId, userLogin), eq(schema.repos.owner, task.repoOwner), eq(schema.repos.name, task.repoName)))
-        if (!repoRow) return { items: [] }
-        const [pr] = await db
-          .select()
-          .from(schema.pullRequests)
-          .where(and(eq(schema.pullRequests.userId, userLogin), eq(schema.pullRequests.repoId, repoRow.id), eq(schema.pullRequests.number, task.pullNumber)))
+        // The three-table join this used to run against core's database is now one capability call into
+        // plugins/github (which sorts the changed-file list, as the join's ORDER did). Core keeps the
+        // budgeting, the `legacy` projection and the compact formatter — those are the section contract,
+        // not the storage.
+        const pr = await sources.pullRequest(userLogin, task.repoOwner, task.repoName, task.pullNumber)
         if (!pr) return { items: [] }
-        const files = await db
-          .select({ path: schema.prFiles.path })
-          .from(schema.prFiles)
-          .where(and(eq(schema.prFiles.userId, userLogin), eq(schema.prFiles.repoId, repoRow.id), eq(schema.prFiles.number, task.pullNumber)))
-        const changedFiles = files.map((file) => file.path).sort()
+        const changedFiles = pr.changedFiles
         const legacy = { number: pr.number, title: pr.title, body: pr.body, changedFiles }
         return {
           items: [{ id: `pr:${pr.number}`, kind: 'PR', label: `#${pr.number} ${pr.title}`, body: pr.body ?? undefined, details: changedFiles }],
@@ -221,7 +232,9 @@ export function buildContextSections(sources: { notes: ContextNotesSource; memor
   ]
 }
 
-let registry = buildContextSections({ notes: async () => [], memory: async () => [] })
+// The default registry every section source answers empty. It is what a node serves before
+// wireContextSections runs, and what a test that never wires sources sees.
+let registry = buildContextSections({ notes: async () => [], memory: async () => [], pullRequest: async () => null })
 
 export function setContextSections(sections: ContextSectionContribution[]): void {
   const ids = new Set<string>()

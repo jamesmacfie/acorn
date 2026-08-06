@@ -2,6 +2,7 @@ import { buildContextSections, setContextSections } from '@acorn/node-core/serve
 import type { AppDatabase } from '@acorn/node-core/server/db/index.ts'
 import type { NoteAuthor, NoteLocation, NoteScope } from '@acorn/protocol/notes.ts'
 import type { MemoryIndex } from '@acorn/plugin-memory/main/knowledgeIpc.ts'
+import type { GithubMirrorCapability } from '@acorn/plugin-github/contract/mirror.ts'
 import type { NotesStoreCapability } from '@acorn/plugin-notes/contract/store.ts'
 import { loadTask, workspaceIdForRepo } from '@acorn/node-core/main/taskWorktree.ts'
 
@@ -19,13 +20,26 @@ export type ContextSectionsDeps = {
   // The memory index reads, bound to the memory plugin's own SQLite file (its `memory.knowledge`
   // capability). The app cannot query that database itself — it has no handle to it.
   memory: MemoryIndex
+  // plugins/github's mirror, for the `pr` section — the third source to arrive this way, and the reason
+  // is identical to the other two: `repos` / `pull_requests` / `pr_files` are in that plugin's own SQLite
+  // file now, so the join the section used to run against core's handle is a capability call.
+  //
+  // A THUNK, not the resolved capability, and unlike notes/memory this one is genuinely optional. Two
+  // reasons: it is resolved per assembly rather than captured at wiring time, and `get` returning
+  // undefined (a node whose github init failed) has to render an EMPTY pr section rather than throw
+  // through a prompt build. `require` here would turn a degraded mirror into a broken context assembler.
+  mirror: () => GithubMirrorCapability | undefined
 }
 
 // Context contributions close over service-process stores once at composition time. The server route,
 // compact formatter and renderer all consume their serialized result; no per-domain source setters.
-export function wireContextSections({ db, notesStore, memory }: ContextSectionsDeps): void {
+export function wireContextSections({ db, notesStore, memory, mirror }: ContextSectionsDeps): void {
   setContextSections(
     buildContextSections({
+      // Absent capability and cold mirror converge on `null`, which the section renders as no PR at all —
+      // the same output it produced when the repo was simply not mirrored yet.
+      pullRequest: async (userId, repoOwner, repoName, pullNumber) =>
+        (await mirror()?.pullRequest(userId, repoOwner, repoName, pullNumber)) ?? null,
       notes: async (taskId) => {
         const task = await loadTask(db, taskId)
         if (!task) return []

@@ -4,20 +4,18 @@ import { Hono } from 'hono'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { Repo } from '@acorn/protocol/api.ts'
 import { settleBackground } from '@acorn/node-core/server/background.ts'
-import { getDb, schema } from '@acorn/node-core/server/db/index.ts'
-import { reposResource } from '@acorn/node-core/server/db/resourceKeys.ts'
+import { reposResource } from '../resourceKeys'
 import { gh } from '..'
 import type { AppEnv } from '@acorn/node-core/server/middleware/auth.ts'
 import { REPOS_STALE_AFTER_MS } from '@acorn/node-core/server/sync/policy.ts'
 import { repos } from './repos'
-import { makeTestDb, type TestDb } from '@acorn/node-core/server/routes/testDb.ts'
+import { makeTestDb, makeTestPluginDb, type TestDb, type TestPluginDb } from '@acorn/node-core/server/routes/testDb.ts'
+import { migrationsDir } from '../../node/migrations'
 import { seedGithubIntegration } from '../testGithubToken'
 import type { Env } from '@acorn/node-core/main/bindings.ts'
-
-vi.mock('@acorn/node-core/server/db/index.ts', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('@acorn/node-core/server/db/index.ts')>()
-  return { ...actual, getDb: vi.fn() }
-})
+// Aliased away from the `repos` ROUTER imported above — the table and the route factory now share a name
+// because the table moved into this plugin. Production repos.ts aliases it the same way.
+import { repos as reposTable, syncState } from '../../node/schema'
 
 vi.mock('..', async (importOriginal) => {
   const actual = await importOriginal<typeof import('..')>()
@@ -40,29 +38,36 @@ const publicRepo: Repo = { id: 19847, owner: 'Runn-Fast', name: 'runn', private:
 const responseJson = (body: unknown, init?: ResponseInit) =>
   new Response(JSON.stringify(body), { ...init, headers: { 'content-type': 'application/json', ...init?.headers } })
 
+// TWO handles, and no getDb mock any more: `repos`/`sync_state` are this plugin's tables in
+// <data-root>/plugins/github.sqlite and the router is a factory over that handle, while the stored GitHub
+// credential still lives in CORE's `integrations` table and is read through the core seam off `env.DB`.
 describe('repos list (serve-then-revalidate via the sync engine)', () => {
-  let t: TestDb
+  let core: TestDb
+  let plugin: TestPluginDb
   let app: Hono<AppEnv>
 
   beforeEach(async () => {
     vi.clearAllMocks()
-    t = makeTestDb()
-    vi.mocked(getDb).mockReturnValue(t.db)
+    core = makeTestDb()
+    plugin = makeTestPluginDb('github', migrationsDir())
     // The GitHub token comes from a stored integration row now, not from the caller's identity.
-    await seedGithubIntegration(t.db, 'james', 'token', ENC_KEY)
+    await seedGithubIntegration(core.db, 'james', 'token', ENC_KEY)
     app = new Hono<AppEnv>()
     app.use('/api/*', async (c, next) => {
       c.set('principal', { kind: 'device', userId: 'james' })
       await next()
     })
-    app.route('/api/repos', repos)
+    app.route('/api/repos', repos(plugin.db))
   })
 
-  afterEach(() => t.cleanup())
+  afterEach(() => {
+    plugin.cleanup()
+    core.cleanup()
+  })
 
-  const get = () => app.fetch(new Request('http://acorn.test/api/repos'), { ...testSecretEnv(ENC_KEY) } as Env)
+  const get = () => app.fetch(new Request('http://acorn.test/api/repos'), { DB: core.db, ...testSecretEnv(ENC_KEY) } as Env)
   const syncRow = () =>
-    t.db.select().from(schema.syncState).where(and(eq(schema.syncState.userId, 'james'), eq(schema.syncState.resource, reposResource())))
+    plugin.db.select().from(syncState).where(and(eq(syncState.userId, 'james'), eq(syncState.resource, reposResource())))
 
   it('cold: blocks on GitHub, mirrors the list + ETag, serves it', async () => {
     vi.mocked(gh).mockResolvedValueOnce(responseJson([ghRepo], { headers: { etag: '"repos-v1"' } }))
@@ -85,8 +90,8 @@ describe('repos list (serve-then-revalidate via the sync engine)', () => {
 
   it('stale: serves the mirror immediately, then revalidates with If-None-Match → 304 keeps rows', async () => {
     const stale = Date.now() - REPOS_STALE_AFTER_MS - 1
-    await t.db.insert(schema.repos).values({ userId: 'james', ...publicRepo, pushedAt: publicRepo.pushedAt, fetchedAt: stale })
-    await t.db.insert(schema.syncState).values({ userId: 'james', resource: reposResource(), etag: '"repos-v1"', fetchedAt: stale })
+    await plugin.db.insert(reposTable).values({ userId: 'james', ...publicRepo, pushedAt: publicRepo.pushedAt, fetchedAt: stale })
+    await plugin.db.insert(syncState).values({ userId: 'james', resource: reposResource(), etag: '"repos-v1"', fetchedAt: stale })
     vi.mocked(gh).mockResolvedValueOnce(new Response(null, { status: 304 }))
 
     const res = await get()
@@ -96,16 +101,16 @@ describe('repos list (serve-then-revalidate via the sync engine)', () => {
     await settleBackground()
     expect(gh).toHaveBeenCalledWith('token', '/user/repos?sort=pushed&direction=desc&per_page=100', { headers: { 'If-None-Match': '"repos-v1"' } })
     // 304 → rows untouched, freshness bumped.
-    expect(await t.db.select().from(schema.repos)).toHaveLength(1)
+    expect(await plugin.db.select().from(reposTable)).toHaveLength(1)
     const [sync] = await syncRow()
     expect(sync.fetchedAt).toBeGreaterThan(stale)
   })
 
   it('POST /refresh zeroes freshness so the next read revalidates', async () => {
-    await t.db.insert(schema.repos).values({ userId: 'james', ...publicRepo, pushedAt: publicRepo.pushedAt, fetchedAt: Date.now() })
-    await t.db.insert(schema.syncState).values({ userId: 'james', resource: reposResource(), etag: '"repos-v1"', fetchedAt: Date.now() })
+    await plugin.db.insert(reposTable).values({ userId: 'james', ...publicRepo, pushedAt: publicRepo.pushedAt, fetchedAt: Date.now() })
+    await plugin.db.insert(syncState).values({ userId: 'james', resource: reposResource(), etag: '"repos-v1"', fetchedAt: Date.now() })
 
-    const res = await app.fetch(new Request('http://acorn.test/api/repos/refresh', { method: 'POST' }), { ...testSecretEnv(ENC_KEY) } as Env)
+    const res = await app.fetch(new Request('http://acorn.test/api/repos/refresh', { method: 'POST' }), { DB: core.db, ...testSecretEnv(ENC_KEY) } as Env)
     expect(res.status).toBe(204)
     const [sync] = await syncRow()
     expect(sync.fetchedAt).toBe(0)

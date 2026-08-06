@@ -29,6 +29,7 @@ import type { AppDatabase } from '@acorn/node-core/server/db/index.ts'
 import { schema } from '@acorn/node-core/server/db/index.ts'
 import type { BrowserDesktopCapability } from '@acorn/protocol/desktopCapabilities.ts'
 import { loadTask } from '@acorn/node-core/main/taskWorktree.ts'
+import { repoMirrorSource } from '@acorn/node-core/server/repoMirror.ts'
 
 // The owner id these contributions are registered under. Not a plugin namespace: the tools below are
 // core's own, plus two groups being held by an unconverted plugin. It exists so they can be removed as a
@@ -112,11 +113,12 @@ export function buildAgentTools(deps: AgentToolsDeps): AgentToolContribution[] {
       handler: async (_a, ctx) => {
         const t = await loadTask(db, ctx.taskId)
         if (!t) throw new ToolError('not_found', 'no such task')
-        const [repoRow] = await db
-          .select()
-          .from(schema.repos)
-          .where(and(eq(schema.repos.userId, ctx.userLogin), eq(schema.repos.owner, t.repoOwner), eq(schema.repos.name, t.repoName)))
-        return { owner: t.repoOwner, name: t.repoName, defaultBranch: repoRow?.defaultBranch ?? null, branch: t.branch, worktreePath: t.worktreePath }
+        // Everything but the default branch is core's `tasks` row. The default branch is only GitHub's
+        // opinion and its mirror is that plugin's own SQLite file now, so it arrives through the one slot
+        // core fills with it (@acorn/node-core/server/repoMirror.ts). null was already a valid answer for an
+        // unmirrored repo, so a disabled github plugin degrades into a case this tool's callers handle.
+        const defaultBranch = await repoMirrorSource().defaultBranch(ctx.userLogin, t.repoOwner, t.repoName)
+        return { owner: t.repoOwner, name: t.repoName, defaultBranch, branch: t.branch, worktreePath: t.worktreePath }
       },
     },
 

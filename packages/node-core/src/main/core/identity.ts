@@ -16,12 +16,13 @@
 // quarantine this function's whole contract is about: "exactly one identity" and "the currently
 // selected one" are different questions, and only the first is safe to hand a legacy row to.
 //
-// The `repos` half is still a core read of a table github will own once it converts. That is the same
-// grandfathered debt phase2-notes.md records for agentTools/contextSections.ts and storageFootprint.ts,
-// and it is strictly better positioned here: when github becomes a NodePlugin this function is the ONE
-// place that has to grow a github-side answer, instead of the http plugin needing an import edge.
+// The `repos` half is no longer a core table read: github owns that table now, and this function grew the
+// github-side answer its previous comment said it would — through `repoMirrorSource()`, the one slot the
+// composition root fills with that plugin's capability (server/repoMirror.ts). The http plugin still needs
+// no import edge, which was the point.
 import type { AppDatabase } from '../../server/db'
 import { schema } from '../../server/db'
+import { repoMirrorSource } from '../../server/repoMirror'
 
 export type IdentityService = {
   // The one identity this node knows, or null when there are none or more than one. Callers that
@@ -32,13 +33,19 @@ export type IdentityService = {
 export function createIdentityService(db: AppDatabase): IdentityService {
   return {
     sole: async () => {
-      // Two tables because either can be the only evidence of an identity: a login that connected
-      // GitHub has `repos` rows, and one that only ever changed a preference has `prefs` rows.
-      const [prefUsers, repoUsers] = await Promise.all([
+      // Two sources because either can be the only evidence of an identity: a login that connected
+      // GitHub has mirror rows, and one that only ever changed a preference has `prefs` rows. They now sit
+      // in two different SQLite files, which is why the second arrives through the mirror slot rather than
+      // as a second query on this handle.
+      //
+      // An UNFILLED slot makes this see fewer identities, so it is more likely to return null — and null is
+      // the fail-closed answer that refuses to hand an unowned legacy row to a guessed owner. The
+      // degradation therefore cannot cause a wrong claim, only a skipped one.
+      const [prefUsers, mirrorUsers] = await Promise.all([
         db.selectDistinct({ userId: schema.prefs.userId }).from(schema.prefs),
-        db.selectDistinct({ userId: schema.repos.userId }).from(schema.repos),
+        repoMirrorSource().identities(),
       ])
-      const identities = new Set([...prefUsers, ...repoUsers].map((row) => row.userId))
+      const identities = new Set([...prefUsers.map((row) => row.userId), ...mirrorUsers])
       return identities.size === 1 ? [...identities][0]! : null
     },
   }

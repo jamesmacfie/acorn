@@ -1,12 +1,13 @@
 import { and, eq, isNull, sql } from 'drizzle-orm'
-import type { AppDatabase } from '@acorn/node-core/server/db/index.ts'
-import { schema } from '@acorn/node-core/server/db/index.ts'
-import { chunkRowsByColumnBudget } from '@acorn/node-core/server/db/batch.ts'
-import { pullsResource } from '@acorn/node-core/server/db/resourceKeys.ts'
+import { chunkRowsByColumnBudget } from '@acorn/node-core/server/rows.ts'
+import { pullsResource } from '../resourceKeys'
 import type { RefreshResult, RouteResult } from '@acorn/node-core/server/sync/engine.ts'
 import { gh, ghError, ghGraphQL, ghGraphQLResult } from '..'
 import { fetchFiles, mirrorFiles, mirrorPr, PR_FRAGMENT, type GqlPull, type PatchBlobStore } from './prMirror'
 import { deletePullMirrorStatements } from '../mirrorRetention'
+import { pullRequests, syncState } from '../../node/schema'
+import type { PluginDatabase } from '@acorn/node-core/main/pluginStorage.ts'
+import type { CoreServices } from '@acorn/node-core/main/core/index.ts'
 
 type GitHubFetcher = (token: string, path: string, init?: RequestInit) => Promise<Response>
 
@@ -39,7 +40,8 @@ query PR($owner: String!, $repo: String!, $number: Int!) {
 /** Force-refresh the mirrored open-PR list for one repository. */
 export async function refreshOpenPulls(
   token: string,
-  db: AppDatabase,
+  db: PluginDatabase,
+  core: Pick<CoreServices, 'tasks'>,
   key: PullRefreshKey,
   fetcher: GitHubFetcher = gh,
 ): Promise<RefreshResult> {
@@ -47,8 +49,8 @@ export async function refreshOpenPulls(
   const resource = pullsResource(repoId, 'open')
   const [sync] = await db
     .select()
-    .from(schema.syncState)
-    .where(and(eq(schema.syncState.userId, userId), eq(schema.syncState.resource, resource)))
+    .from(syncState)
+    .where(and(eq(syncState.userId, userId), eq(syncState.resource, resource)))
   const res = await fetcher(token, `/repos/${owner}/${repo}/pulls?state=open&sort=updated&direction=desc&per_page=100`, {
     headers: sync?.etag ? { 'If-None-Match': sync.etag } : {},
   })
@@ -56,9 +58,9 @@ export async function refreshOpenPulls(
 
   if (res.status === 304) {
     await db
-      .insert(schema.syncState)
+      .insert(syncState)
       .values({ userId, resource, etag: sync?.etag ?? null, fetchedAt: now })
-      .onConflictDoUpdate({ target: [schema.syncState.userId, schema.syncState.resource], set: { fetchedAt: now } })
+      .onConflictDoUpdate({ target: [syncState.userId, syncState.resource], set: { fetchedAt: now } })
     return { ok: true }
   }
 
@@ -70,13 +72,13 @@ export async function refreshOpenPulls(
   const retainedNumbers = new Set(body.map((pull) => pull.number))
   const removedPulls = (
     await db
-      .select({ userId: schema.pullRequests.userId, repoId: schema.pullRequests.repoId, number: schema.pullRequests.number })
-      .from(schema.pullRequests)
+      .select({ userId: pullRequests.userId, repoId: pullRequests.repoId, number: pullRequests.number })
+      .from(pullRequests)
       .where(
         and(
-          eq(schema.pullRequests.userId, userId),
-          eq(schema.pullRequests.repoId, repoId),
-          eq(schema.pullRequests.state, 'open'),
+          eq(pullRequests.userId, userId),
+          eq(pullRequests.repoId, repoId),
+          eq(pullRequests.state, 'open'),
         ),
       )
   ).filter((pull) => !retainedNumbers.has(pull.number))
@@ -96,42 +98,27 @@ export async function refreshOpenPulls(
     fetchedAt: now,
   }))
 
+  // Branch → PR for adopting a PR into a local-first task (Flow B). The adoption itself is CORE's write —
+  // `tasks` is core's table, in core's SQLite file — so it can no longer ride in the mirror's `db.batch`
+  // the way it used to. It runs AFTER the mirror commits, and `adoptPullNumbers` is idempotent (it only
+  // ever fills a NULL), so a crash in between self-heals on the next refresh.
   const branchToPull = new Map<string, number>()
   for (const pull of body) if (pull.head?.ref) branchToPull.set(pull.head.ref, pull.number)
-  const taskRows = branchToPull.size
-    ? await db
-        .select()
-        .from(schema.tasks)
-        .where(
-          and(
-            eq(schema.tasks.repoOwner, owner),
-            eq(schema.tasks.repoName, repo),
-            eq(schema.tasks.status, 'active'),
-            isNull(schema.tasks.pullNumber),
-          ),
-        )
-    : []
-  const taskUpdates = taskRows.flatMap((task) => {
-    const pullNumber = branchToPull.get(task.branch)
-    return pullNumber == null
-      ? []
-      : [db.update(schema.tasks).set({ pullNumber, updatedAt: now }).where(eq(schema.tasks.id, task.id))]
-  })
 
   await db.batch([
     db
-      .insert(schema.syncState)
+      .insert(syncState)
       .values({ userId, resource, etag, fetchedAt: now })
       .onConflictDoUpdate({
-        target: [schema.syncState.userId, schema.syncState.resource],
+        target: [syncState.userId, syncState.resource],
         set: { etag, fetchedAt: now },
       }),
     ...chunkRowsByColumnBudget(rows).map((part) =>
       db
-        .insert(schema.pullRequests)
+        .insert(pullRequests)
         .values(part)
         .onConflictDoUpdate({
-          target: [schema.pullRequests.userId, schema.pullRequests.repoId, schema.pullRequests.number],
+          target: [pullRequests.userId, pullRequests.repoId, pullRequests.number],
           set: {
             nodeId: sql`excluded.node_id`,
             state: sql`excluded.state`,
@@ -146,8 +133,9 @@ export async function refreshOpenPulls(
         }),
     ),
     ...deletePullMirrorStatements(db, removedPulls),
-    ...taskUpdates,
   ])
+  // After the mirror commits, never inside it: two SQLite files cannot share a transaction.
+  await core.tasks.adoptPullNumbers(owner, repo, branchToPull)
   return { ok: true }
 }
 
@@ -175,7 +163,7 @@ async function fetchPullComposite(
 /** Force-refresh one PR's GraphQL composite. */
 export async function refreshPullDetail(
   token: string,
-  db: AppDatabase,
+  db: PluginDatabase,
   key: PullRefreshKey & { number: number },
 ): Promise<RefreshResult> {
   const pull = await fetchPullComposite(token, key.owner, key.repo, key.number)
@@ -187,7 +175,7 @@ export async function refreshPullDetail(
 /** Force-refresh one PR's composite and changed files, fetching both before mirror writes begin. */
 export async function refreshPullWithFiles(
   token: string,
-  db: AppDatabase,
+  db: PluginDatabase,
   blobs: PatchBlobStore,
   key: PullRefreshKey & { number: number },
 ): Promise<RefreshResult> {

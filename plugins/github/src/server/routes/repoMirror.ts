@@ -1,13 +1,16 @@
 import { and, desc, eq } from 'drizzle-orm'
-import { getDb, schema } from '@acorn/node-core/server/db/index.ts'
-import { chunkRowsByColumnBudget } from '@acorn/node-core/server/db/batch.ts'
-import { reposResource } from '@acorn/node-core/server/db/resourceKeys.ts'
+import { chunkRowsByColumnBudget } from '@acorn/node-core/server/rows.ts'
+import { reposResource } from '../resourceKeys'
 import { gh, ghError } from '..'
 import type { RefreshResult, RouteFailure, RouteResult } from '@acorn/node-core/server/sync/engine.ts'
 import type { Repo } from '@acorn/protocol/api.ts'
 import { deleteRepoMirrorStatements } from '../mirrorRetention'
+import { repos, syncState } from '../../node/schema'
+import type { PluginDatabase } from '@acorn/node-core/main/pluginStorage.ts'
 
-type Db = ReturnType<typeof getDb>
+// Every exported helper here already took the handle as a parameter, which is why this module needed no
+// reshaping when the tables moved — only the type of the thing being passed in changed.
+type Db = PluginDatabase
 type GitHubFetcher = (token: string, path: string, init?: RequestInit) => Promise<Response>
 
 type GitHubRepo = {
@@ -22,7 +25,7 @@ type GitHubRepo = {
 export type ResolvedRepo = { repoId: number }
 
 export const readCachedRepos = (db: Db, userId: string) =>
-  db.select().from(schema.repos).where(eq(schema.repos.userId, userId)).orderBy(desc(schema.repos.pushedAt))
+  db.select().from(repos).where(eq(repos.userId, userId)).orderBy(desc(repos.pushedAt))
 
 export const toPublicRepo = (r: {
   id: number
@@ -72,8 +75,8 @@ export const refreshRepos = async (token: string, db: Db, userId: string, fetche
   const resource = reposResource()
   const [sync] = await db
     .select()
-    .from(schema.syncState)
-    .where(and(eq(schema.syncState.userId, userId), eq(schema.syncState.resource, resource)))
+    .from(syncState)
+    .where(and(eq(syncState.userId, userId), eq(syncState.resource, resource)))
 
   const res = await fetcher(token, '/user/repos?sort=pushed&direction=desc&per_page=100', {
     headers: sync?.etag ? { 'If-None-Match': sync.etag } : {},
@@ -83,9 +86,9 @@ export const refreshRepos = async (token: string, db: Db, userId: string, fetche
   // 304 Not Modified → mirror still valid; bump freshness only (free against the rate limit).
   if (res.status === 304) {
     await db
-      .insert(schema.syncState)
+      .insert(syncState)
       .values({ userId, resource, etag: sync?.etag ?? null, fetchedAt: now })
-      .onConflictDoUpdate({ target: [schema.syncState.userId, schema.syncState.resource], set: { fetchedAt: now } })
+      .onConflictDoUpdate({ target: [syncState.userId, syncState.resource], set: { fetchedAt: now } })
     return { ok: true }
   }
 
@@ -94,7 +97,7 @@ export const refreshRepos = async (token: string, db: Db, userId: string, fetche
 
   const etag = res.headers.get('etag')
   const body = (await res.json()) as GitHubRepo[]
-  const previous = await db.select({ id: schema.repos.id }).from(schema.repos).where(eq(schema.repos.userId, userId))
+  const previous = await db.select({ id: repos.id }).from(repos).where(eq(repos.userId, userId))
   const retainedIds = new Set(body.map((repo) => repo.id))
   const removedRepoIds = previous.map((repo) => repo.id).filter((id) => !retainedIds.has(id))
   const rows = body.map((repo) => repoRow(userId, repo, now))
@@ -102,13 +105,13 @@ export const refreshRepos = async (token: string, db: Db, userId: string, fetche
   // Full-list replace + sync bump, all-or-nothing: a mid-refresh failure leaves the prior mirror and
   // stale sync intact, and the next request retries.
   await db.batch([
-    db.delete(schema.repos).where(eq(schema.repos.userId, userId)),
+    db.delete(repos).where(eq(repos.userId, userId)),
     ...deleteRepoMirrorStatements(db, userId, removedRepoIds),
-    ...chunkRowsByColumnBudget(rows).map((part) => db.insert(schema.repos).values(part)),
+    ...chunkRowsByColumnBudget(rows).map((part) => db.insert(repos).values(part)),
     db
-      .insert(schema.syncState)
+      .insert(syncState)
       .values({ userId, resource, etag, fetchedAt: now })
-      .onConflictDoUpdate({ target: [schema.syncState.userId, schema.syncState.resource], set: { etag, fetchedAt: now } }),
+      .onConflictDoUpdate({ target: [syncState.userId, syncState.resource], set: { etag, fetchedAt: now } }),
   ])
 
   return { ok: true }
@@ -129,9 +132,9 @@ export const resolveRepoForUser = async (
   fetcher: GitHubFetcher = gh,
 ): Promise<RouteResult<ResolvedRepo>> => {
   const [cached] = await db
-    .select({ id: schema.repos.id })
-    .from(schema.repos)
-    .where(and(eq(schema.repos.userId, userId), eq(schema.repos.owner, owner), eq(schema.repos.name, repo)))
+    .select({ id: repos.id })
+    .from(repos)
+    .where(and(eq(repos.userId, userId), eq(repos.owner, owner), eq(repos.name, repo)))
   if (cached) return { ok: true, value: { repoId: cached.id } }
 
   const res = await fetcher(token, `/repos/${owner}/${repo}`)
@@ -141,10 +144,10 @@ export const resolveRepoForUser = async (
   const body = (await res.json()) as GitHubRepo
   const row = repoRow(userId, body, Date.now())
   await db
-    .insert(schema.repos)
+    .insert(repos)
     .values(row)
     .onConflictDoUpdate({
-      target: [schema.repos.userId, schema.repos.id],
+      target: [repos.userId, repos.id],
       set: row,
     })
 

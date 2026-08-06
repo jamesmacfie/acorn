@@ -4,6 +4,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { AppEnv, Principal } from '@acorn/node-core/server/middleware/auth.ts'
 import type { Env } from '@acorn/node-core/main/bindings.ts'
 import { makeTestDb, type TestDb } from '@acorn/node-core/server/routes/testDb.ts'
+// CORE's schema, on purpose: the device flow writes core's `integrations` row through core's own
+// connectProvider and touches none of this plugin's tables — so this test needs core's handle only, and
+// `githubDeviceAuth` is the one github router that is not a factory over the plugin database.
 import { schema } from '@acorn/node-core/server/db/index.ts'
 import { decryptSecret } from '@acorn/node-core/server/secretBox.ts'
 import { testGate } from '@acorn/node-core/server/routes/testAuth.ts'

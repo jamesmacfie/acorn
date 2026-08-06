@@ -1,8 +1,7 @@
 import { and, eq } from 'drizzle-orm'
 import { Hono } from 'hono'
 import type { PullDetail } from '@acorn/protocol/api.ts'
-import { getDb, schema } from '@acorn/node-core/server/db/index.ts'
-import { prResource } from '@acorn/node-core/server/db/resourceKeys.ts'
+import { prResource } from '../resourceKeys'
 import type { AppEnv } from '@acorn/node-core/server/middleware/auth.ts'
 import { ownerId } from '@acorn/node-core/server/middleware/requireUser.ts'
 import { respondError } from '@acorn/node-core/server/respond.ts'
@@ -12,17 +11,23 @@ import { readComposite } from './prMirror'
 import { refreshPullDetail } from './pullRefresh'
 import { resolveRepoForUser } from './repoMirror'
 import { githubToken } from '../githubToken'
+import { syncState } from '../../node/schema'
+import type { PluginDatabase } from '@acorn/node-core/main/pluginStorage.ts'
 
 // PR detail — the composite GraphQL read (docs/github-integration.md), the primary read for the
 // PR screen: PR + reviews + comments + checks in one round-trip. GraphQL has no ETag, so
 // freshness is a TTL gate in sync_state (`pr:<repoId>:<number>`); the mirror tables are the
 // cache. The mirror logic is shared with the batch route — see prMirror.ts. Files live in
 // pr_files, owned by /files.
-export const pullDetail = new Hono<AppEnv>().get('/:owner/:repo/pulls/:number', async (c) => {
+// A FACTORY over this plugin's own database, not a module-scope router reading getDb(c.env). The tables
+// live in <data-root>/plugins/github.sqlite now, and `c.env` deliberately carries no per-plugin handles
+// (docs/vNext/data.md § Plugin DBs). The handle arrives at plugin init, so no request can reach an
+// unmigrated database — and a second startServiceRuntime in one process builds fresh routers over its own
+// handle instead of inheriting a closed one.
+export const pullDetail = (db: PluginDatabase) => new Hono<AppEnv>().get('/:owner/:repo/pulls/:number', async (c) => {
   const uid = ownerId(c)
   const token = await githubToken(c)
 
-  const db = getDb(c.env)
   const userId = uid
   const owner = c.req.param('owner')
   const repo = c.req.param('repo')
@@ -41,8 +46,8 @@ export const pullDetail = new Hono<AppEnv>().get('/:owner/:repo/pulls/:number', 
   const read = async (): Promise<Cached<PullDetail> | null> => {
     const [sync] = await db
       .select()
-      .from(schema.syncState)
-      .where(and(eq(schema.syncState.userId, userId), eq(schema.syncState.resource, resource)))
+      .from(syncState)
+      .where(and(eq(syncState.userId, userId), eq(syncState.resource, resource)))
     if (!sync) return null
     const composite = await readComposite(db, key)
     if (!composite.pull) return null

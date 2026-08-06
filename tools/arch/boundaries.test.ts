@@ -303,12 +303,22 @@ describe('architecture boundaries', () => {
     // unexpressible rather than merely impolite. They are id round trips through
     // `CoreServices.tasks.idsForWorkspace()` now.
     //
-    // Three to go — and 'linear'/'rollbar' are one decision, because they SHARE the `issues` table.
-    const SCHEMA_BASELINE = [
-      'github',
-      'linear',
-      'rollbar',
-    ]
+    // ZERO. Every plugin owns its own schema, or owns no tables at all.
+    //
+    // The last three were one decision, not three. 'linear' and 'rollbar' SHARED core's `issues` table, so
+    // neither could own it; the resolution was that `issues` / `issue_resources` and the `provider:%` half
+    // of `sync_state` STAY core's — they are the generic external-item read model, `task_links` is keyed to
+    // match them, and cascade.ts deletes all of it in one transaction — and both plugins reach them through
+    // a narrow core-owned store instead of core's database handle
+    // (packages/node-core/src/server/integrations/itemStore.ts states the full argument). So those two own
+    // no database and have no `dispose`, exactly like docker, editor and notes.
+    //
+    // 'github' moved thirteen tables, including the OTHER half of `sync_state` — which had two unrelated
+    // key spaces sharing one table, separated by convention alone until this split.
+    //
+    // Keep this at zero. It is now a real invariant rather than a ratchet: a plugin that starts importing
+    // core's table definitions is reaching across a database file that no longer holds what it wants.
+    const SCHEMA_BASELINE: string[] = []
     // Any import FROM core's db module that is not exclusively type-only. The first version matched only
     // `{ schema }` / `* as schema`, so `import * as db from '.../db/index.ts'` + `db.schema.tasks`, or
     // `import { tasks } from '.../db/schema.ts'` — the natural form once the barrel is off-limits — both

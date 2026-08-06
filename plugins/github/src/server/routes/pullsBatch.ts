@@ -1,8 +1,7 @@
 import { and, eq, inArray } from 'drizzle-orm'
 import { Hono } from 'hono'
 import type { PullBatchFilesMode, PullBatchItem, PullBatchRequest } from '@acorn/protocol/api.ts'
-import { getDb, schema } from '@acorn/node-core/server/db/index.ts'
-import { filesResource, prResource } from '@acorn/node-core/server/db/resourceKeys.ts'
+import { filesResource, prResource } from '../resourceKeys'
 import { ghError, ghGraphQL } from '..'
 import type { AppEnv } from '@acorn/node-core/server/middleware/auth.ts'
 import { ownerId } from '@acorn/node-core/server/middleware/requireUser.ts'
@@ -11,6 +10,8 @@ import { PULLS_STALE_AFTER_MS } from '@acorn/node-core/server/sync/policy.ts'
 import { fetchFiles, mirrorFiles, mirrorPr, PR_FRAGMENT, readComposite, readFiles, type GqlPull } from './prMirror'
 import { resolveRepoForUser } from './repoMirror'
 import { githubToken } from '../githubToken'
+import { syncState } from '../../node/schema'
+import type { PluginDatabase } from '@acorn/node-core/main/pluginStorage.ts'
 
 // Batch prefetch — warm the mirror for several open PRs at once so client navigation is instant.
 // Detail is one multi-alias GraphQL call for all stale PRs (one GitHub round-trip); files stay N
@@ -25,7 +26,12 @@ const MAX_BATCH = 10 // bounds the GraphQL query size; the client sends ~5
 const isFilesMode = (value: unknown): value is PullBatchFilesMode =>
   value === 'full' || value === 'summary' || value === 'none'
 
-export const pullsBatch = new Hono<AppEnv>().post('/:owner/:repo/pulls/batch', async (c) => {
+// A FACTORY over this plugin's own database, not a module-scope router reading getDb(c.env). The tables
+// live in <data-root>/plugins/github.sqlite now, and `c.env` deliberately carries no per-plugin handles
+// (docs/vNext/data.md § Plugin DBs). The handle arrives at plugin init, so no request can reach an
+// unmigrated database — and a second startServiceRuntime in one process builds fresh routers over its own
+// handle instead of inheriting a closed one.
+export const pullsBatch = (db: PluginDatabase) => new Hono<AppEnv>().post('/:owner/:repo/pulls/batch', async (c) => {
   const uid = ownerId(c)
   const token = await githubToken(c)
 
@@ -39,7 +45,6 @@ export const pullsBatch = new Hono<AppEnv>().post('/:owner/:repo/pulls/batch', a
   const filesMode = body?.files ?? 'full'
   if (!isFilesMode(filesMode)) return respondError(c, 400, 'bad_files_mode')
 
-  const db = getDb(c.env)
   const userId = uid
   const resolved = await resolveRepoForUser(db, token, userId, owner, repo)
   if (!resolved.ok) return respondError(c, resolved.failure.status, resolved.failure.error)
@@ -48,9 +53,9 @@ export const pullsBatch = new Hono<AppEnv>().post('/:owner/:repo/pulls/batch', a
   // Per-PR TTL: only stale resources go to GitHub; fresh ones serve straight from the mirror.
   const resources = numbers.flatMap((n) => [prResource(repoId, n), filesResource(repoId, n)])
   const syncRows = await db
-    .select({ resource: schema.syncState.resource, fetchedAt: schema.syncState.fetchedAt })
-    .from(schema.syncState)
-    .where(and(eq(schema.syncState.userId, userId), inArray(schema.syncState.resource, resources)))
+    .select({ resource: syncState.resource, fetchedAt: syncState.fetchedAt })
+    .from(syncState)
+    .where(and(eq(syncState.userId, userId), inArray(syncState.resource, resources)))
   const now = Date.now()
   const freshAt = new Map(syncRows.map((s) => [s.resource, s.fetchedAt]))
   const isFresh = (resource: string) => {

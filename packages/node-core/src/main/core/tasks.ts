@@ -5,7 +5,7 @@
 // Cross-plugin references are plain IDs, validated by the owning plugin when dereferenced").
 //
 // So this is that validation seam: a plugin holds a taskId and asks core to resolve it.
-import { and, eq, max } from 'drizzle-orm'
+import { and, eq, isNull, max } from 'drizzle-orm'
 import { randomUUID } from 'node:crypto'
 import { dedupeBranch, slugifyBranch } from '@acorn/protocol/branch.ts'
 import type { LayoutRecipe, RunTarget } from '../runConfig'
@@ -92,6 +92,21 @@ export type TaskService = {
   // ticket reachable through two Linear connections is two different rows, and refetching it needs to
   // name which one.
   links(taskId: string): Promise<TaskLinkRef[]>
+  // Adopt a PR into this repo's local-first tasks (docs/workspaces-and-tasks.md Flow B): for every ACTIVE
+  // task on this repo that has no `pullNumber` yet, set it from `branchToPull[task.branch]`. Returns how
+  // many tasks were adopted, which the caller logs rather than acts on.
+  //
+  // A WRITE, and it is here for the same reason `createChild` is: `tasks` is core's table. plugins/github
+  // used to do this inline, as extra statements inside the SAME `db.batch` as its mirror writes — one
+  // transaction covering `pull_requests` and `tasks` at once. That is now two SQLite files, and data.md is
+  // explicit that a transaction never spans them, so the atomicity is genuinely gone rather than hidden:
+  // the mirror commits first, then this runs. A crash between them leaves a mirrored PR whose task has not
+  // adopted it, which self-heals on the next pull refresh (this is idempotent — it only ever fills a NULL)
+  // and which the schema tolerates because it declares no foreign keys anywhere.
+  //
+  // Only NULL pullNumbers are touched, never an existing one: a task that already tracks a PR must not be
+  // silently re-pointed because someone pushed a same-named branch.
+  adoptPullNumbers(repoOwner: string, repoName: string, branchToPull: ReadonlyMap<string, number>): Promise<number>
   // Materialise a fan-out child task under a parent (docs/workflows.md, 14 P4) and return its id. Its
   // worktree is deliberately NOT created here — `resolveCwd` does that lazily the moment the child's
   // first step runs, which is the same path every other surface takes.
@@ -108,6 +123,31 @@ export type TaskService = {
 
 export function createTaskService(db: AppDatabase): TaskService {
   return {
+    adoptPullNumbers: async (repoOwner, repoName, branchToPull) => {
+      if (!branchToPull.size) return 0
+      const candidates = await db
+        .select({ id: schema.tasks.id, branch: schema.tasks.branch })
+        .from(schema.tasks)
+        .where(
+          and(
+            eq(schema.tasks.repoOwner, repoOwner),
+            eq(schema.tasks.repoName, repoName),
+            eq(schema.tasks.status, 'active'),
+            isNull(schema.tasks.pullNumber),
+          ),
+        )
+      const now = Date.now()
+      const updates = candidates.flatMap((task) => {
+        const pullNumber = branchToPull.get(task.branch)
+        return pullNumber == null
+          ? []
+          : [db.update(schema.tasks).set({ pullNumber, updatedAt: now }).where(eq(schema.tasks.id, task.id))]
+      })
+      if (!updates.length) return 0
+      // One batch WITHIN core's file, which is all the atomicity data.md permits here.
+      await db.batch(updates as [(typeof updates)[number], ...(typeof updates)[number][]])
+      return updates.length
+    },
     load: (taskId) => loadTask(db, taskId),
     root: (taskId, userId = null) => taskRoot(db, taskId, userId),
     resolveCwd: (task, baseCheckout, userId = null) => resolveTaskCwd(db, task, baseCheckout, userId),

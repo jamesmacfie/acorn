@@ -17,12 +17,11 @@ import { openDataRoot, type DataRoot } from '@acorn/node-core/main/dataRoot.ts'
 import { launcherSpec, serverName } from '@acorn/node-core/main/mcpRegister.ts'
 import { reconcileWorktrees, setWorktreesRoot } from '@acorn/node-core/main/taskWorktree.ts'
 import { logStorageFootprint } from '@acorn/node-core/main/storageFootprint.ts'
+import { GITHUB_MIRROR } from '@acorn/plugin-github/contract/mirror.ts'
 import { disposeWsHub } from '@acorn/node-core/main/wsHub.ts'
 import { wireAgentTools } from '../wiring/agentToolsWiring'
 import { wireContextSections } from '../wiring/contextSectionsWiring'
-import { failingChecksFor } from '../wiring/workflowWiring'
 import { wireConfigTrust } from '../wiring/configTrustWiring'
-import { prepareSecurityState } from '../wiring/startupSecurity'
 import { AGENTS_RUNTIME } from '@acorn/plugin-agents/main/runtime.ts'
 import { MEMORY_KNOWLEDGE } from '@acorn/plugin-memory/main/knowledgeIpc.ts'
 import { NOTES_STORE } from '@acorn/plugin-notes/contract/store.ts'
@@ -166,7 +165,6 @@ export async function startServiceRuntime({ config, desktop, stateChanged }: Run
   }
 
   try {
-    await prepareSecurityState(runtime)
     // Expired replay rows read as absent already (auth/idempotency.ts), so this only reclaims space.
     // Boot is the right moment because it is the one time nothing is mid-request, and a periodic
     // sweeper would be machinery for a table that holds 24 hours of one owner's mutations.
@@ -177,12 +175,12 @@ export async function startServiceRuntime({ config, desktop, stateChanged }: Run
     setWorktreesRoot(worktreesDir)
     // Mutable on purpose. The listener's origin is not known until it binds, but every consumer of
     // this object reads it at spawn/call time rather than at wire time (terminal.ts spreads it per
-    // session, seedTaskNotes and workflowWiring read it per call), so seeding the token here and
+    // session, seedTaskNotes and the workflow runner read it per call), so seeding the token here and
     // assigning the URL right after startListener is enough — no restructuring of the wiring order,
     // which exists for a different reason (bridges must be installed before requests arrive).
     //
     // Two of these four are split by LIFETIME, not by taste. ACORN_API_URL is correct for callers
-    // rebuilt on every boot (seedTaskNotes, workflowWiring, both in-process). It is NOT correct for a
+    // rebuilt on every boot (seedTaskNotes and the workflow runner, both in-process). It is NOT correct for a
     // child that outlives a boot: an agent pane runs in tmux and is reattached after a restart, keeping
     // the environment of the boot that created it — and the port is ephemeral now, so a baked URL points
     // at nothing. ACORN_DATA_DIR is the stable thing, and mcp/api.ts resolves the current port from
@@ -261,9 +259,12 @@ export async function startServiceRuntime({ config, desktop, stateChanged }: Run
           reconciled,
           currentUserId: () => runtime.ACTIVE_IDENTITY.get(),
           memoryReviewTrigger: (taskId, transcriptTail) => knowledgeAt().memoryReviewTrigger(taskId, transcriptTail),
-          // github's mirror tables, read here because github is not a NodePlugin — see
-          // wiring/workflowWiring.ts for why this is not a CoreServices member.
-          failingChecks: (taskId) => failingChecksFor(db, runtime.ACTIVE_IDENTITY.get(), taskId),
+          // github's `repos` + `checks`, now behind that plugin's own capability. Resolved at CALL
+          // time, never at init: plugin init order is undefined, so reading it here could capture
+          // `undefined` purely because github is declared after workflows in the list. `get`, not
+          // `require` — a node whose github init failed should fail this one policy, not every step.
+          failingChecks: async (taskId) =>
+            (await capabilities.get(GITHUB_MIRROR)?.failingChecks(runtime.ACTIVE_IDENTITY.get(), taskId)) ?? null,
         },
       }),
       { capabilities, core },
@@ -275,7 +276,7 @@ export async function startServiceRuntime({ config, desktop, stateChanged }: Run
     // are `required` plugins, so absence is a bug rather than a configuration.
     const knowledge = knowledgeAt()
     wireConfigTrust(db)
-    wireContextSections({ db, notesStore: notesAt(), memory: knowledge })
+    wireContextSections({ db, notesStore: notesAt(), memory: knowledge, mirror: () => capabilities.get(GITHUB_MIRROR) })
     // Only the tools no plugin can own yet: core's task/PR reads and the browser (plugins/preview runs in
     // Electron main). changes, memory, notes, terminal and workflows register their own inside initPlugins
     // above — which is why this bag no longer holds the memory index, the proposal store, the run service
@@ -296,7 +297,15 @@ export async function startServiceRuntime({ config, desktop, stateChanged }: Run
       void refreshAcornMcpRegistrations().catch((error) => console.warn('[service:boot] MCP re-register failed:', error))
     }
     reconcileTask = (async () => {
-      void logStorageFootprint(db, config.dataDir).catch((error) => console.warn('[storage] footprint failed:', error))
+      // The github mirror's row counts come from the plugin that owns those tables now; core counts only
+      // what it can still see (main/storageFootprint.ts explains why an absent contributor is omitted
+      // from the line rather than logged as zero).
+      const githubMirror = capabilities.get(GITHUB_MIRROR)
+      void logStorageFootprint(
+        db,
+        config.dataDir,
+        githubMirror ? [{ plugin: 'github', counts: () => githubMirror.footprint() }] : [],
+      ).catch((error) => console.warn('[storage] footprint failed:', error))
       try {
         await reconcileTmux()
         mark('reconcile.tmux')

@@ -1,8 +1,7 @@
 import { gitOrThrow } from '@acorn/node-core/main/core/git.ts'
 import { Hono } from 'hono'
 import type { PullConflicts } from '@acorn/protocol/api.ts'
-import { getDb } from '@acorn/node-core/server/db/index.ts'
-import { getRepoPath } from '@acorn/node-core/main/repoPaths.ts'
+import type { CoreServices } from '@acorn/node-core/main/core/index.ts'
 import type { AppEnv } from '@acorn/node-core/server/middleware/auth.ts'
 import { ownerId } from '@acorn/node-core/server/middleware/requireUser.ts'
 import { respondError } from '@acorn/node-core/server/respond.ts'
@@ -31,9 +30,8 @@ export function parseConflictNames(stdout: string): string[] {
   return files
 }
 
-export const pullConflicts = new Hono<AppEnv>().get('/:owner/:repo/pulls/:number/conflicts', async (c) => {
+export const pullConflicts = (core: Pick<CoreServices, 'repos'>) => new Hono<AppEnv>().get('/:owner/:repo/pulls/:number/conflicts', async (c) => {
   ownerId(c) // gate on auth, like the other /v2/p/github/repos reads
-  const db = getDb(c.env)
   const owner = c.req.param('owner')
   const repo = c.req.param('repo')
   const number = Number(c.req.param('number'))
@@ -41,7 +39,9 @@ export const pullConflicts = new Hono<AppEnv>().get('/:owner/:repo/pulls/:number
   const base = c.req.query('base') ?? ''
 
   const unavailable: PullConflicts = { available: false, files: [] }
-  const mapped = await getRepoPath(db, owner, repo)
+  // `repo_paths` is CORE's table, so the checkout lookup goes through CoreServices rather than a handle of
+  // this plugin's — which is why this is the one github router that takes `core` and no database at all.
+  const mapped = await core.repos.path(owner, repo)
   if (!mapped || !isValidRef(base)) return c.json(unavailable)
   const checkout = mapped.path
 
