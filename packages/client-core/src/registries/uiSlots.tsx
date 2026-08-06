@@ -1,45 +1,22 @@
 import { For } from 'solid-js'
 import { Dynamic } from 'solid-js/web'
-import type { Component } from 'solid-js'
-import { hasClientCapability, type ClientCapabilityRequirement } from '../capabilities'
+import { hasClientCapability } from '../capabilities'
 import { ContributionBoundary } from '../ui/ContributionBoundary'
-import { Registry } from './registry'
+import { taskSlotRegistry, uiSlotRegistry, type TaskSlotId, type UiSlotContext, type UiSlotId } from './slots'
 
-export type UiSlotId = 'topbar.left' | 'topbar.right' | 'task.switcher.extra' | 'overlay'
-
-export type UiSlotContext = {
-  taskActive: boolean
-  terminalOpen: boolean
-  toggleTerminal: () => void
-  openSettings: (tab?: string) => void
-  selectTask: (taskId: string) => void
-}
-
-export type UiSlotContribution = {
-  id: string
-  slot: UiSlotId
-  order: number
-  requires?: ClientCapabilityRequirement
-  when?: (context: UiSlotContext) => boolean
-  component: Component<{ context: UiSlotContext }>
-}
-
-export const uiSlotRegistry = new Registry<UiSlotContribution>('ui-slot')
-
-// Task-scoped slots: lighter than UiSlotContext (components get just the taskId), so hosts like
-// the worktree footer don't have to thread shell callbacks they don't own. Additive — plugins
-// contribute badges (e.g. docker's running-container count) without a core import of the plugin.
-export type TaskSlotId = 'task.footer' | 'tabrail.task-row'
-
-export type TaskSlotContribution = {
-  id: string
-  slot: TaskSlotId
-  order: number
-  requires?: ClientCapabilityRequirement
-  component: Component<{ taskId: string }>
-}
-
-export const taskSlotRegistry = new Registry<TaskSlotContribution>('task-slot')
+// The two slot HOSTS. The registries and their contribution types live in ./slots.ts, JSX-free, and are
+// re-exported here so `registries/uiSlots.tsx` stays the one import path callers already use.
+export {
+  taskSlotRegistry,
+  uiSlotRegistry,
+} from './slots'
+export type {
+  TaskSlotContribution,
+  TaskSlotId,
+  UiSlotContext,
+  UiSlotContribution,
+  UiSlotId,
+} from './slots'
 
 export function TaskSlotHost(props: { slot: TaskSlotId; taskId: string }) {
   const contributions = () => [...taskSlotRegistry.entries()]

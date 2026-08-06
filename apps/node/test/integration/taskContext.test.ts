@@ -1,6 +1,6 @@
 import { Hono } from 'hono'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import '../../src/server/providers'
+import '../registerProviders'
 import type { TaskContext } from '@acorn/protocol/api.ts'
 import { getDb, schema } from '@acorn/node-core/server/db/index.ts'
 import type { AppEnv } from '@acorn/node-core/server/middleware/auth.ts'

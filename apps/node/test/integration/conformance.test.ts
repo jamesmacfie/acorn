@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import '../../src/server/providers'
+import '../registerProviders'
 import { connectionProviderRegistry } from '@acorn/node-core/server/integrations/connectionRegistry.ts'
 import { integrationProviderRegistry } from '@acorn/node-core/server/integrations/registry.ts'
 

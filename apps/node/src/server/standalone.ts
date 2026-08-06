@@ -1,6 +1,7 @@
 // The Electron-free entry: `pnpm dev:node` from a checkout, and the standalone node a client pairs
 // with over the LAN (docs/vNext/plan.md § Phase 5, "standalone node distribution" — this is the down
-// payment on it). It is a composition root: it registers the built-in integration providers, wires the
+// payment on it). It is a composition root: it initializes the plugin graph (which is what registers the
+// built-in integration providers now), wires the
 // pure-Node domain bridges, then starts the HTTPS listener over a data root. Under Electron this path
 // is never taken — apps/desktop's main/bootstrap.ts owns boot and installs the stateful bridges too.
 //
@@ -9,7 +10,6 @@
 // (main/serverConfig.ts), so a parent process — the two-node e2e today, a launchd/systemd wrapper
 // later — cannot guess the endpoint, and the self-signed certificate has no CA to vouch for it.
 // Everything else this process logs is free-form; this line is the contract.
-import './providers' // register built-in integration providers into the core registry
 import './routes' // register plugin-owned HTTP routers into the core route registry
 import { join } from 'node:path'
 import { devDataDir, makeRuntime, startListener } from '@acorn/node-core/main/server.ts'
@@ -28,6 +28,7 @@ import { reconcileTmux } from '@acorn/plugin-terminal/main/terminal.ts'
 import { WORKFLOWS_RUNNER } from '@acorn/plugin-workflows/main/workflowRunner.ts'
 import { GITHUB_MIRROR } from '@acorn/plugin-github/contract/mirror.ts'
 import { nodePlugins } from './plugins'
+import type { BrowserDesktopCapability } from '@acorn/protocol/desktopCapabilities.ts'
 
 // ACORN_DATA_DIR names the root explicitly. It is the same variable this node hands its own child
 // processes (service/runtime.ts's internalApiEnv), so one spelling of "which root" covers the whole
@@ -61,6 +62,19 @@ const knowledgeAt = () => capabilities.require(MEMORY_KNOWLEDGE)
 const notesAt = () => capabilities.require(NOTES_STORE)
 const core = createCoreServices({ secrets: runtime.SECRETS, db: runtime.DB })
 
+// Every method rejects identically: there is no window on a standalone node, so there is nothing to drive.
+// A rejection rather than a silent empty result, because an agent that asked for a snapshot and got nothing
+// back cannot tell "the page is blank" from "there is no browser".
+const browserUnavailable = () => Promise.reject(new Error('The preview browser needs a desktop window; this node is running headless.'))
+const unavailableBrowser: BrowserDesktopCapability = {
+  navigate: browserUnavailable,
+  snapshot: browserUnavailable,
+  click: browserUnavailable,
+  fill: browserUnavailable,
+  screenshot: browserUnavailable,
+  console: browserUnavailable,
+}
+
 // Converted plugins register their own routes and open their own SQLite files here. A standalone node
 // runs the SAME list as the supervised one — the difference is only which engine bridges get filled,
 // so a plugin that needs no DesktopCapabilities works identically over the LAN.
@@ -75,6 +89,12 @@ await initPlugins(
       memoryReviewTrigger: (taskId, transcriptTail) => knowledgeAt().memoryReviewTrigger(taskId, transcriptTail),
     },
     memory: { currentUserId: () => runtime.ACTIVE_IDENTITY.get() },
+    // A standalone node has no BrowserWindow, so the six `browser_*` tools preview contributes cannot work
+    // here. They are still REGISTERED — the tool manifest must be the same shape on every node, or an agent
+    // would see a different surface depending on how its node was started — and each one rejects with a
+    // clear reason instead of pretending to drive a webview that does not exist. That is the same degraded
+    // shape `dev:node` already has for anything needing native UI.
+    preview: { browser: unavailableBrowser },
     terminal: {
       internalEnv,
       launchInjector: (taskId, sessionId) => knowledgeAt().launchInjector(taskId, sessionId),

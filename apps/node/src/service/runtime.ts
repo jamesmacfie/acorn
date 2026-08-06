@@ -1,7 +1,6 @@
 import type { ServerType } from '@hono/node-server'
 import { execFile } from 'node:child_process'
 import { join } from 'node:path'
-import '../server/providers'
 import '../server/routes'
 import '../wiring/agentProfiles'
 import type { DesktopCapabilities } from '@acorn/protocol/desktopCapabilities.ts'
@@ -28,10 +27,11 @@ import { NOTES_STORE } from '@acorn/plugin-notes/contract/store.ts'
 import { WORKFLOWS_RUNNER } from '@acorn/plugin-workflows/main/workflowRunner.ts'
 import { configureTerminalMcp, reconcileTmux, refreshAcornMcpRegistrations } from '@acorn/plugin-terminal/main/terminal.ts'
 import { seedTaskNotes } from '@acorn/plugin-notes/main/seedTaskNotes.ts'
-import { previewRulesForTask } from '@acorn/plugin-preview/server/previewRules.ts'
+import type { PreviewBrowserRule } from '@acorn/protocol/serviceProtocol.ts'
+import { PREVIEW_RULES } from '@acorn/plugin-preview/contract/rules.ts'
 
 export type ServiceRuntime = {
-  previewRules(taskId: string): ReturnType<typeof previewRulesForTask>
+  previewRules(taskId: string): Promise<PreviewBrowserRule[]>
   stop(): Promise<void>
   // What the parent needs to reach this node: where it bound, who it is, and the bearer to use.
   // Reported rather than assumed, so a second node on the same machine is just another endpoint.
@@ -245,6 +245,10 @@ export async function startServiceRuntime({ config, desktop, stateChanged }: Run
           memoryReviewTrigger: (taskId, transcriptTail) => knowledgeAt().memoryReviewTrigger(taskId, transcriptTail),
         },
         memory: { currentUserId: () => runtime.ACTIVE_IDENTITY.get() },
+        // The Electron-main browser driver, behind the six `browser_*` tools preview now owns. Supplied
+        // here because it is a native adapter: this root has the DesktopCapabilities RPC peer, and a
+        // plugin may not import electron to build one.
+        preview: { browser: desktop.browser },
         terminal: {
           internalEnv,
           launchInjector: (taskId, sessionId) => knowledgeAt().launchInjector(taskId, sessionId),
@@ -277,11 +281,11 @@ export async function startServiceRuntime({ config, desktop, stateChanged }: Run
     const knowledge = knowledgeAt()
     wireConfigTrust(db)
     wireContextSections({ db, notesStore: notesAt(), memory: knowledge, mirror: () => capabilities.get(GITHUB_MIRROR) })
-    // Only the tools no plugin can own yet: core's task/PR reads and the browser (plugins/preview runs in
-    // Electron main). changes, memory, notes, terminal and workflows register their own inside initPlugins
-    // above — which is why this bag no longer holds the memory index, the proposal store, the run service
-    // or the notes store.
-    wireAgentTools({ db, browser: desktop.browser })
+    // Only the tools no plugin can own, which after preview's conversion is core's own six alone: the
+    // context-read group and the two repo reads. changes, memory, notes, preview, terminal and workflows
+    // register their own inside initPlugins above — which is why this bag no longer holds the memory index,
+    // the proposal store, the run service, the notes store, or the browser driver.
+    wireAgentTools({ db })
     mark('install')
 
     const listener = await startListener(runtime, dataRoot)
@@ -343,7 +347,11 @@ export async function startServiceRuntime({ config, desktop, stateChanged }: Run
     })()
 
     return {
-      previewRules: (taskId) => previewRulesForTask(db, taskId),
+      // preview's one node-side read, resolved through its capability at CALL time rather than wired as a
+      // query. `[]` when the plugin is disabled is the right answer, not a degradation: with no preview
+      // plugin there are no page rules to report, and an empty list is already the "none configured" case
+      // the browser automation handles.
+      previewRules: async (taskId) => (await capabilities.get(PREVIEW_RULES)?.forTask(taskId)) ?? [],
       stop,
       started: {
         state: 'listening',

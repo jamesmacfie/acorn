@@ -1,11 +1,15 @@
+// The Linear task pane: the issues linked to this task, with a picker when there is more than one.
+//
+// This whole component lived in apps/desktop/src/app/client/taskPaneContributions.tsx — a plugin's
+// pane, written in the app, importing the plugin's panel to render it. Nothing about it was the app's:
+// it reads `task.links` for its own providerId and it consumes its own `pane-intent` events.
 import { createMemo, createSignal, lazy, onCleanup, onMount } from 'solid-js'
 import type { Task } from '@acorn/client-core/queries.ts'
-import type { PaneContribution } from '@acorn/client-core/registries/panes.ts'
-import type { LinearIssueTarget } from '@acorn/plugin-linear/client/LinearIssuePanel.tsx'
 import { clientEvents, consumePaneIntent } from '@acorn/client-core/registries/clientEvents.ts'
+import type { PaneContribution } from '@acorn/client-core/registries/panes.ts'
+import type { LinearIssueTarget } from './LinearIssuePanel'
 
-const LinearIssuePanel = lazy(() => import('@acorn/plugin-linear/client/LinearIssuePanel.tsx'))
-const RollbarPane = lazy(() => import('@acorn/plugin-rollbar/client/RollbarPane.tsx'))
+const LinearIssuePanel = lazy(() => import('./LinearIssuePanel'))
 
 function LinearTaskPane(props: { task: Task }) {
   const links = createMemo(() => props.task.links.filter((link) => link.providerId === 'linear'))
@@ -42,11 +46,4 @@ export const linearPaneContribution: PaneContribution = {
   defaultChord: 'meta+shift+l',
   when: (task) => task.links.some((link) => link.providerId === 'linear'),
   component: LinearTaskPane,
-}
-
-export const rollbarPaneContribution: PaneContribution = {
-  id: 'rollbar', providerId: 'rollbar', label: 'Rollbar', glyph: '◍', description: 'Linked Rollbar items', order: 100,
-  defaultChord: 'meta+shift+o',
-  when: (task) => task.links.some((link) => link.providerId === 'rollbar'),
-  component: RollbarPane,
 }

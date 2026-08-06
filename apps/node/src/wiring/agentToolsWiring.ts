@@ -9,9 +9,15 @@
 //     mirror through the shared section registry (server/agentTools/contextSections.ts) and core's
 //     `repos` table directly. They have no plugin to move to until github is converted, and even then
 //     the mirror stays core's.
-//   - **browser_*** belong to plugins/preview, which has NO node-side part at all: previewService.ts and
-//     browserService.ts import `electron` and run in Electron MAIN, and the driver arrives here as an
-//     injected DesktopCapability. Converting it is not a tool move, it is a process-boundary change.
+// The SIX browser_* tools that used to sit here are gone too, and their recorded blocker is worth
+// restating because of what actually closed it. It was "plugins/preview has no node-side part at all", not
+// "the driver is in Electron main" — the driver still IS in Electron main, still arrives as an injected
+// task-addressed DesktopCapability, and no process boundary moved. What changed is that preview is a
+// NodePlugin, so there is finally an owner to declare them against (plugins/preview/src/server/agentTools.ts).
+//
+// So what is left in this file is only the first group: core's own six. They have no plugin to move to and
+// will not get one — `tasks`, `task_links` and the context assembler are core's, and the two that touch the
+// github mirror reach it through core's own slot rather than a table.
 //
 // The FOUR notes_* tools that used to sit here are gone: plugins/notes is a NodePlugin now, so it owns
 // its store and declares them itself (plugins/notes/src/main/agentTools.ts). Both recorded blockers were
@@ -27,7 +33,6 @@ import { assembleContext, parseInclude } from '@acorn/node-core/server/agentTool
 import { registerAgentTool, removeAgentTools, ToolError, type AgentToolContribution, type ToolContext } from '@acorn/node-core/server/agentTools/registry.ts'
 import type { AppDatabase } from '@acorn/node-core/server/db/index.ts'
 import { schema } from '@acorn/node-core/server/db/index.ts'
-import type { BrowserDesktopCapability } from '@acorn/protocol/desktopCapabilities.ts'
 import { loadTask } from '@acorn/node-core/main/taskWorktree.ts'
 import { repoMirrorSource } from '@acorn/node-core/server/repoMirror.ts'
 
@@ -38,7 +43,6 @@ const OWNER = 'core'
 
 export type AgentToolsDeps = {
   db: AppDatabase
-  browser: BrowserDesktopCapability
 }
 
 async function assemble(deps: AgentToolsDeps, ctx: ToolContext, include: Set<string>) {
@@ -48,7 +52,7 @@ async function assemble(deps: AgentToolsDeps, ctx: ToolContext, include: Set<str
 }
 
 export function buildAgentTools(deps: AgentToolsDeps): AgentToolContribution[] {
-  const { db, browser } = deps
+  const { db } = deps
   const empty = z.object({})
 
   // The context-read tools compose from the shared section registry (contextSections.ts). Its
@@ -122,68 +126,6 @@ export function buildAgentTools(deps: AgentToolsDeps): AgentToolContribution[] {
       },
     },
 
-    // ── Browser (execute tier): drive the task's preview webview via CDP ────────────────────────────
-    {
-      name: 'browser_navigate',
-      description: "Navigate the task's preview browser to a URL (get it from run_status; http(s) only).",
-      input: z.object({ url: z.string() }),
-      scope: 'task',
-      risk: 'execute',
-      exposeToRenderer: true,
-      handler: async (a, ctx) => browser.navigate(ctx.taskId, (a as { url: string }).url),
-    },
-    {
-      name: 'browser_snapshot',
-      description: 'Accessibility snapshot of the current page: a compact tree with element refs (e1, e2, …) for browser_click/browser_fill.',
-      input: empty,
-      scope: 'task',
-      risk: 'execute',
-      exposeToRenderer: true,
-      handler: async (_a, ctx) => {
-        return browser.snapshot(ctx.taskId)
-      },
-    },
-    {
-      name: 'browser_click',
-      description: 'Click an element by its snapshot ref.',
-      input: z.object({ ref: z.string() }),
-      scope: 'task',
-      risk: 'execute',
-      exposeToRenderer: true,
-      handler: async (a, ctx) => browser.click(ctx.taskId, (a as { ref: string }).ref),
-    },
-    {
-      name: 'browser_fill',
-      description: 'Fill a textbox by its snapshot ref (replaces the current value).',
-      input: z.object({ ref: z.string(), text: z.string() }),
-      scope: 'task',
-      risk: 'execute',
-      exposeToRenderer: true,
-      handler: async (a, ctx) => {
-        const { ref, text } = a as { ref: string; text: string }
-        return browser.fill(ctx.taskId, ref, text)
-      },
-    },
-    {
-      name: 'browser_screenshot',
-      description: 'Screenshot the current page (png data URI).',
-      input: empty,
-      scope: 'task',
-      risk: 'execute',
-      exposeToRenderer: true,
-      handler: async (_a, ctx) => {
-        return browser.screenshot(ctx.taskId)
-      },
-    },
-    {
-      name: 'browser_console',
-      description: "The page's recent console output.",
-      input: empty,
-      scope: 'task',
-      risk: 'execute',
-      exposeToRenderer: true,
-      handler: async (_a, ctx) => browser.console(ctx.taskId),
-    },
   ]
 }
 

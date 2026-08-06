@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import '../../src/server/providers'
+import '../registerProviders'
 import '../../src/server/routes'
 import type { ApiError } from '@acorn/protocol/api.ts'
 import { NODE_PROTOCOL_VERSION, type DevicesResponse, type NodeInfo, type PairResult, type PairingWindow } from '@acorn/protocol/node.ts'

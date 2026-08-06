@@ -45,7 +45,10 @@ partitioned per node. V1's bearer-authenticated `/api/v1` automation listener is
   handle, and `apps/node/src/server/plugins.ts` is the list — a plugin absent from it does not exist.
   Cross-plugin collaboration is a `CapabilityRegistry` (typed, late-bound, optional-by-default) and a
   `NodeEventBus`, both owned by the service runtime rather than module singletons. `contract/` is the
-  only cross-plugin import surface, boundary-tested. Eleven plugins are through the host and
+  only cross-plugin import surface, boundary-tested. Both halves exist: `ClientPlugin`
+  (`packages/client-core/src/registries/plugin.ts`) mirrors it over the nine client registries that have
+  real contributions, with `apps/desktop/src/app/client/plugins.ts` as the list. Every plugin with a node
+  part is through the host and
   `apps/node/src/server/routes.ts` is empty — the app names no product route module. `linear` and
   `rollbar` are not `NodePlugin`s because they own no tables and no routes of their own; they register
   through the integration-provider registry.

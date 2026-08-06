@@ -7,7 +7,8 @@ import { appStateBinding, parseJson, type PersistedStateSlice } from './persiste
 // Core-owned persisted state only: the task layout (core owns panes) and notices (core owns the
 // notification centre). Feature-owned slices live next to the store they bind — see
 // plugins/{editor/client/openFilesSlice,github/client/pullList/filterSlice,context/client/selectionSlice}.ts
-// — and the composition root assembles the full set in app/client/persistedSliceContributions.ts.
+// — and each plugin registers its own through `ctx.persistedState` in its client/index.ts. The
+// composition root registers only these and the direct preference slices (app/client/activate.ts).
 
 const taskLayoutSlice: PersistedStateSlice<TaskLayout> = {
   id: 'core.task-layouts',

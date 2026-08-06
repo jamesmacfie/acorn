@@ -5,7 +5,7 @@ import { contextSelectionsByTask, hydrateContextSelection } from './selectionSta
 
 // The context tray's own persisted-state descriptor: which sections are selected, per task. Owned
 // here rather than in core so core never has to know which features persist state (docs/plugins.md);
-// registered by the composition root in app/client/persistedSliceContributions.ts.
+// registered by this plugin's own ClientPlugin init (client/index.ts).
 const parseContextSelection = (raw: unknown): TraySelection => {
   const value = parseJson(raw)
   if (!value || typeof value !== 'object' || Array.isArray(value)) return {}

@@ -15,7 +15,8 @@
     "@acorn/node-core": "workspace:*",
     "@acorn/plugin-terminal": "workspace:*",
     "@acorn/protocol": "workspace:*",
-    "solid-js": "catalog:"
+    "solid-js": "catalog:",
+    "zod": "catalog:"
   },
   "devDependencies": {
     "@types/node": "^26.0.0",
