@@ -200,6 +200,61 @@ describe('architecture boundaries', () => {
     expect([...new Set([...badExternal, ...badFirstParty])].sort()).toEqual([])
   })
 
+  it('protocol declares no plugin route', () => {
+    // The rule that keeps api.ts from becoming a mixing bowl again. It was 701 lines holding route
+    // builders for nine plugins' namespaces, which meant no plugin could define its own wire surface
+    // without editing core — the single largest blocker to third-party plugins.
+    //
+    // One literal does the whole job with no name list and no false positives: every plugin route
+    // lives under /v2/p/<plugin>/ and core's under /v2/core/. If protocol contains the plugin prefix,
+    // it is building a route it does not own.
+    const proto = byName.get('@acorn/protocol')!
+    const files = walk(proto.src)
+    // Anti-vacuity for THIS rule: the guard at the top of the suite counts packages and edges, not
+    // protocol's own files, so a walk that returned nothing would satisfy the assertion below.
+    expect(files.length).toBeGreaterThan(15)
+    const offenders = files.filter((f) => readFileSync(f, 'utf8').includes('/v2/p/')).map((f) => relative(proto.src, f))
+    expect([...new Set(offenders)].sort()).toEqual([])
+  })
+
+  it('protocol modules named for a plugin are an enumerated, shrinking set', () => {
+    // The routes are gone (rule above), but a plugin's TYPES can still accumulate here without one.
+    // This is the ratchet for that: an explicit list, in the SCHEMA_BASELINE style, so adding a
+    // plugin-shaped module to protocol is a decision someone has to write down rather than a drift.
+    //
+    // Each survivor is here for a stated reason, not by neglect:
+    const PLUGIN_NAMED_BASELINE = [
+      // Both sides consume it and `ServerMsg` is the terminal WS transport itself, which core's own
+      // hub (main/wsHub.ts) speaks. Core vocabulary that happens to share a plugin's name.
+      'terminal.ts',
+      // `NoteLocation` addresses a task/workspace/global scope — core's own addressing scheme. The
+      // notes ROUTES that used it moved to plugins/notes/src/shared/api.ts.
+      'notes.ts',
+      // The workflow row types are read by client-core's notification pipeline as well as the plugin.
+      'workflow.ts',
+      // Blocked, not kept: client-core/registries/agentToolRenderers.ts imports it, so it cannot move
+      // until the shell stops naming agents (finding 10).
+      'managedAgents.ts',
+      // Moves with finding 2, which opens the WS envelope — protocol imports DockerStatsSample from
+      // here into ws.ts today, and both leave together.
+      'docker.ts',
+    ]
+    // Kept OUT of the baseline on purpose, because a baseline means "still to fix" and these are not.
+    // The match is a name collision with core vocabulary, not a dependency: `AgentContextContribution`
+    // is client-core's registry type and has nothing to do with plugins/context.
+    const NAME_COLLISIONS = ['agentContext.ts']
+    const pluginNames = PACKAGES.filter((p) => p.kind === 'plugin').map((p) => p.name.replace('@acorn/plugin-', ''))
+    const proto = byName.get('@acorn/protocol')!
+    const named = walk(proto.src)
+      .map((f) => relative(proto.src, f))
+      .filter((f) => !f.endsWith('.test.ts'))
+      .filter((f) => !NAME_COLLISIONS.includes(f))
+      // Matched on the FILE NAME, not the contents: a comment cannot create a dependency, and
+      // scanning prose for 'context' or 'http' would flag half of core's English.
+      .filter((f) => pluginNames.some((n) => f.toLowerCase().replace(/s?\.ts$/, '').includes(n.replace(/s$/, ''))))
+    expect([...new Set(named)].sort()).toEqual([...PLUGIN_NAMED_BASELINE].sort())
+  })
+
   it('only core reaches the machine identity store', () => {
     // The node's identity used to be WRITTEN by a feature plugin: plugins/github's device-flow route
     // set `c.env.ACTIVE_IDENTITY` after connecting an account, so core's answer to "who is the user"

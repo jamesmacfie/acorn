@@ -15,7 +15,7 @@ import { broadcastWorkflowNotice } from '@acorn/node-core/main/notify.ts'
 import { listProfileDefs, profileAvailable, resolveCommand, type ProfileDef } from '@acorn/node-core/main/profiles.ts'
 import { isDir } from '@acorn/node-core/main/taskWorktree.ts'
 import { buildSessionEnv } from '@acorn/node-core/main/taskEnv.ts'
-import { formatLaunchContext } from '@acorn/protocol/contextBlock.ts'
+import { formatLaunchContext } from '@acorn/plugin-context/contract/contextBlock.ts'
 import { capabilityId } from '@acorn/node-core/server/plugin/capabilities.ts'
 import type { MemoryHit, MemoryRow } from './memory'
 

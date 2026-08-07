@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import type { TaskContext } from './api'
+import type { TaskContext } from '@acorn/protocol/api.ts'
 import { formatContextBlock, formatLaunchContext } from './contextBlock'
 
 const ctx: TaskContext = {
