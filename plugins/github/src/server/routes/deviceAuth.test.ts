@@ -1,9 +1,9 @@
-import { testSecretEnv } from '@acorn/node-core/server/routes/testDb.ts'
+import { testSecretEnv } from '@acorn/node-core/testkit/db.ts'
 import { Hono } from 'hono'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { AppEnv, Principal } from '@acorn/node-core/server/middleware/auth.ts'
 import type { Env } from '@acorn/node-core/main/bindings.ts'
-import { makeTestDb, type TestDb } from '@acorn/node-core/server/routes/testDb.ts'
+import { makeTestDb, type TestDb } from '@acorn/node-core/testkit/db.ts'
 // CORE's schema, on purpose: the device flow writes core's `integrations` row through core's own
 // connectProvider and touches none of this plugin's tables — so this test needs core's handle only, and
 // `githubDeviceAuth` is the one github router that is a factory over CoreServices rather than over the
@@ -12,7 +12,7 @@ import { schema } from '@acorn/node-core/server/db/index.ts'
 import { createCoreServices, SecretService } from '@acorn/node-core/main/core/index.ts'
 import { memoryIdentityStore, type ActiveIdentityStore } from '@acorn/node-core/main/activeIdentity.ts'
 import { decryptSecret } from '@acorn/node-core/server/secretBox.ts'
-import { testGate } from '@acorn/node-core/server/routes/testAuth.ts'
+import { testGate } from '@acorn/node-core/testkit/auth.ts'
 import { githubDeviceAuth } from './deviceAuth'
 import { githubProvider } from '../provider'
 import { connectionProviderRegistry } from '@acorn/node-core/server/integrations/connectionRegistry.ts'

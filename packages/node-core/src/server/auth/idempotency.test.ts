@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import { makeTestDb, type TestDb } from '../routes/testDb'
+import { makeTestDb, type TestDb } from '../../testkit/db'
 import { idempotencyStore, requestHash, type IdempotencyStore } from './idempotency'
 
 let harness: TestDb

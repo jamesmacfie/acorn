@@ -1,5 +1,5 @@
 import { mintInternalToken } from '../auth/internalTokens'
-import { testSecretEnv } from '../routes/testDb'
+import { testSecretEnv } from '../../testkit/db'
 import { Hono } from 'hono'
 import { describe, expect, it, vi } from 'vitest'
 import { authMiddleware, type AppEnv } from './auth'

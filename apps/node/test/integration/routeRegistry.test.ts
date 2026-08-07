@@ -14,7 +14,7 @@ import { initPlugins } from '@acorn/node-core/server/plugin/host.ts'
 import { connectionProviderRegistry } from '@acorn/node-core/server/integrations/connectionRegistry.ts'
 import { integrationProviderRegistry } from '@acorn/node-core/server/integrations/registry.ts'
 import { modelProviderRegistry } from '@acorn/node-core/server/modelProviders/registry.ts'
-import { makeTestDb, type TestDb } from '@acorn/node-core/server/routes/testDb.ts'
+import { makeTestDb, type TestDb } from '@acorn/node-core/testkit/db.ts'
 import { RouteRegistry, routeMountPath } from '@acorn/node-core/server/routeRegistry.ts'
 
 describe('plugin route registry', () => {

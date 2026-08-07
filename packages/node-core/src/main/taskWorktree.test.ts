@@ -4,7 +4,7 @@ import { join } from 'node:path'
 import { tmpdir } from 'node:os'
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { schema } from '../server/db'
-import { makeTestDb, type TestDb } from '../server/routes/testDb'
+import { makeTestDb, type TestDb } from '../testkit/db'
 import { baseRefPref, computeTaskStatuses, loadTask, resolveTaskCwd, setOnWorktreeCreated, setWorktreesRoot } from './taskWorktree'
 
 vi.setConfig({ testTimeout: 20_000 })

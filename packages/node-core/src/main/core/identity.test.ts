@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { schema } from '../../server/db'
 import { setRepoMirrorSource } from '../../server/repoMirror'
-import { makeTestDb, type TestDb } from '../../server/routes/testDb'
+import { makeTestDb, type TestDb } from '../../testkit/db'
 import { memoryIdentityStore } from '../activeIdentity'
 import { createIdentityService } from './identity'
 

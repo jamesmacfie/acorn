@@ -1,6 +1,6 @@
 import { getTableColumns, sql } from 'drizzle-orm'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import { makeTestPluginDb, type TestPluginDb } from '@acorn/node-core/server/routes/testDb.ts'
+import { makeTestPluginDb, type TestPluginDb } from '@acorn/node-core/testkit/db.ts'
 import { migrationsDir } from './migrations'
 import { agentEvents } from './schema'
 

@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { makeTestDb, testSecretEnv, type TestDb } from '@acorn/node-core/server/routes/testDb.ts'
+import { makeTestDb, testSecretEnv, type TestDb } from '@acorn/node-core/testkit/db.ts'
 import { Hono } from 'hono'
 import { settleBackground } from '@acorn/node-core/server/background.ts'
 import { gh } from '..'
@@ -9,7 +9,7 @@ import { pullFiles } from './pullFiles'
 import { resolveRepoForUser } from './repoMirror'
 import type { Env } from '@acorn/node-core/main/bindings.ts'
 import type { PluginDatabase } from '@acorn/node-core/main/pluginStorage.ts'
-import { seedGithubIntegration } from '../testGithubToken'
+import { seedGithubIntegration } from '../../testkit/githubToken'
 
 vi.mock('..', async (importOriginal) => {
   const actual = await importOriginal<typeof import('..')>()

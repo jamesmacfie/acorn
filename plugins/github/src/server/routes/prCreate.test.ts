@@ -1,4 +1,4 @@
-import { makeTestPluginDb, testSecretEnv, type TestPluginDb } from '@acorn/node-core/server/routes/testDb.ts'
+import { makeTestPluginDb, testSecretEnv, type TestPluginDb } from '@acorn/node-core/testkit/db.ts'
 import { Hono } from 'hono'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { ApiError } from '@acorn/protocol/api.ts'
@@ -6,7 +6,7 @@ import { gh } from '..'
 import type { AppEnv, Principal } from '@acorn/node-core/server/middleware/auth.ts'
 import { prCreate } from './prCreate'
 import { migrationsDir } from '../../node/migrations'
-import { testGate } from '@acorn/node-core/server/routes/testAuth.ts'
+import { testGate } from '@acorn/node-core/testkit/auth.ts'
 import type { Env } from '@acorn/node-core/main/bindings.ts'
 
 vi.mock('..', async (importOriginal) => {

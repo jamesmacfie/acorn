@@ -1,6 +1,7 @@
+// Test-only helper. See testkit/db.ts for why this directory exists.
 import type { Context, Next } from 'hono'
-import type { AppEnv, Principal } from '../middleware/auth'
-import { requireUser } from '../middleware/requireUser'
+import type { AppEnv, Principal } from '../server/middleware/auth'
+import { requireUser } from '../server/middleware/requireUser'
 
 // The auth slice of the mount contract for route tests: seed the principal exactly as
 // authMiddleware would, then run the real requireUser gate. Spread into

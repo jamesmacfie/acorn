@@ -7,7 +7,7 @@ import { registerAgentTool, removeAgentTools, ToolError, TOOL_PERMS_PREF_KEY, ty
 import { getDb, schema } from '../db'
 import type { AppEnv } from '../middleware/auth'
 import { agentTools, agentToolsCatalog } from './agentTools'
-import { makeTestDb, type TestDb } from './testDb'
+import { makeTestDb, type TestDb } from '../../testkit/db'
 import type { Env } from '../../main/bindings'
 
 vi.mock('../db', async (importOriginal) => {

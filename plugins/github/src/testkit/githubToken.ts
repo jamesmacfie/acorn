@@ -1,6 +1,8 @@
+// Test-only helper, in testkit/ for the same reason node-core's is: it is scaffolding, not surface,
+// and it was sitting in server/ where every import read like production code.
 import type { AppDatabase } from '@acorn/node-core/server/db/index.ts'
-import { seedProviderConnection } from '@acorn/node-core/server/routes/testIntegration.ts'
-import { GITHUB_PROVIDER } from './githubToken'
+import { seedProviderConnection } from '@acorn/node-core/testkit/integration.ts'
+import { GITHUB_PROVIDER } from '../server/githubToken'
 
 // The credential half of the mount contract for github route tests, alongside node-core's testDb and
 // testAuth. It is now a one-line binding of this plugin's provider id onto core's seeding helper: the row

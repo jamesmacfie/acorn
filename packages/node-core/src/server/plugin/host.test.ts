@@ -1,7 +1,7 @@
 import { afterAll, describe, expect, it, vi } from 'vitest'
 import { memoryIdentityStore } from '../../main/activeIdentity'
 import { createCoreServices, SecretService } from '../../main/core'
-import { makeTestDb } from '../routes/testDb'
+import { makeTestDb } from '../../testkit/db'
 import { CapabilityRegistry, capabilityId } from './capabilities'
 import { Hono } from 'hono'
 import { z } from 'zod'

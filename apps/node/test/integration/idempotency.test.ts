@@ -12,7 +12,7 @@ import { idempotencyStore, type IdempotencyStore } from '@acorn/node-core/server
 import { idempotency } from '@acorn/node-core/server/middleware/idempotency.ts'
 import type { AppEnv, Principal } from '@acorn/node-core/server/middleware/auth.ts'
 import { requireUser } from '@acorn/node-core/server/middleware/requireUser.ts'
-import { makeTestDb, type TestDb } from '@acorn/node-core/server/routes/testDb.ts'
+import { makeTestDb, type TestDb } from '@acorn/node-core/testkit/db.ts'
 import type { Env } from '@acorn/node-core/main/bindings.ts'
 
 // Idempotency-Key semantics (docs/api-reference.md § HTTP conventions) over a counting stub route,

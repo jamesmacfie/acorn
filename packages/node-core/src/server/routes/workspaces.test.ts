@@ -4,7 +4,7 @@ import type { Workspace } from '@acorn/protocol/api.ts'
 import { getDb } from '../db'
 import type { AppEnv } from '../middleware/auth'
 import { workspaces } from './workspaces'
-import { makeTestDb, type TestDb } from './testDb'
+import { makeTestDb, type TestDb } from '../../testkit/db'
 import type { Env } from '../../main/bindings'
 
 vi.mock('../db', async (importOriginal) => {

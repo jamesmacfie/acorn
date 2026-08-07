@@ -7,7 +7,7 @@ import type { Env } from '../../main/bindings'
 import type { AppEnv } from '../middleware/auth'
 import { requireUser } from '../middleware/requireUser'
 import { schema } from '../db'
-import { makeTestDb, testSecretEnv, type TestDb } from './testDb'
+import { makeTestDb, testSecretEnv, type TestDb } from '../../testkit/db'
 import { setTaskSessionsBridge, worktree, type TaskSessionsBridge } from './worktree'
 
 const req = (url: string, method = 'GET', body?: unknown) =>

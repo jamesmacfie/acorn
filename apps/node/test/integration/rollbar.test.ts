@@ -1,4 +1,4 @@
-import { testSecretEnv } from '@acorn/node-core/server/routes/testDb.ts'
+import { testSecretEnv } from '@acorn/node-core/testkit/db.ts'
 import { Hono } from 'hono'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type {
@@ -16,7 +16,7 @@ import { ROLLBAR_ITEMS_STALE_AFTER_MS } from '@acorn/node-core/server/sync/polic
 import { settleBackground } from '@acorn/node-core/server/background.ts'
 import { integrations } from '@acorn/node-core/server/routes/integrations.ts'
 import { rollbar } from '@acorn/plugin-rollbar/server/routes/rollbar.ts'
-import { makeTestDb, type TestDb } from '@acorn/node-core/server/routes/testDb.ts'
+import { makeTestDb, type TestDb } from '@acorn/node-core/testkit/db.ts'
 import '../registerProviders'
 import type { Env } from '@acorn/node-core/main/bindings.ts'
 

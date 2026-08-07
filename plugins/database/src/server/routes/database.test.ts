@@ -7,7 +7,7 @@ import type { GenerateTextRequest, ModelService } from '@acorn/node-core/main/co
 import { ProviderOperationError } from '@acorn/node-core/server/integrations/types.ts'
 import type { AppEnv } from '@acorn/node-core/server/middleware/auth.ts'
 import { requireUser } from '@acorn/node-core/server/middleware/requireUser.ts'
-import { makeTestDb, makeTestPluginDb, type TestDb, type TestPluginDb } from '@acorn/node-core/server/routes/testDb.ts'
+import { makeTestDb, makeTestPluginDb, type TestDb, type TestPluginDb } from '@acorn/node-core/testkit/db.ts'
 import type { DbSavedQuery } from '../../shared/database'
 import { databaseRoutes, setDatabaseBridge } from './database'
 import { migrationsDir } from '../../node/migrations'

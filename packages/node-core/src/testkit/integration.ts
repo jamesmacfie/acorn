@@ -1,6 +1,7 @@
+// Test-only helper. See testkit/db.ts for why this directory exists.
 import { randomUUID } from 'node:crypto'
-import { SecretService } from '../../main/core/secrets'
-import { schema, type AppDatabase } from '../db'
+import { SecretService } from '../main/core/secrets'
+import { schema, type AppDatabase } from '../server/db'
 
 export async function seedProviderConnection(
   db: AppDatabase,

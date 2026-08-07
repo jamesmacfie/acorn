@@ -2,7 +2,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import { makeTestDb, type TestDb } from '../server/routes/testDb'
+import { makeTestDb, type TestDb } from '../testkit/db'
 import { schema } from '../server/db'
 import { acknowledgeRepoConfig, assertRepoConfigTrusted, readRepoConfigSnapshot, RepoConfigTrustError, repoConfigTrustReview } from './repoConfigTrust'
 
