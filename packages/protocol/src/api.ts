@@ -281,17 +281,6 @@ export type RepoConfigTrustReview = {
 }
 export const repoConfigTrustRoute = (taskId: string) => `/v2/core/tasks/${taskId}/config-trust`
 
-// Workflow control (docs/workflows.md): task-scoped defs/start/runs and run-scoped steps/gates.
-// Commands use HTTP; workflow notices and step events use the shared WebSocket.
-export const workflowDefsRoute = (taskId: string) => `/v2/p/workflows/tasks/${taskId}/workflows`
-export const workflowStartRoute = (taskId: string) => `/v2/p/workflows/tasks/${taskId}/workflows`
-export const workflowRunsRoute = (taskId: string) => `/v2/p/workflows/tasks/${taskId}/workflows/runs`
-export const workflowStepsRoute = (runId: string) => `/v2/p/workflows/workflows/runs/${runId}/steps`
-export const workflowGateRoute = (runId: string) => `/v2/p/workflows/workflows/runs/${runId}/gate`
-export const workflowCancelRoute = (runId: string) => `/v2/p/workflows/workflows/runs/${runId}/cancel`
-export const workflowKillRoute = (runId: string) => `/v2/p/workflows/workflows/runs/${runId}/kill`
-export const workflowTriggerPollRoute = '/v2/p/workflows/workflows/triggers/poll'
-
 // Local-changes review (docs/panes.md): working-tree status/diff/blob + stage/commit/discard/push.
 // Was the `local:*` IPC channels.
 export const localChangesRoute = (taskId: string) => `/v2/p/changes/tasks/${taskId}/local/changes`

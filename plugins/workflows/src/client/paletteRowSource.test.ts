@@ -3,7 +3,7 @@ import type { PaletteItem } from '@acorn/client-core/palette/model.ts'
 import type { WorkflowDefSummary } from '@acorn/protocol/workflow.ts'
 
 const mocks = vi.hoisted(() => ({ defs: vi.fn(), start: vi.fn() }))
-vi.mock('@acorn/client-core/tasks/workflowClient.ts', () => ({ workflowApi: { defs: mocks.defs, start: mocks.start } }))
+vi.mock('../contract/workflowClient', () => ({ workflowApi: { defs: mocks.defs, start: mocks.start } }))
 
 import { workflowsPaletteRowSource as source } from './paletteRowSource'
 

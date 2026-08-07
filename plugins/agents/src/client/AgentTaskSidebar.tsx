@@ -10,7 +10,8 @@ import { wsOnStatus } from '@acorn/client-core/wsClient.ts'
 import { terminalSessions } from '@acorn/plugin-terminal/contract/sessionsClient.ts'
 import { buildRoster, resumeCommandFor, type RosterRow } from './model'
 import { managedAgentStore } from './managedStore'
-import { workflowApi } from '@acorn/client-core/tasks/workflowClient.ts'
+import { clientCapability } from '@acorn/client-core/clientCapabilities.ts'
+import { WORKFLOW_CONTROL } from '../contract/workflowControl'
 import './agent-task-sidebar.css'
 
 const RUNTIME_GLYPH: Record<string, string> = {
@@ -51,9 +52,13 @@ export default function AgentTaskSidebar(props: {
   const [workflowData, { refetch }] = createResource(
     () => props.task.id,
     async (taskId) => {
-      if (!hasEngine()) return { runs: [], steps: [] as WorkflowStepRow[] }
-      const runs = await workflowApi.runs(taskId)
-      const steps = (await Promise.all(runs.map((run) => workflowApi.steps(run.id)))).flat()
+      // Resolved per call, never captured: client plugin registration order is not a dependency
+      // contract, and `undefined` here is also the honest answer on a node with workflows disabled —
+      // the roster then shows agent sessions alone rather than failing to render.
+      const workflows = clientCapability(WORKFLOW_CONTROL)
+      if (!hasEngine() || !workflows) return { runs: [], steps: [] as WorkflowStepRow[] }
+      const runs = await workflows.runs(taskId)
+      const steps = (await Promise.all(runs.map((run) => workflows.steps(run.id)))).flat()
       return { runs, steps }
     },
     { initialValue: { runs: [], steps: [] } },
@@ -111,7 +116,9 @@ export default function AgentTaskSidebar(props: {
 
   async function resolveGate(row: Extract<RosterRow, { kind: 'step' }>, approved: boolean) {
     try {
-      await workflowApi.gate(row.step.runId, row.step.id, approved)
+      const workflows = clientCapability(WORKFLOW_CONTROL)
+      if (!workflows) throw new Error('The workflows plugin is not available on this node.')
+      await workflows.gate(row.step.runId, row.step.id, approved)
       await refetch()
     } catch (caught) {
       props.onError(caught instanceof Error ? caught.message : 'Unable to resolve the workflow gate.')

@@ -9,6 +9,7 @@ import { nodeStatRegistry, type NodeStatContribution } from './nodeStats'
 import { paneRegistry, type PaneContribution } from './panes'
 import { refPanelRegistry, type RefPanelContribution } from './refPanels'
 import { pollerRegistry, type PollerContribution } from './pollers'
+import { provideClientCapability, type ClientCapabilityId } from '../clientCapabilities'
 import type { Disposable, Registry } from './registry'
 import { settingsRegistry, type SettingsContribution } from './settings'
 import { sourceRegistry, type SourceContribution } from './sources'
@@ -45,6 +46,10 @@ export type ClientPluginContext = {
   // (registries/attention.ts).
   attention: ClientContributionPoint<AttentionSourceContribution>
   contribute<T extends { id: string }>(registry: Registry<T>, entry: T): void
+  // Publish a typed capability for another plugin to resolve at call time, mirroring the node's
+  // ctx.capabilities.provide. Disposal is the host's, exactly like every registry contribution above:
+  // a second activation in one process must not hit "already provided".
+  capability<T>(id: ClientCapabilityId<T>, impl: T): void
 }
 
 export type ClientPlugin = {
@@ -132,6 +137,7 @@ function makeContext(name: string, record: (disposable: Disposable) => void): Cl
     // disposable recorded. The only difference from the members above is that the registry arrives as an
     // argument instead of being named here.
     contribute: (registry, entry) => own(registry).register(entry),
+    capability: (id, impl) => record(provideClientCapability(id, impl)),
   }
 }
 
