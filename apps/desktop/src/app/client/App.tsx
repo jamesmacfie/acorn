@@ -8,6 +8,7 @@ import { bootstrapWorkspaces } from '@acorn/client-core/workspaces/mutations.ts'
 import RepoPicker from '@acorn/client-core/ui/RepoPicker.tsx'
 import WorkspacePicker from '@acorn/client-core/ui/WorkspacePicker.tsx'
 import { workspaceForRepo } from '@acorn/client-core/workspaces/activeWorkspace.ts'
+import { createFleetWorkspaces, selectFleetWorkspace } from '@acorn/client-core/workspaces/fleetWorkspaces.ts'
 import { planWorkspaceViewTransition } from '@acorn/client-core/workspaces/workspaceViewTransition.ts'
 import AccountMenu from '@acorn/client-core/AccountMenu.tsx'
 import { initWorkflowNotices } from '@acorn/client-core/notifications/notifications.ts'
@@ -183,8 +184,18 @@ export default function App() {
     void bootstrapWorkspaces().then(() => queryClient.invalidateQueries({ queryKey: workspacesKey }))
   })
 
-  // Active workspace is derived from the current repo (partition — a repo is in exactly one).
+  // Active workspace is derived from the current repo (partition — a repo is in exactly one). The ACTIVE
+  // node's list, deliberately: the route carries no node, so the workspace the shell is showing is
+  // whichever one the active node has for this repo.
   const activeWorkspace = () => workspaceForRepo(workspaces.data, params.owner, params.repo)
+  // Every node's workspaces, for the topbar picker. Grouped rather than merged: a workspace belongs to
+  // exactly one node, and two nodes both having a "Default" is the normal case.
+  const fleetWorkspaces = createFleetWorkspaces()
+  const activeFleetWorkspace = () => {
+    const workspace = activeWorkspace()
+    if (!workspace) return null
+    return fleetWorkspaces().entries.find((entry) => entry.nodeId === activeNodeId() && entry.workspace.id === workspace.id) ?? null
+  }
   // Repos scoped to the active workspace for the topbar sub-selector. Falls back to all repos before
   // the workspace mapping has loaded so the picker is never empty.
   const scopedRepos = () => {
@@ -282,19 +293,15 @@ export default function App() {
           >
             {collapsed() ? '»' : '«'}
           </button>
-          <Show when={workspaces.data?.length}>
+          <Show when={fleetWorkspaces().entries.length}>
             <WorkspacePicker
-              workspaces={workspaces.data ?? []}
-              active={activeWorkspace()}
-              onSelect={(w) => {
-                // Selecting a workspace navigates to its first repo; the active workspace is derived
-                // from the repo, so no extra state. Empty workspaces stay put.
-                const first = w.repos[0]
-                if (!first) return
-                // The last view (source or task) is restored per-workspace by the activeWorkspace
-                // effect above, which may re-navigate to a remembered task's own path.
-                navigate(`/${first.owner}/${first.name}`)
-              }}
+              workspaces={fleetWorkspaces().entries}
+              active={activeFleetWorkspace()}
+              grouped={fleetWorkspaces().grouped}
+              /* Switches node context before navigating, so the route resolves against the node that
+                 owns the workspace (client-core's workspaces/fleetWorkspaces.ts explains the order).
+                 The last view is then restored per-workspace by the activeWorkspace effect above. */
+              onSelect={(entry) => selectFleetWorkspace(entry, navigate)}
             />
           </Show>
           <Show when={scopedRepos().length}>

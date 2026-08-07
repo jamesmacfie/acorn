@@ -1,7 +1,12 @@
 import { useNavigate, useParams } from '@solidjs/router'
 import { createQuery } from '@tanstack/solid-query'
 import { createEffect, createMemo, createResource, createSignal, For, on, onCleanup, onMount, Show } from 'solid-js'
-import { tasksOptions, workspacesOptions } from '@acorn/client-core/queries.ts'
+import { tasksOptions, workspacesOptions, type Task } from '@acorn/client-core/queries.ts'
+import { tasksRoute } from '@acorn/protocol/api.ts'
+import { readJson } from '@acorn/client-core/apiClient.ts'
+import { createFleetQuery } from '@acorn/client-core/node/fanout.ts'
+import { activeNodeId, setActiveNode } from '@acorn/client-core/node/activeNode.ts'
+import { nodes } from '@acorn/client-core/node/fleet.ts'
 import { activateTaskSignals, pathForTask } from '@acorn/client-core/tasks/activate.ts'
 import { workspaceForRepo } from '@acorn/client-core/workspaces/activeWorkspace.ts'
 import { isActiveAgent, needsAttention } from './agentActivity'
@@ -21,6 +26,10 @@ const elapsed = (timestamp: number): string => {
   return `${Math.round(minutes / 1_440)}d`
 }
 
+// One row, whichever scope produced it. `nodeId` is always present — in workspace scope it is the active
+// node — so `open` has one code path instead of branching on the scope that happened to be selected.
+type AgentRow = { session: AgentSession; nodeId: string; nodeLabel: string; task: Task | undefined }
+
 export default function AgentCenter() {
   const navigate = useNavigate()
   const params = useParams()
@@ -36,13 +45,19 @@ export default function AgentCenter() {
   const workspaceTaskIds = createMemo(() => new Set(workspaceTasks().map((task) => task.id)))
   const [providers] = createResource(() => managedAgentApi.providers())
   const [query, setQuery] = createSignal('')
+  // Workspace scope is the default and is unchanged: live through the WebSocket-backed store, scoped by
+  // the URL's repo. Fleet scope is polled, and that is a recorded divergence rather than an oversight —
+  // the live store is keyed by session id alone, so making every node live would mean keying it by
+  // (nodeId, sessionId) and opening a socket per node. See docs/vNext/phase4-notes.md.
+  const [scope, setScope] = createSignal<'workspace' | 'fleet'>('workspace')
+  const fleetScope = () => scope() === 'fleet' && nodes().length > 1
   const [searchResults] = createResource(
     () => {
       const value = query().trim()
       const activeId = workspaceId()
-      return value && activeId ? { value, activeId } : null
+      return value && activeId && !fleetScope() ? { value, activeId } : null
     },
-    (scope) => managedAgentApi.search(scope.value, { workspaceId: scope.activeId }),
+    (target) => managedAgentApi.search(target.value, { workspaceId: target.activeId }),
   )
   const [workspaceSessions] = createResource(
     workspaceId,
@@ -59,6 +74,22 @@ export default function AgentCenter() {
       ? (await managedAgentApi.sessions({ workspaceId: activeId, archived: true })).sessions
       : [],
   )
+
+  // The fleet halves. Sessions and tasks are two fan-outs because a row needs both: the session comes from
+  // the agents plugin's route and the task title from core's, on the SAME node — and a remote node's tasks
+  // are not in `tasks.data`, which is the active node's query.
+  const [fleetSessions] = createFleetQuery(
+    () => ['agents', 'sessions', 'fleet'] as const,
+    async (nodeId, dep: boolean, signal) =>
+      dep ? (await managedAgentApi.sessions({ archived: false }, { nodeId, signal })).sessions : [],
+    fleetScope,
+  )
+  const [fleetTasks] = createFleetQuery(
+    () => ['tasks', 'fleet'] as const,
+    async (nodeId, dep: boolean, signal) => (dep ? await readJson<Task[]>(tasksRoute, { nodeId, signal }) : []),
+    fleetScope,
+  )
+
   const [providerFilter, setProviderFilter] = createSignal('')
   const [stateFilter, setStateFilter] = createSignal<'all' | 'active' | 'attention' | 'archived'>('all')
   const [error, setError] = createSignal('')
@@ -73,38 +104,76 @@ export default function AgentCenter() {
   }, { defer: true }))
 
   const taskById = createMemo(() => new Map(workspaceTasks().map((task) => [task.id, task])))
-  const sourceSessions = createMemo(() => {
+
+  // Rows, in whichever scope is selected. Both branches produce the same shape so everything downstream —
+  // filters, counts, sort, open — is written once.
+  const rows = createMemo<AgentRow[]>(() => {
+    if (fleetScope()) {
+      // Per node, because a task id is only meaningful on its own node (architecture.md § Fleet semantics:
+      // two nodes may hold the same UUID). A single flat map would resolve one node's task title against
+      // another node's session.
+      const tasksByNode = new Map(
+        fleetTasks().rows.map((row) => [row.nodeId, new Map(row.data.map((task) => [task.id, task]))]),
+      )
+      return fleetSessions().rows.flatMap((row) =>
+        row.data.map((session) => ({
+          session,
+          nodeId: row.nodeId,
+          nodeLabel: row.node.label,
+          task: tasksByNode.get(row.nodeId)?.get(session.taskId),
+        })),
+      )
+    }
     void workspaceSessions()
-    if (stateFilter() === 'archived') return archived() ?? []
-    if (query().trim()) return searchResults() ?? []
-    return managedAgentStore.sessions().filter((session) =>
-      !session.archivedAt && workspaceTaskIds().has(session.taskId))
+    const sessions = stateFilter() === 'archived'
+      ? (archived() ?? [])
+      : query().trim()
+        ? (searchResults() ?? [])
+        : managedAgentStore.sessions().filter((session) => !session.archivedAt && workspaceTaskIds().has(session.taskId))
+    const active = activeNodeId() ?? ''
+    return sessions.map((session) => ({ session, nodeId: active, nodeLabel: '', task: taskById().get(session.taskId) }))
   })
+
+  const sourceSessions = createMemo(() => rows().map((row) => row.session))
   const shown = createMemo(() => {
-    return sourceSessions().filter((session) => {
+    const needle = fleetScope() ? query().trim().toLowerCase() : ''
+    return rows().filter(({ session, task }) => {
       if (providerFilter() && session.providerId !== providerFilter()) return false
       if (stateFilter() === 'active' && !isActiveAgent(session)) return false
       if (stateFilter() === 'attention' && !needsAttention(session)) return false
+      // Fleet search is client-side over the fetched rows. The server search takes a workspaceId, which
+      // only names a workspace on ONE node, so there is nothing to fan a server search out with.
+      if (needle && !`${session.title} ${session.providerId} ${task?.title ?? ''} ${task?.repoName ?? ''}`.toLowerCase().includes(needle)) return false
       return true
-    }).sort((a, b) => {
-      return Number(needsAttention(b)) - Number(needsAttention(a)) || b.updatedAt - a.updatedAt
-    })
+    }).sort((a, b) =>
+      Number(needsAttention(b.session)) - Number(needsAttention(a.session)) || b.session.updatedAt - a.session.updatedAt,
+    )
   })
-  function open(session: AgentSession) {
-    const task = taskById().get(session.taskId)
-    if (!task) return setError('The session’s task is no longer available.')
-    activateTaskSignals(task, { pane: 'agents' })
-    openManagedSession(task.id, session.id)
-    navigate(pathForTask(task))
+  const unavailable = () => (fleetScope() ? fleetSessions().unavailable : [])
+
+  function open(row: AgentRow) {
+    if (!row.task) return setError('The session’s task is no longer available.')
+    // The node FIRST. Everything below resolves against the active node — `activateTaskSignals` writes
+    // per-task client state and `navigate` lands on a route the shell reads through the active node's
+    // query cache — so opening a remote row without switching would address the wrong machine, or collide
+    // with a local task holding the same id.
+    if (row.nodeId && row.nodeId !== activeNodeId()) setActiveNode(row.nodeId)
+    activateTaskSignals(row.task, { pane: 'agents' })
+    openManagedSession(row.task.id, row.session.id)
+    navigate(pathForTask(row.task))
   }
 
   return (
     <main class="agent-center">
       <header class="agent-center-head">
         <div>
-          <span class="agent-center-kicker">Workspace</span>
+          <span class="agent-center-kicker">{fleetScope() ? 'Fleet' : 'Workspace'}</span>
           <h1>Agent Center</h1>
-          <p>Managed Claude Code and Codex sessions across this workspace’s tasks and worktrees.</p>
+          <p>
+            {fleetScope()
+              ? 'Managed sessions across every paired node. Remote rows refresh on load rather than live.'
+              : 'Managed Claude Code and Codex sessions across this workspace’s tasks and worktrees.'}
+          </p>
         </div>
         <div class="agent-center-stats">
           <span><strong>{sourceSessions().filter((session) => isActiveAgent(session)).length}</strong> active</span>
@@ -114,6 +183,13 @@ export default function AgentCenter() {
       </header>
 
       <Show when={error()}><div class="action-error agent-center-error" role="alert">{error()}</div></Show>
+
+      {/* Partial results are a banner, never a failed page (architecture.md § Fleet semantics). */}
+      <Show when={unavailable().length}>
+        <div class="agent-center-banner" role="status">
+          <For each={unavailable()}>{(entry) => <span>{entry.label} unavailable — {entry.reason}</span>}</For>
+        </div>
+      </Show>
 
       <section class="agent-center-providers">
         <For each={providers() ?? []}>
@@ -133,8 +209,26 @@ export default function AgentCenter() {
           <option value="">All providers</option>
           <For each={providers() ?? []}>{(provider) => <option value={provider.id}>{provider.label}</option>}</For>
         </Select>
+        {/* Only with a fleet to aggregate. With one node the two scopes answer identically, and offering
+            the choice would mention nodes on a first run (ui.md § New surfaces). */}
+        <Show when={nodes().length > 1}>
+          <div class="agent-center-segments">
+            <For each={['workspace', 'fleet'] as const}>
+              {(value) => (
+                <Button
+                  variant="bare"
+                  size="sm"
+                  classList={{ active: scope() === value }}
+                  onClick={() => setScope(value)}
+                >
+                  {value}
+                </Button>
+              )}
+            </For>
+          </div>
+        </Show>
         <div class="agent-center-segments">
-          <For each={['all', 'active', 'attention', 'archived'] as const}>
+          <For each={(fleetScope() ? ['all', 'active', 'attention'] : ['all', 'active', 'attention', 'archived']) as readonly ('all' | 'active' | 'attention' | 'archived')[]}>
             {(filter) => (
               <Button
                 variant="bare"
@@ -157,15 +251,24 @@ export default function AgentCenter() {
           each={shown()}
           fallback={<div class="agent-center-empty"><span>✦</span><p>No sessions match these filters.</p></div>}
         >
-          {(session) => {
-            const task = () => taskById().get(session.taskId)
+          {(row) => {
+            const session = row.session
+            const task = () => row.task
             return (
-              <Row class="agent-center-row" onActivate={() => open(session)}>
+              <Row class="agent-center-row" onActivate={() => open(row)}>
                 <span class="agent-center-session">
                   <span class="agent-center-session-icon" data-provider={session.providerId}>{session.providerId === 'claude' ? 'C' : '⌘'}</span>
                   <span><strong>{session.title}</strong><small>{session.providerId} · {session.kind}</small></span>
                 </span>
-                <span><strong>{task()?.title ?? 'Missing task'}</strong><small>{task() ? `${task()!.repoOwner}/${task()!.repoName}` : session.taskId}</small></span>
+                <span>
+                  <strong>{task()?.title ?? 'Missing task'}</strong>
+                  <small>
+                    {task() ? `${task()!.repoOwner}/${task()!.repoName}` : session.taskId}
+                    {/* The node only when there is a fleet to disambiguate — otherwise it names the only
+                        machine there is. */}
+                    <Show when={row.nodeLabel}>{(label) => <> · {label()}</>}</Show>
+                  </small>
+                </span>
                 <span class="agent-center-state">
                   <span data-state={session.runtimeState} />
                   <span>{session.runtimeState}<small>{session.attention === 'none' ? '' : session.attention.replace('_', ' ')}</small></span>

@@ -1,8 +1,14 @@
 import { createMemo, createResource, createSignal, For, Show } from 'solid-js'
 import { createQuery } from '@tanstack/solid-query'
 import { useNavigate, useParams } from '@solidjs/router'
-import { tasksOptions, workspacesOptions } from '@acorn/client-core/queries.ts'
+import { tasksOptions } from '@acorn/client-core/queries.ts'
+import { tasksRoute, type Task } from '@acorn/protocol/api.ts'
+import { readJson } from '@acorn/client-core/apiClient.ts'
 import { workspaceForRepo } from '@acorn/client-core/workspaces/activeWorkspace.ts'
+import { createFleetWorkspaces, selectFleetWorkspace } from '@acorn/client-core/workspaces/fleetWorkspaces.ts'
+import { createFleetQuery } from '@acorn/client-core/node/fanout.ts'
+import { activeNodeId, setActiveNode } from '@acorn/client-core/node/activeNode.ts'
+import { nodes } from '@acorn/client-core/node/fleet.ts'
 import { hasClientCapability } from '@acorn/client-core/capabilities.ts'
 import { activeTaskId } from '@acorn/client-core/tasks/tasks.ts'
 import { activateTaskSignals, pathForTask } from '@acorn/client-core/tasks/activate.ts'
@@ -25,8 +31,20 @@ export default function CommandPalette() {
   const navigate = useNavigate()
   const params = useParams()
   const tasks = createQuery(() => tasksOptions(true))
-  const workspaces = createQuery(() => workspacesOptions(true))
+  const fleetWorkspaces = createFleetWorkspaces()
   const [actionError, setActionError] = createSignal('')
+  // plan.md § Phase 4's "search with per-node fan-out" is THIS: go-to-task and switch-workspace rows go
+  // fleet-wide. `plugins/editor`'s find-in-files is worktree-scoped, so fanning that out is meaningless —
+  // recorded as a divergence in docs/vNext/phase4-notes.md.
+  //
+  // Fetched only while the palette is open and only with more than one node paired: with one node the
+  // active-node query below already has every task, and a second fan-out would be the same request twice.
+  const fanTasks = () => palette.open() && nodes().length > 1
+  const [fleetTasks] = createFleetQuery(
+    () => ['tasks', 'palette', 'fleet'] as const,
+    async (nodeId, dep: boolean, signal) => (dep ? await readJson<Task[]>(tasksRoute, { nodeId, signal }) : []),
+    fanTasks,
+  )
 
   const palette = createOverlayPalette({
     id: 'commands',
@@ -81,21 +99,43 @@ export default function CommandPalette() {
       .filter((command) => command.palette && commandAvailable(command))
       .map((command) => ({ id: command.id, label: commandTitle(command), hint: commandHint(command) }))
 
+  // Every task the fleet knows, with the node that owns it. Keyed `${nodeId}:${taskId}` because a task id
+  // is only unique WITHIN a node (architecture.md § Fleet semantics), and this list is the one place two
+  // nodes' ids sit side by side — a bare task id here would make one of two colliding rows unreachable.
+  const fleetTaskRows = createMemo(() => {
+    const active = activeNodeId() ?? ''
+    if (!fanTasks()) return (tasks.data ?? []).map((task) => ({ task, nodeId: active, nodeLabel: '' }))
+    return fleetTasks().rows.flatMap((row) =>
+      row.data.map((task) => ({ task, nodeId: row.nodeId, nodeLabel: nodes().length > 1 ? row.node.label : '' })),
+    )
+  })
+  const taskByKey = createMemo(() => new Map(fleetTaskRows().map((row) => [`${row.nodeId}:${row.task.id}`, row])))
+
   // Go-to-task rows: every other task, jumpable by name (⌘1–9 covers the first nine by position).
   const taskItems = () => {
     const cur = activeTaskId()
-    return (tasks.data ?? [])
-      .filter((t) => t.id !== cur)
-      .map((t) => ({ id: t.id, label: `Go to task: ${t.title}`, hint: `${t.repoOwner}/${t.repoName}` }))
+    const active = activeNodeId() ?? ''
+    return fleetTaskRows()
+      .filter((row) => !(row.task.id === cur && row.nodeId === active))
+      .map((row) => ({
+        id: `${row.nodeId}:${row.task.id}`,
+        label: `Go to task: ${row.task.title}`,
+        hint: `${row.task.repoOwner}/${row.task.repoName}${row.nodeLabel ? ` · ${row.nodeLabel}` : ''}`,
+      }))
   }
 
-  // Switch-workspace rows: every workspace except the current one (derived from the route repo, like App's
-  // activeWorkspace). Picking one navigates to its first repo, mirroring the topbar picker.
+  // Switch-workspace rows: every workspace on every node except the current one. Same key shape and the
+  // same reason — two nodes may hold the same workspace UUID.
   const workspaceItems = () => {
-    const active = workspaceForRepo(workspaces.data, params.owner, params.repo)
-    return (workspaces.data ?? [])
-      .filter((w) => w.id !== active?.id)
-      .map((w) => ({ id: w.id, label: `Switch workspace: ${w.name}`, hint: `${(w.repos ?? []).length} repos` }))
+    const active = workspaceForRepo(fleetWorkspaces().entries.filter((entry) => entry.nodeId === activeNodeId()).map((entry) => entry.workspace), params.owner, params.repo)
+    const activeNode = activeNodeId() ?? ''
+    return fleetWorkspaces().entries
+      .filter((entry) => !(entry.workspace.id === active?.id && entry.nodeId === activeNode))
+      .map((entry) => ({
+        id: `${entry.nodeId}:${entry.workspace.id}`,
+        label: `Switch workspace: ${entry.workspace.name}`,
+        hint: `${(entry.workspace.repos ?? []).length} repos${fleetWorkspaces().grouped ? ` · ${entry.node.label}` : ''}`,
+      }))
   }
 
   const items = createMemo<PaletteItem[]>(() => {
@@ -113,18 +153,22 @@ export default function CommandPalette() {
     palette.close()
     if (item.kind === 'task') {
       // Navigation, not a task-scoped command — no active task required.
-      const t = tasks.data?.find((x) => `task:${x.id}` === item.id)
-      if (t) {
-        activateTaskSignals(t)
-        navigate(pathForTask(t))
+      const row = taskByKey().get(item.id.slice('task:'.length))
+      if (row) {
+        // The node FIRST: `activateTaskSignals` and the route both resolve against the active node, so a
+        // remote task opened without switching addresses the wrong machine.
+        if (row.nodeId && row.nodeId !== activeNodeId()) setActiveNode(row.nodeId)
+        activateTaskSignals(row.task)
+        navigate(pathForTask(row.task))
       }
       return
     }
     if (item.kind === 'workspace') {
-      // Navigation — mirror the topbar picker: jump to the workspace's first repo. The rail source is restored
-      // per-workspace by the activeWorkspace effect in App.tsx.
-      const first = workspaces.data?.find((x) => `workspace:${x.id}` === item.id)?.repos[0]
-      if (first) navigate(`/${first.owner}/${first.name}`)
+      // Navigation — mirror the topbar picker, including the node switch (fleetWorkspaces.ts explains the
+      // order). The rail source is restored per-workspace by the activeWorkspace effect in App.tsx.
+      const key = item.id.slice('workspace:'.length)
+      const entry = fleetWorkspaces().entries.find((candidate) => `${candidate.nodeId}:${candidate.workspace.id}` === key)
+      if (entry) selectFleetWorkspace(entry, navigate)
       return
     }
     if (item.kind === 'action') {

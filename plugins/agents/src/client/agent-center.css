@@ -153,3 +153,15 @@
   .agent-center-row > .ui-row-body > span:nth-child(2) { grid-row: 1; grid-column: 2; }
   .agent-center-row > .ui-row-body > span:nth-child(3) { grid-row: 2; grid-column: 2; }
 }
+
+/* Fleet scope's partial-result banner (AgentCenter.tsx). */
+.agent-center-banner {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  padding: var(--space-3);
+  border: var(--control-border);
+  border-radius: var(--radius-control);
+  color: var(--warn);
+  font-size: var(--fs-sm);
+}
