@@ -3,8 +3,30 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 const electron = vi.hoisted(() => {
   type Listener = (...args: unknown[]) => unknown
 
+  // The per-view session. It is a fake with real behaviour rather than a stub of vi.fn()s, because the
+  // three things registered on it are the whole of the view's hardening (docs/vNext/security.md
+  // § Execution boundaries) and a test that only checked they were CALLED would not notice one of them
+  // answering the wrong way.
+  class FakeSession {
+    permissionRequestHandler: ((wc: unknown, permission: string, cb: (allowed: boolean) => void) => void) | null = null
+    permissionCheckHandler: (() => boolean) | null = null
+    beforeSendHeaders: ((details: { url: string; requestHeaders: Record<string, string> }, cb: (r: { requestHeaders: Record<string, string> }) => void) => void) | null = null
+    setPermissionRequestHandler = vi.fn((handler: FakeSession['permissionRequestHandler']) => {
+      this.permissionRequestHandler = handler
+    })
+    setPermissionCheckHandler = vi.fn((handler: FakeSession['permissionCheckHandler']) => {
+      this.permissionCheckHandler = handler
+    })
+    webRequest = {
+      onBeforeSendHeaders: vi.fn((handler: FakeSession['beforeSendHeaders']) => {
+        this.beforeSendHeaders = handler
+      }),
+    }
+  }
+
   class FakeWebContents {
     private listeners = new Map<string, Listener[]>()
+    session = new FakeSession()
     destroyed = false
     devToolsOpened = false
     loading = false
@@ -37,7 +59,13 @@ const electron = vi.hoisted(() => {
     webContents = new FakeWebContents()
     setVisible = vi.fn()
     setBounds = vi.fn()
-    constructor(_options?: unknown) { FakeWebContentsView.instances.push(this) }
+    // Retained so the partition can be asserted: an ephemeral, per-task one is the difference between
+    // "each preview has its own cookie jar" and "every preview shares the app's default session".
+    readonly options: { webPreferences?: { partition?: string } }
+    constructor(options?: unknown) {
+      this.options = (options ?? {}) as { webPreferences?: { partition?: string } }
+      FakeWebContentsView.instances.push(this)
+    }
   }
 
   class FakeBrowserWindow {
@@ -99,12 +127,24 @@ const ensure = (win: TestWindow, taskId: string, url: string) =>
   electron.invokeHandlers.get('preview:ensure')?.(eventFor(win), { taskId, url })
 
 let dispose: () => void
+// What the injected tunnel lookup was asked about, so the "never leaves loopback" property can be
+// checked from the call site rather than trusted.
+let headerLookups: string[]
 beforeEach(() => {
   vi.clearAllMocks()
   electron.invokeHandlers.clear()
   electron.eventHandlers.clear()
   electron.FakeWebContentsView.instances.length = 0
-  dispose = registerPreviewIpc()
+  headerLookups = []
+  dispose = registerPreviewIpc({
+    tunnelHeadersFor: (url) => {
+      headerLookups.push(url)
+      // Stands in for PreviewTunnels.headersFor, whose own loopback/port matching is tested in
+      // apps/desktop/src/app/main/previewTunnel.test.ts. Here the question is only whether the view
+      // consults it and merges what it returns.
+      return url.startsWith('http://127.0.0.1:4321/') ? { 'x-acorn-tunnel': 'sekret' } : null
+    },
+  })
 })
 afterEach(() => dispose())
 
@@ -155,5 +195,61 @@ describe('previewService lifecycle', () => {
 
     command?.(eventFor(owner), { taskId: 'task-1', action: 'devtools' })
     expect(view.webContents.closeDevTools).toHaveBeenCalledOnce()
+  })
+})
+
+// docs/vNext/security.md § Execution boundaries requires all three of these, and until Phase 5 the repo
+// had none of them: previews ran on the app's DEFAULT session, no permission handler existed anywhere in
+// the tree, and the preview tunnel's loopback listener carried no credential at all.
+describe('the preview view is a hardened, isolated guest', () => {
+  it('gets its own ephemeral partition per task, so two previews share no storage', () => {
+    const win = new electron.FakeBrowserWindow()
+    ensure(win, 'task-1', 'http://localhost:3000')
+    ensure(win, 'task-2', 'http://localhost:3001')
+    const [first, second] = electron.FakeWebContentsView.instances
+    expect(first.options.webPreferences?.partition).toBe('acorn-preview-task-1')
+    expect(second.options.webPreferences?.partition).toBe('acorn-preview-task-2')
+    // No `persist:` prefix — the session must die with the process rather than leaving a third-party
+    // page's cookies on disk.
+    for (const view of [first, second]) expect(view.options.webPreferences?.partition).not.toMatch(/^persist:/)
+  })
+
+  it('denies every permission, whether the page asks or merely checks', () => {
+    const win = new electron.FakeBrowserWindow()
+    ensure(win, 'task-1', 'http://localhost:3000')
+    const { session } = electron.FakeWebContentsView.instances[0].webContents
+
+    // The request path: a page calling getUserMedia, Notification.requestPermission, and so on.
+    const answers: boolean[] = []
+    session.permissionRequestHandler?.({}, 'media', (allowed) => answers.push(allowed))
+    session.permissionRequestHandler?.({}, 'notifications', (allowed) => answers.push(allowed))
+    expect(answers).toEqual([false, false])
+
+    // The check path, which is the one easy to forget: a page told "granted" here proceeds without ever
+    // firing a request, so a missing check handler makes the request handler unreachable.
+    expect(session.permissionCheckHandler?.()).toBe(false)
+  })
+
+  it('attaches the tunnel secret to a tunnel URL and to nothing else', () => {
+    const win = new electron.FakeBrowserWindow()
+    ensure(win, 'task-1', 'http://127.0.0.1:4321/')
+    const { session } = electron.FakeWebContentsView.instances[0].webContents
+
+    const headersFor = (url: string): Record<string, string> => {
+      let out: Record<string, string> = {}
+      session.beforeSendHeaders?.({ url, requestHeaders: { accept: '*/*' } }, (r) => {
+        out = r.requestHeaders
+      })
+      return out
+    }
+
+    // The document, a subresource and the dev server's HMR upgrade all go through this one hook, which is
+    // why the header is attached here rather than on the URL the pane is told to load.
+    expect(headersFor('http://127.0.0.1:4321/')).toEqual({ accept: '*/*', 'x-acorn-tunnel': 'sekret' })
+    expect(headersFor('http://127.0.0.1:4321/assets/app.js')).toMatchObject({ 'x-acorn-tunnel': 'sekret' })
+    // A page served through a tunnel can link anywhere; attaching the secret to an outbound request would
+    // hand it to a third party. The caller-supplied headers still pass through untouched.
+    expect(headersFor('https://example.com/pixel.gif')).toEqual({ accept: '*/*' })
+    expect(headerLookups).toContain('https://example.com/pixel.gif')
   })
 })

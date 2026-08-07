@@ -56,6 +56,9 @@ type PageBridge = {
   nodeSend(nodeId: string, frame: unknown): void
   onNodeFrame(listener: (nodeId: string, frame: unknown) => void): () => void
   nodeTunnelOpen(request: { nodeId: string; taskId: string; port: number }): Promise<{ port: number }>
+  // The preview surface, so the tunnel can be exercised the way the product does: through the pane's own
+  // WebContentsView, whose session is what attaches the tunnel's secret.
+  preview: { ensure(taskId: string, url: string): Promise<boolean> }
 }
 type BridgeWindow = Window & { acorn?: PageBridge }
 
@@ -571,23 +574,46 @@ test('runs a terminal and opens a preview tunnel on a remote task, over the LAN'
     // A LOCAL port, not the node's — the whole point. The renderer never learns the node's endpoint.
     expect(tunnelPort).not.toBe(devPort)
 
-    // …and the BYTES are fetched from this process, not from the page. The first version used `fetch` inside
-    // `page.evaluate` and got "Failed to fetch", which is the architecture working rather than a bug: the
-    // renderer loads from app://acorn under a `connect-src 'self'` CSP and has no network permission at all
-    // (security.md § Transport). The preview pane does not fetch the tunnel either — a WebContentsView does,
-    // and that is a separate guest contents outside the renderer's policy. So an out-of-page client is the
-    // faithful stand-in.
-    const body = await new Promise<{ status: number; text: string }>((resolvePromise, reject) => {
+    // …and the bytes come back through the PREVIEW PANE, which is the only client that can reach the
+    // tunnel now (Phase 5 closed Phase 4's unauthenticated-listener risk). The pane's WebContentsView runs
+    // on its own session, and that session's `onBeforeSendHeaders` attaches the listener's secret — so
+    // driving the real pane is what proves the two halves agree. Neither `fetch` in `page.evaluate` nor an
+    // out-of-process client can stand in: the renderer has no network permission at all under
+    // `connect-src 'self'` (security.md § Transport), and an outside client has no secret.
+    await running.page.evaluate(
+      ({ taskId, tunnelPort }) => (window as BridgeWindow).acorn!.preview.ensure(taskId, `http://127.0.0.1:${tunnelPort}/`),
+      { taskId: seeded.taskId, tunnelPort },
+    )
+    // Read from MAIN, because a WebContentsView is not a Playwright page: it is a separate guest contents
+    // with no window of its own, so `electronApp.evaluate` and `webContents.getAllWebContents()` are how a
+    // test sees what it rendered.
+    const rendered = await running.app.evaluate(async ({ webContents }, port) => {
+      const deadline = Date.now() + 20_000
+      while (Date.now() < deadline) {
+        const view = webContents.getAllWebContents().find((contents) => contents.getURL().includes(`127.0.0.1:${port}`))
+        if (view && !view.isLoading()) {
+          const text = (await view.executeJavaScript('document.body.innerText')) as string
+          if (text.trim()) return text.trim()
+        }
+        await new Promise((resolve) => setTimeout(resolve, 250))
+      }
+      return '(the preview never rendered)'
+    }, tunnelPort)
+    expect(rendered).toBe('ACORN_TUNNEL_OK')
+
+    // The other half of the same property, and the reason the pane detour above is not ceremony: a client
+    // that does NOT present the secret gets nothing. Before Phase 5 this request succeeded, which is
+    // exactly the widening that was accepted rather than closed.
+    const uncredentialed = await new Promise<{ ok: boolean; text: string }>((resolvePromise) => {
       const request = httpGet({ host: '127.0.0.1', port: tunnelPort, path: '/' }, (response) => {
         const chunks: Buffer[] = []
         response.on('data', (chunk: Buffer) => chunks.push(chunk))
-        response.on('end', () => resolvePromise({ status: response.statusCode ?? 0, text: Buffer.concat(chunks).toString('utf8') }))
+        response.on('end', () => resolvePromise({ ok: true, text: Buffer.concat(chunks).toString('utf8') }))
       })
-      request.on('error', reject)
+      request.on('error', (error) => resolvePromise({ ok: false, text: error.message }))
       request.end()
     })
-    expect(body.status).toBe(200)
-    expect(body.text).toBe('ACORN_TUNNEL_OK')
+    expect(uncredentialed.text).not.toContain('ACORN_TUNNEL_OK')
   } finally {
     await new Promise<void>((resolve) => server.close(() => resolve()))
   }
