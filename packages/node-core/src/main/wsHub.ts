@@ -59,9 +59,22 @@ type Conn = {
   // pseudo-terminal — arbitrary command execution as the owner in another task's shell, which is
   // exactly what scoping the token was supposed to prevent.
   internal?: InternalClaims
+  // Heartbeat bookkeeping (docs/vNext/protocol.md § Events). Counts pings this hub has sent that the
+  // peer has not answered; cleared by 'pong'. The client runs the same watchdog in the other direction
+  // (apps/desktop/src/app/main/nodeBroker.ts) — the two are not redundant, because they detect different
+  // ends going quiet, and only the CLIENT's half fixes what Phase 4 recorded (a hung node reading
+  // `online` forever). This half stops a vanished client's socket, and its stream subscriptions, from
+  // living on the node until the process restarts.
+  missedPongs: number
 }
 const conns = new Set<Conn>()
 const hubDisposers = new WeakMap<Server, () => void>()
+
+// Two unanswered pings, not one: a single miss on a congested link is not evidence, and the cost of
+// being wrong is tearing down a working socket and every stream attached to it. The ping rides the
+// existing revocation sweep rather than a second timer — same cadence, one thing to unref, and the sweep
+// is already the "walk every connection" loop.
+const MISSED_PONGS_BEFORE_DEAD = 2
 
 // Per-connection ceiling on unflushed bytes. A remote link that stops draining is the case this
 // exists for: a PTY producing faster than the socket drains would otherwise grow the send buffer
@@ -176,8 +189,11 @@ function mayDriveStream(conn: Conn, id: string | null): boolean {
 }
 
 function onConnect(ws: WebSocket, authorized: Authorized): void {
-  const conn: Conn = { ws, sinks: new Map(), deviceId: authorized.deviceId, seq: 0, internal: authorized.internal }
+  const conn: Conn = { ws, sinks: new Map(), deviceId: authorized.deviceId, seq: 0, internal: authorized.internal, missedPongs: 0 }
   conns.add(conn)
+  ws.on('pong', () => {
+    conn.missedPongs = 0
+  })
   ws.on('message', (raw) => {
     let frame: WsClientFrame
     try {
@@ -253,6 +269,23 @@ export function attachWsHub(server: Server, deps: WsAuthDeps): void {
   // listener registered after the revoke — which is exactly the case a live socket cannot detect,
   // since it holds no bearer to re-present.
   const sweep = setInterval(() => {
+    for (const conn of [...conns]) {
+      // Liveness first, and synchronously: a socket whose peer has vanished is one this hub should stop
+      // holding stream subscriptions open for, and asking the database whether its device is still active
+      // tells us nothing about that. Checked BEFORE the ping is sent, so the count read here is of pings
+      // that have already had a full interval to be answered.
+      if (conn.missedPongs >= MISSED_PONGS_BEFORE_DEAD) {
+        conn.ws.terminate()
+        continue
+      }
+      conn.missedPongs += 1
+      try {
+        conn.ws.ping()
+      } catch {
+        conn.ws.terminate()
+        continue
+      }
+    }
     void (async () => {
       for (const conn of [...conns]) {
         if (conn.deviceId && !(await deps.devices.isActive(conn.deviceId))) conn.ws.terminate()

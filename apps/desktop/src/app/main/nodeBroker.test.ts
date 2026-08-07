@@ -356,6 +356,53 @@ describe('broker WebSocket', () => {
     expect(frames).toEqual([{ channel: 'term:status', seq: 1 }])
   })
 
+  // docs/vNext/protocol.md § Events, and the risk Phase 4 accepted rather than closed: a node that has
+  // HUNG, or a laptop that slept without dropping its TCP connections, holds the socket open without
+  // answering anything. Nothing fires 'close', so the broker attempts no reconnect and the node reads
+  // `online` indefinitely — found by trying SIGSTOP in the two-node e2e.
+  it('tears down and reconnects a socket whose peer stops answering pings', async () => {
+    const { origin, server } = await listen(false)
+    let connections = 0
+    // `autoPong: false` is the whole reason this can be tested: `ws` answers a ping inside the library,
+    // below any application code, so a genuinely hung peer looks exactly like a healthy one unless the
+    // server is told to stay silent. This is the closest a test gets to SIGSTOP.
+    const wss = new WebSocketServer({ server, path: WS_PATH, autoPong: false })
+    wss.on('connection', () => {
+      connections += 1
+    })
+
+    const broker = new NodeBroker({ frame: () => {}, status: (s) => statuses.push(s) }, { pingIntervalMs: 20 })
+    brokers.push(broker)
+    broker.upsert({ nodeId: 'n1', label: 'local', endpoint: origin, local: true, token: 't' })
+
+    await waitFor(() => statuses.some((s) => s.state === 'online'), 'the online transition')
+    // Two things, and both matter. The socket is torn down despite the peer never closing it, and the
+    // broker then does what a dropped socket already made it do — reconnect, so a node that comes back
+    // is picked up rather than left needing a relaunch.
+    await waitFor(() => statuses.some((s) => s.state !== 'online'), 'the node to stop reading online', 8_000)
+    await waitFor(() => connections >= 2, 'a reconnect after the silence', 8_000)
+  })
+
+  it('keeps a socket that answers its pings', async () => {
+    const { origin, server } = await listen(false)
+    let connections = 0
+    // The default `autoPong`, i.e. an ordinary healthy peer. Without this case a heartbeat that
+    // terminated EVERY socket on a timer would satisfy the case above.
+    const wss = new WebSocketServer({ server, path: WS_PATH })
+    wss.on('connection', () => {
+      connections += 1
+    })
+
+    const broker = new NodeBroker({ frame: () => {}, status: (s) => statuses.push(s) }, { pingIntervalMs: 20 })
+    brokers.push(broker)
+    broker.upsert({ nodeId: 'n1', label: 'local', endpoint: origin, local: true, token: 't' })
+
+    await waitFor(() => statuses.some((s) => s.state === 'online'), 'the online transition')
+    await new Promise((r) => setTimeout(r, 300)) // many ping intervals
+    expect(connections).toBe(1)
+    expect(statuses.at(-1)?.state).toBe('online')
+  })
+
   it('stops reconnecting when the upgrade is refused as unauthorized', async () => {
     const { origin, server } = await listen(false)
     let attempts = 0
