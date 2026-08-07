@@ -150,12 +150,16 @@ one node down; a remote task's terminal/agent/preview work end-to-end over the L
 > beyond Phase 1's two render sites, and word fingerprints — landed with it, as did Phase 3's two open
 > prerequisites. [phase4-notes.md](./phase4-notes.md) records the divergences (tunnels are a dedicated
 > upgrade rather than multiplexed stream frames; the aggregated Agent Center is polled for non-active nodes;
-> a plugin's enabled state is the NODE's) and, more usefully, the **five pre-existing bugs the two-node
-> assertions found** — inbound WS frames ignoring their nodeId, `everOnline` shared across the fleet,
-> module state surviving a node switch, an unclaimed HTTP upgrade leaking its socket, and PullDetail wiping
-> the user's text on a failed mutation. Two gaps are left open on purpose and named there: **there is no
-> heartbeat on the events socket**, so a hung-but-connected node reads `online` indefinitely, and
-> `standalone.ts`'s SIGTERM drain is slow enough that a socket outlives a 30-second poll.
+> a plugin's enabled state is the NODE's) and, more usefully, the bugs the assertions found — five
+> pre-existing (inbound WS frames ignoring their nodeId, `everOnline` shared across the fleet, module state
+> surviving a node switch, an unclaimed HTTP upgrade leaking its socket, PullDetail wiping the user's text on
+> a failed mutation) plus **fourteen from an adversarial review**, including a tunnel that survived device
+> revocation, a preview that fell back to loading the CLIENT's own localhost, a plugin-disable that never
+> applied on a node switch, and a `requireDevice` claim that was VACUOUS (deleting the real mount left all 26
+> packages green). Three risks are accepted rather than closed and named there: **the client-side loopback
+> tunnel listener is unauthenticated**, **there is no heartbeat on the events socket** (a hung-but-connected
+> node reads `online` indefinitely), and `standalone.ts`'s SIGTERM drain is slow enough that a socket
+> outlives a 30-second poll.
 
 ## Phase 5 — polish, importer, release
 

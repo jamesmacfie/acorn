@@ -72,7 +72,10 @@ export function openTarget(taskId: string, target: NoticeTarget): void {
 }
 
 export function pushNotice(n: Omit<Notice, 'id' | 'read'>): Notice {
-  const notice: Notice = { nodeId: activeNodeId() ?? undefined, ...n, id: noticeId(n.at), read: false }
+  // The stamp goes AFTER the spread, with the caller's value preferred only when it is actually set.
+  // `Omit<Notice,'id'|'read'>` still includes an optional `nodeId`, so a caller passing `nodeId: undefined`
+  // used to clear the stamp — and an unstamped notice reads as the home node's, i.e. someone else's.
+  const notice: Notice = { ...n, nodeId: n.nodeId ?? activeNodeId() ?? undefined, id: noticeId(n.at), read: false }
   setNotices((prev) => capNotices([notice, ...prev]))
   return notice
 }
@@ -103,9 +106,15 @@ export function markAllRead(): void {
     prev.some((n) => !n.read && visible.has(n.id)) ? prev.map((n) => (visible.has(n.id) ? { ...n, read: true } : n)) : prev,
   )
 }
-// Viewing a task acknowledges its notices (verne's needsAcknowledgement).
+// Viewing a task acknowledges its notices — the ACTIVE node's, matching `unreadForTask` and `markAllRead`.
+// Without the filter this marked another node's notice about a task with the same id read, so the badge on
+// that node silently lost the only signal that it existed. Two nodes holding one task UUID is the case
+// architecture.md § Fleet semantics says must never collide.
 export function markTaskRead(taskId: string): void {
-  setNotices((prev) => (prev.some((n) => !n.read && n.taskId === taskId) ? prev.map((n) => (n.taskId === taskId ? { ...n, read: true } : n)) : prev))
+  const visible = new Set(noticesForActiveNode().filter((n) => n.taskId === taskId).map((n) => n.id))
+  setNotices((prev) =>
+    prev.some((n) => !n.read && visible.has(n.id)) ? prev.map((n) => (visible.has(n.id) ? { ...n, read: true } : n)) : prev,
+  )
 }
 
 // Hydrate from the persisted prefs blob without clobbering notices raised pre-hydration.

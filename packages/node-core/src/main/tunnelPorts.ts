@@ -15,11 +15,13 @@ import { loadTask } from './taskWorktree'
 //      running instance's `url_command` output);
 //   2. the repo's `previewMode: 'port'` value.
 //
-// `previewMode: 'script'` is deliberately NOT a source. Its value is a shell command whose stdout is the
-// URL, and running it to answer an upgrade would mean executing repo config on every tunnel attempt — the
-// config-trust gate exists precisely to stop that being incidental. A repo using a URL script still gets a
-// tunnel: the pane resolves the script through its own (gated) route and the resulting port comes back
-// through source 1 when it is a run target, or the owner sets `previewMode: 'port'`.
+// `previewMode: 'script'` is deliberately NOT a source, and it is the ONE case that is not covered. Its
+// value is a shell command whose stdout is the URL, and running it to answer an upgrade would mean
+// executing repo config on every tunnel attempt — the config-trust gate exists precisely to stop that
+// being incidental. So a remote task using a URL script gets no tunnel unless the same port also appears
+// as a run target's url or as `previewMode: 'port'`. The client fails CLOSED there (node/tunnelUrl.ts
+// returns null rather than the untunnelled URL), so the pane says nothing rather than showing the owner's
+// own localhost.
 //
 // A URL naming a host other than loopback contributes nothing: it is already reachable from the client, so
 // there is nothing to tunnel, and treating it as a port to open would be the SOCKS hole.
@@ -46,12 +48,29 @@ export function loopbackPortOf(url: string | undefined | null): number | null {
 export function declaredTunnelPorts(db: AppDatabase) {
   return async (taskId: string): Promise<readonly number[]> => {
     const ports = new Set<number>()
+    const add = (url: string | undefined | null): void => {
+      const port = loopbackPortOf(url)
+      if (port) ports.add(port)
+    }
 
-    // Source 1. `get`, not `require`: a node whose terminal plugin is disabled has no run bridge, and the
-    // honest answer there is "no run-target port", not a thrown upgrade.
-    const fromRun = await getRunBridge()?.defaultUrl(taskId).catch(() => undefined)
-    const runPort = loopbackPortOf(fromRun)
-    if (runPort) ports.add(runPort)
+    // Source 1: EVERY run target's fixed `url`, not just the default one's.
+    //
+    // The first version called `defaultUrl` alone, which meant a task with two run targets — an app on 3000
+    // and a Storybook on 6006 — could only tunnel to whichever was marked default. A layout recipe's
+    // `browser` url points at any of them (client-core's `recipeBrowserUrl` is the FIRST branch of the
+    // preview pane's resolution), so the non-default case is the normal one, not an edge.
+    //
+    // `get`, not `require`: a node whose terminal plugin is disabled has no run bridge, and the honest
+    // answer there is "no run-target port", not a thrown upgrade.
+    const bridge = getRunBridge()
+    if (bridge) {
+      add(await bridge.defaultUrl(taskId).catch(() => undefined))
+      const resolved = await bridge.targets(taskId).catch(() => null)
+      // `targets` is typed `unknown` on the bridge (the route projects it verbatim), so this reads the two
+      // fields it needs defensively rather than importing the terminal plugin's shape into core.
+      const list = (resolved as { targets?: { url?: unknown }[] } | null)?.targets
+      if (Array.isArray(list)) for (const target of list) if (typeof target?.url === 'string') add(target.url)
+    }
 
     // Source 2. Resolved through the task's repo, so a caller cannot name a repo it has no task in — the
     // taskId is already scope-checked by the upgrade handler.
@@ -62,10 +81,16 @@ export function declaredTunnelPorts(db: AppDatabase) {
         .from(schema.repoPaths)
         .where(and(eq(schema.repoPaths.owner, task.repoOwner), eq(schema.repoPaths.repo, task.repoName)))
         .limit(1)
+      const value = (row?.previewValue ?? '').trim()
       if (row?.previewMode === 'port') {
-        const port = Number((row.previewValue ?? '').trim())
+        const port = Number(value)
         if (Number.isInteger(port) && port >= 1 && port <= 65535) ports.add(port)
       }
+      // `'url'` was missing, and its absence was the worse half of the bug: the client resolves the URL,
+      // asks for a tunnel, gets a 403, and falls back to loading the URL as given — so a remote task
+      // configured with `http://localhost:8025` rendered whatever was on the OWNER'S 8025 while claiming to
+      // show the remote preview. It is declarative config, exactly like `'port'`.
+      if (row?.previewMode === 'url') add(value)
     }
 
     return [...ports]

@@ -78,7 +78,10 @@ const reasonOf = (error: unknown): string =>
 // rather than repeating the generic message every failure would otherwise share.
 function withDeadline<T>(promise: Promise<T>, ms: number): Promise<T> {
   return new Promise<T>((resolve, reject) => {
-    const timer = setTimeout(() => reject(new Error(`no answer within ${Math.round(ms / 1000)}s`)), ms)
+    // Seconds above a second, milliseconds below. `Math.round(ms/1000)` produced "no answer within 0s" for
+    // every sub-second deadline — a string the banner shows the owner verbatim.
+    const label = ms >= 1_000 ? `${Math.round(ms / 1000)}s` : `${ms}ms`
+    const timer = setTimeout(() => reject(new Error(`no answer within ${label}`)), ms)
     promise.then(
       (value) => {
         clearTimeout(timer)

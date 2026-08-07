@@ -34,25 +34,46 @@ export function loopbackTarget(url: string): { port: number; rest: string } | nu
 //     proxy protocol.md rules out);
 //   - there is no broker (a plain browser served by a node, where the origin IS the node).
 //
-// A failure to open the tunnel returns the original URL too. The pane then shows whatever the browser makes
-// of an unreachable localhost, which is no worse than the state before this existed — and main logs why.
+// A failure to open the tunnel returns NULL, not the original URL, and that is the security-relevant half.
+//
+// The first version fell back to the URL as given, reasoning that it was "no worse than before this
+// existed". It was much worse: the URL is loopback and the node is remote, so the WebContentsView loaded
+// whatever happened to be on the OWNER'S machine at that port while the pane claimed to be showing the
+// remote task's preview. A repo configured `previewMode: 'url' = http://localhost:8025` on a build box
+// rendered the owner's own Mailhog. Showing nothing is the only honest answer, and main logs why.
 export async function tunnelUrl(taskId: string, url: string | null): Promise<string | null> {
   if (!url) return url
-  const open = acornGlobal()?.nodeTunnelOpen
   const nodeId = activeNodeId()
-  if (!open || !nodeId) return url
+  // No broker, or no node: the origin IS the node (`dev:node` in a browser), so nothing needs rewriting.
+  if (!nodeId) return url
+  // The bundled local node — same machine, so a tunnel would be a pointless extra hop. `!== false` rather
+  // than `=== true`: an unknown node is treated as local and left alone rather than tunnelled blindly.
   if (nodes().find((node) => node.nodeId === nodeId)?.local !== false) return url
   const target = loopbackTarget(url)
+  // A real host is already reachable from here, and tunnelling it would be the general proxy protocol.md
+  // rules out.
   if (!target) return url
+  const open = acornGlobal()?.nodeTunnelOpen
+  if (!open) {
+    console.warn('[tunnel] this build cannot tunnel, so a remote loopback preview is unavailable')
+    return null
+  }
   try {
     const { port } = await open({ nodeId, taskId, port: target.port })
     return `http://127.0.0.1:${port}${target.rest}`
   } catch (error) {
     console.warn('[tunnel] could not open a preview tunnel:', error)
-    return url
+    return null
   }
 }
 
-// Called when a task is archived or its preview pane goes away, so the loopback listener does not outlive
-// what it was for.
-export const closeTunnelsForTask = (taskId: string): void => acornGlobal()?.nodeTunnelClose?.({ taskId })
+// Called when a preview pane goes away (and so on task archive, which unmounts it), so the loopback
+// listener does not outlive what it was for.
+//
+// Scoped to the node as well as the task. Without the nodeId this matched every node's tunnels for that
+// task id — and two nodes may hold the same task UUID by construction, so unmounting one pane could close
+// a live pipe belonging to a different machine.
+export const closeTunnelsForTask = (taskId: string): void => {
+  const nodeId = activeNodeId()
+  acornGlobal()?.nodeTunnelClose?.(nodeId ? { nodeId, taskId } : { taskId })
+}

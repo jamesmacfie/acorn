@@ -53,8 +53,19 @@ if (activated.skipped.length) console.log(`[client:boot] plugins disabled: ${act
 // Re-run the host with whatever the active node reports. This IS the client-side disable: the host takes
 // each plugin's previous contributions back before re-registering, so one call replaces a predicate
 // threaded through nine registry accessors (node/nodePlugins.ts explains the trade at length).
+//
+// `applied` makes it idempotent per node, so App.tsx can call it from a plain mount effect (which fires for
+// the first node too, right after index.tsx already did) without disposing and re-registering every
+// contribution a second time mid-paint.
+let applied: string | null = null
+
 export async function applyNodePlugins(nodeId?: string): Promise<void> {
-  await refreshNodePlugins(nodeId)
+  const target = nodeId ?? null
+  if (target !== null && applied === target) return
+  const state = await refreshNodePlugins(nodeId)
+  // Only mark it applied once the node has actually answered. A read failure leaves `applied` alone so the
+  // next mount retries, rather than pinning the full contribution set for the session.
+  if (state) applied = target
   const disabled = disabledNodePlugins()
   const result = initClientPlugins(clientPlugins, { disabled })
   if (result.skipped.length) console.log(`[client] plugins disabled by this node: ${result.skipped.join(', ')}`)

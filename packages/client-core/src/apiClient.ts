@@ -101,12 +101,12 @@ async function send(path: string, options: SendOptions = {}): Promise<ApiRespons
   // `offline` and `revoked` only. `degraded` is WS-down/HTTP-up, where writes still work, and
   // `incompatible` gets its own message from the route it fails on.
   if (isMutation(options.method) && !isWritable(nodeId)) {
-    throw new ApiError(
-      'This node is offline. Your changes have not been sent — they are kept here until it is back.',
-      0,
-      'node_offline',
-      { retryable: true },
-    )
+    // Says only what this layer can guarantee. It used to add "they are kept here until it is back", which
+    // is not this module's to promise: whether the input survives depends on each caller doing what
+    // PullDetail's `runThenClear` does, and two call sites away that sentence becomes a lie.
+    throw new ApiError('This node is offline, so nothing was sent. Try again once it is back.', 0, 'node_offline', {
+      retryable: true,
+    })
   }
 
   const requestId = nextRequestId()

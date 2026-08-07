@@ -59,13 +59,18 @@ const DEVICE_KEYS: ReadonlySet<string> = new Set<string>([
 
 const PREFIX = 'acorn-pref:'
 
-// A scoped slice appends `:<encodedScopeId>` to its declared key (persistence/persistedState.ts), so the
-// membership test has to match the base key rather than the whole string — otherwise every per-task layout
-// would be classified as a node pref.
+// Exact match, or a scoped slice's key with its id appended.
+//
+// A scoped slice writes `<declaredKey>:<encodedScopeId>` (persistence/persistedState.ts), so matching the
+// whole string alone would classify every per-task layout as a NODE pref and start PUTting pane layouts to
+// the node. The prefix scan is the clause that does the work; an earlier version also tried "the segment
+// before the first colon", which can never match a scoped device key (all four contain a colon in the
+// DECLARED part — `core:task-layouts`, `editor:open-files`, …) and only invited someone to delete the clause
+// that matters believing it was covered.
 export function isDevicePref(key: string): boolean {
   if (DEVICE_KEYS.has(key)) return true
-  const base = key.slice(0, key.indexOf(':') === -1 ? key.length : key.indexOf(':'))
-  return DEVICE_KEYS.has(base) || [...DEVICE_KEYS].some((candidate) => key.startsWith(`${candidate}:`))
+  for (const candidate of DEVICE_KEYS) if (key.startsWith(`${candidate}:`)) return true
+  return false
 }
 
 // `null` rather than a throw when there is no storage: this runs in a bare-Node vitest too, and a pref that

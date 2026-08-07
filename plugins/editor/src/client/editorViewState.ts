@@ -24,3 +24,8 @@ export function evictEditorViewStates(taskId: string): void {
   const suffix = `/${taskId}:`
   for (const key of viewStates.keys()) if (key.includes(suffix)) viewStates.delete(key)
 }
+
+// Same reason as clearEditorStates: keyed by a node-minted task id, must not outlive a node switch.
+export function clearEditorViewStates(): void {
+  viewStates.clear()
+}

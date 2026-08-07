@@ -147,10 +147,23 @@ export default function App() {
     onCleanup(initWorkflowNotices())
   })
 
-  // Which plugins the node we just switched to runs. `defer` because index.tsx already applied the list
-  // for the node this window opened on, and re-running the host during the first render would dispose and
-  // re-register every contribution mid-paint. Not for the initial node — for the second one onwards.
-  createEffect(on(activeNodeId, () => void applyNodePlugins(), { defer: true }))
+  // Which plugins the node this shell is showing runs.
+  //
+  // NOT `on(activeNodeId, …, { defer: true })`, which is what this was and which never fired. index.tsx
+  // mounts App inside a `<Show keyed>` on the active node, so a switch DISPOSES this component and builds a
+  // new one: the fresh effect records the new node and defers, the dying one is disposed during Solid's pure
+  // pass before user effects flush, and `applyNodePlugins` ran exactly once per window — at boot, from
+  // index.tsx. Every node after the first kept the previous node's contributions, so a plugin disabled on
+  // node B still had its pane, source, poller and settings page. The comment claiming "for the second one
+  // onwards" was precisely backwards.
+  //
+  // A plain effect reading the signal is right BECAUSE of that remount: it runs once on mount, which is once
+  // per node. The duplicate for the first node is a no-op — `applyNodePlugins` skips a node whose list it has
+  // already applied.
+  createEffect(() => {
+    const nodeId = activeNodeId()
+    if (nodeId) void applyNodePlugins(nodeId)
+  })
 
   // Gated on having a node to ask, not on an identity: there is no login. NodeGate below holds the
   // screen until `nodeReady()`, so these only ever fire against a selected node.

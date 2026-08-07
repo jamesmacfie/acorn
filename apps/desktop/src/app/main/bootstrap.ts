@@ -79,8 +79,10 @@ export async function bootstrap({ dataDir, createWindow }: BootstrapOptions): Pr
   const push = brokerPushTargets(() => window)
   const broker = new NodeBroker({ frame: push.frame, status: push.status })
   const fleet = new FleetStore(userDataDir)
-  // Preview tunnels resolve their node from the same fleet store the broker reads, so an unpaired or
-  // re-paired node cannot leave a pipe pointed at a stale endpoint or a revoked token.
+  // Preview tunnels re-resolve their node from the same fleet store the broker reads on EVERY connection
+  // (main/previewTunnel.ts), so a re-paired node's later connections pick up the new endpoint and token
+  // rather than dialling the old ones. Established pipes still have to be torn down explicitly — see
+  // `restartLocalNode` and `adoptLocalNode` below, and `NODE_FORGET` in nodeBrokerIpc.ts.
   const tunnels = new PreviewTunnels((nodeId) => {
     const node = fleet.get(nodeId)
     const token = node && fleet.tokenFor(nodeId)
@@ -99,6 +101,9 @@ export async function bootstrap({ dataDir, createWindow }: BootstrapOptions): Pr
   // ephemeral, so this is driven by each start result rather than cached — but the LABEL is the
   // owner's, so a rename survives.
   const adoptLocalNode = (started: ServiceStartResult): void => {
+    // Every start — first boot, crash recovery, a deliberate restart — can change the endpoint, the
+    // certificate and the token, so any surviving pipe to this node is pointed at a process that is gone.
+    tunnels.closeFor({ nodeId: started.nodeId })
     const node = fleet.remember(
       {
         nodeId: started.nodeId,
@@ -124,11 +129,34 @@ export async function bootstrap({ dataDir, createWindow }: BootstrapOptions): Pr
   // token — all three can change across a restart now that the port is ephemeral. Not routed through
   // `recover()`, deliberately: this is a deliberate restart, and spending one of the five crashes in the
   // ten-minute budget on it would mean a few plugin toggles could trip the recovery screen.
+  // Guarded against `recover()`, which is the case that made this dangerous rather than merely racy.
+  //
+  // `ServiceHost.start` throws "already started" while a child exists. So without the guard: the service
+  // crashes, `recover()` is inside its backoff `wait`, the owner clicks Restart, Restart succeeds — and
+  // then `recover()`'s own `startService()` throws, its catch calls `service.stop()` and KILLS the working
+  // node, then re-enters `recover()` and spends another crash from the budget. Two clicks during recovery
+  // tripped the recovery dialog on a healthy node.
+  //
+  // A failure here also has to reach `recover()`, not just the renderer: if `startService()` rejects (a
+  // taken port, a corrupt plugin DB) no child was ever spawned, so `unexpectedExit` never fires and the app
+  // would sit with a dead node until relaunch. It still reports to the caller, so Settings → Plugins shows
+  // the reason.
   const restartLocalNode = async (): Promise<void> => {
     if (disposed) return
-    await service.stop()
-    await startService()
-    if (window && !window.isDestroyed()) window.webContents.reload()
+    if (recovering) throw new Error('acorn is already restarting the background service.')
+    recovering = true
+    // A pipe to the process we are about to kill is dead either way, and its endpoint is about to change.
+    tunnels.closeFor({})
+    try {
+      await service.stop()
+      await startService()
+      if (window && !window.isDestroyed()) window.webContents.reload()
+    } catch (error) {
+      recovering = false
+      void recover()
+      throw error
+    }
+    recovering = false
   }
 
   const dispose = async (): Promise<void> => {

@@ -80,7 +80,12 @@ export const appStateBinding = <T>(read: () => T, hydrate: (value: T) => void): 
 export const storageKeyFor = (slice: Pick<PersistedStateSlice<unknown>, 'key' | 'scope'>, scopeId: string): string => {
   if (slice.scope === 'app') return slice.key
   const nodeId = activeNodeId()
-  return `${slice.key}:${nodeId ? `${nodeId}/` : ''}${encodeURIComponent(scopeId)}`
+  // BOTH halves encoded. A nodeId arrives from `GET /v2/node` over the wire and nothing validates it as a
+  // UUID, so writing it raw let a node reporting `a/b` produce keys this parser could never recover (the
+  // qualifier would read as `a`), and one reporting `''` produce keys indistinguishable from pre-Phase-4
+  // unqualified ones — which is a node reading another node's layouts. `encodeURIComponent` cannot emit a
+  // `/`, so the separator stays the only unescaped slash in the key either way.
+  return `${slice.key}:${nodeId ? `${encodeURIComponent(nodeId)}/` : ''}${encodeURIComponent(scopeId)}`
 }
 
 // The inverse, and it FILTERS as well as parses: a key qualified with another node's id returns null, so
@@ -96,7 +101,7 @@ export const scopeIdFromStorageKey = (slice: Pick<PersistedStateSlice<unknown>, 
   // No raw slash → written before Phase 4, or written with no node selected (`dev:node`, where the origin IS
   // the node). Accepted whatever the active node: rejecting these would silently reset every existing
   // install's pane layouts and open editor files on upgrade.
-  if (slash !== -1 && suffix.slice(0, slash) !== activeNodeId()) return null
+  if (slash !== -1 && decodeURIComponent(suffix.slice(0, slash)) !== activeNodeId()) return null
   try {
     return decodeURIComponent(slash === -1 ? suffix : suffix.slice(slash + 1))
   } catch {

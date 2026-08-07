@@ -20,9 +20,11 @@ partitioned per node. V1's bearer-authenticated `/api/v1` automation listener is
 > [docs/vNext/phase2-notes.md](./docs/vNext/phase2-notes.md),
 > [docs/vNext/phase3-notes.md](./docs/vNext/phase3-notes.md) and
 > [docs/vNext/phase4-notes.md](./docs/vNext/phase4-notes.md). Read the Phase 4 notes before touching the
-> fleet surfaces: they list five pre-existing bugs the two-node assertions found, and two gaps left open on
-> purpose — **there is no heartbeat on the events socket** (a hung-but-connected node reads `online`
-> forever), and a fan-out sharing a query key must share the value's SHAPE.
+> fleet surfaces: they list nineteen bugs the phase's tests and a following adversarial review found, and
+> three risks accepted rather than closed — **the preview tunnel's client-side loopback listener is
+> unauthenticated** (bounded by declared-ports-only, pane lifetime and a cap), **there is no heartbeat on the
+> events socket** (a hung-but-connected node reads `online` forever), and a fan-out sharing a query key must
+> share the value's SHAPE or it corrupts every other reader.
 
 ## Architecture (a client, and N nodes)
 
