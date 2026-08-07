@@ -8,8 +8,13 @@ import {
   type PluginContextSection,
 } from './contextSections'
 
+// `order` defaults to the four real ids' declared values so the cases below read the way they did
+// before order moved onto the contribution; anything else gets a high number, i.e. "unlisted".
+const ORDERS: Record<string, number> = { pr: 10, issues: 20, notes: 30, memory: 40 }
+
 const section = (id: string, over: Partial<PluginContextSection> = {}): PluginContextSection => ({
   id,
+  order: ORDERS[id] ?? 900,
   label: id,
   defaultIncluded: false,
   budget: { overflow: 'truncate-tail' },
@@ -43,10 +48,19 @@ describe('the context-section registry', () => {
     expect(getContextSections().map((s) => s.id)).toEqual(['pr', 'issues', 'notes', 'memory'])
   })
 
-  it('puts an unlisted section last rather than dropping it', () => {
+  it('places a section by its declared order, wherever it registers', () => {
     registerContextSection('a', asContextSection(section('memory')))
     registerContextSection('b', asContextSection(section('experimental')))
     expect(getContextSections().map((s) => s.id)).toEqual(['memory', 'experimental'])
+  })
+
+  // The point of declaring order rather than ranking a list in core: a new section can land BETWEEN two
+  // existing ones. Under the old SECTION_ORDER array it could only ever go last.
+  it('lets a new section slot between two existing ones', () => {
+    registerContextSection('a', asContextSection(section('pr')))
+    registerContextSection('b', asContextSection(section('memory')))
+    registerContextSection('b', asContextSection(section('scratch', { order: 25 })))
+    expect(getContextSections().map((s) => s.id)).toEqual(['pr', 'scratch', 'memory'])
   })
 
   it('refuses a duplicate id and names both owners', () => {
