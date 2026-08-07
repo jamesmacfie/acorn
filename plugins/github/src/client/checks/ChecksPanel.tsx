@@ -1,7 +1,7 @@
 import { createEffect, createMemo, createResource, createSignal, For, onCleanup, onMount, Show } from 'solid-js'
 import { Portal } from 'solid-js/web'
 import { createQuery } from '@tanstack/solid-query'
-import { jobLogOptions, runJobsOptions } from '@acorn/client-core/queries.ts'
+import { jobLogOptions, runJobsOptions } from '../queries'
 import { FAILED_STATUSES } from '@acorn/client-core/ui/displayMeta.ts'
 import { getHighlighter, tokenizeAnsiLines } from '@acorn/client-core/highlight/shiki.ts'
 import Icon from '@acorn/client-core/ui/Icon.tsx'

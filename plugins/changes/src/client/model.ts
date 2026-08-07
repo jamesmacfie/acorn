@@ -1,6 +1,6 @@
 // ChangesPane model (docs/panes.md): pure grouping/ordering/selection over LocalChange[] and the
-// adapter that feeds a local patch into the existing PR diff pipeline (PullFile shape → diff.ts).
-import type { PullFile } from '@acorn/protocol/api.ts'
+// adapter that feeds a local patch into the shared diff pipeline (DiffFile shape → diff.ts).
+import type { DiffFile } from '@acorn/client-core/ui/diff/model.ts'
 import type { LocalChange } from '@acorn/protocol/terminal.ts'
 
 export type ChangesGroups = { staged: LocalChange[]; unstaged: LocalChange[] }
@@ -28,9 +28,9 @@ export function pickSelected(groups: ChangesGroups, selectedKey: string | null):
   return all[0] ?? null
 }
 
-// Local change + patch → the PullFile shape the diff model consumes (sha stays null: gap expansion
+// Local change + patch → the DiffFile shape the diff model consumes (sha stays null: gap expansion
 // needs a blob source; the local pane re-reads on demand instead).
-export function toPullFile(change: LocalChange, patch: string | null): PullFile {
+export function toPullFile(change: LocalChange, patch: string | null): DiffFile {
   return {
     path: change.path,
     status: change.status === 'untracked' ? 'added' : change.status,

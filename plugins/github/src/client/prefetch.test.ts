@@ -1,6 +1,6 @@
 import { QueryClient } from '@tanstack/solid-query'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { fileSummariesKey, filesKey, pullKey } from '@acorn/protocol/api.ts'
+import { fileSummariesKey, filesKey, pullKey } from '../contract/api'
 import { INITIAL_PREFETCH_LIMIT, prefetchOpenPulls, prefetchPullSummary } from './prefetch'
 
 // Bodies cross the transport as bytes now, so assert the decoded payload rather than a JSON string.

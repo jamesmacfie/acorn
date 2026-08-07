@@ -1,9 +1,10 @@
 import { createResource, createSignal, For, onCleanup, onMount, Show } from 'solid-js'
 import { useNavigate, useParams } from '@solidjs/router'
 import { createQuery, useQueryClient } from '@tanstack/solid-query'
-import { integrationsOptions, prefsOptions, pullDetailOptions, tasksKey, tasksOptions, workspacesOptions, type Task } from '../queries'
+import { integrationsOptions, prefsOptions, tasksKey, tasksOptions, workspacesOptions, type Task } from '../queries'
 import { archiveTask, createCheckoutTask, createTask, patchTask } from '../tasks/mutations'
 import { applyRailOrder, isPinned, moveTask, parseRailOrder, pinTask, unpinTask, type RailOrder } from './railOrder'
+import { shellPullChecksOptions } from '../githubShellReads'
 import { checksState } from '../ui/displayMeta'
 import { createDismissable } from '../ui/dismissable'
 import { activeTaskId, selectedSource, setActiveTaskId, setSelectedSource, type SourceId } from '../tasks/tasks'
@@ -284,7 +285,7 @@ export default function TabRail() {
       <div class="tabrail-list">
         <For each={visibleTasks()}>
           {(w) => {
-            const detail = createQuery(() => pullDetailOptions(
+            const detail = createQuery(() => shellPullChecksOptions(
               w.repoOwner,
               w.repoName,
               w.pullNumber != null ? String(w.pullNumber) : '',

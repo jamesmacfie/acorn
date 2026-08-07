@@ -1,5 +1,5 @@
 import { Hono } from 'hono'
-import type { Label } from '@acorn/protocol/api.ts'
+import type { Label } from '../../contract/api'
 import { gh, ghError } from '..'
 import type { AppEnv } from '@acorn/node-core/server/middleware/auth.ts'
 import { ownerId } from '@acorn/node-core/server/middleware/requireUser.ts'

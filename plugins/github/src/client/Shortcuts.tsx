@@ -3,7 +3,7 @@ import { useNavigate, useParams } from '@solidjs/router'
 import { useChangedFiles } from './changedFiles'
 import { fuzzyScore } from '@acorn/client-core/palette/model.ts'
 import { createOverlayPalette } from '@acorn/client-core/palette/overlay.ts'
-import type { PullFile } from '@acorn/client-core/queries.ts'
+import type { PullFile } from '../contract/api'
 import { registerCommands } from '@acorn/client-core/registries/commands.ts'
 import { registerKeybindings } from '@acorn/client-core/registries/keybindings.tsx'
 

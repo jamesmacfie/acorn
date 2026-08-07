@@ -6,14 +6,7 @@
 // task and review-note writes in core/client/tasks/mutations.ts, and prefs behind
 // core/client/settings/savePref.ts — none of those are GitHub concepts.
 import { postJson, writeJson } from '@acorn/client-core/apiClient.ts'
-import {
-  autoMergeRoute,
-  createPullRoute,
-  pullRoute,
-  rerunFailedRoute,
-  requestedReviewersRoute,
-  resolveThreadRoute,
-} from '@acorn/protocol/api.ts'
+import { autoMergeRoute, createPullRoute, pullRoute, rerunFailedRoute, requestedReviewersRoute, resolveThreadRoute } from '../contract/api'
 
 export const createPr = (o: string, r: string, input: { title: string; body: string; base: string; head: string; draft: boolean }) =>
   postJson<{ number: number }>(createPullRoute(o, r), input)

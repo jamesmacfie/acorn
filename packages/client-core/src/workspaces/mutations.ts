@@ -3,7 +3,6 @@
 // already lives in core/shared/api.ts. Callers invalidate workspacesKey / reposKey after.
 import { postJson, writeJson } from '../apiClient'
 import {
-  pinsRoute,
   type Workspace,
   type WorkspaceIcon,
   workspaceProjectsRoute,
@@ -16,6 +15,8 @@ import {
   workspaceUnignoreRepoRoute,
   workspaceIgnoreAllRoute,
 } from '@acorn/protocol/api.ts'
+
+import { pinsRoute } from '../githubShellReads'
 
 // Replace a workspace's combined external-project set. Provider-specific callers merge their slice
 // first via integrations/workspaceProjects.ts so sibling-provider mappings survive.

@@ -2,7 +2,7 @@ import { createMemo, createSignal, Show } from 'solid-js'
 import { useQueryClient } from '@tanstack/solid-query'
 import { postJson } from '../apiClient'
 import { setPin } from '../workspaces/mutations'
-import { pinsKey, reposKey, reposRefreshRoute, type Repo } from '../queries'
+import { pinsKey, reposKey, reposRefreshRoute, type ShellRepo as Repo } from '../githubShellReads'
 import Picker from './Picker'
 
 // Searchable repo picker (the topbar selector). Owns repo-specific bits — pinned-first ordering,

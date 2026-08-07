@@ -13,86 +13,6 @@ import type {
 // `detail: string[]`; it is now a nested object carrying requestId and retryable too
 // (docs/api-reference.md § Errors).
 export type { ApiError } from './errors.ts'
-export type Repo = {
-  id: number
-  owner: string
-  name: string
-  private: boolean
-  defaultBranch: string | null
-  pushedAt: number | null
-}
-export type Pull = {
-  number: number
-  title: string
-  state: string
-  draft: boolean
-  author: string | null
-  headRef: string | null
-  baseRef: string | null
-  updatedAt: number | null
-  mergeable: string | null
-  mergeStateStatus: string | null
-  autoMergeEnabled: boolean
-}
-
-// Closed PRs are paginated on demand (one GitHub page per fetch); nextPage is null at the end.
-export type ClosedPullsPage = { pulls: Pull[]; nextPage: number | null }
-
-export type PullFile = {
-  path: string
-  status: string | null
-  additions: number | null
-  deletions: number | null
-  sha: string | null
-  viewed: boolean
-  patch: string | null
-}
-export type PullFilesPatchRequest = { paths: string[] }
-// Conflicting files for a PR. `available` is false when the repo isn't mapped to a local checkout
-// (or the trial merge couldn't run) — the UI then can't enumerate files, only say conflicts exist.
-export type PullConflicts = { available: boolean; files: string[] }
-export type Review = { id: string; author: string | null; state: string | null; body: string | null; submittedAt: number | null }
-export type Comment = { id: string; author: string | null; body: string | null; createdAt: number | null }
-export type PullCommit = { sha: string; message: string; author: string | null; authorLogin: string | null; committedAt: number | null }
-export type Check = { name: string; status: string | null; url: string | null; runId: number | null }
-// A workflow run's jobs and their steps, for the checks side panel. Logs are a separate fetch.
-export type WorkflowStep = { number: number; name: string; status: string | null; conclusion: string | null }
-export type WorkflowJob = { id: number; name: string; status: string | null; conclusion: string | null; steps: WorkflowStep[] }
-export type RunJobs = { jobs: WorkflowJob[] }
-export type JobLog = { text: string }
-export type Label = { name: string; color: string | null }
-export type ThreadComment = { id: string; databaseId: number | null; author: string | null; body: string | null; createdAt: number | null }
-export type Thread = {
-  threadId: string
-  path: string | null
-  line: number | null
-  side: string | null
-  resolved: boolean
-  comments: ThreadComment[]
-}
-export type PullDetail = {
-  pull: (Pull & { number: number; body: string | null; headSha: string | null }) | null
-  labels: Label[]
-  reviews: Review[]
-  requestedReviewers: string[]
-  comments: Comment[]
-  commits: PullCommit[]
-  checks: Check[]
-  threads: Thread[]
-}
-// One PR's full warmed payload, returned by the batch prefetch endpoint.
-export type PullBatchItem = { number: number; detail: PullDetail; files: PullFile[] }
-export type PullBatchFilesMode = 'full' | 'summary' | 'none'
-export type PullBatchRequest = { numbers: number[]; files?: PullBatchFilesMode }
-
-// Create-PR support: branch picker list + base..head compare (diff preview + commits for prefill).
-export type Branch = { name: string }
-export type CompareCommit = { sha: string; message: string }
-export type Compare = { aheadBy: number; files: PullFile[]; commits: CompareCommit[] }
-
-// Full head-blob body, fetched on demand to expand unchanged context around diff hunks.
-export type FileBlob = { text: string }
-
 // --- Integrations: multi-row per provider (docs/workspaces-and-tasks.md). GitHub appears as a synthesized
 // entry (id 'github') so it reads as "just another integration", while its encrypted token remains the
 // Node's active provider credential. ---
@@ -285,40 +205,6 @@ export const taskMcpRoute = (id: string) => `/v2/core/tasks/${id}/mcp`
 export const taskMcpStarterRoute = (id: string) => `/v2/core/tasks/${id}/mcp/starter`
 
 
-export const repoRoute = (owner: string, repo: string, child = '') => `/v2/p/github/repos/${owner}/${repo}${child ? `/${child}` : ''}`
-export const pullRoute = (owner: string, repo: string, number: string | number, child = '') =>
-  repoRoute(owner, repo, `pulls/${number}${child ? `/${child}` : ''}`)
-
-export const reposRoute = '/v2/p/github/repos'
-export const reposRefreshRoute = '/v2/p/github/repos/refresh'
-
-export const pullsRoute = (owner: string, repo: string, state: 'open' | 'closed') => `${repoRoute(owner, repo)}/pulls?state=${state}`
-export const closedPullsRoute = (owner: string, repo: string, page: number) => `${pullsRoute(owner, repo, 'closed')}&page=${page}`
-export const pullsBatchRoute = (owner: string, repo: string) => `${repoRoute(owner, repo)}/pulls/batch`
-export const createPullRoute = (owner: string, repo: string) => `${repoRoute(owner, repo)}/pulls`
-export const repoLabelsRoute = (owner: string, repo: string) => repoRoute(owner, repo, 'labels')
-export const fileSummariesRoute = (owner: string, repo: string, number: string | number) => `${pullRoute(owner, repo, number, 'files')}?summary=1`
-export const filePatchRoute = (owner: string, repo: string, number: string | number, path: string) =>
-  `${pullRoute(owner, repo, number, 'files')}?path=${encodeURIComponent(path)}`
-export const filePatchesRoute = (owner: string, repo: string, number: string | number) => pullRoute(owner, repo, number, 'files/patches')
-export const branchesRoute = (owner: string, repo: string) => repoRoute(owner, repo, 'branches')
-export const compareRoute = (owner: string, repo: string, base: string, head: string) =>
-  `${repoRoute(owner, repo, 'compare')}?base=${encodeURIComponent(base)}&head=${encodeURIComponent(head)}`
-export const fileBlobRoute = (owner: string, repo: string, sha: string) => repoRoute(owner, repo, `blobs/${sha}`)
-export const resolveThreadRoute = (owner: string, repo: string, number: string | number, threadId: string) =>
-  pullRoute(owner, repo, number, `threads/${encodeURIComponent(threadId)}/resolve`)
-export const autoMergeRoute = (owner: string, repo: string, number: string | number) => pullRoute(owner, repo, number, 'auto-merge')
-// Files that conflict on a trial merge of base←head, computed locally (GitHub's API exposes no
-// per-file conflict data — only the `mergeable` enum). `base` is the PR's base ref.
-export const conflictsRoute = (owner: string, repo: string, number: string | number, base: string) =>
-  `${pullRoute(owner, repo, number, 'conflicts')}?base=${encodeURIComponent(base)}`
-export const rerunFailedRoute = (owner: string, repo: string, runId: number) => repoRoute(owner, repo, `actions/${runId}/rerun`)
-export const runJobsRoute = (owner: string, repo: string, runId: number) => repoRoute(owner, repo, `actions/runs/${runId}/jobs`)
-export const jobLogRoute = (owner: string, repo: string, jobId: number) => repoRoute(owner, repo, `actions/jobs/${jobId}/logs`)
-export const mentionsRoute = (owner: string, repo: string) => repoRoute(owner, repo, 'mentions')
-export const requestedReviewersRoute = (owner: string, repo: string, number: string | number) =>
-  pullRoute(owner, repo, number, 'requested-reviewers')
-export const pinsRoute = '/v2/p/github/pins'
 export const prefsRoute = '/v2/core/prefs'
 // Settings → Plugins (docs/ui-design.md § New surfaces). Per NODE: which plugins a node runs decides
 // which routes exist and which SQLite files open, so this is node state and not a client preference.
@@ -396,31 +282,12 @@ export const integrationsRoute = '/v2/core/integrations'
 export const integrationRoute = (id: string) => `/v2/core/integrations/${id}`
 export const integrationTestRoute = (id: string) => `/v2/core/integrations/${id}/test`
 
-export const reposKey = ['repos'] as const
-export const pullsKey = (owner: string, repo: string, state: 'open' | 'closed') => ['pulls', owner, repo, state] as const
-// The closed list is an infinite query, so its key includes the `pages` shape marker.
-export const closedPullsKey = (owner: string, repo: string) => ['pulls', owner, repo, 'closed', 'pages'] as const
-export const pullsPrefixKey = (owner: string, repo: string) => ['pulls', owner, repo] as const
-export const pullKey = (owner: string, repo: string, number: string) => ['pull', owner, repo, number] as const
-export const pullPrefixKey = (owner: string, repo: string) => ['pull', owner, repo] as const
-export const repoLabelsKey = (owner: string, repo: string) => ['labels', owner, repo] as const
-export const filesKey = (owner: string, repo: string, number: string) => ['files', owner, repo, number] as const
-export const conflictsKey = (owner: string, repo: string, number: string, base: string) => ['conflicts', owner, repo, number, base] as const
-export const fileSummariesKey = (owner: string, repo: string, number: string) => ['files', owner, repo, number, 'summary'] as const
-export const filePatchKey = (owner: string, repo: string, number: string, path: string) => ['files', owner, repo, number, 'patch', path] as const
-export const fileBlobKey = (owner: string, repo: string, sha: string) => ['blob', owner, repo, sha] as const
-export const branchesKey = (owner: string, repo: string) => ['branches', owner, repo] as const
-export const compareKey = (owner: string, repo: string, base: string, head: string) => ['compare', owner, repo, base, head] as const
-export const pinsKey = ['pins'] as const
 export const prefsKey = ['prefs'] as const
 // The suffixes identify the current response shapes and prevent unrelated query data from sharing keys.
 export const workspacesKey = ['workspaces', 'groups', 'v2'] as const
 export const workspaceAssignmentsKey = ['workspace-assignments'] as const
 // The `v2` suffix identifies the current task response shape, including its required `icon` field.
 export const tasksKey = ['tasks', 'v2'] as const
-export const mentionsKey = (owner: string, repo: string) => ['mentions', owner, repo] as const
-export const runJobsKey = (owner: string, repo: string, runId: number) => ['run-jobs', owner, repo, runId] as const
-export const jobLogKey = (owner: string, repo: string, jobId: number) => ['job-log', owner, repo, jobId] as const
 // v3 adds descriptor metadata and normalized connection summaries. A distinct key prevents a
 // persisted v2 `{ provider, connected }` row from hiding registry-driven sources/settings.
 export const integrationsKey = ['integrations', 'v3'] as const
