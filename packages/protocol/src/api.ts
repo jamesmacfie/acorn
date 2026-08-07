@@ -609,6 +609,31 @@ export const corePluginsRoute = '/v2/core/plugins'
 // other devices"). Device-only, like the plugin list — this is node administration.
 export const coreDevicesRoute = '/v2/core/devices'
 export const coreDeviceRoute = (deviceId: string) => `/v2/core/devices/${encodeURIComponent(deviceId)}`
+
+// Settings → Security (docs/vNext/security.md § Audit, § On-disk).
+//
+// `diskEncrypted` is deliberately three-valued. `null` means "this node cannot tell" — the honest answer
+// off macOS, where LUKS, dm-crypt, ZFS native encryption and a dozen NAS arrangements all count and
+// probing for them badly would produce a confident wrong answer. A security warning that cries wolf is
+// worse than no warning.
+export type NodeSecurityPosture = { diskEncrypted: boolean | null; platform: string }
+export const coreSecurityRoute = '/v2/core/security'
+
+// The append-only audit trail. `details` is an allowlisted bag of scalars chosen per action — never a
+// request body, a credential, or a file's contents.
+export type AuditEntry = {
+  id: string
+  at: number
+  actor: string
+  actorId: string | null
+  action: string
+  subject: string | null
+  details: Record<string, unknown> | null
+}
+// `nextBefore` is a TIMESTAMP cursor, not an offset: rows are only appended and pruned from the far end,
+// so an offset would skip or repeat entries whenever the 90-day prune ran under a paging reader.
+export type AuditPage = { entries: AuditEntry[]; nextBefore: number | null }
+export const coreAuditRoute = '/v2/core/audit'
 // Workspaces (named groups of repos) — the top-level unit.
 export const workspacesRoute = '/v2/core/workspaces'
 export const workspaceRoute = (id: string) => `/v2/core/workspaces/${id}`
