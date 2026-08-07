@@ -13,7 +13,7 @@ import { settingsRegistry } from '@acorn/client-core/registries/settings.ts'
 import { taskSlotRegistry, uiSlotRegistry } from '@acorn/client-core/registries/slots.ts'
 import { sourceRegistry } from '@acorn/client-core/registries/sources.ts'
 import { persistedStateRegistry } from '@acorn/client-core/persistence/persistedState.ts'
-import { contentLinkRegistry } from '@acorn/plugin-github/client/contentLinks.ts'
+import { contentLinkRegistry } from '@acorn/client-core/registries/contentLinks.ts'
 import { clientPlugins } from '../../src/app/client/plugins'
 
 const REGISTRIES = {
@@ -94,7 +94,11 @@ const OWNED: Record<string, Partial<Snapshot>> = {
   },
   editor: { panes: ['editor', 'search'], slots: ['overlay/palette.files'], persistedState: ['editor.open-files'] },
   http: { panes: ['http'], sources: ['http'], settingsPages: ['http'], agentContexts: ['acorn-http'] },
-  linear: { panes: ['linear'], sources: ['linear'], refPanels: ['linear.issue-panel'] },
+  // `linear.issue` belongs to linear now. It used to be registered by plugins/github, so disabling
+  // linear left the recogniser behind — a link to a ticket the app could no longer open still claimed
+  // to be handled in-app. Finding 10 moved the contribution to the plugin that can answer for it, and
+  // this row is what says so.
+  linear: { panes: ['linear'], sources: ['linear'], refPanels: ['linear.issue-panel'], contentLinks: ['linear.issue'] },
   onboarding: { slots: ['overlay/onboarding.first-run'] },
   preview: { panes: ['preview'] },
   rollbar: { panes: ['rollbar'], sources: ['rollbar'] },

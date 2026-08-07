@@ -6,10 +6,15 @@ import type { ClientPlugin } from '@acorn/client-core/registries/plugin.ts'
 import { linearPaneContribution } from './paneContribution'
 import { linearRefPanelContribution } from './refPanelContribution'
 import { linearSourceContribution } from './sourceContribution'
+import { contentLinkRegistry } from '@acorn/client-core/registries/contentLinks.ts'
+import { linearContentLinkContribution } from './contentLink'
 
 export const linearClientPlugin: ClientPlugin = {
   name: 'linear',
   init: (ctx) => {
+    // The recogniser that turns a linear.app issue URL into an in-app target. Contributed from here
+    // rather than from github, which is where it lived while github owned the registry.
+    ctx.contribute(contentLinkRegistry, linearContentLinkContribution)
     ctx.sources.register(linearSourceContribution)
     ctx.panes.register(linearPaneContribution)
     // How plugins/github shows a ticket it found in a PR body without importing this plugin — the last

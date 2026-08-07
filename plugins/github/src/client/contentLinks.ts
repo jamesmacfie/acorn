@@ -1,42 +1,31 @@
-// Recognise links inside rendered content (GitHub bodyHTML + Linear markdown) that Acorn can open
-// itself instead of sending the user to github.com / linear.app. Shared by the PR conversation and
-// the Linear ticket panel.
-import { Registry } from '@acorn/client-core/registries/registry.ts'
+// GitHub's content-link recognisers, plus the bare-Linear-id text helpers the PR conversation uses.
+//
+// The registry, the target type and parseInAppTarget moved to
+// @acorn/client-core/registries/contentLinks.ts: link resolution is the shell's, and while it lived
+// here a third provider could not participate without editing github. Linear's URL recogniser went
+// with it, to plugins/linear.
+//
+// The `splitLinearIds` / `linkifyLinearIds` pair genuinely does stay. It is not link RESOLUTION — it
+// is github's PR body rendering, turning bare `CRA-404` text into something clickable, and it runs
+// against GitHub's innerHTML in github's own pane.
+import type { ContentLinkContribution } from '@acorn/client-core/registries/contentLinks.ts'
+import { parseInAppTarget } from '@acorn/client-core/registries/contentLinks.ts'
 
-export type InAppTarget =
-  | { kind: 'linear'; identifier: string }
-  | { kind: 'pr'; owner: string; repo: string; number: string }
-  | { kind: 'repo'; owner: string; repo: string }
-
-// No `providerId`. It carried one (`'linear'` on the recogniser below) and nothing ever read it — `parseInAppTarget`
-// iterates the registry and calls `parse`, full stop. It had to go once this registry started being written through
-// `ClientPluginContext.contribute`, because the plugin host's ownership rule reads that field and would reject
-// github registering a contribution stamped with linear's id. That rule is right, and this field was wrong: the
-// recogniser belongs to github (it lives here, beside the two built-in GitHub patterns, so that linear does not
-// have to import github's client internals), and `id: 'linear.issue'` already says what it recognises.
-export type ContentLinkContribution = {
-  id: string
-  parse: (href: string) => InAppTarget | null
-}
-
-export const contentLinkRegistry = new Registry<ContentLinkContribution>('content-link')
-
-const LINEAR_ISSUE_RE = /^https?:\/\/linear\.app\/[^/]+\/issue\/([A-Za-z][A-Za-z0-9]*-\d+)/i
 const GH_PR_RE = /^https?:\/\/github\.com\/([^/]+)\/([^/]+)\/pull\/(\d+)/i
 const GH_REPO_RE = /^https?:\/\/github\.com\/([^/?#]+)\/([^/?#]+)\/?(?:[?#].*)?$/i
 // github.com/<name> single-segment paths that are not repos (user/org profiles are one segment and
 // already won't match GH_REPO_RE, but these two-ish reserved roots could look like an owner).
 const GH_RESERVED = new Set(['orgs', 'sponsors', 'settings', 'notifications', 'marketplace', 'explore', 'topics', 'about'])
 
-export const linearContentLinkContribution: ContentLinkContribution = {
-  id: 'linear.issue',
-  parse: (href) => {
-    const match = LINEAR_ISSUE_RE.exec(href)
-    return match ? { kind: 'linear', identifier: match[1].toUpperCase() } : null
-  },
-}
-
-const builtInContentLinks: ContentLinkContribution[] = [
+// Registered from client/index.ts through ctx.contribute, like every other contribution.
+//
+// This used to be a module-scope loop guarded by `if (!contentLinkRegistry.entries().length)`, which
+// worked only while github was also the module that DEFINED the registry and so was guaranteed to
+// import first. The moment linear started contributing its own recogniser, that guard saw a non-empty
+// registry and silently skipped both of github's — the pane still rendered, links just stopped
+// resolving. Host-owned registration has no such ordering assumption, and it is taken back on
+// re-init.
+export const githubContentLinkContributions: ContentLinkContribution[] = [
   {
     id: 'github.pull-request',
     parse: (href) => {
@@ -52,7 +41,6 @@ const builtInContentLinks: ContentLinkContribution[] = [
     },
   },
 ]
-if (!contentLinkRegistry.entries().length) for (const contribution of builtInContentLinks) contentLinkRegistry.register(contribution)
 
 const escapeRegExp = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 
@@ -103,13 +91,6 @@ export function linkifyLinearIds(root: HTMLElement, prefixes: string[]): void {
   }
 }
 
-export function parseInAppTarget(href: string): InAppTarget | null {
-  for (const contribution of contentLinkRegistry.entries()) {
-    const target = contribution.parse(href)
-    if (target) return target
-  }
-  return null
-}
 
 // A delegated click handler for a content container: routes recognised links in-app (Linear issues
 // open the side panel via `openLinear`; GitHub PRs/repos navigate the SPA via `navigate`) and leaves
@@ -130,9 +111,15 @@ export function makeContentLinkHandler(navigate: (to: string) => void, openLinea
     if (!href) return
     const target = parseInAppTarget(href)
     if (!target) return
+    // Narrowed on `kind`, and an UNRECOGNISED kind falls through to the browser rather than being
+    // swallowed. That is the behavioural change the open target type buys: a provider this handler has
+    // never heard of can contribute a recogniser, and until something knows how to route its kind the
+    // link keeps working the way it did before anyone recognised it.
+    const str = (value: unknown): string => (typeof value === 'string' ? value : '')
+    if (target.kind === 'linear') openLinear(str(target.identifier))
+    else if (target.kind === 'pr') navigate(`/${str(target.owner)}/${str(target.repo)}/${str(target.number)}`)
+    else if (target.kind === 'repo') navigate(`/${str(target.owner)}/${str(target.repo)}`)
+    else return
     e.preventDefault()
-    if (target.kind === 'linear') openLinear(target.identifier)
-    else if (target.kind === 'pr') navigate(`/${target.owner}/${target.repo}/${target.number}`)
-    else navigate(`/${target.owner}/${target.repo}`)
   }
 }

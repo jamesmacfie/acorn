@@ -1,9 +1,10 @@
 import { lazy } from 'solid-js'
 import type { ClientPlugin } from '@acorn/client-core/registries/plugin.ts'
-import { linearContentLinkContribution, contentLinkRegistry } from './contentLinks'
 import { prFiltersSlice } from './pullList/filterSlice'
 import { prPaneContribution } from './pullDetail/PrPane'
 import { pullFilePaletteSlotContribution } from './slotContribution'
+import { contentLinkRegistry } from '@acorn/client-core/registries/contentLinks.ts'
+import { githubContentLinkContributions } from './contentLinks'
 
 const GithubBrowse = lazy(() => import('./GithubBrowse'))
 
@@ -11,6 +12,8 @@ export const githubClientPlugin: ClientPlugin = {
   name: 'github',
   required: true,
   init: (ctx) => {
+    // github.com PR and repo URLs, resolved in-app instead of opening a browser.
+    for (const contribution of githubContentLinkContributions) ctx.contribute(contentLinkRegistry, contribution)
     // No `providerId`: unlike linear's and rollbar's, this source is NOT gated on a connected integration
     // row. It has to be visible before GitHub is connected — that browse surface is where a fresh install
     // ends up, and gating it would leave first run with no source at all.
@@ -23,6 +26,5 @@ export const githubClientPlugin: ClientPlugin = {
     ctx.panes.register(prPaneContribution)
     ctx.slots.register(pullFilePaletteSlotContribution)
     ctx.persistedState.register(prFiltersSlice)
-    ctx.contribute(contentLinkRegistry, linearContentLinkContribution)
   },
 }
