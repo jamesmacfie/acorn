@@ -1,6 +1,10 @@
 import { For, Show, type JSX } from 'solid-js'
 import type { Task } from '../queries'
 import { paneAvailable, paneContribution, paneContributions, type PaneContribution, type PaneId } from '../registries/panes'
+import { activeNodeId } from '../node/activeNode'
+import { nodeState } from '../node/fleet'
+import { freshnessOf, type Freshness } from '../node/freshness'
+import NodeChip from '../node/NodeChip'
 import { ContributionBoundary } from '../ui/ContributionBoundary'
 import { paneFocus } from '../ui/focus'
 import Icon from '../ui/Icon'
@@ -31,6 +35,11 @@ export default function TaskPaneHost(props: {
   const isPinned = (id: PaneId) => layout().pinned?.includes(id) ?? false
   const onSwitch = (pane: PaneId, event: MouseEvent) =>
     dispatch(event.metaKey || event.ctrlKey ? { type: 'add', pane } : { type: 'show', pane })
+
+  // The badge is hidden while everything is fine, which is the common case and the reason this is not
+  // visual noise in every pane header. One value for the whole task view, because that is what it reports:
+  // the node's state, not a per-pane query (registries/panes.ts explains why there is no per-pane hook).
+  const nodeFreshness = (): Freshness => freshnessOf(nodeState(activeNodeId() ?? ''))
 
   const weightFor = (pane: PaneId) => layout().weights?.[pane] ?? 1
   const minWidthFor = (pane: PaneContribution) => pane.minWidth ?? 240
@@ -112,6 +121,15 @@ export default function TaskPaneHost(props: {
                 data-pane-id={pane.id}
               >
                 <div class="pane-slot-actions">
+                  {/* ui.md § Connection and staleness vocabulary asks for offline/stale rendering on every
+                      node-backed surface. `.pane-slot-actions` is the ONE piece of chrome every pane has,
+                      so this is one edit rather than thirteen — and it is rendered only when there is
+                      something to say, so a healthy node changes nothing on screen.
+                      It reports the NODE's state, which is the reactive half of ui.md's vocabulary; see
+                      registries/panes.ts for why there is no per-pane query hook. */}
+                  <Show when={nodeFreshness() !== 'live'}>
+                    <NodeChip nodeId={activeNodeId() ?? ''} compact />
+                  </Show>
                   <button
                     type="button"
                     class="pane-pin-btn"
