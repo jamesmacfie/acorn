@@ -373,8 +373,8 @@ describe('architecture boundaries', () => {
     // It has already shrunk twice: three entries went when the capability ids moved into contract/
     // (agents.runtime, workflows.runner, memory.knowledge), and nine more when per-node state eviction
     // was inverted so each owner registers its own evictor (registries/scopeEviction.ts) instead of
-    // being listed by the shell. What is left is honest work still to do — the `profiles-*` packages,
-    // the preview and terminal main-process adapters, and onboarding's client entry.
+    // being listed by the shell. What is left is honest work still to do: the preview and terminal
+    // main-process adapters, notes' task seeding, and onboarding's client entry.
     //
     // Tests are exempt. A test may reach into whatever it is testing, and holding integration tests to
     // the production surface would only push them into re-exporting internals through it.
@@ -383,9 +383,7 @@ describe('architecture boundaries', () => {
       '@acorn/plugin-onboarding/client/index.tsx',
       '@acorn/plugin-preview/main/browserService.ts',
       '@acorn/plugin-preview/main/previewService.ts',
-      '@acorn/plugin-profiles-aider/main/aider.ts',
-      '@acorn/plugin-profiles-claude/main/claudeCode.ts',
-      '@acorn/plugin-profiles-codex/main/codex.ts',
+      '@acorn/plugin-agents/main/profiles/index.ts',
       '@acorn/plugin-terminal/main/pickerIpc.ts',
       '@acorn/plugin-terminal/main/terminal.ts',
     ]

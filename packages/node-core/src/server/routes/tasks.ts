@@ -49,12 +49,18 @@ function rowToTask(row: Row, links: TaskLink[]): Task {
   }
 }
 
-type LinkInput = Partial<TaskLinkSeed> & { integrationId?: string; provider?: string }
+// The wire names only. This accepted `integrationId` and `provider` as aliases for `connectionId` and
+// `providerId`, which was not input leniency but naming history leaking outward: those two ARE the
+// storage column names (`task_links.integration_id`, `task_links.provider`), so the request body
+// documented the schema instead of the API.
+//
+// The columns keep their names — renaming them is a migration for no behavioural gain, and `rowLink`
+// below is the one place that maps between the two vocabularies, which is where a mapping belongs.
+type LinkInput = Partial<TaskLinkSeed>
 
 const parseLinkInput = (input: LinkInput): { connectionId: string; identifier: string; ref?: Partial<ExternalRef>; claimedProviderId?: string } | null => {
-  const connectionId = input.connectionId ?? input.integrationId
-  if (!connectionId || !input.identifier) return null
-  return { connectionId, identifier: input.identifier, ref: input.ref, claimedProviderId: input.providerId ?? input.provider }
+  if (!input.connectionId || !input.identifier) return null
+  return { connectionId: input.connectionId, identifier: input.identifier, ref: input.ref, claimedProviderId: input.providerId }
 }
 
 const rowLink = (row: typeof schema.taskLinks.$inferSelect): TaskLink => {
