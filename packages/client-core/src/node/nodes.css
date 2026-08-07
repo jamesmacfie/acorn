@@ -249,3 +249,6 @@
   gap: var(--space-2);
   margin-top: auto;
 }
+.fleet-card-attention {
+  color: var(--warn);
+}
