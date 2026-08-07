@@ -4,6 +4,7 @@ import { wsOnAgentFrame } from './wsChannel'
 import type { AgentEventRecord, AgentSession, AgentSessionSnapshot, AgentWsFrame } from '@acorn/protocol/managedAgents.ts'
 import { managedAgentApi } from './managedClient'
 import { mergeManagedSnapshot } from './managedSnapshot'
+import { onScopeEvicted } from '@acorn/client-core/registries/scopeEviction.ts'
 
 const [sessions, setSessions] = createSignal<AgentSession[]>([])
 const [snapshots, setSnapshots] = createSignal<Record<string, AgentSessionSnapshot>>({})
@@ -204,3 +205,9 @@ export function activateManagedAgentNotifications(): void {
     console.warn('[agents] could not prime the managed-session roster:', error)
   })
 }
+
+// Registered here rather than listed in the shell's evictor file, so this signal and the thing that
+// clears it are one edit apart (registries/scopeEviction.ts states the full argument).
+onScopeEvicted((e) => {
+  if (e.scope === 'node-switched') managedAgentStore.clear()
+})

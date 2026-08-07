@@ -370,23 +370,15 @@ describe('architecture boundaries', () => {
     // up depending on an internal module that was never meant to be load-bearing. That is what this
     // ratchet measures: it may only shrink.
     //
-    // Three of these were retired by moving their capability ids into contract/ (agents.runtime,
-    // workflows.runner, memory.knowledge); the rest are honest work still to do. `profiles-*` go with
-    // the Tier 3 sweep, and the `*State`/`*Slice` client modules go with finding 11, which gives
-    // per-node state one registered eviction hook instead of a hand-maintained list in the shell.
+    // It has already shrunk twice: three entries went when the capability ids moved into contract/
+    // (agents.runtime, workflows.runner, memory.knowledge), and nine more when per-node state eviction
+    // was inverted so each owner registers its own evictor (registries/scopeEviction.ts) instead of
+    // being listed by the shell. What is left is honest work still to do — the `profiles-*` packages,
+    // the preview and terminal main-process adapters, and onboarding's client entry.
     //
     // Tests are exempt. A test may reach into whatever it is testing, and holding integration tests to
     // the production surface would only push them into re-exporting internals through it.
     const APP_DEEP_IMPORT_BASELINE = [
-      '@acorn/plugin-agents/client/managedStore.ts',
-      '@acorn/plugin-context/client/selectionState.ts',
-      '@acorn/plugin-context/client/syncState.ts',
-      '@acorn/plugin-editor/client/editorState.ts',
-      '@acorn/plugin-editor/client/editorTreeState.ts',
-      '@acorn/plugin-editor/client/editorViewState.ts',
-      '@acorn/plugin-github/client/pullList/filterState.ts',
-      '@acorn/plugin-github/client/reviewViewState.ts',
-      '@acorn/plugin-notes/client/notesPaneState.ts',
       '@acorn/plugin-notes/main/seedTaskNotes.ts',
       '@acorn/plugin-onboarding/client/index.tsx',
       '@acorn/plugin-preview/main/browserService.ts',

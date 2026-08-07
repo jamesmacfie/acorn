@@ -2,6 +2,7 @@
 // free-text query are remembered per workspace id and persisted to the `pr_filters` pref (App.tsx),
 // so returning to a workspace restores its last filter. Signals-only, like ../tasks/tasks.ts.
 import { createSignal } from 'solid-js'
+import { onScopeEvicted } from '@acorn/client-core/registries/scopeEviction.ts'
 
 export type PrFilter = { tab: 'open' | 'closed'; filter: string }
 const defaultFilter = (): PrFilter => ({ tab: 'open', filter: '' })
@@ -52,3 +53,10 @@ export { prFilters }
 export function clearPrFilters(): void {
   setPrFilters({})
 }
+
+// Registered here rather than listed in the shell's evictor file, so this signal and the thing that
+// clears it are one edit apart (registries/scopeEviction.ts states the full argument).
+onScopeEvicted((e) => {
+  if (e.scope === 'workspace') evictPrFilter(e.workspaceId)
+  else if (e.scope === 'node-switched') clearPrFilters()
+})

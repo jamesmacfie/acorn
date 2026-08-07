@@ -1,5 +1,6 @@
 import type { editor } from 'monaco-editor'
 import { activeNodeId } from '@acorn/client-core/node/activeNode.ts'
+import { onScopeEvicted } from '@acorn/client-core/registries/scopeEviction.ts'
 
 const viewStates = new Map<string, editor.ICodeEditorViewState>()
 const viewKey = (taskId: string, path: string): string => `${activeNodeId() ?? ''}/${taskId}:${path}`
@@ -22,3 +23,10 @@ export function evictEditorViewStates(taskId: string): void {
 export function clearEditorViewStates(): void {
   viewStates.clear()
 }
+
+// Registered here rather than listed in the shell's evictor file, so this signal and the thing that
+// clears it are one edit apart (registries/scopeEviction.ts states the full argument).
+onScopeEvicted((e) => {
+  if (e.scope === 'task') evictEditorViewStates(e.taskId)
+  else if (e.scope === 'node-switched') clearEditorViewStates()
+})

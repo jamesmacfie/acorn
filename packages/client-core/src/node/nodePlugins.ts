@@ -2,6 +2,7 @@ import { createSignal } from 'solid-js'
 import { corePluginsRoute, type NodePluginState } from '@acorn/protocol/api.ts'
 import { readJson, writeJson } from '../apiClient'
 import { activeNodeId } from './activeNode'
+import { onScopeEvicted } from '../registries/scopeEviction'
 
 const [nodePlugins, setNodePlugins] = createSignal<NodePluginState | null>(null)
 
@@ -50,3 +51,9 @@ export async function saveDisabledNodePlugins(disabled: readonly string[], nodeI
 export function clearNodePlugins(): void {
   setNodePlugins(null)
 }
+
+// Registered here rather than listed in the shell's evictor file, so this signal and the thing that
+// clears it are one edit apart (registries/scopeEviction.ts states the full argument).
+onScopeEvicted((e) => {
+  if (e.scope === 'node-switched') clearNodePlugins()
+})

@@ -3,6 +3,7 @@
 // (dirty resets: content isn't persisted). Pure list ops + a thin signal store, like tasks.ts.
 import { createSignal } from 'solid-js'
 import { openPane } from '@acorn/client-core/registries/clientEvents.ts'
+import { onScopeEvicted } from '@acorn/client-core/registries/scopeEviction.ts'
 
 export type OpenFile = { path: string; ephemeral: boolean; dirty: boolean }
 
@@ -118,3 +119,10 @@ export { byTask as editorStateByTask }
 export function clearEditorStates(): void {
   setByTask({})
 }
+
+// Registered here rather than listed in the shell's evictor file, so this signal and the thing that
+// clears it are one edit apart (registries/scopeEviction.ts states the full argument).
+onScopeEvicted((e) => {
+  if (e.scope === 'task') evictEditorState(e.taskId)
+  else if (e.scope === 'node-switched') clearEditorStates()
+})

@@ -7,6 +7,7 @@ import { applyLayoutAction, defaultLayout, type LayoutAction, type PaneId, type 
 import { activeNodeId } from '../node/activeNode'
 import { sourceRegistry } from '../registries/sources'
 import type { WorkspaceView } from '../workspaces/workspaceViewTransition'
+import { onScopeEvicted } from '../registries/scopeEviction'
 
 export type { PaneId, TaskLayout } from './layout'
 export type { WorkspaceView } from '../workspaces/workspaceViewTransition'
@@ -204,3 +205,11 @@ export function clearNodeScopedTaskState(): void {
   setFocusedPanes({})
   setMaximizedPanes({})
 }
+
+// Registered here rather than listed in the shell's evictor file, so this signal and the thing that
+// clears it are one edit apart (registries/scopeEviction.ts states the full argument).
+onScopeEvicted((e) => {
+  if (e.scope === 'task') evictTaskState(e.taskId)
+  else if (e.scope === 'workspace') evictWorkspaceView(e.workspaceId)
+  else clearNodeScopedTaskState()
+})

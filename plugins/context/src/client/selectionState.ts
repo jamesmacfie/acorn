@@ -6,6 +6,7 @@
 import { createSignal } from 'solid-js'
 import type { TraySelection } from './model'
 import { bumpContextRevision, evictContextRevision } from './contextRevision'
+import { onScopeEvicted } from '@acorn/client-core/registries/scopeEviction.ts'
 
 const [contextSelections, setContextSelections] = createSignal<Record<string, TraySelection>>({})
 
@@ -38,3 +39,10 @@ export { contextSelections as contextSelectionsByTask }
 export function clearContextSelections(): void {
   setContextSelections({})
 }
+
+// Registered here rather than listed in the shell's evictor file, so this signal and the thing that
+// clears it are one edit apart (registries/scopeEviction.ts states the full argument).
+onScopeEvicted((e) => {
+  if (e.scope === 'task') evictContextSelection(e.taskId)
+  else if (e.scope === 'node-switched') clearContextSelections()
+})

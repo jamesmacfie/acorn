@@ -1,4 +1,5 @@
 import { createSignal } from 'solid-js'
+import { onScopeEvicted } from '@acorn/client-core/registries/scopeEviction.ts'
 
 // Session-only expanded-directory state, scoped to the task whose worktree the tree represents.
 // Keeping this outside EditorPane lets pane/task navigation unmount the lazy tree without losing
@@ -35,3 +36,10 @@ export function evictEditorTreeState(taskId: string): void {
 export function clearEditorTreeStates(): void {
   setExpandedByTask(new Map())
 }
+
+// Registered here rather than listed in the shell's evictor file, so this signal and the thing that
+// clears it are one edit apart (registries/scopeEviction.ts states the full argument).
+onScopeEvicted((e) => {
+  if (e.scope === 'task') evictEditorTreeState(e.taskId)
+  else if (e.scope === 'node-switched') clearEditorTreeStates()
+})
