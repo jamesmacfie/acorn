@@ -596,6 +596,15 @@ export const requestedReviewersRoute = (owner: string, repo: string, number: str
 // Phase 1. The repo selector is the only caller.
 export const pinsRoute = '/v2/p/github/pins'
 export const prefsRoute = '/v2/core/prefs'
+// Settings → Plugins (docs/vNext/ui.md § New surfaces). Per NODE: which plugins a node runs decides
+// which routes exist and which SQLite files open, so this is node state and not a client preference.
+//
+// `running` and `disabled` are separate answers, not one. A toggle takes effect at the node's next
+// start (plugins.md: "disabling unregisters contributions at next startup"), so between the save and the
+// restart the two differ — which is exactly the state the page has to render rather than lie about.
+export type NodePluginRow = { name: string; required: boolean; disabled: boolean; running: boolean }
+export type NodePluginState = { plugins: NodePluginRow[]; restartRequired: boolean }
+export const corePluginsRoute = '/v2/core/plugins'
 // Workspaces (named groups of repos) — the top-level unit.
 export const workspacesRoute = '/v2/core/workspaces'
 export const workspaceRoute = (id: string) => `/v2/core/workspaces/${id}`

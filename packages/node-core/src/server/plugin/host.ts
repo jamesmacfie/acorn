@@ -26,9 +26,16 @@ export type PluginHostOptions = {
   disabled?: readonly string[]
 }
 
+// One row per plugin the composition root offered, whether or not it ran. Settings → Plugins needs the
+// whole list — a plugin the owner has turned off has to still appear, with a checkbox — and `enabled`
+// plus `skipped` is not that list: it says nothing about which names are `required` and therefore not
+// togglable at all.
+export type PluginRosterEntry = { name: string; required: boolean; disabled: boolean }
+
 export type PluginHostResult = {
   enabled: readonly string[]
   skipped: readonly string[]
+  roster: readonly PluginRosterEntry[]
   // Release every initialized plugin, newest first, before the data root lock is dropped. Never
   // rejects: one plugin failing to close must not stop the rest, and teardown is already best-effort.
   dispose(): Promise<void>
@@ -136,7 +143,17 @@ export async function initPlugins(plugins: readonly NodePlugin[], options: Plugi
     }
   }
 
-  return { enabled, skipped, dispose: () => disposeStarted(started) }
+  // Built from the offered list, in declaration order, so a plugin that was skipped still has a row.
+  // `disabled` reports what the OWNER asked for, not what the host did — a required plugin named in the
+  // list reads `{ required: true, disabled: false }`, because it is running and the UI must not offer to
+  // turn it off.
+  const roster = plugins.map((plugin) => ({
+    name: plugin.name,
+    required: plugin.required === true,
+    disabled: disabled.has(plugin.name) && plugin.required !== true,
+  }))
+
+  return { enabled, skipped, roster, dispose: () => disposeStarted(started) }
 }
 
 // Reverse order, because a later plugin may depend on an earlier one's resources. Never rejects: one
