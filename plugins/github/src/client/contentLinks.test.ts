@@ -1,17 +1,18 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
-import { contentLinkRegistry, linearContentLinkContribution, parseInAppTarget, splitLinearIds } from './contentLinks'
+import { contentLinkRegistry, parseInAppTarget } from '@acorn/client-core/registries/contentLinks.ts'
+import { githubContentLinkContributions, splitLinearIds } from './contentLinks'
 
-let dispose: (() => void) | undefined
+// Only github's own recognisers are asserted here. Linear's moved to plugins/linear with the
+// contribution itself — a github test importing linear's client would be a plugin->plugin edge
+// outside contract/, which the arch suite refuses, and rightly: that coupling is the thing finding 10
+// is removing.
+let dispose: (() => void)[] = []
 beforeAll(() => {
-  const registered = contentLinkRegistry.register(linearContentLinkContribution)
-  dispose = () => registered.dispose()
+  dispose = githubContentLinkContributions.map((c) => contentLinkRegistry.register(c).dispose)
 })
-afterAll(() => dispose?.())
+afterAll(() => dispose.forEach((d) => d()))
 
 describe('parseInAppTarget', () => {
-  it('recognises Linear issue links', () => {
-    expect(parseInAppTarget('https://linear.app/acme/issue/CRA-275/some-slug')).toEqual({ kind: 'linear', identifier: 'CRA-275' })
-  })
   it('recognises GitHub PR links (ignoring trailing path)', () => {
     expect(parseInAppTarget('https://github.com/runn/acorn/pull/42/files')).toEqual({ kind: 'pr', owner: 'runn', repo: 'acorn', number: '42' })
   })
