@@ -1,6 +1,7 @@
 import { dispatchLayout } from '../tasks/tasks'
 import type { NoteScope } from '@acorn/protocol/notes.ts'
 import type { ExternalRef } from '@acorn/protocol/integrations.ts'
+import { onScopeEvicted } from './scopeEviction'
 
 export type PaneIntent =
   | { kind: 'notes:open'; slug: string; scope: NoteScope }
@@ -92,3 +93,9 @@ export function evictPendingIntents(taskId: string): void {
   for (const key of pendingPaneIntents.keys()) if (key.startsWith(prefix)) pendingPaneIntents.delete(key)
   pendingTerminalFocus.delete(taskId)
 }
+
+// Registered here rather than listed in the shell's evictor file, so this signal and the thing that
+// clears it are one edit apart (registries/scopeEviction.ts states the full argument).
+onScopeEvicted((e) => {
+  if (e.scope === 'task') evictPendingIntents(e.taskId)
+})

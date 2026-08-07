@@ -25,6 +25,7 @@ import type { TerminalSession } from '@acorn/protocol/terminal.ts'
 const terminalSessionsRoute = '/v2/p/terminal/sessions'
 import { requestTerminalFocusIntent } from '../registries/clientEvents'
 import { latestOnly } from '../lib/latestOnly'
+import { onScopeEvicted } from '../registries/scopeEviction'
 
 const [sessions, setSessions] = createSignal<TerminalSession[]>([])
 export { sessions }
@@ -93,3 +94,10 @@ export function workingCountFor(taskId: string | null): number {
     (s) => s.kind === 'agent' && s.status === 'running' && !s.idle && s.taskId === taskId,
   ).length
 }
+
+// Registered here rather than listed in the shell's evictor file, so this signal and the thing that
+// clears it are one edit apart (registries/scopeEviction.ts states the full argument).
+onScopeEvicted((e) => {
+  if (e.scope === 'task') evictActiveTerminal(e.taskId)
+  else if (e.scope === 'node-switched') clearSessions()
+})

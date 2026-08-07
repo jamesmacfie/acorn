@@ -3,6 +3,7 @@
 // Manifest's section selection has a stated durability requirement). Evicted on task archive.
 import { createSignal } from 'solid-js'
 import type { NoteScope } from '@acorn/protocol/notes.ts'
+import { onScopeEvicted } from '@acorn/client-core/registries/scopeEviction.ts'
 
 export type NotesSelection = { scope: NoteScope; slug: string }
 
@@ -28,3 +29,9 @@ export function evictNotesPaneState(taskId: string): void {
     return next
   })
 }
+
+// Registered here rather than listed in the shell's evictor file, so this signal and the thing that
+// clears it are one edit apart (registries/scopeEviction.ts states the full argument).
+onScopeEvicted((e) => {
+  if (e.scope === 'task') evictNotesPaneState(e.taskId)
+})

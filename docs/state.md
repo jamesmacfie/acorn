@@ -40,8 +40,31 @@ Use the persistence scope that owns the state:
 | Draft editor/comment text | client + current task |
 | Provider data and task mutations | owning Node |
 
-Module-level signals or maps that reference a task/workspace must either include the Node ID or be
-cleared on `runtime:node-switched`. `scopedEviction.ts` handles cache and runtime eviction events.
+Module-level signals or maps that reference a task or workspace must either include the Node ID or be
+cleared on a node switch. A state owner registers its OWN evictor beside the signal it clears, through
+`onScopeEvicted` (`client-core/registries/scopeEviction.ts`); the shell only maps runtime lifecycle
+events onto scopes. It used to hold the list of evictors itself, which meant every new signal had to
+remember to add itself there, and forgetting was silent.
+
+Choosing between "keyed by node" and "cleared on switch" is not taste. A LIVE roster clears — the
+agent list, terminal sessions, the node's plugin list — because it refetches for the new node within a
+tick, so clearing costs nothing and keying would buy nothing. DURABLE memory is keyed — editor scroll,
+the active terminal tab, the workspace view — because switching back should restore what was there.
+
+### Which mechanism holds a given fact
+
+Three mechanisms, and the choice follows from the question "who is the source of truth, and how long
+should this outlive the tab?":
+
+| Mechanism | Use when | Example |
+| --- | --- | --- |
+| TanStack query | The Node owns it and the client is caching a read | tasks, workspaces, a PR's files |
+| Persisted state slice | The client owns it and it must survive a relaunch | appearance, pane layout, open editor files |
+| Module-level signal | The client owns it and it is session-only | a live roster, a scroll position, a draft |
+
+A module-level signal is the default for anything ephemeral, and the cost of that default is exactly
+the eviction question above — so a signal keyed by task, workspace or node owes an `onScopeEvicted`
+registration in the same file.
 
 ## Freshness
 
