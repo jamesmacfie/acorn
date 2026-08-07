@@ -18,6 +18,18 @@ type ContextDraft = {
 
 export type ContextSectionContribution = {
   id: string
+  // Where this section sits in the assembled block. DECLARED by the section, not ranked by core.
+  //
+  // The order used to be a `SECTION_ORDER = ['pr','issues','notes','memory']` list in this file — core
+  // sequencing four plugin-owned ids, which meant a fifth section could only ever land at the end and
+  // a plugin could not say where it belonged. This is the same "sort on a declared field, never on
+  // when you registered" rule the client-side pane and slot registries already follow, and the numbers
+  // are spaced so a new section can slot between two without renumbering.
+  //
+  // The ORDER IS LOAD-BEARING, not cosmetic: every existing prompt, the client's Manifest preview and
+  // the byte-exactness invariant all assume pr, issues, notes, memory. Changing a number changes what
+  // an agent reads.
+  order: number
   label: string
   defaultIncluded: boolean
   budget: ContextBudget
@@ -102,6 +114,7 @@ const formatOmitted = (omitted: number) => (omitted ? `\n- … ${omitted} more o
 export function pullRequestSection(source: ContextPullRequestSource): PluginContextSection {
   return {
     id: 'pr',
+    order: 10,
     label: 'Pull request',
     defaultIncluded: false,
     budget: { maxItems: 1, maxBytesPerItem: 2_000, overflow: 'truncate-tail' },
@@ -139,6 +152,7 @@ export function pullRequestSection(source: ContextPullRequestSource): PluginCont
 // can withhold the handle without costing anything.
 export const linkedIssuesSection: ContextSectionContribution = {
   id: 'issues',
+  order: 20,
   label: 'Linked issues',
   defaultIncluded: true,
   budget: { maxItems: 50, maxBytesPerItem: 1_000, overflow: 'omit-with-marker' },
@@ -195,6 +209,7 @@ export const linkedIssuesSection: ContextSectionContribution = {
 export function notesSection(source: ContextNotesSource): PluginContextSection {
   return {
     id: 'notes',
+    order: 30,
     label: 'Notes',
     defaultIncluded: true,
     budget: { maxItems: 10, maxBytesPerItem: 2_000, overflow: 'truncate-tail' },
@@ -219,6 +234,7 @@ export function notesSection(source: ContextNotesSource): PluginContextSection {
 export function memorySection(source: ContextMemorySource): PluginContextSection {
   return {
     id: 'memory',
+    order: 40,
     label: 'Repo memory',
     defaultIncluded: false,
     budget: { maxItems: 30, overflow: 'index-only' },
@@ -257,21 +273,15 @@ class ContextSectionRegistry {
     }
   }
 
-  // ORDER IS THE WIRE ORDER of the assembled block, so it cannot be registration order: `pr`, `issues`,
-  // `notes`, `memory` is what every existing prompt, the client's Manifest preview and the byte-exactness
-  // invariant above all assume. Sections sort on this list, and anything unlisted follows in registration
-  // order — the same "sort on a declared field, never on when you registered" rule the client-side pane and
-  // slot registries follow.
+  // ORDER IS THE WIRE ORDER of the assembled block, so it cannot be registration order.
+  // Sorted on each section's DECLARED order. Ties keep registration order, because Array.sort is stable
+  // — two sections claiming the same slot is a contribution the author should fix, not something for
+  // this list to arbitrate.
   list(): readonly ContextSectionContribution[] {
-    const rank = (id: string) => {
-      const index = SECTION_ORDER.indexOf(id)
-      return index === -1 ? SECTION_ORDER.length : index
-    }
-    return this.#registrations.map((r) => r.section).sort((a, b) => rank(a.id) - rank(b.id))
+    return this.#registrations.map((r) => r.section).sort((a, b) => a.order - b.order)
   }
 }
 
-const SECTION_ORDER = ['pr', 'issues', 'notes', 'memory']
 
 const registry = new ContextSectionRegistry()
 
