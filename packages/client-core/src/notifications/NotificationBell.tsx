@@ -1,5 +1,5 @@
 import { createSignal, For, onCleanup, onMount, Show } from 'solid-js'
-import { markAllRead, markRead, notices, openNoticeTarget, unreadCount } from './notifications'
+import { markAllRead, markRead, noticesForActiveNode, openNoticeTarget, unreadCount } from './notifications'
 import { noticeKindContribution } from '../registries/notices'
 import Icon from '../ui/Icon'
 import './notifications.css'
@@ -39,7 +39,7 @@ export default function NotificationBell(props: { onSelectTask: (taskId: string)
             <button type="button" class="notify-mark-all" onClick={markAllRead}>Mark all read</button>
           </div>
           <ul class="notify-list">
-            <For each={notices()} fallback={<li class="notify-empty muted">No notifications.</li>}>
+            <For each={noticesForActiveNode()} fallback={<li class="notify-empty muted">No notifications.</li>}>
               {(n) => (
                 <li>
                   <button

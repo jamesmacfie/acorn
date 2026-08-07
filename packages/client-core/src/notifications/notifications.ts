@@ -6,6 +6,8 @@
 import { createSignal } from 'solid-js'
 import type { TerminalSession } from '@acorn/protocol/terminal.ts'
 import { wsOnNotice } from '../wsClient'
+import { activeNodeId } from '../node/activeNode'
+import { homeNodeId } from '../node/fleet'
 import { noticeKindContribution } from '../registries/notices'
 
 export type NoticeKind = string
@@ -25,6 +27,16 @@ export type Notice = {
   read: boolean
   action?: 'review-config'
   target?: NoticeTarget
+  // Which node the notice is about. Stamped by `pushNotice` from the active node rather than passed by
+  // each of the six call sites: every notice originates from a frame or a session list belonging to
+  // whichever node the client is currently talking to (wsClient.ts now drops frames from any other), so
+  // the caller has no extra information to add and six chances to forget.
+  //
+  // A nodeId rather than clearing the ring on a switch. Notices are persisted and rehydrated once at
+  // boot, so clearing would empty the bell permanently after the first node switch; filtering keeps both
+  // nodes' history and is what ui.md § Prompts and notifications asks for ("grouped per node").
+  // `undefined` for a notice restored from a pre-Phase-4 blob, which reads as "belongs to the home node".
+  nodeId?: string
 }
 
 export const NOTICE_CAP = 50
@@ -53,19 +65,36 @@ export function openNoticeTarget(notice: Notice): void {
 }
 
 export function pushNotice(n: Omit<Notice, 'id' | 'read'>): Notice {
-  const notice: Notice = { ...n, id: noticeId(n.at), read: false }
+  const notice: Notice = { nodeId: activeNodeId() ?? undefined, ...n, id: noticeId(n.at), read: false }
   setNotices((prev) => capNotices([notice, ...prev]))
   return notice
 }
 
-export const unreadCount = (): number => notices().filter((n) => !n.read).length
-export const unreadForTask = (taskId: string): number => notices().filter((n) => !n.read && n.taskId === taskId).length
+// Notices for the node the client is looking at. A notice with no nodeId is a pre-Phase-4 restored entry
+// and belongs to the home node, which is where the prefs blob it came from lives.
+export const noticesForActiveNode = (): Notice[] => {
+  const active = activeNodeId()
+  if (!active) return notices()
+  const home = homeNodeId()
+  return notices().filter((n) => (n.nodeId ?? home ?? active) === active)
+}
+
+// Counts follow the same filter. They drive the bell pill and the rail's per-task marker, and a count
+// that included another node's tasks pointed at rows the user cannot see from here.
+export const unreadCount = (): number => noticesForActiveNode().filter((n) => !n.read).length
+export const unreadForTask = (taskId: string): number =>
+  noticesForActiveNode().filter((n) => !n.read && n.taskId === taskId).length
 
 export function markRead(id: string): void {
   setNotices((prev) => prev.map((n) => (n.id === id ? { ...n, read: true } : n)))
 }
+// "Mark all read" from the bell means the list the bell is SHOWING. Marking another node's notices read
+// from a popover that never displayed them would quietly destroy the only signal that they existed.
 export function markAllRead(): void {
-  setNotices((prev) => (prev.some((n) => !n.read) ? prev.map((n) => ({ ...n, read: true })) : prev))
+  const visible = new Set(noticesForActiveNode().map((n) => n.id))
+  setNotices((prev) =>
+    prev.some((n) => !n.read && visible.has(n.id)) ? prev.map((n) => (visible.has(n.id) ? { ...n, read: true } : n)) : prev,
+  )
 }
 // Viewing a task acknowledges its notices (verne's needsAcknowledgement).
 export function markTaskRead(taskId: string): void {
@@ -90,6 +119,13 @@ export function hydrateNoticeValues(restored: Notice[]): void {
   setNotices((prev) => capNotices([...prev, ...restored.filter((candidate) => !prev.some((notice) => notice.id === candidate.id))]))
 }
 export const serializeNotices = (): string => JSON.stringify(notices())
+
+// Test seam: the ring is a module singleton, so cases in one file otherwise inherit each other's
+// notices — which matters now that visibility depends on a node stamp and an unstamped leftover reads as
+// "belongs to whatever node is active".
+export function _resetNotices(): void {
+  setNotices([])
+}
 
 // --- Pure edge detection (docs/terminal-and-agents.md): compare consecutive session snapshots. Edges are
 // tracked unconditionally (suppression only affects the OS toast) so the NEXT transition is right.

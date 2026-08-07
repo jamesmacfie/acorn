@@ -22,6 +22,15 @@ export type ClientEventMap = {
   // A node left the fleet (unpaired or revoked). Emitted by the renderer AFTER main confirms the
   // removal, because main is the authority on membership.
   'runtime:node-removed': { nodeId: string }
+  // The active node changed. Emitted by `setActiveNode` BEFORE the QueryClient provider swaps, so a
+  // listener clearing module state runs while the old node's components are still mounted rather than
+  // after the new node's have rendered against stale data.
+  //
+  // It exists because the per-node QueryClient partition covers cached QUERIES only. Feature state that
+  // lives in module-level Solid signals — the managed-agent roster, terminal sessions, the notice feed,
+  // per-workspace view memory — sat outside it, so switching nodes showed node A's agent sessions and
+  // notices under node B, keyed by ids that may collide across nodes by construction.
+  'runtime:node-switched': { from: string | null; to: string | null }
 }
 
 type Listener<T> = (payload: T) => void

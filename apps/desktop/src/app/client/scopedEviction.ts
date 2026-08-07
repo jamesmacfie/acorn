@@ -8,7 +8,9 @@ import { evictEditorTreeState } from '@acorn/plugin-editor/client/editorTreeStat
 import { evictEditorViewStates } from '@acorn/plugin-editor/client/editorViewState.ts'
 import { evictPrFilter } from '@acorn/plugin-github/client/pullList/filterState.ts'
 import { evictReviewViewStates } from '@acorn/plugin-github/client/reviewViewState.ts'
-import { evictActiveTerminal } from '@acorn/client-core/tasks/agentSessions.ts'
+import { clearSessions, evictActiveTerminal } from '@acorn/client-core/tasks/agentSessions.ts'
+import { clearNodePlugins } from '@acorn/client-core/node/nodePlugins.ts'
+import { managedAgentStore } from '@acorn/plugin-agents/client/managedStore.ts'
 import { evictTaskState, evictWorkspaceView } from '@acorn/client-core/tasks/tasks.ts'
 
 // Each owner exposes its own eviction operation; this only maps lifecycle events to scopes. It lives
@@ -35,7 +37,22 @@ export function activateScopedStateEviction(): () => void {
   // piece of a node's cached data lives in that node's client and nowhere else, so there is exactly one
   // thing to drop and no per-plugin evictor to forget when a plugin is added.
   const offNode = clientEvents.on('runtime:node-removed', ({ nodeId }) => dropNode(nodeId))
+  // …and this is where that payoff STOPS. The QueryClient partition covers cached queries; feature state
+  // held in module-level signals sits outside it and survived a node switch, so node A's agent roster,
+  // terminal sessions and plugin list were rendered under node B — against ids that may collide across
+  // nodes by construction (docs/vNext/architecture.md § Fleet semantics).
+  //
+  // Only the LIVE rosters are cleared. They are refetched for the new node within a tick, so clearing
+  // costs nothing and keying by node would buy nothing. Durable per-workspace and per-task memory
+  // (viewByWorkspace, editor scroll, the active terminal tab) is the opposite case: it should be KEYED by
+  // node so switching back restores it, which is where those keys gained a nodeId rather than a clear.
+  const offSwitch = clientEvents.on('runtime:node-switched', () => {
+    clearSessions()
+    managedAgentStore.clear()
+    clearNodePlugins()
+  })
   return () => {
+    offSwitch()
     offNode()
     offWorkspace()
     offTask()

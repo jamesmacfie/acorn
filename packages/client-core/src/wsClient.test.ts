@@ -7,8 +7,8 @@ import { setActiveNode } from './node/activeNode'
 
 type Bridge = {
   sent: { nodeId: string; frame: unknown }[]
-  emitFrame(frame: unknown): void
-  emitStatus(state: NodeStatus['state']): void
+  emitFrame(frame: unknown, nodeId?: string): void
+  emitStatus(state: NodeStatus['state'], nodeId?: string): void
 }
 
 function installBridge(): Bridge {
@@ -30,8 +30,10 @@ function installBridge(): Bridge {
   ;(globalThis as { window?: unknown }).window = { acorn }
   return {
     sent,
-    emitFrame: (frame) => frameHandlers.forEach((cb) => cb('n1', frame)),
-    emitStatus: (state) => statusHandlers.forEach((cb) => cb({ nodeId: 'n1', state })),
+    // The nodeId defaults to the active node, so every existing case reads as before; the fleet cases
+    // below pass a second node explicitly.
+    emitFrame: (frame, nodeId = 'n1') => frameHandlers.forEach((cb) => cb(nodeId, frame)),
+    emitStatus: (state, nodeId = 'n1') => statusHandlers.forEach((cb) => cb({ nodeId, state })),
   }
 }
 
@@ -155,5 +157,69 @@ describe('wsClient', () => {
     bridge.emitFrame({ channel: 'docker:log', id: 'other', data: 'ignored' })
     bridge.emitFrame({ channel: 'docker:stream-end', id: 'c1', kind: 'logs' })
     expect(events).toEqual([{ kind: 'log', data: 'line' }, { kind: 'end' }])
+  })
+
+  // Main holds a socket to EVERY paired node and pushes every frame here, while the subscription maps
+  // below are keyed on session / container / exec ids alone. architecture.md § Fleet semantics: two nodes
+  // may coincidentally hold the same UUID, and that must never collide in the client.
+  describe('frames from a node that is not the active one', () => {
+    it('does not reach a terminal subscriber, even for the same session id', () => {
+      const output: unknown[] = []
+      client.wsAttach('s1', (m) => output.push(m))
+      bridge.emitFrame({ channel: 'term:out', id: 's1', msg: { type: 'output', data: 'from-b' } }, 'n2')
+      expect(output).toEqual([])
+      // …and the identical frame from the active node does, so the filter is the reason and not the shape.
+      bridge.emitFrame({ channel: 'term:out', id: 's1', msg: { type: 'output', data: 'from-a' } })
+      expect(output).toEqual([{ type: 'output', data: 'from-a' }])
+    })
+
+    it('does not reach an agent-frame subscriber', () => {
+      const frames: unknown[] = []
+      client.wsOnAgentFrame((frame) => frames.push(frame))
+      bridge.emitFrame({ channel: 'agent:deleted', sessionId: 'a1' }, 'n2')
+      expect(frames).toEqual([])
+      bridge.emitFrame({ channel: 'agent:deleted', sessionId: 'a1' })
+      expect(frames).toEqual([{ channel: 'agent:deleted', sessionId: 'a1' }])
+    })
+
+    it('follows the active node when it changes', () => {
+      const output: unknown[] = []
+      client.wsAttach('s1', (m) => output.push(m))
+      setActiveNode('n2')
+      bridge.emitFrame({ channel: 'term:out', id: 's1', msg: { type: 'output', data: 'now-b' } }, 'n2')
+      expect(output).toEqual([{ type: 'output', data: 'now-b' }])
+    })
+  })
+
+  describe('reconnect bookkeeping is per node', () => {
+    it('treats a second node\'s FIRST connect as a first connect, not a reconnect', () => {
+      // A single `everOnline` boolean was set by whichever node connected first, so node B's very first
+      // online status re-attached every one of node A's PTY subscriptions and told the shell to refetch.
+      const reconnects: number[] = []
+      client.wsOnReconnect(() => reconnects.push(1))
+      client.wsAttach('s1', () => {})
+      bridge.emitStatus('online') // n1's first connect
+      bridge.sent.length = 0
+      bridge.emitStatus('online', 'n2') // n2's first connect
+      expect(reconnects).toEqual([])
+      expect(bridge.sent).toHaveLength(0)
+    })
+
+    it('ignores a reconnect of a node that is not active', () => {
+      const reconnects: number[] = []
+      client.wsOnReconnect(() => reconnects.push(1))
+      client.wsAttach('s1', () => {})
+      bridge.emitStatus('online', 'n2')
+      bridge.emitStatus('offline', 'n2')
+      bridge.sent.length = 0
+      bridge.emitStatus('online', 'n2') // n2's genuine reconnect — nothing to do with n1's queries
+      expect(reconnects).toEqual([])
+      expect(bridge.sent).toHaveLength(0)
+      // The active node's own reconnect still works, so the guard is not simply switched off.
+      bridge.emitStatus('online')
+      bridge.emitStatus('online')
+      expect(reconnects).toEqual([1])
+      expect(framesSent()).toContainEqual({ channel: 'term:attach', id: 's1' })
+    })
   })
 })

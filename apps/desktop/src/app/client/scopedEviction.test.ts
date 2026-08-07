@@ -4,7 +4,8 @@ import { editorTreeDirectoryOpen, setEditorTreeDirectoryOpen } from '@acorn/plug
 import { editorViewState, rememberEditorViewState } from '@acorn/plugin-editor/client/editorViewState.ts'
 import { prFilterFor, setPrFilter } from '@acorn/plugin-github/client/pullList/filterState.ts'
 import { rememberReviewDiffScroll, reviewDiffScroll } from '@acorn/plugin-github/client/reviewViewState.ts'
-import { activeTerminal, rememberActiveTerminal } from '@acorn/client-core/tasks/agentSessions.ts'
+import { activeTerminal, rememberActiveTerminal, sessions } from '@acorn/client-core/tasks/agentSessions.ts'
+import { managedAgentStore } from '@acorn/plugin-agents/client/managedStore.ts'
 import {
   dispatchLayout,
   focusedPane,
@@ -67,6 +68,36 @@ describe('scoped lifecycle eviction', () => {
     expect(consumePaneIntent(taskId, 'editor')).toBeUndefined()
     expect(consumeTerminalFocusIntent(taskId)).toBeUndefined()
     expect(editorViewState(taskId, 'src/a.ts')).toBeUndefined()
+    off()
+  })
+
+  it('clears the live per-node rosters when the active node changes', () => {
+    // The per-node QueryClient partition covers cached queries and nothing else. These three live in
+    // module-level signals, so before this they carried node A's data into node B's shell — against ids
+    // two nodes may hold in common by construction.
+    const off = activateScopedStateEviction()
+    rememberActiveTerminal('task-on-a', 'session-1')
+    managedAgentStore.upsertSession({
+      id: 'agent-1', taskId: 'task-on-a', provider: 'claude', title: 'On node A',
+      state: 'idle', createdAt: 1, updatedAt: 1, archivedAt: null,
+    } as never)
+    expect(managedAgentStore.sessions()).toHaveLength(1)
+
+    clientEvents.emit('runtime:node-switched', { from: 'node-a', to: 'node-b' })
+
+    expect(managedAgentStore.sessions()).toEqual([])
+    expect(activeTerminal('task-on-a')).toBeUndefined()
+    expect(sessions()).toEqual([])
+    off()
+  })
+
+  it('leaves the rosters alone when a node is merely removed', () => {
+    // `runtime:node-removed` drops that node's cache; it must not also wipe the ACTIVE node's live
+    // rosters, which is what a single shared handler would have done.
+    const off = activateScopedStateEviction()
+    rememberActiveTerminal('task-on-a', 'session-1')
+    clientEvents.emit('runtime:node-removed', { nodeId: 'some-other-node' })
+    expect(activeTerminal('task-on-a')).toBe('session-1')
     off()
   })
 

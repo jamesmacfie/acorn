@@ -1,5 +1,6 @@
 import { createSignal } from 'solid-js'
 import { acornGlobal } from '../capabilities'
+import { clientEvents } from '../registries/clientEvents'
 import { homeNode, nodes, ORIGIN_NODE_ID, refreshFleet } from './fleet'
 
 // Which node the renderer's ambient requests go to.
@@ -20,7 +21,16 @@ const [activeNodeId, setActiveNodeIdSignal] = createSignal<string | null>(null)
 export { activeNodeId }
 
 export function setActiveNode(nodeId: string | null): void {
+  const previous = activeNodeId()
+  if (previous === nodeId) return
   setActiveNodeIdSignal(nodeId)
+  // Announced, not performed here: which module signals hold node-scoped state is a composition question
+  // (apps/desktop's scopedEviction.ts owns the list, the same way it owns task archival's ten evictors),
+  // and client-core must not import a plugin's store to clear it.
+  //
+  // Emitted AFTER the signal so a listener reads the new node, but before the QueryClient provider
+  // remounts — the provider is keyed on `activeCacheId()`, and Solid flushes that on the next tick.
+  clientEvents.emit('runtime:node-switched', { from: previous, to: nodeId })
 }
 
 // Which cache partition the mounted provider uses (node/fleet.ts). Not the same thing as
