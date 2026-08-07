@@ -138,7 +138,7 @@ export function assertValidWorkflow(def: WorkflowDef, catalog: WorkflowValidatio
 export function normalizePersistedWorkflow(def: WorkflowDef): WorkflowDef {
   const steps = def.steps.map((step, index, all) => {
     if (step.kind !== 'join' || step.joins) return step
-    const fanOut = [...all.slice(0, index)].reverse().find((candidate) => candidate.kind === 'fan-out')
+    const fanOut = all.slice(0, index).reverse().find((candidate) => candidate.kind === 'fan-out')
     return fanOut ? { ...step, joins: fanOut.name } : step
   })
   return { ...def, steps }

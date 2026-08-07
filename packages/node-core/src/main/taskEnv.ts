@@ -52,5 +52,5 @@ export function buildSessionEnv(opts: {
     out.ACORN_TASK_SLUG = branchSlug(opts.task.branch)
     out.ACORN_TASK_TITLE = opts.task.title
   }
-  return { ...out, ...(opts.env ?? {}) }
+  return { ...out, ...opts.env }
 }

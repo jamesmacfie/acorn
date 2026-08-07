@@ -1,6 +1,6 @@
 import type { ITheme } from '@xterm/xterm'
 import { getHighlighter } from '@acorn/client-core/highlight/shiki.ts'
-import { isAppDark, token } from '@acorn/client-core/ui/appearance.ts'
+import { token } from '@acorn/client-core/ui/appearance.ts'
 
 // Re-exported for convenience inside this plugin. The generic appearance readers live in
 // core/client/ui/appearance.ts so other plugins reach them without a plugin→plugin import.

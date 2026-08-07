@@ -1,6 +1,5 @@
 import { Hono } from 'hono'
 import { z } from 'zod'
-import type { RepoConfigTrustReview } from '@acorn/protocol/api.ts'
 import { acknowledgeRepoConfig, repoConfigTrustReview } from '../../main/repoConfigTrust'
 import { auditRequest } from '../auditRequest'
 import { getDb } from '../db'

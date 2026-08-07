@@ -1,5 +1,5 @@
 import { Hono } from 'hono'
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import type { ApiError } from '@acorn/protocol/api.ts'
 import type { AppEnv, Principal } from '@acorn/node-core/server/middleware/auth.ts'
 import { prActions } from './prActions'

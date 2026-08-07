@@ -57,9 +57,9 @@ declare global {
       onClosePane?: (cb: () => void) => () => void
       // App quit lifecycle concern collection. Returns an unsubscribe.
       onWillQuit?: (cb: () => boolean | Promise<boolean>) => () => void
-      // Node access via the connection broker in Electron main. The renderer holds no device token
-      // and opens no socket of its own; `nodeSocket` is assembled from these primitives in
-      // node/nodeSocket.ts rather than crossing contextBridge as a closure.
+      // Node access via the connection broker in Electron main. The renderer holds no device token and
+      // opens no socket of its own: these primitives are what apiClient.ts and wsClient.ts are built on,
+      // rather than a live socket object crossing contextBridge as a closure.
       nodeFetch?: (nodeId: string, request: NodeFetchRequest) => Promise<NodeFetchResponse>
       nodeAbort?: (requestId: string) => void
       nodeSend?: (nodeId: string, frame: WsClientFrame) => void

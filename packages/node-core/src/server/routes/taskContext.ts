@@ -1,4 +1,4 @@
-import { and, eq } from 'drizzle-orm'
+import { eq } from 'drizzle-orm'
 import { Hono } from 'hono'
 import { assembleContext, parseInclude } from '../agentTools/contextSections'
 import { getDb, schema } from '../db'

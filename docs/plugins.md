@@ -32,9 +32,13 @@ is the client activation list. The host validates unique names, applies the per-
 set, initializes enabled plugins, runs the optional ready/activation pass, and owns disposal of their
 registrations.
 
-Required Node plugins are GitHub, terminal, and agents. Required client contributions also include
-the pieces the shell needs from notes and memory. Optional plugins can be disabled per Node through
-Settings → Plugins; their SQLite files remain on disk and can be re-enabled later.
+Required plugins are agents, GitHub, memory, notes, and terminal — the same five on the Node and on
+the client, because core (or the shell in front of it) assumes their contributions exist. This
+paragraph used to say "GitHub, terminal, and agents" while the code required five, and hand-waved
+notes and memory as client-only when both are required Node plugins too.
+
+Optional plugins can be disabled per Node through Settings → Plugins; their SQLite files remain on
+disk and can be re-enabled later.
 
 Node initialization happens before the listener accepts requests. A plugin can register:
 
@@ -46,8 +50,11 @@ Node initialization happens before the listener accepts requests. A plugin can r
 - a plugin-owned SQLite migration chain and disposal hook.
 
 The host supplies `CoreServices` for confined filesystem access, Git, processes, secrets, tasks,
-repositories, preferences, HTTP, and other core operations. Plugins do not receive the core database
-handle merely to query shared tables.
+repositories, task context, model generation, preferences, and the machine identity. Plugins do not
+receive the core database handle merely to query shared tables.
+
+It supplies no HTTP client. This list named one, and none exists — see docs/http-client.md for why
+that matters and when it will have to.
 
 Client initialization is synchronous registration. The host exposes contribution points for panes,
 sources, settings pages, shell/task slots, context sections, provider reference panels, palette rows,

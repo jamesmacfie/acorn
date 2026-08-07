@@ -91,7 +91,7 @@ export function brokerEnv(spec: Pick<ProcSpec, 'env' | 'passthrough'>, parent: N
       if (value) out[rule] = value
     }
   }
-  return { ...out, ...(spec.env ?? {}) }
+  return { ...out, ...spec.env }
 }
 
 // Never rejects on a non-zero exit: the exit code is data, and every current call site branches on it

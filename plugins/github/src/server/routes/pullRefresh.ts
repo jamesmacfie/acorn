@@ -1,4 +1,4 @@
-import { and, eq, isNull, sql } from 'drizzle-orm'
+import { and, eq, sql } from 'drizzle-orm'
 import { chunkRowsByColumnBudget } from '@acorn/node-core/server/rows.ts'
 import { pullsResource } from '../resourceKeys'
 import type { RefreshResult, RouteResult } from '@acorn/node-core/server/sync/engine.ts'

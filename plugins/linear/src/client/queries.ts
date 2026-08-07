@@ -4,22 +4,9 @@
 // Moved verbatim from @acorn/client-core/queries.ts — same keys, same staleTime, same refetch policy.
 // `workspaceLinearIssuesKey`'s '-v2' suffix is load-bearing: it orphans persisted pre-redesign rows
 // that would otherwise hydrate and crash the browse model.
-import { readJson, writeJson } from '@acorn/client-core/apiClient.ts'
+import { readJson } from '@acorn/client-core/apiClient.ts'
 import type { WorkspaceProject } from '@acorn/protocol/api.ts'
-import {
-  linearIssueKey,
-  linearIssueRoute,
-  linearIssuesKey,
-  linearIssuesRoute,
-  linearProjectsKey,
-  linearProjectsRoute,
-  linearProjectIssuesRoute,
-  type LinearIssueDetail,
-  type LinearIssuesRequest,
-  type LinearIssuesResponse,
-  type LinearProjectsResponse,
-  type LinearProjectIssuesResponse,
-} from '../shared/api'
+import { linearIssueKey, linearIssueRoute, linearProjectsKey, linearProjectsRoute, linearProjectIssuesRoute, type LinearIssueDetail, type LinearProjectsResponse, type LinearProjectIssuesResponse } from '../shared/api'
 
 type QueryContext = { signal?: AbortSignal }
 

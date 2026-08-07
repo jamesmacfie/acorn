@@ -7,7 +7,6 @@
 // (main/serverConfig.ts), so a parent process — the two-node e2e today, a launchd/systemd wrapper
 // later — cannot guess the endpoint, and the self-signed certificate has no CA to vouch for it.
 // Everything else this process logs is free-form; this line is the contract.
-import './routes' // register plugin-owned HTTP routers into the core route registry
 // These pure-Node composition hooks register agent profiles, core agent tools, and config-trust
 // behavior before the listener binds. Desktop-only capabilities are supplied separately by Electron
 // main; this entry supplies explicit headless adapters where a plugin still needs one.

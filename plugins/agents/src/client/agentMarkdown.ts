@@ -46,7 +46,7 @@ export function renderAgentMarkdown(source: string): string {
     if (fence) {
       const body: string[] = []
       index++
-      while (index < lines.length && !/^```/.test(lines[index].trim())) body.push(lines[index++])
+      while (index < lines.length && !lines[index].trim().startsWith('```')) body.push(lines[index++])
       if (index < lines.length) index++
       const language = /^[a-zA-Z0-9_+-]+$/.test(fence[1]) ? fence[1] : 'text'
       output.push(`<pre><code data-language="${language}">${escapeHtml(body.join('\n'))}</code></pre>`)

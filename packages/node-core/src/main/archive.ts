@@ -5,7 +5,7 @@
 import { execFile } from 'node:child_process'
 import { resolve } from 'node:path'
 import { promisify } from 'node:util'
-import { and, eq } from 'drizzle-orm'
+import { eq } from 'drizzle-orm'
 import type { AppDatabase } from '../server/db'
 import { schema } from '../server/db'
 import type { ArchiveOpts, ArchiveResult } from '@acorn/protocol/terminal.ts'

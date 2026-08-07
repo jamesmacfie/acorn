@@ -75,10 +75,10 @@ export async function trustClaudeProbeDirectory(configFile: string, probeDir: st
   }
   const currentProjects = root.projects
   if (currentProjects != null && !asObject(currentProjects)) return false
-  const projects = { ...(asObject(currentProjects) ?? {}) }
+  const projects = { ...asObject(currentProjects) }
   const currentEntry = projects[probeDir]
   if (currentEntry != null && !asObject(currentEntry)) return false
-  const entry = { ...(asObject(currentEntry) ?? {}) }
+  const entry = { ...asObject(currentEntry) }
   if (entry.hasTrustDialogAccepted === true) return true
   entry.hasTrustDialogAccepted = true
   projects[probeDir] = entry

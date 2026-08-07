@@ -1,9 +1,6 @@
 import { createQuery, useQueryClient } from '@tanstack/solid-query'
 import { createEffect, createMemo, createSignal, For, onMount, Show } from 'solid-js'
-import {
-  claudePriceCatalog,
-  type AgentModelPrice,
-} from '../shared/pricing'
+import { claudePriceCatalog } from '../shared/pricing'
 import {
   agentPricingOptions,
   agentPricingQueryKey,

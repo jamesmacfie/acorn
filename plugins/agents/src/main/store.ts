@@ -1,16 +1,7 @@
 import { randomUUID } from 'node:crypto'
 import { and, asc, desc, eq, gt, inArray, isNotNull, isNull, like, lt, or, sql } from 'drizzle-orm'
 import * as schema from '../node/schema'
-import type {
-  AgentEventPage,
-  AgentEventRecord,
-  AgentProviderDescriptor,
-  AgentRequest,
-  AgentSession,
-  AgentSessionList,
-  AgentSessionSnapshot,
-  AgentTurn,
-} from '@acorn/protocol/managedAgents.ts'
+import type { AgentEventPage, AgentEventRecord, AgentProviderDescriptor, AgentSession, AgentSessionList, AgentSessionSnapshot, AgentTurn } from '@acorn/protocol/managedAgents.ts'
 import type { CreateAgentSessionInput, EnqueueAgentTurnInput } from '../shared/schemas'
 import { mapAgentEvent, mapAgentRequest, mapAgentSession, mapAgentTurn } from './rowMapping'
 import { AgentSessionRepository } from './sessionRepository'

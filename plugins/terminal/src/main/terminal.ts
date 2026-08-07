@@ -1,7 +1,6 @@
 import { spawn, type IPty } from 'node-pty'
-import { execFile, execFileSync } from 'node:child_process'
+import { execFileSync } from 'node:child_process'
 import { randomUUID } from 'node:crypto'
-import { promisify } from 'node:util'
 import { dirname, resolve } from 'node:path'
 import { homedir } from 'node:os'
 import { eq } from 'drizzle-orm'
@@ -370,7 +369,7 @@ async function spawnOne(
     taskId: opts.taskId,
     cwd,
     task: task ? { repoOwner: task.repoOwner, repoName: task.repoName, branch: task.branch, title: task.title } : null,
-    env: { ...internalEnv({ scope: 'task', taskId: opts.taskId, sessionId: id }), ACORN_SESSION_ID: id, ...(opts.env ?? {}) },
+    env: { ...internalEnv({ scope: 'task', taskId: opts.taskId, sessionId: id }), ACORN_SESSION_ID: id, ...opts.env },
   })
   const backend = resolveBackend(profile.backendPreference, tmuxAvailable())
   const cols = clampDim(opts.cols, 80)

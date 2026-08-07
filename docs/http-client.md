@@ -15,8 +15,15 @@ key is unavailable. A command variable stores its command metadata, not its gene
 
 ## Sending
 
-The Node resolves interpolation once, validates the resulting URL/scheme and headers, and sends via
-the core HTTP service with bounded time and response-size limits. Command variables execute through
+The Node resolves interpolation once, validates the resulting URL and scheme and the headers, then
+sends with `fetch` under its own bounded time and response-size limits (`plugins/http/src/server/send.ts`).
+
+There is NO core HTTP service, and this paragraph used to say there was. Nothing central inspects an
+outbound request and there is no host allowlist: the plugin's own validation is the whole control.
+That is defensible while every plugin is first-party code in this repo — and it is exactly the thing
+that has to change before a third-party plugin can make outbound requests, because at that point
+"each plugin validates its own" stops being a control at all. Described here rather than built now:
+a guard nobody can point at is worse than a documented absence. Command variables execute through
 the process broker with their own grants and capture limits. Supplying an override for a command
 variable suppresses command execution.
 

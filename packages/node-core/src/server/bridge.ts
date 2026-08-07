@@ -5,7 +5,7 @@ import { respondError } from './respond'
 // A domain bridge is the service-process backing for a /v2 route family whose work needs a runtime
 // handle the server layer doesn't own — a PTY engine, git, ripgrep, a pg pool, the worktree resolver.
 // The route holds a slot; the plugin that owns the engine fills it from its `init` (or, for an
-// app-composition concern, apps/node/src/service/runtime.ts does). `dev:node` leaves engine-only
+// app-composition concern, apps/node/src/service/runtime.ts and apps/node/src/server/standalone.ts do). `dev:node` leaves engine-only
 // bridges null, so those routes answer a clean 503 instead of crashing (docs/electron.md § capability
 // map). This is the seam server/routes/harness.ts pioneered, generalized so every migrated IPC domain
 // shares one shape.

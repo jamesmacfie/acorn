@@ -1,9 +1,7 @@
-import { and, eq } from 'drizzle-orm'
 import { z } from 'zod'
 import { assembleContext, parseInclude } from '@acorn/node-core/server/agentTools/contextSections.ts'
 import { registerAgentTool, removeAgentTools, ToolError, type AgentToolContribution, type ToolContext } from '@acorn/node-core/server/agentTools/registry.ts'
 import type { AppDatabase } from '@acorn/node-core/server/db/index.ts'
-import { schema } from '@acorn/node-core/server/db/index.ts'
 import { loadTask } from '@acorn/node-core/main/taskWorktree.ts'
 import { repoMirrorSource } from '@acorn/node-core/server/repoMirror.ts'
 

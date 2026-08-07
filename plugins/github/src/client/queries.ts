@@ -3,7 +3,6 @@
 // layer. Moved verbatim from @acorn/client-core/queries.ts — same keys, same staleTime, same refetch
 // and invalidation behaviour.
 import { readJson, writeJson } from '@acorn/client-core/apiClient.ts'
-import { homeNodeTarget } from '@acorn/client-core/node/fleet.ts'
 import {
   branchesKey,
   branchesRoute,
