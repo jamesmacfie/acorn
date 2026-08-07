@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto'
+import { z } from 'zod'
 import { and, eq, inArray, max } from 'drizzle-orm'
 import { getDb, schema } from '../db'
 import type { AppEnv } from '../middleware/auth'
@@ -17,6 +18,16 @@ import { integrationProviderRegistry } from '../integrations/registry'
 // git/fs); this route only flips the status.
 
 type Row = typeof schema.tasks.$inferSelect
+
+// Zod at the mutation boundary (docs/architecture-overview.md § Wire validation). The positive-integer
+// constraint on pullNumber used to be three conjuncts of a `typeof` chain; getting it wrong here writes
+// a bad row rather than returning a 400.
+const taskPatchBody = z.object({
+  title: z.string().optional(),
+  icon: z.string().nullable().optional(),
+  status: z.enum(['active', 'archived']).optional(),
+  pullNumber: z.int().positive().nullable().optional(),
+})
 
 const cleanIcon = (v: unknown): string | null => (typeof v === 'string' && ICON_NAME_RE.test(v) ? v : null)
 
@@ -141,22 +152,27 @@ export const tasks = new Hono<AppEnv>()
   })
   .patch('/:id', async (c) => {
     const id = c.req.param('id')
-    const body = (await c.req.json().catch(() => ({}))) as { title?: string; icon?: string | null; status?: 'active' | 'archived'; pullNumber?: number | null }
+    // Every field optional and every absent field left untouched, which is what makes this a PATCH.
+    // The parse REPLACES a chain of hand-rolled `typeof` guards; it is deliberately lenient about
+    // unknown keys (zod strips them) and strict about the ones it knows.
+    const parsed = taskPatchBody.safeParse(await c.req.json().catch(() => ({})))
+    if (!parsed.success) return respondError(c, 400, 'bad_request')
+    const body = parsed.data
     const db = getDb(c.env)
     const [existing] = await db.select({ id: schema.tasks.id }).from(schema.tasks).where(eq(schema.tasks.id, id))
     if (!existing) return respondError(c, 404, 'not_found')
     const patch: Partial<Row> = { updatedAt: Date.now() }
-    if (typeof body.title === 'string' && body.title.trim()) patch.title = body.title.trim()
+    if (body.title !== undefined && body.title.trim()) patch.title = body.title.trim()
     // A name to set, or null to clear back to the origin-derived default.
     if (typeof body.icon === 'string') patch.icon = cleanIcon(body.icon)
     else if (body.icon === null) patch.icon = null
-    if (body.status === 'archived' || body.status === 'active') {
+    if (body.status !== undefined) {
       patch.status = body.status
       patch.archivedAt = body.status === 'archived' ? Date.now() : null
     }
     // Link a task to a PR after the fact (Flow B: local-first task → PR created → number back-filled).
     // Accept a positive number to set, or null to unlink.
-    if (typeof body.pullNumber === 'number' && Number.isInteger(body.pullNumber) && body.pullNumber > 0) patch.pullNumber = body.pullNumber
+    if (typeof body.pullNumber === 'number') patch.pullNumber = body.pullNumber
     else if (body.pullNumber === null) patch.pullNumber = null
     await db.update(schema.tasks).set(patch).where(eq(schema.tasks.id, id))
     return c.json({ id, ...patch })

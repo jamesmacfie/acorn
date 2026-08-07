@@ -1,4 +1,5 @@
 import { Hono } from 'hono'
+import { z } from 'zod'
 import type { ConnectIntegrationRequest, IntegrationsResponse, RotateIntegrationRequest } from '@acorn/protocol/api.ts'
 import { auditRequest } from '../auditRequest'
 import { getDb } from '../db'
@@ -18,6 +19,10 @@ import type { AppEnv } from '../middleware/auth'
 import { ownerId } from '../middleware/requireUser'
 import { respondError } from '../respond'
 
+// Zod at the mutation boundary (docs/architecture-overview.md § Wire validation).
+const setDisabledBody = z.object({ disabled: z.boolean() })
+const connectBody = z.looseObject({ providerId: z.string().optional(), provider: z.string().optional() })
+
 // Core-owned provider connection lifecycle. Provider descriptors validate and normalize credentials;
 // this route alone encrypts, stores, rotates, tests, disables, and disconnects connection rows.
 export const integrations = new Hono<AppEnv>()
@@ -30,8 +35,12 @@ export const integrations = new Hono<AppEnv>()
     } satisfies IntegrationsResponse)
   })
   .post('/', async (c) => {
-    const body = (await c.req.json().catch(() => ({}))) as Record<string, unknown>
-    const providerId = typeof body.providerId === 'string' ? body.providerId : typeof body.provider === 'string' ? body.provider : ''
+    // `provider` is the legacy field name for `providerId`, still accepted on the wire. Zod's union
+    // keeps the leniency explicit and typed rather than buried in a nested ternary.
+    const parsed = connectBody.safeParse(await c.req.json().catch(() => ({})))
+    if (!parsed.success) return respondError(c, 400, 'provider_bad_config')
+    const body = parsed.data
+    const providerId = body.providerId ?? body.provider ?? ''
     if (!providerId) return respondError(c, 400, 'provider_bad_config')
     const request: ConnectIntegrationRequest = { providerId, credentials: credentialsFromBody(body) }
     try {
@@ -73,8 +82,10 @@ export const integrations = new Hono<AppEnv>()
     }
   })
   .patch('/:id', async (c) => {
-    const body = (await c.req.json().catch(() => ({}))) as { disabled?: boolean }
-    if (typeof body.disabled !== 'boolean') return respondError(c, 400, 'provider_bad_config')
+    // Zod at the mutation boundary (docs/architecture-overview.md § Wire validation).
+    const parsed = setDisabledBody.safeParse(await c.req.json().catch(() => ({})))
+    if (!parsed.success) return respondError(c, 400, 'provider_bad_config')
+    const body = parsed.data
     try {
       const integration = await setConnectionDisabled(getDb(c.env), ownerId(c), c.req.param('id'), body.disabled)
       return c.json({ integration })
