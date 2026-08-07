@@ -33,3 +33,15 @@ export const GENERATE_MAX_PROMPT_CHARS = 4000
 // A named SQL snippet saved against a repo (docs/pg.md): loaded back into the editor, and optionally
 // fed to AI generation as a worked example (name + notes + SQL).
 export type DbSavedQuery = { id: string; name: string; notes: string | null; sql: string; updatedAt: number }
+
+// Database pane (docs/pg.md): per-task Postgres browse/edit over the plugin route namespace.
+export const databaseTablesRoute = (taskId: string) => `/v2/p/database/tasks/${taskId}/database/tables`
+export const databaseColumnsRoute = (taskId: string, schema: string, name: string) =>
+  `/v2/p/database/tasks/${taskId}/database/columns?schema=${encodeURIComponent(schema)}&name=${encodeURIComponent(name)}`
+export const databaseRowsRoute = (taskId: string, schema: string, name: string, offset?: number) =>
+  `/v2/p/database/tasks/${taskId}/database/rows?schema=${encodeURIComponent(schema)}&name=${encodeURIComponent(name)}${offset ? `&offset=${offset}` : ''}`
+export const databaseActionRoute = (taskId: string, action: 'connect' | 'disconnect' | 'query' | 'update' | 'insert' | 'delete' | 'generate') =>
+  `/v2/p/database/tasks/${taskId}/database/${action}`
+// Saved queries: repo-scoped rows, addressed through the task (the repo is resolved server-side).
+export const databaseQueriesRoute = (taskId: string) => `/v2/p/database/tasks/${taskId}/database/queries`
+export const databaseQueryRoute = (taskId: string, queryId: string) => `/v2/p/database/tasks/${taskId}/database/queries/${queryId}`

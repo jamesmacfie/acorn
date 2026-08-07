@@ -282,34 +282,6 @@ export type RepoConfigTrustReview = {
 export const repoConfigTrustRoute = (taskId: string) => `/v2/core/tasks/${taskId}/config-trust`
 
 
-// Database pane (docs/pg.md): per-task Postgres browse/edit over the plugin route namespace.
-export const databaseTablesRoute = (taskId: string) => `/v2/p/database/tasks/${taskId}/database/tables`
-export const databaseColumnsRoute = (taskId: string, schema: string, name: string) =>
-  `/v2/p/database/tasks/${taskId}/database/columns?schema=${encodeURIComponent(schema)}&name=${encodeURIComponent(name)}`
-export const databaseRowsRoute = (taskId: string, schema: string, name: string, offset?: number) =>
-  `/v2/p/database/tasks/${taskId}/database/rows?schema=${encodeURIComponent(schema)}&name=${encodeURIComponent(name)}${offset ? `&offset=${offset}` : ''}`
-export const databaseActionRoute = (taskId: string, action: 'connect' | 'disconnect' | 'query' | 'update' | 'insert' | 'delete' | 'generate') =>
-  `/v2/p/database/tasks/${taskId}/database/${action}`
-// Saved queries: repo-scoped rows, addressed through the task (the repo is resolved server-side).
-export const databaseQueriesRoute = (taskId: string) => `/v2/p/database/tasks/${taskId}/database/queries`
-export const databaseQueryRoute = (taskId: string, queryId: string) => `/v2/p/database/tasks/${taskId}/database/queries/${queryId}`
-
-// Notes + memory pane (docs/notes-and-memory.md). These routes are exposed through the plugin namespaces.
-export const memoryListRoute = (repo?: string) => `/v2/p/memory/memory${repo ? `?repo=${encodeURIComponent(repo)}` : ''}`
-export const memorySearchRoute = (query: string, repo?: string, type?: string) =>
-  `/v2/p/memory/memory/search?q=${encodeURIComponent(query)}${repo ? `&repo=${encodeURIComponent(repo)}` : ''}${type ? `&type=${encodeURIComponent(type)}` : ''}`
-export const memoryAddRoute = (taskId: string) => `/v2/p/memory/tasks/${taskId}/memory`
-export const memoryProposalsRoute = (taskId?: string) => `/v2/p/memory/memory/proposals${taskId ? `?task=${encodeURIComponent(taskId)}` : ''}`
-export const memoryResolveProposalRoute = (id: string) => `/v2/p/memory/memory/proposals/${encodeURIComponent(id)}/resolve`
-// Existing workspace/global URLs stay stable; task scope adds its reserved subtree without moving
-// persisted files. `global` remains the reserved workspace-key URL for compatibility.
-export const notesListRoute = (location: NoteLocation) =>
-  location.scope === 'task'
-    ? `/v2/p/memory/tasks/${encodeURIComponent(location.taskId)}/notes`
-    : `/v2/p/memory/workspaces/${encodeURIComponent(location.scope === 'global' ? 'global' : location.workspaceId)}/notes`
-export const noteRoute = (location: NoteLocation, slug: string) => `${notesListRoute(location)}/${encodeURIComponent(slug)}`
-export const noteIncludedRoute = (location: NoteLocation, slug: string) => `${noteRoute(location, slug)}/included`
-export const noteTitleRoute = (location: NoteLocation, slug: string) => `${noteRoute(location, slug)}/title`
 
 export const terminalSessionsRoute = '/v2/p/terminal/sessions'
 export const terminalProfilesRoute = '/v2/p/terminal/profiles'
