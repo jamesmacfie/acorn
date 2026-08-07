@@ -634,6 +634,14 @@ export type AuditEntry = {
 // so an offset would skip or repeat entries whenever the 90-day prune ran under a paging reader.
 export type AuditPage = { entries: AuditEntry[]; nextBefore: number | null }
 export const coreAuditRoute = '/v2/core/audit'
+
+// `POST /v2/core/backup` (docs/vNext/data.md § Backup). `destPath` is a path on the NODE's filesystem,
+// which is why the client offers a native save dialog only for the local node. `excluded` is echoed back
+// — and written into the archive's manifest — because "why is my GitHub token gone" is a question the
+// backup itself should answer for whoever restores it a year later.
+export type BackupResult = { path: string; bytes: number; files: string[]; excluded: string[] }
+export type BackupSuggestion = { suggestedPath: string }
+export const coreBackupRoute = '/v2/core/backup'
 // Workspaces (named groups of repos) — the top-level unit.
 export const workspacesRoute = '/v2/core/workspaces'
 export const workspaceRoute = (id: string) => `/v2/core/workspaces/${id}`

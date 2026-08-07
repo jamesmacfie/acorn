@@ -6,6 +6,7 @@ import { requireDevice, requireProviderAccess, requireTaskScope, requireUser } f
 import { onServerError, requestIdMiddleware } from './respond'
 import { CORE_NAMESPACE, PLUGIN_NAMESPACE, pluginRouteContributions, routeMountPath } from './routeRegistry'
 import { audit } from './routes/audit'
+import { backup } from './routes/backup'
 import { security } from './routes/security'
 import { integrations } from './routes/integrations'
 import { pairingRoutes } from './routes/pairing'
@@ -89,6 +90,10 @@ export function createApp() {
     // reconnaissance for anything running in a task.
     .use(`${CORE_NAMESPACE}/security`, requireDevice)
     .use(`${CORE_NAMESPACE}/security/*`, requireDevice)
+    // Backup reads every database this node owns and writes them to a path of the caller's choosing.
+    // Even with the credentials scrubbed out, that is an exfiltration primitive in an agent's hands.
+    .use(`${CORE_NAMESPACE}/backup`, requireDevice)
+    .use(`${CORE_NAMESPACE}/backup/*`, requireDevice)
     // Task scope, enforced by MOUNT rather than per handler. A 'task'-scoped internal credential may act
     // only on the task it names (server/auth/internalTokens.ts). An adversarial review confirmed that a
     // per-route guard had been applied at one site out of six, leaving arbitrary shell execution in
@@ -120,6 +125,7 @@ export function createApp() {
     .route(`${CORE_NAMESPACE}/plugins`, plugins) // Settings → Plugins: the roster + the per-node toggle
     .route(`${CORE_NAMESPACE}/audit`, audit) // Settings → Security: the append-only trail (security.md § Audit)
     .route(`${CORE_NAMESPACE}/security`, security) // Settings → Security: this node's posture (security.md § On-disk)
+    .route(`${CORE_NAMESPACE}/backup`, backup) // data.md § Backup: core + plugin databases, minus credentials
     .route(`${CORE_NAMESPACE}/workspaces`, workspaces)
     .route(`${CORE_NAMESPACE}/tasks`, tasks)
     .route(`${CORE_NAMESPACE}/tasks`, configTrust)
