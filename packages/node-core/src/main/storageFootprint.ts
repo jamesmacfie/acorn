@@ -17,6 +17,16 @@ import { join } from 'node:path'
 import { count } from 'drizzle-orm'
 import type { AppDatabase } from '../server/db'
 import { schema } from '../server/db'
+import { PLUGIN_DB_DIR } from './pluginStorage'
+import { resolveDatabasePath } from './serverPaths'
+
+async function fileBytes(path: string): Promise<number> {
+  try {
+    return (await stat(path)).size
+  } catch {
+    return 0
+  }
+}
 
 async function directoryBytes(path: string): Promise<number> {
   try {
@@ -49,13 +59,25 @@ export async function logStorageFootprint(
 ): Promise<void> {
   // Core's own remaining mirror-ish tables: the generic external-item read model and the provider
   // freshness markers (server/integrations/itemStore.ts explains why these two stayed here).
-  const [blobBytes, issues, syncRows] = await Promise.all([
+  // The DATABASES were unmeasured until Phase 5, and phase2-notes.md had named that as cleanup since the
+  // split. It mattered more than it sounds: `blobs=` alone made a data root look like a cache with some
+  // bookkeeping beside it, when the plugin databases are where agent transcripts, notes and memories
+  // accumulate — i.e. where retention will actually have to bite. The `plugins/` directory walk is the
+  // same one main/backup.ts uses and needs no plugin list (main/pluginStorage.ts § PLUGIN_DB_DIR).
+  const [blobBytes, coreBytes, pluginBytes, issues, syncRows] = await Promise.all([
     directoryBytes(join(dataDir, 'blobs')),
+    fileBytes(resolveDatabasePath(dataDir)),
+    directoryBytes(join(dataDir, PLUGIN_DB_DIR)),
     db.select({ value: count() }).from(schema.issues),
     db.select({ value: count() }).from(schema.syncState),
   ])
 
-  const parts = [`blobs=${blobBytes}B`, `core issues=${issues[0]?.value ?? 0} provider-sync=${syncRows[0]?.value ?? 0}`]
+  const parts = [
+    `blobs=${blobBytes}B`,
+    `core.sqlite=${coreBytes}B`,
+    `plugin-dbs=${pluginBytes}B`,
+    `core issues=${issues[0]?.value ?? 0} provider-sync=${syncRows[0]?.value ?? 0}`,
+  ]
   for (const contributor of contributors) {
     const counts = await contributor.counts().catch((error: unknown) => {
       console.warn(`[storage] ${contributor.plugin} footprint failed:`, error)

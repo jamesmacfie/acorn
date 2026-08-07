@@ -182,6 +182,20 @@ one node down; a remote task's terminal/agent/preview work end-to-end over the L
 data root; full test pyramid green (unit, integration on real node processes, two-node e2e,
 packaging smoke test on a clean macOS VM); V1 remains installed and functional alongside.
 
+> **Phase 5 is done, with two qualifications stated rather than buried.** All three risks Phase 4
+> accepted are CLOSED — the preview tunnel's loopback listener carries a per-tunnel secret, both ends of
+> the events socket run a ping/pong watchdog, and the drain closes its listener first under a 30s
+> deadline. The importer, backup, the audit table and its six producers, the disk-encryption warning,
+> Settings → Security and the standalone-node tarball all shipped, and the importer is verified against
+> a copy of a real V1 root. The two qualifications: **notarization cannot be done** without an Apple
+> Developer ID (`identity: null` is unchanged, and dead config was deliberately not added), and **the
+> manual half of the parity checklist is written but not walked** — the literal half is asserted in
+> `apps/desktop/test/client/parity.test.ts`, the fleet half in `twoNode.spec.ts`, and the rest is
+> [parity-checklist.md](./parity-checklist.md) for a person with a real build. The packaging check was a
+> by-hand launch of the real DMG rather than a clean macOS VM.
+> [phase5-notes.md](./phase5-notes.md) records the decisions, what the work caught (including a stale
+> claim in the handoff and a real parity divergence in ui.md's own prose), and what is still not done.
+
 ## Testing summary (what "fully tested" means here)
 
 | Layer | Tooling | What it proves |
