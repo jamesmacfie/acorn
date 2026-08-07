@@ -49,10 +49,19 @@ owner's GitHub credential.
 
 ## Process, path, and configuration controls
 
-- Plugins use CoreServices for filesystem access, Git, and child processes. The filesystem service
-  applies one symlink-aware data-root/worktree confinement policy.
-- The process broker uses explicit working directories, environment allowlists, process-group
-  termination, bounded output, and production timeouts.
+- Plugins use CoreServices for filesystem access and Git. The filesystem service applies one
+  symlink-aware data-root/worktree confinement policy.
+- Short-lived task work goes through the process broker, which uses explicit working directories,
+  environment allowlists, process-group termination, bounded output, and production timeouts.
+- Long-lived engines own their own children, under the same environment hygiene. The broker's model is
+  "run a bounded command, capture its output, kill its group" — which does not fit a PTY, a JSON-RPC
+  agent driver, a `docker logs -f` stream, a ripgrep scan or a pg client, all of which outlive a
+  request and stream as they go. These are an ENUMERATED set, not an open door: the list of files
+  permitted to import `node:child_process` is asserted in `tools/arch/boundaries.test.ts`, each entry
+  with its reason, and adding one is a decision rather than a drift.
+
+  This paragraph used to claim every child process went through the broker. Nineteen production
+  modules did not, and the claim being both untrue and unenforceable was worse than not making it.
 - Executable repository configuration (`.acorn/config.toml`, workflow files, and URL scripts) is
   hash-gated. The exact snapshot must be acknowledged before execution; a changed snapshot fails
   closed with `needs-trust`/`config-changed`.

@@ -205,6 +205,55 @@ describe('architecture boundaries', () => {
     expect([...new Set([...badExternal, ...badFirstParty])].sort()).toEqual([])
   })
 
+  it('spawning a child process is an enumerated exception to the broker', () => {
+    // main/core/proc.ts opens by quoting docs/security.md: "all child processes go through the process
+    // broker". Nineteen production modules import node:child_process directly, ten of them in plugins.
+    //
+    // Most of those are legitimately outside the broker's model, which captures bounded output from a
+    // short-lived child and kills its process group. A PTY, a long-lived JSON-RPC agent driver, a
+    // `docker logs -f` stream and a pg client are none of those things. The problem was never that the
+    // exceptions exist — it is that nothing distinguished a sanctioned one from a call site that simply
+    // had not been migrated, so the claim in the docs was flatly untrue and unenforceable.
+    //
+    // This is the list. Every entry is a considered exception, and the reason is written beside it in
+    // the file itself. Adding one is a decision; docs/security.md now describes THIS, not the universal
+    // claim it used to make.
+    const CHILD_PROCESS_OK = new Set([
+      // Core, and the broker itself.
+      'packages/node-core/src/main/core/proc.ts', // IS the broker
+      'packages/node-core/src/main/archive.ts', // bounded git archive
+      'packages/node-core/src/main/headless.ts', // one-shot agent run, streams stdout as it goes
+      'packages/node-core/src/main/mcpRegister.ts', // registers the MCP server with a CLI
+      'packages/node-core/src/main/profiles.ts', // probes whether an agent CLI is installed
+      'packages/node-core/src/main/tls.ts', // openssl, at first boot only
+      // Composition roots: a login-shell PATH probe, and the supervised node's own child.
+      'apps/node/src/service/runtime.ts',
+      'apps/desktop/src/app/main/serviceHost.ts',
+      // Long-lived engines. Each owns its children's lifetime, and the broker has no model for that.
+      'plugins/terminal/src/main/terminal.ts', // PTYs
+      'plugins/agents/src/main/drivers/jsonRpcProcess.ts', // ACP driver, one process per session
+      'plugins/agents/src/main/drivers/claudeDriver.ts',
+      'plugins/agents/src/main/drivers/codexDriver.ts',
+      'plugins/agents/src/main/drivers/authProbe.ts',
+      'plugins/agents/src/main/usage/codexUsage.ts',
+      'plugins/docker/src/main/cli.ts',
+      'plugins/docker/src/main/dockerService.ts', // `docker logs -f` / `stats` streams
+      'plugins/database/src/main/database.ts',
+      'plugins/editor/src/main/search.ts', // ripgrep, streamed
+      'plugins/http/src/server/send.ts',
+    ])
+    const importers = [...new Set(
+      // Build tooling excluded: apps/desktop/scripts/ runs at package time and never ships, so the
+      // broker's confinement guarantees have nothing to say about it.
+      EDGES.filter((e) => !isTestCode(e.fromFile) && !/\/scripts\//.test(rel(e.fromFile)))
+        .filter((e) => e.target.external === 'node:child_process' || e.target.external === 'child_process')
+        .map((e) => rel(e.fromFile)),
+    )].sort()
+    // Anti-vacuity: the broker itself must always be in the result, or the matcher has stopped matching.
+    expect(importers).toContain('packages/node-core/src/main/core/proc.ts')
+    expect(importers.filter((f) => !CHILD_PROCESS_OK.has(f))).toEqual([])
+  })
+
   it('plugins import core through a reviewed set of module roots (ratchet)', () => {
     // Every package declares `"exports": { "./*": "./src/*" }`, so there is no encapsulation at the
     // module-system level at all — a plugin can reach any file in core. This turns "everything is
