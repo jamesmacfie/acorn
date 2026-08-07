@@ -143,6 +143,7 @@ Run from the repo root via Turborepo, or per-package with `--filter`. The db scr
 | --- | --- |
 | `pnpm dev` | `build:service && electron-vite build && check:runtime-syntax && electron-vite preview` — build the node artifact + Electron bundles, then launch the app |
 | `pnpm dev:node` | `pnpm --filter @acorn/node dev:node` — run just the node (no Electron) from `src/server/standalone.ts`. Needs the Node ABI, `SESSION_ENC_KEY` and `GITHUB_CLIENT_ID`. Binds an ephemeral port, takes its data root from `ACORN_DATA_DIR` or the dev root, and prints one JSON line: `{nodeId, endpoint, fingerprint, certPem, deviceToken}` |
+| `pnpm pack:node` | `node scripts/pack-node.mjs` — build the standalone-node tarball for a remote machine (`apps/node/release/acorn-node-<version>.tar.gz`). Verifies that every package the artifact imports is in the generated manifest, including the ones loaded through `createRequire`. See [node-distribution.md](./node-distribution.md) |
 | `pnpm --filter @acorn/desktop build` | Build the node artifact (`service.js`/`mcp.js`/`standalone.js` from `apps/node`), then Electron main + preload + renderer, stage `packages/node-core/migrations` into `out/migrations`, and enforce the renderer budget |
 | `pnpm dist` | Run the gated build and package the `.dmg`/`.zip` |
 | `pnpm --filter @acorn/desktop electron:dev` | `electron-vite dev` — watch mode for main/preload; the renderer comes from the last-built `dist/client`, never the vite dev server |
