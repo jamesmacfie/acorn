@@ -4,6 +4,7 @@
 // off activeTaskId.
 import { createSignal } from 'solid-js'
 import { applyLayoutAction, defaultLayout, type LayoutAction, type PaneId, type TaskLayout } from './layout'
+import { activeNodeId } from '../node/activeNode'
 import { sourceRegistry } from '../registries/sources'
 import type { WorkspaceView } from '../workspaces/workspaceViewTransition'
 
@@ -21,13 +22,20 @@ const [selectedSource, setSelectedSource] = createSignal<string | null>('github'
 // Per-workspace memory of the last view — a rail source (browse) or a task — so switching workspaces
 // returns you to exactly what you were looking at rather than always jumping back to GitHub.
 // Session-only (not persisted); first-load restore is handled by the last_source/last_task prefs.
+//
+// KEYED BY NODE, not cleared on a node switch, and the difference matters. Both would fix the collision
+// (workspace ids are node-minted UUIDs, and two nodes may hold the same one — architecture.md § Fleet
+// semantics), but this memory is worth keeping: switch to the build box and back, and you are returned to the
+// task you were reading rather than to GitHub. The live rosters ARE cleared instead, because they are
+// refetched within a tick and a stale roster is worse than an empty one (apps/desktop's scopedEviction.ts).
 const viewByWorkspace = new Map<string, WorkspaceView>()
+const viewKey = (workspaceId: string): string => `${activeNodeId() ?? ''}/${workspaceId}`
 export const rememberWorkspaceView = (workspaceId: string, view: WorkspaceView): void => {
-  viewByWorkspace.set(workspaceId, view)
+  viewByWorkspace.set(viewKey(workspaceId), view)
 }
-export const workspaceView = (workspaceId: string): WorkspaceView | undefined => viewByWorkspace.get(workspaceId)
+export const workspaceView = (workspaceId: string): WorkspaceView | undefined => viewByWorkspace.get(viewKey(workspaceId))
 export const evictWorkspaceView = (workspaceId: string): void => {
-  viewByWorkspace.delete(workspaceId)
+  viewByWorkspace.delete(viewKey(workspaceId))
 }
 
 // The active task (its terminals scope to this; its view shows when no Source is selected).

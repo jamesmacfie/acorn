@@ -252,3 +252,39 @@
 .fleet-card-attention {
   color: var(--warn);
 }
+
+/* Fingerprint rendering (node/fingerprintWords.ts): the word phrase is what a person compares, the hex is
+   what a person pastes. Both are shown; the phrase leads. */
+.node-fingerprint-words {
+  display: block;
+  font-family: var(--font-mono);
+  font-size: var(--fs-sm);
+  color: var(--text);
+}
+.node-fingerprint-hex {
+  display: block;
+  font-family: var(--font-mono);
+  font-size: var(--fs-xs);
+  color: var(--text-muted);
+  overflow-wrap: anywhere;
+}
+
+/* Paired-client list per node (settings/NodeDevices.tsx). Collapsed by default — on a one-device install it
+   says "you are here", and unfolding it is the deliberate act of auditing access. */
+.node-devices {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+.node-devices-toggle {
+  align-self: flex-start;
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--text-muted);
+  font-size: var(--fs-xs);
+  cursor: pointer;
+}
+.node-device-list { display: flex; flex-direction: column; gap: var(--space-2); margin: 0; padding: 0; list-style: none; }
+.node-device { display: flex; align-items: center; gap: var(--space-3); font-size: var(--fs-sm); }
+.node-device-name { font-weight: var(--fw-medium); }

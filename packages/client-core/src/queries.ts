@@ -3,6 +3,7 @@
 // is a valid logged-out state, elsewhere it's an error.
 import { readJson, writeJson } from './apiClient'
 import { homeNodeTarget } from './node/fleet'
+import { mergePrefs, seedDevicePrefs } from './persistence/devicePrefs'
 import {
   branchesKey,
   branchesRoute,
@@ -208,26 +209,28 @@ export const workspaceProjectsOptions = (workspaceId: string | null, enabled: bo
     readJson<WorkspaceProjectsResponse>(workspaceProjectsRoute(workspaceId as string), { signal }),
 })
 
-// KNOWN PHASE 1 DIVERGENCE — prefs are node-scoped storage serving a client-scoped concern.
+// Prefs are TWO tiers as of Phase 4, merged here (persistence/devicePrefs.ts).
 //
-// `/v2/core/prefs` is one flat Record on the NODE, and the client keeps presentation state there:
-// theme, style pack, keybindings, rail order/collapse, restored selection. That was free when there
-// was exactly one node; with a fleet it means the user's theme would flip when they switched nodes,
-// which is not a feature. So every pref read AND write is addressed at the home node
-// (fleet.homeNode — the bundled local one) regardless of which node is active.
+// Presentation — theme, style pack, keybindings, rail order, restored selection, layouts — is the DEVICE's,
+// in localStorage. Behaviour that belongs to a machine — agent tool permissions, startup context injection,
+// the onboarded flag — stays in the node's flat `/v2/core/prefs` record.
 //
-// Addressing is the fix, not the cache partition: pointing these at the home node's QueryClient
-// instead would have left the FETCH going to the active node, and would have split the optimistic
-// write in savePref.ts from the readers mounted under the active provider. Because the content is
-// node-independent once the address is fixed, which partition holds it does not matter.
+// That closes the last recorded Phase 1 divergence. Every pref used to live on the node, which was free with
+// one node and wrong with a fleet, so Phase 1 pinned all of them to the HOME node whatever node was active —
+// purely so the theme would not flip on a switch. The node read is still addressed at the home node, and
+// still for that reason: what remains there is per-node behaviour, but a single flat record has no room to
+// say so, and flipping a tool permission on switch would be the same bug in a smaller costume.
 //
-// The real answer is a client-side device-prefs tier (docs/vNext/ui.md § State ownership: "Client
-// owns presentation"), which is Phase 4 work. Recorded in docs/vNext/data.md § Client cache.
+// Device wins the merge. Once a key has moved, the node's copy is a leftover from before the upgrade and must
+// not resurrect itself; `seedDevicePrefs` copies it across once so nothing is lost.
 export const prefsOptions = (enabled: boolean) => ({
   queryKey: prefsKey,
   enabled,
-  queryFn: async ({ signal }: QueryContext): Promise<Record<string, string>> =>
-    readJson<Record<string, string>>(prefsRoute, { signal, ...homeNodeTarget() }),
+  queryFn: async ({ signal }: QueryContext): Promise<Record<string, string>> => {
+    const nodePrefs = await readJson<Record<string, string>>(prefsRoute, { signal, ...homeNodeTarget() })
+    seedDevicePrefs(nodePrefs)
+    return mergePrefs(nodePrefs)
+  },
 })
 
 export const filesOptions = (owner: string, repo: string, number: string, enabled: boolean) => ({

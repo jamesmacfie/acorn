@@ -13,38 +13,77 @@ vi.mock('../notifications/notifications', () => ({ pushBackgroundError: mocks.pu
 
 import { savePref } from './savePref'
 
+// A NODE pref, not `theme`. Every case below is about the server round trip — the optimistic write, the
+// rollback, the per-key serialization — and `theme` moved to the device tier in Phase 4, where none of that
+// happens. `agent_tool_permissions` is the real thing that stayed on a node: it governs what an agent running
+// THERE may do (persistence/devicePrefs.ts states the split).
+const NODE_PREF = 'agent_tool_permissions'
+
+const withLocalStorage = <T>(run: () => T): T => {
+  const store = new Map<string, string>()
+  ;(globalThis as { localStorage?: unknown }).localStorage = {
+    get length() { return store.size },
+    key: (index: number) => [...store.keys()][index] ?? null,
+    getItem: (key: string) => store.get(key) ?? null,
+    setItem: (key: string, value: string) => void store.set(key, value),
+    removeItem: (key: string) => void store.delete(key),
+    clear: () => store.clear(),
+  }
+  ;(globalThis as { __store?: Map<string, string> }).__store = store
+  try {
+    return run()
+  } finally {
+    delete (globalThis as { localStorage?: unknown }).localStorage
+  }
+}
+
 describe('savePref', () => {
   beforeEach(() => vi.clearAllMocks())
 
   it('publishes the optimistic value and keeps it after a successful write', async () => {
     const client = new QueryClient()
-    client.setQueryData(prefsKey, { theme: 'light' })
-    mocks.writeJson.mockResolvedValue({ key: 'theme', value: 'dark' })
-    const pending = savePref(client, 'theme', 'dark')
-    expect(client.getQueryData(prefsKey)).toEqual({ theme: 'dark' })
+    client.setQueryData(prefsKey, { [NODE_PREF]: 'light' })
+    mocks.writeJson.mockResolvedValue({ key: NODE_PREF, value: 'dark' })
+    const pending = savePref(client, NODE_PREF, 'dark')
+    expect(client.getQueryData(prefsKey)).toEqual({ [NODE_PREF]: 'dark' })
     await expect(pending).resolves.toBe(true)
     expect(mocks.pushBackgroundError).not.toHaveBeenCalled()
   })
 
   it('rolls back the attempted value and surfaces a notice on failure', async () => {
     const client = new QueryClient()
-    client.setQueryData(prefsKey, { theme: 'light' })
+    client.setQueryData(prefsKey, { [NODE_PREF]: 'light' })
     mocks.writeJson.mockRejectedValue(new Error('disk full'))
-    await expect(savePref(client, 'theme', 'dark')).resolves.toBe(false)
-    expect(client.getQueryData(prefsKey)).toEqual({ theme: 'light' })
-    expect(mocks.pushBackgroundError).toHaveBeenCalledWith('', 'Could not save theme', 'disk full')
+    await expect(savePref(client, NODE_PREF, 'dark')).resolves.toBe(false)
+    expect(client.getQueryData(prefsKey)).toEqual({ [NODE_PREF]: 'light' })
+    expect(mocks.pushBackgroundError).toHaveBeenCalledWith('', `Could not save ${NODE_PREF}`, 'disk full')
   })
 
   it('does not let an older equal-value failure roll back a newer successful attempt', async () => {
     const client = new QueryClient()
-    client.setQueryData(prefsKey, { theme: 'light' })
-    mocks.writeJson.mockRejectedValueOnce(new Error('transient')).mockResolvedValueOnce({ key: 'theme', value: 'dark' })
+    client.setQueryData(prefsKey, { [NODE_PREF]: 'light' })
+    mocks.writeJson.mockRejectedValueOnce(new Error('transient')).mockResolvedValueOnce({ key: NODE_PREF, value: 'dark' })
 
-    const first = savePref(client, 'theme', 'dark')
-    const second = savePref(client, 'theme', 'dark')
+    const first = savePref(client, NODE_PREF, 'dark')
+    const second = savePref(client, NODE_PREF, 'dark')
 
     await expect(Promise.all([first, second])).resolves.toEqual([false, true])
-    expect(client.getQueryData(prefsKey)).toEqual({ theme: 'dark' })
+    expect(client.getQueryData(prefsKey)).toEqual({ [NODE_PREF]: 'dark' })
+  })
+
+  it('writes a DEVICE pref locally and never reaches a node', async () => {
+    // The whole point of the tier: `theme` is a property of this installation, `localStorage.setItem` cannot
+    // fail in a way a retry would fix, and the optimistic-write-and-roll-back dance above exists for a network
+    // round trip that no longer happens. The cache write still happens, because that is what every reactive
+    // reader sees.
+    await withLocalStorage(async () => {
+      const client = new QueryClient()
+      client.setQueryData(prefsKey, { theme: 'light' })
+      await expect(savePref(client, 'theme', 'dark')).resolves.toBe(true)
+      expect(client.getQueryData(prefsKey)).toEqual({ theme: 'dark' })
+      expect(mocks.writeJson).not.toHaveBeenCalled()
+      expect([...(globalThis as { __store?: Map<string, string> }).__store!.entries()]).toEqual([['acorn-pref:theme', 'dark']])
+    })
   })
 
   it('refuses an oversize descriptor value before writing', async () => {
