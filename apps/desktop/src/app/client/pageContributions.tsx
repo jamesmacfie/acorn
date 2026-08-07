@@ -13,6 +13,7 @@ const AgentToolsSettings = lazy(() => import('@acorn/client-core/settings/AgentT
 const AppearanceSettings = lazy(() => import('@acorn/client-core/settings/AppearanceSettings.tsx'))
 const ShortcutsSettings = lazy(() => import('@acorn/client-core/settings/ShortcutsSettings.tsx'))
 const NodesSettings = lazy(() => import('@acorn/client-core/settings/NodesSettings.tsx'))
+const PluginsSettings = lazy(() => import('@acorn/client-core/settings/PluginsSettings.tsx'))
 const StyleGallery = lazy(() => import('@acorn/client-core/settings/StyleGallery.tsx'))
 
 export const settingsPageContributions: SettingsContribution[] = [
@@ -36,6 +37,9 @@ export const settingsPageContributions: SettingsContribution[] = [
   // The slot the deleted Permissions page vacated (order 80). Not `requires: 'desktop'`: the page
   // renders its own explanation in a browser, where there is no broker and so no fleet.
   { id: 'nodes', label: 'Nodes', group: 'general', order: 80, component: () => <NodesSettings /> },
+  // Beside Nodes, because both are node administration. Not `requires: 'desktop'`, for the same reason as
+  // Nodes: the page explains itself in a browser, where there is no fleet to pick from.
+  { id: 'plugins', label: 'Plugins', group: 'general', order: 85, component: () => <PluginsSettings /> },
   // Dev only: the style-pack authoring surface, not something a user needs.
   ...(import.meta.env.DEV
     ? [{ id: 'gallery', label: 'Style gallery', group: 'general' as const, order: 999, component: () => <StyleGallery /> }]
