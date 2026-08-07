@@ -1,6 +1,6 @@
 import { Hono } from 'hono'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import type { ReviewNote } from '@acorn/protocol/api.ts'
+import type { ReviewNote } from '../../shared/api'
 import { schema } from '@acorn/node-core/server/db/index.ts'
 import { createTaskService } from '@acorn/node-core/main/core/tasks.ts'
 import type { AppEnv } from '@acorn/node-core/server/middleware/auth.ts'
