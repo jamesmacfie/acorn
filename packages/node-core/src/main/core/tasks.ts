@@ -12,7 +12,7 @@ import type { LayoutRecipe, RunTarget } from '../runConfig'
 import type { AppDatabase } from '../../server/db'
 import { schema } from '../../server/db'
 import { broadcastStatus } from '../notify'
-import { loadTask, resolveTaskCwd, taskRoot, taskRunConfig, workspaceIdFor, type TaskRow } from '../taskWorktree'
+import { loadTask, resolveTaskCwd, taskRoot, taskRunConfig, workspaceIdFor, workspaceIdForRepo, type TaskRow } from '../taskWorktree'
 
 // What `taskRunConfig` answers: the merged run-target config plus the cwd to run it in. Restated as a
 // named type because it is now a CoreServices return value rather than an internal helper's.
@@ -71,6 +71,20 @@ export type TaskService = {
   // This is the seam whose absence was the second of the two blockers recorded against moving those
   // tools out of apps/node/src/wiring/agentToolsWiring.ts.
   workspaceId(taskId: string): Promise<string>
+  // The same lookup, with "no workspace" as a VALUE rather than a throw.
+  //
+  // Added for plugins/notes' context section, which walks task → workspace → global and must skip the middle
+  // scope when the task's repo is in no workspace yet. It was written as
+  // `ctx.core.tasks.workspaceId(taskId).catch(() => null)`, and that catch is too wide: `workspaceId` throws for
+  // "task not found", for "no membership", AND for any genuine database failure, so a broken query degraded into
+  // "this task has no workspace" and every included workspace note silently vanished from the prompt with no
+  // error anywhere. A prompt quietly missing its context is the worst kind of failure this seam can produce.
+  //
+  // So: null means the two answers that really are "no workspace", and a real failure still throws. Kept as a
+  // second method rather than changing `workspaceId`'s signature, because the `notes_*` tools' caller genuinely
+  // has no degraded answer — a workspace-scoped note must land in a directory named after a real workspace — and
+  // making the type nullable there would push a decision onto a call site that has already made it.
+  workspaceIdOrNull(taskId: string): Promise<string | null>
   // The inverse of `workspaceId`: every task id in a workspace, resolved workspace → `workspace_repos`
   // → `tasks`. This is what replaced the only real cross-DB JOINs in the codebase. plugins/agents had
   // three queries answering "sessions in workspace X" as `agent_sessions ⋈ tasks ⋈ workspace_repos`,
@@ -154,6 +168,13 @@ export function createTaskService(db: AppDatabase): TaskService {
     runConfig: (taskId) => taskRunConfig(db, taskId),
     active: () => db.select().from(schema.tasks).where(eq(schema.tasks.status, 'active')),
     workspaceId: (taskId) => workspaceIdFor(db, taskId),
+    // Built from the same two queries as `workspaceIdFor` rather than by catching its throw: catching cannot tell
+    // "no membership" from "the database is broken", which is the whole point of this method existing.
+    workspaceIdOrNull: async (taskId) => {
+      const task = await loadTask(db, taskId)
+      if (!task) return null
+      return workspaceIdForRepo(db, task.repoOwner, task.repoName)
+    },
     idsForWorkspace: async (workspaceId) =>
       (
         await db

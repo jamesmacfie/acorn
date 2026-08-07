@@ -320,6 +320,31 @@ export const registerContextSection = (owner: string, section: ContextSectionCon
 export const removeContextSections = (owner: string): void => registry.remove(owner)
 export const getContextSections = (): readonly ContextSectionContribution[] => registry.list()
 
+// Core's own section, registered HERE at module scope — beside the registry, the assembler that reads it and
+// the route that serves it, rather than from a composition-root wiring file.
+//
+// It used to be registered by apps/node/src/wiring/agentToolsWiring.ts, which is reached only from
+// apps/node/src/service/runtime.ts. apps/node/src/server/standalone.ts calls `initPlugins` and never
+// `wireAgentTools`, so on a standalone node — `pnpm dev:node`, and per that file's own header the node a
+// client pairs with over the LAN — the Linked-issues row silently vanished from the context pane, from the
+// assembled send block and from the launch injector. Nothing errored; a section simply was not there. Before
+// Phase 3 this registry self-seeded a default list of all four sections, so the regression arrived WITH the
+// per-owner contribution point, and pluginDisable.test.ts then baked the three-section result in as its
+// expected baseline.
+//
+// Module scope is right for this one and only this one: `issues` reads `task_links` and `issues`, core's own
+// tables, through the `db` handle `assemble` is already given — so it closes over no dependency, needs no
+// boot ordering, and is the same object on every boot. A plugin's section cannot do this, because it closes
+// over that plugin's own SQLite handle, which is exactly why the other three stay in their plugin's `init`.
+//
+// The `removeContextSections('core')` that sat beside the old registration is deliberately NOT carried over,
+// and this is the one place where "move it too" would have been wrong. Its job was idempotence for a process
+// that boots the service more than once (service/runtime.test.ts does it four times): a per-boot registration
+// has to clear the previous boot's entry or the duplicate-id guard fails the second boot. A module body runs
+// once per module instance, so there is nothing to clear — the line would be a permanent no-op documenting a
+// problem that no longer exists. The multi-boot property comes free instead.
+registerContextSection('core', linkedIssuesSection)
+
 export function parseInclude(raw: string | undefined): Set<string> {
   const sections = registry.list()
   if (raw === '*') return new Set(sections.map((section) => section.id))

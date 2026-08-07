@@ -48,12 +48,15 @@ export const notesPlugin = (dataDir: string): NodePlugin => ({
         // `tasks` and `workspace_repos` are CORE's tables and this plugin has no handle to either, so the
         // workspace arrives through CoreServices rather than a query.
         //
-        // CAUGHT, not propagated, and the catch is the behaviour rather than defensive noise.
-        // `CoreServices.tasks.workspaceId` THROWS for an unknown task and for a task whose repo is in no
-        // workspace; the wiring this replaces called `workspaceIdForRepo`, which returned null and simply
-        // skipped the workspace scope. Letting it throw would fail prompt assembly for a repo the user has
-        // not put in a workspace yet — a degraded section turning into a hard error.
-        const workspaceId = await ctx.core.tasks.workspaceId(taskId).catch(() => null)
+        // `workspaceIdOrNull`, not `workspaceId(taskId).catch(() => null)`. Null is the right BEHAVIOUR here —
+        // the wiring this replaces called `workspaceIdForRepo`, which returned null and skipped the workspace
+        // scope, and letting it throw would fail prompt assembly for a repo the user has not put in a workspace
+        // yet. But the bare catch bought that by swallowing everything: `workspaceId` throws for "task not
+        // found", for "no membership" and for any real database failure alike, so a broken query became "this
+        // task has no workspace" and every included workspace note dropped out of the prompt silently. A prompt
+        // quietly missing its context is worse than a section that errors. Now only the two genuine cases
+        // degrade, and a failure propagates.
+        const workspaceId = await ctx.core.tasks.workspaceIdOrNull(taskId)
         const locations: { scope: NoteScope; location: NoteLocation }[] = [
           { scope: 'task', location: { scope: 'task', taskId } },
           ...(workspaceId ? [{ scope: 'workspace' as const, location: { scope: 'workspace' as const, workspaceId } }] : []),

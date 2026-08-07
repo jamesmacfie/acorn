@@ -12,11 +12,13 @@ describe('the codex profile', () => {
     expect(codexProfile).toMatchObject({ id: 'codex', label: 'Codex', kind: 'agent', command: 'codex', transport: 'pty' })
   })
 
+  // THE WHOLE ARRAY, not a prefix slice plus a last-element check. Those two together left the MIDDLE of the
+  // argv unasserted, so anything inserted between `--json` and the prompt — a sandbox opt-out, an extra
+  // `--config` — passed. Same change as the claude suite, same reason: these arrays are the command line.
   it('builds a headless turn as `exec --json`, with the prompt last', () => {
     const { file, args } = codexProfile.headlessArgv!('codex', { prompt: 'do the thing' })
     expect(file).toBe('codex')
-    expect(args.slice(0, 2)).toEqual(['exec', '--json'])
-    expect(args.at(-1)).toBe('do the thing')
+    expect(args).toEqual(['exec', '--json', 'do the thing'])
   })
 
   it('materializes a schema to a FILE, because codex takes a path where claude takes JSON', () => {
