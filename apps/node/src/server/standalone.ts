@@ -25,7 +25,7 @@ import './routes' // register plugin-owned HTTP routers into the core route regi
 //     config — so every gated workflow and executable config on that node stayed unusable.
 import '../wiring/agentProfiles'
 import { join } from 'node:path'
-import { devDataDir, makeRuntime, startListener } from '@acorn/node-core/main/server.ts'
+import { closeListener, devDataDir, drainWithDeadline, makeRuntime, startListener } from '@acorn/node-core/main/server.ts'
 import { openDataRoot } from '@acorn/node-core/main/dataRoot.ts'
 import { resolveDeviceToken } from '@acorn/node-core/server/auth/deviceTokens.ts'
 import { mintInternalToken, type InternalEnvFactory } from '@acorn/node-core/server/auth/internalTokens.ts'
@@ -191,30 +191,38 @@ console.log(
   }),
 )
 
-// Ctrl-C is how `dev:node` ends, so it is the ONLY teardown path this entry has — and it had none.
-// Eight plugins own WAL-mode SQLite files now and the data root holds an exclusive pidfile lock, so
-// exiting without this left journals unflushed and the lock held, which the next `dev:node` refuses to
-// take. The supervised root has done this since Phase 1 (service/runtime.ts's stop()); this entry simply
-// never grew the equivalent, and the plugin conversions are what made it matter.
+// Ctrl-C is how `dev:node` ends, and SIGTERM is how launchd/systemd end a standalone node, so this is
+// the ONLY teardown path this entry has — and it had none. Eight plugins own WAL-mode SQLite files now
+// and the data root holds an exclusive pidfile lock, so exiting without this left journals unflushed and
+// the lock held, which the next `dev:node` refuses to take. The supervised root has done this since
+// Phase 1 (service/runtime.ts's stop()); this entry simply never grew the equivalent, and the plugin
+// conversions are what made it matter.
 //
-// Same order as the supervised root, for the same reason: plugins before core's database, core's database
-// before the root lock, because a restart must not open a database this process still holds a WAL for.
+// The SAME list, in the SAME order, as the supervised root's stop(), and two of the entries are Phase 5
+// corrections:
+//
+//   - **The LISTENER is closed first, and used not to be closed at all.** That is the whole of
+//     docs/vNext/phase4-notes.md's "SIGTERM was too slow": the port stayed bound for as long as the
+//     slowest plugin took to dispose, because nothing had told the server to stop accepting. A poll for
+//     "is the node gone" therefore watched a socket that was never going to close on its own schedule,
+//     which is why the two-node e2e reached for SIGKILL.
+//   - **The drain is bounded** (architecture.md § Inside the Node: 30s). An operator's
+//     `systemctl restart` must not hang on one plugin whose dispose never settles.
+//
+// The root lock comes last because a restart must not open a database this process still holds a WAL
+// for; if the deadline fires before that step, dataRoot's own `process.on('exit')` hook releases it.
 let stopping = false
 const shutdown = async (signal: NodeJS.Signals): Promise<void> => {
   if (stopping) return
   stopping = true
   console.log(`[node] ${signal} — draining`)
-  for (const [label, step] of [
+  const outcome = await drainWithDeadline([
+    ['listener', () => closeListener(listener.server)],
     ['plugins', () => plugins.dispose()],
     ['sqlite', async () => runtime.DB.close()],
     ['data root', async () => root.release()],
-  ] as const) {
-    try {
-      await step()
-    } catch (error) {
-      console.warn(`[node] ${label} teardown failed:`, error)
-    }
-  }
+  ])
+  if (outcome === 'timeout') console.warn('[node] drain exceeded its deadline; exiting anyway')
   process.exit(0)
 }
 process.once('SIGINT', (signal) => void shutdown(signal))

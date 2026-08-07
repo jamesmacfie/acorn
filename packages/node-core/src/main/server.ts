@@ -8,8 +8,8 @@ import { openDataRoot, type DataRoot } from './dataRoot'
 import { resolveDatabasePath } from './serverPaths'
 import { configuredPort, devDataDir } from './serverConfig'
 import { ensureCert } from './tls'
-import { attachWsHub } from './wsHub'
-import { attachTunnel, type TunnelDeps } from './tunnel'
+import { attachWsHub, disposeWsHub } from './wsHub'
+import { attachTunnel, disposeTunnel, type TunnelDeps } from './tunnel'
 import { isUpgradeClaimed } from './upgradeClaim'
 import { declaredTunnelPorts } from './tunnelPorts'
 import type { Env } from './bindings'
@@ -154,6 +154,70 @@ export function startListener(runtime: RuntimeBindings, root: DataRoot): Promise
     server.on('error', onError)
     server.listen(requested, '127.0.0.1', onListening)
   })
+}
+
+// Stop accepting, then reap every socket this listener still owns. Both composition roots call it as
+// the FIRST teardown step, and it lives here rather than in either of them because it is the only
+// place that knows what `startListener` attached: two upgrade handlers with their own socket sets,
+// neither of which `server.close()` can see.
+//
+// It used to live in apps/node's service/runtime.ts alone, and the standalone entry closed nothing at
+// all — its drain went straight to plugin dispose. That is why a standalone node's listening socket
+// outlived a 30-second poll in the two-node e2e (docs/vNext/phase4-notes.md § "the kill signal is
+// SIGKILL"): the port stayed bound for as long as the slowest plugin took to dispose, because nothing
+// had told the server to stop.
+export function closeListener(server: ServerType | null): Promise<void> {
+  if (!server) return Promise.resolve()
+  const httpServer = server as unknown as import('node:http').Server
+  disposeWsHub(httpServer)
+  // Tunnel sockets hold a live TCP connection to a dev server on this host, so they have to be terminated
+  // too — `closeAllConnections` below reaps the HTTP sockets but an upgraded one is the tunnel's, not the
+  // server's, to close.
+  disposeTunnel(httpServer)
+  return new Promise((resolve) => {
+    server.close(() => resolve())
+    // Node otherwise waits out keepAliveTimeout for an idle renderer/fetch socket. Once close()
+    // has stopped new requests, loopback connections are safe to reap immediately; WebSockets were
+    // already terminated by disposeWsHub above.
+    httpServer.closeIdleConnections?.()
+    httpServer.closeAllConnections?.()
+  })
+}
+
+// docs/vNext/architecture.md § Inside the Node: "Shutdown drains in-flight work with a bounded timeout
+// (30s)". Bounded means the process exits either way — an operator's `systemctl restart` must not hang
+// on one plugin whose dispose never settles.
+export const DRAIN_TIMEOUT_MS = 30_000
+
+// Run a drain to completion or to the deadline, whichever comes first, reporting which. The steps are
+// awaited in order (each one's teardown assumes the previous one finished — plugins before core's
+// SQLite before the root lock), so the deadline covers the SEQUENCE rather than each step: a step that
+// hangs must not get its own fresh 30 seconds after two others already spent theirs.
+export async function drainWithDeadline(
+  steps: readonly (readonly [string, () => Promise<unknown>])[],
+  timeoutMs = DRAIN_TIMEOUT_MS,
+): Promise<'drained' | 'timeout'> {
+  let timer: ReturnType<typeof setTimeout> | undefined
+  const expired = new Promise<'timeout'>((resolve) => {
+    timer = setTimeout(() => resolve('timeout'), timeoutMs)
+    timer.unref?.()
+  })
+  const run = (async (): Promise<'drained'> => {
+    for (const [label, step] of steps) {
+      try {
+        await step()
+      } catch (error) {
+        // A failed step is not a reason to skip the rest: the root lock still has to come off.
+        console.warn(`[node] ${label} teardown failed:`, error)
+      }
+    }
+    return 'drained'
+  })()
+  try {
+    return await Promise.race([run, expired])
+  } finally {
+    clearTimeout(timer)
+  }
 }
 
 // One definition of the on-disk app-data layout under a data root (DB, blobs) — Electron's utility

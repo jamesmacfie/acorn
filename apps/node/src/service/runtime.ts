@@ -13,14 +13,12 @@ import { createCoreServices } from '@acorn/node-core/main/core/index.ts'
 import { disabledPluginsStore } from '@acorn/node-core/main/disabledPlugins.ts'
 import { setPluginsBridge } from '@acorn/node-core/server/routes/plugins.ts'
 import { nodePlugins } from '../server/plugins'
-import { makeRuntime, startListener } from '@acorn/node-core/main/server.ts'
+import { closeListener, drainWithDeadline, makeRuntime, startListener } from '@acorn/node-core/main/server.ts'
 import { openDataRoot, type DataRoot } from '@acorn/node-core/main/dataRoot.ts'
 import { launcherSpec, serverName } from '@acorn/node-core/main/mcpRegister.ts'
 import { reconcileWorktrees, setWorktreesRoot } from '@acorn/node-core/main/taskWorktree.ts'
 import { logStorageFootprint } from '@acorn/node-core/main/storageFootprint.ts'
 import { GITHUB_MIRROR } from '@acorn/plugin-github/contract/mirror.ts'
-import { disposeWsHub } from '@acorn/node-core/main/wsHub.ts'
-import { disposeTunnel } from '@acorn/node-core/main/tunnel.ts'
 import { wireAgentTools } from '../wiring/agentToolsWiring'
 import { wireConfigTrust } from '../wiring/configTrustWiring'
 import { AGENTS_RUNTIME } from '@acorn/plugin-agents/main/runtime.ts'
@@ -65,24 +63,6 @@ async function inheritLoginShellPath(isPackaged: boolean): Promise<void> {
   } catch (error) {
     console.warn('[service:boot] login-shell PATH probe failed; keeping inherited PATH:', error)
   }
-}
-
-function closeListener(server: ServerType | null): Promise<void> {
-  if (!server) return Promise.resolve()
-  const httpServer = server as unknown as import('node:http').Server
-  disposeWsHub(httpServer)
-  // Tunnel sockets hold a live TCP connection to a dev server on this host, so they have to be terminated
-  // too — `closeAllConnections` below reaps the HTTP sockets but an upgraded one is the tunnel's, not the
-  // server's, to close.
-  disposeTunnel(httpServer)
-  return new Promise((resolve) => {
-    server.close(() => resolve())
-    // Node otherwise waits out keepAliveTimeout for an idle renderer/fetch socket. Once close()
-    // has stopped new requests, loopback connections are safe to reap immediately; WebSockets were
-    // already terminated by disposeWsHub above.
-    httpServer.closeIdleConnections?.()
-    httpServer.closeAllConnections?.()
-  })
 }
 
 // Electron-free composition root. This process exclusively owns SQLite, Hono/WS, PTYs, workflow
@@ -136,42 +116,33 @@ export async function startServiceRuntime({ config, desktop, stateChanged }: Run
     if (stopped) return
     stopped = true
     stateChanged('draining')
-    try {
-      await closeListener(server)
-    } catch (error) {
-      console.warn('[service:stop] listener close failed:', error)
-    }
-    try {
-      await reconcileTask
-    } catch (error) {
-      console.warn('[service:stop] reconciliation drain failed:', error)
-    }
-    // Before core's DB and before the root lock: each plugin owns a WAL-mode SQLite file of its own
-    // (main/pluginStorage.ts), and the invariant below applies to those too. This is also where the
-    // terminal engine's idle watch and session displays, the docker streams, the database plugin's pg
-    // pools and the agent runtime's live provider children / reconnect timers / webhook pump are closed
-    // — each in its own plugin's dispose, rather than in a list here that a new plugin has to remember
-    // to join.
-    try {
-      await disposePlugins?.()
-    } catch (error) {
-      console.warn('[service:stop] plugin dispose failed:', error)
-    }
-    if (!dbClosed) {
-      dbClosed = true
-      try {
-        db.close()
-      } catch (error) {
-        console.warn('[service:stop] SQLite close failed:', error)
-      }
-    }
-    // Last: only drop the root lock once SQLite is closed, or a restart could open the database
-    // while this process still holds its WAL.
-    try {
-      dataRoot.release()
-    } catch (error) {
-      console.warn('[service:stop] data root release failed:', error)
-    }
+    // Bounded, and in this order — the same list, in the same order, as server/standalone.ts's:
+    //   - the LISTENER first, so nothing new arrives while the rest tears down. This is also what stops
+    //     the port outliving the drain, which is what made the two-node e2e reach for SIGKILL.
+    //   - plugins before core's DB and before the root lock: each plugin owns a WAL-mode SQLite file of
+    //     its own (main/pluginStorage.ts), and the invariant below applies to those too. This is also
+    //     where the terminal engine's idle watch and session displays, the docker streams, the database
+    //     plugin's pg pools and the agent runtime's live provider children / reconnect timers / webhook
+    //     pump are closed — each in its own plugin's dispose, rather than in a list here that a new
+    //     plugin has to remember to join.
+    //   - the root lock LAST: only drop it once SQLite is closed, or a restart could open the database
+    //     while this process still holds its WAL. A drain that hits the deadline leaves it to
+    //     dataRoot's own `process.on('exit')` hook, which is why missing it here is survivable.
+    const outcome = await drainWithDeadline([
+      ['listener', () => closeListener(server)],
+      ['reconciliation', async () => await reconcileTask],
+      ['plugins', async () => await disposePlugins?.()],
+      [
+        'sqlite',
+        async () => {
+          if (dbClosed) return
+          dbClosed = true
+          db.close()
+        },
+      ],
+      ['data root', async () => dataRoot.release()],
+    ])
+    if (outcome === 'timeout') console.warn('[service:stop] drain exceeded its deadline; exiting anyway')
     stateChanged('stopped')
     mark('teardown')
   }
