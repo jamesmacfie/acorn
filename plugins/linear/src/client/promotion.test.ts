@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest'
-import type { LinearProjectIssue } from '@acorn/protocol/api.ts'
-import { prepareLinearPromotion } from './providerPromotion'
+import { prepareLinearPromotion } from './promotion'
+import type { LinearProjectIssue } from '../shared/api'
 
-describe('provider-owned source promotion', () => {
+describe('linear source promotion', () => {
   it('uses Linear branch suggestions and connection-scoped links', () => {
     const item: LinearProjectIssue = {
       integrationId: 'linear-work', identifier: 'ENG-42', title: 'Ship it', url: 'https://linear.app/acme/issue/ENG-42',
