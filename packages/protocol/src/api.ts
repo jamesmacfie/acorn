@@ -605,6 +605,10 @@ export const prefsRoute = '/v2/core/prefs'
 export type NodePluginRow = { name: string; required: boolean; disabled: boolean; running: boolean }
 export type NodePluginState = { plugins: NodePluginRow[]; restartRequired: boolean }
 export const corePluginsRoute = '/v2/core/plugins'
+// Every client paired with a node, and the revoke for one of them (ui.md § New surfaces: "revoke this or
+// other devices"). Device-only, like the plugin list — this is node administration.
+export const coreDevicesRoute = '/v2/core/devices'
+export const coreDeviceRoute = (deviceId: string) => `/v2/core/devices/${encodeURIComponent(deviceId)}`
 // Workspaces (named groups of repos) — the top-level unit.
 export const workspacesRoute = '/v2/core/workspaces'
 export const workspaceRoute = (id: string) => `/v2/core/workspaces/${id}`

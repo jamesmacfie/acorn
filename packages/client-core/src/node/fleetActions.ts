@@ -1,5 +1,8 @@
 import type { NodePairRequest, NodeProbeResult, NodeRecord } from '@acorn/protocol/broker.ts'
 import { acornGlobal } from '../capabilities'
+import type { DevicesResponse, PairedDevice } from '@acorn/protocol/node.ts'
+import { coreDeviceRoute, coreDevicesRoute } from '@acorn/protocol/api.ts'
+import { readJson, sendJson } from '../apiClient'
 import { clientEvents } from '../registries/clientEvents'
 import { selectActiveNode } from './activeNode'
 import { refreshFleet } from './fleet'
@@ -68,4 +71,21 @@ export const restartLocalNode = async (): Promise<void> => {
   const restart = bridge()?.nodeRestartLocal
   if (!restart) throw new Error('This build does not supervise a local node.')
   await restart()
+}
+
+// The node's OWN device list — every client paired with it, not just this one. ui.md § New surfaces asks for
+// "revoke this or other devices", and only the first half existed: `removeNode(nodeId, revoke)` deletes THIS
+// client's row. A laptop that was lost, or a machine that was reinstalled, had no way to be cut off short of
+// re-pairing everything.
+//
+// Device-only on the node (routes/pairing.ts, gated in server/index.ts), which is why it is here beside the
+// other fleet mutations rather than in a plugin.
+export const nodeDevices = async (nodeId: string): Promise<PairedDevice[]> =>
+  (await readJson<DevicesResponse>(coreDevicesRoute, { nodeId })).devices
+
+// Revoking a device closes its sockets immediately and fails its in-flight requests
+// (docs/vNext/protocol.md § Pairing). Revoking THIS client's own row is possible and is not stopped here: it
+// is the same thing `removeNode(nodeId, true)` does, and the caller is better placed to warn about it.
+export const revokeNodeDevice = async (nodeId: string, deviceId: string): Promise<void> => {
+  await sendJson(coreDeviceRoute(deviceId), { method: 'DELETE', nodeId })
 }

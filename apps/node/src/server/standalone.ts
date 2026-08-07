@@ -11,6 +11,19 @@
 // later — cannot guess the endpoint, and the self-signed certificate has no CA to vouch for it.
 // Everything else this process logs is free-form; this line is the contract.
 import './routes' // register plugin-owned HTTP routers into the core route registry
+// The three app-layer wirings the supervised root does, and this entry did NOT — which was a real gap
+// rather than a deliberate omission, and it is the one that made "a remote task's agent works over the
+// LAN" untrue. All three are pure Node and need no DesktopCapabilities:
+//
+//   - `agentProfiles` registers claude / codex / aider into core's profile registry. Without it a remote
+//     node offered only core's shell profile, so launching an agent on it had nothing to launch.
+//   - `wireAgentTools` registers core's own six tools. Without it an agent on a remote node saw a
+//     six-tool-smaller MCP surface than the same agent on the local one — the same class of silent
+//     divergence as the `issues` context section Phase 3 found on this exact path.
+//   - `wireConfigTrust` fills the config-trust bridge, without which
+//     `/v2/core/tasks/:id/config-trust` answered 503 and a remote task could never acknowledge its repo
+//     config — so every gated workflow and executable config on that node stayed unusable.
+import '../wiring/agentProfiles'
 import { join } from 'node:path'
 import { devDataDir, makeRuntime, startListener } from '@acorn/node-core/main/server.ts'
 import { openDataRoot } from '@acorn/node-core/main/dataRoot.ts'
@@ -29,6 +42,8 @@ import { seedTaskNotes } from '@acorn/plugin-notes/main/seedTaskNotes.ts'
 import { reconcileTmux } from '@acorn/plugin-terminal/main/terminal.ts'
 import { WORKFLOWS_RUNNER } from '@acorn/plugin-workflows/main/workflowRunner.ts'
 import { GITHUB_MIRROR } from '@acorn/plugin-github/contract/mirror.ts'
+import { wireAgentTools } from '../wiring/agentToolsWiring'
+import { wireConfigTrust } from '../wiring/configTrustWiring'
 import { nodePlugins } from './plugins'
 import type { BrowserDesktopCapability } from '@acorn/protocol/desktopCapabilities.ts'
 
@@ -128,6 +143,11 @@ setPluginsBridge({
   disabled: () => disabledPlugins.get(),
   setDisabled: (names) => disabledPlugins.set(names),
 })
+
+// Core's own six agent tools and the config-trust bridge, matching service/runtime.ts. Both are pure
+// functions over the database; neither needs a window.
+wireAgentTools({ db: runtime.DB })
+wireConfigTrust(runtime.DB)
 
 // Awaited, not fire-and-forget: there is nothing to hand back until the listener has bound, and a
 // listen failure now exits non-zero with its reason instead of leaving a process alive that answers

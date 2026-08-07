@@ -3,13 +3,16 @@ import { prefsKey, prefsRoute } from '@acorn/protocol/api.ts'
 import { writeJson } from '../apiClient'
 import { homeNodeTarget } from '../node/fleet'
 import { pushBackgroundError } from '../notifications/notifications'
+import { isDevicePref, writeDevicePref } from '../persistence/devicePrefs'
 import { persistedStateRegistry, utf8Bytes } from '../persistence/persistedState'
 
-// The single server write behind every pref. Lives here because savePref is its only caller — the
+// The server write behind a NODE pref. Lives here because savePref is its only caller — the
 // optimistic-cache + rollback dance below is the whole contract.
-// Addressed at the home node, matching prefsOptions — see the divergence note there. A pref written
-// to whichever node happens to be active and read back from the home node would silently lose every
-// theme change made while a remote node was selected.
+//
+// Addressed at the home node, matching prefsOptions. What is left on a node after Phase 4's device tier is
+// per-node behaviour (agent tool permissions, startup context injection), and pinning it to the home node is
+// the same compromise as before — a single flat record cannot say "per node", so one node has to win. Stated
+// in full at prefsOptions.
 const setPref = async (key: string, value: string) =>
   writeJson<{ key: string; value: string }>(prefsRoute, {
     method: 'PUT',
@@ -45,6 +48,16 @@ export async function savePref(
   }
   const previous = qc.getQueryData<Record<string, string>>(prefsKey)
   qc.setQueryData<Record<string, string>>(prefsKey, (old) => ({ ...(old ?? {}), [key]: value }))
+
+  // A DEVICE pref never reaches a node (persistence/devicePrefs.ts): it is a property of this
+  // installation, `localStorage.setItem` cannot fail in a way a retry would fix, and the whole
+  // optimistic-write-and-roll-back dance below exists for a network round trip that no longer happens.
+  // The cache write above is what every reactive reader sees, so it stays and this returns straight away.
+  if (isDevicePref(key)) {
+    writeDevicePref(key, value)
+    return true
+  }
+
   const state = writes.get(key) ?? {
     tail: Promise.resolve(),
     confirmed: previous?.[key],

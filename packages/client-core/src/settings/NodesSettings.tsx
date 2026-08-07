@@ -2,6 +2,8 @@ import { createSignal, For, Match, Show, Switch } from 'solid-js'
 import type { NodeProbeResult } from '@acorn/protocol/broker.ts'
 import { nodes, nodeStatus } from '../node/fleet'
 import { fleetMutable, pairNode, probeNodeEndpoint, reconnectNode, removeNode, renameNode } from '../node/fleetActions'
+import { fingerprintPhrase } from '../node/fingerprintWords'
+import NodeDevices from './NodeDevices'
 import NodeChip from '../node/NodeChip'
 import '../node/nodes.css'
 
@@ -120,12 +122,18 @@ export default function NodesSettings() {
                       </p>
                       <dl class="node-fingerprints">
                         <dt>Pinned</dt>
-                        <dd>{node.fingerprint ?? 'unknown'}</dd>
+                        <dd>
+                          <span class="node-fingerprint-words">{fingerprintPhrase(node.fingerprint) ?? 'unknown'}</span>
+                          <span class="node-fingerprint-hex">{node.fingerprint ?? 'unknown'}</span>
+                        </dd>
                         <Show when={status()?.error?.presentedFingerprint}>
                           {(presented) => (
                             <>
                               <dt>Presented</dt>
-                              <dd>{presented()}</dd>
+                              <dd>
+                                <span class="node-fingerprint-words">{fingerprintPhrase(presented()) ?? 'unknown'}</span>
+                                <span class="node-fingerprint-hex">{presented()}</span>
+                              </dd>
                             </>
                           )}
                         </Show>
@@ -211,7 +219,14 @@ export default function NodesSettings() {
                     Compare it with the value shown on {probed().endpoint} itself. This comparison is the only thing that
                     proves you are pairing with your node and not with something in between — acorn cannot check it for you.
                   </p>
-                  <code class="node-fingerprint">{probed().fingerprint}</code>
+                  {/* Words first, hex second. Two 64-character hex strings differing in the middle look
+                      identical to a person, which is exactly the substitution an attacker wants — so the
+                      phrase is what the owner is asked to compare, and the hex stays for anyone who would
+                      rather paste and diff it exactly (node/fingerprintWords.ts). */}
+                  <Show when={fingerprintPhrase(probed().fingerprint)}>
+                    {(phrase) => <code class="node-fingerprint node-fingerprint-words">{phrase()}</code>}
+                  </Show>
+                  <code class="node-fingerprint node-fingerprint-hex">{probed().fingerprint}</code>
                   <Show when={!probed().compatible}>
                     <p class="action-error">
                       This node speaks protocol v{probed().protocolVersion}; this client speaks a different major version.
