@@ -66,14 +66,39 @@ The Node exposes one Hono application:
 - `/v2/events` is the authenticated WebSocket for invalidation events, PTY/process streams, Docker
   streams, workflow notices, agent events, and preview tunnels.
 
-`packages/protocol/src/api.ts` owns route builders, response types, and query keys. The renderer
-calls the thin client in `packages/client-core` through `window.acorn.nodeFetch` and stream methods.
+Who owns which contract: `packages/protocol` holds what is genuinely shared — the error envelope,
+node identity, pairing, the broker and service protocols, the WS envelope, and the core resource
+types (workspaces, tasks, devices, audit, backup). A plugin owns its own wire surface: route
+builders, request/response types, and query keys live in that plugin's `shared/`, or in its
+`contract/` when another plugin reads them (`plugins/docker/src/shared/model.ts` is the model to
+copy). Two boundary rules in `tools/arch/boundaries.test.ts` enforce it — protocol may declare no
+`/v2/p/` route at all, and the set of protocol modules named for a plugin is an enumerated,
+shrinking list. This is what lets a plugin define its wire contract without editing core, which is
+the precondition for third-party plugins.
+
+The renderer calls the thin client in `packages/client-core` through `window.acorn.nodeFetch` and
+stream methods.
 Electron main supplies the Node endpoint, pinned HTTPS agent, and bearer token. The renderer never
 holds a token or certificate and cannot open a direct network connection under the app CSP.
 
 Every response has an `X-Request-Id`. Errors use the single envelope
 `{ error: { code, message, requestId, retryable, details? } }`. Mutations may use
 `Idempotency-Key`; session creation, agent turns, and request resolution require one.
+
+### Wire validation
+
+**Zod at every mutation boundary.** A route that accepts a body parses it with a Zod schema and
+returns 400 on failure — `safeParse` against a module-level schema, as
+`server/routes/worktree.ts` does. Reads are not validated: the client is TypeScript compiled against
+the same types, and a response schema would only restate the type.
+
+The rule exists because the alternative was drift. Roughly ten route files parsed with Zod while
+others hand-rolled `typeof` chains, and the chains were where the bugs hid: a positive-integer check
+spread over three conjuncts, a non-empty string check that only tested `typeof`. Neither is visible
+to `tsc`, because the body starts as `unknown`.
+
+Deliberately NOT done: response schemas, full request/response codegen, or an OpenAPI pipeline.
+Every consumer is TypeScript in this repo; Zod at the boundary is as far as this needs to go.
 
 ## Product model
 

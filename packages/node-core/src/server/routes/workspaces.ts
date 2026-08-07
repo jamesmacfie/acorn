@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto'
+import { z } from 'zod'
 import { and, eq, inArray, max } from 'drizzle-orm'
 import { Hono } from 'hono'
 import { getDb, schema } from '../db'
@@ -16,6 +17,10 @@ import { repoMirrorSource } from '../repoMirror'
 
 // The `owner/repo` keys of every ignored repo — the shared filter for hiding them from the
 // selector / rail / scoping while their workspace membership is kept.
+const workspaceProjectsBody = z.object({
+  projects: z.array(z.object({ integrationId: z.string().min(1), externalId: z.string().min(1) })).optional(),
+})
+
 async function ignoredRepoSet(db: ReturnType<typeof getDb>): Promise<Set<string>> {
   return new Set((await db.select().from(schema.ignoredRepos)).map((i) => `${i.owner}/${i.repo}`))
 }
@@ -105,7 +110,7 @@ export const workspaces = new Hono<AppEnv>()
     }
     if (body.color !== undefined) {
       if (body.color === null || body.color === '') set.color = null
-      else if (typeof body.color === 'string' && isValidWorkspaceColor(body.color)) set.color = body.color
+      else if (isValidWorkspaceColor(body.color)) set.color = body.color
       else return respondError(c, 400, 'bad_request')
     }
     if (set.name === undefined && set.icon === undefined && set.color === undefined) return respondError(c, 400, 'bad_request')
@@ -191,8 +196,12 @@ export const workspaces = new Hono<AppEnv>()
   })
   .put('/:id/projects', async (c) => {
     const id = c.req.param('id')
-    const body = (await c.req.json().catch(() => ({}))) as { projects?: WorkspaceProject[] }
-    const projects = (body.projects ?? []).filter((p) => p && typeof p.integrationId === 'string' && typeof p.externalId === 'string' && p.integrationId && p.externalId)
+    // Zod at the mutation boundary (docs/architecture-overview.md § Wire validation). Non-empty rather
+    // than merely present: an empty id would have passed the old `typeof` filter and then failed the
+    // connection check below with a confusing 403.
+    const parsed = workspaceProjectsBody.safeParse(await c.req.json().catch(() => ({})))
+    if (!parsed.success) return respondError(c, 400, 'bad_request')
+    const projects = parsed.data.projects ?? []
     const db = getDb(c.env)
     const uid = ownerId(c)
     for (const project of projects) {
