@@ -135,6 +135,14 @@ describe('the internal principal cannot administer devices', () => {
     expect(((await res.json()) as { error?: { code?: string } }).error?.code).toBe('interactive_user_required')
   })
 
+  // The posture answer is smaller than the trail, and gated for the same class of reason: it describes
+  // the machine, which is reconnaissance for anything running in a task.
+  it("cannot read the node's security posture", async () => {
+    const res = await call('/v2/core/security', { headers: asAgent })
+    expect(res.status).toBe(403)
+    expect(((await res.json()) as { error?: { code?: string } }).error?.code).toBe('interactive_user_required')
+  })
+
   // The whole escalation in one test: window → code → token. If this ever returns 200 at the first
   // step, the rest follows and the internal token becomes owner-permanent.
   it('cannot escalate to an owner-authority device token', async () => {

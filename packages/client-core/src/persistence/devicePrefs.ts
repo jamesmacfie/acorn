@@ -55,6 +55,7 @@ const DEVICE_KEYS: ReadonlySet<string> = new Set<string>([
   PrefKeys.prFiltersScoped,
   PrefKeys.contextSelectionScoped,
   PrefKeys.dockerPrefs,
+  PrefKeys.diskWarningAcked,
 ])
 
 const PREFIX = 'acorn-pref:'

@@ -6,6 +6,7 @@ import { requireDevice, requireProviderAccess, requireTaskScope, requireUser } f
 import { onServerError, requestIdMiddleware } from './respond'
 import { CORE_NAMESPACE, PLUGIN_NAMESPACE, pluginRouteContributions, routeMountPath } from './routeRegistry'
 import { audit } from './routes/audit'
+import { security } from './routes/security'
 import { integrations } from './routes/integrations'
 import { pairingRoutes } from './routes/pairing'
 import { prefs } from './routes/prefs'
@@ -84,6 +85,10 @@ export function createApp() {
     // that a route added later inherits it.
     .use(`${CORE_NAMESPACE}/audit`, requireDevice)
     .use(`${CORE_NAMESPACE}/audit/*`, requireDevice)
+    // The node's own security posture, same class again: it describes the machine, which is
+    // reconnaissance for anything running in a task.
+    .use(`${CORE_NAMESPACE}/security`, requireDevice)
+    .use(`${CORE_NAMESPACE}/security/*`, requireDevice)
     // Task scope, enforced by MOUNT rather than per handler. A 'task'-scoped internal credential may act
     // only on the task it names (server/auth/internalTokens.ts). An adversarial review confirmed that a
     // per-route guard had been applied at one site out of six, leaving arbitrary shell execution in
@@ -114,6 +119,7 @@ export function createApp() {
     .route(`${CORE_NAMESPACE}/prefs`, prefs)
     .route(`${CORE_NAMESPACE}/plugins`, plugins) // Settings → Plugins: the roster + the per-node toggle
     .route(`${CORE_NAMESPACE}/audit`, audit) // Settings → Security: the append-only trail (security.md § Audit)
+    .route(`${CORE_NAMESPACE}/security`, security) // Settings → Security: this node's posture (security.md § On-disk)
     .route(`${CORE_NAMESPACE}/workspaces`, workspaces)
     .route(`${CORE_NAMESPACE}/tasks`, tasks)
     .route(`${CORE_NAMESPACE}/tasks`, configTrust)

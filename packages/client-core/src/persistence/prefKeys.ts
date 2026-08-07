@@ -34,6 +34,15 @@ export const PrefKeys = {
   editorOpenFilesScoped: 'editor:open-files',
   prFiltersScoped: 'github:pr-filters',
   contextSelectionScoped: 'context:section-selection',
+  // Which nodes' disk-encryption warnings this DEVICE has already been shown (docs/vNext/data.md
+  // § Backup: "the app surfaces a one-time warning if the disk isn't encrypted"). A JSON array of
+  // nodeIds in ONE key rather than a key per node: the fleet is small, and a key-per-node scheme would
+  // need a scoped slice and an eviction rule for a value that is three booleans.
+  //
+  // The DEVICE's, not the node's, and that is the substantive choice. "Have I shown you this?" is a
+  // fact about this installation of the app — a second machine paired with the same node has never seen
+  // the warning and should get it.
+  diskWarningAcked: 'disk_warning_acked',
 } as const
 
 export type PrefKey = (typeof PrefKeys)[keyof typeof PrefKeys]

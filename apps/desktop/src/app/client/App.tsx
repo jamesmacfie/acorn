@@ -24,6 +24,7 @@ import NodeGate from '@acorn/client-core/node/NodeGate.tsx'
 import NodeChip from '@acorn/client-core/node/NodeChip.tsx'
 import { activeNodeId, nodeReady, setActiveNode } from '@acorn/client-core/node/activeNode.ts'
 import { nodes } from '@acorn/client-core/node/fleet.ts'
+import { warnOnceAboutDisk } from '@acorn/client-core/node/nodeSecurity.ts'
 import { applyNodePlugins } from './activate'
 import TaskView from './TaskView'
 import Acorn from '@acorn/client-core/Acorn.tsx'
@@ -163,6 +164,20 @@ export default function App() {
   createEffect(() => {
     const nodeId = activeNodeId()
     if (nodeId) void applyNodePlugins(nodeId)
+  })
+
+  // The one-time disk-encryption warning (docs/vNext/data.md § Backup: "the app surfaces a one-time
+  // warning if the disk isn't encrypted"). Once per (device, node), which is why it sits here beside the
+  // plugin apply rather than at boot: a node the owner pairs later has never been checked, and the same
+  // remount that makes the effect above correct makes this one fire for it.
+  //
+  // `warnOnceAboutDisk` swallows its own failures and records the acknowledgement before pushing, so this
+  // can never be the thing that fails a boot or repeats every launch.
+  createEffect(() => {
+    const nodeId = activeNodeId()
+    if (!nodeId) return
+    const label = nodes().find((candidate) => candidate.nodeId === nodeId)?.label ?? 'This node'
+    void warnOnceAboutDisk(queryClient, nodeId, label)
   })
 
   // Gated on having a node to ask, not on an identity: there is no login. NodeGate below holds the

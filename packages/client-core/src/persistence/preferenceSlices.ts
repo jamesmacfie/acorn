@@ -55,5 +55,9 @@ export const directPreferenceSlices: readonly PersistedStateSlice<unknown>[] = [
   direct('terminal.font-size', PrefKeys.terminalFontSize, 'panes'),
   direct('core.startup-context-injection', PrefKeys.startupContextInjection),
   direct('core.onboarded', PrefKeys.onboarded),
+  // A JSON array, so `direct` (a bare string) rather than `jsonObject` (a record) — the value is read
+  // and written by nodeSecurity's warning gate, which parses it itself. 4 KiB is a few hundred nodeIds,
+  // which is several orders of magnitude more fleet than exists.
+  direct('core.disk-warning-acked', PrefKeys.diskWarningAcked, 'workspace', 4 * 1024),
   jsonObject('agent-tools.permissions', PrefKeys.agentToolPermissions),
 ] as readonly PersistedStateSlice<unknown>[]

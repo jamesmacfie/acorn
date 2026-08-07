@@ -166,3 +166,11 @@
 .plugin-row label { display: flex; align-items: center; gap: var(--space-2); }
 .plugin-name { font-family: var(--font-mono); font-size: var(--fs-sm); }
 .plugin-pending { font-size: var(--fs-xs); }
+
+/* Settings → Security's audit trail. A list rather than a table: the rows have one strong field (what
+   happened) and one weak one (when, by whom, about what), and a table would give six columns equal
+   weight and then wrap them all on a narrow modal. */
+.audit-list { display: flex; flex-direction: column; gap: var(--space-2); margin: 0; padding: 0; list-style: none; }
+.audit-row { display: flex; flex-direction: column; gap: var(--space-1); }
+.audit-action { font-size: var(--fs-sm); }
+.audit-meta { font-size: var(--fs-xs); }
