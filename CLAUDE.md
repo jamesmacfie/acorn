@@ -12,14 +12,17 @@ partitioned per node. V1's bearer-authenticated `/api/v1` automation listener is
 > For the Cloudflare-Workers→Electron migration history and rationale, see
 > [docs/electron.md](./docs/electron.md); current topic docs describe the shipped Electron runtime.
 > vNext Phase 1 landed the protocol v2 / fleet spine; Phase 2 landed core services, the terminal scope-shed,
-> scoped internal tokens, the plugin host and the database split; **Phase 3 is done** — the plugin→plugin
-> baseline is ZERO, the shell imports no feature UI, and context sections are a per-plugin contribution point.
-> Deliberate divergences and — importantly — what has NOT landed are recorded in
-> [docs/vNext/phase1-notes.md](./docs/vNext/phase1-notes.md),
-> [docs/vNext/phase2-notes.md](./docs/vNext/phase2-notes.md) and
-> [docs/vNext/phase3-notes.md](./docs/vNext/phase3-notes.md). Read the Phase 3 notes before touching the
-> client registries or assuming a disabled plugin is safe on the client — that half is unproven, and one
-> security gap (a task-scoped agent can prune the Docker daemon) is open on purpose.
+> scoped internal tokens, the plugin host and the database split; Phase 3 drove the plugin→plugin baseline to
+> ZERO and made context sections a per-plugin contribution point; **Phase 4 is done** — fleet home, the
+> aggregated surfaces, Settings → Nodes/Plugins, the preview tunnel, and a two-node e2e suite that covers
+> every Phase 4 exit criterion. Deliberate divergences and — importantly — what has NOT landed are recorded
+> in [docs/vNext/phase1-notes.md](./docs/vNext/phase1-notes.md),
+> [docs/vNext/phase2-notes.md](./docs/vNext/phase2-notes.md),
+> [docs/vNext/phase3-notes.md](./docs/vNext/phase3-notes.md) and
+> [docs/vNext/phase4-notes.md](./docs/vNext/phase4-notes.md). Read the Phase 4 notes before touching the
+> fleet surfaces: they list five pre-existing bugs the two-node assertions found, and two gaps left open on
+> purpose — **there is no heartbeat on the events socket** (a hung-but-connected node reads `online`
+> forever), and a fan-out sharing a query key must share the value's SHAPE.
 
 ## Architecture (a client, and N nodes)
 

@@ -31,10 +31,10 @@ export const freshnessOf = (state: NodeConnectionState, query: FreshnessQuery = 
   return query.isStale ? 'stale' : 'live'
 }
 
-// PHASE 1 SCOPE: this is rendered in exactly two places — the topbar chip and the Settings → Nodes
-// rows. ui.md's "offline/stale rendering everywhere" across the 13 panes is Phase 4 (plan.md § 116),
-// deliberately not forgotten: threading a freshness prop through every pane before the fleet UX exists
-// would be 13 edits to revisit.
+// Rendered wherever a node-backed surface is: the topbar chip, the Settings → Nodes rows, the Fleet home
+// cards, and — as of Phase 4 — every task pane, through the one piece of chrome they all share
+// (tasks/TaskPaneHost.tsx's `.pane-slot-actions`). It renders only when the state is not `live`, so the
+// healthy case is unchanged. There is deliberately no per-PANE query hook; registries/panes.ts says why.
 export const FRESHNESS_LABELS: Record<Freshness, string> = {
   live: 'Live',
   refreshing: 'Refreshing',

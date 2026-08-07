@@ -23,6 +23,19 @@ import { freshnessOf, type Freshness } from './freshness'
 // and a hook resolves the one from context. `fetchQuery` against an explicitly named client is the only
 // shape that reaches the right cache, and it writes through it, so a later single-node read of the same
 // key is warm.
+//
+// ## The one rule that matters when picking `queryKey`
+//
+// **Sharing a key with another reader means sharing the value's SHAPE.** `fetchQuery` writes through, which is
+// the feature — a fan-out over `tasksKey` warms the same cache the rail and the palette read — and it is also
+// the trap. Fleet home's first version fetched `(await readJson<Task[]>(...)).length` under `tasksKey`, so a
+// NUMBER landed where every other surface expects `Task[]`; the rail, the palette and the workspace-restore
+// effect all began throwing `.find is not a function`, an uncaught render error wedged Solid's flush queue,
+// and the visible symptom was a node badge that never updated. Two-node e2e caught it; nothing else could.
+//
+// So: reuse a domain key when the fetch returns exactly that domain value (fleet home now fetches the task
+// LIST and counts in the component), and use a private key otherwise (`['node-stat', id]`,
+// `['attention', id]`).
 
 // Matches the broker's DEGRADED_AFTER_MS. Past this a node is treated as not-answering for aggregation
 // purposes, whatever its socket says.

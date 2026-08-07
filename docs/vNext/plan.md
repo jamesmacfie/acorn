@@ -145,6 +145,18 @@ The user-visible multi-node experience:
 (stale render + failed mutation kept as draft), revocation mid-session, aggregated surfaces with
 one node down; a remote task's terminal/agent/preview work end-to-end over the LAN.
 
+> **Phase 4 is done.** All six exit criteria are covered (twoNode.spec.ts is 12/12 with the smoke suite),
+> and the three items earlier phases scheduled into this one — the client-side device-prefs tier, freshness
+> beyond Phase 1's two render sites, and word fingerprints — landed with it, as did Phase 3's two open
+> prerequisites. [phase4-notes.md](./phase4-notes.md) records the divergences (tunnels are a dedicated
+> upgrade rather than multiplexed stream frames; the aggregated Agent Center is polled for non-active nodes;
+> a plugin's enabled state is the NODE's) and, more usefully, the **five pre-existing bugs the two-node
+> assertions found** — inbound WS frames ignoring their nodeId, `everOnline` shared across the fleet,
+> module state surviving a node switch, an unclaimed HTTP upgrade leaking its socket, and PullDetail wiping
+> the user's text on a failed mutation. Two gaps are left open on purpose and named there: **there is no
+> heartbeat on the events socket**, so a hung-but-connected node reads `online` indefinitely, and
+> `standalone.ts`'s SIGTERM drain is slow enough that a socket outlives a 30-second poll.
+
 ## Phase 5 — polish, importer, release
 
 - Onboarding flow with the config-only V1 importer (idempotent, resumable, V1 files byte-

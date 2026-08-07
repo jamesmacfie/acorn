@@ -8,8 +8,8 @@ import { openDataRoot, type DataRoot } from './dataRoot'
 import { resolveDatabasePath } from './serverPaths'
 import { configuredPort, devDataDir } from './serverConfig'
 import { ensureCert } from './tls'
-import { attachWsHub, type WsAuthDeps } from './wsHub'
-import { attachTunnel } from './tunnel'
+import { attachWsHub } from './wsHub'
+import { attachTunnel, type TunnelDeps } from './tunnel'
 import { isUpgradeClaimed } from './upgradeClaim'
 import { declaredTunnelPorts } from './tunnelPorts'
 import type { Env } from './bindings'
@@ -93,22 +93,27 @@ export function startListener(runtime: RuntimeBindings, root: DataRoot): Promise
   // `allowedHost` is read at upgrade time by the hub's authorize(), so it is filled in once the port is
   // known — the same "mutable on purpose, read per call" shape service/runtime.ts uses for
   // internalApiEnv.
-  const wsDeps: WsAuthDeps = {
+  // ONE object, shared by both upgrade handlers, and that is not a tidiness choice.
+  //
+  // `allowedHost` is filled in below once the kernel has picked a port, and both handlers read it at upgrade
+  // time — the "mutable on purpose, read per call" shape service/runtime.ts uses for internalApiEnv. The
+  // tunnel was first attached with `{ ...wsDeps, declaredPorts }`, which COPIED `allowedHost` while it was
+  // still the empty string, so its Host guard rejected every upgrade forever. It failed as a bare 403 with
+  // nothing logged on the node, and the two-node e2e is what caught it.
+  const upgradeDeps: TunnelDeps = {
     internalToken: runtime.INTERNAL_TOKEN,
     allowedHost: '',
     devices: runtime.DEVICES,
+    // Derived from what this node already resolves for the task, so the tunnel's allowlist is not a new
+    // configuration surface (main/tunnelPorts.ts).
+    declaredPorts: declaredTunnelPorts(runtime.DB),
   }
-  attachWsHub(server as unknown as import('node:http').Server, wsDeps)
+  attachWsHub(server as unknown as import('node:http').Server, upgradeDeps)
 
   // The preview tunnel (/v2/tunnel) shares the same listener and the same upgrade auth, so a remote task's
   // dev server is reachable from the client without the node exposing anything beyond loopback
   // (main/tunnel.ts explains why this is a dedicated upgrade rather than a multiplexed stream frame).
-  // The port allowlist is derived from what this node already resolves for the task, so there is no new
-  // configuration surface to get wrong.
-  attachTunnel(server as unknown as import('node:http').Server, {
-    ...wsDeps,
-    declaredPorts: declaredTunnelPorts(runtime.DB),
-  })
+  attachTunnel(server as unknown as import('node:http').Server, upgradeDeps)
 
   // Registered LAST, so it runs after both handlers above have had their synchronous chance to claim. An
   // upgrade neither of them owns is destroyed here rather than left open forever — see
@@ -140,7 +145,7 @@ export function startListener(runtime: RuntimeBindings, root: DataRoot): Promise
       const address = server.address()
       if (!address || typeof address === 'string') return reject(new Error('acorn server bound no TCP port'))
       allowedHost = `127.0.0.1:${address.port}`
-      wsDeps.allowedHost = allowedHost
+      upgradeDeps.allowedHost = allowedHost
       root.recordPort(address.port)
       console.log(`acorn server on https://${allowedHost}`)
       server.off('error', onError) // listening — later runtime errors are not listen failures
