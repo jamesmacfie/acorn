@@ -16,9 +16,20 @@ explicit state for the owner to inspect.
 
 ## Providers
 
-Claude and Codex drivers adapt provider protocols into the common session/event model. Provider
-profiles are separate Node plugins used by terminal, agents, and workflows. A profile may be available
-for interactive terminal use without the managed driver being enabled.
+Claude and Codex drivers adapt provider protocols into the common session/event model. A provider
+PROFILE — how to launch the CLI, resume it, run it headless — is registered into a core registry and
+used by terminal, agents, and workflows. A profile may be available for interactive terminal use
+without the managed driver being enabled; `aider` is exactly that case.
+
+**Both are first-party.** The profiles live in `plugins/agents/src/main/profiles/`, and the driver
+registry is not a contribution point: `plugins/agents/src/node/index.ts` registers `claude` and
+`codex` by literal. Adding an agent CLI means a change to plugins/agents.
+
+Until recently each profile was its own workspace package, which read as an extension seam and was
+not one — everything that actually encodes provider knowledge (drivers, normalizers, usage probes,
+pricing) was already inside plugins/agents, so a new profiles package bought a menu entry whose agent
+could not run. Making the driver registry a real contribution point is the change that would open
+this up; the packages were not.
 
 The Node probes provider availability and usage on bounded intervals. Usage and pricing details are
 displayed in the Agent pane; pricing overrides are local preferences and provider prompts/responses
