@@ -1,4 +1,4 @@
-import type { RollbarItemMetadata, RollbarItemSummary } from '@acorn/protocol/api.ts'
+import type { RollbarItemMetadata, RollbarItemSummary } from '../shared/api'
 import type { ExternalRef } from '@acorn/protocol/integrations.ts'
 import {
   itemByCounterPath,

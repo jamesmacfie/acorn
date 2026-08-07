@@ -3,8 +3,8 @@
 // Gated by `providerId` like linear's — visible only with a connected Rollbar integration that can
 // browse.
 import { lazy } from 'solid-js'
-import type { RollbarItemSummary } from '@acorn/protocol/api.ts'
-import { prepareRollbarPromotion } from '@acorn/client-core/integrations/providerPromotion.ts'
+import type { RollbarItemSummary } from '../shared/api'
+import { prepareRollbarPromotion } from './promotion'
 import type { SourceContribution } from '@acorn/client-core/registries/sources.ts'
 import { addTaskLink, createTask } from '@acorn/client-core/tasks/mutations.ts'
 

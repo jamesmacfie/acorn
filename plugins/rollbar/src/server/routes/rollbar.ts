@@ -6,7 +6,7 @@ import type {
   RollbarItemSummary,
   RollbarOccurrenceDetail,
   RollbarOccurrencesResponse,
-} from '@acorn/protocol/api.ts'
+} from '../../shared/api'
 import { ownedConnections } from '@acorn/node-core/server/integrations/connections.ts'
 import { providerResource } from '@acorn/node-core/server/integrations/resourceRuntime.ts'
 import {

@@ -1,4 +1,4 @@
-import type { RollbarItemSummary, RollbarOccurrenceDetail, RollbarOccurrenceSummary } from '@acorn/protocol/api.ts'
+import type { RollbarItemSummary, RollbarOccurrenceDetail, RollbarOccurrenceSummary } from '../shared/api'
 
 // Pure list model for the Rollbar Source browse (docs/frontend.md). P1 filters the loaded active set
 // locally; server-side query syntax is P2. Kept side-effect-free so it is trivially unit-tested.
