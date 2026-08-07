@@ -34,8 +34,19 @@ export const NODE_PAIR = 'acorn:node-pair'
 export const NODE_RENAME = 'acorn:node-rename'
 export const NODE_FORGET = 'acorn:node-forget'
 export const NODE_RECONNECT = 'acorn:node-reconnect'
+export const NODE_RESTART_LOCAL = 'acorn:node-restart-local'
 
-export function registerNodeBrokerIpc(broker: NodeBroker, fleet: FleetStore): () => void {
+export type NodeBrokerIpcDeps = {
+  // Stop and start the supervised local service. Supplied by main/bootstrap.ts, which owns the
+  // ServiceHost and the crash-restart budget — this module must not learn how to spawn anything.
+  //
+  // Only the LOCAL node has one. A remote node is started by launchd, systemd or a shell on another
+  // machine, and nothing this app can do restarts it; Settings → Plugins says "restart required" there
+  // instead, which is honest rather than a button that would lie.
+  restartLocalNode?: () => Promise<void>
+}
+
+export function registerNodeBrokerIpc(broker: NodeBroker, fleet: FleetStore, deps: NodeBrokerIpcDeps = {}): () => void {
   // Bring a remembered node's connection up (or back up). Idempotent: `upsert` tears down any existing
   // connection first, so this doubles as the Reconnect button's implementation.
   const connect = (nodeId: string): void => {
@@ -141,12 +152,21 @@ export function registerNodeBrokerIpc(broker: NodeBroker, fleet: FleetStore): ()
     if (typeof nodeId === 'string') connect(nodeId)
   })
 
+  // Settings → Plugins' Restart button. A plugin's routes, tables and jobs are wired at init, so nothing
+  // short of a restart applies a toggle (plugins.md: "disabling unregisters contributions at next
+  // startup"). The list itself lives in the node's data root, so this needs no argument — the node
+  // re-reads it on the way up.
+  ipcMain.handle(NODE_RESTART_LOCAL, async (): Promise<void> => {
+    if (!deps.restartLocalNode) throw new Error('This build does not supervise a local node.')
+    await deps.restartLocalNode()
+  })
+
   // Bring up every node remembered from a previous launch. The local one is adopted separately, from
   // the service start handoff, because its endpoint is only known once it has bound a port.
   for (const node of fleet.list()) if (!node.local) connect(node.nodeId)
 
   return () => {
-    for (const channel of [NODE_FETCH, FLEET_LIST, NODE_PROBE, NODE_PAIR, NODE_RENAME, NODE_FORGET]) {
+    for (const channel of [NODE_FETCH, FLEET_LIST, NODE_PROBE, NODE_PAIR, NODE_RENAME, NODE_FORGET, NODE_RESTART_LOCAL]) {
       ipcMain.removeHandler(channel)
     }
     ipcMain.removeAllListeners(NODE_ABORT)

@@ -60,3 +60,12 @@ export async function removeNode(nodeId: string, revoke: boolean): Promise<void>
 export function reconnectNode(nodeId: string): void {
   bridge()?.nodeReconnect?.(nodeId)
 }
+
+// Stop and start the supervised local node, so a plugin toggle takes effect (settings/PluginsSettings.tsx).
+// Absent in a plain browser and for every remote node — nothing this app runs restarts another machine's
+// service, which is why the page shows "restart required" there rather than a button that cannot work.
+export const restartLocalNode = async (): Promise<void> => {
+  const restart = bridge()?.nodeRestartLocal
+  if (!restart) throw new Error('This build does not supervise a local node.')
+  await restart()
+}

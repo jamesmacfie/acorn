@@ -78,7 +78,7 @@ export async function bootstrap({ dataDir, createWindow }: BootstrapOptions): Pr
   const push = brokerPushTargets(() => window)
   const broker = new NodeBroker({ frame: push.frame, status: push.status })
   const fleet = new FleetStore(userDataDir)
-  const disposeBrokerIpc = registerNodeBrokerIpc(broker, fleet)
+  const disposeBrokerIpc = registerNodeBrokerIpc(broker, fleet, { restartLocalNode: () => restartLocalNode() })
 
   // Record (or re-record, after a crash restart) the local node and bring its connection up. The
   // endpoint, the certificate and even the token can change between starts now that the port is
@@ -101,6 +101,20 @@ export async function bootstrap({ dataDir, createWindow }: BootstrapOptions): Pr
       token: started.deviceToken,
       ...(node.certPem ? { certPem: node.certPem } : {}),
     })
+  }
+
+  // Settings → Plugins' Restart button (nodeBrokerIpc.ts explains why only the local node has one).
+  //
+  // It goes through the same `startService` as boot and crash recovery, so the node re-reads its
+  // disabled-plugins file on the way up and `adoptLocalNode` re-records the endpoint, certificate and
+  // token — all three can change across a restart now that the port is ephemeral. Not routed through
+  // `recover()`, deliberately: this is a deliberate restart, and spending one of the five crashes in the
+  // ten-minute budget on it would mean a few plugin toggles could trip the recovery screen.
+  const restartLocalNode = async (): Promise<void> => {
+    if (disposed) return
+    await service.stop()
+    await startService()
+    if (window && !window.isDestroyed()) window.webContents.reload()
   }
 
   const dispose = async (): Promise<void> => {

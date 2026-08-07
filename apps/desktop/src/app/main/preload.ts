@@ -46,6 +46,9 @@ contextBridge.exposeInMainWorld('acorn', {
   nodeRename: (nodeId: string, label: string) => ipcRenderer.invoke('acorn:node-rename', { nodeId, label }),
   nodeForget: (nodeId: string, revoke: boolean) => ipcRenderer.invoke('acorn:node-forget', { nodeId, revoke }),
   nodeReconnect: (nodeId: string) => ipcRenderer.send('acorn:node-reconnect', nodeId),
+  // Settings → Plugins' Restart button. Takes no nodeId: only the LOCAL node is supervised by this app,
+  // and a remote node is restarted by whatever started it (nodeBrokerIpc.ts).
+  nodeRestartLocal: (): Promise<void> => ipcRenderer.invoke('acorn:node-restart-local'),
   // Node recovery screen (client-core/node/NodeGate.tsx). Only reachable when there is no node to
   // talk to, which is also why `quit` cannot go through the renderer's will-quit prompt: the shell
   // that answers it is not mounted.

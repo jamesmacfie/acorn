@@ -74,6 +74,7 @@ declare global {
       nodeRename?: (nodeId: string, label: string) => Promise<NodeRecord | null>
       nodeForget?: (nodeId: string, revoke: boolean) => Promise<void>
       nodeReconnect?: (nodeId: string) => void
+      nodeRestartLocal?: () => Promise<void>
       // The two native actions the node recovery screen offers (node/NodeGate.tsx). Neither is
       // expressible in the renderer: one reveals a path in Finder, the other has to bypass the
       // will-quit prompt, whose handler lives in a shell that is not mounted behind the gate.
