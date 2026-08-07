@@ -174,6 +174,23 @@ export const managedAgentStore = {
   },
   upsertSession,
   removeSession,
+  // Drop every node-scoped entry. Called on a node switch (apps/desktop's scopedEviction.ts): sessions,
+  // snapshots and session ids are all minted by ONE node, and two nodes may hold the same UUID by
+  // construction (docs/vNext/architecture.md § Fleet semantics) — so without this the Agent Center
+  // rendered node A's roster under node B and `loadSnapshot` could merge B's transcript into A's cached
+  // snapshot for a colliding id.
+  //
+  // The dedupe sets go too: `noticedEventIds` suppressing a notice and `deletedSessionIds` suppressing an
+  // upsert are both judgements about one node's ids, and keeping them would silently swallow the new
+  // node's first events for any id that collided.
+  clear(): void {
+    setSessions([])
+    setSnapshots({})
+    noticedEventIds.clear()
+    deletedSessionIds.clear()
+    for (const timer of snapshotRefreshTimers.values()) clearTimeout(timer)
+    snapshotRefreshTimers.clear()
+  },
 }
 
 // Agent attention is workspace-wide, so the renderer keeps one application-lifetime subscription

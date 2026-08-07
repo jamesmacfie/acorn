@@ -41,9 +41,13 @@ const dockerExecSubs = new Map<string, (event: DockerExecEvent) => void>()
 const reconnectSubs = new Set<() => void>()
 
 let bridged = false
-// Whether the broker's socket has been up at least once. A transition to online AFTER that is a
-// reconnect, and reconnect means both re-attach and refetch; the first connect means neither.
-let everOnline = false
+// Which nodes' sockets have been up at least once. A transition to online AFTER that is a reconnect, and
+// reconnect means both re-attach and refetch; the first connect means neither.
+//
+// Per node, not one flag. A single boolean was set by whichever node connected first, so a SECOND node's
+// very first connect read as a reconnect: it re-attached every PTY subscription and told the shell to
+// refetch, both against the active node, for an event that had nothing to do with it.
+const everOnline = new Set<string>()
 
 function rawSend(frame: WsClientFrame): void {
   const nodeId = activeNodeId()
@@ -61,13 +65,30 @@ function connect(): void {
   if (!bridge?.onNodeFrame) return
   bridged = true
 
-  bridge.onNodeFrame((_nodeId, raw) => dispatch(raw))
+  // The nodeId is a FILTER, not decoration. Main opens a socket to every paired node and pushes every
+  // frame here, and this module's subscriber maps are keyed on session/container/exec ids alone — so
+  // before this, node B's `term:out` for a session id that happened to collide fed node A's xterm, and
+  // its `agent:*` frames mutated the managed-session store the Agent Center renders for A.
+  // architecture.md § Fleet semantics: "Two nodes may coincidentally hold the same UUID; that must never
+  // collide in the client." The QueryClient partition made that true for cached data; this makes it true
+  // for the live stream.
+  //
+  // Dropping rather than routing is right for now: only the active node's surfaces are subscribed, so a
+  // frame from any other node has no consumer. A fleet-wide live surface would need a nodeId in the
+  // subscription key, not a wider filter here.
+  bridge.onNodeFrame((nodeId, raw) => {
+    if (nodeId !== activeNodeId()) return
+    dispatch(raw)
+  })
   bridge.onNodeStatus?.((status) => {
     if (status.state !== 'online') return
-    if (!everOnline) {
-      everOnline = true
+    if (!everOnline.has(status.nodeId)) {
+      everOnline.add(status.nodeId)
       return
     }
+    // A reconnect of some OTHER node must not re-attach this node's PTYs or refetch its queries: every
+    // `rawSend` below addresses the active node, and `reconnectSubs` invalidates the active node's cache.
+    if (status.nodeId !== activeNodeId()) return
     // Re-attach every live subscription: the node treats attach as idempotent per connection, so this
     // re-subscribes each PTY and restores its display snapshot.
     for (const id of outputSubs.keys()) rawSend({ channel: 'term:attach', id })
@@ -114,7 +135,7 @@ export function wsOnReconnect(cb: () => void): () => void {
 // Test seam: this module's singletons outlive a single test otherwise.
 export function _resetWsClient(): void {
   bridged = false
-  everOnline = false
+  everOnline.clear()
   outputSubs.clear()
   statusSubs.clear()
   noticeSubs.clear()

@@ -54,6 +54,16 @@ export const evictActiveTerminal = (taskId: string): void => {
   activeByTask.delete(taskId)
 }
 
+// Drop everything on a node switch. Terminal sessions are keyed by an opaque node-minted id and the
+// rail, the topbar badge and both archive/quit concerns read this list — so node A's running sessions
+// were being counted against node B's tasks, up to and including blocking an archive with "2 active
+// sessions" that belong to another machine. `initSessions` refetches immediately for the new node, which
+// is why clearing is right here where keying by node would be right for a durable preference.
+export function clearSessions(): void {
+  setSessions([])
+  activeByTask.clear()
+}
+
 export const requestTerminalFocus = (taskId: string, sessionId: string): void => requestTerminalFocusIntent(taskId, sessionId)
 
 // Target-picker data for sendToAgent (docs/panes.md): the task's running agent sessions,
