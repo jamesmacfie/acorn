@@ -3,7 +3,7 @@ import { gh, ghError } from '..'
 import type { AppEnv } from '@acorn/node-core/server/middleware/auth.ts'
 import { ownerId } from '@acorn/node-core/server/middleware/requireUser.ts'
 import { respondError } from '@acorn/node-core/server/respond.ts'
-import type { RunJobs } from '@acorn/protocol/api.ts'
+import type { RunJobs } from '../../contract/api'
 import { githubToken } from '../githubToken'
 
 // Read-only Actions endpoints for the checks side panel. Writes (rerun) live in prActions.ts.

@@ -1,4 +1,4 @@
-import type { Pull } from '@acorn/client-core/queries.ts'
+import type { Pull } from '../../contract/api'
 
 // Client-side text filter over the loaded tab. This intentionally stays local to
 // the current PR list; older PR search/pagination belongs in the server workflow.

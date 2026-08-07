@@ -1,6 +1,6 @@
 import { and, eq, inArray } from 'drizzle-orm'
 import { Hono } from 'hono'
-import type { PullBatchFilesMode, PullBatchItem, PullBatchRequest } from '@acorn/protocol/api.ts'
+import type { PullBatchFilesMode, PullBatchItem, PullBatchRequest } from '../../contract/api'
 import { filesResource, prResource } from '../resourceKeys'
 import { ghError, ghGraphQL } from '..'
 import type { AppEnv } from '@acorn/node-core/server/middleware/auth.ts'

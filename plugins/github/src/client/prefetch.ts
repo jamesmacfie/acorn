@@ -6,8 +6,8 @@
 // Best-effort: any failure just leaves that PR to load on first visit. Abortable, so a repo switch
 // cancels the in-flight warm-up (the caller aborts on cleanup).
 import type { QueryClient } from '@tanstack/solid-query'
-import { fileSummariesKey, pullKey, pullsBatchRoute, type PullBatchItem, type PullBatchRequest } from '@acorn/protocol/api.ts'
-import { pullsOptions } from '@acorn/client-core/queries.ts'
+import { fileSummariesKey, pullKey, pullsBatchRoute, type PullBatchItem, type PullBatchRequest } from '../contract/api'
+import { pullsOptions } from './queries'
 import { writeJson } from '@acorn/client-core/apiClient.ts'
 
 const CHUNK = 5 // PRs per batch request (one GitHub GraphQL round-trip server-side)

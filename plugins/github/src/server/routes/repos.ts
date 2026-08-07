@@ -1,6 +1,6 @@
 import { and, eq } from 'drizzle-orm'
 import { Hono } from 'hono'
-import type { Repo } from '@acorn/protocol/api.ts'
+import type { Repo } from '../../contract/api'
 import { reposResource } from '../resourceKeys'
 import type { AppEnv } from '@acorn/node-core/server/middleware/auth.ts'
 import { ownerId } from '@acorn/node-core/server/middleware/requireUser.ts'

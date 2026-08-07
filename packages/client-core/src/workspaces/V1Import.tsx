@@ -1,6 +1,7 @@
 import { createResource, createSignal, Show } from 'solid-js'
 import { useQueryClient } from '@tanstack/solid-query'
-import { coreImportV1Route, reposKey, type V1ImportProbe, type V1ImportReport } from '@acorn/protocol/api.ts'
+import { coreImportV1Route, type V1ImportProbe, type V1ImportReport } from '@acorn/protocol/api.ts'
+import { reposKey } from '../queries'
 import { workspaceAssignmentsKey, workspacesKey } from '../queries'
 import { readJson, writeJson } from '../apiClient'
 

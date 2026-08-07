@@ -1,6 +1,6 @@
 import { performance } from 'node:perf_hooks'
 import { describe, expect, it } from 'vitest'
-import type { PullDetail, PullFile, Thread } from '@acorn/client-core/queries.ts'
+import type { PullDetail, PullFile, Thread } from '../../contract/api'
 import { buildConversationEntries, buildThreadSnippetIndex, hasRenderableBody, reviewAction, threadSnippet, threadSnippetFromIndex } from './model'
 
 const baseDetail = (overrides: Partial<PullDetail> = {}): PullDetail => ({

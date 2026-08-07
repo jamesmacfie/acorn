@@ -1,7 +1,7 @@
 import { createEffect, createMemo, createSignal, For, on, onCleanup, Show } from 'solid-js'
 import { createQuery } from '@tanstack/solid-query'
 import { useParams, useSearchParams } from '@solidjs/router'
-import { compareOptions, reposOptions } from '@acorn/client-core/queries.ts'
+import { compareOptions, reposOptions } from './queries'
 import { getHighlighter } from '@acorn/client-core/highlight/shiki.ts'
 import { DiffLine, NonCodeRow } from '@acorn/client-core/ui/diff/DiffRows.tsx'
 import { createDiffHydrator } from '@acorn/client-core/ui/diff/hydration.ts'

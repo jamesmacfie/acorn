@@ -7,7 +7,8 @@ const jsonResponse = (body: unknown, status = 200) =>
     headers: { 'Content-Type': 'application/json' },
   })
 
-describe('client query options', () => {
+// Moved here from @acorn/client-core/queries.test.ts with the factories it covers.
+describe('github query options', () => {
   afterEach(() => {
     vi.unstubAllGlobals()
   })

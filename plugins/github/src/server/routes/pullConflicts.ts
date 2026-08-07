@@ -1,6 +1,6 @@
 import { gitOrThrow } from '@acorn/node-core/main/core/git.ts'
 import { Hono } from 'hono'
-import type { PullConflicts } from '@acorn/protocol/api.ts'
+import type { PullConflicts } from '../../contract/api'
 import type { CoreServices } from '@acorn/node-core/main/core/index.ts'
 import type { AppEnv } from '@acorn/node-core/server/middleware/auth.ts'
 import { ownerId } from '@acorn/node-core/server/middleware/requireUser.ts'
