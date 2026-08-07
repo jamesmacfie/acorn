@@ -278,9 +278,11 @@ export async function startServiceRuntime({ config, desktop, stateChanged }: Run
     wireConfigTrust(db)
     // wireContextSections is GONE. Context sections are a per-plugin contribution point now
     // (server/plugin/types.ts § PluginContextSectionRegistry): github registers `pr`, notes registers
-    // `notes`, memory registers `memory`, and wireAgentTools below registers core's own `issues`. This call
-    // was the last place that had to hold three plugins' seams at once, which was the whole reason neither
-    // notes nor memory could own its own half.
+    // `notes`, memory registers `memory`, and core's own `issues` registers itself at module scope in
+    // contextSections.ts. It used to be registered by wireAgentTools below, which meant server/standalone.ts
+    // — a node that runs initPlugins and nothing else — booted without it. This call was the last place that
+    // had to hold three plugins' seams at once, which was the whole reason neither notes nor memory could own
+    // its own half.
     // Only the tools no plugin can own, which after preview's conversion is core's own six alone: the
     // context-read group and the two repo reads. changes, memory, notes, preview, terminal and workflows
     // register their own inside initPlugins above — which is why this bag no longer holds the memory index,

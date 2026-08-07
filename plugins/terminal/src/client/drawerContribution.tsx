@@ -21,8 +21,16 @@ export const terminalDrawerContribution: UiSlotContribution = {
   // browser (dev:node). The slot host filters on this, so the component never mounts to discover it.
   requires: 'terminal',
   when: (context) => context.terminalOpen,
-  // `toggleTerminal`, where the shell passed an explicit `setTerminalOpen(id, false)`. Equivalent here and
-  // only here: `when` guarantees this is mounted solely while the drawer is open, so the toggle can only go
-  // open → closed. The shell's own close affordances still call it the same way.
-  component: (props) => <TerminalPanel task={props.context.activeTask} onClose={props.context.toggleTerminal} />,
+  // `closeTerminal`, not `toggleTerminal`. This was `toggleTerminal` with a comment arguing the two were
+  // equivalent because `when` guarantees the drawer is open while this is mounted, so a toggle could only go
+  // open → closed. That argument does not survive TerminalPanel.closeTab, which decides to close the drawer
+  // AFTER two awaits (`await api.remove(id)` then `await refreshSessions()`): close the last two tabs in quick
+  // succession and both continuations see an empty roster, so `onClose` fires twice. The first toggle closes
+  // the drawer, the second reopens it — into an empty drawer, where onMount auto-launches the rail's default
+  // profile. A stray PTY, from closing a tab.
+  //
+  // An idempotent `closeTerminal` on the slot context rather than a `props.context.terminalOpen` check here:
+  // the guard belongs with the state, the shell already had the mirror form for its open affordance, and
+  // "close" is what this call site actually means.
+  component: (props) => <TerminalPanel task={props.context.activeTask} onClose={props.context.closeTerminal} />,
 }

@@ -7,8 +7,9 @@
 // App.tsx used to render the three-pane review layout in its `<Switch>` fallback and import five of this
 // plugin's components to do it, because client-core/tabs/sources.ts hardcoded `github` ahead of the source
 // registry while every other Source went through `<Dynamic>`. Now github is an ordinary source and the
-// hardcoding is gone — which is also why this plugin must sit FIRST in apps/desktop's client plugin list:
-// rail order is registration order, and GitHub leads it.
+// hardcoding is gone. Phase 3 replaced it with a rule that this plugin had to sit FIRST in apps/desktop's
+// client plugin list, because rail order was registration order; that is no longer true either — the source
+// declares `order` and this plugin's position in the list means nothing.
 import { lazy } from 'solid-js'
 import type { ClientPlugin } from '@acorn/client-core/registries/plugin.ts'
 import { linearContentLinkContribution, contentLinkRegistry } from './contentLinks'
@@ -28,7 +29,9 @@ export const githubClientPlugin: ClientPlugin = {
     //
     // No `promotion` either: github's browse creates a task inline from its PR list (seeding provider links
     // as it goes) rather than through PromoteToTaskModal, so there is nothing for the registry to hold.
-    ctx.sources.register({ id: 'github', glyph: '◇', label: 'GitHub', component: GithubBrowse, defaultPane: 'pr' })
+    // `order: 10` is what puts GitHub at the head of the rail. Declared, so it survives this plugin being
+    // moved anywhere in the client plugin list.
+    ctx.sources.register({ id: 'github', order: 10, glyph: '◇', label: 'GitHub', component: GithubBrowse, defaultPane: 'pr' })
     ctx.panes.register(prPaneContribution)
     ctx.slots.register(pullFilePaletteSlotContribution)
     ctx.persistedState.register(prFiltersSlice)
@@ -37,11 +40,15 @@ export const githubClientPlugin: ClientPlugin = {
     // beside it; having linear register it would mean linear importing github's client internals — a
     // new plugin→plugin edge, and the boundary ledger may shrink but never grow.
     //
+    // Through `ctx.contribute`, not `contentLinkRegistry.register` directly. `contentLinkRegistry` is this
+    // plugin's own, so client-core cannot name it as a contribution point — but registering it by hand meant
+    // the host held no disposable for it, and that has two consequences: Phase 4's disable could not take this
+    // one contribution back, and a re-activation would hit the registry's duplicate-id throw. The
+    // `if (!get(id))` probe that used to sit here was papering over exactly that.
+    //
     // Unconditional, exactly as before: the app registered it as part of an integration-provider
     // record that was itself registered unconditionally. Recognising a linear.app URL with no Linear
     // connection just opens a panel that reports there is none.
-    if (!contentLinkRegistry.get(linearContentLinkContribution.id)) {
-      contentLinkRegistry.register(linearContentLinkContribution)
-    }
+    ctx.contribute(contentLinkRegistry, linearContentLinkContribution)
   },
 }

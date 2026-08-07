@@ -243,17 +243,18 @@ test('S1 boots the authenticated desktop shell with no console errors', async ()
   await running.page.reload()
   await expect(running.page.locator('.brand')).toContainText('acorn')
   expect(errors).toEqual([])
-  // The rail's Sources, which is the only place a client plugin's registration is observable before a
-  // task exists — and the only registry whose visible order is registration order rather than a sorted
-  // `order` field (client-core/tabs/sources.ts appends unsorted). ALL FOUR are plugin contributions as of
-  // Phase 3: GitHub used to be a hardcoded literal inside `availableSources`, outside the registry, which is
-  // what made it the one Source the shell rendered itself.
+  // The rail's Sources, which is the only place a client plugin's registration is observable before a task
+  // exists. ALL FOUR are plugin contributions as of Phase 3: GitHub used to be a hardcoded literal inside
+  // `availableSources`, outside the registry, which is what made it the one Source the shell rendered itself.
   //
-  // This is deliberately an ORDER assertion, not a membership one, and it is now the ONLY check that github
-  // still sits first: its position is guaranteed by nothing but its position in
-  // apps/desktop/src/app/client/plugins.ts. Reordering that list silently reorders the rail, and vitest cannot
-  // catch it — the plugin entrypoints import .tsx modules it has no transform for, which is also why the
-  // client half of Phase 3's "cycle every plugin disabled" criterion lives here rather than in vitest.
+  // What this assertion is, and is NOT. It proves the four ungated sources are registered and reach the DOM
+  // through a real Electron render, which no vitest test in this repo can do. It does NOT prove the rail's
+  // ORDER, and Phase 3's comment here claiming it was the only such check was wrong: `availableSources` hides a
+  // provider-gated source with no connected integration and this fixture connects none, so linear and rollbar —
+  // github's two immediate neighbours in the plugin list — are absent from this list entirely. Reordering the
+  // list to put linear first passed. Order is a declared `SourceContribution.order` now, checked directly in
+  // client-core/tabs/sources.test.ts with every gated source connected, and this list is a membership-plus-shape
+  // check on the four that survive the gate.
   await expect(running.page.locator('.tabrail-source').first()).toBeVisible()
   const railSources = await running.page.locator('.tabrail-source')
     .evaluateAll((buttons) => buttons.map((button) => button.getAttribute('aria-label')))

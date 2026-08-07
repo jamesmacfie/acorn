@@ -3,8 +3,7 @@ import { createQuery, useIsRestoring, useQueryClient } from '@tanstack/solid-que
 import { useMatch, useNavigate, useParams } from '@solidjs/router'
 import { Dynamic } from 'solid-js/web'
 import { clear } from 'idb-keyval'
-import { readJson } from '@acorn/client-core/apiClient.ts'
-import { filesKey, forceRefreshPull, pinsOptions, prefsOptions, pullKey, pullsKey, pullsRoute, pullsPrefixKey, reposOptions, tasksOptions, workspacesKey, workspacesOptions, type Pull } from '@acorn/client-core/queries.ts'
+import { pinsOptions, prefsOptions, reposOptions, tasksOptions, workspacesKey, workspacesOptions } from '@acorn/client-core/queries.ts'
 import { bootstrapWorkspaces } from '@acorn/client-core/workspaces/mutations.ts'
 import RepoPicker from '@acorn/client-core/ui/RepoPicker.tsx'
 import WorkspacePicker from '@acorn/client-core/ui/WorkspacePicker.tsx'
@@ -66,6 +65,13 @@ export default function App() {
   const toggleTerm = () => {
     const id = activeTaskId()
     if (id) setTerminalOpen(id, !isTerminalOpen(id))
+  }
+  // Idempotent, unlike the toggle. The drawer contribution closes itself when its last tab goes, and that path
+  // can fire twice (TerminalPanel.closeTab decides after two awaits, so two racing closes both see an empty
+  // roster) — a second toggle would reopen the drawer and auto-launch a profile into it.
+  const closeTerm = () => {
+    const id = activeTaskId()
+    if (id) setTerminalOpen(id, false)
   }
 
   // Shell-owned commands are registered once; the single dispatcher below owns the only global
@@ -221,6 +227,7 @@ export default function App() {
     taskActive: inTaskView(),
     terminalOpen: termOpen(),
     toggleTerminal: toggleTerm,
+    closeTerminal: closeTerm,
     openSettings,
     activeTask: activeTask(),
     selectTask: (taskId) => {
@@ -244,35 +251,11 @@ export default function App() {
     window.location.reload()
   }
 
-  const [refreshingPulls, setRefreshingPulls] = createSignal(false)
-  const [refreshingPull, setRefreshingPull] = createSignal(false)
-  async function refreshAllPulls() {
-    if (!params.owner || !params.repo) return
-    setRefreshingPulls(true)
-    try {
-      const data = await readJson<Pull[]>(`${pullsRoute(params.owner, params.repo, 'open')}&force=true`)
-      queryClient.setQueryData(pullsKey(params.owner, params.repo, 'open'), data)
-    } finally {
-      setRefreshingPulls(false)
-    }
-  }
-  async function refreshCurrentPull() {
-    if (!params.owner || !params.repo || !params.number) return
-    setRefreshingPull(true)
-    try {
-      const { detail, files } = await forceRefreshPull(params.owner, params.repo, params.number)
-      queryClient.setQueryData(pullKey(params.owner, params.repo, params.number), detail)
-      queryClient.setQueryData(filesKey(params.owner, params.repo, params.number), files)
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: pullsPrefixKey(params.owner, params.repo) }),
-        // Linked Linear tickets (list enrichment + any open detail) — refetch their status too.
-        queryClient.invalidateQueries({ queryKey: ['linear-issues'] }),
-        queryClient.invalidateQueries({ queryKey: ['linear-issue'] }),
-      ])
-    } finally {
-      setRefreshingPull(false)
-    }
-  }
+  // The two force-refresh handlers that used to live here (refreshAllPulls / refreshCurrentPull, with their
+  // `refreshing*` signals) are GONE, not moved: Phase 3 COPIED them into plugins/github's GithubBrowse.tsx along
+  // with the rest of the three-pane layout, and left these behind unreferenced. Nothing rendered the buttons that
+  // called them once the shell stopped rendering the browse surface, so they were dead code holding the shell's
+  // last four imports of github query keys.
 
   // Hold the bare gate until there is a node AND the persisted cache has finished rehydrating. The
   // second half is not about auth — it never was: rendering mid-restore flashes empty panes that fill

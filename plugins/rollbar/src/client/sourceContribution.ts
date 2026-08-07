@@ -12,6 +12,9 @@ const RollbarBrowse = lazy(() => import('./RollbarBrowse'))
 
 export const rollbarSourceContribution: SourceContribution<RollbarItemSummary> = {
   id: 'rollbar',
+  // Rail position, declared (registries/sources.ts § order). Was implied by this plugin's place in
+  // apps/desktop/src/app/client/plugins.ts.
+  order: 30,
   providerId: 'rollbar',
   glyph: '◍',
   label: 'Rollbar',

@@ -78,6 +78,20 @@ export type ClientPluginContext = {
   agentToolRenderers: ClientContributionPoint<AgentToolRendererContribution>
   pollers: ClientContributionPoint<PollerContribution>
   persistedState: ClientContributionPoint<PersistedStateSlice<unknown>>
+  // Registration into a registry client-core does not own — a registry a PLUGIN publishes.
+  //
+  // There is exactly one today: plugins/github's `contentLinkRegistry`, which decides which hrefs inside
+  // rendered markdown acorn opens itself. It cannot be a named member above, because client-core would have to
+  // import the plugin's type to declare it, which is the dependency direction the whole plugin API exists to
+  // prevent. Before this it was registered by calling `contentLinkRegistry.register(...)` directly, so the host
+  // held no disposable — meaning Phase 4's disable could not take it back and a re-activation appended a second
+  // copy (which the registry's duplicate-id guard turns into a throw, so re-enabling github would have failed
+  // the boot).
+  //
+  // Same rules as every named point: the provider-ownership check applies and the host owns the disposable. It
+  // is not a general escape hatch — the constraint is only that client-core cannot NAME the registry's type,
+  // not that the contribution gets to skip the rules.
+  contribute<T extends { id: string }>(registry: Registry<T>, entry: T): void
 }
 
 export type ClientPlugin = {
@@ -151,16 +165,19 @@ function makeContext(name: string, record: (disposable: Disposable) => void): Cl
     agentToolRenderers: own(agentToolRendererRegistry),
     pollers: own(pollerRegistry),
     persistedState: own(persistedStateRegistry),
+    // Straight through `own`, so a plugin-published registry gets the identical treatment: ownership checked,
+    // disposable recorded. The only difference from the members above is that the registry arrives as an
+    // argument instead of being named here.
+    contribute: (registry, entry) => own(registry).register(entry),
   }
 }
 
 // Runs every enabled plugin's init, in declaration order.
 //
-// Declaration order IS observable here, unlike on the node side, and in exactly one place: the rail's
-// Source order is `sourceRegistry.entries()` in registration order (tabs/sources.ts prepends GitHub
-// and appends the rest unsorted). Everything else sorts — panes and settings pages by `order`, slots
-// by `order` within a slot, agent contexts by label — so the list's order is load-bearing for the rail
-// and for nothing else. apps/desktop/src/app/client/plugins.ts says so at the top.
+// Declaration order is observable NOWHERE, which matches the node side. It used to be observable in exactly one
+// place — the rail's Source order was `sourceRegistry.entries()` unsorted — and `SourceContribution.order`
+// closed that: every client registry now sorts on a declared field (panes and settings pages by `order`, slots
+// by `order` within a slot, palette rows by `order`, agent contexts by label, sources by `order`).
 export function initClientPlugins(
   plugins: readonly ClientPlugin[],
   options: ClientPluginHostOptions = {},

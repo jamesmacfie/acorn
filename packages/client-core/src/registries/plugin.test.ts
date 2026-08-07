@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { paneRegistry, type PaneContribution } from './panes'
 import { initClientPlugins, type ClientPlugin } from './plugin'
+import { Registry } from './registry'
 import { sourceRegistry, type SourceContribution } from './sources'
 import { uiSlotRegistry } from './slots'
 
@@ -17,6 +18,7 @@ const pane = (id: string, extra: Partial<PaneContribution> = {}): PaneContributi
 
 const source = (id: string, extra: Partial<SourceContribution<never>> = {}): SourceContribution<never> => ({
   id,
+  order: 1,
   glyph: 'x',
   label: id,
   promotion: {
@@ -33,15 +35,18 @@ const clear = (...names: string[]) =>
   initClientPlugins(names.map((name) => ({ name, init: () => {} })))
 
 describe('the client plugin host', () => {
-  it('runs init in declaration order, which is what fixes the rail Source order', () => {
+  it('runs init in declaration order, which no registry order depends on', () => {
     const order: string[] = []
     initClientPlugins([
       { name: 'first', init: (ctx) => { order.push('first'); ctx.sources.register(source('host.first')) } },
       { name: 'second', init: (ctx) => { order.push('second'); ctx.sources.register(source('host.second')) } },
     ])
     expect(order).toEqual(['first', 'second'])
-    // The rail reads sourceRegistry.entries() unsorted (tabs/sources.ts), so this ordering IS the
-    // user-visible one. Compared as the tail of the list because other tests may have registered too.
+    // Registration order is still what it is — the point is only that nothing user-visible reads it any more.
+    // It used to: the rail read `sourceRegistry.entries()` unsorted, so this list WAS the rail. `availableSources`
+    // sorts on the declared `SourceContribution.order` now (tabs/sources.test.ts pins that), which is why this
+    // case no longer doubles as the rail-order test. Compared as the tail of the list because other tests may
+    // have registered too.
     const ids = sourceRegistry.entries().map((entry) => entry.id).filter((id) => id.startsWith('host.'))
     expect(ids).toEqual(['host.first', 'host.second'])
     clear('first', 'second')
@@ -101,5 +106,34 @@ describe('the client plugin host', () => {
     expect(paneRegistry.get('host.toggled')).toBeDefined()
     initClientPlugins(plugins, { disabled: ['toggled'] })
     expect(paneRegistry.get('host.toggled')).toBeUndefined()
+  })
+
+  // `contribute` is for a registry a PLUGIN publishes, which client-core cannot name as a member without
+  // importing the plugin's type. plugins/github's contentLinkRegistry is the one instance. It used to be written
+  // by calling `register` on it directly, so the host held no disposable — which is why an `if (!get(id))` probe
+  // had grown around the call site, papering over the re-activation throw. These are the two properties the
+  // named points have and that call site did not.
+  it('tracks a plugin-published registry the same as its own, so disable and re-activation both work', () => {
+    const plugin: Registry<{ id: string; note: string }> = new Registry('plugin-owned')
+    const plugins: ClientPlugin[] = [
+      { name: 'publisher', init: (ctx) => ctx.contribute(plugin, { id: 'host.owned', note: 'x' }) },
+    ]
+    initClientPlugins(plugins)
+    expect(plugin.get('host.owned')).toBeDefined()
+    // Re-activation replaces rather than appending — a second bare `register` would throw on the duplicate id.
+    expect(() => initClientPlugins(plugins)).not.toThrow()
+    expect(plugin.entries()).toHaveLength(1)
+    // And Phase 4's disable can take it back, which a hand-registered contribution could not be.
+    initClientPlugins(plugins, { disabled: ['publisher'] })
+    expect(plugin.get('host.owned')).toBeUndefined()
+  })
+
+  it('applies the provider-ownership rule to a plugin-published registry too', () => {
+    const plugin: Registry<{ id: string; providerId?: string }> = new Registry('plugin-owned-2')
+    expect(() => initClientPlugins([
+      { name: 'github', init: (ctx) => ctx.contribute(plugin, { id: 'host.stamped', providerId: 'linear' }) },
+    ])).toThrow(/registered 'host.stamped' under provider 'linear'/)
+    expect(plugin.entries()).toEqual([])
+    clear('github')
   })
 })

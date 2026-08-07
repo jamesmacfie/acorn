@@ -14,6 +14,9 @@ const LinearBrowse = lazy(() => import('./LinearBrowse'))
 
 export const linearSourceContribution: SourceContribution<LinearProjectIssue> = {
   id: 'linear',
+  // Rail position, declared (registries/sources.ts § order). Was implied by this plugin's place in
+  // apps/desktop/src/app/client/plugins.ts.
+  order: 20,
   providerId: 'linear',
   glyph: '◷',
   label: 'Linear',

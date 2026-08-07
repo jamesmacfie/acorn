@@ -8,9 +8,14 @@ export type InAppTarget =
   | { kind: 'pr'; owner: string; repo: string; number: string }
   | { kind: 'repo'; owner: string; repo: string }
 
+// No `providerId`. It carried one (`'linear'` on the recogniser below) and nothing ever read it — `parseInAppTarget`
+// iterates the registry and calls `parse`, full stop. It had to go once this registry started being written through
+// `ClientPluginContext.contribute`, because the plugin host's ownership rule reads that field and would reject
+// github registering a contribution stamped with linear's id. That rule is right, and this field was wrong: the
+// recogniser belongs to github (it lives here, beside the two built-in GitHub patterns, so that linear does not
+// have to import github's client internals), and `id: 'linear.issue'` already says what it recognises.
 export type ContentLinkContribution = {
   id: string
-  providerId?: string
   parse: (href: string) => InAppTarget | null
 }
 
@@ -25,7 +30,6 @@ const GH_RESERVED = new Set(['orgs', 'sponsors', 'settings', 'notifications', 'm
 
 export const linearContentLinkContribution: ContentLinkContribution = {
   id: 'linear.issue',
-  providerId: 'linear',
   parse: (href) => {
     const match = LINEAR_ISSUE_RE.exec(href)
     return match ? { kind: 'linear', identifier: match[1].toUpperCase() } : null
