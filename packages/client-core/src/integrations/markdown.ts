@@ -42,10 +42,10 @@ export function renderMarkdown(src: string): string {
   let i = 0
   while (i < lines.length) {
     const line = lines[i]
-    if (/^```/.test(line.trim())) {
+    if (line.trim().startsWith('```')) {
       const buf: string[] = []
       i++
-      while (i < lines.length && !/^```/.test(lines[i].trim())) buf.push(lines[i++])
+      while (i < lines.length && !lines[i].trim().startsWith('```')) buf.push(lines[i++])
       i++ // closing fence
       out.push(`<pre><code>${esc(buf.join('\n'))}</code></pre>`)
       continue

@@ -3,7 +3,6 @@ import type { NodeProbeResult } from '@acorn/protocol/broker.ts'
 import { nodes, nodeStatus } from '../node/fleet'
 import { fleetMutable, pairNode, probeNodeEndpoint, reconnectNode, removeNode, renameNode } from '../node/fleetActions'
 import { fingerprintPhrase } from '../node/fingerprintWords'
-import NodeDevices from './NodeDevices'
 import NodeChip from '../node/NodeChip'
 import '../node/nodes.css'
 

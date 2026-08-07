@@ -40,7 +40,7 @@ export async function savePref(
     return false
   }
   const previous = qc.getQueryData<Record<string, string>>(prefsKey)
-  qc.setQueryData<Record<string, string>>(prefsKey, (old) => ({ ...(old ?? {}), [key]: value }))
+  qc.setQueryData<Record<string, string>>(prefsKey, (old) => ({ ...old, [key]: value }))
 
   // A DEVICE pref never reaches a node (persistence/devicePrefs.ts): it is a property of this
   // installation, `localStorage.setItem` cannot fail in a way a retry would fix, and the whole
@@ -74,7 +74,7 @@ export async function savePref(
     if (state.latestAttempt === attempt) {
       const current = qc.getQueryData<Record<string, string>>(prefsKey)
       qc.setQueryData<Record<string, string>>(prefsKey, () => {
-        const next = { ...(current ?? {}) }
+        const next = { ...current }
         if (state.hadConfirmedValue) next[key] = state.confirmed as string
         else delete next[key]
         return next

@@ -6,7 +6,7 @@ import { requestTerminalFocusIntent } from '@acorn/client-core/registries/client
 import { terminalSessionsRoute } from '@acorn/plugin-terminal/contract/routes.ts'
 import { wsDockerAttach } from './wsChannel'
 import type { DockerStatsSample } from '../shared/wsFrames'
-import type { DockerContainerAction, DockerContainerDetail, DockerPort } from '../shared/model'
+import type { DockerContainerAction, DockerPort } from '../shared/model'
 import { containerAction, fetchContainerDetail, removeContainer } from './dockerClient'
 import { refreshDocker } from './dockerStore'
 import { dockerLogBuffer, type DockerLogBuffer } from './dockerLogStore'

@@ -44,8 +44,8 @@ export class CapabilityRegistry {
     return this.#impls.get(id) as T | undefined
   }
 
-  // For consumers of a `required: true` plugin (github, terminal, agents) where absence is a bug,
-  // not a configuration.
+  // For consumers of a `required: true` plugin (agents, github, memory, notes, terminal) where absence
+  // is a bug, not a configuration.
   require<T>(id: CapabilityId<T>): T {
     const impl = this.get(id)
     if (impl === undefined) throw new Error(`Required capability not provided: ${id}`)

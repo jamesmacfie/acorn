@@ -115,7 +115,13 @@ preferences. Imported executable config has no `config_acks` entry and must be r
 
 ## Retention
 
-- idempotency rows: 24 hours;
+Both sweeps run AT BOOT, not on a timer, and there is no scheduler service. A node that is never
+restarted is also one that is never accumulating a backlog worth pruning, and a scheduler for one
+range-delete a day is machinery this does not need (`server/audit.ts` states the same). Some of the
+`docs/legacy/vNext/` material lists a `scheduler` on CoreServices; that was written and deleted, and
+never shipped.
+
+- idempotency rows: 24 hours, cleaned at boot;
 - audit rows: 90 days, pruned at boot;
 - terminal replay: bounded per session;
 - logs: size/age policy owned by the Node runtime;

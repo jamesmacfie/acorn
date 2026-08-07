@@ -51,7 +51,7 @@ async function apiCall(path: string, init?: RequestInit): Promise<ApiResult> {
           ...(SESSION_ID ? { 'x-acorn-session-id': SESSION_ID } : {}),
           ...(TOOL_CEILING ? { 'x-acorn-tool-ceiling': TOOL_CEILING } : {}),
           ...(init?.body ? { 'content-type': 'application/json' } : {}),
-          ...(init?.headers ?? {}),
+          ...init?.headers,
         },
       })
       if (!res.ok) return { ok: false, kind: 'api-error', detail: `${res.status} ${await res.text().catch(() => '')}`.trim() }

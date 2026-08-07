@@ -85,7 +85,7 @@ export class MemoryProposalStore {
   async resolve(id: string, status: 'accepted' | 'rejected', edited?: Pick<MemoryProposal, 'name' | 'description' | 'body' | 'type'>): Promise<MemoryProposal | null> {
     const p = await this.get(id)
     if (!p) return null
-    const next: MemoryProposal = { ...p, ...(edited ?? {}), status }
+    const next: MemoryProposal = { ...p, ...edited, status }
     await this.atomicWrite(this.fileFor(id), next)
     return next
   }

@@ -1,5 +1,4 @@
 import { randomUUID } from 'node:crypto'
-import { capabilityId } from '@acorn/node-core/server/plugin/capabilities.ts'
 import type {
   AgentDeleteResult,
   AgentRequest,

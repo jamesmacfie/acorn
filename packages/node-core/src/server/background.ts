@@ -11,4 +11,4 @@ export const trackBackgroundRefresh = (label: string, promise: Promise<unknown>)
   background.add(p)
 }
 
-export const settleBackground = () => Promise.all([...background])
+export const settleBackground = () => Promise.all(background)

@@ -32,7 +32,7 @@ const spec = (args: readonly string[], opts: GitOptions) => ({
   file: 'git',
   args,
   cwd: opts.cwd,
-  env: { GIT_TERMINAL_PROMPT: '0', ...(opts.env ?? {}) },
+  env: { GIT_TERMINAL_PROMPT: '0', ...opts.env },
   // Proxy and GPG entries are not optional extras: an allowlist that omits them silently breaks
   // `git fetch` behind a corporate proxy and every signed commit. Inverting a denylist means naming
   // what tools legitimately need, and forgetting one is a real regression rather than a hardening win.

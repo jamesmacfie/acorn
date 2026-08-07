@@ -15,7 +15,7 @@ import { initWorkflowNotices } from '@acorn/client-core/notifications/notificati
 import { initSessions, sessions } from '@acorn/client-core/tasks/agentSessions.ts'
 import TabRail from '@acorn/client-core/tabs/TabRail.tsx'
 import RailTips from '@acorn/client-core/tooltip/RailTips.tsx'
-import { activeTaskId, focusedPane, isTerminalMax, isTerminalOpen, maximizedPane, rememberWorkspaceView, selectedSource, setMaximizedPane, setSelectedSource, setTerminalMax, setTerminalOpen, toggleFocusedPaneMax, workspaceView } from '@acorn/client-core/tasks/tasks.ts'
+import { activeTaskId, focusedPane, isTerminalMax, isTerminalOpen, rememberWorkspaceView, selectedSource, setMaximizedPane, setSelectedSource, setTerminalMax, setTerminalOpen, toggleFocusedPaneMax, workspaceView } from '@acorn/client-core/tasks/tasks.ts'
 import { isTerminalTarget } from '@acorn/client-core/lib/isTypingTarget.ts'
 import { activateTaskSignals, pathForTask } from '@acorn/client-core/tasks/activate.ts'
 import { taskStatus } from '@acorn/client-core/tasks/taskStatus.ts'

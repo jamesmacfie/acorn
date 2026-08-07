@@ -1,6 +1,6 @@
 import { createEffect, createMemo, createResource, createSignal, For, on, onCleanup, onMount, Show } from 'solid-js'
 import type { Task } from '@acorn/client-core/queries.ts'
-import type { AgentProviderDescriptor, AgentSession } from '@acorn/protocol/managedAgents.ts'
+import type { AgentProviderDescriptor } from '@acorn/protocol/managedAgents.ts'
 import { managedAgentApi } from './managedClient'
 import { managedAgentStore } from './managedStore'
 import {

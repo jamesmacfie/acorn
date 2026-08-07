@@ -142,7 +142,7 @@ export async function acceptProposal(
   const proposal = await store.get(id)
   if (!proposal || proposal.status !== 'pending') return { ok: false, reason: 'Proposal not found or already resolved.' }
   if (!worktreePath || !existsSync(worktreePath)) return { ok: false, reason: 'The task worktree is gone — repo-scoped memory has nowhere to land.' }
-  const final = { ...proposal, ...(edited ?? {}) }
+  const final = { ...proposal, ...edited }
   await writeMemoryFile(join(worktreePath, '.acorn', 'memory'), {
     name: final.name,
     description: final.description,

@@ -1,7 +1,6 @@
 import type { ServerType } from '@hono/node-server'
 import { execFile } from 'node:child_process'
 import { join } from 'node:path'
-import '../server/routes'
 import '../wiring/agentProfiles'
 import type { DesktopCapabilities } from '@acorn/protocol/desktopCapabilities.ts'
 import type { ServiceEndpoint, ServiceStartConfig, ServiceStartResult, ServiceState } from '@acorn/protocol/serviceProtocol.ts'

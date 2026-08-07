@@ -1,4 +1,3 @@
-import type { NoteLocation } from './notes'
 import type {
   ExternalRef,
   IntegrationAuthKind,

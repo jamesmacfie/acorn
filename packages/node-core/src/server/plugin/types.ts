@@ -102,7 +102,8 @@ export type NodePluginContext = {
 
 export type NodePlugin = {
   name: string
-  // github, terminal and agents: core assumes their capabilities exist, so they cannot be disabled.
+  // agents, github, memory, notes and terminal: core (or the shell in front of it) assumes their
+  // contributions exist, so they cannot be disabled. Same five as the client half.
   required?: boolean
   // Awaited before the listener binds. Initialization may open plugin storage, migrate rows, or prepare
   // route state that must be complete before requests can be served.

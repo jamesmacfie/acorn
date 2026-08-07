@@ -1,4 +1,3 @@
-import { timingSafeEqual } from 'node:crypto'
 import { createMiddleware } from 'hono/factory'
 import type { Env } from '../../main/bindings'
 import { verifyInternalToken, type InternalScope } from '../auth/internalTokens'

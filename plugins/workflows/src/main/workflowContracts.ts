@@ -2,7 +2,7 @@
 // against the local tables is what keeps every handler, the bridge and the client's row shape in step
 // with one migration chain.
 import type * as schema from '../node/schema'
-import type { ToolCeiling, ToolRisk } from '@acorn/protocol/workflow.ts'
+import type { ToolCeiling } from '@acorn/protocol/workflow.ts'
 
 export type WorkflowPosture = 'gated' | 'autonomous'
 export type { ToolCeiling, ToolRisk } from '@acorn/protocol/workflow.ts'

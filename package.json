@@ -4,24 +4,26 @@
   "packageManager": "pnpm@11.0.0",
   "scripts": {
     "build": "turbo run build",
-    "dev": "turbo run dev",
-    "lint": "turbo run lint",
-    "test": "node scripts/rebuild-node-abi.mjs && turbo run test --concurrency=6",
-    "dist": "pnpm --filter @acorn/desktop dist",
-    "release": "pnpm dist",
-    "rebuild": "pnpm --filter @acorn/desktop electron:rebuild",
-    "rebuild:node": "node scripts/rebuild-node-abi.mjs",
-    "dev:node": "pnpm --filter @acorn/node dev:node",
-    "pack:node": "node scripts/pack-node.mjs",
+    "db:check": "node scripts/db.mjs check",
     "db:generate": "node scripts/db.mjs generate",
     "db:locate": "pnpm --filter @acorn/node-core db:locate",
     "db:migrate": "pnpm --filter @acorn/node-core db:migrate",
-    "db:check": "node scripts/db.mjs check"
+    "dev": "turbo run dev",
+    "dev:node": "pnpm --filter @acorn/node dev:node",
+    "dist": "pnpm --filter @acorn/desktop dist",
+    "lint": "oxlint && turbo run lint",
+    "lint:types": "turbo run lint",
+    "pack:node": "node scripts/pack-node.mjs",
+    "rebuild": "pnpm --filter @acorn/desktop electron:rebuild",
+    "rebuild:node": "node scripts/rebuild-node-abi.mjs",
+    "release": "pnpm dist",
+    "test": "node scripts/rebuild-node-abi.mjs && turbo run test --concurrency=6"
   },
   "devDependencies": {
     "better-sqlite3": "^12.11.1",
     "drizzle-kit": "^0.31.10",
     "node-pty": "^1.0.0",
+    "oxlint": "^1.77.0",
     "turbo": "^2"
   }
 }

@@ -3,7 +3,6 @@
 import { randomUUID } from 'node:crypto'
 import { asc, eq, inArray } from 'drizzle-orm'
 import type { PluginDatabase } from '@acorn/node-core/main/pluginStorage.ts'
-import { capabilityId } from '@acorn/node-core/server/plugin/capabilities.ts'
 import * as schema from '../node/schema'
 import { agentProfileRegistry, DEFAULT_PROFILE_ID } from '@acorn/node-core/main/agentProfiles/index.ts'
 import type { HeadlessOpts, HeadlessResult, StreamEvent } from '@acorn/node-core/main/headless.ts'
