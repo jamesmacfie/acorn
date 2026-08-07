@@ -19,8 +19,10 @@ export const httpClientPlugin: ClientPlugin = {
     ctx.settingsPages.register({
       id: 'http', label: 'API requests', group: 'general', order: 66, component: HttpVariablesSettings,
     })
-    // Activation: drops localStorage drafts whose task no longer exists. Once per boot, before the
-    // panel can read one back (docs/http-client.md § drafts).
-    purgeStoredHttpDrafts()
   },
+  // Drops localStorage drafts whose task no longer exists. Once per activation, before the panel can
+  // read one back (docs/http-client.md § drafts). In `activate` rather than `init` because it is a
+  // synchronous enumeration of `localStorage` — I/O, and the reason `init` is documented as
+  // registration-only.
+  activate: () => purgeStoredHttpDrafts(),
 }

@@ -96,14 +96,25 @@ export type ClientPluginContext = {
 
 export type ClientPlugin = {
   name: string
-  // github, terminal and agents: the shell assumes their contributions exist, so they cannot be
-  // disabled. Same three as the node half, and for the same reason.
+  // github, terminal, agents, memory and notes: the shell (or core's context assembler behind it)
+  // assumes their contributions exist, so they cannot be disabled. Same five as the node half, and for
+  // the same reason. This list said "same three" while the node half had five — `memory` and `notes`
+  // were togglable on the client and not on the node, so a user could untick half of one plugin.
   required?: boolean
-  // Synchronous, unlike NodePlugin.init. Nothing here awaits anything: registration publishes a
-  // descriptor into a signal, and the activation side effects (preview's event subscription, docker's
-  // archive concern, the managed-agent stores) attach listeners rather than performing I/O. Making it
-  // async would put a promise between `render()` and the first paint for no gain.
+  // Registration only, and synchronous: it publishes descriptors into signals. Nothing here awaits
+  // anything, and nothing here performs I/O — making it async would put a promise between `render()`
+  // and the first paint for no gain.
   init(ctx: ClientPluginContext): void
+  // The side-effect phase, run after EVERY plugin's `init`. This is where a plugin does the once-per-
+  // activation work that is not registration: subscribing to the event bus, priming a store, reading
+  // localStorage. It exists because two plugins were doing exactly that inside `init` — plugins/http
+  // enumerated `localStorage` and plugins/agents issued a `fetch` — which contradicted the paragraph
+  // above and, worse, ran while half the registries were still empty. A plugin disabled in this pass
+  // never reaches it.
+  //
+  // Still synchronous: a plugin that wants a network read fires it and handles its own rejection. The
+  // host will not await a plugin before the first paint.
+  activate?(ctx: ClientPluginContext): void
 }
 
 export type ClientPluginHostOptions = {
@@ -190,6 +201,10 @@ export function initClientPlugins(
   const disabled = new Set(options.disabled ?? [])
   const enabled: string[] = []
   const skipped: string[] = []
+  // Kept so the activate pass runs in declaration order over exactly the plugins that initialized,
+  // paired with the context each one already owns — a second `makeContext` would hand the plugin a
+  // recorder writing into a disposable list nobody holds.
+  const activations: { plugin: ClientPlugin; ctx: ClientPluginContext }[] = []
 
   for (const plugin of plugins) {
     // Take back whatever this plugin registered on a previous activation, before it registers again.
@@ -207,9 +222,15 @@ export function initClientPlugins(
     }
     // Not caught, matching the node host: every plugin here is first-party code shipped in the same
     // bundle, and a shell that half-registered is a worse outcome than one that fails loudly at boot.
-    plugin.init(makeContext(plugin.name, (disposable) => disposables.push(disposable)))
+    const ctx = makeContext(plugin.name, (disposable) => disposables.push(disposable))
+    plugin.init(ctx)
     enabled.push(plugin.name)
+    if (plugin.activate) activations.push({ plugin, ctx })
   }
+
+  // Second pass, mirroring the node host's `ready`: by here every registry holds every enabled
+  // plugin's contributions, so a plugin priming a store can look up a sibling's descriptor.
+  for (const { plugin, ctx } of activations) plugin.activate?.(ctx)
 
   return { enabled, skipped }
 }

@@ -25,10 +25,13 @@ export const agentsClientPlugin: ClientPlugin = {
       id: 'agent-pricing', label: 'Agent pricing', group: 'general', order: 45, requires: 'desktop',
       component: AgentPricingSettings,
     })
-    // Activation, not registration: these three attach listeners to the managed-session store (agent
-    // references in note bodies, the notice feed, and which notice targets resolve to a session) and
-    // return nothing the registries can hold. They ran from activate.ts for the same reason — they
-    // have to run once, before the first render, and only their own plugin knows that.
+  },
+  // Not registration: these three attach listeners to the managed-session store (agent references in
+  // note bodies, the notice feed, and which notice targets resolve to a session) and return nothing
+  // the registries can hold. `activateManagedAgentNotifications` also opens the app-lifetime agent
+  // WebSocket subscription and primes the store over HTTP, which is why the whole set is in `activate`
+  // rather than `init`.
+  activate: () => {
     activateManagedAgentReferences()
     activateManagedAgentNotifications()
     activateManagedAgentNoticeTargets()
