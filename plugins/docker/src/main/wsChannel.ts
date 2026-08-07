@@ -2,7 +2,7 @@
 // interactive `docker exec` PTYs (node-pty — `-it` needs a real tty). Everything is keyed by
 // connection and torn down on detach/kill/disconnect. Refs are shape-validated here — they reach argv.
 import { spawn as ptySpawn, type IPty } from 'node-pty'
-import { registerWsChannelHandler } from '@acorn/node-core/main/wsHub.ts'
+import type { PluginBroadcast } from '@acorn/node-core/server/plugin/types.ts'
 import { isDockerRef } from '../shared/model'
 import { dockerEnv } from './cli'
 import { parseStatsLine } from './parse'
@@ -14,7 +14,10 @@ const MAX_EXECS_PER_CONN = 8
 // Try bash, fall back to sh — works across alpine/debian-ish images.
 const EXEC_SHELL = 'command -v bash >/dev/null && exec bash || exec sh'
 
-export function registerDockerWsChannel(): void {
+// `events` rather than a direct main/wsHub import: the hub is reached through the plugin context now
+// (server/plugin/types.ts § PluginBroadcast), which is also what makes the host able to take the
+// registration back on a re-init.
+export function registerDockerWsChannel(events: PluginBroadcast): void {
   const service = getDockerService()
   const streamSubs = new Map<object, Map<StreamKey, { stop(): void }>>()
   const execSubs = new Map<object, Map<string, IPty>>()
@@ -26,7 +29,7 @@ export function registerDockerWsChannel(): void {
     execSubs.delete(conn)
   }
 
-  registerWsChannelHandler('docker', {
+  events.channel('docker', {
     onFrame(frame, send, conn) {
       switch (frame.channel) {
         case 'docker:logs:attach':

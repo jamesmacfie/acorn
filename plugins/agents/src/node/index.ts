@@ -2,7 +2,6 @@ import type { InternalEnvFactory } from '@acorn/node-core/server/auth/internalTo
 import type { NodePlugin } from '@acorn/node-core/server/plugin/types.ts'
 import { openPluginDb } from '@acorn/node-core/main/pluginStorage.ts'
 import { getProfile, resolveCommand } from '@acorn/node-core/main/profiles.ts'
-import { wsBroadcast } from '@acorn/node-core/main/wsHub.ts'
 import { TERMINAL_SESSIONS } from '@acorn/plugin-terminal/contract/sessions.ts'
 import { join } from 'node:path'
 import { AGENTS_SESSION_EXECUTE } from '../contract/sessionExecute'
@@ -71,7 +70,7 @@ export const agentsPlugin = (dataDir: string, deps: AgentsPluginDeps): NodePlugi
         // Read per call, never captured: creating a task's worktree consults that owner's per-repo
         // `base_ref` preference, and an account switch must not be served from a cached value.
         currentUserId: () => core.identity.active(),
-        publish: (frame) => wsBroadcast(frame),
+        publish: (frame) => ctx.events.send(frame),
         startTerminalHandoff: async (session) => {
           if (!session.providerSessionRef) throw new Error('The provider session cannot be resumed in a terminal.')
           const profile = getProfile(session.profileId)

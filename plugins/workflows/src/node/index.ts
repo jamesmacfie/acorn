@@ -5,7 +5,6 @@ import { NOTES_STORE } from '@acorn/plugin-notes/contract/store.ts'
 import { TERMINAL_RUN_TARGETS } from '@acorn/plugin-terminal/contract/runTargets.ts'
 import { DEFAULT_PROFILE_ID } from '@acorn/node-core/main/agentProfiles/index.ts'
 import { buildHeadlessArgv, runHeadless } from '@acorn/node-core/main/headless.ts'
-import { broadcastRepoConfigTrustNotice, broadcastStatus, broadcastWorkflowNotice, broadcastWorkflowStepEvent } from '@acorn/node-core/main/notify.ts'
 import { openPluginDb } from '@acorn/node-core/main/pluginStorage.ts'
 import { getProfile, requireProfile, resolveCommand } from '@acorn/node-core/main/profiles.ts'
 import { isRepoConfigTrustError } from '@acorn/node-core/main/repoConfigTrust.ts'
@@ -138,9 +137,9 @@ export const workflowsPlugin = (dataDir: string, deps: WorkflowsPluginDeps): Nod
           return { pass: false, detail: `Unknown policy '${policy}' — failing closed.` }
         },
         failingChecks: deps.failingChecks,
-        notify: broadcastWorkflowNotice,
-        statusChanged: broadcastStatus,
-        emitStepEvent: broadcastWorkflowStepEvent,
+        notify: ctx.events.notice,
+        statusChanged: ctx.events.status,
+        emitStepEvent: ctx.events.stepEvent,
         onRunTerminal: async (taskId, runId) => {
           if (!deps.memoryReviewTrigger) return
           const handoff = await ctx.capabilities
@@ -190,7 +189,7 @@ export const workflowsPlugin = (dataDir: string, deps: WorkflowsPluginDeps): Nod
             return { runId: await runner.start(taskId, def as WorkflowDef) }
           } catch (error) {
             if (isRepoConfigTrustError(error)) {
-              broadcastRepoConfigTrustNotice(taskId)
+              ctx.events.repoConfigTrustNotice(taskId)
               return { error: 'needs-trust' }
             }
             return { error: error instanceof WorkflowValidationError ? error.message : 'Failed to start workflow.' }

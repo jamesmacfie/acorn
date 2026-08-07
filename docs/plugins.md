@@ -39,7 +39,8 @@ Settings → Plugins; their SQLite files remain on disk and can be re-enabled la
 Node initialization happens before the listener accepts requests. A plugin can register:
 
 - routes under `/v2/p/<plugin>/...`;
-- typed capabilities and event subscriptions;
+- typed capabilities;
+- client broadcasts through `ctx.events`;
 - agent tools and task-context sections;
 - integration, connection, and model-provider descriptors;
 - a plugin-owned SQLite migration chain and disposal hook.
@@ -62,8 +63,11 @@ Plugins collaborate through four mechanisms:
    narrow pure functions.
 2. **Capabilities** — resolve typed functions from the Node's per-runtime capability registry at
    call time. Missing optional providers produce a degraded feature, not a module import.
-3. **Events** — publish small invalidation or lifecycle facts. Durable history belongs in the owning
-   plugin's tables, not in the event stream.
+3. **Broadcasts** (`ctx.events`) — tell connected CLIENTS that something changed. This is not a
+   plugin-to-plugin channel and there is no subscribe side: nothing in the node listens. It is an
+   invalidation channel over the authenticated WebSocket — no durability, no replay, no delivery
+   guarantee — and a client that misses one refetches after the gap. Durable history belongs in the
+   owning plugin's tables. Two plugins that need to talk use a capability (2).
 4. **Client registries and slots** — register UI contributions without importing another plugin's
    implementation. The host records disposables so disabling/reloading a plugin removes its entries.
 
@@ -98,8 +102,8 @@ databases directly.
 
 1. Put the behavior in the owning plugin and choose the correct runtime directory.
 2. Use CoreServices rather than importing core implementation modules or another plugin's internals.
-3. Add a narrow `contract/` export, capability, event, or client registry entry when collaboration is
-   needed.
+3. Add a narrow `contract/` export, capability, or client registry entry when collaboration is
+   needed; `ctx.events` if the renderer needs telling.
 4. Register the Node/client entry in the appropriate composition list.
 5. Add package-local tests and, for rendered behavior, desktop e2e coverage.
 6. Run the architecture test, `pnpm lint`, and the relevant tests.
