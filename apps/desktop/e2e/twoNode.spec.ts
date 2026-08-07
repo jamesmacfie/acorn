@@ -431,6 +431,57 @@ test('drives the bundled node and a second node concurrently, with per-node cach
 //
 // The collision case is the test above. These are the other four.
 
+// docs/vNext/ui.md's parity checklist has a FLEET half that a single-node walk cannot see, and
+// phase5-handoff.md says so explicitly: "Fleet home, Settings → Plugins' node picker, the Agent Center
+// scope toggle, the workspace picker's grouping, the attention section's node badges and the ⌘K palette's
+// node hints are all gated on `nodes().length > 1` — deliberately, because ui.md says first-run must never
+// mention nodes. Walk the checklist twice."
+//
+// This is the machine-checkable half of that instruction: the same surfaces, absent then present, in one
+// rendered app. The absence direction is the one that matters and the one no other test covers —
+// apps/desktop/test/client/parity.test.ts can assert the `when` predicate returns false, but only a real
+// render proves the button is not in the DOM.
+test('hides the fleet surfaces with one node and shows them with two', async () => {
+  test.setTimeout(120_000)
+
+  const running = await launch()
+  await dismissOnboarding(running.page)
+  // ui.md § New surfaces: "With only the bundled local node, this view stays out of the way; first-run
+  // never mentions nodes at all."
+  await expect(running.page.locator('.tabrail-source[aria-label="Fleet"]')).toHaveCount(0)
+  await expect(running.page.locator('.node-switcher')).toHaveCount(0)
+
+  // Pair a second node into the SAME running app, rather than launching a fresh two-node one: what is
+  // under test is that these surfaces appear when the fleet grows, which a second launch would hide
+  // behind a fresh render.
+  const remoteRoot = mkdtempSync(join(tmpdir(), 'acorn-node-b-'))
+  roots.push(remoteRoot)
+  const remote = await startSecondNode(join(remoteRoot, 'data'))
+  // Named `pairing`, not `window`: a local called `window` shadows the browser global inside the
+  // `page.evaluate` callback below, which type-checks against the wrong thing entirely.
+  const pairing = await remoteJson<PairingWindow>(remote, '/v2/core/pair/start', { method: 'POST' })
+  await running.page.evaluate(
+    async ({ code, endpoint }) => {
+      const bridge = (window as BridgeWindow).acorn!
+      await bridge.nodeProbe(endpoint)
+      await bridge.nodePair({ code, deviceName: 'e2e client', label: 'Node B' })
+    },
+    { code: pairing.code, endpoint: remote.endpoint },
+  )
+  await running.page.reload()
+  await running.page.waitForSelector('.shell')
+  await dismissOnboarding(running.page)
+
+  await expect(running.page.locator('.tabrail-source[aria-label="Fleet"]')).toBeVisible()
+  await expect(running.page.locator('.node-switcher')).toBeVisible()
+  // The picker lists both nodes by label — the switcher existing is not the same as it being useful.
+  const labels = await running.page.locator('.node-switcher option').evaluateAll((options) => options.map((o) => o.textContent))
+  expect(labels).toHaveLength(2)
+  expect(labels).toContain('Node B')
+
+  await running.app.close()
+})
+
 test('renders the fleet with one node down: a banner, and every other node still listed', async () => {
   test.setTimeout(120_000)
   const { running, localNodeId, remote, child } = await pairTwoNodes()
@@ -442,17 +493,18 @@ test('renders the fleet with one node down: a banner, and every other node still
   await expect(running.page.locator(`.fleet-card[data-node-id="${localNodeId}"]`)).toBeVisible()
   await expect(running.page.locator(`.fleet-card[data-node-id="${remote.nodeId}"]`)).toBeVisible()
 
-  // SIGKILL, and the two rejected alternatives are findings in their own right (both recorded in
-  // docs/vNext/phase4-notes.md):
+  // SIGKILL, still — but both reasons recorded here in Phase 4 have since been FIXED, and the signal is
+  // now a choice rather than a workaround:
   //
-  //   - SIGSTOP leaves the process holding its sockets open without answering, which is the truer picture of
-  //     a laptop that went to sleep — and the broker does NOT detect it. Nothing closes, so no reconnect is
-  //     attempted and the node reads `online` indefinitely: there is no application-level heartbeat on the
-  //     events socket.
-  //   - SIGTERM runs standalone.ts's drain (plugins, SQLite, the root lock) before exiting, which took long
-  //     enough that the socket outlived a 30-second poll.
+  //   - SIGSTOP left the process holding its sockets open without answering, and the broker did not detect
+  //     it: the node read `online` indefinitely. Phase 5 added the ping/pong watchdog both ends now run
+  //     (nodeBroker.ts, wsHub.ts), so a stopped node IS detected — after two missed pings, which is 30–45
+  //     seconds and slower than this test wants to wait.
+  //   - SIGTERM's drain outlived a 30-second poll because standalone.ts closed no listener at all. It does
+  //     now, first, under a bounded deadline (node-core's main/server.ts).
   //
-  // What this criterion asks about is a node that has gone away, and SIGKILL is that unambiguously.
+  // What this criterion asks about is a node that has GONE AWAY rather than one that has gone quiet, and
+  // SIGKILL is that unambiguously and immediately.
   child.kill('SIGKILL')
   try {
     await expect.poll(() => stateOf(running.page, remote.nodeId), { timeout: 60_000 }).not.toBe('online')
