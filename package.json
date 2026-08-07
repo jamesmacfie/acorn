@@ -12,6 +12,7 @@
     "rebuild": "pnpm --filter @acorn/desktop electron:rebuild",
     "rebuild:node": "node scripts/rebuild-node-abi.mjs",
     "dev:node": "pnpm --filter @acorn/node dev:node",
+    "pack:node": "node scripts/pack-node.mjs",
     "db:generate": "node scripts/db.mjs generate",
     "db:locate": "pnpm --filter @acorn/node-core db:locate",
     "db:migrate": "pnpm --filter @acorn/node-core db:migrate",
