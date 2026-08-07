@@ -3,6 +3,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { SecretService } from '@acorn/node-core/main/core/secrets.ts'
+import { memoryIdentityStore } from '@acorn/node-core/main/activeIdentity.ts'
 import { createCoreServices } from '@acorn/node-core/main/core/index.ts'
 import { schema } from '@acorn/node-core/server/db/index.ts'
 import { makeTestDb, makeTestPluginDb, type TestDb, type TestPluginDb } from '@acorn/node-core/server/routes/testDb.ts'
@@ -36,7 +37,7 @@ beforeEach(async () => {
   store = new AgentAttachmentStore(
     pluginDb.db,
     dataDir,
-    createCoreServices({ secrets: new SecretService('11'.repeat(32)), db: coreDb.db }),
+    createCoreServices({ secrets: new SecretService('11'.repeat(32)), db: coreDb.db, activeIdentity: memoryIdentityStore() }),
   )
 })
 

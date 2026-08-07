@@ -200,6 +200,29 @@ describe('architecture boundaries', () => {
     expect([...new Set([...badExternal, ...badFirstParty])].sort()).toEqual([])
   })
 
+  it('only core reaches the machine identity store', () => {
+    // The node's identity used to be WRITTEN by a feature plugin: plugins/github's device-flow route
+    // set `c.env.ACTIVE_IDENTITY` after connecting an account, so core's answer to "who is the user"
+    // was a side effect of one provider. It is CoreServices.identity now (main/core/identity.ts), and
+    // github binds through that seam like any other consumer.
+    //
+    // This rule keeps the raw store out of reach so the inversion cannot come back. The allowlist is
+    // node-core, which owns the store, plus the two composition roots, which construct it and hand it
+    // to createCoreServices — the one legitimate reason to name it outside core. A plugin appearing
+    // here means someone went around the seam again.
+    const IDENTITY_STORE_OK = new Set(['packages/node-core', 'apps/node'])
+    const offenders = PACKAGES.flatMap((p) =>
+      walk(p.src)
+        .filter((f) => !/\.test\.tsx?$/.test(f))
+        .filter((f) => /\bACTIVE_IDENTITY\b\s*[.:=)]/.test(readFileSync(f, 'utf8')))
+        .map(() => relative(ROOT, p.dir)),
+    )
+    expect([...new Set(offenders)].filter((p) => !IDENTITY_STORE_OK.has(p)).sort()).toEqual([])
+    // Anti-vacuity: the regex above must still match the declaration and the two reads in the auth
+    // middleware, or this rule passes because it stopped finding anything at all.
+    expect([...new Set(offenders)]).toContain('packages/node-core')
+  })
+
   it('the Electron surface stays where it is declared', () => {
     // apps/desktop IS the Electron app, so anything in it may import electron. What matters is
     // that the surface OUTSIDE it stays tiny and enumerated — those are the files that would have

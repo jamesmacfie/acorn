@@ -8,9 +8,9 @@ import { MEMORY_KNOWLEDGE, registerKnowledgeIpc, type KnowledgeDeps } from '../m
 import { knowledge, setKnowledgeBridge } from '../server/routes/knowledge'
 import { migrationsDir } from './migrations'
 
-export type MemoryPluginDeps = Omit<KnowledgeDeps, 'sendToAgent' | 'notes'>
-
-export const memoryPlugin = (dataDir: string, deps: MemoryPluginDeps): NodePlugin => {
+// No deps: both of this plugin's former app-supplied thunks now resolve through the plugin context —
+// sendToAgent and notes through capabilities, the owner identity through ctx.core.identity.
+export const memoryPlugin = (dataDir: string): NodePlugin => {
   let db: ReturnType<typeof openPluginDb> | null = null
   return {
     name: 'memory',
@@ -42,7 +42,7 @@ export const memoryPlugin = (dataDir: string, deps: MemoryPluginDeps): NodePlugi
       // does NOT degrade: notes is a `required` plugin, and a notes pane that silently answered "no
       // notes" because a capability was missing would look exactly like data loss.
       const notes = () => ctx.capabilities.require(NOTES_STORE)
-      const runtime = registerKnowledgeIpc(db, dataDir, ctx.core, { ...deps, sendToAgent, notes })
+      const runtime = registerKnowledgeIpc(db, dataDir, ctx.core, { sendToAgent, notes })
       ctx.capabilities.provide(MEMORY_KNOWLEDGE, runtime)
       ctx.routes.register(knowledge, { prefix: '', note: 'notes/memory pane' })
       for (const tool of memoryAgentTools(runtime, runtime.proposals, ctx.core)) ctx.tools.register(tool)

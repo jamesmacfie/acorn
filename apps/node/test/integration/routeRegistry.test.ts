@@ -6,6 +6,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import '../../src/server/routes'
 import { nodePlugins } from '../../src/server/plugins'
 import { createApp } from '@acorn/node-core/server/index.ts'
+import { memoryIdentityStore } from '@acorn/node-core/main/activeIdentity.ts'
 import { createCoreServices, SecretService } from '@acorn/node-core/main/core/index.ts'
 import type { AppEnv } from '@acorn/node-core/server/middleware/auth.ts'
 import { CapabilityRegistry } from '@acorn/node-core/server/plugin/capabilities.ts'
@@ -130,8 +131,7 @@ describe('assembled routes', () => {
         // agents is `required` too, so it initializes here as well. Same treatment as terminal below: the
         // deps are inert, because this suite asserts the MOUNT TABLE and nothing it exercises starts a
         // provider child.
-        agents: { internalEnv: () => ({}), currentUserId: () => null },
-        memory: { currentUserId: () => null },
+        agents: { internalEnv: () => ({}) },
         // Inert: this suite asserts the MOUNT TABLE, and preview contributes agent tools, not routes.
         preview: { browser: {} as never },
         // terminal is `required`, so it initializes here whatever this test asks for. Its four
@@ -149,13 +149,12 @@ describe('assembled routes', () => {
         workflows: {
           internalEnv: () => ({}),
           reconciled: Promise.resolve(),
-          currentUserId: () => null,
           failingChecks: async () => null,
         },
       }),
       {
         capabilities: new CapabilityRegistry(),
-        core: createCoreServices({ secrets: new SecretService('0'.repeat(64)), db: core.db }),
+        core: createCoreServices({ secrets: new SecretService('0'.repeat(64)), db: core.db, activeIdentity: memoryIdentityStore() }),
       },
     )
   })

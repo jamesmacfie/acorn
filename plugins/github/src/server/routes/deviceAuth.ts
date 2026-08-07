@@ -1,4 +1,5 @@
 import { Hono } from 'hono'
+import type { CoreServices } from '@acorn/node-core/main/core/index.ts'
 import { connectProvider } from '@acorn/node-core/server/integrations/connections.ts'
 import { providerError } from '@acorn/node-core/server/integrations/respondProvider.ts'
 import type { AppEnv } from '@acorn/node-core/server/middleware/auth.ts'
@@ -44,7 +45,9 @@ const form = (body: Record<string, string>): RequestInit => ({
   body: new URLSearchParams(body).toString(),
 })
 
-export const githubDeviceAuth = new Hono<AppEnv>()
+// A factory over CoreServices, like every other router in this plugin: connecting an account is what
+// binds the machine identity, and binding is core's to do (main/core/identity.ts).
+export const githubDeviceAuth = (core: CoreServices) => new Hono<AppEnv>()
   // Open a device-flow window. Returns what the UI must display: the code, where to type it, and how
   // often to poll. The device_code is a bearer for the pending grant, so it is returned to the
   // client rather than held server-side — it authorizes nothing on this node and keeping per-owner
@@ -105,8 +108,10 @@ export const githubDeviceAuth = new Hono<AppEnv>()
         { providerId: GITHUB_PROVIDER, credentials: { accessToken: body.access_token } },
         c.env.SECRETS,
       )
-      // Bind the machine identity so internal callers (MCP, agents) resolve to this account.
-      c.env.ACTIVE_IDENTITY.set(integration.label)
+      // Bind the machine identity so internal callers (MCP, agents) resolve to this account. Through
+      // core's seam, not `c.env.ACTIVE_IDENTITY` — this plugin knows the login first, but it does not
+      // own what the node's identity IS.
+      core.identity.bind(integration.label)
       // The token itself is never echoed back — the client only needs to know it worked.
       return c.json({ status: 'connected', integration } as const)
     } catch (error) {

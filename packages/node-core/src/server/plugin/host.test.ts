@@ -1,4 +1,5 @@
 import { afterAll, describe, expect, it, vi } from 'vitest'
+import { memoryIdentityStore } from '../../main/activeIdentity'
 import { createCoreServices, SecretService } from '../../main/core'
 import { makeTestDb } from '../routes/testDb'
 import { CapabilityRegistry, capabilityId } from './capabilities'
@@ -63,7 +64,7 @@ describe('plugin host', () => {
   const host = (plugins: readonly NodePlugin[], disabled?: readonly string[]) =>
     initPlugins(plugins, {
       capabilities: new CapabilityRegistry(),
-      core: createCoreServices({ secrets: new SecretService('a'.repeat(64)), db: coreDb() }),
+      core: createCoreServices({ secrets: new SecretService('a'.repeat(64)), db: coreDb(), activeIdentity: memoryIdentityStore() }),
       disabled,
     })
 

@@ -1,4 +1,5 @@
 import type { AppDatabase } from '../../server/db'
+import type { ActiveIdentityStore } from '../activeIdentity'
 import { createContextService, type ContextService } from './context'
 import * as fs from './fs'
 import * as git from './git'
@@ -34,12 +35,18 @@ export type CoreServices = {
   // the node itself has to read — today only plugins/agents' model-pricing overrides, which the usage
   // service needs before it can price a token count.
   prefs: PrefService
-  // "Which owner identities does this node know about?" — used by plugins/http when assigning stored
-  // request rows to the active owner without scanning plugin tables directly.
+  // The machine identity: which owner this node is bound to, which identities it knows about, and the
+  // bind/unbind writes. Core owns it — a plugin used to write it directly (main/core/identity.ts).
   identity: IdentityService
 }
 
-export function createCoreServices(options: { secrets: SecretService; db: AppDatabase }): CoreServices {
+export function createCoreServices(options: {
+  secrets: SecretService
+  db: AppDatabase
+  // The persisted binding. Required rather than defaulted, so a composition root cannot end up with a
+  // process-local identity by omission; tests pass memoryIdentityStore() (main/activeIdentity.ts).
+  activeIdentity: ActiveIdentityStore
+}): CoreServices {
   return {
     fs,
     git,
@@ -50,7 +57,7 @@ export function createCoreServices(options: { secrets: SecretService; db: AppDat
     context: createContextService(options.db),
     models: createModelService(options.db, options.secrets),
     prefs: createPrefService(options.db),
-    identity: createIdentityService(options.db),
+    identity: createIdentityService(options.db, options.activeIdentity),
   }
 }
 

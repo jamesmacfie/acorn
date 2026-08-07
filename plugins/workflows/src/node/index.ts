@@ -28,7 +28,6 @@ export type WorkflowsPluginDeps = {
   // failure). workflow:start/gate/cancel/kill await it: reconcile() sweeps EVERY 'running' step to
   // 'pending', so a run started before the sweep would have its live step re-queued underneath it.
   reconciled: Promise<void>
-  currentUserId: () => string | null
   // plugins/memory's auto-generation trigger, as a thunk (see the header). Optional so a node with
   // memory disabled still runs workflows — the run simply produces no memory proposals.
   memoryReviewTrigger?: (taskId: string, transcriptTail: string) => Promise<void>
@@ -77,7 +76,7 @@ export const workflowsPlugin = (dataDir: string, deps: WorkflowsPluginDeps): Nod
           const baseCheckout = mapped?.path && isDir(mapped.path) ? mapped.path : undefined
           // The identity is passed through because creating the worktree consults the owner's per-repo
           // base_ref preference — dropping it would silently fall back to git's origin/main.
-          const { cwd } = task ? await core.tasks.resolveCwd(task, baseCheckout, deps.currentUserId()) : { cwd: homedir() }
+          const { cwd } = task ? await core.tasks.resolveCwd(task, baseCheckout, core.identity.active()) : { cwd: homedir() }
           const profile = requireProfile(def.profileId ?? DEFAULT_PROFILE_ID)
           const argv = opts.mode === 'ai' ? profile.aiArgv?.(resolveCommand(profile), opts) : buildHeadlessArgv(profile.id, resolveCommand(profile), opts)
           if (!argv) {

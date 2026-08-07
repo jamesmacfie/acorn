@@ -87,8 +87,9 @@ export const githubPlugin = (dataDir: string): NodePlugin => {
       // caller.
       ctx.routes.register(pins(store), { prefix: '/pins' })
       // The device-flow connect, which writes CORE's `integrations` row through core's own
-      // connectProvider. It touches none of this plugin's tables, so it takes no handle.
-      ctx.routes.register(githubDeviceAuth, { prefix: '', note: '/auth/device/* — OAuth device-flow connect' })
+      // connectProvider and binds the machine identity through core's own identity service. It touches
+      // none of this plugin's tables, so it takes CoreServices and no handle.
+      ctx.routes.register(githubDeviceAuth(ctx.core), { prefix: '', note: '/auth/device/* — OAuth device-flow connect' })
 
       ctx.capabilities.provide(GITHUB_MIRROR, {
         pullRequest: (userId, repoOwner, repoName, pullNumber) => mirroredPullRequest(store, userId, repoOwner, repoName, pullNumber),

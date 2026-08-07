@@ -33,7 +33,7 @@ function registerBuiltInDrivers(): void {
 
 const shellQuote = (value: string): string => `'${value.replaceAll("'", "'\\''")}'`
 
-// The two things this plugin still cannot resolve for itself.
+// The one thing this plugin still cannot resolve for itself.
 export type AgentsPluginDeps = {
   // Mints the per-session loopback credential every provider child runs under. It stays an app-supplied
   // dep for the same stated reason plugins/terminal's does: it closes over the listener's ORIGIN, which
@@ -43,10 +43,6 @@ export type AgentsPluginDeps = {
   // `{ scope: 'task', taskId, sessionId }`, so each agent gets a credential bound to its own task.
   internalEnv: InternalEnvFactory
   memoryReviewTrigger?: (taskId: string, transcriptTail: string) => Promise<void>
-  // The node's active GitHub identity, which lives in the runtime bindings — not on CoreServices, and
-  // not something a plugin should be able to set. Read per call: creating a task's worktree consults
-  // that owner's per-repo `base_ref` preference.
-  currentUserId(): string | null
 }
 
 export const agentsPlugin = (dataDir: string, deps: AgentsPluginDeps): NodePlugin => {
@@ -71,7 +67,9 @@ export const agentsPlugin = (dataDir: string, deps: AgentsPluginDeps): NodePlugi
         core,
         internalEnv: deps.internalEnv,
         secrets: core.secrets,
-        currentUserId: deps.currentUserId,
+        // Read per call, never captured: creating a task's worktree consults that owner's per-repo
+        // `base_ref` preference, and an account switch must not be served from a cached value.
+        currentUserId: () => core.identity.active(),
         publish: (frame) => wsBroadcast(frame),
         startTerminalHandoff: async (session) => {
           if (!session.providerSessionRef) throw new Error('The provider session cannot be resumed in a terminal.')
