@@ -1,14 +1,12 @@
-// Task and review-note writes (docs/workspaces-and-tasks.md, docs/panes.md). Core owns tasks — they are
-// the workspace's unit of work, not a GitHub concept — and every route helper below already lives in
-// core/shared/api.ts. Callers invalidate tasksKey / reviewNotesKey(taskId) after.
+// Task writes (docs/workspaces-and-tasks.md). Core owns tasks — they are the workspace's unit of work,
+// not a GitHub concept — and every route helper below lives in protocol. Callers invalidate tasksKey
+// after.
 //
+// The review-note writes that used to sit alongside these moved to
+// plugins/changes/src/client/reviewNoteMutations.ts: they are the changes pane's, and keeping them
+// here meant core held that plugin's routes.
 import { postJson, writeJson } from '../apiClient'
 import {
-  reviewNoteRoute,
-  reviewNotesRoute,
-  reviewNotesSentRoute,
-  type ReviewNote,
-  type ReviewNoteSeed,
   type Task,
   type TaskSeed,
   taskLinksRoute,
@@ -59,11 +57,3 @@ export const removeTaskLink = (id: string, ref: Pick<TaskLink, 'connectionId' | 
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(ref),
   })
-
-// Local review notes (docs/panes.md): task-scoped, never sent to GitHub until the review is submitted.
-export const addReviewNote = (taskId: string, seed: ReviewNoteSeed) => postJson<ReviewNote>(reviewNotesRoute(taskId), seed)
-export const editReviewNote = (taskId: string, noteId: string, body: string) =>
-  writeJson<{ ok: true }>(reviewNoteRoute(taskId, noteId), { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ body }) })
-export const deleteReviewNote = (taskId: string, noteId: string) =>
-  writeJson<{ ok: true }>(reviewNoteRoute(taskId, noteId), { method: 'DELETE' })
-export const markReviewNotesSent = (taskId: string, ids: string[]) => postJson<{ ok: true }>(reviewNotesSentRoute(taskId), { ids })

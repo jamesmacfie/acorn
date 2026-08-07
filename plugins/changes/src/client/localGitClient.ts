@@ -1,6 +1,6 @@
 // Local-changes review over loopback HTTP: was `window.acorn.terminal.local`. Pure-Node
 // on the server, so it works in a plain browser (dev:node) too.
-import { localActionRoute, localBlobRoute, localChangesRoute, localDiffRoute } from '@acorn/protocol/api.ts'
+import { localActionRoute, localBlobRoute, localChangesRoute, localDiffRoute } from '../shared/api'
 import { readJson, writeJson } from '@acorn/client-core/apiClient.ts'
 import type { LocalChange } from '@acorn/protocol/terminal.ts'
 

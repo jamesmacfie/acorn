@@ -281,15 +281,6 @@ export type RepoConfigTrustReview = {
 }
 export const repoConfigTrustRoute = (taskId: string) => `/v2/core/tasks/${taskId}/config-trust`
 
-// Local-changes review (docs/panes.md): working-tree status/diff/blob + stage/commit/discard/push.
-// Was the `local:*` IPC channels.
-export const localChangesRoute = (taskId: string) => `/v2/p/changes/tasks/${taskId}/local/changes`
-export const localDiffRoute = (taskId: string, path: string, scope: 'unstaged' | 'staged') =>
-  `/v2/p/changes/tasks/${taskId}/local/diff?path=${encodeURIComponent(path)}&scope=${scope}`
-export const localBlobRoute = (taskId: string, path: string, ref?: string) =>
-  `/v2/p/changes/tasks/${taskId}/local/blob?path=${encodeURIComponent(path)}${ref ? `&ref=${encodeURIComponent(ref)}` : ''}`
-export const localActionRoute = (taskId: string, action: 'stage' | 'unstage' | 'discard' | 'commit' | 'stage-all' | 'unstage-all' | 'discard-all' | 'push') =>
-  `/v2/p/changes/tasks/${taskId}/local/${action}`
 
 // Database pane (docs/pg.md): per-task Postgres browse/edit over the plugin route namespace.
 export const databaseTablesRoute = (taskId: string) => `/v2/p/database/tasks/${taskId}/database/tables`
@@ -338,20 +329,6 @@ export const taskUseCheckoutRoute = (id: string) => `/v2/core/tasks/${id}/use-ch
 export const taskMcpRoute = (id: string) => `/v2/core/tasks/${id}/mcp`
 export const taskMcpStarterRoute = (id: string) => `/v2/core/tasks/${id}/mcp/starter`
 
-// Local review notes (docs/panes.md): inline annotations on uncommitted changes, acorn-owned.
-export type ReviewNote = {
-  id: string
-  taskId: string
-  path: string
-  side: 'additions' | 'deletions'
-  startLine: number
-  endLine: number
-  snippet: string | null
-  body: string
-  sentAt: number | null // stamped on delivery; cleared on edit
-  createdAt: number
-}
-export type ReviewNoteSeed = Pick<ReviewNote, 'path' | 'side' | 'startLine' | 'endLine' | 'body'> & { snippet?: string | null }
 
 export const repoRoute = (owner: string, repo: string, child = '') => `/v2/p/github/repos/${owner}/${repo}${child ? `/${child}` : ''}`
 export const pullRoute = (owner: string, repo: string, number: string | number, child = '') =>
@@ -479,10 +456,6 @@ export const workspaceProjectsRoute = (id: string) => `/v2/core/workspaces/${id}
 export const tasksRoute = '/v2/core/tasks'
 export const taskRoute = (id: string) => `/v2/core/tasks/${id}`
 export const taskLinksRoute = (id: string) => `/v2/core/tasks/${id}/links`
-export const reviewNotesRoute = (taskId: string) => `/v2/p/changes/tasks/${taskId}/review-notes`
-export const reviewNoteRoute = (taskId: string, noteId: string) => `/v2/p/changes/tasks/${taskId}/review-notes/${noteId}`
-export const reviewNotesSentRoute = (taskId: string) => `/v2/p/changes/tasks/${taskId}/review-notes/sent`
-export const reviewNotesKey = (taskId: string) => ['review-notes', taskId] as const
 export const integrationsRoute = '/v2/core/integrations'
 export const integrationRoute = (id: string) => `/v2/core/integrations/${id}`
 export const integrationTestRoute = (id: string) => `/v2/core/integrations/${id}/test`

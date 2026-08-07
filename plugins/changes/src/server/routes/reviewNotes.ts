@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto'
 import { and, eq, inArray } from 'drizzle-orm'
 import { Hono } from 'hono'
-import type { ReviewNote } from '@acorn/protocol/api.ts'
+import type { ReviewNote } from '../../shared/api'
 import type { CoreServices } from '@acorn/node-core/main/core/index.ts'
 import type { PluginDatabase } from '@acorn/node-core/main/pluginStorage.ts'
 import type { AppEnv } from '@acorn/node-core/server/middleware/auth.ts'
