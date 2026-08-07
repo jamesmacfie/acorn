@@ -62,6 +62,7 @@ the door open; vNext ships none of them:
 | [security.md](./security.md) | Threat model, pairing/revocation, secrets, transport, at-rest |
 | [plugin-inventory.md](./plugin-inventory.md) | All 20 plugins: what each does and its node/client/data split |
 | [plan.md](./plan.md) | Phases with exit criteria and testing, migration and cutover |
+| [phase5-handoff.md](./phase5-handoff.md) | Where Phase 4 left things: accepted risks, landmines, what Phase 5 inherited |
 
 ## Vocabulary
 

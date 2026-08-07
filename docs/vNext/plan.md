@@ -163,6 +163,11 @@ one node down; a remote task's terminal/agent/preview work end-to-end over the L
 
 ## Phase 5 — polish, importer, release
 
+> **Start with [phase5-handoff.md](./phase5-handoff.md).** It records the three risks Phase 4 accepted rather
+> than closed, the landmines in the fleet code, and the two things Phase 5's own scope inherited from it: the
+> parity checklist now has a fleet half that a single-node walk cannot see, and prefs are two tiers so an
+> importer that writes them must respect the split.
+
 - Onboarding flow with the config-only V1 importer (idempotent, resumable, V1 files byte-
   identical after import — verified by hashing in tests; imported executable config lands
   untrusted).
