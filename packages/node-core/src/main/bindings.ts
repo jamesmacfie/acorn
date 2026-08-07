@@ -19,6 +19,11 @@ import { ensureCert } from './tls'
 // at startup and handed to the Hono app at the single app.fetch() seam in main/server.ts.
 export type RuntimeBindings = {
   DB: AppDatabase
+  // This node's data root. On c.env because `POST /v2/core/backup` has to enumerate `plugins/*.sqlite`
+  // beside core.sqlite (main/backup.ts), and there is nothing sensitive about a path — every child this
+  // node spawns already receives it as ACORN_DATA_DIR, and pluginStorage computes it from the same
+  // value. A bridge slot was the alternative and would be three files for one string.
+  DATA_DIR: string
   // This Node's durable identity, minted into node.json on first start (main/dataRoot.ts). Every
   // resource a client caches is keyed (nodeId, id), so two nodes holding the same UUID never
   // collide (docs/vNext/architecture.md § Fleet semantics).
@@ -218,6 +223,7 @@ export function makeBindings({ dbPath, blobsDir, nodeId, appVersion }: BindingsO
   const dataDir = dirname(databasePath)
   return {
     DB: db,
+    DATA_DIR: dataDir,
     NODE_ID: nodeId,
     // ensureCert is idempotent, so calling it here AND in startListener is not two certificates — it is
     // the same one read twice, which is what lets the routes hold the public fingerprint without the

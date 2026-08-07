@@ -2,8 +2,8 @@ import { createResource, createSignal, For, Show } from 'solid-js'
 import type { AuditEntry, NodeSecurityPosture } from '@acorn/protocol/api.ts'
 import { activeNodeId } from '../node/activeNode'
 import { nodes } from '../node/fleet'
-import { nodeAuditPage, nodeSecurityPosture } from '../node/nodeSecurity'
-import { Button, Select } from '../ui/primitives'
+import { createNodeBackup, nodeAuditPage, nodeSecurityPosture, suggestedBackupPath } from '../node/nodeSecurity'
+import { Button, Input, Select } from '../ui/primitives'
 import './settings.css'
 
 // Settings → Security (docs/vNext/security.md § Audit: "Owner-readable in Settings"; § On-disk: "the app
@@ -63,6 +63,39 @@ export default function SecuritySettings() {
     () => nodeId() ?? '',
     async (id) => (id ? await nodeSecurityPosture(id).catch(() => null) : null),
   )
+
+  // The node's suggestion, and whatever the owner has typed over it. Kept apart so switching nodes
+  // re-suggests without discarding a path the owner is halfway through editing for THIS node — and so
+  // an empty field means "use the suggestion" rather than "back up to nowhere".
+  const [destPath, setDestPath] = createSignal('')
+  const [backingUp, setBackingUp] = createSignal(false)
+  const [backupDone, setBackupDone] = createSignal('')
+  const [suggestion] = createResource<string | null, string>(
+    () => nodeId() ?? '',
+    async (id) => {
+      setDestPath('')
+      setBackupDone('')
+      return id ? await suggestedBackupPath(id).then((s) => s.suggestedPath).catch(() => null) : null
+    },
+  )
+
+  const runBackup = async () => {
+    const target = destPath().trim() || suggestion()
+    if (!target) return
+    setError('')
+    setBackupDone('')
+    setBackingUp(true)
+    try {
+      const result = await createNodeBackup(target, nodeId() ?? undefined)
+      setBackupDone(`Wrote ${Math.round(result.bytes / 1024).toLocaleString()} KB to ${result.path}`)
+      // The backup itself is an audited action, so the trail the page is showing is now out of date.
+      await refetch()
+    } catch (failure) {
+      setError(failure instanceof Error ? failure.message : String(failure))
+    } finally {
+      setBackingUp(false)
+    }
+  }
 
   const [firstPage, { refetch }] = createResource<AuditEntry[], string>(
     () => nodeId() ?? '',
@@ -130,6 +163,28 @@ export default function SecuritySettings() {
         )}
       </Show>
 
+      <h3 class="settings-heading">Backup</h3>
+      <p class="muted">
+        Writes this node's databases to a single archive <em>on that node's machine</em>. Credentials,
+        device tokens and the TLS key are excluded — restoring means re-entering them and re-pairing.
+        Worktrees and the blob cache are excluded too: both are recoverable from git and GitHub.
+      </p>
+      <label class="settings-field">
+        <span>Archive path</span>
+        <Input
+          value={destPath()}
+          placeholder={suggestion() ?? 'Loading…'}
+          onInput={(event) => setDestPath(event.currentTarget.value)}
+        />
+      </label>
+      <div class="settings-actions">
+        <Button size="sm" disabled={backingUp() || !(destPath() || suggestion())} onClick={() => void runBackup()}>
+          {backingUp() ? 'Backing up…' : 'Back up this node'}
+        </Button>
+        <Show when={backupDone()}>{(done) => <span class="muted">{done()}</span>}</Show>
+      </div>
+
+      <h3 class="settings-heading">Audit trail</h3>
       <p class="muted">
         Security-relevant actions on <strong>{node()?.label ?? 'this node'}</strong>: pairing, device
         revocation, credential changes, repo-config trust and plugin changes. Kept for 90 days.

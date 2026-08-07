@@ -1,6 +1,14 @@
 import type { QueryClient } from '@tanstack/solid-query'
-import { coreAuditRoute, coreSecurityRoute, type AuditPage, type NodeSecurityPosture } from '@acorn/protocol/api.ts'
-import { readJson } from '../apiClient'
+import {
+  coreAuditRoute,
+  coreBackupRoute,
+  coreSecurityRoute,
+  type AuditPage,
+  type BackupResult,
+  type BackupSuggestion,
+  type NodeSecurityPosture,
+} from '@acorn/protocol/api.ts'
+import { readJson, writeJson } from '../apiClient'
 import { pushNotice } from '../notifications/notifications'
 import { readDevicePrefs } from '../persistence/devicePrefs'
 import { PrefKeys } from '../persistence/prefKeys'
@@ -27,6 +35,30 @@ export function nodeAuditPage(options: { nodeId?: string; before?: number; limit
   if (options.limit !== undefined) params.set('limit', String(options.limit))
   const query = params.toString()
   return readJson<AuditPage>(`${coreAuditRoute}${query ? `?${query}` : ''}`, options.nodeId ? { nodeId: options.nodeId } : {})
+}
+
+// --- Backup (docs/vNext/data.md § Backup) ---
+
+// Where the NODE suggests writing the archive. Asked rather than composed on this side, because the
+// path is on the node's filesystem and a client cannot know its home directory — that is also why there
+// is no native save dialog: it would pick a path on the wrong machine for any node but the local one.
+export function suggestedBackupPath(nodeId?: string): Promise<BackupSuggestion> {
+  return readJson<BackupSuggestion>(coreBackupRoute, nodeId ? { nodeId } : {})
+}
+
+// Errors propagate. This is a deliberate action with a button behind it, so a failure has to be shown —
+// the same rule `saveDisabledNodePlugins` follows and `refreshNodePlugins` deliberately does not.
+export function createNodeBackup(destPath: string, nodeId?: string): Promise<BackupResult> {
+  return writeJson<BackupResult>(
+    coreBackupRoute,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ destPath }),
+      ...(nodeId ? { nodeId } : {}),
+    },
+    (res) => `backup ${res.status}`,
+  )
 }
 
 // --- The one-time disk-encryption warning (docs/vNext/data.md § Backup) ---
