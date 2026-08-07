@@ -1,7 +1,6 @@
 import { createMemo, createSignal, For, onCleanup, Show } from 'solid-js'
 import { createQuery, useQueryClient } from '@tanstack/solid-query'
 import type { PublicIntegrationProvider } from '@acorn/protocol/integrations.ts'
-import { githubDevicePollRoute, githubDeviceStartRoute, type GithubDevicePoll, type GithubDeviceStart } from '@acorn/protocol/api.ts'
 import { postJson } from '../apiClient'
 import CopyButton from '../ui/CopyButton'
 import Icon from '../ui/Icon'
@@ -13,6 +12,35 @@ import {
   testIntegration,
 } from '../integrations/integrationClient'
 import { integrationsKey, integrationsOptions } from '../queries'
+
+// plugins/github owns this flow end to end — its two routes and their response shapes are declared
+// in plugins/github/src/server/routes/deviceAuth.ts. They are duplicated here as local literals
+// because client-core is a shared library and may not import a plugin.
+//
+// This settings page runs the flow itself, which is the real problem and not one a move can fix: the
+// proper shape is a `deviceAuth` field on the integration-provider contribution, so the provider
+// supplies its own connect flow and core just renders it. That is finding 10's job (de-GitHub the
+// shell); collected here as debt against it.
+//
+// Two routes rather than one because the client owns the polling interval: a long poll would hold a
+// request slot for up to fifteen minutes per pending connection.
+const githubDeviceStartRoute = '/v2/p/github/auth/device/start'
+const githubDevicePollRoute = '/v2/p/github/auth/device/poll'
+
+type GithubDeviceStart = {
+  deviceCode: string
+  userCode: string
+  verificationUri: string
+  expiresIn: number
+  // Seconds. GitHub's floor is 5 and it may ask for more; never poll faster than it asks.
+  interval: number
+}
+type GithubDevicePoll =
+  | { status: 'pending'; slowDown?: boolean }
+  | { status: 'denied' }
+  | { status: 'expired' }
+  | { status: 'connected'; integration?: unknown }
+
 
 function IntegrationLogo(props: { provider: PublicIntegrationProvider | undefined }) {
   return (
