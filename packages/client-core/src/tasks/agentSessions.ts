@@ -10,10 +10,19 @@
 import { createSignal } from 'solid-js'
 import { capabilities } from '../capabilities'
 import { readJson } from '../apiClient'
-import { terminalSessionsRoute } from '@acorn/protocol/api.ts'
 import { wsOnStatus } from '../wsClient'
 import { trackSessionEdges } from '../notifications/notifications'
 import type { TerminalSession } from '@acorn/protocol/terminal.ts'
+
+// plugins/terminal owns these paths (plugins/terminal/src/contract/routes.ts). They are duplicated
+// here as literals because client-core is a shared library and may not import a plugin — the arch
+// suite enforces that, and it is the rule that keeps the shell from depending on features.
+//
+// This file is deliberately core: it is platform state (which agent sessions exist on this node),
+// not terminal-drawer internals, and its own header says so. Two duplicated strings is the cheaper
+// side of that trade against inventing a capability seam for a GET. Collected as debt against
+// finding 10 (de-GitHub the shell), which reworks how the shell reaches feature routes.
+const terminalSessionsRoute = '/v2/p/terminal/sessions'
 import { requestTerminalFocusIntent } from '../registries/clientEvents'
 import { latestOnly } from '../lib/latestOnly'
 

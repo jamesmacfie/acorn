@@ -250,19 +250,6 @@ export const agentToolsCatalogRoute = '/v2/core/agent-tools'
 export type AgentToolCatalogEntry = { name: string; description: string; risk: ToolRisk; availability?: string }
 export const rendererAgentToolRoute = (taskId: string, name: string) => `/v2/core/tasks/${taskId}/renderer-tools/${encodeURIComponent(name)}`
 
-// Find-in-files (docs/panes.md): POST because it spawns ripgrep and the query is arbitrary body,
-// not a path segment. Was the `search:findInFiles` IPC channel.
-export const searchRoute = (taskId: string) => `/v2/p/editor/tasks/${taskId}/search`
-
-// Editor pane (docs/workspaces-and-tasks.md): read/write/list worktree files. Was the `editor:*` IPC channels.
-// relPath rides a query param so a nested path never collides with the route segments.
-export type EditorEntry = { name: string; dir: boolean }
-export type EditorWriteResult = { ok: boolean; reason?: string }
-export const editorRootRoute = (taskId: string) => `/v2/p/editor/tasks/${taskId}/editor/root`
-export const editorFilesRoute = (taskId: string) => `/v2/p/editor/tasks/${taskId}/editor/files`
-export const editorListRoute = (taskId: string, relPath: string) => `/v2/p/editor/tasks/${taskId}/editor/list?path=${encodeURIComponent(relPath)}`
-export const editorReadRoute = (taskId: string, relPath: string) => `/v2/p/editor/tasks/${taskId}/editor/read?path=${encodeURIComponent(relPath)}`
-export const editorWriteRoute = (taskId: string) => `/v2/p/editor/tasks/${taskId}/editor/file`
 
 // Run targets (docs/workflows.md §2): the renderer shares the RunBridge routes the MCP run tools use
 // (server/routes/harness.ts). Was the `run:*` IPC channels.
@@ -283,10 +270,6 @@ export const repoConfigTrustRoute = (taskId: string) => `/v2/core/tasks/${taskId
 
 
 
-export const terminalSessionsRoute = '/v2/p/terminal/sessions'
-export const terminalProfilesRoute = '/v2/p/terminal/profiles'
-export const terminalSessionActionRoute = (sid: string, action: 'kill' | 'interrupt' | 'remove' | 'resize' | 'send') =>
-  `/v2/p/terminal/sessions/${encodeURIComponent(sid)}/${action}`
 
 export const taskStatusesRoute = '/v2/core/task-statuses'
 export const repoPathRoute = (owner: string, repo: string) =>

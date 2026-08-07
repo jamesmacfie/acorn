@@ -13,6 +13,7 @@
   "dependencies": {
     "@acorn/client-core": "workspace:*",
     "@acorn/node-core": "workspace:*",
+    "@acorn/plugin-terminal": "workspace:*",
     "@acorn/protocol": "workspace:*",
     "@tanstack/solid-query": "^5.101.0",
     "@xterm/addon-fit": "^0.10.0",
