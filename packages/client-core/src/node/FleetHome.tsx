@@ -27,9 +27,16 @@ import './nodes.css'
 // Settings → Nodes, which already does all four properly; duplicating them here would mean two places to
 // keep in step on a screen whose job is an overview.
 export default function FleetHome() {
-  const [taskCounts] = createFleetQuery(
+  // The TASK LIST under `tasksKey`, counted in the component — not a count fetched under that key.
+  //
+  // The first version returned `.length`, which wrote a NUMBER into the key every other surface reads
+  // `Task[]` from, and `fetchQuery` writes through the node's own cache by design. So the rail, the palette
+  // and the workspace effect all started calling `.find`/`.map` on a number; the resulting page errors wedged
+  // Solid's flush queue, and the visible symptom was a node badge that never updated. The two-node e2e is
+  // what caught it. A fan-out shares a key ONLY when it shares the value's shape — see fanout.ts.
+  const [tasksPerNode] = createFleetQuery(
     () => tasksKey,
-    async (nodeId, _dep, signal) => (await readJson<Task[]>(tasksRoute, { nodeId, signal })).length,
+    (nodeId, _dep, signal) => readJson<Task[]>(tasksRoute, { nodeId, signal }),
   )
   // One fan-out per contributed stat rather than one combined call: each plugin's fetch is independent,
   // and a plugin disabled on one node should leave that number off THAT card without affecting the rest.
@@ -46,8 +53,8 @@ export default function FleetHome() {
   const inbox = createAttentionInbox()
   const attentionFor = (nodeId: string) => inbox().rows.filter((row) => row.nodeId === nodeId).length
 
-  const countFor = (nodeId: string) => taskCounts().rows.find((row) => row.nodeId === nodeId)?.data
-  const unavailable = () => taskCounts().unavailable
+  const countFor = (nodeId: string) => tasksPerNode().rows.find((row) => row.nodeId === nodeId)?.data.length
+  const unavailable = () => tasksPerNode().unavailable
 
   return (
     <main class="panes fleet-home">

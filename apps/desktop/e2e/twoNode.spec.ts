@@ -2,6 +2,7 @@ import { expect, test, _electron as electron, type ElectronApplication, type Pag
 import { execFileSync, spawn, type ChildProcess } from 'node:child_process'
 import { mkdtempSync, rmSync } from 'node:fs'
 import { createRequire } from 'node:module'
+import { createServer as createHttpServer, request as httpGet } from 'node:http'
 import { request as httpsRequest } from 'node:https'
 import { tmpdir } from 'node:os'
 import { dirname, join, resolve } from 'node:path'
@@ -50,6 +51,11 @@ type PageBridge = {
   fleetList(): Promise<{ nodes: NodeRecord[]; statuses: NodeStatus[] }>
   nodeProbe(endpoint: string): Promise<NodeProbeResult>
   nodePair(request: { code: string; deviceName: string; label: string }): Promise<NodeRecord>
+  // The stream and tunnel halves, used by the remote-task test. Declared here rather than cast at the call
+  // site so a rename in the preload surfaces as a type error instead of a runtime undefined.
+  nodeSend(nodeId: string, frame: unknown): void
+  onNodeFrame(listener: (nodeId: string, frame: unknown) => void): () => void
+  nodeTunnelOpen(request: { nodeId: string; taskId: string; port: number }): Promise<{ port: number }>
 }
 type BridgeWindow = Window & { acorn?: PageBridge }
 
@@ -107,7 +113,9 @@ function remoteJson<T>(node: StandaloneHandshake, path: string, init: { method?:
         })
       },
     )
-    req.on('error', reject)
+    // Name the path: a bare 'socket hang up' from node:https says nothing about which request died, and
+    // this helper makes half a dozen of them per test.
+    req.on('error', (error: Error) => reject(new Error(`${path}: ${error.message}`)))
     if (payload !== undefined) req.write(payload)
     req.end()
   })
@@ -189,7 +197,13 @@ async function launch(): Promise<RunningApp> {
     },
   })
   apps.push(app)
+  // Electron main's logs, forwarded so a broker or tunnel failure names itself. Without this the preview
+  // tunnel's first bug surfaced only as a bare `socket hang up` from the fetch on the other side of it.
+  app.process().stderr?.on('data', (chunk: Buffer) => console.error(`[main] ${chunk.toString().trimEnd()}`))
   const page = await app.firstWindow()
+  // An uncaught renderer error wedges Solid's flush queue, so the visible symptom is "the UI stopped
+  // updating" with nothing else to go on. Forwarding these is how the fan-out key collision below was found.
+  page.on('pageerror', (error) => console.error(`[pageerror] ${error.message}`))
   await expect(page.locator('.shell')).toBeVisible()
   return { app, page, dataDir, repoDir }
 }
@@ -209,20 +223,75 @@ async function seedLocal(page: Page, nodeId: string, repoDir: string, title: str
   return { workspaceId: workspace.id, taskId: task.id }
 }
 
-// No repo-path mapping here, unlike the local node. The standalone entry wires only the pure-Node
-// domain bridges, so `/v2/p/terminal/*` answers a clean 503 bridge-unavailable — the same degraded mode
-// `dev:node` has always had (docs/electron.md § Capability map). Nothing this test asserts needs it: the
-// rail scopes tasks by workspace_repos, and a checkout only matters once a remote task wants a worktree
-// or a terminal, which is Phase 4's "a remote task's terminal/agent/preview work end-to-end".
-async function seedRemote(node: StandaloneHandshake, title: string): Promise<Seed> {
+// `repoPath` is optional, and whether it is supplied is the difference between the cache/collision cases
+// below and the remote-terminal one.
+//
+// The comment that used to sit here — "the standalone entry wires only the pure-Node domain bridges, so
+// /v2/p/terminal/* answers a clean 503" — was STALE. That entry runs a real terminal engine, the managed
+// agent runtime and the workflow runner; Phase 4 added the three app-layer wirings it was still missing
+// (agent profiles, core's agent tools, config trust). So a remote task's terminal does work, which is what
+// the last test in this file asserts, and it needs a checkout on the node's own machine to work in.
+async function seedRemote(node: StandaloneHandshake, title: string, repoPath?: string): Promise<Seed> {
   const workspace = await remoteJson<{ id: string }>(node, '/v2/core/workspaces', { method: 'POST', body: { name: 'Beta' } })
   await remoteJson(node, `/v2/core/workspaces/${workspace.id}/repos`, { method: 'POST', body: { owner: 'acorn', name: 'smoke' } })
+  if (repoPath) await remoteJson(node, '/v2/core/repos/path', { method: 'PUT', body: { owner: 'acorn', repo: 'smoke', path: repoPath } })
   const task = await remoteJson<{ id: string }>(node, '/v2/core/tasks', {
     method: 'POST',
     body: { origin: 'local', repoOwner: 'acorn', repoName: 'smoke', branch: 'main', title },
   })
   return { workspaceId: workspace.id, taskId: task.id }
 }
+
+// A git repo on "the other machine", for a remote task that needs a worktree.
+function makeRepo(dir: string): string {
+  execFileSync('git', ['init', '-q', dir])
+  execFileSync('git', ['-C', dir, 'config', 'user.email', 'e2e@acorn.test'])
+  execFileSync('git', ['-C', dir, 'config', 'user.name', 'Acorn E2E'])
+  execFileSync('git', ['-C', dir, 'remote', 'add', 'origin', 'https://github.com/acorn/smoke.git'])
+  execFileSync('git', ['-C', dir, 'commit', '--allow-empty', '-qm', 'init'])
+  return dir
+}
+
+// A fixture that boots the app and a second node and pairs them — the setup four of the five scenarios
+// below share. Returns everything each needs to address either node explicitly.
+type TwoNodes = {
+  running: RunningApp
+  localNodeId: string
+  remote: StandaloneHandshake
+  remoteRoot: string
+  child: ChildProcess
+}
+
+async function pairTwoNodes(): Promise<TwoNodes> {
+  const running = await launch()
+  const localNodeId = (await fleet(running.page)).nodes.find((node) => node.local)?.nodeId
+  if (!localNodeId) throw new Error('main never adopted the local node.')
+  const remoteRoot = mkdtempSync(join(tmpdir(), 'acorn-node-b-'))
+  roots.push(remoteRoot)
+  const remote = await startSecondNode(join(remoteRoot, 'data'))
+  const child = children[children.length - 1]!
+
+  const { code } = await remoteJson<PairingWindow>(remote, '/v2/core/pair/start', { method: 'POST' })
+  await running.page.evaluate(async ({ endpoint, code }) => {
+    const bridge = (window as BridgeWindow).acorn
+    if (!bridge) throw new Error('The node broker bridge is missing.')
+    await bridge.nodeProbe(endpoint)
+    await bridge.nodePair({ code, deviceName: 'Two-node e2e client', label: 'Second node' })
+  }, { endpoint: remote.endpoint, code })
+
+  await running.page.reload()
+  await expect(running.page.locator('.shell')).toBeVisible()
+  await dismissOnboarding(running.page)
+  await expect.poll(async () => {
+    const { statuses } = await fleet(running.page)
+    return [localNodeId, remote.nodeId].map((nodeId) => statuses.find((status) => status.nodeId === nodeId)?.state)
+  }, { timeout: 30_000 }).toEqual(['online', 'online'])
+
+  return { running, localNodeId, remote, remoteRoot, child }
+}
+
+const stateOf = async (page: Page, nodeId: string): Promise<NodeStatus['state'] | undefined> =>
+  (await fleet(page)).statuses.find((status) => status.nodeId === nodeId)?.state
 
 // Force the second node's workspace and task onto the FIRST node's UUIDs.
 //
@@ -348,5 +417,179 @@ test('drives the bundled node and a second node concurrently, with per-node cach
   await expect(running.page.locator('.tabrail-task[aria-label="Task on A"]')).toBeVisible()
   await expect(running.page.locator('.tabrail-task[aria-label="Task on B"]')).toHaveCount(0)
 
+  await running.app.close()
+})
+
+// ─── plan.md § Phase 4's exit criteria ──────────────────────────────────────────────────────────────
+//
+// "e2e suite covers two-node scenarios: same-UUID collision across nodes, node offline (stale render +
+// failed mutation kept as draft), revocation mid-session, aggregated surfaces with one node down; a remote
+// task's terminal/agent/preview work end-to-end over the LAN."
+//
+// The collision case is the test above. These are the other four.
+
+test('renders the fleet with one node down: a banner, and every other node still listed', async () => {
+  test.setTimeout(120_000)
+  const { running, localNodeId, remote, child } = await pairTwoNodes()
+
+  // Fleet home only exists with more than one node paired (`SourceContribution.when`), so its presence in the
+  // rail is itself part of the assertion — with a single node the button must not be there at all.
+  await expect(running.page.locator('.tabrail-source[aria-label="Fleet"]')).toBeVisible()
+  await running.page.locator('.tabrail-source[aria-label="Fleet"]').click()
+  await expect(running.page.locator(`.fleet-card[data-node-id="${localNodeId}"]`)).toBeVisible()
+  await expect(running.page.locator(`.fleet-card[data-node-id="${remote.nodeId}"]`)).toBeVisible()
+
+  // SIGKILL, and the two rejected alternatives are findings in their own right (both recorded in
+  // docs/vNext/phase4-notes.md):
+  //
+  //   - SIGSTOP leaves the process holding its sockets open without answering, which is the truer picture of
+  //     a laptop that went to sleep — and the broker does NOT detect it. Nothing closes, so no reconnect is
+  //     attempted and the node reads `online` indefinitely: there is no application-level heartbeat on the
+  //     events socket.
+  //   - SIGTERM runs standalone.ts's drain (plugins, SQLite, the root lock) before exiting, which took long
+  //     enough that the socket outlived a 30-second poll.
+  //
+  // What this criterion asks about is a node that has gone away, and SIGKILL is that unambiguously.
+  child.kill('SIGKILL')
+  try {
+    await expect.poll(() => stateOf(running.page, remote.nodeId), { timeout: 60_000 }).not.toBe('online')
+
+    // The criterion: "aggregated surfaces with one node down". BOTH cards stay rendered — never a failed
+    // page (architecture.md § Fleet semantics) — and the one that went away says so.
+    //
+    // It is NOT asserted that a `.fleet-banner` appears, and that is a correction to this test's first
+    // version rather than a gap. `createFleetQuery` falls back to the dead node's OWN QueryClient, which is
+    // warm from the successful render above, so the honest rendering here is a STALE ROW and the banner is
+    // reserved for a node that has never answered. That fallback is the whole point of partitioning the cache
+    // per node, so asserting the banner instead would have been asserting the weaker behaviour. The banner
+    // path is covered directly, with an empty cache, in client-core's fanout.test.ts.
+    await expect(running.page.locator(`.fleet-card[data-node-id="${remote.nodeId}"] .node-chip`))
+      .toHaveAttribute('data-freshness', 'offline', { timeout: 30_000 })
+    await expect(running.page.locator(`.fleet-card[data-node-id="${localNodeId}"] .node-chip`))
+      .toHaveAttribute('data-freshness', 'live')
+    await expect(running.page.locator(`.fleet-card[data-node-id="${localNodeId}"]`)).toBeVisible()
+    await expect(running.page.locator(`.fleet-card[data-node-id="${remote.nodeId}"]`)).toBeVisible()
+    // Served from cache, not blanked: the task count is still a number rather than the em dash the card shows
+    // when a node has said nothing at all. ui.md: "reads come from cache with badges."
+    await expect(running.page.locator(`.fleet-card[data-node-id="${remote.nodeId}"] .fleet-card-stats dd`).first())
+      .not.toHaveText('—')
+
+    // The other half of this criterion — a mutation to an offline node failing fast with `node_offline` and
+    // the user's text kept as a draft — is NOT asserted here, deliberately. It lives inside `apiClient.send`,
+    // and reaching it from Playwright would mean either importing a renderer module by specifier (which the
+    // bundle does not expose at runtime) or driving a whole compose form. It is covered directly, with
+    // non-vacuity checks, in packages/client-core/src/apiClient.test.ts and by PullDetail's `runThenClear`.
+  } finally {
+    // afterEach kills it again, harmlessly.
+  }
+  await running.app.close()
+})
+
+test('reports a node as revoked when it revokes this client mid-session', async () => {
+  test.setTimeout(120_000)
+  const { running, remote } = await pairTwoNodes()
+
+  // Revoked FROM the node, by the test process — not through the client, or this would be asserting that
+  // the client agrees with itself. protocol.md § Pairing: "deleting a device row invalidates its token
+  // immediately — open sockets are closed, in-flight requests fail."
+  const devices = await remoteJson<{ devices: { id: string; name: string }[] }>(remote, '/v2/core/devices')
+  const ours = devices.devices.find((device) => device.name === 'Two-node e2e client')
+  if (!ours) throw new Error('The node does not list the device it just paired.')
+  await remoteJson(remote, `/v2/core/devices/${ours.id}`, { method: 'DELETE' })
+
+  // `revoked`, specifically — not `offline`. The broker distinguishes them (a 401 whose envelope says
+  // `unauthenticated` stops the reconnect loop entirely), and the distinction is what stops the app
+  // retrying forever against a node that has torn up its credential.
+  await expect.poll(() => stateOf(running.page, remote.nodeId), { timeout: 60_000 }).toBe('revoked')
+  // The local node is untouched, which is the fleet property under test: one node's credential failing is
+  // not the fleet failing.
+  expect(await stateOf(running.page, (await fleet(running.page)).nodes.find((node) => node.local)!.nodeId)).toBe('online')
+  await running.app.close()
+})
+
+test('runs a terminal and opens a preview tunnel on a remote task, over the LAN', async () => {
+  test.setTimeout(180_000)
+  const { running, remote, remoteRoot } = await pairTwoNodes()
+
+  // A checkout on the OTHER machine, which is what makes this a remote-task test rather than a local one
+  // with an extra hop: the worktree, the PTY and the dev server all live beside the node.
+  const seeded = await seedRemote(remote, 'Task on B', makeRepo(join(remoteRoot, 'repo')))
+
+  // A terminal on the remote node, attached through the broker exactly as the renderer does. This is the
+  // criterion the stale comment above used to deny: `standalone.ts` runs a real terminal engine.
+  const output = await running.page.evaluate(async ({ nodeId, taskId }) => {
+    const bridge = (window as BridgeWindow).acorn
+    if (!bridge) throw new Error('The node broker bridge is missing.')
+    const created = await bridge.nodeFetch(nodeId, {
+      requestId: `e2e-term-${Math.random().toString(36).slice(2)}`,
+      path: '/v2/p/terminal/sessions',
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: { kind: 'bytes', bytes: new TextEncoder().encode(JSON.stringify({ taskId, profileId: 'shell', command: "printf 'ACORN_REMOTE_ECHO\\n'", title: 'Remote terminal' })) },
+    })
+    const text = new TextDecoder().decode(created.body)
+    if (created.status < 200 || created.status >= 300) throw new Error(`create session: ${created.status} ${text}`)
+    const sessionId = (JSON.parse(text) as { id: string }).id
+    return new Promise<string>((resolve, reject) => {
+      let seen = ''
+      const off = bridge.onNodeFrame((frameNodeId, raw) => {
+        const frame = raw as { channel?: string; id?: string; msg?: { type: string; data?: string } }
+        if (frameNodeId !== nodeId || frame.channel !== 'term:out' || frame.id !== sessionId || !frame.msg) return
+        if (frame.msg.type === 'output') seen += frame.msg.data ?? ''
+        if (frame.msg.type === 'exit') { window.clearTimeout(timer); off(); resolve(seen) }
+      })
+      const timer = window.setTimeout(() => { off(); reject(new Error(`remote terminal timeout: ${seen}`)) }, 30_000)
+      bridge.nodeSend(nodeId, { channel: 'term:attach', id: sessionId })
+    })
+  }, { nodeId: remote.nodeId, taskId: seeded.taskId })
+  expect(output).toContain('ACORN_REMOTE_ECHO')
+
+  // The preview tunnel. A plain HTTP server stands in for a dev server on the node's host — in this fixture
+  // that is the same machine, but nothing in the path knows it: the bytes still cross the pinned WebSocket
+  // to `/v2/tunnel` and come back through a loopback listener main created.
+  const server = createHttpServer((_request, response) => {
+    response.writeHead(200, { 'content-type': 'text/plain' })
+    response.end('ACORN_TUNNEL_OK')
+  })
+  await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', () => resolve()))
+  const devPort = (server.address() as { port: number }).port
+  try {
+    // Declared, which is what makes it tunnellable at all — "Only declared ports; no general SOCKS". Through
+    // the CONFIG route (`/repos/path/config`), not `/repos/path`: the first is the authoring surface for the
+    // executable half of repo config and takes a `patch`, the second sets the checkout location.
+    await remoteJson(remote, '/v2/core/repos/path/config', {
+      method: 'PUT',
+      body: { owner: 'acorn', repo: 'smoke', patch: { previewMode: 'port', previewValue: String(devPort) } },
+    })
+
+    // The renderer opens the tunnel and learns only a loopback port…
+    const tunnelPort = await running.page.evaluate(async ({ nodeId, taskId, devPort }) => {
+      const bridge = (window as BridgeWindow).acorn
+      if (!bridge) throw new Error('The node broker bridge is missing.')
+      return (await bridge.nodeTunnelOpen({ nodeId, taskId, port: devPort })).port
+    }, { nodeId: remote.nodeId, taskId: seeded.taskId, devPort })
+    // A LOCAL port, not the node's — the whole point. The renderer never learns the node's endpoint.
+    expect(tunnelPort).not.toBe(devPort)
+
+    // …and the BYTES are fetched from this process, not from the page. The first version used `fetch` inside
+    // `page.evaluate` and got "Failed to fetch", which is the architecture working rather than a bug: the
+    // renderer loads from app://acorn under a `connect-src 'self'` CSP and has no network permission at all
+    // (security.md § Transport). The preview pane does not fetch the tunnel either — a WebContentsView does,
+    // and that is a separate guest contents outside the renderer's policy. So an out-of-page client is the
+    // faithful stand-in.
+    const body = await new Promise<{ status: number; text: string }>((resolvePromise, reject) => {
+      const request = httpGet({ host: '127.0.0.1', port: tunnelPort, path: '/' }, (response) => {
+        const chunks: Buffer[] = []
+        response.on('data', (chunk: Buffer) => chunks.push(chunk))
+        response.on('end', () => resolvePromise({ status: response.statusCode ?? 0, text: Buffer.concat(chunks).toString('utf8') }))
+      })
+      request.on('error', reject)
+      request.end()
+    })
+    expect(body.status).toBe(200)
+    expect(body.text).toBe('ACORN_TUNNEL_OK')
+  } finally {
+    await new Promise<void>((resolve) => server.close(() => resolve()))
+  }
   await running.app.close()
 })
