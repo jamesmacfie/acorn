@@ -358,3 +358,40 @@ export const idempotency = sqliteTable(
   },
   (t) => [primaryKey({ columns: [t.deviceId, t.key] }), index('idempotency_expiry_idx').on(t.expiresAt)],
 )
+
+// Append-only record of security-relevant actions (docs/vNext/security.md § Audit, data.md § Core DB).
+// Promised since the specs were written and empty until Phase 5.
+//
+// What it is FOR, which decides its shape: an owner asking "what happened to this node?" after finding
+// a device they do not recognise, a credential they did not connect, or a plugin they did not disable.
+// It is not a debugging log and not an intrusion-detection feed.
+//
+// Deliberately NOT tamper-evident. security.md says so outright — hash chains defend against an attacker
+// who already owns the DB file, and a compromised machine is out of scope. Adding them would be
+// ceremony that changes no outcome.
+//
+// `details` is JSON of allowlisted scalars only, decided at each call site. Never a request body, never
+// a credential, never a file's contents — an audit trail that quotes what it saw becomes a second copy
+// of the thing it was protecting.
+export const audit = sqliteTable(
+  'audit',
+  {
+    id: text('id').primaryKey(), // uuid
+    at: integer('at').notNull(),
+    // WHO: 'device' is a paired client (actorId is its device id), 'internal' is a child process this
+    // node spawned, 'system' is the node acting on its own behalf (boot-time decisions).
+    actor: text('actor').notNull(),
+    actorId: text('actor_id'),
+    // WHAT, as a dotted verb from a closed set (server/audit.ts's AuditAction). A closed set rather than
+    // free text because the settings surface groups and filters on it, and because an action nobody can
+    // enumerate is one nobody reviews.
+    action: text('action').notNull(),
+    // WHICH THING: a device id, an `owner/repo`, a plugin name, a connection id. Deliberately one opaque
+    // string rather than a typed reference — the rows outlive what they point at, which is the whole
+    // point of keeping them after a delete.
+    subject: text('subject'),
+    details: text('details'),
+  },
+  // Every read is "the most recent N", and the 90-day prune is a range delete over the same column.
+  (t) => [index('audit_at_idx').on(t.at)],
+)

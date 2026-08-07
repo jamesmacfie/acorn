@@ -27,6 +27,7 @@ import '../wiring/agentProfiles'
 import { join } from 'node:path'
 import { closeListener, devDataDir, drainWithDeadline, makeRuntime, startListener } from '@acorn/node-core/main/server.ts'
 import { openDataRoot } from '@acorn/node-core/main/dataRoot.ts'
+import { pruneAudit } from '@acorn/node-core/server/audit.ts'
 import { resolveDeviceToken } from '@acorn/node-core/server/auth/deviceTokens.ts'
 import { mintInternalToken, type InternalEnvFactory } from '@acorn/node-core/server/auth/internalTokens.ts'
 import { createCoreServices } from '@acorn/node-core/main/core/index.ts'
@@ -57,6 +58,8 @@ const root = openDataRoot(process.env.ACORN_DATA_DIR || devDataDir())
 const runtime = makeRuntime(root)
 const disabledPlugins = disabledPluginsStore(root.dir)
 await runtime.IDEMPOTENCY.cleanupExpired() // reclaim yesterday's replay rows; see service/runtime.ts
+// Audit retention, 90 days (docs/vNext/data.md § Retention defaults). Same moment, same reasoning.
+await pruneAudit(runtime.DB).catch((error) => console.warn('[node] audit prune failed:', error))
 setWorktreesRoot(join(root.dir, 'worktrees'))
 
 // The same deps the supervised composition root supplies (service/runtime.ts explains why each one
