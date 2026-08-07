@@ -12,12 +12,20 @@ A fresh vNext install must look and behave like V1. That means, concretely:
   notes (30, ⌘⇧D), context (40, ⌘⇧X), editor (50, ⌘⇧E), search (60, ⌘⇧F), database (70, ⌘⇧J),
   docker (75), http (76, ⌘⇧H), preview (80, ⌘⇧B), linear (⌘⇧L), rollbar (⌘⇧O).
 - The 6 default sources: GitHub, Docker, API Requests, Linear, Rollbar, Agent Center.
-- Command palette, ⌘1–9 pane focus, ⌘⇧T terminal drawer, ⌘⇧N new task, typing protection,
+- Command palette, ⌘1–9 task activation, ⌘⇧T terminal drawer, ⌘⇧N new task, typing protection,
   12 themes × 4 style packs (the two-axis appearance system), settings pages.
 - Task creation flows (from PR, Linear issue, Rollbar item, or local), lazy worktree creation,
   branch-prefix rules — all V1 behavior.
 
+(⌘1–9 read "pane focus" here until Phase 5. It was simply wrong: both V1 and vNext bind
+`task.activate.N` — activate the Nth visible task — and the prose was corrected rather than the code.)
+
 Parity is a checklist to walk in the release phase (plan.md), not a wire-compatibility claim.
+The half of it that is a declared literal in a registry — the 13 panes with their orders and chords,
+the 6 sources with their rail order, 12 themes, 4 style packs, and the shell's own chords — is
+asserted in `apps/desktop/test/client/parity.test.ts`; the fleet half, which is invisible with one
+node, is asserted in `apps/desktop/e2e/twoNode.spec.ts`; the rest is
+[parity-checklist.md](./parity-checklist.md), walked by a person.
 Storage keys and formats may change; visible behavior may not, except for the recorded
 divergences: editor autosave surfaces conflicts instead of unconditionally overwriting;
 `/api/v1` automation tokens are gone; preview's raw shell URL-script mode is removed.
