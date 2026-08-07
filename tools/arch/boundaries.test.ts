@@ -200,6 +200,55 @@ describe('architecture boundaries', () => {
     expect([...new Set([...badExternal, ...badFirstParty])].sort()).toEqual([])
   })
 
+  it('apps reach plugins through entrypoints or contract/ (shrinking baseline)', () => {
+    // A plugin's public surface is its three entrypoints — node/index.ts, client/index.ts,
+    // main/index.ts — plus contract/, which is also what another plugin may import. An app is allowed
+    // to know more than a plugin does, but "allowed to import anything" is how a composition root ends
+    // up depending on an internal module that was never meant to be load-bearing. That is what this
+    // ratchet measures: it may only shrink.
+    //
+    // Three of these were retired by moving their capability ids into contract/ (agents.runtime,
+    // workflows.runner, memory.knowledge); the rest are honest work still to do. `profiles-*` go with
+    // the Tier 3 sweep, and the `*State`/`*Slice` client modules go with finding 11, which gives
+    // per-node state one registered eviction hook instead of a hand-maintained list in the shell.
+    //
+    // Tests are exempt. A test may reach into whatever it is testing, and holding integration tests to
+    // the production surface would only push them into re-exporting internals through it.
+    const APP_DEEP_IMPORT_BASELINE = [
+      '@acorn/plugin-agents/client/managedStore.ts',
+      '@acorn/plugin-context/client/selectionState.ts',
+      '@acorn/plugin-context/client/syncState.ts',
+      '@acorn/plugin-editor/client/editorState.ts',
+      '@acorn/plugin-editor/client/editorTreeState.ts',
+      '@acorn/plugin-editor/client/editorViewState.ts',
+      '@acorn/plugin-github/client/pullList/filterState.ts',
+      '@acorn/plugin-github/client/reviewViewState.ts',
+      '@acorn/plugin-notes/client/notesPaneState.ts',
+      '@acorn/plugin-notes/main/seedTaskNotes.ts',
+      '@acorn/plugin-onboarding/client/index.tsx',
+      '@acorn/plugin-preview/main/browserService.ts',
+      '@acorn/plugin-preview/main/previewService.ts',
+      '@acorn/plugin-profiles-aider/main/aider.ts',
+      '@acorn/plugin-profiles-claude/main/claudeCode.ts',
+      '@acorn/plugin-profiles-codex/main/codex.ts',
+      '@acorn/plugin-terminal/main/pickerIpc.ts',
+      '@acorn/plugin-terminal/main/terminal.ts',
+    ]
+    const ENTRYPOINTS = ['/node/index.ts', '/client/index.ts', '/main/index.ts']
+    // Broader than the suite's `isTest`, which only matches the `.test.ts` suffix: an app's test tree
+    // also holds fixtures and harnesses (apps/node/test/registerProviders.ts, apps/desktop/e2e/) that
+    // are test code by location rather than by filename.
+    const inTestTree = (file: string) => /\/(test|e2e)\//.test(rel(file))
+    const deep = EDGES.filter((e) => e.fromPkg.kind === 'app' && !e.isTest && !inTestTree(e.fromFile))
+      .filter((e) => e.target.pkg?.kind === 'plugin' && e.target.pkg.name !== e.fromPkg.name)
+      .filter((e) => {
+        const rest = e.spec.split('/').slice(2)
+        return rest.length > 0 && rest[0] !== 'contract' && !ENTRYPOINTS.some((entry) => e.spec.endsWith(entry))
+      })
+      .map((e) => e.spec)
+    expect([...new Set(deep)].sort()).toEqual([...APP_DEEP_IMPORT_BASELINE].sort())
+  })
+
   it('protocol declares no plugin route', () => {
     // The rule that keeps api.ts from becoming a mixing bowl again. It was 701 lines holding route
     // builders for nine plugins' namespaces, which meant no plugin could define its own wire surface

@@ -472,17 +472,5 @@ export class ManagedAgentRuntime extends ManagedAgentEngine {
 
 }
 
-// agents.runtime — the post-listener reconcile pass, exactly as `workflows.runner` is.
-//
-// Deliberately in main/ rather than contract/: its only consumer is the composition root, and an app may
-// import any plugin. A contract/ file is for the surface ANOTHER PLUGIN may import, and no plugin has any
-// business sweeping this one's unsettled sessions.
-//
-// One method, not the runtime object. reconcile() has to run after the listener binds (a resumed
-// session's tools call the node's own loopback surface) and before the root resolves its `reconciled`
-// promise, because the sweep interrupts every active turn and expires every pending request — anything
-// started before it would be clobbered. That ordering is the composition root's to own; publishing the
-// whole runtime would let it own rather more than that.
-export const AGENTS_RUNTIME = capabilityId<{ reconcile(): Promise<void> }>('agents.runtime')
 
 export type { AgentRuntimeOptions }
