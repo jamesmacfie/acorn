@@ -23,6 +23,7 @@ import NodeGate from '@acorn/client-core/node/NodeGate.tsx'
 import NodeChip from '@acorn/client-core/node/NodeChip.tsx'
 import { activeNodeId, nodeReady, setActiveNode } from '@acorn/client-core/node/activeNode.ts'
 import { nodes } from '@acorn/client-core/node/fleet.ts'
+import { applyNodePlugins } from './activate'
 import TaskView from './TaskView'
 import Acorn from '@acorn/client-core/Acorn.tsx'
 import { clientEvents } from '@acorn/client-core/registries/clientEvents.ts'
@@ -144,6 +145,11 @@ export default function App() {
     onCleanup(startClientPollers())
     onCleanup(initWorkflowNotices())
   })
+
+  // Which plugins the node we just switched to runs. `defer` because index.tsx already applied the list
+  // for the node this window opened on, and re-running the host during the first render would dispose and
+  // re-register every contribution mid-paint. Not for the initial node — for the second one onwards.
+  createEffect(on(activeNodeId, () => void applyNodePlugins(), { defer: true }))
 
   // Gated on having a node to ask, not on an identity: there is no login. NodeGate below holds the
   // screen until `nodeReady()`, so these only ever fire against a selected node.

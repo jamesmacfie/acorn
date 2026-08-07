@@ -20,6 +20,7 @@ const PROTECTED_PATHS: [string, string][] = [
   // Device administration sits BELOW the gate even though pairing sits above it: a device route that
   // drifted above requireUser would be an unauthenticated hole (routes/pairing.ts).
   ['GET', '/v2/core/devices'],
+  ['GET', '/v2/core/plugins'], // node administration: which plugins this node runs (routes/plugins.ts)
   ['GET', '/v2/p/changes/tasks/t1/review-notes'],
   ['GET', '/v2/p/memory/tasks/t1/notes'],
   ['GET', '/v2/p/linear/projects'],

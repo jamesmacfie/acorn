@@ -10,6 +10,8 @@ import { mintInternalToken, type InternalEnvFactory } from '@acorn/node-core/ser
 import { CapabilityRegistry } from '@acorn/node-core/server/plugin/capabilities.ts'
 import { initPlugins } from '@acorn/node-core/server/plugin/host.ts'
 import { createCoreServices } from '@acorn/node-core/main/core/index.ts'
+import { disabledPluginsStore } from '@acorn/node-core/main/disabledPlugins.ts'
+import { setPluginsBridge } from '@acorn/node-core/server/routes/plugins.ts'
 import { nodePlugins } from '../server/plugins'
 import { makeRuntime, startListener } from '@acorn/node-core/main/server.ts'
 import { openDataRoot, type DataRoot } from '@acorn/node-core/main/dataRoot.ts'
@@ -118,6 +120,9 @@ export async function startServiceRuntime({ config, desktop, stateChanged }: Run
     throw error
   }
   const db = runtime.DB
+  // Read before the plugin host runs and before any route can answer, which is why it is a file in the
+  // data root rather than a settings row: the list decides which databases get opened at all.
+  const disabledPlugins = disabledPluginsStore(config.dataDir)
 
   const stop = async (): Promise<void> => {
     if (stopped) return
@@ -270,10 +275,19 @@ export async function startServiceRuntime({ config, desktop, stateChanged }: Run
             (await capabilities.get(GITHUB_MIRROR)?.failingChecks(runtime.ACTIVE_IDENTITY.get(), taskId)) ?? null,
         },
       }),
-      { capabilities, core, disabled: config.disabledPlugins },
+      // The persisted per-node list UNION the start config's. The file is the owner's setting, and it is
+      // the only form a remote node can have — nothing about a launchd boot consults a client's fleet
+      // file. The start config stays an override for tests and `dev:node`, which want to pin a list
+      // without writing into a data root.
+      { capabilities, core, disabled: [...new Set([...disabledPlugins.get(), ...(config.disabledPlugins ?? [])])] },
     )
     disposePlugins = plugins.dispose
     if (plugins.skipped.length) console.log(`[service:boot] plugins disabled for this node: ${plugins.skipped.join(', ')}`)
+    setPluginsBridge({
+      roster: () => plugins.roster,
+      disabled: () => disabledPlugins.get(),
+      setDisabled: (names) => disabledPlugins.set(names),
+    })
 
     wireConfigTrust(db)
     // wireContextSections is GONE. Context sections are a per-plugin contribution point now

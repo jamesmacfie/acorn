@@ -9,6 +9,7 @@ import { getContextSections } from '@acorn/node-core/server/agentTools/contextSe
 import { connectionProviderRegistry } from '@acorn/node-core/server/integrations/connectionRegistry.ts'
 import { integrationProviderRegistry } from '@acorn/node-core/server/integrations/registry.ts'
 import { modelProviderRegistry } from '@acorn/node-core/server/modelProviders/registry.ts'
+import type { PluginRosterEntry } from '@acorn/node-core/server/plugin/host.ts'
 import { makeTestDb, type TestDb } from '@acorn/node-core/server/routes/testDb.ts'
 import { createCoreServices } from '@acorn/node-core/main/core/index.ts'
 import { SecretService } from '@acorn/node-core/main/core/index.ts'
@@ -170,7 +171,7 @@ describe('disabling a node plugin', () => {
   // files sitting on disk and the two lists were identical by construction. Comparing them would have been a
   // guaranteed pass — a test that cannot fail — which is why the old file built the list and then never
   // compared it. A separate root per boot makes "the disabled plugin did not open its file" observable.
-  const start = async (disabled?: readonly string[]): Promise<{ enabled: readonly string[]; skipped: readonly string[]; snapshot: Snapshot }> => {
+  const start = async (disabled?: readonly string[]): Promise<{ enabled: readonly string[]; skipped: readonly string[]; roster: readonly PluginRosterEntry[]; snapshot: Snapshot }> => {
     const dataDir = mkdtempSync(join(tmpdir(), 'acorn-plugin-disable-'))
     dataRoots.push(dataDir)
     const { initPlugins } = await import('@acorn/node-core/server/plugin/host.ts')
@@ -185,6 +186,7 @@ describe('disabling a node plugin', () => {
     return {
       enabled: result.enabled,
       skipped: result.skipped,
+      roster: result.roster,
       snapshot: {
         routes: pluginRouteContributions().map((c) => `${c.plugin}${c.prefix}`).sort(),
         tools: agentToolContributions().map((t) => t.name).sort(),
@@ -301,8 +303,21 @@ describe('disabling a node plugin', () => {
   })
 
   it('ignores the flag for a required plugin', async () => {
-    const { enabled, skipped } = await start(required)
+    const { enabled, skipped, roster } = await start(required)
     expect(skipped).toEqual([])
     expect(enabled).toEqual(all.map((p) => p.name))
+    // And the roster says so too, which is what Settings → Plugins renders: a required plugin named in
+    // the disabled list is still `disabled: false`, so the page cannot offer a checkbox that would not
+    // stick.
+    expect(roster.filter((entry) => entry.disabled)).toEqual([])
+  })
+
+  it('reports a roster covering every offered plugin, including the skipped ones', async () => {
+    // `enabled` + `skipped` is not the list Settings → Plugins needs: it says nothing about which names
+    // are `required` and therefore not togglable, and a disabled plugin still has to appear as a row.
+    const { roster } = await start(['docker', 'rollbar'])
+    expect(roster.map((entry) => entry.name)).toEqual(all.map((p) => p.name))
+    expect(roster.filter((entry) => entry.required).map((entry) => entry.name).sort()).toEqual(required.sort())
+    expect(roster.filter((entry) => entry.disabled).map((entry) => entry.name)).toEqual(['docker', 'rollbar'])
   })
 })

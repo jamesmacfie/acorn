@@ -8,6 +8,7 @@ import { CORE_NAMESPACE, PLUGIN_NAMESPACE, pluginRouteContributions, routeMountP
 import { integrations } from './routes/integrations'
 import { pairingRoutes } from './routes/pairing'
 import { prefs } from './routes/prefs'
+import { plugins } from './routes/plugins'
 import { harness } from './routes/harness'
 import { agentTools, agentToolsCatalog } from './routes/agentTools'
 import { taskContext } from './routes/taskContext'
@@ -65,6 +66,11 @@ export function createApp() {
     .use(`${CORE_NAMESPACE}/pair/*`, requireDevice)
     .use(`${CORE_NAMESPACE}/devices`, requireDevice)
     .use(`${CORE_NAMESPACE}/devices/*`, requireDevice)
+    // Node administration, same class as devices: which plugins this node runs decides which routes
+    // exist and which SQLite files open, so a task-scoped agent must not be able to read the list (it
+    // enumerates the surface) or write it (it could disable the plugin whose gate it is standing behind
+    // and get a different node on the next restart).
+    .use(`${CORE_NAMESPACE}/plugins`, requireDevice)
     // Task scope, enforced by MOUNT rather than per handler. A 'task'-scoped internal credential may act
     // only on the task it names (server/auth/internalTokens.ts). An adversarial review confirmed that a
     // per-route guard had been applied at one site out of six, leaving arbitrary shell execution in
@@ -93,6 +99,7 @@ export function createApp() {
     .use(`${CORE_NAMESPACE}/integrations/*`, requireProviderAccess)
     .route(CORE_NAMESPACE, pairing.core) // /pair, /pair/start, /devices — owner-only device administration
     .route(`${CORE_NAMESPACE}/prefs`, prefs)
+    .route(`${CORE_NAMESPACE}/plugins`, plugins) // Settings → Plugins: the roster + the per-node toggle
     .route(`${CORE_NAMESPACE}/workspaces`, workspaces)
     .route(`${CORE_NAMESPACE}/tasks`, tasks)
     .route(`${CORE_NAMESPACE}/tasks`, configTrust)

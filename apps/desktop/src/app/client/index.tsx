@@ -1,6 +1,6 @@
 /* @refresh reload */
 import { render } from 'solid-js/web'
-import './activate'
+import { applyNodePlugins } from './activate'
 import { Show } from 'solid-js'
 import { PersistQueryClientProvider } from '@tanstack/solid-query-persist-client'
 import { Route, Router } from '@solidjs/router'
@@ -34,6 +34,12 @@ wsOnReconnect(() => void clientFor(activeCacheId()).client.invalidateQueries({ r
 // shell's onMount side effects (session tracking, pollers) do not sit behind NodeGate's <Show>, so
 // rendering first would fire requests with no node selected.
 await selectActiveNode()
+
+// …and then which of that node's plugins are on, before anything renders a pane switcher. A node switch
+// re-applies it (App.tsx), which is safe because the plugin host replaces a plugin's contributions rather
+// than appending them. Not awaited-and-fatal: `applyNodePlugins` swallows a read failure and leaves the
+// full contribution set active, because a node that cannot answer must not cost the owner their UI.
+await applyNodePlugins()
 
 render(
   () => (

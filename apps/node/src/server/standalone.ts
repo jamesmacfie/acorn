@@ -17,6 +17,8 @@ import { openDataRoot } from '@acorn/node-core/main/dataRoot.ts'
 import { resolveDeviceToken } from '@acorn/node-core/server/auth/deviceTokens.ts'
 import { mintInternalToken, type InternalEnvFactory } from '@acorn/node-core/server/auth/internalTokens.ts'
 import { createCoreServices } from '@acorn/node-core/main/core/index.ts'
+import { disabledPluginsStore } from '@acorn/node-core/main/disabledPlugins.ts'
+import { setPluginsBridge } from '@acorn/node-core/server/routes/plugins.ts'
 import { CapabilityRegistry } from '@acorn/node-core/server/plugin/capabilities.ts'
 import { initPlugins } from '@acorn/node-core/server/plugin/host.ts'
 import { setWorktreesRoot } from '@acorn/node-core/main/taskWorktree.ts'
@@ -38,6 +40,7 @@ import type { BrowserDesktopCapability } from '@acorn/protocol/desktopCapabiliti
 // share one root explicitly instead of racing over SQLite.
 const root = openDataRoot(process.env.ACORN_DATA_DIR || devDataDir())
 const runtime = makeRuntime(root)
+const disabledPlugins = disabledPluginsStore(root.dir)
 await runtime.IDEMPOTENCY.cleanupExpired() // reclaim yesterday's replay rows; see service/runtime.ts
 setWorktreesRoot(join(root.dir, 'worktrees'))
 
@@ -115,8 +118,16 @@ const plugins = await initPlugins(
         (await capabilities.get(GITHUB_MIRROR)?.failingChecks(runtime.ACTIVE_IDENTITY.get(), taskId)) ?? null,
     },
   }),
-  { capabilities, core },
+  // The same per-node file the supervised root reads (main/disabledPlugins.ts). It matters MORE here:
+  // this is the entry a remote node boots from, and a client's fleet file has no say in a launchd start,
+  // so this file is the only place a "disable docker on the build box" setting could live.
+  { capabilities, core, disabled: disabledPlugins.get() },
 )
+setPluginsBridge({
+  roster: () => plugins.roster,
+  disabled: () => disabledPlugins.get(),
+  setDisabled: (names) => disabledPlugins.set(names),
+})
 
 // Awaited, not fire-and-forget: there is nothing to hand back until the listener has bound, and a
 // listen failure now exits non-zero with its reason instead of leaving a process alive that answers
