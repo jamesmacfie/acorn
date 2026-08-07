@@ -161,7 +161,19 @@ export default function PullDetail(props: { task?: Task } = {}) {
   persistDraft(() => (hasPullParams() ? `pr-comment:${o()}/${r()}/${n()}` : null), draftText, setDraftText)
   persistDraft(() => (hasPullParams() ? `review-body:${o()}/${r()}/${n()}` : null), reviewBody, setReviewBody)
   const [actionError, setActionError] = createSignal('')
+  // Reports the failure and RESOLVES, so a caller chaining `.then` is not left hanging. That is fine for a
+  // fire-and-forget action and wrong for anything that clears the user's text — see `runThenClear`.
   const run = (p: Promise<unknown>) => p.then(refresh).catch((e) => setActionError(String(e.message ?? e)))
+  // Clear the input ONLY on success. Both callers used to be `run(...).then(() => setBody(''))`, and because
+  // `run` catches, that `.then` fired on failure too: a comment submitted against an offline node (or
+  // rejected by GitHub) reported the error and wiped what the user had typed. ui.md § Connection and
+  // staleness vocabulary is explicit — a failed mutation "keeps the user's input as a draft" — and the
+  // drafts are persisted per PR two lines above, which made the loss survive a reload.
+  const runThenClear = (p: Promise<unknown>, clear: () => void) =>
+    p.then(() => {
+      clear()
+      return refresh()
+    }).catch((e: unknown) => setActionError(String((e as Error).message ?? e)))
 
   const [openCheck, setOpenCheck] = createSignal<{ runId: number; name: string } | null>(null)
   const [rerunned, setRerunned] = createSignal(new Set<number>())
@@ -188,13 +200,13 @@ export default function PullDetail(props: { task?: Task } = {}) {
   const submitReviewWith = (event: string) => {
     const body = reviewBody().trim()
     if ((event === 'REQUEST_CHANGES' || event === 'COMMENT') && !body) return
-    run(review.mutateAsync({ event, body })).then(() => setReviewBody(''))
+    void runThenClear(review.mutateAsync({ event, body }), () => setReviewBody(''))
   }
 
   const submitComment = () => {
     const body = draftText().trim()
     if (!body) return
-    run(comment.mutateAsync(body)).then(() => setDraftText(''))
+    void runThenClear(comment.mutateAsync(body), () => setDraftText(''))
   }
   const chooseLabel = (label: Label) => run(addLabel(o(), r(), n(), label.name))
   const selectFile = (path: string) => {

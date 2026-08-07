@@ -20,6 +20,18 @@ export type PaneContribution = {
   minWidth?: number
 }
 
+// There is deliberately NO per-pane `freshness` hook here, and it is worth saying why, because plan.md's
+// "offline/stale rendering everywhere" reads like it wants one.
+//
+// A pane's own query status is only knowable reactively — TanStack's `getQueryState` is a snapshot, so a
+// `freshness(task)` field returning one would render a badge that never updated, which is worse than no
+// badge. Making it reactive means either a QueryObserver subscription per pane per render inside the host's
+// `<For>`, or each pane publishing a signal it does not currently have.
+//
+// What the host renders instead is the NODE's state, which is the half ui.md's vocabulary is actually
+// about (`offline`/`stale`/`error` all come from the connection) and which IS reactive. A pane that wants
+// to say more about its own data renders it in its own header, where it has the query in scope.
+
 export const paneRegistry = new Registry<PaneContribution>('pane')
 
 export const paneContributions = (): readonly PaneContribution[] =>

@@ -2,6 +2,7 @@ import type { ApiError as ApiErrorBody } from '@acorn/protocol/api.ts'
 import type { NodeFetchBody, NodeFetchResponse } from '@acorn/protocol/broker.ts'
 import { acornGlobal } from './capabilities'
 import { activeNodeId } from './node/activeNode'
+import { nodeState } from './node/fleet'
 
 // The renderer's only HTTP surface. Every request goes through Electron main's connection broker
 // (docs/vNext/architecture.md § How the client talks to nodes), which owns the endpoint, the pinned
@@ -55,6 +56,20 @@ type SendOptions = {
   nodeId?: string
 }
 
+// GET and HEAD are the reads; everything else changes something on the node. Defaulted to GET, matching
+// `send`'s own default.
+const isMutation = (method: string | undefined): boolean => {
+  const verb = (method ?? 'GET').toUpperCase()
+  return verb !== 'GET' && verb !== 'HEAD'
+}
+
+// A node whose connection state means a write cannot land. Read from the broker's projection rather than
+// attempted and timed out — main already knows.
+const isWritable = (nodeId: string): boolean => {
+  const state = nodeState(nodeId)
+  return state !== 'offline' && state !== 'revoked'
+}
+
 // The one place a request leaves the renderer.
 async function send(path: string, options: SendOptions = {}): Promise<ApiResponse> {
   const bridge = acornGlobal()
@@ -72,6 +87,26 @@ async function send(path: string, options: SendOptions = {}): Promise<ApiRespons
       signal: options.signal,
     })
     return { ok: res.ok, status: res.status, headers: headersToObject(res.headers), body: new Uint8Array(await res.arrayBuffer()) }
+  }
+
+  // ui.md § Connection and staleness vocabulary: "mutations fail fast with a clear 'node offline' error
+  // and keep the user's input as a draft. Nothing is queued for later automatic replay."
+  //
+  // Fail fast HERE, not by waiting for a TCP timeout. Main holds the socket, so it already knows the node
+  // is unreachable, and without this check a submit sat spinning for the broker's 30s request timeout
+  // before producing a message about connect ECONNREFUSED. A mutation is what matters — a READ against an
+  // offline node is still worth attempting, because the broker may reconnect between the status update
+  // and the request, and a read that fails costs nothing but a stale badge.
+  //
+  // `offline` and `revoked` only. `degraded` is WS-down/HTTP-up, where writes still work, and
+  // `incompatible` gets its own message from the route it fails on.
+  if (isMutation(options.method) && !isWritable(nodeId)) {
+    throw new ApiError(
+      'This node is offline. Your changes have not been sent — they are kept here until it is back.',
+      0,
+      'node_offline',
+      { retryable: true },
+    )
   }
 
   const requestId = nextRequestId()
