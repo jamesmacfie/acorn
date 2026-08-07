@@ -2,6 +2,7 @@ import { For, Show } from 'solid-js'
 import { tasksKey, tasksRoute, type Task } from '@acorn/protocol/api.ts'
 import { readJson } from '../apiClient'
 import { formatNodeStat, nodeStatContributions } from '../registries/nodeStats'
+import { createAttentionInbox } from '../notifications/attentionInbox'
 import { createFleetQuery } from './fanout'
 import { activeNodeId, setActiveNode } from './activeNode'
 import { nodes, nodeStatus } from './fleet'
@@ -39,6 +40,11 @@ export default function FleetHome() {
     )
     return { stat, values }
   })
+
+  // ui.md's "attention count" on the card. Same source of truth as the bell's "Needs you" section, so the
+  // two cannot disagree about how many things are waiting on a node.
+  const inbox = createAttentionInbox()
+  const attentionFor = (nodeId: string) => inbox().rows.filter((row) => row.nodeId === nodeId).length
 
   const countFor = (nodeId: string) => taskCounts().rows.find((row) => row.nodeId === nodeId)?.data
   const unavailable = () => taskCounts().unavailable
@@ -97,6 +103,14 @@ export default function FleetHome() {
                       )
                     }}
                   </For>
+                  <Show when={attentionFor(node.nodeId)}>
+                    {(count) => (
+                      <div>
+                        <dt>Needs you</dt>
+                        <dd class="fleet-card-attention">{count()}</dd>
+                      </div>
+                    )}
+                  </Show>
                   <div>
                     <dt>Last seen</dt>
                     <dd>{formatLastSeen(status()?.lastSeenAt)}</dd>

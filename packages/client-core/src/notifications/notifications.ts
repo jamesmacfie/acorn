@@ -61,7 +61,14 @@ export function registerNoticeTargetHandler(
 }
 
 export function openNoticeTarget(notice: Notice): void {
-  if (notice.target) targetHandlers.get(notice.target.kind)?.(notice.taskId, notice.target)
+  if (notice.target) openTarget(notice.taskId, notice.target)
+}
+
+// The same dispatch for an ATTENTION item, which carries the identical target shape but is not a Notice
+// (registries/attention.ts explains why they are separate types). Exported rather than duplicating the
+// handler-table lookup in the inbox: one table, one place that knows how to open a target.
+export function openTarget(taskId: string, target: NoticeTarget): void {
+  targetHandlers.get(target.kind)?.(taskId, target)
 }
 
 export function pushNotice(n: Omit<Notice, 'id' | 'read'>): Notice {

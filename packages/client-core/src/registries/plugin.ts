@@ -46,6 +46,7 @@ import { agentContextRegistry } from './agentContexts'
 import { agentToolRendererRegistry, type AgentToolRendererContribution } from './agentToolRenderers'
 import { contextSectionRegistry, type ContextSectionContribution } from './contextSections'
 import { paletteRowRegistry, type PaletteRowSource } from './paletteRows'
+import { attentionRegistry, type AttentionSourceContribution } from './attention'
 import { nodeStatRegistry, type NodeStatContribution } from './nodeStats'
 import { paneRegistry, type PaneContribution } from './panes'
 import { refPanelRegistry, type RefPanelContribution } from './refPanels'
@@ -82,6 +83,9 @@ export type ClientPluginContext = {
   // One number on a Fleet home node card. Core supplies the task count; "agents running" is the agents
   // plugin's, and client-core cannot import it (registries/nodeStats.ts).
   nodeStats: ClientContributionPoint<NodeStatContribution>
+  // Rows for the attention inbox — states on a node that need the owner, fetched per node
+  // (registries/attention.ts).
+  attention: ClientContributionPoint<AttentionSourceContribution>
   // Registration into a registry client-core does not own — a registry a PLUGIN publishes.
   //
   // There is exactly one today: plugins/github's `contentLinkRegistry`, which decides which hrefs inside
@@ -181,6 +185,7 @@ function makeContext(name: string, record: (disposable: Disposable) => void): Cl
     pollers: own(pollerRegistry),
     persistedState: own(persistedStateRegistry),
     nodeStats: own(nodeStatRegistry),
+    attention: own(attentionRegistry),
     // Straight through `own`, so a plugin-published registry gets the identical treatment: ownership checked,
     // disposable recorded. The only difference from the members above is that the registry arrives as an
     // argument instead of being named here.

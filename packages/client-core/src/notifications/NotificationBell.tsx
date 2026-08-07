@@ -1,5 +1,8 @@
 import { createSignal, For, onCleanup, onMount, Show } from 'solid-js'
-import { markAllRead, markRead, noticesForActiveNode, openNoticeTarget, unreadCount } from './notifications'
+import { markAllRead, markRead, noticesForActiveNode, openNoticeTarget, openTarget, unreadCount } from './notifications'
+import { createAttentionInbox } from './attentionInbox'
+import { activeNodeId, setActiveNode } from '../node/activeNode'
+import { nodes } from '../node/fleet'
 import { noticeKindContribution } from '../registries/notices'
 import Icon from '../ui/Icon'
 import './notifications.css'
@@ -13,9 +16,21 @@ const relTime = (at: number): string => {
   return `${Math.round(s / 86400)}d`
 }
 
-// The top-bar bell (docs/terminal-and-agents.md): unread pill + popover inbox. Clicking a row selects its task.
+// The top-bar bell (docs/terminal-and-agents.md): unread pill + popover, now holding TWO sections.
+//
+// "Needs you" is the attention inbox (ui.md § Prompts and notifications), fleet-wide and fetched from every
+// node. It shares the popover with notices rather than getting its own surface because the two answer
+// adjacent questions — "what needs me" and "what happened" — and the popover already has the row chrome,
+// the target-handler table and the task navigation both need. A separate rail source would have duplicated
+// all three and split the unread pill's meaning.
+//
+// The sections differ in kind and the copy says so: an attention item is a STATE on the node and cannot be
+// dismissed from here (dismiss it and the next fetch brings it back, correctly); a notice is an event that
+// already happened and is client-local.
 export default function NotificationBell(props: { onSelectTask: (taskId: string) => void }) {
   const [open, setOpen] = createSignal(false)
+  const inbox = createAttentionInbox()
+  const multiNode = () => nodes().length > 1
   let rootRef: HTMLDivElement | undefined
 
   const onDocPointer = (e: PointerEvent) => {
@@ -28,12 +43,56 @@ export default function NotificationBell(props: { onSelectTask: (taskId: string)
     <div class="notify-bell" ref={rootRef}>
       <button type="button" class="theme-toggle" title="Notifications" aria-expanded={open()} onClick={() => setOpen(!open())}>
         ◔
-        <Show when={unreadCount()}>
-          <span class="notify-count">{unreadCount()}</span>
+        {/* One pill for both sections. An attention item always counts — it is unresolved by definition —
+            so it is added rather than max()'d with the unread notices. */}
+        <Show when={unreadCount() + inbox().rows.length}>
+          {(count) => <span class="notify-count">{count()}</span>}
         </Show>
       </button>
       <Show when={open()}>
         <div class="notify-popover">
+          <Show when={inbox().rows.length || inbox().unavailable.length}>
+            <div class="notify-head">
+              <span>Needs you</span>
+            </div>
+            {/* Partial results are a banner, never a failed list (architecture.md § Fleet semantics). */}
+            <Show when={inbox().unavailable.length}>
+              <div class="notify-banner" role="status">
+                <For each={inbox().unavailable}>{(entry) => <span>{entry.label} unavailable</span>}</For>
+              </div>
+            </Show>
+            <ul class="notify-list">
+              <For each={inbox().rows}>
+                {(row) => (
+                  <li>
+                    <button
+                      type="button"
+                      class="notify-row unread"
+                      onClick={() => {
+                        setOpen(false)
+                        // The node FIRST, then the task: navigation resolves against the active node, so
+                        // selecting a task on another node before switching would look up an id that is
+                        // not there (and might collide with a local one).
+                        if (row.nodeId !== activeNodeId()) setActiveNode(row.nodeId)
+                        if (row.item.taskId) props.onSelectTask(row.item.taskId)
+                        if (row.item.target && row.item.taskId) openTarget(row.item.taskId, row.item.target)
+                      }}
+                    >
+                      <span class="notify-glyph" classList={{ 'notify-warn': row.item.severity !== 'info' }}>
+                        <Icon name={row.item.severity === 'info' ? 'info' : 'alert-triangle'} />
+                      </span>
+                      <span class="notify-title">{row.item.title}</span>
+                      <Show when={row.item.detail}><span class="notify-detail muted">{row.item.detail}</span></Show>
+                      {/* The node badge only when there is more than one node — otherwise it is noise
+                          naming the only machine there is (ui.md: first-run never mentions nodes). */}
+                      <Show when={multiNode()}><span class="notify-node muted">{row.node.label}</span></Show>
+                      <span class="notify-time muted">{relTime(row.item.at)}</span>
+                    </button>
+                  </li>
+                )}
+              </For>
+            </ul>
+          </Show>
           <div class="notify-head">
             <span>Notifications</span>
             <button type="button" class="notify-mark-all" onClick={markAllRead}>Mark all read</button>

@@ -41,7 +41,10 @@ export type MemoryApi = {
   list(repo?: string): Promise<MemoryRow[] | { error: string }>
   search(query: string, repo?: string, type?: MemoryType): Promise<(MemoryRow & { rank: number })[] | { error: string }>
   add(p: { taskId: string; scope: 'repo' | 'private'; name: string; description: string; type: MemoryType; body: string }): Promise<{ path: string } | { error: string }>
-  proposals(taskId?: string): Promise<MemoryProposalRow[]>
+  // `options` is the fleet escape hatch (client-core's node/fanout.ts): the attention inbox asks every
+  // paired node for its pending proposals, so this one read has to be addressable. Everything else here
+  // stays on the ambient active node, which is right for a pane bound to one task.
+  proposals(taskId?: string, options?: { nodeId?: string; signal?: AbortSignal }): Promise<MemoryProposalRow[]>
   resolveProposal(id: string, approved: boolean, edited?: { name: string; type: MemoryType; description: string; body: string }): Promise<{ ok: boolean; reason?: string }>
 }
 
@@ -52,7 +55,7 @@ const api: MemoryApi = {
   list: (repo) => readJson<MemoryRow[] | { error: string }>(memoryListRoute(repo)),
   search: (query, repo, type) => readJson<(MemoryRow & { rank: number })[] | { error: string }>(memorySearchRoute(query, repo, type)),
   add: (p) => post<{ path: string } | { error: string }>(memoryAddRoute(p.taskId), { scope: p.scope, name: p.name, description: p.description, type: p.type, body: p.body }),
-  proposals: (taskId) => readJson<MemoryProposalRow[]>(memoryProposalsRoute(taskId)),
+  proposals: (taskId, options) => readJson<MemoryProposalRow[]>(memoryProposalsRoute(taskId), options ?? {}),
   resolveProposal: (id, approved, edited) => post<{ ok: boolean; reason?: string }>(memoryResolveProposalRoute(id), { approved, edited }),
 }
 

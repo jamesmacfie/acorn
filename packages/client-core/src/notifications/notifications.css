@@ -79,3 +79,15 @@
   pointer-events: none;
   z-index: var(--z-base);
 }
+
+/* The attention inbox's banner and node badge (notifications/attentionInbox.ts). The rows themselves
+   reuse .notify-row: an attention item and a notice differ in lifecycle, not in shape. */
+.notify-banner {
+  padding: var(--space-2) var(--space-3);
+  color: var(--warn);
+  font-size: var(--fs-xs);
+}
+.notify-node {
+  font-size: var(--fs-xs);
+  white-space: nowrap;
+}
