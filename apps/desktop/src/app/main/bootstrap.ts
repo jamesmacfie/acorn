@@ -9,6 +9,7 @@ import { NodeBroker } from './nodeBroker'
 import { brokerPushTargets, registerNodeBrokerIpc } from './nodeBrokerIpc'
 import { PreviewTunnels } from './previewTunnel'
 import { ServiceHost } from './serviceHost'
+import { MAX_CRASHES_PER_WINDOW, recordCrash } from './crashBudget'
 
 export type BootstrapOptions = {
   dataDir: string
@@ -22,9 +23,6 @@ const wait = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(
 // 250·2^(n-1) ms with a >3-in-60s ceiling — much tighter, and tight enough that a service crashing on
 // something durable (a corrupt database, a port it can never bind) burned its budget in under two
 // seconds and quit before a human could read anything.
-const CRASH_BACKOFF_MS = [1_000, 2_000, 4_000, 8_000, 16_000]
-const CRASH_WINDOW_MS = 10 * 60_000
-const MAX_CRASHES_PER_WINDOW = 5
 
 export async function bootstrap({ dataDir, createWindow }: BootstrapOptions): Promise<BrowserWindow> {
   let disposed = false
@@ -201,15 +199,15 @@ export async function bootstrap({ dataDir, createWindow }: BootstrapOptions): Pr
   const recover = async (): Promise<void> => {
     if (recovering || disposed) return
     recovering = true
-    const now = Date.now()
-    crashTimes.push(now)
-    while (crashTimes[0] != null && crashTimes[0] < now - CRASH_WINDOW_MS) crashTimes.shift()
-    if (crashTimes.length > MAX_CRASHES_PER_WINDOW) {
+    // The budget arithmetic is in crashBudget.ts, where it can be tested without booting Electron and
+    // crashing a real service five times.
+    const decision = recordCrash(crashTimes, Date.now())
+    if (!decision.retry) {
       await showRecoveryScreen()
       return
     }
     try {
-      await wait(CRASH_BACKOFF_MS[Math.min(crashTimes.length - 1, CRASH_BACKOFF_MS.length - 1)]!)
+      await wait(decision.delayMs)
       await startService()
       if (window && !window.isDestroyed()) window.webContents.reload()
       console.log('[service-host] background service recovered')
