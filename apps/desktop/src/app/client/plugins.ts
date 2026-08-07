@@ -1,19 +1,20 @@
 // The client plugin list (docs/vNext/plugins.md § The plugin API). The mirror of
 // apps/node/src/server/plugins.ts: one place, one array, and a plugin that is not here does not exist.
 //
-// **Declaration order is load-bearing in exactly one way, and only one.** The rail's Source order is
-// `sourceRegistry.entries()` in registration order, so the rail reads GitHub, Linear, Rollbar, Docker, API,
-// Agents, and the first SIX entries below are in that order to keep it. github joined that block in Phase 3:
-// client-core/tabs/sources.ts used to prepend it as a hardcoded literal outside the registry, so its position
-// was guaranteed by code rather than by this list. e2e S1 asserts the resulting order. Everything else sorts on its own field:
-// panes and settings pages by `order`, slots by `order` within a slot, agent contexts by label. Panes
-// therefore keep their ui.md order (10 pr, 15 agents, 20 changes, 30 notes, 40 context, 50 editor,
-// 60 search, 70 database, 75 docker, 76 http, 80 preview, 90 linear, 100 rollbar) no matter what this
-// file says, which is why the two integration providers can sit at the top without moving their panes.
+// **Declaration order here is load-bearing for NOTHING.** Every client registry sorts on a declared field:
+// panes and settings pages by `order`, slots by `order` within a slot, palette rows by `order`, agent contexts
+// by label — and, as of the Phase 3 review, the rail's Sources by `order` too (registries/sources.ts). Phase 3
+// shipped the rail reading `sourceRegistry.entries()` in registration order, which made this file's first six
+// entries load-bearing and left the rule stated only in a comment. Worse, the only check was e2e S1, and it
+// could not see a reorder: `availableSources` hides a provider-gated source with no connected integration, so
+// Linear and Rollbar — github's two immediate neighbours — never appeared in the assertion at all.
 //
-// Nothing else here may depend on order. There is no init-time cross-plugin resolution on the client at
-// all — a plugin that needs another's UI imports its `contract/`, and the six remaining direct imports
-// are Phase 3's.
+// Panes keep their ui.md order (10 pr, 15 agents, 20 changes, 30 notes, 40 context, 50 editor, 60 search,
+// 70 database, 75 docker, 76 http, 80 preview, 90 linear, 100 rollbar) no matter what this file says, and the
+// rail now reads GitHub, Linear, Rollbar, Docker, API, Agents for the same reason: each source says so.
+//
+// There is no init-time cross-plugin resolution on the client either — a plugin that needs another's UI imports
+// its `contract/`, and the six remaining direct imports are Phase 3's.
 import type { ClientPlugin } from '@acorn/client-core/registries/plugin.ts'
 import { agentsClientPlugin } from '@acorn/plugin-agents/client/index.ts'
 import { changesClientPlugin } from '@acorn/plugin-changes/client/index.ts'
@@ -43,22 +44,22 @@ import { workflowsClientPlugin } from '@acorn/plugin-workflows/client/index.ts'
 // moved into the plugin — App.tsx used to own the five-clause `<Show>` deciding when this plugin's modal
 // appears, which is why "nothing registrable" was true rather than lazy.
 export const clientPlugins: readonly ClientPlugin[] = [
-  // Order-sensitive block: these six own the rail's sources, in rail order. github MUST stay first.
-  githubClientPlugin,
-  linearClientPlugin,
-  rollbarClientPlugin,
-  dockerClientPlugin,
-  httpClientPlugin,
+  // Alphabetical, because nothing reads this order. The six rail sources used to have to lead this list in rail
+  // order; they declare `order` now, so this is just a list.
   agentsClientPlugin,
-  // Order-insensitive from here.
   changesClientPlugin,
   contextClientPlugin,
   databaseClientPlugin,
+  dockerClientPlugin,
   editorClientPlugin,
+  githubClientPlugin,
+  httpClientPlugin,
+  linearClientPlugin,
   memoryClientPlugin,
   notesClientPlugin,
   onboardingClientPlugin,
   previewClientPlugin,
+  rollbarClientPlugin,
   terminalClientPlugin,
   workflowsClientPlugin,
 ]

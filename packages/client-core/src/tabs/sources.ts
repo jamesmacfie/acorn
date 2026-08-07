@@ -4,8 +4,10 @@
 //
 // GitHub used to be PREPENDED here as a hardcoded literal, outside the registry, which is what made it the
 // one Source the shell had to render itself. It is an ordinary contribution now (plugins/github's
-// client/index.ts) and leads the rail because it is first in the client plugin list — registration order is
-// this registry's order, and apps/desktop/src/app/client/plugins.ts says so.
+// client/index.ts) and leads the rail because it declares the lowest `order` — not because of where its plugin
+// sits in the list. Phase 3 shipped it the other way round (registration order, with a comment in
+// apps/desktop/src/app/client/plugins.ts as the only statement of the rule), and that was the last registry on
+// either side whose visible order depended on a declaration list.
 import type { Integration } from '@acorn/protocol/api.ts'
 import type { SourceId } from '../tasks/tasks'
 import { sourceRegistry } from '../registries/sources'
@@ -19,5 +21,8 @@ export function availableSources(integrations: Integration[] | undefined): Sourc
   return sourceRegistry
     .entries()
     .filter((source) => !source.providerId || has(source.providerId, source.requiredCapability))
+    // `id` breaks a tie, so two sources declaring the same order still produce a STABLE rail rather than one
+    // that depends on registration after all — the same tiebreak the slot hosts use.
+    .sort((a, b) => a.order - b.order || a.id.localeCompare(b.id))
     .map(({ id, glyph, label }) => ({ id, glyph, label }))
 }

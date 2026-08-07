@@ -8,6 +8,9 @@ const HttpBrowse = lazy(() => import('./HttpBrowse'))
 
 export const httpSourceContribution: SourceContribution<never> = {
   id: 'http',
+  // Rail position, declared (registries/sources.ts § order). Was implied by this plugin's place in
+  // apps/desktop/src/app/client/plugins.ts.
+  order: 50,
   glyph: 'send',
   label: 'API',
   component: HttpBrowse,

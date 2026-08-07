@@ -22,12 +22,14 @@ describe('availableSources (docs/integrations.md — gated by integration rows)'
     // github is a REGISTERED source as of Phase 3, not a hardcoded literal inside availableSources, so the
     // fixture has to register it like any other. It carries no `providerId` (it must be visible before GitHub
     // is connected) and no `promotion` (its browse creates tasks inline), which is exactly the real
-    // contribution's shape — and registering it FIRST is what puts it at the head of the rail, since this
-    // registry's order is registration order.
-    disposables.push(sourceRegistry.register({ id: 'github', glyph: '◇', label: 'GitHub' }))
+    // contribution's shape.
+    //
+    // Registered LAST while declaring the LOWEST order, deliberately: it is the head of the rail because of
+    // `order: 10`, and registering it last is what proves that. The previous fixture registered it first, so
+    // "github leads" was satisfied by registration order and the assertion could not tell the two rules apart.
     for (const id of ['linear', 'rollbar']) {
       disposables.push(sourceRegistry.register({
-        id, providerId: id, glyph: id === 'linear' ? '◷' : '◍', label: id === 'linear' ? 'Linear' : 'Rollbar',
+        id, order: id === 'linear' ? 20 : 30, providerId: id, glyph: id === 'linear' ? '◷' : '◍', label: id === 'linear' ? 'Linear' : 'Rollbar',
         promotion: {
           canPromote: () => true,
           prepare: async () => ({ origin: id, repoOwner: 'acme', repoName: 'widget', branch: 'main' }),
@@ -39,12 +41,13 @@ describe('availableSources (docs/integrations.md — gated by integration rows)'
         },
       }))
     }
+    disposables.push(sourceRegistry.register({ id: 'github', order: 10, glyph: '◇', label: 'GitHub' }))
   })
   afterAll(() => disposables.forEach((disposable) => disposable.dispose()))
 
   it('local sources (no providerId) are always shown', () => {
     const local = sourceRegistry.register({
-      id: 'docker-test', glyph: '◧', label: 'Docker',
+      id: 'docker-test', order: 40, glyph: '◧', label: 'Docker',
     })
     try {
       expect(availableSources(undefined).map((s) => s.id)).toContain('docker-test')
@@ -60,5 +63,38 @@ describe('availableSources (docs/integrations.md — gated by integration rows)'
     expect(availableSources([integration('rollbar')]).map((s) => s.id)).toEqual(['github', 'rollbar'])
     expect(availableSources([integration('linear'), integration('rollbar')]).map((s) => s.id)).toEqual(['github', 'linear', 'rollbar'])
     expect(availableSources([integration('rollbar', false)]).map((s) => s.id)).toEqual(['github'])
+  })
+
+  // The rail's order comes from the declared `order`, not from when a plugin happened to register.
+  //
+  // This is the assertion e2e S1 could not make. `availableSources` hides a provider-gated source with no
+  // connected integration, and the e2e fixture connects none — so linear and rollbar, github's two immediate
+  // neighbours in the old registration-ordered list, never appeared in S1's `['GitHub','Docker','API','Agents']`
+  // at all. Reordering the plugin list to put linear first passed. Here every gated source is connected, so the
+  // full rail is visible and its order is checked directly.
+  it('orders the rail by the declared order, whatever the registration order was', () => {
+    const late = sourceRegistry.register({ id: 'aardvark', order: 999, glyph: 'a', label: 'Aardvark' })
+    const early = sourceRegistry.register({ id: 'zebra', order: 1, glyph: 'z', label: 'Zebra' })
+    try {
+      // 'zebra' registered last with order 1 leads; 'aardvark' registered first with order 999 trails. Under
+      // registration order this would read aardvark, linear, rollbar, github, zebra — and alphabetically it
+      // would read aardvark first too, so neither fallback can produce this answer.
+      expect(availableSources([integration('linear'), integration('rollbar')]).map((s) => s.id)).toEqual(['zebra', 'github', 'linear', 'rollbar', 'aardvark'])
+    } finally {
+      late.dispose()
+      early.dispose()
+    }
+  })
+
+  it('breaks an order tie by id, so equal orders still give a stable rail', () => {
+    const b = sourceRegistry.register({ id: 'b-source', order: 5, glyph: 'b', label: 'B' })
+    const a = sourceRegistry.register({ id: 'a-source', order: 5, glyph: 'a', label: 'A' })
+    try {
+      // Registered b then a; the tiebreak puts a first, so the answer does not depend on registration.
+      expect(availableSources(undefined).map((s) => s.id)).toEqual(['a-source', 'b-source', 'github'])
+    } finally {
+      a.dispose()
+      b.dispose()
+    }
   })
 })

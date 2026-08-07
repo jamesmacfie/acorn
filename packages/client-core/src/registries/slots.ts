@@ -11,15 +11,33 @@ import type { ClientCapabilityRequirement } from '../capabilities'
 import type { Task } from '../queries'
 import { Registry } from './registry'
 
-// 'drawer' is Phase 3's addition, for the terminal drawer the shell used to render itself. It is NOT
-// 'overlay': the drawer sits below the routed surface in document order and the overlay host sits after it,
-// so CSS stacking is load-bearing and merging the two would put the drawer above every dialog.
+// 'drawer' is Phase 3's addition, for the terminal drawer the shell used to render itself.
+//
+// It is NOT merged into 'overlay', but the reason first recorded here — "the drawer sits below the routed
+// surface in document order and the overlay host sits after it, so merging them would put the drawer above
+// every dialog" — was wrong on the facts. TerminalPanel renders through a `<Portal>`, so where its host sits in
+// App.tsx's document order decides nothing about stacking, and the drawer is below a modal by z-index anyway
+// (`--z-drawer: 50` vs `--z-modal: 100` in styles/tokens-invariant.css).
+//
+// The genuine reason is the `when` predicate. A contribution whose `when` is false is never rendered, which
+// keeps the property the shell's own `<Show when={termOpen()}>` had: xterm is not constructed for a closed
+// drawer. Overlay contributions decide their own visibility inside the component, so folding the drawer in
+// there would build a terminal for every task view and throw it away.
 export type UiSlotId = 'topbar.left' | 'topbar.right' | 'task.switcher.extra' | 'overlay' | 'drawer'
 
 export type UiSlotContext = {
   taskActive: boolean
   terminalOpen: boolean
   toggleTerminal: () => void
+  // Idempotent close, separate from the toggle, because a toggle is not safe to call twice.
+  //
+  // The terminal drawer closes itself when its last tab is closed, and TerminalPanel.closeTab does that after
+  // two awaits — so two closes racing both see an empty roster and both fire. With only `toggleTerminal`
+  // available the second flipped the drawer back OPEN, where TerminalPanel's onMount auto-launches the rail's
+  // default profile: a spurious PTY in a drawer the user had just closed. The shell already used the mirror
+  // form of this guard for its own open affordance (`if (!termOpen()) toggleTerm()`), which is a hint that the
+  // toggle was the wrong shape to publish alone.
+  closeTerminal: () => void
   openSettings: (tab?: string) => void
   selectTask: (taskId: string) => void
   // The task the drawer belongs to, or null outside a task view. Added with the 'drawer' slot: a shell slot
