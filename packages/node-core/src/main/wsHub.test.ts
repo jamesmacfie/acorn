@@ -207,6 +207,37 @@ describe('wsHub seq and revocation', () => {
   })
 })
 
+// docs/vNext/protocol.md § Events. Phase 4 shipped without a heartbeat and recorded it as an accepted
+// risk; Phase 5 closes it. The ping rides the same sweep as the revocation backstop, so `revocationCheckMs`
+// is the cadence for both — which is why these cases resolve in tens of milliseconds.
+describe('wsHub heartbeat', () => {
+  it('terminates a socket whose peer stops answering pings', async () => {
+    // `autoPong: false` is what makes this test possible AND what makes it honest: a `ws` client answers
+    // pings inside the library, below any application code, so a socket that has genuinely gone away is
+    // indistinguishable in a test from one that has not — unless the client is told to stay silent.
+    const ws = new WebSocket(`ws://${host}${WS_PATH}`, { headers: authHeaders(), autoPong: false })
+    await new Promise((resolve, reject) => {
+      ws.on('open', resolve)
+      ws.on('unexpected-response', () => reject(new Error('upgrade refused')))
+    })
+    await closed(ws)
+    expect(ws.readyState).toBe(WebSocket.CLOSED)
+  })
+
+  it('leaves a socket alone for as long as it keeps answering', async () => {
+    const ws = await open(authHeaders())
+    const got = frames(ws)
+    // Long enough for several sweeps at 20ms, so "still open" means the heartbeat looked at it and let it
+    // be, not that the timer had not fired yet. Without that, a heartbeat that terminated EVERY socket
+    // would pass this case.
+    await new Promise((resolve) => setTimeout(resolve, 200))
+    expect(ws.readyState).toBe(WebSocket.OPEN)
+    wsBroadcast({ channel: 'term:status' })
+    await waitFor(() => got.length >= 1, 'the socket to still be receiving')
+    ws.close()
+  })
+})
+
 describe('wsHub streaming', () => {
   it('delivers ready + initial screen BEFORE any live frame on attach, and routes input', async () => {
     const inputs: string[] = []

@@ -108,6 +108,14 @@ Events are live notifications, not a durable replication log:
 - Subscriptions are coarse: the client subscribes to topic groups (e.g. all events for the active
   workspace + global attention topics), not per-resource. Fine-grained filtering is a client-side
   concern.
+- **Both ends run a ping/pong watchdog** (WebSocket control frames, not application messages). Each
+  side pings on an interval and `terminate()`s — never `close()`, which would wait for a reply from
+  the peer it has just concluded is silent — after two unanswered pings. Without it a node that has
+  hung, or a laptop that slept without dropping its TCP connections, holds the socket open and reads
+  `online` indefinitely; the drop is what makes the reconnect-and-refetch above happen at all. The
+  client's half is the one that fixes that (`apps/desktop/src/app/main/nodeBroker.ts`, 15 s); the
+  node's rides its existing revocation sweep (`packages/node-core/src/main/wsHub.ts`, 60 s) and stops
+  a vanished client's stream subscriptions living on until the process restarts.
 
 ## Streams
 

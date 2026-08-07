@@ -28,6 +28,21 @@ const JITTER = 0.2
 // A WS that has been down this long while HTTP still works is `degraded`, not `offline`.
 const DEGRADED_AFTER_MS = 5_000
 const DEFAULT_TIMEOUT_MS = 30_000
+// The events-socket heartbeat (docs/vNext/protocol.md § Events). Phase 4 shipped without one and
+// recorded it as an accepted risk: a node that has HUNG, or a laptop that slept without dropping its TCP
+// connections, holds the socket open without answering, so nothing ever fires `'close'` and the node
+// reads `online` indefinitely. Found by trying SIGSTOP in the two-node e2e.
+//
+// A ping is the only probe that works here, because the failure is precisely that the peer is silent —
+// no application traffic is due, so "we have heard nothing" is indistinguishable from "nothing has
+// happened" without one. `ws` answers a ping automatically at the protocol level, below any application
+// code, which is why a pong proves reachability rather than health of the node's event loop... except
+// that it does not: a `ws` server's autoresponder runs on the same event loop, so a node blocked in a
+// synchronous call fails to pong too. That is the case this catches.
+const PING_INTERVAL_MS = 15_000
+// Two intervals of silence, not one: a single missed pong on a congested link is not evidence, and the
+// cost of being wrong is tearing down a working socket and refetching everything on it.
+const MISSED_PONGS_BEFORE_DEAD = 2
 
 // A node plus the material only main may hold: the bearer, and the certificate to pin against.
 export type BrokerNode = NodeRecord & { token: string; certPem?: string }
@@ -49,6 +64,10 @@ type Connection = {
   error: NodeStatus['error']
   attempt: number
   reconnectTimer: NodeJS.Timeout | null
+  // The heartbeat's own timer and its miss counter. Per connection, not per broker: nodes are on
+  // different links and a slept laptop must not condemn the loopback node beside it.
+  pingTimer: NodeJS.Timeout | null
+  missedPongs: number
   wsDownSince: number | null
   lastHttpOkAt: number | null
   lastSeenAt: number | null
@@ -61,8 +80,17 @@ type Connection = {
 export class NodeBroker {
   private readonly connections = new Map<string, Connection>()
   private readonly inFlight = new Map<string, AbortController>()
+  private readonly pingIntervalMs: number
 
-  constructor(private readonly events: BrokerEvents) {}
+  // The heartbeat cadence is injectable for the same reason node-core's `revocationCheckMs` is: the
+  // interval runs for REAL in tests, so the assertion is that the socket actually died rather than that
+  // a timer was scheduled. Faking the clock would test the schedule and not the behaviour.
+  constructor(
+    private readonly events: BrokerEvents,
+    options: { pingIntervalMs?: number } = {},
+  ) {
+    this.pingIntervalMs = options.pingIntervalMs ?? PING_INTERVAL_MS
+  }
 
   // Add or replace a node. Replacing tears the old connection down first, so a re-pair with a new
   // token or a moved endpoint cannot leave a socket authenticated by the previous credential.
@@ -80,6 +108,8 @@ export class NodeBroker {
       error: undefined,
       attempt: 0,
       reconnectTimer: null,
+      pingTimer: null,
+      missedPongs: 0,
       wsDownSince: Date.now(),
       lastHttpOkAt: null,
       lastSeenAt: null,
@@ -95,6 +125,7 @@ export class NodeBroker {
     if (!connection) return
     connection.closed = true
     if (connection.reconnectTimer) clearTimeout(connection.reconnectTimer)
+    this.stopHeartbeat(connection)
     connection.ws?.terminate()
     connection.agent.destroy()
     this.connections.delete(nodeId)
@@ -182,6 +213,11 @@ export class NodeBroker {
       connection.seq = 0
       for (const payload of connection.outbox.splice(0)) ws.send(payload)
       this.setState(connection, 'online')
+      this.startHeartbeat(connection, ws)
+    })
+    ws.on('pong', () => {
+      connection.missedPongs = 0
+      connection.lastSeenAt = Date.now()
     })
     ws.on('message', (data) => this.receive(connection, data.toString()))
     ws.on('unexpected-response', (_req, res) => {
@@ -196,9 +232,47 @@ export class NodeBroker {
     })
     ws.on('error', (error) => this.noteSocketError(connection, error))
     ws.on('close', () => {
+      this.stopHeartbeat(connection)
       if (connection.wsDownSince === null) connection.wsDownSince = Date.now()
       this.scheduleReconnect(connection)
     })
+  }
+
+  // Ping on an interval; a peer that misses two in a row is treated as gone.
+  //
+  // `terminate()` rather than `close()`, and that is the whole point: `close()` starts a closing
+  // HANDSHAKE, which waits for a reply from the peer we have just concluded is not replying. The socket
+  // would sit in CLOSING and the node would still read `online` — the exact bug this exists to fix, one
+  // state further along. `terminate()` destroys it, which fires `'close'`, which reaches the reconnect
+  // and state machinery already there.
+  private startHeartbeat(connection: Connection, ws: WebSocket): void {
+    this.stopHeartbeat(connection)
+    connection.missedPongs = 0
+    const timer = setInterval(() => {
+      if (ws.readyState !== WebSocket.OPEN) return
+      // Checked BEFORE sending, so the count read here is of pings that have already had a full interval
+      // to be answered. Incrementing first and checking after would condemn the socket on a ping that had
+      // not been given its chance yet.
+      if (connection.missedPongs >= MISSED_PONGS_BEFORE_DEAD) {
+        console.warn(`[broker] ${connection.node.nodeId} left ${connection.missedPongs} pings unanswered; treating it as unreachable`)
+        ws.terminate()
+        return
+      }
+      connection.missedPongs += 1
+      try {
+        ws.ping()
+      } catch {
+        ws.terminate() // a socket that cannot even be pinged is not a socket we are waiting on
+      }
+    }, this.pingIntervalMs)
+    timer.unref?.()
+    connection.pingTimer = timer
+  }
+
+  private stopHeartbeat(connection: Connection): void {
+    if (connection.pingTimer) clearInterval(connection.pingTimer)
+    connection.pingTimer = null
+    connection.missedPongs = 0
   }
 
   private receive(connection: Connection, raw: string): void {
