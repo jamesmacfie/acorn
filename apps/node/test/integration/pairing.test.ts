@@ -6,7 +6,7 @@ import { NODE_PROTOCOL_VERSION, type DevicesResponse, type NodeInfo, type PairRe
 import { createApp } from '@acorn/node-core/server/index.ts'
 import { deviceService } from '@acorn/node-core/server/auth/deviceTokens.ts'
 import { pairingCodes } from '@acorn/node-core/server/auth/pairingCodes.ts'
-import { makeTestDb, type TestDb } from '@acorn/node-core/server/routes/testDb.ts'
+import { makeTestDb, type TestDb } from '@acorn/node-core/testkit/db.ts'
 import type { Env } from '@acorn/node-core/main/bindings.ts'
 
 // The pairing surface end to end over the assembled app (docs/api-reference.md § Pairing): what the

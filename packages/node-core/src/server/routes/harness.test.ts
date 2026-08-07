@@ -3,7 +3,7 @@ import { afterEach, describe, expect, it } from 'vitest'
 import type { ApiError } from '@acorn/protocol/api.ts'
 import type { AppEnv, Principal } from '../middleware/auth'
 import { harness, HarnessError, type RunBridge, setRunBridge } from './harness'
-import { testGate } from './testAuth'
+import { testGate } from '../../testkit/auth'
 import type { Env } from '../../main/bindings'
 
 const INTERNAL: Principal = { kind: 'internal', userId: 'local' }

@@ -6,7 +6,7 @@ import { SecretService } from '@acorn/node-core/main/core/secrets.ts'
 import { memoryIdentityStore } from '@acorn/node-core/main/activeIdentity.ts'
 import { createCoreServices } from '@acorn/node-core/main/core/index.ts'
 import { schema } from '@acorn/node-core/server/db/index.ts'
-import { makeTestDb, makeTestPluginDb, type TestDb, type TestPluginDb } from '@acorn/node-core/server/routes/testDb.ts'
+import { makeTestDb, makeTestPluginDb, type TestDb, type TestPluginDb } from '@acorn/node-core/testkit/db.ts'
 import { migrationsDir } from '../node/migrations'
 import { AgentAttachmentStore } from './attachmentStore'
 

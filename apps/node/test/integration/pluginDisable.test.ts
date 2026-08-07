@@ -10,7 +10,7 @@ import { connectionProviderRegistry } from '@acorn/node-core/server/integrations
 import { integrationProviderRegistry } from '@acorn/node-core/server/integrations/registry.ts'
 import { modelProviderRegistry } from '@acorn/node-core/server/modelProviders/registry.ts'
 import type { PluginRosterEntry } from '@acorn/node-core/server/plugin/host.ts'
-import { makeTestDb, type TestDb } from '@acorn/node-core/server/routes/testDb.ts'
+import { makeTestDb, type TestDb } from '@acorn/node-core/testkit/db.ts'
 import { memoryIdentityStore } from '@acorn/node-core/main/activeIdentity.ts'
 import { createCoreServices } from '@acorn/node-core/main/core/index.ts'
 import { SecretService } from '@acorn/node-core/main/core/index.ts'

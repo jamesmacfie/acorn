@@ -12,7 +12,7 @@ import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import { makeTestDb, type TestDb } from '@acorn/node-core/server/routes/testDb.ts'
+import { makeTestDb, type TestDb } from '@acorn/node-core/testkit/db.ts'
 import { schema } from '@acorn/node-core/server/db/index.ts'
 import * as coreFs from '@acorn/node-core/main/core/fs.ts'
 import { createRepoService } from '@acorn/node-core/main/core/repos.ts'

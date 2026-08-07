@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import { makeTestDb, type TestDb } from '../routes/testDb'
+import { makeTestDb, type TestDb } from '../../testkit/db'
 import { deviceService, type DeviceService } from './deviceTokens'
 
 let harness: TestDb

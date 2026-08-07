@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { eq } from 'drizzle-orm'
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
-import { makeTestDb, type TestDb } from '../server/routes/testDb'
+import { makeTestDb, type TestDb } from '../testkit/db'
 import { schema } from '../server/db'
 import { archiveTask, runTeardownProcess, type ArchiveDeps } from './archive'
 

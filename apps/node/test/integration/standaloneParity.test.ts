@@ -4,7 +4,7 @@ import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
 import { agentProfileRegistry } from '@acorn/node-core/main/agentProfiles/index.ts'
 import { agentToolContributions } from '@acorn/node-core/server/agentTools/registry.ts'
-import { makeTestDb } from '@acorn/node-core/server/routes/testDb.ts'
+import { makeTestDb } from '@acorn/node-core/testkit/db.ts'
 import { wireAgentTools } from '../../src/wiring/agentToolsWiring'
 
 const HERE = dirname(fileURLToPath(import.meta.url))

@@ -10,7 +10,7 @@ import type { AppEnv } from '@acorn/node-core/server/middleware/auth.ts'
 import { requireUser } from '@acorn/node-core/server/middleware/requireUser.ts'
 import * as coreFs from '@acorn/node-core/main/core/fs.ts'
 import { createTaskService } from '@acorn/node-core/main/core/tasks.ts'
-import { makeTestDb, type TestDb } from '@acorn/node-core/server/routes/testDb.ts'
+import { makeTestDb, type TestDb } from '@acorn/node-core/testkit/db.ts'
 import { editor, setEditorBridge } from './editor'
 import type { Env } from '@acorn/node-core/main/bindings.ts'
 

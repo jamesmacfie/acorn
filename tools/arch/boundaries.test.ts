@@ -121,6 +121,11 @@ const segment = (pkg: Pkg, file: string): string => relative(pkg.src, file).spli
 const isContract = (pkg: Pkg | undefined, file: string | null): boolean =>
   !!pkg && !!file && pkg.kind === 'plugin' && segment(pkg, file) === 'contract'
 
+// Test scaffolding by LOCATION rather than by filename: a `.test.ts` suffix, a package's test/ or e2e/
+// tree, or its testkit/ — the last of which holds helpers that are test-only but deliberately not
+// suffixed, because they are imported BY tests rather than run as one.
+const isTestCode = (file: string): boolean => /\.test\.tsx?$/.test(file) || /\/(test|e2e|testkit)\//.test(rel(file))
+
 // Which side of the client/node split a file sits on, from its path inside its package.
 function side(pkg: Pkg, file: string): 'client' | 'node' | 'shared' {
   if (pkg.name === '@acorn/client-core') return 'client'
@@ -200,6 +205,91 @@ describe('architecture boundaries', () => {
     expect([...new Set([...badExternal, ...badFirstParty])].sort()).toEqual([])
   })
 
+  it('plugins import core through a reviewed set of module roots (ratchet)', () => {
+    // Every package declares `"exports": { "./*": "./src/*" }`, so there is no encapsulation at the
+    // module-system level at all — a plugin can reach any file in core. This turns "everything is
+    // public" into "the public surface is a reviewed list", with no build step, no versioning and no
+    // new package. When third-party plugins become real, this list IS the draft API to harden.
+    //
+    // ROOTS, not files: ~110 distinct paths would be a list nobody reads, and the value here is the
+    // review. A new entry means someone opened a new seam and had to say so; a new file under an
+    // existing root is ordinary work.
+    //
+    // The deliberate omission is `@acorn/node-core/testkit` — that is test-only surface, and the rule
+    // below keeps production out of it.
+    const CORE_IMPORT_ROOTS = [
+      // client-core
+      '@acorn/client-core/Acorn.tsx',
+      '@acorn/client-core/agent',
+      '@acorn/client-core/apiClient.ts',
+      '@acorn/client-core/capabilities.ts',
+      '@acorn/client-core/clientCapabilities.ts',
+      '@acorn/client-core/configTrust',
+      '@acorn/client-core/highlight',
+      '@acorn/client-core/integrations',
+      '@acorn/client-core/lib',
+      '@acorn/client-core/modelProviders',
+      '@acorn/client-core/node',
+      '@acorn/client-core/notifications',
+      '@acorn/client-core/palette',
+      '@acorn/client-core/persistence',
+      // Shrinks with finding 10: what is left in core's queries.ts after the github/linear/rollbar
+      // factories moved out is core's own, plus the githubShellReads ledger that finding deletes.
+      '@acorn/client-core/queries.ts',
+      '@acorn/client-core/registries',
+      '@acorn/client-core/settings',
+      '@acorn/client-core/tasks',
+      '@acorn/client-core/ui',
+      '@acorn/client-core/ui/diff',
+      '@acorn/client-core/workspaces',
+      '@acorn/client-core/wsChannels.ts',
+      '@acorn/client-core/wsClient.ts',
+      // node-core
+      '@acorn/node-core/main',
+      '@acorn/node-core/main/agentProfiles',
+      '@acorn/node-core/main/core',
+      '@acorn/node-core/server',
+      '@acorn/node-core/server/agentTools',
+      '@acorn/node-core/server/auth',
+      '@acorn/node-core/server/integrations',
+      '@acorn/node-core/server/middleware',
+      '@acorn/node-core/server/modelProviders',
+      '@acorn/node-core/server/plugin',
+      // Only the bridge slots a plugin fills for a core route family (server/bridge.ts explains which
+      // mechanism belongs where). Not a licence to import core's route handlers.
+      '@acorn/node-core/server/routes',
+      '@acorn/node-core/server/sync',
+    ]
+    const rootOf = (spec: string): string => {
+      const pkg = spec.startsWith('@acorn/node-core/') ? '@acorn/node-core/' : '@acorn/client-core/'
+      const parts = spec.slice(pkg.length).split('/')
+      if (parts.length === 1) return spec
+      return pkg + (parts.length > 2 ? `${parts[0]}/${parts[1]}` : parts[0])
+    }
+    const used = EDGES.filter((e) => e.fromPkg.kind === 'plugin' && !isTestCode(e.fromFile))
+      .filter((e) => e.spec.startsWith('@acorn/node-core/') || e.spec.startsWith('@acorn/client-core/'))
+      .map((e) => rootOf(e.spec))
+    expect([...new Set(used)].sort()).toEqual([...CORE_IMPORT_ROOTS].sort())
+  })
+
+  it('the testkit is imported only by tests', () => {
+    // Three test helpers used to live in packages/node-core/src/server/routes/ — testDb.ts with sixty
+    // inbound references across eleven packages, plus testAuth.ts and testIntegration.ts. Nothing about
+    // them was a route; they sat there because that is where they were first needed, and every consumer
+    // then imported test scaffolding through a path that reads like production surface.
+    //
+    // The directory rename is most of the fix: `@acorn/node-core/testkit/db.ts` says what it is at
+    // every call site. This is the part the rename cannot do — keeping a production file from reaching
+    // for one, which is how a tmp-dir SQLite factory ends up shipped.
+    //
+    // Any package's testkit/, not just node-core's: the rule immediately found the same shape in
+    // plugins/github, whose seedGithubIntegration helper was sitting in server/.
+    const offenders = EDGES.filter((e) => !isTestCode(e.fromFile))
+      .filter((e) => e.target.file?.includes('/src/testkit/'))
+      .map((e) => `${rel(e.fromFile)}: ${e.spec}`)
+    expect([...new Set(offenders)].sort()).toEqual([])
+  })
+
   it('plugins broadcast through the plugin context (shrinking baseline)', () => {
     // docs/plugins.md promised event subscriptions and NodePluginContext had no `events` member; what
     // plugins actually did was deep-import main/wsHub.ts and main/notify.ts. The context now carries
@@ -259,11 +349,7 @@ describe('architecture boundaries', () => {
       '@acorn/plugin-terminal/main/terminal.ts',
     ]
     const ENTRYPOINTS = ['/node/index.ts', '/client/index.ts', '/main/index.ts']
-    // Broader than the suite's `isTest`, which only matches the `.test.ts` suffix: an app's test tree
-    // also holds fixtures and harnesses (apps/node/test/registerProviders.ts, apps/desktop/e2e/) that
-    // are test code by location rather than by filename.
-    const inTestTree = (file: string) => /\/(test|e2e)\//.test(rel(file))
-    const deep = EDGES.filter((e) => e.fromPkg.kind === 'app' && !e.isTest && !inTestTree(e.fromFile))
+    const deep = EDGES.filter((e) => e.fromPkg.kind === 'app' && !isTestCode(e.fromFile))
       .filter((e) => e.target.pkg?.kind === 'plugin' && e.target.pkg.name !== e.fromPkg.name)
       .filter((e) => {
         const rest = e.spec.split('/').slice(2)
@@ -459,7 +545,7 @@ describe('architecture boundaries', () => {
     const offenders = PACKAGES.filter((p) => p.kind === 'plugin')
       .filter((p) =>
         walk(p.src)
-          .filter((file) => !/\.test\.tsx?$/.test(file))
+          .filter((file) => !isTestCode(file))
           .some((file) => importsCoreTables(readFileSync(file, 'utf8'))),
       )
       .map((p) => p.name.replace('@acorn/plugin-', ''))

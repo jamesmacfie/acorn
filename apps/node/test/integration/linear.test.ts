@@ -1,4 +1,4 @@
-import { testSecretEnv } from '@acorn/node-core/server/routes/testDb.ts'
+import { testSecretEnv } from '@acorn/node-core/testkit/db.ts'
 import { Hono } from 'hono'
 import { eq } from 'drizzle-orm'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -10,7 +10,7 @@ import '../registerProviders'
 import type { AppEnv } from '@acorn/node-core/server/middleware/auth.ts'
 import { encryptSecret } from '@acorn/node-core/server/secretBox.ts'
 import { linear } from '@acorn/plugin-linear/server/routes/linear.ts'
-import { makeTestDb, type TestDb } from '@acorn/node-core/server/routes/testDb.ts'
+import { makeTestDb, type TestDb } from '@acorn/node-core/testkit/db.ts'
 import type { Env } from '@acorn/node-core/main/bindings.ts'
 
 vi.mock('@acorn/node-core/server/db/index.ts', async (importOriginal) => {

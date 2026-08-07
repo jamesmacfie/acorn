@@ -16,7 +16,7 @@ import {
   type ContextNotesSource,
 } from '@acorn/node-core/server/agentTools/contextSections.ts'
 import { taskContext } from '@acorn/node-core/server/routes/taskContext.ts'
-import { makeTestDb, makeTestPluginDb, type TestDb, type TestPluginDb } from '@acorn/node-core/server/routes/testDb.ts'
+import { makeTestDb, makeTestPluginDb, type TestDb, type TestPluginDb } from '@acorn/node-core/testkit/db.ts'
 import { migrationsDir as githubMigrationsDir } from '@acorn/plugin-github/node/migrations.ts'
 import { mirroredPullRequest } from '@acorn/plugin-github/server/mirrorQueries.ts'
 import { pullRequests, prFiles, repos } from '@acorn/plugin-github/node/schema.ts'

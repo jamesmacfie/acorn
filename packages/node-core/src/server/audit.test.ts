@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { deviceService } from './auth/deviceTokens'
 import { AUDIT_RETENTION_MS, pruneAudit, readAudit, recordAudit } from './audit'
-import { makeTestDb, type TestDb } from './routes/testDb'
+import { makeTestDb, type TestDb } from '../testkit/db'
 import { schema } from './db'
 
 let test: TestDb

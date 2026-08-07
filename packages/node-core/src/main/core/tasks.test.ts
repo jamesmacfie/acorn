@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { schema, type AppDatabase } from '../../server/db'
-import { makeTestDb, type TestDb } from '../../server/routes/testDb'
+import { makeTestDb, type TestDb } from '../../testkit/db'
 import { createTaskService } from './tasks'
 
 // `workspaceId` vs `workspaceIdOrNull` — two answers to the same question, and the difference is what a caller

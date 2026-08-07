@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { makeTestPluginDb } from '@acorn/node-core/server/routes/testDb.ts'
+import { makeTestPluginDb } from '@acorn/node-core/testkit/db.ts'
 import { migrationsDir } from '../node/migrations'
 import { WorkflowRunner, type RunnerDeps } from './workflowRunner'
 

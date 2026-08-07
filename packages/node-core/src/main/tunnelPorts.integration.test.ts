@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { randomUUID } from 'node:crypto'
 import { schema } from '../server/db/index'
-import { makeTestDb, type TestDb } from '../server/routes/testDb'
+import { makeTestDb, type TestDb } from '../testkit/db'
 import { setRunBridge, type RunBridge } from '../server/routes/harness'
 import { declaredTunnelPorts } from './tunnelPorts'
 

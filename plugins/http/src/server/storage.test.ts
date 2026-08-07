@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import type { IdentityService } from '@acorn/node-core/main/core/index.ts'
-import { makeTestPluginDb, type TestPluginDb } from '@acorn/node-core/server/routes/testDb.ts'
+import { makeTestPluginDb, type TestPluginDb } from '@acorn/node-core/testkit/db.ts'
 import { httpRequests, httpVariables } from '../node/schema'
 import { migrationsDir } from '../node/migrations'
 import { openHttpValue, protectLegacyHttpStorage } from './storage'

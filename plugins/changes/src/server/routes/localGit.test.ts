@@ -12,7 +12,7 @@ import type { AppEnv } from '@acorn/node-core/server/middleware/auth.ts'
 import { requireUser } from '@acorn/node-core/server/middleware/requireUser.ts'
 import { onServerError } from '@acorn/node-core/server/respond.ts'
 import { localGit, setLocalGitBridge } from './localGit'
-import { makeTestDb, type TestDb } from '@acorn/node-core/server/routes/testDb.ts'
+import { makeTestDb, type TestDb } from '@acorn/node-core/testkit/db.ts'
 import type { Env } from '@acorn/node-core/main/bindings.ts'
 
 // Wiring test over a REAL git worktree (the git parsing itself is covered by main/localDiff.test.ts):
