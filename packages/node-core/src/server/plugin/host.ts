@@ -14,6 +14,12 @@ import { integrationProviderRegistry } from '../integrations/registry'
 import { modelProviderRegistry } from '../modelProviders/registry'
 import type { CapabilityRegistry } from './capabilities'
 import type { NodePlugin, NodePluginContext } from './types'
+import { registerWsChannelHandler, setStreamHandlers, wsBroadcast } from '../../main/wsHub'
+import { broadcastRepoConfigTrustNotice, broadcastStatus, broadcastWorkflowNotice, broadcastWorkflowStepEvent } from '../../main/notify'
+
+// What each plugin claimed on the WS hub, so a re-init can take it back. The hub's slots are module
+// singletons with no duplicate guard, unlike the route and tool registries.
+const wsRegistrations = new Map<string, (() => void)[]>()
 
 export type PluginHostOptions = {
   // Owned by the caller, not by this module: see the note in capabilities.ts about why these are not
@@ -66,6 +72,11 @@ export async function initPlugins(plugins: readonly NodePlugin[], options: Plugi
     // routes that silently served every request from a closed handle; for tools it would throw on the
     // duplicate name and fail the whole boot.
     removePluginRoutes(plugin.name)
+    // Same reason, for the WS hub's two module-singleton slots: a second boot in one process would
+    // otherwise leave the first boot's handler — closed over its now-disposed engine — still claiming
+    // the prefix, and registerWsChannelHandler has no duplicate guard to make that loud.
+    for (const undo of wsRegistrations.get(plugin.name) ?? []) undo()
+    wsRegistrations.delete(plugin.name)
     removeAgentTools(plugin.name)
     removeContextSections(plugin.name)
     // The provider registries are the same class of module singleton, and now written from init too. A
@@ -105,6 +116,24 @@ export async function initPlugins(plugins: readonly NodePlugin[], options: Plugi
       },
       capabilities: options.capabilities,
       core: options.core,
+      // The broadcast surface, projected rather than re-implemented: these are main/notify.ts and
+      // main/wsHub.ts, reached through the context so a plugin does not deep-import them. `channel` and
+      // `streams` return disposers, which the host records like any other contribution.
+      events: {
+        send: wsBroadcast,
+        status: broadcastStatus,
+        notice: broadcastWorkflowNotice,
+        repoConfigTrustNotice: broadcastRepoConfigTrustNotice,
+        stepEvent: broadcastWorkflowStepEvent,
+        channel: (prefix, handler) => {
+          registerWsChannelHandler(prefix, handler)
+          wsRegistrations.set(plugin.name, [...(wsRegistrations.get(plugin.name) ?? []), () => registerWsChannelHandler(prefix, null)])
+        },
+        streams: (handlers) => {
+          setStreamHandlers(handlers)
+          wsRegistrations.set(plugin.name, [...(wsRegistrations.get(plugin.name) ?? []), () => setStreamHandlers(null)])
+        },
+      },
       log: {
         log: (...args: unknown[]) => console.log(`[plugin:${plugin.name}]`, ...args),
         warn: (...args: unknown[]) => console.warn(`[plugin:${plugin.name}]`, ...args),

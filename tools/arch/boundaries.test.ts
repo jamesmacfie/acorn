@@ -200,6 +200,30 @@ describe('architecture boundaries', () => {
     expect([...new Set([...badExternal, ...badFirstParty])].sort()).toEqual([])
   })
 
+  it('plugins broadcast through the plugin context (shrinking baseline)', () => {
+    // docs/plugins.md promised event subscriptions and NodePluginContext had no `events` member; what
+    // plugins actually did was deep-import main/wsHub.ts and main/notify.ts. The context now carries
+    // the real surface (server/plugin/types.ts § PluginBroadcast), and this is the ratchet that drains
+    // the imports it replaced.
+    //
+    // Everything reachable from a plugin's `init` is already migrated. What is left is six call sites
+    // inside `main/` modules that are constructed without a context — a PTY engine, a docker service, a
+    // git watcher. Each needs its own threading, so they are listed rather than rewritten in a commit
+    // whose job was the seam.
+    const BROADCAST_BASELINE = [
+      'plugins/changes/src/main/localGit.ts',
+      'plugins/docker/src/main/dockerService.ts',
+      'plugins/memory/src/main/knowledgeIpc.ts',
+      'plugins/terminal/src/main/agentTools.ts',
+      'plugins/terminal/src/main/terminal.ts',
+    ]
+    const HUB = ['@acorn/node-core/main/wsHub.ts', '@acorn/node-core/main/notify.ts']
+    const offenders = EDGES.filter((e) => e.fromPkg.kind === 'plugin' && !e.isTest)
+      .filter((e) => HUB.includes(e.spec))
+      .map((e) => rel(e.fromFile))
+    expect([...new Set(offenders)].sort()).toEqual([...BROADCAST_BASELINE].sort())
+  })
+
   it('apps reach plugins through entrypoints or contract/ (shrinking baseline)', () => {
     // A plugin's public surface is its three entrypoints — node/index.ts, client/index.ts,
     // main/index.ts — plus contract/, which is also what another plugin may import. An app is allowed

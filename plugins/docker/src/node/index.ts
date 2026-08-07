@@ -1,4 +1,3 @@
-import { registerWsChannelHandler } from '@acorn/node-core/main/wsHub.ts'
 import type { NodePlugin } from '@acorn/node-core/server/plugin/types.ts'
 import { dockerBridge } from '../main/dockerBridge'
 import { disposeDocker } from '../main/dockerService'
@@ -13,14 +12,13 @@ export const dockerPlugin = (): NodePlugin => ({
     // The log/stats streams and interactive `docker exec` PTYs ride the one authenticated WebSocket
     // (@acorn/protocol/ws.ts), so the channel handler is part of this plugin's surface too — losing
     // it would leave the routes working and every live pane silent.
-    registerDockerWsChannel()
+    registerDockerWsChannel(ctx.events)
   },
   // Kills the log/stats children and the cached daemon polls this plugin started. The channel handler
-  // is dropped explicitly rather than relying on disposeWsHub having cleared the whole table first:
-  // "release what init opened" has to hold on its own, or a change to teardown order leaves a handler
-  // closed over a disposed plugin.
+  // no longer needs dropping here: it was registered through ctx.events, so the host takes it back on
+  // re-init — which is the same guarantee this dispose used to provide by hand, moved somewhere a new
+  // plugin cannot forget it.
   dispose: () => {
-    registerWsChannelHandler('docker', null)
     setDockerBridge(null)
     disposeDocker()
   },

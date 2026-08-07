@@ -1,7 +1,6 @@
 import type { NodePlugin } from '@acorn/node-core/server/plugin/types.ts'
 import { openPluginDb } from '@acorn/node-core/main/pluginStorage.ts'
 import { setRunBridge } from '@acorn/node-core/server/routes/harness.ts'
-import { setStreamHandlers } from '@acorn/node-core/main/wsHub.ts'
 import { setOnTaskCreated, setTaskSessionsBridge } from '@acorn/node-core/server/routes/worktree.ts'
 import { setOnWorktreeCreated } from '@acorn/node-core/main/taskWorktree.ts'
 import { TERMINAL_RUN_TARGETS } from '../contract/runTargets'
@@ -74,7 +73,6 @@ export const terminalPlugin = (dataDir: string, deps: TerminalPluginDeps): NodeP
       disposeTerminal()
       setTerminalBridge(null)
       setTaskSessionsBridge(null)
-      setStreamHandlers(null)
       setOnTaskCreated(null)
       setOnWorktreeCreated(null)
       setRunBridge(null)
