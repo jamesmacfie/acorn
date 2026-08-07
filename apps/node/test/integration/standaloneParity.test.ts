@@ -55,6 +55,13 @@ describe('the standalone entry performs the same app-layer wirings as the superv
     ["../wiring/agentProfiles'", 'agent profiles (claude, codex, aider)'],
     ['wireAgentTools(', "core's own agent tools"],
     ['wireConfigTrust(', 'the config-trust bridge'],
+    // Teardown parity, added in Phase 5 for the same reason as the three above: the standalone entry's
+    // drain went straight to plugin dispose and closed no listener at all, so its port stayed bound for
+    // as long as the slowest plugin took — which is why the two-node e2e uses SIGKILL
+    // (docs/vNext/phase4-notes.md § "the kill signal is SIGKILL"). Both roots share one definition now
+    // (node-core's main/server.ts), and this pins that they both still call it.
+    ['closeListener(', 'stopping the listener FIRST'],
+    ['drainWithDeadline(', 'a bounded drain (architecture.md § Inside the Node: 30s)'],
   ])('names %s — %s', (needle) => {
     // Asserted against BOTH roots, so the check is "the two agree" rather than a list this file invents.
     // If the supervised root ever stops doing one of these, this fails and asks for a decision instead of
