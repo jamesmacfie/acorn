@@ -11,6 +11,7 @@ import { integrationProviderRegistry } from '@acorn/node-core/server/integration
 import { modelProviderRegistry } from '@acorn/node-core/server/modelProviders/registry.ts'
 import type { PluginRosterEntry } from '@acorn/node-core/server/plugin/host.ts'
 import { makeTestDb, type TestDb } from '@acorn/node-core/server/routes/testDb.ts'
+import { memoryIdentityStore } from '@acorn/node-core/main/activeIdentity.ts'
 import { createCoreServices } from '@acorn/node-core/main/core/index.ts'
 import { SecretService } from '@acorn/node-core/main/core/index.ts'
 import { nodePlugins } from '../../src/server/plugins'
@@ -39,10 +40,8 @@ const buildPlugins = (dataDir: string) =>
   nodePlugins(dataDir, {
     agents: {
       internalEnv: () => ({}),
-      currentUserId: () => 'james',
       memoryReviewTrigger: async () => undefined,
     },
-    memory: { currentUserId: () => 'james' },
     preview: { browser: desktop.browser },
     terminal: {
       internalEnv: () => ({}),
@@ -54,7 +53,6 @@ const buildPlugins = (dataDir: string) =>
     workflows: {
       internalEnv: () => ({}),
       reconciled: Promise.resolve(),
-      currentUserId: () => 'james',
       memoryReviewTrigger: async () => undefined,
       failingChecks: async () => null,
     },
@@ -156,7 +154,7 @@ describe('disabling a node plugin', () => {
     const capabilities = new CapabilityRegistry()
     const result = await initPlugins(buildPlugins(dataDir), {
       capabilities,
-      core: createCoreServices({ secrets: new SecretService('0'.repeat(64)), db: coreDb.db }),
+      core: createCoreServices({ secrets: new SecretService('0'.repeat(64)), db: coreDb.db, activeIdentity: memoryIdentityStore() }),
       disabled,
     })
     dispose = result.dispose

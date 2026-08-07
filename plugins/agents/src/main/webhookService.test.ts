@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto'
 import { SecretService } from '@acorn/node-core/main/core/secrets.ts'
 import { eq } from 'drizzle-orm'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { memoryIdentityStore } from '@acorn/node-core/main/activeIdentity.ts'
 import { createCoreServices } from '@acorn/node-core/main/core/index.ts'
 import { makeTestDb, makeTestPluginDb, type TestDb, type TestPluginDb } from '@acorn/node-core/server/routes/testDb.ts'
 import * as schema from '../node/schema'
@@ -22,7 +23,7 @@ describe('managed-agent signed webhooks', () => {
   beforeEach(() => {
     testDb = makeTestPluginDb('agents', migrationsDir())
     coreDb = makeTestDb()
-    service = new AgentWebhookService(testDb.db, SECRETS, createCoreServices({ secrets: SECRETS, db: coreDb.db }))
+    service = new AgentWebhookService(testDb.db, SECRETS, createCoreServices({ secrets: SECRETS, db: coreDb.db, activeIdentity: memoryIdentityStore() }))
   })
 
   afterEach(async () => {

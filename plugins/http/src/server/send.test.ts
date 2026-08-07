@@ -3,6 +3,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { schema } from '@acorn/node-core/server/db/index.ts'
+import { memoryIdentityStore } from '@acorn/node-core/main/activeIdentity.ts'
 import { createCoreServices } from '@acorn/node-core/main/core/index.ts'
 import { makeTestDb, makeTestPluginDb } from '@acorn/node-core/server/routes/testDb.ts'
 import type { HttpSendInput } from '../shared/model'
@@ -40,7 +41,7 @@ function fixture(): Fixture {
   const coreDb = makeTestDb()
   const pluginDb = makeTestPluginDb('http', migrationsDir())
   return {
-    core: createCoreServices({ secrets: SECRETS, db: coreDb.db }),
+    core: createCoreServices({ secrets: SECRETS, db: coreDb.db, activeIdentity: memoryIdentityStore() }),
     db: pluginDb.db,
     coreDb: coreDb.db,
     cleanup: () => {

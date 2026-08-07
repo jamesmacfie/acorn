@@ -1,5 +1,6 @@
 import { Hono } from 'hono'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { memoryIdentityStore } from '@acorn/node-core/main/activeIdentity.ts'
 import { createCoreServices } from '@acorn/node-core/main/core/index.ts'
 import { SecretService } from '@acorn/node-core/main/core/secrets.ts'
 import type { AppEnv, Principal } from '@acorn/node-core/server/middleware/auth.ts'
@@ -49,7 +50,7 @@ describe('HTTP credential isolation', () => {
       c.set('principal', caller)
       await next()
     })
-    app.route('/api/http', httpRoutes(pluginDb.db, createCoreServices({ secrets: new SecretService(ENC_KEY), db: coreDb.db })))
+    app.route('/api/http', httpRoutes(pluginDb.db, createCoreServices({ secrets: new SecretService(ENC_KEY), db: coreDb.db, activeIdentity: memoryIdentityStore() })))
     return app.fetch(new Request(`http://acorn.test${path}`, init), {} as Env)
   }
 

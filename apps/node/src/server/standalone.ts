@@ -69,7 +69,7 @@ const capabilities = new CapabilityRegistry()
 // when this object is built, and terminal may not import it (see service/runtime.ts).
 const knowledgeAt = () => capabilities.require(MEMORY_KNOWLEDGE)
 const notesAt = () => capabilities.require(NOTES_STORE)
-const core = createCoreServices({ secrets: runtime.SECRETS, db: runtime.DB })
+const core = createCoreServices({ secrets: runtime.SECRETS, db: runtime.DB, activeIdentity: runtime.ACTIVE_IDENTITY })
 
 // Every method rejects identically: there is no window on a standalone node, so there is nothing to drive.
 // A rejection rather than a silent empty result, because an agent that asked for a snapshot and got nothing
@@ -91,10 +91,8 @@ const plugins = await initPlugins(
     // Managed agents are available in the standalone composition as well as the Electron composition.
     agents: {
       internalEnv,
-      currentUserId: () => runtime.ACTIVE_IDENTITY.get(),
       memoryReviewTrigger: (taskId, transcriptTail) => knowledgeAt().memoryReviewTrigger(taskId, transcriptTail),
     },
-    memory: { currentUserId: () => runtime.ACTIVE_IDENTITY.get() },
     // A standalone node has no BrowserWindow, so the six `browser_*` tools preview contributes cannot work
     // here. They are still REGISTERED — the tool manifest must be the same shape on every node, or an agent
     // would see a different surface depending on how its node was started — and each one rejects with a
@@ -113,10 +111,9 @@ const plugins = await initPlugins(
     workflows: {
       internalEnv,
       reconciled,
-      currentUserId: () => runtime.ACTIVE_IDENTITY.get(),
       memoryReviewTrigger: (taskId, transcriptTail) => knowledgeAt().memoryReviewTrigger(taskId, transcriptTail),
       failingChecks: async (taskId) =>
-        (await capabilities.get(GITHUB_MIRROR)?.failingChecks(runtime.ACTIVE_IDENTITY.get(), taskId)) ?? null,
+        (await capabilities.get(GITHUB_MIRROR)?.failingChecks(core.identity.active(), taskId)) ?? null,
     },
   }),
   // Plugin disablement is stored by the Node itself. The desktop fleet file controls the client view,

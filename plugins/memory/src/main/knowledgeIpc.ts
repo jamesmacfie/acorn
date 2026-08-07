@@ -22,11 +22,10 @@ import type { MemoryHit, MemoryRow } from './memory'
 export type KnowledgeDeps = {
   // Queue a text block into an agent session on its idle edge (agentSender in terminal.ts).
   sendToAgent(sessionId: string, text: string, submit: 'after-ready'): void
-  currentUserId(): string | null
   notes(): NotesStoreCapability
 }
 
-export type KnowledgeCoreServices = Pick<CoreServices, 'tasks' | 'repos' | 'context'>
+export type KnowledgeCoreServices = Pick<CoreServices, 'tasks' | 'repos' | 'context' | 'identity'>
 
 // Reads over the derived index, BOUND to this plugin's own database. This is what lets the app-layer
 // agent-tool and context-section wiring keep working: it can no longer hold a handle to the file these
@@ -106,7 +105,7 @@ export function registerKnowledgeIpc(db: PluginDatabase, dataRoot: string, core:
       const repo = `${t.repoOwner}/${t.repoName}`
       const blocks: string[] = []
 
-      const userId = deps.currentUserId()
+      const userId = core.identity.active()
       if (userId && (await core.context.injectionEnabled(userId))) {
         const ctx = await core.context.assemble(userId, taskId, new Set(['pr', 'issues', 'notes']))
         const contextBlock = ctx ? formatLaunchContext(ctx) : ''

@@ -211,7 +211,7 @@ export async function startServiceRuntime({ config, desktop, stateChanged }: Run
     // runtime rather than by the module, so a process that starts the service more than once (the
     // tests do) gets a clean graph each time instead of "capability already provided".
     const capabilities = new CapabilityRegistry()
-    const core = createCoreServices({ secrets: runtime.SECRETS, db })
+    const core = createCoreServices({ secrets: runtime.SECRETS, db, activeIdentity: runtime.ACTIVE_IDENTITY })
     // The memory runtime, resolved LAZILY. plugins/terminal needs three of its closures (the launch
     // injector, the memory-review trigger and note seeding) at spawn time, but it may not import them:
     // `memory.knowledge`'s id lives in that plugin's main/ rather than a contract/, so the edge would be
@@ -226,10 +226,8 @@ export async function startServiceRuntime({ config, desktop, stateChanged }: Run
       nodePlugins(config.dataDir, {
         agents: {
           internalEnv,
-          currentUserId: () => runtime.ACTIVE_IDENTITY.get(),
           memoryReviewTrigger: (taskId, transcriptTail) => knowledgeAt().memoryReviewTrigger(taskId, transcriptTail),
         },
-        memory: { currentUserId: () => runtime.ACTIVE_IDENTITY.get() },
         // The Electron-main browser driver, behind the six `browser_*` tools preview now owns. Supplied
         // here because it is a native adapter: this root has the DesktopCapabilities RPC peer, and a
         // plugin may not import electron to build one.
@@ -246,14 +244,13 @@ export async function startServiceRuntime({ config, desktop, stateChanged }: Run
         workflows: {
           internalEnv,
           reconciled,
-          currentUserId: () => runtime.ACTIVE_IDENTITY.get(),
           memoryReviewTrigger: (taskId, transcriptTail) => knowledgeAt().memoryReviewTrigger(taskId, transcriptTail),
           // github's `repos` + `checks`, now behind that plugin's own capability. Resolved at CALL
           // time, never at init: plugin init order is undefined, so reading it here could capture
           // `undefined` purely because github is declared after workflows in the list. `get`, not
           // `require` — a node whose github init failed should fail this one policy, not every step.
           failingChecks: async (taskId) =>
-            (await capabilities.get(GITHUB_MIRROR)?.failingChecks(runtime.ACTIVE_IDENTITY.get(), taskId)) ?? null,
+            (await capabilities.get(GITHUB_MIRROR)?.failingChecks(core.identity.active(), taskId)) ?? null,
         },
       }),
       // The persisted per-node list UNION the start config's. The file is the owner's setting, and it is

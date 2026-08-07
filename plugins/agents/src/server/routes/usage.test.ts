@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it } from 'vitest'
 import type { AppEnv } from '@acorn/node-core/server/middleware/auth.ts'
 import { requireUser } from '@acorn/node-core/server/middleware/requireUser.ts'
 import { SecretService } from '@acorn/node-core/main/core/secrets.ts'
+import { memoryIdentityStore } from '@acorn/node-core/main/activeIdentity.ts'
 import { createCoreServices } from '@acorn/node-core/main/core/index.ts'
 import { makeTestDb } from '@acorn/node-core/server/routes/testDb.ts'
 import type { AgentUsageSnapshot } from '../../shared/usage'
@@ -118,7 +119,7 @@ describe('agent usage routes', () => {
   it('reads, validates, and persists plugin-owned pricing preferences', async () => {
     const testDb = makeTestDb()
     try {
-      const core = createCoreServices({ secrets: new SecretService('33'.repeat(32)), db: testDb.db })
+      const core = createCoreServices({ secrets: new SecretService('33'.repeat(32)), db: testDb.db, activeIdentity: memoryIdentityStore() })
       setAgentUsageBridge({
         read: async () => snapshot,
         pricing: (userId) => readAgentPricingPreferences(core.prefs, userId),

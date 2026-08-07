@@ -9,7 +9,13 @@ import { SecretService } from '@acorn/node-core/main/core/secrets.ts'
 const ENC_KEY = '0'.repeat(64)
 const SECRETS = new SecretService(ENC_KEY)
 
-const identity = (sole: string | null): IdentityService => ({ sole: async () => sole })
+// Only `sole` is under test here — the legacy-row claim never consults the bound identity.
+const identity = (sole: string | null): IdentityService => ({
+  sole: async () => sole,
+  active: () => null,
+  bind: () => {},
+  unbind: () => {},
+})
 
 describe('legacy HTTP storage protection', () => {
   let testDb: TestPluginDb

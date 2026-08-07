@@ -10,7 +10,7 @@ import { editorPlugin } from '@acorn/plugin-editor/node/index.ts'
 import { githubPlugin } from '@acorn/plugin-github/node/index.ts'
 import { httpPlugin } from '@acorn/plugin-http/node/index.ts'
 import { linearPlugin } from '@acorn/plugin-linear/node/index.ts'
-import { memoryPlugin, type MemoryPluginDeps } from '@acorn/plugin-memory/node/index.ts'
+import { memoryPlugin } from '@acorn/plugin-memory/node/index.ts'
 import { modelProvidersPlugin } from '@acorn/plugin-model-providers/node/index.ts'
 import { notesPlugin } from '@acorn/plugin-notes/node/index.ts'
 import { previewPlugin, type PreviewPluginDeps } from '@acorn/plugin-preview/node/index.ts'
@@ -24,7 +24,6 @@ import { workflowsPlugin, type WorkflowsPluginDeps } from '@acorn/plugin-workflo
 // capability and provider registries; this bag is for runtime seams that are not domain contracts.
 export type NodePluginDeps = {
   agents: AgentsPluginDeps
-  memory: MemoryPluginDeps
   // The Electron-main browser driver behind the six `browser_*` agent tools. A native adapter, so it stays
   // an app-supplied dep: a plugin may not import electron (tools/arch/boundaries.test.ts enumerates the
   // three that may, and preview's node/ is not one of them).
@@ -45,7 +44,7 @@ export const nodePlugins = (dataDir: string, deps: NodePluginDeps): NodePlugin[]
   githubPlugin(dataDir),
   httpPlugin(dataDir),
   linearPlugin(),
-  memoryPlugin(dataDir, deps.memory),
+  memoryPlugin(dataDir),
   modelProvidersPlugin(),
   notesPlugin(dataDir),
   previewPlugin(deps.preview),

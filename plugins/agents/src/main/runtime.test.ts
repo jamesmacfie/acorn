@@ -4,6 +4,7 @@ import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { memoryIdentityStore } from '@acorn/node-core/main/activeIdentity.ts'
 import { createCoreServices, type CoreServices } from '@acorn/node-core/main/core/index.ts'
 import { schema } from '@acorn/node-core/server/db/index.ts'
 import { makeTestDb, makeTestPluginDb, type TestDb, type TestPluginDb } from '@acorn/node-core/server/routes/testDb.ts'
@@ -207,7 +208,7 @@ describe('managed agent runtime conformance', () => {
   beforeEach(async () => {
     testDb = makeTestDb()
     pluginDb = makeTestPluginDb('agents', migrationsDir())
-    core = createCoreServices({ secrets: SECRETS, db: testDb.db })
+    core = createCoreServices({ secrets: SECRETS, db: testDb.db, activeIdentity: memoryIdentityStore() })
     dataDir = await mkdtemp(join(tmpdir(), 'acorn-managed-runtime-'))
     runtime = null
   })
