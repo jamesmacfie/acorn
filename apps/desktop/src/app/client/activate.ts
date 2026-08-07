@@ -18,16 +18,20 @@ import { coreStateSlices } from '@acorn/client-core/persistence/stateSlices.ts'
 import { noticeKindRegistry } from '@acorn/client-core/registries/notices.ts'
 import { pollerRegistry } from '@acorn/client-core/registries/pollers.ts'
 import { settingsRegistry } from '@acorn/client-core/registries/settings.ts'
+import { sourceRegistry } from '@acorn/client-core/registries/sources.ts'
 import { uiSlotRegistry } from '@acorn/client-core/registries/uiSlots.tsx'
 import { taskStatusPollerContribution } from '@acorn/client-core/tasks/taskStatus.ts'
 import { settingsPageContributions } from './pageContributions'
 import { clientPlugins } from './plugins'
 import { activateScopedStateEviction } from './scopedEviction'
 import { shellSlotContributions } from './slotContributions'
+import { coreSourceContributions } from './sourceContributions'
 
 for (const kind of noticeKindContributions) noticeKindRegistry.register(kind)
 for (const page of settingsPageContributions) settingsRegistry.register(page)
 for (const contribution of shellSlotContributions) uiSlotRegistry.register(contribution)
+// Core's one rail source: Fleet home, hidden by its own `when` until a second node is paired.
+for (const source of coreSourceContributions) sourceRegistry.register(source)
 // Core's own persisted state: the shell slices (selection, layouts, drawer height, notices) plus the
 // direct preference slices. Which FEATURES persist state is each plugin's own declaration now, through
 // ctx.persistedState — the app no longer holds a list of four plugin slices it does not own.

@@ -86,6 +86,34 @@ describe('availableSources (docs/integrations.md — gated by integration rows)'
     }
   })
 
+  // `when` is the second, independent gate. Fleet home is its one contributor: ui.md says the view "stays
+  // out of the way" with a single node, and first-run must never mention nodes at all — so the rail button
+  // has to be absent, not present-and-empty.
+  it('honours `when` independently of providerId', () => {
+    let visible = false
+    const gated = sourceRegistry.register({ id: 'when-test', order: 0, glyph: 'w', label: 'When', when: () => visible })
+    try {
+      expect(availableSources(undefined).map((s) => s.id)).toEqual(['github'])
+      visible = true
+      expect(availableSources(undefined).map((s) => s.id)).toEqual(['when-test', 'github'])
+    } finally {
+      gated.dispose()
+    }
+  })
+
+  it('AND-s `when` with the provider gate rather than replacing it', () => {
+    // A source with both must satisfy both — otherwise adding `when` would have quietly opened a hole in
+    // the integration gate for any contribution that declared one.
+    const both = sourceRegistry.register({
+      id: 'both-test', order: 0, glyph: 'b', label: 'Both', providerId: 'linear', when: () => false,
+    })
+    try {
+      expect(availableSources([integration('linear')]).map((s) => s.id)).not.toContain('both-test')
+    } finally {
+      both.dispose()
+    }
+  })
+
   it('breaks an order tie by id, so equal orders still give a stable rail', () => {
     const b = sourceRegistry.register({ id: 'b-source', order: 5, glyph: 'b', label: 'B' })
     const a = sourceRegistry.register({ id: 'a-source', order: 5, glyph: 'a', label: 'A' })

@@ -37,6 +37,14 @@ export type SourceContribution<Item = unknown> = {
   providerId?: string
   glyph: string
   label: string
+  // An extra gate beyond `providerId`, for a source whose relevance is not an integration question.
+  //
+  // One contributor: core's Fleet home, which must not exist with a single node — ui.md § New surfaces
+  // says "with only the bundled local node, this view stays out of the way; first-run never mentions
+  // nodes at all". Expressing that as a `providerId` would be a lie (no integration backs it), and having
+  // the component render an empty state would still leave a rail button asking about a concept the owner
+  // has not met.
+  when?: () => boolean
   component?: Component
   defaultPane?: string
   requiredCapability?: string

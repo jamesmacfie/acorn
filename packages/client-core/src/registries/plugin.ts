@@ -28,7 +28,7 @@
 //                     ClientPlugin. Note this is the CLIENT registry — extra controls rendered under a
 //                     section — not the node one that supplies a section's data.
 //                     `agentContexts` below is a different thing and is included on its own merits.
-//   attention       → LEFT OUT. The attention inbox is Phase 4; there is nothing to register into.
+//   attention       → registries/attention.ts, added in Phase 4 with the inbox that consumes it.
 //   api             → LEFT OUT. Plugins already call the typed fetchers in client-core directly; a
 //                     second way to reach the same node would be a parallel idiom with no consumer.
 //   events          → LEFT OUT. registries/clientEvents.ts is imported directly by the handful of
@@ -46,6 +46,7 @@ import { agentContextRegistry } from './agentContexts'
 import { agentToolRendererRegistry, type AgentToolRendererContribution } from './agentToolRenderers'
 import { contextSectionRegistry, type ContextSectionContribution } from './contextSections'
 import { paletteRowRegistry, type PaletteRowSource } from './paletteRows'
+import { nodeStatRegistry, type NodeStatContribution } from './nodeStats'
 import { paneRegistry, type PaneContribution } from './panes'
 import { refPanelRegistry, type RefPanelContribution } from './refPanels'
 import { pollerRegistry, type PollerContribution } from './pollers'
@@ -78,6 +79,9 @@ export type ClientPluginContext = {
   agentToolRenderers: ClientContributionPoint<AgentToolRendererContribution>
   pollers: ClientContributionPoint<PollerContribution>
   persistedState: ClientContributionPoint<PersistedStateSlice<unknown>>
+  // One number on a Fleet home node card. Core supplies the task count; "agents running" is the agents
+  // plugin's, and client-core cannot import it (registries/nodeStats.ts).
+  nodeStats: ClientContributionPoint<NodeStatContribution>
   // Registration into a registry client-core does not own — a registry a PLUGIN publishes.
   //
   // There is exactly one today: plugins/github's `contentLinkRegistry`, which decides which hrefs inside
@@ -176,6 +180,7 @@ function makeContext(name: string, record: (disposable: Disposable) => void): Cl
     agentToolRenderers: own(agentToolRendererRegistry),
     pollers: own(pollerRegistry),
     persistedState: own(persistedStateRegistry),
+    nodeStats: own(nodeStatRegistry),
     // Straight through `own`, so a plugin-published registry gets the identical treatment: ownership checked,
     // disposable recorded. The only difference from the members above is that the registry arrives as an
     // argument instead of being named here.

@@ -5,6 +5,8 @@
 // exist.
 import { lazy } from 'solid-js'
 import type { ClientPlugin } from '@acorn/client-core/registries/plugin.ts'
+import { isActiveAgent } from './agentActivity'
+import { managedAgentApi } from './managedClient'
 import { activateManagedAgentNoticeTargets } from './managedSelection'
 import { activateManagedAgentNotifications } from './managedStore'
 import { agentPaneContribution } from './paneContribution'
@@ -24,6 +26,13 @@ export const agentsClientPlugin: ClientPlugin = {
     ctx.settingsPages.register({
       id: 'agent-pricing', label: 'Agent pricing', group: 'general', order: 45, requires: 'desktop',
       component: AgentPricingSettings,
+    })
+    // Fleet home's "agents running" number. Addressed at an explicit node, never the ambient one: the
+    // card exists to show several nodes at once.
+    ctx.nodeStats.register({
+      id: 'agents.active', order: 10, label: ['agent running', 'agents running'],
+      fetch: async (nodeId, signal) =>
+        (await managedAgentApi.sessions({ archived: false }, { nodeId, signal })).sessions.filter(isActiveAgent).length,
     })
   },
   // Not registration: these three attach listeners to the managed-session store (agent references in
