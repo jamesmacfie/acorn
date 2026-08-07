@@ -6,7 +6,7 @@ import {
 } from '../../shared/pricing'
 import { bridgeSlot, viaBridge } from '@acorn/node-core/server/bridge.ts'
 import type { AppEnv } from '@acorn/node-core/server/middleware/auth.ts'
-import { ownerId } from '@acorn/node-core/server/middleware/requireUser.ts'
+import { ownerId, requireDevice } from '@acorn/node-core/server/middleware/requireUser.ts'
 import { respondError } from '@acorn/node-core/server/respond.ts'
 
 // Account-scoped local provider usage, plus the pricing overrides it is computed against.
@@ -31,7 +31,12 @@ export const agentUsage = new Hono<AppEnv>()
     const userId = ownerId(c)
     return viaBridge(c, agentUsageBridgeSlot, (bridge) => bridge.pricing(userId))
   })
-  .put('/pricing', async (c) => {
+  // Device only. This writes the OWNER's pricing preferences, keyed on `ownerId(c)` — which is the same value for
+  // a device and for an agent-spawned child, so nothing else here distinguished them. A task-scoped agent could
+  // overwrite the cost table every usage figure in the app is computed against, for every task; that is a
+  // settings surface, not something a session needs. The reads stay open: an agent asking what a turn costs is
+  // reasonable, and it is the owner's own data either way.
+  .put('/pricing', requireDevice, async (c) => {
     const body = await c.req.json().catch(() => null) as unknown
     // Validated at the boundary, before anything is stored: the renderer is the less-trusted side, and
     // a malformed override would otherwise be parsed back into the built-in table on every read and

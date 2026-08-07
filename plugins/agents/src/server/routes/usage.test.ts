@@ -44,6 +44,16 @@ const authed = () => {
 
 const gated = () => new Hono<AppEnv>().use('/api/*', requireUser).route('/api/agents', agentUsage)
 
+// A child an agent spawned inside task1 — an agent session's own ACORN_API_TOKEN.
+const asTask1 = () => {
+  const app = new Hono<AppEnv>()
+  app.use('/api/*', async (c, next) => {
+    c.set('principal', { kind: 'internal', userId: 'james', scope: 'task', taskId: 'task1' })
+    await next()
+  })
+  return app.route('/api/agents', agentUsage)
+}
+
 describe('agent usage routes', () => {
   afterEach(() => setAgentUsageBridge(null))
 
@@ -139,5 +149,36 @@ describe('agent usage routes', () => {
     } finally {
       testDb.cleanup()
     }
+  })
+})
+
+// `ownerId(c)` resolves to the same login for a device and for an agent-spawned child, so nothing here
+// distinguished them — a task-scoped agent could overwrite the cost table every usage figure in the app is
+// computed against, for every task.
+describe('writing pricing preferences needs a human', () => {
+  afterEach(() => setAgentUsageBridge(null))
+
+  it('403s a PUT from a task-scoped credential, without reaching the bridge or parsing the body', async () => {
+    let wrote = 0
+    setAgentUsageBridge({
+      read: async () => snapshot,
+      pricing: async () => emptyAgentPricingPreferences(),
+      setPricing: async () => void (wrote += 1),
+    })
+    // A body that WOULD validate, so a 403 cannot be a 400 in disguise.
+    const valid = emptyAgentPricingPreferences()
+    const refused = await asTask1().fetch(request('/api/agents/pricing', 'PUT', valid), {} as Env)
+    expect(refused.status).toBe(403)
+    expect(wrote).toBe(0)
+    // The control: the same request from a device is accepted.
+    expect((await authed().fetch(request('/api/agents/pricing', 'PUT', valid), {} as Env)).status).toBe(200)
+    expect(wrote).toBe(1)
+  })
+
+  it('leaves the READS open to an agent — a turn asking what it cost is reasonable', async () => {
+    setAgentUsageBridge({ read: async () => snapshot, pricing: async () => emptyAgentPricingPreferences(), setPricing: async () => {} })
+    const app = asTask1()
+    expect((await app.fetch(request('/api/agents/pricing'), {} as Env)).status).toBe(200)
+    expect((await app.fetch(request('/api/agents/usage'), {} as Env)).status).toBe(200)
   })
 })

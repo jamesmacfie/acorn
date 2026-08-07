@@ -5,6 +5,7 @@ import { Hono } from 'hono'
 import { z } from 'zod'
 import { bridgeSlot, viaBridge } from '@acorn/node-core/server/bridge.ts'
 import type { AppEnv } from '@acorn/node-core/server/middleware/auth.ts'
+import { requireDevice } from '@acorn/node-core/server/middleware/requireUser.ts'
 import { respondError } from '@acorn/node-core/server/respond.ts'
 import type {
   DockerComposeAction,
@@ -55,7 +56,35 @@ const ref = (c: { req: { param(k: string): string } }): string | null => {
   return isDockerRef(value) ? value : null
 }
 
+// Every DAEMON-WIDE path in this router is device-only. Only the two task-addressed routes at the bottom are
+// reachable by a task-scoped agent, and those are already confined by core's `/v2/p/:plugin/tasks/:id` mount.
+//
+// phase3-notes.md named this gap but described it as availability — "a task-scoped agent can still prune the
+// daemon". The sharper half is exfiltration: `GET /containers/:ref/inspect` returns `env: string[]`
+// (shared/model.ts), i.e. every container's full environment. With `/containers` and `/task-summary`
+// enumerating what exists, a confined agent could walk the machine and read `POSTGRES_PASSWORD` and every API
+// key in every container the owner runs — including containers belonging to work it has nothing to do with.
+// The delete surface (`/prune`, the four `*/remove`, `/containers/:ref/action`, `/compose/action`) is real too
+// and none of it has a task to check, which is why `mayActOnTask` was never the shape of this fix.
+//
+// requireDevice, not requireProviderAccess: nothing on the node's own loopback path browses the daemon, so
+// there is no 'service'-scope caller to keep working. Docker browse is a renderer surface.
+//
+// Enumerated per subtree rather than one `use('*')` with a path-string exemption for `/tasks/`, because this
+// router is mounted under `/v2/p/docker` and a middleware matching `*` sees the full request path — sniffing
+// for a `/tasks/` segment in it would be a guard whose correctness depends on the mount prefix. The cost is
+// that a NEW daemon-wide route must be added to this list; docker.test.ts closes that by walking the router's
+// own route table and refusing any ungated non-task path, so forgetting fails the suite rather than shipping.
+// Measured: Hono's trailing `/*` matches zero segments, so `/containers/*` also covers bare `/containers`.
 export const docker = new Hono<AppEnv>()
+  .use('/info', requireDevice)
+  .use('/containers/*', requireDevice)
+  .use('/images/*', requireDevice)
+  .use('/volumes/*', requireDevice)
+  .use('/networks/*', requireDevice)
+  .use('/prune', requireDevice)
+  .use('/compose/*', requireDevice)
+  .use('/task-summary', requireDevice)
   .get('/info', (c) => viaBridge(c, dockerBridgeSlot, (b) => b.info()))
   .get('/containers', (c) => viaBridge(c, dockerBridgeSlot, (b) => b.containers()))
   .get('/containers/:ref/inspect', (c) => {
