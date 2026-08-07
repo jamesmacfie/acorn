@@ -25,14 +25,11 @@ import { CapabilityRegistry } from '@acorn/node-core/server/plugin/capabilities.
 import { initPlugins } from '@acorn/node-core/server/plugin/host.ts'
 import { setWorktreesRoot } from '@acorn/node-core/main/taskWorktree.ts'
 import { AGENTS_RUNTIME } from '@acorn/plugin-agents/contract/runtime.ts'
-import { MEMORY_KNOWLEDGE } from '@acorn/plugin-memory/contract/knowledge.ts'
-import { NOTES_STORE } from '@acorn/plugin-notes/contract/store.ts'
-import { seedTaskNotes } from '@acorn/plugin-notes/main/seedTaskNotes.ts'
 import { reconcileTmux } from '@acorn/plugin-terminal/main/terminal.ts'
 import { WORKFLOWS_RUNNER } from '@acorn/plugin-workflows/contract/runner.ts'
-import { GITHUB_MIRROR } from '@acorn/plugin-github/contract/mirror.ts'
 import { wireAgentTools } from '../wiring/agentToolsWiring'
 import { nodePlugins } from './plugins'
+import { buildPluginDeps } from './pluginDeps'
 import type { BrowserDesktopCapability } from '@acorn/protocol/desktopCapabilities.ts'
 
 // ACORN_DATA_DIR names the root explicitly. It is the same variable this node hands its own child
@@ -64,11 +61,6 @@ const internalEnv: InternalEnvFactory = (claims) => ({
 let finishReconcile!: () => void
 const reconciled = new Promise<void>((resolve) => (finishReconcile = resolve))
 const capabilities = new CapabilityRegistry()
-// Resolved at CALL time, never here: `memory.knowledge` is published by memory's init, which has not run
-// when this object is built, and terminal cannot import it without closing a package cycle (the reasoning
-// is written out in service/runtime.ts).
-const knowledgeAt = () => capabilities.require(MEMORY_KNOWLEDGE)
-const notesAt = () => capabilities.require(NOTES_STORE)
 const core = createCoreServices({ secrets: runtime.SECRETS, db: runtime.DB, activeIdentity: runtime.ACTIVE_IDENTITY })
 
 // Every method rejects identically: there is no window on a standalone node, so there is nothing to drive.
@@ -84,38 +76,10 @@ const unavailableBrowser: BrowserDesktopCapability = {
   console: browserUnavailable,
 }
 
-// The standalone and Electron roots activate the same plugin list. Their behavior differs only where
-// the available runtime bridge differs, such as the desktop preview browser.
+// The standalone and Electron roots activate the same plugin list, through the same builder. Their
+// behavior differs only where the available runtime bridge does — here, the preview browser.
 const plugins = await initPlugins(
-  nodePlugins(root.dir, {
-    // Managed agents are available in the standalone composition as well as the Electron composition.
-    agents: {
-      internalEnv,
-      memoryReviewTrigger: (taskId, transcriptTail) => knowledgeAt().memoryReviewTrigger(taskId, transcriptTail),
-    },
-    // A standalone node has no BrowserWindow, so the six `browser_*` tools preview contributes cannot work
-    // here. They are still REGISTERED — the tool manifest must be the same shape on every node, or an agent
-    // would see a different surface depending on how its node was started — and each one rejects with a
-    // clear reason instead of pretending to drive a webview that does not exist. That is the same degraded
-    // shape `dev:node` already has for anything needing native UI.
-    preview: { browser: unavailableBrowser },
-    terminal: {
-      internalEnv,
-      launchInjector: (taskId, sessionId) => knowledgeAt().launchInjector(taskId, sessionId),
-      memoryReviewTrigger: (taskId, transcriptTail) => knowledgeAt().memoryReviewTrigger(taskId, transcriptTail),
-      seedTaskNotes: (task) => seedTaskNotes(core, notesAt(), internalEnv({ scope: 'service' }), task),
-      reconciled,
-    },
-    // Workflows are available in the standalone composition and resolve GitHub mirror data through the
-    // capability registry at call time.
-    workflows: {
-      internalEnv,
-      reconciled,
-      memoryReviewTrigger: (taskId, transcriptTail) => knowledgeAt().memoryReviewTrigger(taskId, transcriptTail),
-      failingChecks: async (taskId) =>
-        (await capabilities.get(GITHUB_MIRROR)?.failingChecks(core.identity.active(), taskId)) ?? null,
-    },
-  }),
+  nodePlugins(root.dir, buildPluginDeps({ capabilities, core, internalEnv, reconciled, browser: unavailableBrowser })),
   // Plugin disablement is stored by the Node itself. The desktop fleet file controls the client view,
   // while this persisted set controls a standalone process at boot.
   { capabilities, core, disabled: disabledPlugins.get() },
