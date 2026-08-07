@@ -9,6 +9,9 @@ import { resolveDatabasePath } from './serverPaths'
 import { configuredPort, devDataDir } from './serverConfig'
 import { ensureCert } from './tls'
 import { attachWsHub, type WsAuthDeps } from './wsHub'
+import { attachTunnel } from './tunnel'
+import { isUpgradeClaimed } from './upgradeClaim'
+import { declaredTunnelPorts } from './tunnelPorts'
 import type { Env } from './bindings'
 
 // DEV data root: the repo-local apps/node/.acorn (gitignored) — it belongs to apps/node because the
@@ -96,6 +99,23 @@ export function startListener(runtime: RuntimeBindings, root: DataRoot): Promise
     devices: runtime.DEVICES,
   }
   attachWsHub(server as unknown as import('node:http').Server, wsDeps)
+
+  // The preview tunnel (/v2/tunnel) shares the same listener and the same upgrade auth, so a remote task's
+  // dev server is reachable from the client without the node exposing anything beyond loopback
+  // (main/tunnel.ts explains why this is a dedicated upgrade rather than a multiplexed stream frame).
+  // The port allowlist is derived from what this node already resolves for the task, so there is no new
+  // configuration surface to get wrong.
+  attachTunnel(server as unknown as import('node:http').Server, {
+    ...wsDeps,
+    declaredPorts: declaredTunnelPorts(runtime.DB),
+  })
+
+  // Registered LAST, so it runs after both handlers above have had their synchronous chance to claim. An
+  // upgrade neither of them owns is destroyed here rather than left open forever — see
+  // main/upgradeClaim.ts for what Node does (and stops doing) once any 'upgrade' listener exists.
+  ;(server as unknown as import('node:http').Server).on('upgrade', (_req, socket) => {
+    if (!isUpgradeClaimed(socket)) socket.destroy()
+  })
 
   // Binding is asynchronous — resolve only once listening so callers can safely reach the origin
   // without a race. Reject on listen failure so bootstrap can surface it instead of the raw 'error'

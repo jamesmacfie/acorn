@@ -10,6 +10,7 @@ import { WebSocketServer, type WebSocket } from 'ws'
 import type { DeviceService } from '../server/auth/deviceTokens'
 import type { ServerMsg } from '@acorn/protocol/terminal.ts'
 import { WS_PATH, type WsClientFrame, type WsServerFrame, type WsServerWireFrame } from '@acorn/protocol/ws.ts'
+import { claimUpgrade } from './upgradeClaim'
 
 // A sink is one connection's outlet for a session's ServerMsg frames — terminal.ts adds/removes it
 // from a session's subscriber set on attach/detach and calls it to push output.
@@ -134,6 +135,15 @@ type Authorized = { deviceId: string | null; internal?: InternalClaims }
 // now and every frame crosses IPC to the broker in Electron main, which presents a device bearer like
 // any other client. No cookie means no Origin check either: Origin was how a cookie-bearing browser
 // socket was distinguished from a cross-site one, and there is no ambient credential left to defend.
+// Exported so the tunnel upgrade (main/tunnel.ts) authenticates on exactly these terms rather than
+// growing a second, subtly different door. A raw TCP pipe to a port on the node's host is the single most
+// sensitive upgrade this server offers, so it must not be the one with its own auth code.
+export async function authorizeWsUpgrade(req: IncomingMessage, deps: WsAuthDeps): Promise<Authorized | null> {
+  return authorize(req, deps)
+}
+
+export type { Authorized as AuthorizedWsUpgrade }
+
 async function authorize(req: IncomingMessage, deps: WsAuthDeps): Promise<Authorized | null> {
   if (req.headers.host !== deps.allowedHost) return null
   const bearer = req.headers.authorization
@@ -261,6 +271,9 @@ export function attachWsHub(server: Server, deps: WsAuthDeps): void {
       return
     }
     if (path !== WS_PATH) return
+    // Synchronously, before the async authorize below: the "nobody answered" sweeper runs as the last
+    // upgrade listener and cannot wait for our promise (main/upgradeClaim.ts).
+    claimUpgrade(socket)
     void authorize(req, deps).then((authorized) => {
       if (!authorized) {
         socket.write('HTTP/1.1 403 Forbidden\r\n\r\n')

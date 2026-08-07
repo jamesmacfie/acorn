@@ -5,13 +5,16 @@ import {
   nodePairRequestSchema,
   nodeProbeRequestSchema,
   nodeRenameRequestSchema,
+  nodeTunnelRequestSchema,
   type NodeProbeResult,
   type NodeRecord,
+  type NodeTunnelResult,
 } from '@acorn/protocol/broker.ts'
 import type { WsClientFrame } from '@acorn/protocol/ws.ts'
 import { toNodeRecord, type FleetStore } from './fleetStore'
 import type { NodeBroker } from './nodeBroker'
 import { pairWithNode, probeNode } from './nodePairing'
+import type { PreviewTunnels } from './previewTunnel'
 
 // The IPC projection of the broker and the fleet store. Deliberately thin: every decision lives in
 // nodeBroker.ts / fleetStore.ts / nodePairing.ts, which are Electron-free and therefore testable, and
@@ -35,6 +38,8 @@ export const NODE_RENAME = 'acorn:node-rename'
 export const NODE_FORGET = 'acorn:node-forget'
 export const NODE_RECONNECT = 'acorn:node-reconnect'
 export const NODE_RESTART_LOCAL = 'acorn:node-restart-local'
+export const NODE_TUNNEL_OPEN = 'acorn:node-tunnel-open'
+export const NODE_TUNNEL_CLOSE = 'acorn:node-tunnel-close'
 
 export type NodeBrokerIpcDeps = {
   // Stop and start the supervised local service. Supplied by main/bootstrap.ts, which owns the
@@ -44,6 +49,8 @@ export type NodeBrokerIpcDeps = {
   // machine, and nothing this app can do restarts it; Settings → Plugins says "restart required" there
   // instead, which is honest rather than a button that would lie.
   restartLocalNode?: () => Promise<void>
+  // The preview tunnel's loopback listeners (main/previewTunnel.ts). Absent in a build with no preview.
+  tunnels?: PreviewTunnels
 }
 
 export function registerNodeBrokerIpc(broker: NodeBroker, fleet: FleetStore, deps: NodeBrokerIpcDeps = {}): () => void {
@@ -146,6 +153,8 @@ export function registerNodeBrokerIpc(broker: NodeBroker, fleet: FleetStore, dep
     }
     broker.remove(nodeId)
     fleet.forget(nodeId)
+    // A pipe to a node we have just stopped trusting must not outlive the pairing.
+    deps.tunnels?.closeFor({ nodeId })
   })
 
   ipcMain.on(NODE_RECONNECT, (_event, nodeId: unknown) => {
@@ -161,17 +170,37 @@ export function registerNodeBrokerIpc(broker: NodeBroker, fleet: FleetStore, dep
     await deps.restartLocalNode()
   })
 
+  // The preview tunnel. The renderer sends a task and a port ON THE NODE and gets back a port on THIS
+  // machine; it never learns the endpoint or the token, and the pipe is main's (main/previewTunnel.ts).
+  ipcMain.handle(NODE_TUNNEL_OPEN, async (_event, raw: unknown): Promise<NodeTunnelResult> => {
+    const request = nodeTunnelRequestSchema.parse(raw)
+    if (!deps.tunnels) throw new Error('This build cannot open a preview tunnel.')
+    return { port: await deps.tunnels.open(request) }
+  })
+
+  ipcMain.on(NODE_TUNNEL_CLOSE, (_event, raw: unknown) => {
+    // Closing is a best-effort cleanup (a task archived, a pane disposed), so an unparseable payload is
+    // ignored rather than thrown back at a renderer that is already tearing down.
+    if (!raw || typeof raw !== 'object') return
+    const { nodeId, taskId } = raw as { nodeId?: unknown; taskId?: unknown }
+    deps.tunnels?.closeFor({
+      ...(typeof nodeId === 'string' ? { nodeId } : {}),
+      ...(typeof taskId === 'string' ? { taskId } : {}),
+    })
+  })
+
   // Bring up every node remembered from a previous launch. The local one is adopted separately, from
   // the service start handoff, because its endpoint is only known once it has bound a port.
   for (const node of fleet.list()) if (!node.local) connect(node.nodeId)
 
   return () => {
-    for (const channel of [NODE_FETCH, FLEET_LIST, NODE_PROBE, NODE_PAIR, NODE_RENAME, NODE_FORGET, NODE_RESTART_LOCAL]) {
+    for (const channel of [NODE_FETCH, FLEET_LIST, NODE_PROBE, NODE_PAIR, NODE_RENAME, NODE_FORGET, NODE_RESTART_LOCAL, NODE_TUNNEL_OPEN]) {
       ipcMain.removeHandler(channel)
     }
     ipcMain.removeAllListeners(NODE_ABORT)
     ipcMain.removeAllListeners(NODE_SEND)
     ipcMain.removeAllListeners(NODE_RECONNECT)
+    ipcMain.removeAllListeners(NODE_TUNNEL_CLOSE)
   }
 }
 

@@ -1,0 +1,92 @@
+import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import type { NodeRecord } from '@acorn/protocol/broker.ts'
+import { setActiveNode } from './activeNode'
+import { refreshFleet, _resetFleet } from './fleet'
+import { loopbackTarget, tunnelUrl } from './tunnelUrl'
+
+const node = (nodeId: string, local: boolean): NodeRecord => ({
+  nodeId, label: nodeId, endpoint: `https://127.0.0.1:9${nodeId.length}00`, local,
+})
+
+let asked: { nodeId: string; taskId: string; port: number }[] = []
+let opens: (request: { nodeId: string; taskId: string; port: number }) => Promise<{ port: number }>
+
+beforeEach(async () => {
+  _resetFleet()
+  asked = []
+  opens = (request) => {
+    asked.push(request)
+    return Promise.resolve({ port: 51000 })
+  }
+  ;(globalThis as { window?: unknown }).window = {
+    acorn: {
+      desktop: true,
+      fleetList: () => Promise.resolve({
+        nodes: [node('local', true), node('remote', false)],
+        statuses: [{ nodeId: 'local', state: 'online' as const }, { nodeId: 'remote', state: 'online' as const }],
+      }),
+      onNodeStatus: () => () => {},
+      nodeTunnelOpen: (request: { nodeId: string; taskId: string; port: number }) => opens(request),
+      nodeTunnelClose: () => {},
+    },
+  }
+  await refreshFleet()
+})
+
+afterEach(() => {
+  _resetFleet()
+  setActiveNode(null)
+  delete (globalThis as { window?: unknown }).window
+})
+
+describe('loopbackTarget', () => {
+  it('recognises the loopback spellings and keeps the rest of the URL', () => {
+    expect(loopbackTarget('http://localhost:5173/app?x=1#top')).toEqual({ port: 5173, rest: '/app?x=1#top' })
+    expect(loopbackTarget('http://127.0.0.1:3000')).toEqual({ port: 3000, rest: '/' })
+    expect(loopbackTarget('https://localhost')).toEqual({ port: 443, rest: '/' })
+    expect(loopbackTarget('http://localhost')).toEqual({ port: 80, rest: '/' })
+  })
+
+  it('is null for anything that does not need a tunnel or must not get one', () => {
+    // A real host is already reachable from here, and tunnelling it would be the general proxy protocol.md
+    // rules out. `localhost@evil.test` is the userinfo trick the preview URL guard also refuses.
+    expect(loopbackTarget('https://staging.example.com')).toBeNull()
+    expect(loopbackTarget('http://localhost@evil.test/')).toBeNull()
+    expect(loopbackTarget('file:///etc/passwd')).toBeNull()
+    expect(loopbackTarget('not a url')).toBeNull()
+  })
+})
+
+describe('tunnelUrl', () => {
+  it('leaves the URL alone for the local node', async () => {
+    // Same machine: a tunnel would be a pointless extra hop, and every single-node install takes this path.
+    setActiveNode('local')
+    await expect(tunnelUrl('task-1', 'http://localhost:5173/')).resolves.toBe('http://localhost:5173/')
+    expect(asked).toEqual([])
+  })
+
+  it('rewrites a loopback URL to a tunnel port for a remote node', async () => {
+    setActiveNode('remote')
+    await expect(tunnelUrl('task-1', 'http://localhost:5173/app?x=1')).resolves.toBe('http://127.0.0.1:51000/app?x=1')
+    expect(asked).toEqual([{ nodeId: 'remote', taskId: 'task-1', port: 5173 }])
+  })
+
+  it('leaves a non-loopback URL alone even on a remote node', async () => {
+    setActiveNode('remote')
+    await expect(tunnelUrl('task-1', 'https://staging.example.com/')).resolves.toBe('https://staging.example.com/')
+    expect(asked).toEqual([])
+  })
+
+  it('falls back to the original URL when the tunnel cannot be opened', async () => {
+    // No worse than the state before tunnels existed, and main logs the reason. Returning null instead would
+    // blank the pane and hide the fact that a URL was resolved at all.
+    setActiveNode('remote')
+    opens = () => Promise.reject(new Error('403'))
+    await expect(tunnelUrl('task-1', 'http://localhost:5173/')).resolves.toBe('http://localhost:5173/')
+  })
+
+  it('passes null through', async () => {
+    setActiveNode('remote')
+    await expect(tunnelUrl('task-1', null)).resolves.toBeNull()
+  })
+})
