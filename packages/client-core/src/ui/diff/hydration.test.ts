@@ -1,10 +1,10 @@
 import { createRoot } from 'solid-js'
 import { describe, expect, it, vi } from 'vitest'
-import type { PullFile } from '../../queries'
+import type { DiffFile } from './model'
 import { createDiffHydrator } from './hydration'
 import type { ParsedFile, TokenizeLine } from './model'
 
-const pullFile = (path: string, patch: string | null): PullFile => ({
+const pullFile = (path: string, patch: string | null): DiffFile => ({
   path,
   status: 'modified',
   additions: 1,
@@ -69,7 +69,7 @@ describe('diff hydrator', () => {
   })
 
   it('parses already-loaded patch-bearing files without fetching patch batches', async () => {
-    const fetchPatches = vi.fn(async () => [] as PullFile[])
+    const fetchPatches = vi.fn(async () => [] as DiffFile[])
     const parsed: ParsedFile[] = []
     const { hydrator, disposeRoot } = makeHydrator(parsed, { fetchPatches })
 

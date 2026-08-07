@@ -1,4 +1,4 @@
-import type { PullFile } from '../queries'
+import type { DiffFile } from './diff/model'
 
 export type FileStatusTone = 'add' | 'del' | 'warn' | 'muted'
 
@@ -31,7 +31,7 @@ export function fileStatusMeta(status: string | null | undefined): FileStatusMet
   }
 }
 
-export function summarizeFileStats(files: readonly Pick<PullFile, 'additions' | 'deletions'>[] | undefined): {
+export function summarizeFileStats(files: readonly Pick<DiffFile, 'additions' | 'deletions'>[] | undefined): {
   count: number
   additions: number
   deletions: number

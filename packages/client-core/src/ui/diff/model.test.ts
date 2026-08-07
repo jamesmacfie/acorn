@@ -1,6 +1,6 @@
 import { performance } from 'node:perf_hooks'
 import { describe, expect, it } from 'vitest'
-import type { PullFile, Thread } from '../../queries'
+import type { DiffFile, DiffThread } from './model'
 import {
   buildDiffRows,
   buildRenderableRows,
@@ -18,7 +18,7 @@ import {
   type ParsedFile,
 } from './model'
 
-const pullFile = (path: string, patch: string | null): PullFile => ({
+const pullFile = (path: string, patch: string | null): DiffFile => ({
   path,
   status: 'modified',
   additions: 1,
@@ -28,7 +28,7 @@ const pullFile = (path: string, patch: string | null): PullFile => ({
   patch,
 })
 
-const thread = (path: string, line: number, side: 'LEFT' | 'RIGHT' | null = 'RIGHT', resolved = false): Thread => ({
+const thread = (path: string, line: number, side: 'LEFT' | 'RIGHT' | null = 'RIGHT', resolved = false): DiffThread => ({
   threadId: `${path}:${line}:${side ?? 'RIGHT'}`,
   path,
   line,
