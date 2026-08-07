@@ -1,6 +1,6 @@
 import { lazy } from 'solid-js'
-import type { LinearProjectIssue } from '@acorn/protocol/api.ts'
-import { prepareLinearPromotion } from '@acorn/client-core/integrations/providerPromotion.ts'
+import type { LinearProjectIssue } from '../shared/api'
+import { prepareLinearPromotion } from './promotion'
 import type { SourceContribution } from '@acorn/client-core/registries/sources.ts'
 import { addTaskLink, createTask } from '@acorn/client-core/tasks/mutations.ts'
 

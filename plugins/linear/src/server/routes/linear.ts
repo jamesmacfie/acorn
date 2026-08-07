@@ -33,7 +33,15 @@ import {
 import { providerResource } from '@acorn/node-core/server/integrations/resourceRuntime.ts'
 import { providerRequestScheduler } from '@acorn/node-core/server/integrations/budgetRuntime.ts'
 import { ProviderOperationError } from '@acorn/node-core/server/integrations/types.ts'
-import type { LinearIssueDetail, LinearIssuesRequest, LinearIssuesResponse, LinearProject, LinearProjectIssue, LinearProjectIssuesResponse, LinearProjectsResponse } from '@acorn/protocol/api.ts'
+import type {
+  LinearIssueDetail,
+  LinearIssuesRequest,
+  LinearIssuesResponse,
+  LinearProject,
+  LinearProjectIssue,
+  LinearProjectIssuesResponse,
+  LinearProjectsResponse,
+} from '../../shared/api'
 
 // TTL centralized in server/sync/policy.ts. Linear's reads fan out across all connected
 // integrations with partial results and per-item (`issues.fetchedAt`) freshness, so they do NOT use

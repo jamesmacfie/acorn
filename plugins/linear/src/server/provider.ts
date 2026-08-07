@@ -1,4 +1,13 @@
-import type { LinearActivity, LinearAttachment, LinearComment, LinearIssueDetail, LinearIssueSummary, LinearRelatedIssue, LinearRelation, LinearRelationKind } from '@acorn/protocol/api.ts'
+import type {
+  LinearActivity,
+  LinearAttachment,
+  LinearComment,
+  LinearIssueDetail,
+  LinearIssueSummary,
+  LinearRelatedIssue,
+  LinearRelation,
+  LinearRelationKind,
+} from '../shared/api'
 import type { ExternalRef } from '@acorn/protocol/integrations.ts'
 import {
   COMMENT_CREATE,

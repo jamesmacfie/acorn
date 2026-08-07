@@ -1,9 +1,18 @@
 import { createEffect, createMemo, createSignal, For, on, Show } from 'solid-js'
 import { useNavigate, useParams } from '@solidjs/router'
 import { createQuery, useQueryClient } from '@tanstack/solid-query'
-import { integrationsOptions, linearProjectsOptions, tasksKey, tasksOptions, workspaceProjectsKey, workspaceProjectsOptions, workspaceLinearIssuesOptions, workspacesOptions } from '@acorn/client-core/queries.ts'
+import {
+  integrationsOptions,
+  tasksKey,
+  tasksOptions,
+  workspaceProjectsKey,
+  workspaceProjectsOptions,
+  workspacesOptions,
+} from '@acorn/client-core/queries.ts'
+import { linearProjectsOptions, workspaceLinearIssuesOptions } from './queries'
 import { setWorkspaceProjects } from '@acorn/client-core/workspaces/mutations.ts'
-import type { LinearProjectIssue, Task, WorkspaceProject } from '@acorn/protocol/api.ts'
+import type { Task, WorkspaceProject } from '@acorn/protocol/api.ts'
+import type { LinearProjectIssue } from '../shared/api'
 import { workspaceForRepo } from '@acorn/client-core/workspaces/activeWorkspace.ts'
 import { createDismissable } from '@acorn/client-core/ui/dismissable.ts'
 import { activateTaskSignals, pathForTask } from '@acorn/client-core/tasks/activate.ts'

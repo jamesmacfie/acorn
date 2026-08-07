@@ -9,7 +9,19 @@ import Icon from '@acorn/client-core/ui/Icon.tsx'
 import { requestFileScroll, routeKey } from './fileNavigation'
 import Picker from '@acorn/client-core/ui/Picker.tsx'
 import CopyButton from '@acorn/client-core/ui/CopyButton.tsx'
-import { integrationsOptions, linearIssuesOptions, mentionsOptions, pullConflictsOptions, pullDetailOptions, pullPrefixKey, pullsPrefixKey, repoLabelsOptions, reposOptions, type Label, type Task } from '@acorn/client-core/queries.ts'
+import {
+  integrationsOptions,
+  mentionsOptions,
+  pullConflictsOptions,
+  pullDetailOptions,
+  pullPrefixKey,
+  pullsPrefixKey,
+  repoLabelsOptions,
+  reposOptions,
+  type Label,
+  type Task,
+} from '@acorn/client-core/queries.ts'
+import { linearIssuesOptions } from '@acorn/plugin-linear/contract/issues.ts'
 import MentionTextarea from '@acorn/client-core/ui/MentionTextarea.tsx'
 import { addComment, addLabel, closePr, disableAutoMerge, enableAutoMerge, mergePr, removeLabel, removeReviewer, reopenPr, rerunFailed, requestReviewer, setDraft, setViewed, submitReview } from './mutations'
 import { UserAvatar } from '@acorn/client-core/ui/UserAvatar.tsx'

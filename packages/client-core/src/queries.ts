@@ -22,13 +22,6 @@ import {
   filesKey,
   integrationsKey,
   integrationsRoute,
-  linearIssueKey,
-  linearIssueRoute,
-  linearIssuesKey,
-  linearIssuesRoute,
-  linearProjectsKey,
-  linearProjectsRoute,
-  linearProjectIssuesRoute,
   workspaceProjectsRoute,
   workspaceAssignmentsRoute,
   workspaceAssignmentsKey,
@@ -67,11 +60,6 @@ import {
   type WorkspaceProject,
   type WorkspaceProjectsResponse,
   type JobLog,
-  type LinearIssueDetail,
-  type LinearIssuesRequest,
-  type LinearIssuesResponse,
-  type LinearProjectsResponse,
-  type LinearProjectIssuesResponse,
   type Pull,
   type RunJobs,
   type Label,
@@ -86,7 +74,6 @@ export {
   filePatchKey,
   fileSummariesKey,
   integrationsKey,
-  linearIssueKey,
   pinsKey,
   prefsKey,
   pullKey,
@@ -100,7 +87,7 @@ export {
   tasksKey,
   workspacesKey,
 } from '@acorn/protocol/api.ts'
-export type { Branch, Check, Comment, Compare, CompareCommit, Integration, IntegrationsResponse, Label, LinearActivity, LinearComment, LinearIssueDetail, LinearIssueState, LinearIssueSummary, Pull, PullCommit, PullDetail, PullFile, Repo, Review, Thread, ThreadComment, Task, TaskLink, TaskSeed, Workspace, WorkspaceProject, WorkspaceRepo } from '@acorn/protocol/api.ts'
+export type { Branch, Check, Comment, Compare, CompareCommit, Integration, IntegrationsResponse, Label, Pull, PullCommit, PullDetail, PullFile, Repo, Review, Thread, ThreadComment, Task, TaskLink, TaskSeed, Workspace, WorkspaceProject, WorkspaceRepo } from '@acorn/protocol/api.ts'
 
 type QueryContext = { signal?: AbortSignal }
 type PageQueryContext = QueryContext & { pageParam: number }
@@ -297,58 +284,3 @@ export const integrationsOptions = (enabled: boolean) => ({
   queryFn: async ({ signal }: QueryContext): Promise<IntegrationsResponse> => readJson<IntegrationsResponse>(integrationsRoute, { signal }),
 })
 
-// Batch enrichment for the Integrations list (title + status per referenced ticket). The client caches
-// the server's provider-backed response for five minutes. Returns only the issues Linear resolved.
-export const linearIssuesOptions = (identifiers: string[], enabled: boolean) => ({
-  queryKey: linearIssuesKey(identifiers),
-  enabled,
-  staleTime: 5 * 60 * 1000,
-  // Always re-check on mount so the list self-heals from a stale or empty persisted cache.
-  refetchOnMount: 'always' as const,
-  queryFn: async ({ signal }: QueryContext): Promise<LinearIssuesResponse> =>
-    writeJson<LinearIssuesResponse>(
-      linearIssuesRoute,
-      { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ identifiers } satisfies LinearIssuesRequest), signal },
-      'linear_issues_failed',
-    ),
-})
-
-// Linear projects for the per-repo picker (Linear source). Cached 5 min — projects change rarely.
-export const linearProjectsOptions = (enabled: boolean) => ({
-  queryKey: linearProjectsKey,
-  enabled,
-  staleTime: 5 * 60 * 1000,
-  queryFn: async ({ signal }: QueryContext): Promise<LinearProjectsResponse> => readJson<LinearProjectsResponse>(linearProjectsRoute, { signal }),
-})
-
-// All active issues for a workspace's linked Linear projects, which may span several connections.
-// Groups the (integrationId, externalId) selection by integration and fans out one request each,
-// merging the results. Each issue carries its integrationId (stamped server-side) for promotion.
-// v2: LinearProjectIssue grew required labels/priority/updatedAt fields — the version suffix orphans
-// persisted pre-redesign rows that would otherwise hydrate and crash the browse model.
-export const workspaceLinearIssuesKey = (selection: WorkspaceProject[]) =>
-  ['workspace-linear-issues-v2', ...selection.map((p) => `${p.integrationId}:${p.externalId}`).sort()] as const
-export const workspaceLinearIssuesOptions = (selection: WorkspaceProject[], enabled: boolean) => ({
-  queryKey: workspaceLinearIssuesKey(selection),
-  enabled,
-  refetchOnMount: 'always' as const,
-  queryFn: async ({ signal }: QueryContext): Promise<LinearProjectIssuesResponse> => {
-    const byIntegration = new Map<string, string[]>()
-    for (const p of selection) byIntegration.set(p.integrationId, [...(byIntegration.get(p.integrationId) ?? []), p.externalId])
-    const results = await Promise.all(
-      [...byIntegration].map(([integrationId, ids]) => readJson<LinearProjectIssuesResponse>(linearProjectIssuesRoute(integrationId, ids), { signal })),
-    )
-    return { issues: results.flatMap((r) => r.issues) }
-  },
-})
-
-// Full ticket detail for the side panel. refetchOnMount:'always' + staleTime 0 → opening the panel
-// re-fetches (the route's ?refresh=1 forces a fresh Linear read and updates the cache).
-export const linearIssueOptions = (identifier: string, enabled: boolean, connectionId?: string) => ({
-  queryKey: linearIssueKey(identifier, connectionId),
-  enabled,
-  staleTime: 0,
-  refetchOnMount: 'always' as const,
-  queryFn: async ({ signal }: QueryContext): Promise<LinearIssueDetail> =>
-    readJson<LinearIssueDetail>(linearIssueRoute(identifier, connectionId), { signal }),
-})
