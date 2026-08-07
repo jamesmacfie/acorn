@@ -1,7 +1,7 @@
 // Find-in-files over the active task's worktree via ripgrep. Was the `window.acorn.search` preload
 // bridge; now a loopback HTTP route, so it works in a plain browser (dev:node) too — no
 // desktop bridge required.
-import { searchRoute } from '@acorn/protocol/api.ts'
+import { searchRoute } from '../../contract/api'
 import { writeJson } from '@acorn/client-core/apiClient.ts'
 import type { SearchOpts, SearchResult } from '../../shared/search'
 

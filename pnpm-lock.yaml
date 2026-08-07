@@ -489,6 +489,9 @@ importers:
       '@acorn/node-core':
         specifier: workspace:*
         version: link:../../packages/node-core
+      '@acorn/plugin-editor':
+        specifier: workspace:*
+        version: link:../editor
       '@acorn/plugin-terminal':
         specifier: workspace:*
         version: link:../terminal
@@ -685,6 +688,9 @@ importers:
       '@acorn/node-core':
         specifier: workspace:*
         version: link:../../packages/node-core
+      '@acorn/plugin-terminal':
+        specifier: workspace:*
+        version: link:../terminal
       '@acorn/protocol':
         specifier: workspace:*
         version: link:../../packages/protocol

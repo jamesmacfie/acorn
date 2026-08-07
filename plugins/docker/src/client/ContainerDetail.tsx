@@ -3,7 +3,7 @@
 import { createEffect, createMemo, createResource, createSignal, For, on, onCleanup, Show, type JSX } from 'solid-js'
 import { writeJson } from '@acorn/client-core/apiClient.ts'
 import { requestTerminalFocusIntent } from '@acorn/client-core/registries/clientEvents.ts'
-import { terminalSessionsRoute } from '@acorn/protocol/api.ts'
+import { terminalSessionsRoute } from '@acorn/plugin-terminal/contract/routes.ts'
 import { wsDockerAttach } from '@acorn/client-core/wsClient.ts'
 import type { DockerStatsSample } from '@acorn/protocol/docker.ts'
 import type { DockerContainerAction, DockerContainerDetail, DockerPort } from '../shared/model'

@@ -5,7 +5,7 @@
 // platform concerns and live in core/client/tasks/taskBridge.ts; the `window.acorn` global itself is
 // declared in core/client/capabilities.ts, which is what reads it to answer "is this desktop?".
 import type { CreateOpts, ServerMsg, TerminalProfile, TerminalSession } from '@acorn/protocol/terminal.ts'
-import { terminalProfilesRoute, terminalSessionActionRoute, terminalSessionsRoute } from '@acorn/protocol/api.ts'
+import { terminalProfilesRoute, terminalSessionActionRoute, terminalSessionsRoute } from '../contract/routes'
 import { readJson, writeJson } from '@acorn/client-core/apiClient.ts'
 import { wsAttach, wsOnNotice, wsOnStatus, wsOnWorkflowStepEvent, wsWrite } from '@acorn/client-core/wsClient.ts'
 

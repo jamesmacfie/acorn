@@ -16,7 +16,7 @@
 //
 // Names nothing from the plugin's internals — both types come from @acorn/protocol, which is what the
 // contract-purity boundary rule requires.
-import { terminalSessionsRoute } from '@acorn/protocol/api.ts'
+import { terminalSessionsRoute } from './routes'
 import type { CreateOpts, TerminalSession } from '@acorn/protocol/terminal.ts'
 import { readJson, writeJson } from '@acorn/client-core/apiClient.ts'
 
