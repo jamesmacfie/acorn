@@ -933,6 +933,9 @@ importers:
       '@acorn/node-core':
         specifier: workspace:*
         version: link:../../packages/node-core
+      '@acorn/plugin-context':
+        specifier: workspace:*
+        version: link:../context
       '@acorn/plugin-notes':
         specifier: workspace:*
         version: link:../notes
@@ -1273,6 +1276,9 @@ importers:
       '@acorn/plugin-agents':
         specifier: workspace:*
         version: link:../agents
+      '@acorn/plugin-context':
+        specifier: workspace:*
+        version: link:../context
       '@acorn/plugin-notes':
         specifier: workspace:*
         version: link:../notes

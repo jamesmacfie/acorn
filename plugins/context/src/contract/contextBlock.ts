@@ -1,4 +1,4 @@
-import type { TaskContext } from './api'
+import type { TaskContext } from '@acorn/protocol/api.ts'
 
 // Every section contribution owns its compact projection. This renderer only supplies the stable
 // task frame and ordering, so a new section reaches push, workflow and MCP paths automatically.
