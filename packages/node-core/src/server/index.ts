@@ -7,6 +7,7 @@ import { onServerError, requestIdMiddleware } from './respond'
 import { CORE_NAMESPACE, PLUGIN_NAMESPACE, pluginRouteContributions, routeMountPath } from './routeRegistry'
 import { audit } from './routes/audit'
 import { backup } from './routes/backup'
+import { importV1 } from './routes/importV1'
 import { security } from './routes/security'
 import { integrations } from './routes/integrations'
 import { pairingRoutes } from './routes/pairing'
@@ -94,6 +95,10 @@ export function createApp() {
     // Even with the credentials scrubbed out, that is an exfiltration primitive in an agent's hands.
     .use(`${CORE_NAMESPACE}/backup`, requireDevice)
     .use(`${CORE_NAMESPACE}/backup/*`, requireDevice)
+    // The V1 importer reads an arbitrary SQLite file the caller nominates and writes it into core's
+    // tables. Both halves are device-only: the probe alone names a filesystem path.
+    .use(`${CORE_NAMESPACE}/import/v1`, requireDevice)
+    .use(`${CORE_NAMESPACE}/import/v1/*`, requireDevice)
     // Task scope, enforced by MOUNT rather than per handler. A 'task'-scoped internal credential may act
     // only on the task it names (server/auth/internalTokens.ts). An adversarial review confirmed that a
     // per-route guard had been applied at one site out of six, leaving arbitrary shell execution in
@@ -126,6 +131,7 @@ export function createApp() {
     .route(`${CORE_NAMESPACE}/audit`, audit) // Settings → Security: the append-only trail (security.md § Audit)
     .route(`${CORE_NAMESPACE}/security`, security) // Settings → Security: this node's posture (security.md § On-disk)
     .route(`${CORE_NAMESPACE}/backup`, backup) // data.md § Backup: core + plugin databases, minus credentials
+    .route(`${CORE_NAMESPACE}/import/v1`, importV1) // plan.md § Phase 5: the config-only V1 importer
     .route(`${CORE_NAMESPACE}/workspaces`, workspaces)
     .route(`${CORE_NAMESPACE}/tasks`, tasks)
     .route(`${CORE_NAMESPACE}/tasks`, configTrust)

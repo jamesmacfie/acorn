@@ -642,6 +642,21 @@ export const coreAuditRoute = '/v2/core/audit'
 export type BackupResult = { path: string; bytes: number; files: string[]; excluded: string[] }
 export type BackupSuggestion = { suggestedPath: string }
 export const coreBackupRoute = '/v2/core/backup'
+
+// The config-only V1 importer (docs/vNext/plan.md § Phase 5). The V1 data root is on the NODE's
+// filesystem, so this is local-node-only by construction — a remote build box has no V1 install of the
+// owner's to read, and the probe simply answers `found: false` there.
+export type V1ImportProbe = { found: boolean; path: string | null; workspaces: number; repos: number; checkouts: number }
+export type V1ImportReport = {
+  workspacesCreated: number
+  reposRegrouped: number
+  reposIgnored: number
+  checkoutsImported: number
+  // Checkout paths that no longer resolve to a git repository. Imported anyway and listed here, because
+  // a moved path is editable in Settings and a lost one is not recoverable.
+  checkoutsUnverified: string[]
+}
+export const coreImportV1Route = '/v2/core/import/v1'
 // Workspaces (named groups of repos) — the top-level unit.
 export const workspacesRoute = '/v2/core/workspaces'
 export const workspaceRoute = (id: string) => `/v2/core/workspaces/${id}`
