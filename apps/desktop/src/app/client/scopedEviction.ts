@@ -1,17 +1,17 @@
 import { clientEvents, evictPendingIntents } from '@acorn/client-core/registries/clientEvents.ts'
 import { dropNode } from '@acorn/client-core/node/fleet.ts'
-import { evictContextSelection } from '@acorn/plugin-context/client/selectionState.ts'
+import { clearContextSelections, evictContextSelection } from '@acorn/plugin-context/client/selectionState.ts'
 import { evictSyncState } from '@acorn/plugin-context/client/syncState.ts'
 import { evictNotesPaneState } from '@acorn/plugin-notes/client/notesPaneState.ts'
-import { evictEditorState } from '@acorn/plugin-editor/client/editorState.ts'
-import { evictEditorTreeState } from '@acorn/plugin-editor/client/editorTreeState.ts'
-import { evictEditorViewStates } from '@acorn/plugin-editor/client/editorViewState.ts'
-import { evictPrFilter } from '@acorn/plugin-github/client/pullList/filterState.ts'
+import { clearEditorStates, evictEditorState } from '@acorn/plugin-editor/client/editorState.ts'
+import { clearEditorTreeStates, evictEditorTreeState } from '@acorn/plugin-editor/client/editorTreeState.ts'
+import { clearEditorViewStates, evictEditorViewStates } from '@acorn/plugin-editor/client/editorViewState.ts'
+import { clearPrFilters, evictPrFilter } from '@acorn/plugin-github/client/pullList/filterState.ts'
 import { evictReviewViewStates } from '@acorn/plugin-github/client/reviewViewState.ts'
 import { clearSessions, evictActiveTerminal } from '@acorn/client-core/tasks/agentSessions.ts'
 import { clearNodePlugins } from '@acorn/client-core/node/nodePlugins.ts'
 import { managedAgentStore } from '@acorn/plugin-agents/client/managedStore.ts'
-import { evictTaskState, evictWorkspaceView } from '@acorn/client-core/tasks/tasks.ts'
+import { clearNodeScopedTaskState, evictTaskState, evictWorkspaceView } from '@acorn/client-core/tasks/tasks.ts'
 
 // Each owner exposes its own eviction operation; this only maps lifecycle events to scopes. It lives
 // in app/ because choosing the concrete set of state owners is composition, not a core concern — that
@@ -47,9 +47,25 @@ export function activateScopedStateEviction(): () => void {
   // (viewByWorkspace, editor scroll, the active terminal tab) is the opposite case: it should be KEYED by
   // node so switching back restores it, which is where those keys gained a nodeId rather than a clear.
   const offSwitch = clientEvents.on('runtime:node-switched', () => {
+    // The live rosters: refetched for the new node within a tick, so clearing costs nothing.
     clearSessions()
     managedAgentStore.clear()
     clearNodePlugins()
+    // And every store keyed by a node-minted id. This is the OTHER half of Phase 4's storage-key
+    // qualification, and without it that change made things worse: `storageKeyFor` reads the active node at
+    // WRITE time while these maps survive the shell's remount, so the persistence pass wrote node A's pane
+    // layouts, open files, PR filters and context selections under node B's namespace — and overwrote B's
+    // own for any id the two nodes shared, which architecture.md § Fleet semantics says they may.
+    //
+    // `recipeBrowserUrls` (inside clearNodeScopedTaskState) is the one that mattered beyond lost UI state:
+    // it is the first branch of the preview pane's URL resolution, so node A's value decided which port the
+    // client asked node B to tunnel to.
+    clearNodeScopedTaskState()
+    clearEditorStates()
+    clearEditorTreeStates()
+    clearEditorViewStates()
+    clearPrFilters()
+    clearContextSelections()
   })
   return () => {
     offSwitch()

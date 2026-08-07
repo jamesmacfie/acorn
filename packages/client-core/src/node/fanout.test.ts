@@ -81,7 +81,9 @@ describe('fetchFleet', () => {
       await vi.advanceTimersByTimeAsync(60)
       const result = await pending
       expect(result.rows.map((row) => row.nodeId)).toEqual(['a'])
-      expect(result.unavailable[0]).toMatchObject({ nodeId: 'b', reason: 'no answer within 0s' })
+      // Milliseconds below a second. `Math.round(ms/1000)` rendered every sub-second deadline as
+      // "no answer within 0s" — a string the partial-result banner shows the owner verbatim.
+      expect(result.unavailable[0]).toMatchObject({ nodeId: 'b', reason: 'no answer within 50ms' })
     } finally {
       vi.useRealTimers()
     }

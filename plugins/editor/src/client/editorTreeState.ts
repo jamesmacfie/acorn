@@ -30,3 +30,8 @@ export function evictEditorTreeState(taskId: string): void {
     return next
   })
 }
+
+// Same reason as clearEditorStates: keyed by a node-minted task id, must not outlive a node switch.
+export function clearEditorTreeStates(): void {
+  setExpandedByTask(new Map())
+}

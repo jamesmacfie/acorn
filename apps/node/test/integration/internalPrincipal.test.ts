@@ -103,6 +103,27 @@ describe('the internal principal cannot administer devices', () => {
     expect(await devices.isActive(device.id)).toBe(true)
   })
 
+  // Phase 4's node-administration surface, gated by the same `requireDevice` mount and belonging in the same
+  // list. It was NOT here, and the omission mattered: `routes/plugins.test.ts` asserts the middleware's
+  // verdict while MOUNTING `requireDevice` itself, so deleting the real mount from server/index.ts left the
+  // whole 26-package suite green — measured. This is the case that exercises `createApp()`.
+  //
+  // Reading the list enumerates the node's surface (which plugins, therefore which routes and databases);
+  // writing it lets an agent disable the plugin whose gate it is standing behind and get a different node at
+  // the next restart. Both are exactly what security.md forbids an agent-spawned child.
+  it('can neither read nor write which plugins this node runs', async () => {
+    const read = await call('/v2/core/plugins', { headers: asAgent })
+    expect(read.status).toBe(403)
+    // The 503 a bridge-less test app would answer must not be mistaken for a refusal: assert the code.
+    expect(((await read.json()) as { error?: { code?: string } }).error?.code).toBe('interactive_user_required')
+    const write = await call('/v2/core/plugins', {
+      method: 'PUT',
+      headers: { ...asAgent, 'content-type': 'application/json' },
+      body: JSON.stringify({ disabled: ['docker'] }),
+    })
+    expect(write.status).toBe(403)
+  })
+
   // The whole escalation in one test: window → code → token. If this ever returns 200 at the first
   // step, the rest follows and the internal token becomes owner-permanent.
   it('cannot escalate to an owner-authority device token', async () => {

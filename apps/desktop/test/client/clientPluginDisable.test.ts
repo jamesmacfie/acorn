@@ -13,7 +13,7 @@
 //
 // Keeping it literal costs one edit when a plugin gains a contribution. That is the point: a
 // contribution appearing or vanishing should be a reviewed line, not a silent diff.
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it } from 'vitest'
 import { agentContextRegistry } from '@acorn/client-core/registries/agentContexts.ts'
 import { agentToolRendererRegistry } from '@acorn/client-core/registries/agentToolRenderers.ts'
 import { contextSectionRegistry } from '@acorn/client-core/registries/contextSections.ts'
@@ -144,6 +144,11 @@ const OPTIONAL = clientPlugins.filter((plugin) => !plugin.required).map((plugin)
 const REQUIRED = clientPlugins.filter((plugin) => plugin.required).map((plugin) => plugin.name)
 
 describe('disabling a client plugin', () => {
+  // The reset lives here, not at the foot of each case. It used to sit after three assertions in the
+  // `it.each` body, so the FIRST genuine failure left the registries partly disabled and every later case
+  // failed spuriously — one regression reading as eleven.
+  afterEach(() => void activate())
+
   it('has a plugin list worth cycling (anti-vacuity)', () => {
     expect(NAMES.length).toBeGreaterThanOrEqual(16)
     // The five the node half marks `required`. Reconciled in Phase 4: `memory` and `notes` were
@@ -190,7 +195,6 @@ describe('disabling a client plugin', () => {
     expect(snap).toEqual(without(FULL, OWNED[name]))
     expect(result.skipped).toEqual([name])
     expect(result.enabled).toEqual(NAMES.filter((candidate) => candidate !== name))
-    activate()
   })
 
   it('performs no browser I/O during init', () => {
@@ -207,7 +211,6 @@ describe('disabling a client plugin', () => {
       expect(() => initClientPlugins(initOnly)).not.toThrow()
     } finally {
       Object.assign(globals, saved)
-      activate()
     }
   })
 })

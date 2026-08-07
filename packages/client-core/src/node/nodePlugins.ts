@@ -1,6 +1,7 @@
 import { createSignal } from 'solid-js'
 import { corePluginsRoute, type NodePluginState } from '@acorn/protocol/api.ts'
 import { readJson, writeJson } from '../apiClient'
+import { activeNodeId } from './activeNode'
 
 // Which plugins the ACTIVE node is running, and therefore which client contributions should exist
 // (docs/vNext/ui.md § New surfaces, "Settings → Plugins").
@@ -30,18 +31,21 @@ export { nodePlugins }
 export const disabledNodePlugins = (): readonly string[] =>
   (nodePlugins()?.plugins ?? []).filter((row) => row.disabled).map((row) => row.name)
 
-// A read failure leaves the previous answer in place rather than clearing it. The route is device-only and
-// bridge-backed, so the two realistic failures are "this node is offline" and "an older node has no such
-// route" — and in both cases dropping to "nothing disabled" would re-register a plugin the owner turned
-// off, which is worse than a stale list.
+// A read failure returns null and leaves the SIGNAL untouched. Two consequences, both wanted: the previous
+// answer keeps applying (dropping to "nothing disabled" would re-register a plugin the owner turned off,
+// which is worse than a stale list), and the caller can tell "the node answered" from "it did not" —
+// `applyNodePlugins` uses that to decide whether to remember the node as applied or retry on the next mount.
 export async function refreshNodePlugins(nodeId?: string): Promise<NodePluginState | null> {
   try {
     const state = await readJson<NodePluginState>(corePluginsRoute, nodeId ? { nodeId } : {})
-    setNodePlugins(state)
+    // Publish ONLY when this is the active node's list. The signal is the input to the client plugin host,
+    // and Settings → Plugins can read any paired node — so a peek at node B while node A is active used to
+    // leave the signal describing B, which the next `applyNodePlugins` would have applied to A's shell.
+    if (!nodeId || nodeId === activeNodeId()) setNodePlugins(state)
     return state
   } catch (error) {
     console.warn('[fleet] could not read the node plugin list:', error)
-    return nodePlugins()
+    return null
   }
 }
 
@@ -58,7 +62,8 @@ export async function saveDisabledNodePlugins(disabled: readonly string[], nodeI
     },
     (res) => `plugins ${res.status}`,
   )
-  setNodePlugins(state)
+  // Same rule as the read: only the active node's list may become the host's input.
+  if (!nodeId || nodeId === activeNodeId()) setNodePlugins(state)
   return state
 }
 

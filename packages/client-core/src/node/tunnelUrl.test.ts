@@ -77,12 +77,24 @@ describe('tunnelUrl', () => {
     expect(asked).toEqual([])
   })
 
-  it('falls back to the original URL when the tunnel cannot be opened', async () => {
-    // No worse than the state before tunnels existed, and main logs the reason. Returning null instead would
-    // blank the pane and hide the fact that a URL was resolved at all.
+  it('returns NULL when the tunnel cannot be opened, rather than the original URL', async () => {
+    // This case asserted the opposite until the Phase 4 review, and the original reasoning ("no worse than
+    // before tunnels existed") was wrong. The URL is loopback and the node is REMOTE, so falling back loads
+    // whatever is on the OWNER'S machine at that port while the pane claims to show the remote task's
+    // preview — a repo configured `previewMode: 'url' = http://localhost:8025` on a build box rendered the
+    // owner's own Mailhog. Showing nothing is the only honest answer; main logs why.
     setActiveNode('remote')
     opens = () => Promise.reject(new Error('403'))
-    await expect(tunnelUrl('task-1', 'http://localhost:5173/')).resolves.toBe('http://localhost:5173/')
+    await expect(tunnelUrl('task-1', 'http://localhost:5173/')).resolves.toBeNull()
+  })
+
+  it('returns NULL for a remote loopback URL in a build with no tunnel support', async () => {
+    // Same reasoning: no `nodeTunnelOpen` means no way to reach the node's port, so the pane must not be
+    // handed a URL that resolves here instead.
+    setActiveNode('remote')
+    const bridge = (globalThis as { window?: { acorn?: Record<string, unknown> } }).window?.acorn
+    delete bridge?.nodeTunnelOpen
+    await expect(tunnelUrl('task-1', 'http://localhost:5173/')).resolves.toBeNull()
   })
 
   it('passes null through', async () => {

@@ -28,8 +28,27 @@ import { wireConfigTrust } from '../../src/wiring/configTrustWiring'
 // test would start a node.
 
 const HERE = dirname(fileURLToPath(import.meta.url))
-const standalone = readFileSync(join(HERE, '../../src/server/standalone.ts'), 'utf8')
-const runtime = readFileSync(join(HERE, '../../src/service/runtime.ts'), 'utf8')
+
+// Comments STRIPPED before scanning, and this is the whole reason the helper exists.
+//
+// The first version matched against the raw source, so commenting a call out —
+// `// wireAgentTools({ db: runtime.DB })` — satisfied every assertion while fully restoring the remote-node
+// divergence this file exists to prevent. CLAUDE.md warns about exactly this failure mode for
+// boundaries.test.ts, whose scanner deliberately does NOT strip comments; there the false POSITIVE is loud
+// and immediate, so leaving them in is the safer trade. Here the failure runs the other way — a stripped
+// comment can only produce a false negative, i.e. a test that fails until the call is real — so stripping is
+// the safer trade.
+//
+// Line and block comments only. Good enough because the needles are call expressions and import specifiers,
+// and the one construct that would break a regex like this (a `//` inside a string literal) does not appear
+// in either composition root.
+const sourceOf = (relative: string): string =>
+  readFileSync(join(HERE, relative), 'utf8')
+    .replace(/\/\*[\s\S]*?\*\//g, '')
+    .replace(/(^|\s)\/\/[^\n]*/g, '$1')
+
+const standalone = sourceOf('../../src/server/standalone.ts')
+const runtime = sourceOf('../../src/service/runtime.ts')
 
 describe('the standalone entry performs the same app-layer wirings as the supervised one', () => {
   it.each([

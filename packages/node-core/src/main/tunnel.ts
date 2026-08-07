@@ -65,8 +65,17 @@ function parseTarget(url: string | undefined, host: string): Target | null {
   return { taskId, port }
 }
 
+// Refusing has to survive a peer that has already gone away.
+//
+// The window is real and not small: between `claimUpgrade` and the refusal the handler awaits a device
+// lookup AND the port resolver, which reads the tasks table, the repo_paths row and (through the run
+// bridge) possibly a `url_command`. A client that connects and immediately RSTs leaves a destroyed socket,
+// and `write` on one emits `'error'` — the HTTP server has already handed the socket over, so nobody is
+// listening and the emit becomes an `uncaughtException` that takes the service down and spends one of the
+// five crashes in the restart budget. A loop of half-open upgrades was a remote denial of service.
 const refuse = (socket: Duplex, status: number, reason: string): void => {
-  socket.write(`HTTP/1.1 ${status} ${reason}\r\n\r\n`)
+  socket.on('error', () => {})
+  if (socket.writable) socket.write(`HTTP/1.1 ${status} ${reason}\r\n\r\n`)
   socket.destroy()
 }
 
@@ -105,8 +114,39 @@ function bridge(ws: WebSocket, tcp: Socket): void {
   tcp.on('error', closeBoth)
 }
 
+// A live pipe, remembered so revocation can tear it down. Same reason `wsHub`'s `Conn` carries a deviceId:
+// a socket holds no bearer to re-present, so the connection has to remember which device it belongs to.
+type Pipe = { ws: WebSocket; tcp: Socket; deviceId: string | null }
+
 export function attachTunnel(server: Server, deps: TunnelDeps): void {
   const wss = new WebSocketServer({ noServer: true })
+  const pipes = new Set<Pipe>()
+
+  // Revocation tears down live pipes, exactly as it does live event sockets.
+  //
+  // protocol.md § Pairing: "deleting a device row invalidates its token immediately — open sockets are
+  // closed, in-flight requests fail. Long-lived streams re-check the device every 60s as a backstop."
+  // `wsHub` has honoured both halves since Phase 1; the tunnel honoured NEITHER, so a stolen laptop's
+  // already-established pipe kept reaching the dev server after the owner revoked it. The upgrade would
+  // refuse a new connection, which is exactly the half that stops mattering once one is open.
+  const closePipe = (pipe: Pipe): void => {
+    pipes.delete(pipe)
+    pipe.tcp.destroy()
+    pipe.ws.terminate() // terminate, not close: an invalidated credential must not survive a handshake
+  }
+  const offRevoked = deps.devices.onRevoked((deviceId) => {
+    for (const pipe of [...pipes]) if (pipe.deviceId === deviceId) closePipe(pipe)
+  })
+  // The backstop, for a revoke this process never heard about (another process, or a listener registered
+  // after the revoke). Same interval and same injection point as wsHub's.
+  const sweep = setInterval(() => {
+    void (async () => {
+      for (const pipe of [...pipes]) {
+        if (pipe.deviceId && !(await deps.devices.isActive(pipe.deviceId))) closePipe(pipe)
+      }
+    })()
+  }, deps.revocationCheckMs ?? 60_000)
+  sweep.unref?.()
 
   const onUpgrade = (req: IncomingMessage, socket: Duplex, head: Buffer): void => {
     const host = req.headers.host ?? deps.allowedHost
@@ -130,10 +170,22 @@ export function attachTunnel(server: Server, deps: TunnelDeps): void {
       if (!ports.includes(target.port)) return refuse(socket, 403, 'Forbidden')
 
       const tcp = connect({ host: LOOPBACK, port: target.port })
-      tcp.once('error', () => refuse(socket, 502, 'Bad Gateway'))
+      // The listener stays attached through the handshake. `removeAllListeners('error')` on connect left a
+      // window with NO error listener at all, so a dev server that reset between `connect` and the upgrade
+      // write produced an unhandled `'error'` and took the process down.
+      let handedOver = false
+      tcp.on('error', () => {
+        if (!handedOver) refuse(socket, 502, 'Bad Gateway')
+        tcp.destroy()
+      })
       tcp.once('connect', () => {
-        tcp.removeAllListeners('error')
-        wss.handleUpgrade(req, socket, head, (ws) => bridge(ws, tcp))
+        handedOver = true
+        wss.handleUpgrade(req, socket, head, (ws) => {
+          const pipe: Pipe = { ws, tcp, deviceId: authorized.deviceId }
+          pipes.add(pipe)
+          ws.on('close', () => pipes.delete(pipe))
+          bridge(ws, tcp)
+        })
       })
     })()
   }
@@ -141,7 +193,9 @@ export function attachTunnel(server: Server, deps: TunnelDeps): void {
   server.on('upgrade', onUpgrade)
   tunnelDisposers.set(server, () => {
     server.off('upgrade', onUpgrade)
-    for (const client of wss.clients) client.terminate()
+    clearInterval(sweep)
+    offRevoked()
+    for (const pipe of [...pipes]) closePipe(pipe)
     wss.close()
   })
 }

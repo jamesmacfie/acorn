@@ -71,6 +71,12 @@ export function createApp() {
     // enumerates the surface) or write it (it could disable the plugin whose gate it is standing behind
     // and get a different node on the next restart).
     .use(`${CORE_NAMESPACE}/plugins`, requireDevice)
+    // Both forms, like `pair` and `devices` above. There is no subpath today (the router is `GET|PUT /`),
+    // so this is insurance — but the point of gating by MOUNT is that a route added later inherits it, and a
+    // `GET /v2/core/plugins/:name` under a one-form mount would be an ungated node-administration route
+    // reachable by a task-scoped agent. (Hono's trailing `/*` matches zero segments, so this one covers the
+    // bare path too — the pair above is belt and braces, exactly as it is for pair/devices.)
+    .use(`${CORE_NAMESPACE}/plugins/*`, requireDevice)
     // Task scope, enforced by MOUNT rather than per handler. A 'task'-scoped internal credential may act
     // only on the task it names (server/auth/internalTokens.ts). An adversarial review confirmed that a
     // per-route guard had been applied at one site out of six, leaving arbitrary shell execution in

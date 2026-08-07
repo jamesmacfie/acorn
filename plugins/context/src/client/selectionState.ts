@@ -31,3 +31,10 @@ export function evictContextSelection(taskId: string): void {
 }
 
 export { contextSelections as contextSelectionsByTask }
+
+// Everything this module holds is keyed by a NODE-MINTED id, so it must not survive a node switch: the
+// persistence pass reads these maps and writes each scope under the ACTIVE node's storage key, which
+// carried one node's state into another's namespace (client-core's tasks/tasks.ts states the case in full).
+export function clearContextSelections(): void {
+  setContextSelections({})
+}

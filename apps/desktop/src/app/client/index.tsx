@@ -7,7 +7,7 @@ import { Route, Router } from '@solidjs/router'
 import App from './App'
 import '@acorn/client-core/styles.css'
 import { PERSISTED_QUERY_MAX_AGE_MS, shouldPersistQuery } from '@acorn/client-core/persistence/queryPersistence.ts'
-import { activeCacheId, selectActiveNode } from '@acorn/client-core/node/activeNode.ts'
+import { activeCacheId, activeNodeId, selectActiveNode } from '@acorn/client-core/node/activeNode.ts'
 import { clientFor } from '@acorn/client-core/node/fleet.ts'
 import { wsOnReconnect } from '@acorn/client-core/wsClient.ts'
 
@@ -39,7 +39,7 @@ await selectActiveNode()
 // re-applies it (App.tsx), which is safe because the plugin host replaces a plugin's contributions rather
 // than appending them. Not awaited-and-fatal: `applyNodePlugins` swallows a read failure and leaves the
 // full contribution set active, because a node that cannot answer must not cost the owner their UI.
-await applyNodePlugins()
+await applyNodePlugins(activeNodeId() ?? undefined)
 
 render(
   () => (
