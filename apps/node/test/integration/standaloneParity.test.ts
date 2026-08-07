@@ -4,10 +4,8 @@ import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
 import { agentProfileRegistry } from '@acorn/node-core/main/agentProfiles/index.ts'
 import { agentToolContributions } from '@acorn/node-core/server/agentTools/registry.ts'
-import { configTrustBridgeSlot } from '@acorn/node-core/server/routes/configTrust.ts'
 import { makeTestDb } from '@acorn/node-core/server/routes/testDb.ts'
 import { wireAgentTools } from '../../src/wiring/agentToolsWiring'
-import { wireConfigTrust } from '../../src/wiring/configTrustWiring'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 
@@ -36,7 +34,6 @@ describe('the standalone entry performs the same app-layer wirings as the superv
   it.each([
     ["../wiring/agentProfiles'", 'agent profiles (claude, codex, aider)'],
     ['wireAgentTools(', "core's own agent tools"],
-    ['wireConfigTrust(', 'the config-trust bridge'],
     ['closeListener(', 'stopping the listener FIRST'],
     ['drainWithDeadline(', 'a bounded drain (docs/architecture-overview.md § Shutdown)'],
   ])('names %s — %s', (needle) => {
@@ -75,16 +72,4 @@ describe('what each wiring populates', () => {
     }
   })
 
-  it('fills the config-trust bridge, which otherwise answers 503', () => {
-    const db = makeTestDb()
-    try {
-      configTrustBridgeSlot.set(null)
-      expect(configTrustBridgeSlot.get()).toBeNull()
-      wireConfigTrust(db.db)
-      expect(configTrustBridgeSlot.get()).not.toBeNull()
-    } finally {
-      configTrustBridgeSlot.set(null)
-      db.cleanup()
-    }
-  })
 })

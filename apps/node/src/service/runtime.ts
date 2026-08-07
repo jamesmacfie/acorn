@@ -21,7 +21,6 @@ import { reconcileWorktrees, setWorktreesRoot } from '@acorn/node-core/main/task
 import { logStorageFootprint } from '@acorn/node-core/main/storageFootprint.ts'
 import { GITHUB_MIRROR } from '@acorn/plugin-github/contract/mirror.ts'
 import { wireAgentTools } from '../wiring/agentToolsWiring'
-import { wireConfigTrust } from '../wiring/configTrustWiring'
 import { AGENTS_RUNTIME } from '@acorn/plugin-agents/contract/runtime.ts'
 import { MEMORY_KNOWLEDGE } from '@acorn/plugin-memory/contract/knowledge.ts'
 import { NOTES_STORE } from '@acorn/plugin-notes/contract/store.ts'
@@ -279,7 +278,6 @@ export async function startServiceRuntime({ config, desktop, stateChanged }: Run
       setDisabled: (names) => disabledPlugins.set(names),
     })
 
-    wireConfigTrust(db)
     wireAgentTools({ db })
     mark('install')
 

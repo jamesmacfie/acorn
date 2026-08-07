@@ -32,7 +32,6 @@ import { reconcileTmux } from '@acorn/plugin-terminal/main/terminal.ts'
 import { WORKFLOWS_RUNNER } from '@acorn/plugin-workflows/contract/runner.ts'
 import { GITHUB_MIRROR } from '@acorn/plugin-github/contract/mirror.ts'
 import { wireAgentTools } from '../wiring/agentToolsWiring'
-import { wireConfigTrust } from '../wiring/configTrustWiring'
 import { nodePlugins } from './plugins'
 import type { BrowserDesktopCapability } from '@acorn/protocol/desktopCapabilities.ts'
 
@@ -130,7 +129,6 @@ setPluginsBridge({
 // Core's own six agent tools and the config-trust bridge, matching service/runtime.ts. Both are pure
 // functions over the database; neither needs a window.
 wireAgentTools({ db: runtime.DB })
-wireConfigTrust(runtime.DB)
 
 // Awaited, not fire-and-forget: there is nothing to hand back until the listener has bound, and a
 // listen failure now exits non-zero with its reason instead of leaving a process alive that answers
