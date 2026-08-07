@@ -43,6 +43,26 @@ describe('the standalone entry performs the same app-layer wirings as the superv
     expect(runtime).toContain(needle)
     expect(standalone).toContain(needle)
   })
+
+  // The ~50-line plugin dependency bag used to be written out in both roots, and THAT is what this
+  // scanner could not really guard: it matches source strings, so it catches a removed call but never a
+  // divergent argument or a reordered field. There is one builder now
+  // (apps/node/src/server/pluginDeps.ts), so the question becomes whether both roots still use it —
+  // which a string scan can answer honestly.
+  it('builds its plugin dependencies through the one shared builder', () => {
+    expect(runtime).toContain('buildPluginDeps({')
+    expect(standalone).toContain('buildPluginDeps({')
+    // And neither root reconstructs the bag by hand around it. `terminal: {` was the giveaway shape.
+    for (const root of [runtime, standalone]) expect(root).not.toContain('seedTaskNotes(')
+  })
+
+  // The genuine delta, asserted rather than assumed. Everything else about the two roots is now the
+  // same call; the preview browser is the one dependency that cannot be, because a headless node has no
+  // BrowserWindow to drive.
+  it('differs only in the preview browser it supplies', () => {
+    expect(runtime).toContain('browser: desktop.browser')
+    expect(standalone).toContain('browser: unavailableBrowser')
+  })
 })
 
 describe('what each wiring populates', () => {

@@ -13,6 +13,7 @@ import { createCoreServices } from '@acorn/node-core/main/core/index.ts'
 import { disabledPluginsStore } from '@acorn/node-core/main/disabledPlugins.ts'
 import { setPluginsBridge } from '@acorn/node-core/server/routes/plugins.ts'
 import { nodePlugins } from '../server/plugins'
+import { buildPluginDeps } from '../server/pluginDeps'
 import { closeListener, drainWithDeadline, makeRuntime, startListener } from '@acorn/node-core/main/server.ts'
 import { openDataRoot, type DataRoot } from '@acorn/node-core/main/dataRoot.ts'
 import { pruneAudit } from '@acorn/node-core/server/audit.ts'
@@ -22,11 +23,8 @@ import { logStorageFootprint } from '@acorn/node-core/main/storageFootprint.ts'
 import { GITHUB_MIRROR } from '@acorn/plugin-github/contract/mirror.ts'
 import { wireAgentTools } from '../wiring/agentToolsWiring'
 import { AGENTS_RUNTIME } from '@acorn/plugin-agents/contract/runtime.ts'
-import { MEMORY_KNOWLEDGE } from '@acorn/plugin-memory/contract/knowledge.ts'
-import { NOTES_STORE } from '@acorn/plugin-notes/contract/store.ts'
 import { WORKFLOWS_RUNNER } from '@acorn/plugin-workflows/contract/runner.ts'
 import { configureTerminalMcp, reconcileTmux, refreshAcornMcpRegistrations } from '@acorn/plugin-terminal/main/terminal.ts'
-import { seedTaskNotes } from '@acorn/plugin-notes/main/seedTaskNotes.ts'
 import type { PreviewBrowserRule } from '@acorn/protocol/serviceProtocol.ts'
 import { PREVIEW_RULES } from '@acorn/plugin-preview/contract/rules.ts'
 
@@ -160,23 +158,6 @@ export async function startServiceRuntime({ config, desktop, stateChanged }: Run
 
     const worktreesDir = join(config.dataDir, 'worktrees')
     setWorktreesRoot(worktreesDir)
-    // Mutable on purpose. The listener's origin is not known until it binds, but every consumer of
-    // this object reads it at spawn/call time rather than at wire time (terminal.ts spreads it per
-    // session, seedTaskNotes and the workflow runner read it per call), so seeding the token here and
-    // assigning the URL right after startListener is enough — no restructuring of the wiring order,
-    // which exists for a different reason (bridges must be installed before requests arrive).
-    //
-    // Two of these four are split by LIFETIME, not by taste. ACORN_API_URL is correct for callers
-    // rebuilt on every boot (seedTaskNotes and the workflow runner, both in-process). It is NOT correct for a
-    // child that outlives a boot: an agent pane runs in tmux and is reattached after a restart, keeping
-    // the environment of the boot that created it — and the port is ephemeral now, so a baked URL points
-    // at nothing. ACORN_DATA_DIR is the stable thing, and mcp/api.ts resolves the current port from
-    // <dataDir>/node.json. The internal token needs no such treatment: it is deliberately persisted
-    // across boots for exactly this reason (main/bindings.ts).
-    //
-    // NODE_EXTRA_CA_CERTS is how a child trusts the node's self-signed certificate with zero code. The
-    // certificate is a CA with an IP:127.0.0.1 SAN (main/tls.ts), so the child validates FULLY — no
-    // `rejectUnauthorized: false` anywhere. Ceiling documented in mcp/api.ts.
     // One factory, not one record. Every child gets a token minted for ITS scope — a PTY, an agent
     // session and a workflow step are all 'task'-scoped and bound to their own task, while the node's own
     // loopback calls are 'service' (server/auth/internalTokens.ts). Before this, all five presented the
@@ -188,9 +169,15 @@ export async function startServiceRuntime({ config, desktop, stateChanged }: Run
     // session's MCP / notes / memory / context calls.
     //
     // ACORN_API_URL is mutable on purpose — the listener's origin is not known until it binds, and every
-    // consumer calls this factory at spawn time rather than at wire time. ACORN_DATA_DIR is the stable
-    // thing a long-lived child needs: mcp/api.ts resolves the current port from <dataDir>/node.json,
-    // because the port is ephemeral now and a baked URL would point at nothing after a restart.
+    // consumer calls this factory at spawn time rather than at wire time (terminal.ts spreads it per
+    // session; seedTaskNotes and the workflow runner read it per call). So seeding the token here and
+    // assigning the URL right after startListener is enough; the wiring order exists for a different
+    // reason, which is that bridges must be installed before requests arrive.
+    //
+    // ACORN_DATA_DIR is the stable thing a long-lived child needs. An agent pane runs in tmux and is
+    // reattached after a restart with the environment of the boot that spawned it, and the port is
+    // ephemeral now — so a baked URL points at nothing, and mcp/api.ts resolves the current one from
+    // <dataDir>/node.json instead.
     //
     // NODE_EXTRA_CA_CERTS is how a child trusts the node's self-signed certificate with zero code. The
     // certificate is a CA with an IP:127.0.0.1 SAN (main/tls.ts), so the child validates FULLY — no
@@ -211,55 +198,10 @@ export async function startServiceRuntime({ config, desktop, stateChanged }: Run
     // tests do) gets a clean graph each time instead of "capability already provided".
     const capabilities = new CapabilityRegistry()
     const core = createCoreServices({ secrets: runtime.SECRETS, db, activeIdentity: runtime.ACTIVE_IDENTITY })
-    // The memory runtime, resolved LAZILY, on plugins/terminal's behalf. It needs three closures at
-    // spawn time — the launch injector, the memory-review trigger, and note seeding.
-    //
-    // This used to be explained as "memory.knowledge's id lives in main/ rather than a contract/, so
-    // the edge would be a plugin→plugin coupling." That reason was wrong, and moving the id to
-    // plugins/memory/src/contract/knowledge.ts proves it: terminal STILL cannot import it. The real
-    // obstacle is a package CYCLE — plugins/memory already imports terminal's TERMINAL_SEND_TO_AGENT
-    // to push a block into a live session, so terminal importing memory back would close the loop and
-    // turbo refuses to build it.
-    //
-    // Breaking it properly means inverting one half, the way plugins/agents and plugins/workflows were
-    // (see plugins/agents/src/contract/workflowControl.ts). Until then the root injects the thunks, and
-    // CALL time is the only order that can work anyway: terminal's init runs inside initPlugins, and
-    // memory's may not have run when the deps below are constructed.
-    const knowledgeAt = () => capabilities.require(MEMORY_KNOWLEDGE)
-    const notesAt = () => capabilities.require(NOTES_STORE)
     // Awaited before the listener binds: a plugin's init opens and migrates its own SQLite file, so a
     // request must not be able to arrive first (server/plugin/host.ts).
     const plugins = await initPlugins(
-      nodePlugins(config.dataDir, {
-        agents: {
-          internalEnv,
-          memoryReviewTrigger: (taskId, transcriptTail) => knowledgeAt().memoryReviewTrigger(taskId, transcriptTail),
-        },
-        // The Electron-main browser driver, behind the six `browser_*` tools preview now owns. Supplied
-        // here because it is a native adapter: this root has the DesktopCapabilities RPC peer, and a
-        // plugin may not import electron to build one.
-        preview: { browser: desktop.browser },
-        terminal: {
-          internalEnv,
-          launchInjector: (taskId, sessionId) => knowledgeAt().launchInjector(taskId, sessionId),
-          memoryReviewTrigger: (taskId, transcriptTail) => knowledgeAt().memoryReviewTrigger(taskId, transcriptTail),
-          // 'service' scope, deliberately: seeding calls the node's own loopback surface to read the PR
-          // mirror and the linked Linear tickets, so it must keep the reach a task-scoped child is denied.
-          seedTaskNotes: (task) => seedTaskNotes(core, notesAt(), internalEnv({ scope: 'service' }), task),
-          reconciled,
-        },
-        workflows: {
-          internalEnv,
-          reconciled,
-          memoryReviewTrigger: (taskId, transcriptTail) => knowledgeAt().memoryReviewTrigger(taskId, transcriptTail),
-          // github's `repos` + `checks`, now behind that plugin's own capability. Resolved at CALL
-          // time, never at init: plugin init order is undefined, so reading it here could capture
-          // `undefined` purely because github is declared after workflows in the list. `get`, not
-          // `require` — a node whose github init failed should fail this one policy, not every step.
-          failingChecks: async (taskId) =>
-            (await capabilities.get(GITHUB_MIRROR)?.failingChecks(core.identity.active(), taskId)) ?? null,
-        },
-      }),
+      nodePlugins(config.dataDir, buildPluginDeps({ capabilities, core, internalEnv, reconciled, browser: desktop.browser })),
       // The persisted per-node list UNION the start config's. The file is the owner's setting, and it is
       // the only form a remote node can have — nothing about a launchd boot consults a client's fleet
       // file. The start config stays an override for tests and `dev:node`, which want to pin a list
