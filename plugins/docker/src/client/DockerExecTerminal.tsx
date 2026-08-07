@@ -5,7 +5,7 @@ import { onCleanup, onMount } from 'solid-js'
 import { Terminal } from '@xterm/xterm'
 import { FitAddon } from '@xterm/addon-fit'
 import '@xterm/xterm/css/xterm.css'
-import { wsDockerExecInput, wsDockerExecOpen, wsDockerExecResize } from '@acorn/client-core/wsClient.ts'
+import { wsDockerExecInput, wsDockerExecOpen, wsDockerExecResize } from './wsChannel'
 
 export default function DockerExecTerminal(props: { containerRef: string }) {
   let host!: HTMLDivElement

@@ -5,7 +5,7 @@
 import { createQuery } from '@tanstack/solid-query'
 import { createMemo, createResource, createSignal, For, onCleanup, onMount, Show } from 'solid-js'
 import { prefsOptions } from '@acorn/client-core/queries.ts'
-import { wsOnDockerChanged } from '@acorn/client-core/wsClient.ts'
+import { wsOnDockerChanged } from './wsChannel'
 import { readDockerPrefs } from './dockerPrefs'
 import type { DockerComposeAction, DockerContainerSummary, DockerPruneKind } from '../shared/model'
 import { composeAction, containerAction, dockerPrune, fetchImages, fetchNetworks, fetchVolumes, removeContainer, removeImage, removeNetwork, removeVolume } from './dockerClient'

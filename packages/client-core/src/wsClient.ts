@@ -7,37 +7,25 @@
 // queues frames until its socket is open) and the fixed 1s reconnect timer — backoff now lives in the
 // broker, where the connection does.
 //
-// The dispatch table keeps the protocol's flat channel-tagged frame vocabulary so each stream consumer
-// can subscribe without another renderer-side envelope.
-import type { DockerStatsSample } from '@acorn/protocol/docker.ts'
+// Dispatch is a PREFIX REGISTRY now (wsChannels.ts), not a flat if/else over every channel name. This
+// file still owns the `term:` and `workflow:` prefixes, deliberately: `term:` is core transport on both
+// ends — the node's hub handles it inline, before prefix dispatch, so it can apply the task-scope check
+// — and `workflow:notice` feeds core's own notification pipeline. `docker:` and `agent:` are
+// registered by the plugins that own them.
 import type { ServerMsg } from '@acorn/protocol/terminal.ts'
 import type { WsClientFrame, WsServerFrame } from '@acorn/protocol/ws.ts'
 import { acornGlobal } from './capabilities'
 import { activeNodeId } from './node/activeNode'
+import { registerWsChannel, routeWsFrame, wsReattachFrames, _resetWsChannels } from './wsChannels'
 
 type OutputCb = (m: ServerMsg) => void
 type NoticeCb = (n: { taskId: string; kind: 'gate' | 'run-done' | 'repo-config-trust'; title: string; action?: 'review-config' }) => void
 type StepEventCb = (event: { runId: string; stepId: string; event: unknown }) => void
-type AgentFrameCb = (frame:
-  | { channel: 'agent:event'; event: unknown }
-  | { channel: 'agent:session'; session: unknown }
-  | { channel: 'agent:deleted'; sessionId: string }
-) => void
 
 const outputSubs = new Map<string, Set<OutputCb>>() // sessionId → local subscribers
 const statusSubs = new Set<() => void>()
 const noticeSubs = new Set<NoticeCb>()
 const stepEventSubs = new Set<StepEventCb>()
-const agentFrameSubs = new Set<AgentFrameCb>()
-const dockerChangedSubs = new Set<(scopes: string[]) => void>()
-// Docker log/stats stream subscribers, keyed `${kind}:${id}` — mirrors outputSubs' first-attach /
-// last-detach contract and the reconnect re-attach below.
-export type DockerStreamEvent = { kind: 'log'; data: string } | { kind: 'stats'; sample: DockerStatsSample } | { kind: 'end' }
-const dockerStreamSubs = new Map<string, Set<(event: DockerStreamEvent) => void>>()
-// Interactive docker-exec PTYs: one listener per execId, no reconnect re-attach (the PTY dies with
-// the connection — the component shows the exit and the user reopens).
-export type DockerExecEvent = { kind: 'out'; data: string } | { kind: 'exit' }
-const dockerExecSubs = new Map<string, (event: DockerExecEvent) => void>()
 const reconnectSubs = new Set<() => void>()
 
 let bridged = false
@@ -48,6 +36,12 @@ let bridged = false
 // very first connect read as a reconnect: it re-attached every PTY subscription and told the shell to
 // refetch, both against the active node, for an event that had nothing to do with it.
 const everOnline = new Set<string>()
+
+// The one send door. Exported because a channel owner needs it to attach and detach its own streams,
+// and it is the only thing about the socket a plugin should be able to reach.
+export function wsSend(frame: WsClientFrame): void {
+  rawSend(frame)
+}
 
 function rawSend(frame: WsClientFrame): void {
   const nodeId = activeNodeId()
@@ -90,12 +84,9 @@ function connect(): void {
     // `rawSend` below addresses the active node, and `reconnectSubs` invalidates the active node's cache.
     if (status.nodeId !== activeNodeId()) return
     // Re-attach every live subscription: the node treats attach as idempotent per connection, so this
-    // re-subscribes each PTY and restores its display snapshot.
-    for (const id of outputSubs.keys()) rawSend({ channel: 'term:attach', id })
-    for (const key of dockerStreamSubs.keys()) {
-      const [kind, id] = splitStreamKey(key)
-      rawSend({ channel: `docker:${kind}:attach`, id })
-    }
+    // re-subscribes each PTY and restores its display snapshot. Each channel owner supplies its own
+    // frames (wsChannels.ts) — this loop no longer knows how to spell another prefix's attach.
+    for (const frame of wsReattachFrames()) rawSend(frame)
     // Reconnect means refetch (docs/api-reference.md § Events): there is no cursor into history, so
     // the client marks the node's cache stale instead of replaying. The QueryClient lives in the app
     // shell, so this is announced rather than performed here.
@@ -106,24 +97,29 @@ function connect(): void {
 function dispatch(raw: unknown): void {
   if (!raw || typeof raw !== 'object' || typeof (raw as { channel?: unknown }).channel !== 'string') return
   // `seq` is stripped by the broker's gap detection before we see it; the remaining value is the
-  // channel-tagged event frame defined by the protocol.
-  const frame = raw as WsServerFrame
-  {
-    if (frame.channel === 'term:out') outputSubs.get(frame.id)?.forEach((cb) => cb(frame.msg))
-    else if (frame.channel === 'term:status') statusSubs.forEach((cb) => cb())
-    else if (frame.channel === 'workflow:notice') noticeSubs.forEach((cb) => cb(frame.notice))
-    else if (frame.channel === 'workflow:step:event') stepEventSubs.forEach((cb) => cb(frame))
-    else if (frame.channel === 'agent:event' || frame.channel === 'agent:session' || frame.channel === 'agent:deleted') {
-      agentFrameSubs.forEach((cb) => cb(frame))
-    }
-    else if (frame.channel === 'docker:changed') dockerChangedSubs.forEach((cb) => cb(frame.scopes))
-    else if (frame.channel === 'docker:log') dockerStreamSubs.get(`logs:${frame.id}`)?.forEach((cb) => cb({ kind: 'log', data: frame.data }))
-    else if (frame.channel === 'docker:stats') dockerStreamSubs.get(`stats:${frame.id}`)?.forEach((cb) => cb({ kind: 'stats', sample: frame.sample }))
-    else if (frame.channel === 'docker:stream-end') dockerStreamSubs.get(`${frame.kind}:${frame.id}`)?.forEach((cb) => cb({ kind: 'end' }))
-    else if (frame.channel === 'docker:exec:out') dockerExecSubs.get(frame.execId)?.({ kind: 'out', data: frame.data })
-    else if (frame.channel === 'docker:exec:exit') dockerExecSubs.get(frame.execId)?.({ kind: 'exit' })
-  }
+  // channel-tagged event frame. Core reads only `channel` — the owner narrows the rest.
+  routeWsFrame(raw as WsServerFrame)
 }
+
+// This file's own two prefixes, registered exactly as a plugin's are. `term:` frames carry a
+// per-session ServerMsg; `workflow:` carries the notification bell's notices and step events.
+registerWsChannel(
+  'term',
+  (frame) => {
+    if (frame.channel === 'term:status') return statusSubs.forEach((cb) => cb())
+    if (frame.channel !== 'term:out') return
+    const { id, msg } = frame as { id?: unknown; msg?: unknown }
+    if (typeof id !== 'string') return
+    outputSubs.get(id)?.forEach((cb) => cb(msg as ServerMsg))
+  },
+  () => [...outputSubs.keys()].map((id) => ({ channel: 'term:attach', id })),
+)
+
+registerWsChannel('workflow', (frame) => {
+  if (frame.channel === 'workflow:notice') return noticeSubs.forEach((cb) => cb(frame.notice as Parameters<NoticeCb>[0]))
+  if (frame.channel === 'workflow:step:event') stepEventSubs.forEach((cb) => cb(frame as unknown as Parameters<StepEventCb>[0]))
+})
+
 
 // Fires when the node's socket comes back after a drop. The app shell uses it to mark that node's
 // queries stale so whatever is on screen refetches.
@@ -133,18 +129,21 @@ export function wsOnReconnect(cb: () => void): () => void {
   return () => void reconnectSubs.delete(cb)
 }
 
+// Announce that the socket should exist. A channel owner calls this when it takes its first
+// subscriber, the same way every subscribe helper in this file does.
+export const wsConnect = (): void => connect()
+
 // Test seam: this module's singletons outlive a single test otherwise.
 export function _resetWsClient(): void {
   bridged = false
+  // NOT _resetWsChannels(): this module registers its prefixes at import time, and clearing the map
+  // would leave the whole socket mute for every later test in the file. A plugin's registration is
+  // taken back by its own reset.
   everOnline.clear()
   outputSubs.clear()
   statusSubs.clear()
   noticeSubs.clear()
   stepEventSubs.clear()
-  agentFrameSubs.clear()
-  dockerChangedSubs.clear()
-  dockerStreamSubs.clear()
-  dockerExecSubs.clear()
   reconnectSubs.clear()
 }
 
@@ -194,64 +193,3 @@ export function wsOnWorkflowStepEvent(cb: StepEventCb): () => void {
   return () => void stepEventSubs.delete(cb)
 }
 
-export function wsOnAgentFrame(cb: AgentFrameCb): () => void {
-  agentFrameSubs.add(cb)
-  connect()
-  return () => void agentFrameSubs.delete(cb)
-}
-
-// Docker cache-dirty pings (the docker plugin's event-driven refresh edge).
-export function wsOnDockerChanged(cb: (scopes: string[]) => void): () => void {
-  dockerChangedSubs.add(cb)
-  connect()
-  return () => void dockerChangedSubs.delete(cb)
-}
-
-const splitStreamKey = (key: string): ['logs' | 'stats', string] => {
-  const sep = key.indexOf(':')
-  return [key.slice(0, sep) as 'logs' | 'stats', key.slice(sep + 1)]
-}
-
-// Open an interactive docker-exec PTY; returns a dispose that kills it. Input/resize ride the
-// same socket via the exported senders.
-export function wsDockerExecOpen(execId: string, ref: string, cols: number, rows: number, cb: (event: DockerExecEvent) => void): () => void {
-  dockerExecSubs.set(execId, cb)
-  connect()
-  rawSend({ channel: 'docker:exec:open', execId, ref, cols, rows })
-  return () => {
-    dockerExecSubs.delete(execId)
-    rawSend({ channel: 'docker:exec:kill', execId })
-  }
-}
-
-export function wsDockerExecInput(execId: string, data: string): void {
-  rawSend({ channel: 'docker:exec:in', execId, data })
-}
-
-export function wsDockerExecResize(execId: string, cols: number, rows: number): void {
-  rawSend({ channel: 'docker:exec:resize', execId, cols, rows })
-}
-
-// Subscribe to a docker log/stats stream; returns an unsubscribe. First local subscriber per
-// (kind, container) attaches, the last detaches — the wsAttach contract.
-export function wsDockerAttach(kind: 'logs' | 'stats', id: string, cb: (event: DockerStreamEvent) => void): () => void {
-  const key = `${kind}:${id}`
-  let set = dockerStreamSubs.get(key)
-  const first = !set
-  if (!set) {
-    set = new Set()
-    dockerStreamSubs.set(key, set)
-  }
-  set.add(cb)
-  connect()
-  if (first) rawSend({ channel: `docker:${kind}:attach`, id })
-  return () => {
-    const s = dockerStreamSubs.get(key)
-    if (!s) return
-    s.delete(cb)
-    if (s.size === 0) {
-      dockerStreamSubs.delete(key)
-      rawSend({ channel: `docker:${kind}:detach`, id })
-    }
-  }
-}

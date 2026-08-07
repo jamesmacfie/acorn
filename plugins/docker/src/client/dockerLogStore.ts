@@ -3,7 +3,7 @@
 // at the same spot instead of a fresh tail replay. Buffers are LRU-capped; a stream that ended
 // (container stopped/removed) is reopened on next use so the attach replays a fresh tail.
 import { createSignal, type Accessor } from 'solid-js'
-import { wsDockerAttach } from '@acorn/client-core/wsClient.ts'
+import { wsDockerAttach } from './wsChannel'
 
 const MAX_LOG_CHARS = 512 * 1024 // char-capped ring; virtualize if huge logs ever matter
 const MAX_BUFFERS = 8 // LRU cap on background `docker logs -f` attachments

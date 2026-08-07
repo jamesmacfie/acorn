@@ -308,9 +308,6 @@ describe('architecture boundaries', () => {
       // Blocked, not kept: client-core/registries/agentToolRenderers.ts imports it, so it cannot move
       // until the shell stops naming agents (finding 10).
       'managedAgents.ts',
-      // Moves with finding 2, which opens the WS envelope — protocol imports DockerStatsSample from
-      // here into ws.ts today, and both leave together.
-      'docker.ts',
     ]
     // Kept OUT of the baseline on purpose, because a baseline means "still to fix" and these are not.
     // The match is a name collision with core vocabulary, not a dependency: `AgentContextContribution`

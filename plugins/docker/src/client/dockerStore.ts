@@ -5,7 +5,7 @@
 import { createSignal } from 'solid-js'
 import { latestOnly } from '@acorn/client-core/lib/latestOnly.ts'
 import type { PollerContribution } from '@acorn/client-core/registries/pollers.ts'
-import { wsOnDockerChanged } from '@acorn/client-core/wsClient.ts'
+import { wsOnDockerChanged } from './wsChannel'
 import type { DockerContainerSummary, DockerInfo, DockerTaskSummary } from '../shared/model'
 import { fetchContainers, fetchDockerInfo, fetchTaskSummaries } from './dockerClient'
 

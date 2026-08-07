@@ -4,6 +4,7 @@
 import { spawn as ptySpawn, type IPty } from 'node-pty'
 import type { PluginBroadcast } from '@acorn/node-core/server/plugin/types.ts'
 import { isDockerRef } from '../shared/model'
+import type { DockerClientFrame } from '../shared/wsFrames'
 import { dockerEnv } from './cli'
 import { parseStatsLine } from './parse'
 import { getDockerService } from './dockerService'
@@ -30,7 +31,11 @@ export function registerDockerWsChannel(events: PluginBroadcast): void {
   }
 
   events.channel('docker', {
-    onFrame(frame, send, conn) {
+    onFrame(rawFrame, send, conn) {
+      // The ONE cast, at the front door. Core hands over an open envelope and this plugin owns what is
+      // inside it (../shared/wsFrames.ts); every field read below is still guarded, because the sender
+      // is a peer over JSON and a type has never proved anything about that.
+      const frame = rawFrame as DockerClientFrame
       switch (frame.channel) {
         case 'docker:logs:attach':
         case 'docker:stats:attach':
