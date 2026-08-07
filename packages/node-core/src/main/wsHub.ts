@@ -181,20 +181,27 @@ function onConnect(ws: WebSocket, authorized: Authorized): void {
       // internal socket may drive only the streams of the task its credential names. An unknown stream
       // id is refused for a task-scoped caller rather than allowed — failing open here would make the
       // check trivially bypassable by racing session creation.
-      const streamId = (frame as { id?: unknown }).id
-      if (!mayDriveStream(conn, typeof streamId === 'string' ? streamId : null)) return
+      //
+      // Narrowed once, here, because the frame envelope is open now (@acorn/protocol/ws.ts): the union
+      // used to do this discrimination for us. The runtime guards below are unchanged and every one of
+      // them is load-bearing — the union only ever proved the shapes to the compiler, never to a peer
+      // sending JSON.
+      const { id, data } = frame as { id?: unknown; data?: unknown }
+      const streamId = typeof id === 'string' ? id : null
+      if (!mayDriveStream(conn, streamId)) return
+      if (!streamId) return
       if (frame.channel === 'term:input') {
-        if (typeof frame.id === 'string' && typeof frame.data === 'string') handlers.input(frame.id, frame.data)
+        if (typeof data === 'string') handlers.input(streamId, data)
       } else if (frame.channel === 'term:attach') {
-        if (typeof frame.id !== 'string' || conn.sinks.has(frame.id)) return
-        const sink: StreamSink = (msg) => sendFrame(conn, { channel: 'term:out', id: frame.id, msg })
-        conn.sinks.set(frame.id, sink)
-        handlers.attach(frame.id, sink) // engine restores the canonical screen before queued live frames
+        if (conn.sinks.has(streamId)) return
+        const sink: StreamSink = (msg) => sendFrame(conn, { channel: 'term:out', id: streamId, msg })
+        conn.sinks.set(streamId, sink)
+        handlers.attach(streamId, sink) // engine restores the canonical screen before queued live frames
       } else if (frame.channel === 'term:detach') {
-        const sink = conn.sinks.get(frame.id)
+        const sink = conn.sinks.get(streamId)
         if (sink) {
-          handlers.detach(frame.id, sink)
-          conn.sinks.delete(frame.id)
+          handlers.detach(streamId, sink)
+          conn.sinks.delete(streamId)
         }
       }
       return

@@ -255,7 +255,9 @@ describe('wsHub streaming', () => {
     await waitFor(() => got.length >= 2, 'ready + initial screen')
     liveSink!({ type: 'output', data: 'LIVE' } satisfies ServerMsg)
     await waitFor(() => got.length >= 3, 'the live frame')
-    const outs = got.filter((f) => f.channel === 'term:out') as Extract<WsServerWireFrame, { channel: 'term:out' }>[]
+    // Spelled out rather than Extract<>'d: the frame envelope is open now, so there is no union left to
+    // discriminate. The shape asserted here is terminal's, and this is a terminal test.
+    const outs = got.filter((f) => f.channel === 'term:out') as unknown as { channel: 'term:out'; id: string; msg: ServerMsg }[]
     expect(outs.map((f) => f.msg.type)).toEqual(['ready', 'output', 'output'])
     expect(outs[1].msg).toMatchObject({ data: 'SCREEN' })
     expect(outs[2].msg).toMatchObject({ data: 'LIVE' }) // live strictly after the screen restore
