@@ -16,7 +16,6 @@ import { listProfileDefs, profileAvailable, resolveCommand, type ProfileDef } fr
 import { isDir } from '@acorn/node-core/main/taskWorktree.ts'
 import { buildSessionEnv } from '@acorn/node-core/main/taskEnv.ts'
 import { formatLaunchContext } from '@acorn/plugin-context/contract/contextBlock.ts'
-import { capabilityId } from '@acorn/node-core/server/plugin/capabilities.ts'
 import type { MemoryHit, MemoryRow } from './memory'
 
 export type KnowledgeDeps = {
@@ -52,16 +51,9 @@ export type MemoryKnowledge = MemoryIndex & {
   memoryReviewTrigger(taskId: string, transcriptTail: string): Promise<void>
 }
 
-// Published by the plugin's init (node/index.ts) and resolved by the composition root.
-//
-// Deliberately NOT in a `contract/` entrypoint, unlike agents.sessionExecute. A contract carries types
-// and ids only and may not name the plugin's internals (tools/arch/boundaries.test.ts), and this
-// capability's value still exposes one — the proposal store. It is also not a cross-plugin surface: the
-// only consumer is apps/node's composition root, which may import a plugin's internals by design.
-//
-// The capability exposes the memory proposal store to the composition root and the agent, terminal, and
-// workflow integrations. It remains an internal capability because its value contains a store handle.
-export const MEMORY_KNOWLEDGE = capabilityId<MemoryKnowledge>('memory.knowledge')
+// The capability id moved to ../contract/knowledge.ts, narrowed to the two methods that are actually
+// driven from outside this plugin. This type stays here because it is the full runtime — including the
+// proposal-store handle, which a contract/ file may not name.
 
 // The headless profile the memory-review pass runs on: the FIRST installed agent profile with a
 // headless mode (claude-code, then codex) — hardcoding claude-code silently disabled

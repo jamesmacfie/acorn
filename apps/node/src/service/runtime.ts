@@ -22,10 +22,10 @@ import { logStorageFootprint } from '@acorn/node-core/main/storageFootprint.ts'
 import { GITHUB_MIRROR } from '@acorn/plugin-github/contract/mirror.ts'
 import { wireAgentTools } from '../wiring/agentToolsWiring'
 import { wireConfigTrust } from '../wiring/configTrustWiring'
-import { AGENTS_RUNTIME } from '@acorn/plugin-agents/main/runtime.ts'
-import { MEMORY_KNOWLEDGE } from '@acorn/plugin-memory/main/knowledgeIpc.ts'
+import { AGENTS_RUNTIME } from '@acorn/plugin-agents/contract/runtime.ts'
+import { MEMORY_KNOWLEDGE } from '@acorn/plugin-memory/contract/knowledge.ts'
 import { NOTES_STORE } from '@acorn/plugin-notes/contract/store.ts'
-import { WORKFLOWS_RUNNER } from '@acorn/plugin-workflows/main/workflowRunner.ts'
+import { WORKFLOWS_RUNNER } from '@acorn/plugin-workflows/contract/runner.ts'
 import { configureTerminalMcp, reconcileTmux, refreshAcornMcpRegistrations } from '@acorn/plugin-terminal/main/terminal.ts'
 import { seedTaskNotes } from '@acorn/plugin-notes/main/seedTaskNotes.ts'
 import type { PreviewBrowserRule } from '@acorn/protocol/serviceProtocol.ts'
@@ -212,12 +212,20 @@ export async function startServiceRuntime({ config, desktop, stateChanged }: Run
     // tests do) gets a clean graph each time instead of "capability already provided".
     const capabilities = new CapabilityRegistry()
     const core = createCoreServices({ secrets: runtime.SECRETS, db, activeIdentity: runtime.ACTIVE_IDENTITY })
-    // The memory runtime, resolved LAZILY. plugins/terminal needs three of its closures (the launch
-    // injector, the memory-review trigger and note seeding) at spawn time, but it may not import them:
-    // `memory.knowledge`'s id lives in that plugin's main/ rather than a contract/, so the edge would be
-    // a plugin→plugin coupling. So the composition root resolves the capability on terminal's behalf, at
-    // CALL time — which is also the only order that can work, since terminal's init runs inside
-    // initPlugins and memory's may not have run yet when the deps below are constructed.
+    // The memory runtime, resolved LAZILY, on plugins/terminal's behalf. It needs three closures at
+    // spawn time — the launch injector, the memory-review trigger, and note seeding.
+    //
+    // This used to be explained as "memory.knowledge's id lives in main/ rather than a contract/, so
+    // the edge would be a plugin→plugin coupling." That reason was wrong, and moving the id to
+    // plugins/memory/src/contract/knowledge.ts proves it: terminal STILL cannot import it. The real
+    // obstacle is a package CYCLE — plugins/memory already imports terminal's TERMINAL_SEND_TO_AGENT
+    // to push a block into a live session, so terminal importing memory back would close the loop and
+    // turbo refuses to build it.
+    //
+    // Breaking it properly means inverting one half, the way plugins/agents and plugins/workflows were
+    // (see plugins/agents/src/contract/workflowControl.ts). Until then the root injects the thunks, and
+    // CALL time is the only order that can work anyway: terminal's init runs inside initPlugins, and
+    // memory's may not have run when the deps below are constructed.
     const knowledgeAt = () => capabilities.require(MEMORY_KNOWLEDGE)
     const notesAt = () => capabilities.require(NOTES_STORE)
     // Awaited before the listener binds: a plugin's init opens and migrates its own SQLite file, so a

@@ -24,12 +24,12 @@ import { setPluginsBridge } from '@acorn/node-core/server/routes/plugins.ts'
 import { CapabilityRegistry } from '@acorn/node-core/server/plugin/capabilities.ts'
 import { initPlugins } from '@acorn/node-core/server/plugin/host.ts'
 import { setWorktreesRoot } from '@acorn/node-core/main/taskWorktree.ts'
-import { AGENTS_RUNTIME } from '@acorn/plugin-agents/main/runtime.ts'
-import { MEMORY_KNOWLEDGE } from '@acorn/plugin-memory/main/knowledgeIpc.ts'
+import { AGENTS_RUNTIME } from '@acorn/plugin-agents/contract/runtime.ts'
+import { MEMORY_KNOWLEDGE } from '@acorn/plugin-memory/contract/knowledge.ts'
 import { NOTES_STORE } from '@acorn/plugin-notes/contract/store.ts'
 import { seedTaskNotes } from '@acorn/plugin-notes/main/seedTaskNotes.ts'
 import { reconcileTmux } from '@acorn/plugin-terminal/main/terminal.ts'
-import { WORKFLOWS_RUNNER } from '@acorn/plugin-workflows/main/workflowRunner.ts'
+import { WORKFLOWS_RUNNER } from '@acorn/plugin-workflows/contract/runner.ts'
 import { GITHUB_MIRROR } from '@acorn/plugin-github/contract/mirror.ts'
 import { wireAgentTools } from '../wiring/agentToolsWiring'
 import { wireConfigTrust } from '../wiring/configTrustWiring'
@@ -66,7 +66,8 @@ let finishReconcile!: () => void
 const reconciled = new Promise<void>((resolve) => (finishReconcile = resolve))
 const capabilities = new CapabilityRegistry()
 // Resolved at CALL time, never here: `memory.knowledge` is published by memory's init, which has not run
-// when this object is built, and terminal may not import it (see service/runtime.ts).
+// when this object is built, and terminal cannot import it without closing a package cycle (the reasoning
+// is written out in service/runtime.ts).
 const knowledgeAt = () => capabilities.require(MEMORY_KNOWLEDGE)
 const notesAt = () => capabilities.require(NOTES_STORE)
 const core = createCoreServices({ secrets: runtime.SECRETS, db: runtime.DB, activeIdentity: runtime.ACTIVE_IDENTITY })
