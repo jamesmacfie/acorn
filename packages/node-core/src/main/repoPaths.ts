@@ -67,9 +67,9 @@ export async function setRunTargets(db: AppDatabase, owner: string, repo: string
 }
 
 // Persist a partial repo-config update (the machine-local DB fallback for lifecycle/build/preview
-// config; committed .acorn/config.toml still wins at read time). Validation mirrors the old
-// per-workspace PATCH route: trigger + preview-mode enums, a bare-port check, and browser-rule
-// shape. An omitted field is untouched; '' (or [] for rules) clears.
+// config; committed .acorn/config.toml still wins at read time). Validation covers trigger and
+// preview-mode enums, bare ports, and browser-rule shape. Omitted fields are untouched; '' (or [] for
+// rules) clears.
 export async function setRepoConfig(db: AppDatabase, owner: string, repo: string, patch: RepoConfigPatch): Promise<RepoPathResult> {
   const existing = await getRepoPath(db, owner, repo)
   if (!existing) return { ok: false, reason: 'Map a local checkout for this repo first.' }

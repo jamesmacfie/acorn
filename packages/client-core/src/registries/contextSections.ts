@@ -1,18 +1,3 @@
-// Extra UI a plugin renders INSIDE a context-pane section (docs/vNext/plugins.md § ClientPluginContext).
-//
-// plugins.md names `contextSections` on the client context; Phase 2 left it out for having no consumer, and
-// this is that consumer. plugins/context's pane rendered `<MemorySection>` by importing plugins/memory
-// directly, which was the `context -> memory` coupling edge and also the reason plugins/memory had no
-// ClientPlugin at all: it had client code but nothing registrable.
-//
-// The node-side registry is a different thing with a similar name, and the split is deliberate: there, a
-// contribution supplies a section's DATA (server/agentTools/contextSections.ts). Here it supplies extra
-// controls rendered under a section the node already returned. Memory's section is the only one with any —
-// the add-memory form and the pending-proposal count — and every other section renders from its items
-// alone.
-//
-// Kept JSX-free for the reason registries/slots.ts states: registries/plugin.ts must stay importable in a
-// bare-Node vitest run, and a module that reaches a `.tsx` file cannot be.
 import type { Component } from 'solid-js'
 import type { Task } from '../queries'
 import { Registry } from './registry'

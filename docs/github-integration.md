@@ -1,179 +1,50 @@
-# GitHub Integration
+# GitHub integration
 
-All GitHub access goes through two thin clients in
-`plugins/github/src/server/index.ts`. The route handlers
-(`plugins/github/src/server/routes/`) call these, mirror the result into the local
-SQLite read-model, and return a public projection. The browser never talks to GitHub directly and
-never holds the token (see [authentication](./authentication.md)).
+GitHub is a provider plugin, not the acorn authentication system. Its token is an encrypted
+integration credential and its repositories/PRs are a disposable local mirror.
 
-## The clients
+## Connecting
 
-Both inject the standard headers and return the **raw `Response`** so callers
-own status handling and parsing.
+Settings → Integrations runs the OAuth device authorization flow:
 
-```ts
-const ghHeaders = (token: string) => ({
-  Authorization: `Bearer ${token}`,
-  Accept: 'application/vnd.github+json',
-  'X-GitHub-Api-Version': '2022-11-28',
-  'User-Agent': 'acorn',
-})
+1. `POST /v2/p/github/auth/device/start` asks GitHub for a device code.
+2. The owner enters the user code at GitHub's verification URI.
+3. `POST /v2/p/github/auth/device/poll` checks the provider at GitHub's requested interval.
+4. On success the Node validates the token, stores it in an encrypted `integrations` row, and binds
+   the active GitHub identity.
 
-// REST
-export const gh = (token, path, init?) =>
-  fetch(`https://api.github.com${path}`, { ...init, headers: { ...ghHeaders(token), ...init?.headers } })
+The flow uses `GITHUB_CLIENT_ID`, no client secret, and no callback URL. `githubToken(c)` is the
+single credential read site for GitHub routes.
 
-// GraphQL — POST to /graphql
-export const ghGraphQL = (token, query, variables) =>
-  fetch('https://api.github.com/graphql', {
-    method: 'POST',
-    headers: { ...ghHeaders(token), 'Content-Type': 'application/json' },
-    body: JSON.stringify({ query, variables }),
-  })
-```
+## Mirror
 
-These deliberately stay in `plugins/github/src/server/` rather than being promoted to
-a shared package until a third consumer justifies it.
+The GitHub plugin database contains repositories, pull requests, PR files, reviews, comments,
+commits, review threads, labels, requested reviewers, checks, freshness, viewed files, and pinned
+repositories. Provider reads are serve-then-revalidate and may use ETags. List refreshes replace
+collections so inaccessible repositories/PRs disappear from the local projection.
 
-Two calls deliberately bypass the clients: the device-flow code request and token
-exchange (`routes/deviceAuth.ts` — they target `github.com/login/device/code` and
-`github.com/login/oauth/access_token`, not the API host, and there is no token yet
-to send) and the signed log-blob fetch in `routes/actions.ts` (the redirect target
-must be fetched **without** the auth header).
+Patch bodies and full file bodies use the Node's immutable on-disk blob cache. A blob miss fetches
+from GitHub and stores the result by SHA. The cache is per Node and can hold private repository data.
 
-The token every call above takes comes from `githubToken(c)`
-(`plugins/github/src/server/githubToken.ts`): one encrypted `integrations` row per
-owner, resolved for `ownerId(c)`. An absent row yields `''`, which `gh()`/`ghGraphQL()`
-turn into the same synthetic `401` a rejected token produces — so "never connected"
-and "credential revoked" land on one path.
+## Reads and writes
 
-## REST vs GraphQL — the decision
+The GitHub source provides repository browse, PR lists/detail, diff files, checks, Actions logs,
+mentions, labels, reviewers, comments, review threads, and create-PR. Mutations call GitHub first and
+then update or invalidate the affected mirror so a subsequent read does not serve a known pre-write
+value.
 
-- **REST** for list reads and most writes — it's simple, and crucially it
-  carries **ETags**, which enable free conditional revalidation (`304`). See
-  [caching](./caching.md#etag-conditional-revalidation).
-- **GraphQL** for the **composite PR-detail read** (PR + reviews + comments +
-  review threads + checks in one round-trip) and for two mutations that have no
-  clean REST equivalent (draft toggle, thread resolve/unresolve). GraphQL has
-  **no ETag**, so anything fetched this way self-caches by TTL only.
+Closed PR lists are paginated live provider reads. Open lists, details, and files use the local mirror
+with explicit force-refresh support. GraphQL errors and provider authorization failures are mapped to
+the common API envelope and surfaced as GitHub-specific status where the UI needs it.
 
-## Operation → endpoint map
+## Tasks and references
 
-### Reads
+A PR can promote to a task. The task stores the repository and pull number; subsequent task context
+and changes use the owning Node. Linear reference panels are contributed through a provider contract,
+so the GitHub plugin does not import Linear's implementation.
 
-| acorn operation | API | GitHub endpoint |
-| --- | --- | --- |
-| Repos list | REST | `GET /user/repos?sort=pushed&direction=desc&per_page=100` |
-| Single repo (mirror-miss resolve) | REST | `GET /repos/{owner}/{repo}` (`resolveRepoForUser`) |
-| Repo labels | REST | `GET /repos/{owner}/{repo}/labels?per_page=100` |
-| Open PR list | REST | `GET /repos/{owner}/{repo}/pulls?state=open&sort=updated&direction=desc&per_page=100` (conditional `If-None-Match`) |
-| Closed PR list (paged proxy) | REST | `GET /repos/{owner}/{repo}/pulls?state=closed&…&per_page=50&page={p}` (no mirror; Link header drives load-more) |
-| PR files + patches | REST | `GET /repos/{owner}/{repo}/pulls/{n}/files?per_page=100` |
-| PR detail (composite) | GraphQL | `repository.pullRequest { …PrFields }` — single and multi-alias batch forms share `PR_FRAGMENT` (`prMirror.ts`) |
-| File blob (context expansion) | REST | `GET /repos/{owner}/{repo}/git/blobs/{sha}` (cached forever on disk by sha) |
-| Branch list (create PR) | GraphQL | `repository.refs(refPrefix:"refs/heads/", …)` — paged up to 30×100, sorted by tip `committedDate` locally |
-| Compare (create PR preview) | REST | `GET /repos/{owner}/{repo}/compare/{base}...{head}?per_page=100` |
-| Workflow run jobs | REST | `GET /repos/{owner}/{repo}/actions/runs/{runId}/jobs?per_page=100` |
-| Job logs | REST | `GET /repos/{owner}/{repo}/actions/jobs/{jobId}/logs` (302 followed manually, unauthenticated) |
+## Actions and logs
 
-The composite GraphQL query (`PR_FRAGMENT`) pulls `id number title state isDraft
-bodyHTML headRefOid author baseRefName headRefName updatedAt mergeable
-mergeStateStatus autoMergeRequest.mergeMethod`, plus `labels` (first 20),
-`reviews` / `reviewRequests` / `comments` / `reviewThreads` (first 50), timeline
-commits (first 100), and the latest commit's `statusCheckRollup` contexts
-(`CheckRun` and `StatusContext`). Files are *not* in the composite — the richer
-REST `/files` endpoint owns `pr_files`.
-
-> `ponytail:` first-page only — cursor pagination for reviews/comments/threads,
-> and Link-header pagination for repos/PRs/files, are deferred.
-
-### Write actions
-
-| acorn operation | API | GitHub endpoint |
-| --- | --- | --- |
-| Merge | REST | `PUT /repos/{owner}/{repo}/pulls/{n}/merge` (`merge_method`) |
-| Enable / disable auto-merge | GraphQL | `enablePullRequestAutoMerge` / `disablePullRequestAutoMerge` (needs PR node id; no REST equivalent) |
-| Close / reopen | REST | `PATCH /repos/{owner}/{repo}/pulls/{n}` (`{ state }`) |
-| Draft ↔ ready | GraphQL | `convertPullRequestToDraft` / `markPullRequestReadyForReview` (needs PR node id) |
-| Add discussion comment | REST | `POST /repos/{owner}/{repo}/issues/{n}/comments` (`Accept: …full+json` → `body_html`) |
-| Add label / remove label | REST | `POST` / `DELETE /repos/{owner}/{repo}/issues/{n}/labels[/{name}]` |
-| Submit review | REST | `POST /repos/{owner}/{repo}/pulls/{n}/reviews` (`{ event, body }`) |
-| Request / remove reviewer | REST | `POST` / `DELETE /repos/{owner}/{repo}/pulls/{n}/requested_reviewers` (`{ reviewers: [login] }`) |
-| Start inline review comment | REST | `POST /repos/{owner}/{repo}/pulls/{n}/comments` (`commit_id` = head sha, `path`, `line`, `side`) |
-| Reply to thread | REST | `POST /repos/{owner}/{repo}/pulls/{n}/comments/{commentId}/replies` (numeric `databaseId`) |
-| Resolve / unresolve thread | GraphQL | `resolveReviewThread` / `unresolveReviewThread` (by thread node id) |
-| Create PR | REST | `POST /repos/{owner}/{repo}/pulls` (`{ title, body, base, head, draft }`; `422` message surfaced verbatim) |
-| Rerun failed jobs | REST | `POST /repos/{owner}/{repo}/actions/runs/{runId}/rerun-failed-jobs` |
-| Toggle "viewed" file | — | No GitHub call — app-state only (see [data-layer](./data-layer.md)) |
-
-### Write actions and the mirror {#write-actions}
-
-Each write calls GitHub, then keeps the local mirror consistent so a read inside
-the TTL window reflects the change:
-
-- **Merge / close / reopen** update `pull_requests.state` directly.
-- **Draft toggle** updates `pull_requests.draft`; **auto-merge enable/disable**
-  update `pull_requests.auto_merge_enabled`. Both are GraphQL and require the
-  mirrored `nodeId` — if absent, they return `409 node_id_unknown` (open the PR
-  first to mirror it).
-- **Add comment / labels / requested reviewers** write the returned canonical
-  data into `comments` / `pr_labels` / `review_requests` (labels and reviewers
-  replace the full set GitHub echoes back).
-- **Inline review comment / reply / resolve / submit review** can't be mirrored
-  surgically, so they **bust the PR's `sync_state` freshness** (`bustPrSync`) —
-  the next detail GET refetches the composite from GitHub.
-- **Create PR** busts the repo's open-pulls `sync_state` so the list refetches
-  with the new PR; the detail mirror fills on first navigation.
-- **Rerun failed jobs** has no mirror to update; the new run states surface on
-  the next composite refetch.
-
-The client layers optimistic updates / invalidation on top. See
-[api-reference](./api-reference.md) for request/response shapes and
-[frontend](./frontend.md) for the mutation wiring.
-
-### Explicit PR refreshes
-
-A forced refresh reuses the same mirror refresh operations a normal read does
-(`routes/pullRefresh.ts`): a forced detail/files read for one PR, or a forced open-list read for one
-repository. Single-PR refresh fetches both upstream representations before starting mirror writes,
-while open-list refresh preserves ETag `304` handling, atomic pruning/upsert, and local-task
-PR-number backfill.
-
-## ETags and rate limits
-
-- **ETags** are acorn's main rate-limit defense. The **PR-list** and **repos-list**
-  routes send `If-None-Match` with the stored `sync_state.etag`; a `304` costs
-  nothing against the limit and just bumps freshness (the mirror is re-served).
-  GraphQL reads (PR detail) and REST files have no usable ETag and rely on the
-  TTL gate. All of this runs behind the sync engine (`server/sync/engine.ts`);
-  the 304 branch lives in each route's `refresh` because it is specific to the
-  `sync_state` ETag store.
-- A shared `ghError(res)` helper in `plugins/github/src/server/index.ts` maps any non-OK
-  GitHub REST/GraphQL response to a normalized `{ error, status }`, applied uniformly
-  across every route:
-  - **`401`** (revoked/expired token, or GitHub never connected) → `{ error: 'reauth' }`,
-    so the client prompts to reconnect
-    (see [authentication](./authentication.md#the-401--reauth-bounce)).
-  - **rate limit** (`403`/`429` with `x-ratelimit-remaining: 0`, or any `retry-after`)
-    → `429 { error: 'rate_limited' }`.
-  - **SAML SSO** (`403` with `x-github-sso`) → `403 { error: 'sso' }`.
-  - other **`403`** (insufficient scope/permission) → `403 { error: 'forbidden' }`.
-  - anything else → `502 { error: 'github_unavailable' }`.
-- Routes handle their endpoint-specific statuses first — e.g. merge `405`/`409`
-  (`merge_failed`) — then delegate the remainder to `ghError()`.
-- GraphQL responses go through `ghGraphQLResult(res)` (same module): it runs
-  `ghError` for HTTP-level failures and normalizes a `200 + errors` body into a
-  `kind: 'graphql'` result with the messages, so callers apply only their
-  endpoint-specific mapping (prActions maps auto-merge-enable errors to
-  `422 auto_merge_not_allowed`; most others map to `502`; pullDetail surfaces
-  the messages as a `502` with code `graphql`, the GraphQL messages joined into
-  the envelope's `message`).
-- REST helpers that feed the mirror return the same normalized
-  `RouteResult<T>` shape (`{ ok: true, value } | { ok: false, failure }`) —
-  `refreshRepos`, `resolveRepoForUser`, and `fetchFiles` in
-  `routes/prMirror.ts` — so route handlers never re-derive failures.
-- `resolveRepoForUser` (`routes/repoMirror.ts`) additionally folds a GitHub
-  `404` *or plain `403`* on the single-repo resolve into `404 repo_not_found` —
-  a deliberate, kept decision (documented at the fold): GitHub itself 404s
-  repos you can't see, so the UI gets one "can't get there" state and acorn
-  doesn't confirm that a private repo exists.
+Checks expose Actions run/job data. Job logs follow GitHub's signed redirect without forwarding the
+GitHub bearer to the blob host. Rerun-failed-jobs is an explicit mutation and requires the provider
+permission GitHub reports.

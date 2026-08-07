@@ -1,6 +1,5 @@
-// Renderer broadcasts shared by the main-process surfaces (split out of terminal.ts). These
-// the WebSocket transport these ride the one authenticated WebSocket (main/wsHub.ts), not per-window IPC — a
-// no-op when no socket is connected (dev:node, tests), same "no consumer → no-op" idea as before.
+// Renderer broadcasts shared by the main-process surfaces. They use the authenticated WebSocket hub
+// rather than per-window IPC and are no-ops when no socket is connected.
 import { wsBroadcast } from './wsHub'
 
 // Per-tab status (idle/exited) is shown for sessions the renderer isn't attached to, so changes

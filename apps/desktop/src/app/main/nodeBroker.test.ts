@@ -332,7 +332,7 @@ describe('broker WebSocket', () => {
     expect(JSON.parse(inbound[0])).toEqual({ channel: 'term:attach', id: 's1' })
   })
 
-  // docs/vNext/protocol.md § Events: a seq gap means loss, and the remedy is to reconnect, because
+  // docs/api-reference.md § Events: a seq gap means loss, and the remedy is to reconnect, because
   // there is no cursor into history to replay from.
   it('treats a seq gap as loss and reconnects', async () => {
     const { origin, server } = await listen(false)
@@ -356,10 +356,6 @@ describe('broker WebSocket', () => {
     expect(frames).toEqual([{ channel: 'term:status', seq: 1 }])
   })
 
-  // docs/vNext/protocol.md § Events, and the risk Phase 4 accepted rather than closed: a node that has
-  // HUNG, or a laptop that slept without dropping its TCP connections, holds the socket open without
-  // answering anything. Nothing fires 'close', so the broker attempts no reconnect and the node reads
-  // `online` indefinitely — found by trying SIGSTOP in the two-node e2e.
   it('tears down and reconnects a socket whose peer stops answering pings', async () => {
     const { origin, server } = await listen(false)
     let connections = 0

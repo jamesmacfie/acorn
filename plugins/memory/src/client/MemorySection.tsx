@@ -4,7 +4,7 @@ import { memoryApi, type MemoryType } from './memoryClient'
 
 const MEMORY_TYPE_OPTIONS: MemoryType[] = ['convention', 'architecture', 'decision', 'fix', 'reference', 'feedback', 'task', 'user']
 
-// The memory surfaces of the Manifest pane (docs/next/context-ui.md), kept as a child in the memory
+// The memory surfaces of the Manifest pane (docs/agent-tools.md), kept as a child in the memory
 // plugin so it owns every memoryApi() call: the human gate over auto-generated proposals — accept
 // (with an optional description edit) writes to the task worktree + index, reject leaves no trace —
 // and the manual "+ memory" form (repo scope → the task worktree, lands via its PR; private scope →

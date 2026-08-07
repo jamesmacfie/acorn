@@ -3,7 +3,7 @@
 //
 // Three kinds:
 //   value   — stored and shown as typed
-//   secret  — encrypted at rest (AES-GCM, the same key that seals the session cookie); the
+//   secret  — encrypted at rest with the Node's secret key; the
 //             plaintext never comes back to the renderer, so the field shows a placeholder
 //   command — a stored shell command run in the task worktree (or the repo checkout) when a
 //             request references it. Its output is never stored. The same mechanism the Database

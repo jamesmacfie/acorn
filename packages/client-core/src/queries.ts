@@ -209,20 +209,6 @@ export const workspaceProjectsOptions = (workspaceId: string | null, enabled: bo
     readJson<WorkspaceProjectsResponse>(workspaceProjectsRoute(workspaceId as string), { signal }),
 })
 
-// Prefs are TWO tiers as of Phase 4, merged here (persistence/devicePrefs.ts).
-//
-// Presentation — theme, style pack, keybindings, rail order, restored selection, layouts — is the DEVICE's,
-// in localStorage. Behaviour that belongs to a machine — agent tool permissions, startup context injection,
-// the onboarded flag — stays in the node's flat `/v2/core/prefs` record.
-//
-// That closes the last recorded Phase 1 divergence. Every pref used to live on the node, which was free with
-// one node and wrong with a fleet, so Phase 1 pinned all of them to the HOME node whatever node was active —
-// purely so the theme would not flip on a switch. The node read is still addressed at the home node, and
-// still for that reason: what remains there is per-node behaviour, but a single flat record has no room to
-// say so, and flipping a tool permission on switch would be the same bug in a smaller costume.
-//
-// Device wins the merge. Once a key has moved, the node's copy is a leftover from before the upgrade and must
-// not resurrect itself; `seedDevicePrefs` copies it across once so nothing is lost.
 export const prefsOptions = (enabled: boolean) => ({
   queryKey: prefsKey,
   enabled,
@@ -295,7 +281,6 @@ export const fileBlobOptions = (owner: string, repo: string, sha: string) => ({
   queryFn: async ({ signal }: QueryContext): Promise<FileBlob> => readJson<FileBlob>(fileBlobRoute(owner, repo, sha), { signal }),
 })
 
-// Distinct participant logins for the repo — used to populate @mention autocomplete.
 export const mentionsOptions = (owner: string, repo: string, enabled: boolean) => ({
   queryKey: mentionsKey(owner, repo),
   enabled,
@@ -311,8 +296,6 @@ export const runJobsOptions = (owner: string, repo: string, runId: number, enabl
   queryFn: async ({ signal }: QueryContext): Promise<RunJobs> => readJson<RunJobs>(runJobsRoute(owner, repo, runId), { signal }),
 })
 
-// One job's full log. staleTime Infinity: a completed job's log is immutable. ponytail: a still-
-// running job's log going stale is the accepted ceiling (manual refresh is a later add).
 export const jobLogOptions = (owner: string, repo: string, jobId: number, enabled: boolean) => ({
   queryKey: jobLogKey(owner, repo, jobId),
   enabled,
@@ -329,14 +312,13 @@ export const integrationsOptions = (enabled: boolean) => ({
   queryFn: async ({ signal }: QueryContext): Promise<IntegrationsResponse> => readJson<IntegrationsResponse>(integrationsRoute, { signal }),
 })
 
-// Batch enrichment for the Integrations list (title + status per referenced ticket). Server
-// serves-then-revalidates from D1; client caches 5 min. Returns only the issues Linear resolved.
+// Batch enrichment for the Integrations list (title + status per referenced ticket). The client caches
+// the server's provider-backed response for five minutes. Returns only the issues Linear resolved.
 export const linearIssuesOptions = (identifiers: string[], enabled: boolean) => ({
   queryKey: linearIssuesKey(identifiers),
   enabled,
   staleTime: 5 * 60 * 1000,
-  // Always re-check on mount so the list self-heals from a stale/empty persisted cache; the
-  // server's 10-min D1 cache keeps this cheap (serves cached title/status without hitting Linear).
+  // Always re-check on mount so the list self-heals from a stale or empty persisted cache.
   refetchOnMount: 'always' as const,
   queryFn: async ({ signal }: QueryContext): Promise<LinearIssuesResponse> =>
     writeJson<LinearIssuesResponse>(

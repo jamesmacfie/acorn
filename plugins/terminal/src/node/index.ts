@@ -1,15 +1,3 @@
-// The terminal plugin's node part (docs/vNext/plugins.md § The plugin API).
-//
-// This is the largest single conversion in Phase 2, because the composition root did all of it by hand:
-// apps/node/src/server/routes.ts registered the PTY router, apps/node/src/service/runtime.ts called
-// registerTerminalIpc with core's database handle and five hand-built deps, built the RuntimeService from
-// createRuntimeService + terminalRunGlue, exported sendToAgent into the memory plugin's dep bag, and
-// remembered to call disposeTerminal() during teardown. apps/node/src/wiring/harnessWiring.ts filled the
-// harness RunBridge. Core owned the `terminal_sessions` table.
-//
-// `required: true` for the reason plugins.md gives for github/terminal/agents: core's archive route, the
-// WS hub's stream handlers and the agent-tool run projection all assume a PTY engine answers. A node
-// with this disabled would boot and then fail at the first task — not a configuration worth supporting.
 import type { NodePlugin } from '@acorn/node-core/server/plugin/types.ts'
 import { openPluginDb } from '@acorn/node-core/main/pluginStorage.ts'
 import { setRunBridge } from '@acorn/node-core/server/routes/harness.ts'

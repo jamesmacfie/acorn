@@ -40,7 +40,7 @@ export function activateScopedStateEviction(): () => void {
   // …and this is where that payoff STOPS. The QueryClient partition covers cached queries; feature state
   // held in module-level signals sits outside it and survived a node switch, so node A's agent roster,
   // terminal sessions and plugin list were rendered under node B — against ids that may collide across
-  // nodes by construction (docs/vNext/architecture.md § Fleet semantics).
+  // nodes by construction (docs/architecture-overview.md § Fleet semantics).
   //
   // Only the LIVE rosters are cleared. They are refetched for the new node within a tick, so clearing
   // costs nothing and keying by node would buy nothing. Durable per-workspace and per-task memory
@@ -51,15 +51,6 @@ export function activateScopedStateEviction(): () => void {
     clearSessions()
     managedAgentStore.clear()
     clearNodePlugins()
-    // And every store keyed by a node-minted id. This is the OTHER half of Phase 4's storage-key
-    // qualification, and without it that change made things worse: `storageKeyFor` reads the active node at
-    // WRITE time while these maps survive the shell's remount, so the persistence pass wrote node A's pane
-    // layouts, open files, PR filters and context selections under node B's namespace — and overwrote B's
-    // own for any id the two nodes shared, which architecture.md § Fleet semantics says they may.
-    //
-    // `recipeBrowserUrls` (inside clearNodeScopedTaskState) is the one that mattered beyond lost UI state:
-    // it is the first branch of the preview pane's URL resolution, so node A's value decided which port the
-    // client asked node B to tunnel to.
     clearNodeScopedTaskState()
     clearEditorStates()
     clearEditorTreeStates()

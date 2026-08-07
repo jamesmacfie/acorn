@@ -3,13 +3,10 @@ import { and, eq, lte } from 'drizzle-orm'
 import type { AppDatabase } from '../db'
 import { schema } from '../db'
 
-// Idempotency replay storage (docs/vNext/protocol.md § HTTP conventions). Keyed (deviceId, key):
+// Idempotency replay storage (docs/api-reference.md § HTTP conventions). Keyed (deviceId, key):
 // the same request replays the stored response, a different request under the same key is a
 // conflict, and 5xx is never stored so a genuine retry re-executes.
 //
-// Recovered from V1's /api/v1 store, re-keyed from (tokenId, operationId, key) — vNext has no
-// per-endpoint operationId, and the path is already part of the request hash.
-
 const TTL_MS = 24 * 60 * 60_000
 
 export const requestHash = (method: string, path: string, rawBody: string): string =>

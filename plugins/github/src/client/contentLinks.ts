@@ -56,9 +56,6 @@ if (!contentLinkRegistry.entries().length) for (const contribution of builtInCon
 
 const escapeRegExp = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 
-// Split text into runs, tagging bare Linear identifiers (e.g. CRA-404) whose team prefix is in
-// `prefixes`. Prefix-gating avoids false positives like UTF-8 / SHA-256. Used to linkify GitHub
-// titles/bodies, where Linear ids appear as plain text (GitHub doesn't auto-link them).
 export function splitLinearIds(text: string, prefixes: string[]): { text: string; id?: string }[] {
   const keys = [...new Set(prefixes)].filter(Boolean)
   if (!keys.length) return [{ text }]

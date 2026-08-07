@@ -4,7 +4,7 @@ import type { NodeProbeResult } from '@acorn/protocol/broker.ts'
 import { normalizeFingerprint, pinnedTlsOptions } from './nodeBroker'
 import { nodeRequest } from './nodeRequest'
 
-// The two requests that turn a URL into a fleet member (docs/vNext/protocol.md § Pairing).
+// The two requests that turn a URL into a fleet member (docs/api-reference.md § Pairing).
 //
 // They cannot go through the broker: the broker's whole job is to attach a device token to a pinned
 // connection, and pairing exists precisely because there is no token and no pin yet. So this is the one

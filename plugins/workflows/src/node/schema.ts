@@ -1,4 +1,4 @@
-// The workflows plugin's own tables (docs/vNext/data.md § Plugin DBs). They live in
+// The workflows plugin's own tables (docs/data-layer.md § Plugin DBs). They live in
 // <data-root>/plugins/workflows.sqlite with their own Drizzle chain, migrated at plugin init.
 //
 // Moved out of @acorn/node-core's schema.ts: a run and its steps are the workflow engine's durable

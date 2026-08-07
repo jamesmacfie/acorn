@@ -1,39 +1,3 @@
-// The workflows plugin's node part (docs/vNext/plugins.md § The plugin API).
-//
-// What the composition root used to do by hand, all of it in apps/node/src/wiring/workflowWiring.ts:
-// build the WorkflowRunner over core's database handle with fourteen RunnerDeps closures, register the
-// workflow router in apps/node/src/server/routes.ts, fill the WorkflowBridge behind it, and own the
-// `workflow_runs` / `workflow_steps` tables in core's schema. All of that is here now, and the plugin
-// owns its own SQLite file.
-//
-// Not `required`: an owner who never declares a workflow loses nothing by turning it off, and no core
-// surface resolves anything this plugin provides. The one consumer of its capability — the composition
-// root's reconcile pass — uses `get`, not `require`.
-//
-// Four deps could NOT move, and each has a real blocker rather than an unfinished edge. The fifth,
-// `failingChecks`, CLOSED when github converted — see the note at the end of this list:
-//
-//   - `internalEnv` mints the loopback credential a step runs under. It closes over the listener's
-//     origin, which does not exist until after every plugin's init has run, and over INTERNAL_TOKEN —
-//     the signing KEY. Putting that on CoreServices would let any plugin mint a token for any scope,
-//     which is the opposite of what scoping the tokens bought.
-//   - `reconciled` is the composition root's own post-listener reconcile pass. It has no other owner,
-//     and the runner has to await it before starting or resuming a run.
-//   - `currentUserId` is the node's active GitHub identity, which lives in the runtime bindings.
-//   - `memoryReviewTrigger` belongs to plugins/memory. Its capability id deliberately lives in that
-//     plugin's main/ rather than a contract/ (its value still exposes an internal store), so importing
-//     it here would ADD a workflows→memory coupling edge — an addition to the plugin→plugin baseline
-//     that Phase 3 exists to shrink. The composition root resolves it at CALL time instead.
-//
-// `failingChecks` used to be the fifth, and it is the one this phase resolved. It re-derives CI state from
-// github's `repos` and `checks`, and it lived in apps/node/src/wiring/workflowWiring.ts purely because
-// github was not a NodePlugin and so could not publish the capability. It can now: the query is
-// `github.mirror.failingChecks` (plugins/github/src/contract/mirror.ts) and that wiring file is deleted.
-// It still arrives here as a DEP rather than being resolved in this file, and that is not a leftover —
-// the call needs the node's active GitHub identity, which lives in the runtime bindings and is not a
-// plugin's to read, so the composition root resolves the capability and supplies the identity together.
-// A CoreServices member would still have been the wrong answer: "are this PR's checks green" is github's
-// question, not core's.
 import { homedir } from 'node:os'
 import { formatContextBlock } from '@acorn/protocol/contextBlock.ts'
 import { AGENTS_SESSION_EXECUTE } from '@acorn/plugin-agents/contract/sessionExecute.ts'
@@ -262,11 +226,9 @@ export const workflowsPlugin = (dataDir: string, deps: WorkflowsPluginDeps): Nod
         pollTriggers: () => runner.pollTriggers(),
       })
 
-      // Namespace-root router: it owns a mix of task-scoped (/tasks/:id/workflows) and run-scoped
-      // (/workflows/runs/:runId/...) paths, so the segment doubling under /v2/p/workflows is preserved
-      // exactly as apps/node/src/server/routes.ts had it. Rewriting those internal paths is the
-      // route-declaration phase's job, not this conversion's — the client's route builders would have to
-      // move in the same commit.
+      // Namespace-root router: it owns both task-scoped (/tasks/:id/workflows) and run-scoped
+      // (/workflows/runs/:runId/...) paths. The internal paths are registered as declared so the client
+      // route builders and server surface share one contract.
       ctx.routes.register(workflow, { prefix: '', note: 'workflow control' })
 
       // reconcile() is NOT called here. It has to run after the listener binds and before the

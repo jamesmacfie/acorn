@@ -1,4 +1,4 @@
-// The preview plugin's node part (docs/vNext/plugins.md § The plugin API).
+// The preview plugin's node part (docs/plugins.md § The plugin API).
 //
 // The smallest NodePlugin in the tree, and it is small for a real reason rather than an unfinished one:
 // preview is an ELECTRON-MAIN feature. The pane is a `WebContentsView`, the CDP driving lives in main/, and

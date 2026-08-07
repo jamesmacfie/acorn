@@ -26,14 +26,6 @@ export type ContextSectionContribution = {
   jump?: (item: ContextItem) => ContextItem['jump']
 }
 
-// What a PLUGIN registers. Identical except that `assemble` never sees `db`.
-//
-// That omission is the point, not a convenience. `AssembleArgs.db` is core's own handle, and handing it to
-// a plugin would re-open exactly what Phase 2's database split closed — a plugin reading tables that no
-// longer live in its file. It costs nothing to withhold: of the four sections that exist, only core's own
-// `issues` touches `db` at all, and the three that moved out (`pr`, `notes`, `memory`) read nothing but
-// `task`, `repo`, `userLogin` and `workflowRunId`. A plugin section that finds it needs a core query wants
-// a CoreServices call, not this handle.
 export type PluginContextSection = Omit<ContextSectionContribution, 'assemble'> & {
   assemble: (args: Omit<AssembleArgs, 'db'>) => Promise<ContextDraft>
 }
@@ -44,14 +36,6 @@ export type ContextNotesSource = (
 ) => Promise<{ slug: string; scope: NoteScope; title: string; kind: string; body: string; author: NoteAuthor }[]>
 export type ContextMemorySource = (taskId: string, repo: string) => Promise<{ name: string; description: string }[]>
 
-// The `pr` section's source, injected for the same reason `notes` and `memory` already were: the data
-// lives in a plugin's own SQLite file and core has no handle to it. github's mirror moved out of core's
-// schema in Phase 2, so the section that used to join `repos ⋈ pull_requests ⋈ pr_files` here now asks
-// the plugin (plugins/github/src/contract/mirror.ts § pullRequest).
-//
-// `null` covers three cases the section must render identically — no PR on the task, the repo is not
-// mirrored, the PR is not cached yet — and one more the injected form adds: github disabled entirely.
-// All four produce an empty section rather than an error, which is what the section did before.
 export type ContextPullRequestSource = (
   userId: string,
   repoOwner: string,
@@ -103,7 +87,7 @@ function budgetLegacy(
 
 const formatOmitted = (omitted: number) => (omitted ? `\n- … ${omitted} more omitted` : '')
 
-// INVARIANT (relied on by the client-side Manifest preview + local send assembly, docs/next/context-ui.md):
+// INVARIANT (relied on by the client-side Manifest preview + local send assembly, docs/ui-design.md):
 // a section's `compact` MUST be computed independently of which *other* sections are included. This lets
 // the client assemble the exact send block from a single `include=*` inventory by filtering ctx.sections
 // and calling formatContextBlock — no second curated fetch. A new section that reads sibling inclusion
@@ -111,15 +95,9 @@ const formatOmitted = (omitted: number) => (omitted ? `\n- … ${omitted} more o
 
 // ─── The sections ───────────────────────────────────────────────────────────────────────────────
 //
-// Four builders where there was one `buildContextSections({ notes, memory, pullRequest })`. The split is
-// by DATA OWNER: `issues` reads core's own `task_links` and `issues` tables, so it stays core's; the other
-// three read a plugin's SQLite file through that plugin's capability, so each is registered by the plugin
-// that owns the rows (plugins/github, plugins/notes, plugins/memory).
-//
-// What deliberately did NOT move is the section CONTRACT — `budget`, the `legacy` projection and `format`.
-// Those decide the assembled block's bytes, the invariant above depends on them being computed one way, and
-// every consumer reads them: the route, the client's Manifest preview, the local send assembly. A plugin
-// owns where rows come from; core owns what a section looks like on the wire.
+// Sections are registered by the plugin or core service that owns their rows. The shared contract keeps
+// budgets, legacy projections, and wire formatting consistent for the route, manifest preview, and send
+// assembly.
 
 export function pullRequestSection(source: ContextPullRequestSource): PluginContextSection {
   return {
@@ -129,8 +107,6 @@ export function pullRequestSection(source: ContextPullRequestSource): PluginCont
     budget: { maxItems: 1, maxBytesPerItem: 2_000, overflow: 'truncate-tail' },
     async assemble({ userLogin, task }) {
       if (task.pullNumber == null) return { items: [] }
-      // The three-table join this used to run against core's database is one capability call into
-      // plugins/github (which sorts the changed-file list, as the join's ORDER did).
       const pr = await source(userLogin, task.repoOwner, task.repoName, task.pullNumber)
       if (!pr) return { items: [] }
       const changedFiles = pr.changedFiles
@@ -262,16 +238,8 @@ export function memorySection(source: ContextMemorySource): PluginContextSection
 
 // ─── The contribution point ─────────────────────────────────────────────────────────────────────
 
-// Was `setContextSections(buildContextSections({ notes, memory, pullRequest }))`: ONE slot that had to be
-// filled with every source at once, which meant apps/node/src/wiring/contextSectionsWiring.ts was the only
-// place allowed to hold three different plugins' seams — and so neither notes nor memory could own its own
-// half. That file is gone; each plugin registers its own section in its own `init`.
-//
-// Same shape as AgentToolRegistry above, for the same three reasons: an owner id so a contribution can be
-// REMOVED as a unit, a duplicate-id throw rather than last-write-wins (two sections under one id would
-// resolve by plugin init order, which host.ts explicitly refuses to make load-bearing), and a `remove` the
-// plugin host calls before re-registering, because a process that starts the service twice would otherwise
-// keep sections closed over the first boot's handles.
+// Each section carries an owner ID. The registry rejects duplicate IDs and can remove one owner's
+// contributions during service teardown or reinitialization.
 type Registration = { owner: string; section: ContextSectionContribution }
 
 class ContextSectionRegistry {
@@ -320,29 +288,6 @@ export const registerContextSection = (owner: string, section: ContextSectionCon
 export const removeContextSections = (owner: string): void => registry.remove(owner)
 export const getContextSections = (): readonly ContextSectionContribution[] => registry.list()
 
-// Core's own section, registered HERE at module scope — beside the registry, the assembler that reads it and
-// the route that serves it, rather than from a composition-root wiring file.
-//
-// It used to be registered by apps/node/src/wiring/agentToolsWiring.ts, which is reached only from
-// apps/node/src/service/runtime.ts. apps/node/src/server/standalone.ts calls `initPlugins` and never
-// `wireAgentTools`, so on a standalone node — `pnpm dev:node`, and per that file's own header the node a
-// client pairs with over the LAN — the Linked-issues row silently vanished from the context pane, from the
-// assembled send block and from the launch injector. Nothing errored; a section simply was not there. Before
-// Phase 3 this registry self-seeded a default list of all four sections, so the regression arrived WITH the
-// per-owner contribution point, and pluginDisable.test.ts then baked the three-section result in as its
-// expected baseline.
-//
-// Module scope is right for this one and only this one: `issues` reads `task_links` and `issues`, core's own
-// tables, through the `db` handle `assemble` is already given — so it closes over no dependency, needs no
-// boot ordering, and is the same object on every boot. A plugin's section cannot do this, because it closes
-// over that plugin's own SQLite handle, which is exactly why the other three stay in their plugin's `init`.
-//
-// The `removeContextSections('core')` that sat beside the old registration is deliberately NOT carried over,
-// and this is the one place where "move it too" would have been wrong. Its job was idempotence for a process
-// that boots the service more than once (service/runtime.test.ts does it four times): a per-boot registration
-// has to clear the previous boot's entry or the duplicate-id guard fails the second boot. A module body runs
-// once per module instance, so there is nothing to clear — the line would be a permanent no-op documenting a
-// problem that no longer exists. The multi-boot property comes free instead.
 registerContextSection('core', linkedIssuesSection)
 
 export function parseInclude(raw: string | undefined): Set<string> {

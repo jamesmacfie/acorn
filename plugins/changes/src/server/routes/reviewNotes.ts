@@ -14,7 +14,7 @@ import { reviewNotes as reviewNotesTable } from '../../node/schema'
 //
 // A FACTORY over the plugin's own database, not a module-scope router reading getDb(c.env). Two
 // reasons: the table lives in <data-root>/plugins/changes.sqlite now, and c.env deliberately does not
-// carry per-plugin handles (docs/vNext/data.md § Plugin DBs). The handle arrives at plugin init, so
+// carry per-plugin handles (docs/data-layer.md § Plugin DBs). The handle arrives at plugin init, so
 // there is no request that can reach an unmigrated database.
 
 type Row = typeof reviewNotesTable.$inferSelect
@@ -54,8 +54,6 @@ export const reviewNotesRoutes = (db: PluginDatabase, core: Pick<CoreServices, '
         !body.body?.trim()
       )
         return respondError(c, 400, 'bad_request')
-      // The taskId is a plain ID into core's tables, so core validates it. This used to be a join in
-      // the same file; it cannot be one across two SQLite files.
       if (!(await core.tasks.load(taskId))) return respondError(c, 404, 'not_found')
       const row: Row = {
         id: randomUUID(),

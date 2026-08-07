@@ -9,8 +9,6 @@ import PreviewPane from './PreviewPane'
 
 export function PreviewTaskPane(props: { task: Task }) {
   const api = taskBridge()
-  // Repo-level preview config (repo-level-settings): the machine-local repo_paths values. ponytail:
-  // committed .acorn/config.toml preview keys drive the public-API resolver, not this in-app pane.
   const [config] = createResource(
     () => `${props.task.repoOwner}/${props.task.repoName}`,
     () => api?.repoPath.get(props.task.repoOwner, props.task.repoName) ?? null,

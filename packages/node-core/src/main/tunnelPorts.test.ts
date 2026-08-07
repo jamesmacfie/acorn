@@ -19,7 +19,7 @@ describe('loopbackPortOf', () => {
 
   it('is null for a URL that is not loopback', () => {
     // Already reachable from the client, so there is nothing to tunnel — and opening a port to it would be
-    // the general proxy protocol.md § Streams rules out ("Only declared ports; no general SOCKS").
+    // the general proxy docs/api-reference.md § Streams rules out ("Only declared ports; no general SOCKS").
     expect(loopbackPortOf('https://staging.example.com:8443')).toBeNull()
     expect(loopbackPortOf('http://192.168.1.20:3000')).toBeNull()
   })

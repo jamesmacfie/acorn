@@ -1,266 +1,82 @@
 # Features
 
-A capabilities tour: what acorn can do, where each feature lives in the UI, and the deeper doc for
-each. For system design (the client/node model, caches, request flow) read
-[architecture-overview.md](./architecture-overview.md) instead — this doc is the feature map.
+acorn combines GitHub review with a task-oriented coding workspace. The desktop shell is shared by
+all features; Node-backed data is addressed to the active Node and rendered with its connection
+freshness.
 
-## What acorn is
+## GitHub review
 
-acorn began as a **GitHub pull-request review tool** and has grown into a **local macOS agent
-workspace**: a keyboard-driven desktop app for reviewing PRs *and* driving coding agents (Claude
-Code, Codex, aider) against your repositories, each in its own git worktree. It is a SolidJS
-single-page app that loads from its own `app://acorn` origin inside Electron and talks to a Hono
-service — a spawned Node child process, listening over TLS on an ephemeral loopback port — through a
-connection broker in Electron main, backed by a local SQLite mirror of GitHub. Everything runs on one
-machine for one user.
-
-The UI is token-driven: colour themes compose independently with style packs that control
-typography, shape, density, chrome, and motion. See [ui-design.md](./ui-design.md).
+The GitHub source provides repository search, pinned repositories, open and closed pull requests,
+PR detail, checks, Actions logs, labels, reviewers, comments, review threads, merge/draft actions,
+and create-PR. The diff viewer supports unified/split modes, syntax highlighting, word-level changes,
+viewed-file state, inline threads, and lazy context expansion.
 
----
+## Workspaces and tasks
 
-## PR review
+A workspace is a named group of repositories. A task is work on one repository and branch, with an
+optional worktree, linked PR or external issue, panes, terminal sessions, and managed agent sessions.
+Tasks can originate from GitHub, Linear, Rollbar, or the local task command. Worktrees are created
+lazily when a task first needs filesystem/process access.
 
-The original core, default-on. Pick a repo from the searchable **repo picker** in the top bar
-(pinned repos float to the top; pins persist); the left **Reviews** pane shows a virtualized list of
-open/closed PRs. Selecting one opens the **Navigator** (PR detail: title/metadata, conversation
-timeline, checks, labels, reviewers) and the **Diff** pane beside it.
+## Task panes
 
-Diffs are Shiki-highlighted with unified/split toggle, word-level intra-line highlighting, inline
-review-comment threads, per-file "viewed" state, and gap expansion for unchanged regions. See
-[diff-rendering.md](./diff-rendering.md).
+- `agents` — managed Claude/Codex sessions, requests, context, artifacts, and lifecycle.
+- `pr` — linked pull-request review.
+- `changes` — uncommitted diff, staging, commit/push, and review notes.
+- `notes` — task, workspace, and global Markdown notes.
+- `context` — choose, preview, size, and send task context.
+- `editor` / `search` — worktree files, Monaco editing, and ripgrep search.
+- `preview` — hardened browser preview and agent browser tools.
+- `database` — task-scoped PostgreSQL schema, rows, SQL, and saved queries.
+- `docker` — task-matched containers, logs, stats, exec, and lifecycle actions.
+- `http` — encrypted requests, variables, auth helpers, and response inspection.
+- `linear` / `rollbar` — linked issue panels.
 
-Write actions go straight to GitHub then update the local mirror (`client/mutations.ts`): merge /
-enable-or-disable auto-merge, close / reopen, mark draft / ready, add a comment, submit a review
-(approve / request changes / comment), add / remove labels, request / remove reviewers, resolve
-threads, reply to review threads, and **re-run failed Actions** (`rerunFailed`). A **create-PR flow**
-(the `+ New PR` button, or `c`) opens a compose form with a live compare preview.
+The row is ordered/resizable and persisted per Node/task. Contributions are registered by plugins;
+unknown persisted pane IDs render safely as placeholders.
 
-→ [github-integration.md](./github-integration.md) · [api-reference.md](./api-reference.md) ·
-[diff-rendering.md](./diff-rendering.md)
+## Terminals and agents
 
-## Workspaces
+The terminal drawer provides shells, run targets, raw provider TUIs, and tool terminals. Terminal
+sessions use the Node process broker, PTY/tmux reconciliation, bounded replay, and the authenticated
+event socket.
 
-A **workspace** is a named group of repos (e.g. "Runn", "Acorn") — the top-level unit picked in the
-top bar. A repo belongs to exactly one workspace (a partition); the active workspace is *derived*
-from the current repo. Workspaces carry identity (a color plus an emoji / lucide / github icon,
-rendered as a 3px accent on task rows); the per-repo scripts (setup / dev / dev-restart / teardown /
-db) plus browser-preview config are repo-level, edited per-repo in **Settings → (workspace)**.
+The Agent pane and Agent Center manage structured Claude and Codex sessions: durable normalized event
+ledgers, queued turns, permission/question requests, attachments, artifacts, usage, search, archive,
+fork, compact, import, and terminal handoff. Aider is available through its terminal profile.
 
-First run bootstraps a Default workspace and assigns every mirrored repo; an **onboarding modal**
-lets you re-group afterwards. Repos can be **hidden** from a workspace. Repo→workspace assignment
-lives in **Settings → Workspaces**.
+## Integrations and model providers
 
-→ [workspaces-and-tasks.md](./workspaces-and-tasks.md)
+GitHub uses device-flow OAuth. Linear and Rollbar connections are managed from Settings and expose
+provider sources and task links. OpenAI and Anthropic are model-provider connections used by features
+such as SQL generation; prompts and responses are not persisted by the model-provider plugin.
 
-## Tasks
+## Notes, memory, and context
 
-A **task** is the single-repo unit of work: repo + branch + optional git worktree + optional linked
-PR + its panes and terminals. Its `origin` is one of `github-pr | linear | rollbar | local`. Tasks
-appear as rows in the left **TabRail**, scoped to the active workspace.
+Notes are Markdown at task, workspace, and global scope. Memory is durable reviewed knowledge with an
+index, search, proposals, and agent tools. Agents propose memory changes; accepting a proposal is a
+human-gated action. The context feature assembles provider, task, notes, and memory sections within
+byte/token budgets and can sync an immutable snapshot to an agent session.
 
-From a task row you can **pin to top**, **drag-reorder**, **rename**, and **archive** (archive runs
-a guarded worktree teardown on desktop). **⌘1–⌘9** jump to the Nth task in the rail. Each row
-carries live status glyphs: a PR-checks dot, an agent-working spinner, an unread "needs you" marker,
-and worktree status (dirty file count, or a "needs repair" warning if the worktree vanished). New
-tasks are created on a fresh branch (slugged from the title) via the rail's `+` button.
+## Workflows
 
-→ [workspaces-and-tasks.md](./workspaces-and-tasks.md)
+Workflows are loaded from trusted `.acorn/workflows/*.toml` files. The Node persists runs, steps,
+gates, budgets, branches, joins, and trigger state. Agent, terminal, GitHub-check, and human-gate
+steps use typed capabilities and structured step output. Authoring is file-based; the desktop shows
+inspection, problems, palette rows, activity, attention, and gate controls.
 
-## Panes
+## Docker, database, and HTTP
 
-Inside a task, the view is a flat left→right row of registered **panes**. One pure reducer owns pane
-order, widths, pins, show/add/close, and recipe replacement. A switcher click keeps pinned panes and
-shows the target; ⌘/Ctrl-click opens it beside the others. Dividers resize/equalize the row, while
-focus and maximize stay session-only. Pane shortcuts are contribution-owned and user-overridable.
+Docker inventory is Node-local and matched to tasks using Compose/project/worktree metadata. Docker
+execution is process-brokered and trust-gated where configuration is executable.
 
-| Pane | What it shows |
-| --- | --- |
-| `agents` | Managed Claude/Codex conversation, requests, queue, context, artifacts and lifecycle |
-| `pr` | PR review — the Navigator + Diff (only when a PR is linked) |
-| `changes` | Uncommitted working-tree review (see below) |
-| `notes` | Scratchpad-first task/workspace/global markdown library |
-| `context` | Select, preview, size, and sync assembled context to a chosen agent session |
-| `editor` | In-app code editor over the worktree |
-| `preview` | Kept-alive `WebContentsView` preview of the running app, with browser chrome and agent CDP tools |
-| `linear` / `rollbar` | The linked issue panel(s) |
-| `database` | Task-scoped PostgreSQL browser/editor, saved queries, and model-assisted SQL |
-| `search` | Ripgrep-backed worktree search |
-| `docker` | Containers linked to this task, with logs/stats/exec |
-| `http` | Encrypted repo/task API requests and variables |
+The database pane leases a task-scoped PostgreSQL connection, introspects schema, pages rows, edits
+primary-key values, runs SQL, and stores repository-scoped saved queries. The HTTP pane stores request
+and variable data encrypted at rest; sending is restricted to an interactive device principal.
 
-The switcher also hosts **run targets** (one ▶ per configured target — they run as terminal
-sessions, acorn allocates no ports), the **Agents** toggle, and the **Terminal** toggle.
+## Settings and fleet
 
-→ [panes.md](./panes.md)
-
-## Docker
-
-The always-visible Docker Source browses Compose projects, containers, images, volumes, and
-networks, with guarded lifecycle/prune actions. A conditional task pane, rail badge, and footer
-badge show containers matched to the current task. Docker daemon events flow through the shared
-WebSocket so logs, stats, task summaries, and browse state refresh without an aggressive poll loop.
-
-→ [docker.md](./docker.md)
-
-## API requests
-
-The always-visible API Requests Source and task pane share a server-side HTTP client. Saved
-requests belong to a repo; new task-pane requests can remain task-local until filed. URLs, headers,
-bodies, auth, request variables, and repo variables are encrypted at rest. Variables can be plain,
-secret, or command-backed, resolve only when referenced, and redact from the response timeline.
-Only a device principal — an interactive client, never an agent or other internal caller — may send
-requests.
-
-→ [http-client.md](./http-client.md)
-
-## Local-changes review
-
-The **Changes** pane brings the PR-review experience to uncommitted worktree changes: a GitHub-style
-diff over the task's dirty working tree, with **inline review notes** you can attach to lines and
-send to the agent working in that worktree. This closes the loop between reviewing an agent's output
-and telling it what to fix, without leaving acorn.
-
-→ [panes.md](./panes.md)
-
-## Terminals & agents *(desktop-only)*
-
-The task **Agent pane** is the primary conversation UI for managed Claude Code and Codex sessions.
-It renders structured protocol messages, displayable reasoning, tools, plans, file changes, usage,
-questions and permissions without parsing a terminal. The workspace **Agent Center** aggregates
-history/search, provider health, unread/attention state, transcript import and launch.
-
-Inside the task **Agent pane**, a persistent sidebar lists the task's managed sessions,
-working/needs-you state, raw terminals and workflow gates. Switching rows changes the conversation
-without hiding the roster. The bottom **terminal drawer** remains per-task for shells, raw
-coding-agent TUIs (including Aider and explicit Claude/Codex fallback) and tool terminals. Managed
-and terminal controllers cannot concurrently write to one provider session.
-
-The Agent header also reads provider usage without persisting it and shows the detailed breakdown
-on hover/focus: Claude uses bounded local transcript aggregates, while Codex uses its app-server
-usage/status surface. A configurable pricing catalog turns token categories into local cost
-estimates; the cache is five minutes and no usage row is written to SQLite or IndexedDB.
-
-→ [managed-agents.md](./managed-agents.md) ·
-[terminal-and-agents.md](./terminal-and-agents.md)
-
-## Integrations
-
-External issue trackers surface both as browse **Sources** (extra icons in the TabRail, shown only
-when connected) and as **task links**:
-
-- **Linear** (live) — browse issues, open the Linear panel beside a task, post comments, link
-  tickets to tasks. A task can link several Linear tickets and switch between them.
-- **Rollbar** — browse errors as a Source and open the Rollbar pane on a linked task.
-
-Connect / disconnect in **Settings → Integrations**; tokens are encrypted at rest.
-The same registry also hosts shared OpenAI and Anthropic model-provider connections used by
-model-assisted features such as SQL generation.
-
-→ [integrations.md](./integrations.md)
-
-## Notes & memory
-
-**Markdown notes** live at task (the safe default), workspace, and global scopes — edited in the
-Notes pane and written by agents via the MCP
-`notes_*` tools. Alongside them sits a **memory system** — durable, searchable facts an agent can
-write and recall across sessions (FTS5 full-text search, MCP `memory_*` tools).
-
-→ [notes-and-memory.md](./notes-and-memory.md)
-
-## MCP
-
-acorn ships a stdio **MCP server** (`packages/node-core/src/mcp/server.ts`) that exposes the current
-task's context to any agent launched from it — task/PR context, changed files, local diffs, git log,
-repo info, linked issues, notes, memory, run targets, and browser driving. Tools loopback into the
-running app's Hono API (never their own DB), and return structured "no active task" results when
-launched outside acorn. Configure in **Settings → MCP**.
-
-→ [mcp.md](./mcp.md)
-
-## Workflows *(desktop-only)*
-
-Composable multi-agent orchestration: committed `.acorn/workflows` run as multi-step agent
-sequences. Claude/Codex steps share the managed-agent ledger and request path. The durable runtime
-supports registry-backed step kinds, profiles and policies; explicit joins and conditional branches;
-named-output templates; inherited tool/wall-time/cost/token/turn ceilings; bounded fan-out;
-cancellation; human/policy gates; live step events; run-scoped handoffs; and app-open triggers.
-Definitions remain file-authored, and execution advances only while the app is open.
-
-→ [workflows.md](./workflows.md)
-
-## Command palette & shortcuts
-
-- **⌘K** — the command palette: fuzzy-filtered run targets, layouts, workflows, pane actions,
-  "go to task" navigation, and visible (non-invocable) config parse-error rows
-  (`@acorn/client-core/palette/model.ts`).
-- **⌘P** — go-to-file across the task worktree.
-- **`/`** — find file within the current PR's changed files (the finder overlay).
-- **`j` / `k`** — next / previous PR; **`[` / `]`** — previous / next file; **`c`** — create PR;
-  **`?`** — open the shortcut reference (Settings → Shortcuts); **Esc** — close overlay.
-
-The full reference lives in Settings → Shortcuts; per-pane keys are user-overridable there.
-
-→ [command-palette-and-shortcuts.md](./command-palette-and-shortcuts.md)
-
-## Notifications
-
-A topbar **bell** (`NotificationBell`) surfaces agent-status notices and per-task unread markers.
-Selecting a notice navigates to the relevant task and marks it read; unread tasks also show a
-"needs you" marker in the TabRail. Notices persist across sessions (the last ~50, in a prefs blob —
-ephemeral app state, not a table).
-
-## Settings
-
-Reached from the account menu. A left tab rail:
-
-| Tab | Contents |
-| --- | --- |
-| Workspaces | Repo→workspace assignment (and hide/ignore repos) |
-| *(per workspace)* | Identity (color/icon), scripts, browser preview, projects |
-| Appearance | Theme (12 themes) + follow-system light/dark |
-| Integrations | Connect / disconnect Linear, Rollbar |
-| Agent tools | Per-tool policy and permission controls |
-| Agent pricing | Provider/model pricing overrides used for local usage estimates |
-| Docker | Daemon status, stopped-container visibility, destructive confirmations |
-| API requests | HTTP-client behavior and stored-variable controls |
-| MCP | MCP server config |
-| Workflows | Read-only workflow inspector |
-| Terminal | Default profile when the terminal button is clicked |
-| Shortcuts | Editable per-pane keys + the global shortcut reference |
-| Nodes | Paired nodes: pairing, fingerprint, rename, forget/revoke, connection state |
-
----
-
-## Availability
-
-Be aware of what's real today:
-
-- **Shipped, default-on:** GitHub PR review (list / detail / diff / write actions), Workspaces,
-  Tasks, the TabRail, panes, local-changes review, Docker/API-request sources, database/model
-  providers, notifications, integrations (Linear and Rollbar), settings, command palette, and the
-  file finder.
-- **Desktop-only (capability-gated, always on):** the terminal drawer, agent sessions, run targets,
-  and workflows — available whenever the Electron terminal capability is present (`capabilities()`);
-  the `acorn:term` localStorage flag has been deleted.
-- **Deliberate workflow limits:** no GUI workflow authoring, daemon/background runner, general DAG,
-  or arbitrary recovery graph. See [workflows.md](./workflows.md).
-
-## Source
-
-- Client shell: `apps/desktop/src/app/client/App.tsx`; capabilities: `@acorn/client-core/capabilities.ts`
-- TabRail: `packages/client-core/src/tabs/{TabRail.tsx,sources.ts,railOrder.ts}`
-- Task view + panes: `packages/client-core/src/tasks/{TaskView.tsx,layout.ts}`
-- Write actions: PR verbs in `plugins/github/src/client/mutations.ts`; workspace/repo and
-  task/review-note writes in `@acorn/client-core/{workspaces,tasks}/mutations.ts`
-- Palette / shortcuts: `packages/client-core/src/palette/model.ts`, `plugins/github/src/client/Shortcuts.tsx`
-- Settings shell: `packages/client-core/src/settings/`; contributed pages live with plugins
-- MCP server: `packages/node-core/src/mcp/server.ts`
-
-See also: [architecture-overview.md](./architecture-overview.md) ·
-[workspaces-and-tasks.md](./workspaces-and-tasks.md) · [panes.md](./panes.md) ·
-[managed-agents.md](./managed-agents.md) ·
-[terminal-and-agents.md](./terminal-and-agents.md) · [integrations.md](./integrations.md) ·
-[notes-and-memory.md](./notes-and-memory.md) · [mcp.md](./mcp.md) · [workflows.md](./workflows.md) ·
-[command-palette-and-shortcuts.md](./command-palette-and-shortcuts.md) ·
-[docker.md](./docker.md) · [http-client.md](./http-client.md)
+Settings includes workspaces, appearance, integrations, MCP, agent tools, pricing, workflows,
+terminal, Docker, HTTP requests, shortcuts, Nodes, Plugins, and Security. Nodes and plugins are
+managed per Node. With more than one Node, the shell adds Fleet home, Node labels, aggregate Agent
+Center/attention/search, Node-aware palette rows, and partial/offline states.

@@ -45,10 +45,6 @@ export default function AgentCenter() {
   const workspaceTaskIds = createMemo(() => new Set(workspaceTasks().map((task) => task.id)))
   const [providers] = createResource(() => managedAgentApi.providers())
   const [query, setQuery] = createSignal('')
-  // Workspace scope is the default and is unchanged: live through the WebSocket-backed store, scoped by
-  // the URL's repo. Fleet scope is polled, and that is a recorded divergence rather than an oversight —
-  // the live store is keyed by session id alone, so making every node live would mean keying it by
-  // (nodeId, sessionId) and opening a socket per node. See docs/vNext/phase4-notes.md.
   const [scope, setScope] = createSignal<'workspace' | 'fleet'>('workspace')
   const fleetScope = () => scope() === 'fleet' && nodes().length > 1
   const [searchResults] = createResource(
@@ -109,7 +105,7 @@ export default function AgentCenter() {
   // filters, counts, sort, open — is written once.
   const rows = createMemo<AgentRow[]>(() => {
     if (fleetScope()) {
-      // Per node, because a task id is only meaningful on its own node (architecture.md § Fleet semantics:
+      // Per node, because a task id is only meaningful on its own node (docs/architecture-overview.md § Fleet semantics:
       // two nodes may hold the same UUID). A single flat map would resolve one node's task title against
       // another node's session.
       const tasksByNode = new Map(
@@ -184,7 +180,7 @@ export default function AgentCenter() {
 
       <Show when={error()}><div class="action-error agent-center-error" role="alert">{error()}</div></Show>
 
-      {/* Partial results are a banner, never a failed page (architecture.md § Fleet semantics). */}
+      {/* Partial node results remain visible while the unavailable-node banner explains the gap. */}
       <Show when={unavailable().length}>
         <div class="agent-center-banner" role="status">
           <For each={unavailable()}>{(entry) => <span>{entry.label} unavailable — {entry.reason}</span>}</For>
@@ -209,8 +205,7 @@ export default function AgentCenter() {
           <option value="">All providers</option>
           <For each={providers() ?? []}>{(provider) => <option value={provider.id}>{provider.label}</option>}</For>
         </Select>
-        {/* Only with a fleet to aggregate. With one node the two scopes answer identically, and offering
-            the choice would mention nodes on a first run (ui.md § New surfaces). */}
+        {/* With one node the workspace and fleet scopes answer identically, so the switch is unnecessary. */}
         <Show when={nodes().length > 1}>
           <div class="agent-center-segments">
             <For each={['workspace', 'fleet'] as const}>

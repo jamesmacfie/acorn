@@ -128,9 +128,8 @@ describe('docker routes', () => {
   })
 })
 
-// The daemon is the whole machine, not a task, so nothing here can be narrowed with `mayActOnTask` — which is
-// why phase3-notes.md left it open. The sharpest edge is not `/prune`: `GET /containers/:ref/inspect` returns
-// `env: string[]`, so a confined agent could enumerate every container the owner runs and read its secrets.
+// The daemon is machine-wide rather than task-owned, so daemon routes require a device principal. In
+// particular, container inspection can return environment data belonging to unrelated work.
 describe('the docker daemon surface is device-only', () => {
   afterEach(() => setDockerBridge(null))
 

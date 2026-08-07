@@ -176,7 +176,7 @@ export const managedAgentStore = {
   removeSession,
   // Drop every node-scoped entry. Called on a node switch (apps/desktop's scopedEviction.ts): sessions,
   // snapshots and session ids are all minted by ONE node, and two nodes may hold the same UUID by
-  // construction (docs/vNext/architecture.md § Fleet semantics) — so without this the Agent Center
+  // construction (docs/architecture-overview.md § Fleet semantics) — so without this the Agent Center
   // rendered node A's roster under node B and `loadSnapshot` could merge B's transcript into A's cached
   // snapshot for a colliding id.
   //

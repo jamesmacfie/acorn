@@ -1,27 +1,3 @@
-// notes.store — read and write the workspace/task/global note files this plugin owns
-// (docs/vNext/plugins.md § Cross-plugin collaboration, which names this seam: "Memory → Notes store
-// (knowledge bridge) | notes owns its storage; memory consumes `notes.read` capability").
-//
-// This file is the notes plugin's CONTRACT: the only surface another plugin may import. It carries the
-// capability id and its signature, nothing executable — `NotesStore` itself stays in main/, and a
-// contract may not name a plugin's internals (tools/arch/boundaries.test.ts).
-//
-// It exists because the store INSTANCE used to be constructed by plugins/memory's registerKnowledgeIpc
-// and handed round as an app-layer dep. That was not laziness: notes was not a NodePlugin, so nothing
-// owned the object, and every consumer — the notes pane, the four `notes_*` agent tools, core's context
-// assembler, the workflow handoff writer, the task-note seeder — had to be given the SAME instance or
-// two of them would race on the same files with independent atomic-write temp names. Now notes' init
-// constructs it once and publishes it here, and "one store" is a property of the plugin rather than of
-// the wiring order.
-//
-// Named `notes.store`, not plugins.md's `notes.read`: three of the five consumers WRITE (the pane
-// creates and edits notes, the agent tools append, workflow handoffs append and then de-include), so a
-// read-only signature would leave the write path exactly where it is today — in an app-layer dep bag.
-// A separate read-only id over the same object would be two names for one seam.
-//
-// Consumers resolve it with `capabilities.get()`/`require()` at CALL time, not at init: plugin init
-// order is undefined (server/plugin/capabilities.ts), so a consumer that caches at init may cache
-// `undefined` purely because notes is declared after it in the plugin list.
 import { capabilityId } from '@acorn/node-core/server/plugin/capabilities.ts'
 import type { Note, NoteAuthor, NoteKind, NoteLocation, NoteSummary } from '@acorn/protocol/notes.ts'
 

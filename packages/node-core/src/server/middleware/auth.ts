@@ -3,21 +3,9 @@ import { createMiddleware } from 'hono/factory'
 import type { Env } from '../../main/bindings'
 import { verifyInternalToken, type InternalScope } from '../auth/internalTokens'
 
-// The authenticated caller. Exactly two kinds, and the shape is now the whole of what a route may know
-// about who is asking: an owner id, and (for a device) which device it was.
-//
-//   device   — a paired client's bearer token (docs/vNext/protocol.md § Transport and identity). Full
-//              owner authority, by design: every paired device is the owner.
-//   internal — a child process this node spawned, or the node calling itself over loopback. Carries a
-//              SCOPE (server/auth/internalTokens.ts): 'service' has full reach, 'task' is bound to one
-//              task and cannot read a provider credential. Before Phase 2 there was one node-wide token
-//              for both, so an agent-spawned child acted with the service's authority.
-//
-// There used to be a third kind, `user`, carrying a whole `SessionUser` decrypted out of a session
-// cookie — including the GitHub token. Both are gone. The cookie is gone because the renderer no longer
-// shares an origin with any node (it loads from app://acorn and talks through the broker), and the token
-// is gone because a device is an IDENTITY, not a provider credential: GitHub now lives in an encrypted
-// `integrations` row read through the github plugin's own accessor.
+// The authenticated caller. A device is a paired owner client. An internal principal is a Node-owned
+// service or child process carrying a scoped HMAC token. Provider credentials are separate encrypted
+// integration records and are not part of Principal.
 export type PrincipalKind = 'device' | 'internal'
 // `userId` is the owner's login — the scope key for every user-scoped table. `deviceId` is set only for
 // kind 'device'; the internal principal has no device row to revoke.

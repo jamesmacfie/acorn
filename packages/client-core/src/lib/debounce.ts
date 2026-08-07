@@ -1,5 +1,3 @@
-// Debounce with flush/cancel, for autosave surfaces (notes, editor, settings): input schedules a
-// deferred save; blur/switch flushes it now. ponytail: 12 lines over a library.
 export type Debounced<A extends unknown[]> = ((...args: A) => void) & { flush: () => void; cancel: () => void }
 
 export function debounce<A extends unknown[]>(fn: (...args: A) => void, ms: number): Debounced<A> {

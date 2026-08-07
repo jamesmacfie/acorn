@@ -33,8 +33,6 @@ export const slugifyTitle = (title: string): string =>
 const AUTHORS: readonly NoteAuthor[] = ['user', 'agent', 'workflow']
 const KINDS: readonly NoteKind[] = ['scratch', 'plan', 'finding', 'handoff']
 
-// --- Pure frontmatter round-trip (minimal key: value block, not full YAML — ponytail) ---
-
 export function serializeNote(meta: NoteMeta, body: string): string {
   const lines = [
     '---',

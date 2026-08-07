@@ -36,8 +36,6 @@ const tsx = () =>
 const rel = (p: string) => p.slice(SRC.length + 1)
 
 describe('primitive adoption', () => {
-  // Classes the primitives own outright. Nothing may spell them by hand any more; the CSS rules
-  // they used to point at have been deleted, so a stray usage renders unstyled.
   it('no call site hand-writes a retired shared class', () => {
     const retired = /class="[^"]*\b(overlay-btn|integration-key-input|ui-form-field|query-gate-\w+)\b/
     const offenders = tsx().filter((f) => retired.test(readFileSync(f, 'utf8'))).map(rel)

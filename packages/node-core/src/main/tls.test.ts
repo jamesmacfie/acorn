@@ -17,7 +17,7 @@ afterEach(() => {
 
 const mode = (path: string): string => (statSync(path).mode & 0o777).toString(8)
 
-describe('the node TLS identity (docs/vNext/security.md § Transport and authentication)', () => {
+describe('the node TLS identity (docs/security.md § Transport and authentication)', () => {
   it('mints a private key + certificate, and keeps both to the owner', () => {
     const dir = root()
     const cert = ensureCert(dir)

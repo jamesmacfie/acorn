@@ -24,7 +24,7 @@ export const requestIdMiddleware = createMiddleware<AppEnv>(async (c, next) => {
 const requestIdOf = (c: Context<AppEnv>): string => c.get('requestId') ?? 'unknown'
 
 // The single error-construction path. Every error body is built here, so it always conforms to
-// ApiError (docs/vNext/protocol.md § Errors) — one shape, no per-route idiom.
+// ApiError (docs/api-reference.md § Errors) — one shape, no per-route idiom.
 //
 // `code` stays a stable machine code the client branches on; `detail` carries human/upstream prose
 // and becomes `message`. `retryable` is derived from the status so no route maintains a table.
@@ -65,7 +65,5 @@ export const onServerError = (err: Error, c: Context<AppEnv>) => {
     path: c.req.path,
     requestId: requestIdOf(c),
   })
-  // No path gate. This used to answer JSON only under /api/ and text/plain elsewhere, which would
-  // have silently downgraded every 500 on the /v2 namespace to unparseable prose.
   return respondError(c, 500, 'internal')
 }

@@ -1,5 +1,5 @@
-// Test-only helper: a real better-sqlite3 DB in a tmp dir with all Drizzle migrations applied —
-// the plan's pattern for DB-shape-critical route tests. Requires the Node ABI build of
+// Test-only helper: a real better-sqlite3 DB in a tmp dir with all Drizzle migrations applied.
+// Requires the Node ABI build of
 // better-sqlite3 (`pnpm --filter @acorn/desktop node:rebuild`); vitest runs under plain Node.
 import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
@@ -41,13 +41,10 @@ export function testSecretEnv(hexKey: string): { SESSION_ENC_KEY: string; SECRET
 
 export type TestPluginDb = { db: PluginDatabase; dataDir: string; cleanup: () => void }
 
-// A real per-plugin SQLite file in a temp data root, migrated with that plugin's OWN chain — the
-// plugin-side counterpart of makeTestDb. The caller passes its migrations folder because core cannot
-// import a plugin (main/pluginStorage.ts).
+// A real per-plugin SQLite file in a temp data root, migrated with that plugin's own chain. The caller
+// passes its migrations folder because core cannot import a plugin.
 //
-// Deliberately not "makeTestDb with extra tables": a plugin test that could see core's schema would
-// keep passing after the plugin started reading a table it no longer owns, which is exactly the
-// coupling the split removes.
+// Keeping the schemas separate ensures plugin tests exercise the same ownership boundary as production.
 export function makeTestPluginDb(plugin: string, migrationsFolder: string): TestPluginDb {
   const dataDir = mkdtempSync(join(tmpdir(), `acorn-test-${plugin}-`))
   const db = openPluginDb(dataDir, plugin, { migrationsFolder })

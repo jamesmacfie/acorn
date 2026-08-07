@@ -8,25 +8,6 @@ import { isTaskConfined, mayActOnTask } from '@acorn/node-core/server/middleware
 import { respondError } from '@acorn/node-core/server/respond.ts'
 import type { SendSubmit } from '../../shared/send'
 
-// Terminal control (docs/terminal-and-agents.md): the request/response half of the PTY engine —
-// list/create/kill/interrupt/remove/resize sessions and the bracketed-paste send. Streams ride the
-// WebSocket hub; only the native folder picker remains on the terminal preload bridge. Backed by the
-// PTY engine in the service process, so these routes return 503 under dev:node.
-//
-// Eight routes, all of them about a pseudo-terminal. The other eleven this router used to serve —
-// task statuses, repo-path mapping, repo executable config, preview-url capture, task
-// on-created/use-checkout/archive, and the MCP config inspector — moved to
-// @acorn/node-core/server/routes/worktree.ts under /v2/core (docs/vNext/plan.md § Phase 2, "the
-// terminal scope-shed"). None of them were about a terminal; they were about where a repo lives and
-// what a task is, and leaving them here meant disabling the terminal plugin would disable worktree
-// management. Archive's PTY half comes back through worktree.ts's taskSessionsBridgeSlot, which this
-// plugin fills.
-//
-// Paths are relative to /v2/p/terminal, so `/sessions` mounts at /v2/p/terminal/sessions. It used to
-// state `/terminal/sessions` internally, producing the doubled /v2/p/terminal/terminal/sessions that
-// app/server/routes.ts flagged for "the route-declaration phase" — this is that phase, and
-// docs/vNext/protocol.md § HTTP conventions already writes the de-doubled form.
-
 export type { SendSubmit }
 export type TerminalBridge = {
   // Which task owns a session, for the ownership check every /sessions/:sid route below runs. The SAME

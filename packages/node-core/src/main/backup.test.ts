@@ -9,7 +9,7 @@ import { PLUGIN_DB_DIR } from './pluginStorage'
 import { loadDatabase } from './sqliteLoader'
 import { schema } from '../server/db'
 
-// The backup, against a REAL data root and unpacked with the real `tar` (docs/vNext/data.md § Backup).
+// The backup, against a REAL data root and unpacked with the real `tar` (docs/data-layer.md § Backup).
 //
 // The archive is the deliverable, so the assertions are about what comes back OUT of it. A test that
 // checked the staging directory would prove the copy and not the thing an owner actually restores from —
@@ -120,7 +120,7 @@ describe('createBackup', () => {
       const Database = loadDatabase()
       const core = new Database(join(dir, 'core.sqlite'), { readonly: true })
       // Blanked rather than deleted, so a restored node still shows that a Linear connection existed and
-      // needs re-entering — which is the state data.md describes.
+      // needs re-entering — which is the state docs/data-layer.md describes.
       expect(core.prepare('SELECT access_token, label FROM integrations').all()).toEqual([
         { access_token: '', label: 'Linear – work' },
       ])

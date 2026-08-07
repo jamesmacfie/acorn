@@ -61,9 +61,6 @@ export function rollbarImpact(occurrences: readonly RollbarOccurrenceSummary[], 
   }
 }
 
-// Map a stack-frame filename to a worktree-relative path for the editor. Build tooling prefixes the
-// real path; strip the common ones and refuse absolute paths we cannot anchor.
-// ponytail: naive prefix heuristic; upgrade path is verifying candidates against the repo file listing.
 const FRAME_ROOTS = ['/app/', '/usr/src/app/', '/var/task/']
 export function frameRepoPath(filename: string): string | null {
   let path = filename.replace(/^webpack:\/{2,3}/, '').replace(/\?.*$/, '')

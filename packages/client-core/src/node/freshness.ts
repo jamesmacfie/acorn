@@ -1,6 +1,6 @@
 import type { NodeConnectionState } from '@acorn/protocol/broker.ts'
 
-// docs/vNext/ui.md § Connection and staleness vocabulary: "Every node-backed surface can render
+// docs/ui-design.md § Connection and staleness vocabulary: "Every node-backed surface can render
 // exactly one of: live, refreshing, stale (with age), offline (cached), disabled (plugin off), error
 // (with retry). No infinite spinners: anything past its deadline resolves to stale/offline/error."
 //
@@ -20,7 +20,7 @@ export type FreshnessQuery = {
 
 // Precedence, and why: `disabled` is not a data state at all. An unreachable node comes next and wins
 // over `refreshing`, because a fetch against an offline node is going to fail and calling it
-// "refreshing" would be the infinite spinner ui.md forbids. `degraded` is WS-down/HTTP-up: reads still
+// "refreshing" would be the infinite spinner docs/ui-design.md forbids. `degraded` is WS-down/HTTP-up: reads still
 // work, but there are no live events, so what is on screen is stale by definition.
 export const freshnessOf = (state: NodeConnectionState, query: FreshnessQuery = {}): Freshness => {
   if (query.disabled) return 'disabled'
@@ -31,10 +31,6 @@ export const freshnessOf = (state: NodeConnectionState, query: FreshnessQuery = 
   return query.isStale ? 'stale' : 'live'
 }
 
-// Rendered wherever a node-backed surface is: the topbar chip, the Settings → Nodes rows, the Fleet home
-// cards, and — as of Phase 4 — every task pane, through the one piece of chrome they all share
-// (tasks/TaskPaneHost.tsx's `.pane-slot-actions`). It renders only when the state is not `live`, so the
-// healthy case is unchanged. There is deliberately no per-PANE query hook; registries/panes.ts says why.
 export const FRESHNESS_LABELS: Record<Freshness, string> = {
   live: 'Live',
   refreshing: 'Refreshing',
@@ -44,7 +40,7 @@ export const FRESHNESS_LABELS: Record<Freshness, string> = {
   error: 'Error',
 }
 
-// Ages are shown next to `stale`/`offline` per ui.md ("stale (with age)"); "never" rather than a
+// Ages are shown next to `stale`/`offline` per docs/ui-design.md ("stale (with age)"); "never" rather than a
 // fabricated 0 when the node has not answered once in this session.
 export function formatLastSeen(lastSeenAt: number | undefined, now = Date.now()): string {
   if (lastSeenAt === undefined) return 'never'

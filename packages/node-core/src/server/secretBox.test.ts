@@ -36,8 +36,6 @@ describe('secret box', () => {
     for (const bad of ['', 'not-a-jwe', 'a.b.c.d.e']) expect(await decryptSecret(bad, KEY)).toBeNull()
   })
 
-  // No expiry by design: an integration credential lives until the owner disconnects it, unlike the
-  // session cookie this used to share a module with.
   it('does not expire', async () => {
     const sealed = await encryptSecret('s', KEY)
     expect(await decryptSecret(sealed, KEY)).toBe('s')

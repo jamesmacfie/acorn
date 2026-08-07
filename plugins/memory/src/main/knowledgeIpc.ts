@@ -1,14 +1,3 @@
-// The notes + memory surfaces (the renderer's KnowledgeBridge over HTTP + the context-assembler
-// seams), the launch-time memory injector and the memory auto-generation trigger — split out of
-// terminal.ts (docs/notes-and-memory.md). HTTP routing moved the `memory:*` / `notes:*` IPC channels
-// to the KnowledgeBridge (server/routes/knowledge.ts).
-//
-// Called from the plugin's init (node/index.ts), not from the app: what it returns is published as the
-// `memory.knowledge` capability for the consumers that used to be handed it by the composition root. Its
-// arguments say the whole story of the split — the DERIVED index is this plugin's own SQLite file,
-// everything it needs from core's tables (the task set, the checkout list, the injection pref, the
-// context assembler) arrives as CoreServices, and the note files it no longer owns arrive as another
-// plugin's capability.
 import { gitOrThrow } from '@acorn/node-core/main/core/git.ts'
 import { existsSync } from 'node:fs'
 import { homedir } from 'node:os'
@@ -34,26 +23,14 @@ export type KnowledgeDeps = {
   // Queue a text block into an agent session on its idle edge (agentSender in terminal.ts).
   sendToAgent(sessionId: string, text: string, submit: 'after-ready'): void
   currentUserId(): string | null
-  // plugins/notes' store (its `notes.store` capability). A THUNK, not the value: capabilities resolve at
-  // call time because plugin init order is undefined, and this plugin's init runs before it can know
-  // whether notes' has. It throws when notes is absent — notes is a `required` plugin, so absence is a
-  // boot bug rather than a configuration, and the notes half of the pane has no degraded mode worth
-  // serving (an empty note list looks like data loss).
-  //
-  // This replaces `new NotesStore(join(dataRoot, 'notes'))`, which is why the store used to be reachable
-  // as `memory.knowledge.notesStore`: one instance had to exist somewhere, and memory happened to be the
-  // plugin that got converted first.
   notes(): NotesStoreCapability
 }
 
-// Four core reads, each replacing a `db.select()` this file used to make against a core table:
-// `tasks` (one id + the active set), `repo_paths` (every primary checkout), the
-// `startup_context_injection` pref and core's section assembler.
 export type KnowledgeCoreServices = Pick<CoreServices, 'tasks' | 'repos' | 'context'>
 
 // Reads over the derived index, BOUND to this plugin's own database. This is what lets the app-layer
 // agent-tool and context-section wiring keep working: it can no longer hold a handle to the file these
-// rows live in (docs/vNext/data.md § Plugin DBs). Every read reconciles from the markdown files first —
+// rows live in (docs/data-layer.md § Plugin DBs). Every read reconciles from the markdown files first —
 // they are the truth.
 export type MemoryIndex = {
   // Exposed as well as used internally, because a caller that then reads through some OTHER path (core's
@@ -67,12 +44,6 @@ export type MemoryIndex = {
 }
 
 export type MemoryKnowledge = MemoryIndex & {
-  // `notesStore` used to be here, and its absence is the point of this batch: notes is a NodePlugin now
-  // and publishes its own store as `notes.store`, so the four consumers that used to reach it through
-  // THIS capability resolve it from the registry directly (docs/vNext/plugins.md § Cross-plugin
-  // collaboration). Memory is one of those consumers, not the owner.
-  //
-  // The human gate's pending proposals, on disk under the data root.
   proposals: MemoryProposalStore
   // Push the combined launch block (task context + repo memory) into a fresh agent session
   // (docs/notes-and-memory.md). Best-effort — a session must never fail to launch over it.
@@ -89,11 +60,8 @@ export type MemoryKnowledge = MemoryIndex & {
 // capability's value still exposes one — the proposal store. It is also not a cross-plugin surface: the
 // only consumer is apps/node's composition root, which may import a plugin's internals by design.
 //
-// W6 moved the memory tool definitions into this plugin (main/agentTools.ts) and the notes conversion
-// removed `notesStore` from the value, so it is down from two internal stores to one. Two consumers are
-// left: the composition root's contextSectionsWiring, plus one thunk each for agents, terminal and
-// workflows. Nothing to promote until those move, and the cost of promoting it is a real
-// coupling: an id in contract/ is importable by every plugin, which is what makes it worth withholding.
+// The capability exposes the memory proposal store to the composition root and the agent, terminal, and
+// workflow integrations. It remains an internal capability because its value contains a store handle.
 export const MEMORY_KNOWLEDGE = capabilityId<MemoryKnowledge>('memory.knowledge')
 
 // The headless profile the memory-review pass runs on: the FIRST installed agent profile with a

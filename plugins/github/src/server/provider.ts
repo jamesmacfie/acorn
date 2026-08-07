@@ -5,12 +5,8 @@ import { gh, ghError } from './index'
 type GithubViewer = { login: string; name: string | null; avatar_url: string | null }
 type GithubValidated = { secret: string; viewer: GithubViewer; scopes: string[] }
 
-// GitHub as a stored credential rather than the identity root.
-//
-// In V1 GitHub was special: its token WAS the session cookie, `userId` was derived from it, and this
-// provider only appeared as a synthesized row in the list endpoint (`githubConnectionSummary`). With
-// device identity replacing the login session, it becomes an ordinary connection — encrypted at rest
-// in `integrations`, read by githubToken.ts, rotatable and disconnectable like any other.
+// GitHub is an ordinary stored provider connection. Its encrypted token is read by githubToken.ts and
+// can be rotated or disconnected like any other connection.
 //
 // `fields` is empty and `connectable` is true, which looks contradictory but is exactly right: the
 // owner supplies no credential by hand. The device-flow routes obtain the token from GitHub and hand

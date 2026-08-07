@@ -1,5 +1,5 @@
 // preview.rules — the browser page rules configured for a task's repo
-// (docs/vNext/plugins.md § Cross-plugin collaboration).
+// (docs/plugins.md § Cross-plugin collaboration).
 //
 // This plugin is almost entirely Electron-main: the preview pane is a `WebContentsView` and its driver
 // lives in main/. Its one node-side read is this — resolve a taskId to the `browser_rules` its repo

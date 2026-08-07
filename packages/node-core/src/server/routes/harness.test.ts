@@ -8,8 +8,7 @@ import type { Env } from '../../main/bindings'
 
 const INTERNAL: Principal = { kind: 'internal', userId: 'local' }
 
-// The run bridge is the last harness domain (notes/memory/browser moved to the agent-tool registry
-// in the agent-tool registry). This proves the shared auth gate + error envelope over what remains.
+// The run bridge exposes task run targets. This proves its shared auth gate and error envelope.
 const app = (principal: Principal | null) => new Hono<AppEnv>().use('/api/*', ...testGate(principal)).route('/api/tasks', harness)
 
 const req = (principal: Principal | null, method: string, path: string) =>

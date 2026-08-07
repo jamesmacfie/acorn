@@ -9,10 +9,6 @@ import { SecretService } from '@acorn/node-core/main/core/secrets.ts'
 const ENC_KEY = '0'.repeat(64)
 const SECRETS = new SecretService(ENC_KEY)
 
-// The identity question is core's now (CoreServices.identity), so these tests state the ANSWER rather
-// than seeding the two tables it used to be derived from. That is the point of the seam: the migration's
-// contract is "claim only when there is exactly one identity", and it no longer has an opinion about
-// which tables prove that.
 const identity = (sole: string | null): IdentityService => ({ sole: async () => sole })
 
 describe('legacy HTTP storage protection', () => {

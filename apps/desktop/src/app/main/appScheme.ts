@@ -4,7 +4,7 @@ import { join, sep } from 'node:path'
 import { pathToFileURL } from 'node:url'
 
 // The renderer's own origin. It is bundled with the desktop app and no longer served by a node
-// (docs/vNext/architecture.md § How the client talks to nodes): nodes serve no web assets, and the
+// (docs/architecture-overview.md § How the client talks to nodes): nodes serve no web assets, and the
 // window must be able to reach N of them without inheriting any one's origin.
 export const APP_ORIGIN = 'app://acorn'
 
@@ -22,7 +22,7 @@ const ROOT = join(import.meta.dirname, '../../dist/client')
 //                              hardening candidate: narrowing it to github.com/avatars.githubusercontent.com
 //                              is a one-line change once nothing else renders a remote image.
 // connect-src 'self' is the one worth stating plainly: ALL node traffic is IPC through the broker, so
-// the renderer needs no network permission at all (docs/vNext/security.md).
+// the renderer needs no network permission at all (docs/security.md).
 const CSP = [
   "default-src 'self'",
   "script-src 'self'",

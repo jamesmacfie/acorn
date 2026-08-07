@@ -2,26 +2,6 @@ import { builtinModules } from 'node:module'
 import { isAbsolute, resolve } from 'node:path'
 import { defineConfig } from 'vite'
 
-// The Node service artifact. `apps/desktop` may NOT import this package's source
-// (docs/vNext/architecture.md — "the desktop build embeds the built Node artifact and spawns it as
-// a child process"), so the two entries the desktop runtime needs are BUILT here and copied into
-// out/main by apps/desktop/electron.vite.config.ts.
-//
-//  - service.js    — spawned by Electron main as a child process over ELECTRON_RUN_AS_NODE, with an
-//                    IPC channel on fd 3 (apps/desktop/src/app/main/serviceHost.ts)
-//  - mcp.js        — the acorn MCP server (docs/mcp.md), launched by agents via
-//                    ELECTRON_RUN_AS_NODE=1 <electron> out/main/mcp.js, never by the app itself
-//  - standalone.js — a node with no supervisor: it opens ACORN_DATA_DIR itself and prints its
-//                    endpoint/pin/token as one JSON line (src/server/standalone.ts). Built here rather
-//                    than run from source so anything that can spawn a Node process can start a node —
-//                    which is what the two-node e2e does, and what the Phase 5 standalone
-//                    distribution needs.
-//
-// Externalization rule, identical to the desktop main build: bundle our own source (relative
-// imports AND @acorn/* workspace packages), keep every other bare/node: specifier external so it
-// is required from node_modules at runtime. @acorn/* MUST stay internal — those packages ship
-// TypeScript source (exports './*': './src/*'), so externalizing them would emit
-// `import '@acorn/protocol/api.ts'` into the artifact and the runtime would try to load a .ts file.
 const isWorkspacePackage = (id: string) => id.startsWith('@acorn/')
 const externalizeBareImports = (id: string) => !id.startsWith('.') && !isAbsolute(id) && !isWorkspacePackage(id)
 

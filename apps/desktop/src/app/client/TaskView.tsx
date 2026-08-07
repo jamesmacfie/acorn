@@ -50,8 +50,6 @@ export default function TaskView(props: {
       return 'targets' in result ? result.targets : []
     },
   )
-  // ponytail: run targets refetch on task open + after a toggle. Dev script is repo-level config now
-  // (edited in a separate resource in settings), so there's no shared signal to live-watch here.
   const [runError, setRunError] = createSignal('')
   async function toggleTarget(id: string, running: boolean) {
     if (!hasEngine()) return

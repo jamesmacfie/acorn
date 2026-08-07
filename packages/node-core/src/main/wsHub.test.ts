@@ -85,8 +85,6 @@ function open(headers: Record<string, string>): Promise<WebSocket> {
   })
 }
 
-// The ordinary authenticated socket: a device bearer. It used to be a session cookie plus an exact
-// Origin, back when the renderer's socket was a browser socket on the node's own origin.
 const authHeaders = () => ({ host, authorization: `Bearer ${DEVICE_TOKEN}` })
 
 const frames = (ws: WebSocket): WsServerWireFrame[] => {
@@ -118,7 +116,7 @@ describe('wsHub auth', () => {
     await expect(open({ ...authHeaders(), host: 'evil.example.com' })).rejects.toThrow()
   })
 
-  // docs/vNext/protocol.md § Events: the socket is token-authenticated at upgrade. No cookie and no
+  // docs/api-reference.md § Events: the socket is token-authenticated at upgrade. No cookie and no
   // Origin — a broker socket from Electron main is not a browser socket, and there is no ambient
   // credential left for an Origin check to defend.
   it('accepts a device bearer, and does not care what Origin says', async () => {
@@ -127,7 +125,7 @@ describe('wsHub auth', () => {
     ws.close()
   })
 
-  it('rejects a session cookie, which is no longer a credential', async () => {
+  it('rejects a cookie-based credential', async () => {
     await expect(open({ host, origin, cookie: 'session=anything-at-all' })).rejects.toThrow(/403/)
   })
 
@@ -207,9 +205,6 @@ describe('wsHub seq and revocation', () => {
   })
 })
 
-// docs/vNext/protocol.md § Events. Phase 4 shipped without a heartbeat and recorded it as an accepted
-// risk; Phase 5 closes it. The ping rides the same sweep as the revocation backstop, so `revocationCheckMs`
-// is the cadence for both — which is why these cases resolve in tens of milliseconds.
 describe('wsHub heartbeat', () => {
   it('terminates a socket whose peer stops answering pings', async () => {
     // `autoPong: false` is what makes this test possible AND what makes it honest: a `ws` client answers

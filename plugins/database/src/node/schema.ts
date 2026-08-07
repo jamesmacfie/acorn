@@ -1,4 +1,4 @@
-// The database plugin's own tables (docs/vNext/data.md § Plugin DBs). Lives in
+// The database plugin's own tables (docs/data-layer.md § Plugin DBs). Lives in
 // <data-root>/plugins/database.sqlite with its own Drizzle chain, migrated at plugin init.
 //
 // Moved out of @acorn/node-core's schema.ts: a saved SQL snippet is this pane's data and core has no

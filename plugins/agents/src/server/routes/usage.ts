@@ -9,14 +9,6 @@ import type { AppEnv } from '@acorn/node-core/server/middleware/auth.ts'
 import { ownerId, requireDevice } from '@acorn/node-core/server/middleware/requireUser.ts'
 import { respondError } from '@acorn/node-core/server/respond.ts'
 
-// Account-scoped local provider usage, plus the pricing overrides it is computed against.
-//
-// All four handlers go through the bridge now. The two pricing handlers used to read and write core's
-// `prefs` table directly with `getDb(c.env)`, which stopped being allowed when this plugin took
-// ownership of its own database: `c.env` carries CORE's handle, and a plugin route reaching into it is
-// the coupling the split removes. The plugin's init fills the bridge over `CoreServices.prefs`
-// (main/pricingStore.ts), so the preference still lives in core's table — read by its owner, on behalf
-// of the caller whose identity `ownerId(c)` resolves.
 export type AgentUsageBridge = {
   read(options: { userId: string; force?: boolean }): Promise<AgentUsageSnapshot>
   pricing(userId: string): Promise<AgentPricingPreferences>

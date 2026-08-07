@@ -1,26 +1,8 @@
-// The agent-tool registry (docs/agent-tools.md, docs/agent-tools.md): each agent capability is
-// declared ONCE as an AgentToolContribution, then PROJECTED to every surface — the MCP server
-// (mcp/server.ts fetches the manifest and proxies calls), the harness HTTP route
-// (server/routes/agentTools.ts) and, when `exposeToRenderer` is set, a renderer client. A handler
-// returns domain data or throws a ToolError; the projections translate to their own envelopes. A
-// handler that inspects which surface invoked it is a boundary bug (the agent-tool registry guardrail).
-//
-// Contributions are BUILT where their domain deps live — inside the owning plugin's init for a
-// converted plugin (`ctx.tools.register`), or in apps/node's remaining wiring for the tools whose
-// plugin is not converted yet — and registered INCREMENTALLY. `tools` is the contribution point
-// docs/vNext/plan.md § Phase 2 asks for, so it has to behave like `routes`: many independent
-// contributors, each owning its own entries, none able to see or replace another's.
 import type { z } from 'zod'
 import { AGENT_TOOLS_PERMS_PREF_KEY, type ToolRisk as SharedToolRisk } from '@acorn/protocol/api.ts'
 
 export type ToolRisk = SharedToolRisk
 
-// Everything a handler / availability predicate needs that is NOT closed over at build time. Kept
-// deliberately small: deps ride in the closure, only the invocation-scoped identity rides here.
-// `userLogin` is the resolved principal (single machine user under the internal token) — the
-// context-read tools scope the mirror by it, exactly as the /context route does. `sessionId` is the
-// agent session's id (from the `x-acorn-session-id` header the MCP proxy sends), used to STAMP
-// provenance on notes/memory writes — it is transport metadata, never a tool input arg.
 export type ToolContext = { taskId: string; userLogin: string; sessionId?: string }
 
 export type AgentToolContribution = {
@@ -79,8 +61,8 @@ export function isToolPermitted(tool: Pick<AgentToolContribution, 'name' | 'risk
 
 // ─── The contribution point ─────────────────────────────────────────────────────────────────────
 
-// Who contributed a tool. A plugin id for a converted plugin (bound by the plugin host, so a plugin
-// cannot register on another's behalf), or 'core' for the tools apps/node still assembles itself.
+// Who contributed a tool. A plugin ID is bound by the plugin host, so a plugin cannot register on
+// another's behalf; 'core' identifies core-owned tools.
 // Not projected anywhere: it exists so a contributor can be REMOVED as a unit, which is the whole
 // reason routes carry a `plugin` field too.
 type Registration = { owner: string; tool: AgentToolContribution }

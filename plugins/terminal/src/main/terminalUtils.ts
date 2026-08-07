@@ -71,10 +71,6 @@ export const computeIdle = (
 export const resolveBackend = (preference: 'node-pty' | 'tmux', tmuxAvailable: boolean): 'node-pty' | 'tmux' =>
   preference === 'tmux' && tmuxAvailable ? 'tmux' : 'node-pty'
 
-// Blocked-prompt detection (docs/terminal-and-agents.md): when an agent session is otherwise idle, scan the
-// tail of its PTY ring for a tiny const rule list of input prompts. ponytail: a heuristic with a
-// known ceiling — the upgrade path is config-injected agent hooks (deferred, invasive).
-// eslint-disable-next-line no-control-regex
 const ANSI_RE = /\x1b(?:\[[0-9;?]*[a-zA-Z~]|\][^\x07\x1b]*(?:\x07|\x1b\\)|[()][A-Z0-9])/g
 const SPINNER_RE = /[⠁⠂⠄⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏◐◓◑◒]/g
 

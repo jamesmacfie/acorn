@@ -12,7 +12,4 @@ const builtInStyles: StyleContribution[] = [
 
 if (!styleRegistry.entries().length) for (const style of builtInStyles) styleRegistry.register(style)
 
-// A function, not a const. `Registry` is signal-backed, so reading it at module load (as THEMES
-// used to) snapshots the list outside any reactive scope and a late-registering plugin style would
-// never appear in the picker.
 export const STYLES = (): [string, string][] => styleContributions().map((style) => [style.id, style.label])

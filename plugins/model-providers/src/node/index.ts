@@ -1,4 +1,4 @@
-// The model-providers plugin's node part (docs/vNext/plugins.md § The plugin API).
+// The model-providers plugin's node part (docs/plugins.md § The plugin API).
 //
 // Replaces six calls in apps/node/src/server/providers.ts: two connection-provider registrations and two
 // model-adapter registrations, plus the two imports that made the composition root name this package.

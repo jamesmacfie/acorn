@@ -1,10 +1,6 @@
 import { afterEach, describe, expect, it } from 'vitest'
 import { paletteRowRegistry, paletteRowSources, type PaletteRowSource } from './paletteRows'
 
-// `paletteRowSources()` sorts on the declared `order`, which is the whole reason the field exists: the palette's
-// row order used to be fixed because `composeItems` built run, layout and workflow rows itself, and once the
-// three moved into two plugins the only thing left holding the order was this sort. Nothing asserted it.
-
 const source = (id: string, order: number): PaletteRowSource => ({
   id,
   order,

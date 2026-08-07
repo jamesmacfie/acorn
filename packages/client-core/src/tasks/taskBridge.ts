@@ -1,15 +1,3 @@
-// The desktop task bridge: task lifecycle, per-repo checkout/config, browser-preview resolution, and
-// agent delivery. Core owns this because tasks, repo paths and the preview URL are platform concepts
-// — the terminal feature is one consumer among many (settings, the rail, the changes and context
-// panes, preview, task creation).
-//
-// As of Phase 2's scope-shed the ROUTES agree with that: everything here except sendToAgent now
-// addresses /v2/core/*. Only the bracketed-paste send still goes to the terminal plugin, because only
-// it needs a pseudo-terminal.
-//
-// Composition mirrors terminalClient: loopback HTTP for commands, the residual preload bridge for the
-// one thing that cannot be HTTP (the native folder picker). Returns null off-desktop on exactly the
-// same probe (`window.acorn?.terminal`), so every consumer's `if (!api)` guard behaves as before.
 import type { ArchiveOpts, ArchiveResult, RepoConfigPatch, RepoPath, RepoPathResult, TaskStatus } from '@acorn/protocol/terminal.ts'
 import {
   taskArchiveRoute,

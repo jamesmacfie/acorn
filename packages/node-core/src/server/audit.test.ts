@@ -4,10 +4,6 @@ import { AUDIT_RETENTION_MS, pruneAudit, readAudit, recordAudit } from './audit'
 import { makeTestDb, type TestDb } from './routes/testDb'
 import { schema } from './db'
 
-// The audit trail (docs/vNext/security.md § Audit, data.md § Core DB) — promised since the specs were
-// written and empty until Phase 5. Against a REAL migrated database, because half of what is under test
-// is the table and its index existing at all.
-
 let test: TestDb
 
 beforeEach(() => {

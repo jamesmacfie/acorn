@@ -2,9 +2,6 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { PrefKeys } from './prefKeys'
 import { isDevicePref, mergePrefs, readDevicePrefs, seedDevicePrefs, writeDevicePref } from './devicePrefs'
 
-// The device-prefs tier closes the last recorded Phase 1 divergence (docs/vNext/data.md § Client cache).
-// What matters is where the line falls and that an existing install keeps its settings across it.
-
 const store = new Map<string, string>()
 beforeEach(() => {
   store.clear()
@@ -39,8 +36,7 @@ describe('isDevicePref', () => {
 
   it('claims a SCOPED slice key, which appends an id to its base', () => {
     // `core:task-layouts:<nodeId>/<taskId>`. Matching the whole string would classify every per-task
-    // layout as a node pref, which is the bug this test exists for: they are the keys that made the old
-    // arrangement unsafe (a remote task's layout stored under a bare task id).
+    // layout as a node pref, keeping remote task layouts under a node-qualified key rather than a bare task id.
     expect(isDevicePref(`${PrefKeys.taskLayoutsScoped}:node-a/task-1`)).toBe(true)
     expect(isDevicePref(`${PrefKeys.editorOpenFilesScoped}:node-a/task-1`)).toBe(true)
     expect(isDevicePref(`${PrefKeys.agentToolPermissions}:anything`)).toBe(false)

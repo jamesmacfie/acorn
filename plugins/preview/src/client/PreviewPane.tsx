@@ -1,18 +1,6 @@
 import { createEffect, createSignal, onCleanup, onMount, Show } from 'solid-js'
 import { clientEvents } from '@acorn/client-core/registries/clientEvents.ts'
 
-// The browser-preview pane (docs/panes.md): browser chrome (back/forward/stop-reload/home
-// + an editable URL bar + a loading spinner) over a per-task, MAIN-owned WebContentsView. `props.url`
-// is the resolved "home" (run target / workspace preview — TaskView computes the priority chain).
-// The native view lives in the main process (previewService.ts) and is positioned over this pane's
-// host rect, so browse state (page, scroll, form input) survives pane/task switches for free — the
-// old <webview> was reparented in the DOM and reloaded on every switch, which this replaces.
-// Agent driving binds inside main when the view is created, so `browser_*` tools drive exactly the
-// surface the user sees.
-
-// A native view always paints above web content, so overlays (palette, modals) can't sit above it via
-// z-index. We poll whether something covers the pane and hide the view when so (see checkOcclusion).
-
 const withScheme = (v: string) => (/^[a-z]+:\/\//i.test(v) ? v : `https://${v}`)
 
 // Drop an archived task's preview view (called by every archive path via the runtime event below).
@@ -39,11 +27,6 @@ export default function PreviewPane(props: { taskId: string; url: string | null 
     preview.setBounds(props.taskId, { x: r.left, y: r.top, width: r.width, height: r.height })
   }
 
-  // Is an overlay covering the pane? The host div is empty (the native view floats over it, not
-  // inside the DOM), so elementFromPoint at its centre returns the host itself when nothing covers it.
-  // ponytail: polled at ~200ms via a single centre-point probe — a modal/palette over the preview
-  // hides it within a frame or two. A corner-only overlay (e.g. a toast) over an off-centre part isn't
-  // detected; upgrade to multi-point sampling or a global overlay signal if that regresses.
   const checkOcclusion = () => {
     if (!host) return
     const r = host.getBoundingClientRect()

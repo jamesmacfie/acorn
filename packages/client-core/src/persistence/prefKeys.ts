@@ -34,7 +34,7 @@ export const PrefKeys = {
   editorOpenFilesScoped: 'editor:open-files',
   prFiltersScoped: 'github:pr-filters',
   contextSelectionScoped: 'context:section-selection',
-  // Which nodes' disk-encryption warnings this DEVICE has already been shown (docs/vNext/data.md
+  // Which nodes' disk-encryption warnings this DEVICE has already been shown (docs/data-layer.md
   // § Backup: "the app surfaces a one-time warning if the disk isn't encrypted"). A JSON array of
   // nodeIds in ONE key rather than a key per node: the fleet is small, and a key-per-node scheme would
   // need a scoped slice and an eviction rule for a value that is three booleans.
@@ -47,8 +47,6 @@ export const PrefKeys = {
 
 export type PrefKey = (typeof PrefKeys)[keyof typeof PrefKeys]
 
-// Canonical descriptor keys for aggregates that used to share one unbounded JSON pref. Scoped
-// storage appends an encoded workspace/task id; the old keys above remain read-only fallbacks.
 export const PersistedSliceKeys = {
   taskLayouts: PrefKeys.taskLayoutsScoped,
   editorOpenFiles: PrefKeys.editorOpenFilesScoped,

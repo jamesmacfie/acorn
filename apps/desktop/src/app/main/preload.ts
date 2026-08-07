@@ -19,11 +19,6 @@ contextBridge.exposeInMainWorld('acorn', {
     ipcRenderer.on('acorn:will-quit', listener)
     return () => ipcRenderer.removeListener('acorn:will-quit', listener)
   },
-  // Node access, through the connection broker in main (docs/vNext/architecture.md § How the client
-  // talks to nodes). This INVERTS the invariant this file used to state: request/response and streams
-  // both ride IPC now, because main is where the pinned certificate and the device token live and the
-  // renderer must never hold either. Seven primitives only — no closures cross the bridge, so
-  // `nodeSocket()` is assembled on the renderer side from `nodeSend` + `onNodeFrame`.
   nodeFetch: (nodeId: string, request: unknown) => ipcRenderer.invoke('acorn:node-fetch', nodeId, request),
   nodeAbort: (requestId: string) => ipcRenderer.send('acorn:node-abort', requestId),
   nodeSend: (nodeId: string, frame: unknown) => ipcRenderer.send('acorn:node-send', nodeId, frame),

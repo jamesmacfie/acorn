@@ -8,10 +8,6 @@ import type { CoreServices } from '@acorn/node-core/main/core/index.ts'
 import type { TaskRow } from '@acorn/node-core/main/taskWorktree.ts'
 import type { NotesStoreCapability } from '../contract/store'
 
-// The one core read this pass makes. It used to be `db.select().from(schema.taskLinks)` against core's
-// handle; `task_links` is a CORE table, so once each plugin owns its own SQLite file the read has to come
-// through the seam that resolves a plain task id (docs/vNext/data.md § Plugin DBs). Narrowed to `tasks`
-// so the signature says exactly which core surface note seeding touches.
 export type SeedCoreServices = Pick<CoreServices, 'tasks'>
 
 // The slices of the mirror composites we render into notes (bodies are sanitized bodyHTML / markdown).
@@ -76,7 +72,7 @@ export async function seedTaskNotes(core: SeedCoreServices, notesStore: NotesSto
 
   // author 'workflow' marks these as external snapshots (PR/comment/ticket), not hand-authored notes
   // — they carry the `seed` badge, stay in assembled context, and are hidden from the Notes editing
-  // pane (docs/next/context-ui.md). Handoffs are also author 'workflow' but kind 'finding', so they
+  // pane (docs/agent-tools.md). Handoffs are also author 'workflow' but kind 'finding', so they
   // stay visible; only the workflow+scratch combo is a seed.
   const seed = (title: string, body: string) => notesStore.create(location, title, { author: 'workflow', kind: 'scratch', originTaskId: task.id, included: true, body })
 

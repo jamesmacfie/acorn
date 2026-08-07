@@ -80,6 +80,6 @@ describe('workspace icon + colour', () => {
     const res = await app.fetch(jsonReq('/api/workspaces/nope', 'PATCH', { name: 'Ghost' }), {} as Env)
     expect(res.status).toBe(404)
   })
-  // Build/run/db/preview config (incl. the AI schema source) moved off the workspace to repo scope
-  // (repo-level-settings) — it's set via PUT /api/terminal/repo-path/config, not this route.
+  // Build/run/db/preview config (including the AI schema source) is repository-scoped and is set via
+  // the repo-path config route, not this workspace route.
 })

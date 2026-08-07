@@ -11,24 +11,6 @@ import { schema } from '@acorn/node-core/server/db/index.ts'
 import type { AppEnv } from '@acorn/node-core/server/middleware/auth.ts'
 import type { Env } from '@acorn/node-core/main/bindings.ts'
 
-// What an agent-spawned child may NOT do.
-//
-// The internal token (ACORN_API_TOKEN) is injected into every PTY and agent session env, so anything
-// running in a task terminal holds it. docs/vNext/security.md § Threat model is explicit that this
-// principal is LESS trusted than the owner and "can never read secrets back, mint tokens, pair, or
-// touch device management".
-//
-// Every case below was VERIFIED to succeed before the gates existed: an agent could open a pairing
-// window, read the code out of the response body, mint itself a permanent owner-authority device
-// token, revoke the owner's own devices, and act on GitHub as the owner. requireUser could not catch
-// any of it, because requireUser only asserts that SOME principal resolved — which is the right rule
-// for product routes and the wrong one for these.
-//
-// Phase 2 changed the trust model, and this file changed with it. There is no longer ONE internal
-// token: a credential carries a scope, so 'the service calling itself' and 'a child an agent spawned'
-// are finally distinguishable (server/auth/internalTokens.ts). The GitHub case below therefore flipped
-// from "pinned divergence" to "denied", which is the whole point of the change.
-
 const INTERNAL = 'internal-secret'
 const ENC_KEY = '0'.repeat(64)
 
@@ -103,14 +85,6 @@ describe('the internal principal cannot administer devices', () => {
     expect(await devices.isActive(device.id)).toBe(true)
   })
 
-  // Phase 4's node-administration surface, gated by the same `requireDevice` mount and belonging in the same
-  // list. It was NOT here, and the omission mattered: `routes/plugins.test.ts` asserts the middleware's
-  // verdict while MOUNTING `requireDevice` itself, so deleting the real mount from server/index.ts left the
-  // whole 26-package suite green — measured. This is the case that exercises `createApp()`.
-  //
-  // Reading the list enumerates the node's surface (which plugins, therefore which routes and databases);
-  // writing it lets an agent disable the plugin whose gate it is standing behind and get a different node at
-  // the next restart. Both are exactly what security.md forbids an agent-spawned child.
   it('can neither read nor write which plugins this node runs', async () => {
     const read = await call('/v2/core/plugins', { headers: asAgent })
     expect(read.status).toBe(403)
@@ -124,11 +98,6 @@ describe('the internal principal cannot administer devices', () => {
     expect(write.status).toBe(403)
   })
 
-  // Phase 5's addition to the same list, and it is here rather than in a focused route test for exactly
-  // the reason above: a gate asserted against a test-mounted middleware proves nothing about the real
-  // app. The audit trail names every device that has ever paired with this node and every credential
-  // that has been connected to it — the enumeration security.md § Threat model puts furthest out of an
-  // agent's reach.
   it('cannot read the audit trail', async () => {
     const res = await call('/v2/core/audit', { headers: asAgent })
     expect(res.status).toBe(403)
@@ -206,24 +175,12 @@ describe('scope decides who may spend the owner provider credential', () => {
       .get('/v2/probe', async (c) => c.json({ token: await githubToken(c as never) }))
   }
 
-  // THE trust-model change. V1 made this impossible (its internal principal carried token: ''); Phase 1
-  // dropped that property when the credential moved to an integrations row keyed by owner, and pinned
-  // the regression deliberately. Scoping restores it: a 'task' credential — everything in a PTY, an
-  // agent session, a workflow step or an MCP server — gets '', which gh()/ghGraphQL() already turn into
-  // the same `reauth` outcome as "never connected", so no call site needed new error plumbing.
-  //
-  // Residual risk, stated rather than hidden: an agent has a shell in the task worktree with the owner's
-  // git credentials, so it can still push and open pull requests that way. This closes the node handing
-  // it a token, not every path to GitHub.
   it('denies a task-scoped agent credential', async () => {
     const app = await probe()
     const agent = await app.fetch(new Request('http://127.0.0.1/v2/probe', { headers: asAgent }), env)
     expect((await agent.json()) as { token: string }).toEqual({ token: '' })
   })
 
-  // The Phase 1 objection that made gating-on-kind wrong: seedTaskNotes runs INSIDE the service and uses
-  // a loopback internal call to reuse pullDetail's serve-then-revalidate, so a blanket gate silently
-  // stopped seeding PR notes whenever the mirror was cold. Scope answers it — the service keeps reach.
   it('allows the service scope, so loopback seeding still works on a cold mirror', async () => {
     const app = await probe()
     const service = await app.fetch(new Request('http://127.0.0.1/v2/probe', { headers: asService }), env)
@@ -256,13 +213,6 @@ describe('a task-scoped credential is confined to its own task', () => {
   })
 })
 
-// The gate over the PLUGIN namespace, which Phase 2 left open: `requireTaskScope` was mounted only over
-// /v2/core/tasks/:id*, and zero of the sixteen plugin route files that read a taskId checked ownership.
-//
-// Asserted through a SYNTHETIC plugin rather than by walking the real ones, because the invariant is the
-// mount, not the plugin list: "any task-addressed path under /v2/p is gated". A per-plugin test would
-// pass while the next plugin to add a task route forgot the gate — which is exactly how this hole was
-// created at the core door and missed at the plugin one. Each plugin's own suite covers its handlers.
 describe('the task-scope gate covers the plugin namespace', () => {
   const probeRoutes = async (prefix: string, path: string) => {
     const { Hono } = await import('hono')

@@ -47,7 +47,7 @@ export function registerWsChannelHandler(prefix: string, handler: WsChannelHandl
 }
 
 // `deviceId` is null for an internal-token socket — the one credential kind with no device row to
-// revoke. `seq` is this connection's own counter (docs/vNext/protocol.md § Events), so a
+// revoke. `seq` is this connection's own counter (docs/api-reference.md § Events), so a
 // reconnect legitimately restarts at 1 and the client compares only within one socket's lifetime.
 type Conn = {
   ws: WebSocket
@@ -59,12 +59,6 @@ type Conn = {
   // pseudo-terminal — arbitrary command execution as the owner in another task's shell, which is
   // exactly what scoping the token was supposed to prevent.
   internal?: InternalClaims
-  // Heartbeat bookkeeping (docs/vNext/protocol.md § Events). Counts pings this hub has sent that the
-  // peer has not answered; cleared by 'pong'. The client runs the same watchdog in the other direction
-  // (apps/desktop/src/app/main/nodeBroker.ts) — the two are not redundant, because they detect different
-  // ends going quiet, and only the CLIENT's half fixes what Phase 4 recorded (a hung node reading
-  // `online` forever). This half stops a vanished client's socket, and its stream subscriptions, from
-  // living on the node until the process restarts.
   missedPongs: number
 }
 const conns = new Set<Conn>()
@@ -76,14 +70,6 @@ const hubDisposers = new WeakMap<Server, () => void>()
 // is already the "walk every connection" loop.
 const MISSED_PONGS_BEFORE_DEAD = 2
 
-// Per-connection ceiling on unflushed bytes. A remote link that stops draining is the case this
-// exists for: a PTY producing faster than the socket drains would otherwise grow the send buffer
-// without bound inside the service process.
-//
-// ponytail: dropping frames is the crude version of protocol.md § Streams' credit scheme (client
-// grants bytes, server never exceeds outstanding credit), which is the Phase 2 replacement. It is
-// safe in the meantime *because* seq is stamped before the drop: the client sees the gap and does what
-// the protocol says — reconnect and refetch — rather than silently rendering a hole.
 const MAX_BUFFERED_BYTES = 4 * 1024 * 1024
 
 function sendFrame(conn: Conn, frame: WsServerFrame): void {
@@ -130,7 +116,7 @@ export type WsAuthDeps = {
   allowedHost: string
   // Resolves the device bearer at upgrade and tells the hub when a device is revoked.
   devices: DeviceService
-  // How often the backstop sweep re-checks each connection's device. protocol.md § Pairing pins the
+  // How often the backstop sweep re-checks each connection's device. docs/api-reference.md § Pairing pins the
   // production value at 60s; tests inject a short one instead of faking timers.
   revocationCheckMs?: number
 }
@@ -139,18 +125,6 @@ export type WsAuthDeps = {
 // socket holds no bearer to re-present, so the connection has to remember which device it belongs to.
 type Authorized = { deviceId: string | null; internal?: InternalClaims }
 
-// Upgrade auth (docs/vNext/protocol.md § Events: "token-authenticated at upgrade"): loopback Host
-// guard, then a device bearer OR the internal token. Anything else → 403 before the ws handshake
-// completes.
-//
-// There used to be a third branch — exact-Origin plus a valid session cookie — for the days when the
-// renderer's socket was a browser socket on the node's own origin. The renderer loads from app://acorn
-// now and every frame crosses IPC to the broker in Electron main, which presents a device bearer like
-// any other client. No cookie means no Origin check either: Origin was how a cookie-bearing browser
-// socket was distinguished from a cross-site one, and there is no ambient credential left to defend.
-// Exported so the tunnel upgrade (main/tunnel.ts) authenticates on exactly these terms rather than
-// growing a second, subtly different door. A raw TCP pipe to a port on the node's host is the single most
-// sensitive upgrade this server offers, so it must not be the one with its own auth code.
 export async function authorizeWsUpgrade(req: IncomingMessage, deps: WsAuthDeps): Promise<Authorized | null> {
   return authorize(req, deps)
 }
@@ -253,7 +227,7 @@ function onConnect(ws: WebSocket, authorized: Authorized): void {
 
 // Terminate every socket belonging to a revoked device. `terminate()` rather than `close()`: an
 // invalidated credential must not keep a socket alive for a graceful closing handshake
-// (docs/vNext/protocol.md § Pairing: "open sockets are closed, in-flight requests fail").
+// (docs/api-reference.md § Pairing: "open sockets are closed, in-flight requests fail").
 function dropDevice(deviceId: string): void {
   for (const conn of [...conns]) {
     if (conn.deviceId === deviceId) conn.ws.terminate()
@@ -264,7 +238,7 @@ export function attachWsHub(server: Server, deps: WsAuthDeps): void {
   const wss = new WebSocketServer({ noServer: true })
   // Immediate path: the revoke that happened in this process tells us directly.
   const offRevoked = deps.devices.onRevoked(dropDevice)
-  // Backstop for long-lived streams (protocol.md § Pairing, security.md § Transport: "re-check
+  // Backstop for long-lived streams (docs/api-reference.md § Pairing, security.md § Transport: "re-check
   // revocation every 60s"). It covers a revoke this hub never heard about — another process, or a
   // listener registered after the revoke — which is exactly the case a live socket cannot detect,
   // since it holds no bearer to re-present.

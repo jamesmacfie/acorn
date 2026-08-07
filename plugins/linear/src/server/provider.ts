@@ -192,9 +192,6 @@ const linearIssuesResource: MirroredResourceContribution<LinearResourceInput, Li
   ttlMs: 10 * 60_000,
   merge: 'summary-preserves-detail',
   key: (connectionId, input) => `provider:linear:${connectionId}:issues:${input.identifier}`,
-  // The cached row comes from the external-item store rather than a query against core's `issues`
-  // table: the store is already scoped to this owner, so the `userId` clause every one of these reads
-  // used to carry by hand cannot be forgotten or pointed at somebody else (integrations/itemStore.ts).
   async read(context, input) {
     const row = await context.items.read(context.connection.id, input.identifier)
     if (!row) return null

@@ -1,11 +1,3 @@
-// Run-target and layout-recipe palette rows (docs/workflows.md §2, §3).
-//
-// CommandPalette used to build these itself: it read `runApi.targets()`, mapped the result into rows through
-// `composeItems`, and imported this plugin's `invokeLayoutRecipe` to execute a layout pick. The rows and the
-// recipe executor are this plugin's; the palette's job is to show a list and dispatch a pick.
-//
-// `runApi` is client-core's (its routes are `/v2/core/tasks/:id/run*` — core's since Phase 2's scope-shed), so
-// nothing here reaches across a plugin boundary; what moved is ownership of the ROWS.
 import { runApi } from '@acorn/client-core/tasks/runClient.ts'
 import type { PaletteItem } from '@acorn/client-core/palette/model.ts'
 import type { PaletteRowSource } from '@acorn/client-core/registries/paletteRows.ts'
@@ -27,8 +19,6 @@ let lastTargets: { taskId: string; targets: { id: string; running: boolean }[]; 
 export const terminalPaletteRowSource: PaletteRowSource = {
   id: 'terminal.run',
   order: 10,
-  // Desktop-only: run needs the main-process session engine, so these rows are absent under dev:node rather
-  // than present-and-failing. The palette used to guard on `capabilities().terminal` for the whole list.
   requires: 'terminal',
   rows: async (taskId) => {
     if (!taskId) return { rows: [] }

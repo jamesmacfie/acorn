@@ -2,23 +2,6 @@ import { Show, splitProps, type ComponentProps, type JSX } from 'solid-js'
 import { cx } from './cx'
 import Icon from './Icon'
 
-// The shared primitive layer. Each primitive emits ONE stable semantic class plus `data-*` variant
-// attributes, and appends `props.class`. That is the whole style-awareness mechanism:
-//
-//   .ui-btn                                    (0,1,0)  base, the Terminal look
-//   .ui-btn[data-variant="ghost"]              (0,2,0)  variant
-//   :root[data-style="modern"] .ui-btn[…]      (0,3,0)  pack override, wins without !important
-//
-// Packs therefore win by specificity rather than by source order — strictly more robust than the
-// theme blocks, whose correctness used to depend on file order. Variants are `data-*` because that
-// is already idiomatic here ([data-severity], [data-state], data-tip*, [data-theme]) and because
-// the repo has no class-merge utility and no build step to add one.
-//
-// Primitives are named by ROLE, never by appearance. There is deliberately no <Card>: "card" is a
-// look, and in the Terminal pack nothing is a card, so every call site would be <Card variant=flat>
-// — a lie. A bounded region is <SectionHeader> plus a container; the PACK decides whether that
-// region gets a radius and a shadow.
-
 /* ── Button ──────────────────────────────────────────────────────────────────────────────────
    Replaces the action buttons only. Rows, tabs, tree nodes and popover triggers that happen to be
    <button> belong to Row/Tabs/Picker, not here — forcing them through Button is what makes a

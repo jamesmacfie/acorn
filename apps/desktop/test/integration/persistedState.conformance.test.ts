@@ -11,12 +11,9 @@ import { dockerPrefsSlice } from '@acorn/plugin-docker/client/dockerPrefs.ts'
 import { editorOpenFilesSlice } from '@acorn/plugin-editor/client/openFilesSlice.ts'
 import { prFiltersSlice } from '@acorn/plugin-github/client/pullList/filterSlice.ts'
 
-// The four plugin slices are enumerated HERE rather than read off persistedStateRegistry, and that is a
-// consequence of the ClientPlugin conversion worth stating: each plugin registers its own slice in its
-// client/index.ts now, so the only way to see the assembled set is to activate the plugins — and
-// activating them imports .tsx modules, which this vitest setup cannot transform (no vite-plugin-solid,
-// deliberately: a green suite here must not imply anything about rendered UI). The completeness check
-// below is what stops the list from silently going stale.
+// The four plugin slices are enumerated here rather than read from persistedStateRegistry because this
+// Node-only conformance suite does not load SolidJS modules. The completeness check keeps the persisted
+// slice inventory aligned with the activated client plugins.
 const pluginSlices: readonly PersistedStateSlice<unknown>[] = [
   editorOpenFilesSlice,
   prFiltersSlice,

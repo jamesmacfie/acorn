@@ -18,27 +18,12 @@ import { createOverlayPalette } from '@acorn/client-core/palette/overlay.ts'
 import { commandAvailable, commandHint, commandRegistry, commandTitle, executeCommand } from '@acorn/client-core/registries/commands.ts'
 import '@acorn/client-core/palette/palette.css'
 
-// ⌘K command palette (docs/command-palette-and-shortcuts.md): fuzzy search over contributed per-task rows,
-// registered commands, and go-to-task / switch-workspace navigation. Thin glue over the pure model; keyboard
-// and overlay plumbing come from the shared createOverlayPalette hook.
-//
-// It imports NO plugin. Run targets, layout recipes and committed workflows used to be fetched here — two
-// resources, plugins/terminal's recipe executor and the workflow client, all in this file — which is row 3 of
-// plugins.md's coupling table. Each is a `paletteRows` contribution now
-// (client-core/registries/paletteRows.ts), so the plugin that owns a row owns fetching and invoking it, and
-// this component owns the list and the keyboard.
 export default function CommandPalette() {
   const navigate = useNavigate()
   const params = useParams()
   const tasks = createQuery(() => tasksOptions(true))
   const fleetWorkspaces = createFleetWorkspaces()
   const [actionError, setActionError] = createSignal('')
-  // plan.md § Phase 4's "search with per-node fan-out" is THIS: go-to-task and switch-workspace rows go
-  // fleet-wide. `plugins/editor`'s find-in-files is worktree-scoped, so fanning that out is meaningless —
-  // recorded as a divergence in docs/vNext/phase4-notes.md.
-  //
-  // Fetched only while the palette is open and only with more than one node paired: with one node the
-  // active-node query below already has every task, and a second fan-out would be the same request twice.
   const fanTasks = () => palette.open() && nodes().length > 1
   const [fleetTasks] = createFleetQuery(
     () => ['tasks', 'palette', 'fleet'] as const,
@@ -100,7 +85,7 @@ export default function CommandPalette() {
       .map((command) => ({ id: command.id, label: commandTitle(command), hint: commandHint(command) }))
 
   // Every task the fleet knows, with the node that owns it. Keyed `${nodeId}:${taskId}` because a task id
-  // is only unique WITHIN a node (architecture.md § Fleet semantics), and this list is the one place two
+  // is only unique WITHIN a node (docs/architecture-overview.md § Fleet semantics), and this list is the one place two
   // nodes' ids sit side by side — a bare task id here would make one of two colliding rows unreachable.
   const fleetTaskRows = createMemo(() => {
     const active = activeNodeId() ?? ''

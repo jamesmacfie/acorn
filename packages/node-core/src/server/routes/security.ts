@@ -3,7 +3,7 @@ import type { NodeSecurityPosture } from '@acorn/protocol/api.ts'
 import { diskEncryption } from '../../main/diskEncryption'
 import type { AppEnv } from '../middleware/auth'
 
-// What this node can tell the owner about its own posture (docs/vNext/security.md § On-disk).
+// What this node can tell the owner about its own posture (docs/security.md § On-disk).
 //
 // One field today, and deliberately only one. Two others were considered and dropped because reporting
 // them would be decoration rather than information: the data root's mode is always 0700 (dataRoot.ts

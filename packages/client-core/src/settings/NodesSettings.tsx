@@ -7,11 +7,11 @@ import NodeDevices from './NodeDevices'
 import NodeChip from '../node/NodeChip'
 import '../node/nodes.css'
 
-// Settings → Nodes (docs/vNext/ui.md § Node management): add, rename, reconnect, unpair, revoke.
+// Settings → Nodes (docs/ui-design.md § Node management): add, rename, reconnect, unpair, revoke.
 //
 // ONE component with three inline steps rather than a wizard framework. The steps are not a UX
 // flourish — step 2 exists because comparing the fingerprint against the one the node itself displays
-// IS the security of pairing (docs/vNext/protocol.md § Pairing). Making it a deliberate screen with the
+// IS the security of pairing (docs/api-reference.md § Pairing). Making it a deliberate screen with the
 // value in front of the owner, rather than a checkbox next to a URL field, is the whole point; a
 // checkbox is a thing people tick.
 type Step = { kind: 'idle' } | { kind: 'endpoint' } | { kind: 'confirm'; probe: NodeProbeResult } | { kind: 'code'; probe: NodeProbeResult }
@@ -108,10 +108,8 @@ export default function NodesSettings() {
                     <NodeChip nodeId={node.nodeId} query={{}} />
                   </div>
 
-                  {/* The identity-change hard stop (docs/vNext/security.md): old and new fingerprints,
-                      and NO retrust affordance at all. The broker has already stopped reconnecting; the
-                      only two honest answers are "the node was rebuilt, so forget it and pair again" or
-                      "something is intercepting this connection". */}
+                  {/* A fingerprint mismatch is a hard stop. The broker has stopped reconnecting; the
+                      owner must forget and pair the node again after verifying its identity. */}
                   <Show when={mismatch()}>
                     <div class="node-alarm">
                       <strong>This node's identity changed.</strong>
@@ -151,7 +149,7 @@ export default function NodesSettings() {
                     >
                       Rename
                     </button>
-                    {/* Labelled distinctly on purpose (ui.md § Node management). Confusing the two is
+                    {/* Labelled distinctly on purpose (docs/ui-design.md § Node management). Confusing the two is
                         how an owner loses access to a remote node: unpair is recoverable with the same
                         pairing code, revoke means the node has torn up this client's credential. */}
                     <Show when={!node.local}>

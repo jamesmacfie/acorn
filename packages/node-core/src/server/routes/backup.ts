@@ -5,26 +5,9 @@ import { createBackup, suggestBackupPath } from '../../main/backup'
 import type { AppEnv } from '../middleware/auth'
 import { respondError } from '../respond'
 
-// `POST /v2/core/backup` (docs/vNext/data.md § Backup).
-//
-// The destination is a path on the NODE's filesystem, not an upload — which is why the client shows a
-// text field prefilled by the GET below rather than a native save dialog. Streaming a
-// multi-gigabyte archive back through the broker to write it on the client's disk would be a different
-// feature with different failure modes, and data.md asks for "a single archive in a user-chosen
-// location", which for a build box means a location on the build box.
-//
-// Device-only at the mount in server/index.ts: it reads every database this node owns, and an
-// agent-spawned child writing one to a path of its choosing is an exfiltration primitive even with the
-// credentials scrubbed out.
 const body = z.strictObject({ destPath: z.string().min(1).max(4096) })
 
 export const backup = new Hono<AppEnv>()
-  // Where the node suggests writing it. This exists so the client needs no native save dialog: a text
-  // field prefilled with a real path on the RIGHT machine works for a remote node too, and a save dialog
-  // would only ever have worked for the local one — it picks a path in the client's filesystem, which is
-  // the wrong filesystem for exactly the deployment the fleet exists to serve.
-  //
-  // ponytail: no native dialog. Add one for the local node if someone asks for it.
   .get('/', (c) => c.json({ suggestedPath: suggestBackupPath() }))
   .post('/', async (c) => {
     const parsed = body.safeParse(await c.req.json().catch(() => null))

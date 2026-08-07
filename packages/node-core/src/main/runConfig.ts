@@ -1,9 +1,3 @@
-// Layered run/config source (docs/workflows.md §2) — the merged run-target config plus lifecycle
-// scripts/copy/layouts: ./.acorn/config.toml (committed, team-shared) → ~/.acorn/config.toml
-// (personal defaults) → DB columns (fallback only). Returns a typed, validated config PLUS
-// structured parse errors — a broken file is surfaced (palette row, 13 §B), never silently
-// ignored. A repo with no .acorn/ behaves exactly as today.
-// ponytail: smol-toml + hand validation — no config framework.
 import { existsSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { parse as parseToml } from 'smol-toml'
@@ -34,9 +28,8 @@ export type RepoConfig = {
   runTargets: RunTarget[]
   copy: string[]
   layouts: LayoutRecipe[]
-  // Database-pane connection resolver + browser-preview URL config (repo-level-settings). db/preview
-  // moved off the workspace and gained a committed-toml layer here; browserRules stays DB-only
-  // (dev-login autofill selectors are machine/personal, not something you'd commit).
+  // Database-pane connection resolver + browser-preview URL config. db/preview may come from committed
+  // repo config; browserRules stays DB-only because autofill selectors are machine/personal.
   dbUrlScript: string | null
   // True when dbUrlScript's winning layer is the committed repo config — the same provenance signal
   // repoTargetIds carries, for the same reason: dbUrlScript is executed as a shell script, so the

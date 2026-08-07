@@ -11,7 +11,7 @@ import { formatLastSeen } from './freshness'
 import NodeChip from './NodeChip'
 import './nodes.css'
 
-// Fleet home (docs/vNext/ui.md § New surfaces): the landing view once more than one node is paired — a
+// Fleet home (docs/ui-design.md § New surfaces): the landing view once more than one node is paired — a
 // card per node with connection state, counts, last-refresh and the two actions that matter from here.
 //
 // It is a rail SOURCE rather than a route, registered by core with `order: 0` and
@@ -29,11 +29,8 @@ import './nodes.css'
 export default function FleetHome() {
   // The TASK LIST under `tasksKey`, counted in the component — not a count fetched under that key.
   //
-  // The first version returned `.length`, which wrote a NUMBER into the key every other surface reads
-  // `Task[]` from, and `fetchQuery` writes through the node's own cache by design. So the rail, the palette
-  // and the workspace effect all started calling `.find`/`.map` on a number; the resulting page errors wedged
-  // Solid's flush queue, and the visible symptom was a node badge that never updated. The two-node e2e is
-  // what caught it. A fan-out shares a key ONLY when it shares the value's shape — see fanout.ts.
+  // `fetchQuery` writes through the node's own cache, so this fetch returns the task list itself and the
+  // component derives the count. A fan-out shares a key only when it shares the value's shape.
   const [tasksPerNode] = createFleetQuery(
     () => tasksKey,
     (nodeId, _dep, signal) => readJson<Task[]>(tasksRoute, { nodeId, signal }),
@@ -48,7 +45,7 @@ export default function FleetHome() {
     return { stat, values }
   })
 
-  // ui.md's "attention count" on the card. Same source of truth as the bell's "Needs you" section, so the
+  // docs/ui-design.md's "attention count" on the card. Same source of truth as the bell's "Needs you" section, so the
   // two cannot disagree about how many things are waiting on a node.
   const inbox = createAttentionInbox()
   const attentionFor = (nodeId: string) => inbox().rows.filter((row) => row.nodeId === nodeId).length
@@ -65,7 +62,7 @@ export default function FleetHome() {
         </p>
       </header>
 
-      {/* Partial results are a banner, never a failed page (architecture.md § Fleet semantics). */}
+      {/* Partial results are a banner, never a failed page (docs/architecture-overview.md § Fleet). */}
       <Show when={unavailable().length}>
         <div class="fleet-banner" role="status">
           <For each={unavailable()}>

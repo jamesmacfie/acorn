@@ -160,7 +160,7 @@ describe('wsClient', () => {
   })
 
   // Main holds a socket to EVERY paired node and pushes every frame here, while the subscription maps
-  // below are keyed on session / container / exec ids alone. architecture.md § Fleet semantics: two nodes
+  // below are keyed on session / container / exec ids alone. docs/architecture-overview.md § Fleet semantics: two nodes
   // may coincidentally hold the same UUID, and that must never collide in the client.
   describe('frames from a node that is not the active one', () => {
     it('does not reach a terminal subscriber, even for the same session id', () => {

@@ -19,14 +19,6 @@ const integration = (providerId: string, connected = true): Integration => ({
 describe('availableSources (docs/integrations.md — gated by integration rows)', () => {
   const disposables: { dispose(): void }[] = []
   beforeAll(() => {
-    // github is a REGISTERED source as of Phase 3, not a hardcoded literal inside availableSources, so the
-    // fixture has to register it like any other. It carries no `providerId` (it must be visible before GitHub
-    // is connected) and no `promotion` (its browse creates tasks inline), which is exactly the real
-    // contribution's shape.
-    //
-    // Registered LAST while declaring the LOWEST order, deliberately: it is the head of the rail because of
-    // `order: 10`, and registering it last is what proves that. The previous fixture registered it first, so
-    // "github leads" was satisfied by registration order and the assertion could not tell the two rules apart.
     for (const id of ['linear', 'rollbar']) {
       disposables.push(sourceRegistry.register({
         id, order: id === 'linear' ? 20 : 30, providerId: id, glyph: id === 'linear' ? '◷' : '◍', label: id === 'linear' ? 'Linear' : 'Rollbar',
@@ -67,11 +59,8 @@ describe('availableSources (docs/integrations.md — gated by integration rows)'
 
   // The rail's order comes from the declared `order`, not from when a plugin happened to register.
   //
-  // This is the assertion e2e S1 could not make. `availableSources` hides a provider-gated source with no
-  // connected integration, and the e2e fixture connects none — so linear and rollbar, github's two immediate
-  // neighbours in the old registration-ordered list, never appeared in S1's `['GitHub','Docker','API','Agents']`
-  // at all. Reordering the plugin list to put linear first passed. Here every gated source is connected, so the
-  // full rail is visible and its order is checked directly.
+  // This exercises the full registry independently of provider availability, so every gated source is
+  // visible and its declared order is checked directly.
   it('orders the rail by the declared order, whatever the registration order was', () => {
     const late = sourceRegistry.register({ id: 'aardvark', order: 999, glyph: 'a', label: 'Aardvark' })
     const early = sourceRegistry.register({ id: 'zebra', order: 1, glyph: 'z', label: 'Zebra' })
@@ -86,7 +75,7 @@ describe('availableSources (docs/integrations.md — gated by integration rows)'
     }
   })
 
-  // `when` is the second, independent gate. Fleet home is its one contributor: ui.md says the view "stays
+  // `when` is the second, independent gate. Fleet home is its one contributor: docs/ui-design.md says the view "stays
   // out of the way" with a single node, and first-run must never mention nodes at all — so the rail button
   // has to be absent, not present-and-empty.
   it('honours `when` independently of providerId', () => {

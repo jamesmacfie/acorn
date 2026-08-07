@@ -1,27 +1,3 @@
-// The agents plugin's node part (docs/vNext/plugins.md § The plugin API).
-//
-// The largest conversion in Phase 2 by table count, and the last one with real cross-database joins.
-// What the composition root used to do by hand:
-//
-//   - apps/node/src/wiring/managedAgentsWiring.ts (~130 lines) registered the two built-in drivers,
-//     constructed ManagedAgentRuntime over CORE's database handle, defined the agent→terminal handoff by
-//     reaching into `terminalBridgeSlot`, wrapped 27 runtime methods into the ManagedAgentsBridge with a
-//     shared error taxonomy, and published `agents.sessionExecute`. All of it is here now except the
-//     bridge's error mapping, which stayed beside the routes it produces status codes for.
-//   - apps/node/src/wiring/serverBridges.ts filled the agent-usage bridge. It was one bridge from empty
-//     and its own comment said to DELETE it rather than keep an empty hook; that is what happened.
-//   - apps/node/src/server/routes.ts registered both routers.
-//   - apps/node/src/service/runtime.ts held the runtime handle so teardown could call stop(), and drove
-//     reconcile() after the listener bound.
-//   - @acorn/node-core's schema.ts owned ten `agent_*` tables plus the hand-written `agent_events_fts`
-//     virtual table and its three triggers.
-//
-// `required: true`, for the reason plugins.md gives for github/terminal/agents: the Agent Center is a
-// primary surface, the workflow runner resolves `agents.sessionExecute` for every managed step, and a
-// node with this off would boot and then fail at the first agent session. Note the consequence for
-// `dev:node`, which never wired managed agents at all: a standalone node now runs the full agent
-// runtime instead of answering 503 on /v2/p/agents/sessions*. That is a behaviour change, deliberately,
-// on the same terms as terminal's and workflows' were.
 import type { InternalEnvFactory } from '@acorn/node-core/server/auth/internalTokens.ts'
 import type { NodePlugin } from '@acorn/node-core/server/plugin/types.ts'
 import { openPluginDb } from '@acorn/node-core/main/pluginStorage.ts'
@@ -66,10 +42,6 @@ export type AgentsPluginDeps = {
   // of what scoping the tokens bought. The engine calls it per session start with
   // `{ scope: 'task', taskId, sessionId }`, so each agent gets a credential bound to its own task.
   internalEnv: InternalEnvFactory
-  // plugins/memory's auto-generation trigger, fired when a turn completes. A thunk supplied by the
-  // composition root because `memory.knowledge`'s capability id deliberately lives in that plugin's
-  // main/ rather than a contract/ (its value exposes two internal stores), so importing it here would
-  // ADD an agents→memory coupling edge to the ledger Phase 3 exists to shrink.
   memoryReviewTrigger?: (taskId: string, transcriptTail: string) => Promise<void>
   // The node's active GitHub identity, which lives in the runtime bindings — not on CoreServices, and
   // not something a plugin should be able to set. Read per call: creating a task's worktree consults
@@ -101,11 +73,6 @@ export const agentsPlugin = (dataDir: string, deps: AgentsPluginDeps): NodePlugi
         secrets: core.secrets,
         currentUserId: deps.currentUserId,
         publish: (frame) => wsBroadcast(frame),
-        // Hand a provider session over to a real shell. Resolved through `terminal.sessions` at CALL
-        // time, never at init: plugin init order is undefined, so resolving here could capture
-        // `undefined` purely because terminal is declared after agents in the plugin list. It used to
-        // read `terminalBridgeSlot` from the app, which a plugin may not do — the slot is another
-        // plugin's route wiring, and importing it would turn a client-only ledger edge into a node one.
         startTerminalHandoff: async (session) => {
           if (!session.providerSessionRef) throw new Error('The provider session cannot be resumed in a terminal.')
           const profile = getProfile(session.profileId)

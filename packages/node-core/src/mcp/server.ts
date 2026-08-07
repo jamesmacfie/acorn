@@ -56,9 +56,6 @@ export async function main(): Promise<void> {
   const server = buildServer()
   await server.connect(new StdioServerTransport())
 
-  // Availability watch (the agent-tool registry: emit tools/list_changed when the set changes mid-session). A poll,
-  // not a push channel — the MCP process has only the loopback API. ponytail: 10s poll; a push
-  // channel only if list-change latency ever matters.
   if (TASK_ID) {
     let seen = (await fetchManifest().catch(() => [])).map((t) => t.name).sort().join(',')
     const timer = setInterval(async () => {

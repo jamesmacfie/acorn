@@ -3,26 +3,13 @@ import { requestHash, type IdempotencyStore } from '../auth/idempotency'
 import { respondError } from '../respond'
 import type { AppEnv } from './auth'
 
-// Idempotency-Key handling for /v2 (docs/vNext/protocol.md § HTTP conventions). Mounted once, after
-// the auth gate, so a route earns replay semantics by being reachable rather than by opting in.
-//
-// Policy is `optional` everywhere: the header is honoured when present and never demanded. protocol.md
-// says endpoints with external side effects (create PR, post comment, send agent turn) should *require*
-// it, and that needs a per-route declaration — the route registry carries { plugin, prefix, router } and
-// nothing else, so there is no field to read and inventing route metadata here would be worse than
-// waiting.
-// ponytail: requiring a key per endpoint is Phase 2, alongside the route-declaration field it needs.
-
-// UUID shape (any version — the client mints UUIDv7, and pinning the version here would reject a
-// perfectly good v4 from a script). Bounded by construction, which is what keeps a hostile header from
-// becoming an unbounded key.
 const KEY_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
 // Statuses that MUST NOT carry a body — replaying one with an empty-string body throws in undici
 // rather than producing an empty 204.
 const BODILESS = new Set([204, 205, 304])
 
-// In-flight executions, keyed exactly as the store is. protocol.md: "a duplicate arriving while the
+// In-flight executions, keyed exactly as the store is. docs/api-reference.md: "a duplicate arriving while the
 // first is still executing waits for it and gets its response". Process-local by design — this is the
 // window between "first request started" and "its response was stored", which only exists inside one
 // process.
@@ -33,7 +20,6 @@ const conflict = (c: Parameters<typeof respondError>[0]): Response =>
 
 // Rebuild a Response from a stored row. Content type is asserted rather than stored: every /v2 route
 // answers JSON or nothing, and a column would need a migration to carry what is currently a constant.
-// (V1's /api/v1 middleware did the same for the same reason.)
 const replay = (stored: { responseStatus: number; responseBody: string }): Response =>
   new Response(BODILESS.has(stored.responseStatus) ? null : stored.responseBody, {
     status: stored.responseStatus,

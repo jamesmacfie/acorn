@@ -1,9 +1,6 @@
-// The Electron-free entry: `pnpm dev:node` from a checkout, and the standalone node a client pairs
-// with over the LAN (docs/vNext/plan.md § Phase 5, "standalone node distribution" — this is the down
-// payment on it). It is a composition root: it initializes the plugin graph (which is what registers the
-// built-in integration providers now), wires the
-// pure-Node domain bridges, then starts the HTTPS listener over a data root. Under Electron this path
-// is never taken — apps/desktop's main/bootstrap.ts owns boot and installs the stateful bridges too.
+// The Electron-free entry for `pnpm dev:node` and the packaged standalone Node. It initializes the
+// plugin graph, wires the pure-Node domain bridges, and starts the loopback HTTPS listener over a data
+// root. Under Electron this path is not taken; desktop main owns boot and supplies native bridges.
 //
 // Once listening it prints ONE line of JSON holding everything a client needs to reach it, pin it and
 // authenticate to it. That handshake is not a convenience: the port is ephemeral now
@@ -11,18 +8,9 @@
 // later — cannot guess the endpoint, and the self-signed certificate has no CA to vouch for it.
 // Everything else this process logs is free-form; this line is the contract.
 import './routes' // register plugin-owned HTTP routers into the core route registry
-// The three app-layer wirings the supervised root does, and this entry did NOT — which was a real gap
-// rather than a deliberate omission, and it is the one that made "a remote task's agent works over the
-// LAN" untrue. All three are pure Node and need no DesktopCapabilities:
-//
-//   - `agentProfiles` registers claude / codex / aider into core's profile registry. Without it a remote
-//     node offered only core's shell profile, so launching an agent on it had nothing to launch.
-//   - `wireAgentTools` registers core's own six tools. Without it an agent on a remote node saw a
-//     six-tool-smaller MCP surface than the same agent on the local one — the same class of silent
-//     divergence as the `issues` context section Phase 3 found on this exact path.
-//   - `wireConfigTrust` fills the config-trust bridge, without which
-//     `/v2/core/tasks/:id/config-trust` answered 503 and a remote task could never acknowledge its repo
-//     config — so every gated workflow and executable config on that node stayed unusable.
+// These pure-Node composition hooks register agent profiles, core agent tools, and config-trust
+// behavior before the listener binds. Desktop-only capabilities are supplied separately by Electron
+// main; this entry supplies explicit headless adapters where a plugin still needs one.
 import '../wiring/agentProfiles'
 import { join } from 'node:path'
 import { closeListener, devDataDir, drainWithDeadline, makeRuntime, startListener } from '@acorn/node-core/main/server.ts'
@@ -58,7 +46,7 @@ const root = openDataRoot(process.env.ACORN_DATA_DIR || devDataDir())
 const runtime = makeRuntime(root)
 const disabledPlugins = disabledPluginsStore(root.dir)
 await runtime.IDEMPOTENCY.cleanupExpired() // reclaim yesterday's replay rows; see service/runtime.ts
-// Audit retention, 90 days (docs/vNext/data.md § Retention defaults). Same moment, same reasoning.
+// Audit retention is enforced at boot so the append-only audit table remains bounded.
 await pruneAudit(runtime.DB).catch((error) => console.warn('[node] audit prune failed:', error))
 setWorktreesRoot(join(root.dir, 'worktrees'))
 
@@ -96,14 +84,11 @@ const unavailableBrowser: BrowserDesktopCapability = {
   console: browserUnavailable,
 }
 
-// Converted plugins register their own routes and open their own SQLite files here. A standalone node
-// runs the SAME list as the supervised one — the difference is only which engine bridges get filled,
-// so a plugin that needs no DesktopCapabilities works identically over the LAN.
+// The standalone and Electron roots activate the same plugin list. Their behavior differs only where
+// the available runtime bridge differs, such as the desktop preview browser.
 const plugins = await initPlugins(
   nodePlugins(root.dir, {
-    // A standalone node runs the managed agent runtime too, which is another BEHAVIOUR CHANGE of the same
-    // kind as the workflow one below: this entry never wired managed agents, so `dev:node` answered a flat
-    // 503 for every /v2/p/agents/sessions* route. `agents` is a `required` plugin, so it serves them now.
+    // Managed agents are available in the standalone composition as well as the Electron composition.
     agents: {
       internalEnv,
       currentUserId: () => runtime.ACTIVE_IDENTITY.get(),
@@ -123,10 +108,8 @@ const plugins = await initPlugins(
       seedTaskNotes: (task) => seedTaskNotes(core, notesAt(), internalEnv({ scope: 'service' }), task),
       reconciled,
     },
-    // A standalone node now runs the workflow engine too, which is a BEHAVIOUR CHANGE: this entry never
-    // called registerWorkflowIpc, so `dev:node` answered a flat 503 for every workflow route. It serves
-    // them now, on the same terms as the supervised root — including the github-mirror CI read, which is
-    // that plugin's own capability, resolved at call time.
+    // Workflows are available in the standalone composition and resolve GitHub mirror data through the
+    // capability registry at call time.
     workflows: {
       internalEnv,
       reconciled,
@@ -136,9 +119,8 @@ const plugins = await initPlugins(
         (await capabilities.get(GITHUB_MIRROR)?.failingChecks(runtime.ACTIVE_IDENTITY.get(), taskId)) ?? null,
     },
   }),
-  // The same per-node file the supervised root reads (main/disabledPlugins.ts). It matters MORE here:
-  // this is the entry a remote node boots from, and a client's fleet file has no say in a launchd start,
-  // so this file is the only place a "disable docker on the build box" setting could live.
+  // Plugin disablement is stored by the Node itself. The desktop fleet file controls the client view,
+  // while this persisted set controls a standalone process at boot.
   { capabilities, core, disabled: disabledPlugins.get() },
 )
 setPluginsBridge({
@@ -194,26 +176,8 @@ console.log(
   }),
 )
 
-// Ctrl-C is how `dev:node` ends, and SIGTERM is how launchd/systemd end a standalone node, so this is
-// the ONLY teardown path this entry has — and it had none. Eight plugins own WAL-mode SQLite files now
-// and the data root holds an exclusive pidfile lock, so exiting without this left journals unflushed and
-// the lock held, which the next `dev:node` refuses to take. The supervised root has done this since
-// Phase 1 (service/runtime.ts's stop()); this entry simply never grew the equivalent, and the plugin
-// conversions are what made it matter.
-//
-// The SAME list, in the SAME order, as the supervised root's stop(), and two of the entries are Phase 5
-// corrections:
-//
-//   - **The LISTENER is closed first, and used not to be closed at all.** That is the whole of
-//     docs/vNext/phase4-notes.md's "SIGTERM was too slow": the port stayed bound for as long as the
-//     slowest plugin took to dispose, because nothing had told the server to stop accepting. A poll for
-//     "is the node gone" therefore watched a socket that was never going to close on its own schedule,
-//     which is why the two-node e2e reached for SIGKILL.
-//   - **The drain is bounded** (architecture.md § Inside the Node: 30s). An operator's
-//     `systemctl restart` must not hang on one plugin whose dispose never settles.
-//
-// The root lock comes last because a restart must not open a database this process still holds a WAL
-// for; if the deadline fires before that step, dataRoot's own `process.on('exit')` hook releases it.
+// SIGINT and SIGTERM close the listener first, dispose plugins, close SQLite, and release the data-root
+// lock. The ordered drain is bounded so shutdown cannot hang indefinitely on one plugin.
 let stopping = false
 const shutdown = async (signal: NodeJS.Signals): Promise<void> => {
   if (stopping) return

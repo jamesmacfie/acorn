@@ -133,8 +133,8 @@ function parseRollbar(raw: unknown, ref: ExternalRef): CodecResult<RollbarCached
       },
     }
   }
-  // v1 envelope (summary/detail both the old RollbarItem shape): keep list membership, drop the old
-  // detail — it lacked the occurrence, so a detail fetch repopulates it.
+  // Normalize the versioned envelope: keep list membership and repopulate detail on demand when it is
+  // absent from the summary payload.
   if (isRecord(raw) && raw.schemaVersion === 1 && isRecord(raw.summary)) {
     return { ok: true, migrated: true, value: { ref, summary: widen(raw.summary), listFetchedAt: typeof raw.listFetchedAt === 'number' ? raw.listFetchedAt : undefined, schemaVersion: 4 } }
   }

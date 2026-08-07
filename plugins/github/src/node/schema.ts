@@ -1,26 +1,3 @@
-// The github plugin's own tables (docs/vNext/data.md § Plugin DBs). They lived in
-// packages/node-core/src/server/db/schema.ts until Phase 2; this is the largest single move of the
-// phase, thirteen tables into <data-root>/plugins/github.sqlite.
-//
-// Two groups, and the distinction survives the move because it governs retention:
-//
-//   - **Mirror tables** (repos … checks, plus `sync_state`) are cached, revalidated projections of
-//     GitHub data. Disposable by construction: GitHub is the source of truth, and anything deleted here
-//     is re-fetched on the next serve-then-revalidate pass (docs/caching.md).
-//   - **App-state tables** (`viewed_files`, `pinned_repos`) are data GitHub does not have, where WE are
-//     the source of truth. They are github-shaped rather than github-derived — a viewed-file checkbox is
-//     keyed by (repoId, PR number, path) — which is why they moved here with the mirror instead of
-//     staying in core. `pinned_repos` came with them, and its route came along too: it is now
-//     /v2/p/github/pins rather than /v2/core/pins (server/routes/pins.ts).
-//
-// The schema declares no foreign keys, exactly as core's does not. Every parent eviction therefore
-// carries its inverse writes explicitly, in ONE place — server/mirrorRetention.ts. That was already the
-// rule; it matters more now, because these rows can no longer be swept by a core-side cascade.
-//
-// `user_id` on every table is the authenticated GitHub login. It is not multi-tenancy: this is a
-// single-user app. It pins the mirror to the GitHub identity, so connecting a different account does not
-// inherit the previous one's cache — and for private repos it is load-bearing, because two logins may
-// legitimately mirror the same repo id with different visibility.
 import { index, integer, primaryKey, sqliteTable, text } from 'drizzle-orm/sqlite-core'
 
 // --- Mirror tables: cached projections of GitHub data (revalidated, disposable) ---
@@ -169,7 +146,6 @@ export const prLabels = sqliteTable(
   (t) => [primaryKey({ columns: [t.userId, t.repoId, t.number, t.name] })],
 )
 
-// Pending review requests (logins). ponytail: users only — team review requests not mirrored.
 export const reviewRequests = sqliteTable(
   'review_requests',
   {
@@ -195,17 +171,6 @@ export const checks = sqliteTable(
   (t) => [primaryKey({ columns: [t.userId, t.repoId, t.number, t.name] })],
 )
 
-// Collection-level revalidation bookkeeping: a list endpoint's ETag has no per-row home
-// (docs/caching.md). Keyed by (userId, resource) e.g. `pulls:<repoId>:open`, `pr:<repoId>:<number>`.
-//
-// This table is now github's ALONE, and that is the resolution of a debt phase2-notes.md recorded as
-// intent: `sync_state` used to be one core table with two unrelated key spaces sharing it — github's
-// `repos` / `pulls:…` / `pr:…` / `files:…` beside the providers' `provider:<id>:<connection>:…`. Nothing
-// enforced the split but convention, and a key collision between a repo id and a connection id would
-// have silently crossed the two caches. The move separated them by construction: the provider markers
-// stayed in core's `sync_state` (reached through `ExternalItemStore.readMarker`, which is also what
-// cascade.ts evicts), and these four key shapes came here. The keys themselves are built in exactly one
-// place, server/resourceKeys.ts, which moved out of core with the table.
 export const syncState = sqliteTable(
   'sync_state',
   {

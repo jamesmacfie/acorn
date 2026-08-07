@@ -9,7 +9,7 @@ import { pairingCodes } from '@acorn/node-core/server/auth/pairingCodes.ts'
 import { makeTestDb, type TestDb } from '@acorn/node-core/server/routes/testDb.ts'
 import type { Env } from '@acorn/node-core/main/bindings.ts'
 
-// The pairing surface end to end over the assembled app (docs/vNext/protocol.md § Pairing): what the
+// The pairing surface end to end over the assembled app (docs/api-reference.md § Pairing): what the
 // two pre-auth routes may leak, that every pairing failure is byte-identical, and that a paired token
 // then works everywhere a session does — and stops working the instant the device is revoked.
 

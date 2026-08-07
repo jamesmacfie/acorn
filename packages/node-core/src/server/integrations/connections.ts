@@ -263,14 +263,10 @@ export function externalRefForConnection(row: StoredConnection, identifier: stri
 
 // --- Request-context seams, for provider plugins ---
 //
-// Everything above takes `db: AppDatabase` because core's own routes already hold one. A provider
-// PLUGIN must not: `getDb` lives in server/db, and holding core's handle is precisely the coupling the
-// per-plugin database split removes (tools/arch/boundaries.test.ts § "plugin server code owns its own
-// schema"). linear and rollbar previously wrote `forEachConnection(getDb(c.env), ownerId(c), …)` at
-// eight call sites; these three wrappers are the same calls with core keeping the handle.
+// Core-owned routes pass their database explicitly. Provider plugins use these request-context wrappers,
+// which keep the core handle inside the service boundary while scoping every read to the caller.
 //
-// They also collapse the (db, userId, secrets) triple that every one of those call sites had to repeat
-// correctly. Passing another owner's id was possible before and is not now.
+// They also keep the database, owner ID, and secret scope consistent at every provider call site.
 
 /** Every stored connection for one provider, owned by the calling principal. */
 export const ownedConnections = (c: Context<AppEnv>, providerId: string): Promise<StoredConnection[]> =>
@@ -297,6 +293,6 @@ export const credentialsFromBody = (body: unknown): ProviderCredentials => {
   if (record.credentials && typeof record.credentials === 'object') {
     return Object.fromEntries(Object.entries(record.credentials as Record<string, unknown>).filter((entry): entry is [string, string] => typeof entry[1] === 'string'))
   }
-  // One-release compatibility for clients posting the pre-Phase-7 token field.
+  // Accept the legacy token field while clients transition to the provider credential shape.
   return typeof record.token === 'string' ? { token: record.token } : {}
 }

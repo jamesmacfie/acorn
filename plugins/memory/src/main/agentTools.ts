@@ -1,4 +1,4 @@
-// The memory plugin's agent tools, as the `tools` contribution point (docs/vNext/plugins.md § Agent
+// The memory plugin's agent tools, as the `tools` contribution point (docs/plugins.md § Agent
 // tools and MCP).
 //
 // These four were defined in apps/node/src/wiring/agentToolsWiring.ts, which held this plugin's
@@ -19,7 +19,7 @@ import type { MemoryProposalStore } from './memoryProposals'
 
 // The one core read these tools need: `tasks` is a CORE table and this plugin owns its own SQLite file,
 // so the repo a memory is scoped to is resolved through core rather than queried here
-// (docs/vNext/data.md § Plugin DBs).
+// (docs/data-layer.md § Plugin DBs).
 type ToolCore = Pick<CoreServices, 'tasks'>
 
 const asMemoryType = (type: string | undefined): MemoryType | undefined =>

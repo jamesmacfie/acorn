@@ -1,276 +1,62 @@
 # Caching
 
-> **Runtime note:** acorn migrated from Cloudflare Workers to a local Electron app (see
-> [electron.md](./electron.md)). The shared-KV `BLOBS` cache is now a per-user **on-disk dir** keyed
-> by SHA, and the old public-only caching guard (`if (!repoRow.private)`) has since been **removed**
-> — every body caches locally regardless of repo visibility. The three-tier model and TTLs are
-> otherwise unchanged.
+acorn has three independent cache layers. None of them replaces the source of truth that owns the
+data.
 
-acorn layers three caches between the browser and GitHub. Each has a different
-scope and lifetime. The whole design follows one principle:
-**serve the last-known data immediately, revalidate behind it.**
+## Provider mirrors
 
-| Layer | Where | Scope | Holds |
-| --- | --- | --- | --- |
-| SQLite mirror | Local server / SQLite | Per user | All GitHub projections (repos, PRs, files, reviews, comments, checks, labels, threads) plus external issues (Linear, Rollbar → `issues`) |
-| `BLOBS` cache | Local server / on-disk | Per device | Immutable patch bodies + full file bodies keyed by blob SHA |
-| IndexedDB | Browser | Per device, partitioned per node | Filtered TanStack Query cache (last API responses, excluding file bodies/patches) |
+The GitHub plugin stores repository and pull-request projections in `plugins/github.sqlite`. Linear
+and Rollbar use the core external-item projection. Reads use serve-then-revalidate:
 
-See [data-layer](./data-layer.md) for the schema behind layer 1. Layer 3
-(the IndexedDB-persisted TanStack Query cache, below) powers offline browsing
-of recently-seen data.
+1. resolve the resource and freshness marker;
+2. serve a usable local projection immediately when one exists;
+3. refresh in the request or in a bounded background operation when the policy says it is stale;
+4. replace or update the projection and freshness marker.
 
-## Layer 1 — SQLite mirror
+Mirror collections are disposable. A full list refresh can delete and rebuild rows so repositories
+or issues no longer visible to the provider do not remain in the UI. Provider errors preserve a
+usable stale projection and return its freshness state; a cold read without a projection reports the
+provider failure.
 
-The mirror is the local server's read cache of GitHub. Every read goes through it
-(see the serve-then-revalidate pattern below). Freshness is governed by a TTL
-and, where available, an ETag.
+GitHub list and PR detail policies are defined in `plugins/github/src/server/` and use TTLs appropriate
+to each resource. Repositories and open PR lists use ETags where the provider supplies them. A `304`
+only advances the local freshness timestamp. Explicit `force` requests block for a fresh response.
 
-### TTLs (`server/sync/policy.ts`)
+Provider item resources have independent freshness markers. A Rollbar item list, item detail, and
+occurrence history can therefore be stale independently.
 
-Every serve-then-revalidate TTL lives in **one** greppable module,
-`server/sync/policy.ts` — the sync engine owns the *flow*, `policy.ts` owns the
-*numbers*. No route declares its own TTL constant anymore.
+## Immutable blob cache
 
-| Resource | Constant (`server/sync/policy.ts`) | TTL |
-| --- | --- | --- |
-| Repos list | `REPOS_STALE_AFTER_MS` | `300_000` ms (5 min) — "slow-changing" metadata |
-| PR list (open), PR detail, PR files | `PULLS_STALE_AFTER_MS` | `45_000` ms (45 s) — "fast-changing"; one constant, shared by `pulls.ts` / `prMirror.ts` / `pullFiles.ts` / `pullsBatch.ts` |
-| Linear issues | `LINEAR_ISSUES_STALE_AFTER_MS` | `600_000` ms (10 min) — tickets move slowly; the panel forces fresh with `?refresh=1` |
-| Rollbar items | `ROLLBAR_ITEMS_STALE_AFTER_MS` | `120_000` ms (2 min) — errors move fast |
+`BLOBS` is an on-disk, content-addressed cache under `<data-root>/blobs/`. GitHub patch bodies and
+file bodies are keyed by SHA; attachments and agent artifacts use the same immutable storage
+mechanism. A cache miss fetches the provider body, verifies the expected digest where available,
+and writes it atomically. The cache is local to a Node and stores both public and private repository
+content because it is not shared storage.
 
-Rollbar splits freshness by resource: the **active list** gates on its `sync_state`
-list-fetch time; item metadata gates on the issue envelope's `detailFetchedAt`; occurrence history
-and each normalized occurrence gate on their own `issue_resources.fetchedAt` rows. A list refresh restamps every current-list summary's
-`listFetchedAt` (a detail write preserves it), and the list read returns only
-rows carrying the current list time — so a detail fetch never makes an item
-"appear" in the list, a list refresh never makes a stale detail look fresh, and
-resolved-but-linked items keep their cached detail offline without polluting the
-list. The client mirrors the same split with distinct persisted TanStack Query keys; inactive right-pane
-tabs create no query. Its active-list key also includes the sorted Rollbar connection IDs mapped to
-the routed workspace, so persisted results cannot bleed between workspace mappings. Absent items are
-not deleted. The active list paginates up to
-`budgets.maxPages` (300 items); at the cap the UI says "300 most recent" rather
-than implying completeness.
+Blob pruning must respect references retained by plugin records. Worktrees are not part of the blob
+cache.
 
-Rollbar child-resource rows use a small versioned storage envelope that is not exposed by the API.
-Rows from the original occurrence normalizer are rejected as cache misses because that version read
-the wrong upstream payload property; the next tab read refetches and replaces them immediately.
+## Renderer query cache
 
-A row/collection is fresh when `fetchedAt + <TTL> > Date.now()`. Repos, the PR
-list, PR detail and PR files gate on the matching `sync_state` row; external
-issues (Linear/Rollbar) gate on provider-owned row freshness (`issues` or `issue_resources`). The engine
-reads none of these stores directly — the caller's `read()` reports the cached
-data plus its `fetchedAt`, so the freshness backend stays opaque. There is no
-per-row `staleAfter` column.
+The renderer uses TanStack Query with one `QueryClient` and one IndexedDB persister per Node. The
+persister key is scoped to the Node, not merely prefixed into every feature key. This makes the cache
+partition structural: identical task or repository IDs on separate Nodes cannot collide.
 
-The batch-prefetch route (`plugins/github/src/server/routes/pullsBatch.ts`) warms detail + files for up to
-10 PRs at once and applies the same per-PR `sync_state` gates, so already-fresh
-PRs cost no GitHub calls.
+The persisted cache is disposable and has a bounded lifetime. It provides fast last-known reads,
+not mutation confirmation. When a Node is reconnecting or offline, cached responses remain visible
+with freshness badges. A WebSocket reconnect or sequence gap marks affected data stale and triggers
+normal refetching; there is no history cursor or offline mutation queue.
 
-### ETag conditional revalidation
+## Fan-out cache safety
 
-When stale, endpoints that have an ETag revalidate conditionally rather than
-blindly refetching:
+Fleet surfaces fan out one request per Node. A fan-out may warm a Node's regular query cache only when
+it writes the exact value shape expected by that query key. For example, a task-list key must contain
+`Task[]`, never a derived count. Client code should use `createFleetQuery` and keep aggregate keys
+separate from per-Node resource keys when the shapes differ.
 
-- **Open PR list** and the **repos list** store the collection ETag in
-  `sync_state` and send `If-None-Match` on the next fetch. (The **closed** PR list does *not* go
-  through the mirror at all — it is proxied straight from GitHub one 50-item
-  page per request and load-mored client-side; closed PRs are historical, so
-  there is nothing worth caching in the mirror with a 45 s TTL.) A **`304 Not Modified` is free** against
-  the GitHub rate limit — the route just bumps `sync_state.fetchedAt` and
-  re-serves the existing mirror rows:
+## Measurement
 
-```ts
-if (res.status === 304) {
-  await db.insert(schema.syncState)
-    .values({ userId, resource, etag: sync?.etag ?? null, fetchedAt: now })
-    .onConflictDoUpdate({ target: [...], set: { fetchedAt: now } })
-  return { ok: true }
-}
-```
-
-- **GraphQL has no ETag.** PR detail (the composite read) cannot do conditional
-  revalidation, so it is **TTL-only** — freshness is purely the `sync_state`
-  gate. The same is true for `pr_files` (it's TTL-only in `sync_state`; the REST
-  files call does not currently send `If-None-Match`).
-
-> Conditional `If-None-Match` revalidation is wired for the **PR list** and the
-> **repos list**; `pr_files`/PR-detail are TTL-only (no ETag — GraphQL/REST-files
-> don't supply a usable one). Rate-limit responses (`403`/`429`) are detected
-> centrally by `ghError()` — see
-> [github integration](./github-integration.md#etags-and-rate-limits).
-
-### Serve-then-revalidate pattern (`server/sync/engine.ts`)
-
-The four-branch flow lives in **one** place — `serveThenRevalidate` in
-`server/sync/engine.ts`. Routes no longer hand-roll it; they supply a `read()`
-(cached data + its `fetchedAt`, or `null` when never fetched) and a `refresh()`
-(the atomic mirror write). The engine owns *when*:
-
-```
-read() → { data, fetchedAt } | null
-1. null?                → COLD: block on refresh(), then re-read and serve.
-2. fresh within TTL?    → serve data. No GitHub call.
-3. stale?               → serve data immediately; refresh() in the background.
-   (?force=true)        → treated as cold: block on refresh() even if fresh.
-                          Forced refreshes never join an in-flight refresh —
-                          "force means fresh", not "force means whatever fetch
-                          happened to be running".
-```
-
-The engine also owns two cross-cutting concerns the copies used to get wrong:
-
-- **In-flight dedupe** (keyed by `userId` + `resource` — mirrors are per-user,
-  so flow state is too): two stale hits for the same user's resource join one
-  refresh instead of firing two.
-- **Rate-limit backoff** (same `userId` + `resource` key): after a `429`
-  background refresh, further *background*
-  refreshes for that resource are suppressed for `RATE_LIMIT_BACKOFF_MS`
-  (`policy.ts`) — stale data keeps serving instead of hammering a throttled
-  upstream. Cold reads still try (there's nothing else to serve).
-
-The engine never touches the caller's store. ETag/304 handling stays inside each
-caller's `refresh()` because it's specific to the `sync_state` ETag store, not
-universal to the flow — a `304` is just a successful (data-preserving) refresh
-from the engine's point of view. Background refreshes go through
-`trackBackgroundRefresh` (`packages/node-core/src/server/background.ts`); tests settle them via
-`settleBackground()`.
-
-**Not on the engine** (deliberately, see `inventories.md` §2d): `pullsBatch.ts`
-(a multi-item prefetch that always blocks — no single response resource to serve
-stale), and the Linear/Rollbar reads (multi-connection fan-out with partial
-results and per-item freshness). They share the engine's TTLs from `policy.ts`
-but own their own flow.
-
-Explicit forced paths bypass the TTL: `POST /v2/p/github/repos/refresh` zeroes
-both the repo rows' and the repos `sync_state` row's `fetchedAt` (the ETag is
-kept so the refetch can still `304`), and PR mutations bust the PR's
-`sync_state` row (`bustPrSync` in `plugins/github/src/server/routes/prContext.ts`) so the next read
-refetches. PR detail/files reads accept `?force=true`.
-
-How the 200 path rewrites the mirror differs per resource:
-
-- **Repos** (`refreshRepos`, `plugins/github/src/server/routes/repoMirror.ts`): delete-then-insert in one
-  `db.batch([...])` (emulated via a better-sqlite3 transaction — see
-  [electron.md](./electron.md) §4c) so repos the user lost access to drop out
-  atomically.
-- **Open PR list** (`plugins/github/src/server/routes/pulls.ts`): chunked **upsert** of list-level fields
-  only — preserving detail-owned columns like `body` that the GraphQL detail
-  route fetched — followed by a prune of rows whose `fetchedAt` predates the
-  refresh, the Flow B task updates, and the `sync_state` upsert, all in one
-  `db.batch` (a single transaction), so a mid-refresh failure leaves the
-  previous mirror + stale sync intact and the next request retries.
-- **PR detail children** (`mirrorPr`) and **`pr_files`** (`mirrorFiles`), both in
-  `plugins/github/src/server/routes/prMirror.ts`: delete-then-insert in one `db.batch`.
-
-Inserts are chunked by column count (`chunkRowsByColumnBudget`,
-`packages/node-core/src/server/db/batch.ts`) to keep each statement under a conservative
-100-bound-parameter budget (`MAX_BOUND_PARAMS`) — better-sqlite3 allows far
-more (32k+), but small statements stay predictable. `pr_files` inserts one row
-per statement.
-
-## Layer 2 — on-disk `BLOBS` cache (immutable patches)
-
-The `BLOBS` cache holds **patch/diff bodies** and **full file bodies** (for
-expanding unchanged context around diff hunks), keyed by the file's blob `sha`.
-It's a local directory — `<dataDir>/blobs/`, where the data root is
-`app.getPath('userData')` in packaged builds and the repo-local
-`apps/node/.acorn/` in dev (`main/electron.ts` / `devDataDir`, defined in
-`packages/node-core/src/main/serverConfig.ts` and re-exported from `main/server.ts`) — one file per key, implemented by `diskBlobCache`
-(the typed `BlobCache { get, put }`) in `packages/node-core/src/main/bindings.ts`
-(non-filename-safe chars are sanitized to `_`, so `patch:<sha>` lands on disk
-as `patch_<sha>`). Immutable content means no TTL and no delete. Both key
-formats live in one shared module, `packages/node-core/src/server/blobs.ts`:
-
-```ts
-export const patchBlobKey = (sha: string) => `patch:${sha}`       // prMirror.ts — patch bodies
-export const fileBodyBlobKey = (sha: string) => `filebody:${sha}` // pullBlob.ts — full file bodies
-```
-
-A body is immutable for a given blob sha — the content can't change without the
-sha changing — so it is cached indefinitely. There is **no eviction, by design**:
-the cache is a single user's own diff bodies on their own disk, entries are
-small text, and correctness never depends on deletion (a stale entry is
-impossible; an unused one is just bytes). Revisit only if `.acorn/blobs/` ever
-becomes a real disk-space complaint. Every body is cached regardless of repo
-visibility: `mirrorFiles` writes patches to `BLOBS` (the `pr_files` table
-carries only metadata + `sha`; its old always-null `patch` column is dropped),
-and reads resolve from `BLOBS` by sha:
-
-```ts
-patch: includePatches && f.sha ? await env.BLOBS.get(patchBlobKey(f.sha)) : null
-```
-
-(The old public-only rule existed because Workers KV was *shared* across users; a
-local single-user cache has no such constraint, and the `if (!repoRow.private)`
-guard has been removed from `plugins/github/src/server/routes/`'s
-`pullBlob.ts`/`prMirror.ts` — see
-[electron.md](./electron.md) §5.)
-
-## Layer 3 — Client IndexedDB (TanStack Query persistence)
-
-The SPA uses TanStack Query as a stale-while-revalidate cache and persists it to
-IndexedDB via `idb-keyval`. There is **one `QueryClient` and one IndexedDB persister per node**,
-both built lazily by `clientFor(nodeId)` in `packages/client-core/src/node/fleet.ts` — the only place
-a `QueryClient` is constructed in production. `apps/desktop/src/app/client/index.tsx` mounts just the
-*active* node's provider, keyed on the node id, so switching nodes remounts against a different
-cache rather than mixing two nodes' data. The defaults come from `fleet.ts`:
-
-```ts
-defaultOptions: {
-  queries: {
-    refetchOnWindowFocus: true,
-    staleTime: 30_000,
-    gcTime: 1000 * 60 * 60 * 24,
-  },
-}
-```
-
-- **`gcTime`: 24h** (`1000 * 60 * 60 * 24`). Deliberately long so persisted
-  entries survive a reload — that's what enables offline browsing of
-  recently-seen PRs.
-- **`staleTime: 30s`** — rapid app switches do not fan out across every active query. Resources
-  that need tighter freshness override it.
-- **`refetchOnWindowFocus: true`** — refocusing revalidates data once it is stale, keeping the
-  serve-then-revalidate feel without a request burst on every focus edge.
-
-The persister stores under key `acorn-cache:<nodeId>` (`cacheKeyFor` in `fleet.ts` — one IndexedDB
-key per node, so one node's snapshot can never rehydrate into another) with `maxAge` 24h and a
-5-second write throttle.
-It keeps TanStack's successful-query-only dehydration gate; pending Promises and failed queries are
-never serialized. `persistence/queryPersistence.ts` additionally excludes immutable file bodies and
-every patch-bearing files query because those payloads are reconstructable from the node API and
-on-disk blob cache. It also applies a per-query 24h cutoff: `maxAge` alone timestamps the whole
-snapshot, so a regularly used app could otherwise rewrite the snapshot and preserve long-dead PR
-entries forever. On render the app shows the remaining last-known data instantly, then refetches.
-
-This cache is **per-node and private**. Eviction is `dropNode(nodeId)` in `fleet.ts`, which runs when
-a node is removed from the fleet: it drops the in-memory client *and* deletes that node's IndexedDB
-key, because the two tiers are independent — deleting only the key would leave a live cache that
-re-persists itself on the next write. The account menu also exposes a manual **Clear cache** action.
-
-## Locality {#public-private-rule}
-
-All three layers are now local to one machine and one user, so the old
-"only-public-data-in-shared-storage" invariant (a Workers-KV concern) is retired:
-
-- SQLite mirror rows are **user-scoped** (`userId` in every PK), inherited from the
-  multi-tenant design. See [data-layer](./data-layer.md#user-scoping-rule).
-- The `BLOBS` cache is an on-disk dir private to your machine — it caches all
-  bodies by sha, public or private (the public-only guard is gone from the code).
-- IndexedDB is per-device and partitioned per node, and a node's partition is deleted when that node
-  leaves the fleet.
-
-## Maintenance and measurement
-
-Startup performs one correctness repair before serving: orphaned GitHub mirror children left by
-older non-atomic refreshes are pruned. It also sweeps the one device-scoped `idempotency` table via
-`runtime.IDEMPOTENCY.cleanupExpired()`. Derived mirror/provider/blob data does not yet have a general
-age/size retention sweep. Instead `@acorn/node-core/main/storageFootprint.ts` logs the SQLite and blob footprint
-at startup so that sweep is triggered by measured growth rather than speculation. See
-[next/performance.md](./next/performance.md).
-
-The Docker plugin also uses short main-memory info/list caches, but they are live-service
-coalescing rather than product persistence: daemon events invalidate them and app quit discards
-them. They are documented in [docker.md](./docker.md), not counted as a fourth durable cache layer.
+The Node reports storage-footprint information at startup. It does not run a general destructive
+cache sweep on every request. Provider mirrors, immutable blobs, plugin databases, logs, and
+application-owned records have different retention semantics and must not share a blind deletion
+policy.

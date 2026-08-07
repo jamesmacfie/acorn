@@ -1,8 +1,3 @@
-// Rail ordering model (docs/panes.md): pin-to-top + manual reorder, persisted as a dedicated
-// `rail_order` pref — NEVER tasks.sort (the doc's warning: sort used to derive dev-server ports;
-// 13 §A removed ports, but sort stays untouched on principle — reordering is view state).
-// Pure + unit-tested; TabRail applies it over the workspace-scoped task list.
-
 export type RailOrder = {
   pinned: string[] // task ids pinned to the top, in pinned order
   order: string[] // manual order for the rest; unknown ids keep their tasks.sort order after these

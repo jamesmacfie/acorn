@@ -8,8 +8,8 @@ import { memories } from './schema'
 // `memories` by migration discipline alone. This guard opens a real migrated DB and asserts the FTS
 // column set still matches what main/memory.ts indexes, so a drifted migration edit fails CI.
 //
-// It moved here with the tables: the chain that creates memories_fts is this plugin's now
-// (migrations/0000_*.sql), and core's database no longer has either table to assert about.
+// The chain that creates memories_fts is this plugin's migration chain (migrations/0000_*.sql), and the
+// guard runs against the plugin database that owns both tables.
 describe('memories_fts schema drift guard', () => {
   let t: TestPluginDb
 

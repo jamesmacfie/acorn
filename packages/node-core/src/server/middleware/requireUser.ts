@@ -12,20 +12,12 @@ export const requireUser = createMiddleware<AppEnv>(async (c, next) => {
   await next()
 })
 
-// The owner id to scope this request's data by. Safe only downstream of requireUser, which asserts the
-// same variable is present — gate and read share the one slot, so they cannot desync.
-//
-// This used to be `getUser(c)`, returning the whole decrypted session — login, display name, avatar,
-// scopes, and the GitHub token. Every one of the ~60 call sites read `.login` and nothing else, which is
-// why the narrowing is a rename rather than a refactor. Named `ownerId` rather than `userId` because
-// `userId` is the name of a column on a dozen tables and half these call sites already have a local by
-// that name; shadowing the accessor with the value it produced would be a TDZ error waiting to happen.
 export const ownerId = (c: Context<AppEnv>): string => c.get('principal')!.userId
 
 // Device-only gate, for surfaces an agent-spawned child must never reach.
 //
 // requireUser deliberately accepts either credential kind, which is right for product routes: the MCP
-// server and agent sessions read and write task data as the owner. But docs/vNext/security.md is
+// server and agent sessions read and write task data as the owner. But docs/security.md is
 // explicit that an internal token "can never read secrets back, mint tokens, pair, or touch device
 // management" — and requireUser cannot express that, because it only asserts that SOME principal
 // resolved.
@@ -45,21 +37,6 @@ export const requireDevice = createMiddleware<AppEnv>(async (c, next) => {
   await next()
 })
 
-// May this principal use a stored provider credential (a GitHub token, a Linear key)?
-//
-// A device may: every paired device is the owner. The 'service' scope may: the node calls its own HTTP
-// surface over loopback to reuse serve-then-revalidate — plugins/notes' seedTaskNotes does exactly this
-// to warm a cold PR mirror. A 'task'-scoped token may NOT, and that is the posture change Phase 2 makes
-// deliberately.
-//
-// V1 enforced this structurally: the internal principal carried `token: ''`, so an agent-spawned child
-// could not call GitHub at all. Moving the credential into an `integrations` row keyed by owner dropped
-// that property, because ownerId(c) is identical for a device and an internal principal
-// (docs/vNext/phase1-notes.md § "Accepted divergence"). The Phase 1 note recorded two objections to
-// gating it, and scoping answers both: it is no longer "one guard for two different callers" (the
-// service keeps its reach, so seedTaskNotes still works), and while it is true that an agent has a shell
-// with the owner's git credentials and can push anyway, "it could do it another way" is not a reason for
-// the node to hand it a token it never needs.
 export const canUseProviderCredential = (c: Context<AppEnv>): boolean => {
   const principal = c.get('principal')
   if (!principal) return false

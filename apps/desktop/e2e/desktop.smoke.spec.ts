@@ -31,14 +31,6 @@ function seedQueuedAgent(dataDir: string, taskId: string): QueuedAgentSeed {
       ${sqlText(JSON.stringify([{ type: 'text', text: prompt }]))}, '{}',
       ${sqlText(randomUUID())}, 0, ${timestamp + ordinal}
     );`
-  // plugins/agents.sqlite, NOT core.sqlite. The ten `agent_*` tables moved into the agents plugin's own
-  // database in Phase 2 (docs/vNext/data.md § Plugin DBs, main/pluginStorage.ts), so this is where they
-  // live now — and naming the wrong file is worse than a miss, because `sqlite3` CREATES what it cannot
-  // open: seeding core.sqlite would have silently produced an empty Agent Center, and seeding V1's
-  // acorn.sqlite would have made openDataRoot refuse the whole data root on the next launch.
-  //
-  // The `tasks` row this references is still core's, seeded elsewhere. That split is the point: the ids
-  // cross the boundary, the query does not.
   execFileSync('sqlite3', [join(dataDir, 'plugins', 'agents.sqlite'), `
     BEGIN;
     INSERT INTO agent_sessions (
@@ -101,10 +93,9 @@ function seedQueuedAgent(dataDir: string, taskId: string): QueuedAgentSeed {
 }
 
 // The window holds no credential of its own: every request goes through Electron main's connection
-// broker, which owns the endpoint and the device bearer (docs/vNext/architecture.md § How the client
+// broker, which owns the endpoint and the device bearer (docs/architecture-overview.md § How the client
 // talks to nodes). So the suite seeds through the same bridge the renderer's apiClient uses. Raw
-// `fetch('/v2/…')` from the page worked only because the e2e launch established a session cookie
-// first; there is no login left to establish one.
+// The page uses the same broker bridge as the renderer, so the test never gives the page a token.
 type NodeFetchResult = { status: number; body: Uint8Array }
 type PageBridge = {
   nodeFetch(nodeId: string, request: Record<string, unknown>): Promise<NodeFetchResult>
@@ -149,10 +140,8 @@ async function launch(previous?: Pick<RunningApp, 'dataDir' | 'repoDir'>): Promi
   const app = await electron.launch({
     // Per-run Chromium profile. The renderer's origin is now the constant app://acorn, so its
     // IndexedDB bucket — which holds the persisted TanStack cache — is shared by every launch that
-    // shares a userData dir. Under the old http origin the port was random, so each launch got a fresh
-    // bucket by accident; without this, one test's cached (and still-fresh) task list rehydrates into
-    // the next test's window. Keyed to dataDir so a relaunch of the SAME app keeps its cache and its
-    // device token.
+    // shares a userData dir. Keying the profile to dataDir keeps a relaunch of the same app's cache and
+    // device token isolated from other tests.
     args: ['out/main/index.js', `--user-data-dir=${join(dataDir, 'chromium')}`],
     env: {
       ...process.env,
@@ -243,18 +232,6 @@ test('S1 boots the authenticated desktop shell with no console errors', async ()
   await running.page.reload()
   await expect(running.page.locator('.brand')).toContainText('acorn')
   expect(errors).toEqual([])
-  // The rail's Sources, which is the only place a client plugin's registration is observable before a task
-  // exists. ALL FOUR are plugin contributions as of Phase 3: GitHub used to be a hardcoded literal inside
-  // `availableSources`, outside the registry, which is what made it the one Source the shell rendered itself.
-  //
-  // What this assertion is, and is NOT. It proves the four ungated sources are registered and reach the DOM
-  // through a real Electron render, which no vitest test in this repo can do. It does NOT prove the rail's
-  // ORDER, and Phase 3's comment here claiming it was the only such check was wrong: `availableSources` hides a
-  // provider-gated source with no connected integration and this fixture connects none, so linear and rollbar —
-  // github's two immediate neighbours in the plugin list — are absent from this list entirely. Reordering the
-  // list to put linear first passed. Order is a declared `SourceContribution.order` now, checked directly in
-  // client-core/tabs/sources.test.ts with every gated source connected, and this list is a membership-plus-shape
-  // check on the four that survive the gate.
   await expect(running.page.locator('.tabrail-source').first()).toBeVisible()
   const railSources = await running.page.locator('.tabrail-source')
     .evaluateAll((buttons) => buttons.map((button) => button.getAttribute('aria-label')))
@@ -280,7 +257,7 @@ test('S3 opens a task from the rail', async () => {
   await openSmokeWorkspace(running.page)
   await running.page.getByRole('button', { name: 'Smoke task' }).click()
   await expect(running.page.locator('.task-layout')).toBeVisible()
-  // Every pane a LOCAL task can show, in ui.md's order (agents 15, changes 20, notes 30, context 40,
+  // Every pane a LOCAL task can show, in docs/ui-design.md's order (agents 15, changes 20, notes 30, context 40,
   // editor 50, search 60, database 70, http 76, preview 80), contributed by nine separate plugins'
   // init. Absent by their own `when` predicate rather than by failing to register: pr (needs a PR
   // number), docker (needs a linked container), linear and rollbar (need a task link).
@@ -379,10 +356,6 @@ test('S8 survives a hard reload of a deep route under the app scheme', async () 
   await running.page.reload()
   await expect(running.page.locator('.shell')).toBeVisible()
   expect(running.page.url()).toBe('app://acorn/acorn/smoke/1')
-  // Also the only place the GitHub browse SURFACE renders: it needs an `:owner/:repo` route, which S1's
-  // fresh root has not got. As of Phase 3 that surface is a source CONTRIBUTION rather than JSX inside
-  // App.tsx's Switch fallback (plugins/github's GithubBrowse.tsx), so this is what proves the `<Dynamic>`
-  // path resolves it — the whole surface is .tsx and no vitest suite can import it.
   await expect(running.page.locator('.pane-left .section-header')).toContainText('Reviews')
   await expect(running.page.locator('.pane-mid .section-header')).toContainText('Navigator')
   // Read the policy back off the response. S1's console-error assertion catches a policy that is too
@@ -419,8 +392,6 @@ test('S7 loads the Agent Center and combines task agent switching with the conve
     if (!(button instanceof HTMLButtonElement)) throw new Error('Task Agent pane button is missing.')
     button.click()
   })
-  // Task context used to be asserted by watching page responses; broker traffic never touches the page,
-  // so ask the node the same question the pane asks and let the attached chip below prove the pane got it.
   expect(await nodeJson<{ sections: unknown[] }>(running.page, `/v2/core/tasks/${task.id}/context`)).toBeTruthy()
   await expect.poll(() => running.page.evaluate(() => ({
     pane: !!document.querySelector('.managed-agent-pane'),

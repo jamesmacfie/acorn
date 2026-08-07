@@ -1,48 +1,5 @@
 import { blob, index, integer, primaryKey, sqliteTable, text } from 'drizzle-orm/sqlite-core'
 
-// CORE's schema — what is left after Phase 2 moved every plugin's tables into its own SQLite file
-// (docs/vNext/data.md § Core DB / § Plugin DBs). Edit here, then `pnpm db:generate` → `pnpm db:migrate`.
-//
-// What core still owns, and why each is core's rather than some plugin's:
-//   - device identity (`devices`, `idempotency`) — the auth root; every plugin sits behind it.
-//   - the workspace/task model (`workspaces`, `workspace_repos`, `ignored_repos`, `repo_paths`,
-//     `tasks`, `task_links`, `config_acks`, `workspace_projects`) — the nouns every plugin addresses by
-//     id and dereferences through CoreServices.tasks / .repos.
-//   - the connection registry (`integrations`) and the generic external-item read model it keys
-//     (`issues`, `issue_resources`, and the `provider:%` half of `sync_state`) — shared by two provider
-//     plugins, so owned by neither; see server/integrations/itemStore.ts for the full argument.
-//   - `prefs` — node-scoped preferences, read by core and by plugins through CoreServices.prefs.
-//
-// This file no longer describes any GitHub data. It used to be titled "the read-model mirror", which is
-// now plugins/github/src/node/schema.ts.
-
-// The thirteen GitHub tables moved to plugins/github/src/node/schema.ts in Phase 2
-// (docs/vNext/data.md § Plugin DBs): the mirror (`repos`, `pull_requests`, `pr_files`, `reviews`,
-// `comments`, `pr_commits`, `review_threads`, `pr_labels`, `review_requests`, `checks`), its
-// collection-level freshness table (`sync_state`), and the two app-state tables keyed by a GitHub repo
-// id (`viewed_files`, `pinned_repos`). Core keeps the generated DROP TABLE migration rather than
-// resetting its chain — see docs/vNext/phase2-notes.md.
-//
-// `sync_state` is the one that changed SHAPE rather than just address, and it is worth recording. It was
-// a single table with two unrelated key spaces in it: github's `repos` / `pulls:…` / `pr:…` / `files:…`
-// beside the integration providers' `provider:<id>:<connection>:…`. Only convention kept them apart.
-// github's keys went with the table; the provider markers stayed in CORE, as the `sync_state` table
-// below, because they are read and written beside `issues` / `issue_resources` — which are core's for the
-// reasons set out in server/integrations/itemStore.ts — and because db/cascade.ts evicts them in the same
-// transaction as the integration row they belong to.
-//
-// Three core readers of the github mirror went with it, each becoming a capability the plugin publishes
-// rather than a core-side query (plugins/github/src/contract/):
-//   - the `pr` context section (server/agentTools/contextSections.ts) now takes an injected source, the
-//     same way `notes` and `memory` already did;
-//   - `main/storageFootprint.ts` counts only what core still owns and asks each plugin for its own;
-//   - `apps/node/src/wiring/workflowWiring.ts`'s `failingChecksFor` is `github.mirror.failingChecks`, and
-//     that file is deleted.
-
-// Collection-level revalidation bookkeeping for INTEGRATION PROVIDER resources only (docs/caching.md).
-// Keyed by (userId, resource) with the `provider:<providerId>:<connectionId>:…` shape that cascade.ts
-// matches to evict a disconnected integration's markers. Reached by a plugin exclusively through
-// `ExternalItemStore.readMarker` / `writeMarker`, never as a table.
 export const syncState = sqliteTable(
   'sync_state',
   {
@@ -113,9 +70,8 @@ export const repoPaths = sqliteTable(
     // 'cursor -n' | an absolute path. null → the prefs 'editor_command_default' → 'code'.
     editorCommand: text('editor_command'),
     // Repo-level lifecycle/build config (docs/workspaces-and-tasks.md). These are the machine-local DB
-    // fallback layer beneath a committed .acorn/config.toml (loadRepoConfig precedence). They were
-    // per-workspace columns until repo-level-settings moved them here — a workspace is a GROUP of
-    // repos, but these describe how to build/run/inspect ONE repo, so they belong per (owner, repo).
+    // fallback layer beneath a committed .acorn/config.toml (loadRepoConfig precedence). A workspace is
+    // a group of repositories; these fields describe how to build, run, and inspect one repository.
     setupScript: text('setup_script'), // shell command run once when a task worktree is created; null/blank = none
     setupScriptTrigger: text('setup_script_trigger'), // 'off' | 'created' | 'terminal' — when to run it; null → 'terminal'
     devScript: text('dev_script'), // "run dev" command → a base `dev` run target; null/blank = no run button
@@ -153,12 +109,6 @@ export const configAcks = sqliteTable(
   (t) => [primaryKey({ columns: [t.repo, t.hash] }), index('config_acks_repo_acked_idx').on(t.repo, t.ackedAt)],
 )
 
-// A Workspace is a named GROUP of repos (docs/workspaces-and-tasks.md) — "Runn", "Acorn". The top-level unit
-// the user selects in the top bar. Machine-scoped like repo_paths / tasks (single-user machine).
-// A repo belongs to exactly one workspace (partition) — see workspaceRepos.
-// PURE GROUPING: identity (name/icon/color/sort) + membership + external-project links only. The
-// build/run/db/preview config that used to live here moved to repo_paths (repo-level-settings) —
-// those describe a repo, not the group.
 export const workspaces = sqliteTable('workspaces', {
   id: text('id').primaryKey(), // opaque uuid
   name: text('name').notNull(), // editable label
@@ -199,11 +149,9 @@ export const ignoredRepos = sqliteTable(
   (t) => [primaryKey({ columns: [t.owner, t.repo] })],
 )
 
-// External projects (Linear/Rollbar/…) linked to a workspace. One project → many repos falls out of
-// the workspace grouping (the project backs every repo in the workspace). `integrationId` records
-// WHICH connection the project belongs to, so a workspace can link projects across several
-// integrations (docs/workspaces-and-tasks.md). Provider-agnostic — generalizes the old
-// `workspace_linear_projects` / per-repo prefs key `linear:projects:{owner}/{repo}`.
+// External projects (Linear/Rollbar/…) linked to a workspace. One project → many repos follows from the
+// workspace grouping. `integrationId` records which connection the project belongs to, so a workspace
+// can link projects across several integrations (docs/workspaces-and-tasks.md).
 export const workspaceProjects = sqliteTable(
   'workspace_projects',
   {
@@ -254,34 +202,6 @@ export const taskLinks = sqliteTable(
   (t) => [primaryKey({ columns: [t.taskId, t.integrationId, t.identifier] })],
 )
 
-// `db_saved_queries` moved to plugins/database/src/node/schema.ts (docs/vNext/data.md § Plugin DBs).
-
-// `memories` (and its hand-written `memories_fts` virtual table) moved to
-// plugins/memory/src/node/schema.ts (docs/vNext/data.md § Plugin DBs).
-
-// `terminal_sessions` moved to plugins/terminal/src/node/schema.ts (docs/vNext/data.md § Plugin DBs).
-
-// The ten `agent_*` tables (agent_sessions, agent_turns, agent_events, agent_requests,
-// agent_attachments, agent_attachment_refs, agent_artifacts, agent_operations, agent_webhooks,
-// agent_webhook_deliveries) moved to plugins/agents/src/node/schema.ts in Phase 2
-// (docs/vNext/data.md § Plugin DBs), along with the hand-written `agent_events_fts` virtual table and
-// its three triggers. drizzle-kit models neither, so the DROPs for those four objects are hand-added
-// to the generated migration in this chain — exactly as `memories_fts` was.
-//
-// These were the only tables in the codebase a plugin genuinely JOINED against core's: three queries
-// answering "sessions in workspace X" ran `agent_sessions ⋈ tasks ⋈ workspace_repos`. They are now an
-// id round trip through `CoreServices.tasks.idsForWorkspace()`.
-
-// `workflow_runs` and `workflow_steps` moved to plugins/workflows/src/node/schema.ts in Phase 2
-// (docs/vNext/data.md § Plugin DBs). They are the workflow engine's durable checkpoint and nothing
-// outside that plugin ever read them; `workflow_steps.task_id`/`agent_session_id` were always plain
-// IDs across what are now database files, never joins. Core keeps the generated DROP TABLE migration
-// rather than resetting its 42-file chain — see docs/vNext/phase2-notes.md.
-
-// Per-user cache of fetched external issues (generic across providers, parallels integrations).
-// Keyed by `integrationId` so the same identifier fetched via two different connections doesn't
-// collide. Mirror table: serve-then-revalidate by TTL. Single JSON `data` column so a provider's
-// issue shape can evolve without migrations.
 export const issues = sqliteTable(
   'issues',
   {
@@ -314,13 +234,12 @@ export const issueResources = sqliteTable(
   (t) => [primaryKey({ columns: [t.userId, t.integrationId, t.issueIdentifier, t.resource, t.identifier] })],
 )
 
-// `http_requests` and `http_variables` moved to plugins/http/src/node/schema.ts
-// (docs/vNext/data.md § Plugin DBs).
+// HTTP request and variable tables are owned by plugins/http (docs/data-layer.md § Plugin DBs).
 
-// --- Device identity: the vNext auth root (docs/vNext/protocol.md § Pairing) ---
+// --- Device identity: the node authentication root (docs/api-reference.md § Pairing) ---
 
 // One row per paired client. Every paired device has full owner authority — a disclosed product
-// decision (docs/vNext/security.md § Threat model), so there are no scopes and no per-device
+// decision (docs/security.md § Threat model), so there are no scopes and no per-device
 // authorization; the row exists to name a device and to be revocable.
 //
 // Only sha256(secret) is stored. A 256-bit random secret makes offline hash guessing infeasible, so
@@ -342,7 +261,7 @@ export const devices = sqliteTable(
   (t) => [index('devices_revoked_idx').on(t.revokedAt)],
 )
 
-// Idempotency replay (docs/vNext/protocol.md § HTTP conventions). Stores (deviceId, key) → request
+// Idempotency replay (docs/api-reference.md § HTTP conventions). Stores (deviceId, key) → request
 // hash + response for 24h: the same request replays the stored response, a different request under
 // the same key is a 409, and 5xx is never stored so a genuine retry re-executes.
 export const idempotency = sqliteTable(
@@ -359,20 +278,6 @@ export const idempotency = sqliteTable(
   (t) => [primaryKey({ columns: [t.deviceId, t.key] }), index('idempotency_expiry_idx').on(t.expiresAt)],
 )
 
-// Append-only record of security-relevant actions (docs/vNext/security.md § Audit, data.md § Core DB).
-// Promised since the specs were written and empty until Phase 5.
-//
-// What it is FOR, which decides its shape: an owner asking "what happened to this node?" after finding
-// a device they do not recognise, a credential they did not connect, or a plugin they did not disable.
-// It is not a debugging log and not an intrusion-detection feed.
-//
-// Deliberately NOT tamper-evident. security.md says so outright — hash chains defend against an attacker
-// who already owns the DB file, and a compromised machine is out of scope. Adding them would be
-// ceremony that changes no outcome.
-//
-// `details` is JSON of allowlisted scalars only, decided at each call site. Never a request body, never
-// a credential, never a file's contents — an audit trail that quotes what it saw becomes a second copy
-// of the thing it was protecting.
 export const audit = sqliteTable(
   'audit',
   {

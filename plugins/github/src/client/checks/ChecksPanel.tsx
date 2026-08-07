@@ -7,8 +7,6 @@ import { getHighlighter, tokenizeAnsiLines } from '@acorn/client-core/highlight/
 import Icon from '@acorn/client-core/ui/Icon.tsx'
 import { splitJobLog } from './splitJobLog'
 
-// One step's log, ANSI-colour highlighted (the colours CI tools emit). Falls back to raw text while
-// the highlighter loads and for very large slices. ponytail: 300k-char cap keeps huge logs snappy.
 function StepLog(props: { text: string }) {
   const [lines] = createResource(
     () => props.text,
@@ -41,8 +39,6 @@ function StepLog(props: { text: string }) {
 // fires when the first step opens. Logs load lazily and are cached by the query client.
 export default function ChecksPanel(props: { owner: string; repo: string; runId: number; jobName: string; onClose: () => void }) {
   const jobs = createQuery(() => runJobsOptions(props.owner, props.repo, props.runId, true))
-  // The clicked check name == its job name. Fall back to the first job if no exact match
-  // (matrix / name-format edge case). ponytail.
   const job = createMemo(() => {
     const list = jobs.data?.jobs ?? []
     return list.find((j) => j.name === props.jobName) ?? list[0] ?? null

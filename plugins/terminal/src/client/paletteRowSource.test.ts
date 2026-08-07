@@ -1,14 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { PaletteItem } from '@acorn/client-core/palette/model.ts'
 
-// The row-building and invoke logic CommandPalette used to hold, now this plugin's. It moved in Phase 3 with no
-// test of its own, and the invoke half had a real bug: the layout branch checked that the cached fetch belonged
-// to the task being invoked and the run branch did not.
-//
-// Everything the source touches is mocked at the module boundary rather than reached: `runApi` is HTTP,
-// `setTerminalOpen` is a client-core signal, `refreshSessions` refetches a query, and `invokeLayoutRecipe` has
-// its own suite (recipes.test.ts). What is under test is which of them gets called, with what, and when not at
-// all.
 const mocks = vi.hoisted(() => ({
   targets: vi.fn(),
   start: vi.fn(),

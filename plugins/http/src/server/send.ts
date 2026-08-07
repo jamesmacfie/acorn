@@ -373,8 +373,6 @@ export async function readCapped(res: Response): Promise<{ bytes: Uint8Array; tr
   return { bytes, truncated }
 }
 
-// A chronological log of what went out and what came back, in Bruno's spirit but without its
-// https.Agent subclass — no DNS/TCP/TLS phase breakdown.
 function buildTimeline(
   method: string,
   url: string,

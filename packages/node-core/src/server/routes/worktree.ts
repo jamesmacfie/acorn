@@ -1,17 +1,3 @@
-// Worktree, repo-config and task-lifecycle authority (docs/vNext/plan.md § Phase 2: "Move misplaced
-// authority into core: worktree/run-target/captured-command/config-trust routes out of terminal").
-//
-// These eleven routes were served by the terminal plugin at /v2/p/terminal/*, which put the terminal
-// in charge of things it does not own: where a repo is checked out, what a repo's executable config
-// says, whether a task borrows a checkout or gets an isolated worktree, and whether a task is
-// archived. The ENGINES were already core's (main/repoPaths.ts, main/taskWorktree.ts,
-// main/worktrees.ts, main/archive.ts) — only the routes and the bridge object lived in the plugin, so
-// disabling terminal would have taken worktree management with it.
-//
-// Most handlers therefore call core engines directly, with no bridge at all. The one exception is
-// archive, which genuinely needs the PTY: the running-session guard, killing a task's sessions, and
-// streaming teardown output into a "Teardown" tab. That is a four-method slot the terminal plugin
-// fills, and an unfilled slot answers 503 exactly as the whole terminal bridge did before.
 import { eq } from 'drizzle-orm'
 import { existsSync } from 'node:fs'
 import { readFile, writeFile } from 'node:fs/promises'
@@ -37,12 +23,7 @@ import { respondError } from '../respond'
 // main/archive.ts's archiveTask already takes, so filling this slot is a pass-through in the plugin
 // rather than a new adapter.
 export type TaskSessionsBridge = {
-  // Resolves when the engine's startup reconcile has run. Archive MUST await this before anything else:
-  // before the sweep the session map is empty, so runningCount() returns 0, the guard passes vacuously,
-  // killRunning kills nothing — and the task's live tmux session survives its deleted worktree and gets
-  // re-attached. The old implementation awaited it at the top of archive; the move to core left the await
-  // inside runTeardown, which runs AFTER the guard, so `skipTeardown` or a repo with no teardown script
-  // skipped it entirely.
+  // Archive waits for startup reconciliation before checking or stopping live sessions.
   ready(): Promise<void>
   runningCount(taskId: string): number
   killRunning(taskId: string): void
@@ -96,11 +77,6 @@ const repoConfigBody = z.object({
 const previewBody = z.object({ script: z.string() })
 const archiveBody = z.object({ deleteWorktree: z.boolean().optional(), force: z.boolean().optional(), skipTeardown: z.boolean().optional() })
 
-// Browser-preview 'script' mode: run the repo-configured command in the task's worktree and use its
-// last non-empty stdout line as the preview URL. Keyed by taskId so no caller supplies a path.
-// Through the process broker, so it gets an allowlisted env (it used to inherit the node's entire
-// environment, SESSION_ENC_KEY included), an output cap, and a process-group kill — a URL script
-// commonly starts a dev server.
 async function capturePreviewUrl(
   db: ReturnType<typeof getDb>,
   taskId: string,

@@ -8,15 +8,6 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from
 import { ensureCert } from '@acorn/node-core/main/tls.ts'
 import { PreviewTunnels } from './previewTunnel'
 
-// The credential on the tunnel's loopback hop — the risk Phase 4 accepted rather than closed
-// (docs/vNext/phase4-notes.md § "Considered and NOT changed"). Until Phase 5 anything that could find
-// the port got a byte pipe to another machine's dev server, using the owner's device token.
-//
-// Driven against a REAL node end: a TLS server with the node's own `ensureCert` certificate and a
-// WebSocketServer on /v2/tunnel. That matters for the negative cases especially — "refused" has to mean
-// "no upgrade was ever attempted against the node", not merely "the local socket closed", and only a
-// real listener on the other end can tell those apart.
-
 let certDir: string
 let certPem: string
 let keyPem: string

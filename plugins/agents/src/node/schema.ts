@@ -1,13 +1,9 @@
-// The agents plugin's own tables (docs/vNext/data.md § Plugin DBs). Lives in
+// The agents plugin's own tables (docs/data-layer.md § Plugin DBs). Lives in
 // <data-root>/plugins/agents.sqlite with its own Drizzle chain, migrated at plugin init.
 //
-// Ten tables moved out of @acorn/node-core's schema.ts: the managed-agent transcript is this plugin's
-// data, and core has no reason to know its shape. Nothing here references another database — a
-// `taskId` is a plain id resolved through CoreServices.tasks rather than joined, because a query never
-// spans database files. That rewrite was the substance of the conversion, not the move: the three
-// `agent_sessions ⋈ tasks ⋈ workspace_repos` joins that answered "sessions in workspace X" were the
-// only real cross-DB joins in the codebase, and they are now an id round trip through
-// `CoreServices.tasks.idsForWorkspace()` followed by an `inArray` inside this file.
+// Managed-agent transcript data is owned by this plugin. Nothing here references another database: a
+// `taskId` is a plain ID resolved through CoreServices.tasks, and plugin queries remain local to this
+// SQLite file.
 //
 // The companion FTS5 virtual table (`agent_events_fts`, plus its three append/update/delete triggers
 // over `agent_events`) is created BY HAND in this chain's migration — drizzle-kit does not model
@@ -82,7 +78,7 @@ export const agentTurns = sqliteTable(
   ],
 )
 
-// Append-only normalized event ledger — the durable ordered history protocol.md § Streams describes.
+// Append-only normalized event ledger — the durable ordered history docs/api-reference.md § Streams describes.
 // `searchText` feeds the migration-owned FTS5 virtual table; large bytes and verbose command output
 // live in agent_artifacts instead of this row.
 export const agentEvents = sqliteTable(

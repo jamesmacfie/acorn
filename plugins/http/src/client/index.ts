@@ -1,4 +1,4 @@
-// The http plugin's client part (docs/vNext/plugins.md § The plugin API).
+// The http plugin's client part (docs/plugins.md § The plugin API).
 import { lazy } from 'solid-js'
 import type { ClientPlugin } from '@acorn/client-core/registries/plugin.ts'
 import { httpAgentContextContribution } from './agentContextContribution'

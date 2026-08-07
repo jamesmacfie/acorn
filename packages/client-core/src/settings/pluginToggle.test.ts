@@ -34,8 +34,6 @@ describe('nextDisabledList', () => {
   })
 
   it('never carries a required plugin through from the rows', () => {
-    // A stale file, or a build where the plugin used to be optional, can leave `disabled: true` on a
-    // required row. Passing it back would 400 every subsequent save.
     const stale = [row('github', { required: true, disabled: true }), row('docker')]
     expect(nextDisabledList(stale, 'docker', true)).toEqual(['docker'])
   })

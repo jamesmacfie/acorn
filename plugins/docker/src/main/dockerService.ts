@@ -12,7 +12,7 @@ const INFO_TTL_MS = 10_000
 const LIST_TTL_MS = 5_000 // backstop only; the events watcher invalidates eagerly
 const BROADCAST_DEBOUNCE_MS = 300
 const EVENTS_BACKOFF_MAX_MS = 60_000
-const MAX_STREAM_CHILDREN = 32 // ponytail: hard cap; raise if someone genuinely tails 32 streams
+const MAX_STREAM_CHILDREN = 32 // Bound concurrent stream readers to protect the local daemon.
 
 type VersionJson = { Client?: { Context?: string }; Server?: { Version?: string } }
 

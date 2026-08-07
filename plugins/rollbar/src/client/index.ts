@@ -1,4 +1,4 @@
-// The rollbar plugin's client part (docs/vNext/plugins.md § The plugin API).
+// The rollbar plugin's client part (docs/plugins.md § The plugin API).
 //
 // Like linear: no tables of its own (core owns `issues` / `issue_resources`), so everything that makes
 // rollbar visible is here — a rail source and a pane.

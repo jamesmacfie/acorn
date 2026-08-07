@@ -1,4 +1,4 @@
-// The editor plugin's client part (docs/vNext/plugins.md § The plugin API).
+// The editor plugin's client part (docs/plugins.md § The plugin API).
 //
 // Two panes, not one: the file editor and find-in-files are separate panes with separate chords, but
 // one plugin — they share the ripgrep/read-file routes and the Monaco setup.

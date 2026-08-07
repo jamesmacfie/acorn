@@ -41,7 +41,7 @@ beforeEach(() => {
 
 describe('per-node cache partitioning', () => {
   it('does not collide when two nodes hold the same resource UUID', () => {
-    // docs/vNext/architecture.md § Fleet semantics: "Two nodes may coincidentally hold the same UUID;
+    // docs/architecture-overview.md § Fleet semantics: "Two nodes may coincidentally hold the same UUID;
     // that must never collide in the client." This is the whole reason the partition is a QueryClient
     // per node rather than a nodeId prefix on 34 query-option factories.
     const sharedId = 'f6a1c0de-0000-4000-8000-000000000000'

@@ -1,13 +1,9 @@
-// Browser-preview surface (docs/panes.md): a main-owned WebContentsView per task, not a
-// renderer <webview>. The <webview> tag is on Electron's deprecation trajectory and
-// forced the old body-parented floating layer — a DOM-embedded guest is reloaded whenever it leaves
-// and re-enters the DOM, so surviving pane switches was a hack. A WebContentsView is main-owned and
-// bounds-managed: surviving pane/task switches is its natural behaviour. The renderer drives it over
-// IPC (create/bounds/show/navigate) and gets chrome state (loading, url, back/forward) pushed back.
+// Browser-preview surface (docs/panes.md): a main-owned WebContentsView per task, not a renderer
+// <webview>. The renderer drives it over IPC (create/bounds/show/navigate) and receives chrome state
+// (loading, URL, back/forward) over the same bridge.
 //
 // Occlusion caveat: a native view always paints above the window's web content, so overlays can't
-// sit above it via z-index. The renderer detects when an overlay covers the pane and calls hide()
-// (PreviewPane.tsx) — the WebContentsView equivalent of the old z-index dance.
+// sit above it via z-index. The renderer detects when an overlay covers the pane and calls hide().
 import { BrowserWindow, WebContentsView, ipcMain, type IpcMainEvent, type IpcMainInvokeEvent, type WebContents } from 'electron'
 import { matchesUrlPattern } from '@acorn/protocol/browserRules.ts'
 import type { PreviewBrowserRule } from '@acorn/protocol/serviceProtocol.ts'
@@ -50,10 +46,9 @@ function trackOwner(owner: BrowserWindow): void {
 }
 
 function create(taskId: string, owner: BrowserWindow, homeUrl: string): PreviewRecord {
-  // Hardened guest: no preload, no node integration, sandboxed — same posture the old
-  // will-attach-webview handler pinned on the <webview>.
+  // Hardened guest: no preload, no Node integration, sandboxed.
   //
-  // Plus an EPHEMERAL partition per task, which docs/vNext/security.md § Execution boundaries has
+  // Plus an EPHEMERAL partition per task, which docs/security.md § Execution boundaries has
   // required since it was written and this never had: without one, every preview shared the app's
   // DEFAULT session, so a page in one task's preview could read another's cookies and storage, and
   // anything it stored outlived the pane. No `persist:` prefix, so the session is in-memory and dies

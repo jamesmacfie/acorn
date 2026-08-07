@@ -73,7 +73,7 @@ export const restartLocalNode = async (): Promise<void> => {
   await restart()
 }
 
-// The node's OWN device list — every client paired with it, not just this one. ui.md § New surfaces asks for
+// The node's OWN device list — every client paired with it, not just this one. docs/ui-design.md § New surfaces asks for
 // "revoke this or other devices", and only the first half existed: `removeNode(nodeId, revoke)` deletes THIS
 // client's row. A laptop that was lost, or a machine that was reinstalled, had no way to be cut off short of
 // re-pairing everything.
@@ -84,7 +84,7 @@ export const nodeDevices = async (nodeId: string): Promise<PairedDevice[]> =>
   (await readJson<DevicesResponse>(coreDevicesRoute, { nodeId })).devices
 
 // Revoking a device closes its sockets immediately and fails its in-flight requests
-// (docs/vNext/protocol.md § Pairing). Revoking THIS client's own row is possible and is not stopped here: it
+// (docs/api-reference.md § Pairing). Revoking THIS client's own row is possible and is not stopped here: it
 // is the same thing `removeNode(nodeId, true)` does, and the caller is better placed to warn about it.
 export const revokeNodeDevice = async (nodeId: string, deviceId: string): Promise<void> => {
   await sendJson(coreDeviceRoute(deviceId), { method: 'DELETE', nodeId })

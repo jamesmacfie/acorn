@@ -8,16 +8,12 @@ import { resolveRepoForUser } from './repoMirror'
 import { githubToken } from '../githubToken'
 import type { PluginDatabase } from '@acorn/node-core/main/pluginStorage.ts'
 
-// Full file body at an immutable blob sha — used to expand unchanged context around diff hunks.
-// The sha keys immutable content, so bodies cache forever in the local on-disk BLOBS dir
-// (key format in server/blobs.ts, next to the patch:<sha> keys prMirror writes).
-
 const decodeBase64 = (content: string) =>
   new TextDecoder().decode(Uint8Array.from(atob(content.replace(/\n/g, '')), (c) => c.charCodeAt(0)))
 
 // A FACTORY over this plugin's own database, not a module-scope router reading getDb(c.env). The tables
 // live in <data-root>/plugins/github.sqlite now, and `c.env` deliberately carries no per-plugin handles
-// (docs/vNext/data.md § Plugin DBs). The handle arrives at plugin init, so no request can reach an
+// (docs/data-layer.md § Plugin DBs). The handle arrives at plugin init, so no request can reach an
 // unmigrated database — and a second startServiceRuntime in one process builds fresh routers over its own
 // handle instead of inheriting a closed one.
 export const pullBlob = (db: PluginDatabase) => new Hono<AppEnv>().get('/:owner/:repo/blobs/:sha', async (c) => {

@@ -47,8 +47,6 @@ fragment PrFields on PullRequest {
   mergeStateStatus
   autoMergeRequest { mergeMethod }
 }`
-// ponytail: first-page only (reviewsTable,comments 50) — cursor pagination deferred.
-
 export type GqlPull = {
   id: string
   number: number
@@ -296,9 +294,6 @@ export type GitHubFile = {
   patch?: string // omitted for binary / too-large / pure-rename files
 }
 
-// Fetch one PR's changed files from the REST API. ponytail: first 100 files — Link-header
-// pagination deferred. Non-OK responses are normalized through ghError (same RouteResult shape
-// as refreshRepos), so callers don't re-derive failures themselves.
 export const fetchFiles = async (token: string, owner: string, repo: string, number: number): Promise<RouteResult<GitHubFile[]>> => {
   const res = await gh(token, `/repos/${owner}/${repo}/pulls/${number}/files?per_page=100`)
   const err = ghError(res)

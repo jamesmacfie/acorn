@@ -7,7 +7,7 @@ import { forgetDeviceToken, LOCAL_TOKEN_SCOPE, readDeviceToken, writeDeviceToken
 // Fleet membership: which nodes this client knows, where they are, and what certificate to pin.
 //
 // It lives in main because main holds the two things membership is inseparable from — the device
-// tokens and the pinned certificates (docs/vNext/architecture.md § What runs where). The renderer gets
+// tokens and the pinned certificates (docs/architecture-overview.md § What runs where). The renderer gets
 // a token-free projection and asks main to mutate; nothing here is ever handed across contextBridge
 // except via `NodeRecord`.
 //

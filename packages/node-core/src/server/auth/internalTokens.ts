@@ -1,30 +1,7 @@
-// Scoped internal tokens (docs/vNext/protocol.md § Transport: internal tokens are "task- or
-// session-scoped, expiring, and restricted: they can call only the routes their scope declares, and can
-// never read secrets back, mint tokens, pair, or touch device management").
-//
-// What this replaces, and why it is the phase's most important fix: there was ONE node-wide
-// INTERNAL_TOKEN, a bare UUID, injected identically into every PTY, every agent session, every workflow
-// step, and used by the service to call itself over loopback. So a single string meant two completely
-// different things — "the service calling itself" and "a child an agent spawned" — and the auth layer
-// could not tell them apart. Two consequences followed:
-//
-//   1. An agent could spend the owner's stored GitHub credential, because githubToken() resolves the
-//      row for ownerId(c) and ownerId is the same for both. docs/vNext/phase1-notes.md records this as a
-//      known divergence pending exactly this change.
-//   2. Task scoping was decorative. routes/agentTools.ts takes the taskId from the URL, so a token
-//      handed to task A's agent could call /v2/core/tasks/B/tools/* — the credential said nothing about
-//      which task it belonged to.
-//
-// Design: a stateless HMAC token, NOT a row in a table.
-//
-// The reason is a real constraint, not taste. An agent pane runs under tmux and is reattached after a
-// restart, keeping the environment of the boot that spawned it — which is exactly why the old token was
-// deliberately persisted across boots. A token that has to be looked up in a table would either need
-// those rows to outlive the boot (a new table, a new sweep, a new failure mode) or would break every
-// reattached session. Signing with a key that is already persisted gives the same property with no
-// storage: the token verifies as long as the key exists, and the key is the file the old token lived in.
-//
-// No expiry, and that is a deliberate gap: see the note on `verifyInternalToken`.
+// Internal tokens are stateless HMAC credentials. Claims distinguish Node service calls from child
+// calls and bind task credentials to one task. The signing key persists so tmux-reattached sessions
+// can reconnect after a Node restart; rotating the key revokes outstanding tokens. Tokens do not
+// expire, so scope and key rotation are the active lifetime controls.
 import { createHmac, timingSafeEqual } from 'node:crypto'
 
 // 'service' — the node calling its own HTTP surface over loopback (notes seeding, workflow context
@@ -66,12 +43,8 @@ export function mintInternalToken(key: string, claims: InternalClaims): string {
 // Uniformly null, so a caller cannot distinguish "malformed" from "forged" (the same rule pairing
 // already follows).
 //
-// No expiry check, and the omission is deliberate rather than forgotten. protocol.md asks for expiring
-// tokens; a reattached tmux agent holds the environment of the boot that spawned it, so an expiry short
-// enough to matter would break the reattach case that made the old token persistent in the first place,
-// and an expiry long enough not to would buy nothing. What actually bounds these tokens is scope, which
-// is what this change adds. Rotating the signing key invalidates every outstanding token at once, which
-// is the revocation lever that does exist.
+// Tokens do not expire. Reattached tmux agents retain the environment of the boot that spawned them, so
+// scope and signing-key rotation provide the operational boundary and revocation lever.
 export function verifyInternalToken(key: string, token: string): InternalClaims | null {
   if (!key || !token) return null
   if (!token.startsWith(PREFIX)) return null

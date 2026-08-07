@@ -2,15 +2,6 @@ import Picker from './Picker'
 import { resolveWorkspaceColor } from '@acorn/protocol/workspaceIdentity.ts'
 import type { FleetWorkspace } from '../workspaces/fleetWorkspaces'
 
-// The top-level workspace selector (docs/workspaces-and-tasks.md). Sits in the topbar; picking a workspace
-// navigates to one of its repos (the caller derives "active" from the current repo). Reuses the
-// shared Picker primitive, like RepoPicker. Rows carry the workspace identity (docs/workspaces-and-tasks.md):
-// a colour dot (stored colour or name-hash default) and the emoji icon when one is set.
-//
-// Fleet-wide as of Phase 4: rows are (workspace, node) pairs. `grouped` decides whether the node label is
-// rendered — with one node it names the only machine there is, which ui.md rules out. `active` is matched
-// on the PAIR, not the workspace id: two nodes may hold the same workspace UUID by construction
-// (architecture.md § Fleet semantics), so an id-only match would highlight the wrong row.
 export default function WorkspacePicker(props: {
   workspaces: FleetWorkspace[]
   active: FleetWorkspace | null

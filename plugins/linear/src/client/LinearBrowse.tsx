@@ -48,9 +48,6 @@ export default function LinearBrowse() {
   const patch = (part: Partial<LinearFilter>) => setFilter((f) => ({ ...f, ...part }))
   const groups = createMemo(() => groupLinearIssuesByState(sortLinearIssues(filterLinearIssues(allIssues(), filter()))))
 
-  // ponytail: local selection signal, add a route param only if issues need deep-linking.
-  // The source component survives repo navigation, so explicitly keep this session-only selection
-  // (and the filter) scoped to the routed repo rather than carrying state from the workspace we left.
   createEffect(on(
     () => `${params.owner ?? ''}/${params.repo ?? ''}`,
     () => {

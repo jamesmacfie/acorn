@@ -26,9 +26,6 @@ export const integrations = new Hono<AppEnv>()
     const rows = await listConnections(getDb(c.env), uid)
     return c.json({
       providers: connectionProviderRegistry.list().map((provider) => provider.toPublic()),
-      // GitHub is an ordinary stored connection now. It used to be synthesized here because its
-      // token WAS the session cookie and there was no row to list; leaving the synthesizer in place
-      // alongside the real row would list GitHub twice.
       integrations: rows.map(connectionSummary),
     } satisfies IntegrationsResponse)
   })

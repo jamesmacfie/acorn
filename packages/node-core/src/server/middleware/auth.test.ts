@@ -52,9 +52,6 @@ describe('machine identity binding', () => {
     }
   })
 
-  // A cookie used to be a third way in, and it was the only credential the middleware could WRITE the
-  // identity binding from. Both are gone: there is no cookie to present, and the binding is written when
-  // a provider account is connected instead.
   it('ignores a cookie entirely', async () => {
     const set = vi.fn()
     const response = await app.fetch(

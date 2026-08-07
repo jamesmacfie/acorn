@@ -1,4 +1,4 @@
-// The http plugin's own tables (docs/vNext/data.md § Plugin DBs). Lives in
+// The http plugin's own tables (docs/data-layer.md § Plugin DBs). Lives in
 // <data-root>/plugins/http.sqlite with its own Drizzle chain, migrated at plugin init.
 //
 // Moved out of @acorn/node-core's schema.ts: saved requests and repo variables are the API panel's
@@ -22,9 +22,6 @@ export const httpRequests = sqliteTable(
     userId: text('user_id').notNull().default('__legacy_unscoped__'),
     repoOwner: text('repo_owner').notNull(),
     repoName: text('repo_name').notNull(),
-    // ponytail: a slash path ('auth/login'), not a folders table with parent_id. The client splits
-    // on '/' to build the tree. Renaming a folder is one UPDATE; there are no orphans or cycles to
-    // handle. The one cost is that a folder can't exist while empty.
     folder: text('folder').notNull().default(''),
     // Set = an ad-hoc request living with a task (shown in that task's API pane). Null = saved in
     // the repo tree. "Save this ad-hoc request" clears taskId and sets folder + name. No FK, and now

@@ -1,4 +1,4 @@
-// The terminal plugin's own tables (docs/vNext/data.md § Plugin DBs). Lives in
+// The terminal plugin's own tables (docs/data-layer.md § Plugin DBs). Lives in
 // <data-root>/plugins/terminal.sqlite with its own Drizzle chain, migrated at plugin init.
 //
 // Moved out of @acorn/node-core's schema.ts: a pseudo-terminal session is this plugin's data and
@@ -6,14 +6,6 @@
 // CoreServices.tasks, never joined, because a transaction never spans database files.
 import { index, integer, sqliteTable, text } from 'drizzle-orm/sqlite-core'
 
-// Durable terminal sessions (docs/workflows.md). Machine-scoped like repo_paths. We persist ONLY
-// tmux-backed sessions: tmux outlives an app restart, so on startup the engine reconciles these rows
-// against `tmux list-sessions` and re-attaches the survivors. node-pty sessions die with the process
-// and live only in the in-memory map. No terminal output is ever stored
-// (docs/terminal-and-agents.md). ponytail: a §7 subset — no pid / last_attached_at (we re-derive
-// liveness from tmux, not a stored pid).
-// Bound to a task (docs/workspaces-and-tasks.md/03): repo / branch / PR are derived through the
-// taskId → tasks lookup, so the loose repo_owner / repo_name / pull_number columns are gone.
 export const terminalSessions = sqliteTable(
   'terminal_sessions',
   {

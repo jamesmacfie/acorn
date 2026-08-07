@@ -149,8 +149,6 @@ export default function RollbarBrowse() {
     if (!item) return
     setAttachMessage('')
     if (!taskId) return setAttachMessage('No active task — open one first, or use +TASK.')
-    // `promotion` is optional on SourceContribution since Phase 3 (github has none), so this reads its own
-    // registration defensively rather than asserting. It is this plugin's own entry and it always has one.
     const promotion = (sourceRegistry.get('rollbar') as SourceContribution<RollbarItemSummary> | undefined)?.promotion
     if (!promotion?.attachToCurrentTask) return
     await promotion.attachToCurrentTask(taskId, item)

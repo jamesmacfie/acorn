@@ -3,11 +3,8 @@ import { chmodSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'n
 import { randomBytes } from 'node:crypto'
 import { dirname, join } from 'node:path'
 
-// Migration C (docs/electron.md): SESSION_ENC_KEY via Electron safeStorage, not keytar. safeStorage
-// is built in (no native rebuild) and encrypts against the OS keychain. This is the FIRST secret to
-// move; integration tokens ride the same key at rest (session.ts encryptSecret), so losing it logs
-// everyone out AND strands every stored provider token — hence the deliberate throw-not-regenerate
-// on decrypt failure below (acceptance: a failure mode that never silently creates a second identity).
+// SESSION_ENC_KEY is stored with Electron safeStorage when available. The same key protects encrypted
+// provider credentials, so a decrypt failure is fatal rather than silently creating a second identity.
 //
 // Env always wins: `.env` (dev), the real environment, and tests can set SESSION_ENC_KEY directly.
 // When safeStorage is available, an env key is also persisted so env-only installations migrate
@@ -38,8 +35,7 @@ export function resolveSessionKey(dataDir: string): void {
     assertValidKey(envKey, 'SESSION_ENC_KEY')
     if (!safeStorage.isEncryptionAvailable()) return // explicit env remains the supported fallback
 
-    // Migration/repair path: make the authoritative env identity durable. Avoid rewriting the
-    // ciphertext on every launch when the keychain copy already resolves to the same key.
+    // Make an explicitly supplied key durable without rewriting an unchanged keychain value.
     let persistedKey: string | null = null
     if (existsSync(path)) {
       try {
@@ -70,8 +66,8 @@ export function resolveSessionKey(dataDir: string): void {
     return
   }
 
-  // Missing key material beside an existing DB is an incomplete migration, not a first run. The old
-  // env key can recover both sessions and provider tokens; inventing one here would strand both.
+  // Missing key material beside an existing database is an integrity failure, not a first run. The
+  // original key must be supplied so the database and provider credentials remain readable.
   if (existsSync(join(dataDir, DB_FILE))) {
     throw new Error(
       `${KEY_FILE} is missing for an existing ${DB_FILE} — restore the original SESSION_ENC_KEY in the environment so it can be migrated to safeStorage.`,

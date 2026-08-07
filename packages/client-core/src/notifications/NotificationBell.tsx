@@ -18,7 +18,7 @@ const relTime = (at: number): string => {
 
 // The top-bar bell (docs/terminal-and-agents.md): unread pill + popover, now holding TWO sections.
 //
-// "Needs you" is the attention inbox (ui.md § Prompts and notifications), fleet-wide and fetched from every
+// "Needs you" is the attention inbox (docs/ui-design.md § Prompts and notifications), fleet-wide and fetched from every
 // node. It shares the popover with notices rather than getting its own surface because the two answer
 // adjacent questions — "what needs me" and "what happened" — and the popover already has the row chrome,
 // the target-handler table and the task navigation both need. A separate rail source would have duplicated
@@ -55,7 +55,7 @@ export default function NotificationBell(props: { onSelectTask: (taskId: string)
             <div class="notify-head">
               <span>Needs you</span>
             </div>
-            {/* Partial results are a banner, never a failed list (architecture.md § Fleet semantics). */}
+            {/* Partial results are a banner, never a failed list (docs/architecture-overview.md § Fleet). */}
             <Show when={inbox().unavailable.length}>
               <div class="notify-banner" role="status">
                 <For each={inbox().unavailable}>{(entry) => <span>{entry.label} unavailable</span>}</For>
@@ -84,7 +84,7 @@ export default function NotificationBell(props: { onSelectTask: (taskId: string)
                       <span class="notify-title">{row.item.title}</span>
                       <Show when={row.item.detail}><span class="notify-detail muted">{row.item.detail}</span></Show>
                       {/* The node badge only when there is more than one node — otherwise it is noise
-                          naming the only machine there is (ui.md: first-run never mentions nodes). */}
+                          naming the only machine there is (docs/ui-design.md: first-run never mentions nodes). */}
                       <Show when={multiNode()}><span class="notify-node muted">{row.node.label}</span></Show>
                       <span class="notify-time muted">{relTime(row.item.at)}</span>
                     </button>

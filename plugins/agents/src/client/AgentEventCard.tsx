@@ -12,10 +12,6 @@ const copy = (text: string): void => {
   void navigator.clipboard.writeText(text)
 }
 
-// An artifact used to be a plain `href` to its content route. That only ever worked while the renderer
-// shared an origin with the node; from app:// the URL resolves against the renderer's own protocol
-// handler and 404s into index.html, and the bearer lives in main either way. So fetch the bytes through
-// the broker and hand the browser a blob URL — the same shape AgentPane's transcript export uses.
 async function downloadArtifact(artifactId: string, title: string): Promise<void> {
   const { bytes, type, filename } = await managedAgentApi.artifactContent(artifactId)
   const url = URL.createObjectURL(new Blob([bytes as unknown as BlobPart], { type }))

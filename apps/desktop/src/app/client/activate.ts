@@ -1,14 +1,3 @@
-// Renderer activation: register CORE's contributions, then run every client plugin's init.
-//
-// This file used to name all fourteen plugins' contribution modules by hand and push them into fifteen
-// registries — 91 lines in which adding a pane meant editing the app, and turning a plugin off meant
-// deleting lines. Both halves of that are gone: the plugin list is plugins.ts, and each plugin says what
-// it contributes in its own client/index.ts. What is left below is what genuinely belongs to the
-// composition root — core's own contributions, which no plugin owns.
-//
-// Ordering: core first, then plugins. That is not load-bearing (core contributes no rail source, and
-// every other registry sorts), but it keeps the shell's own overlays and pollers registered before any
-// plugin can observe the registries.
 import { initClientPlugins } from '@acorn/client-core/registries/plugin.ts'
 import { disabledNodePlugins, refreshNodePlugins } from '@acorn/client-core/node/nodePlugins.ts'
 import { noticeKindContributions } from '@acorn/client-core/notifications/kindContributions.ts'

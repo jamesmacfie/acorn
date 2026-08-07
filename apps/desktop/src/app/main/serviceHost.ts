@@ -25,19 +25,6 @@ export type ServiceHostEvents = {
 // the data root's lock is worse than a hard kill (main/dataRoot.ts).
 const KILL_ESCALATION_MS = 5_000
 
-// Supervises the Node service as an ordinary child process (docs/vNext/architecture.md: "the desktop
-// build embeds the built Node artifact and spawns it as a child process").
-//
-// It used to be an Electron utilityProcess. The change buys two things and costs nothing measurable:
-// the service becomes a process this repo can start WITHOUT Electron — which is what makes the spawn
-// integration test possible, and what a headless node will need — and `stdio: 'ipc'` is a plain
-// Node channel, so `apps/node/src/service/index.ts` speaks `process.send` instead of shimming
-// Electron's `parentPort` against plain-Node types.
-//
-// Three things that look risky and are not. ELECTRON_RUN_AS_NODE=1 on process.execPath is already the
-// shipped pattern (main/mcpRegister.ts launches out/main/mcp.js that way from inside app.asar). The
-// better-sqlite3 / node-pty ABI is unchanged, because that is still Electron's V8. And the artifact is
-// ESM under a "type": "module" package, which the IPC channel does not care about.
 export class ServiceHost {
   private child: ChildProcess | null = null
   private peer: ServiceRpcPeer | null = null
@@ -106,8 +93,6 @@ export class ServiceHost {
       }
       child.once('spawn', onSpawn)
       child.once('exit', onEarlyExit)
-      // 'error' is the spawn failure a utilityProcess reported as an immediate exit: a missing entry or
-      // an unexecutable binary never reaches 'exit' at all, so without this the promise never settles.
       child.once('error', onEarlyExit)
     })
     child.on('exit', (code) => this.handleExit(child, code ?? 0))

@@ -22,7 +22,7 @@ import { buildSystemPrompt, GENERATE_MAX_OUTPUT_TOKENS, stripSqlFences } from '.
 //
 // A FACTORY over the plugin's own database, not a module-scope router reading getDb(c.env): saved
 // queries live in <data-root>/plugins/database.sqlite now, and c.env deliberately does not carry
-// per-plugin handles (docs/vNext/data.md § Plugin DBs). The handle arrives at plugin init, so no
+// per-plugin handles (docs/data-layer.md § Plugin DBs). The handle arrives at plugin init, so no
 // request can reach an unmigrated database.
 
 export type DatabaseBridge = {
@@ -64,10 +64,6 @@ const id = (c: { req: { param(k: string): string } }) => c.req.param('id')
 type SavedRow = typeof dbSavedQueries.$inferSelect
 const rowToQuery = (r: SavedRow): DbSavedQuery => ({ id: r.id, name: r.name, notes: r.notes, sql: r.sql, updatedAt: r.updatedAt })
 
-// The core services this router needs. `tasks` resolves the (repoOwner, repoName) a saved query is
-// scoped to — it used to be a join against core's `tasks` in this file, and cannot be one across two
-// SQLite files. `models` is provider access for AI generation: the plugin owns the prompt, core owns
-// the credential.
 type DatabaseRouteServices = Pick<CoreServices, 'tasks' | 'models'>
 
 export const databaseRoutes = (db: PluginDatabase, core: DatabaseRouteServices) => {
@@ -137,8 +133,6 @@ export const databaseRoutes = (db: PluginDatabase, core: DatabaseRouteServices) 
       const rows = await db.select().from(dbSavedQueries).where(repoScope(t)).orderBy(dbSavedQueries.name)
       return c.json(rows.map(rowToQuery))
     })
-    // Save = upsert on (repo, name): re-saving under an existing name overwrites it, which is also how
-    // a query is edited or renamed. ponytail: no PATCH route, add one if renaming without retyping matters.
     .post('/:id/database/queries', async (c) => {
       const p = savedQueryBody.safeParse(await c.req.json().catch(() => null))
       if (!p.success) return respondError(c, 400, 'bad_request')

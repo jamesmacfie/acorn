@@ -40,8 +40,8 @@ describe('plugin route registry', () => {
 })
 
 // One representative route per core router mounted by name in createApp(). Together with the plugin
-// table below, this file is the proof of the vNext mount shape: core answers under /v2/core, plugins
-// under /v2/p/<plugin>, and nothing is left at the V1 /api prefix.
+// table below, this file verifies the current mount shape: core answers under /v2/core and plugins under
+// /v2/p/<plugin>.
 const MOUNTED_CORE_ROUTES: ReadonlyArray<readonly [method: string, path: string]> = [
   // The two pre-auth pairing routes. Core-owned but deliberately outside /v2/core, because that
   // namespace is the gated one and these are how an unpaired client gets a credential at all.
@@ -58,8 +58,6 @@ const MOUNTED_CORE_ROUTES: ReadonlyArray<readonly [method: string, path: string]
   ['PATCH', '/v2/core/tasks/:id'],
   ['POST', '/v2/core/tasks/:id/links'],
   ['GET', '/v2/core/tasks/:id/config-trust'],
-  // Worktree/repo-config/task-lifecycle authority, moved out of the terminal plugin in Phase 2's
-  // scope-shed (server/routes/worktree.ts).
   ['GET', '/v2/core/task-statuses'],
   ['GET', '/v2/core/repos/path'],
   ['PUT', '/v2/core/repos/path'],
@@ -93,12 +91,12 @@ const MOUNTED_PLUGIN_ROUTES: ReadonlyArray<readonly [method: string, path: strin
   ['GET', '/v2/p/http/:owner/:repo/requests'],
   ['GET', '/v2/p/agents/usage'],
   ['GET', '/v2/p/agents/sessions'],
-  ['GET', '/v2/p/workflows/tasks/:id/workflows'], // registered by the plugin's own init since Phase 2
+  ['GET', '/v2/p/workflows/tasks/:id/workflows'], // registered by the plugin's own init
   ['GET', '/v2/p/workflows/workflows/runs/:runId/steps'], // doubled: the router owns '/workflows/*'
   ['GET', '/v2/p/memory/memory'], // doubled: the router owns '/memory'
   ['GET', '/v2/p/memory/tasks/:id/notes'],
   ['GET', '/v2/p/memory/workspaces/:wsId/notes'],
-  ['GET', '/v2/p/terminal/sessions'], // de-doubled in Phase 2's route-declaration pass
+  ['GET', '/v2/p/terminal/sessions'], // the terminal router owns the sessions namespace
   ['GET', '/v2/p/terminal/profiles'],
   ['GET', '/v2/p/github/repos'],
   ['GET', '/v2/p/github/repos/:owner/:repo/labels'],
@@ -113,8 +111,6 @@ const MOUNTED_PLUGIN_ROUTES: ReadonlyArray<readonly [method: string, path: strin
   ['POST', '/v2/p/github/repos/:owner/:repo/pulls'], // prCreate
   ['GET', '/v2/p/github/repos/:owner/:repo/branches'],
   ['GET', '/v2/p/github/repos/:owner/:repo/mentions'],
-  // Moved out of core with `pinned_repos` in Phase 2: this was ['GET', '/v2/core/pins'] through Phase 1.
-  // The table is keyed by a GitHub repo id, which nothing outside the mirror can resolve.
   ['GET', '/v2/p/github/pins'],
   ['PUT', '/v2/p/github/pins'],
   ['POST', '/v2/p/github/auth/device/start'],
@@ -123,11 +119,6 @@ const MOUNTED_PLUGIN_ROUTES: ReadonlyArray<readonly [method: string, path: strin
 ]
 
 describe('assembled routes', () => {
-  // Converted plugins register their routes in init(), so the mount table is only complete after the
-  // plugin host has run — the same order the composition root uses (routes before the listener binds).
-  // That now includes the PROVIDER routers (/v2/p/linear, /v2/p/rollbar): they used to arrive from a
-  // side-effect import of src/server/providers.ts, which is deleted. Nothing here registers a provider by
-  // hand, which is what makes this suite able to catch a provider plugin that stops contributing its own.
   let core: TestDb
   let dataDir: string
   let plugins: Awaited<ReturnType<typeof initPlugins>>
@@ -182,25 +173,10 @@ describe('assembled routes', () => {
     expect(routes().some((route) => route.method === method && route.path === path)).toBe(true)
   })
 
-  it('leaves nothing behind on the V1 /api prefix', () => {
+  it('does not mount routes outside the current /v2 namespaces', () => {
     expect(routes().filter((route) => route.path.startsWith('/api'))).toEqual([])
   })
 
-  // Every built-in provider is registered BY ITS PLUGIN, asserted from the real plugin list.
-  //
-  // This is the test whose absence let a critical defect ship: deleting
-  // apps/node/src/server/providers.ts moved provider registration into each plugin's init, and github's
-  // was simply forgotten. `connectProvider` looks the provider up in the connection registry, so the
-  // device-flow poll answered `provider_bad_config` and GitHub could never be connected on a fresh data
-  // root — while an already-authenticated machine kept working, because githubToken() reads the stored
-  // row and never consults the registry. Only an empty data root revealed it.
-  //
-  // It has to assert BOTH registries, because `ctx.providers.integration` fills them together and a
-  // provider present in one is broken in a different way: absent from `connection` breaks
-  // connect/rotate/test, absent from `integration` breaks the mirrored resources and the route
-  // projection. And it must NOT go through apps/node/test/registerProviders.ts — that shim registers
-  // these by hand, which is exactly how the defect passed conformance in CI while being absent at
-  // runtime.
   it('registers every built-in provider from its own plugin, in both registries', () => {
     const expected = ['anthropic', 'github', 'linear', 'openai', 'rollbar']
     expect(connectionProviderRegistry.list().map((p) => p.id).sort()).toEqual(expected)

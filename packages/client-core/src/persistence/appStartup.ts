@@ -104,7 +104,7 @@ export function createAppStartupRestore(options: AppStartupOptions): { restored:
       binding: appStateBinding(
         () => selectedSource() ?? '',
         (saved) => {
-          // ui.md § New surfaces: "Fleet home — the landing view when more than one node is paired."
+          // docs/ui-design.md § New surfaces: "Fleet home — the landing view when more than one node is paired."
           // Only when NOTHING was saved: a returning owner's last view always wins, and with a single
           // node the source is not even registered, so this can never fire on first run.
           if (!saved && nodes().length > 1) {

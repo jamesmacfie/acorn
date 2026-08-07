@@ -155,11 +155,6 @@ export function parseIdentifier(id: string): { key: string; number: number } | n
   return m ? { key: m[1], number: Number(m[2]) } : null
 }
 
-// Build an IssueFilter matching the given identifiers. Group by team key and match the exact
-// numbers with `number: { in }` in ONE filter object (team + number are ANDed) — this reliably
-// narrows the result. NOTE: an `or` of per-issue `{ team, number }` objects does NOT apply the
-// number constraint (Linear returns the whole team), so we never use that shape. `or` is only used
-// to union distinct teams. ponytail: multi-team PRs are rare; single team takes the clean path.
 export function issuesFilter(identifiers: string[]): Record<string, unknown> | null {
   const byTeam = new Map<string, number[]>()
   for (const id of identifiers) {

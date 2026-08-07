@@ -1,7 +1,7 @@
 import type { Hono } from 'hono'
 import type { AppEnv } from './middleware/auth'
 
-// The two vNext HTTP namespaces (docs/vNext/protocol.md § HTTP conventions). Core owns
+// The two current HTTP namespaces (docs/api-reference.md § HTTP conventions). Core owns
 // `/v2/core/*`; every plugin gets `/v2/p/<plugin>/*`. Both live under the one `/v2/*` middleware
 // envelope, so a route cannot be added outside the auth gate by choosing a prefix.
 export const CORE_NAMESPACE = '/v2/core'

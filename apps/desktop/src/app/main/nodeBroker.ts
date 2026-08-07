@@ -11,7 +11,7 @@ import {
   type NodeStatus,
 } from '@acorn/protocol/broker.ts'
 
-// The connection broker (docs/vNext/architecture.md § How the client talks to nodes). Owns, per node:
+// The connection broker (docs/architecture-overview.md § How the client talks to nodes). Owns, per node:
 // the endpoint, the pinned certificate, the device token, one WebSocket, and the connection state.
 //
 // Electron-free on purpose — it imports node:https and `ws`, nothing from electron — so it can be
@@ -21,24 +21,13 @@ import {
 // so a node:https import there would both fail the client/node split rule and drag Node builtins into
 // the renderer bundle.
 
-// Reconnect backoff per docs/vNext/architecture.md § Failure behavior, capped so a node that is off
+// Reconnect backoff per docs/architecture-overview.md § Failure behavior, capped so a node that is off
 // for the night is retried every 30s rather than every 16.
 const BACKOFF_MS = [1_000, 2_000, 4_000, 8_000, 16_000, 30_000]
 const JITTER = 0.2
 // A WS that has been down this long while HTTP still works is `degraded`, not `offline`.
 const DEGRADED_AFTER_MS = 5_000
 const DEFAULT_TIMEOUT_MS = 30_000
-// The events-socket heartbeat (docs/vNext/protocol.md § Events). Phase 4 shipped without one and
-// recorded it as an accepted risk: a node that has HUNG, or a laptop that slept without dropping its TCP
-// connections, holds the socket open without answering, so nothing ever fires `'close'` and the node
-// reads `online` indefinitely. Found by trying SIGSTOP in the two-node e2e.
-//
-// A ping is the only probe that works here, because the failure is precisely that the peer is silent —
-// no application traffic is due, so "we have heard nothing" is indistinguishable from "nothing has
-// happened" without one. `ws` answers a ping automatically at the protocol level, below any application
-// code, which is why a pong proves reachability rather than health of the node's event loop... except
-// that it does not: a `ws` server's autoresponder runs on the same event loop, so a node blocked in a
-// synchronous call fails to pong too. That is the case this catches.
 const PING_INTERVAL_MS = 15_000
 // Two intervals of silence, not one: a single missed pong on a congested link is not evidence, and the
 // cost of being wrong is tearing down a working socket and refetching everything on it.
@@ -72,7 +61,7 @@ type Connection = {
   lastHttpOkAt: number | null
   lastSeenAt: number | null
   // Per-connection monotonic counter from the server. A gap means frames were lost, which the protocol
-  // says to treat as a reconnect (docs/vNext/protocol.md § Events).
+  // says to treat as a reconnect (docs/api-reference.md § Events).
   seq: number
   closed: boolean
 }
@@ -351,7 +340,7 @@ export class NodeBroker {
 
   private noteSocketError(connection: Connection, error: unknown): void {
     if (isPinMismatch(error)) {
-      // A changed fingerprint is a hard security stop (docs/vNext/security.md), never an auto-retrust:
+      // A changed fingerprint is a hard security stop (docs/security.md), never an auto-retrust:
       // stop reconnecting so the UI must involve the owner.
       connection.closed = true
       this.setState(connection, 'offline', { code: 'identity_mismatch' })
@@ -382,7 +371,7 @@ export class NodeBroker {
 type HttpsAgentIdentityCheck = (host: string, cert: { fingerprint256: string }) => Error | undefined
 export type PinnedTlsOptions = { ca?: string[]; rejectUnauthorized: boolean; checkServerIdentity?: HttpsAgentIdentityCheck }
 
-// Certificate pinning (docs/vNext/protocol.md § Transport and identity: "No CA, no hostname
+// Certificate pinning (docs/api-reference.md § Transport and identity: "No CA, no hostname
 // validation — the pin is the identity").
 //
 // `rejectUnauthorized` MUST stay true. In false mode Node does not call checkServerIdentity at all,
@@ -409,7 +398,7 @@ export const PIN_MISMATCH_CODE = 'ACORN_PIN_MISMATCH'
 
 export const normalizeFingerprint = (value: string): string => value.replace(/:/g, '').toLowerCase()
 
-// The `error.code` out of the node's error envelope (docs/vNext/protocol.md § Errors), or null if this
+// The `error.code` out of the node's error envelope (docs/api-reference.md § Errors), or null if this
 // response is not one. Only consulted for a 401, so parsing a body here costs nothing on the happy path.
 const errorCodeOf = (response: NodeFetchResponse): string | null => {
   try {

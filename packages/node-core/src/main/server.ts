@@ -20,17 +20,13 @@ import type { Env } from './bindings'
 // app.getPath('userData') root into bootstrap() instead when app.isPackaged.
 export { devDataDir }
 
-// What the listener bound, plus the identity it bound it with. Returned rather than assumed by the
-// caller: the parent used to compute the origin from a pinned port before the child existed, which
-// cannot survive two nodes on one machine (docs/vNext/architecture.md § Topology). fingerprint/certPem
-// sit BESIDE the endpoint rather than inside it, mirroring ServiceStartResult — the endpoint is where
-// to connect, the pin is who answers.
+// What the listener bound, plus the certificate identity it bound it with. The endpoint is reported
+// after the kernel chooses a port; the fingerprint and certificate let the broker pin that endpoint.
 export type Listener = { server: ServerType; endpoint: ServiceEndpoint; fingerprint: string; certPem: string }
 
-// Start the loopback HTTPS listener over an already-built runtime. Split from startServer so the
-// service composition root (app/service/runtime.ts) can wire the harness/context bridges into the route modules
-// BEFORE the listener accepts requests (composition-root ownership boot-order fix). Resolves once listening so
-// callers can safely reach the origin.
+// Start the loopback HTTPS listener over an already-built runtime. The service composition root wires the
+// harness and context bridges before the listener accepts requests. Resolves once listening so callers
+// can safely reach the origin.
 //
 // It takes the DataRoot as well as the runtime because the transport identity lives on disk beside the
 // database: the certificate is minted into <root>/tls, and the last bound port is remembered in
@@ -41,7 +37,7 @@ export function startListener(runtime: RuntimeBindings, root: DataRoot): Promise
   // otherwise) BEFORE this is called — core no longer imports plugin bridge wiring (docs/plugins.md).
   const app = createApp()
 
-  // No static assets and no SPA fallback: "the Node serves no web assets" (docs/vNext/architecture.md).
+  // No static assets and no SPA fallback: the Node serves API and event traffic only.
   // The renderer ships with the desktop app and loads from app://acorn, so a node that answered with an
   // HTML shell would only be inviting a browser to treat it as an origin. Unmatched paths get Hono's
   // plain 404.
@@ -78,7 +74,7 @@ export function startListener(runtime: RuntimeBindings, root: DataRoot): Promise
   const server = createAdaptorServer({
     fetch,
     createServer: createHttpsServer,
-    // TLS 1.3 only (docs/vNext/security.md § Transport and authentication). Every client is one we
+    // TLS 1.3 only (docs/security.md § Transport and authentication). Every client is one we
     // ship — the broker's https.Agent, `ws`, and Node children — so there is no legacy peer to
     // accommodate, and pinning the floor here means the transport cannot be downgraded.
     serverOptions: { key: keyPem, cert: certPem, minVersion: 'TLSv1.3' },
@@ -161,11 +157,8 @@ export function startListener(runtime: RuntimeBindings, root: DataRoot): Promise
 // place that knows what `startListener` attached: two upgrade handlers with their own socket sets,
 // neither of which `server.close()` can see.
 //
-// It used to live in apps/node's service/runtime.ts alone, and the standalone entry closed nothing at
-// all — its drain went straight to plugin dispose. That is why a standalone node's listening socket
-// outlived a 30-second poll in the two-node e2e (docs/vNext/phase4-notes.md § "the kill signal is
-// SIGKILL"): the port stayed bound for as long as the slowest plugin took to dispose, because nothing
-// had told the server to stop.
+// Both composition roots call this shared helper so the listener and its upgraded connections stop
+// before plugin and database teardown begins.
 export function closeListener(server: ServerType | null): Promise<void> {
   if (!server) return Promise.resolve()
   const httpServer = server as unknown as import('node:http').Server
@@ -184,9 +177,8 @@ export function closeListener(server: ServerType | null): Promise<void> {
   })
 }
 
-// docs/vNext/architecture.md § Inside the Node: "Shutdown drains in-flight work with a bounded timeout
-// (30s)". Bounded means the process exits either way — an operator's `systemctl restart` must not hang
-// on one plugin whose dispose never settles.
+// Shutdown drains in-flight work with a bounded timeout. The process exits even if one plugin's dispose
+// never settles.
 export const DRAIN_TIMEOUT_MS = 30_000
 
 // Run a drain to completion or to the deadline, whichever comes first, reporting which. The steps are

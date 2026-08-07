@@ -1,6 +1,6 @@
 import { runProcess } from './core/proc'
 
-// Is this machine's disk encrypted? (docs/vNext/security.md § On-disk: "Worktrees, mirrors, caches,
+// Is this machine's disk encrypted? (docs/security.md § On-disk: "Worktrees, mirrors, caches,
 // scrollback rely on OS full-disk encryption; the app warns once if the disk isn't encrypted".)
 //
 // It matters because of what application encryption deliberately does NOT cover. Only secrets and backup

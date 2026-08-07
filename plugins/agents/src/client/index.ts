@@ -1,4 +1,4 @@
-// The agents plugin's client part (docs/vNext/plugins.md § The plugin API).
+// The agents plugin's client part (docs/plugins.md § The plugin API).
 //
 // `required: true`, matching the node half: the Agent pane and the Agent Center rail source are what
 // the managed-agent runtime is FOR, and core's task view falls back to a pane list that assumes they
@@ -21,8 +21,6 @@ export const agentsClientPlugin: ClientPlugin = {
   init: (ctx) => {
     ctx.panes.register(agentPaneContribution)
     ctx.sources.register(agentCenterSourceContribution)
-    // The `workflows.triggers` poller used to be registered here. It is workflows' — its id said so —
-    // and it now lives in that plugin's client part.
     ctx.settingsPages.register({
       id: 'agent-pricing', label: 'Agent pricing', group: 'general', order: 45, requires: 'desktop',
       component: AgentPricingSettings,

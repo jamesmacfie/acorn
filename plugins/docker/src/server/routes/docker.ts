@@ -56,25 +56,17 @@ const ref = (c: { req: { param(k: string): string } }): string | null => {
   return isDockerRef(value) ? value : null
 }
 
-// Every DAEMON-WIDE path in this router is device-only. Only the two task-addressed routes at the bottom are
-// reachable by a task-scoped agent, and those are already confined by core's `/v2/p/:plugin/tasks/:id` mount.
-//
-// phase3-notes.md named this gap but described it as availability — "a task-scoped agent can still prune the
-// daemon". The sharper half is exfiltration: `GET /containers/:ref/inspect` returns `env: string[]`
-// (shared/model.ts), i.e. every container's full environment. With `/containers` and `/task-summary`
-// enumerating what exists, a confined agent could walk the machine and read `POSTGRES_PASSWORD` and every API
-// key in every container the owner runs — including containers belonging to work it has nothing to do with.
-// The delete surface (`/prune`, the four `*/remove`, `/containers/:ref/action`, `/compose/action`) is real too
-// and none of it has a task to check, which is why `mayActOnTask` was never the shape of this fix.
+// Every daemon-wide path in this router is device-only. Only the task-addressed routes at the bottom are
+// reachable by a task-scoped agent, and core confines those routes to the task in the caller's token.
+// Device-only access protects both destructive operations and container inspection, whose environment data
+// can contain credentials belonging to unrelated work.
 //
 // requireDevice, not requireProviderAccess: nothing on the node's own loopback path browses the daemon, so
 // there is no 'service'-scope caller to keep working. Docker browse is a renderer surface.
 //
-// Enumerated per subtree rather than one `use('*')` with a path-string exemption for `/tasks/`, because this
-// router is mounted under `/v2/p/docker` and a middleware matching `*` sees the full request path — sniffing
-// for a `/tasks/` segment in it would be a guard whose correctness depends on the mount prefix. The cost is
-// that a NEW daemon-wide route must be added to this list; docker.test.ts closes that by walking the router's
-// own route table and refusing any ungated non-task path, so forgetting fails the suite rather than shipping.
+// Subtrees are enumerated instead of using one path-string exemption for `/tasks/`: the router is mounted under
+// `/v2/p/docker`, so a guard based on the full request path would depend on the mount prefix. The route test
+// walks Hono's route table and fails if a new daemon-wide path is added without a device gate.
 // Measured: Hono's trailing `/*` matches zero segments, so `/containers/*` also covers bare `/containers`.
 export const docker = new Hono<AppEnv>()
   .use('/info', requireDevice)

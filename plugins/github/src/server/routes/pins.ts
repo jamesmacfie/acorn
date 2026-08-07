@@ -6,18 +6,6 @@ import { ownerId } from '@acorn/node-core/server/middleware/requireUser.ts'
 import { respondError } from '@acorn/node-core/server/respond.ts'
 import { pinnedRepos } from '../../node/schema'
 
-// Pinned repos for the selector — app-state, source of truth is us (not GitHub), user-scoped.
-// GET returns this user's pinned repo ids (sort ascending); PUT pins/unpins one repo.
-//
-// This was CORE's route at /v2/core/pins through Phase 1. It moved here with its table because
-// `pinned_repos` is keyed by the numeric GitHub repo id, and nothing outside this mirror can resolve that
-// id to a repo — a "pin" in core would have been a core row core could not interpret. The mount is
-// /v2/p/github/pins now, and `pinsRoute` in @acorn/protocol moved in the same commit; the repo selector is
-// the only caller.
-//
-// A FACTORY over this plugin's own database, not a module-scope router reading getDb(c.env): the table is
-// in <data-root>/plugins/github.sqlite, and `c.env` deliberately carries no per-plugin handles
-// (docs/vNext/data.md § Plugin DBs).
 export const pins = (db: PluginDatabase) =>
   new Hono<AppEnv>()
     .get('/', async (c) => {

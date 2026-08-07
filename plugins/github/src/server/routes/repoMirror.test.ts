@@ -44,10 +44,6 @@ const makeResolverDb = (rows: unknown[] = []) => {
   return { db: { select, insert } as never, inserted, insert }
 }
 
-// A stand-in for THIS PLUGIN's github.sqlite handle, which the router is now a factory over. Every entry
-// in the queue is one of github's own tables — the GitHub-credential lookup used to be answered here too
-// and is not any more: `integrations` is core's table, read off `env.DB` through the core seam, so this
-// fake never sees it and the queue no longer needs to dispatch on the table to skip it.
 const makePullFilesDb = (selectRows: unknown[][]) => {
   const queue = [...selectRows]
   const select = vi.fn(() => ({

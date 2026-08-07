@@ -13,10 +13,6 @@ vi.mock('../notifications/notifications', () => ({ pushBackgroundError: mocks.pu
 
 import { savePref } from './savePref'
 
-// A NODE pref, not `theme`. Every case below is about the server round trip — the optimistic write, the
-// rollback, the per-key serialization — and `theme` moved to the device tier in Phase 4, where none of that
-// happens. `agent_tool_permissions` is the real thing that stayed on a node: it governs what an agent running
-// THERE may do (persistence/devicePrefs.ts states the split).
 const NODE_PREF = 'agent_tool_permissions'
 
 const withLocalStorage = <T>(run: () => T): T => {

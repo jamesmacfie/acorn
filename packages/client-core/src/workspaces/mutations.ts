@@ -36,9 +36,8 @@ const patchWorkspace = (id: string, body: unknown) =>
 export const bootstrapWorkspaces = () => postJson<Workspace[]>(workspaceBootstrapRoute)
 export const createWorkspace = (name: string) => postJson<Workspace>(workspacesRoute, { name })
 export const renameWorkspace = async (id: string, name: string) => patchWorkspace(id, { name })
-// Build/run/db/preview config moved off the workspace to repo scope (repo-level-settings) — edit it
-// via the desktop bridge's repoPath.config(owner, name, patch). Only workspace identity is patched
-// here: icon (null clears) + colour (preset token or hex; null clears).
+// Build/run/db/preview config is repository-scoped — edit it via the desktop bridge's repoPath.config.
+// Only workspace identity is patched here: icon (null clears) and colour (preset token or hex; null clears).
 export const setWorkspaceIcon = async (id: string, icon: WorkspaceIcon | null) => patchWorkspace(id, { icon })
 export const setWorkspaceColor = async (id: string, color: string | null) => patchWorkspace(id, { color })
 export const deleteWorkspace = async (id: string) =>

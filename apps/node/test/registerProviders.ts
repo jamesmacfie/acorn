@@ -6,10 +6,8 @@
 // conformance) should not have to boot the whole plugin host, open four SQLite files and start a PTY
 // engine to get one.
 //
-// Imported rather than put in the vitest global setup, deliberately, and for the reason the old
-// providers.ts carried: a suite that `vi.mock`s a provider plugin's modules needs its mock to hoist above
-// this registration. `vi.mock` hoists above a test file's own imports, so importing this from the test
-// works; a global pre-load would have loaded the real module first and defeated the mock.
+// Imported from each test rather than Vitest global setup so a suite's `vi.mock` declarations hoist before
+// provider modules are loaded.
 //
 // Suites that assert the assembled MOUNT TABLE must NOT use this — they run `initPlugins` over the real
 // plugin list, which is where the provider routers come from now.

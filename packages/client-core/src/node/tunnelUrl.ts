@@ -3,7 +3,7 @@ import { activeNodeId } from './activeNode'
 import { nodes } from './fleet'
 
 // Rewrite a loopback URL resolved BY a node so it is reachable FROM this machine
-// (docs/vNext/plugin-inventory.md § preview: "for remote nodes, 'localhost' means the node's host … local
+// (docs/plugins.md § preview: "for remote nodes, 'localhost' means the node's host … local
 // nodes skip it").
 //
 // The preview pane's URL comes from the node — a run target's `url`, a repo's `previewMode: 'port'`, a URL
@@ -31,16 +31,13 @@ export function loopbackTarget(url: string): { port: number; rest: string } | nu
 //
 //   - the active node is the local one (same machine — a tunnel would be a pointless hop);
 //   - the URL names a real host (already reachable from here, and tunnelling it would be the general
-//     proxy protocol.md rules out);
+//     proxy docs/api-reference.md rules out);
 //   - there is no broker (a plain browser served by a node, where the origin IS the node).
 //
 // A failure to open the tunnel returns NULL, not the original URL, and that is the security-relevant half.
 //
-// The first version fell back to the URL as given, reasoning that it was "no worse than before this
-// existed". It was much worse: the URL is loopback and the node is remote, so the WebContentsView loaded
-// whatever happened to be on the OWNER'S machine at that port while the pane claimed to be showing the
-// remote task's preview. A repo configured `previewMode: 'url' = http://localhost:8025` on a build box
-// rendered the owner's own Mailhog. Showing nothing is the only honest answer, and main logs why.
+// A remote loopback URL is only usable when the build can open the node-owned tunnel: localhost is local
+// to the Node, not the client. Returning null prevents the preview from showing an unrelated local service.
 export async function tunnelUrl(taskId: string, url: string | null): Promise<string | null> {
   if (!url) return url
   const nodeId = activeNodeId()
@@ -50,7 +47,7 @@ export async function tunnelUrl(taskId: string, url: string | null): Promise<str
   // than `=== true`: an unknown node is treated as local and left alone rather than tunnelled blindly.
   if (nodes().find((node) => node.nodeId === nodeId)?.local !== false) return url
   const target = loopbackTarget(url)
-  // A real host is already reachable from here, and tunnelling it would be the general proxy protocol.md
+  // A real host is already reachable from here, and tunnelling it would be the general proxy docs/api-reference.md
   // rules out.
   if (!target) return url
   const open = acornGlobal()?.nodeTunnelOpen

@@ -4,7 +4,7 @@ const electron = vi.hoisted(() => {
   type Listener = (...args: unknown[]) => unknown
 
   // The per-view session. It is a fake with real behaviour rather than a stub of vi.fn()s, because the
-  // three things registered on it are the whole of the view's hardening (docs/vNext/security.md
+  // three things registered on it are the whole of the view's hardening (docs/security.md
   // § Execution boundaries) and a test that only checked they were CALLED would not notice one of them
   // answering the wrong way.
   class FakeSession {
@@ -198,9 +198,6 @@ describe('previewService lifecycle', () => {
   })
 })
 
-// docs/vNext/security.md § Execution boundaries requires all three of these, and until Phase 5 the repo
-// had none of them: previews ran on the app's DEFAULT session, no permission handler existed anywhere in
-// the tree, and the preview tunnel's loopback listener carried no credential at all.
 describe('the preview view is a hardened, isolated guest', () => {
   it('gets its own ephemeral partition per task, so two previews share no storage', () => {
     const win = new electron.FakeBrowserWindow()

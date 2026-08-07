@@ -10,7 +10,7 @@ import { broadcastStatus } from '@acorn/node-core/main/notify.ts'
 
 // Takes CoreServices, not a database handle: this plugin holds no tables of its own for local git —
 // it shells out to git in the task's worktree, and resolving a taskId to that worktree is core's job
-// now that plugins cannot query core's tables (docs/vNext/data.md § Plugin DBs).
+// now that plugins cannot query core's tables (docs/data-layer.md § Plugin DBs).
 export function localGitBridge(core: Pick<CoreServices, 'tasks'>): LocalGitBridge {
   // A mutation resolves the root, runs the git action, then pings status so dirty markers move.
   const withRoot = async (taskId: string, fn: (root: string) => Promise<{ ok: boolean; reason?: string }>) => {

@@ -98,10 +98,6 @@ export async function refreshOpenPulls(
     fetchedAt: now,
   }))
 
-  // Branch → PR for adopting a PR into a local-first task (Flow B). The adoption itself is CORE's write —
-  // `tasks` is core's table, in core's SQLite file — so it can no longer ride in the mirror's `db.batch`
-  // the way it used to. It runs AFTER the mirror commits, and `adoptPullNumbers` is idempotent (it only
-  // ever fills a NULL), so a crash in between self-heals on the next refresh.
   const branchToPull = new Map<string, number>()
   for (const pull of body) if (pull.head?.ref) branchToPull.set(pull.head.ref, pull.number)
 

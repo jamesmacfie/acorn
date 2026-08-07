@@ -1,4 +1,4 @@
-// Use-scoped secret access (docs/vNext/security.md § Secrets: "Plugins get use-scoped access… No
+// Use-scoped secret access (docs/security.md § Secrets: "Plugins get use-scoped access… No
 // getSecret() free-for-all, and credentials never appear in logs, events, error bodies, or client
 // payloads").
 //

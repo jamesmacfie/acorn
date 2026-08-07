@@ -93,12 +93,6 @@ describe('knowledge routes (memory + notes)', () => {
   })
 })
 
-// The proposal queue is the human review gate for `memory_write`, and it had no gate of its own.
-//
-// Neither of these paths carries a `/tasks/:id`, so Phase 3's `/v2/p/:plugin/tasks/:id*` mount never saw
-// them and the router added nothing — an agent holding a task-scoped token could approve its own proposal
-// (defeating the whole mechanism), approve any OTHER task's pending proposal with an attacker-chosen
-// `edited` body, or simply read every pending proposal's body off the node.
 describe('memory proposals are device-gated and task-confined', () => {
   afterEach(() => setKnowledgeBridge(null))
 
@@ -106,8 +100,6 @@ describe('memory proposals are device-gated and task-confined', () => {
     const calls: string[] = []
     setKnowledgeBridge(fake({ memoryResolveProposal: async (id, approved) => (calls.push(`resolve:${id}:${approved}`), { ok: true }) }))
     const body = { approved: true, edited: { name: 'n', type: 'reference', description: 'd', body: 'rm -rf /' } }
-    // Its OWN task's proposal id is refused too: an agent approving what it proposed is precisely the
-    // thing the gate exists to prevent, so there is no id that makes this allowed.
     expect((await asTask1().fetch(req('/api/memory/proposals/p-task1/resolve', 'POST', body), {} as Env)).status).toBe(403)
     expect((await asTask1().fetch(req('/api/memory/proposals/p-task2/resolve', 'POST', body), {} as Env)).status).toBe(403)
     expect((await asService().fetch(req('/api/memory/proposals/p-task1/resolve', 'POST', body), {} as Env)).status).toBe(403)
@@ -117,9 +109,8 @@ describe('memory proposals are device-gated and task-confined', () => {
     expect(calls).toEqual(['resolve:p-task1:true'])
   })
 
-  // The `/workspaces/:wsId/notes*` half of this router is the widest surface in it, and phase3-notes.md
-  // skipped it on the grounds that it was "workspace-scoped, not task-scoped" — which is a reason it needed
-  // a gate MORE, not less. An included global note is injected into every task's assembled context.
+  // The `/workspaces/:wsId/notes*` routes are workspace-scoped, but they still need owner-only access:
+  // included global notes are injected into every task's assembled context.
   it('refuses the whole workspace/global note subtree from a task-scoped credential', async () => {
     const calls: string[] = []
     setKnowledgeBridge(fake({
@@ -159,7 +150,6 @@ describe('memory proposals are device-gated and task-confined', () => {
   it('pins the proposal list to a confined caller, and 404s a request for another task', async () => {
     const asked: Array<string | undefined> = []
     setKnowledgeBridge(fake({ memoryProposals: async (taskId) => (asked.push(taskId), []) }))
-    // No ?task= at all used to mean "every pending proposal on the node, bodies included".
     expect((await asTask1().fetch(req('/api/memory/proposals'), {} as Env)).status).toBe(200)
     expect((await asTask1().fetch(req('/api/memory/proposals?task=task1'), {} as Env)).status).toBe(200)
     expect((await asTask1().fetch(req('/api/memory/proposals?task=task2'), {} as Env)).status).toBe(404)

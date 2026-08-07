@@ -1,316 +1,66 @@
 # Frontend
 
-The acorn client shell — how the SolidJS SPA boots, how contribution registries switch between
-browse sources, tasks, and the classic PR browser, how session state is restored, and where each
-kind of state lives. Per-pane behaviour lives in [panes.md](./panes.md); this doc is about the shell
-and its state model.
+The renderer is a SolidJS application bundled into the Electron desktop. It loads from
+`app://acorn`; it does not run from a Node origin and cannot make direct network requests.
 
-## Overview
+## Composition
 
-The client is a SolidJS single-page app composed from `packages/client-core/src/`,
-`plugins/*/src/client/`, and `apps/desktop/src/app/client/`. It ships **inside** the Electron app and
-loads from the bundled `app://acorn` origin, served by Electron main's own protocol handler
-(`main/appScheme.ts`) — nodes serve no web assets. It reaches a node only through
-`window.acorn.nodeFetch` / `nodeSend` over the preload bridge, and main's connection broker performs
-the real pinned HTTPS with the device bearer attached. So the renderer holds no credential at all:
-not a device token, not a certificate, and not the GitHub token
-(see [authentication.md](./authentication.md)).
+`apps/desktop/src/app/client/index.tsx` creates the renderer runtime and mounts `App.tsx`. The
+runtime installs the client plugin host, scoped persistence, query clients, broker event handling,
+notification sources, and the shell registries before rendering.
 
-State is deliberately split three ways, with no other store:
+`App.tsx` composes the top bar, TabRail, main view, task view, notices, overlays, Node gate, and
+appearance. It selects a Node-aware cache scope and keys task content by Node/task identity so a
+switch disposes the previous task scope.
 
-| Kind | Home | Survives reload? |
-| --- | --- | --- |
-| Server data (PRs, repos, tasks, workspaces, Linear/Rollbar) | [TanStack Query](./caching.md) cache | Yes — persisted to IndexedDB |
-| Transient UI (popovers, drag, focus/maximize, active terminal) | module-level / component SolidJS signals | No |
-| Durable view state (last repo, layouts, theme, shortcuts) | node-persisted `prefs` (the `/v2/core/prefs` key/value store, addressed at the **home** node — see the divergence note in `queries.ts`) | Yes — round-trips through owner-scoped SQLite |
+## Registries and plugins
 
-## Entry point (`index.tsx`)
+The client plugin host activates `apps/desktop/src/app/client/plugins.ts`. Plugins register panes,
+rail sources, settings pages, shell/task slots, palette rows, context sections, ref panels, agent
+contexts/renderers, pollers, persisted-state slices, Node stats, and attention sources. The host owns
+the returned disposables so a plugin can be disabled and reactivated without duplicate entries.
 
-`index.tsx` mounts the app and owns cross-cutting cache concerns:
+The shell imports no feature UI directly. `App.tsx`, `TaskView.tsx`, and `CommandPalette.tsx` consume
+registry entries and client-core contracts. A feature that needs native behavior uses typed
+`window.acorn` capabilities through client-core; plugins do not import Electron.
 
-- `await selectActiveNode()` **before the first render**. Every request is node-addressed now, and
-  the shell's `onMount` side effects do not sit behind the node gate, so rendering first would fire
-  requests with no node selected.
-- Mounts the tree inside `<Show when={activeCacheId()} keyed>`. The `keyed` is load-bearing:
-  switching nodes must REMOUNT the provider and the shell under it, so a query started against node
-  A cannot resolve into node B's cache.
-- Wraps that in `PersistQueryClientProvider` with the active node's client and persister. It no
-  longer constructs either: there is **one `QueryClient` + one IndexedDB persister per node**, built
-  lazily in `packages/client-core/src/node/fleet.ts`, and only the active node's provider is mounted.
-  The defaults are unchanged — `refetchOnWindowFocus: true`, a 30s `staleTime`, `gcTime: 24h`. The
-  freshness window prevents a quick app switch from refetching every active query; genuinely live
-  resources override it. The long `gcTime` lets persisted entries outlive a session.
-- Persistence is `idb-keyval` under **`acorn-cache:<nodeId>`** — one key per node, so node A's
-  snapshot can never rehydrate into node B (`maxAge` 24h, 5s write throttle). File bodies and
-  patch-bearing queries are excluded because the node API/on-disk blob cache reconstructs them;
-  TanStack's successful-query-only gate also excludes pending and failed queries. A per-query 24h
-  age gate prevents regularly rewritten snapshots from carrying old PR data forward indefinitely.
-- Registers `wsOnReconnect(…)` to invalidate the active node's queries with
-  `refetchType: 'active'`. A WS drop means the client missed events and there is no cursor into
-  history, so the remedy is to mark what is on screen stale — and only the active node has a mounted
-  query to refetch.
-- Mounts `<Router root={App}>` with four routes whose components are all `noop` — **routes exist
-  only to populate `useParams()`**; `App` is the layout root and renders the actual UI from those
-  params.
+## Node data access
 
-There is deliberately **no global 401 handler**. A 401 used to mean "the GitHub session expired,
-bounce to OAuth"; with the bearer held by the broker it means the device was revoked, which the
-broker observes itself and reports as a node connection state — not something a query error should
-navigate on. There is likewise no `acorn:logout` cache wipe, because there is no logout: per-node
-eviction is `dropNode(nodeId)` (`fleet.ts`), which clears the in-memory client *and* deletes that
-node's IndexedDB key.
+`packages/client-core/src/apiClient.ts` uses route builders and response types from
+`@acorn/protocol/api.ts`. In the desktop it calls `window.acorn.nodeFetch(nodeId, request)`, which
+Electron main sends through the pinned broker. The standalone server can be tested with a direct
+fetch client, but it does not provide a renderer shell.
 
-### Routes
+TanStack Query is the server-data cache. There is one QueryClient/persister scope per Node. Query
+keys do not need an ad hoc Node prefix because the cache itself is partitioned. Fleet queries fan out
+per Node and must not write aggregate shapes into ordinary per-Node keys.
 
-| Route | Params | Purpose |
-| --- | --- | --- |
-| `/` | — | Boot root. Electron always launches here; `App` redirects to the last/first repo once data loads. |
-| `/:owner/:repo` | `owner`, `repo` | Scopes the app to a repo (and, derived from it, a workspace). |
-| `/:owner/:repo/new` | `owner`, `repo` | Create-PR mode (static segment; outranks `:number`). |
-| `/:owner/:repo/:number` | `+ number` | A specific PR (classic browser detail/diff, or a PR task). |
+## Connection and freshness UI
 
-The active **workspace** carries no URL dimension — it is derived from the current repo
-(`workspaceForRepo`, a partition: a repo belongs to exactly one workspace). The selected browse
-**source** and **active task** are signals, not routes.
+The broker exposes `online`, `degraded`, `offline`, `incompatible`, and `revoked`. Client-core maps
+these plus query state to `live`, `refreshing`, `stale`, `offline`, `disabled`, and `error` displays.
+Offline reads use cached values with a Node badge; mutations fail fast and retain drafts.
 
-## Layout shell (`App.tsx`)
+The event client tracks per-connection sequence numbers and reconnects with backoff. A gap, heartbeat
+failure, or Node restart marks the scope stale and refetches active queries. Feature streams render
+attached/disconnected state independently of whether a process is still alive.
 
-`App` is the router root. It gates on **having a node to ask** — `<Show when={nodeReady() && !isRestoring()} fallback={<NodeGate />}>`,
-not on an identity, because there is no login — applies the theme, and lays out a left `TabRail`
-beside a topbar + a main-area `Switch`:
+## Shell state
 
-```
-┌──────┬───────────────────────────────────────────────────────────────┐
-│ Tab  │ topbar: [«] Workspace  Repo    owner / repo / #n   🔔 ▣ Account │
-│ Rail ├───────────────────────────────────────────────────────────────┤
-│      │ main <Switch>:                                                  │
-│ src  │   • contributed source selected → registry component            │
-│ ──   │   • no source && activeTask()  → <TaskView> (panes + terminal)  │
-│ task │   • fallback (github browse)   → 3-pane PR browser:             │
-│ task │        [ PullList | PullDetail | DiffView ]                     │
-│  +   │        or /new → [ CreatePullForm | ComparePreview ]           │
-└──────┴───────────────────────────────────────────────────────────────┘
-            terminal drawer (bottom, per-task, desktop-only) ─┘
-```
+The TabRail is source → workspace → task. The main region can show Fleet home, a source, or the active
+task. Task panes are an ordered/resizable row with persisted widths, pinning, and layout recipes.
+The terminal drawer is a task surface and is available when the desktop terminal capability exists.
 
-The left `TabRail` (see [workspaces-and-tasks.md](./workspaces-and-tasks.md)) holds contributed
-source buttons and workspace-scoped task rows; it is always mounted. GitHub, Docker, and API
-Requests are always visible, while Linear/Rollbar depend on a connected provider. The right column
-is a CSS grid of `var(--topbar-h) 1fr` — topbar over the main switch. See
-[ui-design.md](./ui-design.md) for tokens.
+Overlays are shell-owned: command palette, settings, onboarding, notices, confirmations, and secret
+entry are not rendered by arbitrary pane content. Native preview views are positioned by the main
+process over a renderer pane host and hidden while overlays cover them.
 
-### Topbar clusters
+## Restore and persistence
 
-`.topbar` is a `1fr auto 1fr` grid with three regions:
+Launch restore proceeds in this order: fleet membership and Node records, active Node, selection and
+main view, task, task layout, and pane-local state. Missing Nodes and unknown pane IDs render repair
+states rather than throwing.
 
-| Region | Contents |
-| --- | --- |
-| Left (`.topbar-side`) | Collapse toggle (`«`/`»`, drives the `left_collapsed` pref); `WorkspacePicker` (selecting a workspace navigates to its first repo); `RepoPicker` (scoped to the active workspace, **disabled inside a task view** since the repo is fixed to that worktree). |
-| Center (`.breadcrumb`) | `owner / repo / #number` crumbs (the `#n` crumb links out to GitHub), or the `acorn` brand when no repo is routed. |
-| Right (`.topbar-end`) | `NotificationBell`; a terminal toggle `▣` (only when `terminalEnabled` and in a task view); the minimal **node switcher** and the `NodeChip` freshness badge (plan.md § 69's dev switcher — hidden with a single node in a production build, since first-run must never mention nodes); `AccountMenu` (Settings / Clear cache). There is no Logout and no Login link. |
-
-### Main modes
-
-The main area selects exactly one view from two signals —
-`selectedSource()` and `activeTask()`:
-
-| Condition | View | Notes |
-| --- | --- | --- |
-| a registered source is selected | its lazy contribution component | GitHub, Docker, API Requests, Linear, and Rollbar ship today; availability is descriptor-owned. |
-| no source **and** an active task | `TaskView` | The task's pane row + per-task terminal drawer. |
-| fallback (github source) | classic 3-pane PR browser | `PullList` / `PullDetail` / `DiffView`, or on `/new` a `CreatePullForm` + `ComparePreview`, or the `Acorn` mark when no repo is routed. |
-
-So "GitHub browse" is the fallback: `selectedSource()` is `'github'` and no task is active. Picking
-a source in the rail sets `selectedSource`; clicking a task row clears the source and sets
-`activeTaskId`. Task activation is shared logic — `activateTaskSignals` + `pathForTask`
-(`@acorn/client-core/tasks/activate.ts`) flip the signals, mark the task's notices read, and compute the
-route, and are reused by the rail rows, ⌘1–9, and the palette's Go-to-task. Overlays
-(`SettingsModal`, `OnboardingModal`, `TerminalPanel`, `CommandPalette`, `FilePalette`) and the
-global `Shortcuts` handler are mounted after the switch, independent of the active mode.
-
-The shell, task/source registries, and PR list are in the startup chunk. Conditional screens and
-plugin contributions use Solid `lazy` boundaries: PR detail/diff, Monaco-backed panes, terminal,
-settings pages, provider browsers, and task panes load when selected. `pnpm build` enforces the
-critical HTML script/modulepreload and stylesheet budgets in
-`scripts/check-renderer-budget.mjs`.
-
-`TaskView` is keyed by `activeTaskId`: switching or archiving a task disposes the old task-owned
-component scope before the replacement mounts. The archive lifecycle event then performs final
-T3/T4 eviction after component cleanup has published any last session-only view state.
-
-### Node gate + appearance
-
-`NodeGate` (`packages/client-core/src/node/NodeGate.tsx`) occupies the slot `LoginGate` used to. It
-answers one question — *which node answers?* — and renders the bare `Acorn` mark while that is still
-`starting` (initial load / cache restore) to avoid a flash. `unpaired` means the broker knows no
-nodes, so there is nothing to talk to until the owner pairs one; `failed` means the broker itself
-could not answer, and offers Retry plus the native Diagnostics / Open data folder / Quit actions
-(the last two go straight to main, because the shell that would answer a renderer quit prompt is not
-mounted). There is no OAuth bounce and no `acorn:loggedout` special case, because there is no login.
-
-Appearance is two orthogonal axes, both written by the startup-state service onto `<html>`
-(`persistence/appStartup.ts`):
-
-- **`data-theme` — colour.** When `theme_follow_system` is on it swaps the chosen
-  `theme_light`/`theme_dark` on the OS `prefers-color-scheme` and re-applies live on change;
-  otherwise it uses the fixed `theme` pref.
-- **`data-style` — shape, typography, spacing, density, chrome, motion.** A single `style` pref;
-  there is no OS signal to follow and no follow-system mode. `terminal` is the attribute-less
-  default, so the correct default paints before any JS runs and no FOUC script is needed.
-
-The two token sets are disjoint (`styles/tokenAxes.test.ts` enforces it), so every style composes
-with every theme and their relative source order is irrelevant. See
-[ui-design.md](./ui-design.md).
-
-## Session restore
-
-`persistence/startupRestore.ts` treats `prefs` as the durable view layer. Registered descriptors
-hydrate in `workspace → view → panes` order, emit `boot:restored`, then arm throttled persistence.
-The service waits for `useIsRestoring()`, prefs, repos, and tasks before navigation, so startup
-defaults cannot clobber saved state or drop a gated query mid-restore. Descriptors registered by
-lazy plugins after boot hydrate before their own persistence is armed. See [state.md](./state.md).
-
-Core prefs and scoped slices that make up a restored session:
-
-| Pref key | Restores | Writer |
-| --- | --- | --- |
-| `last_path` | The `/:owner/:repo[/:number]` that reopens on relaunch. | shell descriptor |
-| `last_source` | The selected browse source (`''` = a task view was active). | shell descriptor |
-| `last_task` | Which task is focused. | shell descriptor |
-| `core:task-layouts:<taskId>` | A task's pane row; legacy `task_layouts` / `task_panes` migrate on hydrate. | layout descriptor |
-| `rail_order` | Task rail pin-to-top + drag order. | `TabRail` |
-| `left_collapsed` | Left-pane collapse (`'1'`/`'0'`). | shell descriptor |
-| `theme`, `theme_follow_system`, `theme_light`, `theme_dark` | Theme (colour) selection + follow-system. | `AppearanceSettings` |
-| `style` | Style pack (shape/type/space/density). | `AppearanceSettings` |
-| `pane_shortcuts` | Per-pane keyboard-shortcut overrides (JSON). | `ShortcutsSettings` |
-| `term_rail_default` | Default terminal profile for a new task's rail. | `TerminalSettings` |
-| `term_height` | Terminal drawer height. | `TerminalPanel` |
-| `term_font_size` | Terminal glyph size; validated to 11–24px and applied live. | `TerminalSettings` |
-| `notices` | The last ~50 notification-centre notices (bounded ring). | notice descriptor |
-| `editor:open-files:<taskId>` | Open-file tabs per task (content not persisted; dirty resets). | editor descriptor |
-| `onboarded` | Whether the onboarding modal has been dismissed. | `OnboardingModal` |
-
-Every write goes through `savePref`: the shared `prefsKey` cache updates optimistically, server
-writes serialize per key, and failures roll back and surface as notices.
-
-## State management
-
-### TanStack Query (server data)
-
-Query option factories live in `queries.ts` so multiple consumers share one definition (e.g. the
-`RepoPicker` dropdown and `PullList` both read `repos`). Route builders, response types, and
-query-key factories live in `@acorn/protocol/api.ts`; `queries.ts` imports them and keeps the runtime
-path in the thin `apiClient.ts` (`readJson`/`writeJson`, whose options are `{ signal, nodeId }` —
-omitting `nodeId` means the ambient active node). Under the desktop app that is
-`window.acorn.nodeFetch`; the raw same-origin `fetch` branch exists only when there is no broker at
-all. Writes live in `mutations.ts` and POST/PUT/DELETE to the same route builders. There is no
-`Origin`/CSRF check on the server, and no need for one — see
-[authentication.md](./authentication.md).
-
-Refetch behaviour starts with the 30s default freshness window and is tightened per query:
-
-- **Polled:** `pullsOptions` refetches every 60s; `tasksOptions` refetches on focus (keeps
-  dirty/PR markers fresh).
-- **Short staleTime:** `runJobsOptions` (15s, running jobs change), Linear enrichment /
-  `repoLabels` / `mentions` (5 min).
-- **Immutable → `staleTime: Infinity`:** `fileBlobOptions` (body keyed by immutable SHA) and
-  `jobLogOptions` (a completed job's log never changes). See [caching.md](./caching.md).
-
-`prefetch.ts` warms only the first five open PRs in the background after the list loads, seeding
-detail + file-summary caches for the most likely navigation. This bound prevents network, SQLite,
-JSON parsing, memory, and IndexedDB work from scaling with every open PR in a repo. Remaining rows
-use `schedulePullSummaryPrefetch`, an 80ms-debounced hover/focus prefetch. All warming is abortable
-on repo switch and uses `seedIfNotNewer`; patch bodies remain intent-driven in `DiffView` (see
-[diff-rendering.md](./diff-rendering.md)).
-
-### IndexedDB persistence
-
-The filtered query cache is mirrored to IndexedDB (see entry point); file bodies and patches are
-excluded, and writes are throttled. Consumers must gate first mount on
-`useIsRestoring()` — mounting a gated query mid-restore can drop its fetch as the `enabled` flip
-races the restore boundary (this is why `App`'s repo-redirect waits on `isRestoring()`).
-
-### Module-level signal stores
-
-Transient/live state that must not survive reload lives in signals-only modules (no query cache, no
-prefs). They export getters + mutators in the codebase's single-writer style:
-
-| Module | Owns |
-| --- | --- |
-| `@acorn/client-core/tasks/tasks.ts` | `selectedSource`, `activeTaskId`, and per-task `taskLayouts` (all layout transitions go through `dispatchLayout` → the pure `applyLayoutAction` reducer); plus per-task terminal-open and recipe-browser-URL state. |
-| `@acorn/client-core/tasks/agentSessions.ts` | The live agent/terminal session list + a single `onStatus` subscription, so the rail/topbar can show agent-working activity even with the drawer closed. |
-| `@acorn/client-core/tasks/taskStatus.ts` | Live worktree status per task (dirty count / `missing`), 10s-polled + `onStatus` edges; unchanged snapshots preserve signal identity. |
-| `@acorn/client-core/notifications/notifications.ts` | The bounded in-memory notice ring (mirrored to the `notices` pref) + pure edge detection over session snapshots. |
-| `plugins/editor/client/editorState.ts` | Open-file tabs per task (mirrored to `editor:open-files:<taskId>`). |
-
-These are initialised once in `App`'s `onMount` (`initSessions`/`initTaskStatuses`/
-`initWorkflowNotices`), each a no-op when the terminal bridge is absent, so they naturally show
-nothing on a non-desktop build.
-
-### Task pane layout
-
-A task's layout is a **flat left→right row**:
-`TaskLayout = { panes: string[], weights?, pinned? }`
-(`@acorn/client-core/tasks/layout.ts`). Pane ids and UI descriptors come from the pane registry; core does
-not carry a feature union. One pure reducer owns show/add, close/unpin, pin, move, resize/equalize,
-and recipe replacement. Durable state is written to the scoped
-`core:task-layouts:<taskId>` descriptor; aggregate `task_layouts` / `task_panes` values are migration
-inputs only. Focus and maximize remain session-only. Pane internals are documented in
-[panes.md](./panes.md).
-
-## Client transport and desktop capabilities
-
-Every renderer request and every live frame crosses the preload bridge to Electron main's connection
-broker, which performs the pinned HTTPS and owns the one authenticated WebSocket per node
-(`/v2/events`). This **inverts** what this file used to say — "every request/response verb is HTTP,
-every stream is the WebSocket" — because main is where the pinned certificate and the device token
-live and the renderer must never hold either. It is also what lets the renderer's CSP say
-`connect-src 'self'`: it needs no network permission at all. Search, editor, local changes, database,
-HTTP requests, notes, memory, terminal control, run targets, workflows and MCP settings still have no
-feature-specific preload APIs — they are ordinary `/v2` routes carried over that one channel.
-
-The Electron preload (`apps/desktop/src/app/main/preload.ts`) exposes:
-
-- the node-broker primitives — `nodeFetch`, `nodeAbort`, `nodeSend`, `onNodeFrame`, `onNodeStatus`,
-  `fleetList`, and the owner-initiated fleet mutations (`nodeProbe`, `nodePair`, `nodeRename`,
-  `nodeForget`, `nodeReconnect`). No closure crosses the bridge, so `nodeSocket()` is assembled on
-  the renderer side from `nodeSend` + `onNodeFrame`. No token and no certificate ever crosses back;
-- desktop/platform markers and the close-pane/quit lifecycle callbacks;
-- the node recovery screen's two native actions (open data folder, force quit);
-- the native repository folder picker;
-- preview `WebContentsView` lifecycle, bounds, navigation, and chrome-state events.
-
-`capabilities()` (`packages/client-core/src/capabilities.ts`) reports `{ desktop, terminal }`
-from that surface. The terminal drawer, agents, run targets, and workflows are available whenever
-the desktop terminal capability exists; `dev:node` remains a deliberate degraded mode for features
-whose node-side engine is unavailable — and note it can no longer serve the SPA to a browser at all,
-since the node serves no web assets.
-
-## Source
-
-Key files: `apps/desktop/src/app/client/{index.tsx,App.tsx}`,
-`packages/client-core/src/{apiClient.ts,wsClient.ts,queries.ts}`,
-`packages/client-core/src/node/{fleet.ts,activeNode.ts,freshness.ts,NodeGate.tsx,NodeChip.tsx}`,
-`packages/client-core/src/tabs/TabRail.tsx`,
-`packages/client-core/src/tasks/{tasks.ts,layout.ts,activate.ts,TaskView.tsx}`,
-`apps/desktop/src/app/main/{preload.ts,nodeBroker.ts,appScheme.ts}`, and feature-owned
-client code under `plugins/*/src/client/`.
-
-See also: [panes.md](./panes.md) (the pane catalog), [workspaces-and-tasks.md](./workspaces-and-tasks.md)
-(the rail + task model), [diff-rendering.md](./diff-rendering.md), [caching.md](./caching.md),
-[ui-design.md](./ui-design.md), and
-[command-palette-and-shortcuts.md](./command-palette-and-shortcuts.md).
-
-## Notes on shared plumbing
-
-- Task activation lives once in `@acorn/client-core/tasks/activate.ts`: `activateTaskSignals(t, { pane? })`
-  (rail rows, ⌘1–9, the new-task flow, browse promotes, the notification bell, the palette) plus
-  `pathForTask`. The optional `pane` forces a pane (promotes land on their provider pane);
-  otherwise the saved layout is restored and only the first activation picks a default.
-- Layout state has no single-pane shim: all pane transitions go through
-  `dispatchLayout(taskId, action)` / `layoutForTask(taskId)` with an explicit task id.
-- `last_source` keeps unknown contribution ids inert and round-trippable. A temporarily missing
-  provider therefore does not destroy the user's selection; choosing another source replaces it.
-- API failures are typed: `apiClient.ts` throws `ApiError` carrying the node's error envelope —
-  `status`, `code`, `requestId`, `retryable` — so a consumer branches on a machine code rather than
-  on message text. Nothing bounces on a 401 any more (see the entry-point section).
+Device presentation preferences include theme, style pack, keybindings, and layout. Node preferences
+include operational settings and setup state. Draft text remains client-local and is not treated as
+successful server state. Secret fields are never persisted in renderer storage.

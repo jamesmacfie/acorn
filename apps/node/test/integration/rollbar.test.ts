@@ -248,7 +248,8 @@ describe('Rollbar source (docs/integrations.md, docs/next/rollbar.md)', () => {
     await app.fetch(new Request(`http://acorn.test/api/rollbar/items/142/occurrences?integration=${integrationId}`), env())
     const [cached] = await t.db.select().from(schema.issueResources)
     const envelope = JSON.parse(cached.data) as { value: RollbarOccurrencesResponse }
-    // v1 child rows stored the public value directly and may contain an `unknown` normalization.
+    // A child row may contain an `unknown` normalization; the provider must recognize the stored
+    // value as stale and refresh it.
     await t.db.update(schema.issueResources).set({ data: JSON.stringify(envelope.value) })
 
     const before = vi.mocked(rollbarFetch).mock.calls.length

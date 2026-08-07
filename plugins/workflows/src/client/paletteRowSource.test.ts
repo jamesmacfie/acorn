@@ -2,12 +2,6 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { PaletteItem } from '@acorn/client-core/palette/model.ts'
 import type { WorkflowDefSummary } from '@acorn/protocol/workflow.ts'
 
-// The workflow rows CommandPalette used to fetch and start itself. Moved in Phase 3 with no test; this pins the
-// mapping and the origin guard that keeps a stale row from starting a run in the wrong task.
-//
-// `workflowApi` is mocked at the module boundary because it is HTTP. Note what `invoke` returns straight through:
-// `workflowApi.start` already turns a thrown HTTP error into `{ error }` and handles the needs-trust prompt, so
-// this source deliberately adds nothing.
 const mocks = vi.hoisted(() => ({ defs: vi.fn(), start: vi.fn() }))
 vi.mock('@acorn/client-core/tasks/workflowClient.ts', () => ({ workflowApi: { defs: mocks.defs, start: mocks.start } }))
 

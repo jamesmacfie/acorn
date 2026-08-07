@@ -6,7 +6,7 @@ import { PLUGIN_DB_DIR } from './pluginStorage'
 import { resolveDatabasePath } from './serverPaths'
 import { loadDatabase } from './sqliteLoader'
 
-// `POST /v2/core/backup` (docs/vNext/data.md § Backup). The spec's own words are "keep it boring", and
+// `POST /v2/core/backup` (docs/data-layer.md § Backup). The spec's own words are "keep it boring", and
 // this is that: SQLite's online-backup API into a staging directory, a scrub, a manifest, and `tar`.
 //
 // ## What is in it, and what is deliberately not
@@ -19,7 +19,7 @@ import { loadDatabase } from './sqliteLoader'
 //
 //   - **Secrets.** `integrations.access_token` is a JWE blob, so an archive that carried it would be
 //     decryptable by anyone who also had the key — and the key is exactly what a backup travelling to a
-//     NAS or a cloud drive is most likely to end up beside. data.md is explicit: "restoring credentials
+//     NAS or a cloud drive is most likely to end up beside. docs/data-layer.md is explicit: "restoring credentials
 //     from a file that might travel is exactly the risk we don't want."
 //   - **Device tokens.** Same argument, one step worse: a `devices` row's hash plus a stolen archive is
 //     an offline guessing target for a credential with full owner authority.
@@ -72,7 +72,7 @@ function scrubCore(copy: string): void {
   const handle = new Database(copy)
   try {
     // Blanked rather than deleted: a restored node should still show that a Linear connection existed
-    // and needs re-entering, which is the state data.md describes ("secrets and pairings are
+    // and needs re-entering, which is the state docs/data-layer.md describes ("secrets and pairings are
     // re-entered"). A deleted row would silently lose the workspace links that point at it.
     handle.exec("UPDATE integrations SET access_token = ''")
     // Deleted rather than blanked: a device row IS its credential's public half, and a restored node
@@ -142,9 +142,6 @@ export async function createBackup(dataDir: string, destPath: string): Promise<B
       { mode: 0o600 },
     )
 
-    // `tar` through the process broker rather than a tar library: the platform has one, it is the tool
-    // whoever restores this will reach for, and a dependency for a single `-czf` is the kind of thing
-    // ponytail exists to refuse. `-C` so the archive holds bare filenames rather than a temp path.
     const result = await runProcess({
       file: '/usr/bin/tar',
       args: ['-czf', destPath, '-C', staging, '.'],

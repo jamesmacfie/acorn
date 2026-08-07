@@ -5,10 +5,8 @@
 // all: plugins/docker reads `docker_prefs` client-side out of the prefs query, and that is the right
 // shape when only the UI cares.
 //
-// plugins/agents is the exception, and it is the reason this exists. Its model-pricing overrides are a
-// preference the SERVER has to read: the usage service computes per-token costs from them before it
-// answers, so the value must be resolvable from the node with no request in hand. Before the database
-// split the plugin read `schema.prefs` with core's handle; it cannot any more.
+// The agents usage service reads model-pricing overrides on the Node before it prices a token count, so
+// those values need a service seam in addition to the HTTP preference route.
 //
 // Deliberately a general (userId, key) accessor rather than one named method per preference. It looks
 // wider than the alternative and is not, because it grants nothing a caller does not already have:

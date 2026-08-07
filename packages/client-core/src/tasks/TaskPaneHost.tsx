@@ -121,11 +121,11 @@ export default function TaskPaneHost(props: {
                 data-pane-id={pane.id}
               >
                 <div class="pane-slot-actions">
-                  {/* ui.md § Connection and staleness vocabulary asks for offline/stale rendering on every
+                  {/* docs/ui-design.md § Connection and staleness vocabulary asks for offline/stale rendering on every
                       node-backed surface. `.pane-slot-actions` is the ONE piece of chrome every pane has,
                       so this is one edit rather than thirteen — and it is rendered only when there is
                       something to say, so a healthy node changes nothing on screen.
-                      It reports the NODE's state, which is the reactive half of ui.md's vocabulary; see
+                      It reports the NODE's state, which is the reactive half of docs/ui-design.md's vocabulary; see
                       registries/panes.ts for why there is no per-pane query hook. */}
                   <Show when={nodeFreshness() !== 'live'}>
                     <NodeChip nodeId={activeNodeId() ?? ''} compact />

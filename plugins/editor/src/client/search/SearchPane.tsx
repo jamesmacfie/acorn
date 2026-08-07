@@ -76,7 +76,7 @@ export default function SearchPane(props: { task: Task }) {
                 <CopyButton text={() => file.path} title="Copy file path" />
                 <span class="search-file-count muted">{file.hits.length}</span>
               </div>
-              {/* ponytail: render every hit; the backend caps totals at 2000, so no per-file cap yet. */}
+              {/* Render every returned hit; the backend caps the total result set. */}
               <For each={file.hits}>
                 {(hit) => (
                   <button
@@ -103,8 +103,6 @@ export default function SearchPane(props: { task: Task }) {
   )
 }
 
-// Split the preview line around the matched span so it can be highlighted. col/endCol are 1-based
-// columns; for ASCII they equal string indices (see shared/search.ts ponytail note).
 function HitPreview(props: { hit: SearchHit }) {
   const parts = createMemo(() => {
     const { preview, col, endCol } = props.hit

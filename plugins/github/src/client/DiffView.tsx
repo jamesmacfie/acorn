@@ -247,7 +247,6 @@ function DiffForPull(props: { route: PullRoute; router: boolean; taskId?: string
   const [matchIdx, setMatchIdx] = createSignal(0)
   const [findFocusTick, setFindFocusTick] = createSignal(0)
   let findInput: HTMLInputElement | undefined
-  // ponytail: linear rescan of all code rows on every keystroke; fine until diffs get pathological.
   const matches = createMemo(() => (findOpen() ? collectMatches(rows(), findQuery(), findCase()) : []))
   const matchesByRow = createMemo(() => {
     const map = new Map<CodeRow, [number, number][]>()

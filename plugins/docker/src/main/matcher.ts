@@ -8,8 +8,6 @@ import { defaultOverrides, type DockerMatchOverrides } from './dockerConfig'
 export type MatchableTask = { worktreePath: string | null; branch: string }
 export type MatchableContainer = Pick<DockerContainerSummary, 'name' | 'composeProject' | 'composeWorkingDir' | 'labels'>
 
-// ponytail: duplicated one-liner — keep in sync with plugins/terminal/main/terminalUtils.ts
-// branchSlug (frozen plugin boundary; it's the documented isolation handle for compose -p).
 export const branchSlug = (branch: string): string => branch.replace(/[^A-Za-z0-9._-]/g, '-')
 
 // Slugs shorter than this are too generic for substring matching ("main" would link everything).

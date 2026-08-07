@@ -8,14 +8,6 @@ import type { DbSavedQuery } from '../shared/database'
 import { GENERATE_MAX_PROMPT_CHARS } from '../shared/database'
 import { databaseApi } from './databaseClient'
 
-// AI SQL generation (docs/pg.md): describe the query, pick a configured model connection + model,
-// and the generated PostgreSQL replaces the editor contents via onGenerated. The server route owns
-// the prompt; this modal only collects the inputs and surfaces errors.
-//
-// Saved queries can be added as worked examples — the server sends each one's name, notes and SQL
-// alongside the schema and the repo's schema notes. ponytail: the selection resets each open; nothing
-// to persist until someone asks for a default set.
-
 const errorMessage = (e: unknown): string => {
   if (e instanceof ApiError) {
     if (e.code === 'provider_needs_auth') return 'The provider key was rejected — reconnect it in Settings → Integrations.'

@@ -1,18 +1,3 @@
-// The client half of plan.md § Phase 3's second exit criterion: "disabling any non-required plugin at
-// startup leaves the rest working". `apps/node/test/integration/pluginDisable.test.ts` has proven the
-// NODE half since Phase 3; this is the twin, and it is the file phase3-notes.md called impossible and
-// then corrected itself about. It cycles the REAL sixteen-plugin list, not synthetic fixtures —
-// `packages/client-core/src/registries/plugin.test.ts` already covers the host's semantics.
-//
-// Same shape as the node file, with one correction to it. The node version derives its `OWNED` ledger by
-// diffing a full boot against each disabled boot; the ledger here is a LITERAL, because a derived one
-// co-varies with the very bug it is meant to catch. Neuter the host's disabled check and a derived
-// ledger goes empty, `full − {} === full`, and the registry equality passes while nothing is disabled at
-// all. Measured: with a derived ledger the only line that failed was `expect(skipped).toEqual([name])` —
-// the host's own self-report, which is precisely the trap Phase 3 shipped. A literal cannot do that.
-//
-// Keeping it literal costs one edit when a plugin gains a contribution. That is the point: a
-// contribution appearing or vanishing should be a reviewed line, not a silent diff.
 import { afterEach, describe, expect, it } from 'vitest'
 import { agentContextRegistry } from '@acorn/client-core/registries/agentContexts.ts'
 import { agentToolRendererRegistry } from '@acorn/client-core/registries/agentToolRenderers.ts'
@@ -31,11 +16,6 @@ import { persistedStateRegistry } from '@acorn/client-core/persistence/persisted
 import { contentLinkRegistry } from '@acorn/plugin-github/client/contentLinks.ts'
 import { clientPlugins } from '../../src/app/client/plugins'
 
-// Every registry a ClientPluginContext can write to, plus the one a PLUGIN publishes (github's content
-// links, reached through `ctx.contribute`). The plugin-published one is here deliberately: it is the
-// entry whose disposal Phase 3 shipped broken, so a regression there has to fail something. It never
-// varies across the cycle — github is `required` — but its two module-scope built-ins plus the one
-// contributed entry are exactly what a broken `contribute` path would disturb.
 const REGISTRIES = {
   panes: paneRegistry,
   sources: sourceRegistry,
@@ -78,7 +58,7 @@ const snapshot = (): Snapshot =>
     }),
   )
 
-// The complete contribution set, as a literal. `panes` and `sources` are ui.md contracts in their own
+// The complete contribution set, as a literal. `panes` and `sources` are docs/ui-design.md contracts in their own
 // right (13 panes, 6 default sources), so this doubles as the parity assertion for both.
 const FULL: Snapshot = {
   panes: ['agents', 'changes', 'context', 'database', 'docker', 'editor', 'search', 'pr', 'http', 'linear', 'notes', 'preview', 'rollbar'],
@@ -144,15 +124,10 @@ const OPTIONAL = clientPlugins.filter((plugin) => !plugin.required).map((plugin)
 const REQUIRED = clientPlugins.filter((plugin) => plugin.required).map((plugin) => plugin.name)
 
 describe('disabling a client plugin', () => {
-  // The reset lives here, not at the foot of each case. It used to sit after three assertions in the
-  // `it.each` body, so the FIRST genuine failure left the registries partly disabled and every later case
-  // failed spuriously — one regression reading as eleven.
   afterEach(() => void activate())
 
   it('has a plugin list worth cycling (anti-vacuity)', () => {
     expect(NAMES.length).toBeGreaterThanOrEqual(16)
-    // The five the node half marks `required`. Reconciled in Phase 4: `memory` and `notes` were
-    // togglable here and not on the node, so a user could have turned off half of one plugin.
     expect([...REQUIRED].sort()).toEqual(['agents', 'github', 'memory', 'notes', 'terminal'])
     expect(OPTIONAL.length).toBeGreaterThanOrEqual(10)
     // Every optional plugin is in the ledger, and every ledger entry claims something. A plugin
@@ -187,21 +162,12 @@ describe('disabling a client plugin', () => {
 
   it.each(OPTIONAL)('boots the rest when %s is disabled', (name) => {
     const { result, snap } = activate([name])
-    // The registry equality comes FIRST, deliberately. Phase 3's node-side version asserted the host's
-    // own `skipped` self-report first, so every mutation it was checked against failed on that line and
-    // the contribution assertions were never exercised. ONE equality per registry, both directions:
-    // this plugin's entries gone, every sibling's contribution byte-identical and in the same order,
-    // and nothing new appeared.
     expect(snap).toEqual(without(FULL, OWNED[name]))
     expect(result.skipped).toEqual([name])
     expect(result.enabled).toEqual(NAMES.filter((candidate) => candidate !== name))
   })
 
   it('performs no browser I/O during init', () => {
-    // The property `ClientPlugin.init`'s doc comment claims and two plugins used to break: plugins/http
-    // enumerated `localStorage` and plugins/agents issued a `fetch`, both inside a synchronous `init`.
-    // Stripping `activate` and removing the two globals is the mechanical check — if a third plugin
-    // joins them, this throws rather than passing quietly because the setup file happened to stub them.
     const initOnly: ClientPlugin[] = clientPlugins.map(({ activate: _activate, ...rest }) => rest)
     const globals = globalThis as unknown as Record<string, unknown>
     const saved = { localStorage: globals.localStorage, fetch: globals.fetch }

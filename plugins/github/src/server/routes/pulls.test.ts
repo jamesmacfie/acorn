@@ -55,10 +55,6 @@ const responseJson = (body: unknown, init?: ResponseInit) =>
 
 const ENC_KEY = '0'.repeat(64)
 
-// TWO handles, which is the point of this route's new signature. The PR mirror (`repos`,
-// `pull_requests`, `sync_state`) is this plugin's, in <data-root>/plugins/github.sqlite; `tasks` is
-// CORE's, so the Flow-B adoption assertion below reads core's handle and the route reaches it through
-// CoreServices.tasks rather than a query. The getDb mock that used to serve both is gone.
 describe('pulls list (serve-then-revalidate via the sync engine)', () => {
   let core: TestDb
   let plugin: TestPluginDb

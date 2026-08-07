@@ -1,83 +1,105 @@
-# Plugin architecture
+# Plugins
 
-> **Removed.** The bearer-authenticated public automation API (`/api/v1`), its tokens,
-> idempotency store and second listener were deleted in vNext Phase 0 — along with
-> `oauth_accounts`, `api_tokens`, `api_idempotency` and `command_executions`. Passages below
-> that describe it are historical. See [vNext/plan.md](./vNext/plan.md).
+Plugins are first-party packages compiled into acorn. A plugin can contribute Node behavior, client
+behavior, or both. There is no runtime installation system: a plugin exists only when its composition
+root registers it.
 
-acorn is organised into three layers under `apps/desktop/src`:
+## Package shape
 
-- `core/` owns platform contracts and services: the shell, persistence, registries, HTTP/auth,
-  SQLite, transport, worktree primitives, MCP projection, and shared wire types.
-- `plugins/<name>/` owns a product feature and may contain `client`, `server`, `main`, `mcp`, or
-  `shared` parts.
-- `app/` is the composition layer. It activates the built-in plugins and is the only layer that
-  chooses the concrete shipped feature set.
+```text
+plugins/<name>/
+  src/
+    node/       NodePlugin entry, schema, and Node-owned behavior
+    server/     Hono route handlers and provider logic
+    main/       Electron-free runtime engines and adapters
+    client/     SolidJS panes, sources, settings, and contributions
+    contract/   narrow cross-plugin types, capability IDs, and provider contracts
+    shared/     types/logic shared by this plugin's runtimes
+```
 
-This is a statically composed in-tree plugin system, not a runtime package loader. A contribution is
-registered at startup, then consumed through a core registry or an injected capability.
+Not every plugin has every directory. The profile packages are Node-only adapters. Onboarding is a
+client overlay with core setup support. Linear and Rollbar are integration providers that use core's
+generic external-item store rather than owning a plugin database.
 
-## Runtime boundaries
+The current Node plugin interface is defined in
+`packages/node-core/src/server/plugin/types.ts`; the client interface is in
+`packages/client-core/src/registries/plugin.ts`. There is no separate `plugin-api` package.
 
-Client code runs in the sandboxed renderer. Server and most legacy-named `main` modules run in the
-Node utility service; MCP code runs in the stdio proxy. The small Electron `app/main` graph owns
-native UI adapters and service supervision. Renderer modules must not import
-server/main/service/MCP implementations, Node-side modules must not import renderer components, and
-the utility-service graph must remain Electron-free. Shared modules contain serializable contracts only.
+## Activation
 
-Folder names describe the original architecture, not necessarily the current process. In particular,
-the service runtime still imports Electron-free wiring from `app/main/*Wiring.ts` and domain engines
-from `core/main` and `plugins/*/main`. Treat those as service-owned unless their dependency graph
-imports Electron. New native adapters belong in the main graph; new domain engines belong in the
-service graph.
+`apps/node/src/server/plugins.ts` is the Node activation list. `apps/desktop/src/app/client/plugins.ts`
+is the client activation list. The host validates unique names, applies the per-Node disabled-plugin
+set, initializes enabled plugins, runs the optional ready/activation pass, and owns disposal of their
+registrations.
 
-`apps/desktop/tools/arch/boundaries.test.ts` enforces those runtime boundaries and prevents
-`core/`/`plugins/` from importing the `app/` composition layer. It also records a shrinking baseline
-of legacy core→plugin and plugin→plugin imports; new cross-feature edges fail the test, and removing
-an edge requires removing its baseline entry.
+Required Node plugins are GitHub, terminal, and agents. Required client contributions also include
+the pieces the shell needs from notes and memory. Optional plugins can be disabled per Node through
+Settings → Plugins; their SQLite files remain on disk and can be re-enabled later.
 
-## Contribution points
+Node initialization happens before the listener accepts requests. A plugin can register:
 
-| Surface | Registry or contract | Activation home |
-| --- | --- | --- |
-| Panes | `@acorn/client-core/registries/panes.ts` | each plugin's `client/index.ts` (`ctx.panes`) |
-| Sources | `@acorn/client-core/registries/sources.ts` | each plugin's `client/index.ts` (`ctx.sources`) |
-| Commands / keybindings | `@acorn/client-core/registries/{commands,keybindings}.tsx` | the component that owns them, at MOUNT — a pane's shortcuts exist only while it does |
-| Settings pages | `@acorn/client-core/registries/settings.ts` | `ctx.settingsPages`; core's own in `app/client/pageContributions.tsx` |
-| UI slots, task slots, agent contexts, agent tool renderers, pollers, persisted state | `@acorn/client-core/registries/` | `ctx.{slots,taskSlots,agentContexts,agentToolRenderers,pollers,persistedState}`; core's own in `app/client/{slotContributions,activate}.ts` |
-| Notices, themes, styles | `@acorn/client-core/registries/` | core-owned; no plugin contributes one, so they are not on `ClientPluginContext` |
-| HTTP routes (internal) | `@acorn/node-core/server/routeRegistry.ts` | `app/server/routes.ts` |
-| Public API endpoints | `@acorn/node-core/server/publicApi/` (schema-first `PluginApiContribution`) | `app/server/publicApi.ts` |
-| Provider connections | `@acorn/node-core/server/integrations/connectionRegistry.ts` | the plugin's `init`, via `ctx.providers` |
-| External-item integrations | `@acorn/node-core/server/integrations/registry.ts` | the plugin's `init`, via `ctx.providers` |
-| Model generation adapters | `@acorn/node-core/server/modelProviders/registry.ts` | the plugin's `init`, via `ctx.providers` |
-| Agent tools and context | `@acorn/node-core/server/agentTools/` | service runtime imports `app/main/{agentToolsWiring,contextSectionsWiring}.ts` |
-| Agent profiles | `@acorn/node-core/main/agentProfiles/` | service runtime imports `app/main/agentProfiles.ts` |
-| Workflow steps, policies, triggers | `plugins/workflows/main/workflowRegistry.ts` | service runtime imports `app/main/workflowWiring.ts` |
+- routes under `/v2/p/<plugin>/...`;
+- typed capabilities and event subscriptions;
+- agent tools and task-context sections;
+- integration, connection, and model-provider descriptors;
+- a plugin-owned SQLite migration chain and disposal hook.
 
-Registries reject duplicate identifiers. Server route contributions must stay under `/api`, where
-the core app applies CSRF, principal resolution, and `requireUser` before mounting contributed
-routers. Service-process implementations are injected before the listener accepts requests, so a
-route either has its capability or returns the standard `bridge-unavailable` error.
+The host supplies `CoreServices` for confined filesystem access, Git, processes, secrets, tasks,
+repositories, preferences, HTTP, and other core operations. Plugins do not receive the core database
+handle merely to query shared tables.
 
-A plugin may also contribute to the opt-in public automation API: a schema-first
-`PluginApiContribution` mounted under `/api/v1/plugins/<pluginId>`, whose Zod schemas are validated at
-runtime and generate OpenAPI. The registry `freeze()` enforces namespace, scope, and strict-schema
-invariants, so a malformed contribution cannot mount. See `plugins/<name>/server/publicApi.ts`.
+Client initialization is synchronous registration. The host exposes contribution points for panes,
+sources, settings pages, shell/task slots, context sections, provider reference panels, palette rows,
+agent contexts, agent-tool renderers, pollers, persisted-state slices, Node statistics, and attention
+items. An activation pass handles subscriptions or local storage initialization after all descriptors
+exist.
 
-## Adding a feature
+## Collaboration rules
 
-1. Put feature-owned UI, routes, Node services, native adapters, and contracts under one
-   `plugins/<feature>/` directory, split by runtime.
-2. Expose behavior through the narrowest existing contribution point. Add a new registry only when
-   the behavior is genuinely open-ended and has more than one plausible contributor.
-3. Register the concrete contribution in `app/`; do not make `core/` discover product modules.
-4. Keep request/response work on authenticated HTTP, streams on the shared WebSocket, and preload
-   IPC for renderer-facing Electron-native capabilities only. If a service-owned feature needs a
-   native operation, add a narrow serializable contract to the service protocol rather than
-   importing Electron into the engine.
-5. Add focused behavior tests plus any registry, route, provider, or architecture conformance case.
-6. Update the durable topic documentation in the same change.
+Plugins collaborate through four mechanisms:
 
-For agent tools see [agent-tools.md](./agent-tools.md); for providers see
-[integrations.md](./integrations.md); for state ownership see [state.md](./state.md).
+1. **Contracts** — import only a provider's `contract/` entrypoint for types, capability IDs, or
+   narrow pure functions.
+2. **Capabilities** — resolve typed functions from the Node's per-runtime capability registry at
+   call time. Missing optional providers produce a degraded feature, not a module import.
+3. **Events** — publish small invalidation or lifecycle facts. Durable history belongs in the owning
+   plugin's tables, not in the event stream.
+4. **Client registries and slots** — register UI contributions without importing another plugin's
+   implementation. The host records disposables so disabling/reloading a plugin removes its entries.
+
+The architecture test enforces zero non-contract plugin-to-plugin edges, no app imports from packages
+or plugins, no Electron imports outside the allowed desktop surface, protocol purity, declared
+dependencies, an acyclic package graph, and the client/Node split.
+
+## Data ownership
+
+Table-owning plugins open one `plugins/<name>.sqlite` file under the Node data root and own its
+migrations. Current table-owning plugins include agents, changes, database, GitHub, HTTP, memory,
+notes, terminal, and workflows. Core owns shared workspace/task/integration/external-item/security
+tables. Docker, editor, Linear, Rollbar, model providers, preview, and profile packages use core
+services or provider registries without owning a database file.
+
+There are no cross-file foreign keys, `ATTACH` queries, or transactions spanning plugin databases.
+Cross-plugin workflows use durable operation state and explicit IDs/capabilities.
+
+## Tool projection
+
+A plugin registers schema-validated agent tools with risk metadata. Core projects the registry into:
+
+- the task-scoped HTTP tool surface;
+- the stdio MCP server used by spawned agents;
+- renderer permission and tool-description UI.
+
+The caller's internal-token scope and the owner's tool permission settings are both applied. Tool
+implementations run in the Node and use CoreServices; the renderer and MCP process do not open plugin
+databases directly.
+
+## Adding a plugin contribution
+
+1. Put the behavior in the owning plugin and choose the correct runtime directory.
+2. Use CoreServices rather than importing core implementation modules or another plugin's internals.
+3. Add a narrow `contract/` export, capability, event, or client registry entry when collaboration is
+   needed.
+4. Register the Node/client entry in the appropriate composition list.
+5. Add package-local tests and, for rendered behavior, desktop e2e coverage.
+6. Run the architecture test, `pnpm lint`, and the relevant tests.

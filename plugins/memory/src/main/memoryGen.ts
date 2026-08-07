@@ -47,9 +47,8 @@ export type VerifyContext = {
 
 export type VerifiedCandidate = { candidate: MemoryCandidate; blocking: string[]; flags: string[] }
 
-// The 3 checks acorn needs (Cloudflare runs 8): dangling refs + duplicates BLOCK; a same-name
-// different-content memory is a contradiction FLAG the human resolves at the gate (supersede,
-// never overwrite in place).
+// The three checks acorn needs: dangling references and duplicates block; a same-name, different-content
+// memory is flagged for human resolution at the gate (supersede, never overwrite in place).
 export function verifyCandidates(candidates: MemoryCandidate[], ctx: VerifyContext): VerifiedCandidate[] {
   return candidates.map((candidate) => {
     const blocking: string[] = []

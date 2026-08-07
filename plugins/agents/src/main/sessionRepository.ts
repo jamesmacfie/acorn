@@ -30,12 +30,10 @@ type SessionSearchFilter = {
  * session sequence and all query projections atomically. Turn queue operations remain in
  * AgentStore; both slices share one inherited database handle.
  *
- * `core` is here for exactly one question: which tasks belong to a workspace. Three queries in this
- * file and one in AgentStore used to answer "sessions in workspace X" by JOINing `agent_sessions` to
- * core's `tasks` and `workspace_repos` — the only real cross-database joins in the codebase. They now
- * resolve the workspace's task ids through `CoreServices.tasks.idsForWorkspace()` and filter with
- * `inArray` inside this plugin's own file, which is what data.md means by "cross-plugin references are
- * plain IDs, validated by the owning plugin when dereferenced".
+ * `core` answers exactly one question here: which tasks belong to a workspace. The repository asks
+ * `CoreServices.tasks.idsForWorkspace()` for those task ids, then filters its own session tables with
+ * `inArray`. Cross-plugin references remain plain IDs; the owning plugin validates them when it reads
+ * them.
  */
 export class AgentSessionRepository {
   constructor(
@@ -329,10 +327,6 @@ export class AgentSessionRepository {
       .join(' ')
     if (!terms) return []
     const escapedLike = `%${query.replace(/[%_]/g, '\\$&')}%`
-    // The workspace scope, resolved ONCE and shared by all three queries below. It used to be three
-    // separate `⋈ tasks ⋈ workspace_repos` joins, one per query, which is also why they could not
-    // survive the split: an FTS5 MATCH, a LIKE over artifacts and the session page each reached across
-    // a database boundary to answer the same sub-question.
     const taskIds = await this.workspaceTaskIds(filter.workspaceId)
     if (taskIds?.length === 0) return []
     // A reusable `task_id IN (…)` chunk for the one query that has to be raw SQL: FTS5 MATCH has no

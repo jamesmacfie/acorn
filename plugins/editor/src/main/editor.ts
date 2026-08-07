@@ -10,9 +10,6 @@ import { BridgeError } from '@acorn/node-core/server/bridge.ts'
 import type { CoreServices } from '@acorn/node-core/main/core/index.ts'
 import type { EditorBridge, EditorEntry } from '../server/routes/editor'
 
-// This plugin owns no tables. Every call is keyed by taskId and resolves the worktree root through
-// core, which owns `tasks` — a plugin has no handle to core's database (docs/vNext/data.md § Plugin
-// DBs). `fs` is core's one path-confinement implementation, which this file used to wrap.
 export type EditorCoreServices = Pick<CoreServices, 'tasks' | 'fs'>
 
 // Confine relPath to the task's worktree; throw the HTTP-classified error the route surfaces.

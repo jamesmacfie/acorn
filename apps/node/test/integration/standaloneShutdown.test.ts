@@ -5,25 +5,6 @@ import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { afterEach, describe, expect, it } from 'vitest'
 
-// SIGTERM against a REAL standalone node, which is the signal launchd and systemd send.
-//
-// docs/vNext/phase4-notes.md records the finding behind the Phase 5 fix: "`standalone.ts`'s drain ran
-// long enough that the socket outlived a 30-second poll", and the two-node e2e uses SIGKILL because of
-// it. The cause was that the drain closed no listener at all — it went straight to plugin dispose — so
-// the port came free only when the process finally exited.
-//
-// **What this file proves, exactly**: that a SIGTERM ends the process cleanly and in a bounded time, and
-// that the drain got far enough to release the data root's exclusive lock. That is the operator-facing
-// property (`systemctl restart`), and nothing asserted it.
-//
-// **What it does NOT prove** is the listener-close itself, and the distinction is worth stating rather
-// than glossing: `process.exit(0)` frees the port whether or not anything closed the server, so an
-// end-to-end test cannot tell the fixed drain from the broken one without racing the two events. Those
-// two halves are covered where they can fail honestly instead — `closeListener` frees a port under a live
-// keep-alive connection in node-core's main/serverDrain.test.ts (verified by deleting
-// `closeAllConnections`, which makes exactly that case fail), and standaloneParity.test.ts pins that both
-// composition roots still call it.
-
 const appRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../..')
 
 // Generous relative to the 30s deadline the drain itself carries — the point is to catch a HANG, not to

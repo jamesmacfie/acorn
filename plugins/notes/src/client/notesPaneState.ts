@@ -1,4 +1,4 @@
-// Notes pane view state (docs/next/context-ui.md): which note you were on and whether the library
+// Notes pane view state (docs/agent-tools.md): which note you were on and whether the library
 // column is collapsed, per task. Session-only (matches the house session-first guidance — only the
 // Manifest's section selection has a stated durability requirement). Evicted on task archive.
 import { createSignal } from 'solid-js'

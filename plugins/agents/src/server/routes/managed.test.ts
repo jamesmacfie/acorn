@@ -4,17 +4,6 @@ import type { AppEnv } from '@acorn/node-core/server/middleware/auth.ts'
 import type { Env } from '@acorn/node-core/main/bindings.ts'
 import { managedAgents, setManagedAgentsBridge, type ManagedAgentsBridge } from './managed'
 
-// The task-scope contract for the managed-agent surface.
-//
-// This router had NO route test before Phase 3, which is part of why the hole below survived: a managed
-// session drives a provider CLI in a task's worktree, every route that names one is addressed by an
-// opaque id, and none of them checked ownership. `requireTaskScope` is mounted over
-// /v2/p/:plugin/tasks/:id (packages/node-core/src/server/index.ts) and therefore cannot see any of these
-// paths — so the checks live in the router and this file is what keeps them there.
-//
-// Scope is deliberate: ownership only. The other ~25 routes' bodies, idempotency keys and error taxonomy
-// are the runtime's contract (main/runtime.test.ts) and are not re-asserted here.
-
 const req = (url: string, method = 'GET', body?: unknown) =>
   new Request(`http://acorn.test${url}`, {
     method,

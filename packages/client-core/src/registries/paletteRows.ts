@@ -1,15 +1,3 @@
-// Per-task rows a plugin contributes to the ⌘K palette, and how to invoke one
-// (docs/vNext/plugins.md § ClientPluginContext, the `palette` member).
-//
-// Phase 2 left `palette` off the client context on the grounds that commands and keybindings register at
-// COMPONENT MOUNT — which is correct, and unchanged: `registerCommands` still owns anything with a fixed id
-// and a `run`. What it does not serve is the other half of the palette: rows that are FETCHED per task from
-// repo config, so they cannot be registered at mount and cannot be known until the palette opens. Those are
-// run targets, layout recipes and committed workflows, and CommandPalette read all three itself by importing
-// plugins/terminal and plugins/agents directly (plugins.md's coupling table, row 3).
-//
-// So this is not "a second command registry". The split is: a COMMAND is a known action, a ROW SOURCE is a
-// query whose results happen to be actionable.
 import type { ClientCapabilityRequirement } from '../capabilities'
 import type { PaletteItem } from '../palette/model'
 import { Registry } from './registry'

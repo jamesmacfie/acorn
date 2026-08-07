@@ -1,269 +1,39 @@
 # Notes and memory
 
-acorn keeps two distinct stores of free-form knowledge, separated by a deliberate hard boundary:
-**notes** are ephemeral working context (what someone is thinking *right now* on a task); **memory**
-is durable, distilled knowledge (how a repo works, learned once and reused forever). Notes are
-gitignored; memory is committed. Notes consolidate *into* memory — never the reverse. Both stores can
-be read by agents; agent **note** writes land directly but are stamped with provenance, while every
-agent **memory** write is a proposal that a human gates — nothing lands in memory silently.
-
-A third store, **`review_notes`** (anchored inline annotations on a diff), is *not* markdown notes and
-is documented with the Changes pane — see [panes.md](./panes.md). The boundary is below.
-
-## The boundary
-
-| | Notes | Memory | `review_notes` |
-| --- | --- | --- | --- |
-| Purpose | ephemeral working context | durable distilled knowledge | inline annotations on uncommitted changes |
-| Lifetime | task/workspace-scoped, disposable | cross-task, reused forever | until sent to the agent, then re-anchored |
-| Truth | `.md` files, **gitignored** | `.md` files, **committed** (repo scope) | rows in the `review_notes` SQLite table |
-| Content | prose, no anchors | frontmatter + prose, `[[wikilinks]]` | body anchored to `path` + line range |
-| Agent write | direct (stamped as agent) | **propose only** (human gate) | n/a (human authors, sent as a prompt) |
-| Doc | this file | this file | [panes.md](./panes.md) (Changes pane) |
-
-The rule of thumb: a note is *"what I'm thinking on this task"*; a memory
-is *"how this repo works."* Notes are meant to be thrown away; the valuable distillate is promoted into
-memory, where it is reviewed exactly like code (via the PR that carries the file).
-
-The paragraphs below describe the shipped system. Periodic consolidation and richer decay handling
-remain intentionally outside the current runtime.
+Notes and memory are separate Node plugins with different ownership and review semantics. Both are
+available to the renderer and to task-scoped MCP tools.
 
 ## Notes
 
-### Where they live
+Notes are Markdown content at task, workspace, and global scope. The notes plugin owns revisions,
+CRUD, context projection, agent read/append tools, and import/export. The Node stores note records in
+`plugins/notes.sqlite`; autosave sends an expected revision and surfaces a conflict rather than
+overwriting a newer edit.
 
-Notes are gitignored markdown files under `notes/` in the node's data root (`apps/node/.acorn/notes/`
-in a dev checkout). They have three first-class locations, represented by the shared `NoteLocation`
-union:
-
-| Scope | Directory | Shared by |
-| --- | --- | --- |
-| `task` | `task/<taskId>/` | only the owning task; default for agents/workflows and new human notes |
-| `workspace` | `<workspaceId>/` | every task/worktree in that workspace group |
-| `global` | `global/` | every workspace |
-
-Existing workspace/global directories remain in place. The reserved `task/` subtree cannot collide
-with workspace UUIDs, so adding task scope requires no data migration. `originTaskId` is provenance,
-not the isolation mechanism.
-
-### Kinds and authors
-
-Each note carries an `author` (`user | agent | workflow`) and a `kind`
-(`scratch | plan | finding | handoff`) — `notesClient.ts:5-6`. Humans in the UI only ever create
-`scratch` notes; `plan`/`finding`/`handoff` are written by agents and workflows and surface separately.
-
-### The Notes pane
-
-`plugins/notes/src/client/NotesPane.tsx` — the registered `notes` layout pane, whose client
-uses the task/workspace-scoped routes under `/v2/p/memory` (`/tasks/:id/notes*`,
-`/workspaces/:wsId/notes*`). The backing file store is service-owned, so those routes
-return a clean `503 bridge-unavailable` under `dev:node`. Layout:
-
-- A scratchpad is the landing surface. Until the first keystroke it is virtual; typing creates the
-  task `scratchpad` file through a single-flight guard.
-- A collapsible/filterable library groups **Task**, **Workspace**, and **Global** notes. It creates
-  in any available scope, badges agent/workflow provenance, supports rename/delete, and hides
-  workflow-authored seed snapshots that already appear in their native context sections.
-- Each library row has an include dot. This controls whether the note participates in assembled
-  context without deleting it.
-- The editor keeps sanitized markdown Preview/Edit modes. Body autosave debounces 1.5 seconds and
-  flushes before blur/switch/cleanup; title autosave has its own shorter debounce.
-
-The Context pane's per-note edit jump uses a retained pane intent with scope + slug. If Notes is
-already mounted it consumes the live event; otherwise it consumes the retained intent on mount.
-
-### Agent access — the harness endpoints and MCP tools
-
-Agents reach notes over the **loopback harness routes** (`packages/node-core/src/server/routes/harness.ts`),
-which are keyed by **task id** (the store resolves task → workspace internally). The routes delegate to
-the service-owned `NotesStore` through the injected `HarnessBridge` (`harness.ts:10-36`):
-
-| Route | Bridge method | MCP tool |
-| --- | --- | --- |
-| `GET /:id/notes` | `notesList` | `notes_list` |
-| `GET /:id/notes/:slug` | `notesRead` | `notes_read` |
-| `PUT /:id/notes/:slug` | `notesWrite` | `notes_write` |
-| `POST /:id/notes/:slug/append` | `notesAppend` | `notes_append` |
-
-The MCP tools (the notes block in `packages/node-core/src/mcp/server.ts`) call these routes with the inherited
-`ACORN_SESSION_ID`, so agent writes are **stamped server-side** with `author: agent` + the session id
-for provenance. `notes_write` replaces a body (creating the note if missing); `notes_append` adds to
-it (findings, plans, handoffs). Files remain the source of truth — the MCP tools and the UI edit the
-same `.md` files.
+The Notes pane provides a task-first scratchpad, scope navigation, include-in-context controls,
+debounced saves, conflict recovery, and Markdown import/export. Notes written by an agent are
+attributed to the task/session and still follow the same revision rules.
 
 ## Memory
 
-### Files are the truth; SQLite is a derived index
+Memory is durable reviewed knowledge. Accepted entries are Markdown files in the repository's
+`.acorn/memory/` directory or Node-private memory storage. The memory plugin owns file reconciliation,
+hash deduplication, supersession, proposals, an FTS index, and recall metadata.
 
-Memory is markdown files, at two scopes (schema comment `schema.ts:392-397`):
+Agents can search and propose memory entries but cannot write accepted knowledge directly. Acceptance
+revalidates the proposal revision and relevant worktree state before updating the authoritative file.
+The index is rebuildable; the Markdown files remain the durable content.
 
-```
-<worktree>/.acorn/memory/*.md   + MEMORY.md   ← repo scope: COMMITTED, reviewed in PRs, portable
-~/.acorn/memory/*.md            + MEMORY.md   ← private scope: operator machine gotchas / prefs
-```
+## Context integration
 
-The files are the source of truth — grep-able, diffable, reviewable, and readable by any agent with
-plain file tools even if the MCP is off. The **`memories` SQLite table** (`schema.ts:398-414`) is a
-*derived index* reconciled on file change from every active worktree plus the primary checkout:
+Notes and memory each register a context section. Core assembles sections with GitHub, task, Linear,
+and Rollbar contributions under a deterministic byte/token budget. Section failure or stale data is
+reported independently. The context pane previews the exact snapshot and can send it to a selected
+managed agent session.
 
-- **`id` is a content hash** (`sha256(content)` prefix) — the same file seen in N checkouts collapses
-  to one row (idempotent).
-- **Conflicts on `(scope, repo, name)` resolve by newest `updatedAt`**; genuine contradictions are what
-  the `supersededBy` chain is for (supersede, never overwrite in place).
-- The index is the **cross-task retrieval plane**: a memory accepted on task A's branch is retrievable
-  by task B immediately (via search/injection) even though B's *files* only gain it after merge — the
-  index papers over merge lag.
+## Lifecycle hooks
 
-A companion **FTS5 virtual table `memories_fts`** (Porter tokenizer over `name`/`description`/`body`,
-created by hand in migration `0011` since Drizzle doesn't model virtual tables — `schema.ts:394-396`)
-powers ranked keyword search. No embeddings; FTS5 ships with better-sqlite3, so keyword retrieval needs
-zero new deps.
-
-### Fields
-
-| Column | Meaning |
-| --- | --- |
-| `scope` | `repo` (committed) or `private` (`~/.acorn`) |
-| `repo` | `owner/name` for repo scope; `null` for private |
-| `name` | kebab-case identifier |
-| `type` | `convention` \| `architecture` \| `decision` \| `fix` \| `reference` \| `feedback` \| `task` \| `user` |
-| `description` | one-line summary (what the index shows) |
-| `body` | full markdown, includes a **"Why:"** rationale line |
-| `path` | the winning file on disk |
-| `originSessionId` | provenance — the session that produced it |
-| `commitSha` / `updatedAt` | so staleness is measurable |
-| `supersededBy` | version-chain pointer (never delete) |
-| `lastAccessedAt` / `accessCount` | recall bookkeeping |
-
-The `type` enum splits by decay policy: `convention`/`architecture`/`decision`/`user`
-are stable; `fix`/`reference` are episodic and `reference` "rots on refactor" (verify); `task` is
-in-flight and dropped on completion.
-
-## The memory UI — `MemorySection` inside Context
-
-Memory has no pane of its own. `plugins/memory/src/client/MemorySection.tsx` renders
-inline inside the Context pane's Memory section, so proposals/manual creation sit beside the exact
-memory inventory and inclusion state they affect. The client in
-`plugins/memory/src/client/memoryClient.ts` calls the `/v2/p/memory` routes. Two surfaces:
-
-1. **Memory proposals — the human gate.** Pending proposals are listed with an editable
-   description and **Accept / Reject** buttons; structural verification `flags` (e.g. a
-   contradiction) render as warning badges separate from the description.
-   Accept writes the memory file into the task worktree's `.acorn/memory/` and reconciles the
-   index (repo scope lands via the PR — `acceptProposal`,
-   `plugins/memory/src/main/memoryGen.ts:137-161`); reject leaves no trace. This is the
-   countermeasure to "LLM rewriting corrupts ground truth" — a human always sees the memory
-   before it lands.
-
-   Proposals arrive from two sources and land in one store: an agent's `memory_write` (the MCP
-   propose path) and the **auto-generation pass** (below). The store is JSON files under
-   `memory-proposals/` in the node's data root — visible, greppable, crash-safe, no schema
-   (`MemoryProposalStore`, `plugins/memory/src/main/memoryProposals.ts`).
-2. **Manual "+ memory"**: a form with name (kebab-cased), type, scope (`repo (worktree,
-   committed)` vs `private (~/.acorn)`), one-line description, and body. Writes directly on the
-   human's behalf (no gate — the human *is* the gate).
-
-Agents reach memory through projected agent tools, keyed by task id:
-
-| Capability | Behavior | MCP tool |
-| --- | --- | --- |
-| Search | FTS5-ranked recall | `memory_search` |
-| List | Index: name + description | `memory_list` |
-| Get | Full body + path | `memory_get` |
-| Propose | File a human-gated proposal | `memory_write` |
-
-Note the asymmetry: agent reads are direct, but the **only write path an agent has is `propose`**
-(the projected `memory_write` tool). `memory_write` is documented to the agent as "a human
-reviews before it lands — nothing is written directly." A silent agent write does not exist.
-
-### Auto-generation — the task-boundary memory-review pass
-
-Implemented in `plugins/memory/src/main/memoryGen.ts`, triggered from `memoryReviewTrigger`
-(`plugins/memory/src/main/knowledgeIpc.ts`): when an agent session ends (and best-effort at archive),
-while the worktree is still alive, acorn runs a **headless memory-review step** — the same headless
-runner workflows use (`claude -p --json-schema …`; it uses the first installed headless-capable
-agent profile — claude-code, then codex (`memoryReviewProfile`) — else it silently skips) — over
-the task diff (`git diff HEAD`, capped at 20k chars) plus the session transcript tail (10k), with the
-existing memory index inlined so the model doesn't duplicate. The structured output
-(`MEMORY_REVIEW_SCHEMA`) is then **verified cheaply before it ever reaches a human**
-(`verifyCandidates`, `memoryGen.ts:54-67`):
-
-- a candidate citing a **missing file** is blocked;
-- a **duplicate** (content-hash match against the index) is blocked;
-- a **same-name, different-content** candidate is *flagged* as a contradiction — accepting it
-  supersedes the existing memory (supersede, never overwrite in place). Flags ride the proposal's
-  structural `flags` field (`MemoryProposal`, `main/memoryProposals.ts`; mirrored on the client's
-  `MemoryProposalRow` and rendered as badges in `MemorySection`) — never folded into the
-  description, which would leak into the memory file on accept.
-
-Survivors are filed as proposals through the same gate as `memory_write`; a bell notice ("N memory
-proposals await review") surfaces them. The whole pass is best-effort — a failure never disturbs the
-task lifecycle (`knowledgeIpc.ts`).
-
-## How this feeds agents
-
-Notes and the memory index are folded into the task's **assembled context**
-(`packages/protocol/src/api.ts:198-207`, `TaskContext`), which has two consumers — plus a third
-path for memory alone:
-
-- **Push** — the Context pane's **Sync context** button. The human selects sections, previews the
-  exact assembled block and its byte/budget indicators, chooses a running agent session, and sends
-  on the idle edge. A per-session fingerprint reports never synced / synced / stale as selected
-  context changes. Section selection persists per task.
-- **Pull** — the MCP `task_context` tool (`mcp/server.ts`) returns the same assembled bundle,
-  including notes and the repo memory *index*.
-- **Inject at launch** — when an agent terminal session starts, the repo's memory index slice is
-  formatted and injected into the session (`memoryIndexSlice` + `formatMemoryInjection`, wired in
-  `plugins/memory/src/main/knowledgeIpc.ts`), so an agent knows what memory exists before it asks.
-  The per-directory `MEMORY.md` (one line per memory) serves the same index role for agents reading
-  files directly (`memory.ts:106`).
-
-`formatContextBlock` is compact by design: it emits note titles + bodies but the memory **index only**
-(`- name — description`) with the hint "ask for bodies via memory_get" (`contextBlock.ts:32-35`). The
-mantra: the primary agent should never burn context on storage strategy — it pulls
-memory bodies on demand.
-
-### The committed `.acorn/` convention
-
-Both memory (repo scope) and notes reference a **single `.acorn/` directory**, not a dotfile per
-feature. In a repo/worktree it holds `config.toml` (run targets, editor — see
-[workflows.md](./workflows.md)), `memory/`, and workflow assets; committed content is
-team-shared, while acorn's own local state lives in the node's data root — `apps/node/.acorn/` in a
-dev checkout (gitignored: the SQLite database, blob cache, and workspace notes).
-
-## Availability and limits
-
-- **File-backed paths need the supervised service.** Human-facing HTTP routes delegate through an
-  injected `KnowledgeBridge`. Without it — e.g.
-  `dev:node` running just the Hono server with no Electron — every route degrades to a clean **503**
-  (`bridge-unavailable`) rather than crashing.
-- **The full proposal loop is implemented** — the human gate (Accept/Reject, manual add,
-  `memory_write` = propose) *and* the automatic generation of proposals at task boundaries: the
-  agent-session-end hook fires the headless memory-review pass over the diff + transcript
-  (`memoryGen.ts`, wired in `knowledgeIpc.ts`; see "Auto-generation" above). It depends on an
-  agent CLI being installed and is best-effort by design. What remains **design-stage**
-  is the separate *periodic consolidation* pass (re-distilling/merging existing
-  memories over time) and richer decay handling for episodic types.
-
-## Source
-
-- Schema: `packages/node-core/src/server/db/schema.ts` (`memories` + `memories_fts` in migration `0011`;
-  `review_notes` for the separate anchored store)
-- Shared note shapes: `packages/protocol/src/notes.ts` (canonical `Note`/`NoteSummary` +
-  author/kind unions, imported by main and client)
-- Stores (service-owned; historical `main` paths):
-  `plugins/notes/src/main/notes.ts` (`NotesStore` — the `.md` files),
-  `plugins/memory/src/main/memory.ts` (memory files + derived index + `MEMORY.md`),
-  `plugins/memory/src/main/memoryProposals.ts` (proposal JSON store),
-  `plugins/memory/src/main/memoryGen.ts` (auto-generation + accept/reject verdicts; trigger + the
-  knowledge bridge wired in `plugins/memory/src/main/knowledgeIpc.ts`)
-- Human-facing routes: `plugins/memory/src/server/routes/knowledge.ts`
-- Notes UI: `plugins/notes/src/client/{NotesPane.tsx,notesClient.ts}`
-- Memory UI: `plugins/memory/src/client/{MemorySection.tsx,memoryClient.ts}`, hosted by
-  `plugins/context/src/client/{ContextPane.tsx,model.ts,selectionState.ts,syncState.ts}`
-- Assembly: `packages/protocol/src/{api.ts,contextBlock.ts}`
-- MCP tools: `packages/node-core/src/mcp/server.ts`
-
-See also: [panes.md](./panes.md) (Context / Notes / Changes panes),
-[mcp.md](./mcp.md), [workspaces-and-tasks.md](./workspaces-and-tasks.md),
-[data-layer.md](./data-layer.md), [workflows.md](./workflows.md).
+Managed-agent completion can trigger memory review. The hook creates proposals or review attention;
+it does not bypass the human acceptance gate. Notes and memory capabilities resolve through the Node
+capability registry, so disabling one plugin yields an explicit unavailable section rather than a
+cross-plugin import.

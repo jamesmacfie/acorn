@@ -15,23 +15,6 @@ import { createCoreServices } from '@acorn/node-core/main/core/index.ts'
 import { SecretService } from '@acorn/node-core/main/core/index.ts'
 import { nodePlugins } from '../../src/server/plugins'
 
-// Phase 3's second exit criterion, node half (docs/vNext/plan.md § Phase 3): "disabling any non-required
-// plugin at startup leaves the rest working (automated test cycles through each plugin disabled)".
-//
-// Both hosts have honoured a `disabled` list since Phase 2 and NOTHING populated it — Settings → Plugins is
-// Phase 4 — so this is the flag's first consumer. That matters more than it sounds: the point is to discover
-// now whether fifteen real plugins have a hidden dependency on each other's contributions, rather than when a
-// user first unticks a box.
-//
-// Against the REAL list, not a fixture. host.test.ts already proves the `continue` statement works; what is
-// unproven is that the real graph survives a hole in it. This boots the whole plugin set on a real temp data
-// root — every plugin opens and migrates its own SQLite file — once per optional plugin.
-//
-// It drives `initPlugins` directly rather than `startServiceRuntime` for one reason: a full runtime boot also
-// binds a TLS listener and starts a PTY engine per case, which for a dozen cases is minutes of wall clock for
-// no extra coverage. Plugin composition is what is under test, and `service/runtime.test.ts` already proves the
-// listener path. `disabledPlugins` is plumbed through the service config for Phase 4's UI either way.
-
 const desktop: DesktopCapabilities = {
   preview: {
     currentUrl: async () => null,
@@ -165,12 +148,6 @@ describe('disabling a node plugin', () => {
     for (const root of dataRoots) rmSync(root, { recursive: true, force: true })
   })
 
-  // A FRESH data root per boot, which is what makes `snapshot.databases` mean anything.
-  //
-  // Both boots in a case used to share one root, so the reduced boot still found the full boot's `.sqlite`
-  // files sitting on disk and the two lists were identical by construction. Comparing them would have been a
-  // guaranteed pass — a test that cannot fail — which is why the old file built the list and then never
-  // compared it. A separate root per boot makes "the disabled plugin did not open its file" observable.
   const start = async (disabled?: readonly string[]): Promise<{ enabled: readonly string[]; skipped: readonly string[]; roster: readonly PluginRosterEntry[]; snapshot: Snapshot }> => {
     const dataDir = mkdtempSync(join(tmpdir(), 'acorn-plugin-disable-'))
     dataRoots.push(dataDir)
@@ -235,14 +212,6 @@ describe('disabling a node plugin', () => {
     const { enabled, skipped, snapshot } = await start()
     expect(skipped).toEqual([])
     expect(enabled).toEqual(all.map((p) => p.name))
-    // Sanity on the baseline the cases below compare against.
-    //
-    // FOUR sections, and `issues` being here is the point. This boot is standalone-shaped — `initPlugins` and
-    // no `wireAgentTools` — which is exactly what apps/node/src/server/standalone.ts does. Core's `issues`
-    // section used to be registered from wiring/agentToolsWiring.ts, reached only from service/runtime.ts, so
-    // `pnpm dev:node` silently lost the Linked-issues row and this assertion said `['pr','notes','memory']`,
-    // baking the bug in as the expected answer. It is registered at module scope in contextSections.ts now,
-    // so every entry point gets it, and this line is the regression test for that.
     expect(snapshot.sections).toEqual(['pr', 'issues', 'notes', 'memory'])
     expect(snapshot.databases.length).toBeGreaterThanOrEqual(8)
     expect(snapshot.routes.length).toBeGreaterThanOrEqual(15)

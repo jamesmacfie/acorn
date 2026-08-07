@@ -26,9 +26,9 @@ export type RuntimeBindings = {
   DATA_DIR: string
   // This Node's durable identity, minted into node.json on first start (main/dataRoot.ts). Every
   // resource a client caches is keyed (nodeId, id), so two nodes holding the same UUID never
-  // collide (docs/vNext/architecture.md § Fleet semantics).
+  // collide (docs/architecture-overview.md § Fleet semantics).
   NODE_ID: string
-  // The sha256 of this node's TLS certificate — the value a client pins (docs/vNext/protocol.md
+  // The sha256 of this node's TLS certificate — the value a client pins (docs/api-reference.md
   // § Transport and identity), advertised at GET /v2/node.
   //
   // The fingerprint, NOT the certificate and emphatically not the private key: c.env reaches every
@@ -36,20 +36,10 @@ export type RuntimeBindings = {
   // inside main/tls.ts and main/server.ts, which are the only modules that need it.
   NODE_FINGERPRINT: string
   // The app version this node is running, reported at GET /v2/node to an authenticated caller
-  // (docs/vNext/protocol.md § Versioning). Injected rather than read from a package.json, because the
+  // (docs/api-reference.md § Versioning). Injected rather than read from a package.json, because the
   // service is a bundled artifact by then and only the composition root knows the real version.
   APP_VERSION: string
   BLOBS: BlobCache
-  // The secret-box key. Named for the session cookie it used to seal; that cookie is gone, but the key
-  // outlived it — integration credentials and HTTP-client fields are encrypted at rest with it
-  // (server/secretBox.ts), so it is now simply "the key this node encrypts secrets with".
-  // ponytail: docs/vNext/data.md wants it renamed `secrets.key`. That is main/sessionKeyStore.ts, the
-  // docs, and every developer's .env, for zero behavioural gain — deferred deliberately.
-  //
-  // Read by exactly two things now: SECRETS below, and the legacy HTTP-storage migration in
-  // apps/node/src/wiring/startupSecurity.ts. No plugin touches it — a plugin uses SECRETS, which is
-  // the difference between holding the key and being able to use one credential for one purpose
-  // (docs/vNext/security.md § Secrets, "No getSecret() free-for-all").
   SESSION_ENC_KEY: string
   // Use-scoped credential access (main/core/secrets.ts). On c.env deliberately: it is strictly less
   // dangerous than the raw SESSION_ENC_KEY that was already here, and it is the seam that scrubs a
@@ -70,18 +60,15 @@ export type RuntimeBindings = {
   // device flow), and read by every principal — a device inherits it, and a machine caller fails closed
   // without it rather than selecting an arbitrary cached prefs/repo row.
   ACTIVE_IDENTITY: ActiveIdentityStore
-  // vNext auth root (docs/vNext/protocol.md § Pairing): paired devices and their revocable bearer
+  // Node auth root (docs/api-reference.md § Pairing): paired devices and their revocable bearer
   // tokens, the replay store behind Idempotency-Key, and the one-time pairing window.
   DEVICES: DeviceService
   IDEMPOTENCY: IdempotencyStore
   PAIRING_CODES: PairingCodes
 }
 
-// What routes actually see as `c.env`. Was an ambient `declare global { interface Env }` in
-// src/env.d.ts; that only worked because the whole app was one TypeScript program. Under the vNext
-// package split each package compiles with `include: ["src"]`, so an ambient global declared in
-// node-core would be invisible to the twenty plugin packages whose routes read c.env — hence an
-// ordinary exported type that travels with the import graph.
+// What routes actually see as `c.env`: an ordinary exported type that travels with the import graph
+// so every package compiling a route can use the same bindings contract.
 //
 // HttpBindings is Partial because the @hono/node-server adapter only spreads raw incoming/outgoing
 // at the app.fetch() seam (main/server.ts); tests and non-HTTP callers don't provide them.
@@ -125,15 +112,6 @@ export function diskBlobCache(dir: string): BlobCache {
   }
 }
 
-// drizzle-generated migrations: packaged as extraResources (<resources>/migrations) in a built
-// app, else resolved by walking ancestors from this module. Never from process.cwd().
-// ponytail: search ancestors instead of a fixed `../../` — the module sits at a different depth in
-// the built bundle (apps/desktop/out/main, where the build copies migrations to out/migrations)
-// than in dev/test source (packages/node-core/src/main, next to packages/node-core/migrations), so
-// no single relative path serves both.
-//
-// resourcesPath is an Electron addition to `process`, and node-core compiles against plain Node
-// types by design — read it defensively rather than widening the package's type surface.
 const electronResourcesPath = (process as { resourcesPath?: string }).resourcesPath
 const migrationsFolder = (() => {
   const packaged = electronResourcesPath ? join(electronResourcesPath, 'migrations') : null
