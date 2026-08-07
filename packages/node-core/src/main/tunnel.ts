@@ -1,0 +1,152 @@
+import { connect, type Socket } from 'node:net'
+import type { IncomingMessage, Server } from 'node:http'
+import type { Duplex } from 'node:stream'
+import { WebSocketServer, type WebSocket } from 'ws'
+import { claimUpgrade } from './upgradeClaim'
+import { authorizeWsUpgrade, type WsAuthDeps } from './wsHub'
+
+// The preview tunnel (docs/vNext/plan.md § Phase 4: "Preview tunnel for remote nodes (task-scoped, over
+// the authenticated connection)"; protocol.md § Streams).
+//
+// The problem it solves is one sentence from plugin-inventory.md § preview: "for remote nodes, 'localhost'
+// means the node's host". The preview pane's URL is resolved BY the node (a run target's url, a repo's
+// preview port, a URL script) and then loaded BY the client's Electron main — so a remote node hands back
+// `http://localhost:5173`, which resolves on the owner's laptop, where nothing is listening.
+//
+// ## Why a dedicated upgrade rather than multiplexed stream frames
+//
+// protocol.md § Streams designs tunnels as a third flavour of the `kind: "stream"` frame, sharing the
+// events socket with a credit-based flow-control layer. This is one WebSocket per TCP connection on its
+// own path instead, and that is a deliberate divergence recorded in docs/vNext/phase4-notes.md:
+//
+//   - It is LESS code, not a shortcut. One socket per connection means `pipe()` is the whole
+//     implementation, and Node's stream backpressure is the credit layer — no window accounting, no
+//     per-stream buffers, no head-of-line blocking between a dev server's HMR socket and its asset
+//     requests.
+//   - The events socket carries the flat V1 frame vocabulary (phase1-notes.md), which has no `kind`
+//     discriminator to hang a tunnel frame off. Adding one is the rewrite that document explains was
+//     deferred, and doing it here would mean rewriting eleven client frames to ship a preview pane.
+//
+// ## What it will and will not connect to
+//
+// protocol.md: "Only declared ports; no general SOCKS." The allowlist is not a new config surface — it is
+// whatever the NODE itself already resolves as that task's preview or run URLs. So a port is reachable
+// exactly when the owner has configured something on it, and adding a run target adds its port without a
+// second place to edit.
+export type TunnelDeps = WsAuthDeps & {
+  // Ports this task legitimately serves on, resolved by the node. Empty (or a throw) means nothing is
+  // tunnellable for that task, which is the safe answer.
+  declaredPorts(taskId: string): Promise<readonly number[]>
+}
+
+export const TUNNEL_PATH = '/v2/tunnel'
+
+// 127.0.0.1 only, never the hostname. A tunnel that resolved a name could be pointed at another host on
+// the node's network, which is the SOCKS proxy protocol.md rules out.
+const LOOPBACK = '127.0.0.1'
+
+const tunnelDisposers = new WeakMap<Server, () => void>()
+
+type Target = { taskId: string; port: number }
+
+// `?task=<uuid>&port=<n>`. A query rather than a path segment so the path stays a constant the upgrade
+// handler can match with `===`, the same shape wsHub uses.
+function parseTarget(url: string | undefined, host: string): Target | null {
+  let parsed: URL
+  try {
+    parsed = new URL(url ?? '', `http://${host}`)
+  } catch {
+    return null
+  }
+  if (parsed.pathname !== TUNNEL_PATH) return null
+  const taskId = parsed.searchParams.get('task')
+  const port = Number(parsed.searchParams.get('port'))
+  if (!taskId || !Number.isInteger(port) || port < 1 || port > 65535) return null
+  return { taskId, port }
+}
+
+const refuse = (socket: Duplex, status: number, reason: string): void => {
+  socket.write(`HTTP/1.1 ${status} ${reason}\r\n\r\n`)
+  socket.destroy()
+}
+
+// Pipe a WebSocket and a TCP socket into each other. Binary both ways: a dev server's bytes are not text,
+// and without `binaryType` set `ws` would hand them over as string fragments and corrupt anything non-UTF8.
+//
+// Flow control in BOTH directions, and it has to be real rather than the drop-on-overflow the events hub
+// uses: dropping a frame there costs a client a `seq` gap and a refetch, whereas dropping bytes here
+// corrupts a TCP stream with no way to notice.
+function bridge(ws: WebSocket, tcp: Socket): void {
+  ws.binaryType = 'nodebuffer'
+  const closeBoth = (): void => {
+    tcp.destroy()
+    if (ws.readyState === ws.OPEN || ws.readyState === ws.CONNECTING) ws.close()
+  }
+
+  // client → node. `write` returning false is TCP backpressure; pausing the WebSocket stops `ws` reading,
+  // which closes the kernel window back to the client. This is the credit scheme protocol.md describes,
+  // supplied by the transports themselves.
+  ws.on('message', (data: Buffer) => {
+    if (!tcp.write(data)) ws.pause()
+  })
+  tcp.on('drain', () => ws.resume())
+
+  // node → client. `ws.send`'s callback fires once the frame has been handed to the socket, so it is the
+  // drain signal — no polling on `bufferedAmount`, and no unbounded queue in this process if the LAN link
+  // is slower than the dev server.
+  tcp.on('data', (chunk: Buffer) => {
+    tcp.pause()
+    ws.send(chunk, () => tcp.resume())
+  })
+
+  ws.on('close', closeBoth)
+  ws.on('error', closeBoth)
+  tcp.on('close', closeBoth)
+  tcp.on('error', closeBoth)
+}
+
+export function attachTunnel(server: Server, deps: TunnelDeps): void {
+  const wss = new WebSocketServer({ noServer: true })
+
+  const onUpgrade = (req: IncomingMessage, socket: Duplex, head: Buffer): void => {
+    const host = req.headers.host ?? deps.allowedHost
+    const target = parseTarget(req.url, host)
+    // Only claim our own path, leaving `/v2/events` (and anything later) to its own handler — the same
+    // contract wsHub's handler observes.
+    if (!target) return
+    // Synchronously, for the reason main/upgradeClaim.ts gives: the sweeper cannot await our auth.
+    claimUpgrade(socket)
+    void (async () => {
+      const authorized = await authorizeWsUpgrade(req, deps)
+      if (!authorized) return refuse(socket, 403, 'Forbidden')
+      // A task-scoped credential may tunnel only to its OWN task. Without this, an agent holding
+      // ACORN_API_TOKEN could open a pipe to any port any other task declares — which is the same class of
+      // hole the Phase 3 audit closed on the HTTP and channel surfaces.
+      const claims = authorized.internal
+      if (claims?.scope === 'task' && claims.taskId !== target.taskId) return refuse(socket, 403, 'Forbidden')
+
+      // A throw is the same answer as an empty list: nothing is tunnellable, which is the safe direction.
+      const ports: readonly number[] = await deps.declaredPorts(target.taskId).catch(() => [] as number[])
+      if (!ports.includes(target.port)) return refuse(socket, 403, 'Forbidden')
+
+      const tcp = connect({ host: LOOPBACK, port: target.port })
+      tcp.once('error', () => refuse(socket, 502, 'Bad Gateway'))
+      tcp.once('connect', () => {
+        tcp.removeAllListeners('error')
+        wss.handleUpgrade(req, socket, head, (ws) => bridge(ws, tcp))
+      })
+    })()
+  }
+
+  server.on('upgrade', onUpgrade)
+  tunnelDisposers.set(server, () => {
+    server.off('upgrade', onUpgrade)
+    for (const client of wss.clients) client.terminate()
+    wss.close()
+  })
+}
+
+export function disposeTunnel(server: Server): void {
+  tunnelDisposers.get(server)?.()
+  tunnelDisposers.delete(server)
+}

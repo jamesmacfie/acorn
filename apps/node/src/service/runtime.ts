@@ -20,6 +20,7 @@ import { reconcileWorktrees, setWorktreesRoot } from '@acorn/node-core/main/task
 import { logStorageFootprint } from '@acorn/node-core/main/storageFootprint.ts'
 import { GITHUB_MIRROR } from '@acorn/plugin-github/contract/mirror.ts'
 import { disposeWsHub } from '@acorn/node-core/main/wsHub.ts'
+import { disposeTunnel } from '@acorn/node-core/main/tunnel.ts'
 import { wireAgentTools } from '../wiring/agentToolsWiring'
 import { wireConfigTrust } from '../wiring/configTrustWiring'
 import { AGENTS_RUNTIME } from '@acorn/plugin-agents/main/runtime.ts'
@@ -70,6 +71,10 @@ function closeListener(server: ServerType | null): Promise<void> {
   if (!server) return Promise.resolve()
   const httpServer = server as unknown as import('node:http').Server
   disposeWsHub(httpServer)
+  // Tunnel sockets hold a live TCP connection to a dev server on this host, so they have to be terminated
+  // too — `closeAllConnections` below reaps the HTTP sockets but an upgraded one is the tunnel's, not the
+  // server's, to close.
+  disposeTunnel(httpServer)
   return new Promise((resolve) => {
     server.close(() => resolve())
     // Node otherwise waits out keepAliveTimeout for an idle renderer/fetch socket. Once close()

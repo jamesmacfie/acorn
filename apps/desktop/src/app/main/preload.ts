@@ -49,6 +49,12 @@ contextBridge.exposeInMainWorld('acorn', {
   // Settings → Plugins' Restart button. Takes no nodeId: only the LOCAL node is supervised by this app,
   // and a remote node is restarted by whatever started it (nodeBrokerIpc.ts).
   nodeRestartLocal: (): Promise<void> => ipcRenderer.invoke('acorn:node-restart-local'),
+  // The preview tunnel. In: a task and a port ON THE NODE. Out: a port on THIS machine. The renderer never
+  // sees the node's endpoint or its device token — main owns the pipe (main/previewTunnel.ts).
+  nodeTunnelOpen: (request: { nodeId: string; taskId: string; port: number }): Promise<{ port: number }> =>
+    ipcRenderer.invoke('acorn:node-tunnel-open', request),
+  nodeTunnelClose: (match: { nodeId?: string; taskId?: string }): void =>
+    ipcRenderer.send('acorn:node-tunnel-close', match),
   // Node recovery screen (client-core/node/NodeGate.tsx). Only reachable when there is no node to
   // talk to, which is also why `quit` cannot go through the renderer's will-quit prompt: the shell
   // that answers it is not mounted.

@@ -11,6 +11,7 @@ import { LOCAL_TOKEN_SCOPE, readDeviceToken } from './deviceTokenStore'
 import { FleetStore, toNodeRecord } from './fleetStore'
 import { NodeBroker } from './nodeBroker'
 import { brokerPushTargets, registerNodeBrokerIpc } from './nodeBrokerIpc'
+import { PreviewTunnels } from './previewTunnel'
 import { ServiceHost } from './serviceHost'
 
 export type BootstrapOptions = {
@@ -78,7 +79,20 @@ export async function bootstrap({ dataDir, createWindow }: BootstrapOptions): Pr
   const push = brokerPushTargets(() => window)
   const broker = new NodeBroker({ frame: push.frame, status: push.status })
   const fleet = new FleetStore(userDataDir)
-  const disposeBrokerIpc = registerNodeBrokerIpc(broker, fleet, { restartLocalNode: () => restartLocalNode() })
+  // Preview tunnels resolve their node from the same fleet store the broker reads, so an unpaired or
+  // re-paired node cannot leave a pipe pointed at a stale endpoint or a revoked token.
+  const tunnels = new PreviewTunnels((nodeId) => {
+    const node = fleet.get(nodeId)
+    const token = node && fleet.tokenFor(nodeId)
+    if (!node || !token) return null
+    return {
+      endpoint: node.endpoint,
+      token,
+      ...(node.certPem ? { certPem: node.certPem } : {}),
+      ...(node.fingerprint ? { fingerprint: node.fingerprint } : {}),
+    }
+  })
+  const disposeBrokerIpc = registerNodeBrokerIpc(broker, fleet, { restartLocalNode: () => restartLocalNode(), tunnels })
 
   // Record (or re-record, after a crash restart) the local node and bring its connection up. The
   // endpoint, the certificate and even the token can change between starts now that the port is
@@ -121,6 +135,7 @@ export async function bootstrap({ dataDir, createWindow }: BootstrapOptions): Pr
     if (disposed) return
     disposed = true
     await service.stop()
+    tunnels.dispose()
     broker.dispose()
     disposeBrokerIpc()
     disposePreview()
