@@ -57,22 +57,29 @@ export const managedAgentApi = {
   // the device bearer. The caller turns this into a blob URL for the download.
   artifactContent: (artifactId: string) =>
     readBytes(`${ROOT}/artifacts/${encodeURIComponent(artifactId)}/content`, 'Unable to download artifact.'),
-  sessions: (filter: { taskId?: string; workspaceId?: string; attention?: boolean; archived?: boolean } = {}) => {
+  // `nodeId` and `signal` are the fleet escape hatch (client-core's node/fanout.ts). Every other method
+  // here addresses the AMBIENT active node, which is right for a surface bound to one task; these two feed
+  // Fleet home and the aggregated Agent Center, whose whole job is to ask several nodes at once.
+  sessions: (
+    filter: { taskId?: string; workspaceId?: string; attention?: boolean; archived?: boolean } = {},
+    options: { nodeId?: string; signal?: AbortSignal } = {},
+  ) => {
     const query = new URLSearchParams()
     if (filter.taskId) query.set('taskId', filter.taskId)
     if (filter.workspaceId) query.set('workspaceId', filter.workspaceId)
     if (filter.attention != null) query.set('attention', String(filter.attention))
     if (filter.archived != null) query.set('archived', String(filter.archived))
-    return readJson<AgentSessionList>(`${ROOT}/sessions?${query}`)
+    return readJson<AgentSessionList>(`${ROOT}/sessions?${query}`, options)
   },
   search: (
     query: string,
     filter: { taskId?: string; workspaceId?: string; limit?: number } = {},
+    options: { nodeId?: string; signal?: AbortSignal } = {},
   ) => {
     const params = new URLSearchParams({ q: query, limit: String(filter.limit ?? 100) })
     if (filter.taskId) params.set('taskId', filter.taskId)
     if (filter.workspaceId) params.set('workspaceId', filter.workspaceId)
-    return readJson<AgentSession[]>(`${ROOT}/sessions/search?${params}`)
+    return readJson<AgentSession[]>(`${ROOT}/sessions/search?${params}`, options)
   },
   createSession: (input: CreateAgentSessionInput) =>
     jsonWrite<AgentSession>(`${ROOT}/sessions`, 'POST', input, true),

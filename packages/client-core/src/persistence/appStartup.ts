@@ -2,6 +2,7 @@ import { createEffect, onCleanup, type Accessor, type Setter } from 'solid-js'
 import type { QueryClient } from '@tanstack/solid-query'
 import type { NavigateOptions } from '@solidjs/router'
 import type { Repo, Task } from '@acorn/protocol/api.ts'
+import { nodes } from '../node/fleet'
 import { selectedSource, setActiveTaskId, setSelectedSource, activeTaskId } from '../tasks/tasks'
 import { PrefKeys } from './prefKeys'
 import { appStateBinding, persistedStateRegistry, type PersistedStateSlice } from './persistedState'
@@ -103,6 +104,13 @@ export function createAppStartupRestore(options: AppStartupOptions): { restored:
       binding: appStateBinding(
         () => selectedSource() ?? '',
         (saved) => {
+          // ui.md § New surfaces: "Fleet home — the landing view when more than one node is paired."
+          // Only when NOTHING was saved: a returning owner's last view always wins, and with a single
+          // node the source is not even registered, so this can never fire on first run.
+          if (!saved && nodes().length > 1) {
+            setSelectedSource('fleet')
+            return
+          }
           setSelectedSource(saved || null)
         },
       ),

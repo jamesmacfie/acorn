@@ -4,6 +4,7 @@ import { createEffect, createMemo, createResource, createSignal, For, on, onClea
 import { tasksOptions, workspacesOptions } from '@acorn/client-core/queries.ts'
 import { activateTaskSignals, pathForTask } from '@acorn/client-core/tasks/activate.ts'
 import { workspaceForRepo } from '@acorn/client-core/workspaces/activeWorkspace.ts'
+import { isActiveAgent, needsAttention } from './agentActivity'
 import { managedAgentApi } from './managedClient'
 import { managedAgentStore } from './managedStore'
 import { openManagedSession } from './managedSelection'
@@ -11,7 +12,6 @@ import type { AgentProviderDescriptor, AgentSession } from '@acorn/protocol/mana
 import { Button, Input, Row, Select } from '@acorn/client-core/ui/primitives.tsx'
 import './agent-center.css'
 
-const ACTIVE_STATES = new Set(['creating', 'connecting', 'replaying', 'working', 'waiting', 'cancelling', 'reconnecting'])
 
 const elapsed = (timestamp: number): string => {
   const minutes = Math.max(0, Math.round((Date.now() - timestamp) / 60_000))
@@ -83,13 +83,11 @@ export default function AgentCenter() {
   const shown = createMemo(() => {
     return sourceSessions().filter((session) => {
       if (providerFilter() && session.providerId !== providerFilter()) return false
-      if (stateFilter() === 'active' && !ACTIVE_STATES.has(session.runtimeState)) return false
-      if (stateFilter() === 'attention' && ['none', 'unread'].includes(session.attention)) return false
+      if (stateFilter() === 'active' && !isActiveAgent(session)) return false
+      if (stateFilter() === 'attention' && !needsAttention(session)) return false
       return true
     }).sort((a, b) => {
-      const aNeeds = !['none', 'unread'].includes(a.attention)
-      const bNeeds = !['none', 'unread'].includes(b.attention)
-      return Number(bNeeds) - Number(aNeeds) || b.updatedAt - a.updatedAt
+      return Number(needsAttention(b)) - Number(needsAttention(a)) || b.updatedAt - a.updatedAt
     })
   })
   function open(session: AgentSession) {
@@ -109,8 +107,8 @@ export default function AgentCenter() {
           <p>Managed Claude Code and Codex sessions across this workspace’s tasks and worktrees.</p>
         </div>
         <div class="agent-center-stats">
-          <span><strong>{sourceSessions().filter((session) => ACTIVE_STATES.has(session.runtimeState)).length}</strong> active</span>
-          <span><strong>{sourceSessions().filter((session) => !['none', 'unread'].includes(session.attention)).length}</strong> need you</span>
+          <span><strong>{sourceSessions().filter((session) => isActiveAgent(session)).length}</strong> active</span>
+          <span><strong>{sourceSessions().filter((session) => needsAttention(session)).length}</strong> need you</span>
           <span><strong>{sourceSessions().length}</strong> sessions</span>
         </div>
       </header>

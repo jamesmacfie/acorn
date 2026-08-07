@@ -18,6 +18,7 @@ import { agentContextRegistry } from '@acorn/client-core/registries/agentContext
 import { agentToolRendererRegistry } from '@acorn/client-core/registries/agentToolRenderers.ts'
 import { contextSectionRegistry } from '@acorn/client-core/registries/contextSections.ts'
 import { paletteRowRegistry } from '@acorn/client-core/registries/paletteRows.ts'
+import { nodeStatRegistry } from '@acorn/client-core/registries/nodeStats.ts'
 import { paneRegistry } from '@acorn/client-core/registries/panes.ts'
 import { initClientPlugins, type ClientPlugin } from '@acorn/client-core/registries/plugin.ts'
 import { pollerRegistry } from '@acorn/client-core/registries/pollers.ts'
@@ -47,6 +48,7 @@ const REGISTRIES = {
   agentToolRenderers: agentToolRendererRegistry,
   pollers: pollerRegistry,
   persistedState: persistedStateRegistry,
+  nodeStats: nodeStatRegistry,
   contentLinks: contentLinkRegistry,
 } as const
 
@@ -89,6 +91,7 @@ const FULL: Snapshot = {
   agentToolRenderers: ['changes.agent-file-tool'],
   pollers: ['docker.task-containers', 'workflows.triggers'],
   persistedState: ['context.section-selection', 'docker.prefs', 'editor.open-files', 'github.pr-filters'],
+  nodeStats: ['agents.active'],
   contentLinks: ['github.pull-request', 'github.repository', 'linear.issue'],
 }
 

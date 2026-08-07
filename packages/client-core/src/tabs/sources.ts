@@ -20,7 +20,9 @@ export function availableSources(integrations: Integration[] | undefined): Sourc
   )
   return sourceRegistry
     .entries()
-    .filter((source) => !source.providerId || has(source.providerId, source.requiredCapability))
+    // Two independent gates, both AND-ed: `providerId` asks "is the integration behind this connected?",
+    // `when` asks anything else the contribution needs (Fleet home: more than one node paired).
+    .filter((source) => (!source.providerId || has(source.providerId, source.requiredCapability)) && (source.when?.() ?? true))
     // `id` breaks a tie, so two sources declaring the same order still produce a STABLE rail rather than one
     // that depends on registration after all — the same tiebreak the slot hosts use.
     .sort((a, b) => a.order - b.order || a.id.localeCompare(b.id))

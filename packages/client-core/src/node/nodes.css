@@ -158,3 +158,94 @@
 .node-step-label .ui-input {
   color: var(--text);
 }
+
+/* Fleet home (node/FleetHome.tsx). Card grid rather than a table: a node has five facts and two
+   actions, and a table row cannot hold a button pair without fighting the column widths. */
+.fleet-home {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  padding: var(--pane-pad);
+  overflow-y: auto;
+}
+.fleet-home-head h1 {
+  margin: 0;
+  font-size: var(--fs-lg);
+}
+.fleet-home-head p {
+  margin: var(--space-2) 0 0;
+  font-size: var(--fs-sm);
+}
+.fleet-banner {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  padding: var(--space-3);
+  border: var(--control-border);
+  border-radius: var(--radius-control);
+  background: var(--bg-subtle);
+  color: var(--warn);
+  font-size: var(--fs-sm);
+}
+.fleet-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: var(--space-3);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.fleet-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--pane-pad);
+  border: var(--surface-border);
+  border-radius: var(--radius-surface);
+}
+.fleet-card.active {
+  border-color: var(--accent);
+}
+.fleet-card-head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+.fleet-card-label {
+  font-weight: var(--fw-medium);
+}
+.fleet-card-badge {
+  padding: 0 var(--space-2);
+  border-radius: var(--radius-control);
+  background: var(--bg-subtle);
+  color: var(--text-muted);
+  font-size: var(--fs-xs);
+}
+.fleet-card-badge-active {
+  color: var(--accent);
+}
+.fleet-card-endpoint {
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+  font-size: var(--fs-xs);
+  overflow-wrap: anywhere;
+}
+.fleet-card-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  margin: 0;
+}
+.fleet-card-stats dt {
+  color: var(--text-muted);
+  font-size: var(--fs-xs);
+}
+.fleet-card-stats dd {
+  margin: 0;
+  font-size: var(--fs-sm);
+}
+.fleet-card-actions {
+  display: flex;
+  gap: var(--space-2);
+  margin-top: auto;
+}
