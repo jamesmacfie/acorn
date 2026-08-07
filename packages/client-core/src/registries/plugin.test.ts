@@ -52,6 +52,27 @@ describe('the client plugin host', () => {
     clear('first', 'second')
   })
 
+  // `activate` is the phase two plugins needed and did not have: plugins/http enumerated `localStorage`
+  // and plugins/agents issued a `fetch`, both inside a synchronous `init` that documents itself as
+  // registration-only. Three properties make it useful rather than decorative.
+  it('runs activate after EVERY init, in declaration order, and never for a disabled plugin', () => {
+    const log: string[] = []
+    const plugins: ClientPlugin[] = [
+      {
+        name: 'first',
+        init: () => log.push('init:first'),
+        // The whole reason for a second pass: by here every enabled plugin has registered, so this can
+        // see a sibling's descriptor. Inside `init` the registry would still be half empty.
+        activate: () => log.push(`activate:first(${paneRegistry.get('host.late') ? 'sees-late' : 'blind'})`),
+      },
+      { name: 'second', init: (ctx) => { log.push('init:second'); ctx.panes.register(pane('host.late')) } },
+      { name: 'off', init: () => log.push('init:off'), activate: () => log.push('activate:off') },
+    ]
+    initClientPlugins(plugins, { disabled: ['off'] })
+    expect(log).toEqual(['init:first', 'init:second', 'activate:first(sees-late)'])
+    clear('first', 'second', 'off')
+  })
+
   it('refuses two plugins with the same name', () => {
     const plugin: ClientPlugin = { name: 'dupe', init: () => {} }
     expect(() => initClientPlugins([plugin, plugin])).toThrow(/Duplicate client plugin: dupe/)

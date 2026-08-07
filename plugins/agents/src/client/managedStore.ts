@@ -180,5 +180,10 @@ export const managedAgentStore = {
 // even when neither Agent Center nor a task Agent pane is currently mounted.
 export function activateManagedAgentNotifications(): void {
   managedAgentStore.activate()
-  void managedAgentStore.loadAll()
+  // Caught, not just `void`ed. This prime runs at activation, so on a node that is still connecting —
+  // or one whose agents plugin is disabled — the rejection had nothing between it and an unhandled
+  // promise rejection. An empty roster is the correct degraded state; Agent Center refetches.
+  managedAgentStore.loadAll().catch((error: unknown) => {
+    console.warn('[agents] could not prime the managed-session roster:', error)
+  })
 }
