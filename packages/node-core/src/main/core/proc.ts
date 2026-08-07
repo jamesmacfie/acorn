@@ -1,6 +1,15 @@
-// The process broker (docs/security.md § Execution boundaries): "All child processes go
-// through the process broker: explicit cwd inside the task worktree (or a declared exception), env
-// allowlists (no ambient ACORN_* tokens), process-group kill, bounded output capture."
+// The process broker (docs/security.md § Process, path, and configuration controls): explicit cwd
+// inside the task worktree (or a declared exception), env allowlists (no ambient ACORN_* tokens),
+// process-group kill, bounded output capture.
+//
+// SHORT-LIVED task work goes through here. Long-lived engines do not, and cannot: this model is "run a
+// bounded command, capture its output, kill its group", which does not describe a PTY, a JSON-RPC
+// agent driver, a `docker logs -f` stream, a ripgrep scan or a pg client. They own their children under
+// the same environment hygiene. That set is ENUMERATED in tools/arch/boundaries.test.ts, each entry
+// with its reason, so a new direct spawn is a decision rather than a drift.
+//
+// This header used to quote the docs claiming ALL child processes came through here. Nineteen
+// production modules did not, and a claim that is both untrue and unenforceable is worse than none.
 //
 // Before this existed there were ~16 independent spawn/execFile sites with inconsistent behaviour,
 // and the inconsistency was not cosmetic:
