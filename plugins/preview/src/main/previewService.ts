@@ -21,9 +21,15 @@ type PreviewRecord = { view: WebContentsView; owner: BrowserWindow; homeUrl: str
 const previews = new Map<string, PreviewRecord>()
 const trackedOwners = new WeakSet<BrowserWindow>()
 type RulesForTask = (taskId: string) => Promise<PreviewBrowserRule[]>
+// Headers this view must attach to reach a preview tunnel, or null for any other URL. Injected for the
+// same reason `loadRules` is: the tunnel lives in apps/desktop's main process and a plugin may not
+// import an app (tools/arch/boundaries.test.ts). Returning the whole record rather than a bare secret
+// keeps the header NAME on the tunnel's side too, so there is no constant for the two to disagree about.
+type TunnelHeadersFor = (url: string) => Record<string, string> | null
 // Set by registerPreviewIpc. Rules are looked up by the utility service and copied across the
 // process boundary; Electron main never opens or imports the application database.
 let loadRules: RulesForTask | undefined
+let tunnelHeaders: TunnelHeadersFor | undefined
 
 function stateOf(taskId: string, wc: WebContents, loading: boolean): PreviewState {
   return { taskId, url: wc.getURL(), loading, canGoBack: wc.navigationHistory.canGoBack(), canGoForward: wc.navigationHistory.canGoForward() }
@@ -46,8 +52,32 @@ function trackOwner(owner: BrowserWindow): void {
 function create(taskId: string, owner: BrowserWindow, homeUrl: string): PreviewRecord {
   // Hardened guest: no preload, no node integration, sandboxed — same posture the old
   // will-attach-webview handler pinned on the <webview>.
-  const view = new WebContentsView({ webPreferences: { contextIsolation: true, nodeIntegration: false, sandbox: true } })
+  //
+  // Plus an EPHEMERAL partition per task, which docs/vNext/security.md § Execution boundaries has
+  // required since it was written and this never had: without one, every preview shared the app's
+  // DEFAULT session, so a page in one task's preview could read another's cookies and storage, and
+  // anything it stored outlived the pane. No `persist:` prefix, so the session is in-memory and dies
+  // with the process.
+  const partition = `acorn-preview-${encodeURIComponent(taskId)}`
+  const view = new WebContentsView({
+    webPreferences: { partition, contextIsolation: true, nodeIntegration: false, sandbox: true },
+  })
   const wc = view.webContents
+  const session = wc.session
+  // "all permission requests denied" (security.md, same section). Both handlers: the request one covers
+  // a page ASKING (camera, notifications, clipboard-read), the check one covers a page testing whether
+  // it already has permission, and a page that is told "granted" by the check proceeds without ever
+  // firing a request. Nothing in the repo set either before this.
+  session.setPermissionRequestHandler((_wc, _permission, callback) => callback(false))
+  session.setPermissionCheckHandler(() => false)
+  // The tunnel's credential. Attached here rather than on the URL, so it reaches subresources and the
+  // dev server's own HMR WebSocket upgrade — every request this view makes — without rewriting a byte of
+  // what the dev server serves. `tunnelHeaders` returns null for anything that is not one of our
+  // loopback listeners, which is what stops the secret leaving with an outbound request.
+  session.webRequest.onBeforeSendHeaders((details, callback) => {
+    const extra = tunnelHeaders?.(details.url)
+    callback({ requestHeaders: extra ? { ...details.requestHeaders, ...extra } : details.requestHeaders })
+  })
   const record = { view, owner, homeUrl }
   // Carry the http(s)-only / no-userinfo restriction (feature-parity §13): block in-page navigations
   // to anything else, and deny window.open outright (preview has no business spawning windows).
@@ -148,9 +178,12 @@ export function previewEvictTask(taskId: string): boolean {
 }
 
 // Registered by the composition root (bootstrap.ts). Returns a disposer that drops every view.
-// `rulesForTask` is optional so focused preview tests can register without a service host.
-export function registerPreviewIpc(rulesForTask?: RulesForTask): () => void {
-  loadRules = rulesForTask
+// Both dependencies are optional so focused preview tests can register without a service host or a
+// tunnel; an absent `tunnelHeadersFor` simply means no preview reaches a remote node, which is exactly
+// what a single-node build already does.
+export function registerPreviewIpc(deps: { rulesForTask?: RulesForTask; tunnelHeadersFor?: TunnelHeadersFor } = {}): () => void {
+  loadRules = deps.rulesForTask
+  tunnelHeaders = deps.tunnelHeadersFor
   const winOf = (e: IpcMainInvokeEvent | IpcMainEvent) => BrowserWindow.fromWebContents(e.sender)
   const ownedRecord = (e: IpcMainInvokeEvent | IpcMainEvent, taskId: unknown): PreviewRecord | null => {
     const owner = winOf(e)
@@ -233,6 +266,7 @@ export function registerPreviewIpc(rulesForTask?: RulesForTask): () => void {
     ipcMain.removeListener('preview:command', onCommand)
     ipcMain.removeListener('preview:evict', onEvict)
     loadRules = undefined
+    tunnelHeaders = undefined
     for (const taskId of [...previews.keys()]) evict(taskId)
   }
 }

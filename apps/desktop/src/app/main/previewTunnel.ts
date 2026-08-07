@@ -1,3 +1,4 @@
+import { randomBytes, timingSafeEqual } from 'node:crypto'
 import { createServer, type Server, type Socket } from 'node:net'
 import { WebSocket } from 'ws'
 import { pinnedTlsOptions } from './nodeBroker'
@@ -16,22 +17,33 @@ import { pinnedTlsOptions } from './nodeBroker'
 // and the pinned certificate are here, and the renderer has no network permission at all under its CSP.
 // The renderer only ever learns a loopback port number.
 //
-// ## The listener is UNAUTHENTICATED, and that is the honest limit of this design
+// ## The loopback hop carries a per-tunnel secret
 //
-// A raw TCP listener carries no credential, so any process on this machine that finds the port can speak to
-// the node's declared dev port through it. security.md § Threat model puts "a compromised machine
-// (root/other-user access)" out of scope, but this is still a genuine widening: before the tunnel, reaching
-// a remote node needed the device token, which lives in main and the OS keychain. Three things bound it,
-// and none of them is authentication:
+// Phase 4 shipped this listener UNAUTHENTICATED and recorded it as the phase's largest accepted risk: a
+// raw TCP listener carries no credential, so any process on the machine that found the port could speak
+// to the node's declared dev port through it. security.md § Threat model puts "a compromised machine"
+// out of scope, but this was still a genuine widening — before the tunnel, reaching a remote node needed
+// the device token, which lives in main and the OS keychain.
+//
+// Phase 5 closes it. Each listener mints a 256-bit secret, and a connection must present it as a request
+// header before a single byte reaches the node. The header rather than a path prefix is what makes this
+// small: a secret in the PATH means rewriting every URL the dev server emits — absolute asset paths,
+// redirects, the HMR socket's own URL — which is the "real build" the handoff estimated. A header rides
+// along untouched, because `webRequest.onBeforeSendHeaders` on the pane's own session attaches it to
+// every request that view makes, subresources and WebSocket upgrades included, and a dev server ignores
+// a header it does not know.
+//
+// What that buys, precisely: a local process that guesses the port now gets its connection destroyed
+// instead of a pipe to another machine's dev server. What it does NOT buy is defence against a process
+// that can read this one's memory or drive the pane — still out of scope, still the same threat model.
+//
+// The three bounds from Phase 4 all remain, because none of them was made redundant:
 //
 //   - **Only declared ports.** The node refuses anything the owner has not configured as that task's
 //     preview or run URL (node-core's main/tunnelPorts.ts).
 //   - **Only while the pane is open.** The pane closes its tunnels on unmount, and a listener with no
 //     connections is reaped after IDLE_MS, so the surface is not ambient.
 //   - **A bounded number.** MAX_TUNNELS caps what a compromised renderer can ask for.
-//
-// A credential would need the loopback hop to carry one, which means the WebContentsView carrying it — a
-// cookie or a header it does not control. Recorded in docs/vNext/phase4-notes.md rather than pretended away.
 export type TunnelKey = { nodeId: string; taskId: string; port: number }
 
 export type TunnelNode = {
@@ -53,7 +65,43 @@ const IDLE_MS = 60_000
 // content; without a cap, `nodeTunnelOpen` in a loop exhausts this process's file descriptors.
 const MAX_TUNNELS = 16
 
-type Entry = { server: Server; port: number; sockets: Set<Socket>; idle: ReturnType<typeof setTimeout> | null }
+// The header the pane's session attaches and this listener demands. Lower-case because that is how both
+// Chromium and `Buffer.toString()` scanning below will see it; the check is case-insensitive anyway.
+const TUNNEL_HEADER = 'x-acorn-tunnel'
+
+// How long a connection has to produce a complete request head, and how much of one we will hold while
+// it does. Both exist so an unauthenticated peer cannot pin memory or a file descriptor by connecting and
+// saying nothing — the same class of bound as MAX_TUNNELS, applied one level down.
+const HEAD_TIMEOUT_MS = 2_000
+const MAX_HEAD_BYTES = 8 * 1024
+
+type Entry = {
+  server: Server
+  port: number
+  sockets: Set<Socket>
+  idle: ReturnType<typeof setTimeout> | null
+  // Per LISTENER, not per connection: the pane's session attaches it by destination port, and a
+  // per-connection value would need a channel to tell the pane about that this design does not have.
+  secret: string
+}
+
+// Case-insensitive scan of a request head for `x-acorn-tunnel: <secret>`.
+//
+// A hand-rolled scan rather than a parser because the only question is whether one exact value is
+// present, and `timingSafeEqual` on a length-checked pair is the comparison that question deserves —
+// the secret is 256 bits of `randomBytes`, so an attacker's leverage is guessing, not timing, but a
+// `===` here would be the kind of thing a later reader has to re-derive.
+function headCarriesSecret(head: string, secret: string): boolean {
+  for (const line of head.split('\r\n')) {
+    const colon = line.indexOf(':')
+    if (colon === -1) continue
+    if (line.slice(0, colon).trim().toLowerCase() !== TUNNEL_HEADER) continue
+    const presented = Buffer.from(line.slice(colon + 1).trim())
+    const expected = Buffer.from(secret)
+    if (presented.length === expected.length && timingSafeEqual(presented, expected)) return true
+  }
+  return false
+}
 
 const key = ({ nodeId, taskId, port }: TunnelKey): string =>
   // Encoded, so a taskId containing the delimiter cannot forge or evade a key. The IPC schema validates
@@ -97,6 +145,8 @@ export class PreviewTunnels {
     if (!this.resolve(target.nodeId)) throw new Error('That node is not paired.')
 
     const sockets = new Set<Socket>()
+    // 32 bytes of CSPRNG, base64url'd so it is a legal header value with no escaping question.
+    const secret = randomBytes(32).toString('base64url')
     const server = createServer((socket) => {
       const entry = this.entries.get(id)
       if (entry?.idle) {
@@ -120,7 +170,9 @@ export class PreviewTunnels {
         socket.destroy()
         return
       }
-      this.pipe(socket, node, target, id)
+      // The credential check happens HERE, before anything dials the node — so an unauthorised connection
+      // costs one destroyed socket rather than an upgrade against the owner's device token.
+      this.authorize(socket, secret, id, (head) => this.pipe(socket, node, target, id, head))
     })
     // 127.0.0.1 explicitly. Binding 0.0.0.0 would publish another machine's dev server to the local
     // network, which is the opposite of what the tunnel is for.
@@ -133,9 +185,69 @@ export class PreviewTunnels {
       console.warn(`[tunnel] listener for ${id} failed:`, error)
       this.closeEntry(id)
     })
-    this.entries.set(id, { server, port, sockets, idle: null })
+    this.entries.set(id, { server, port, sockets, idle: null, secret })
     this.armIdle(id)
     return port
+  }
+
+  // The headers a preview pane must attach to reach a tunnel, or null when the URL is not one of ours.
+  //
+  // This is how the secret reaches the WebContentsView without the plugin that owns the view importing
+  // this file — plugins may not import an app (tools/arch/boundaries.test.ts). It goes in as an injected
+  // function, exactly the way `loadRules` already does (plugins/preview/src/main/previewService.ts).
+  // Returning the whole header record rather than a bare value keeps the header NAME here too, so there
+  // is no constant for the two sides to disagree about.
+  headersFor(url: string): Record<string, string> | null {
+    let parsed: URL
+    try {
+      parsed = new URL(url)
+    } catch {
+      return null
+    }
+    // Loopback only, and by exact host: a page served through the tunnel can link anywhere, and attaching
+    // the secret to an outbound request to a third party would hand it away.
+    if (parsed.hostname !== '127.0.0.1') return null
+    const port = Number(parsed.port)
+    for (const entry of this.entries.values()) {
+      if (entry.port === port) return { [TUNNEL_HEADER]: entry.secret }
+    }
+    return null
+  }
+
+  // Read the request head, check the secret, hand the bytes on. The head is forwarded VERBATIM, including
+  // the secret header: a dev server ignores a header it does not know, and rewriting the request would
+  // mean re-serialising it and owning every edge of HTTP framing to no benefit.
+  private authorize(socket: Socket, secret: string, id: string, onAuthorized: (head: Buffer) => void): void {
+    let buffered = Buffer.alloc(0)
+    const refuse = (reason: string): void => {
+      clearTimeout(timer)
+      socket.off('data', onData)
+      console.warn(`[tunnel] ${id}: ${reason}; refusing`)
+      socket.destroy()
+    }
+    // A peer that connects and says nothing must not hold a socket open indefinitely.
+    const timer = setTimeout(() => refuse('no request head within the deadline'), HEAD_TIMEOUT_MS)
+    timer.unref?.()
+    const onData = (chunk: Buffer): void => {
+      buffered = Buffer.concat([buffered, chunk])
+      // `latin1` rather than `utf8`: header bytes are a byte protocol, and a decoder that can produce a
+      // replacement character could make two different byte strings compare equal.
+      const end = buffered.indexOf('\r\n\r\n', 0, 'latin1')
+      if (end === -1) {
+        if (buffered.length > MAX_HEAD_BYTES) refuse('request head exceeded its ceiling')
+        return
+      }
+      if (!headCarriesSecret(buffered.subarray(0, end).toString('latin1'), secret)) {
+        refuse('connection did not present this tunnel\'s secret')
+        return
+      }
+      clearTimeout(timer)
+      socket.off('data', onData)
+      // Everything read so far, not just the head: a POST's body can arrive in the same packet, and
+      // dropping it would corrupt the request we just authorised.
+      onAuthorized(buffered)
+    }
+    socket.on('data', onData)
   }
 
   // Close every tunnel for a node (unpaired, revoked, restarted) or for a task (pane unmounted, archived).
@@ -168,7 +280,7 @@ export class PreviewTunnels {
     entry.idle.unref?.()
   }
 
-  private pipe(socket: Socket, node: TunnelNode, target: TunnelKey, id: string): void {
+  private pipe(socket: Socket, node: TunnelNode, target: TunnelKey, id: string, head: Buffer): void {
     const url = new URL('/v2/tunnel', node.endpoint)
     url.protocol = 'wss:'
     url.searchParams.set('task', target.taskId)
@@ -188,6 +300,10 @@ export class PreviewTunnels {
     // them in an unbounded array — a local process could stream into main's heap without limit while the ws
     // never opened. Pausing pushes the backpressure onto the kernel, which is where it belongs, and deletes
     // the buffer instead of capping it.
+    //
+    // `head` is the ONE exception, and it is bounded by MAX_HEAD_BYTES rather than unbounded: those bytes
+    // were consumed by the credential check above, so they no longer exist as far as the socket is
+    // concerned, and something has to replay them.
     socket.pause()
 
     const closeBoth = (): void => {
@@ -195,7 +311,11 @@ export class PreviewTunnels {
       if (ws.readyState === ws.OPEN || ws.readyState === ws.CONNECTING) ws.close()
     }
 
-    ws.on('open', () => socket.resume())
+    ws.on('open', () => {
+      // Before resume(), so the request the browser already sent reaches the dev server ahead of anything
+      // that follows it on the same connection.
+      ws.send(head, () => socket.resume())
+    })
     ws.on('message', (data: Buffer) => {
       if (!socket.write(data)) ws.pause()
     })

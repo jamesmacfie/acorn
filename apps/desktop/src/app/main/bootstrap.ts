@@ -71,7 +71,6 @@ export async function bootstrap({ dataDir, createWindow }: BootstrapOptions): Pr
   // Native IPC is installed before the renderer exists. Page rules cross the service boundary as
   // data; neither previewService nor the picker adapter can reach SQLite.
   const disposePicker = registerRepoPickerIpc()
-  const disposePreview = registerPreviewIpc((taskId) => service.previewRules(taskId))
 
   // The connection broker, likewise installed before the renderer: its first act on load is to ask
   // for the fleet, so the handler must already exist. Registering the IPC also reconnects every node
@@ -95,6 +94,16 @@ export async function bootstrap({ dataDir, createWindow }: BootstrapOptions): Pr
     }
   })
   const disposeBrokerIpc = registerNodeBrokerIpc(broker, fleet, { restartLocalNode: () => restartLocalNode(), tunnels })
+
+  // Registered here rather than beside the picker above, because it needs `tunnels`: a preview pane
+  // pointed at a remote task loads a loopback URL, and the tunnel's listener refuses any connection that
+  // does not present that listener's secret (main/previewTunnel.ts). This is the injection that carries
+  // it — plugins/preview may not import an app, so the header record arrives as a function. Still well
+  // before the window exists, which is the ordering the picker comment above is about.
+  const disposePreview = registerPreviewIpc({
+    rulesForTask: (taskId) => service.previewRules(taskId),
+    tunnelHeadersFor: (url) => tunnels.headersFor(url),
+  })
 
   // Record (or re-record, after a crash restart) the local node and bring its connection up. The
   // endpoint, the certificate and even the token can change between starts now that the port is
