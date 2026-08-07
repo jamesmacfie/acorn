@@ -24,8 +24,6 @@ import {
   rerunFailedRoute,
   pinsKey,
   prefsKey,
-  rollbarItemsForConnectionsRoute,
-  rollbarItemsKey,
 } from './api'
 
 describe('shared API contract helpers', () => {
@@ -45,8 +43,6 @@ describe('shared API contract helpers', () => {
       .toBe('/v2/p/github/repos/octo/repo/pulls/12/review-comments/99/replies')
     expect(resolveThreadRoute('octo', 'repo', '12', 'THREAD/id')).toBe('/v2/p/github/repos/octo/repo/pulls/12/threads/THREAD%2Fid/resolve')
     expect(rerunFailedRoute('octo', 'repo', 123)).toBe('/v2/p/github/repos/octo/repo/actions/123/rerun')
-    expect(rollbarItemsForConnectionsRoute(['rollbar-b', 'rollbar-a', 'rollbar-b']))
-      .toBe('/v2/p/rollbar/items?integrations=rollbar-a%2Crollbar-b')
   })
 
   // A net under the ~90 route literals above, which were namespaced by hand: every one of them must
@@ -82,7 +78,5 @@ describe('shared API contract helpers', () => {
     expect(filePatchKey('octo', 'repo', '12', 'src/app.ts')).toEqual(['files', 'octo', 'repo', '12', 'patch', 'src/app.ts'])
     expect(pinsKey).toEqual(['pins'])
     expect(prefsKey).toEqual(['prefs'])
-    expect(rollbarItemsKey(['rollbar-b', 'rollbar-a', 'rollbar-b']))
-      .toEqual(['rollbar-items', 'connections', 'rollbar-a', 'rollbar-b'])
   })
 })

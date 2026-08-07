@@ -1,8 +1,4 @@
-import type {
-  RollbarItemMetadata,
-  RollbarOccurrenceDetail,
-  RollbarOccurrencesResponse,
-} from '@acorn/protocol/api.ts'
+import type { RollbarItemMetadata, RollbarOccurrenceDetail, RollbarOccurrencesResponse } from '../shared/api'
 import { isRecord, parseJson } from '@acorn/node-core/server/integrations/codec.ts'
 import type {
   MirroredResourceContribution,

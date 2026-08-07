@@ -1,8 +1,17 @@
 import { createEffect, createMemo, createSignal, For, on, Show } from 'solid-js'
 import { useNavigate, useParams } from '@solidjs/router'
 import { createQuery, useQueryClient } from '@tanstack/solid-query'
-import { integrationsOptions, rollbarItemsOptions, tasksKey, tasksOptions, workspaceProjectsKey, workspaceProjectsOptions, workspacesOptions } from '@acorn/client-core/queries.ts'
-import type { Integration, RollbarItemSummary, Task, WorkspaceProject } from '@acorn/protocol/api.ts'
+import {
+  integrationsOptions,
+  tasksKey,
+  tasksOptions,
+  workspaceProjectsKey,
+  workspaceProjectsOptions,
+  workspacesOptions,
+} from '@acorn/client-core/queries.ts'
+import { rollbarItemsOptions } from './queries'
+import type { Integration, Task, WorkspaceProject } from '@acorn/protocol/api.ts'
+import type { RollbarItemSummary } from '../shared/api'
 import { sourceRegistry, type SourceContribution } from '@acorn/client-core/registries/sources.ts'
 import { activeTaskId } from '@acorn/client-core/tasks/tasks.ts'
 import { createDismissable } from '@acorn/client-core/ui/dismissable.ts'

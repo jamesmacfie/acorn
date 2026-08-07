@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import type { LinearProjectIssue, RollbarItemSummary } from '@acorn/protocol/api.ts'
-import { prepareLinearPromotion, prepareRollbarPromotion } from './providerPromotion'
+import type { LinearProjectIssue } from '@acorn/protocol/api.ts'
+import { prepareLinearPromotion } from './providerPromotion'
 
 describe('provider-owned source promotion', () => {
   it('uses Linear branch suggestions and connection-scoped links', () => {
@@ -12,19 +12,6 @@ describe('provider-owned source promotion', () => {
     expect(prepareLinearPromotion(item, { owner: 'acme', repo: 'widget' })).toMatchObject({
       origin: 'linear', repoOwner: 'acme', repoName: 'widget', branch: 'eng-42-ship-it',
       links: [{ connectionId: 'linear-work', identifier: 'ENG-42' }],
-    })
-  })
-
-  it('normalizes the chosen Rollbar branch and keeps the visible counter identity', () => {
-    const item: RollbarItemSummary = {
-      integrationId: 'rollbar-api', integrationLabel: 'Rollbar · api', identifier: '142', itemId: '999',
-      url: 'https://rollbar.com/item/999/',
-      title: 'Token is null', level: 'error', environment: 'prod',
-      status: 'active', totalOccurrences: 3, firstOccurrenceAt: 1, lastOccurrenceAt: 2,
-    }
-    expect(prepareRollbarPromotion(item, { owner: 'acme', repo: 'widget', branch: 'Fix Token 142' })).toMatchObject({
-      origin: 'rollbar', repoOwner: 'acme', repoName: 'widget', branch: 'fix-token-142',
-      links: [{ connectionId: 'rollbar-api', identifier: '142', ref: { displayId: '142', externalId: '999' } }],
     })
   })
 })

@@ -14,7 +14,7 @@ import type {
   RollbarOccurrenceDetail,
   RollbarOccurrenceSummary,
   RollbarStackFrame,
-} from '@acorn/protocol/api.ts'
+} from '../shared/api'
 import { levelName, type RollbarApiInstance, type RollbarApiItem } from './'
 import { isRecord } from '@acorn/node-core/server/integrations/codec.ts'
 
