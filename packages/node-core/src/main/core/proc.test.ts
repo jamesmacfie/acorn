@@ -27,7 +27,7 @@ const alive = async (pid: string): Promise<boolean> => {
 }
 
 describe('env allowlist', () => {
-  // The four bindings the node holds that a child must never see. The denylist this replaces
+  // The four bindings the node holds that a child must never see. Keep the boundary explicit
   // enumerated exactly these and missed anything added later.
   const SECRETS = {
     SESSION_ENC_KEY: 'a'.repeat(64),

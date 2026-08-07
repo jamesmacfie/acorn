@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { FINGERPRINT_WORD_COUNT, fingerprintPhrase, fingerprintWords } from './fingerprintWords'
 
-// protocol.md § Transport and identity asks for a fingerprint "rendered as 6 words / grouped base32" because
+// docs/api-reference.md § Transport and identity asks for a fingerprint "rendered as 6 words / grouped base32" because
 // the comparison IS the security of pairing: two 64-character hex strings differing in the middle look
 // identical to a person, which is exactly the substitution an attacker wants.
 

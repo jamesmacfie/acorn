@@ -1,20 +1,3 @@
-// terminal.runTargets — start, stop and observe a repo's run targets as terminal sessions in the
-// task's worktree (docs/vNext/plugins.md § Cross-plugin collaboration, which names this as the seam
-// preview and workflows need).
-//
-// Part of the terminal plugin's CONTRACT: id and signature only, nothing executable.
-//
-// It exists because the RuntimeService is now CONSTRUCTED by the plugin's init — it closes over the
-// live session map and the plugin's own database, neither of which the composition root can reach any
-// more. Two consumers still need it after init: the workflow runner's `run` step in
-// apps/node/src/wiring/, and the harness RunBridge, which the plugin now fills itself. (The five run_*
-// agent tools used to be a third; W6 moved them into this plugin, so they take the service directly.)
-// Publishing it is how those keep working without terminal exporting a second mutable module global for
-// the app to reach into.
-//
-// The signature is the six methods those consumers actually call, restated here so it belongs to the
-// provider rather than being defined by RuntimeService's class shape — a contract may not name the
-// plugin's internals (tools/arch/boundaries.test.ts).
 import { capabilityId } from '@acorn/node-core/server/plugin/capabilities.ts'
 import type { LayoutRecipe } from '@acorn/node-core/main/runConfig.ts'
 import type { RunStatus, RunTargetInfo } from '@acorn/protocol/terminal.ts'

@@ -44,8 +44,7 @@ export type ArchiveDeps = {
   runTeardown: (script: string, cwd: string, env: Record<string, string>, taskId: string) => Promise<TeardownResult>
 }
 
-// The repo-level teardown script (the twin of repoSetup in taskWorktree.ts; repo-level-settings
-// moved it off the workspace onto repo_paths).
+// The repo-level teardown script, paired with repoSetup in taskWorktree.ts, is read from repo settings.
 async function teardownScriptFor(db: AppDatabase, owner: string, repo: string): Promise<string | null> {
   const rp = await getRepoPath(db, owner, repo)
   return rp?.teardownScript?.trim() || null

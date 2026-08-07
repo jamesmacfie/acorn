@@ -1,123 +1,57 @@
 # Agent tools
 
-Every agent capability — read the task context, read/write notes, search/propose memory, read git,
-drive the preview browser, control run targets — is declared **once** as an `AgentToolContribution`
-and **projected** to each surface that needs it. The registry
-(`packages/node-core/src/server/agentTools/registry.ts`) is the single source of truth for a tool's name,
-description, input schema, risk tier, availability and handler. Adding a tool is one contribution
-object, not edits spread across MCP code, a harness route, preload and settings.
+Agent tools are Node-owned capabilities projected to the renderer and to task-scoped MCP clients.
+The registry and schemas live in `packages/node-core/src/server/agentTools/` and plugin contributions
+live beside the feature they operate.
 
-> This replaced the old hand-synced ladder (an MCP `registerTool` body ↔ a bespoke harness route ↔ a
-> per-domain bridge). If you are looking for how the MCP server is launched and inspected, see
-> [mcp.md](./mcp.md); this doc is the tool *catalog and contract*.
-
-## 1. The contribution
+## Contribution
 
 ```ts
 type AgentToolContribution = {
   name: string
   description: string
-  input: z.ZodType
-  scope: 'task'
   risk: 'read' | 'write' | 'execute'
-  exposeToRenderer?: boolean
-  when?: (ctx) => boolean | Promise<boolean>
-  whenDescription?: string
-  handler: (args, ctx) => Promise<unknown>
+  input: ZodSchema
+  execute(input, context): Promise<unknown>
 }
 ```
 
-A handler returns **domain data or throws a `ToolError`** (`not_found` / `bad_request` / `failed`).
-It never knows which surface invoked it — if a handler inspects the caller's surface, the boundary is
-wrong. `ctx` carries only invocation-scoped identity (`taskId`, resolved `userLogin`, and the agent
-`sessionId` used to stamp write provenance); every domain dependency is closed over where the
-contribution is declared.
+The exact type has additional metadata for rendering, permissions, and task context. A contribution
+must validate input again at execution time and use CoreServices for files, Git, processes, secrets,
+and task lookup.
 
-Tools are a **contribution point**, registered incrementally into one registry
-(`packages/node-core/src/server/agentTools/registry.ts`), and a converted plugin declares its own
-inside `init` via `ctx.tools.register` — beside the engine each tool drives, so nothing has to hold
-another plugin's deps to declare a tool. Duplicate names throw, because the winner would otherwise
-depend on plugin init order. `plugins/changes` owns the local-git tools, `plugins/memory` the
-`memory_*` tools and `plugins/terminal` the `run_*` tools. The remainder — core's task/PR reads, plus
-`notes_*` and `browser_*`, whose plugins are not converted yet — is declared by
-`apps/node/src/wiring/agentToolsWiring.ts` under the owner `core`. That wiring must remain
-Electron-free; the browser driver reaches it as an injected `DesktopCapability`.
+Current tool groups include task/context inspection, Git and changes, notes, memory, terminal
+handoff, workflow controls, database operations, Docker, and preview/browser operations.
 
-## 2. Projections
+## Projections
 
-The contribution is projected to three surfaces plus a permission filter:
+The same registry is projected into:
 
-| Projection | Where | How |
-| --- | --- | --- |
-| **MCP** | `packages/node-core/src/mcp/server.ts` | The MCP process is a generic proxy: it fetches `GET /api/tasks/:id/tools` (the manifest) and serves `tools/list`, then proxies each `tools/call` to `POST /api/tasks/:id/tools/:name`. It holds no tool definitions. |
-| **Harness HTTP** | `packages/node-core/src/server/routes/agentTools.ts` | `GET /:id/tools` and `POST /:id/tools/:name` require the internal principal. Schemas use the MCP SDK's draft-07 projection; calls validate with the contribution's Zod schema. |
-| **Renderer** | `POST /:id/renderer-tools/:name` | Cookie-authenticated, and returns `404` unless the contribution opts in with `exposeToRenderer`. `client/agentToolsClient.ts` is the thin client. |
-| **Permissions** | prefs slice + `isToolPermitted` | Applied uniformly by every projection (below). |
+1. `GET /v2/core/agent-tools` for the Settings → Agent tools catalog;
+2. `/v2/core/tasks/:id/tools` and `/v2/core/tasks/:id/tools/:name` for the renderer;
+3. the stdio MCP server for a spawned agent.
 
-**Dynamic availability** re-evaluates on every manifest read. `when` gates a tool per task (the
-`run_*` tools only appear once a repo has run targets), and the MCP server polls the manifest and
-emits `notifications/tools/list_changed` when the available set changes — so `run_*` appear
-mid-session without a restart.
+Renderer calls require a device principal. MCP calls require an internal principal whose token is
+bound to the task. The Node applies the caller scope, task identity, and the owner's per-tool
+permission preference before executing.
 
-## 3. Risk tiers and permissions
+## Context sections
 
-Every tool declares a risk tier:
+Plugins register context sections through the Node context-section registry. Core assembles them in a
+declared order, applies byte/token budgets, records section status/freshness, and returns a deterministic
+snapshot. GitHub, notes, memory, Linear, Rollbar, and task sections are optional contributions; one
+failing section does not discard its siblings.
 
-- **read** — inspect context, notes, memory, git, the PR. No side effects.
-- **write** — create/edit notes, **propose** memory (proposals stay human-gated).
-- **execute** — drive the preview browser, control run targets in the worktree.
+## Safety rules
 
-**Settings → Agent tools** (`AgentToolsSettings.tsx`) lists every tool grouped by tier with per-tier
-and per-tool toggles, persisted as ONE prefs slice under `agentTools.perms`
-(`{ tiers?, tools? }`; a per-tool toggle wins over its tier, both default on). Read has no master
-toggle and is narrowed only per tool; write/execute have tier masters with mixed state. The filter is
-consulted by every projection: turning a tier or tool off removes it from `tools/list` **and** makes
-a direct harness call `404` (a hidden tool is *gone*, not forbidden — the surface must not leak that
-it exists). Workflow/profile ceilings now ride the same manifest/call projection: a headless MCP
-process sends its encoded run/step `allow`/`maxRisk` cap, and the route intersects it with these
-global preferences. Either filter can remove a tool; a workflow can never re-enable one the user
-disabled.
+- Tool input and all path/task IDs are validated at the Node boundary.
+- Task-scoped callers cannot address another task.
+- Secrets are used through scoped provider APIs and never returned by a tool.
+- Child processes use the process broker and bounded output.
+- Agent text is not control flow. Workflow gates consume structured step output only.
+- Tool failures use the common API error envelope and do not expose provider payloads or credentials.
 
-## 4. Context sections
+## Adding a tool
 
-`task_context` (and the push-path context block and the context pane) all derive from ONE section
-registry, `packages/node-core/src/server/agentTools/contextSections.ts`. Each section (`pr`, `issues`,
-`notes`, `memory`) declares its label, default, enforced budget, assembler, compact formatter and
-optional jump. The serialized `TaskContext.sections` drives both the renderer tray and
-`formatContextBlock`, so neither keeps an id-specific switch. Product semantics live in one place:
-
-- **memory is index-only** by default (name + description; bodies via `memory_get`);
-- **notes merge task → workspace → global**, carry bodies/slugs, and declare Notes-pane jumps;
-- **linked provider items use the stale-safe cache**, with missing rows explicitly marked;
-- budgets are applied before both compatibility fields and serialized items leave the server.
-
-## 5. Invariants
-
-- **`memory_write` proposes only.** No tool, plugin or provider writes accepted memory. Accepted
-  memory stays human-gated and file-backed — the `memory_write` handler calls the proposal store, and
-  the human review gate is the sole writer. See [notes-and-memory.md](./notes-and-memory.md).
-- **Notes provenance is single-sourced.** Agent writes stamp `author: agent` + the agent session id
-  through the same location-aware `NotesStore` the UI writes through. Agent writes default to
-  `notes/task/<taskId>/`; callers can explicitly choose workspace/global scope.
-- **Tools never touch GitHub or open their own DB.** They run inside the utility service against the same local mirror
-  the UI reads, so an agent sees exactly what the UI sees, and the internal principal has an empty
-  GitHub token (see [mcp.md](./mcp.md) §2).
-
-## 6. Adding a tool
-
-Add one `AgentToolContribution` to the array in `apps/desktop/src/app/main/agentToolsWiring.ts` (close
-over whatever dep it needs). It appears in the MCP manifest, the harness route, the permissions page
-and the catalog automatically. No other file changes.
-
-## Source
-
-- Registry + permission filter: `packages/node-core/src/server/agentTools/registry.ts`
-- Contributions (handlers, deps): `apps/desktop/src/app/main/agentToolsWiring.ts`
-- Harness HTTP projection: `packages/node-core/src/server/routes/agentTools.ts`
-- Thin renderer client: `packages/client-core/src/agentToolsClient.ts`
-- MCP projection: `packages/node-core/src/mcp/server.ts` (client: `packages/node-core/src/mcp/api.ts`)
-- Context sections: `packages/node-core/src/server/agentTools/contextSections.ts`, wired by `apps/desktop/src/app/main/contextSectionsWiring.ts`
-- Permissions UI: `packages/client-core/src/settings/AgentToolsSettings.tsx`
-
-See also: [mcp.md](./mcp.md) · [notes-and-memory.md](./notes-and-memory.md) ·
-[api-reference.md](./api-reference.md)
+Add the contribution to the owning plugin, register it in the Node plugin host, add the protocol/client
+rendering metadata if needed, and test it through the real `createApp()` route and MCP projection.

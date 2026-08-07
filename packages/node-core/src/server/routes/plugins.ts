@@ -6,7 +6,7 @@ import type { AppEnv } from '../middleware/auth'
 import { respondError } from '../respond'
 import type { PluginRosterEntry } from '../plugin/host'
 
-// Which plugins this node runs, and the owner's toggle (docs/vNext/ui.md § New surfaces, "Settings →
+// Which plugins this node runs, and the owner's toggle (docs/ui-design.md § New surfaces, "Settings →
 // Plugins"). A bridge rather than a direct read, because the roster only exists once the composition
 // root has run the plugin host, and the persisted list is a file in the data root rather than a table —
 // both live one layer above the server (main/disabledPlugins.ts).

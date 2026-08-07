@@ -1,13 +1,3 @@
-// What other packages may ask the github plugin, now that nobody else can read its tables
-// (docs/vNext/plugins.md § Cross-plugin collaboration). This is the whole cross-boundary surface of the
-// GitHub mirror: three questions, each with exactly one consumer that used to answer it by querying
-// core's database directly.
-//
-// Every one is declared `capability`, not a route: the callers are all in-process (core's context
-// assembler, core's boot-time footprint log, the workflow runner), and a capability degrades to
-// `undefined` when the plugin is absent. github is `required: true`, so in practice it is always there —
-// but the consumers still use `get` rather than `require`, because a node booting with a broken github
-// init should log a cold context section, not fail every workflow step.
 import { capabilityId } from '@acorn/node-core/server/plugin/capabilities.ts'
 
 /** A PR as core's context assembler needs it: the mirrored head of the task's pull request. */
@@ -36,15 +26,14 @@ export type GithubMirrorCapability = {
    *   null  — nothing to check at all: no PR, no active identity, or the repo is not mirrored yet. The
    *           ci-loop step treats this as a hard failure rather than as success.
    *
-   * This replaces apps/node/src/wiring/workflowWiring.ts, which existed for exactly one stated reason —
-   * "github is not converted, so there is no `github.checkState` capability to resolve". There is now.
+   * The workflow plugin resolves this capability through the runtime registry rather than importing the
+   * GitHub implementation directly.
    */
   failingChecks(userId: string | null, taskId: string): Promise<string | null>
 
   /**
-   * Row counts for the boot-time storage log (main/storageFootprint.ts). Core used to count these
-   * itself; it cannot see the tables any more, and reporting a silent zero would turn a visibility
-   * trigger into a lie.
+   * Row counts for the boot-time storage log. The GitHub plugin owns these tables, so it reports their
+   * counts through this capability instead of exposing its database handle.
    */
   footprint(): Promise<Record<string, number>>
 

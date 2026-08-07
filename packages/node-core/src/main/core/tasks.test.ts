@@ -6,11 +6,8 @@ import { createTaskService } from './tasks'
 // `workspaceId` vs `workspaceIdOrNull` — two answers to the same question, and the difference is what a caller
 // does with "no workspace".
 //
-// The nullable form was added because plugins/notes' context section had written it as
-// `workspaceId(taskId).catch(() => null)`. Null IS the right behaviour for that section (a repo not yet in a
-// workspace should skip the workspace scope, not fail prompt assembly), but the catch bought it by swallowing
-// every failure alike — so a genuine database error read as "this task has no workspace" and every included
-// workspace note disappeared from the prompt with nothing logged anywhere. These cases pin the split.
+// The nullable form lets context assembly skip the workspace scope when a task's repository has no
+// workspace, while still propagating genuine database failures.
 
 const now = Date.now()
 

@@ -5,7 +5,7 @@ import { activeNodeId } from './node/activeNode'
 import { nodeState } from './node/fleet'
 
 // The renderer's only HTTP surface. Every request goes through Electron main's connection broker
-// (docs/vNext/architecture.md § How the client talks to nodes), which owns the endpoint, the pinned
+// (docs/architecture-overview.md § How the client talks to nodes), which owns the endpoint, the pinned
 // certificate and the device token — so nothing here knows an origin and nothing here holds a
 // credential.
 //
@@ -39,9 +39,6 @@ const nextRequestId = (): string => `r${++requestSeq}-${Date.now()}`
 
 const decoder = new TextDecoder()
 
-// A string body is accepted and encoded here, because that is what every existing call site passes
-// (they used to build a RequestInit). Keeping the ergonomics identical is what made this cutover a
-// one-file change rather than a sweep over ~30 mutation helpers.
 export type ApiBody = string | NodeFetchBody
 
 const asNodeBody = (body: ApiBody | undefined): NodeFetchBody | undefined =>
@@ -89,7 +86,7 @@ async function send(path: string, options: SendOptions = {}): Promise<ApiRespons
     return { ok: res.ok, status: res.status, headers: headersToObject(res.headers), body: new Uint8Array(await res.arrayBuffer()) }
   }
 
-  // ui.md § Connection and staleness vocabulary: "mutations fail fast with a clear 'node offline' error
+  // docs/ui-design.md § Connection and staleness vocabulary: "mutations fail fast with a clear 'node offline' error
   // and keep the user's input as a draft. Nothing is queued for later automatic replay."
   //
   // Fail fast HERE, not by waiting for a TCP timeout. Main holds the socket, so it already knows the node
@@ -101,9 +98,6 @@ async function send(path: string, options: SendOptions = {}): Promise<ApiRespons
   // `offline` and `revoked` only. `degraded` is WS-down/HTTP-up, where writes still work, and
   // `incompatible` gets its own message from the route it fails on.
   if (isMutation(options.method) && !isWritable(nodeId)) {
-    // Says only what this layer can guarantee. It used to add "they are kept here until it is back", which
-    // is not this module's to promise: whether the input survives depends on each caller doing what
-    // PullDetail's `runThenClear` does, and two call sites away that sentence becomes a lie.
     throw new ApiError('This node is offline, so nothing was sent. Try again once it is back.', 0, 'node_offline', {
       retryable: true,
     })
@@ -158,7 +152,7 @@ const JSON_HEADERS = { 'content-type': 'application/json' }
 
 const parseJson = <T>(res: ApiResponse): T => (res.body.byteLength === 0 ? (undefined as T) : (JSON.parse(decoder.decode(res.body)) as T))
 
-// One place that reads the wire envelope (docs/vNext/protocol.md § Errors). A non-JSON or
+// One place that reads the wire envelope (docs/api-reference.md § Errors). A non-JSON or
 // pre-envelope body degrades to `undefined` rather than throwing over the original failure.
 function errorBody(res: ApiResponse): ApiErrorBody['error'] | undefined {
   try {
@@ -241,14 +235,12 @@ export const postJson = async <T>(url: string, body?: unknown, options?: { idemp
       ...(body === undefined ? {} : JSON_HEADERS),
       // Minted by the CALLER, never by the broker: only the call site knows that a retry is the same
       // logical mutation, and a broker-minted key would defeat replay entirely
-      // (docs/vNext/protocol.md § HTTP conventions).
+      // (docs/api-reference.md § HTTP conventions).
       ...(options?.idempotencyKey ? { 'idempotency-key': options.idempotencyKey } : {}),
     },
     ...(body === undefined ? {} : { body: JSON.stringify(body) }),
   })
 
-// For endpoints that answer 204/empty. readJson/writeJson always parse a body, which is the only
-// reason a handful of call sites used to reach past this module to raw fetch.
 export async function sendJson<T = void>(url: string, init: WriteInit, fallback: ErrorFallback = (res) => `${res.status}`): Promise<T> {
   const res = await send(url, init)
   if (!res.ok) raise(res, typeof fallback === 'function' ? fallback(res) : fallback)

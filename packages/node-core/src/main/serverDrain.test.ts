@@ -4,13 +4,6 @@ import type { ServerType } from '@hono/node-server'
 import { afterEach, describe, expect, it } from 'vitest'
 import { closeListener, drainWithDeadline } from './server'
 
-// The two halves of a bounded shutdown, tested apart from the composition roots that call them.
-//
-// This is a Phase 5 fix to a Phase 4 finding: server/standalone.ts never closed its listener at all, so
-// its port stayed bound for as long as the slowest plugin took to dispose. The e2e's remedy was SIGKILL
-// (docs/vNext/phase4-notes.md § "the kill signal is SIGKILL"). Both properties below are the ones an
-// operator's `systemctl restart` depends on — the port comes free, and the process gives up eventually.
-
 const listening = new Set<Server>()
 
 function listen(): Promise<{ server: Server; port: number }> {

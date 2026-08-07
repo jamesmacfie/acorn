@@ -13,8 +13,6 @@ export const requireProfile = (id: string): ProfileDef => agentProfileRegistry.r
 
 export const resolveCommand = (p: ProfileDef): string => (p.command === '$SHELL' ? process.env.SHELL || '/bin/zsh' : p.command)
 
-// Is a command resolvable on PATH? macOS-only (docs/local-development.md), so `which` is fine. ponytail: no cache —
-// only called when the UI lists profiles / a session is created.
 export function onPath(command: string): boolean {
   try {
     execFileSync('which', [command], { stdio: 'ignore' })

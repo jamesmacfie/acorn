@@ -5,7 +5,7 @@ import { getRunBridge } from '../server/routes/harness'
 import { loadTask } from './taskWorktree'
 
 // Which loopback ports a task legitimately serves on, for the preview tunnel's allowlist
-// (main/tunnel.ts). protocol.md § Streams: "Only declared ports; no general SOCKS."
+// (main/tunnel.ts). docs/api-reference.md § Streams: "Only declared ports; no general SOCKS."
 //
 // **Derived, never configured.** There is no new setting here on purpose: a port is tunnellable exactly
 // when the owner has already told the node something serves on it. Two sources, both of which the preview
@@ -55,10 +55,8 @@ export function declaredTunnelPorts(db: AppDatabase) {
 
     // Source 1: EVERY run target's fixed `url`, not just the default one's.
     //
-    // The first version called `defaultUrl` alone, which meant a task with two run targets — an app on 3000
-    // and a Storybook on 6006 — could only tunnel to whichever was marked default. A layout recipe's
-    // `browser` url points at any of them (client-core's `recipeBrowserUrl` is the FIRST branch of the
-    // preview pane's resolution), so the non-default case is the normal one, not an edge.
+    // Include every fixed run-target URL because a layout recipe's browser URL may point to a non-default
+    // target.
     //
     // `get`, not `require`: a node whose terminal plugin is disabled has no run bridge, and the honest
     // answer there is "no run-target port", not a thrown upgrade.

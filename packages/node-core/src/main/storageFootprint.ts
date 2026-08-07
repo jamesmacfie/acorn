@@ -1,17 +1,3 @@
-// Visibility trigger for deferred retention work. Derived mirrors/blob data deliberately have no
-// sweep yet; logging their size at startup turns future retention into a measured decision.
-//
-// Phase 2 split the single database, and this is the one place where that split could have degraded
-// silently. The line used to count `repos` / `pull_requests` / `issues` / `sync_state` off core's handle;
-// two of those tables now live in <data-root>/plugins/github.sqlite, which core cannot see. Counting
-// them against core's schema would still COMPILE (drizzle would happily emit `select count(*) from
-// repos`) and would then fail at runtime, or worse — if a stale core database still had the dropped
-// tables — report a number that has nothing to do with the live mirror.
-//
-// So the counts a plugin owns are CONTRIBUTED by the plugin, and this function reports only what it can
-// actually see. A plugin that contributes nothing is omitted from the line entirely rather than logged as
-// zero, because "0 repos mirrored" and "nobody told me about repos" are different facts and only one of
-// them is a reason to look at retention.
 import { readdir, stat } from 'node:fs/promises'
 import { join } from 'node:path'
 import { count } from 'drizzle-orm'
@@ -57,13 +43,6 @@ export async function logStorageFootprint(
   dataDir: string,
   contributors: readonly FootprintContributor[] = [],
 ): Promise<void> {
-  // Core's own remaining mirror-ish tables: the generic external-item read model and the provider
-  // freshness markers (server/integrations/itemStore.ts explains why these two stayed here).
-  // The DATABASES were unmeasured until Phase 5, and phase2-notes.md had named that as cleanup since the
-  // split. It mattered more than it sounds: `blobs=` alone made a data root look like a cache with some
-  // bookkeeping beside it, when the plugin databases are where agent transcripts, notes and memories
-  // accumulate — i.e. where retention will actually have to bite. The `plugins/` directory walk is the
-  // same one main/backup.ts uses and needs no plugin list (main/pluginStorage.ts § PLUGIN_DB_DIR).
   const [blobBytes, coreBytes, pluginBytes, issues, syncRows] = await Promise.all([
     directoryBytes(join(dataDir, 'blobs')),
     fileBytes(resolveDatabasePath(dataDir)),

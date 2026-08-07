@@ -1,21 +1,3 @@
-// Detail panels for an external item (a Linear ticket, a Rollbar occurrence), contributed by the plugin
-// that owns the provider and rendered by whoever holds a reference to one.
-//
-// It exists for one host and one contributor, and that is deliberate rather than an oversight, so the
-// reasoning is worth stating instead of leaving a reader to wonder whether it is over-built:
-//
-//   plugins/github's PR detail scans PR bodies, comments and reviews for referenced tickets and opens a
-//   panel when the user clicks one. It did that by importing plugins/linear's `LinearIssuePanel` — the last
-//   plugin→plugin edge on the boundary ledger. The problem is not the indirection's cost, it is that
-//   github has no business NAMING a provider plugin: a PR body can reference any provider's item, and the
-//   plugin that reviews pull requests should not gain a dependency for each one.
-//
-// So the seam is keyed on `providerId` and github asks "who renders this ref?". Today exactly linear
-// answers. plugins/rollbar deliberately does NOT register: its panel is rendered only by its own pane and
-// browse view, so a registration would be a contribution with no host — the same speculative machinery
-// Phase 2 deleted the NodeEventBus for.
-//
-// JSX-free, per registries/slots.ts: registries/plugin.ts must stay importable in a bare-Node vitest run.
 import type { Component } from 'solid-js'
 import type { ExternalRef } from '@acorn/protocol/integrations.ts'
 import { Registry } from './registry'

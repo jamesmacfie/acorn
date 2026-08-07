@@ -13,8 +13,7 @@ import { makeTestDb, makeTestPluginDb, type TestDb, type TestPluginDb } from '@a
 import { migrationsDir } from '../../node/migrations'
 import { seedGithubIntegration } from '../testGithubToken'
 import type { Env } from '@acorn/node-core/main/bindings.ts'
-// Aliased away from the `repos` ROUTER imported above — the table and the route factory now share a name
-// because the table moved into this plugin. Production repos.ts aliases it the same way.
+// Aliased away from the `repos` router imported above because the table and route factory share a name.
 import { repos as reposTable, syncState } from '../../node/schema'
 
 vi.mock('..', async (importOriginal) => {

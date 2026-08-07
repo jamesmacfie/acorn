@@ -1,5 +1,5 @@
 // The terminal plugin's agent tools: the five run_* tools, as the `tools` contribution point
-// (docs/vNext/plugins.md § Agent tools and MCP).
+// (docs/plugins.md § Agent tools and MCP).
 //
 // They were defined in apps/node/src/wiring/agentToolsWiring.ts, which resolved the RuntimeService out
 // of the capability registry purely so it could declare them. The service is built by this plugin's init

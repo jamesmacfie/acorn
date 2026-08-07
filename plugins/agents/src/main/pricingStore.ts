@@ -1,14 +1,3 @@
-// Per-owner model-pricing overrides, read and written through core's preference seam.
-//
-// This used to sit in server/ and query `schema.prefs` with core's database handle — one of the four
-// cross-boundary reads that blocked converting this plugin. `prefs` is core's table and stays core's:
-// the overrides are ordinary non-secret app state that the client also edits through the pricing pane,
-// and moving the rows into agents.sqlite would have silently abandoned every owner's existing
-// overrides, because a migration cannot copy across database files (docs/vNext/data.md § Plugin DBs).
-//
-// So it goes through `CoreServices.prefs` instead, and the file moved to main/ because it is now engine
-// code rather than route code: the usage service needs the overrides with no request in hand, so the
-// value is resolved by the plugin's init and reaches the HTTP layer through the usage bridge.
 import type { PrefService } from '@acorn/node-core/main/core/prefs.ts'
 import {
   agentPricingPreferenceKey,

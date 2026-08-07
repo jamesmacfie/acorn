@@ -1,9 +1,7 @@
 import { z } from 'zod'
 
-// Bumped to 2 for vNext: the start config lost `origin` (the service now chooses and reports its
-// own endpoint) and `service.start` resolves a real result instead of `{ state }`. A version bump is
-// a hard break by design — parent and child ship in the same artifact, so there is nothing to
-// negotiate.
+// Version 2: the service chooses and reports its endpoint, and `service.start` resolves a complete
+// start result instead of only a state. A version bump is a hard break; parent and child ship together.
 export const SERVICE_PROTOCOL_VERSION = 2
 
 export const serviceStateSchema = z.enum([
@@ -24,7 +22,7 @@ export const serviceStateEventSchema = z.strictObject({
 
 export const serviceStartConfigSchema = z.strictObject({
   dataDir: z.string().min(1),
-  // No clientDir: the node serves no web assets (docs/vNext/architecture.md). The renderer ships with
+  // No clientDir: the node serves no web assets (docs/architecture-overview.md). The renderer ships with
   // the desktop app and loads from app://acorn, so there is nothing about the renderer's layout the
   // service needs to be told.
   version: z.string().min(1),
@@ -33,23 +31,16 @@ export const serviceStartConfigSchema = z.strictObject({
   mcpEntry: z.string().min(1),
   // The device token this client remembered from a previous boot, if any. The service reuses it when
   // it still authenticates, so the local bundle keeps ONE device row instead of accruing one per
-  // launch; anything else (first run, a reset data root, a revoked device) is replaced and the
-  // effective token comes back in the start result. Custody stays with the client — the service
+  // launch; otherwise (first run, a reset data root, or a revoked device) the service issues a new one
+  // and returns the effective token in the start result. Custody stays with the client — the service
   // never persists it.
   deviceToken: z.string().min(1).optional(),
-  // Plugin ids the owner has turned off for this node. Both plugin hosts have honoured a `disabled` list
-  // since Phase 2 and nothing populated it; this is the wire half, so Settings → Plugins (Phase 4) is a list
-  // rather than a refactor. A `required` plugin ignores it (server/plugin/host.ts).
-  //
-  // Per NODE, not per client: which plugins a node runs decides which routes exist and which SQLite files are
-  // opened, so it belongs to the service's own start config rather than to renderer state.
   disabledPlugins: z.array(z.string().min(1)).optional(),
 })
 export type ServiceStartConfig = z.infer<typeof serviceStartConfigSchema>
 
-// What `service.start` resolves with. V1 returned `{ state: 'listening' }` and the parent derived
-// the origin itself from a pinned port; the service now owns its endpoint and identity and reports
-// them, which is what lets two nodes coexist and what carries the TLS pin once there is one.
+// What `service.start` resolves with. The child owns its endpoint and certificate identity and reports
+// them so the parent can adopt the Node and establish the pinned broker connection.
 export const serviceEndpointSchema = z.strictObject({
   origin: z.string().url(),
   port: z.number().int().min(1).max(65535),
@@ -63,7 +54,7 @@ export const serviceStartResultSchema = z.strictObject({
   // The bearer the client authenticates with. Never logged.
   deviceToken: z.string().min(1),
   // The node's transport identity: the self-signed certificate to pin and its sha256 fingerprint
-  // (docs/vNext/protocol.md § Transport and identity). Required, not optional — the listener is TLS
+  // (docs/api-reference.md § Transport and identity). Required, not optional — the listener is TLS
   // unconditionally, and an optional pin is a pin that silently is not one.
   fingerprint: z.string().min(1),
   certPem: z.string().min(1),
@@ -163,9 +154,6 @@ type Pending = {
 }
 type Handler = (payload: unknown) => unknown | Promise<unknown>
 
-// Small bidirectional RPC peer over Electron utility-process messages. Both sides can serve requests
-// concurrently; no global queue is held while a handler awaits, so a preview navigation may trigger
-// a service-side page-rule lookup without deadlocking the original request.
 export class ServiceRpcPeer {
   private sequence = 0
   private readonly pending = new Map<string, Pending>()

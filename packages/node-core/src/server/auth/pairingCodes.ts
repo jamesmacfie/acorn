@@ -1,14 +1,12 @@
 import { randomBytes, timingSafeEqual } from 'node:crypto'
 
-// One-time pairing codes (docs/vNext/protocol.md § Pairing, docs/vNext/security.md § Transport):
+// One-time pairing codes (docs/api-reference.md § Pairing, docs/security.md § Transport):
 // 128-bit, 10-minute window, 5 attempts, single use, owner-initiated on both ends.
 //
 // In-memory and deliberately not persisted: a code that survived a node restart would be a
 // credential sitting on disk for a window the owner believes has closed. Losing an in-flight code
 // to a restart is the correct trade — the owner just opens the pairing window again.
 //
-// This replaces V1's oauthStateStore, which had the same shape for the same reason.
-
 // Exported because the route that opens a window has to tell the client how long the code it is
 // about to display stays valid, and two constants would drift.
 export const PAIRING_WINDOW_MS = 10 * 60_000
@@ -39,7 +37,7 @@ export function pairingCodes(now: () => number = () => Date.now()): PairingCodes
     },
 
     // Failures are uniform: no window, expired, attempts exhausted, and wrong code are
-    // indistinguishable to the caller (docs/vNext/security.md § Transport: "no oracle for 'right
+    // indistinguishable to the caller (docs/security.md § Transport: "no oracle for 'right
     // code, wrong something'"). The caller turns this into one generic error.
     consume(candidate) {
       if (!open) return false

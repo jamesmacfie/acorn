@@ -2,11 +2,11 @@ import { safeStorage } from 'electron'
 import { chmodSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 
-// Device-token custody, in Electron main (docs/vNext/architecture.md § How the client talks to
+// Device-token custody, in Electron main (docs/architecture-overview.md § How the client talks to
 // nodes): the renderer never holds a token, so the credential lives here and only here.
 //
 // safeStorage encrypts against the OS keychain and is built in — no native module, which is why
-// docs/vNext/data.md's "OS keychain" needs no keytar dependency. Same mechanism as
+// docs/data-layer.md's "OS keychain" needs no keytar dependency. Same mechanism as
 // sessionKeyStore.ts; this is a second independent secret, not a second mechanism.
 //
 // One file per scope, where a scope is a nodeId — except the bundled local node, which uses the

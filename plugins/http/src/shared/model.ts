@@ -1,10 +1,3 @@
-// Wire types and pure logic for the API panel (docs/panes.md), shared between the server executor
-// and the renderer. Bruno is the UI reference; this is a deliberately smaller model — no scripts,
-// tests, assertions, collections, or per-hop TLS timing.
-//
-// ponytail: one module, not five. interpolate/auth/curl are ~30 lines each and always change
-// together. Split when this passes ~400 lines.
-
 export type KeyValue = { name: string; value: string; enabled: boolean }
 
 export const httpMethods = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'HEAD', 'OPTIONS'] as const
@@ -13,8 +6,6 @@ export type HttpMethod = (typeof httpMethods)[number]
 export const bodyModes = ['none', 'json', 'text', 'form'] as const
 export type BodyMode = (typeof bodyModes)[number]
 
-// ponytail: no `inherit`, no folder-level auth. A shared token is a repo variable — put {{TOKEN}}
-// in the bearer field. Add Bruno's mergeAuth tree-walk (~45 lines) if per-folder defaults turn up.
 export type AuthConfig =
   | { mode: 'none' }
   | { mode: 'basic'; username: string; password: string }
@@ -92,11 +83,6 @@ export type SendFailure = {
 
 export type SendResult = SendSuccess | SendFailure
 
-// --- interpolation ------------------------------------------------------------------------
-
-// ponytail: one pass, no recursion. A {{var}} whose value contains {{other}} is left as-is, and an
-// unresolved name stays literal so you can see what was missing. Add a depth-limited loop if
-// composing variables from variables becomes a real need.
 const PLACEHOLDER = /\{\{\s*([A-Za-z0-9_.-]+)\s*\}\}/g
 
 export const interpolate = (input: string, vars: Record<string, string>): string =>

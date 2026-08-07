@@ -3,10 +3,8 @@
 // has acknowledged as trusted executable config. Both are core's because they describe THIS MACHINE's
 // relationship to a repo, not any one plugin's data.
 //
-// Before the database split a plugin read them with core's db handle (plugins/database's resolveDbUrl
-// called getRepoPath + assertRepoConfigTrusted; plugins/memory scanned every checkout). Once each
-// plugin owns its own SQLite file it has no handle to core's at all, so those reads come through here
-// (docs/vNext/data.md § Plugin DBs).
+// Plugins use this service for repository paths and configuration trust instead of receiving core's
+// database handle. This keeps repository authority in the core service layer.
 import type { RepoPath } from '@acorn/protocol/terminal.ts'
 import type { AppDatabase } from '../../server/db'
 import { schema } from '../../server/db'

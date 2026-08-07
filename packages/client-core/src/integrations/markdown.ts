@@ -1,10 +1,3 @@
-// Minimal, XSS-safe Markdown → HTML for Linear ticket bodies (which arrive as raw markdown,
-// unlike GitHub bodies which come pre-sanitized as HTML). Safety invariant: ALL text is HTML-
-// escaped before any transform, and links/images only emit validated remote URLs — so even imperfect
-// parsing can never inject markup. Covers the common subset (headings, bold, italic, inline + fenced
-// code, links, images, lists, blockquotes, rules); not full CommonMark. ponytail: a hand-rolled subset
-// beats adding a markdown lib + sanitizer; widen the subset if tickets need it.
-
 const ESC: Record<string, string> = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }
 const esc = (s: string) => s.replace(/[&<>"]/g, (c) => ESC[c])
 

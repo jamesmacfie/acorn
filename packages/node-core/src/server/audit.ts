@@ -3,12 +3,12 @@ import { desc, lt } from 'drizzle-orm'
 import type { AppDatabase } from './db'
 import { schema } from './db'
 
-// The audit trail's write side (docs/vNext/security.md § Audit, data.md § Core DB).
+// The audit trail's write side (docs/security.md § Audit, docs/data-layer.md § Core DB).
 //
 // security.md names five classes of action, and this is the closed set that implements them. A closed
 // union rather than free-form strings because the settings surface groups and filters on it, and an
 // action nobody can enumerate is one nobody reviews — the same argument as the error-code set in
-// protocol.md § Errors.
+// docs/api-reference.md § Errors.
 export type AuditAction =
   // Pairing and devices. The window open/close pair matters as much as the grant: a pairing window is
   // the one moment this node will hand full owner authority to a stranger who knows a code.
@@ -84,7 +84,7 @@ export function recordAudit(db: AppDatabase, entry: AuditEntry): void {
 // owner reading a trail that names only GitHub would reasonably conclude nothing else spends a
 // credential. Recorded as a deliberate divergence rather than silently skipped.
 
-// 90-day retention (data.md § Retention defaults), run at boot beside the idempotency cleanup rather
+// 90-day retention (docs/data-layer.md § Retention defaults), run at boot beside the idempotency cleanup rather
 // than on a timer: a node that is never restarted is also one that is never accumulating a backlog
 // worth pruning, and a scheduler for one range-delete a day is machinery this does not need.
 export async function pruneAudit(db: AppDatabase, now: number = Date.now()): Promise<void> {

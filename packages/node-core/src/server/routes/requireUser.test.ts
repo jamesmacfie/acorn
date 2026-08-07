@@ -9,7 +9,7 @@ import type { Env } from '../../main/bindings'
 // /v2/core/* and every plugin at /v2/p/<plugin>/* are covered by the same middleware, so a plugin
 // cannot mount itself outside it. This table is the mount contract: a router added outside `/v2/*`
 // (or a public hole) would not appear here and would silently escape the gate, so keep it
-// exhaustive. (docs/security.md §3, §7 · docs/vNext/protocol.md § HTTP conventions)
+// exhaustive. (docs/security.md §3, §7 · docs/api-reference.md § HTTP conventions)
 const PROTECTED_PATHS: [string, string][] = [
   ['GET', '/v2/core/prefs'],
   ['GET', '/v2/core/workspaces'],
@@ -25,9 +25,6 @@ const PROTECTED_PATHS: [string, string][] = [
   ['GET', '/v2/p/memory/tasks/t1/notes'],
   ['GET', '/v2/p/linear/projects'],
   ['GET', '/v2/p/rollbar/items'],
-  // Moved out of core with `pinned_repos` in Phase 2 — it was ['GET', '/v2/core/pins'] through Phase 1.
-  // Kept in the table rather than dropped: requireUser is a `/v2/*` glob that 401s before routing, so a
-  // path that no longer exists is indistinguishable from a gated one and the stale entry asserted nothing.
   ['GET', '/v2/p/github/pins'],
   ['GET', '/v2/p/github/repos'],
   ['GET', '/v2/p/github/repos/o/r/labels'],
@@ -54,10 +51,8 @@ describe('requireUser gate over the protected router table', () => {
     expect(res.status).toBe(200)
   })
 
-  // There is no /auth namespace at all any more. It existed for the GitHub OAuth web flow and the
-  // session cookie it sealed; GitHub is connected by device flow against /v2 now, and the cookie is
-  // gone — so this asserts absence rather than being deleted, because a route reappearing there would
-  // be a public, unauthenticated surface and nothing else in the suite would notice.
+  // The /auth namespace is not part of the current API. Keep these probes so a public login surface
+  // cannot be introduced without the route conformance suite noticing.
   it.each([
     ['POST', '/auth/logout'],
     ['GET', '/auth/login'],

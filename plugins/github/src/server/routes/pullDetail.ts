@@ -21,7 +21,7 @@ import type { PluginDatabase } from '@acorn/node-core/main/pluginStorage.ts'
 // pr_files, owned by /files.
 // A FACTORY over this plugin's own database, not a module-scope router reading getDb(c.env). The tables
 // live in <data-root>/plugins/github.sqlite now, and `c.env` deliberately carries no per-plugin handles
-// (docs/vNext/data.md § Plugin DBs). The handle arrives at plugin init, so no request can reach an
+// (docs/data-layer.md § Plugin DBs). The handle arrives at plugin init, so no request can reach an
 // unmigrated database — and a second startServiceRuntime in one process builds fresh routers over its own
 // handle instead of inheriting a closed one.
 export const pullDetail = (db: PluginDatabase) => new Hono<AppEnv>().get('/:owner/:repo/pulls/:number', async (c) => {

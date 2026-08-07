@@ -1,33 +1,5 @@
 import { PrefKeys } from './prefKeys'
 
-// The device-prefs tier (docs/vNext/ui.md § State ownership: "Client owns presentation: selection, layouts,
-// pane weights/pins, drawer height, theme/style, keybindings, window geometry, drafts").
-//
-// Closing the last Phase 1 divergence. Every pref lived in the NODE's flat `/v2/core/prefs` record, which
-// was free with one node and wrong with a fleet — so Phase 1 pinned all of them to the HOME node, whatever
-// node was active, purely so the theme would not flip on a switch. That works and says the wrong thing:
-// these are properties of this installation, not of a machine that happens to hold repos.
-//
-// ## Which keys move, and why the split is where it is
-//
-// A key belongs to the DEVICE when its meaning is "how this window looks and behaves". It stays on the NODE
-// when its meaning is "how that machine behaves" — agent tool permissions govern what an agent running
-// THERE may do, and `startup_context_injection` and `onboarded` are facts about a node's own setup.
-//
-// The genuinely arguable ones and the call made:
-//
-//   - `last_path` / `last_task` / `last_source` are device: "what was I looking at" is this window's
-//     question. They are also node-SCOPED in content (a task id), which is why the scoped-key change lands
-//     with this one — see persistence/persistedState.ts.
-//   - `task_layouts` and `editor_open_files` are device for the same reason, and are the keys that made the
-//     old arrangement actively unsafe: a remote task's layout was stored on the home node under a bare task
-//     id, and two nodes may hold the same task UUID by construction.
-//   - `notices` is device: the ring is client-local state that happens to be persisted.
-//
-// ## Storage
-//
-// `localStorage`, not IndexedDB. These are small synchronous scalars read during the first paint (the theme
-// is applied before anything renders), and the query cache already owns the async tier.
 const DEVICE_KEYS: ReadonlySet<string> = new Set<string>([
   PrefKeys.themeFollowSystem,
   PrefKeys.theme,

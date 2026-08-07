@@ -98,9 +98,6 @@ describe('onServerError backstop', () => {
     expect(res.status).toBe(403)
   })
 
-  // Regression guard for the trap this commit removed: onServerError used to answer JSON only under
-  // /api/ and text/plain everywhere else, so mounting a new namespace would have silently
-  // downgraded every 500 on it to unparseable prose.
   it('speaks the envelope on every path, not just one namespace prefix', async () => {
     vi.spyOn(console, 'error').mockImplementation(() => undefined)
     const res = await get('/page')

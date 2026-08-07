@@ -8,7 +8,7 @@ import { Button, Select } from '../ui/primitives'
 import { nextDisabledList, pluginPending } from './pluginToggle'
 import './settings.css'
 
-// Settings → Plugins (docs/vNext/ui.md § New surfaces: "the list of plugins with enable/disable toggles
+// Settings → Plugins (docs/ui-design.md § New surfaces: "the list of plugins with enable/disable toggles
 // (per node)").
 //
 // Per NODE, and the node picker at the top is the whole reason this is not a plain list: which plugins a

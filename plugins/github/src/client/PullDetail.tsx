@@ -44,10 +44,6 @@ function LinearText(props: { text: string; prefixes: string[]; onOpen: (id: stri
   )
 }
 
-// Persist a <details> open/closed state in localStorage, keyed by section name, so it survives
-// navigation and reloads. Seeds from storage on mount (falling back to the JSX `open` default),
-// then writes back on every toggle. ponytail: localStorage, not server prefs — these are
-// per-device UI preferences and avoid the async seed-flash the left pane has.
 const rememberOpen = (key: string) => (el: HTMLDetailsElement) => {
   const stored = localStorage.getItem(`section-open:${key}`)
   if (stored !== null) el.open = stored === '1'
@@ -121,8 +117,6 @@ export default function PullDetail(props: { task?: Task } = {}) {
   // Open in-app links found inside rendered bodies (Linear issues → panel; GitHub PRs/repos → SPA).
   const navigate = useNavigate()
   const onContentClick = makeContentLinkHandler(navigate, setOpenIssue)
-  // Team prefixes seen via linear.app URLs in this PR — used to safely linkify bare ids (CRA-404)
-  // in GitHub text/title without false-positives on things like UTF-8.
   const linearPrefixes = createMemo(() => [...new Set(linearRefs().map((rf) => rf.identifier.split('-')[0]))])
 
   // After GitHub bodies render (innerHTML, opaque to Solid), wrap bare Linear ids in clickable
@@ -164,11 +158,6 @@ export default function PullDetail(props: { task?: Task } = {}) {
   // Reports the failure and RESOLVES, so a caller chaining `.then` is not left hanging. That is fine for a
   // fire-and-forget action and wrong for anything that clears the user's text — see `runThenClear`.
   const run = (p: Promise<unknown>) => p.then(refresh).catch((e) => setActionError(String(e.message ?? e)))
-  // Clear the input ONLY on success. Both callers used to be `run(...).then(() => setBody(''))`, and because
-  // `run` catches, that `.then` fired on failure too: a comment submitted against an offline node (or
-  // rejected by GitHub) reported the error and wiped what the user had typed. ui.md § Connection and
-  // staleness vocabulary is explicit — a failed mutation "keeps the user's input as a draft" — and the
-  // drafts are persisted per PR two lines above, which made the loss survive a reload.
   const runThenClear = (p: Promise<unknown>, clear: () => void) =>
     p.then(() => {
       clear()

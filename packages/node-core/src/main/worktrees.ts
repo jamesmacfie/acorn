@@ -164,8 +164,6 @@ export async function worktreePorcelain(path: string): Promise<{ dirty: boolean;
   }
 }
 
-// The checkout's current branch (`git branch --show-current`), or null on a detached HEAD or error.
-// Used to seed a "current-checkout" task with the branch it actually borrows.
 export async function currentBranch(checkout: string): Promise<string | null> {
   try {
     const { stdout } = await gitOrThrow(['branch', '--show-current'], { cwd: checkout, timeoutMs: 10_000 })

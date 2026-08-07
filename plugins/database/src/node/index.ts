@@ -1,9 +1,3 @@
-// The database plugin's node part (docs/vNext/plugins.md § The plugin API).
-//
-// What the composition root used to do by hand: apps/node/src/server/routes.ts registered the router,
-// apps/node/src/wiring/serverBridges.ts connected it to its pg implementation, core owned the
-// `db_saved_queries` table, and apps/node/src/service/runtime.ts remembered to call endDbPools() during
-// teardown. All four are here now, and the plugin owns its own SQLite file.
 import type { NodePlugin } from '@acorn/node-core/server/plugin/types.ts'
 import { openPluginDb } from '@acorn/node-core/main/pluginStorage.ts'
 import { migrationsDir } from './migrations'

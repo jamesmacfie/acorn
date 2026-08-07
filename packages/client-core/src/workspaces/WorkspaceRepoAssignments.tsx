@@ -6,16 +6,6 @@ import { taskBridge } from '../tasks/taskBridge'
 import V1Import from './V1Import'
 import './onboarding.css'
 
-// The repo→workspace mapping body (docs/workspaces-and-tasks.md): create named workspaces, assign each repo to
-// one (partition), hide repos with the eye toggle, and (desktop) point each repo at its on-disk
-// checkout via the native folder picker. Changes apply immediately. Shared by the first-run
-// OnboardingModal and the Settings → Workspaces tab, so it renders no overlay/footer of its own.
-//
-// The V1 importer (docs/vNext/plan.md § Phase 5) is rendered at the top of this body rather than by each
-// consumer, which is what makes it appear in BOTH places from one insertion point — first-run, which is
-// where it matters, and Settings → Workspaces, which is the re-entry plugin-inventory.md asks for. It
-// renders nothing at all when there is no V1 install to import, so on a fresh machine it costs one
-// probe and no pixels. Above the mapping, because importing decides what the mapping shows.
 export default function WorkspaceRepoAssignments() {
   const qc = useQueryClient()
   const repos = createQuery(() => reposOptions(true))

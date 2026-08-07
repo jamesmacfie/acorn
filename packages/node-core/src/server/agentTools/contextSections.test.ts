@@ -8,14 +8,6 @@ import {
   type PluginContextSection,
 } from './contextSections'
 
-// The context-section contribution point (docs/vNext/plan.md § Phase 3, item 3).
-//
-// It replaced `setContextSections(buildContextSections({ notes, memory, pullRequest }))` — one slot that had
-// to be filled with every source at once, which is why apps/node/src/wiring/contextSectionsWiring.ts had to
-// exist and why neither notes nor memory could own its own half. Three properties are worth pinning: the
-// wire ORDER cannot depend on registration order, an owner's contributions come out as a unit, and a
-// plugin's section can never see core's database handle.
-
 const section = (id: string, over: Partial<PluginContextSection> = {}): PluginContextSection => ({
   id,
   label: id,
@@ -78,9 +70,6 @@ describe('the context-section registry', () => {
   })
 
   it('never hands a plugin section core database handle', async () => {
-    // The one property PluginContextSection exists for. asContextSection widens the args, and this asserts
-    // it widens by DROPPING rather than by passing through — a plugin reading core's tables is exactly what
-    // Phase 2's database split closed.
     let seen: Record<string, unknown> = {}
     registerContextSection('github', asContextSection(section('pr', {
       assemble: async (a) => ((seen = a as unknown as Record<string, unknown>), { items: [] }),
@@ -91,8 +80,7 @@ describe('the context-section registry', () => {
   })
 
   it('resolves include=* and the defaults against what is actually registered', () => {
-    // A disabled plugin does not register, so its id is simply not includable — which is what replaced the
-    // old thunk-returns-undefined degradation.
+    // A disabled plugin does not register, so its section ID is not includable.
     registerContextSection('a', asContextSection(section('notes', { defaultIncluded: true })))
     registerContextSection('b', asContextSection(section('memory')))
     expect([...parseInclude('*')].sort()).toEqual(['memory', 'notes'])

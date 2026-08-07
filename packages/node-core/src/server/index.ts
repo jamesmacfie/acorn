@@ -30,27 +30,6 @@ export function createApp() {
   // module-level router.
   const pairing = pairingRoutes()
 
-  // Mount order is the auth invariant: every /v2/* request passes authMiddleware (resolve principal) →
-  // requireUser (enforce it) before any router. A router mounted before requireUser would be an
-  // unauthenticated hole, so all /v2 routers stay below this line. One glob covers both namespaces,
-  // which is why plugin prefixes are forced to be relative to /v2/p (routeRegistry.ts). See
-  // docs/security.md §3.
-  //
-  // The one deliberate exception is `pairing.open` (GET /v2/node + POST /v2/pair): a client that has
-  // never paired holds no credential, so those two ARE the way in (docs/vNext/protocol.md § Pairing).
-  // They still sit under authMiddleware — they are public, not unprotected — and everything that
-  // administers devices stays under /v2/core, below requireUser.
-  //
-  // There is NO csrf(), and its absence is deliberate rather than an omission. CSRF exists to defend
-  // *ambient* credentials: a browser attaches a cookie to a cross-site request whether or not the page
-  // meant to send it, so the server has to ask "did a page I trust initiate this?". This app has no
-  // ambient credential left. Every request carries a bearer that lives in Electron main's connection
-  // broker, and nothing a cross-site page can do makes anything attach it — the renderer holds no token
-  // and, under app://acorn's CSP (`connect-src 'self'`), cannot open a socket to a node at all
-  // (docs/vNext/security.md). The check used to be mounted on /auth only, for the one cookie-backed
-  // mutation (POST /auth/logout); that route and its cookie are gone. Reinstating it over /v2 would
-  // additionally break correct callers, because hono/csrf treats a *missing* content-type as
-  // form-submittable and 403s any bodyless mutation — `DELETE /v2/core/devices/:id`, for one.
   const app = new Hono<AppEnv>()
     // First, unconditionally: every response — success, error, public or authenticated — carries a
     // request id, so a user-reported failure is findable in the log.
@@ -59,10 +38,10 @@ export function createApp() {
     .route('/v2', pairing.open) // GET /v2/node + POST /v2/pair — pre-auth by construction (see above)
     .use('/v2/*', requireUser) // single 401 gate over the protected router table
     // Below the gate on purpose: replay is keyed on the caller's deviceId, which only exists once the
-    // principal is resolved and enforced (docs/vNext/protocol.md § HTTP conventions).
+    // principal is resolved and enforced (docs/api-reference.md § HTTP conventions).
     .use('/v2/*', idempotency)
     // Device-only, not merely authenticated: these mint credentials and administer devices, which
-    // docs/vNext/security.md forbids an internal (agent-spawned) caller from touching. requireUser
+    // docs/security.md forbids an internal (agent-spawned) caller from touching. requireUser
     // accepts either kind by design, so the narrower gate has to be explicit and has to sit here,
     // before the router — an agent that reaches pair/start can read the code out of the response and
     // mint itself an owner-authority token.
@@ -95,8 +74,9 @@ export function createApp() {
     // Even with the credentials scrubbed out, that is an exfiltration primitive in an agent's hands.
     .use(`${CORE_NAMESPACE}/backup`, requireDevice)
     .use(`${CORE_NAMESPACE}/backup/*`, requireDevice)
-    // The V1 importer reads an arbitrary SQLite file the caller nominates and writes it into core's
-    // tables. Both halves are device-only: the probe alone names a filesystem path.
+    // The configuration importer reads an arbitrary SQLite file the caller nominates and writes the
+    // supported configuration subset into core's tables. Both halves are device-only: the probe alone
+    // names a filesystem path.
     .use(`${CORE_NAMESPACE}/import/v1`, requireDevice)
     .use(`${CORE_NAMESPACE}/import/v1/*`, requireDevice)
     // Task scope, enforced by MOUNT rather than per handler. A 'task'-scoped internal credential may act
@@ -106,18 +86,6 @@ export function createApp() {
     // every task-scoped core router, where a newly added route inherits it instead of forgetting it.
     .use(`${CORE_NAMESPACE}/tasks/:id`, requireTaskScope)
     .use(`${CORE_NAMESPACE}/tasks/:id/*`, requireTaskScope)
-    // The same gate over the plugin namespace, which Phase 2 left open. It was the previous review's
-    // finding fixed at one door out of two: `wsHub.ts` refuses a task-scoped socket that addresses
-    // another task's PTY stream, and NONE of the sixteen plugin route files that read a taskId checked
-    // ownership at all. `:plugin` is a wildcard on purpose — the invariant is "a task-scoped path under
-    // /v2/p is gated", not "these six plugins are gated", so a plugin that adds a task route tomorrow
-    // inherits it. Covers changes (/:id/review-notes*, /:id/local/*), database (/:id/database/*),
-    // editor (/:id/editor/*, /:id/search), memory (/tasks/:id/notes*, /tasks/:id/memory), workflows
-    // (/tasks/:id/workflows*) and docker (/tasks/:id/containers, /tasks/:id/teardown).
-    //
-    // What a mount CANNOT reach is a route addressed by an opaque id — terminal's /sessions/:sid,
-    // agents' /sessions/:sessionId, workflows' /runs/:runId — because the task is not in the path.
-    // Those resolve the owning task themselves; see each router.
     .use(`${PLUGIN_NAMESPACE}/:plugin/tasks/:id`, requireTaskScope)
     .use(`${PLUGIN_NAMESPACE}/:plugin/tasks/:id/*`, requireTaskScope)
     // Administering or spending the owner's provider connections: device or the service scope, never a
@@ -130,14 +98,11 @@ export function createApp() {
     .route(`${CORE_NAMESPACE}/plugins`, plugins) // Settings → Plugins: the roster + the per-node toggle
     .route(`${CORE_NAMESPACE}/audit`, audit) // Settings → Security: the append-only trail (security.md § Audit)
     .route(`${CORE_NAMESPACE}/security`, security) // Settings → Security: this node's posture (security.md § On-disk)
-    .route(`${CORE_NAMESPACE}/backup`, backup) // data.md § Backup: core + plugin databases, minus credentials
-    .route(`${CORE_NAMESPACE}/import/v1`, importV1) // plan.md § Phase 5: the config-only V1 importer
+    .route(`${CORE_NAMESPACE}/backup`, backup) // docs/data-layer.md § Backup: core + plugin databases, minus credentials
+    .route(`${CORE_NAMESPACE}/import/v1`, importV1) // device-only configuration import
     .route(`${CORE_NAMESPACE}/workspaces`, workspaces)
     .route(`${CORE_NAMESPACE}/tasks`, tasks)
     .route(`${CORE_NAMESPACE}/tasks`, configTrust)
-    // Worktree/repo-config/task-lifecycle authority, moved out of the terminal plugin in Phase 2's
-    // scope-shed. Mounted at the core root because it owns /task-statuses and /repos/path* as well as
-    // /tasks/:id/* (server/routes/worktree.ts).
     .route(CORE_NAMESPACE, worktree)
     .route(`${CORE_NAMESPACE}/tasks`, taskContext) // /:id/context — the assembled task context (docs/agent-tools.md §4)
     .route(`${CORE_NAMESPACE}/tasks`, harness) // /:id/run — the renderer's run-target surface (docs/workflows.md §2)
@@ -158,5 +123,5 @@ export function createApp() {
   // authMiddleware/requireUser envelope). See app/server/routes.ts for the contributions.
   for (const contribution of pluginRouteContributions()) app.route(routeMountPath(contribution), contribution.router)
 
-  return app.onError(onServerError) // uncaught throws still speak the ApiError envelope (docs/vNext/protocol.md § Errors)
+  return app.onError(onServerError) // uncaught throws still speak the ApiError envelope (docs/api-reference.md § Errors)
 }

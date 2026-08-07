@@ -10,11 +10,6 @@ import { schema } from '../db'
 import { makeTestDb, testSecretEnv, type TestDb } from './testDb'
 import { setTaskSessionsBridge, worktree, type TaskSessionsBridge } from './worktree'
 
-// The transport contract for the eleven routes that moved out of the terminal plugin in Phase 2's
-// scope-shed (docs/vNext/plan.md § Phase 2). These are core's now: routing, body validation, and —
-// for archive alone — clean degradation when the PTY slot is unfilled, which is the behaviour dev:node
-// has always had.
-
 const req = (url: string, method = 'GET', body?: unknown) =>
   new Request(`http://acorn.test${url}`, {
     method,
@@ -118,8 +113,6 @@ describe('worktree routes', () => {
   })
 
   it('does not leak the node environment into a captured command', async () => {
-    // The reason this route moved through the process broker: it used to run with no env option at
-    // all, so a repo-configured script saw SESSION_ENC_KEY and INTERNAL_TOKEN.
     const app = authed()
     const res = await app.fetch(req('/core/tasks/task1/preview-url', 'POST', { script: 'echo "[${SESSION_ENC_KEY:-absent}]"' }), env())
     expect(await res.json()).toEqual({ ok: true, url: '[absent]' })

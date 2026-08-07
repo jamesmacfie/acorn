@@ -31,15 +31,10 @@ type GitHubCompare = {
 
 // A FACTORY over this plugin's own database, not a module-scope router reading getDb(c.env). The tables
 // live in <data-root>/plugins/github.sqlite now, and `c.env` deliberately carries no per-plugin handles
-// (docs/vNext/data.md § Plugin DBs). The handle arrives at plugin init, so no request can reach an
+// (docs/data-layer.md § Plugin DBs). The handle arrives at plugin init, so no request can reach an
 // unmigrated database — and a second startServiceRuntime in one process builds fresh routers over its own
 // handle instead of inheriting a closed one.
 export const prCreate = (db: PluginDatabase) => new Hono<AppEnv>()
-  // Branch names for the head/base pickers, newest-first. GitHub can't sort branches by date
-  // (RefOrderField.TAG_COMMIT_DATE only applies to refs/tags/ — on branches it falls back to
-  // alphabetical), so page through the branch refs with each tip's committedDate, sort here, and
-  // return the 100 most-recent. The client gets a small, relevant list to filter rather than every
-  // branch. ponytail: scans up to 30 pages (3000 branches) — raise the cap if a repo overflows it.
   .get('/:owner/:repo/branches', async (c) => {
     ownerId(c) // gate on auth; the credential itself comes from the stored integration
     const token = await githubToken(c)

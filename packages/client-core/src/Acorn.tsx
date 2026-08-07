@@ -1,4 +1,3 @@
-// ponytail: ASCII acorn as a <pre>. Swap the art string for an inline SVG if we want a richer mark.
 const ART = String.raw`
    ()
  .-''-.

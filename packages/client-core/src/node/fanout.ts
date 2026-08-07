@@ -3,14 +3,14 @@ import type { NodeRecord } from '@acorn/protocol/broker.ts'
 import { clientFor, nodes, nodeState, nodeStatus } from './fleet'
 import { freshnessOf, type Freshness } from './freshness'
 
-// The one fan-out primitive (docs/vNext/architecture.md § Fleet semantics: "Aggregate surfaces fan out
+// The one fan-out primitive (docs/architecture-overview.md § Fleet semantics: "Aggregate surfaces fan out
 // per-node requests with per-node timeouts and merge results. A slow or offline node yields a
 // partial-result banner, never a failed page.").
 //
 // It exists once so that Agent Center, the workspace picker, the attention inbox and the palette all get
 // the same three properties without each reimplementing them:
 //
-//   1. **A per-node deadline.** ui.md forbids infinite spinners; a node behind a dropped VPN answers
+//   1. **A per-node deadline.** docs/ui-design.md forbids infinite spinners; a node behind a dropped VPN answers
 //      nothing and its socket may not have been marked offline yet, so the timeout — not the connection
 //      state — is what bounds the page.
 //   2. **Cache as the fallback.** A node that times out still has whatever it last said in its own
@@ -28,10 +28,8 @@ import { freshnessOf, type Freshness } from './freshness'
 //
 // **Sharing a key with another reader means sharing the value's SHAPE.** `fetchQuery` writes through, which is
 // the feature — a fan-out over `tasksKey` warms the same cache the rail and the palette read — and it is also
-// the trap. Fleet home's first version fetched `(await readJson<Task[]>(...)).length` under `tasksKey`, so a
-// NUMBER landed where every other surface expects `Task[]`; the rail, the palette and the workspace-restore
-// effect all began throwing `.find is not a function`, an uncaught render error wedged Solid's flush queue,
-// and the visible symptom was a node badge that never updated. Two-node e2e caught it; nothing else could.
+// the trap. A fan-out must reuse a domain key only when the response has exactly that domain's value shape;
+// otherwise a private aggregate key prevents one reader from corrupting another reader's cache entry.
 //
 // So: reuse a domain key when the fetch returns exactly that domain value (fleet home now fetches the task
 // LIST and counts in the component), and use a private key otherwise (`['node-stat', id]`,
@@ -120,7 +118,7 @@ async function fetchOne<T>(
   } catch (error) {
     const cached = client.getQueryData<T>(queryKey)
     if (cached === undefined) return { unavailable: { nodeId: node.nodeId, label: node.label, reason: reasonOf(error) } }
-    // `isStale`, NOT `isError`. ui.md's `error` means "no data, offer a retry"; a row served from cache
+    // `isStale`, NOT `isError`. docs/ui-design.md's `error` means "no data, offer a retry"; a row served from cache
     // has data, and the honest label for it is `stale` — or `offline` when the connection state already
     // says the node is gone, which freshnessOf decides on its own. Passing `isError` here would paint an
     // error badge over a perfectly readable row.

@@ -5,15 +5,13 @@ import type { AppDatabase } from '../db'
 import { schema } from '../db'
 import { recordAudit, type AuditActor } from '../audit'
 
-// Device tokens: issue / authenticate / list / revoke (docs/vNext/protocol.md § Pairing).
+// Device tokens: issue / authenticate / list / revoke (docs/api-reference.md § Pairing).
 //
 // The raw token is returned exactly once, at pairing; only sha256(secret) is stored. A 256-bit
 // random secret makes offline hash guessing infeasible, so nothing reversible is layered on.
 //
-// Every paired device has full owner authority — disclosed at pairing, and the reason there are no
-// scopes here (docs/vNext/security.md § Threat model). This is a cut-down descendant of V1's
-// /api/v1 TokenService: scopes, per-token userId and expiry all went, because single-owner software
-// with revocable devices needs none of them.
+// Every paired device has full owner authority, disclosed at pairing. Device revocation is the
+// lifecycle control; there are no per-token scopes because this is single-owner software.
 
 // acorn_dt_<uuid>_<base64url(32 bytes)>. Anchored, so trailing garbage or whitespace is rejected
 // rather than trimmed into a valid-looking token.
@@ -43,7 +41,7 @@ export type DeviceService = {
   // unpaired this one?" is the question the trail exists to answer.
   revoke(id: string, actor?: AuditActor): Promise<boolean>
   // Fires after a successful revoke so live sockets for that device close immediately
-  // (docs/vNext/protocol.md § Pairing: "open sockets are closed").
+  // (docs/api-reference.md § Pairing: "open sockets are closed").
   onRevoked(listener: (deviceId: string) => void): () => void
   // Is this device still allowed? The 60s stream re-check reads this rather than re-authenticating,
   // because a long-lived socket holds no bearer to re-present.

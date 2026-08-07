@@ -3,7 +3,7 @@ import type { PairedDevice } from '@acorn/protocol/node.ts'
 import { nodeDevices, revokeNodeDevice } from '../node/fleetActions'
 import { formatLastSeen } from '../node/freshness'
 
-// Every client paired with one node, with a revoke per row (ui.md § New surfaces: "revoke this or other
+// Every client paired with one node, with a revoke per row (docs/ui-design.md § New surfaces: "revoke this or other
 // devices").
 //
 // Only the first half of that existed. `removeNode(nodeId, revoke)` deletes THIS client's device row, so a
@@ -27,7 +27,7 @@ export default function NodeDevices(props: { nodeId: string; onError: (message: 
     try {
       await revokeNodeDevice(props.nodeId, device.id)
       // Optimistic, then refetch: revoking closes that device's sockets immediately
-      // (docs/vNext/protocol.md § Pairing), so the row should go at once rather than after a round trip.
+      // (docs/api-reference.md § Pairing), so the row should go at once rather than after a round trip.
       mutate((current) => (current ?? []).filter((candidate) => candidate.id !== device.id))
       await refetch()
     } catch (failure) {

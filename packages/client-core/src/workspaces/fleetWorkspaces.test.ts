@@ -40,9 +40,9 @@ afterEach(() => {
 describe('selectFleetWorkspace', () => {
   it('switches the node BEFORE navigating', () => {
     // The order is the whole contract. Routes are `/:owner/:repo` with no node in them, and the shell
-    // derives the active workspace from that repo against the ACTIVE node's cache — so navigating first
-    // resolves the path against the old node, which either finds nothing or finds a different repo that
-    // happens to share the owner/name.
+    // derives the active workspace from that repo against the ACTIVE node's cache — navigating first
+    // would resolve the path against the wrong node, which either finds nothing or finds a different repo
+    // that happens to share the owner/name.
     const observed: { path: string; node: string | null }[] = []
     selectFleetWorkspace(
       entry('b', 'Node B', workspace('ws-1', 'Beta', [{ owner: 'acorn', name: 'widget' }])),

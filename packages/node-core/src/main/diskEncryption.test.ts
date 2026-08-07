@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
-// The FileVault probe (docs/vNext/security.md § On-disk). The subprocess is mocked because the answer on
+// The FileVault probe (docs/security.md § On-disk). The subprocess is mocked because the answer on
 // the machine running the suite is neither known nor interesting; what is under test is the mapping from
 // what `fdesetup isactive` says to the three-valued answer the client renders — and specifically that
 // every failure mode lands on `null` rather than `false`.

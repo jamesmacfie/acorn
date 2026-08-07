@@ -1,4 +1,4 @@
-// The process broker (docs/vNext/security.md § Execution boundaries): "All child processes go
+// The process broker (docs/security.md § Execution boundaries): "All child processes go
 // through the process broker: explicit cwd inside the task worktree (or a declared exception), env
 // allowlists (no ambient ACORN_* tokens), process-group kill, bounded output capture."
 //
@@ -142,10 +142,7 @@ export function runProcess(spec: ProcSpec): Promise<ProcResult> {
     //
     // Decoding each chunk with `chunk.toString()` corrupts any multi-byte character that straddles a
     // pipe chunk boundary — a 64 KiB read can split a 3-byte character in half and each half decodes to
-    // U+FFFD. Every call site this broker replaced used execFile, which sets stream.setEncoding('utf8')
-    // and therefore carries partial sequences across chunks via a StringDecoder; the first version of
-    // this function did not, and silently mangled `git show` file bodies and `git diff` patches over
-    // 64 KiB. Confirmed: 40 000 box-drawing characters came back with three replacement characters.
+    // U+FFFD. Preserve partial sequences across chunks with a StringDecoder before exposing text to callers.
     //
     // Accumulating Buffers also makes the cap exact. Slicing a decoded STRING to a byte length cut
     // mid-character, so the result could exceed maxOutputBytes and end in U+FFFD; slicing the byte
@@ -234,10 +231,6 @@ export async function runProcessOrThrow(spec: ProcSpec): Promise<ProcResult> {
   const result = await runProcess(spec)
   if (result.spawnError) throw new ProcessError(result, `${spec.file}: ${result.spawnError}`)
   if (result.timedOut) throw new ProcessError(result, `${spec.file} timed out after ${spec.timeoutMs ?? DEFAULT_TIMEOUT_MS}ms`)
-  // Truncation is a FAILURE for a caller that wanted the whole output. execFile used to raise ENOBUFS
-  // past maxBuffer, loudly; silently returning a truncated file body or patch is worse than either, and
-  // git.ts's own comment promises byte-exactness. A caller that only samples output uses runProcess()
-  // and reads `truncated` itself.
   if (result.truncated) {
     throw new ProcessError(result, `${spec.file} produced more than ${spec.maxOutputBytes ?? DEFAULT_MAX_OUTPUT_BYTES} bytes of output`)
   }

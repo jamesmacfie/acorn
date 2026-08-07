@@ -4,7 +4,7 @@ import { readAudit } from '../audit'
 import { getDb } from '../db'
 import type { AppEnv } from '../middleware/auth'
 
-// The owner-readable audit trail (docs/vNext/security.md § Audit: "Owner-readable in Settings").
+// The owner-readable audit trail (docs/security.md § Audit: "Owner-readable in Settings").
 //
 // Read-only, and there is deliberately no delete: an append-only table with a 90-day prune is the whole
 // design, and a route that could remove rows would make the trail worth less than the prune already

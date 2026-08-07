@@ -3,47 +3,6 @@ import { createServer, type Server, type Socket } from 'node:net'
 import { WebSocket } from 'ws'
 import { pinnedTlsOptions } from './nodeBroker'
 
-// The client end of the preview tunnel (docs/vNext/protocol.md § Streams: "The client end terminates in a
-// local loopback listener created by the connection broker, which is what a remote task's preview pane
-// points its WebContentsView at").
-//
-// One `net` listener per (node, task, port), on 127.0.0.1:0. Each accepted TCP connection opens its own
-// pinned WebSocket to the node's `/v2/tunnel` and pipes. That per-connection shape is what makes the
-// preview pane work at all: a browser opens many sockets to a dev server — assets, XHR, an HMR
-// WebSocket — and multiplexing them over one pipe would need a framing layer and head-of-line handling
-// that `net` and `ws` already provide for free.
-//
-// It lives in main, not the renderer, for the same reason every other node request does: the device token
-// and the pinned certificate are here, and the renderer has no network permission at all under its CSP.
-// The renderer only ever learns a loopback port number.
-//
-// ## The loopback hop carries a per-tunnel secret
-//
-// Phase 4 shipped this listener UNAUTHENTICATED and recorded it as the phase's largest accepted risk: a
-// raw TCP listener carries no credential, so any process on the machine that found the port could speak
-// to the node's declared dev port through it. security.md § Threat model puts "a compromised machine"
-// out of scope, but this was still a genuine widening — before the tunnel, reaching a remote node needed
-// the device token, which lives in main and the OS keychain.
-//
-// Phase 5 closes it. Each listener mints a 256-bit secret, and a connection must present it as a request
-// header before a single byte reaches the node. The header rather than a path prefix is what makes this
-// small: a secret in the PATH means rewriting every URL the dev server emits — absolute asset paths,
-// redirects, the HMR socket's own URL — which is the "real build" the handoff estimated. A header rides
-// along untouched, because `webRequest.onBeforeSendHeaders` on the pane's own session attaches it to
-// every request that view makes, subresources and WebSocket upgrades included, and a dev server ignores
-// a header it does not know.
-//
-// What that buys, precisely: a local process that guesses the port now gets its connection destroyed
-// instead of a pipe to another machine's dev server. What it does NOT buy is defence against a process
-// that can read this one's memory or drive the pane — still out of scope, still the same threat model.
-//
-// The three bounds from Phase 4 all remain, because none of them was made redundant:
-//
-//   - **Only declared ports.** The node refuses anything the owner has not configured as that task's
-//     preview or run URL (node-core's main/tunnelPorts.ts).
-//   - **Only while the pane is open.** The pane closes its tunnels on unmount, and a listener with no
-//     connections is reaped after IDLE_MS, so the surface is not ambient.
-//   - **A bounded number.** MAX_TUNNELS caps what a compromised renderer can ask for.
 export type TunnelKey = { nodeId: string; taskId: string; port: number }
 
 export type TunnelNode = {
@@ -104,10 +63,6 @@ function headCarriesSecret(head: string, secret: string): boolean {
 }
 
 const key = ({ nodeId, taskId, port }: TunnelKey): string =>
-  // Encoded, so a taskId containing the delimiter cannot forge or evade a key. The IPC schema validates
-  // `taskId` only as a non-empty string, and `closeFor` recovers the parts by splitting — so `real|evil`
-  // used to produce a key that a close for `real` matched and a close for `real|evil` never did, leaking an
-  // unauthenticated listener.
   `${encodeURIComponent(nodeId)}|${encodeURIComponent(taskId)}|${port}`
 
 const partsOf = (id: string): { nodeId: string; taskId: string } => {
@@ -158,9 +113,8 @@ export class PreviewTunnels {
         sockets.delete(socket)
         this.armIdle(id)
       })
-      // Resolved PER CONNECTION, not once in `open`. The first version closed over the node record, so after
-      // a node restart (Settings → Plugins' Restart button, or crash recovery) every later connection dialled
-      // the old ephemeral port with the old token — and bootstrap.ts claimed the opposite in a comment.
+      // Resolve the current node record for every connection so restarts and re-pairing use the active
+      // endpoint, token, and certificate.
       const node = this.resolve(target.nodeId)
       if (!node?.certPem || !node.fingerprint) {
         // No pin, no tunnel. Every other path to a node goes through the broker's pinned agent, and a raw
@@ -296,10 +250,8 @@ export class PreviewTunnels {
     // PAUSED until the upgrade completes, rather than buffering.
     //
     // The socket is accepted the moment Chromium connects, which is before the WebSocket handshake has
-    // finished, so the first bytes of the HTTP request would otherwise be dropped. The first version queued
-    // them in an unbounded array — a local process could stream into main's heap without limit while the ws
-    // never opened. Pausing pushes the backpressure onto the kernel, which is where it belongs, and deletes
-    // the buffer instead of capping it.
+    // finished, so the first bytes of the HTTP request would otherwise be dropped. Pausing pushes
+    // backpressure onto the kernel and avoids unbounded buffering while the WebSocket opens.
     //
     // `head` is the ONE exception, and it is bounded by MAX_HEAD_BYTES rather than unbounded: those bytes
     // were consumed by the credential check above, so they no longer exist as far as the socket is

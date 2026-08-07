@@ -42,14 +42,6 @@ import type { LinearIssueDetail, LinearIssuesRequest, LinearIssuesResponse, Line
 const PROVIDER = 'linear'
 const ISSUES_TTL_MS = linearProvider.resources.find((resource) => resource.id === 'linear.issues')!.ttlMs
 
-// Every connected Linear integration for the user (0..n). A bare identifier is resolved by trying
-// these in turn (see resolveIssues). ponytail: first-hit-wins — if two Linears both own an
-// identifier, the first row queried shadows the other. Accepted ceiling until colliding prefixes
-// across connected workspaces is a real case (then route by team prefix).
-//
-// The owner comes from the request, not from a threaded `userId` argument: core reads it off the
-// principal inside the wrapper, so every handler below stopped needing to fetch and pass it, and the
-// plugin stopped needing core's database handle to get at the `integrations` rows in the first place.
 const linearConnections = (c: Context<AppEnv>) =>
   withOwnedConnections(c, PROVIDER, async (row, key) => ({ row, key }))
 

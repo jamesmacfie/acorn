@@ -6,7 +6,7 @@ import { createNodeBackup, nodeAuditPage, nodeSecurityPosture, suggestedBackupPa
 import { Button, Input, Select } from '../ui/primitives'
 import './settings.css'
 
-// Settings → Security (docs/vNext/security.md § Audit: "Owner-readable in Settings"; § On-disk: "the app
+// Settings → Security (docs/security.md § Audit: "Owner-readable in Settings"; § On-disk: "the app
 // warns once if the disk isn't encrypted").
 //
 // Per NODE, with the same picker as Settings → Plugins and for the same reason: both answers are facts

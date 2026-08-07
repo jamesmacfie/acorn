@@ -6,7 +6,7 @@ import { shouldWarnAboutDisk } from './nodeSecurity'
 // Extracted for a test because it is a THREE-valued input to a boolean, and both ways of getting it wrong
 // are bad in ways nobody notices: warn on `null` and every Linux node nags forever about a perfectly well
 // encrypted LUKS volume; treat `null` as encrypted and… that is right, which is the asymmetry that makes
-// the wrong version look reasonable while you write it (docs/vNext/data.md § Backup).
+// the wrong version look reasonable while you write it (docs/data-layer.md § Backup).
 
 const posture = (diskEncrypted: boolean | null) => ({ diskEncrypted, platform: 'darwin' })
 

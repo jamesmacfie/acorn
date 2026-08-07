@@ -17,9 +17,6 @@ import { respondError } from '@acorn/node-core/server/respond.ts'
 // number is validated as an integer separately.
 const isValidRef = (ref: string): boolean => !ref.startsWith('-') && /^[A-Za-z0-9._/-]+$/.test(ref)
 
-// `git merge-tree --write-tree --name-only <base> <head>` prints the merged tree oid on line 0, then
-// one conflicting path per line until a blank line (informational messages follow). ponytail: plain
-// text parse, not `-z` — a path with an embedded newline is a non-case for real branch content.
 export function parseConflictNames(stdout: string): string[] {
   const lines = stdout.split('\n')
   const files: string[] = []

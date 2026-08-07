@@ -34,8 +34,8 @@ export type Notice = {
   //
   // A nodeId rather than clearing the ring on a switch. Notices are persisted and rehydrated once at
   // boot, so clearing would empty the bell permanently after the first node switch; filtering keeps both
-  // nodes' history and is what ui.md § Prompts and notifications asks for ("grouped per node").
-  // `undefined` for a notice restored from a pre-Phase-4 blob, which reads as "belongs to the home node".
+  // nodes' history and is what docs/ui-design.md § Prompts and notifications asks for ("grouped per node").
+  // `undefined` means the notice belongs to the home node.
   nodeId?: string
 }
 
@@ -72,16 +72,12 @@ export function openTarget(taskId: string, target: NoticeTarget): void {
 }
 
 export function pushNotice(n: Omit<Notice, 'id' | 'read'>): Notice {
-  // The stamp goes AFTER the spread, with the caller's value preferred only when it is actually set.
-  // `Omit<Notice,'id'|'read'>` still includes an optional `nodeId`, so a caller passing `nodeId: undefined`
-  // used to clear the stamp — and an unstamped notice reads as the home node's, i.e. someone else's.
   const notice: Notice = { ...n, nodeId: n.nodeId ?? activeNodeId() ?? undefined, id: noticeId(n.at), read: false }
   setNotices((prev) => capNotices([notice, ...prev]))
   return notice
 }
 
-// Notices for the node the client is looking at. A notice with no nodeId is a pre-Phase-4 restored entry
-// and belongs to the home node, which is where the prefs blob it came from lives.
+// Notices for the node the client is looking at. A notice with no nodeId belongs to the home node.
 export const noticesForActiveNode = (): Notice[] => {
   const active = activeNodeId()
   if (!active) return notices()
@@ -109,7 +105,7 @@ export function markAllRead(): void {
 // Viewing a task acknowledges its notices — the ACTIVE node's, matching `unreadForTask` and `markAllRead`.
 // Without the filter this marked another node's notice about a task with the same id read, so the badge on
 // that node silently lost the only signal that it existed. Two nodes holding one task UUID is the case
-// architecture.md § Fleet semantics says must never collide.
+// docs/architecture-overview.md § Fleet semantics says must never collide.
 export function markTaskRead(taskId: string): void {
   const visible = new Set(noticesForActiveNode().filter((n) => n.taskId === taskId).map((n) => n.id))
   setNotices((prev) =>

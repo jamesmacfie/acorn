@@ -23,9 +23,8 @@ export const isDarkColor = (hex: string): boolean => {
  * Is the effective theme dark? Every theme declares this about itself via --is-dark
  * (styles/tokens-theme.css), so there is no hardcoded list of dark theme names to keep in sync.
  *
- * The luma fallback is what this used to do unconditionally, and it constrained the whole token
- * system: it requires --bg to be a literal 6-digit hex, so a theme written with color-mix(),
- * oklch(), rgb() or #fff parsed to NaN and silently classified as light in xterm and Monaco.
+ * The luma fallback supports older or incomplete themes, but the explicit --is-dark token is the
+ * authoritative value for shipped themes and supports modern CSS color functions.
  */
 export const isAppDark = (): boolean => {
   const flag = token('--is-dark')

@@ -1,5 +1,5 @@
 // The changes plugin's agent tools: read-only git over the task worktree, as the `tools` contribution
-// point (docs/vNext/plugins.md § Agent tools and MCP).
+// point (docs/plugins.md § Agent tools and MCP).
 //
 // These three were defined in apps/node/src/wiring/agentToolsWiring.ts, which had to import this
 // plugin's localDiff module to do it — an app reaching into a plugin's internals to declare a

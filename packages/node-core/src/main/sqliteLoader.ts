@@ -3,8 +3,8 @@
 // surfaces as an actionable error naming the right rebuild script, instead of a bare
 // NODE_MODULE_VERSION stack at import time.
 //
-// Split out of main/bindings.ts so main/pluginStorage.ts can share it without importing the whole
-// bindings module (which pulls in the schema, the device service and the TLS cert).
+// Kept independent of main/bindings.ts so plugin storage can load the native driver without importing
+// the schema, device service, or TLS certificate bindings.
 import { createRequire } from 'node:module'
 
 const nodeRequire = createRequire(import.meta.url)

@@ -85,9 +85,9 @@ export type TerminalProfile = {
 }
 
 // Local checkout mapping + repo-level config (docs/workspaces-and-tasks.md). Returned by repoPath.get / set.
-// The config fields below are the machine-local DB fallback beneath a committed .acorn/config.toml
-// (loadRepoConfig precedence). They moved off the workspace (repo-level-settings): a workspace groups
-// repos, but this describes how to build/run/inspect ONE repo.
+// The fields below are the machine-local DB fallback beneath a committed .acorn/config.toml
+// (loadRepoConfig precedence). A workspace groups repositories; this describes how to build, run, and
+// inspect one repository.
 export type RepoPath = {
   owner: string
   repo: string
@@ -109,7 +109,7 @@ export type RepoPath = {
 }
 
 // Partial repo-config update sent to repoPath.config. Any omitted field is left unchanged; a field
-// set to '' (or [] for browserRules) clears server-side. Mirrors the old per-workspace PATCH body.
+// set to '' (or [] for browserRules) clears the server-side value.
 export type RepoConfigPatch = {
   setupScript?: string
   setupScriptTrigger?: SetupTrigger
@@ -156,7 +156,7 @@ export type LocalChange = {
 }
 
 // Pushed from main to a subscribed renderer inside a `term:out` WebSocket frame (shared/ws.ts;
-// wsHub → wsClient). Was per-session IPC (`term:out:<id>`) before the WebSocket transport.
+// wsHub → wsClient).
 export type ServerMsg =
   | { type: 'ready'; session: TerminalSession; replayed: boolean } // replayed = a canonical display snapshot follows
   | { type: 'output'; data: string }

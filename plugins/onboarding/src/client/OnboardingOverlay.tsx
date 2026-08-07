@@ -1,12 +1,3 @@
-// The first-run gate, moved out of the shell (docs/vNext/plan.md § Phase 3, item 1).
-//
-// App.tsx used to own all of this: a lazy reference to this plugin's modal, an
-// `onboardingDismissed` signal, and a five-clause `<Show when={…}>` reading two of its own queries. That
-// made the shell responsible for knowing WHEN this plugin's modal should appear — which is why onboarding
-// had no ClientPlugin at all: it had client code and nothing registrable.
-//
-// The gate lives here now because every input is client-core's, not the shell's: `nodeReady`, the prefs
-// query and the workspaces query. The shell contributed nothing to the decision except the place to put it.
 import { createSignal, lazy, Show } from 'solid-js'
 import { createQuery } from '@tanstack/solid-query'
 import { nodeReady } from '@acorn/client-core/node/activeNode.ts'

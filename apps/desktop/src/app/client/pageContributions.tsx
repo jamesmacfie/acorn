@@ -1,10 +1,6 @@
 import { lazy } from 'solid-js'
 import type { SettingsContribution } from '@acorn/client-core/registries/settings.ts'
 
-// CORE's settings pages, and only core's. The five plugin-owned pages that used to sit in this list —
-// agent-pricing (45), workflows (50), terminal (60), docker (65) and API requests (66) — are declared by
-// the plugins that own them, in their client/index.ts. The order numbers are unchanged, and the registry
-// sorts on them, so the visible page order is identical with the list split in two.
 const WorkspaceRepoAssignments = lazy(() => import('@acorn/client-core/workspaces/WorkspaceRepoAssignments.tsx'))
 const IntegrationsSettings = lazy(() => import('@acorn/client-core/settings/IntegrationsSettings.tsx'))
 const WorkspaceSettings = lazy(() => import('@acorn/client-core/settings/WorkspaceSettings.tsx'))

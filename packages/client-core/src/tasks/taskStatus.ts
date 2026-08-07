@@ -1,8 +1,3 @@
-// Live worktree status per task (docs/workspaces-and-tasks.md/05): dirty + changed-file count, and
-// `missing` (worktree removed outside acorn → needs repair). The rail markers and the task
-// footer read this. Signals-only, like ../terminal/sessions.ts. Polled on a short interval (git
-// file changes don't ping onStatus) plus on onStatus edges. ponytail: 5s poll over a few worktrees
-// is cheap; tighten to a watcher only if it ever matters.
 import { createSignal } from 'solid-js'
 import { taskBridge } from './taskBridge'
 import { wsOnStatus } from '../wsClient'

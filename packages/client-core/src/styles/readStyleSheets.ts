@@ -13,9 +13,8 @@ export type StyleSheetFile = { path: string; name: string; text: string }
 export const stripComments = (text: string): string => text.replace(/\/\*[\s\S]*?\*\//g, '')
 
 /**
- * Nearest ancestor holding pnpm-workspace.yaml. Was a fixed `../..` hop to the old single-package
- * src root; that broke the moment the renderer became its own package, and it would break again on
- * every subsequent move. Anchor on the one file that marks the repo root instead.
+ * Nearest ancestor holding pnpm-workspace.yaml. Anchor on the one file that marks the repository root so
+ * the helper works from every package.
  */
 function workspaceRoot(): string {
   let dir = fileURLToPath(new URL('.', import.meta.url))

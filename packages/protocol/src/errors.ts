@@ -1,6 +1,6 @@
 import { z } from 'zod'
 
-// The one error envelope every route returns (docs/vNext/protocol.md § Errors):
+// The one error envelope every route returns (docs/api-reference.md § Errors):
 //
 //   { "error": { "code", "message", "requestId", "retryable", "details"? } }
 //
@@ -10,12 +10,12 @@ import { z } from 'zod'
 // Transport-level codes: the floor every consumer can rely on, used verbatim for failures that have
 // no domain meaning.
 //
-// protocol.md calls this "a small closed set". It is the closed *floor*, not an exclusive whitelist,
+// docs/api-reference.md calls this "a small closed set". It is the closed *floor*, not an exclusive whitelist,
 // and the deviation is deliberate: 37 domain codes are already load-bearing on the client — a
 // `needs-trust` opens the config-trust modal, `provider_needs_auth` rewrites the message — so
 // collapsing them all into ten would delete real behaviour. A closed set buys interop discipline
 // across an API boundary, and there isn't one here: client and Node ship from the same repo and are
-// released together (protocol.md § Versioning). So a route may return its own documented code, and
+// released together (docs/api-reference.md § Versioning). So a route may return its own documented code, and
 // anything without one falls back to these.
 export const ERROR_CODES = [
   'bad_request',

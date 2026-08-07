@@ -4,7 +4,7 @@ import { clientFor, refreshFleet, _resetFleet } from './fleet'
 import { fetchFleet } from './fanout'
 
 // The fan-out is what makes "a slow or offline node yields a partial-result banner, never a failed page"
-// (architecture.md § Fleet semantics) true once instead of four times. These cases are the three
+// (docs/architecture-overview.md § Fleet semantics) true once instead of four times. These cases are the three
 // properties it exists to provide.
 
 const record = (nodeId: string, label: string, local = false): NodeRecord => ({
@@ -70,7 +70,7 @@ describe('fetchFleet', () => {
 
   it('bounds a hanging node by the deadline rather than the connection state', async () => {
     // Node B's socket still reads `online` — a dropped VPN takes a while to surface — so the timeout is
-    // the only thing that stops the page spinning forever. ui.md: "No infinite spinners."
+    // the only thing that stops the page spinning forever. docs/ui-design.md: "No infinite spinners."
     vi.useFakeTimers()
     try {
       const pending = fetchFleet(

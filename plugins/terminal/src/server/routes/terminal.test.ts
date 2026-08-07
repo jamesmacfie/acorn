@@ -5,13 +5,6 @@ import { requireUser } from '@acorn/node-core/server/middleware/requireUser.ts'
 import { setTerminalBridge, terminal, type TerminalBridge } from './terminal'
 import type { Env } from '@acorn/node-core/main/bindings.ts'
 
-// Transport contract for terminal control: routing, auth, body validation, and clean
-// bridge-unavailable degradation. PTY behavior is covered by main tests; streaming is covered at the
-// WebSocket boundary.
-//
-// The worktree/repo-path/task-lifecycle half of this router moved to core in Phase 2's scope-shed —
-// its transport contract now lives in packages/node-core/src/server/routes/worktree.test.ts.
-
 const req = (url: string, method = 'GET', body?: unknown) =>
   new Request(`http://acorn.test${url}`, {
     method,
@@ -61,7 +54,7 @@ describe('terminal control routes', () => {
     }))
     const app = authed()
     // De-doubled paths: /sessions, not /terminal/sessions. Under the plugin namespace this is
-    // /v2/p/terminal/sessions, which is what docs/vNext/protocol.md § HTTP conventions specifies.
+    // /v2/p/terminal/sessions, which is what docs/api-reference.md § HTTP conventions specifies.
     expect((await app.fetch(req('/api/sessions'), {} as Env)).status).toBe(200)
     await app.fetch(req('/api/sessions', 'POST', { taskId: 'task1', profileId: 'shell' }), {} as Env)
     await app.fetch(req('/api/sessions/s1/resize', 'POST', { cols: 100, rows: 40 }), {} as Env)
@@ -100,10 +93,6 @@ describe('terminal control routes', () => {
   })
 })
 
-// A PTY is arbitrary command execution as the owner. main/wsHub.ts refuses a task-scoped socket that
-// addresses another task's stream; until Phase 3 this router — one directory away — refused nothing, so
-// POST /sessions/<any sid>/send typed a shell command into any task's terminal. requireTaskScope cannot
-// be mounted over these paths because the session id is opaque, so the checks live in the router.
 describe('a task-scoped credential is confined to its own task PTYs', () => {
   afterEach(() => setTerminalBridge(null))
 

@@ -25,23 +25,6 @@ const workspacePackages = Object.keys(
   }).devDependencies ?? {},
 ).filter(isWorkspacePackage)
 
-// Three targets (docs/electron.md §4i). externalizeDepsPlugin keeps node_modules (notably the
-// native better-sqlite3) external — required at runtime, never bundled. Using rollupOptions.input
-// (not lib mode) is what lets that externalization take effect. The renderer is the existing
-// SolidJS SPA, built to dist/client and served by Electron main's app:// protocol handler
-// (main/appScheme.ts) — no node serves web assets.
-// Every Drizzle chain in the workspace, staged where the bundled service can find it.
-//
-// Core's chain goes to out/migrations (main/bindings.ts walks ancestors from its own location); each
-// plugin's goes to out/migrations/<plugin>, which is where main/pluginMigrations.ts looks first via
-// process.resourcesPath. Phase 2 split one 45-table database into core plus one file per plugin
-// (docs/vNext/data.md § Plugin DBs), so staging only core's chain would ship a packaged app whose
-// plugin databases are never migrated — and, because a chain with no journal applies nothing, it would
-// fail at the first query rather than at boot.
-//
-// Discovered from the filesystem, exactly like scripts/db.mjs, so adding a plugin DB needs no edit
-// here. A plugin with a drizzle.config.ts but no generated chain yet is skipped rather than staged
-// empty.
 const chainDirs = () => {
   const out: { plugin: string | null; dir: string }[] = []
   const coreChain = resolve(__dirname, '../../packages/node-core/migrations')
@@ -69,7 +52,7 @@ const stageMigrations = () => ({
 })
 
 // service.js, mcp.js and standalone.js are built by @acorn/node, not here: apps/desktop must never
-// import apps/node source (docs/vNext/architecture.md, enforced by tools/arch/boundaries.test.ts), so
+// import apps/node source (docs/architecture-overview.md, enforced by tools/arch/boundaries.test.ts), so
 // it embeds the built artifacts instead. Copy them next to index.js, which is where main/bootstrap.ts
 // spawns service.js from (`join(import.meta.dirname, 'service.js')`) and where mcpRegister points
 // agents.

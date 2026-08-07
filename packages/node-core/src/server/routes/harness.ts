@@ -2,14 +2,6 @@ import { Hono, type Context } from 'hono'
 import type { AppEnv } from '../middleware/auth'
 import { respondError } from '../respond'
 
-// Run-target routes (docs/workflows.md §2): the RENDERER's run surface — the run pane and preview home
-// call these (packages/client-core/src/tasks/runClient.ts). The agent-facing run_* verbs are the same
-// runtime, projected instead through the agent-tool registry (main/agentToolsWiring.ts); notes,
-// memory and the drivable browser moved there wholesale in the agent-tool registry. What's left here is one bridge:
-// the run service, filled by the terminal plugin's init (plugins/terminal/src/node/index.ts) — a run
-// target IS a terminal session in the task worktree, so the plugin that owns the PTYs owns this bridge
-// too. It used to be an app-layer wireRunBridge call. An unfilled slot degrades to a clean 503.
-
 export type RunBridge = {
   targets(taskId: string): Promise<unknown>
   start(taskId: string, targetId: string): Promise<unknown>

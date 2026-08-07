@@ -11,23 +11,10 @@ import { loadDatabase } from './sqliteLoader'
 import { schema } from '../server/db'
 import type { AppDatabase } from '../server/db'
 
-// The config-only V1 importer (docs/vNext/plan.md § Phase 5).
-//
-// Against a synthetic V1 root built from V1's real DDL, because the scope is defined by what is left
-// BEHIND as much as by what comes across — so the fixture has to contain the excluded tables for their
-// absence downstream to mean anything. A fixture with only the four importable tables would pass every
-// exclusion assertion vacuously.
-//
-// The exit criterion in plan.md is "importer tested against a copy of a real V1 data root". That is the
-// last case in this file, gated on ACORN_V1_ROOT and skipped in CI — pointed at a COPY, never the
-// original, which is the same rule the importer itself follows.
-
 let v1Root: string
 let vnextRoot: string
 let db: AppDatabase
 
-// V1's shapes, verbatim from its schema. Only the columns the importer reads plus enough of the
-// excluded tables to prove they stay put.
 const V1_DDL = [
   'CREATE TABLE workspaces (id TEXT PRIMARY KEY NOT NULL, name TEXT NOT NULL, is_default INTEGER DEFAULT 0 NOT NULL, sort INTEGER DEFAULT 0 NOT NULL, created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL, icon TEXT, color TEXT)',
   'CREATE TABLE workspace_repos (workspace_id TEXT NOT NULL, repo_owner TEXT NOT NULL, repo_name TEXT NOT NULL, sort INTEGER DEFAULT 0 NOT NULL, created_at INTEGER NOT NULL, PRIMARY KEY (repo_owner, repo_name))',
@@ -135,8 +122,6 @@ describe('importV1Config', () => {
 
     const report = await importV1Config(db, v1Root)
 
-    // 'Default' is not created again — V1's default maps onto the local one, because two rows claiming
-    // to be the default is a state nothing in the app knows how to render.
     const workspaces = await db.select().from(schema.workspaces)
     expect(workspaces.map((row) => row.name).sort()).toEqual(['Default', 'Runn'])
     expect(workspaces.filter((row) => row.isDefault)).toHaveLength(1)
@@ -146,7 +131,6 @@ describe('importV1Config', () => {
     expect(runn.color).toBe('green')
     expect(runn.sort).toBe(1)
 
-    // The grouping: the repo V1 had in 'Runn' has MOVED out of the bootstrap's Default.
     expect(await membership()).toEqual({ 'runn/runn': runn.id, 'acme/tools': 'local-default' })
     expect(report.reposRegrouped).toBe(1)
 
@@ -166,13 +150,9 @@ describe('importV1Config', () => {
     await seedBootstrap([])
     await importV1Config(db, v1Root)
 
-    // plugin-inventory.md:258: "Never tokens, tasks, notes, memories, terminals, or preferences."
     expect(await db.select().from(schema.prefs)).toEqual([])
     expect(await db.select().from(schema.integrations)).toEqual([])
     expect(await db.select().from(schema.tasks)).toEqual([])
-    // config_acks specifically: security.md:68's "imported V1 config arrives untrusted" IS this absence.
-    // The trust gate hashes repo-authored files, so dropping the acknowledgements is what makes every
-    // committed .acorn/config.toml get reviewed again on this node.
     expect(await db.select().from(schema.configAcks)).toEqual([])
     // Every row names an integrationId we refuse to import, so these would be dangling references.
     expect(await db.select().from(schema.workspaceProjects)).toEqual([])
@@ -207,8 +187,6 @@ describe('importV1Config', () => {
 
     await importV1Config(db, v1Root)
 
-    // V1 had acme/tools in its Default. The import regroups what the BOOTSTRAP grouped and never
-    // overrides a decision made on this node — which is the difference between seeding and clobbering.
     expect((await membership())['acme/tools']).toBe('mine')
   })
 
@@ -219,9 +197,6 @@ describe('importV1Config', () => {
     await importV1Config(db, v1Root)
     probeV1Root(v1Root)
 
-    // plan.md:172, "V1 files byte-identical after import — verified by hashing in tests". This covers
-    // the -wal and -shm sidecars too, which is the point: a readonly open of a WAL database can still
-    // create a -shm, which is why the importer reads a COPY rather than the original.
     expect(fingerprintDir(v1Root)).toEqual(before)
   })
 })
@@ -238,9 +213,6 @@ function fingerprintDir(dir: string, prefix = ''): Record<string, string> {
   return out
 }
 
-// plan.md's exit criterion, opt-in. Point ACORN_V1_ROOT at a COPY of a real V1 data root and run the
-// suite; it is skipped everywhere else, because a test that depends on one machine's files is a test
-// that fails for everyone else.
 const realRoot = process.env.ACORN_V1_ROOT
 describe.skipIf(!realRoot)('against a copy of a real V1 data root', () => {
   it('imports it, twice, without touching it', async () => {

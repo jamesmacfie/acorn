@@ -1,4 +1,4 @@
-// The changes plugin's own tables (docs/vNext/data.md § Plugin DBs). Lives in
+// The changes plugin's own tables (docs/data-layer.md § Plugin DBs). Lives in
 // <data-root>/plugins/changes.sqlite with its own Drizzle chain, migrated at plugin init.
 //
 // Moved out of @acorn/node-core's schema.ts: review notes are this plugin's data, and core has no

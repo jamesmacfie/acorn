@@ -1,4 +1,4 @@
-// The memory plugin's own tables (docs/vNext/data.md § Plugin DBs). Lives in
+// The memory plugin's own tables (docs/data-layer.md § Plugin DBs). Lives in
 // <data-root>/plugins/memory.sqlite with its own Drizzle chain, migrated at plugin init.
 //
 // Moved out of @acorn/node-core's schema.ts: the memory index is this plugin's data, and core has no

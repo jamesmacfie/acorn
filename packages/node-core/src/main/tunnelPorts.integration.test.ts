@@ -5,7 +5,7 @@ import { makeTestDb, type TestDb } from '../server/routes/testDb'
 import { setRunBridge, type RunBridge } from '../server/routes/harness'
 import { declaredTunnelPorts } from './tunnelPorts'
 
-// The tunnel's allowlist IS the confinement ("Only declared ports; no general SOCKS" — protocol.md
+// The tunnel's allowlist IS the confinement ("Only declared ports; no general SOCKS" — docs/api-reference.md
 // § Streams), and `tunnel.test.ts` stubs it. So the resolver gets its own suite against a real database:
 // everything below is a decision about which ports on the node's loopback a client may reach.
 
@@ -70,7 +70,7 @@ describe('declaredTunnelPorts', () => {
 
   it('declares NOTHING for a previewMode:url pointing at a real host', async () => {
     // Already reachable from the client, so there is nothing to tunnel — and opening a port to it would be
-    // the general proxy protocol.md rules out.
+    // the general proxy docs/api-reference.md rules out.
     const taskId = await seedTask()
     await setRepoConfig({ previewMode: 'url', previewValue: 'https://staging.example.com:8443' })
     expect(await declaredTunnelPorts(db.db)(taskId)).toEqual([])
@@ -88,9 +88,7 @@ describe('declaredTunnelPorts', () => {
   })
 
   it('declares EVERY run target\'s fixed url, not just the default one\'s', async () => {
-    // The first version called `defaultUrl` alone, so a task with an app on 3000 and a Storybook on 6006
-    // could only tunnel to whichever was marked default — and a layout recipe's `browser` url points at any
-    // of them, which is the FIRST branch of the preview pane's resolution.
+    // Every fixed run-target URL is eligible because a layout recipe's browser URL can point to any target.
     const taskId = await seedTask()
     setRunBridge(bridge({ targets: [
       { id: 'app', url: 'http://localhost:3000', default: true },

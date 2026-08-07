@@ -30,13 +30,6 @@ import Icon from '../ui/Icon'
 import IconPicker from '../ui/IconPicker'
 import './tabrail.css'
 
-// The Tasks zone of the left rail (docs/workspaces-and-tasks.md). Rows are real Task entities (not path
-// bookmarks). Clicking a row makes it active and navigates to its repo/PR; clicking the active row
-// opens a popover to rename or archive it. ponytail: create/rename use a small modal reusing the
-// shared .overlay shell. (Electron's BrowserWindow has no window.prompt, so we can't shortcut.)
-
-// Origin → icon name; cosmetic, and only the default — a task's own `icon` wins (see the row below).
-// A source's glyph may still be a Unicode brand mark (Lucide has none); ui/Icon.tsx renders those as-is.
 const originIcon = (origin: string) =>
   ({ 'github-pr': 'git-pull-request', local: 'circle-dot' })[origin] ?? sourceRegistry.get(origin)?.glyph ?? 'circle-dot'
 
@@ -72,7 +65,8 @@ export default function TabRail() {
   const [newRepo, setNewRepo] = createSignal('') // "owner/name" for the new-task repo selector
   // Repo options are snapshotted when the modal opens, not bound to the reactive activeWorkspace().
   // Otherwise a workspace switch mid-modal (App.tsx restore-nav / workspaces refetch) repopulates the
-  // <select> while newRepo() stays on the old repo → the task is created in the wrong workspace.
+  // <select> while newRepo() stays on the previously selected repo → the task is created in the wrong
+  // workspace.
   const [newRepoOptions, setNewRepoOptions] = createSignal<{ owner: string; name: string }[]>([])
   // Custom branch name (docs/terminal-and-agents.md): defaults to a de-duped slug of the title until the user
   // edits the branch field directly, then their value wins.
@@ -290,8 +284,6 @@ export default function TabRail() {
       <div class="tabrail-list">
         <For each={visibleTasks()}>
           {(w) => {
-            // PR checks dot reads an already-warmed detail only. Enabling this observer used to turn
-            // every visible linked task into a full composite PR refresh during startup/refocus.
             const detail = createQuery(() => pullDetailOptions(
               w.repoOwner,
               w.repoName,

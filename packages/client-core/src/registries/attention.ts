@@ -1,7 +1,7 @@
 import { Registry } from './registry'
 
-// The attention inbox's contribution point (docs/vNext/plugins.md § The plugin API names it `attention`;
-// ui.md § Prompts and notifications defines it: "durable items needing action (agent approvals/questions,
+// The attention inbox's contribution point (docs/plugins.md § The plugin API names it `attention`;
+// docs/ui-design.md § Prompts and notifications defines it: "durable items needing action (agent approvals/questions,
 // setup incomplete, failures), sourced from node queries + events, resolved by node commands; dismissal
 // of informational items is client-local").
 //

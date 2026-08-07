@@ -1,7 +1,5 @@
-// Task → checkout/worktree resolution shared by every privileged main-process surface (sessions,
-// local-git, run, workflow, knowledge). Split out of terminal.ts (docs/terminal-and-agents.md):
-// the taskId — never a renderer-supplied absolute path — is the capability; everything here
-// re-derives paths from the DB per call.
+// Task → checkout/worktree resolution shared by every privileged main-process surface. The task ID —
+// never a renderer-supplied absolute path — is the capability; paths are re-derived from the DB per call.
 import { statSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { isAbsolute, resolve } from 'node:path'
@@ -127,14 +125,6 @@ export const setOnWorktreeCreated = (fn: ((t: TaskRow, cwd: string) => Promise<v
   onWorktreeCreated = fn
 }
 
-// Lazy worktree on first use (Flow C, docs/workspaces-and-tasks.md). Reuse the task's worktree if
-// it's set and still on disk; otherwise create one from the base checkout, keyed by branch, and
-// persist worktreePath on the task. Returns the cwd + whether it's an isolated worktree. On
-// any failure (no checkout mapped, git error) it degrades to the base checkout so the terminal
-// still opens — the task just doesn't gain isolation until the next try.
-// ponytail: graceful fallback over a hard error; the dirty/teardown guards still key off worktreePath.
-// Concurrent callers for the same task (a pane poll + a terminal opening in the same second) share
-// one in-flight creation, so `git worktree add` never races itself and the created-hook fires once.
 const inflightCreates = new Map<string, Promise<{ cwd: string; isWorktree: boolean; created: boolean }>>()
 export async function resolveTaskCwd(
   db: AppDatabase,
@@ -185,14 +175,11 @@ export async function taskRoot(db: AppDatabase, taskId: string, userId: string |
   return resolve(cwd)
 }
 
-// Path confinement now lives in main/core/fs.ts — CoreServices.fs (docs/vNext/plan.md § Phase 2).
-// Re-exported so the ~10 existing importers keep working; there is one implementation, not two.
 export { resolveInRoot } from './core/fs'
 
-// The setup script + when-to-run configured for this repo (docs/workspaces-and-tasks.md P5; repo-level-settings
-// moved these off the workspace). trigger: 'off' never runs, 'created' pre-creates the worktree at
-// task creation, 'terminal' (the default; null coalesces to it) leaves creation lazy. The script
-// runs once, whenever the worktree is first created — via onWorktreeCreated (maybeRunSetup, terminal.ts).
+// The setup script and trigger configured for this repository. 'off' never runs, 'created' pre-creates
+// the worktree at task creation, and 'terminal' leaves creation lazy. The script runs once when the
+// worktree is first created through the onWorktreeCreated hook.
 export type SetupTrigger = 'off' | 'created' | 'terminal'
 export async function repoSetup(db: AppDatabase, owner: string, repo: string): Promise<{ script: string | null; trigger: SetupTrigger }> {
   const rp = await getRepoPath(db, owner, repo)

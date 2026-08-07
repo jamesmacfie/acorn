@@ -1,20 +1,6 @@
 import { trackBackgroundRefresh } from '../background'
 import { RATE_LIMIT_BACKOFF_MS } from './policy'
 
-// The single serve-then-revalidate engine (docs/caching.md). Every mirrored-read
-// route used to hand-roll the same four-branch cache flow (fresh / stale / cold / not-modified)
-// with slightly different cold detection, TTLs, and dedupe — this owns the flow once so routes read
-// as domain-mapping plus `serveThenRevalidate`.
-//
-// The engine owns *when* to serve, refresh, dedupe, and back off. The caller owns *what* a resource
-// is: `read` reports the cached data + its freshness, `refresh` performs the (atomic) mirror write.
-// The engine never touches the caller's store — so the freshness backend is opaque (sync_state for
-// GitHub lists, per-row `fetchedAt` for provider items), so providers can add resources
-// without changing anything here. ETag/304 handling stays inside the caller's `refresh` for the
-// same reason: it is specific to the sync_state ETag store, not universal to the flow.
-
-// Failure taxonomy shared across mirrored-read routes (github.ts's ghError statuses plus repo 404).
-// Defined here — the flow layer — and re-exported from routes/repoMirror.ts for existing importers.
 export type RouteFailure = { error: string; status: 401 | 403 | 404 | 429 | 502; detail?: string[] }
 export type RouteResult<T> = { ok: true; value: T } | { ok: false; failure: RouteFailure }
 
@@ -53,9 +39,6 @@ const dedupe = (key: string, refresh: () => Promise<RefreshResult>): Promise<Ref
   return p
 }
 
-// Rate-limit backoff: (userId, resource) → epoch ms until which background refreshes are suppressed.
-// ponytail: unbounded map, but one entry per rate-limited resource and overwritten in place — a
-// retention sweep is warranted only if the resource key space ever grows without bound.
 const backoffUntil = new Map<string, number>()
 
 const scheduleBackgroundRefresh = (key: string, refresh: () => Promise<RefreshResult>, backoffMs: number): void => {

@@ -1,14 +1,14 @@
 // The renderer end of the one authenticated stream socket. It no longer OWNS a socket: Electron main's
 // connection broker holds it, because the device token rides the upgrade request's headers and a
-// browser cannot set those (docs/vNext/architecture.md § How the client talks to nodes).
+// browser cannot set those (docs/architecture-overview.md § How the client talks to nodes).
 //
 // What stayed: the subscription registries, the first-attach/last-detach contract, and the
 // re-attach-on-reconnect behaviour. What went: the URL, the socket lifecycle, the local outbox (main
 // queues frames until its socket is open) and the fixed 1s reconnect timer — backoff now lives in the
 // broker, where the connection does.
 //
-// The dispatch table below is untouched, which is the point of keeping V1's flat channel-tagged frames
-// rather than rewrapping them: all twelve consumers of this module are unchanged.
+// The dispatch table keeps the protocol's flat channel-tagged frame vocabulary so each stream consumer
+// can subscribe without another renderer-side envelope.
 import type { DockerStatsSample } from '@acorn/protocol/docker.ts'
 import type { ServerMsg } from '@acorn/protocol/terminal.ts'
 import type { WsClientFrame, WsServerFrame } from '@acorn/protocol/ws.ts'
@@ -69,7 +69,7 @@ function connect(): void {
   // frame here, and this module's subscriber maps are keyed on session/container/exec ids alone — so
   // before this, node B's `term:out` for a session id that happened to collide fed node A's xterm, and
   // its `agent:*` frames mutated the managed-session store the Agent Center renders for A.
-  // architecture.md § Fleet semantics: "Two nodes may coincidentally hold the same UUID; that must never
+  // docs/architecture-overview.md § Fleet semantics: "Two nodes may coincidentally hold the same UUID; that must never
   // collide in the client." The QueryClient partition made that true for cached data; this makes it true
   // for the live stream.
   //
@@ -96,7 +96,7 @@ function connect(): void {
       const [kind, id] = splitStreamKey(key)
       rawSend({ channel: `docker:${kind}:attach`, id })
     }
-    // Reconnect means refetch (docs/vNext/protocol.md § Events): there is no cursor into history, so
+    // Reconnect means refetch (docs/api-reference.md § Events): there is no cursor into history, so
     // the client marks the node's cache stale instead of replaying. The QueryClient lives in the app
     // shell, so this is announced rather than performed here.
     reconnectSubs.forEach((cb) => cb())
@@ -105,7 +105,8 @@ function connect(): void {
 
 function dispatch(raw: unknown): void {
   if (!raw || typeof raw !== 'object' || typeof (raw as { channel?: unknown }).channel !== 'string') return
-  // `seq` is stripped by the broker's gap detection before we see it; the channel vocabulary is V1's.
+  // `seq` is stripped by the broker's gap detection before we see it; the remaining value is the
+  // channel-tagged event frame defined by the protocol.
   const frame = raw as WsServerFrame
   {
     if (frame.channel === 'term:out') outputSubs.get(frame.id)?.forEach((cb) => cb(frame.msg))
@@ -254,4 +255,3 @@ export function wsDockerAttach(kind: 'logs' | 'stats', id: string, cb: (event: D
     }
   }
 }
-

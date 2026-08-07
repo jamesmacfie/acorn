@@ -8,7 +8,7 @@
 import type { ServerMsg } from './terminal'
 import type { DockerStatsSample } from './docker'
 
-// docs/vNext/protocol.md § Events: one WS per node per client, token-authenticated at upgrade.
+// docs/api-reference.md § Events: one WS per node per client, token-authenticated at upgrade.
 export const WS_PATH = '/v2/events'
 
 // Renderer → server. Keystrokes into a PTY and attach/detach (subscribe + screen restore).
@@ -25,8 +25,8 @@ export type WsClientFrame =
   | { channel: 'docker:exec:resize'; execId: string; cols: number; rows: number }
   | { channel: 'docker:exec:kill'; execId: string }
 
-// Server → renderer. `term:out` wraps the existing per-session ServerMsg (ready/output/exit); the
-// two pings carry the same payloads the old IPC pushes did. workflow:step:event is reserved.
+// Server → renderer. `term:out` wraps the per-session ServerMsg (ready/output/exit); status and
+// workflow frames carry serializable event payloads.
 // docker:changed is the docker plugin's cache-dirty ping (scopes: containers/images/volumes/networks).
 export type WsServerFrame =
   | { channel: 'term:out'; id: string; msg: ServerMsg }
@@ -45,14 +45,4 @@ export type WsServerFrame =
   | { channel: 'agent:session'; session: unknown }
   | { channel: 'agent:deleted'; sessionId: string }
 
-// What actually goes on the wire: every server→client frame carries a per-connection monotonic `seq`
-// starting at 1, so a client can detect in-connection loss and treat a gap as a reconnect
-// (docs/vNext/protocol.md § Events; the broker already does).
-//
-// An intersection rather than a `seq` field spelled into all twelve members: the hub stamps it in one
-// place at send time, and every producer keeps writing plain WsServerFrames.
-//
-// ponytail: protocol.md's envelope is `{ kind, seq, type, payload }`, and this keeps the flat
-// `{ channel, … }` vocabulary V1 built. Rewrapping is Phase 2 work — twelve renderer consumers and
-// the broker read `channel` directly, and `seq` is the only part of the envelope anything needs yet.
 export type WsServerWireFrame = WsServerFrame & { seq: number }

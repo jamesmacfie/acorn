@@ -7,15 +7,9 @@
 // The plugin passes its own `import.meta.url` because the ancestor walk has to start from the PLUGIN's
 // module, not from this one — resolving from here would find node-core's chain.
 //
-// THE PLUGIN-SCOPED CANDIDATE IS CHECKED FIRST AT EVERY LEVEL, and that ordering is the whole
-// correctness of this function rather than a nicety. In the built layout the walk starts at
-// `out/main/`, whose parent holds BOTH `out/migrations/<plugin>/` and `out/migrations/` — and the
-// second is CORE's 42-migration chain. Checking the bare directory first therefore migrated every
-// plugin database with core's schema: 46 core tables and none of the plugin's own. It failed silently,
-// because a plugin only notices when it first touches one of its own tables — three plugin databases
-// had been built that way before plugins/http, whose init queries its own rows before the listener
-// binds, turned it into a boot failure. The packaged check below is the same rule; it was already
-// plugin-scoped, which is why packaging was correct and the unpackaged build was not.
+// The plugin-scoped candidate is checked first at every level. Built and packaged layouts place core
+// and plugin chains beside one another, so selecting a bare migrations directory could apply the wrong
+// schema. The same ordering is used for source, staged, and packaged runtimes.
 import { existsSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -33,8 +27,7 @@ export function pluginMigrationsFolder(plugin: string, moduleUrl: string): strin
   if (packaged && isChain(packaged)) return packaged
   let dir = dirname(fileURLToPath(moduleUrl))
   for (;;) {
-    // Plugin-scoped first (the built/staged layout), then the plugin package's own migrations/ (the
-    // source layout). Never the other way round — see the note above.
+    // Plugin-scoped first (the built/staged layout), then the plugin package's own migrations folder.
     const scoped = join(dir, 'migrations', plugin)
     if (isChain(scoped)) return scoped
     const bare = join(dir, 'migrations')

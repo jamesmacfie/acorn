@@ -17,8 +17,6 @@ const previewNavigatePayload = taskPayload.extend({
 const browserClickPayload = taskPayload.extend({ ref: z.string() })
 const browserFillPayload = browserClickPayload.extend({ text: z.string() })
 
-// Main-process half of the native capability boundary. Keep validation here: utility-process
-// messages are an IPC trust boundary even though both processes ship in the same application.
 export function registerDesktopCapabilityHandlers(peer: ServiceRpcPeer): () => void {
   const disposers = [
     peer.register('desktop.preview-current-url', (payload) => previewCurrentUrl(taskPayload.parse(payload).taskId)),

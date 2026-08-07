@@ -145,7 +145,7 @@ describe('Electron-free service runtime', () => {
       // The pin, end to end: a client that checks the fingerprint the service reported gets through…
       expect(await get(runtime.started, '/v2/node', runtime.started.fingerprint)).toBe(200)
       // …and one expecting any other identity is refused before a byte of the request is sent. A
-      // changed fingerprint is a hard security stop (docs/vNext/security.md), so it must fail CLOSED.
+      // changed fingerprint is a hard security stop (docs/security.md), so it must fail CLOSED.
       const wrong = (runtime.started.fingerprint[0] === '0' ? '1' : '0') + runtime.started.fingerprint.slice(1)
       await expect(get(runtime.started, '/v2/node', wrong)).rejects.toThrow(/fingerprint mismatch/)
 
@@ -157,7 +157,7 @@ describe('Electron-free service runtime', () => {
     expect(states.at(-1)).toBe('stopped')
   }, 20_000)
 
-  // Two nodes on one machine is an ordinary case now (docs/vNext/architecture.md § Topology), and the
+  // Two nodes on one machine is an ordinary case now (docs/architecture-overview.md § Topology), and the
   // pinned port made it impossible.
   it('binds a different port, and a different identity, per data root', async () => {
     seedEnv()

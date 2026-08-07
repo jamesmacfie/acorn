@@ -1,45 +1,3 @@
-// The client-side plugin interface and its host (docs/vNext/plugins.md § The plugin API).
-//
-// The deliberate mirror of packages/node-core/src/server/plugin/{types,host}.ts: same vocabulary
-// (`name`, `required`, `init(ctx)`, a `disabled` list the host applies, ownership bound by the host),
-// so a reader who has learned one half has learned both. What it replaces is
-// apps/desktop/src/app/client/activate.ts — 91 lines in which the APP named every plugin's
-// contribution modules one by one and pushed them into fifteen registries, so adding a pane meant
-// editing the app, and no plugin could be turned off without deleting lines.
-//
-// The registries themselves are UNCHANGED. This owns *who calls them*, not how they work.
-//
-// Which of plugins.md's ten context members are here, and why the rest are not:
-//
-//   panes           → registries/panes.ts (paneRegistry)
-//   sources         → registries/sources.ts (sourceRegistry)
-//   settingsPages   → registries/settings.ts (settingsRegistry)
-//   slots           → registries/uiSlots.tsx — TWO registries, because the doc's single `slots` name
-//                     covers two different props contracts: shell slots get the whole UiSlotContext,
-//                     task slots get just a taskId. Hence `slots` and `taskSlots`.
-//   palette         → registries/paletteRows.ts, as `paletteRows`. Commands and keybindings still register at
-//                     COMPONENT MOUNT (nine sites) and that stays correct — a pane's shortcuts should exist
-//                     only while the pane does. What mount-time registration cannot serve is the palette's
-//                     other half: rows FETCHED per task from repo config (run targets, layout recipes,
-//                     committed workflows), which CommandPalette used to read by importing two plugins.
-//   contextSections → registries/contextSections.ts. Was LEFT OUT in Phase 2 for having no consumer; it
-//                     has one now. plugins/context's pane used to render plugins/memory's section by
-//                     importing it, which was both a coupling edge and the reason memory had no
-//                     ClientPlugin. Note this is the CLIENT registry — extra controls rendered under a
-//                     section — not the node one that supplies a section's data.
-//                     `agentContexts` below is a different thing and is included on its own merits.
-//   attention       → registries/attention.ts, added in Phase 4 with the inbox that consumes it.
-//   api             → LEFT OUT. Plugins already call the typed fetchers in client-core directly; a
-//                     second way to reach the same node would be a parallel idiom with no consumer.
-//   events          → LEFT OUT. registries/clientEvents.ts is imported directly by the handful of
-//                     plugins that use it, at mount time, not during init.
-//   desktop         → LEFT OUT. There is no DesktopServices object; native residue is reached
-//                     through client-core's typed `window.acorn` accessors (capabilities.ts).
-//
-// And five registries the doc does not name but which have real plugin contributions today, so they are
-// here: `agentContexts`, `agentToolRenderers`, `pollers`, `persistedState`, and `refPanels` — which the doc
-// describes as "linear registers a panel into github's PR-detail slot"; it is keyed on providerId instead, so
-// github asks who renders a ref rather than hosting a hole named after one plugin (registries/refPanels.ts).
 import type { AgentContextContribution } from '@acorn/protocol/agentContext.ts'
 import { persistedStateRegistry, type PersistedStateSlice } from '../persistence/persistedState'
 import { agentContextRegistry } from './agentContexts'
@@ -86,19 +44,6 @@ export type ClientPluginContext = {
   // Rows for the attention inbox — states on a node that need the owner, fetched per node
   // (registries/attention.ts).
   attention: ClientContributionPoint<AttentionSourceContribution>
-  // Registration into a registry client-core does not own — a registry a PLUGIN publishes.
-  //
-  // There is exactly one today: plugins/github's `contentLinkRegistry`, which decides which hrefs inside
-  // rendered markdown acorn opens itself. It cannot be a named member above, because client-core would have to
-  // import the plugin's type to declare it, which is the dependency direction the whole plugin API exists to
-  // prevent. Before this it was registered by calling `contentLinkRegistry.register(...)` directly, so the host
-  // held no disposable — meaning Phase 4's disable could not take it back and a re-activation appended a second
-  // copy (which the registry's duplicate-id guard turns into a throw, so re-enabling github would have failed
-  // the boot).
-  //
-  // Same rules as every named point: the provider-ownership check applies and the host owns the disposable. It
-  // is not a general escape hatch — the constraint is only that client-core cannot NAME the registry's type,
-  // not that the contribution gets to skip the rules.
   contribute<T extends { id: string }>(registry: Registry<T>, entry: T): void
 }
 
@@ -126,9 +71,6 @@ export type ClientPlugin = {
 }
 
 export type ClientPluginHostOptions = {
-  // Plugin ids the owner has turned off for this node. `required` plugins ignore it, exactly as on
-  // the node side. Nothing populates this yet on either half — Settings → Plugins is Phase 4 — but
-  // the mechanism is where it has to be for that UI to be a list, not a refactor.
   disabled?: readonly string[]
 }
 
@@ -150,7 +92,7 @@ const contributed = new Map<string, Disposable[]>()
 // covers every plugin instead of those two.
 //
 // Contribution IDS are deliberately NOT namespaced. `pr`, `changes`, `notes`, `palette.files` and
-// `docker-footer-badge` are persisted layout keys and user-visible chord targets (ui.md: panes keep
+// `docker-footer-badge` are persisted layout keys and user-visible chord targets (docs/ui-design.md: panes keep
 // their ids); prefixing them would be a storage break dressed up as hygiene.
 const declaredProvider = (entry: object): string | undefined =>
   'providerId' in entry && typeof (entry as { providerId?: unknown }).providerId === 'string'
@@ -193,12 +135,6 @@ function makeContext(name: string, record: (disposable: Disposable) => void): Cl
   }
 }
 
-// Runs every enabled plugin's init, in declaration order.
-//
-// Declaration order is observable NOWHERE, which matches the node side. It used to be observable in exactly one
-// place — the rail's Source order was `sourceRegistry.entries()` unsorted — and `SourceContribution.order`
-// closed that: every client registry now sorts on a declared field (panes and settings pages by `order`, slots
-// by `order` within a slot, palette rows by `order`, agent contexts by label, sources by `order`).
 export function initClientPlugins(
   plugins: readonly ClientPlugin[],
   options: ClientPluginHostOptions = {},

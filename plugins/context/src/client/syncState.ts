@@ -1,4 +1,4 @@
-// Session-only sync bookkeeping for the Manifest (docs/next/context-ui.md). Two concerns:
+// Session-only sync bookkeeping for the Manifest (docs/agent-tools.md). Two concerns:
 //
 // 1. Staleness — what *this pane* last sent to each agent session via Sync. No hashing: we keep the
 //    raw per-section compact strings (a few KB, one entry per live session). It's a heuristic —

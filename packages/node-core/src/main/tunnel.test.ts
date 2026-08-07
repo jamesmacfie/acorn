@@ -13,7 +13,7 @@ import { isUpgradeClaimed } from './upgradeClaim'
 const INTERNAL_KEY = 'k'.repeat(64)
 const DEVICE_TOKEN = 'acorn_dt_test'
 
-// A revocable stub. The tunnel has to honour both halves of protocol.md § Pairing — the immediate
+// A revocable stub. The tunnel has to honour both halves of docs/api-reference.md § Pairing — the immediate
 // `onRevoked` callback AND the periodic `isActive` sweep — so both are drivable here.
 let active = new Set(['d1'])
 let fireRevoked: ((deviceId: string) => void) | null = null
@@ -145,7 +145,7 @@ describe('attachTunnel', () => {
   })
 
   it('refuses an undeclared port', async () => {
-    // protocol.md § Streams: "Only declared ports; no general SOCKS." Without this the pipe is a proxy to
+    // docs/api-reference.md § Streams: "Only declared ports; no general SOCKS." Without this the pipe is a proxy to
     // anything listening on the node's loopback — every database, every other app's dev server.
     declared = [echoPort + 1]
     await expect(open(url('task-1', echoPort), { authorization: `Bearer ${DEVICE_TOKEN}` })).rejects.toThrow(/status 403/)
@@ -186,14 +186,6 @@ describe('attachTunnel', () => {
   })
 
   it('closes a LIVE pipe the moment its device is revoked', async () => {
-    // protocol.md § Pairing: "deleting a device row invalidates its token immediately — open sockets are
-    // closed, in-flight requests fail." wsHub has honoured this since Phase 1; the tunnel honoured neither
-    // half, so a stolen laptop's established pipe kept reaching the dev server after the owner revoked it.
-    // Refusing a NEW upgrade is the half that stops mattering once one is open.
-    //
-    // `isActive` is left TRUE and only the callback fires, so the periodic sweep cannot be the explanation —
-    // the same non-vacuity trick wsHub.test.ts uses, and without it this case passed with the callback
-    // deleted (measured).
     const held = await hold(url('task-1', echoPort), { authorization: `Bearer ${DEVICE_TOKEN}` })
     fireRevoked?.('d1')
     await expect(held.closed).resolves.toBeUndefined()
@@ -209,21 +201,6 @@ describe('attachTunnel', () => {
   })
 
   it('survives a flood of half-open upgrades', async () => {
-    // What this asserts, and what it does NOT.
-    //
-    // ASSERTS: a loop of connect-then-RST upgrades neither crashes the process nor wedges the tunnel — the
-    // last line proves a legitimate tunnel still works afterwards.
-    //
-    // Does NOT assert the `refuse` guard. `refuse` now attaches an error listener and checks `writable`
-    // before writing, because a `write` to a socket whose peer has gone emits `'error'` and the HTTP server
-    // has already handed the socket over — with no listener that is an uncaughtException. I could NOT
-    // reproduce it: removing the guard leaves this case green even with the resolver stalled 120ms and the
-    // client destroying in the connect callback, so on this platform the write lands in the kernel buffer or
-    // the emit is absorbed. The guard is precautionary and recorded as such in phase4-notes.md rather than
-    // dressed up as a verified fix.
-    // The window has to be WIDE, or the refusal is written before the peer's FIN is even processed and the
-    // case passes with the guard removed (measured). A slow resolver is exactly what production has: the real
-    // `declaredPorts` reads the tasks table, the repo_paths row and possibly a run target's `url_command`.
     slowPorts = 120
     const errors: unknown[] = []
     const onUncaught = (error: unknown) => errors.push(error)

@@ -4,7 +4,7 @@
 //
 // A FACTORY over the plugin's own database, not a module-scope router reading db: the tables
 // live in <data-root>/plugins/http.sqlite now, and c.env deliberately does not carry per-plugin handles
-// (docs/vNext/data.md § Plugin DBs). The SecretService comes from CoreServices for the same reason — this
+// (docs/data-layer.md § Plugin DBs). The SecretService comes from CoreServices for the same reason — this
 // router no longer needs `c.env` at all, which is the point.
 import { Hono } from 'hono'
 import { and, asc, eq, isNull } from 'drizzle-orm'
@@ -133,8 +133,7 @@ export const httpRoutes = (db: PluginDatabase, core: SendCoreServices) => {
     // token is deliberately insufficient: agent/MCP child processes must never use it as a secret
     // decryption oracle.
     .use('*', async (c, next) => {
-      // 'device' is the owner at a client, which is the only principal allowed to drive this pane — it was
-      // 'user' while that meant a session cookie. An internal token must never reach it.
+      // 'device' is the owner principal allowed to drive this pane. An internal token must never reach it.
       if (c.get('principal')?.kind !== 'device') return respondError(c, 403, 'interactive_user_required')
       await next()
     })

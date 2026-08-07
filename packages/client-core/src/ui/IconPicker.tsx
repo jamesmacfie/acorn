@@ -2,11 +2,6 @@ import Picker from './Picker'
 import Icon, { ICON_NAMES } from './Icon'
 import { fuzzyScore } from '../palette/model'
 
-// Pick a Lucide icon by name, with a die-roll for "any old icon". Wraps the shared Picker, so it
-// inherits the portalled popover, filter input and dismiss behaviour.
-//
-// ponytail: the filtered list is capped — Picker renders plain rows with no virtualization, and all
-// 1756 names at once would jank. Raise the cap only alongside virtualizing .repo-picker-list.
 const MAX_RESULTS = 200
 
 // An unfiltered popover of 1756 names alphabetically would open on a-arrow-down, a-arrow-up,

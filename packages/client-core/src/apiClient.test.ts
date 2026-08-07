@@ -4,7 +4,7 @@ import { ApiError, readJson, writeJson } from './apiClient'
 import { setActiveNode } from './node/activeNode'
 import { refreshFleet, _resetFleet } from './node/fleet'
 
-// The offline-mutation contract (docs/vNext/ui.md § Connection and staleness vocabulary): "reads come from
+// The offline-mutation contract (docs/ui-design.md § Connection and staleness vocabulary): "reads come from
 // cache with badges; mutations fail fast with a clear 'node offline' error and keep the user's input as a
 // draft. Nothing is queued for later automatic replay."
 

@@ -12,7 +12,7 @@ export const noticeKindContributions: NoticeKindContribution[] = [
   { id: 'agent-completed', glyph: 'circle-dot', severity: 'info', toast: true },
   { id: 'agent-needs-input', glyph: 'circle-alert', severity: 'warn', toast: true },
   { id: 'agent-error', glyph: 'triangle-alert', severity: 'danger', toast: true },
-  // The one-time disk-encryption warning (docs/vNext/data.md § Backup). `toast: false`, deliberately: an
+  // The one-time disk-encryption warning (docs/data-layer.md § Backup). `toast: false`, deliberately: an
   // OS notification fires whether or not the window has focus, and this is a standing condition rather
   // than something that just happened. It belongs in the bell, where the owner finds it when they look.
   { id: 'disk-unencrypted', glyph: 'triangle-alert', severity: 'warn', toast: false },

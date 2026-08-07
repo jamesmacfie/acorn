@@ -133,8 +133,8 @@ export function assertValidWorkflow(def: WorkflowDef, catalog: WorkflowValidatio
   if (problems.length) throw new WorkflowValidationError(problems)
 }
 
-// Frozen pre-Phase-8 runs may contain a join without `joins`. Preserve their checkpoint semantics
-// at read time; newly loaded/started definitions still fail validation until they migrate.
+// Persisted runs may contain a join without `joins`. Infer it from the preceding fan-out at read time;
+// newly created definitions still require an explicit join target during validation.
 export function normalizePersistedWorkflow(def: WorkflowDef): WorkflowDef {
   const steps = def.steps.map((step, index, all) => {
     if (step.kind !== 'join' || step.joins) return step

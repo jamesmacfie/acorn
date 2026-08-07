@@ -102,9 +102,6 @@ export default function PullList() {
     // Fetch the detail (cached if warm) so the body is present, then seed a task_link for EVERY
     // Linear ticket the PR references — a PR can resolve several, and the task links them all.
     const detail = await queryClient.ensureQueryData(pullDetailOptions(owner, repo, String(pr.number), true)).catch(() => undefined)
-    // A bare Linear id in a PR body doesn't say WHICH connection owns it. ponytail: attribute to the
-    // sole Linear connection when there's exactly one; with 0 or 2+ we can't disambiguate cheaply, so
-    // skip seeding (the Linear pane still resolves bare ids server-side across connections).
     const integrations = await queryClient.ensureQueryData(integrationsOptions(true)).catch(() => null)
     const linears = (integrations?.integrations ?? []).filter((i) => i.providerId === 'linear' && i.status === 'connected')
     const soleLinear = linears.length === 1 ? linears[0].id : null
@@ -198,11 +195,6 @@ export default function PullList() {
         <Show
           when={ready()}
           fallback={
-            // GitHub is an integration now, not the login. A node with no GitHub connection makes every
-            // github query fail with `reauth`, and "Failed to load PRs." would be a lie about a node
-            // that is working exactly as configured — so the un-connected case gets its own state.
-            // Phase 1 minimum: an empty state and a deep link. The attention-inbox item ui.md describes
-            // is Phase 4.
             <Show when={!githubConnected() && (isError() || repoKnown())} fallback={<p class="placeholder">{isError() ? 'Failed to load PRs.' : 'Loading…'}</p>}>
               <div class="placeholder pr-list-connect">
                 <p>acorn is not connected to GitHub on this node.</p>

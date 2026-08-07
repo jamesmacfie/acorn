@@ -16,8 +16,6 @@ import FileTree from './FileTree'
 import { canRevealActiveFile, type FileTreeRevealRequest } from './fileTreeReveal'
 import './editor.css'
 
-// Minimal filename → Monaco language id. Anything unmapped falls back to plaintext (still editable,
-// no highlighting). ponytail: extend the map when a language you use is missing.
 const EXT_LANG: Record<string, string> = {
   ts: 'typescript', tsx: 'typescript', js: 'javascript', jsx: 'javascript', mjs: 'javascript',
   json: 'json', css: 'css', scss: 'scss', less: 'less', html: 'html', xml: 'xml',

@@ -1,17 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { declaredByBlock, readStyleSheets, referenced } from './readStyleSheets'
 
-// Two guards over the whole stylesheet corpus.
-//
-// 1. No phantom tokens. Before the token axes landed, EIGHT custom properties were referenced and
-//    never defined — --fs-xs alone had 25 uses and silently rendered at the inherited size, and
-//    --danger had two different hardcoded red fallbacks at different call sites. That is invisible
-//    at review time and invisible at runtime. Now it fails the suite.
-//
-// 2. Ratcheting literal counts. The style axis can only reach a value that is a token, so every
-//    remaining literal is a surface a style pack cannot restyle. These baselines are the Phase 2
-//    sweep's worklist; they may only go DOWN. Same shrinking-ledger idiom as core/boundaries.test.ts.
-
 const sheets = readStyleSheets()
 const corpus = sheets.map((f) => f.text).join('\n')
 const withoutComments = (text: string) => text.replace(/\/\*[\s\S]*?\*\//g, '')

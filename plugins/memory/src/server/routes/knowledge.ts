@@ -61,28 +61,6 @@ const confineTaskQuery = (c: Context<AppEnv>): { taskId?: string } | null => {
 }
 
 export const knowledge = new Hono<AppEnv>()
-  // The workspace/global note surface is DEVICE ONLY, and phase3-notes.md had this exactly backwards: it
-  // dismissed these routes as "workspace-scoped, not task-scoped" as a reason to skip a gate. A workspace
-  // holds many tasks and `global` holds all of them, so workspace-scoped is BROADER than task scope, not
-  // narrower — the widest surface in the router was the one left open.
-  //
-  // What a task-scoped agent could do with it: create, overwrite, retitle or delete a note in any
-  // workspace or in `global`, and — the one that turns a leak into an injection — POST `included: true`.
-  // An included global or workspace note is assembled into EVERY task's context block
-  // (plugins/notes/src/node/index.ts), and the sibling-note compatibility filter cannot stop it, because
-  // that filter keys on `originTaskId` and a note created for a non-task location has none. It also walks
-  // straight past the `notes_write` tool-permission preference, which is enforced only on the agent-tool
-  // surface in core's routes/agentTools.ts.
-  //
-  // An agent loses nothing it should have: `notes_list`/`notes_read`/`notes_write`/`notes_append` cover
-  // all three scopes, resolve the workspace from the agent's OWN task rather than from a caller-supplied
-  // id, stamp `author: 'agent'` with the session, are permission-checked per task, and cannot set
-  // `included` at all.
-  //
-  // Whole subtree rather than the four writes: `GET /workspaces/:wsId/notes` enumerates every note in any
-  // workspace with its body one read away, which is the same shape of leak as the roster Phase 3 filtered.
-  // Measured — Hono's trailing `/*` matches zero segments, so this one mount also covers the bare
-  // `/workspaces/:wsId/notes`; the test pins both so a Hono upgrade cannot quietly unmount half of it.
   .use('/workspaces/:wsId/notes/*', requireDevice)
   // --- memory ---
   .get('/memory', (c) => viaBridge(c, knowledgeBridgeSlot, (b) => b.memoryList(c.req.query('repo') ?? undefined)))
@@ -98,17 +76,6 @@ export const knowledge = new Hono<AppEnv>()
     if (!filter) return respondError(c, 404, 'not_found')
     return viaBridge(c, knowledgeBridgeSlot, (b) => b.memoryProposals(filter.taskId))
   })
-  // Device only, and this is the point of a proposal rather than a hardening afterthought.
-  //
-  // `memory_write`'s tool description promises the agent that what it writes is "proposed for human
-  // review". Nothing enforced that: the path carries no `/tasks/:id`, so Phase 3's
-  // `/v2/p/:plugin/tasks/:id*` mount never saw it, and the router added nothing — so an agent could
-  // approve its own proposal, or approve ANY task's pending proposal with an attacker-chosen `edited`
-  // body, which knowledgeIpc.ts then writes into that proposal's own worktree.
-  //
-  // Not `requireProviderAccess` (device ∪ service) and not a per-task confinement: the human at the
-  // keyboard IS the gate. The service scope has no reason to resolve a proposal either — nothing in the
-  // node's own loopback calls approves memory.
   .post('/memory/proposals/:id/resolve', requireDevice, async (c) => {
     const p = resolveBody.safeParse(await c.req.json().catch(() => null))
     if (!p.success) return respondError(c, 400, 'bad_request')

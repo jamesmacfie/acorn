@@ -1,90 +1,30 @@
 # HTTP client
 
-The API Requests plugin is a compact, Bruno-inspired HTTP client with an always-visible repo Source
-and a task pane. Both presentations share the same server routes and database rows. Its routes are
-ordinary plugin routes under `/v2/p/http/*` (registered in `apps/node/src/server/routes.ts`) and they
-send user-authored **outbound** requests — this plugin is a client acorn drives, not a surface
-external automation drives.
+The HTTP plugin provides an owner-invoked, Bruno-style request workspace. Requests and variables are
+Node-owned and encrypted where their values are sensitive.
 
-## Scope and storage
+## Data model
 
-Saved requests belong to `(GitHub user, repo)`. A request with `task_id` is an ad-hoc draft owned by
-that task; filing it in the repo tree clears `task_id`. Folders are slash-delimited strings rather
-than entities, so an empty folder does not exist and rename/move cannot create orphan rows.
+Requests can be repository-filed or ad hoc. Variables can be plain, secret, or command-backed. Saved
+requests and variables are stored in `plugins/http.sqlite`; unsaved task-pane edits remain drafts.
+Secret values are encrypted with `SESSION_ENC_KEY` and are never returned as plaintext in list/read
+responses.
 
-Sensitive request fields—URL, headers, body, auth, and per-request variables—are AES-256-GCM JWE
-ciphertext under `SESSION_ENC_KEY`. Every repo-variable value is encrypted, including ordinary
-values and command text. Secret-variable plaintext is never returned to the renderer. Startup
-protects legacy plaintext rows before the listener opens (the http plugin's `init`, pre-listener),
-and renderer activation deletes
-legacy `http-draft:*` localStorage. Unsaved drafts now exist only in memory.
+The plugin migrates older plaintext fields at Node initialization and fails closed when the encryption
+key is unavailable. A command variable stores its command metadata, not its generated secret value.
 
-## Request model
+## Sending
 
-Methods are `GET`, `POST`, `PUT`, `PATCH`, `DELETE`, `HEAD`, and `OPTIONS`. Bodies support none,
-JSON, text, and form encoding. Auth supports none, Basic, Bearer, and API key (header or query).
-The UI has Params, Body, Headers, Auth, and Vars request tabs plus Body, Headers, and Timeline
-response tabs. Pasting curl into the URL field imports supported fields; Copy as curl exports them.
+The Node resolves interpolation once, validates the resulting URL/scheme and headers, and sends via
+the core HTTP service with bounded time and response-size limits. Command variables execute through
+the process broker with their own grants and capture limits. Supplying an override for a command
+variable suppresses command execution.
 
-The deliberate limits are part of the contract: no scripts/tests/assertions, collections, OAuth2,
-Digest/NTLM, multipart body builder, recursive variable interpolation, or per-hop timing.
+The send route requires a `device` principal. Internal agent/MCP callers cannot use the HTTP pane as
+a general outbound or secret-reading oracle. Provider integrations use their own allowlisted clients.
 
-## Variable resolution
+## Client
 
-At send time, values merge from lowest to highest precedence:
-
-1. task builtins: `repo`, `branch`, `worktree`, `taskId`;
-2. enabled repo variables;
-3. per-request variables.
-
-Repo variables have kind `value`, `secret`, or `command`. Only names referenced by an active URL,
-header, body, or auth field are resolved. A per-request override suppresses the lower repo variable
-before execution, so an overridden command is never run for side effects. Referenced commands run
-concurrently as `bash -lc` in the selected task worktree, falling back to the mapped repo checkout.
-Each command has a 15-second/1 MiB cap and the group has a shared 30-second deadline. Command output
-is never persisted.
-
-## Sending and security
-
-The Hono route executes requests with Node's `fetch`; no injected stateful engine bridge is needed, so
-the client works in `dev:node`. Sending is restricted to `principal.kind === 'device'` — the owner at
-a paired client, authenticated by its device bearer token. The internal `x-acorn-internal` principal
-used by agents/MCP receives `403 interactive_user_required`, preventing the route from becoming a
-secret-decryption or SSRF oracle for child processes. This is one of only two kind-based gates in the
-tree; see [vNext/phase1-notes.md](./vNext/phase1-notes.md).
-
-Only `http:` and `https:` URLs are accepted. Requests time out after 30 seconds and response bodies
-are capped at 5 MiB, with a truncation flag. Redirects use undici's standard `follow` behavior so
-credentials are stripped across origins. HTTP 4xx/5xx remain successful transport results with
-their headers/body; DNS, connection, TLS, and timeout failures return a typed failed attempt.
-Authorization, Cookie, secret values, and command outputs are redacted from the response timeline
-and error text.
-
-This is intentionally an arbitrary outbound client for the human at a paired client; it is not an
-SSRF-safe fetch proxy for untrusted callers.
-
-## Internal routes
-
-All routes are under `/v2/p/http/:owner/:repo`:
-
-| Method and suffix | Purpose |
-| --- | --- |
-| `GET /requests?taskId=…` | List repo-filed requests or one task's ad-hoc requests |
-| `POST /requests` | Create a request |
-| `PUT /requests/:id` | Update/rename/move/file a request |
-| `DELETE /requests/:id` | Delete a request |
-| `GET /vars` | List repo variables (secret values masked) |
-| `POST /vars` | Create a variable |
-| `PUT /vars/:id` | Update a variable; blank unchanged secret keeps stored ciphertext |
-| `DELETE /vars/:id` | Delete a variable |
-| `POST /send` | Resolve variables and execute one draft |
-
-Rows are always constrained by the principal's owner id (`ownerId(c)`) and route repo; opaque ids cannot cross
-that boundary. Duplicate names return `duplicate_name`; network/setup failures return
-`send_failed`; non-interactive callers return `interactive_user_required`.
-
-Source: `plugins/http/src/{client,server,shared}/`,
-`packages/node-core/src/server/db/schema.ts`.
-
-See also: [panes.md](./panes.md) · [data-layer.md](./data-layer.md) ·
-[security.md](./security.md) · [api-reference.md](./api-reference.md)
+The API Requests source and task pane provide tabs, request history, variables, auth helpers,
+curl import/export, response inspection, and memory-only drafts. Node freshness/offline status follows
+the shared client model; a failed send leaves the request text in the pane.

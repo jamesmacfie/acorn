@@ -22,17 +22,11 @@ import { loadRepoConfig } from '@acorn/node-core/main/runConfig.ts'
 const { Pool } = pg
 const exec = promisify(execFile)
 
-// What this bridge needs from core, and nothing more. It used to take core's `AppDatabase` and query
-// `tasks`/`repo_paths` through core's helpers; the plugin owns its own SQLite file now and has no
-// handle to core's, so the four reads it makes (resolve a task, its worktree, its repo settings, and
-// the executable-config trust gate for a repo-authored url_script) arrive as services.
 export type DatabaseCoreServices = Pick<CoreServices, 'tasks' | 'repos' | 'fs'>
 
-// One pool per task, torn down on disconnect/reconnect. ponytail: keyed by taskId, not by URL —
-// a task points at one database; reconnect ends the old pool first.
 const pools = new Map<string, { pool: InstanceType<typeof Pool>; url: string; database: string }>()
 
-const ROW_CAP = 500 // ponytail: browse cap; raise / add real paging when a table dwarfs this.
+const ROW_CAP = 500 // Bound table browsing until the UI exposes paging.
 
 // pg returns numbers/bigints/dates/json as their native JS types; flatten every cell to string|null
 // so the grid renders uniformly and NULL stays distinct.
@@ -235,7 +229,6 @@ export function databaseBridge(core: DatabaseCoreServices): DatabaseBridge {
         const order = pkCols.length ? ` ORDER BY ${pkCols.map(qid).join(', ')}` : ''
         const off = Number.isFinite(offset) && offset! > 0 ? Math.floor(offset!) : 0
         const res = await pool.query(`SELECT * FROM ${rel}${order} LIMIT $1 OFFSET $2`, [ROW_CAP, off])
-        // ponytail: exact count(*); swap to a pg_class estimate if it drags on huge tables.
         const cnt = await pool.query<{ n: string }>(`SELECT count(*) AS n FROM ${rel}`)
         return { ...toResultSet(res), total: Number(cnt.rows[0]?.n ?? 0) }
       } catch (e) {

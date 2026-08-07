@@ -12,7 +12,7 @@ import { PAIRING_WINDOW_MS } from '../auth/pairingCodes'
 import type { AppEnv } from '../middleware/auth'
 import { respondError } from '../respond'
 
-// Pairing and device management (docs/vNext/protocol.md § Pairing, docs/vNext/security.md
+// Pairing and device management (docs/api-reference.md § Pairing, docs/security.md
 // § Transport and authentication).
 //
 // Two routers, because they sit on opposite sides of the auth gate. `open` is how a client that
@@ -50,7 +50,7 @@ function attemptCeiling(now: () => number = () => Date.now()): () => boolean {
 
 // The single pairing failure: same status, same code, same message, no details. Malformed body, no
 // open window, expired window, exhausted attempts and a wrong code are byte-identical, so nothing
-// here is an oracle for "right code, wrong something" (docs/vNext/security.md § Transport and
+// here is an oracle for "right code, wrong something" (docs/security.md § Transport and
 // authentication). 401 because the request presented a credential and it was rejected.
 const pairingFailed = (c: Context<AppEnv>): Response => respondError(c, 401, 'pairing_failed', ['Pairing failed.'])
 
@@ -64,7 +64,7 @@ export function pairingRoutes(): { open: Hono<AppEnv>; core: Hono<AppEnv> } {
       const authenticated = c.get('principal') !== null
       const info: NodeInfo = {
         protocolVersion: NODE_PROTOCOL_VERSION,
-        // The certificate a client pins against (docs/vNext/protocol.md § Pairing step 2: the new client
+        // The certificate a client pins against (docs/api-reference.md § Pairing step 2: the new client
         // "verifies the TLS cert matches the advertised fingerprint"). Advertising it here is not what
         // makes the pin trustworthy — reading it over the very connection being authenticated proves
         // nothing. It is the value the owner compares against the code shown on the node.

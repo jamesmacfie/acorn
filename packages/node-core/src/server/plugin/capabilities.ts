@@ -1,4 +1,4 @@
-// Node-side capability registry (docs/vNext/plugins.md § Cross-plugin collaboration): a plugin
+// Node-side capability registry (docs/plugins.md § Cross-plugin collaboration): a plugin
 // exports a named typed function, and another plugin consumes it WITHOUT importing it. Before this
 // existed, `agents.sessionExecute` was 234 lines of app-layer glue in apps/node/src/wiring/ whose
 // only reason to live in the app was that neither plugin may import the other.

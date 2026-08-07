@@ -11,11 +11,11 @@ import type { CoreServices } from '@acorn/node-core/main/core/index.ts'
 import type { FileHits, SearchResult } from '../shared/search'
 
 // Only the task→worktree resolution, from core, which owns `tasks`. This plugin owns no tables and so
-// holds no database handle at all (docs/vNext/data.md § Plugin DBs).
+// holds no database handle at all (docs/data-layer.md § Plugin DBs).
 export type SearchCoreServices = Pick<CoreServices, 'tasks'>
 
-const MAX_TOTAL_HITS = 2000 // ponytail: fixed cap; the pane shows "truncated". Raise if it bites.
-const MAX_PREVIEW_LEN = 300 // ponytail: clamp long lines so one minified file can't bloat the payload.
+const MAX_TOTAL_HITS = 2000 // Bound the response; the pane reports when results are truncated.
+const MAX_PREVIEW_LEN = 300 // Keep one long or minified line from bloating the response payload.
 
 // electron-builder stores executable dependencies beside the archive. Electron's CommonJS
 // child_process shim redirects an app.asar path there, but an ESM import of execFile does not:

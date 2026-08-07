@@ -12,10 +12,6 @@ export function stripTimestamps(text: string): string {
     .join('\n')
 }
 
-// Returns the cleaned full log plus a per-step slice map. The map is populated only when the
-// number of top-level groups matches the number of steps; otherwise callers fall back to `full`.
-// ponytail: positional group→step alignment; whole-log fallback when counts mismatch (nested or
-// group-less steps). Upgrade path: match group headers to step names if alignment proves too lossy.
 export function splitJobLog(text: string, steps: { number: number }[]): { byStep: Map<number, string>; full: string } {
   const full = stripTimestamps(text)
   const byStep = new Map<number, string>()

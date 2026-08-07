@@ -23,8 +23,8 @@ export type ClientEventMap = {
   // removal, because main is the authority on membership.
   'runtime:node-removed': { nodeId: string }
   // The active node changed. Emitted by `setActiveNode` BEFORE the QueryClient provider swaps, so a
-  // listener clearing module state runs while the old node's components are still mounted rather than
-  // after the new node's have rendered against stale data.
+  // listener clearing module state runs while the outgoing node's components are still mounted rather
+  // than after the incoming node has rendered against stale data.
   //
   // It exists because the per-node QueryClient partition covers cached QUERIES only. Feature state that
   // lives in module-level Solid signals — the managed-agent roster, terminal sessions, the notice feed,
@@ -58,8 +58,8 @@ class ClientEventBus {
 
 export const clientEvents = new ClientEventBus()
 
-// Pane intents are retained until the target pane consumes them, closing the mount-order race that
-// the old one-shot signals encoded. Payloads remain plain serializable data.
+// Pane intents are retained until the target pane consumes them, closing the mount-order race. Payloads
+// remain plain serializable data.
 const pendingPaneIntents = new Map<string, PaneIntent>()
 const paneIntentKey = (taskId: string, paneId: string) => `${taskId}:${paneId}`
 

@@ -140,7 +140,7 @@ export function registerNodeBrokerIpc(broker: NodeBroker, fleet: FleetStore, dep
     const { nodeId, revoke } = nodeForgetRequestSchema.parse(raw)
     const node = fleet.get(nodeId)
     if (!node) return
-    // The local node is this app's own data root, not a pairing (docs/vNext/architecture.md § Fleet
+    // The local node is this app's own data root, not a pairing (docs/architecture-overview.md § Fleet
     // semantics: "Exactly one, and it cannot be unpaired").
     if (node.local) throw new Error('The local node cannot be removed.')
     if (revoke && node.deviceId) {

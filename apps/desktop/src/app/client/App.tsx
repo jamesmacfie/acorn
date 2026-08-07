@@ -166,7 +166,7 @@ export default function App() {
     if (nodeId) void applyNodePlugins(nodeId)
   })
 
-  // The one-time disk-encryption warning (docs/vNext/data.md § Backup: "the app surfaces a one-time
+  // The one-time disk-encryption warning (docs/data-layer.md § Backup: "the app surfaces a one-time
   // warning if the disk isn't encrypted"). Once per (device, node), which is why it sits here beside the
   // plugin apply rather than at boot: a node the owner pairs later has never been checked, and the same
   // remount that makes the effect above correct makes this one fire for it.
@@ -296,15 +296,6 @@ export default function App() {
     window.location.reload()
   }
 
-  // The two force-refresh handlers that used to live here (refreshAllPulls / refreshCurrentPull, with their
-  // `refreshing*` signals) are GONE, not moved: Phase 3 COPIED them into plugins/github's GithubBrowse.tsx along
-  // with the rest of the three-pane layout, and left these behind unreferenced. Nothing rendered the buttons that
-  // called them once the shell stopped rendering the browse surface, so they were dead code holding the shell's
-  // last four imports of github query keys.
-
-  // Hold the bare gate until there is a node AND the persisted cache has finished rehydrating. The
-  // second half is not about auth — it never was: rendering mid-restore flashes empty panes that fill
-  // in a beat later.
   return (
     <Show when={nodeReady() && !isRestoring()} fallback={<NodeGate />}>
     <div class="shell">
@@ -369,9 +360,7 @@ export default function App() {
           </Show>
         </div>
         <div class="topbar-side topbar-end">
-          {/* plan.md § 69's "minimal node switcher in the dev UI", and nothing more — the real fleet UX
-              (fleet home, node badges on every row) is Phase 4. Hidden with a single node in a
-              production build, because first-run must never mention nodes (ui.md § New surfaces). */}
+          {/* Keep the node switcher out of production first-run until a second node exists. */}
           <Show when={nodes().length > 1 || import.meta.env.DEV}>
             <select
               class="ui-input node-switcher"
@@ -383,9 +372,8 @@ export default function App() {
               <For each={nodes()}>{(node) => <option value={node.nodeId}>{node.label}</option>}</For>
             </select>
           </Show>
-          {/* One of the two places freshness is rendered in Phase 1 (the other is the Nodes settings
-              rows). Keyed on any node-backed query would be arbitrary, so the chip reports the
-              connection alone; per-surface freshness is Phase 4. */}
+          {/* The compact chip reports the active node's connection state; surfaces render their own
+              freshness where they have useful scope. */}
           <Show when={activeNodeId()}>
             {(nodeId) => <NodeChip nodeId={nodeId()} compact={nodes().length <= 1} query={{}} />}
           </Show>
@@ -393,11 +381,6 @@ export default function App() {
           <AccountMenu onSettings={() => openSettings()} onClearCache={clearCache} />
         </div>
       </header>
-      {/* The GitHub browse surface used to live HERE, as this Switch's fallback: three panes, five imported
-          components and two force-refresh handlers, because tabs/sources.ts hardcoded `github` ahead of the
-          source registry. It is an ordinary source contribution now (plugins/github's GithubBrowse.tsx), so
-          the first Match below renders it exactly as it renders Linear, Docker or Agents — and the fallback
-          is what it always should have been: no source selected and no task open. */}
       <Switch fallback={<main class="panes panes-empty"><Acorn /></main>}
       >
         <Match when={sourceRegistry.get(selectedSource() ?? '')?.component}>

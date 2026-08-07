@@ -39,7 +39,7 @@ export type SourceContribution<Item = unknown> = {
   label: string
   // An extra gate beyond `providerId`, for a source whose relevance is not an integration question.
   //
-  // One contributor: core's Fleet home, which must not exist with a single node — ui.md § New surfaces
+  // One contributor: core's Fleet home, which must not exist with a single node — docs/ui-design.md § New surfaces
   // says "with only the bundled local node, this view stays out of the way; first-run never mentions
   // nodes at all". Expressing that as a `providerId` would be a lie (no integration backs it), and having
   // the component render an empty state would still leave a rail button asking about a concept the owner
@@ -48,10 +48,6 @@ export type SourceContribution<Item = unknown> = {
   component?: Component
   defaultPane?: string
   requiredCapability?: string
-  // OPTIONAL as of Phase 3, when `github` became an ordinary source. Every other source is browsed through
-  // PromoteToTaskModal, which reads this; github's browse creates a task inline from its PR list (seeding
-  // provider links as it goes), so it has no registry-driven promotion and declaring an unused one would be
-  // a required field satisfied by dead code. The modal is only ever opened for a source that has one.
   promotion?: SourcePromotion<Item>
 }
 

@@ -1,12 +1,3 @@
-// The http plugin's node part (docs/vNext/plugins.md § The plugin API).
-//
-// What the composition root used to do by hand: apps/node/src/server/routes.ts registered the router,
-// apps/node/src/wiring/startupSecurity.ts ran the pre-listener plaintext migration, and core owned the
-// `http_requests` / `http_variables` tables. All three are here now, and the plugin owns its own SQLite
-// file.
-//
-// Not `required`: an owner who never opens the API panel loses nothing by turning it off, and no core
-// surface resolves anything this plugin provides.
 import type { NodePlugin } from '@acorn/node-core/server/plugin/types.ts'
 import { openPluginDb } from '@acorn/node-core/main/pluginStorage.ts'
 import { httpRoutes } from '../server/routes/http'
@@ -22,8 +13,7 @@ export const httpPlugin = (dataDir: string): NodePlugin => {
       // AWAITED, and that matters: rows written by releases that stored drafts in plaintext are
       // encrypted here, and a request served before this finishes would read half-migrated rows and hand
       // the plaintext back as if it were ciphertext. NodePlugin.init is awaited before the listener binds
-      // for exactly this case (server/plugin/types.ts), which is the guarantee it had while it lived in
-      // apps/node/src/wiring/startupSecurity.ts.
+      // for exactly this case (server/plugin/types.ts).
       //
       // A failure is deliberately NOT caught: a secret variable that will not decrypt means the node's
       // encryption key changed, and continuing would silently re-seal garbage.
@@ -36,7 +26,7 @@ export const httpPlugin = (dataDir: string): NodePlugin => {
     // owner's saved API requests. Fail-closed, so never a wrong write, but invisible data.
     //
     // Still before the listener binds (server/plugin/host.ts runs this pass first), which is the guarantee
-    // this migration had when it lived in apps/node/src/wiring/startupSecurity.ts.
+    // the listener binds.
     ready: async (ctx) => {
       if (!db) return
       await protectLegacyHttpStorage(db, ctx.core.secrets, ctx.core.identity)

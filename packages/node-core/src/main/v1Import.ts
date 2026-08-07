@@ -6,46 +6,8 @@ import type { AppDatabase } from '../server/db'
 import { schema } from '../server/db'
 import { loadDatabase } from './sqliteLoader'
 
-// The config-only V1 importer (docs/vNext/plan.md § Phase 5, plugin-inventory.md § onboarding).
-//
-// ## The scope, and it is a quotation rather than a judgement call
-//
-// plugin-inventory.md:258 states it exactly: "workspace names/colors/order, repo membership, checkout
-// paths (re-validated), repo config text (arriving untrusted), branch prefix. Never tokens, tasks,
-// notes, memories, terminals, or preferences."
-//
-// That last word settles a contradiction in the handoff, which assumed the importer would write prefs
-// and warned about the device/node tier split. It does not, so the split does not arise. Prefs are
-// per-machine presentation and per-machine behaviour; carrying them would mean importing "which task was
-// I last on" for tasks that were deliberately not imported.
-//
-// Four tables come across — `workspaces`, `workspace_repos`, `ignored_repos`, `repo_paths` — and their
-// vNext shapes are column-for-column identical to V1's, so this is a copy rather than a transform.
-//
-// **`config_acks` is deliberately NOT imported**, and that is what security.md:68 means by "imported V1
-// config arrives untrusted": the trust gate hashes REPO-AUTHORED files (`.acorn/config.toml`,
-// `.acorn/workflows/*.toml` — main/repoConfigTrust.ts), so dropping the acknowledgements means every one
-// of them is re-reviewed on this node. The script columns on `repo_paths` are a different thing and DO
-// come across: the owner typed those into V1's own settings UI, they are machine-local, and they have
-// never been behind that gate.
-//
-// `workspace_projects` is out too, for a reason of its own: every row names an `integrationId`, and
-// integrations are credentials we refuse to import. Rows pointing at connections that do not exist would
-// be dangling references the owner cannot see or fix.
-//
-// ## Why the source is COPIED before it is read
-//
-// plan.md:172 requires "V1 files byte-identical after import — verified by hashing in tests". Opening a
-// WAL database read-only is not enough for that: SQLite may still create a `-shm` beside it, and a
-// recovery pass can touch the `-wal`. Copying the three files to a temp directory and reading the copy
-// makes the guarantee structural rather than hopeful, and costs one file copy of a few megabytes.
-
 const V1_DATABASE = 'acorn.sqlite'
 
-// Where a packaged V1 install keeps its data root on macOS. V1's Electron `app.getName()` read
-// `"@acorn/desktop"` from its package.json, so the directory is the scoped name verbatim — vNext's
-// packaged root is `.../acorn` (productName), which is why the two never collide on disk and why the
-// V1-root guard in main/dataRoot.ts is really about someone pointing ACORN_DATA_DIR at the old one.
 export const defaultV1Root = (): string | null =>
   process.platform === 'darwin' ? join(homedir(), 'Library', 'Application Support', '@acorn', 'desktop') : null
 
@@ -72,8 +34,8 @@ type V1WorkspaceRepo = { workspace_id: string; repo_owner: string; repo_name: st
 type V1IgnoredRepo = { owner: string; repo: string }
 type V1RepoPath = Record<string, string | number | null>
 
-// Run `read` against a private copy of the V1 database. The copy, its sidecars and the temp directory
-// are gone by the time this returns, whatever happened.
+// Read from a private copy of the source database. The copy, its sidecars, and the temporary directory
+// are removed before this returns, whatever happens during the read.
 type V1Reader = { prepare(sql: string): { all(): unknown[]; get(): unknown } }
 
 function withV1Copy<T>(dir: string, read: (db: V1Reader) => T): T {
@@ -83,8 +45,8 @@ function withV1Copy<T>(dir: string, read: (db: V1Reader) => T): T {
   try {
     const copy = join(staging, V1_DATABASE)
     copyFileSync(source, copy)
-    // The sidecars matter: a V1 install that was closed uncleanly has committed transactions living only
-    // in the -wal, and reading the main file alone would silently import a stale snapshot.
+    // Copy the sidecars as well: committed SQLite transactions may still be present in the WAL, and
+    // reading only the main file could import a stale snapshot.
     for (const suffix of ['-wal', '-shm']) {
       if (existsSync(`${source}${suffix}`)) copyFileSync(`${source}${suffix}`, `${copy}${suffix}`)
     }
@@ -100,9 +62,8 @@ function withV1Copy<T>(dir: string, read: (db: V1Reader) => T): T {
   }
 }
 
-// A count of what is there, for the onboarding panel to decide whether to offer the import at all.
-// Never throws: "is there a V1 install" is a question asked speculatively on every first run, and an
-// unreadable directory is a "no" rather than an error the owner has to dismiss.
+// Count the supported source rows for the onboarding panel. Probing is non-fatal: an absent or unreadable
+// source root simply means that there is nothing to offer.
 export function probeV1Root(dir: string | null): V1Probe {
   const empty: V1Probe = { found: false, path: dir, workspaces: 0, repos: 0, checkouts: 0 }
   if (!dir) return empty
@@ -138,18 +99,9 @@ export async function importV1Config(db: AppDatabase, dir: string): Promise<V1Im
   }
   const now = Date.now()
 
-  // --- Workspaces, matched BY NAME ---
-  //
-  // By name rather than by id, and that is what makes a second run a no-op instead of a duplicate: V1
-  // ids are uuids that mean nothing here, and the owner recognises a workspace by what it is called.
-  //
-  // `isDefault` is never imported. The local node already has a default workspace — App.tsx's bootstrap
-  // creates one on first run and puts every mirrored repo in it — and a second row claiming to be the
-  // default is a state nothing in the app knows how to render. V1's default maps onto the local one.
   const existing = await db.select().from(schema.workspaces)
   const byName = new Map(existing.map((row) => [row.name, row.id]))
   const localDefault = existing.find((row) => row.isDefault)?.id ?? null
-  // V1 workspace id → the vNext workspace id its repos should land in.
   const workspaceIdMap = new Map<string, string>()
 
   for (const workspace of source.workspaces) {
@@ -162,8 +114,7 @@ export async function importV1Config(db: AppDatabase, dir: string): Promise<V1Im
       workspaceIdMap.set(workspace.id, already)
       continue
     }
-    // The V1 id is reused, which keeps the import readable in the database and costs nothing: the two
-    // roots are separate installs, so a collision would need the same uuid to have been minted twice.
+    // Reuse the source id so imported relationships remain readable and deterministic in the destination.
     await db.insert(schema.workspaces).values({
       id: workspace.id,
       name: workspace.name,
@@ -190,10 +141,10 @@ export async function importV1Config(db: AppDatabase, dir: string): Promise<V1Im
 
   for (const row of source.workspaceRepos) {
     const targetWorkspace = workspaceIdMap.get(row.workspace_id)
-    if (!targetWorkspace) continue // a membership row pointing at a workspace V1 no longer had
+    if (!targetWorkspace) continue // ignore a membership row whose source workspace was not imported
     const key = `${row.repo_owner}/${row.repo_name}`
     const current = membership.get(key)
-    if (current === targetWorkspace) continue // already where V1 says, including on a second run
+    if (current === targetWorkspace) continue // already in the requested workspace, including on reruns
     if (current && current !== localDefault) continue // the owner moved it deliberately; leave it alone
     if (current) {
       await db
@@ -226,11 +177,6 @@ export async function importV1Config(db: AppDatabase, dir: string): Promise<V1Im
     if (inserted.length) report.reposIgnored += 1
   }
 
-  // --- Checkout paths and repo configuration ---
-  //
-  // Insert-or-ignore, NOT a move: unlike workspace membership, a repo_paths row in vNext can only exist
-  // because the owner deliberately mapped a checkout here, and overwriting that with a V1 path would undo
-  // a decision rather than seed one.
   const existingPaths = await db.select({ owner: schema.repoPaths.owner, repo: schema.repoPaths.repo }).from(schema.repoPaths)
   const mapped = new Set(existingPaths.map((row) => `${row.owner}/${row.repo}`))
 
@@ -252,9 +198,6 @@ export async function importV1Config(db: AppDatabase, dir: string): Promise<V1Im
       repo,
       githubRepoId: typeof row.github_repo_id === 'number' ? row.github_repo_id : null,
       path,
-      // The owner's own machine-local build/run configuration, typed into V1's settings UI. Not behind
-      // the config-trust gate in either version — that gate is for repo-AUTHORED files, whose
-      // acknowledgements are deliberately left behind so they are reviewed again here.
       runTargets: text('run_targets'),
       editorCommand: text('editor_command'),
       setupScript: text('setup_script'),

@@ -258,7 +258,7 @@ export default function DatabasePane(props: { task: Task }) {
                 )}
                 onSelect={(q) => { editor?.setValue(q.sql); setLoadedName(q.name) }}
               />
-              {/* ponytail: Monaco's content isn't a signal, so this can't be disabled-when-empty
+              {/* Monaco's content isn't a signal, so this can't be disabled-when-empty
                   without watching every keystroke — an empty editor just makes the click a no-op. */}
               <button type="button" class="db-run-btn" onClick={() => { const sql = editor?.getValue().trim(); if (sql) setSaving(sql) }}>
                 Save

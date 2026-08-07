@@ -113,7 +113,7 @@ describe('notices are scoped to the node that raised them', () => {
     setActiveNode('node-a')
     pushNotice({ taskId: 'shared-id', kind: 'finished', title: 'on a', at: 1 })
     setActiveNode('node-b')
-    // The SAME task id on another node — the collision architecture.md says must never collide.
+    // The SAME task id on another node — the collision docs/architecture-overview.md says must never collide.
     pushNotice({ taskId: 'shared-id', kind: 'finished', title: 'on b', at: 2 })
     expect(unreadForTask('shared-id')).toBe(1)
   })

@@ -1,8 +1,3 @@
-// The changes plugin's node part (docs/vNext/plugins.md § The plugin API).
-//
-// This is what the composition root used to do by hand: apps/node/src/server/routes.ts registered the
-// two routers, apps/node/src/wiring/serverBridges.ts connected localGit's route to its impl, and
-// nothing owned the plugin's tables. All three are here now, and the plugin owns its own SQLite file.
 import type { NodePlugin } from '@acorn/node-core/server/plugin/types.ts'
 import { openPluginDb } from '@acorn/node-core/main/pluginStorage.ts'
 import { migrationsDir } from './migrations'

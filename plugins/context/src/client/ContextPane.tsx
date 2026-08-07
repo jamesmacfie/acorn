@@ -48,12 +48,6 @@ export default function ContextPane(props: { task: Task }) {
   // The exact block a send would deliver — assembled locally from the include=* inventory.
   const assembled = createMemo(() => (ctx() ? assembleBlockFrom(ctx()!, effective()) : null))
 
-  // An empty section (no items, no ⚠ absent) is noise — hide it, so "Linked issues" vanishes when
-  // there are none and a PR section appears only when the task has a PR. A section with a registered
-  // CONTRIBUTION always shows, because the contribution is interactive and hiding it would hide the only
-  // way to add the thing that would make the section non-empty. That rule used to read
-  // `s.id === 'memory'`, with a comment explaining that memory hosts the add form — true, and exactly the
-  // hardcoding the registry removes: it is now "has something to render", not "is memory".
   const visibleSections = createMemo(() =>
     (ctx()?.sections ?? []).filter((s) => contextSectionContributions(s.id).length > 0 || s.items.length > 0 || !!s.absent),
   )

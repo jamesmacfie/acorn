@@ -9,7 +9,7 @@ import { clientEvents, consumePaneIntent, openPane } from '@acorn/client-core/re
 import { libraryCollapsed, notesSelectionFor, rememberNotesSelection, setLibraryCollapsed } from './notesPaneState'
 import './notes.css'
 
-// The Notes pane (docs/next/context-ui.md): where you write context. Lands in this task's
+// The Notes pane (docs/agent-tools.md): where you write context. Lands in this task's
 // scratchpad (a *virtual* note until the first keystroke creates the file); a library column
 // grouped Task / Workspace / Global with agent/seeded notes badged in place, a filter, per-group
 // create, an include dot per row, rename, and "view in Context". Autosave discipline unchanged:
@@ -71,7 +71,7 @@ export default function NotesPane(props: { task: Task; workspace: Workspace | nu
   // External snapshots (PR description / comments / ticket) are seeded as workflow-authored scratch
   // notes. They belong to context (the PR/issues sections + assembled block), not this editing pane,
   // so keep them out of the library. Workflow handoffs are workflow-authored too but kind 'finding',
-  // so they stay. (docs/next/context-ui.md)
+  // so they stay. (docs/agent-tools.md)
   const notSeed = (n: NoteSummary) => !(n.author === 'workflow' && n.kind === 'scratch')
   const taskNotes = () => taskList() ?? []
   const scratchpad = () => taskNotes().find((n) => n.slug === SCRATCHPAD_SLUG)

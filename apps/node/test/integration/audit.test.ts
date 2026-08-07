@@ -7,14 +7,6 @@ import { setPluginsBridge } from '@acorn/node-core/server/routes/plugins.ts'
 import { makeTestDb, testSecretEnv, type TestDb } from '@acorn/node-core/server/routes/testDb.ts'
 import type { Env } from '@acorn/node-core/main/bindings.ts'
 
-// The audit trail through the REAL app (docs/vNext/security.md § Audit).
-//
-// This lives in apps/node, not packages/node-core, for the reason the whole directory exists: it drives
-// `createApp()` with a genuinely assembled `Env`, so the mount order, the auth gate and the bindings all
-// have to agree. A focused route test that mounted its own middleware would have proved that
-// `auditRequest` writes a row — and Phase 4's review already caught one gate claim that was vacuous for
-// exactly that reason (phase4-notes.md finding 15).
-
 const ENC_KEY = '0'.repeat(64)
 
 let harness: TestDb

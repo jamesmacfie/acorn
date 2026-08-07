@@ -9,11 +9,6 @@ import { migrationsDir } from '../../node/migrations'
 import type { Env } from '@acorn/node-core/main/bindings.ts'
 import { repos } from '../../node/schema'
 
-// TWO handles, deliberately, and the getDb mock this test used to need is gone with them. `repos` is this
-// plugin's table in <data-root>/plugins/github.sqlite and the router is a factory over that handle;
-// `env.DB` is CORE's, because resolvePr finishes by reading the stored GitHub credential out of core's
-// `integrations` table through the core seam. No integration is seeded — the token resolves to '' and
-// every path asserted below returns before it would be spent.
 const ENC_KEY = '0'.repeat(64)
 
 const PRINCIPAL: Principal = { kind: 'device', userId: 'james', deviceId: 'd1' }

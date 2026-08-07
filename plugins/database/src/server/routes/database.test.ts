@@ -13,17 +13,6 @@ import { databaseRoutes, setDatabaseBridge } from './database'
 import { migrationsDir } from '../../node/migrations'
 import type { Env } from '@acorn/node-core/main/bindings.ts'
 
-// Transport contract for the database routes: auth + body validation + bridge-unavailable, plus the
-// saved-query surface over the plugin's OWN database. The SQL-injection posture (identifiers validated
-// against the introspected schema), connection-URL non-persistence, and pool teardown on disconnect are
-// properties of main/database.ts that need a live Postgres — they are verified in the live/integration
-// pass, not here.
-//
-// Two databases, which is the point: saved queries live in the plugin's file and the task they are
-// scoped through lives in core's. The getDb mock this test used to need is gone, and so is the
-// vi.mock of the model runtime — provider access arrives as CoreServices.models, so a fake object
-// replaces a module mock.
-
 const req = (url: string, method = 'GET', body?: unknown) =>
   new Request(`http://acorn.test${url}`, {
     method,

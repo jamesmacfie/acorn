@@ -9,10 +9,6 @@ import { makeTestDb, makeTestPluginDb, type TestDb, type TestPluginDb } from '@a
 import { migrationsDir } from '../../node/migrations'
 import type { Env } from '@acorn/node-core/main/bindings.ts'
 
-// Two databases, which is the point: review notes live in the plugin's own file and the task they
-// reference lives in core's. The getDb mock this test used to need is gone — the plugin never reads
-// core's database.
-
 const jsonReq = (url: string, method: string, body?: unknown) =>
   new Request(`http://acorn.test${url}`, {
     method,

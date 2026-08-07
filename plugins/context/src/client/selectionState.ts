@@ -1,4 +1,4 @@
-// Manifest section selection (docs/next/context-ui.md), persisted per task as a scoped state slice
+// Manifest section selection (docs/agent-tools.md), persisted per task as a scoped state slice
 // (context.section-selection). Mirrors editorState.ts: pure signal store + a no-clobber hydrate.
 // The store holds only tasks the user has actually touched; the pane falls back to
 // selectionFromContext(ctx) for untouched tasks, so a section's defaultIncluded still drives the

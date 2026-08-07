@@ -3,17 +3,6 @@ import { X509Certificate } from 'node:crypto'
 import { chmodSync, existsSync, mkdirSync, readFileSync, rmSync } from 'node:fs'
 import { join } from 'node:path'
 
-// The Node's TLS identity (docs/vNext/security.md § Transport and authentication: "TLS 1.3
-// everywhere, including loopback. Self-signed Node cert, pinned per node by the client at pairing
-// time"). Generated once into the data root and reused for the node's whole life — the fingerprint IS
-// the node's identity, so regenerating it would look to every paired client exactly like the attack
-// the pin exists to catch.
-//
-// Shelling out to openssl rather than adding a dependency: node:crypto can PARSE an X509 but cannot
-// sign one, and every platform we ship to has openssl on PATH (macOS, and any Linux with git).
-// ponytail: if a target platform ever lacks it, the npm `selfsigned` package (pure JS, ~1 dep) is
-// the drop-in replacement for generate() below — nothing else in this file changes.
-
 const TLS_DIR = 'tls'
 const KEY_FILE = 'key.pem'
 const CERT_FILE = 'cert.pem'

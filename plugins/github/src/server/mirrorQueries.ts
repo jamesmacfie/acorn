@@ -1,9 +1,3 @@
-// The reads OTHER packages used to perform against the GitHub mirror when it lived in core's database.
-//
-// All three are published as one capability, `github.mirror` (contract/mirror.ts), and all three are
-// deliberately read-only and non-fetching: each backs a caller that is mid-assembly of something else (a
-// prompt, a policy verdict, a boot log) and must degrade to "nothing known" rather than block on GitHub.
-// Mirror REFRESH stays where it was — demand-driven by serve-then-revalidate on a request.
 import { and, count, desc, eq } from 'drizzle-orm'
 import type { CoreServices } from '@acorn/node-core/main/core/index.ts'
 import type { PluginDatabase } from '@acorn/node-core/main/pluginStorage.ts'
@@ -12,8 +6,7 @@ import { checks, prFiles, pullRequests, repos, syncState } from '../node/schema'
 
 // A mirrored repo row's GitHub id, for a (userId, owner, name). The mirror is keyed by the numeric GitHub
 // repo id everywhere below, and nothing outside this plugin can resolve owner/name → that id — which is
-// the concrete reason `pinned_repos` and `viewed_files` moved here with the mirror rather than staying in
-// core as app state.
+// The GitHub plugin owns mirror-related repository state, including pinned repositories and viewed files.
 async function mirroredRepoId(db: PluginDatabase, userId: string, repoOwner: string, repoName: string): Promise<number | null> {
   const [row] = await db
     .select({ id: repos.id })
@@ -23,10 +16,8 @@ async function mirroredRepoId(db: PluginDatabase, userId: string, repoOwner: str
 }
 
 /**
- * The `pr` context section's source (server/agentTools/contextSections.ts in core takes this injected).
- * This is verbatim the three-table read that section used to run itself, including the sort on the
- * changed-file list — the section renders a capped comma-joined list and depended on that ordering being
- * stable, so it is done here rather than left to the caller.
+ * Source for the `pr` context section. The section renders a capped, comma-joined changed-file list, so
+ * this capability owns the file lookup and returns paths in a stable order.
  */
 export async function mirroredPullRequest(
   db: PluginDatabase,
@@ -50,19 +41,13 @@ export async function mirroredPullRequest(
 }
 
 /**
- * Re-derived CI state for the workflow runner's `checks-green` policy and its ci-loop step. This is what
- * apps/node/src/wiring/workflowWiring.ts held, moved into the plugin that owns `checks`; that file is
- * deleted, and its stated condition for deletion ("the day github can publish the capability") is met.
- *
  * The three-valued contract is unchanged and is load-bearing — '' means every check passed, text is the
  * rendered failure list that becomes the fix prompt, and null means there is nothing to check, which the
  * ci-loop step treats as a hard failure rather than as success. The `!userId` and no-rows cases both fall
  * into null for exactly that reason: an unmirrored repo must not be mistaken for a green one.
  *
- * The task lookup goes through CoreServices because `tasks` is core's table (docs/vNext/data.md § Plugin
- * DBs: "Cross-plugin references are plain IDs, validated by the owning plugin when dereferenced"). The
- * old version read it with `loadTask(db, taskId)` off core's handle, which is precisely what the split
- * makes unexpressible.
+ * The task lookup goes through CoreServices because tasks are core-owned. Cross-plugin references remain
+ * plain IDs and are validated by the owning service when dereferenced.
  */
 export async function failingChecksFor(
   db: PluginDatabase,

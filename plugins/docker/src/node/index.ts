@@ -1,13 +1,3 @@
-// The docker plugin's node part (docs/vNext/plugins.md § The plugin API).
-//
-// No tables: everything this plugin knows comes from the local docker daemon, and the only persisted
-// state it reads is core's `tasks` (to match containers to a task's worktree/branch), through
-// CoreServices. So there is no plugin SQLite file here — a plugin gets one when it owns a table, not
-// as a matter of form.
-//
-// What the composition root used to do by hand: apps/node/src/server/routes.ts registered the router,
-// apps/node/src/wiring/serverBridges.ts connected the bridge AND registered the WebSocket channel, and
-// apps/node/src/service/runtime.ts remembered to call disposeDocker() during teardown.
 import { registerWsChannelHandler } from '@acorn/node-core/main/wsHub.ts'
 import type { NodePlugin } from '@acorn/node-core/server/plugin/types.ts'
 import { dockerBridge } from '../main/dockerBridge'

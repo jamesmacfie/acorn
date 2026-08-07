@@ -1,6 +1,6 @@
 import { Registry } from './registry'
 
-// A number a plugin can put on a Fleet home node card (docs/vNext/ui.md § New surfaces: "a card per
+// A number a plugin can put on a Fleet home node card (docs/ui-design.md § New surfaces: "a card per
 // node with connection state, health, active agents/tasks, attention count, last-refresh").
 //
 // Core supplies the task count itself — `tasks` is core's table. Everything else on the card belongs to

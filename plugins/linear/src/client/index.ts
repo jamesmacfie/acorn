@@ -1,9 +1,7 @@
-// The linear plugin's client part (docs/vNext/plugins.md § The plugin API).
+// The linear plugin's client part (docs/plugins.md § The plugin API).
 //
-// Worth knowing: linear owns no tables. `issues` / `issue_resources` are core's generic external-item
-// read model, shared with rollbar and reached through a core-owned store (phase2-notes.md § `issues`
-// stays a core table), so the node half of this plugin is a provider descriptor and a router — nothing
-// this file needs to know about. What makes linear VISIBLE is entirely here: a rail source and a pane.
+// Linear owns no tables. Its provider descriptor and node routes use the core-owned external-item
+// read model, while this client contribution supplies the rail source, reference panel, and pane.
 import type { ClientPlugin } from '@acorn/client-core/registries/plugin.ts'
 import { linearPaneContribution } from './paneContribution'
 import { linearRefPanelContribution } from './refPanelContribution'

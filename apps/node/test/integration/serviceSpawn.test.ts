@@ -16,17 +16,6 @@ import {
   type ServiceState,
 } from '@acorn/protocol/serviceProtocol.ts'
 
-// The service as a real, separately-spawned process — the thing every other test in this repo stubs.
-//
-// This exists because the supervision channel is now an ordinary Node IPC channel rather than Electron's
-// utilityProcess, which means the whole handshake can be exercised under PLAIN NODE, with no Electron
-// anywhere: spawn, service.start, the state sequence, a validated HTTPS request against the reported
-// pin, and an ordered service.stop. Under utilityProcess none of that was reachable from a unit test,
-// and the first thing to find out that the boot handshake was broken would have been a person.
-//
-// What it cannot cover is the PACKAGED path (Electron's binary under ELECTRON_RUN_AS_NODE, loading the
-// bundled artifact out of app.asar). That is the desktop smoke suite's job.
-
 const appRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../..')
 
 class ServiceChild {
@@ -183,11 +172,6 @@ describe('the service as a spawned child process', () => {
     await expect(get(started, '/v2/node')).rejects.toThrow()
   }, 60_000)
 
-  // plan.md's Phase 1 exit asks for pairing / revocation / idempotency "against a real node process on a
-  // temp data root". Every other suite drives them through `createApp().fetch` with a hand-built env,
-  // which proves the semantics but not that the middleware stack, the bindings factory and the SQLite
-  // schema of a genuinely booted node agree — the two ways that can differ are a router mounted in the
-  // wrong order and a binding the assembled env never supplies.
   it('honours pairing, idempotency and revocation over the wire on a temp data root', async () => {
     const { started } = await boot()
 

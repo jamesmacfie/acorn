@@ -11,18 +11,6 @@ import type { ClientCapabilityRequirement } from '../capabilities'
 import type { Task } from '../queries'
 import { Registry } from './registry'
 
-// 'drawer' is Phase 3's addition, for the terminal drawer the shell used to render itself.
-//
-// It is NOT merged into 'overlay', but the reason first recorded here — "the drawer sits below the routed
-// surface in document order and the overlay host sits after it, so merging them would put the drawer above
-// every dialog" — was wrong on the facts. TerminalPanel renders through a `<Portal>`, so where its host sits in
-// App.tsx's document order decides nothing about stacking, and the drawer is below a modal by z-index anyway
-// (`--z-drawer: 50` vs `--z-modal: 100` in styles/tokens-invariant.css).
-//
-// The genuine reason is the `when` predicate. A contribution whose `when` is false is never rendered, which
-// keeps the property the shell's own `<Show when={termOpen()}>` had: xterm is not constructed for a closed
-// drawer. Overlay contributions decide their own visibility inside the component, so folding the drawer in
-// there would build a terminal for every task view and throw it away.
 export type UiSlotId = 'topbar.left' | 'topbar.right' | 'task.switcher.extra' | 'overlay' | 'drawer'
 
 export type UiSlotContext = {

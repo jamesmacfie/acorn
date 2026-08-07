@@ -9,10 +9,8 @@ import { agentEvents } from './schema'
 // opens a real migrated DB and asserts the projection is installed and shaped the way
 // main/sessionRepository.ts's search path reads it, so a drifted migration edit fails CI.
 //
-// It moved here from main/fts.test.ts with the tables. That matters twice over: the chain that creates
-// these four objects is this plugin's now (migrations/0000_*.sql), and core's database no longer has
-// `agent_events` to assert about — so a version of this test still pointed at makeTestDb() would fail
-// rather than silently pass, which is the outcome the split is supposed to produce.
+// The chain that creates these four objects is this plugin's migration chain (migrations/0000_*.sql),
+// so the guard uses a per-plugin database rather than a core database.
 describe('agent_events_fts schema drift guard', () => {
   let t: TestPluginDb
 

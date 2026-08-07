@@ -13,7 +13,7 @@ export async function protectHttpValue(value: string, secrets: SecretService): P
 }
 
 // reveal(), and deliberately so: this is the API panel's OWN saved data being handed back to the
-// owner who typed it. docs/vNext/security.md § Secrets names that exemption explicitly ("The
+// owner who typed it. docs/security.md § Secrets names that exemption explicitly ("The
 // user-facing HTTP client pane is exempt by design… but is owner-invoked only"), and the router
 // enforces the owner-invoked half by requiring a `device` principal.
 export async function openHttpValue(value: string, encrypted: boolean, secrets: SecretService): Promise<string> {
@@ -26,20 +26,6 @@ export async function openHttpValue(value: string, encrypted: boolean, secrets: 
   }
 }
 
-// Pre-listener upgrade for rows written by releases that stored HTTP drafts in plaintext. All
-// sensitive fields are encrypted in one row update after their ciphertexts are ready. Legacy
-// ownership can be recovered only when the node knows exactly one identity; otherwise the sentinel
-// remains and no authenticated identity can query those rows.
-//
-// It runs from this plugin's init (node/index.ts) rather than from apps/node/src/wiring/startupSecurity.ts,
-// which is where it lived while the app owned this plugin's tables. NodePlugin.init is awaited before the
-// listener binds — the property this migration has always depended on — so the move is a relocation, not
-// a change in ordering guarantees.
-//
-// `identity` is CoreServices.identity, not two queries. This function used to compute the sole identity
-// itself by reading core's `prefs` AND github's `repos` with core's database handle: the first a plugin
-// reading a core table, the second a plugin reading ANOTHER PLUGIN's table. Neither is reachable now, and
-// "which identities does this node know?" was never this plugin's question to answer.
 export async function protectLegacyHttpStorage(db: PluginDatabase, secrets: SecretService, identity: IdentityService): Promise<void> {
   const soleIdentity = await identity.sole()
 

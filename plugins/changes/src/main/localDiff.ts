@@ -166,9 +166,6 @@ export async function commitStaged(worktree: string, message: string): Promise<G
   return run(worktree, ['commit', '-m', msg])
 }
 
-// Push HEAD to origin. `-u origin HEAD` works for the first push (sets upstream) and every
-// push after (harmless re-affirm), so one command covers both — no upstream-detection round-trip.
-// ponytail: origin only; add a remote picker if a multi-remote worktree ever shows up.
 export async function pushBranch(worktree: string): Promise<GitActionResult> {
   return run(worktree, ['push', '--set-upstream', 'origin', 'HEAD'])
 }

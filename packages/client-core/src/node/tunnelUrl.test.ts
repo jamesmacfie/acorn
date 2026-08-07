@@ -48,7 +48,7 @@ describe('loopbackTarget', () => {
   })
 
   it('is null for anything that does not need a tunnel or must not get one', () => {
-    // A real host is already reachable from here, and tunnelling it would be the general proxy protocol.md
+    // A real host is already reachable from here, and tunnelling it would be the general proxy docs/api-reference.md
     // rules out. `localhost@evil.test` is the userinfo trick the preview URL guard also refuses.
     expect(loopbackTarget('https://staging.example.com')).toBeNull()
     expect(loopbackTarget('http://localhost@evil.test/')).toBeNull()
@@ -78,11 +78,6 @@ describe('tunnelUrl', () => {
   })
 
   it('returns NULL when the tunnel cannot be opened, rather than the original URL', async () => {
-    // This case asserted the opposite until the Phase 4 review, and the original reasoning ("no worse than
-    // before tunnels existed") was wrong. The URL is loopback and the node is REMOTE, so falling back loads
-    // whatever is on the OWNER'S machine at that port while the pane claims to show the remote task's
-    // preview — a repo configured `previewMode: 'url' = http://localhost:8025` on a build box rendered the
-    // owner's own Mailhog. Showing nothing is the only honest answer; main logs why.
     setActiveNode('remote')
     opens = () => Promise.reject(new Error('403'))
     await expect(tunnelUrl('task-1', 'http://localhost:5173/')).resolves.toBeNull()

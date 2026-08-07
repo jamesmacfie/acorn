@@ -11,7 +11,7 @@ import '@acorn/client-core/palette/palette.css'
 // palette shell (palette.css + fuzzyScore + createOverlayPalette) over `git ls-files`. Selecting a
 // file opens an ephemeral tab via shared editorState and reveals the editor pane — EditorPane's
 // active() effect swaps it in.
-const MAX_ROWS = 100 // ponytail: big repos have thousands of files; cap the render, raise if it bites
+const MAX_ROWS = 100 // Keep palette rendering bounded for repositories with thousands of files.
 
 export default function FilePalette() {
   const api = editorApi()

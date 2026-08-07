@@ -91,7 +91,7 @@ describe('the loopback TLS listener', () => {
     expect(started.endpoint.origin).toBe(`https://127.0.0.1:${started.endpoint.port}`)
     expect(started.endpoint.port).toBeGreaterThan(0)
     expect(started.fingerprint).toMatch(/^[0-9a-f]{64}$/)
-    // GET /v2/node is the pre-auth route a client that has never paired uses (docs/vNext/protocol.md
+    // GET /v2/node is the pre-auth route a client that has never paired uses (docs/api-reference.md
     // § Pairing), so it is reachable without a bearer — which makes it the right shape probe here. It
     // advertises the same fingerprint the handshake above just presented.
     const response = await probe(started, '/v2/node')
@@ -99,15 +99,13 @@ describe('the loopback TLS listener', () => {
     expect(JSON.parse(response.body)).toMatchObject({ fingerprint: started.fingerprint })
   }, 20_000)
 
-  // The guard used to be built from the pinned ACORN_PORT. On an ephemeral port that expression is
-  // `127.0.0.1:0`, which matches nothing — every request would 403.
   it('rejects an unexpected Host but accepts the port it actually bound', async () => {
     const started = await start()
     expect((await probe(started, '/v2/node', 'localhost:1234')).status).toBe(403)
     expect((await probe(started, '/v2/node', `127.0.0.1:${started.endpoint.port}`)).status).toBe(200)
   }, 20_000)
 
-  // "The Node serves no web assets" (docs/vNext/architecture.md): the renderer loads from app://acorn,
+  // "The Node serves no web assets" (docs/architecture-overview.md): the renderer loads from app://acorn,
   // so an HTML shell here would only invite a browser to treat the node as an origin.
   it('serves no SPA shell', async () => {
     const started = await start()

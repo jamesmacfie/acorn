@@ -6,9 +6,6 @@ import { fuzzyScore } from './model'
 import { createOverlayPalette } from './overlay'
 import './palette.css'
 
-// ⌘L workspace switcher: fuzzy-jump between workspaces (docs/workspaces-and-tasks.md). Fleet-wide as of
-// Phase 4 — the fuzzy match runs over the node label too, so "beta build" finds the Beta workspace on the
-// build box. Picking one switches node context before navigating (workspaces/fleetWorkspaces.ts).
 export default function WorkspacePalette() {
   const navigate = useNavigate()
   const fleet = createFleetWorkspaces()

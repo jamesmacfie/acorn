@@ -100,10 +100,6 @@ const agentSender = new AgentSender((id) => {
   return { write: (data: string) => s.pty.write(data), running: () => s.meta.status === 'running', idle: () => s.meta.idle }
 })
 
-// Queue a text block into an agent session on its idle edge. Published by this plugin's init as the
-// `terminal.sendToAgent` capability (contract/sendToAgent.ts), which is how plugins/memory's launch
-// injector reaches a PTY without importing this engine. It was an app-supplied dep on the memory plugin
-// for one phase because terminal was not a NodePlugin and so could not publish anything.
 export function sendToAgent(sessionId: string, text: string, submit: SendSubmit): void {
   void agentSender.send(sessionId, text, submit)
 }
@@ -123,17 +119,6 @@ export const sessionControl = {
   list: async (): Promise<TerminalSession[]> => [...sessions.values()].map((s) => s.meta),
 }
 
-// The cross-domain hooks that arrive as TerminalIpcDeps — supplied by the composition root and installed
-// by this plugin's init. Held as nullable module state only because the handlers close over module scope;
-// TerminalIpcDeps requires all of them, so registerTerminalIpc sets every one before any session can
-// spawn, and dispose resets every one.
-// - launchInjector: push the combined task-context + repo-memory block into a fresh agent session (docs/notes-and-memory.md).
-// - memoryReviewTrigger: fire the auto-generation pass when an agent session exits (docs/notes-and-memory.md).
-// - seedNotes: snapshot PR/ticket context into curatable notes on task creation (docs/notes-and-memory.md).
-// - internalEnv: mints the loopback credential for ONE session (server/auth/internalTokens.ts). Called
-//   per spawn, not once at wire time, so each PTY carries a token scoped to its own task and session
-//   instead of the node-wide string every child used to share.
-// - bootReconciled: the composition root's reconcile pass — archive awaits it (see the handler).
 let launchInjector: ((taskId: string, sessionId: string) => Promise<void>) | null = null
 let memoryReviewTrigger: ((taskId: string, transcriptTail: string) => Promise<void>) | null = null
 let seedNotes: ((task: TaskRow) => Promise<void>) | null = null
@@ -184,7 +169,6 @@ function ensureTmuxSession(name: string, cwd: string, command: string, env: Reco
   // tmux runs the command argument through the user's shell, so a full "pnpm dev" line works; env
   // (e.g. PORT) is inherited by that shell (docs/workspaces-and-tasks.md).
   execFileSync('tmux', tmuxNewSessionArgs(name, cwd, command, env), { env, stdio: 'ignore' })
-  // ponytail: hide tmux's own status bar — we render our own tab strip, so it's just noise
   execFileSync('tmux', ['set-option', '-t', name, 'status', 'off'], { env, stdio: 'ignore' })
 }
 
@@ -321,9 +305,6 @@ function wireSession(meta: TerminalSession, pty: IPty): Session {
   return s
 }
 
-// One timer flips running agents to idle after enough output silence, notifying once per transition
-// (docs/terminal-and-agents.md). The busy→idle edge lives here; the idle→busy edge lives in onData above. The handle is
-// held so the composition root can clear it on quit (composition-root ownership — it used to leak).
 let idleWatch: ReturnType<typeof setInterval> | null = null
 function startIdleWatch() {
   if (idleWatch) return // registered once; a second boot must not stack a second timer
@@ -418,14 +399,6 @@ async function spawnOne(
     exitCode: null,
   }
 
-  // Auto-register the acorn MCP server with this agent's CLI, so the current task's tools are
-  // available — no manual "Register" click. Idempotent (remove-then-add), failures (CLI missing)
-  // swallowed. Fire-and-forget: `claude mcp add --scope user` persists to ~/.claude.json across
-  // runs, so the agent already sees acorn from a prior run; awaiting a fresh ~1-2s login-shell
-  // round-trip (×2) here just to heal a rarely-changed launcher path made the tab hang for seconds
-  // before the PTY appeared. Boot's refreshAcornMcpRegistrations does the durable heal in the
-  // background. ponytail: cached per app-run so we shell out at most once per CLI; failures stay
-  // uncached so a CLI installed after boot registers on the next spawn.
   if (profile.mcpRegistration && !mcpRegistered.has(profile.id)) {
     void profile.mcpRegistration(mcpName(), mcpLauncher()).then((res) => { if (res?.ok) mcpRegistered.add(profile.id) }).catch(() => undefined)
   }
@@ -554,21 +527,6 @@ export function terminalRunGlue(): RunSessionGlue {
   }
 }
 
-// The four cross-domain hooks the COMPOSITION ROOT still injects, and why each one cannot be a
-// capability this plugin resolves for itself:
-//
-//   - internalEnv mints the loopback credential for one session (server/auth/internalTokens.ts). It
-//     closes over the listener's origin, which does not exist until after every plugin's init has run,
-//     and over `INTERNAL_TOKEN` — the signing key. Putting that key on CoreServices would hand every
-//     plugin the ability to mint a token for any scope, which is the opposite of what scoping the
-//     tokens was for.
-//   - launchInjector, memoryReviewTrigger and seedTaskNotes belong to plugins/memory and plugins/notes.
-//     memory's runtime is published as `memory.knowledge`, but that capability id deliberately lives in
-//     the plugin's main/ rather than a contract/ (its value includes two internal stores), so importing
-//     it here would be a terminal→memory coupling edge — an ADDITION to the plugin→plugin baseline,
-//     which is Phase 3's to shrink, not this batch's to grow. The composition root resolves the
-//     capability at CALL time on this plugin's behalf instead.
-//   - reconciled is the composition root's own post-listener reconcile pass. It has no other owner.
 export type TerminalIpcDeps = {
   internalEnv: InternalEnvFactory
   launchInjector: (taskId: string, sessionId: string) => Promise<void>
@@ -609,10 +567,6 @@ export function disposeTerminal(): void {
   bootReconciled = Promise.resolve()
 }
 
-// The engine's installation step, called from this plugin's init (node/index.ts) — it used to be called
-// by the composition root with core's database handle. Every payload is validated at the route layer
-// because the renderer is the less-trusted side (docs/terminal-and-agents.md). Exited sessions linger
-// until explicitly removed.
 export function registerTerminalIpc(pluginDb: PluginDatabase, coreServices: TerminalCoreServices, deps: TerminalIpcDeps): void {
   store = pluginDb
   core = coreServices

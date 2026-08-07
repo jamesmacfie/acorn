@@ -11,7 +11,7 @@ import type {
 // The one error envelope every route returns — defined in ./errors.ts, re-exported here because
 // `ApiError` is the name 250-odd call sites already know. `error` was a bare string with a sibling
 // `detail: string[]`; it is now a nested object carrying requestId and retryable too
-// (docs/vNext/protocol.md § Errors).
+// (docs/api-reference.md § Errors).
 export type { ApiError } from './errors.ts'
 export type Repo = {
   id: number
@@ -94,8 +94,8 @@ export type Compare = { aheadBy: number; files: PullFile[]; commits: CompareComm
 export type FileBlob = { text: string }
 
 // --- Integrations: multi-row per provider (docs/workspaces-and-tasks.md). GitHub appears as a synthesized
-// entry (id 'github') so it reads as "just another integration", but it's the identity root — its
-// token is the session cookie, not a stored row. ---
+// entry (id 'github') so it reads as "just another integration", while its encrypted token remains the
+// Node's active provider credential. ---
 export type IntegrationProvider = string
 export type Integration = {
   id: string // 'github' for the synthesized entry; opaque uuid otherwise
@@ -122,8 +122,6 @@ export type LinearComment = { id: string; author: string | null; body: string; c
 // maps to a glyph; `color` tints state changes.
 export type LinearActivity = { id: string; actor: string | null; text: string; createdAt: number | null; icon: string; color?: string }
 export type LinearLabel = { id: string; name: string; color: string }
-// An external artifact Linear auto-links to an issue (GitHub PR, Sentry/Rollbar error, Slack thread,
-// Figma file, …). `sourceType` is Linear's integration key used to group/label the link.
 export type LinearAttachment = { id: string; title: string; subtitle: string | null; url: string; sourceType: string | null }
 // A lightweight reference to another issue (parent, sub-issue, or relation target).
 export type LinearRelatedIssue = { id: string; identifier: string; title: string; state: LinearIssueState }
@@ -304,8 +302,6 @@ export type WorkspaceIcon =
   | { kind: 'emoji'; value: string }
   | { kind: 'lucide'; value: string }
   | { kind: 'github' }
-// PURE GROUPING (repo-level-settings): identity + membership only. The build/run/db/preview config
-// that used to live here moved to RepoPath (per (owner, repo)) — see core/shared/terminal.ts.
 export type Workspace = {
   id: string
   name: string
@@ -360,8 +356,6 @@ export type TaskSeed = {
   links?: TaskLinkSeed[]
 }
 
-// Assembled task context (docs/agent-tools.md §4): section contributions serialize their renderer
-// metadata and compact projection beside the compatibility fields used by focused tools.
 export type TaskContextInclude = string
 export type ContextBudget = {
   maxItems?: number
@@ -466,7 +460,7 @@ export const localBlobRoute = (taskId: string, path: string, ref?: string) =>
 export const localActionRoute = (taskId: string, action: 'stage' | 'unstage' | 'discard' | 'commit' | 'stage-all' | 'unstage-all' | 'discard-all' | 'push') =>
   `/v2/p/changes/tasks/${taskId}/local/${action}`
 
-// Database pane (docs/pg.md): per-task Postgres browse/edit. Was the `db:*` IPC channels.
+// Database pane (docs/pg.md): per-task Postgres browse/edit over the plugin route namespace.
 export const databaseTablesRoute = (taskId: string) => `/v2/p/database/tasks/${taskId}/database/tables`
 export const databaseColumnsRoute = (taskId: string, schema: string, name: string) =>
   `/v2/p/database/tasks/${taskId}/database/columns?schema=${encodeURIComponent(schema)}&name=${encodeURIComponent(name)}`
@@ -478,7 +472,7 @@ export const databaseActionRoute = (taskId: string, action: 'connect' | 'disconn
 export const databaseQueriesRoute = (taskId: string) => `/v2/p/database/tasks/${taskId}/database/queries`
 export const databaseQueryRoute = (taskId: string, queryId: string) => `/v2/p/database/tasks/${taskId}/database/queries/${queryId}`
 
-// Notes + memory pane (docs/notes-and-memory.md). These routes replaced the old feature-specific IPC surface.
+// Notes + memory pane (docs/notes-and-memory.md). These routes are exposed through the plugin namespaces.
 export const memoryListRoute = (repo?: string) => `/v2/p/memory/memory${repo ? `?repo=${encodeURIComponent(repo)}` : ''}`
 export const memorySearchRoute = (query: string, repo?: string, type?: string) =>
   `/v2/p/memory/memory/search?q=${encodeURIComponent(query)}${repo ? `&repo=${encodeURIComponent(repo)}` : ''}${type ? `&type=${encodeURIComponent(type)}` : ''}`
@@ -495,21 +489,11 @@ export const noteRoute = (location: NoteLocation, slug: string) => `${notesListR
 export const noteIncludedRoute = (location: NoteLocation, slug: string) => `${noteRoute(location, slug)}/included`
 export const noteTitleRoute = (location: NoteLocation, slug: string) => `${noteRoute(location, slug)}/title`
 
-// Terminal control (docs/terminal-and-agents.md): request/response routes for the PTY engine.
-// Input/output/status use the WebSocket; only the native folder picker stays on preload IPC.
-//
-// De-doubled in Phase 2's route-declaration pass: /v2/p/terminal/sessions, not
-// /v2/p/terminal/terminal/sessions. The plugin's router used to state its own top-level segment
-// internally, which repeated under the namespace; docs/vNext/protocol.md § HTTP conventions already
-// writes the short form.
 export const terminalSessionsRoute = '/v2/p/terminal/sessions'
 export const terminalProfilesRoute = '/v2/p/terminal/profiles'
 export const terminalSessionActionRoute = (sid: string, action: 'kill' | 'interrupt' | 'remove' | 'resize' | 'send') =>
   `/v2/p/terminal/sessions/${encodeURIComponent(sid)}/${action}`
 
-// Worktree, repo-config and task lifecycle — CORE routes as of Phase 2's scope-shed. These were
-// /v2/p/terminal/* until the terminal plugin stopped owning where a repo lives, what its executable
-// config says, and whether a task is archived (docs/vNext/plan.md § Phase 2).
 export const taskStatusesRoute = '/v2/core/task-statuses'
 export const repoPathRoute = (owner: string, repo: string) =>
   `/v2/core/repos/path?owner=${encodeURIComponent(owner)}&repo=${encodeURIComponent(repo)}`
@@ -590,13 +574,9 @@ export const jobLogRoute = (owner: string, repo: string, jobId: number) => repoR
 export const mentionsRoute = (owner: string, repo: string) => repoRoute(owner, repo, 'mentions')
 export const requestedReviewersRoute = (owner: string, repo: string, number: string | number) =>
   pullRoute(owner, repo, number, 'requested-reviewers')
-// Pinned repos are the github plugin's, not core's: the table is keyed by a GitHub repo id, which
-// nothing outside that mirror can resolve (plugins/github/src/node/schema.ts). Phase 2 moved the table
-// and the route together, so this is `/v2/p/github/pins` rather than the `/v2/core/pins` it was through
-// Phase 1. The repo selector is the only caller.
 export const pinsRoute = '/v2/p/github/pins'
 export const prefsRoute = '/v2/core/prefs'
-// Settings → Plugins (docs/vNext/ui.md § New surfaces). Per NODE: which plugins a node runs decides
+// Settings → Plugins (docs/ui-design.md § New surfaces). Per NODE: which plugins a node runs decides
 // which routes exist and which SQLite files open, so this is node state and not a client preference.
 //
 // `running` and `disabled` are separate answers, not one. A toggle takes effect at the node's next
@@ -605,12 +585,12 @@ export const prefsRoute = '/v2/core/prefs'
 export type NodePluginRow = { name: string; required: boolean; disabled: boolean; running: boolean }
 export type NodePluginState = { plugins: NodePluginRow[]; restartRequired: boolean }
 export const corePluginsRoute = '/v2/core/plugins'
-// Every client paired with a node, and the revoke for one of them (ui.md § New surfaces: "revoke this or
+// Every client paired with a node, and the revoke for one of them (docs/ui-design.md § New surfaces: "revoke this or
 // other devices"). Device-only, like the plugin list — this is node administration.
 export const coreDevicesRoute = '/v2/core/devices'
 export const coreDeviceRoute = (deviceId: string) => `/v2/core/devices/${encodeURIComponent(deviceId)}`
 
-// Settings → Security (docs/vNext/security.md § Audit, § On-disk).
+// Settings → Security (docs/security.md § Audit, § On-disk).
 //
 // `diskEncrypted` is deliberately three-valued. `null` means "this node cannot tell" — the honest answer
 // off macOS, where LUKS, dm-crypt, ZFS native encryption and a dozen NAS arrangements all count and
@@ -635,7 +615,7 @@ export type AuditEntry = {
 export type AuditPage = { entries: AuditEntry[]; nextBefore: number | null }
 export const coreAuditRoute = '/v2/core/audit'
 
-// `POST /v2/core/backup` (docs/vNext/data.md § Backup). `destPath` is a path on the NODE's filesystem,
+// `POST /v2/core/backup` (docs/data-layer.md § Backup). `destPath` is a path on the NODE's filesystem,
 // which is why the client offers a native save dialog only for the local node. `excluded` is echoed back
 // — and written into the archive's manifest — because "why is my GitHub token gone" is a question the
 // backup itself should answer for whoever restores it a year later.
@@ -643,9 +623,6 @@ export type BackupResult = { path: string; bytes: number; files: string[]; exclu
 export type BackupSuggestion = { suggestedPath: string }
 export const coreBackupRoute = '/v2/core/backup'
 
-// The config-only V1 importer (docs/vNext/plan.md § Phase 5). The V1 data root is on the NODE's
-// filesystem, so this is local-node-only by construction — a remote build box has no V1 install of the
-// owner's to read, and the probe simply answers `found: false` there.
 export type V1ImportProbe = { found: boolean; path: string | null; workspaces: number; repos: number; checkouts: number }
 export type V1ImportReport = {
   workspacesCreated: number
@@ -690,8 +667,7 @@ export const linearCommentsRoute = (identifier: string, connectionId?: string) =
 
 export const reposKey = ['repos'] as const
 export const pullsKey = (owner: string, repo: string, state: 'open' | 'closed') => ['pulls', owner, repo, state] as const
-// Distinct from pullsKey(_, 'closed'): the closed list is now an infinite query ({pages}), so it must
-// not share a key with the old finite-array cache entry (a persisted array would poison .data.pages).
+// The closed list is an infinite query, so its key includes the `pages` shape marker.
 export const closedPullsKey = (owner: string, repo: string) => ['pulls', owner, repo, 'closed', 'pages'] as const
 export const pullsPrefixKey = (owner: string, repo: string) => ['pulls', owner, repo] as const
 export const pullKey = (owner: string, repo: string, number: string) => ['pull', owner, repo, number] as const
@@ -706,14 +682,10 @@ export const branchesKey = (owner: string, repo: string) => ['branches', owner, 
 export const compareKey = (owner: string, repo: string, base: string, head: string) => ['compare', owner, repo, base, head] as const
 export const pinsKey = ['pins'] as const
 export const prefsKey = ['prefs'] as const
-// 'groups' suffix: the bare ['workspaces'] key held the old single-tier task array, which may still
-// be in a user's persisted IndexedDB cache — restoring it under a new shape (repos[]) would poison
-// reads. A distinct key sidesteps the stale entry (same fix as closedPullsKey). 'v2': the shape
-// gained the required browserRules[] — same stale-restore hazard, same fix.
+// The suffixes identify the current response shapes and prevent unrelated query data from sharing keys.
 export const workspacesKey = ['workspaces', 'groups', 'v2'] as const
 export const workspaceAssignmentsKey = ['workspace-assignments'] as const
-// 'v2': Task gained a non-optional `icon`. A row restored from a user's persisted IndexedDB cache
-// would lack it, contradicting the type — same stale-restore hazard as workspacesKey above.
+// The `v2` suffix identifies the current task response shape, including its required `icon` field.
 export const tasksKey = ['tasks', 'v2'] as const
 export const mentionsKey = (owner: string, repo: string) => ['mentions', owner, repo] as const
 export const runJobsKey = (owner: string, repo: string, runId: number) => ['run-jobs', owner, repo, runId] as const

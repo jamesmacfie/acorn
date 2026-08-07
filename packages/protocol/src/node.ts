@@ -1,13 +1,13 @@
 import { z } from 'zod'
 
-// The vNext wire protocol version. Bumped on breaking change; the Node reports it at GET /v2/node
+// The current wire protocol version. Bumped on breaking change; the Node reports it at GET /v2/node
 // and a client showing a major mismatch disables that node rather than negotiating capabilities
-// (docs/vNext/protocol.md § Versioning). V1's cookie/`/api` transport was version 1.
+// (docs/api-reference.md § Versioning).
 export const NODE_PROTOCOL_VERSION = 2
 
 // `node.json` in the data root: a Node's durable identity. Written once on first start and never
 // rewritten except for `port`, which records the last successfully bound listener port so a restart
-// usually lands back on the same one (docs/vNext/data.md).
+// usually lands back on the same one (docs/data-layer.md).
 export const nodeIdentitySchema = z.strictObject({
   nodeId: z.string().uuid(),
   createdAt: z.number().int().positive(),
@@ -20,7 +20,7 @@ export type NodeIdentity = z.infer<typeof nodeIdentitySchema>
 
 // GET /v2/node. Unauthenticated it carries only what pairing needs — which protocol to speak and
 // which certificate to expect; `nodeId`/`appVersion` appear only for an authenticated caller
-// (docs/vNext/protocol.md § Versioning), because anything that can reach the port can read the
+// (docs/api-reference.md § Versioning), because anything that can reach the port can read the
 // unauthenticated form.
 //
 // `fingerprint` is the sha256 of the node's self-signed certificate (lowercase hex). Always present:

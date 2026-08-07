@@ -42,11 +42,6 @@ describe('the client plugin host', () => {
       { name: 'second', init: (ctx) => { order.push('second'); ctx.sources.register(source('host.second')) } },
     ])
     expect(order).toEqual(['first', 'second'])
-    // Registration order is still what it is — the point is only that nothing user-visible reads it any more.
-    // It used to: the rail read `sourceRegistry.entries()` unsorted, so this list WAS the rail. `availableSources`
-    // sorts on the declared `SourceContribution.order` now (tabs/sources.test.ts pins that), which is why this
-    // case no longer doubles as the rail-order test. Compared as the tail of the list because other tests may
-    // have registered too.
     const ids = sourceRegistry.entries().map((entry) => entry.id).filter((id) => id.startsWith('host.'))
     expect(ids).toEqual(['host.first', 'host.second'])
     clear('first', 'second')
@@ -129,11 +124,6 @@ describe('the client plugin host', () => {
     expect(paneRegistry.get('host.toggled')).toBeUndefined()
   })
 
-  // `contribute` is for a registry a PLUGIN publishes, which client-core cannot name as a member without
-  // importing the plugin's type. plugins/github's contentLinkRegistry is the one instance. It used to be written
-  // by calling `register` on it directly, so the host held no disposable — which is why an `if (!get(id))` probe
-  // had grown around the call site, papering over the re-activation throw. These are the two properties the
-  // named points have and that call site did not.
   it('tracks a plugin-published registry the same as its own, so disable and re-activation both work', () => {
     const plugin: Registry<{ id: string; note: string }> = new Registry('plugin-owned')
     const plugins: ClientPlugin[] = [
@@ -144,7 +134,6 @@ describe('the client plugin host', () => {
     // Re-activation replaces rather than appending — a second bare `register` would throw on the duplicate id.
     expect(() => initClientPlugins(plugins)).not.toThrow()
     expect(plugin.entries()).toHaveLength(1)
-    // And Phase 4's disable can take it back, which a hand-registered contribution could not be.
     initClientPlugins(plugins, { disabled: ['publisher'] })
     expect(plugin.get('host.owned')).toBeUndefined()
   })

@@ -3,17 +3,13 @@ import { dirname, join, relative, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
 
-// Architecture boundary enforcement for the vNext workspace split (docs/vNext/architecture.md).
-// Makes the dependency rules executable instead of leaving them as convention.
-//
-// This replaces the single-package version that lived in apps/desktop/src/core. That one matched
-// only specifiers starting with '.', so once first-party code moved behind @acorn/* specifiers it
-// would have seen zero edges and passed every assertion vacuously — including the two hard
-// invariants. Every rule below therefore resolves BOTH relative and bare @acorn/* specifiers, and
+// Architecture boundary enforcement for the current workspace (docs/architecture-overview.md).
+// The scanner resolves relative and bare @acorn/* specifiers so the package graph is checked across
+// both intra-package and cross-package imports.
 // the suite asserts up front that it can still see a non-trivial graph.
 //
-// Unlike the old version, test files are NOT globally exempt. A blanket exemption is what let nine
-// test files import the composition root unnoticed; each rule now states its own policy.
+// Test files follow the same package graph rules as production files unless a specific rule grants an
+// explicit exception.
 
 const ROOT = (() => {
   let dir = dirname(fileURLToPath(import.meta.url))
@@ -120,7 +116,7 @@ const crossPackage = firstParty.filter((e) => e.target.pkg!.name !== e.fromPkg.n
 // 'contract', 'shared', …
 const segment = (pkg: Pkg, file: string): string => relative(pkg.src, file).split('/')[0]
 
-// contract/ is the ONE cross-plugin import surface (docs/vNext/plugins.md § Package shape). A plugin
+// contract/ is the ONE cross-plugin import surface (docs/plugins.md § Package shape). A plugin
 // may import another plugin's contract/; anything else is a coupling edge.
 const isContract = (pkg: Pkg | undefined, file: string | null): boolean =>
   !!pkg && !!file && pkg.kind === 'plugin' && segment(pkg, file) === 'contract'
@@ -132,7 +128,6 @@ function side(pkg: Pkg, file: string): 'client' | 'node' | 'shared' {
   if (pkg.name === '@acorn/protocol') return 'shared'
   const seg = relative(pkg.src, file).split('/')[0]
   if (seg === 'client') return 'client'
-  // `wiring` is @acorn/node's: the service-owned composition glue that used to sit in app/main.
   if (seg === 'server' || seg === 'main' || seg === 'service' || seg === 'mcp' || seg === 'wiring') return 'node'
   return 'shared'
 }
@@ -288,48 +283,10 @@ describe('architecture boundaries', () => {
   })
 
   it('plugin server code owns its own schema (shrinking baseline)', () => {
-    // Phase 2 moves each plugin's tables into its own package and its own SQLite file
-    // (docs/vNext/data.md § Plugin DBs). Until then, importing core's table definitions is
-    // grandfathered per package. Entries may be removed, never added.
-    //
-    // The intent is to match the TABLE barrel rather than the module — but be aware of what the regex
-    // below ACTUALLY does in this codebase, because it changes what "remove an entry" costs. The source
-    // has no semicolons, so `[^;]*?` runs backwards past earlier import statements: a file whose only
-    // db import is `import type { AppDatabase }` still matches, because the match starts at some
-    // earlier `import` and the clause it captures is not a `{ … }` list of `type` entries. In practice
-    // the rule therefore reads "no db-module import at all", type-only included. That is the stricter
-    // and more useful reading — a plugin holding core's AppDatabase is exactly the coupling the split
-    // removes — so it is left as is rather than loosened to match the comment.
-    // 'agents', 'changes', 'database', 'docker', 'editor', 'http', 'memory', 'notes', 'terminal' and
-    // 'workflows' are off this list: each owns its own schema (or, for docker/editor/notes, no tables at
-    // all) and takes CoreServices instead of core's database.
-    //
-    // 'agents' was the hard one and is worth recording, because it is the case this rule exists to catch.
-    // It did not merely IMPORT core's tables, it JOINED them: three queries answering "sessions in
-    // workspace X" ran `agent_sessions ⋈ tasks ⋈ workspace_repos`, which a per-plugin SQLite file makes
-    // unexpressible rather than merely impolite. They are id round trips through
-    // `CoreServices.tasks.idsForWorkspace()` now.
-    //
-    // ZERO. Every plugin owns its own schema, or owns no tables at all.
-    //
-    // The last three were one decision, not three. 'linear' and 'rollbar' SHARED core's `issues` table, so
-    // neither could own it; the resolution was that `issues` / `issue_resources` and the `provider:%` half
-    // of `sync_state` STAY core's — they are the generic external-item read model, `task_links` is keyed to
-    // match them, and cascade.ts deletes all of it in one transaction — and both plugins reach them through
-    // a narrow core-owned store instead of core's database handle
-    // (packages/node-core/src/server/integrations/itemStore.ts states the full argument). So those two own
-    // no database and have no `dispose`, exactly like docker, editor and notes.
-    //
-    // 'github' moved thirteen tables, including the OTHER half of `sync_state` — which had two unrelated
-    // key spaces sharing one table, separated by convention alone until this split.
-    //
-    // Keep this at zero. It is now a real invariant rather than a ratchet: a plugin that starts importing
-    // core's table definitions is reaching across a database file that no longer holds what it wants.
     const SCHEMA_BASELINE: string[] = []
-    // Any import FROM core's db module that is not exclusively type-only. The first version matched only
-    // `{ schema }` / `* as schema`, so `import * as db from '.../db/index.ts'` + `db.schema.tasks`, or
-    // `import { tasks } from '.../db/schema.ts'` — the natural form once the barrel is off-limits — both
-    // slipped through. Type-only imports (`import type { AppDatabase }`) are legitimate and stay.
+    // Any import FROM core's db module that is not exclusively type-only. Relative and bare package
+    // specifiers are resolved before this rule runs. Type-only imports (`import type { AppDatabase }`)
+    // are legitimate and stay.
     // `[^'"]*?` for the clause, NOT `[^;]*?`. A clause never contains a quote, but a PRECEDING import's
     // specifier does — with `[^;]*?` the lazy match happily spanned two statements in semicolon-free
     // source, so `import { readFile } from 'node:fs/promises'` followed by a type-only db import matched
@@ -362,40 +319,6 @@ describe('architecture boundaries', () => {
   })
 
   it('no plugin imports another outside contract/', () => {
-    // ZERO, as of Phase 3 (docs/vNext/plan.md § Phase 3 exit). This is an INVARIANT now, not a ratchet —
-    // the same transition the schema rule above already made. A new entry here is not a debt to record, it
-    // is a plugin reaching into another plugin's internals, and the fix is one of the four mechanisms the
-    // phase established rather than a line in this array.
-    //
-    // What each of the six V1 edges turned into, because the pattern is the useful part and it was NOT
-    // "add an abstraction" in four of the six cases:
-    //
-    //   THREE were a file in the wrong package, reaching nothing of the plugin they were imported from.
-    //     'context -> notes'      `requestNoteOpen`, one line over client-core's own openPane. Inlined.
-    //     'preview -> terminal'   runClient.ts, a fetcher for /v2/core routes. Moved to client-core.
-    //     'workflows -> agents'   workflowClient.ts, a fetcher for workflows' OWN routes. Moved to
-    //                             client-core — NOT into plugins/workflows, because workflows already
-    //                             imports agents' sessionExecute contract and the reverse edge would close
-    //                             a package cycle the acyclicity rule above rejects.
-    //   ONE was a surface that was too wide. 'agents -> terminal' needed `create`; importing
-    //     client/terminalClient also handed it write/attach/kill/resize. Terminal published the narrow
-    //     client twin of its existing `terminal.sessions` capability instead.
-    //   TWO were real UI composition, and each got the contribution point plugins.md already named:
-    //     'context -> memory'     the client context-section registry. Also gave memory its first
-    //                             ClientPlugin — "client code but nothing registrable" was why it had none.
-    //     'github -> linear'      `scanLinearRefs` to linear's contract/ (a pure function over strings),
-    //                             and the panel through a providerId-keyed ref-panel registry, so the
-    //                             plugin that reviews pull requests names no provider plugin at all.
-    //
-    // Two came off in PHASE 2 and are recorded here because they show the same split: 'changes -> github' and
-    // 'database -> editor' were rendering code, so the shared UI kit landed and both consumers import
-    // client-core (ui/diff/*, ui/monacoSetup.ts); 'memory -> notes' was an OWNERSHIP problem — memory
-    // CONSTRUCTED the NotesStore — so notes became a NodePlugin publishing `notes.store` from its contract/.
-    //
-    // One residual ownership question survives with no import behind it, stated so it is not mistaken for
-    // done: plugins/agents' task sidebar still fetches workflow runs and steps to merge into its own roster.
-    // plugins.md puts that in a task-activity slot both plugins contribute to. It is slot work, and the
-    // fetcher's home in client-core is what stands in for it meanwhile.
     const seen = crossPackage
       .filter((e) => e.fromPkg.kind === 'plugin' && e.target.pkg!.kind === 'plugin')
       // Importing another plugin's contract/ is the sanctioned mechanism, not a coupling: it carries

@@ -14,7 +14,7 @@ import { readDevicePrefs } from '../persistence/devicePrefs'
 import { PrefKeys } from '../persistence/prefKeys'
 import { savePref } from '../settings/savePref'
 
-// Settings → Security's reads, addressed at a named node (docs/vNext/security.md § Audit, § On-disk).
+// Settings → Security's reads, addressed at a named node (docs/security.md § Audit, § On-disk).
 //
 // Node-addressed like Settings → Plugins, and for the same reason: the audit trail and the disk-encryption
 // answer are facts about ONE machine. A fleet-wide roll-up would be actively misleading — "the disk is
@@ -37,7 +37,7 @@ export function nodeAuditPage(options: { nodeId?: string; before?: number; limit
   return readJson<AuditPage>(`${coreAuditRoute}${query ? `?${query}` : ''}`, options.nodeId ? { nodeId: options.nodeId } : {})
 }
 
-// --- Backup (docs/vNext/data.md § Backup) ---
+// --- Backup (docs/data-layer.md § Backup) ---
 
 // Where the NODE suggests writing the archive. Asked rather than composed on this side, because the
 // path is on the node's filesystem and a client cannot know its home directory — that is also why there
@@ -61,7 +61,7 @@ export function createNodeBackup(destPath: string, nodeId?: string): Promise<Bac
   )
 }
 
-// --- The one-time disk-encryption warning (docs/vNext/data.md § Backup) ---
+// --- The one-time disk-encryption warning (docs/data-layer.md § Backup) ---
 
 const ackedNodes = (): string[] => {
   try {
@@ -82,7 +82,7 @@ export function shouldWarnAboutDisk(posture: NodeSecurityPosture, nodeId: string
 }
 
 // Warn once per (device, node). Pushed as a notice rather than a modal because it is information, not a
-// decision: nothing is blocked by an unencrypted disk, and ui.md § Prompts and notifications reserves
+// decision: nothing is blocked by an unencrypted disk, and docs/ui-design.md § Prompts and notifications reserves
 // modal chrome for destructive confirmations, secret entry and agent approvals.
 //
 // Best-effort throughout. A node that cannot answer, or a device with no localStorage, simply does not

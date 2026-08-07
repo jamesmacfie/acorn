@@ -29,13 +29,6 @@ const RESOURCE = ROLLBAR_ITEMS_RESOURCE
 
 const connectionIdFrom = (c: { req: { query(name: string): string | undefined } }) => c.req.query('integration')
 
-// Provider-owned HTTP surface. Core mounts this router through the integration-provider registry;
-// reads execute the descriptor's mirrored-resource callbacks through the Phase-2 sync runtime.
-//
-// Every read below goes through `providerResource`, the request-context form: core resolves the owner
-// off the principal and keeps the database handle and secret service, so this plugin holds neither. The
-// (db, userId, secrets) triple each of these five call sites used to assemble by hand is gone with it —
-// and with it the chance of one of them assembling it wrongly and reading another owner's cache.
 export const rollbar = new Hono<AppEnv>()
   .get('/items', async (c) => {
     const available = await ownedConnections(c, PROVIDER)

@@ -99,8 +99,8 @@ describe('openDataRoot', () => {
     expect(readFileSync(join(dir, 'node.lock'), 'utf8').trim()).toBe('999999999')
   })
 
-  // vNext never migrates V1 data (docs/vNext/plan.md), so a V1 root must fail loudly instead of
-  // gaining a second database beside acorn.sqlite.
+  // The current data-root format is explicit. A source database is handled only through the opt-in
+  // importer, so opening a root containing the source filename must fail loudly.
   it('refuses a V1 data root', () => {
     const dir = freshDir()
     writeFileSync(join(dir, 'acorn.sqlite'), Buffer.alloc(0))

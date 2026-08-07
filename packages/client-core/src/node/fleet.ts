@@ -6,15 +6,15 @@ import type { NodeConnectionState, NodeRecord, NodeStatus } from '@acorn/protoco
 import { acornGlobal } from '../capabilities'
 
 // The fleet store: which nodes this client knows, what state each connection is in, and one query
-// cache per node (docs/vNext/architecture.md § Fleet semantics, docs/vNext/data.md § Client cache).
+// cache per node (docs/architecture-overview.md § Fleet semantics, docs/data-layer.md § Client cache).
 //
 // Membership itself is NOT owned here. Main owns it, because main owns the device tokens and the
-// pinned certificates (architecture.md § What runs where); this is a projection of `fleetList()` plus
+// pinned certificates (docs/architecture-overview.md § What runs where); this is a projection of `fleetList()` plus
 // the `onNodeStatus` push stream, and every mutation is a request to main.
 //
 // ## Why a QueryClient per node rather than a nodeId in every query key
 //
-// data.md calls the cache "keyed by (nodeId, queryKey)". Partitioning at the CLIENT satisfies that
+// docs/data-layer.md calls the cache "keyed by (nodeId, queryKey)". Partitioning at the CLIENT satisfies that
 // without a nodeId in the key, and it is the cheaper half of the trade by a wide margin:
 //
 //   - Prefixing keys means touching all 34 `*Options()` factories, the 44 cache-mutation call sites,

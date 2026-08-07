@@ -1,5 +1,5 @@
 // terminal.sendToAgent — queue a text block into an agent session's pseudo-terminal
-// (docs/vNext/plugins.md § Cross-plugin collaboration).
+// (docs/plugins.md § Cross-plugin collaboration).
 //
 // This file is part of the terminal plugin's CONTRACT: the only surface another plugin may import. It
 // carries the capability id and its signature, nothing executable.

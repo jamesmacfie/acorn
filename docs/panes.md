@@ -1,401 +1,51 @@
 # Panes
 
-How the Task view is laid out, and what every pane does. A **pane** is a surface inside the Task view
-(the single-repo unit of work — repo + branch + optional worktree + optional PR). A task's layout is a
-flat left→right row of open panes; one pure reducer owns every transition. This doc covers the pane
-model and a catalog of all twelve shipped panes, plus the two non-pane surfaces that render over the
-task view.
-
-For where the Task view sits in the app, see [frontend.md](./frontend.md) and
-[workspaces-and-tasks.md](./workspaces-and-tasks.md).
-
-## The pane model
-
-A layout is an ordered list of contribution-owned pane ids plus optional relative widths and pins:
-
-```ts
-type PaneId = string
-type TaskLayout = {
-  panes: PaneId[]                    // left→right, at least one, no duplicates
-  weights?: Record<PaneId, number>  // relative widths
-  pinned?: PaneId[]                 // panes protected from show/first close
-}
-```
-
-There is no separate `browser` pane — agent-driving is a capability of `preview` (see the catalog
-below). Core deliberately does not own a closed union: plugins register descriptors through
-`@acorn/client-core/registries/panes.ts`, and persisted unknown string ids survive a build where their
-contribution is absent. Recipe loading is stricter and drops panes not registered in the running app.
-
-There is **no split-tree**. Panes remain a flat row, but adjacent dividers resize them, the weights
-persist, and double-clicking a divider equalizes the row. Each contribution can declare a minimum
-width. Focus and maximize are session-only presentation state and are intentionally not persisted.
-
-### The reducer
-
-Every layout change goes through one pure function, `applyLayoutAction`
-(`layout.ts`), driven by these actions:
-
-| Action | Trigger | Effect |
-| --- | --- | --- |
-| `show` | switcher click | keep pinned panes and show the requested pane |
-| `add` | ⌘/Ctrl-click a switcher icon | append the pane to the right (no-op if already open) |
-| `close` | a slot's ✕ button | unpin first; otherwise drop it and fall back to `pr` if last |
-| `pin` | pane menu / palette | protect or unprotect the pane |
-| `move` | pane menu / palette | move one slot left or right |
-| `resize` | drag or keyboard-adjust a divider | update adjacent weights within minimum widths |
-| `equalize` | divider double-click | reset every open pane to weight `1` |
-| `replace` | recipe seeding | swap in a whole validated layout |
-
-The reducer is the single writer. `TaskView` never mutates the row directly — it calls
-`dispatchLayout(taskId, action)` (`@acorn/client-core/tasks/tasks.ts`), which runs the reducer and persists
-the result. `layoutForTask(taskId)` reads the current layout; a task with none falls back to
-`defaultLayout()`.
-
-### Persistence & migration
-
-The active format is one scoped preference per task:
-`core:task-layouts:<encoded-task-id>`. `normalizeLayout` validates the row, positive finite weights,
-and pins. The old aggregate `task_layouts` and single-pane `task_panes` preferences are read-only
-migration sources; the state-slice descriptor hydrates them once and writes only the scoped key.
-Archiving a task evicts its scoped layout.
-
-### The switcher
-
-The right-edge `nav.pane-switcher` (`TaskView.tsx:313`) holds one glyph button per available pane,
-plus toggles for Agents (`⠿`) and the Terminal (`>_`), the per-target run buttons (`▶`/`■`), and the
-Close-task `✕`. Interaction rules:
-
-- **Click** → `{ type: 'show', pane }` (replace to a single pane).
-- **⌘/Ctrl-click** → `{ type: 'add', pane }` (open beside the current panes).
-- Each open slot exposes close, pin, move, focus, and maximize affordances through its header/menu.
-- Adjacent dividers support pointer drag, keyboard arrows, and double-click equalization.
-- Provider panes appear conditionally: `pr` only when the task has a linked PR, `linear`/`rollbar`
-  only when the task has links of that provider.
-- Tooltips show the effective keyboard key (`data-tip-key`) and a one-line hint.
-
-The command palette projects registered panes into show, close, pin/unpin, and move actions, so
-contributed panes are reachable without the mouse — see
-[command-palette-and-shortcuts.md](./command-palette-and-shortcuts.md) and
-`apps/desktop/src/app/client/CommandPalette.tsx`.
-
-### Keyboard shortcuts
-
-`@acorn/client-core/tasks/paneShortcuts.ts` formats modifier **chords** (⌘/⌃/⌥/⇧ + a base key — they never
-fire while typing), dispatched from the task view. Defaults live on the ⌘⇧ layer (plain ⌘<letter>
-collides too readily with the OS/browser/Monaco):
-
-| Chord | Target | | Chord | Target |
-| --- | --- | --- | --- | --- |
-| `⌘⇧R` | PR review | | `⌘⇧E` | Editor |
-| `⌘⇧G` | Changes | | `⌘⇧F` | Find in Files |
-| `⌘⇧D` | Notes | | `⌘⇧J` | Database |
-| `⌘⇧X` | Context | | `⌘⇧L` | Linear |
-| `⌘⇧B` | Browser preview | | `⌘⇧O` | Rollbar |
-| `⌘⇧H` | API requests | | | |
-| `⌘⇧A` | Agents (toggle) | | `⌘⇧T` | Terminal (toggle) |
-
-`agents` and `terminal` are toggles, not layout panes; the rest dispatch a `show`. Docker ships
-without a default chord but can be assigned one. Chords are
-overridable via the `pane_shortcuts` pref (Settings → Shortcuts); the switcher tooltip shows the
-effective chord. `RESERVED_CHORDS` (`paneShortcuts.ts:32` — ⌘K, ⌘P, ⌘L, ⌘S, ⌘W, ⌘⇧N, ⌘`,`, ⌘0–9)
-are owned by the app globally and can never be assigned to a pane.
-
-### Layout recipes
-
-A recipe (`plugins/terminal/client/recipes.ts`) is a `[layout.<id>]` config block that seeds a whole layout in
-one shot. `invokeLayoutRecipe` (`recipes.ts:31`), a pure executor over injected services:
-
-1. `recipeToLayout` turns the recipe's `panes` into a validated `TaskLayout` (unknown/duplicate panes
-   dropped) and applies it via `replace`.
-2. If `terminal: "run.<id>"` is set, it auto-starts that run target in the terminal drawer and opens
-   the drawer.
-3. If `browser: "run:<id>"` is set, it ensures the target is up, resolves its URL, and points the
-   browser/preview pane at it (`setBrowserUrl`).
-
-The recipe's old `ratio` field is gone; a recipe starts equal and any later manual widths persist
-with the task. Recipe-resolved browser home
-URLs live in a separate signal (`recipeBrowserUrl`, `tasks.ts:64`) that wins over the workspace's
-configured preview URL for that session. Run targets are
-covered in [terminal-and-agents.md](./terminal-and-agents.md).
-
----
-
-## The pane catalog
-
-Each pane is rendered by `paneBody(pane)` in `TaskView.tsx:251`. PR is the only pane with internal
-structure (a navigator + a diff, two sections in one slot); every other pane is a single section.
-
-### `pr` — PR review
-
-The default pane, shown only when the task has a linked PR (`hasPr()`). It renders two components side
-by side inside the slot (`TaskView.tsx:252`):
-
-- **Navigator** — `PullDetail.tsx`. The PR header (state/draft badge, author, base←head branch chips,
-  file/±line summary, updated-age) with the merge/close/draft/reopen/auto-merge **review actions**;
-  then collapsible sections (state persisted in `localStorage`, `PullDetail.tsx:44`) for Description,
-  Integrations (Linear tickets scanned from the PR body/comments/reviews/threads — opens a
-  `LinearIssuePanel`), Labels (add/remove via `Picker`), the **changed-file list** (per-file status,
-  ±stats, viewed checkbox — clicking a file scrolls the diff to it), Checks (status dots; a check name
-  opens the [ChecksPanel](#checkspanel-non-pane), a failed check offers Rerun), the **conversation
-  timeline** (merged comments/commits with an inline composer + threaded review replies), and Review
-  (requested reviewers + approve / request-changes / comment).
-- **Diff** — `DiffView.tsx`. A virtualized Shiki-highlighted diff with split/unified toggle, inline
-  review threads (reply/resolve), gap expansion, and viewed-marking. The diff rendering pipeline is
-  documented in full in [diff-rendering.md](./diff-rendering.md). Navigator and Diff scroll
-  positions are session-only and scoped per task/PR (or per PR in the classic browser), so changing
-  panes/sources and returning resumes the review instead of starting at the top.
-
-Source: `plugins/github/src/client/{pullDetail,diff}/`.
-
-### `changes` — local working-tree review
-
-A PR-style "Files changed" view over the task worktree's **uncommitted** changes
-(`plugins/changes/client/ChangesPane.tsx`). It reuses the same diff pipeline as `pr`, but is fed by
-task-scoped local-git HTTP routes instead of GitHub patches; the whole-file view (`-U1e6`) drops
-expand-gaps and hunk headers so every line shows with +/- highlights. It refreshes on the rail's
-dirty-poll signal (`taskStatus`). Needs a worktree, so it is terminal-flag territory (see
-[terminal-and-agents.md](./terminal-and-agents.md)).
-
-Interactions:
-
-- Staged / unstaged file groups; per file **stage** (`+`), **unstage** (`−`), and **discard** (`↺`,
-  destructive → explicit confirm); **Commit staged** with a message; **Push → origin** (`git push -u
-  origin HEAD`).
-- **Review notes** — inline annotations anchored to a diff line (shared line composer), rendered under
-  their anchor. **Send N notes → agent** bundles the unsent notes into one prompt via `sendToAgent`
-  (`after-ready` — queued until the agent idles), then stamps them sent (`ChangesPane.tsx:146`).
-- **→ agent** on a file, or **⌥-click** a line, drops a `path[:line]` reference into the agent
-  composer (`sendReferenceToAgent`).
-
-Source: `plugins/changes/src/{client,main,server,shared}/`.
-
-### `notes` — markdown notes
-
-A scratchpad-first markdown library at three scopes: **this task**, **this workspace**, and
-**Global**. A task with no scratchpad starts on a virtual empty editor; the first keystroke creates
-the file. The collapsible library groups scopes, filters notes, creates per scope, marks
-agent/workflow provenance, and has an include dot controlling assembled context. Title and body
-autosave independently; body saves debounce 1.5s and flush on blur/switch. Preview renders sanitized
-markdown. Context jumps open the exact note without losing unsaved work.
-
-Source: `plugins/notes/src/client/{NotesPane.tsx,notesClient.ts,notesPaneState.ts}`.
-
-### `context` — assembled context
-
-The full task-context inventory, grouped into contribution-owned sections (PR, linked issues/errors,
-notes, memory). Empty sections disappear except Memory; absent sources show an explicit warning.
-Each section has a persisted per-task include toggle, expandable item rows, size/budget indicators,
-and jumps back to the owning pane. A preview shows the exact assembled block.
-
-**Sync context** sends that exact block to a user-selected live agent session. The pane records a
-content fingerprint per session and reports never synced / synced / stale; delivery uses
-`after-ready`, so a busy agent receives it at the next idle edge. Memory proposals and manual memory
-creation render inline through `MemorySection`, with the same human accept/reject gate. See
-[notes-and-memory.md](./notes-and-memory.md).
-
-Source: `plugins/context/src/client/{ContextPane.tsx,model.ts,syncState.ts,selectionState.ts}`,
-`packages/protocol/src/contextBlock.ts`, and
-`plugins/memory/src/client/{MemorySection.tsx,memoryClient.ts}`.
-
-### `editor` — in-app code editor
-
-A Monaco editor over the task worktree (`plugins/editor/client/EditorPane.tsx`): a lazy file tree on the
-left, a **tab bar** driving **one reused Monaco instance** on the right. Single-click opens an
-ephemeral (italic) preview tab; editing or double-click promotes it. **⌘S** flushes a save and
-**autosave** runs on a debounce (blur / tab-switch / close); a **dirty dot** marks unsaved tabs.
-Because the agent and human share the worktree, a **reload-on-focus guard** silently reloads clean
-models from disk but never clobbers a dirty one (`EditorPane.tsx:142`). **⌘/Ctrl+W** closes the active
-tab when focus is inside the pane (main suppresses the window-close accelerator and pings the
-renderer; the focus-containment subscription is the shared `onClosePaneWithin` helper in
-`client/lib/`, also used by the terminal drawer).
-Expanded folders are remembered per task for the session, so leaving the editor and returning
-restores the same lazy-tree state; collapsing a parent does not discard its nested expansion.
-When the Editor pane owns focus, **Reveal active file in editor tree** is available in the command
-palette. It expands the active file's lazily-loaded ancestor folders and scrolls its selected row
-into view without moving keyboard focus out of Monaco.
-**→ agent** adds a file (or selection) reference to the agent composer. Open files persist to the
-the scoped `editor:open-files:<taskId>` preference.
-
-Source: `plugins/editor/src/client/{EditorPane.tsx,editorState.ts,editorTreeState.ts,editorClient.ts}`.
-
-### `search` — find in files
-
-Project-wide text search over the task's worktree, backed by **ripgrep** in the utility service and a
-task-scoped HTTP route. Substring search by default with case / whole-word / regex toggles;
-keystrokes are debounced so a ripgrep isn't spawned per character. Results group hits by file;
-each file header can copy its worktree-relative path, and double-clicking a hit opens the file in
-the **Editor pane beside this one**, centered with the cursor at the start of the match
-(`requestEditorReveal`).
-
-Source: `plugins/editor/src/client/search/{SearchPane.tsx,searchClient.ts}`.
-
-### `database` — Postgres viewer/editor
-
-A native Postgres pane, Postico-shaped: a searchable virtualized table list, a row grid with a
-detail panel that edits/inserts/deletes, and a Monaco SQL editor with a results grid. The
-connection is per-task, resolved on demand (repo `dbUrlScript` → `.env` `DATABASE_URL` →
-`process.env`) and never persisted; one `pg.Pool` per task lives in the utility service behind task-scoped HTTP
-routes. Full detail: [pg.md](./pg.md).
-
-Source: `plugins/database/src/{client,main,server,shared}/`.
-
-### `docker` — task-linked containers
-
-The task pane lists only containers matched to the task, with a chip strip when several are linked
-and a shared detail view for metadata, live logs, stats, and an interactive exec terminal. Matching
-is performed in the utility service from Docker Compose working-directory labels, explicit
-`[docker]` config, branch-derived labels, and conservative slug/name fallback. The pane appears only
-when at least one container matches; task-rail and footer badges report running/stopped counts.
-
-The always-visible Docker Source is the fleet view: Compose projects plus containers, images,
-volumes, and networks, with start/stop/remove/down/prune actions and daemon-event-driven refresh.
-See [docker.md](./docker.md).
-
-Source: `plugins/docker/src/{client,main,server,shared}/`.
-
-### `http` — API requests
-
-A Bruno-shaped API client over the task's repo (`plugins/http/client/HttpPanel.tsx`). A sidebar of
-saved requests grouped into folders, a method + URL bar, request tabs (**Params / Body / Headers /
-Auth / Vars**) and a response pane (**Body / Headers / Timeline**). The same component is the `http`
-rail Source; the only difference here is that it is scoped to a task.
-
-- **Storage** is the DB, not files in the repo: identity-scoped `http_requests` (with a slash-path
-  `folder` string instead of a folders table) and `http_variables`. Request URL/header/body/auth/vars
-  and every variable value are encrypted at rest. Nothing is committed, so nothing is shared with
-  teammates — see [data-layer.md](./data-layer.md).
-- **Ad-hoc requests** are rows with `task_id` set. New requests made in this pane stay with the task
-  until the save dialog's "Keep in" is switched to the repo, which clears `task_id` and files them
-  under a folder. Duplicating any request (⧉ on its row) is the same flow pre-filled.
-- **Naming** happens in the save dialog (`SaveRequestModal.tsx`), reached by Save on an unsaved
-  request or by clicking the name in the metabar — that is also the rename/move path. Saving an
-  already-filed request writes straight through. Unsaved drafts are memory-only because they may
-  contain credentials; renderer activation removes plaintext `http-draft:*` localStorage entries
-  left by older releases.
-- **Variables** resolve at send time, lowest precedence first: task builtins (`{{repo}}`,
-  `{{branch}}`, `{{worktree}}`, `{{taskId}}`) → repo variables → the request's own Vars tab. A repo
-  variable is a plain value, a `secret` (never returned to the renderer), or a `command` — all three
-  are AES-GCM encrypted at rest under `SESSION_ENC_KEY`. A command is a `bash -lc` line run in the
-  task worktree whose last output line
-  becomes the value, the same mechanism as the Database pane's `dbUrlScript`. The pane supplies the
-  execution task separately from the request's storage scope, so a repo-saved request opened in a
-  task still runs commands in that task's worktree. The Source view has no task and uses the mapped
-  base checkout. Only variables referenced by an active request field are resolved, and a
-  request-level override prevents a lower command variable from running. Command results are never
-  persisted.
-- **Auth** (`none`/`basic`/`bearer`/`apikey`) is compiled to a header — or a query param for an
-  api-key with `placement: 'query'` — at send time. The Timeline shows exactly what went out, with
-  `Authorization`/`Cookie` and values resolved from secret/command variables redacted.
-- **curl** both ways: pasting a curl command into the URL bar populates the whole request; "Copy as
-  curl" emits one.
-- A failure before an HTTP response exists (DNS, refused connection, TLS, timeout) is shown as a
-  failed attempt with the resolved URL, elapsed time, system error code/detail, and request
-  timeline. HTTP error statuses such as 404 and 500 remain ordinary responses, including their
-  headers and body.
-- Deliberately **no scripts, tests or assertions**, no collections (the repo is the collection), no
-  oauth2/digest/ntlm, no multipart bodies, and no per-hop TLS timings — `redirect: 'follow'` is left
-  to undici so `Authorization` is stripped correctly across origins. The body editor is a plain
-  `<textarea>`: Monaco's single cross-plugin import is baselined in `tools/arch/boundaries.test.ts` and
-  that baseline only shrinks.
-
-Requests execute server-side (`plugins/http/server/send.ts`) using Node's global `fetch` — no bridge,
-because nothing stateful is held — so the pane also works under `dev:node`. Responses are capped at
-5 MB and flagged when truncated.
-
-Source: `plugins/http/src/{client,server,shared}/`.
-
-### `linear` — Linear ticket(s)
-
-The task's linked Linear ticket(s). The switcher `◷` shows only when the task has ≥1 Linear link;
-the pane renders `LinearIssuePanel` **in its layout slot** (`variant="pane"`) like the other
-provider panes, showing title, state, description, activity log, and threaded comments with an
-inline reply box + composer. With several linked tickets it shows a **chip strip** to switch
-between them (`identifiers` / `onSelectIdentifier`). The same component still serves PullDetail's
-Integrations section as a right-anchored overlay (its original variant). See
-[integrations.md](./integrations.md).
-
-Source: `plugins/linear/src/client/LinearIssuePanel.tsx`.
-
-### `rollbar` — Rollbar error(s)
-
-The task's linked Rollbar error(s). `RollbarPane.tsx` is a thin selection wrapper (with a **chip strip**
-for several linked items) over `RollbarItemPanel.tsx` — the **same** detail component the Rollbar Source
-browse mounts, analogous to `LinearIssuePanel`. It resolves `task_links` into a tabbed right pane:
-**Summary** shows triage facts, **Details** lazily reads canonical metadata, and **Occurrences** lazily
-reads history. Selecting an occurrence triggers its own query for exception/message, bounded stack
-context, and safe request/runtime/server/person context. Raw occurrence JSON is never rendered; a
-truncation note appears when Acorn's size/privacy caps fired. Manual **Refresh tab** bypasses only the
-active resource's server TTL. See [integrations.md](./integrations.md) and [security.md](./security.md).
-
-Source: `plugins/rollbar/client/RollbarPane.tsx` + `RollbarItemPanel.tsx`.
-
-### `preview` — browser preview (agent-drivable)
-
-A main-owned `WebContentsView` onto the repo's / run-target's resolved URL, wrapped in browser chrome —
-back / forward / stop-reload / home + an editable URL bar + preview-scoped DevTools + a loading spinner
-(`plugins/preview/client/PreviewPane.tsx`). The home
-URL (`url()` in `PreviewTaskPane.tsx`) resolves in priority order: a layout recipe's
-`browser=run:<id>` resolution → the default run target's resolved URL → the repo-level
-preview config (url / port / script mode; `repo_paths` + committed `[preview]`) → the dev-server port.
-One native view is kept per task so page/scroll/form state survives pane and task switches; archiving
-a task evicts its view. Navigation is restricted to `http(s)`.
-Preview needs a resolvable URL (a configured run target / repo preview), so it only does its
-full job on desktop.
-
-**Agent driving is a capability of this same pane**, not a separate `browser` pane. The main process
-owns the view and binds CDP internally, so no `webContents` id crosses into the renderer. Agents use
-the MCP `browser_*` tools
-(`browser_navigate`, `browser_click`, `browser_snapshot`, …) — see [mcp.md](./mcp.md). One webview
-surface, two entry points (human chrome vs. agent driving).
-
-Source: `plugins/preview/src/{client,main}/`, `packages/node-core/src/mcp/server.ts`.
-
----
-
-## Related non-pane surfaces
-
-One feature surface renders *over* the task view rather than as a layout slot.
-
-### ChecksPanel {#checkspanel-non-pane}
-
-A right-anchored overlay opened from PullDetail's Checks section
-(`plugins/github/client/checks/ChecksPanel.tsx`),
-showing one Actions workflow run's job steps GitHub-Actions style: failed steps start expanded, and
-each step's log is sliced from a single lazy job-log fetch and ANSI-highlighted. Not a pane — it opens
-and closes within the `pr` pane.
-
-### Agent task surface
-
-The `agents` layout slot combines the active managed conversation with a persistent same-task
-sidebar (`plugins/agents/client/AgentTaskSidebar.tsx`). The sidebar switches managed sessions
-without hiding the transcript and also surfaces exact attention requests, raw PTY agents and
-workflow gates. Provider utilization is summarized in the pane header with its detail available on
-hover/focus. Workspace-wide history remains in Agent Center. Full detail in
-[managed-agents.md](./managed-agents.md) and [terminal-and-agents.md](./terminal-and-agents.md).
-
-> **Maturity:** the terminal drawer, agent sessions, run targets, and workflows are desktop-only —
-> always on when the native terminal capability is present (`capabilities()`, `@acorn/client-core/capabilities.ts`; the
-> old `acorn:term` flag is gone). Panes that depend on a worktree or an agent (`changes`, `editor`,
-> `context`'s send, `notes`' agent groups, `preview` targets, the Agent task surface) therefore only do
-> their full job on desktop; in a plain browser session (`dev:node`) the bridge is absent and they
-> degrade. Docker's pure-Node bridge and streams are installed in both Electron and `dev:node`.
-> PR review, Linear, Rollbar, Docker, and the server-backed HTTP client work without the terminal
-> bridge.
-
-## Source
-
-- Model & reducer: `packages/client-core/src/tasks/layout.ts`
-- Layout state / dispatch / persistence: `packages/client-core/src/tasks/tasks.ts`
-- Task view & switcher: `apps/desktop/apps/desktop/src/app/client/TaskView.tsx`
-- Pane shortcuts: `packages/client-core/src/tasks/paneShortcuts.ts`
-- Recipes: `plugins/terminal/src/client/recipes.ts`
-- Pane bodies: `plugins/*/src/client/`; the shell/host lives in
-  `packages/client-core/src/tasks/`
-
-See also: [frontend.md](./frontend.md) · [diff-rendering.md](./diff-rendering.md) ·
-[command-palette-and-shortcuts.md](./command-palette-and-shortcuts.md) ·
-[notes-and-memory.md](./notes-and-memory.md) · [terminal-and-agents.md](./terminal-and-agents.md) ·
-[integrations.md](./integrations.md) · [mcp.md](./mcp.md) ·
-[workspaces-and-tasks.md](./workspaces-and-tasks.md) · [docker.md](./docker.md) ·
-[http-client.md](./http-client.md)
+A task is rendered as a flat, ordered row of plugin-contributed panes. `PaneId` is a persisted
+string owned by the contribution; core does not maintain a closed union of feature IDs.
+
+## Shipped panes
+
+| ID | Order | Surface |
+| --- | ---: | --- |
+| `pr` | 10 | linked GitHub pull request |
+| `agents` | 15 | managed Agent pane |
+| `changes` | 20 | worktree diff and review notes |
+| `notes` | 30 | task/workspace/global notes |
+| `context` | 40 | context selection and sync |
+| `editor` | 50 | worktree editor |
+| `search` | 60 | worktree search |
+| `database` | 70 | PostgreSQL browser/editor |
+| `docker` | 75 | task container surface |
+| `http` | 76 | API request client |
+| `preview` | 80 | browser preview |
+| `linear` | 90 | linked Linear issue |
+| `rollbar` | 100 | linked Rollbar item |
+
+Provider-gated panes appear when their linked provider is connected and the task has relevant data.
+
+## Layout model
+
+The persisted task layout contains pane IDs, optional relative weights, and pinned IDs. The layout
+reducer owns show/add, close/unpin, pin, move, resize, equalize, maximize, and recipe replacement.
+Pinned panes survive a switcher selection; a normal selection focuses the target. Closing the last
+unpinned pane falls back to the PR pane when one is available.
+
+Widths are clamped to pane minimums and normalized on load. Unknown IDs become placeholders so a
+disabled plugin or a stale layout cannot crash the task view. Maximize/focus is session UI state and
+does not rewrite the durable row.
+
+## Contributions
+
+Each pane contributes its ID, label, order, default chord, minimum width, component, and optional
+availability predicate through `paneRegistry`. A pane may also register context sections, task slots,
+palette rows, agent-tool renderers, and persisted state through its plugin.
+
+Shared diff rendering, Monaco setup, markdown, grid, xterm, form, and wizard primitives live in
+client-core. Feature panes use those primitives without importing another plugin's implementation.
+
+## Data and actions
+
+Pane reads use the active Node's typed API client and TanStack Query cache. Pane writes target the
+task's owning Node. Offline reads remain visible as stale; mutations fail fast and retain local text.
+The preview pane is backed by a main-owned `WebContentsView`; terminal and agent panes use the Node
+event/stream socket.

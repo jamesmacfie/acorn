@@ -350,7 +350,7 @@ export class AgentWebhookService {
       return
     }
     // reveal(): the signature is computed below over the delivery body, outside any scope this
-    // could bracket. SecretUnavailable reads as the same null the old decrypt returned.
+    // could bracket. SecretUnavailable reads as the same null used for an unavailable credential.
     const secret = await this.#secrets.reveal(webhook.secretEnc, 'agent webhook: sign delivery').catch((error: unknown) => {
       if (error instanceof SecretUnavailableError) return null
       throw error

@@ -1,4 +1,4 @@
-// The database plugin's client part (docs/vNext/plugins.md § The plugin API).
+// The database plugin's client part (docs/plugins.md § The plugin API).
 import type { ClientPlugin } from '@acorn/client-core/registries/plugin.ts'
 import { databaseAgentContextContribution } from './agentContextContribution'
 import { databasePaneContribution } from './paneContribution'

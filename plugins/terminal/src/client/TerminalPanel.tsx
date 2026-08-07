@@ -78,10 +78,6 @@ export default function TerminalPanel(props: { onClose: () => void; task: Task |
 
   onMount(async () => {
     if (!api) return
-    // Rail default (Settings → Terminal): auto-launch a profile when the drawer opens empty.
-    // Set the loader flag up front so we never flash the "No sessions" empty state.
-    // ponytail: relies on the prefs query being warm by now — App loads it at startup. If it isn't,
-    // we just open empty, which is the safe fallback.
     const def = prefs.data?.[PrefKeys.terminalRailDefault]
     const willAutoLaunch = !!def && def !== 'empty' && !!ws()
     if (willAutoLaunch) setLaunching(true)

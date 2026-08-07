@@ -4,23 +4,14 @@ import { coreImportV1Route, reposKey, type V1ImportProbe, type V1ImportReport } 
 import { workspaceAssignmentsKey, workspacesKey } from '../queries'
 import { readJson, writeJson } from '../apiClient'
 
-// The config-only V1 importer's one piece of UI (docs/vNext/plan.md § Phase 5,
-// plugin-inventory.md § onboarding).
-//
-// Rendered in two places — the first-run modal and Settings → Workspaces — and in neither of them is it
-// a step. Onboarding is one panel today, and a two-step wizard for an optional action that most installs
-// will not have anything to offer is ceremony: this renders NOTHING at all unless a V1 install is
-// actually present, which on a fresh machine is the normal case.
-//
-// ponytail: no stepper, no progress bar, no dry-run preview. The probe's counts are the preview.
 export default function V1Import(props: { onImported?: () => void }) {
   const queryClient = useQueryClient()
   const [importing, setImporting] = createSignal(false)
   const [report, setReport] = createSignal<V1ImportReport | null>(null)
   const [error, setError] = createSignal('')
 
-  // Speculative and silent: this fires on every first run, and a machine with no V1 install must not see
-  // an error for having answered "no". `probeV1Root` on the node is written the same way.
+  // Speculative and silent: a machine without a source install should see no onboarding error. The node
+  // probe returns found:false for that case.
   const [probe] = createResource(async () =>
     readJson<V1ImportProbe>(coreImportV1Route).catch(() => null),
   )
@@ -62,8 +53,7 @@ export default function V1Import(props: { onImported?: () => void }) {
             Found an earlier acorn install: <strong>{probe()?.workspaces}</strong> workspaces,{' '}
             <strong>{probe()?.repos}</strong> repos, <strong>{probe()?.checkouts}</strong> mapped checkouts.
             Its workspace names, grouping, checkout paths and per-repo build settings can be copied over.
-            Credentials, tasks, notes and terminal history are not — and nothing in the old install is
-            changed.
+            Credentials, tasks, notes and terminal history are not copied; the source install is unchanged.
           </span>
           <Show when={error()}><span class="action-error" role="alert">{error()}</span></Show>
           <button type="button" class="ui-btn" disabled={importing()} onClick={() => void run()}>

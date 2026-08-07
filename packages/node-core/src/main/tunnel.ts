@@ -5,34 +5,6 @@ import { WebSocketServer, type WebSocket } from 'ws'
 import { claimUpgrade } from './upgradeClaim'
 import { authorizeWsUpgrade, type WsAuthDeps } from './wsHub'
 
-// The preview tunnel (docs/vNext/plan.md § Phase 4: "Preview tunnel for remote nodes (task-scoped, over
-// the authenticated connection)"; protocol.md § Streams).
-//
-// The problem it solves is one sentence from plugin-inventory.md § preview: "for remote nodes, 'localhost'
-// means the node's host". The preview pane's URL is resolved BY the node (a run target's url, a repo's
-// preview port, a URL script) and then loaded BY the client's Electron main — so a remote node hands back
-// `http://localhost:5173`, which resolves on the owner's laptop, where nothing is listening.
-//
-// ## Why a dedicated upgrade rather than multiplexed stream frames
-//
-// protocol.md § Streams designs tunnels as a third flavour of the `kind: "stream"` frame, sharing the
-// events socket with a credit-based flow-control layer. This is one WebSocket per TCP connection on its
-// own path instead, and that is a deliberate divergence recorded in docs/vNext/phase4-notes.md:
-//
-//   - It is LESS code, not a shortcut. One socket per connection means `pipe()` is the whole
-//     implementation, and Node's stream backpressure is the credit layer — no window accounting, no
-//     per-stream buffers, no head-of-line blocking between a dev server's HMR socket and its asset
-//     requests.
-//   - The events socket carries the flat V1 frame vocabulary (phase1-notes.md), which has no `kind`
-//     discriminator to hang a tunnel frame off. Adding one is the rewrite that document explains was
-//     deferred, and doing it here would mean rewriting eleven client frames to ship a preview pane.
-//
-// ## What it will and will not connect to
-//
-// protocol.md: "Only declared ports; no general SOCKS." The allowlist is not a new config surface — it is
-// whatever the NODE itself already resolves as that task's preview or run URLs. So a port is reachable
-// exactly when the owner has configured something on it, and adding a run target adds its port without a
-// second place to edit.
 export type TunnelDeps = WsAuthDeps & {
   // Ports this task legitimately serves on, resolved by the node. Empty (or a throw) means nothing is
   // tunnellable for that task, which is the safe answer.
@@ -42,7 +14,7 @@ export type TunnelDeps = WsAuthDeps & {
 export const TUNNEL_PATH = '/v2/tunnel'
 
 // 127.0.0.1 only, never the hostname. A tunnel that resolved a name could be pointed at another host on
-// the node's network, which is the SOCKS proxy protocol.md rules out.
+// the node's network, which is the SOCKS proxy docs/api-reference.md rules out.
 const LOOPBACK = '127.0.0.1'
 
 const tunnelDisposers = new WeakMap<Server, () => void>()
@@ -93,7 +65,7 @@ function bridge(ws: WebSocket, tcp: Socket): void {
   }
 
   // client → node. `write` returning false is TCP backpressure; pausing the WebSocket stops `ws` reading,
-  // which closes the kernel window back to the client. This is the credit scheme protocol.md describes,
+  // which closes the kernel window back to the client. This is the credit scheme docs/api-reference.md describes,
   // supplied by the transports themselves.
   ws.on('message', (data: Buffer) => {
     if (!tcp.write(data)) ws.pause()
@@ -122,13 +94,6 @@ export function attachTunnel(server: Server, deps: TunnelDeps): void {
   const wss = new WebSocketServer({ noServer: true })
   const pipes = new Set<Pipe>()
 
-  // Revocation tears down live pipes, exactly as it does live event sockets.
-  //
-  // protocol.md § Pairing: "deleting a device row invalidates its token immediately — open sockets are
-  // closed, in-flight requests fail. Long-lived streams re-check the device every 60s as a backstop."
-  // `wsHub` has honoured both halves since Phase 1; the tunnel honoured NEITHER, so a stolen laptop's
-  // already-established pipe kept reaching the dev server after the owner revoked it. The upgrade would
-  // refuse a new connection, which is exactly the half that stops mattering once one is open.
   const closePipe = (pipe: Pipe): void => {
     pipes.delete(pipe)
     pipe.tcp.destroy()
@@ -159,9 +124,6 @@ export function attachTunnel(server: Server, deps: TunnelDeps): void {
     void (async () => {
       const authorized = await authorizeWsUpgrade(req, deps)
       if (!authorized) return refuse(socket, 403, 'Forbidden')
-      // A task-scoped credential may tunnel only to its OWN task. Without this, an agent holding
-      // ACORN_API_TOKEN could open a pipe to any port any other task declares — which is the same class of
-      // hole the Phase 3 audit closed on the HTTP and channel surfaces.
       const claims = authorized.internal
       if (claims?.scope === 'task' && claims.taskId !== target.taskId) return refuse(socket, 403, 'Forbidden')
 

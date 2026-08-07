@@ -3,13 +3,6 @@ import Acorn from '../Acorn'
 import { acornGlobal } from '../capabilities'
 import { nodeReadiness, selectActiveNode } from './activeNode'
 
-// The shell's pre-flight screen, in the slot LoginGate used to hold. It answers a different question:
-// not "who are you?" (there is no account any more) but "is there a node to talk to?".
-//
-// With a bundled local node the only reachable state is `starting`, and only for as long as the broker
-// takes to answer — Electron main starts and adopts the local node before the window loads. The other
-// two are the recovery screen docs/vNext/architecture.md § Failure behavior calls for: never a silent
-// fresh data root, always the owner's decision.
 export default function NodeGate() {
   const [showReason, setShowReason] = createSignal(false)
   const readiness = nodeReadiness

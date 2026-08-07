@@ -1,7 +1,3 @@
-// Electron composition root. Its responsibilities are intentionally narrow:
-// native UI adapters, utility-process supervision, window timing, and ordered shutdown.
-// The Node application runtime (DB, Hono/WS, PTYs, Git/process work, workflows) is composed in
-// app/service/runtime.ts and cannot stall Electron's main event loop.
 import { app, dialog, shell, type BrowserWindow } from 'electron'
 import { join } from 'node:path'
 import { registerPreviewIpc } from '@acorn/plugin-preview/main/previewService.ts'
@@ -21,7 +17,7 @@ export type BootstrapOptions = {
 
 const wait = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms))
 
-// docs/vNext/architecture.md § Failure behavior, literally: "Electron restarts it with backoff
+// docs/architecture-overview.md § Failure behavior, literally: "Electron restarts it with backoff
 // (1/2/4/8/16s, max 5 in 10 min), then shows a recovery screen". The previous policy was
 // 250·2^(n-1) ms with a >3-in-60s ceiling — much tighter, and tight enough that a service crashing on
 // something durable (a corrupt database, a port it can never bind) burned its budget in under two
@@ -78,10 +74,9 @@ export async function bootstrap({ dataDir, createWindow }: BootstrapOptions): Pr
   const push = brokerPushTargets(() => window)
   const broker = new NodeBroker({ frame: push.frame, status: push.status })
   const fleet = new FleetStore(userDataDir)
-  // Preview tunnels re-resolve their node from the same fleet store the broker reads on EVERY connection
-  // (main/previewTunnel.ts), so a re-paired node's later connections pick up the new endpoint and token
-  // rather than dialling the old ones. Established pipes still have to be torn down explicitly — see
-  // `restartLocalNode` and `adoptLocalNode` below, and `NODE_FORGET` in nodeBrokerIpc.ts.
+  // Preview tunnels re-resolve their node from the same fleet store the broker reads on every connection,
+  // so updated endpoint, token, and certificate records are applied to new connections. Established
+  // pipes are torn down explicitly by restart, adoption, and forget operations.
   const tunnels = new PreviewTunnels((nodeId) => {
     const node = fleet.get(nodeId)
     const token = node && fleet.tokenFor(nodeId)
@@ -179,12 +174,6 @@ export async function bootstrap({ dataDir, createWindow }: BootstrapOptions): Pr
     disposePicker()
   }
 
-  // The recovery screen architecture.md asks for, with its four affordances exactly: Retry /
-  // Diagnostics / Open data folder / Quit. A native dialog rather than a page, because this is the case
-  // where there may be NO window to render into — the renderer's own recovery screen
-  // (client-core/node/NodeGate.tsx) covers the case where there is one, and it cannot cover this one.
-  // ponytail: the designed screen is Phase 4 UI work; four buttons wired to four actions is the whole
-  // behavioural contract, and it needs zero HTML and zero renderer changes.
   const showRecoveryScreen = async (): Promise<void> => {
     const { response } = await dialog.showMessageBox({
       type: 'error',

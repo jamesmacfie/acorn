@@ -1,7 +1,7 @@
 // The shared diff viewer's row model. It moved out of the github plugin because both `changes` (a
 // worktree's uncommitted diff) and `github` (a PR's patches) render diffs, and the changes pane was
 // reaching across a plugin boundary to get here: sharing rendering code is good, sharing feature
-// internals is what's banned (docs/vNext/plugins.md § Cross-plugin collaboration).
+// internals is what's banned (docs/plugins.md § Cross-plugin collaboration).
 //
 // It can live here without inverting anything because its two domain types — PullFile and Thread —
 // are already client-core's (queries.ts); the plugin never owned them.
@@ -224,7 +224,7 @@ export function buildDiffRows(file: PullFile, tokenize: TokenizeLine): DiffRow[]
 // context, so oldNo/newNo step together from the gap's start.
 export function expandGap(gap: GapRow, body: string, tokenize: TokenizeLine): CodeRow[] {
   const lines = body.split('\n')
-  if (lines.length > 0 && lines[lines.length - 1] === '') lines.pop() // ponytail: drop one trailing newline, fine for text
+  if (lines.length > 0 && lines[lines.length - 1] === '') lines.pop() // drop one trailing newline
   const count = gap.count ?? lines.length - (gap.newStart - 1)
   const rows: CodeRow[] = []
   for (let k = 0; k < count; k++) {

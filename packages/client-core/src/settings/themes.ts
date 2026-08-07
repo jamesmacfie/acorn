@@ -17,7 +17,4 @@ const builtInThemes: ThemeContribution[] = [
 
 if (!themeRegistry.entries().length) for (const theme of builtInThemes) themeRegistry.register(theme)
 
-// A function, not a const. This used to be a module-load-time array, which read `Registry`'s
-// signal outside any reactive scope — so a theme registered by a lazily-activated plugin could
-// never appear in the picker, silently. Same shape as STYLES() in uiStyles.ts.
 export const THEMES = (): [string, string][] => themeContributions().map((theme) => [theme.id, theme.label])

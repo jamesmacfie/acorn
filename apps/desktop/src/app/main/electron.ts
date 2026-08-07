@@ -55,9 +55,6 @@ process.env.GITHUB_CLIENT_SECRET ??= import.meta.env.MAIN_VITE_GITHUB_CLIENT_SEC
 if (!app.requestSingleInstanceLock()) app.quit()
 
 let mainWindow: BrowserWindow | null = null
-// Whether the service has started and the broker has adopted the local node. The window used to need
-// the endpoint too; it loads from the app scheme now, so all a Dock-activate has to know is "is there
-// a node to talk to yet".
 let serviceReady = false
 let quitApproved = false
 let quitPromptPending = false

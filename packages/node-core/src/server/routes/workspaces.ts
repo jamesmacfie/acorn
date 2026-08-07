@@ -199,7 +199,6 @@ export const workspaces = new Hono<AppEnv>()
       if (!(await getConnection(db, uid, project.integrationId))) return respondError(c, 403, 'provider_not_connected')
     }
     const now = Date.now()
-    // Replace the whole set (composite key ⇒ simplest correct: clear then insert). ponytail.
     await db.delete(schema.workspaceProjects).where(eq(schema.workspaceProjects.workspaceId, id))
     if (projects.length) {
       await db

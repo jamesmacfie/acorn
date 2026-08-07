@@ -10,14 +10,6 @@ import {
 } from '@acorn/protocol/serviceProtocol.ts'
 import { startServiceRuntime, type ServiceRuntime } from './runtime'
 
-// The supervision channel is an ordinary Node IPC channel: the parent spawns this file with
-// `stdio: [..., 'ipc']` (apps/desktop/src/app/main/serviceHost.ts), so `process.send` exists and needs
-// no framing of its own.
-//
-// This replaces a structural shim over Electron's `process.parentPort`, which existed only because this
-// package compiles against plain Node types by design — it is the Electron-free service
-// (docs/vNext/architecture.md). With a plain child process there is nothing Electron-shaped left to
-// describe, and the service can now be started by anything that can spawn a Node process.
 const send = process.send?.bind(process)
 if (!send) throw new Error('The acorn service must be spawned with an IPC channel (stdio: [..., "ipc"])')
 
@@ -46,8 +38,7 @@ peer.register('service.start', async (payload) => {
     desktop: desktopCapabilitiesOverRpc(peer),
     stateChanged,
   })
-  // The endpoint, identity and bearer the parent needs. V1 returned only `{ state: 'listening' }`
-  // and the parent computed the origin itself from a pinned port.
+  // The endpoint, certificate identity, and device bearer the parent needs to adopt the local Node.
   return runtime.started
 })
 

@@ -4,14 +4,9 @@ import { EncryptJWT, jwtDecrypt } from 'jose'
 // stored provider tokens. JWE A256GCM under SESSION_ENC_KEY, no expiry: an integration credential
 // lives until the owner disconnects it.
 //
-// Split out of session.ts deliberately. SESSION_ENC_KEY predates vNext and its name says "session",
-// but this is the part that OUTLIVES the session cookie: the cookie dies with the auth swap while
-// every stored secret keeps riding this key. Keeping the two in one module meant four packages
-// importing a session module purely for `encryptSecret`, and would have made the cookie's deletion
-// look like it was taking the secret box with it.
-//
-// ponytail: docs/vNext/data.md calls this key `secrets.key`. Renaming it touches sessionKeyStore.ts,
-// the docs, and every developer's .env for no behavioural gain, so the name stays for now.
+// This module owns secret encryption independently of authentication. The environment variable keeps
+// its established name, SESSION_ENC_KEY, while the value protects integration credentials and other
+// stored secret fields at rest.
 
 // SESSION_ENC_KEY is 64 hex chars = 32 bytes, the key size A256GCM requires.
 export function keyBytes(hex: string): Uint8Array {

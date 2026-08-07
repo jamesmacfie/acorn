@@ -1,44 +1,3 @@
-// The external-item read model, as a narrow store instead of a raw database handle.
-//
-// WHY `issues` / `issue_resources` STAYED CORE TABLES while every other plugin's tables moved out
-// (docs/vNext/data.md § Plugin DBs). Two plugins — linear and rollbar — write these, and data.md is
-// explicit that a table has exactly one owner, so the choice was "give one of them the table and make
-// the other reach across a database file", "give each its own copy", or "keep it in core". Core wins on
-// four counts, and it is worth stating them because the tempting answer is the second:
-//
-//   1. **The shape is core's, not a provider's.** One opaque JSON `data` column keyed by
-//      `(userId, integrationId, identifier)`, where `integrationId` points at core's `integrations`. It
-//      is the generic projection of "an external item some connection told us about" — a third provider
-//      adds rows, not a table. Neither `linear` nor `rollbar` appears anywhere in the column list.
-//   2. **`task_links` is core's, and its primary-key tail is deliberately the same
-//      `(integrationId, identifier)`** so a link resolves straight to cached detail (schema.ts says so
-//      at the table). Core's context assembler walks exactly that join to answer "what external items
-//      is this task about?" (server/agentTools/contextSections.ts § issues). Move `issues` into a
-//      plugin and that single query becomes a fan-out of per-provider capability calls that returns
-//      NOTHING for a disabled plugin — the section would silently shrink rather than fail, which is the
-//      worst of the available failure modes. Copy it per plugin and the question stops having one
-//      answer at all.
-//   3. **Disconnecting an integration stays atomic.** `db/cascade.ts` deletes `workspace_projects`,
-//      `issues`, `issue_resources`, the `provider:%` freshness markers, `task_links` and the
-//      `integrations` row in ONE `db.batch`. Keeping these here keeps all six inside one SQLite file,
-//      so that batch is still a transaction. Splitting them turns disconnect into a cross-database saga
-//      — which data.md says needs an `operations` row, and phase2-notes.md records that there is no
-//      `operations` table and no other consumer that would justify inventing one for this.
-//   4. **Core already owns the machinery.** `integrations/resourceRuntime.ts` runs serve-then-revalidate
-//      for every provider resource, keyed on core's `integrations` row and gated by
-//      `requireProviderAccess`. The plugins never opened a database; they were handed core's handle and
-//      wrote raw drizzle against core's tables. The coupling to remove was the HANDLE, not the storage.
-//
-// So the fix is this store rather than a migration: a typed, user-scoped surface carrying only the six
-// operations the two providers actually perform. `ProviderResourceContext` hands it out in place of
-// `db: AppDatabase`, which is what lets both plugins stop importing `@acorn/node-core/server/db` — the
-// thing tools/arch/boundaries.test.ts' schema ratchet measures — without either of them owning a table
-// it shares with the other. Consequence, stated plainly rather than hidden: linear and rollbar own no
-// database and therefore have no `dispose`, exactly like docker, editor and notes.
-//
-// Scoped to ONE userId at construction. That is not ergonomics: it means a provider plugin cannot
-// address another owner's cached items even by accident, and it deletes the `eq(userId, …)` clause that
-// every one of these call sites previously had to remember.
 import { and, eq, inArray } from 'drizzle-orm'
 import type { AppDatabase } from '../db'
 import { schema } from '../db'
@@ -78,8 +37,8 @@ export type ExternalItemStore = {
    *
    * The key space is the caller's — `provider:<id>:<connectionId>:…` by convention, which is what
    * `cascade.ts` matches on to evict a disconnected integration's markers. github's `sync_state` is a
-   * DIFFERENT table in a different file now (plugins/github/src/node/schema.ts); the two key spaces
-   * used to share one table and only conventions kept them apart.
+   * different table in a different file (plugins/github/src/node/schema.ts); the key spaces are kept
+   * separate by ownership rather than convention.
    */
   readMarker(resource: string): Promise<number | null>
   writeMarker(resource: string, fetchedAt: number): Promise<void>

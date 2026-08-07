@@ -1,4 +1,4 @@
-// Per-plugin SQLite (docs/vNext/data.md § Plugin DBs: "Each plugin gets its own SQLite file, opened
+// Per-plugin SQLite (docs/data-layer.md § Plugin DBs: "Each plugin gets its own SQLite file, opened
 // and migrated by core's storage service at plugin init. The plugin owns its schema and its Drizzle
 // migration chain.").
 //
@@ -8,10 +8,9 @@
 //      is a boundary violation (tools/arch/boundaries.test.ts rule 6). So the plugin supplies its own
 //      schema and migrations folder and core supplies the file, the hardening and the migration run.
 //   2. The handle goes to the plugin as `ctx.db`, NOT onto `Env`. `c.env` reaches every core and
-//      plugin route (main/bindings.ts), so a per-plugin DB there would be readable by all of them,
-//      which is the coupling the split exists to remove.
+//      plugin route (main/bindings.ts), so a per-plugin DB there would be readable by all routes.
 //
-// data.md forbids cross-DB queries, ATTACH, and transactions spanning files. Cross-plugin references
+// docs/data-layer.md forbids cross-DB queries, ATTACH, and transactions spanning files. Cross-plugin references
 // are plain IDs, dereferenced through the owning plugin.
 import { chmodSync, closeSync, existsSync, mkdirSync, openSync } from 'node:fs'
 import { join, resolve } from 'node:path'
@@ -20,7 +19,7 @@ import { migrate } from 'drizzle-orm/better-sqlite3/migrator'
 import { loadDatabase } from './sqliteLoader'
 
 // One directory for every plugin DB, so a backup can enumerate them without knowing the plugin list
-// (data.md § Backup) and so `plugins/` is visibly separate from core.sqlite in a data root.
+// (docs/data-layer.md § Backup) and so `plugins/` is visibly separate from core.sqlite in a data root.
 export const PLUGIN_DB_DIR = 'plugins'
 
 const PLUGIN_ID_RE = /^[a-z][a-z0-9-]*$/
@@ -59,7 +58,7 @@ export function openPluginDb(dataDir: string, plugin: string, options: { migrati
 
   const withBatch = db as unknown as PluginDatabase
   // `.batch([...])` as a synchronous transaction, matching openDb. It is all-or-nothing WITHIN this
-  // file only — data.md is explicit that a transaction never spans databases.
+  // file only — docs/data-layer.md is explicit that a transaction never spans databases.
   withBatch.batch = (async (statements: ReadonlyArray<{ run(): unknown }>) =>
     db.transaction((_tx) => statements.map((stmt) => stmt.run()))) as PluginDatabase['batch']
   withBatch.close = () => sqlite.close()

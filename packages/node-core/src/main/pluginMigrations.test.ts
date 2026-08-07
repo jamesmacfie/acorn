@@ -5,11 +5,8 @@ import { pathToFileURL } from 'node:url'
 import { afterEach, describe, expect, it } from 'vitest'
 import { pluginMigrationsFolder } from './pluginMigrations'
 
-// The built layout puts a plugin's chain at out/migrations/<plugin>/ and CORE's at out/migrations/, one
-// directory apart, and the resolver walks up from out/main/. Preferring the bare directory therefore
-// handed every plugin core's 42-migration chain — 46 core tables, none of the plugin's own — silently,
-// because a plugin only notices when it first touches one of its own tables. These tests pin the
-// ordering; the second one fails if the plugin-scoped candidate is checked after the bare one.
+// The built layout puts a plugin's chain at out/migrations/<plugin>/ and core's at out/migrations/, one
+// directory apart. These tests pin the resolver's plugin-scoped-first ordering.
 
 const roots: string[] = []
 const chain = (dir: string) => {

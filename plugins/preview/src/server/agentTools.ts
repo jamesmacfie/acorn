@@ -1,25 +1,3 @@
-// The six `browser_*` agent tools (docs/agent-tools.md), owned by the plugin whose engine they drive.
-//
-// They sat in apps/node/src/wiring/agentToolsWiring.ts through Phase 2, and the blocker recorded there was
-// specific: "browser_* belong to plugins/preview, which has NO node-side part at all: previewService.ts and
-// browserService.ts import `electron` and run in Electron MAIN, and the driver arrives here as an injected
-// DesktopCapability. Converting it is not a tool move, it is a process-boundary change."
-//
-// That blocker is closed, and note WHAT closed it, because the distinction matters: the process boundary did
-// not move. The driver still runs in Electron main and still arrives as an injected `BrowserDesktopCapability`
-// — a narrow, task-addressed, serialisable surface (docs/vNext/architecture.md). What changed is that preview
-// is now a NodePlugin, so there is finally a node-side OWNER to declare these against. The tools are thin
-// task-addressed forwarders either way; the point of moving them is that the declaration now lives with the
-// feature instead of in an app-layer file holding every unconvertible plugin's deps in one bag.
-//
-// `risk: 'execute'`, all six, and that is not over-classification: driving a real browser in the task's
-// worktree can submit forms and trigger side effects on whatever the dev server talks to. `exposeToRenderer`
-// is what puts them in the tool-permission UI, so the owner can withhold them per tool.
-//
-// Every handler is `scope: 'task'` and addresses the browser by `ctx.taskId` rather than by any id the agent
-// supplies. That is load-bearing: a task-scoped internal token is confined to its own task on the agent-tool
-// surface, and taking the target from the credential rather than the arguments is what makes that confinement
-// real here (server/auth/internalTokens.ts).
 import { z } from 'zod'
 import type { AgentToolContribution } from '@acorn/node-core/server/agentTools/registry.ts'
 import type { BrowserDesktopCapability } from '@acorn/protocol/desktopCapabilities.ts'

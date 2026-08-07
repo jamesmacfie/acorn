@@ -1,15 +1,6 @@
 import { activeNodeId } from '../node/activeNode'
 import { Registry } from '../registries/registry'
 
-// ui.md § State ownership: "All keys that touch node resources include the nodeId." Every non-`app` scope
-// here IS a node resource — a workspace, a task, a pane within a task — and the ids are UUIDs a node mints,
-// so architecture.md § Fleet semantics applies directly: "Two nodes may coincidentally hold the same UUID;
-// that must never collide in the client." Before Phase 4 a remote task's pane layout and open editor files
-// were stored under a bare task id, which is precisely that collision.
-//
-// `app` is deliberately NOT qualified: `core.last-path` and `core.left-collapsed` describe the WINDOW, and
-// node-qualifying them would reset the rail's collapse state on every node switch. The qualification happens
-// in `storageKeyFor` / `scopeIdFromStorageKey` below — one matched pair, so no slice has to remember.
 export type PersistedStateScope = 'app' | 'workspace' | 'task' | 'pane'
 export type RestorePhase = 'workspace' | 'view' | 'panes'
 
@@ -60,9 +51,9 @@ export const appStateBinding = <T>(read: () => T, hydrate: (value: T) => void): 
 
 // A scope id qualified by the node that owns the resource it names.
 //
-// ui.md § State ownership: "All keys that touch node resources include the nodeId." Every non-app scope here
+// docs/ui-design.md § State ownership: "All keys that touch node resources include the nodeId." Every non-app scope here
 // is a node resource — a workspace, a task, a pane within a task — and the ids are UUIDs a node mints, so
-// architecture.md § Fleet semantics applies directly: "Two nodes may coincidentally hold the same UUID; that
+// docs/architecture-overview.md § Fleet semantics applies directly: "Two nodes may coincidentally hold the same UUID; that
 // must never collide in the client." Before this, a remote task's pane layout and open editor files were
 // stored under a bare task id, which is exactly that collision.
 //
@@ -76,31 +67,24 @@ export const appStateBinding = <T>(read: () => T, hydrate: (value: T) => void): 
 // in the key. Encoding the pair as one string instead would be ambiguous: a scope id may legitimately contain
 // a slash (a pane scope is a composite), and after a single `encodeURIComponent` there is no way to tell
 // `<node>/<scope>` from a scope id that simply had a slash in it. This spelling makes "contains a raw slash"
-// mean exactly "carries a node qualifier", which is also what lets a pre-Phase-4 key be recognised.
+// mean exactly "carries a node qualifier".
 export const storageKeyFor = (slice: Pick<PersistedStateSlice<unknown>, 'key' | 'scope'>, scopeId: string): string => {
   if (slice.scope === 'app') return slice.key
   const nodeId = activeNodeId()
   // BOTH halves encoded. A nodeId arrives from `GET /v2/node` over the wire and nothing validates it as a
   // UUID, so writing it raw let a node reporting `a/b` produce keys this parser could never recover (the
-  // qualifier would read as `a`), and one reporting `''` produce keys indistinguishable from pre-Phase-4
-  // unqualified ones — which is a node reading another node's layouts. `encodeURIComponent` cannot emit a
-  // `/`, so the separator stays the only unescaped slash in the key either way.
+  // qualifier would read as `a`), and an empty node ID would produce an unqualified key. That could make
+  // one node read another node's layouts. `encodeURIComponent` cannot emit a `/`, so the separator stays
+  // the only unescaped slash in the key either way.
   return `${slice.key}:${nodeId ? `${encodeURIComponent(nodeId)}/` : ''}${encodeURIComponent(scopeId)}`
 }
 
-// The inverse, and it FILTERS as well as parses: a key qualified with another node's id returns null, so
-// node B's saved layouts cannot hydrate into node A's store. An UNQUALIFIED key is accepted whatever the
-// active node — that is every key written before Phase 4, and rejecting them would silently reset every
-// existing install's pane layouts on upgrade.
 export const scopeIdFromStorageKey = (slice: Pick<PersistedStateSlice<unknown>, 'key' | 'scope'>, key: string): string | null => {
   if (slice.scope === 'app') return key === slice.key ? '' : null
   const prefix = `${slice.key}:`
   if (!key.startsWith(prefix)) return null
   const suffix = key.slice(prefix.length)
   const slash = suffix.indexOf('/')
-  // No raw slash → written before Phase 4, or written with no node selected (`dev:node`, where the origin IS
-  // the node). Accepted whatever the active node: rejecting these would silently reset every existing
-  // install's pane layouts and open editor files on upgrade.
   if (slash !== -1 && decodeURIComponent(suffix.slice(0, slash)) !== activeNodeId()) return null
   try {
     return decodeURIComponent(slash === -1 ? suffix : suffix.slice(slash + 1))

@@ -3,13 +3,6 @@ import { chmodSync, closeSync, existsSync, fsyncSync, mkdirSync, openSync, readF
 import { join } from 'node:path'
 import { NODE_PROTOCOL_VERSION, nodeIdentitySchema, type NodeIdentity } from '@acorn/protocol/node.ts'
 
-// The vNext data root (docs/vNext/data.md). Opening one is what makes a directory a Node: it mints
-// or reads the nodeId, takes an exclusive lock, and refuses a V1 root outright.
-//
-// vNext never migrates V1 databases (docs/vNext/plan.md § Approach) — first launch starts fresh and
-// the config-only importer arrives in Phase 5. So a directory holding V1's acorn.sqlite is a hard
-// error rather than something we silently open beside.
-
 const IDENTITY_FILE = 'node.json'
 const LOCK_FILE = 'node.lock'
 const V1_DATABASE = 'acorn.sqlite'
@@ -40,14 +33,6 @@ function writePrivateAtomic(path: string, body: string): void {
   chmodSync(path, 0o600)
 }
 
-// Is `pid` a live process we must yield to?
-//
-// ponytail: PID reuse is the ceiling. After a reboot the recorded pid can belong to an unrelated
-// live process and we refuse a legitimate start — which fails CLOSED, the safe direction, and the
-// caller's error names the lock file to delete. Node exposes no flock(2), and the alternatives are
-// worse: a mkdir lock has the same staleness problem with no pid to probe, a unix socket hits
-// macOS's ~104-byte sun_path limit on mkdtemp paths in tests, and SQLite's locking_mode=EXCLUSIVE
-// guards only the database while locking out db:migrate/db:locate for the whole run.
 function processIsAlive(pid: number): boolean {
   try {
     process.kill(pid, 0)
@@ -128,8 +113,8 @@ function readIdentity(path: string): NodeIdentity | null {
   }
 }
 
-// Open (or initialise) the data root at `dir`. Throws if a V1 root, if another node holds it, or if
-// the identity file is unreadable — never falls back to a fresh identity for an existing root,
+// Open (or initialise) the data root at `dir`. Throws if the directory has a source database, if
+// another node holds it, or if the identity file is unreadable — never falls back to a fresh identity for an existing root,
 // because that would silently orphan the node's paired devices.
 export function openDataRoot(dir: string): DataRoot {
   if (existsSync(join(dir, V1_DATABASE))) {

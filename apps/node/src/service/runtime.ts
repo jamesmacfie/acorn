@@ -153,7 +153,7 @@ export async function startServiceRuntime({ config, desktop, stateChanged }: Run
     // Boot is the right moment because it is the one time nothing is mid-request, and a periodic
     // sweeper would be machinery for a table that holds 24 hours of one owner's mutations.
     await runtime.IDEMPOTENCY.cleanupExpired()
-    // Audit retention, for the same reason and at the same moment (docs/vNext/data.md § Retention
+    // Audit retention, for the same reason and at the same moment (docs/data-layer.md § Retention
     // defaults: 90 days). A timer for one range-delete a day would be machinery this does not need, and
     // a node nobody restarts is also one nobody is accumulating decisions on.
     await pruneAudit(runtime.DB).catch((error) => console.warn('[service:boot] audit prune failed:', error))
@@ -207,7 +207,7 @@ export async function startServiceRuntime({ config, desktop, stateChanged }: Run
     let finishReconcile!: () => void
     const reconciled = new Promise<void>((resolve) => (finishReconcile = resolve))
 
-    // The plugin composition seam (docs/vNext/plugins.md § Cross-plugin collaboration). Owned by this
+    // The plugin composition seam (docs/plugins.md § Cross-plugin collaboration). Owned by this
     // runtime rather than by the module, so a process that starts the service more than once (the
     // tests do) gets a clean graph each time instead of "capability already provided".
     const capabilities = new CapabilityRegistry()
@@ -219,9 +219,6 @@ export async function startServiceRuntime({ config, desktop, stateChanged }: Run
     // CALL time — which is also the only order that can work, since terminal's init runs inside
     // initPlugins and memory's may not have run yet when the deps below are constructed.
     const knowledgeAt = () => capabilities.require(MEMORY_KNOWLEDGE)
-    // plugins/notes' store, resolved the same way and for the same reason. It used to be reached as
-    // `knowledgeAt().notesStore`, because plugins/memory constructed it; notes owns it now and publishes
-    // it as `notes.store` from its contract/ (plugins/notes/src/contract/store.ts).
     const notesAt = () => capabilities.require(NOTES_STORE)
     // Awaited before the listener binds: a plugin's init opens and migrates its own SQLite file, so a
     // request must not be able to arrive first (server/plugin/host.ts).
@@ -278,17 +275,6 @@ export async function startServiceRuntime({ config, desktop, stateChanged }: Run
     })
 
     wireConfigTrust(db)
-    // wireContextSections is GONE. Context sections are a per-plugin contribution point now
-    // (server/plugin/types.ts § PluginContextSectionRegistry): github registers `pr`, notes registers
-    // `notes`, memory registers `memory`, and core's own `issues` registers itself at module scope in
-    // contextSections.ts. It used to be registered by wireAgentTools below, which meant server/standalone.ts
-    // — a node that runs initPlugins and nothing else — booted without it. This call was the last place that
-    // had to hold three plugins' seams at once, which was the whole reason neither notes nor memory could own
-    // its own half.
-    // Only the tools no plugin can own, which after preview's conversion is core's own six alone: the
-    // context-read group and the two repo reads. changes, memory, notes, preview, terminal and workflows
-    // register their own inside initPlugins above — which is why this bag no longer holds the memory index,
-    // the proposal store, the run service, the notes store, or the browser driver.
     wireAgentTools({ db })
     mark('install')
 
@@ -363,7 +349,7 @@ export async function startServiceRuntime({ config, desktop, stateChanged }: Run
         endpoint,
         ...identity,
         // The local bundle pairs without a code: the client spawned this node, which is proof enough
-        // of owner intent (docs/vNext/protocol.md § Pairing, "Local bundle: no code"). The client
+        // of owner intent (docs/api-reference.md § Pairing, "Local bundle: no code"). The client
         // passes back the token it remembered from the OS keychain, and resolveDeviceToken reuses it
         // when it still authenticates, so the steady state is ONE device row rather than one per
         // launch. The service never persists it — custody belongs to the client.

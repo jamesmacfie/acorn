@@ -2,8 +2,8 @@ import { afterEach, describe, expect, it } from 'vitest'
 import { setActiveNode } from '../node/activeNode'
 import { scopeIdFromStorageKey, storageKeyFor } from './persistedState'
 
-// ui.md § State ownership: "All keys that touch node resources include the nodeId." Task and workspace ids are
-// node-minted UUIDs, and architecture.md § Fleet semantics says two nodes may hold the same one — so a bare
+// docs/ui-design.md § State ownership: "All keys that touch node resources include the nodeId." Task and workspace ids are
+// node-minted UUIDs, and docs/architecture-overview.md § Fleet semantics says two nodes may hold the same one — so a bare
 // task id in a storage key was the collision it forbids. `storageKeyFor` and `scopeIdFromStorageKey` are the
 // ONLY places a nodeId enters or leaves a key, so these are the only cases needed.
 
@@ -46,8 +46,6 @@ describe('scopeIdFromStorageKey', () => {
   })
 
   it('accepts an UNQUALIFIED key whatever the active node', () => {
-    // Every key written before Phase 4. Rejecting them would silently reset every existing install's pane
-    // layouts and open editor files on upgrade.
     setActiveNode('node-a')
     expect(scopeIdFromStorageKey(taskSlice, 'core:task-layouts:task-1')).toBe('task-1')
   })

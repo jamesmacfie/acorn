@@ -4,15 +4,6 @@ import { setRepoMirrorSource } from '../../server/repoMirror'
 import { makeTestDb, type TestDb } from '../../server/routes/testDb'
 import { createIdentityService } from './identity'
 
-// This logic used to live inside plugins/http's legacy-row migration, where it was the plugin's excuse
-// for reading core's `prefs` and github's `repos`. It moved here, so its coverage moves here too: the
-// "exactly one identity, or nothing" rule is what stops an unowned row being handed to the wrong login.
-//
-// The second source is no longer a table in this database — github owns the mirror — so the tests drive it
-// through the slot the composition root fills (server/repoMirror.ts). That makes the LAST case below
-// possible to write at all, and it is the one that matters most: an unfilled slot must fail CLOSED, never
-// hand a legacy row to the only identity core happens to be able to see.
-
 const withMirrorIdentities = (logins: string[]) =>
   setRepoMirrorSource({ list: async () => [], defaultBranch: async () => null, identities: async () => logins })
 

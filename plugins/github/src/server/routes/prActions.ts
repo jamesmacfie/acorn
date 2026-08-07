@@ -15,7 +15,7 @@ import type { PluginDatabase } from '@acorn/node-core/main/pluginStorage.ts'
 
 // A FACTORY over this plugin's own database, not a module-scope router reading getDb(c.env). The tables
 // live in <data-root>/plugins/github.sqlite now, and `c.env` deliberately carries no per-plugin handles
-// (docs/vNext/data.md § Plugin DBs). The handle arrives at plugin init, so no request can reach an
+// (docs/data-layer.md § Plugin DBs). The handle arrives at plugin init, so no request can reach an
 // unmigrated database — and a second startServiceRuntime in one process builds fresh routers over its own
 // handle instead of inheriting a closed one.
 export const prActions = (db: PluginDatabase) => new Hono<AppEnv>()
@@ -274,8 +274,6 @@ async function mutateReviewers(db: PluginDatabase, c: Context<AppEnv>, op: 'add'
   })
   const err = ghError(res)
   if (err) return respondError(c, err.status, err.error)
-  // GitHub returns the PR with its full requested_reviewers set → replace the mirror so a
-  // within-TTL read (the client's refetch) reflects the change immediately. ponytail: users only.
   const pr = (await res.json()) as { requested_reviewers?: { login: string }[] }
   const rows = (pr.requested_reviewers ?? []).map((u) => ({ userId: r.userId, repoId: r.repoId, number: r.number, login: u.login }))
   const where = and(

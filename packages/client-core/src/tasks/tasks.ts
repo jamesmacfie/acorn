@@ -25,7 +25,7 @@ const [selectedSource, setSelectedSource] = createSignal<string | null>('github'
 //
 // Keyed by node AND cleared on a switch, which is belt and braces on purpose. The key stops two nodes'
 // workspace ids colliding (they are node-minted UUIDs, and two nodes may hold the same one —
-// architecture.md § Fleet semantics); the clear stops the persistence pass writing one node's scopes under
+// docs/architecture-overview.md § Fleet semantics); the clear stops the persistence pass writing one node's scopes under
 // the other's storage key, because `storageKeyFor` reads the active node at WRITE time and these stores
 // survive the shell's remount. See `clearNodeScopedTaskState` at the foot of this file.
 const viewByWorkspace = new Map<string, WorkspaceView>()
@@ -43,8 +43,7 @@ const [activeTaskId, setActiveTaskId] = createSignal<string | null>(null)
 
 // Per-task pane layout (docs/panes.md): a left→right row of open panes. ALL transitions go
 // through the pure reducer (applyLayoutAction) via dispatchLayout — the single-writer rule.
-// Persisted to the `task_layouts` pref (App.tsx), replacing the old single-pane `task_panes`
-// value (migrated on hydrate).
+// Persisted to the `task_layouts` preference (App.tsx); the value is migrated on hydrate and scoped per task.
 const [taskLayouts, setTaskLayouts] = createSignal<Record<string, TaskLayout>>({})
 
 export const layoutForTask = (taskId: string): TaskLayout | undefined => taskLayouts()[taskId]
@@ -196,16 +195,6 @@ export function evictTaskState(taskId: string): void {
 
 export { activeTaskId, setActiveTaskId, selectedSource, setSelectedSource, taskLayouts }
 
-// Everything keyed by a NODE-MINTED id, dropped on a node switch.
-//
-// This is the other half of Phase 4's storage-key qualification, and without it that qualification made
-// things worse rather than better. `storageKeyFor` reads the active node at WRITE time, while these stores are
-// keyed by bare task/workspace ids and survive the shell's remount — so after a switch the persistence pass
-// wrote node A's pane layouts and recipe URLs under node B's namespace, and for a task id the two nodes
-// shared (legal by construction, architecture.md § Fleet semantics) it OVERWROTE B's real layout with A's.
-//
-// `recipeBrowserUrls` is the one with teeth beyond lost UI state: it is the FIRST branch of the preview
-// pane's URL resolution, so node A's value decided which port the client asked node B to tunnel to.
 export function clearNodeScopedTaskState(): void {
   viewByWorkspace.clear()
   setTaskLayouts({})

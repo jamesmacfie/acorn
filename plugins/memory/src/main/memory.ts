@@ -1,11 +1,3 @@
-// Memory system (docs/notes-and-memory.md): markdown files are TRUTH — `<checkout>/.acorn/memory/*.md`
-// (repo scope, committed, PR-reviewed) and `~/.acorn/memory/*.md` (operator-private) — with a
-// MEMORY.md index per dir. SQLite (`memories` + `memories_fts`) is a DERIVED index, reconciled on
-// change from every active worktree + the primary checkout: ids are content hashes so the same
-// file in N checkouts collapses to one row; same (scope, repo, name) with different bodies →
-// newest updatedAt wins (contradictions are what supersededBy chains are for). Retrieval is FTS5
-// BM25 (porter) with repo-scope filter — keyword-first, no embeddings (ponytail: add RRF/vectors
-// only if keyword recall demonstrably misses).
 import { createHash } from 'node:crypto'
 import { existsSync, mkdirSync } from 'node:fs'
 import { readdir, readFile, rename, stat, unlink, writeFile } from 'node:fs/promises'
@@ -166,7 +158,6 @@ export async function reconcileMemories(db: PluginDatabase, sources: MemorySourc
     createdAt: m.createdAt || Math.round(m.updatedAt),
     updatedAt: Math.round(m.updatedAt),
   }))
-  // Full rebuild (ponytail: hundreds of files at most). Preserve access stats by id.
   const prior = await db.select({ id: memories.id, lastAccessedAt: memories.lastAccessedAt, accessCount: memories.accessCount }).from(memories)
   const stats = new Map(prior.map((p) => [p.id, p]))
   await db.delete(memories)

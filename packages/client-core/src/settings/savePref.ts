@@ -6,13 +6,6 @@ import { pushBackgroundError } from '../notifications/notifications'
 import { isDevicePref, writeDevicePref } from '../persistence/devicePrefs'
 import { persistedStateRegistry, utf8Bytes } from '../persistence/persistedState'
 
-// The server write behind a NODE pref. Lives here because savePref is its only caller — the
-// optimistic-cache + rollback dance below is the whole contract.
-//
-// Addressed at the home node, matching prefsOptions. What is left on a node after Phase 4's device tier is
-// per-node behaviour (agent tool permissions, startup context injection), and pinning it to the home node is
-// the same compromise as before — a single flat record cannot say "per node", so one node has to win. Stated
-// in full at prefsOptions.
 const setPref = async (key: string, value: string) =>
   writeJson<{ key: string; value: string }>(prefsRoute, {
     method: 'PUT',

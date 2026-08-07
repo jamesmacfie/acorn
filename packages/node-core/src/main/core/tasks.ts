@@ -1,10 +1,5 @@
-// The task read seam (CoreServices.tasks). `tasks` is a CORE table, and before the database split
-// nine plugins reached into it directly with `db.select().from(schema.tasks)` — which worked only
-// because every plugin shared one SQLite file. Once each plugin owns its own file, a plugin cannot
-// query core's tables at all (docs/vNext/data.md § Plugin DBs: "No cross-DB queries, no ATTACH…
-// Cross-plugin references are plain IDs, validated by the owning plugin when dereferenced").
-//
-// So this is that validation seam: a plugin holds a taskId and asks core to resolve it.
+// The task read seam (CoreServices.tasks). Plugins hold task IDs and ask core to resolve them through
+// this service; database handles remain private to their owning layer.
 import { and, eq, isNull, max } from 'drizzle-orm'
 import { randomUUID } from 'node:crypto'
 import { dedupeBranch, slugifyBranch } from '@acorn/protocol/branch.ts'
@@ -68,8 +63,6 @@ export type TaskService = {
   // `scope: 'workspace'`) has no meaningful degraded answer: a workspace-scoped note has to land in a
   // directory named after a real workspace, and inventing one would silently write notes nobody reads.
   //
-  // This is the seam whose absence was the second of the two blockers recorded against moving those
-  // tools out of apps/node/src/wiring/agentToolsWiring.ts.
   workspaceId(taskId: string): Promise<string>
   // The same lookup, with "no workspace" as a VALUE rather than a throw.
   //
@@ -85,17 +78,8 @@ export type TaskService = {
   // has no degraded answer — a workspace-scoped note must land in a directory named after a real workspace — and
   // making the type nullable there would push a decision onto a call site that has already made it.
   workspaceIdOrNull(taskId: string): Promise<string | null>
-  // The inverse of `workspaceId`: every task id in a workspace, resolved workspace → `workspace_repos`
-  // → `tasks`. This is what replaced the only real cross-DB JOINs in the codebase. plugins/agents had
-  // three queries answering "sessions in workspace X" as `agent_sessions ⋈ tasks ⋈ workspace_repos`,
-  // which stopped being expressible the moment `agent_*` moved into its own SQLite file. Each is now an
-  // id round trip: resolve the workspace's task ids here, then `inArray` inside the plugin's own
-  // database.
-  //
-  // Ids, not rows: the three call sites only ever used `tasks` as a join hop to reach
-  // `workspace_repos`, never reading a task column, so returning rows would hand a plugin data it has
-  // no use for. An empty array is a real answer (a workspace with no tasks yet) and the callers treat
-  // it as "no sessions" rather than as "unfiltered" — which is the one way this seam could go wrong.
+  // The inverse of `workspaceId`: return every task id in a workspace. Callers use the IDs to filter
+  // their own data, and an empty array means the workspace has no tasks.
   //
   // Deliberately NOT status-filtered. The joins it replaces had no `status` predicate either: an
   // archived task's agent transcripts still belong to the workspace, and the session's own
@@ -106,28 +90,13 @@ export type TaskService = {
   // ticket reachable through two Linear connections is two different rows, and refetching it needs to
   // name which one.
   links(taskId: string): Promise<TaskLinkRef[]>
-  // Adopt a PR into this repo's local-first tasks (docs/workspaces-and-tasks.md Flow B): for every ACTIVE
-  // task on this repo that has no `pullNumber` yet, set it from `branchToPull[task.branch]`. Returns how
-  // many tasks were adopted, which the caller logs rather than acts on.
-  //
-  // A WRITE, and it is here for the same reason `createChild` is: `tasks` is core's table. plugins/github
-  // used to do this inline, as extra statements inside the SAME `db.batch` as its mirror writes — one
-  // transaction covering `pull_requests` and `tasks` at once. That is now two SQLite files, and data.md is
-  // explicit that a transaction never spans them, so the atomicity is genuinely gone rather than hidden:
-  // the mirror commits first, then this runs. A crash between them leaves a mirrored PR whose task has not
-  // adopted it, which self-heals on the next pull refresh (this is idempotent — it only ever fills a NULL)
-  // and which the schema tolerates because it declares no foreign keys anywhere.
-  //
-  // Only NULL pullNumbers are touched, never an existing one: a task that already tracks a PR must not be
-  // silently re-pointed because someone pushed a same-named branch.
   adoptPullNumbers(repoOwner: string, repoName: string, branchToPull: ReadonlyMap<string, number>): Promise<number>
   // Materialise a fan-out child task under a parent (docs/workflows.md, 14 P4) and return its id. Its
   // worktree is deliberately NOT created here — `resolveCwd` does that lazily the moment the child's
   // first step runs, which is the same path every other surface takes.
   //
-  // A WRITE on CoreServices, unlike everything above it, and that is the point: `tasks` is core's table,
-  // so a plugin that wants a task to exist asks core to create it rather than inserting into a file it
-  // has no handle to. Throws when the parent does not resolve.
+  // A write on CoreServices: plugins ask core to create a task rather than writing core-owned rows.
+  // Throws when the parent does not resolve.
   createChild(parentTaskId: string, seed: ChildTaskSeed): Promise<string>
   // Cancel a task — the child-task half of cancelling a fan-out run. A distinct verb rather than a
   // general `setStatus`, so the seam cannot become a way for a plugin to archive or un-archive a task
@@ -158,7 +127,7 @@ export function createTaskService(db: AppDatabase): TaskService {
           : [db.update(schema.tasks).set({ pullNumber, updatedAt: now }).where(eq(schema.tasks.id, task.id))]
       })
       if (!updates.length) return 0
-      // One batch WITHIN core's file, which is all the atomicity data.md permits here.
+      // One batch WITHIN core's file, which is all the atomicity docs/data-layer.md permits here.
       await db.batch(updates as [(typeof updates)[number], ...(typeof updates)[number][]])
       return updates.length
     },

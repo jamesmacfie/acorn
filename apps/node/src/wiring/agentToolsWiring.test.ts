@@ -12,9 +12,8 @@ import { notesAgentTools } from '@acorn/plugin-notes/main/agentTools.ts'
 import { NotesStore } from '@acorn/plugin-notes/main/notes.ts'
 import { browserAgentTools } from '@acorn/plugin-preview/server/agentTools.ts'
 
-// The notes_* tools moved into plugins/notes with the plugin's conversion, so this suite exercises them
-// through THEIR owner rather than through the app-layer remainder. What it pins is unchanged and is the
-// part that regresses silently: a write defaults to task scope, and it stamps agent provenance.
+// The notes_* tools are contributed by the notes plugin. This suite pins their task-scoped default and
+// agent provenance at the composition root.
 describe('agent note contributions', () => {
   let dir: string
   let notesStore: NotesStore
@@ -47,10 +46,8 @@ describe('agent note contributions', () => {
   })
 })
 
-// The manifest is now assembled from FIVE sources — core's remainder here plus one set per converted
-// plugin — and the failure mode that makes it worth pinning is silent: a tool dropped on the way out of
-// this file is invisible until an agent tries to call it and gets a 404. This suite is the only place
-// that may see all five, because importing a plugin's internals is legal from an app and nowhere else.
+// The manifest is assembled from core and plugin contributions. This composition-root test checks that
+// every contribution reaches the assembled surface; package-level tests cover each projection.
 //
 // Names, not shapes: risk tiers, schemas and the three projections are covered by
 // packages/node-core/src/server/routes/agentTools.test.ts and mcp/server.test.ts over a fixture.
@@ -63,8 +60,7 @@ describe('the full agent-tool manifest', () => {
     'linked_issues',
     'repo_info',
   ]
-  // The sixth group to leave this file. Its blocker was "preview has no node-side part to own them", not the
-  // Electron boundary — the driver is still in Electron main and still arrives as an injected capability.
+  // Preview tools remain an Electron capability exposed through the same assembled tool manifest.
   const PREVIEW_TOOLS = ['browser_navigate', 'browser_snapshot', 'browser_click', 'browser_fill', 'browser_screenshot', 'browser_console']
   const CHANGES_TOOLS = ['local_changes', 'local_diff', 'git_log']
   const NOTES_TOOLS = ['notes_list', 'notes_read', 'notes_write', 'notes_append']
