@@ -13,18 +13,21 @@ partitioned per node. V1's bearer-authenticated `/api/v1` automation listener is
 > [docs/electron.md](./docs/electron.md); current topic docs describe the shipped Electron runtime.
 > vNext Phase 1 landed the protocol v2 / fleet spine; Phase 2 landed core services, the terminal scope-shed,
 > scoped internal tokens, the plugin host and the database split; Phase 3 drove the plugin→plugin baseline to
-> ZERO and made context sections a per-plugin contribution point; **Phase 4 is done** — fleet home, the
-> aggregated surfaces, Settings → Nodes/Plugins, the preview tunnel, and a two-node e2e suite that covers
-> every Phase 4 exit criterion. Deliberate divergences and — importantly — what has NOT landed are recorded
-> in [docs/vNext/phase1-notes.md](./docs/vNext/phase1-notes.md),
+> ZERO and made context sections a per-plugin contribution point; Phase 4 landed fleet home, the aggregated
+> surfaces, Settings → Nodes/Plugins, the preview tunnel and a two-node e2e suite; **Phase 5 is done** — the
+> config-only V1 importer, backup, the `audit` table and its producers, the disk-encryption warning,
+> Settings → Security, the parity ledger, the standalone-node tarball, and all three of Phase 4's accepted
+> risks CLOSED. Deliberate divergences and — importantly — what has NOT landed are recorded in
+> [docs/vNext/phase1-notes.md](./docs/vNext/phase1-notes.md),
 > [docs/vNext/phase2-notes.md](./docs/vNext/phase2-notes.md),
-> [docs/vNext/phase3-notes.md](./docs/vNext/phase3-notes.md) and
-> [docs/vNext/phase4-notes.md](./docs/vNext/phase4-notes.md). Read the Phase 4 notes before touching the
-> fleet surfaces: they list nineteen bugs the phase's tests and a following adversarial review found, and
-> three risks accepted rather than closed — **the preview tunnel's client-side loopback listener is
-> unauthenticated** (bounded by declared-ports-only, pane lifetime and a cap), **there is no heartbeat on the
-> events socket** (a hung-but-connected node reads `online` forever), and a fan-out sharing a query key must
-> share the value's SHAPE or it corrupts every other reader.
+> [docs/vNext/phase3-notes.md](./docs/vNext/phase3-notes.md),
+> [docs/vNext/phase4-notes.md](./docs/vNext/phase4-notes.md) and
+> [docs/vNext/phase5-notes.md](./docs/vNext/phase5-notes.md). Read the Phase 4 notes before touching the
+> fleet surfaces: they list nineteen bugs the phase's tests and a following adversarial review found, plus
+> the rule that a fan-out sharing a query key must share the value's SHAPE or it corrupts every other
+> reader. Two things Phase 5 could not close: **notarization** (no Apple Developer ID — `identity: null`
+> stands) and **the manual half of the parity checklist**, which is written
+> ([docs/vNext/parity-checklist.md](./docs/vNext/parity-checklist.md)) and not walked.
 
 ## Architecture (a client, and N nodes)
 
@@ -93,8 +96,19 @@ partitioned per node. V1's bearer-authenticated `/api/v1` automation listener is
   Phase 2, `main/pluginStorage.ts`; agents, changes, database, github, http, memory, terminal,
   workflows), `node.json` (nodeId + last port),
   `node.lock`, `tls/`, `blobs/`, `logs/` and `worktrees/`; `openDataRoot` mints the identity, takes an exclusive pidfile
-  lock and **refuses a V1 root outright**. It lives at `apps/node/.acorn/` in development (gitignored)
-  and Electron's `userData` root when packaged.
+  lock and **refuses a V1 root outright** — the config-only importer (Phase 5, `main/v1Import.ts`) reads
+  a V1 root by COPYING its database and reading the copy, so V1's files are byte-identical afterwards.
+  It lives at `apps/node/.acorn/` in development (gitignored)
+  and Electron's `userData` root when packaged. `POST /v2/core/backup` (`main/backup.ts`) snapshots
+  core + every `plugins/*.sqlite` through SQLite's online-backup API into one tar, scrubbing credentials
+  and device rows out of the copy; blobs and worktrees are excluded as recoverable.
+- **Security surfaces (Phase 5):** an append-only `audit` table in core with a 90-day prune at boot
+  (`server/audit.ts`; write through `auditRequest(c, …)` from a route, never `recordAudit(getDb(c.env), …)`
+  — `getDb` throws with no binding and would fail the action it was describing). Six producers: pairing
+  window open/close, device pair/revoke, config-trust ack, secret create/replace/delete, plugin toggle,
+  backup, import. `secret.used` is deliberately absent (phase5-notes.md § Decisions). `GET /v2/core/audit`
+  and `GET /v2/core/security` are `requireDevice`-gated at the mount, both path forms, and asserted
+  through the real `createApp()`.
 - Bindings: `packages/node-core/src/main/bindings.ts` builds the object routes read via `c.env` (DB,
   on-disk `BLOBS`, device/pairing/idempotency services, secret stores). It also protects the data root
   and persists the loopback internal token and active GitHub identity in mode-`0600` files. `Env` is an
@@ -223,6 +237,7 @@ tools/arch/             @acorn/arch-tests   the executable boundary rules
 | `pnpm db:check` | Replay every chain against a fresh SQLite database |
 | `pnpm db:locate` | Print the absolute path to this worktree's local SQLite database |
 | `pnpm db:migrate` | Apply migrations to the dev data root's DB (`apps/node/.acorn/core.sqlite`; override with `ACORN_DB_PATH`) |
+| `pnpm pack:node` | Build the standalone-node tarball for a remote machine (`apps/node/release/`). See [docs/node-distribution.md](./docs/node-distribution.md) |
 
 ## Conventions & gotchas
 
