@@ -292,25 +292,6 @@ export const pullRoute = (owner: string, repo: string, number: string | number, 
 export const reposRoute = '/v2/p/github/repos'
 export const reposRefreshRoute = '/v2/p/github/repos/refresh'
 
-// GitHub's device authorization grant (plugins/github/server/routes/deviceAuth.ts). Two routes because
-// the client owns the polling interval: a long poll here would hold a request slot for up to fifteen
-// minutes per pending connection.
-export const githubDeviceStartRoute = '/v2/p/github/auth/device/start'
-export const githubDevicePollRoute = '/v2/p/github/auth/device/poll'
-
-export type GithubDeviceStart = {
-  deviceCode: string
-  userCode: string
-  verificationUri: string
-  expiresIn: number
-  // Seconds. GitHub's floor is 5 and it may ask for more; never poll faster than it asks.
-  interval: number
-}
-export type GithubDevicePoll =
-  | { status: 'pending'; slowDown?: boolean }
-  | { status: 'denied' }
-  | { status: 'expired' }
-  | { status: 'connected'; integration?: unknown }
 export const pullsRoute = (owner: string, repo: string, state: 'open' | 'closed') => `${repoRoute(owner, repo)}/pulls?state=${state}`
 export const closedPullsRoute = (owner: string, repo: string, page: number) => `${pullsRoute(owner, repo, 'closed')}&page=${page}`
 export const pullsBatchRoute = (owner: string, repo: string) => `${repoRoute(owner, repo)}/pulls/batch`
