@@ -339,3 +339,95 @@ describe('wsHub task scope', () => {
     device.close()
   })
 })
+
+// The second half of the same hole, found by the same review: the scope check above lived INSIDE the
+// `term:` branch, so every OTHER channel — and every broadcast — was unchecked.
+//
+// The generic dispatch mattered most because of what is on the other side of it:
+// plugins/docker's handler answers `docker:exec:open` by spawning `docker exec -it <ref> sh -c 'exec
+// bash'` and pipes `docker:exec:in` into it. A task-scoped credential therefore had an interactive shell
+// in any container on the machine, from a socket it can open itself.
+describe('wsHub non-term channels and broadcast, under task scope', () => {
+  const taskToken = () => mintInternalToken(INTERNAL, { scope: 'task', taskId: 'task-1' })
+
+  // Records every frame a channel handler is asked to process, so "refused" means the plugin never ran
+  // rather than merely that it declined.
+  const recordingChannel = (seen: string[], disconnects: object[] = []) => {
+    registerWsChannelHandler('docker', {
+      onFrame: (frame, send) => {
+        seen.push(frame.channel)
+        send({ channel: 'docker:log', id: 'c1', data: 'ack' })
+      },
+      onDisconnect: (conn) => void disconnects.push(conn),
+    })
+    return seen
+  }
+
+  it('refuses a non-term channel from a task-scoped socket — the docker exec shell is unreachable', async () => {
+    const seen: string[] = []
+    recordingChannel(seen)
+    const confined = await open({ host, 'x-acorn-internal': taskToken() })
+    const got = frames(confined)
+    confined.send(JSON.stringify({ channel: 'docker:exec:open', execId: 'e1', ref: 'deadbeef', cols: 80, rows: 24 }))
+    confined.send(JSON.stringify({ channel: 'docker:exec:in', execId: 'e1', data: 'cat /run/secrets/db\n' }))
+    confined.send(JSON.stringify({ channel: 'docker:logs:attach', id: 'deadbeef' }))
+    confined.close()
+    await closed(confined)
+
+    // A control on a SECOND socket, so the assertion cannot pass merely because nothing was processed at
+    // all: the same three frames from an unconfined socket must reach the handler.
+    const device = await open(authHeaders())
+    device.send(JSON.stringify({ channel: 'docker:exec:open', execId: 'e1', ref: 'deadbeef', cols: 80, rows: 24 }))
+    await waitFor(() => seen.length > 0, 'the control socket to reach the handler')
+    expect(seen).toEqual(['docker:exec:open'])
+    expect(got).toEqual([]) // and the confined socket got no reply either
+    device.close()
+  })
+
+  it('lets the service scope and a device use a non-term channel', async () => {
+    const seen: string[] = []
+    recordingChannel(seen)
+    const service = await open({ host, 'x-acorn-internal': mintInternalToken(INTERNAL, { scope: 'service' }) })
+    service.send(JSON.stringify({ channel: 'docker:logs:attach', id: 'deadbeef' }))
+    await waitFor(() => seen.length >= 1, 'the service scope to reach the handler')
+    service.close()
+
+    const device = await open(authHeaders())
+    device.send(JSON.stringify({ channel: 'docker:stats:attach', id: 'deadbeef' }))
+    await waitFor(() => seen.length >= 2, 'a device to reach the handler')
+    expect(seen).toEqual(['docker:logs:attach', 'docker:stats:attach'])
+    device.close()
+  })
+
+  // No broadcast frame is task-addressed, so a confined socket gets none of them. workflow:step:event is
+  // the one that hurts — it is another task's raw agent stream, assistant text and tool results included.
+  it('does not fan any broadcast to a task-scoped socket, while an unconfined socket still gets them', async () => {
+    const confined = await open({ host, 'x-acorn-internal': taskToken() })
+    const service = await open({ host, 'x-acorn-internal': mintInternalToken(INTERNAL, { scope: 'service' }) })
+    const device = await open(authHeaders())
+    const confinedGot = frames(confined)
+    const serviceGot = frames(service)
+    const deviceGot = frames(device)
+
+    wsBroadcast({ channel: 'workflow:step:event', runId: 'run-in-task-2', stepId: 's1', event: { text: 'SECRET' } })
+    wsBroadcast({ channel: 'workflow:notice', notice: { taskId: 'task-2', kind: 'run-done', title: "another task's title" } })
+    wsBroadcast({ channel: 'term:status' })
+    await waitFor(() => deviceGot.length >= 3 && serviceGot.length >= 3, 'the unconfined sockets to receive all three')
+    expect(confinedGot).toEqual([])
+
+    // And the socket is still usable for what it IS entitled to, so "receives nothing" is not "is dead":
+    // its own session's output arrives through the per-session sink, which never went through wsBroadcast.
+    setStreamHandlers({
+      input: () => {},
+      attach: (id, sink) => sink({ type: 'ready', session: { id } as never, replayed: false }),
+      detach: () => {},
+      streamTaskId: () => 'task-1',
+    })
+    confined.send(JSON.stringify({ channel: 'term:attach', id: 's1' }))
+    await waitFor(() => confinedGot.length >= 1, "the confined socket's own stream to reach it")
+    expect(confinedGot.map((f) => f.channel)).toEqual(['term:out'])
+    confined.close()
+    service.close()
+    device.close()
+  })
+})

@@ -80,10 +80,32 @@ function sendFrame(conn: Conn, frame: WsServerFrame): void {
   conn.ws.send(JSON.stringify({ ...frame, seq: conn.seq } satisfies WsServerWireFrame))
 }
 
+// Is this connection confined to a single task? The socket-level twin of requireUser.ts's
+// `isTaskConfined`, kept here rather than imported because that one reads a Hono context and this one
+// reads a Conn — same rule, two different carriers of the same claims.
+//
+// A device is the owner and a 'service'-scoped token is the node calling itself; both are unconfined.
+const isConfined = (conn: Conn): boolean => !!conn.internal && conn.internal.scope !== 'service'
+
 // Session-status pings + workflow notices go to every open socket (notify.ts). Sessions' own output
 // goes only to attached sockets, via their per-session sink.
+//
+// A task-confined socket receives NOTHING from here, and the reason is that not one broadcast frame is
+// task-addressed, so there is nothing to narrow: `workflow:step:event` carries a whole agent turn's raw
+// stream (assistant text and tool results) keyed only by runId, `workflow:notice` carries another task's
+// title, `agent:session`/`agent:event` carry another task's session, and `term:status`/`docker:changed`
+// are content-free cache-dirty pings whose only value is to a UI. So the filter is the frame-shaped
+// equivalent of the HTTP side, which now 404s a foreign run — without it the socket handed back exactly
+// what those route guards had just taken away.
+//
+// Rejected: filtering per channel on a taskId in the payload. Only `workflow:notice` has one; runId and
+// sessionId would each need a lookup through a plugin the hub must not know about, and the default for a
+// channel added later would silently be "leak it".
 export function wsBroadcast(frame: WsServerFrame): void {
-  for (const c of conns) sendFrame(c, frame)
+  for (const c of conns) {
+    if (isConfined(c)) continue
+    sendFrame(c, frame)
+  }
 }
 
 // True when any socket is connected — notify.ts uses the same "no window layer → no-op" idea for WS.
@@ -138,8 +160,8 @@ async function authorize(req: IncomingMessage, deps: WsAuthDeps): Promise<Author
 // Device sockets and the 'service' scope: yes. A 'task'-scoped internal socket: only when the stream
 // belongs to that task. The engine answers the ownership question because it owns the session map.
 function mayDriveStream(conn: Conn, id: string | null): boolean {
-  if (!conn.internal || conn.internal.scope === 'service') return true
-  if (!id || !conn.internal.taskId) return false
+  if (!isConfined(conn)) return true
+  if (!id || !conn.internal?.taskId) return false
   return handlers?.streamTaskId(id) === conn.internal.taskId
 }
 
@@ -177,6 +199,20 @@ function onConnect(ws: WebSocket, authorized: Authorized): void {
       }
       return
     }
+    // Every non-`term:` channel is refused outright for a task-confined socket, mirroring the posture
+    // workflows' node-wide trigger-poll route takes (isTaskConfined → 403): there is no task to narrow
+    // the frame to, so the only honest answer is no.
+    //
+    // This is not hypothetical tidying. The scope check above lived INSIDE the `term:` branch, and
+    // `docker:exec:open` spawns `docker exec -it <ref> sh -c …` with `docker:exec:in` writing arbitrary
+    // bytes to it — so a task-scoped credential (which an agent holds in its own environment, along with
+    // the data root that names the port) got an interactive root shell in any container on the machine,
+    // one directory away from the guard that exists to stop exactly that.
+    //
+    // A per-channel opt-in on WsChannelHandler was considered and rejected: docker browse and exec are a
+    // renderer surface with no agent consumer, so the opt-in would have no takers, and the safe default
+    // has to be the one a channel added later inherits.
+    if (isConfined(conn)) return
     channelHandlers.get(frame.channel.split(':')[0])?.onFrame(frame, (f) => sendFrame(conn, f), conn)
   })
   const cleanup = () => {
