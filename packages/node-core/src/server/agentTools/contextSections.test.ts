@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import {
   asContextSection,
   getContextSections,
@@ -29,6 +29,13 @@ const section = (id: string, over: Partial<PluginContextSection> = {}): PluginCo
 const args = { userLogin: 'james', task: { id: 't1' } as never, repo: 'acme/api' }
 
 describe('the context-section registry', () => {
+  // BEFORE as well as after, because importing this module now registers core's real `issues` section at
+  // module scope (that is the fix for a standalone node losing it). Every case below builds a synthetic
+  // registry, and two of them register their own 'issues' — which would collide with the real one on the
+  // FIRST case, before any afterEach has run.
+  beforeEach(() => {
+    for (const owner of ['a', 'b', 'core', 'github']) removeContextSections(owner)
+  })
   afterEach(() => {
     for (const owner of ['a', 'b', 'core', 'github']) removeContextSections(owner)
   })
@@ -58,8 +65,14 @@ describe('the context-section registry', () => {
   it('removes one owner contributions as a unit, leaving the rest', () => {
     // What the plugin host calls before re-registering. Without it, a second startServiceRuntime in one
     // process would either throw on the duplicate id or keep sections closed over the first boot's handles.
+    //
+    // Owner 'a' gets TWO sections, deliberately. With one, a `remove` that stopped after the first match — the
+    // easiest way to write that loop wrong, and the reason the registry iterates backwards with a splice —
+    // passed this case. Two is the smallest number that can tell "as a unit" from "one of them".
     registerContextSection('a', asContextSection(section('notes')))
+    registerContextSection('a', asContextSection(section('pr')))
     registerContextSection('b', asContextSection(section('memory')))
+    expect(getContextSections().map((s) => s.id)).toEqual(['pr', 'notes', 'memory'])
     removeContextSections('a')
     expect(getContextSections().map((s) => s.id)).toEqual(['memory'])
   })
