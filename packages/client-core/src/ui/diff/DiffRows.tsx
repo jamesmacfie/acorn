@@ -7,7 +7,7 @@ import { createEffect, createSignal, For, Match, on, Show, Switch } from 'solid-
 import CopyButton from '../CopyButton'
 import { fileStatusMeta } from '../displayMeta'
 import MentionTextarea from '../MentionTextarea'
-import type { PullFile, Thread } from '../../queries'
+import type { DiffFile, DiffThread } from './model'
 import { UserAvatar } from '../UserAvatar'
 import { fileAnchor, type CodeRow, type FileRow, type GapRow, type HunkRow, type LoadDiffRow, type Row, type ThreadRowT } from './model'
 import { markTokens, type FindHighlight } from './find'
@@ -33,7 +33,7 @@ export function NonCodeRow(props: {
   expandGap?: (gap: GapRow) => Promise<unknown>
   retryDiff?: (file: LoadDiffRow['file']) => void
   mentions?: string[]
-  threadCollapse?: (thread: Thread) => ThreadCollapseController
+  threadCollapse?: (thread: DiffThread) => ThreadCollapseController
   fileCollapsed?: (path: string) => boolean
   onToggleFileCollapse?: (path: string) => void
   onLayoutChange?: () => void
@@ -91,7 +91,7 @@ export function NonCodeRow(props: {
 // Per-file header bar: opens each file's section in the stacked diff, and doubles as the sticky
 // current-file header DiffView pins to the top of the scroller (no anchor id there).
 export function FileHead(props: {
-  file: PullFile
+  file: DiffFile
   anchorId?: string
   collapsed?: boolean
   onToggleCollapse?: (path: string) => void
@@ -308,7 +308,7 @@ function LineComposer(props: {
 }
 
 function ThreadRow(props: {
-  thread: Thread
+  thread: DiffThread
   onMutated: () => void
   resolveThread: (threadId: string, resolved: boolean) => Promise<unknown>
   reply: (commentDatabaseId: number, body: string) => Promise<unknown>

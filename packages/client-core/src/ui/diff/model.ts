@@ -3,14 +3,51 @@
 // reaching across a plugin boundary to get here: sharing rendering code is good, sharing feature
 // internals is what's banned (docs/plugins.md § Cross-plugin collaboration).
 //
-// It can live here without inverting anything because its two domain types — PullFile and Thread —
-// are already client-core's (queries.ts); the plugin never owned them.
+// It used to type on github's `PullFile` and `Thread`, re-exported through client-core's queries.ts,
+// and a comment here claimed those types "are already client-core's; the plugin never owned them."
+// That was backwards — they are github's wire types, and core was holding them. The renderer declares
+// its own contract below instead: what a diff row needs to render, named for what it renders.
+//
+// github's PullFile/Thread and changes' local rows stay structurally assignable to these, so no call
+// site changed. That is the point: a renderer should describe its input, not name one caller's type.
 import { diffWordsWithSpace } from 'diff'
 import gitdiffParser from 'gitdiff-parser'
 import { synth } from './synth'
 import type { getHighlighter } from '../../highlight/shiki'
 import { langFor } from '../../highlight/shiki'
-import type { PullFile, Thread } from '../../queries'
+
+// The renderer's own input contract. Deliberately structural, so any producer of a patch — a PR file
+// from github, an uncommitted hunk from changes, whatever comes next — satisfies it without either
+// side importing the other.
+export type DiffFile = {
+  path: string
+  status: string | null
+  additions: number | null
+  deletions: number | null
+  sha: string | null
+  viewed: boolean
+  patch: string | null
+}
+
+export type DiffThreadComment = {
+  id: string
+  databaseId: number | null
+  author: string | null
+  body: string | null
+  createdAt: number | null
+}
+
+// An inline review conversation anchored to a line. `side` is the producer's own vocabulary; the
+// renderer only groups by it.
+export type DiffThread = {
+  threadId: string
+  path: string | null
+  line: number | null
+  side: string | null
+  resolved: boolean
+  comments: DiffThreadComment[]
+}
+
 
 export type Tok = { content: string; light: string; dark: string }
 export type WordTok = { content: string; kind: 'eq' | 'add' | 'del' }
@@ -24,11 +61,11 @@ export type CodeRow = {
   words?: WordTok[]
 }
 export type HunkRow = { kind: 'hunk'; text: string }
-export type FileRow = { kind: 'file'; file: PullFile }
+export type FileRow = { kind: 'file'; file: DiffFile }
 export type NoDiffRow = { kind: 'nodiff' }
 export type LoadDiffStatus = 'loading' | 'error'
-export type LoadDiffRow = { kind: 'load'; file: PullFile; status: LoadDiffStatus }
-export type ThreadRowT = { kind: 'thread'; thread: Thread }
+export type LoadDiffRow = { kind: 'load'; file: DiffFile; status: LoadDiffStatus }
+export type ThreadRowT = { kind: 'thread'; thread: DiffThread }
 // A run of unchanged lines hidden between/above/below hunks. oldNo/newNo advance in lockstep
 // (unchanged context), so expansion just slices the head blob from newStart. count is null for the
 // bottom gap — its size needs the file's total line count, known only once the body is fetched.
@@ -43,7 +80,7 @@ export type GapRow = {
 }
 export type Row = HunkRow | CodeRow | FileRow | NoDiffRow | LoadDiffRow | ThreadRowT | GapRow
 export type DiffRow = HunkRow | CodeRow | GapRow | LoadDiffRow
-export type ParsedFile = { file: PullFile; diff: DiffRow[] }
+export type ParsedFile = { file: DiffFile; diff: DiffRow[] }
 
 export const gapId = (gap: Pick<GapRow, 'path' | 'side' | 'oldStart' | 'newStart'>) => `${gap.path}:${gap.side}:${gap.oldStart}:${gap.newStart}`
 
@@ -152,7 +189,7 @@ export function wordDiff(oldText: string, newText: string): { del: WordTok[]; ad
   return { del, add }
 }
 
-function rawPatchRows(file: PullFile, tokenize: TokenizeLine): DiffRow[] {
+function rawPatchRows(file: DiffFile, tokenize: TokenizeLine): DiffRow[] {
   const rows: DiffRow[] = []
   for (const line of (file.patch ?? '').split('\n')) {
     if (line.startsWith('@@')) {
@@ -171,7 +208,7 @@ function rawPatchRows(file: PullFile, tokenize: TokenizeLine): DiffRow[] {
   return rows
 }
 
-export function buildDiffRows(file: PullFile, tokenize: TokenizeLine): DiffRow[] {
+export function buildDiffRows(file: DiffFile, tokenize: TokenizeLine): DiffRow[] {
   if (!file.patch) return []
   let parsed: ReturnType<typeof gitdiffParser.parse>
   try {
@@ -235,8 +272,8 @@ export function expandGap(gap: GapRow, body: string, tokenize: TokenizeLine): Co
   return rows
 }
 
-export function buildRenderableRows(parsed: ParsedFile[], threads: Thread[] | undefined, expanded?: Map<string, CodeRow[]>, collapsed?: Set<string>): Row[] {
-  const threadsByPath = new Map<string, Thread[]>()
+export function buildRenderableRows(parsed: ParsedFile[], threads: DiffThread[] | undefined, expanded?: Map<string, CodeRow[]>, collapsed?: Set<string>): Row[] {
+  const threadsByPath = new Map<string, DiffThread[]>()
   for (const thread of threads ?? []) {
     if (!thread.path) continue
     const bucket = threadsByPath.get(thread.path)
@@ -268,7 +305,7 @@ export function buildRenderableRows(parsed: ParsedFile[], threads: Thread[] | un
   return out
 }
 
-function pushCodeRow(out: Row[], row: CodeRow, fileThreads: Thread[]) {
+function pushCodeRow(out: Row[], row: CodeRow, fileThreads: DiffThread[]) {
   out.push(row)
   for (const thread of fileThreads) {
     const onRight = thread.side === 'RIGHT' || thread.side == null

@@ -1,5 +1,5 @@
 import { createSignal } from 'solid-js'
-import type { PullFile } from '../../queries'
+import type { DiffFile } from './model'
 import type { ParsedFile, TokenizeLine } from './model'
 
 export type DiffHydrationStatus = 'idle' | 'queued' | 'loading' | 'loaded' | 'error'
@@ -8,16 +8,16 @@ const PATCH_BATCH_SIZE = 4
 const BACKGROUND_BATCH_DELAY_MS = 80
 
 type HydratorOptions = {
-  tokenizerForFile: (file: PullFile) => Promise<TokenizeLine>
-  parseFile: (file: PullFile, tokenize: TokenizeLine) => ParsedFile
+  tokenizerForFile: (file: DiffFile) => Promise<TokenizeLine>
+  parseFile: (file: DiffFile, tokenize: TokenizeLine) => ParsedFile
   onParsed: (parsed: ParsedFile) => void
   // Patch-body source, injected so the hydrator stays agnostic of where diffs come from (the PR
   // diff wires the query cache + batch endpoint; the compare preview has every body inline):
   /** Resolve a body for a file whose reset() snapshot entry has no patch (e.g. binary → null patch,
    * or a cache entry restored without bodies). Checked before fetchPatches. */
-  cachedFile?: (path: string) => PullFile | null
+  cachedFile?: (path: string) => DiffFile | null
   /** Batch-fetch bodies still missing after cachedFile. Omitted → those files go to 'error'. */
-  fetchPatches?: (paths: string[], signal: AbortSignal | undefined) => Promise<PullFile[]>
+  fetchPatches?: (paths: string[], signal: AbortSignal | undefined) => Promise<DiffFile[]>
 }
 
 const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms))
@@ -40,7 +40,7 @@ const waitForIdle = () =>
 export function createDiffHydrator(options: HydratorOptions) {
   const [version, setVersion] = createSignal(0)
   const statuses = new Map<string, DiffHydrationStatus>()
-  let fileByPath = new Map<string, PullFile>()
+  let fileByPath = new Map<string, DiffFile>()
   let queue: string[] = []
   let generation = 0
   let running = false
@@ -83,7 +83,7 @@ export function createDiffHydrator(options: HydratorOptions) {
     publish()
 
     const signal = controller?.signal
-    const cached: PullFile[] = []
+    const cached: DiffFile[] = []
     const fetchPaths: string[] = []
     for (const path of paths) {
       const file = cachedFile(path)
@@ -91,7 +91,7 @@ export function createDiffHydrator(options: HydratorOptions) {
       else fetchPaths.push(path)
     }
 
-    let fetched: PullFile[] = []
+    let fetched: DiffFile[] = []
     if (fetchPaths.length && options.fetchPatches) {
       fetched = await options.fetchPatches(fetchPaths, signal)
     }
@@ -147,7 +147,7 @@ export function createDiffHydrator(options: HydratorOptions) {
     void pump(generation)
   }
 
-  const reset = (files: PullFile[], priorityPath?: string) => {
+  const reset = (files: DiffFile[], priorityPath?: string) => {
     generation++
     controller?.abort()
     controller = new AbortController()
