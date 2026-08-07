@@ -3,6 +3,7 @@ import { eq } from 'drizzle-orm'
 import type { PairedDevice } from '@acorn/protocol/node.ts'
 import type { AppDatabase } from '../db'
 import { schema } from '../db'
+import { recordAudit, type AuditActor } from '../audit'
 
 // Device tokens: issue / authenticate / list / revoke (docs/vNext/protocol.md § Pairing).
 //
@@ -35,7 +36,12 @@ export type DeviceService = {
   list(): Promise<DeviceSummary[]>
   // True if the device existed (whether or not it was already revoked); false if it never existed,
   // which is how a route decides between 204 and 404.
-  revoke(id: string): Promise<boolean>
+  //
+  // `actor` is who to blame in the audit trail. Optional because the two non-route callers (a test, and
+  // a node revoking on its own behalf) have no principal, and defaulting to 'system' is honest for them
+  // — but a revoke that arrived over HTTP should say which device asked, because "which of my machines
+  // unpaired this one?" is the question the trail exists to answer.
+  revoke(id: string, actor?: AuditActor): Promise<boolean>
   // Fires after a successful revoke so live sockets for that device close immediately
   // (docs/vNext/protocol.md § Pairing: "open sockets are closed").
   onRevoked(listener: (deviceId: string) => void): () => void
@@ -74,6 +80,10 @@ export function deviceService(db: AppDatabase, now: () => number = () => Date.no
       const secret = randomBytes(32).toString('base64url') // 43 chars, unpadded
       const createdAt = now()
       await db.insert(schema.devices).values({ id, name, secretHash: sha256(secret), createdAt, lastSeenAt: null, revokedAt: null })
+      // The actor is 'system': whoever holds the pairing code is by definition not yet a device, and the
+      // bundled local node pairs with no code at all because the client spawned it. The NAME is the only
+      // thing the owner will have to recognise this row by, so it goes in the details.
+      recordAudit(db, { actor: 'system', action: 'device.paired', subject: id, details: { name } })
       return {
         token: `acorn_dt_${id}_${secret}`,
         device: { id, name, createdAt, lastSeenAt: null, revokedAt: null },
@@ -120,11 +130,14 @@ export function deviceService(db: AppDatabase, now: () => number = () => Date.no
       return rows.sort((a, b) => b.createdAt - a.createdAt).map(summarize)
     },
 
-    async revoke(id) {
+    async revoke(id, actor = { actor: 'system' as const }) {
       const [row] = await db.select({ id: schema.devices.id, revokedAt: schema.devices.revokedAt }).from(schema.devices).where(eq(schema.devices.id, id)).limit(1)
       if (!row) return false
       if (row.revokedAt === null) {
         await db.update(schema.devices).set({ revokedAt: now() }).where(eq(schema.devices.id, id))
+        // Only on the transition. A repeat revoke still notifies listeners below (a reconnect racing the
+        // first one has to be closed too), but it is not a second security event to review.
+        recordAudit(db, { ...actor, action: 'device.revoked', subject: id })
       }
       // Notify even on a repeat revoke: it is cheap, and a socket that survived the first one (a
       // reconnect racing the revoke) must still be closed.

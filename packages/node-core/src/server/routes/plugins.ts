@@ -1,5 +1,6 @@
 import { Hono } from 'hono'
 import { z } from 'zod'
+import { auditRequest } from '../auditRequest'
 import { bridgeSlot, BridgeError, viaBridge } from '../bridge'
 import type { AppEnv } from '../middleware/auth'
 import { respondError } from '../respond'
@@ -60,7 +61,19 @@ export const plugins = new Hono<AppEnv>()
         if (!entry) throw new BridgeError(400, 'bad_request', `Unknown plugin: ${name}`)
         if (entry.required) throw new BridgeError(400, 'bad_request', `${name} is a required plugin and cannot be disabled.`)
       }
+      const before = [...bridge.disabled()].sort()
       bridge.setDisabled(parsed.data.disabled)
+      const after = [...parsed.data.disabled].sort()
+      // Only on a real change. The client PUTs the whole list on every toggle, and a no-op PUT — a
+      // re-render, a second client re-saving what it already read — is not a decision anyone made.
+      if (before.join(' ') !== after.join(' ')) {
+        auditRequest(c, {
+          action: 'plugins.disabled.changed',
+          // The list, not a diff: which plugins a node runs decides which routes exist and which
+          // databases open, so the state that was chosen is what an owner needs to see.
+          details: { disabled: after.join(', ') || '(none)' },
+        })
+      }
       return state(bridge)
     })
   })

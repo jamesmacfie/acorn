@@ -7,6 +7,7 @@ import {
   type PairingWindow,
   type PairResult,
 } from '@acorn/protocol/node.ts'
+import { auditActor, auditRequest } from '../auditRequest'
 import { PAIRING_WINDOW_MS } from '../auth/pairingCodes'
 import type { AppEnv } from '../middleware/auth'
 import { respondError } from '../respond'
@@ -87,12 +88,18 @@ export function pairingRoutes(): { open: Hono<AppEnv>; core: Hono<AppEnv> } {
     .post('/pair/start', (c) => {
       // The plaintext code goes back to the caller because the caller is the node's own UI, which has
       // to show it as QR + text. Issuing again replaces any live code (pairingCodes.ts).
+      //
+      // Audited, and it is the single most important row in the table: a pairing window is the one
+      // moment this node will hand full owner authority to whoever knows a five-minute code. The code
+      // itself is NOT recorded — an audit trail that quotes the credential is a second copy of it.
+      auditRequest(c, { action: 'pairing.window.opened' })
       return c.json({ code: c.env.PAIRING_CODES.issue(), expiresInMs: PAIRING_WINDOW_MS } satisfies PairingWindow)
     })
     .delete('/pair', (c) => {
       // Idempotent: "no window is open" is the state the caller asked for, so closing a closed window
       // is a 204 rather than a 404 the settings UI would have to special-case.
       c.env.PAIRING_CODES.close()
+      auditRequest(c, { action: 'pairing.window.closed' })
       return c.body(null, 204)
     })
     .get('/devices', async (c) => c.json({ devices: await c.env.DEVICES.list() } satisfies DevicesResponse))
@@ -100,7 +107,7 @@ export function pairingRoutes(): { open: Hono<AppEnv>; core: Hono<AppEnv> } {
       // A device may revoke itself — that is "unpair this machine" — and every paired device has full
       // owner authority anyway, so there is deliberately no self-revocation guard. 404 only when the
       // device never existed; revoking an already-revoked one is a 204.
-      const existed = await c.env.DEVICES.revoke(c.req.param('id'))
+      const existed = await c.env.DEVICES.revoke(c.req.param('id'), auditActor(c))
       return existed ? c.body(null, 204) : respondError(c, 404, 'not_found', ['No such device.'])
     })
 

@@ -1,5 +1,6 @@
 import { Hono } from 'hono'
 import type { ConnectIntegrationRequest, IntegrationsResponse, RotateIntegrationRequest } from '@acorn/protocol/api.ts'
+import { auditRequest } from '../auditRequest'
 import { getDb } from '../db'
 import {
   connectProvider,
@@ -38,6 +39,14 @@ export const integrations = new Hono<AppEnv>()
     const request: ConnectIntegrationRequest = { providerId, credentials: credentialsFromBody(body) }
     try {
       const integration = await connectProvider(getDb(c.env), ownerId(c), request, c.env.SECRETS)
+      // Audited HERE rather than inside connections.ts, for two reasons: the actor only exists on a
+      // request, and it is the route — not the storage helper — that decides an action succeeded. The
+      // provider and the label go in; the credential never does.
+      auditRequest(c, {
+        action: 'secret.created',
+        subject: integration.id,
+        details: { provider: providerId, label: integration.label },
+      })
       return c.json({ integration })
     } catch (error) {
       return providerError(c, error)
@@ -48,6 +57,11 @@ export const integrations = new Hono<AppEnv>()
     const request: RotateIntegrationRequest = { credentials: credentialsFromBody(body) }
     try {
       const integration = await rotateConnection(getDb(c.env), ownerId(c), c.req.param('id'), request, c.env.SECRETS)
+      auditRequest(c, {
+        action: 'secret.replaced',
+        subject: integration.id,
+        details: { provider: integration.providerId },
+      })
       return c.json({ integration })
     } catch (error) {
       return providerError(c, error)
@@ -75,6 +89,9 @@ export const integrations = new Hono<AppEnv>()
     if (c.req.param('id') === 'github') return respondError(c, 400, 'provider_bad_config')
     try {
       await disconnectConnection(getDb(c.env), ownerId(c), c.req.param('id'))
+      // The row is gone by now, and the audit row is what is left of it — which is exactly why the
+      // subject is an opaque id rather than a foreign key.
+      auditRequest(c, { action: 'secret.deleted', subject: c.req.param('id') })
       return c.body(null, 204)
     } catch (error) {
       return providerError(c, error)

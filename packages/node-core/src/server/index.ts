@@ -5,6 +5,7 @@ import { idempotency } from './middleware/idempotency'
 import { requireDevice, requireProviderAccess, requireTaskScope, requireUser } from './middleware/requireUser'
 import { onServerError, requestIdMiddleware } from './respond'
 import { CORE_NAMESPACE, PLUGIN_NAMESPACE, pluginRouteContributions, routeMountPath } from './routeRegistry'
+import { audit } from './routes/audit'
 import { integrations } from './routes/integrations'
 import { pairingRoutes } from './routes/pairing'
 import { prefs } from './routes/prefs'
@@ -77,6 +78,12 @@ export function createApp() {
     // reachable by a task-scoped agent. (Hono's trailing `/*` matches zero segments, so this one covers the
     // bare path too — the pair above is belt and braces, exactly as it is for pair/devices.)
     .use(`${CORE_NAMESPACE}/plugins/*`, requireDevice)
+    // The audit trail, same class again: it names every device that has ever paired and every credential
+    // that has been connected to this node, which is exactly the enumeration security.md forbids an
+    // agent-spawned child. Both path forms, like every sibling above — the point of gating by MOUNT is
+    // that a route added later inherits it.
+    .use(`${CORE_NAMESPACE}/audit`, requireDevice)
+    .use(`${CORE_NAMESPACE}/audit/*`, requireDevice)
     // Task scope, enforced by MOUNT rather than per handler. A 'task'-scoped internal credential may act
     // only on the task it names (server/auth/internalTokens.ts). An adversarial review confirmed that a
     // per-route guard had been applied at one site out of six, leaving arbitrary shell execution in
@@ -106,6 +113,7 @@ export function createApp() {
     .route(CORE_NAMESPACE, pairing.core) // /pair, /pair/start, /devices — owner-only device administration
     .route(`${CORE_NAMESPACE}/prefs`, prefs)
     .route(`${CORE_NAMESPACE}/plugins`, plugins) // Settings → Plugins: the roster + the per-node toggle
+    .route(`${CORE_NAMESPACE}/audit`, audit) // Settings → Security: the append-only trail (security.md § Audit)
     .route(`${CORE_NAMESPACE}/workspaces`, workspaces)
     .route(`${CORE_NAMESPACE}/tasks`, tasks)
     .route(`${CORE_NAMESPACE}/tasks`, configTrust)

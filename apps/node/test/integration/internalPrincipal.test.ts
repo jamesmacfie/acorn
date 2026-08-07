@@ -124,6 +124,17 @@ describe('the internal principal cannot administer devices', () => {
     expect(write.status).toBe(403)
   })
 
+  // Phase 5's addition to the same list, and it is here rather than in a focused route test for exactly
+  // the reason above: a gate asserted against a test-mounted middleware proves nothing about the real
+  // app. The audit trail names every device that has ever paired with this node and every credential
+  // that has been connected to it — the enumeration security.md § Threat model puts furthest out of an
+  // agent's reach.
+  it('cannot read the audit trail', async () => {
+    const res = await call('/v2/core/audit', { headers: asAgent })
+    expect(res.status).toBe(403)
+    expect(((await res.json()) as { error?: { code?: string } }).error?.code).toBe('interactive_user_required')
+  })
+
   // The whole escalation in one test: window → code → token. If this ever returns 200 at the first
   // step, the rest follows and the internal token becomes owner-permanent.
   it('cannot escalate to an owner-authority device token', async () => {

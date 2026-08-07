@@ -15,6 +15,7 @@ import { setPluginsBridge } from '@acorn/node-core/server/routes/plugins.ts'
 import { nodePlugins } from '../server/plugins'
 import { closeListener, drainWithDeadline, makeRuntime, startListener } from '@acorn/node-core/main/server.ts'
 import { openDataRoot, type DataRoot } from '@acorn/node-core/main/dataRoot.ts'
+import { pruneAudit } from '@acorn/node-core/server/audit.ts'
 import { launcherSpec, serverName } from '@acorn/node-core/main/mcpRegister.ts'
 import { reconcileWorktrees, setWorktreesRoot } from '@acorn/node-core/main/taskWorktree.ts'
 import { logStorageFootprint } from '@acorn/node-core/main/storageFootprint.ts'
@@ -152,6 +153,10 @@ export async function startServiceRuntime({ config, desktop, stateChanged }: Run
     // Boot is the right moment because it is the one time nothing is mid-request, and a periodic
     // sweeper would be machinery for a table that holds 24 hours of one owner's mutations.
     await runtime.IDEMPOTENCY.cleanupExpired()
+    // Audit retention, for the same reason and at the same moment (docs/vNext/data.md § Retention
+    // defaults: 90 days). A timer for one range-delete a day would be machinery this does not need, and
+    // a node nobody restarts is also one nobody is accumulating decisions on.
+    await pruneAudit(runtime.DB).catch((error) => console.warn('[service:boot] audit prune failed:', error))
     mark('migrate')
 
     const worktreesDir = join(config.dataDir, 'worktrees')
