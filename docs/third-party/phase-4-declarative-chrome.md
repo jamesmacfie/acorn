@@ -24,9 +24,14 @@ are static data or route paths into the plugin's own namespace:
 "contributions": {
   "sources": [{
     "id": "board",                       // stable persisted key, host-verified unique
-    "title": "Board",
-    "icon": "kanban",                    // Lucide icon NAME as a string — resolved client-side,
-                                          // exactly how glyph/tasks.icon already work
+    "label": "Board",                    // SourceContribution.label
+    "glyph": "kanban",                   // SourceContribution.glyph — Lucide icon NAME as a
+                                          // string, resolved client-side, exactly how
+                                          // glyph/tasks.icon already work
+    "order": 60,                         // REQUIRED. Rail position is declared, never derived
+                                          // from plugin load order (see the comment block in
+                                          // registries/sources.ts for why)
+    "providerId": "board",               // optional: gate the source on a connected integration
     "items": "/v2/p/board/rail-items",   // GET → { items: RailItem[] }
     "onSelect": { "openPane": "board" }  // action vocabulary, below
   }],
@@ -66,7 +71,14 @@ One adapter module per target registry, living beside the client plugin host
 
 - `sources` → `registries/sources.ts`. The generic source renders native rows from the `items`
   route. Row shape `{ id, title, subtitle?, icon?, badge? }`. Selection executes `onSelect` with
-  the row id appended (frame query param `item=<id>` for `openPane`).
+  the row id appended (frame query param `item=<id>` for `openPane`). Descriptor fields map onto
+  the real contribution: `label`, `glyph`, `order` (required), `providerId` (optional gate).
+  A descriptor source contributes no `routes`: `SourceRouteContribution` kinds are `project`,
+  `create`, `browse`, and `detail`, and the first two are core-owned URLs (`/p/:projectId`,
+  `/p/:projectId/new` — `apps/desktop/src/app/client/sourceContributions.ts`). A plugin claiming
+  them would take over project navigation for the whole shell. If descriptor sources later want
+  deep links, give them `browse`/`detail` under a host-minted path prefix, never the two core
+  kinds.
 - `slots` → `registries/slots.ts` / `uiSlots.tsx`. The generic footer badge is a native
   component fed by the `data` query; `null` body hides it. The precedent for a plugin footer
   badge is `docker-footer-badge` (named in `registries/plugin.ts` comments as a persisted key —
@@ -77,6 +89,10 @@ One adapter module per target registry, living beside the client plugin host
   `openPane`/`runNodeAction` still work — don't block this phase on it.
 - `attention` → `registries/attention.ts`; fetched per node like existing attention sources.
 - `nodeStats` → `registries/nodeStats.ts`.
+- `projectImporters` → **deliberately not a descriptor surface.** Import flows carry provider
+  auth, a browsable candidate list, and a clone/map/defer decision — richer than rows plus a fixed
+  action vocabulary, and every attempt to express it declaratively grows the vocabulary until it
+  is a UI framework. Importers are sandboxed frames; see phase 3.
 
 All adapters register through the same host pass so disposal works: when a plugin is disabled or
 its winning bundle changes at boot, its chrome unregisters with everything else.

@@ -49,7 +49,11 @@ Install steps (each idempotent, whole operation resumable):
    lockfile `<dataRoot>/plugins/<id>.lock.json`:
    `{ source, resolvedVersion, archiveSha256, entrypoints: { node?, client? }, installedAt }`.
 5. Return `state: 'installed-restart-required'`. The plugin loads on next Node restart (Phase 1
-   lifecycle; the roster row shows it immediately with its pending state).
+   lifecycle; the roster row shows it immediately with its pending state). Its migrations run at
+   that boot against its own file (`main/pluginMigrations.ts`). A fresh plugin's chain starts at
+   `0000` — every chain in this repo, core and plugins alike, was reset to a single baseline — so
+   neither the installer nor the authoring guide may assume a plugin arrives with numbered
+   migrations to append to.
 
 Update = install with the same id: resolve the source from the lockfile, replace the directory
 atomically, keep the plugin's SQLite file untouched. **Version must not decrease** unless the

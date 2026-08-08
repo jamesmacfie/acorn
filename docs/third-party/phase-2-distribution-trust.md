@@ -86,9 +86,14 @@ Rules:
   roster row shows "blocked on this device".
 - Acknowledgements are per-device by design — pairing a new laptop re-prompts. This mirrors
   device-token custody and is the consent surface for executing node-supplied code. The pattern
-  precedent in the codebase is repo config trust
+  precedent in the codebase is project config trust
   (`packages/node-core/src/server/routes/configTrust.ts`,
-  `packages/node-core/src/main/repoConfigTrust.test.ts`) — same shape, different scope.
+  `packages/node-core/src/main/repoConfigTrust.test.ts`), where an ack row binds a project id to
+  the hash of the config it approved (`config_acks`, keyed `(project_id, hash)`). Same shape —
+  hash-pinned consent before executing something a config supplied — with the scope moved out one
+  level: that trust is stored on the Node and scoped to a project, this one is stored on the
+  device and scoped to a plugin bundle, because the thing being approved is code the device is
+  about to run.
 
 ## Fleet version resolution
 

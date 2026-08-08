@@ -30,8 +30,11 @@ attacked:
 
 Assets, concretely, on a machine running a Node:
 
-- **The data root**: `core.sqlite` (workspaces, tasks, integrations, device rows, audit),
-  every plugin's SQLite file, the blob cache, worktrees.
+- **The data root**: `core.sqlite` (workspaces, projects, tasks, task links, issues, integrations,
+  device rows, audit), every plugin's SQLite file, the blob cache, worktrees. The `projects` table
+  is the most sensitive of these for a plugin to reach directly: alongside identity it holds the
+  per-project shell commands the Node executes (`setup_script`, `dev_script`,
+  `teardown_script`, `db_url_script`) and the local filesystem path of every mapped codebase.
 - **Provider secrets**: encrypted at rest, decrypted in the Node's memory when used
   (`packages/node-core/src/main/core/secrets.ts`).
 - **The user's account**: `~/.ssh`, `~/.aws`, browser profiles, anything user-readable, plus the
@@ -69,6 +72,22 @@ Implementation notes: gate by **omission**, not by throwing — an absent facet 
 development time with a TypeError the author sees immediately, and the shape of `ctx` becomes
 documentation of the grant. Keep the facet→permission mapping in one module with exhaustive
 tests (phase-1 test list).
+
+`ctx.core.projects` (`packages/node-core/src/main/core/projects.ts`) is the model every facet
+should copy, and also the clearest illustration of rung 1's limit. It is built for plugins rather
+than merely exposed to them: every method returns a `ProjectRef` projection, so a plugin can
+resolve project identity without seeing the config columns on the row and without ever holding the
+core database handle. That is a real reduction in what a *cooperative* plugin can touch, and it is
+why plugins key their rows by `projectId` instead of reaching for the table.
+
+Two things it does not do. It is not a barrier — a loaded bundle can still open `core.sqlite` and
+read the config columns directly; only rung 2 changes that. And even used exactly as intended,
+`checkouts()` returns the local filesystem path of every mapped project on the machine. That is a
+layout disclosure — where the user keeps their code, how many codebases they have, and often their
+employer's project names — and "read projects" does not sound like it. Say so in the phase-5 trust
+prompt, and prefer splitting read from write (`projects:read` / `projects:write`) so an importer
+that needs to create projects does not silently arrive with the same grant as a plugin that only
+wants to label a row.
 
 ### Rung 2 — Out of process (the future hard boundary)
 
@@ -178,6 +197,13 @@ its fetch usage inside the broker module, same posture as the phase-5 installer.
   the scrub — its file is snapshotted verbatim. The credential broker makes core secret storage
   the path of least resistance; state the rule anyway wherever plugin storage is documented:
   secrets go through core secret storage, never plugin tables.
+- **Scope by `projectId`, and store nothing else about the project.** Plugin tables reference a
+  project by its id and nothing more (`plugins/http`, `plugins/database`, `plugins/memory` all do
+  this). A plugin that also caches the project's local path, remote URL, or config columns into
+  its own file has copied the two most sensitive parts of the `projects` row — filesystem layout
+  and executable scripts — into a file the backup scrub does not know to treat as sensitive, and
+  which survives uninstall by default. Re-read through `ctx.core.projects` each time instead; that
+  is what the seam is for.
 
 ## Supply chain
 
@@ -233,5 +259,7 @@ here as the checklist reviewers should hold PRs against:
 | Network egress | Unrestricted | Broker allowlist (brokered traffic); OS sandbox (raw sockets) | Rung 1 partial, rung 3 full |
 | Agent sessions | Tool contributions | Third-party tools default disabled/ask | Phase 1/5 |
 | Fleet devices | Routes + broadcasts | Task-token opt-in default-no; content-free broadcasts | Phase 1/3 |
-| Backups | Plugin-stored secrets survive scrub | Broker + "no secrets in plugin tables" rule | Rung 1 |
+| Backups | Plugin-stored secrets survive scrub | Broker + "no secrets in plugin tables" rule; scope by `projectId`, never mirror the project row | Rung 1 |
+| Project config scripts (`setup_script`, `dev_script`, …) | Writable via the core config route; the Node executes them | Config `PUT`s permanently unmapped on the phase-3 bridge; project config trust ack on the node side | Phase 3 (frames); rung 2 (node half) |
+| Project folder paths | `core.projects.checkouts()` lists every mapped codebase | Split `projects:read`/`:write`; name the disclosure in the trust prompt | Rung 1 (disclosure), rung 2 (enforced) |
 | Trust over time | Malicious update | No auto-update, hash re-prompt, permission diff, provenance | Phase 2/5 |
