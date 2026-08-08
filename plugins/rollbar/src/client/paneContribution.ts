@@ -3,7 +3,7 @@
 // Moved out of apps/desktop/src/app/client/taskPaneContributions.tsx. Unlike linear's, this one needed
 // no wrapper component — RollbarPane already takes `{ task }`, which is the pane contract.
 import { lazy } from 'solid-js'
-import type { PaneContribution } from '@acorn/client-core/registries/panes.ts'
+import type { PaneContribution } from '@acorn/plugin-api/client'
 
 const RollbarPane = lazy(() => import('./RollbarPane'))
 

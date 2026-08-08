@@ -1,6 +1,6 @@
 import type { TaskSeed } from '@acorn/protocol/api.ts'
 import { dedupeBranch, slugifyBranch } from '@acorn/protocol/branch.ts'
-import type { SourcePromotionContext } from '@acorn/client-core/registries/sources.ts'
+import type { SourcePromotionContext } from '@acorn/plugin-api/client'
 import type { RollbarItemSummary } from '../shared/api'
 
 // Turning a Rollbar item into a task seed needs this plugin's wire type, so it belongs to the plugin

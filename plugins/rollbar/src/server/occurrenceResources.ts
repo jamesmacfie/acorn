@@ -1,11 +1,5 @@
 import type { RollbarItemMetadata, RollbarOccurrenceDetail, RollbarOccurrencesResponse } from '../shared/api'
-import { isRecord, parseJson } from '@acorn/node-core/server/integrations/codec.ts'
-import type {
-  MirroredResourceContribution,
-  ProviderResourceContext,
-  ProviderResourceRefreshContext,
-} from '@acorn/node-core/server/integrations/types.ts'
-import type { RouteFailure } from '@acorn/node-core/server/sync/engine.ts'
+import { isRecord, type MirroredResourceContribution, parseJson, type ProviderResourceContext, type ProviderResourceRefreshContext, type RouteFailure } from '@acorn/plugin-api/node'
 import {
   instancePath,
   itemByCounterPath,

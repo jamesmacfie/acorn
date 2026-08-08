@@ -1,25 +1,11 @@
 import { createEffect, createMemo, createSignal, For, on, Show } from 'solid-js'
 import { useNavigate, useParams } from '@solidjs/router'
 import { createQuery, useQueryClient } from '@tanstack/solid-query'
-import {
-  integrationsOptions,
-  tasksKey,
-  tasksOptions,
-  workspaceExternalProjectsKey,
-  workspaceExternalProjectsOptions,
-  workspacesOptions,
-} from '@acorn/client-core/queries.ts'
+import { activateTaskSignals, activeTaskId, createDismissable, integrationsOptions, pathForTask, replaceWorkspaceExternalProjectsForProvider, setWorkspaceExternalProjects, type SourceContribution, sourceRegistry, tasksKey, tasksOptions, workspaceExternalProjectsForProvider, workspaceExternalProjectsKey, workspaceExternalProjectsOptions, workspaceForProject, workspacesOptions } from '@acorn/plugin-api/client'
 import { rollbarItemsOptions } from './queries'
 import type { Integration, Task, WorkspaceExternalProject } from '@acorn/protocol/api.ts'
 import type { RollbarItemSummary } from '../shared/api'
-import { sourceRegistry, type SourceContribution } from '@acorn/client-core/registries/sources.ts'
-import { activeTaskId } from '@acorn/client-core/tasks/tasks.ts'
-import { createDismissable } from '@acorn/client-core/ui/dismissable.ts'
-import { activateTaskSignals, pathForTask } from '@acorn/client-core/tasks/activate.ts'
-import { PromoteToTaskModal } from '@acorn/client-core/integrations/PromoteToTaskModal.tsx'
-import { workspaceForProject } from '@acorn/client-core/workspaces/activeWorkspace.ts'
-import { replaceWorkspaceExternalProjectsForProvider, workspaceExternalProjectsForProvider } from '@acorn/client-core/integrations/workspaceProjects.ts'
-import { setWorkspaceExternalProjects } from '@acorn/client-core/workspaces/mutations.ts'
+import { PromoteToTaskModal } from '@acorn/plugin-api/ui'
 import { emptyRollbarFilter, filterRollbarItems, isRegressed, rollbarFacets, sortRollbarItems, type RollbarFilter, type RollbarSortOrder } from './model'
 import RollbarItemPanel, { type RollbarTarget } from './RollbarItemPanel'
 import './rollbar.css'
