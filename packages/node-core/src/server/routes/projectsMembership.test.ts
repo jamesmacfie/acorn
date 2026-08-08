@@ -35,7 +35,7 @@ const makeApp = () => {
 const jsonReq = (url: string, method: string, body: unknown) =>
   new Request(`http://acorn.test${url}`, { method, headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) })
 
-describe('projects stay in step with the legacy (owner,name) writes', () => {
+describe('project rows own workspace membership and visibility', () => {
   let t: TestDb
   let app: Hono<AppEnv>
   let dir: string

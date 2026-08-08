@@ -58,8 +58,7 @@ export const integrations = sqliteTable('integrations', {
 export const configAcks = sqliteTable(
   'config_acks',
   {
-    // NULL means the pre-project GitHub pair had no surviving project during 0048. These rows
-    // retain their bytes for recovery/audit but are deliberately inert to project trust reads.
+    // NULL rows are inert to project trust reads: an ack that names no project is never matched.
     projectId: text('project_id'),
     hash: text('hash').notNull(), // sha256 of the repo config/workflow snapshot
     snapshot: text('snapshot').notNull(), // verbatim grouped source shown to the user
@@ -79,8 +78,7 @@ export const workspaces = sqliteTable('workspaces', {
   updatedAt: integer('updated_at').notNull(),
 })
 
-// A project: a folder on this machine a workspace groups and tasks run in. The successor to the
-// (owner, name)-keyed legacy tables, which were backfilled by migration 0046.
+// A project: a folder on this machine a workspace groups and tasks run in.
 //
 // The VCS and GitHub facets are nullable columns, not side tables — both are strictly 1:1 — and
 // they are a CACHE of disk truth: `vcs`/`remote_url`/`default_branch` are re-detected on demand,

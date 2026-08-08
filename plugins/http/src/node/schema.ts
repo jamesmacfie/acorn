@@ -9,17 +9,14 @@ import { index, integer, sqliteTable, text, uniqueIndex } from 'drizzle-orm/sqli
 // Saved HTTP requests for the API panel (docs/panes.md). Project-scoped like the database plugin's saved
 // queries — a request written against a project's API outlives any one task worktree. Credentials make
 // this identity-scoped even on a single-user machine. Sensitive fields are JWE ciphertext whenever
-// `encrypted` is true; the plugin's init migrates pre-encryption rows before the listener opens.
+// `encrypted` is true.
 // The `http_` prefix, not `api_`: `api_tokens`/`api_idempotency` belonged to V1's public automation
 // API, and so does the settings page id `api`.
 export const httpRequests = sqliteTable(
   'http_requests',
   {
     id: text('id').primaryKey(),
-    // The default exists only so Drizzle can rebuild populated legacy tables. Init claims legacy rows
-    // only when exactly one identity exists (CoreServices.identity.sole); ambiguous rows stay
-    // quarantined under the sentinel, which no authenticated identity can query.
-    userId: text('user_id').notNull().default('__legacy_unscoped__'),
+    userId: text('user_id').notNull(),
     projectId: text('project_id'), // → CoreServices.projects.byId (plain ID, not a foreign key)
     folder: text('folder').notNull().default(''),
     // Set = an ad-hoc request living with a task (shown in that task's API pane). Null = saved in
@@ -53,7 +50,7 @@ export const httpVariables = sqliteTable(
   'http_variables',
   {
     id: text('id').primaryKey(),
-    userId: text('user_id').notNull().default('__legacy_unscoped__'),
+    userId: text('user_id').notNull(),
     projectId: text('project_id'), // → CoreServices.projects.byId (plain ID, not a foreign key)
     name: text('name').notNull(),
     kind: text('kind').notNull(), // 'value' | 'secret' | 'command'

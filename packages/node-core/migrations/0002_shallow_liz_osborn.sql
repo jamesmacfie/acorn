@@ -1,1 +1,0 @@
-ALTER TABLE `workspaces` ADD `setup_script` text;

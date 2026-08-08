@@ -113,6 +113,10 @@ Edit the schema in its owning package, run `pnpm db:generate`, and verify every 
 `pnpm db:check`. Launching a Node also applies pending migrations. The desktop build stages core and
 plugin migration directories beside the bundled Node artifact.
 
+Every chain starts from a single baseline migration that creates the current schema. The pre-project
+`(owner, name)` model and its one-way data migrations were squashed away with it, so a database
+written before that baseline cannot be upgraded — start from a fresh data root.
+
 Native SQLite access is centralized. Plugins receive their own migrated plugin handle through the
 Node plugin host and use `CoreServices` for core-owned operations.
 
@@ -123,8 +127,8 @@ Node plugin host and use `CoreServices` for core-owned operations.
 The archive excludes blobs and worktrees and scrubs credentials, device rows, and other token
 material. Restore is a manual operation into a fresh data root.
 
-There is no runtime configuration importer. Legacy data is handled by versioned migrations and their
-seeded replay tests; a backup remains the supported way to preserve a source before an upgrade.
+There is no runtime configuration importer, and no upgrade path from a pre-baseline database; a
+backup remains the supported way to preserve a source before an upgrade.
 Executable configuration recovered without a matching `config_acks` row must be reviewed again.
 
 ## Retention

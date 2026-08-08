@@ -1,1 +1,0 @@
-ALTER TABLE `repo_paths` ADD `branch_prefix` text;

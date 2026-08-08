@@ -1,7 +1,7 @@
 CREATE TABLE `memories` (
 	`id` text PRIMARY KEY NOT NULL,
 	`scope` text NOT NULL,
-	`repo` text,
+	`project_id` text,
 	`name` text NOT NULL,
 	`type` text NOT NULL,
 	`description` text NOT NULL,
@@ -14,6 +14,5 @@ CREATE TABLE `memories` (
 	`updated_at` integer NOT NULL,
 	`last_accessed_at` integer,
 	`access_count` integer DEFAULT 0 NOT NULL
-);
---> statement-breakpoint
+);--> statement-breakpoint
 CREATE VIRTUAL TABLE `memories_fts` USING fts5(`id` UNINDEXED, `name`, `description`, `body`, tokenize='porter');

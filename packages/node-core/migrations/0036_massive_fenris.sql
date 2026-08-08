@@ -1,1 +1,0 @@
-ALTER TABLE `agent_turns` ADD `attempt` integer DEFAULT 0 NOT NULL;

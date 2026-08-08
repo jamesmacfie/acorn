@@ -143,8 +143,7 @@ export async function resolveTaskCwd(
   // path into an arbitrary folder.
   const checkout = projectRoot
   if (!t || !checkout) return { cwd: homedir(), isWorktree: false, created: false }
-  // Branchless tasks never use a persisted worktree. This also normalises old checkout-marker rows
-  // (0047 preserves their path for archive safety) back to the project root at runtime.
+  // Branchless tasks never use a persisted worktree: they run in the project root.
   if (!t.branch || project?.vcs !== 'git') return { cwd: checkout, isWorktree: false, created: false }
   if (t.worktreePath && isDir(t.worktreePath)) {
     const isProjectRoot = !!projectRoot && resolve(t.worktreePath) === resolve(projectRoot)

@@ -1,1 +1,0 @@
-ALTER TABLE `workspaces` ADD `teardown_script` text;
